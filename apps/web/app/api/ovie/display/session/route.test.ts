@@ -13,26 +13,35 @@ const state = vi.hoisted(() => ({
   attempts: 0,
   limit: 10,
   redisUp: true,
+  hints: [] as unknown[],
 }));
 vi.mock('@/lib/ovie/display/server', () => ({
   displayConfig: () => state.config,
-  allowDisplayExchangeAttempt: async () =>
-    state.redisUp && ++state.attempts <= state.limit,
+  clientAddress: () => '203.0.113.7',
+  allowDisplayExchangeAttempt: async (input: { deviceHint: unknown }) => {
+    state.hints.push(input.deviceHint);
+    if (!state.redisUp) return 'unavailable';
+    return ++state.attempts <= state.limit ? 'ok' : 'denied';
+  },
   claimDisplayProof: async (device: string, ts: number) => {
-    if (!state.redisUp) return false;
+    if (!state.redisUp) return 'unavailable';
     const key = `${device}:${ts}`;
-    if (state.claimed.has(key)) return false;
+    if (state.claimed.has(key)) return 'denied';
     state.claimed.add(key);
-    return true;
+    return 'ok';
   },
 }));
 
 import * as route from './route';
 
-const post = (body: unknown) =>
+const post = (
+  body: unknown,
+  headers: Record<string, string> = { 'content-type': 'application/json' }
+) =>
   route.POST(
     new NextRequest('https://example.test/api/ovie/display/session', {
       method: 'POST',
+      headers,
       body: typeof body === 'string' ? body : JSON.stringify(body),
     })
   );
@@ -55,6 +64,7 @@ describe('display session exchange', () => {
     state.attempts = 0;
     state.limit = 10;
     state.redisUp = true;
+    state.hints = [];
   });
 
   it('a valid proof sets a HttpOnly Secure SameSite=Strict cookie and returns no token in the body', async () => {
@@ -83,18 +93,53 @@ describe('display session exchange', () => {
     expect(replay.headers.get('set-cookie')).toBeNull();
   });
 
-  it('fails closed when the replay store is unavailable', async () => {
+  it('a store outage is a retryable 503 with no cookie, and the proof is not spent', async () => {
+    const body = proofFor(now());
     state.redisUp = false;
-    const response = await post(proofFor(now()));
-    expect(response.status).toBe(401);
-    expect(response.headers.get('set-cookie')).toBeNull();
+    const down = await post(body);
+    expect(down.status).toBe(503);
+    expect(down.headers.get('set-cookie')).toBeNull();
+    state.redisUp = true;
+    expect((await post(body)).status).toBe(200);
   });
 
-  it('is rate limited: attempts past the cap are denied even with a valid proof', async () => {
+  it('over the per-address-and-device cap is a 429 even with a valid proof', async () => {
     state.limit = 2;
     expect((await post({ device: 'x', ts: 1, proof: 'bad' })).status).toBe(401);
     expect((await post({ device: 'x', ts: 1, proof: 'bad' })).status).toBe(401);
-    expect((await post(proofFor(now()))).status).toBe(401);
+    const limited = await post(proofFor(now()));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('rate limits by the claimed device id, so the key is per address and device', async () => {
+    await post(proofFor(now()));
+    await post({ device: 7, ts: 1, proof: 'x' });
+    expect(state.hints).toEqual(['air-office', 7]);
+  });
+
+  it('requires a JSON content type and a same-origin Origin', async () => {
+    const body = proofFor(now());
+    expect((await post(body, { 'content-type': 'text/plain' })).status).toBe(
+      415
+    );
+    expect((await post(body, {})).status).toBe(415);
+    expect(
+      (
+        await post(body, {
+          'content-type': 'application/json',
+          origin: 'https://evil.test',
+        })
+      ).status
+    ).toBe(403);
+    expect(
+      (
+        await post(body, {
+          'content-type': 'application/json',
+          origin: 'https://example.test',
+        })
+      ).status
+    ).toBe(200);
   });
 
   it('garbage does not burn a real proof', async () => {

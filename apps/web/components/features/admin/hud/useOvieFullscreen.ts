@@ -71,7 +71,10 @@ export function useOvieFullscreen(options?: { readonly force?: boolean }) {
         set(false, true);
       }
     };
-    const onEvent = () => set(!on, false);
+    // The office display has no toggle: neither key nor event may leave it.
+    const onEvent = () => {
+      if (!force) set(!on, false);
+    };
     const onNativeChange = () => {
       // Leaving native fullscreen (the OS consumes Esc) leaves Full screen too.
       if (nativeRef.current && !document.fullscreenElement) {

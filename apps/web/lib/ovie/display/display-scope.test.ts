@@ -4,6 +4,21 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = join(__dirname, '..', '..', '..');
 const SERVER_MODULE = 'lib/ovie/display/server';
+const SESSION_MODULE = 'lib/ovie/display/session';
+/**
+ * Pinned at the verifier: `session.ts` holds `verifyDisplaySession` and the
+ * cookie name. Only these files may import it, so no other module can accept
+ * a display cookie by calling the verifier itself, with or without `server.ts`.
+ */
+const SESSION_IMPORTERS = [
+  'app/api/ovie/display/session/route.ts',
+  'app/display/page.tsx',
+  'lib/ovie/display/server.ts',
+];
+const VERIFIER_SYMBOL_FILES = [
+  'lib/ovie/display/server.ts',
+  'lib/ovie/display/session.ts',
+];
 /** The only modules allowed to accept a display session: Home feeds, read only. */
 const ALLOWED = [
   'app/api/admin/hud/founder-funnel/route.ts',
@@ -22,14 +37,27 @@ export function specifiersOf(source: string): string[] {
   return [...source.matchAll(SPECIFIER)].map(match => match[1]!);
 }
 
-/** Does `source` (at repo-relative `file`) load the display server module, by alias or relative path? */
-export function importsDisplayServer(file: string, source: string): boolean {
+/** Does `source` (at repo-relative `file`) load `module`, by alias or relative path? */
+export function importsModule(
+  file: string,
+  source: string,
+  module: string
+): boolean {
   return specifiersOf(source).some(specifier => {
     const resolved = specifier.startsWith('.')
       ? normalize(join(dirname(file), specifier))
       : specifier.replace(/^@\//, '');
-    return resolved === SERVER_MODULE || resolved === `${SERVER_MODULE}.ts`;
+    return resolved === module || resolved === `${module}.ts`;
   });
+}
+const importsDisplayServer = (file: string, source: string) =>
+  importsModule(file, source, SERVER_MODULE);
+const importsDisplaySession = (file: string, source: string) =>
+  importsModule(file, source, SESSION_MODULE);
+
+/** The cookie verifier and cookie name: reachable only inside the display module. */
+export function usesVerifierSymbols(source: string): boolean {
+  return /\bverifyDisplaySession\b|\bovie_display\b/.test(source);
 }
 
 /** Does `source` export a write handler in any syntax? */
@@ -63,6 +91,27 @@ describe('display session scope', () => {
       )
       .sort();
     expect(importers).toEqual(ALLOWED);
+  });
+
+  it('only the display module imports the session verifier (any importer of session.ts is pinned)', () => {
+    const importers = walk(ROOT)
+      .map(path => relative(ROOT, path))
+      .filter(file => file !== `${SESSION_MODULE}.ts`)
+      .filter(file =>
+        importsDisplaySession(file, readFileSync(join(ROOT, file), 'utf8'))
+      )
+      .sort();
+    expect(importers).toEqual(SESSION_IMPORTERS);
+  });
+
+  it('the verifier symbol and cookie name appear nowhere else', () => {
+    const users = walk(ROOT)
+      .map(path => relative(ROOT, path))
+      .filter(file =>
+        usesVerifierSymbols(readFileSync(join(ROOT, file), 'utf8'))
+      )
+      .sort();
+    expect(users).toEqual(VERIFIER_SYMBOL_FILES);
   });
 
   it('every importing API route other than the exchange is GET-only', () => {
@@ -106,6 +155,39 @@ describe('display scope detectors (deliberate red)', () => {
       expect(importsDisplayServer(file, source), `${file}: ${source}`).toBe(
         true
       );
+  });
+  it('catches any importer of the session verifier, including barrels and star re-exports', () => {
+    const cases: [string, string][] = [
+      [
+        'lib/x.ts',
+        "import { verifyDisplaySession } from '@/lib/ovie/display/session';",
+      ],
+      [
+        'lib/x.ts',
+        "import { verifyDisplaySession as v } from './ovie/display/session';",
+      ],
+      ['lib/ovie/index.ts', "export * from './display/session';"],
+      ['proxy.ts', "const m = await import('./lib/ovie/display/session');"],
+      [
+        'app/a/route.ts',
+        "import * as s from '../../lib/ovie/display/session.ts';",
+      ],
+    ];
+    for (const [file, source] of cases)
+      expect(importsDisplaySession(file, source), `${file}: ${source}`).toBe(
+        true
+      );
+    expect(
+      importsDisplaySession(
+        'lib/x.ts',
+        "import { x } from '@/lib/ovie/display/proof-fragment';"
+      )
+    ).toBe(false);
+  });
+  it('catches the verifier symbol and cookie name used anywhere', () => {
+    expect(usesVerifierSymbols('verifyDisplaySession(token)')).toBe(true);
+    expect(usesVerifierSymbols("cookies.get('ovie_display')")).toBe(true);
+    expect(usesVerifierSymbols('verifyDisplaySessions2')).toBe(false);
   });
   it('does not flag unrelated or sibling modules', () => {
     expect(

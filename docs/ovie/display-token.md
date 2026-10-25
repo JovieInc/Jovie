@@ -32,7 +32,12 @@ login.
    still registered and enabled, `iat >= revokedBefore`, and the runtime
    revocation keys in Redis (below). If Redis cannot answer, the request is
    denied.
-6. A launchd job on the Air re-runs the script and reloads the page every 6 h,
+6. If the store blips, `/display/connect` retries the 503 with backoff inside the
+   proof's 60 s window, and `/display` shows "Reconnecting display" and retries
+   (2 s doubling to 60 s) until the store answers, so the wall heals without
+   waiting for the next reconnect.
+7. The proof is scrubbed from Sentry navigation breadcrumbs (`beforeBreadcrumb`).
+8. A launchd job on the Air re-runs the script and reloads the page every 6 h,
    so the 12 h cookie is replaced before it expires. If it ever lapses the
    screen shows "This display is not authorized", never company data.
 

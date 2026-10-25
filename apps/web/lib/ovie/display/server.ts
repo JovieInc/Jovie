@@ -1,4 +1,5 @@
 import 'server-only';
+import { createHash } from 'node:crypto';
 import { env } from '@/lib/env-server';
 import { getRedis } from '@/lib/redis';
 import {
@@ -16,7 +17,13 @@ export const revokedBeforeKey = (deviceId: string) =>
   `ovie-display:revoked-before:${deviceId}`;
 export const disabledKey = (deviceId: string) =>
   `ovie-display:disabled:${deviceId}`;
-const EXCHANGE_LIMIT_PER_MINUTE = 10;
+export const EXCHANGE_LIMIT_PER_MINUTE = 10;
+
+/**
+ * `ok`, `denied` (a decision), or `unavailable` (the store could not answer:
+ * fail closed now, retry later). Callers never treat `unavailable` as allowed.
+ */
+export type StoreResult = 'ok' | 'denied' | 'unavailable';
 
 export function displayConfig(): {
   readonly devices: DisplayDevice[];
@@ -28,98 +35,133 @@ export function displayConfig(): {
   };
 }
 
-/**
- * Runtime revocation, checked on every display request. Fails closed: if
- * Redis cannot answer, the display is denied (it reads "not authorized"
- * until Redis returns) rather than trusting a possibly revoked session.
- */
+/** Runtime revocation, checked on every display request. */
 export async function displayStillAllowed(
   deviceId: string,
   iat: number
-): Promise<boolean> {
+): Promise<StoreResult> {
   const redis = getRedis();
-  if (!redis) return false;
+  if (!redis) return 'unavailable';
   try {
     const [all, device, disabled] = await Promise.all([
       redis.get<number | string | null>(REVOKED_BEFORE_ALL_KEY),
       redis.get<number | string | null>(revokedBeforeKey(deviceId)),
       redis.get<number | string | null>(disabledKey(deviceId)),
     ]);
-    if (disabled !== null && disabled !== undefined) return false;
+    if (disabled !== null && disabled !== undefined) return 'denied';
     for (const value of [all, device]) {
       if (value === null || value === undefined) continue;
       const cutoff = Number(value);
-      if (!Number.isFinite(cutoff) || iat < cutoff) return false;
+      if (!Number.isFinite(cutoff) || iat < cutoff) return 'denied';
     }
-    return true;
+    return 'ok';
   } catch {
-    return false;
+    return 'unavailable';
   }
 }
 
-async function sessionAllowed(token: string | undefined): Promise<boolean> {
+/** Session check: signature, registry, expiry, scope, then runtime revocation. */
+export async function displayAccess(
+  token: string | undefined
+): Promise<StoreResult> {
   const { devices, key } = displayConfig();
-  if (devices.length === 0 || !key) return false;
+  if (devices.length === 0 || !key) return 'denied';
   const session = verifyDisplaySession({
     token,
     devices,
     key,
     nowMs: Date.now(),
   });
-  if (!session) return false;
+  if (!session) return 'denied';
   return displayStillAllowed(session.device.id, session.iat);
 }
 
 /**
  * True only for a valid, unrevoked, read-only display session. Call this from
  * the Home feed GET routes and nowhere else: `display-scope.test.ts` pins the
- * list of importers, so adding a route here is a reviewed change.
+ * importers of this module and of the session verifier.
  */
-export function isDisplayReadRequest(request: Request): Promise<boolean> {
-  return sessionAllowed(
-    readCookie(request.headers.get('cookie'), DISPLAY_COOKIE) ?? undefined
+export async function isDisplayReadRequest(request: Request): Promise<boolean> {
+  return (
+    (await displayAccess(
+      readCookie(request.headers.get('cookie'), DISPLAY_COOKIE) ?? undefined
+    )) === 'ok'
   );
 }
 
-/** Same check for a server component reading `cookies()`. */
-export function isDisplayCookieValid(token: string | undefined) {
-  return sessionAllowed(token);
-}
-
 /**
- * Single use: the first caller for a device+timestamp wins; everyone else
- * (a replay) loses. Fails closed when Redis is unavailable.
+ * Single use: the first caller for a device+timestamp wins ('ok'); a replay is
+ * 'denied'. 'unavailable' never spends the proof, so the caller can retry
+ * within the proof window.
  */
 export async function claimDisplayProof(
   deviceId: string,
   ts: number
-): Promise<boolean> {
+): Promise<StoreResult> {
   const redis = getRedis();
-  if (!redis) return false;
+  if (!redis) return 'unavailable';
   try {
     const result = await redis.set(
       `ovie-display:proof:${deviceId}:${ts}`,
       '1',
-      { nx: true, ex: DISPLAY_PROOF_REPLAY_TTL_SECONDS }
+      {
+        nx: true,
+        ex: DISPLAY_PROOF_REPLAY_TTL_SECONDS,
+      }
     );
-    return result === 'OK';
+    return result === 'OK' ? 'ok' : 'denied';
   } catch {
-    return false;
+    return 'unavailable';
   }
 }
 
-/** Global cap on exchange attempts per minute; fails closed. */
-export async function allowDisplayExchangeAttempt(
-  nowMs: number
-): Promise<boolean> {
+const DEVICE_HINT = /^[a-z0-9][a-z0-9-]{1,39}$/;
+
+/** The client address behind the platform proxy; hashed before it touches Redis. */
+export function clientAddress(headers: Headers): string {
+  const raw =
+    headers.get('x-vercel-forwarded-for') ??
+    headers.get('x-real-ip') ??
+    headers.get('x-forwarded-for')?.split(',')[0] ??
+    '';
+  return raw.trim() || 'unknown';
+}
+
+/**
+ * Exchange attempts per minute, keyed by client address plus the claimed
+ * device id, so junk from elsewhere cannot spend the Air's budget. `denied` is
+ * over the cap; `unavailable` fails closed for this key only.
+ */
+export async function allowDisplayExchangeAttempt(input: {
+  readonly nowMs: number;
+  readonly address: string;
+  readonly deviceHint: unknown;
+}): Promise<StoreResult> {
   const redis = getRedis();
-  if (!redis) return false;
+  if (!redis) return 'unavailable';
+  const device =
+    typeof input.deviceHint === 'string' && DEVICE_HINT.test(input.deviceHint)
+      ? input.deviceHint
+      : 'none';
+  const who = createHash('sha256')
+    .update(input.address)
+    .digest('hex')
+    .slice(0, 24);
+  const key = `ovie-display:attempts:${who}:${device}:${Math.floor(input.nowMs / 60_000)}`;
+  let count: number;
   try {
-    const key = `ovie-display:attempts:${Math.floor(nowMs / 60_000)}`;
-    const count = await redis.incr(key);
-    if (count === 1) await redis.expire(key, 120);
-    return count <= EXCHANGE_LIMIT_PER_MINUTE;
+    count = await redis.incr(key);
   } catch {
-    return false;
+    return 'unavailable';
   }
+  // The bucket is minute-stamped, so a missing TTL cannot outlive its minute's
+  // meaning; an expire failure must not fail the request.
+  if (count === 1) {
+    try {
+      await redis.expire(key, 120);
+    } catch {
+      // see above
+    }
+  }
+  return count <= EXCHANGE_LIMIT_PER_MINUTE ? 'ok' : 'denied';
 }
