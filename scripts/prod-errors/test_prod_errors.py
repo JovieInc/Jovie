@@ -112,6 +112,14 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(m["firstSeenToFixHours"]["p50"], 2.0)
         self.assertEqual(len((self.dir / "sentry-loop-metrics.jsonl").read_text().splitlines()), 1)
 
+    def test_run_sh_ships_the_apiclient_dependency_tree_with_prod_errors(self):
+        # The updater archived only scripts/prod-errors; prod_errors.py imports scripts/apiclient (which reads
+        # packages/api-client/providers.json), so every self-update failed its tests and the loop froze on a stale tree.
+        sh = (Path(__file__).parent / "run.sh").read_text()
+        for needed in ("scripts/prod-errors", "scripts/apiclient", "packages/api-client"):
+            self.assertIn(needed, sh.split("git -C \"$repo\" archive")[1].split("|")[0])
+        self.assertIn("scripts/prod-errors/prod_errors.py", sh)
+
     def test_query_is_production_only(self):
         urls = []
         s = object.__new__(pe.Sentry)
