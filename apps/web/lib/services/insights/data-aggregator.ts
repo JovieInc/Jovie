@@ -15,7 +15,7 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { tourDates } from '@/lib/db/schema/tour';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
-import type { MetricSnapshot } from '@/types/insights';
+import type { GeoCount, MetricSnapshot } from '@/types/insights';
 import { DEFAULT_PERIOD_DAYS } from './thresholds';
 
 type AggregateValue = string | number | null;
@@ -35,6 +35,40 @@ function parseJsonArray<T>(value: JsonArray<T>): T[] {
 
 function toNumber(value: AggregateValue): number {
   return Number(value ?? 0);
+}
+
+const countryNames = new Intl.DisplayNames(['en'], {
+  type: 'region',
+  fallback: 'none',
+});
+
+function countryIdentity(country: string): string {
+  const normalized = country.trim().toUpperCase();
+  // Existing manual tour dates also use USA; imported dates use country names.
+  const code = normalized === 'USA' ? 'US' : normalized;
+  const name = /^[A-Z]{2}$/.test(code) ? countryNames.of(code) : undefined;
+  return (name ?? normalized).toLowerCase();
+}
+
+function cityIdentity(location: { city: string; country: string }): string {
+  return JSON.stringify([
+    location.city.trim().toLowerCase(),
+    countryIdentity(location.country),
+  ]);
+}
+
+function coalesceCityCounts(cities: GeoCount[]): GeoCount[] {
+  const counts = new Map<string, GeoCount>();
+  for (const city of cities) {
+    const key = cityIdentity(city);
+    const existing = counts.get(key);
+    if (existing) {
+      existing.count += city.count;
+    } else {
+      counts.set(key, { ...city });
+    }
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count);
 }
 
 /**
@@ -100,10 +134,10 @@ export async function aggregateMetrics(
 
   // Identify new cities (present in current but not in previous)
   const previousCitySet = new Set(
-    clickAggregates.previousTopCities.map(c => c.city)
+    clickAggregates.previousTopCities.map(cityIdentity)
   );
   const newCities = clickAggregates.currentTopCities.filter(
-    c => !previousCitySet.has(c.city) && c.count >= 5
+    c => !previousCitySet.has(cityIdentity(c)) && c.count >= 5
   );
 
   // Identify declining cities
@@ -122,11 +156,9 @@ export async function aggregateMetrics(
   );
 
   // Identify tour gaps: audience cities without upcoming shows
-  const showCities = new Set(
-    tourData.upcomingShows.map(s => s.city.toLowerCase())
-  );
+  const showCities = new Set(tourData.upcomingShows.map(cityIdentity));
   const audienceCitiesWithoutShows = audienceAggregates.topCities
-    .filter(c => !showCities.has(c.city.toLowerCase()) && c.count >= 10)
+    .filter(c => !showCities.has(cityIdentity(c)) && c.count >= 10)
     .map(c => ({ city: c.city, country: c.country, audienceCount: c.count }));
 
   // Canonical capture rate derivation — see lib/analytics/metrics.ts.
@@ -324,11 +356,15 @@ async function aggregateClicks(
   );
 
   return {
-    currentTopCities: parseJsonArray(result?.current_top_cities ?? []).filter(
-      c => Boolean(c.city)
+    currentTopCities: coalesceCityCounts(
+      parseJsonArray(result?.current_top_cities ?? []).filter(c =>
+        Boolean(c.city)
+      )
     ),
-    previousTopCities: parseJsonArray(result?.previous_top_cities ?? []).filter(
-      c => Boolean(c.city)
+    previousTopCities: coalesceCityCounts(
+      parseJsonArray(result?.previous_top_cities ?? []).filter(c =>
+        Boolean(c.city)
+      )
     ),
     topReferrersCurrent: parseJsonArray(result?.top_referrers_current ?? []),
     topReferrersPrevious: parseJsonArray(result?.top_referrers_previous ?? []),
@@ -428,7 +464,7 @@ async function aggregateAudience(
 
   return {
     totalMembers: toNumber(result?.total_members),
-    topCities: parseJsonArray(result?.top_cities ?? []),
+    topCities: coalesceCityCounts(parseJsonArray(result?.top_cities ?? [])),
     intentDistributionCurrent: parseJsonArray(result?.intent_current ?? []),
     intentDistributionPrevious: parseJsonArray(result?.intent_previous ?? []),
     deviceDistribution: parseJsonArray(result?.device_distribution ?? []).map(
@@ -509,7 +545,7 @@ async function aggregateSubscribers(
 // Revenue aggregation
 // ---------------------------------------------------------------------------
 
-async function aggregateRevenue(
+export async function aggregateRevenue(
   profileId: string,
   period: { start: Date; end: Date },
   comparisonPeriod: { start: Date; end: Date }
@@ -545,13 +581,23 @@ async function aggregateRevenue(
                     sum(t.amount_cents)::int as total_cents,
                     count(*)::int as count
                   from all_tips t
-                  inner join ${clickEvents} ce on ce.audience_member_id = (
-                    select id from ${audienceMembers}
-                    where ${audienceMembers.creatorProfileId} = ${profileId}
-                      and email = t.contact_email
-                    limit 1
-                  )
-                  where ce.city is not null
+                  inner join lateral (
+                    -- Repeated clicks must contribute at most one location per tip.
+                    -- Conflicting locations remain unattributed, rather than guessed.
+                    select min(city) as city
+                    from ${clickEvents}
+                    where audience_member_id = (
+                      select id from ${audienceMembers}
+                      where ${audienceMembers.creatorProfileId} = ${profileId}
+                        and email = t.contact_email
+                      limit 1
+                    )
+                      and creator_profile_id = ${profileId}
+                      and city is not null
+                    having count(distinct (city, country)) = 1
+                  ) ce on true
+                  where t.created_at >= ${sqlTimestamp(period.start)}
+                    and t.created_at < ${sqlTimestamp(period.end)}
                   group by ce.city
                   order by total_cents desc
                   limit 10
@@ -772,11 +818,11 @@ function computeCityGrowthRates(
   current: { city: string; country: string; count: number }[],
   previous: { city: string; country: string; count: number }[]
 ) {
-  const previousMap = new Map(previous.map(c => [c.city, c]));
+  const previousMap = new Map(previous.map(c => [cityIdentity(c), c]));
 
   return current
     .map(c => {
-      const prev = previousMap.get(c.city);
+      const prev = previousMap.get(cityIdentity(c));
       const previousCount = prev?.count ?? 0;
       const growthPct = computeGrowthPct(c.count, previousCount);
       return {

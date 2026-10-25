@@ -7,6 +7,7 @@ import type { JudgeTransport } from '../../packages/copy/judge.ts';
 import { runContentCli } from './cli.mts';
 import {
   type Draft,
+  diagnoseSpokenRead,
   digest,
   generateProject,
   type Project,
@@ -138,6 +139,7 @@ test('runs research before a genuinely revisable thesis and persists the complet
     'Strongest counterargument',
     'Essay',
     'Spoken vlog',
+    'Table-read diagnostics (advisory)',
     'https://example.org/study',
   ])
     assert.ok(rendered.includes(expected));
@@ -272,6 +274,62 @@ test('rejects incomplete research, unsupported claims, invalid citations and mal
       ),
     /Founder voice validation/
   );
+});
+
+test('spoken inline citations must resolve and belong to the block claim list', () => {
+  for (const block of [
+    { id: 'B1', text: 'Context matters. [C99]', claimIds: ['C1'] },
+    { id: 'B1', text: 'Context matters. [C1]', claimIds: [] },
+    { id: 'B1', text: 'Context matters. [C1] [C2]', claimIds: ['C1'] },
+  ])
+    assert.throws(
+      () => validateDraft({ ...draft, spoken: [block] }, research),
+      /spoken citation/
+    );
+  assert.doesNotThrow(() =>
+    validateDraft(
+      {
+        ...draft,
+        spoken: [
+          { id: 'B1', text: 'Context matters. [C1]', claimIds: ['C1'] },
+          { id: 'B2', text: 'What would change my mind?', claimIds: [] },
+        ],
+      },
+      research
+    )
+  );
+});
+
+test('table-read diagnostics are advisory and preserve locked and multilingual text', () => {
+  const sample = {
+    ...draft,
+    spoken: [
+      {
+        id: 'B1',
+        text: ' First thought.\nCafé stays open. [C1] ',
+        claimIds: ['C1'],
+      },
+      { id: 'B2', text: '你好世界', claimIds: [] },
+    ],
+  };
+  const before = JSON.stringify(sample);
+  const report = diagnoseSpokenRead(sample, 120);
+  assert.deepEqual(report, {
+    wordsPerMinute: 120,
+    totalWords: 6,
+    estimatedSeconds: 3,
+    blocks: [
+      { id: 'B1', words: 5, longestSentenceWords: 3, editorialReferences: 1 },
+      { id: 'B2', words: 1, longestSentenceWords: 1, editorialReferences: 0 },
+    ],
+  });
+  assert.equal(JSON.stringify(sample), before);
+  assert.equal(
+    diagnoseSpokenRead({ ...draft, spoken: [] }).estimatedSeconds,
+    0
+  );
+  for (const pace of [0, -1, Number.NaN, Number.POSITIVE_INFINITY])
+    assert.throws(() => diagnoseSpokenRead(sample, pace), /reading pace/);
 });
 
 test('history versions lock state, rejects stale writers and detects modified bytes', async () => {

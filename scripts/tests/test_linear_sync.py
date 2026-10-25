@@ -256,6 +256,35 @@ class StartedOwnershipTest(Base):
         with mock.patch.object(ls.time, "time", return_value=claimed_at):
             self.assertTrue(ls.claim(self.state, f"id-{n}", f"JOV-{n}", "codex"))
 
+    def lyb_claim(self, n, claimed_at):
+        with mock.patch.object(ls.time, "time", return_value=claimed_at):
+            self.assertTrue(ls.claim(self.state, f"lyb-{n}", f"LYB-{n}", "codex"))
+
+    def binding_lock(self, ident):
+        path = self.state / "bindings" / "LYB" / f"issue.{ident}.lock"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return open(path, "a+")
+
+    def test_dead_binding_claim_is_released_but_a_held_one_is_not(self):
+        """LYB-180 sat `active` 238 h: reconcile only looked at the Jovie run lease."""
+        import fcntl
+        self.lyb_claim(1, self.NOW - 3600)
+        self.lyb_claim(2, self.NOW - 3600)
+        self.binding_lock("LYB-1").close()  # taken and dropped: the run is over
+        live = self.binding_lock("LYB-2")
+        fcntl.flock(live, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            report = self.reconcile()
+        finally:
+            live.close()
+        self.assertEqual(report["claimsReleased"], ["LYB-1"])
+        self.assertEqual(ls._claims(self.state)["lyb-2"]["status"], "active")
+
+    def test_binding_claim_without_any_lock_waits_out_the_legacy_window(self):
+        self.lyb_claim(3, self.NOW - 3600)
+        self.assertEqual(self.reconcile()["claimsReleased"], [])
+        self.assertEqual(self.reconcile(at=ownership.LEGACY_RUN_GRACE_S)["claimsReleased"], ["LYB-3"])
+
     def test_owner_process_dies_then_the_issue_returns_to_the_pool(self):
         self.started(1)
         self.claim_at(1, self.NOW - 3600)
