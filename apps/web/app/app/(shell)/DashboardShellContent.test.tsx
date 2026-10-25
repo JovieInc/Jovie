@@ -43,6 +43,7 @@ vi.mock('@/lib/auth/ban-check', () => ({
 vi.mock('@/lib/auth/cached', () => ({ getFreshAuth: mocks.getFreshAuth }));
 vi.mock('@/lib/ovie/privacy-lock/server', () => ({
   getOviePrivacyLockState: mocks.privacyState,
+  isSyntheticCaptureSession: async () => false,
 }));
 vi.mock('@/lib/app-shell/workspaces', () => ({
   shouldRenderOperatorChrome: () => true,

@@ -10,7 +10,10 @@ import { getFreshAuth } from '@/lib/auth/cached';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { resolveAppShellRouteFlagNames } from '@/lib/flags/route-snapshots';
 import { getAppFlagsSnapshot } from '@/lib/flags/server';
-import { getOviePrivacyLockState } from '@/lib/ovie/privacy-lock/server';
+import {
+  getOviePrivacyLockState,
+  isSyntheticCaptureSession,
+} from '@/lib/ovie/privacy-lock/server';
 import { HydrateClient } from '@/lib/queries';
 import { getDehydratedState } from '@/lib/queries/server';
 import { MoneyVisibilityProvider } from '@/lib/workspace-lock/money-visibility';
@@ -83,6 +86,9 @@ export async function DashboardShellContent({
       const auth = await getFreshAuth();
       if (!auth.userId || !auth.sessionId) {
         initiallyLocked = true;
+      } else if (await isSyntheticCaptureSession(auth.userId)) {
+        // Secretless visual capture has no policy row to read (JOV-7126).
+        privacyEnabled = false;
       } else {
         const privacy = await getOviePrivacyLockState({
           userId: auth.userId,

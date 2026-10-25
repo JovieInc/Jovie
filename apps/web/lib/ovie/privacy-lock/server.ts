@@ -56,6 +56,18 @@ export async function getOviePrivacyLockState(auth: PrivacyAuth) {
     .limit(1);
   return resolveOviePrivacyState(policy, receipt, auth.userId);
 }
+/**
+ * The producer's own dev-test-auth bypass session under secretless visual
+ * capture. The app shell uses the same exemption as the data boundary, so a
+ * capture can render Ovie instead of a lock screen it cannot unlock.
+ */
+export async function isSyntheticCaptureSession(userId: string) {
+  return (
+    isVisualCaptureSyntheticAuthEnabled() &&
+    (await getCachedDevTestAuthSession())?.dbUserId === userId
+  );
+}
+
 /** Server-side data boundaries call this before loading/serializing Ovie data. */
 export async function assertOviePrivacyUnlocked(
   auth?: PrivacyAuth
@@ -68,11 +80,7 @@ export async function assertOviePrivacyUnlocked(
   // exempt — isAdmin already grants that same synthetic actor under this
   // exact gate, so a real session still falls through to the
   // Postgres-backed check below.
-  if (
-    isVisualCaptureSyntheticAuthEnabled() &&
-    (await getCachedDevTestAuthSession())?.dbUserId === identity.userId
-  )
-    return;
+  if (await isSyntheticCaptureSession(identity.userId)) return;
   if ((await getOviePrivacyLockState(identity as PrivacyAuth)).locked)
     throw new OviePrivacyLockError(
       'PRIVACY_UNLOCK_REQUIRED',
