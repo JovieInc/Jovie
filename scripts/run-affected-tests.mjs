@@ -1162,6 +1162,9 @@ const LANE_PYTHON_COVERAGE_INPUTS = new Set([
     `scripts/lanes/${name}.py`,
     `scripts/tests/test_${name}.py`,
   ]),
+  // Pytest loads this session fixture before the structural suite. Mapping it
+  // keeps a fixture change on that suite; the web full suite never imports it.
+  'scripts/tests/conftest.py',
   // The merge reader is exercised by the doctor transport/window regressions.
   'scripts/lanes/merge_evidence.py',
   // Immutable dependency classification is covered by the real lane gate tests.

@@ -986,5 +986,30 @@ class CompleteEventInventoryTest(unittest.TestCase):
             self.assertEqual(list(Path(tmp).iterdir()), [])
 
 
+class HostLaneConfigScrubTest(unittest.TestCase):
+    def test_host_codex_lane_config_is_removed_before_tests_read_it(self):
+        target = Path(__file__).resolve().with_name("conftest.py")
+        module = next(
+            (
+                candidate
+                for candidate in sys.modules.values()
+                if getattr(candidate, "__file__", None)
+                and Path(candidate.__file__).resolve() == target
+            ),
+            None,
+        )
+        self.assertIsNotNone(module, "scripts/tests/conftest.py was not loaded")
+        env = {
+            "CODEX_LANE_AUTH_MODE": "subscription-pool",
+            "CODEX_LANE_LOGIN_SLOTS": "5",
+            "CODEX_LANE_CLI": "/host/codex",
+            "CODEX_LANE_SUBSCRIPTION_PROFILES": "{}",
+            "LANES_STATE": "/tmp/lanes",
+            "PATH": "/usr/bin",
+        }
+        module.scrub_host_lane_env(env)
+        self.assertEqual(env, {"PATH": "/usr/bin"})
+
+
 if __name__ == "__main__":
     unittest.main()

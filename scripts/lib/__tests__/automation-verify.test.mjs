@@ -377,6 +377,15 @@ describe('Codex subscription capacity coverage selection', () => {
       '*/scripts/lanes/codex_lane.py" --fail-under=85'
     );
   });
+  it('keeps the pytest session fixture on the lane coverage suite', () => {
+    const plan = buildAffectedTestPlan(
+      [...inputs, 'scripts/tests/conftest.py'],
+      { isFileAvailable: () => true }
+    );
+    expect(plan.mode).toBe('selected');
+    expect(plan.lanePythonCoverage).toBe(true);
+    expect(plan.fallbackReason).toBeUndefined();
+  });
   it('fails closed with missing tests and preserves unknown mixed-peer fallback', () => {
     const missing = buildAffectedTestPlan(inputs, {
       isFileAvailable: file => file !== inputs[1],
