@@ -25,6 +25,7 @@ import {
 } from '@/lib/waitlist/approval';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
 import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import type { GoldenPathAdmissionDecision } from '@/lib/waitlist/golden-path-admission';
 import {
   type InterviewResponses,
   scoreOnboardingInterview,
@@ -33,7 +34,11 @@ import {
   evaluateWaitlistQualification,
   type QualificationDecision,
 } from '@/lib/waitlist/qualification';
-import { getWaitlistSettings } from '@/lib/waitlist/settings';
+import {
+  getWaitlistSettings,
+  releaseAutoAcceptSlot,
+  tryReserveAutoAcceptSlot,
+} from '@/lib/waitlist/settings';
 import {
   hashEmailForWaitlist,
   isUnqualifiedSignupEntry,
@@ -72,6 +77,11 @@ export interface WaitlistAccessRequestInput {
    * signup (`qualified_interview_signal`).
    */
   readonly interviewResponses?: InterviewResponses;
+  /**
+   * Server-derived golden-path decision (identity resolved, not high-profile,
+   * golden path green). Capacity is reserved here, in the transaction.
+   */
+  readonly goldenPathAdmission?: GoldenPathAdmissionDecision;
   /** Validated by the authenticated intake route for the exact canary email. */
   readonly syntheticRunId?: string;
 }
@@ -262,6 +272,7 @@ async function decideAccess(params: {
   readonly email: string;
   readonly data: WaitlistRequestPayload;
   readonly interviewResponses?: InterviewResponses;
+  readonly goldenPathAdmission?: GoldenPathAdmissionDecision;
 }): Promise<{
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
@@ -284,11 +295,45 @@ async function decideAccess(params: {
         responses: params.interviewResponses,
       })
     : null;
-  const qualification = evaluateWaitlistQualification({
+  const goldenPathDecision =
+    mode === 'waitlist_enabled' ? params.goldenPathAdmission : undefined;
+  let qualification = evaluateWaitlistQualification({
     email: params.email,
     payload: params.data,
-    config: { mode, interview },
+    config: {
+      mode,
+      interview,
+      goldenPath: goldenPathDecision,
+    },
   });
+
+  // A golden-path admit only becomes real once the existing daily auto-accept
+  // slot is reserved. Reserve after qualification says approved (so a held or
+  // invalid request never consumes a slot) and refund it if approval fails.
+  // Admission state only: nothing here emails or invites anyone.
+  let reservedGoldenPathSlot = false;
+  if (qualification.reasonCode === 'qualified_golden_path_resolved_artist') {
+    const reservation = await tryReserveAutoAcceptSlot(params.tx);
+    if (reservation.shouldAutoAccept) {
+      reservedGoldenPathSlot = true;
+    } else {
+      qualification = evaluateWaitlistQualification({
+        email: params.email,
+        payload: params.data,
+        config: {
+          mode,
+          interview: null,
+          goldenPath: {
+            admit: false,
+            reason:
+              reservation.reason === 'auto_accept_disabled'
+                ? 'hold_auto_accept_disabled'
+                : 'hold_capacity_full',
+          },
+        },
+      });
+    }
+  }
 
   if (qualification.status === 'blocked') {
     return {
@@ -315,6 +360,7 @@ async function decideAccess(params: {
     qualification.reasonCode
   );
   if (!approval) {
+    if (reservedGoldenPathSlot) await releaseAutoAcceptSlot(params.tx);
     const failedQualification: QualificationDecision = {
       ...qualification,
       status: 'waitlisted',
@@ -525,6 +571,7 @@ export async function submitWaitlistAccessRequest(
           email: normalizedEmail,
           data: input.data,
           interviewResponses: input.interviewResponses,
+          goldenPathAdmission: input.goldenPathAdmission,
         });
 
         const nextStatus = decision.qualification.status;

@@ -308,6 +308,8 @@ function decideAccess(
       : state.turnCount;
   return decideOnboardingAccess({
     accessControlled: state.accessControlled,
+    goldenPathVerdict: state.goldenPathVerdict,
+    goldenPathHold: state.goldenPathHold,
     spotifyArtistId: state.spotifyArtistId,
     publicProfileUrl: state.publicProfileUrl,
     spotifyFollowers: state.spotifyFollowers,

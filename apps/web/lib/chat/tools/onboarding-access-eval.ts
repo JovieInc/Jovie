@@ -25,6 +25,11 @@ import {
   normalizeArtistMetrics,
 } from '@/lib/onboarding/canonical-metrics';
 import {
+  decideGoldenPathAdmission,
+  type GoldenPathAdmissionReason,
+  type GoldenPathVerdict,
+} from '@/lib/waitlist/golden-path-admission';
+import {
   type AudienceBand,
   collapseInterviewSignals,
   type InterviewSignal,
@@ -95,6 +100,8 @@ export interface AccessDecision {
   readonly kind: AccessDecisionKind;
   /** Short rationale for logging + UI surfaces. Not user-facing copy. */
   readonly rationale: string;
+  /** Why the golden path held this artist (controlled gate only). */
+  readonly goldenPathHold?: GoldenPathAdmissionReason;
   /** 0-100 confidence; useful for retroactive analysis of where to tune thresholds. */
   readonly score: number;
   /**
@@ -197,6 +204,14 @@ export interface OnboardingAccessInput {
   readonly publicProfileUrl?: string | null;
   readonly spotifyFollowers: number | null;
   readonly metrics?: CanonicalArtistMetrics | null;
+  /**
+   * Golden-path verdict resolved once per turn by the handler (already null
+   * when auto-accept capacity is full or the verdict is unreadable). Only the
+   * controlled-access branch reads it.
+   */
+  readonly goldenPathVerdict?: GoldenPathVerdict | null;
+  /** Capacity/throttle hold from the turn context; wins over an admit. */
+  readonly goldenPathHold?: GoldenPathAdmissionReason | null;
   readonly signals: readonly Omit<
     InterviewSignalsMetadata['signals'][number],
     'recordedAt'
@@ -215,6 +230,29 @@ export function decideOnboardingAccess(
   input: OnboardingAccessInput
 ): AccessDecision {
   if (input.accessControlled) {
+    // Tim 2026-10-25: admit when the golden path is green. A server-resolved,
+    // non-high-profile artist is admitted instead of waitlisted; the claim
+    // path reserves the capacity slot and records the same reason.
+    const admission = decideGoldenPathAdmission({
+      spotifyArtistId: input.spotifyArtistId,
+      reach: getDisplaySpotifyFollowers(
+        input.metrics ??
+          normalizeArtistMetrics(
+            { spotifyFollowers: input.spotifyFollowers },
+            { source: 'tool_output' }
+          )
+      ),
+      goldenPathVerdict: input.goldenPathVerdict ?? null,
+    });
+    const goldenPathHold =
+      input.goldenPathHold ?? (admission.admit ? null : admission.reason);
+    if (!goldenPathHold) {
+      return {
+        kind: 'instant_access',
+        rationale: `golden_path_${admission.reason}`,
+        score: 80,
+      };
+    }
     // Artists are admitted first; everyone else reserves their name (Tim
     // 2026-09-29, JOV-3379). Either a confirmed Spotify artist or any public
     // profile link is enough evidence to save the reservation.
@@ -229,6 +267,7 @@ export function decideOnboardingAccess(
       kind: 'waitlist',
       rationale: 'controlled_access_gate_enabled',
       score: 100,
+      goldenPathHold,
     };
   }
   const recordedAt = new Date().toISOString();

@@ -27,6 +27,7 @@ import {
   submitWaitlistAccessRequest,
   type WaitlistAccessRequestResult,
 } from '@/lib/waitlist/access-request';
+import { decideGoldenPathAdmissionForArtist } from '@/lib/waitlist/golden-path-admission.server';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
   isWaitlistApprovedStatus,
@@ -129,6 +130,13 @@ async function createWaitlistReceipt(params: {
     throw new WaitlistIntakeRequiredError();
   }
 
+  // Same pure rule the chat gate used; the access request reserves capacity
+  // and records the reason. Unreadable verdict -> null -> held.
+  const goldenPathAdmission = await decideGoldenPathAdmissionForArtist({
+    spotifyArtistId: state.artist?.id ?? null,
+    reach: state.artist?.followers ?? null,
+  });
+
   const email = normalizeEmail(emailRaw);
   const waitlistData = waitlistRequestSchema.parse({
     primaryGoal: null,
@@ -149,6 +157,7 @@ async function createWaitlistReceipt(params: {
       email,
     }),
     data: waitlistData,
+    goldenPathAdmission,
     source: 'onboarding_chat_claim',
   });
 }

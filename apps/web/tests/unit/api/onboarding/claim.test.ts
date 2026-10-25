@@ -36,6 +36,16 @@ const {
   mockIsWaitlistGateEnabled: vi.fn(),
 }));
 
+const mockDecideGoldenPathAdmission = vi.hoisted(() =>
+  vi.fn().mockResolvedValue({
+    admit: false,
+    reason: 'hold_golden_path_not_green',
+  })
+);
+vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
+  decideGoldenPathAdmissionForArtist: mockDecideGoldenPathAdmission,
+}));
+
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
   getCachedCurrentUser: mockGetCachedCurrentUser,

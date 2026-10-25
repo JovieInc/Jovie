@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const findLatestEntryByEmail = vi.fn();
 const getWaitlistSettings = vi.fn();
 const tryReserveAutoAcceptSlot = vi.fn();
+const releaseAutoAcceptSlot = vi.fn().mockResolvedValue(undefined);
 const approveWaitlistEntryInTx = vi.fn();
 const finalizeWaitlistApproval = vi.fn().mockResolvedValue(undefined);
 const invalidateProxyUserStateCache = vi.fn().mockResolvedValue(undefined);
@@ -39,6 +40,7 @@ vi.mock('@/lib/waitlist/settings', () => ({
   getWaitlistSettings: (...args: unknown[]) => getWaitlistSettings(...args),
   tryReserveAutoAcceptSlot: (...args: unknown[]) =>
     tryReserveAutoAcceptSlot(...args),
+  releaseAutoAcceptSlot: (...args: unknown[]) => releaseAutoAcceptSlot(...args),
 }));
 
 vi.mock('@/lib/utils/social-platform', () => ({
@@ -191,6 +193,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
       autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
     });
     tryReserveAutoAcceptSlot.mockReset();
+    releaseAutoAcceptSlot.mockReset();
     approveWaitlistEntryInTx.mockReset();
     finalizeWaitlistApproval.mockClear();
     invalidateProxyUserStateCache.mockClear();
@@ -235,6 +238,137 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
       baseInput.appUserId
     );
     expect(notifySlackWaitlist).not.toHaveBeenCalled();
+  });
+
+  describe('golden-path admission', () => {
+    const admit = { admit: true, reason: 'admit_resolved_artist' } as const;
+
+    it('admits a resolved artist when capacity reserves, recording the reason and sending nothing', async () => {
+      tryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: true,
+        reason: 'reserved',
+      });
+      approveWaitlistEntryInTx.mockResolvedValue({
+        outcome: 'approved',
+        entryId: 'entry-new',
+        profileId: null,
+        email: 'creator@example.com',
+        fullName: 'Test Creator',
+        clerkId: null,
+      });
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest({
+        ...baseInput,
+        goldenPathAdmission: admit,
+      });
+
+      expect(result.outcome).toBe('accepted');
+      expect(result.status).toBe('approved');
+      expect(tryReserveAutoAcceptSlot).toHaveBeenCalledTimes(1);
+      expect(approveWaitlistEntryInTx).toHaveBeenCalledWith(
+        expect.anything(),
+        'entry-new',
+        expect.objectContaining({
+          reason: 'qualified_golden_path_resolved_artist',
+          targetStatus: 'approved',
+        })
+      );
+      // Admission state only: no confirmation or invite email job.
+      expect(
+        insertedEntries.some(row => 'jobType' in (row.vals as object))
+      ).toBe(false);
+    });
+
+    it('holds with capacity_full when the daily slot cannot be reserved', async () => {
+      tryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: false,
+        reason: 'capacity_full',
+      });
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest({
+        ...baseInput,
+        goldenPathAdmission: admit,
+      });
+
+      expect(result.status).toBe('waitlisted');
+      expect(approveWaitlistEntryInTx).not.toHaveBeenCalled();
+      expect(
+        updatedRows.find(row => row.statusReason === 'waitlist_capacity_full')
+      ).toBeTruthy();
+    });
+
+    it('gives the slot back when the approval it was reserved for fails', async () => {
+      tryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: true,
+        reason: 'reserved',
+      });
+      approveWaitlistEntryInTx.mockResolvedValue({ outcome: 'no_user' });
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest({
+        ...baseInput,
+        goldenPathAdmission: admit,
+      });
+
+      expect(result.status).toBe('waitlisted');
+      expect(releaseAutoAcceptSlot).toHaveBeenCalledTimes(1);
+    });
+
+    it('records auto_accept_disabled as its own hold reason', async () => {
+      tryReserveAutoAcceptSlot.mockResolvedValue({
+        shouldAutoAccept: false,
+        reason: 'auto_accept_disabled',
+      });
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      await submitWaitlistAccessRequest({
+        ...baseInput,
+        goldenPathAdmission: admit,
+      });
+
+      expect(
+        updatedRows.find(row => {
+          const q = row.qualificationResult as
+            | { details?: { goldenPathHold?: string } }
+            | undefined;
+          return q?.details?.goldenPathHold === 'hold_auto_accept_disabled';
+        })
+      ).toBeTruthy();
+      expect(releaseAutoAcceptSlot).not.toHaveBeenCalled();
+    });
+
+    it('never reserves capacity for a held decision', async () => {
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const result = await submitWaitlistAccessRequest({
+        ...baseInput,
+        goldenPathAdmission: {
+          admit: false,
+          reason: 'hold_high_profile_needs_verification',
+        },
+      });
+
+      expect(result.status).toBe('waitlisted');
+      expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(
+        updatedRows.find(row => {
+          const q = row.qualificationResult as
+            | { details?: { goldenPathHold?: string } }
+            | undefined;
+          return (
+            q?.details?.goldenPathHold ===
+            'hold_high_profile_needs_verification'
+          );
+        })
+      ).toBeTruthy();
+    });
   });
 
   it('waitlists fresh submissions even when delayed auto-accept has capacity', async () => {
