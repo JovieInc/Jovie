@@ -17,6 +17,7 @@ import {
   BIOME_TOOLCHAIN_FILES,
   biomeNeedsFullTree,
   CERTIFICATION_KERNEL_COMMAND,
+  DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND,
   earlierLaneFailed,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
@@ -424,6 +425,24 @@ describe('runStructural screenshot contract discovery', () => {
     }
     vi.clearAllMocks();
   });
+
+  it.each(['mac', 'web'])(
+    'selects installed-identity coverage only for the Mac lane (%s)',
+    async lane => {
+      process.env.GITHUB_EVENT_NAME = 'pull_request';
+      process.env.CI_PRODUCT_LANES = lane;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+      await runStructural({
+        execute,
+        changedFileList: ['scripts/desktop-installed-apps-audit.mjs'],
+      });
+      const commands = execute.mock.calls.map(([command]) => String(command));
+      expect(
+        commands.includes(DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND)
+      ).toBe(lane === 'mac');
+    }
+  );
 
   it.each([
     ['web', ['apps/web/lib/leads/constants.ts'], true],
@@ -2100,7 +2119,10 @@ describe('source-read guard selection', () => {
   );
 
   it.each([
-    ['pull_request', ['web-source-read-tests', 'script-contracts']],
+    [
+      'pull_request',
+      ['web-source-read-tests', 'script-contracts', 'gate-weakening-detector'],
+    ],
     ['merge_group', []],
     ['push', []],
   ])(
@@ -2177,6 +2199,10 @@ describe('source-read guard selection', () => {
         'artist-launch-contract',
         'merge-group-unit-guards',
         'static-revalidate-policy',
+        'art-direction',
+        'icp-language',
+        'marketing-rounded-media',
+        'marketing-container-width',
       ],
     ],
     [
@@ -2202,6 +2228,8 @@ describe('source-read guard selection', () => {
       ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
+      ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
+      'gate-weakening-detector',
     ]);
   });
 
@@ -2239,8 +2267,8 @@ describe('source-read guard selection', () => {
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
       const expected = path.startsWith('apps/web/lib/')
-        ? ['artist-profile-conformance', ...apiGuard(path)]
-        : [];
+        ? ['artist-profile-conformance', ...apiGuard(path), 'copy-leak']
+        : ['copy-leak'];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
     }
@@ -2267,8 +2295,11 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
+      'synthetic-canary-liveness',
       'playbook-authoring',
+      'icp-language',
       'external-api-guard',
+      'copy-leak',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
     expect(selected('pull_request', null)).toEqual(all);
@@ -2278,8 +2309,11 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
+      'synthetic-canary-liveness',
       'playbook-authoring',
+      'icp-language',
       'external-api-guard',
+      'copy-leak',
     ]);
   });
 
@@ -2298,6 +2332,44 @@ describe('source-read guard selection', () => {
         expect(guard.command).toContain('node scripts/artist-');
         expect(
           readFileSync(join(REPO_ROOT, `scripts/${guard.id}.test.mjs`), 'utf8')
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'icp-language') {
+        expect(guard.command).toContain(
+          'node scripts/invariants/icp-language/check.mjs'
+        );
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/icp-language/icp-language.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'copy-leak') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain('copy-leak/check.mjs');
+        expect(guard.command).toContain('--test-coverage-lines=95');
+        expect(guard.command).toContain('copy-leak.test.mjs');
+        continue;
+      }
+      if (guard.id === 'oasdiff-breaking-change') {
+        expect(guard.command).toContain(
+          'node scripts/invariants/oasdiff-breaking-change.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/oasdiff-breaking-change.test.mjs'
+            ),
+            'utf8'
+          )
         ).toContain("from 'node:test'");
         continue;
       }
@@ -2320,8 +2392,59 @@ describe('source-read guard selection', () => {
         );
         continue;
       }
+
+      if (guard.id === 'art-direction') {
+        expect(guard.command).toContain(
+          'scripts/invariants/art-direction/run.mjs'
+        );
+        expect(guard.command).toContain(
+          'node --test scripts/invariants/art-direction/*.test.mjs'
+        );
+        expect(guard.prOnly).toBe(true);
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/art-direction/art-direction.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain('describe(');
+        continue;
+      }
+
+      if (guard.id === 'marketing-rounded-media') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toBe(
+          'node --test scripts/invariants/art-direction/rounded.test.mjs'
+        );
+        continue;
+      }
+      if (guard.id === 'marketing-container-width') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toBe(
+          'node --test scripts/invariants/art-direction/container-width.test.mjs'
+        );
+        continue;
+      }
       if (guard.id === 'script-contracts') {
         expect(guard.command).toContain('/lib/script-contract-affected.mjs');
+        continue;
+      }
+      if (guard.id === 'gate-weakening-detector') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/invariants/gate-weakening-detector.mjs')
+        );
+        expect(
+          readFileSync(
+            join(
+              REPO_ROOT,
+              'scripts/invariants/gate-weakening-detector.test.mjs'
+            ),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
         continue;
       }
       if (guard.id === 'web-source-read-tests') {

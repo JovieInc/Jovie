@@ -1,11 +1,12 @@
 #!/usr/bin/env node
-// Advisory mutation testing on changed high-risk apps/web source.
+// Diff-scoped mutation testing on changed high-risk apps/web source.
 //
 //   node scripts/mutation-diff.mjs --base <sha> --head <sha>
 //   node scripts/mutation-diff.mjs --files apps/web/lib/cron/auth.ts
 //
 // Exits non-zero when selection or execution fails (a broken harness must not
-// look like a clean run). Scores below --low are flagged, never enforced.
+// look like a clean run), and when a baselined file scores under its floor.
+// Scores below --low are flagged. Files with no committed floor stay advisory.
 
 import { spawnSync } from 'node:child_process';
 import { appendFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -24,9 +25,20 @@ import {
   selectHighRiskSources,
   WEB_ROOT,
 } from './lib/mutation-diff.mjs';
+import {
+  buildWorkflowRunUrl,
+  fileMutationFloorIssues,
+} from './lib/mutation-floor-intake.mjs';
+import {
+  evaluateMutationScore,
+  loadMutationScoreBaseline,
+} from './lib/mutation-score-floor.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const webRoot = join(repoRoot, WEB_ROOT);
+const scoreBaseline = loadMutationScoreBaseline(
+  join(repoRoot, 'scripts/mutation-score-baseline.json')
+);
 
 const { values } = parseArgs({
   options: {
@@ -174,7 +186,52 @@ for (const source of toRun) {
   }
 }
 
+/** @type {{ file: string, score: number | null, floor: number, valid?: number }[]} */
+const floorFailures = [];
 if (!values['list-only']) {
+  for (const result of results) {
+    const scored = scoreMutants(result.mutants);
+    const verdict = evaluateMutationScore(
+      result.file,
+      scored.score,
+      scored.valid,
+      scoreBaseline
+    );
+    if (
+      verdict.enforced &&
+      verdict.ok === false &&
+      typeof verdict.floor === 'number'
+    ) {
+      floorFailures.push({
+        file: verdict.file,
+        score: verdict.score,
+        floor: verdict.floor,
+        valid: scored.valid,
+      });
+    }
+  }
+  if (floorFailures.length > 0) {
+    // JOV-8857: file one deduped Linear issue per breached file. Filing
+    // failures (including a missing LINEAR_API_KEY) are logged and never
+    // change the exit code, which stays driven by the floor failures.
+    const intake = await fileMutationFloorIssues({
+      failures: floorFailures,
+      runUrl: buildWorkflowRunUrl(process.env),
+      artifactName: process.env.GITHUB_RUN_ID
+        ? `mutation-diff-${process.env.GITHUB_RUN_ID}`
+        : null,
+      sourceSha: process.env.GITHUB_SHA ?? null,
+    });
+    for (const entry of intake.filed) {
+      const where = entry.url ?? entry.identifier ?? entry.reason ?? 'unknown';
+      console.log(
+        `Linear intake (${entry.file}): ${entry.action ?? 'failed'} — ${where}`
+      );
+    }
+    for (const entry of intake.skipped) {
+      console.log(`Linear intake skipped (${entry.file}): ${entry.reason}`);
+    }
+  }
   const summary = renderSummary({
     sources,
     results,
@@ -182,6 +239,8 @@ if (!values['list-only']) {
     skipped,
     lowScore: Number(values.low),
     errors: harnessErrors,
+    floors: scoreBaseline.files,
+    floorFailures,
   });
   console.log(`\n${summary}`);
   if (values.summary) appendFileSync(values.summary, summary);
@@ -195,4 +254,7 @@ if (values['list-only']) {
   for (const error of harnessErrors)
     console.error(`${error.file}: ${error.reason}`);
 }
-process.exitCode = harnessErrors.length > 0 || untested.length > 0 ? 1 : 0;
+process.exitCode =
+  harnessErrors.length > 0 || untested.length > 0 || floorFailures.length > 0
+    ? 1
+    : 0;

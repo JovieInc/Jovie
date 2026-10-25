@@ -15,14 +15,18 @@ import {
   type Request,
   test,
 } from '@playwright/test';
+import { CHAT_TRANSCRIPT_WINDOW } from '@/lib/chat/transcript-window';
 import { UX_LATENCY_STORAGE_KEY } from '@/lib/monitoring/interaction-latency';
 import { PACER_TIMING } from '@/lib/pacer/hooks/timing';
 import {
   buildInteractionLatencyReport,
   type InteractionLatencySample,
 } from '@/scripts/performance-interaction-report';
+import { writeChatAttempt } from '../../scripts/chat-performance-receipt';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import {
+  type BrowserChatProbe,
+  type ChatProbeSnapshot,
   installBrowserChatProbe,
   roundTripCopy,
   roundTripFromRequest,
@@ -42,6 +46,19 @@ const SAMPLE_COUNT = 5;
  * Oct 2 Extended Smoke knee (usable ms): 580, 314, 273, then 142 and 148.
  */
 const WARMUP_ROUND_TRIPS = 3;
+/** User plus assistant. The remounting warmup leaves one pair on the document. */
+const MESSAGES_PER_ROUND_TRIP = 2;
+/**
+ * Virtualizing is a one-time commit. p95 of five samples is the slowest
+ * sample, so that commit has to land before the clock starts. The scroll
+ * probe still runs on the virtualized thread.
+ */
+const VIRTUAL_WINDOW_WARMUP_ROUND_TRIPS = Math.ceil(
+  (CHAT_TRANSCRIPT_WINDOW.virtualizeAfterMessageCount +
+    1 -
+    MESSAGES_PER_ROUND_TRIP) /
+    MESSAGES_PER_ROUND_TRIP
+);
 
 interface PersistedMessage {
   readonly id: string;
@@ -82,6 +99,12 @@ function chatStreamResponse(runIndex: number, assistantText: string): string {
 }
 
 async function mockChatBackend(page: Page) {
+  const scheduling: {
+    driverDispatchToHandlerMs: number;
+    handlerWorkMs: number;
+    fulfillAwaitMs: number;
+  }[] = [];
+  let dispatchedAt = 0;
   const persistedMessages: PersistedMessage[] = [];
   let runIndex = 0;
 
@@ -119,6 +142,7 @@ async function mockChatBackend(page: Page) {
   );
 
   await page.route('**/api/chat', async route => {
+    const handlerAt = performance.now();
     const currentRun = runIndex;
     const { userText, assistantText } = roundTripFromRequest(
       route.request().postDataJSON()
@@ -153,7 +177,8 @@ async function mockChatBackend(page: Page) {
     // Stamp dataReadyMs in the page's own fetch wrapper. page.evaluate inside
     // this route deadlocks the in-flight chat POST, so the optimistic user
     // bubble paints and the assistant reply never arrives.
-    return route.fulfill({
+    const fulfillAt = performance.now();
+    await route.fulfill({
       status: 200,
       contentType: 'text/event-stream; charset=utf-8',
       headers: {
@@ -164,7 +189,18 @@ async function mockChatBackend(page: Page) {
       },
       body: chatStreamResponse(currentRun, assistantText),
     });
+    scheduling[currentRun] = {
+      driverDispatchToHandlerMs: handlerAt - dispatchedAt,
+      handlerWorkMs: fulfillAt - handlerAt,
+      fulfillAwaitMs: performance.now() - fulfillAt,
+    };
   });
+  return {
+    dispatch: () => {
+      dispatchedAt = performance.now();
+    },
+    scheduling,
+  };
 }
 
 async function installChatProbe(
@@ -182,20 +218,11 @@ async function triggerMeasuredSend(
   sendButton: ReturnType<Page['getByRole']>
 ): Promise<void> {
   await sendButton.evaluate(button => {
-    const probeWindow = window as Window & {
-      __jovieChatPerformanceProbe?: {
-        start: number;
-      };
-    };
-    const probe = probeWindow.__jovieChatPerformanceProbe;
-    if (!probe) {
-      throw new Error('Chat performance probe was not installed');
-    }
-
-    // Start the clock in the same browser task as the user action. Starting it
-    // before Playwright's click would include actionability/stability checks,
-    // which are test-runner overhead rather than product interaction latency.
-    probe.start = performance.now();
+    const probe = (
+      window as Window & { __jovieChatPerformanceProbe?: BrowserChatProbe }
+    ).__jovieChatPerformanceProbe;
+    if (!probe) throw new Error('Chat performance probe was not installed');
+    probe.markSend();
     (button as HTMLButtonElement).click();
   });
 }
@@ -208,7 +235,6 @@ async function readChatProbe(page: Page) {
         fetchStartedMs?: number;
         frameId?: number;
         firstFeedbackMs?: number;
-        longTaskDurations: number[];
         renderToInteractiveMs?: number;
         usableStateMs?: number;
       };
@@ -228,10 +254,8 @@ async function readChatProbe(page: Page) {
         fetchStartedMs?: number;
         frameId?: number;
         firstFeedbackMs?: number;
-        longTaskDurations: number[];
-        longTaskObserver?: PerformanceObserver;
         observer: MutationObserver;
-        originalFetch: typeof window.fetch;
+        stop: BrowserChatProbe['stop'];
         renderToInteractiveMs?: number;
         usableStateMs?: number;
       };
@@ -245,32 +269,28 @@ async function readChatProbe(page: Page) {
     ) {
       throw new Error('Chat performance probe did not collect every metric');
     }
-    probe.observer.disconnect();
-    if (probe.frameId !== undefined) cancelAnimationFrame(probe.frameId);
-    probe.longTaskObserver?.disconnect();
-    window.fetch = probe.originalFetch;
-    return {
-      dataReadyMs: probe.dataReadyMs,
-      fetchStartedMs: probe.fetchStartedMs,
-      firstFeedbackMs: probe.firstFeedbackMs,
-      longTaskCount: probe.longTaskDurations.length,
-      maxLongTaskMs: Math.max(0, ...probe.longTaskDurations),
-      renderToInteractiveMs: probe.renderToInteractiveMs,
-      usableStateMs: probe.usableStateMs,
-    };
+    return probe.stop();
   });
 }
 
 async function measureDroppedScrollFrames(page: Page) {
-  return page.getByTestId('chat-message-scroll').evaluate(async element => {
+  const scroll = page.getByTestId('chat-message-scroll');
+  await scroll.evaluate(element => {
     const scrollElement = element as HTMLElement;
     if (scrollElement.scrollHeight <= scrollElement.clientHeight) {
       throw new Error('Chat message list must overflow for the scroll ratchet');
     }
-
+    // Jumping to the top swaps the virtual window and mounts the
+    // scroll-to-latest control. Those commits are not scroll frames.
     scrollElement.scrollTop = 0;
+  });
+  await waitForQuietFrames(page);
+
+  return scroll.evaluate(async element => {
+    const scrollElement = element as HTMLElement;
     const frameIntervals: number[] = [];
     const frameCount = 24;
+    const distance = scrollElement.scrollHeight - scrollElement.clientHeight;
 
     await new Promise<void>(resolve => {
       let previousTime: number | undefined;
@@ -282,9 +302,7 @@ async function measureDroppedScrollFrames(page: Page) {
         }
         previousTime = time;
         currentFrame += 1;
-        scrollElement.scrollTop =
-          (scrollElement.scrollHeight - scrollElement.clientHeight) *
-          (currentFrame / frameCount);
+        scrollElement.scrollTop = distance * (currentFrame / frameCount);
 
         if (currentFrame >= frameCount) {
           resolve();
@@ -323,6 +341,53 @@ function trackChatApiRequests(page: Page) {
   page.on('requestfinished', request => inFlight.delete(request));
   page.on('requestfailed', request => inFlight.delete(request));
   return { pendingCount: () => inFlight.size };
+}
+
+/**
+ * Scored clicks and the scroll probe share the runner with the rest of the
+ * smoke lane. A frame that is already late is runner stall, and p95 of five
+ * samples is the slowest sample. Wait until the event loop can deliver frames
+ * before starting the clock. Give up after a few seconds so a wedged runner
+ * still records the real interaction instead of hanging the lane.
+ */
+async function waitForQuietFrames(page: Page): Promise<void> {
+  await page.evaluate(
+    () =>
+      new Promise<void>(resolve => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const started = performance.now();
+        const gaps: number[] = [];
+        let previous: number | undefined;
+        const step = (time: number) => {
+          if (settled) return;
+          if (previous !== undefined) gaps.push(time - previous);
+          previous = time;
+          const recent = gaps.slice(-4);
+          if (
+            recent.length === 4 &&
+            recent.every(gap => gap < 40) &&
+            performance.now() - started > 50
+          ) {
+            finish();
+            return;
+          }
+          if (performance.now() - started > 8_000) {
+            finish();
+            return;
+          }
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+        // rAF can stop entirely on a backgrounded page. The timeout is the
+        // same 8s cap, so a frozen frame clock cannot hang the smoke lane.
+        setTimeout(finish, 8_000);
+      })
+  );
 }
 
 /** Resolves after two painted frames and an idle main-thread slot. */
@@ -408,20 +473,45 @@ async function exchangeChatRoundTrip(
   composer: Locator,
   sendButton: Locator,
   userText: string,
-  assistantText: string
+  assistantText: string,
+  backend: Awaited<ReturnType<typeof mockChatBackend>>,
+  record?: (snapshot: ChatProbeSnapshot) => void,
+  settleMainThread = false
 ) {
   await expect(composer).toBeEnabled();
   await composer.fill(userText);
+  if (settleMainThread) await waitForQuietFrames(page);
   await installChatProbe(page, userText, assistantText);
-  await triggerMeasuredSend(sendButton);
-  await expect(
-    page.getByTestId('chat-user-bubble').filter({ hasText: userText })
-  ).toBeVisible();
-  await expect(
-    page.getByTestId('chat-message-reply').filter({ hasText: assistantText })
-  ).toBeVisible();
-  return readChatProbe(page);
+  backend.dispatch();
+  try {
+    await triggerMeasuredSend(sendButton);
+    await expect(
+      page.getByTestId('chat-user-bubble').filter({ hasText: userText })
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('chat-message-reply').filter({ hasText: assistantText })
+    ).toBeVisible();
+    return await readChatProbe(page);
+  } finally {
+    const snapshot = await page.evaluate(() =>
+      (
+        window as Window & { __jovieChatPerformanceProbe?: BrowserChatProbe }
+      ).__jovieChatPerformanceProbe?.stop()
+    );
+    if (snapshot) record?.(snapshot);
+  }
 }
+
+let attemptData: Parameters<typeof writeChatAttempt>[1] | undefined;
+test.afterEach(async ({ page }, testInfo) => {
+  if (attemptData)
+    await writeChatAttempt(testInfo, {
+      ...attemptData,
+      browser: page.context().browser()?.version() ?? 'unknown',
+      scheduling: attemptData.scheduling.slice(WARMUP_ROUND_TRIPS),
+    });
+  attemptData = undefined;
+});
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -435,7 +525,15 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   test.setTimeout(300_000);
   await page.setViewportSize({ width: 1280, height: 480 });
 
-  await mockChatBackend(page);
+  const backend = await mockChatBackend(page);
+  const diagnostics: ChatProbeSnapshot[] = [];
+  const samples: InteractionLatencySample[] = [];
+  attemptData = {
+    browser: 'unknown',
+    diagnostics,
+    scheduling: backend.scheduling,
+  };
+
   const chatApi = trackChatApiRequests(page);
   await setTestAuthBypassSession(page, 'creator-ready', 'e2e-chat-performance');
   await page.goto('/app/chat', { waitUntil: 'domcontentloaded' });
@@ -463,6 +561,26 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
       composer,
       sendButton,
       copy.userText,
+      copy.assistantText,
+      backend
+    );
+  }
+
+  // The virtualizer turns on once the thread passes the window threshold.
+  // That commit is not a steady-state send. Cross it on this document, then
+  // drop every warmup sample before scoring.
+  for (
+    let warmupIndex = 0;
+    warmupIndex < VIRTUAL_WINDOW_WARMUP_ROUND_TRIPS;
+    warmupIndex += 1
+  ) {
+    await waitForChatSendPacer(page);
+    const copy = roundTripCopy('Warmup', WARMUP_ROUND_TRIPS + warmupIndex);
+    await exchangeChatRoundTrip(
+      page,
+      composer,
+      sendButton,
+      copy.userText,
       copy.assistantText
     );
   }
@@ -474,8 +592,6 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
     localStorage.removeItem(storageKey);
   }, UX_LATENCY_STORAGE_KEY);
 
-  const samples: InteractionLatencySample[] = [];
-
   for (let runIndex = 0; runIndex < SAMPLE_COUNT; runIndex += 1) {
     await waitForChatSendPacer(page);
     const copy = roundTripCopy('Performance', runIndex);
@@ -484,15 +600,26 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
       composer,
       sendButton,
       copy.userText,
-      copy.assistantText
+      copy.assistantText,
+      backend,
+      snapshot => diagnostics.push(snapshot),
+      true
     );
+    if (
+      timings.firstFeedbackMs === undefined ||
+      timings.usableStateMs === undefined ||
+      timings.renderToInteractiveMs === undefined
+    )
+      throw new Error('Incomplete chat timings');
     samples.push({
       ...timings,
+      firstFeedbackMs: timings.firstFeedbackMs,
       runIndex,
       scenarioId: 'chat-message-round-trip',
     });
   }
 
+  await waitForQuietFrames(page);
   const droppedFrameCount = await measureDroppedScrollFrames(page);
   const completeSamples = samples.map(sample => ({
     ...sample,
@@ -500,6 +627,7 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
   }));
   const report = buildInteractionLatencyReport({ samples: completeSamples });
 
+  attemptData.report = report;
   await testInfo.attach('chat-performance-report.json', {
     body: JSON.stringify(report, null, 2),
     contentType: 'application/json',

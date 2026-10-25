@@ -573,7 +573,7 @@ export function CmdKPalette({
           Search routes, skills, releases, and recent conversations.
         </DialogPrimitive.Description>
         <div
-          className='mx-auto flex h-full w-full max-w-3xl flex-col'
+          className='mx-auto flex h-full w-full max-w-2xl flex-col'
           data-testid='shared-command-palette'
           data-surface='cmdk'
         >

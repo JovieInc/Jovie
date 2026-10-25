@@ -621,6 +621,8 @@ interface OnboardingMessageRegionProps {
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly profileBuilderState: OnboardingProfileBuilderState;
   readonly shouldDockComposer: boolean;
+  /** Starter handoff paints the thread slot at the top, where the first message lands. */
+  readonly pinThreadToTop: boolean;
   readonly entryMode: OnboardingEntryMode;
   readonly entryProfile: StartEntryProfile | null;
   readonly onTryAnotherName: () => void;
@@ -645,6 +647,7 @@ function OnboardingMessageRegion({
   onSelectArtist,
   profileBuilderState,
   shouldDockComposer,
+  pinThreadToTop,
 }: OnboardingMessageRegionProps) {
   if (shouldDockComposer) {
     return (
@@ -670,7 +673,13 @@ function OnboardingMessageRegion({
     return (
       <ChatEmptyStateComposerRegion
         above={
-          <div className='flex min-h-full items-center justify-center'>
+          <div
+            className={
+              pinThreadToTop
+                ? 'flex flex-col'
+                : 'flex min-h-full items-center justify-center'
+            }
+          >
             <OnboardingChatEmptyIntro
               mode={entryMode}
               entryProfile={entryProfile}
@@ -678,6 +687,7 @@ function OnboardingMessageRegion({
             />
           </div>
         }
+        alignAbove={pinThreadToTop ? 'top' : undefined}
         hideWelcomeHeader
       >
         <div
@@ -1246,9 +1256,11 @@ export function OnboardingChat({
           ref={shouldDockComposer ? totalSizeRef : undefined}
           className={cn(
             'mx-auto flex min-h-full w-full flex-col',
-            hasConversationStarted || shouldDockComposer
-              ? 'max-w-[44rem]'
-              : 'max-w-[52rem]',
+            // The empty frame is 52rem. Keep that width when the first
+            // message commits. Narrowing to 44rem here moves a 576px-tall
+            // column by 64px with no input, which Chromium 1280×720 scores
+            // as 0.1503125. The docked composer is the later width change.
+            shouldDockComposer ? 'max-w-[44rem]' : 'max-w-[52rem]',
             !shouldDockComposer && 'h-full justify-center'
           )}
         >
@@ -1270,6 +1282,7 @@ export function OnboardingChat({
             onSelectArtist={handleArtistSelect}
             profileBuilderState={profileBuilderState}
             shouldDockComposer={shouldDockComposer}
+            pinThreadToTop={hasInitialStarterPrompt}
           />
         </div>
       </div>

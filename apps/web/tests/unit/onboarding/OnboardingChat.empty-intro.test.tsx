@@ -199,6 +199,9 @@ describe('OnboardingChat empty intro', () => {
     );
 
     expect(screen.getByTestId('onboarding-empty-intro')).toBeTruthy();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).not.toHaveAttribute('data-align-above');
     expect(screen.getByTestId('onboarding-start-ambient-mark')).toBeTruthy();
     expect(screen.getByText(ONBOARDING_ENTRY_TITLE)).toBeTruthy();
     expect(screen.getByRole('textbox')).toHaveAttribute(
@@ -252,6 +255,9 @@ describe('OnboardingChat empty intro', () => {
     expect(
       screen.getByRole('heading', { name: 'Your first message' })
     ).toBeTruthy();
+    expect(
+      screen.getByTestId('chat-empty-state-composer-region')
+    ).toHaveAttribute('data-align-above', 'top');
     expect(screen.queryByText('Your message is on its way.')).toBeNull();
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
