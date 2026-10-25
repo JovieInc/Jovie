@@ -2121,7 +2121,12 @@ describe('source-read guard selection', () => {
   it.each([
     [
       'pull_request',
-      ['web-source-read-tests', 'script-contracts', 'gate-weakening-detector'],
+      [
+        'web-source-read-tests',
+        'script-contracts',
+        'merged-with-base-invariants',
+        'gate-weakening-detector',
+      ],
     ],
     ['merge_group', []],
     ['push', []],
@@ -2231,6 +2236,7 @@ describe('source-read guard selection', () => {
       ...(/^(?:apps\/web\/components\/|packages\/ui\/)/u.test(path)
         ? ['ui-story-coverage-allowlist']
         : []),
+      'merged-with-base-invariants',
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
       'gate-weakening-detector',
     ]);
@@ -2389,7 +2395,7 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
-      if (guard.id === 'design-surfaces-merged-with-base') {
+      if (guard.id === 'merged-with-base-invariants') {
         expect(guard.prOnly).toBe(true);
         expect(guard.command).toContain('git worktree add');
         expect(guard.command).toContain(

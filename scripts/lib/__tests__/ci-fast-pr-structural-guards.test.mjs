@@ -31,15 +31,18 @@ describe('PR-time structural guards', () => {
     expect(merge).not.toContain('release-lineage-contracts');
   });
 
-  it('runs the design-surfaces invariant merged with base for nav data changes', () => {
-    expect(
-      ids('pull_request', ['apps/web/data/marketingNavigation.ts'])
-    ).toContain('design-surfaces-merged-with-base');
-    expect(ids('pull_request', ['apps/web/lib/foo.ts'])).not.toContain(
-      'design-surfaces-merged-with-base'
-    );
+  it('runs the merged-with-base invariants on every PR, never in merge groups', () => {
+    for (const file of [
+      'apps/web/lib/foo.ts',
+      'scripts/lib/foo.mjs',
+      'apps/web/data/marketingNavigation.ts',
+    ]) {
+      expect(ids('pull_request', [file])).toContain(
+        'merged-with-base-invariants'
+      );
+    }
     expect(
       ids('merge_group', ['apps/web/data/marketingNavigation.ts'])
-    ).not.toContain('design-surfaces-merged-with-base');
+    ).not.toContain('merged-with-base-invariants');
   });
 });
