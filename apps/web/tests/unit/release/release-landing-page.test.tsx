@@ -247,7 +247,7 @@ describe('@critical ReleaseLandingPage', () => {
     expect(buttons[0].getAttribute('data-href')).toBe(
       'https://open.spotify.com/track/1?utm_source=jovie'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Select Apple Music' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Apple Music' }));
     await waitFor(() =>
       expect(screen.getByTestId('provider-button')).toHaveAttribute(
         'data-href',
@@ -266,7 +266,7 @@ describe('@critical ReleaseLandingPage', () => {
       screen.getByRole('group', { name: 'Choose a streaming service' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Select Apple Music' })
+      screen.getByRole('option', { name: 'Apple Music' })
     ).toBeInTheDocument();
   });
 
