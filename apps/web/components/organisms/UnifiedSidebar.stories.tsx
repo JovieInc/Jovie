@@ -300,18 +300,18 @@ chatsClient.setQueryData(queryKeys.chat.conversations(), [
   },
 ]);
 
+const withChatsData: Decorator = Story => (
+  <QueryClientProvider client={chatsClient}>
+    <Story />
+  </QueryClientProvider>
+);
+
 export const ComposedChats: Story = {
   parameters: {
     composedShell: true,
     nextjs: { navigation: { pathname: APP_ROUTES.CHATS } },
   },
-  decorators: [
-    Story => (
-      <QueryClientProvider client={chatsClient}>
-        <Story />
-      </QueryClientProvider>
-    ),
-  ],
+  decorators: [withChatsData],
   render: args => (
     <AppShellFrame
       sidebar={<UnifiedSidebar {...args} />}
@@ -319,4 +319,27 @@ export const ComposedChats: Story = {
       main={<ChatsPageClient />}
     />
   ),
+};
+
+chatsClient.setQueryData(
+  queryKeys.admin.lists.sidebar(),
+  queryClient.getQueryData(queryKeys.admin.lists.sidebar())
+);
+
+/** Real shell and Chats page, with the operator sidebar and authorized identity. */
+export const OperatorShell: Story = {
+  ...ComposedChats,
+  args: { section: 'ov', variant: 'ov', headerOwnsCollapsedToggle: true },
+  parameters: {
+    ...ComposedChats.parameters,
+    nextjs: { navigation: { pathname: APP_ROUTES.ADMIN_CHAT } },
+  },
+  decorators: [
+    withChatsData,
+    Story => (
+      <DashboardDataProvider value={{ ...dashboardData, isAdmin: true }}>
+        <Story />
+      </DashboardDataProvider>
+    ),
+  ],
 };

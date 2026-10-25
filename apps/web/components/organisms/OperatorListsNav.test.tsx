@@ -1,5 +1,5 @@
 import { TooltipProvider } from '@jovie/ui';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 
@@ -86,7 +86,7 @@ describe('OperatorListsNav', () => {
     }
   });
 
-  it('creates a list inline with Enter and cancels with Escape', () => {
+  it('creates a list inline with Enter and cancels with Escape', async () => {
     renderNav();
     fireEvent.click(screen.getByRole('button', { name: 'New List' }));
     const input = screen.getByRole('textbox', { name: 'New List Name' });
@@ -98,6 +98,21 @@ describe('OperatorListsNav', () => {
     expect(
       screen.getByRole('button', { name: 'New List' })
     ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'New List' })).toHaveFocus()
+    );
+  });
+
+  it('returns focus without creating a list when Enter cancels an empty name', async () => {
+    renderNav();
+    fireEvent.click(screen.getByRole('button', { name: 'New List' }));
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'New List Name' }), {
+      key: 'Enter',
+    });
+    expect(mocks.create).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'New List' })).toHaveFocus()
+    );
   });
 
   it('expands a collapsed rail before entering a new list name', () => {
