@@ -23,7 +23,13 @@ SYNC_PAGES = 4    # incremental pages per team per tick
 FILL_PAGES = 10   # first-fill pages per team per tick; the fill resumes next tick
 FILL_OVERLAP_S = 300  # the first incremental re-reads this window before the fill began
 STALE_ALERT_S = 6 * 3600
-FLUSH_LIMIT = 10
+OUTBOX_ALERT_S = 3600  # writes are comments and state moves; an hour behind already misleads the board
+# Gem 2026-10-25: 504 pending writes (408 lane comments), none attempted, oldest 164 min, depth growing.
+# Arrivals ran 80-175 per 30 min against a drain of 10 per dispatch tick, with Linear at 4995/5000
+# requests free: the cap, not the API, was the limit. Drain until the quota guard (admit) holds, the
+# wall budget ends, or the safety ceiling is reached.
+FLUSH_LIMIT = 200
+FLUSH_BUDGET_S = 45
 DEAD_AFTER = 8
 CLAIM_KEEP_S = 7 * 86400
 TERMINAL = frozenset({"completed", "canceled"})
@@ -406,10 +412,14 @@ def _deliver_label(state: Path, linear, entry: dict) -> str:
     return "labelled"
 
 
-def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT) -> dict:
+def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT, budget_s: float = FLUSH_BUDGET_S) -> dict:
     entries = list(_read(_outbox_path(state), OUTBOX).get("entries") or [])
     delivered, outcome = [], "drained"
+    started = time.monotonic()
     for entry in entries[:limit]:
+        if time.monotonic() - started > budget_s:
+            outcome = "partial"
+            break
         if not admit(2):
             outcome = "budget-held"
             break
@@ -489,9 +499,9 @@ def alerts(view: dict) -> dict[str, str]:
             found[f"backlog-ready-idle:{team}"] = (f"{team}: {row.get('ready')} agent-ready in Backlog while Todo is "
                                                    f"{row.get('todo')} of {row.get('target')} since the deficit opened")
     outbox = view.get("outbox") or {}
-    if (outbox.get("oldestAgeS") or 0) > STALE_ALERT_S:
+    if (outbox.get("oldestAgeS") or 0) > OUTBOX_ALERT_S:
         found["linear-outbox-stale"] = (f"Linear outbox: {outbox['depth']} writes waiting, "
-                                        f"oldest {outbox['oldestAgeS'] // 3600}h")
+                                        f"oldest {outbox['oldestAgeS'] // 60}m")
     if outbox.get("dead"):
         found["linear-outbox-dead"] = f"Linear outbox: {outbox['dead']} writes dead-lettered after {DEAD_AFTER} attempts"
     return found
