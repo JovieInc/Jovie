@@ -218,6 +218,32 @@ class CostPerMerge(unittest.TestCase):
         self.assertIsNone(hyper["costPerMergedUsd"])
         self.assertEqual((hyper["costUsd"], hyper["costBasis"]), (333.2, "credit-burn-estimate"))
 
+    def test_agent_started_merges_join_by_trailer_thread_id_or_glm_prefix(self):
+        merged_rows = [{"number": 1, "headRefName": "hyperagent/jov-1-abc", "author": {"login": "itstimwhite"}},
+                       {"number": 2, "headRefName": "glm/fix-x", "author": {"login": "itstimwhite"}, "body": "Dispatch ID: thread cmvkjd36b01q406adg01gyra4"},
+                       {"number": 3, "headRefName": "glm/fix-y", "author": {"login": "itstimwhite"}, "body": "no id"},
+                       {"number": 5, "headRefName": "tim/z", "author": {"login": "itstimwhite"}, "body": "Agent-Path: hyperagent/glm-5.3"},
+                       {"number": 6, "headRefName": "ops/q", "author": {"login": "itstimwhite"}},
+                       {"number": 4, "headRefName": "grok/z", "author": {"login": "app/jovie-bot"}}]
+        merged = {f"JovieInc/Jovie#{n}" for n in (1, 2, 3, 4, 5, 6)}
+        rows = [lane_row("grok", 4, "autonomous-created")]
+        out = CM.compute(REGISTRY, rows, merged, {"providers": []}, NOW, merged_rows=merged_rows)
+        hyper = out["hyperagent"]
+        self.assertEqual((hyper["mergedUnreceipted"], hyper["mergedAgentProven"], hyper["mergedAgentInferred"]), (1, 2, 1))
+        self.assertEqual(hyper["mergedCreated"], 0)
+        self.assertEqual(CM.unattributed(rows, merged_rows, {"hyperagent", "grok", "codex"}),
+                         {"total": 1, "byBranchPrefix": {"ops/ (itstimwhite)": 1}})
+
+    def test_credit_burn_cost_divides_by_receipted_plus_thread_attributed_merges(self):
+        spend = {"providers": [{"id": "hyperagent-credits", "burnPerDayUsd": {"value": 47.6}}]}
+        merged_rows = [{"number": n, "headRefName": f"glm/x{n}"} for n in range(10, 79)]  # 69 inferred
+        merged = {"JovieInc/Jovie#9"} | {f"JovieInc/Jovie#{r['number']}" for r in merged_rows}
+        out = CM.compute(REGISTRY, [lane_row("hyperagent", 9, "autonomous-created")], merged, spend, NOW, merged_rows=merged_rows)
+        hyper = out["hyperagent"]
+        self.assertEqual((hyper["mergedCreated"], hyper["mergedAgentInferred"]), (1, 69))
+        self.assertEqual(hyper["costPerMergedUsd"], round(333.2 / 70, 2))
+        self.assertEqual(hyper["costScope"], "all-usage-over-receipted-plus-thread-attributed-merges")
+
     def test_an_incomplete_merge_window_is_reported_not_counted(self):
         with tempfile.TemporaryDirectory() as tmp:
             incomplete = lambda *a, **k: {"complete": False, "reason": "max_pages_reached", "prs": []}  # noqa: E731

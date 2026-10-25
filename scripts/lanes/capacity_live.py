@@ -207,7 +207,11 @@ def read_metrics(state_dir: Path, registry: dict, now: float, merge_window=None)
         spend = {}
     rows = capacity_metrics.read_ledger_tail(Path(state_dir) / "runs" / "ledger.jsonl")
     return {"windowDays": capacity_metrics.WINDOW_DAYS, "mergedInWindow": len(merged), "readAt": _iso(now),
-            "providers": capacity_metrics.compute(registry, rows, merged, spend, now)}
+            "providers": capacity_metrics.compute(registry, rows, merged, spend, now, repository=repository,
+                                                  merged_rows=evidence.get("prs", [])),
+            "unattributed": capacity_metrics.unattributed(
+                rows, evidence.get("prs", []), {p.get("lane") for p in registry.get("providers", []) if p.get("lane")},
+                repository)}
 
 
 def tick(state_dir: Path, now: float | None = None, registry: dict | None = None, grok=read_grok,
