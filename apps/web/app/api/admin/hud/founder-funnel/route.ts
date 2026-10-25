@@ -46,7 +46,7 @@ async function authorizeAdmin(): Promise<Response | null> {
  */
 export async function GET(request: Request): Promise<Response> {
   try {
-    const authResponse = isDisplayReadRequest(request)
+    const authResponse = (await isDisplayReadRequest(request))
       ? null
       : await authorizeAdmin();
     if (authResponse) return authResponse;

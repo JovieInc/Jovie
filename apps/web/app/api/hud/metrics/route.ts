@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const kioskToken = request.nextUrl.searchParams.get('kiosk');
-    const auth = isDisplayReadRequest(request)
+    const auth = (await isDisplayReadRequest(request))
       ? ({ ok: true, mode: 'kiosk' } as const)
       : await authorizeHud(kioskToken);
 

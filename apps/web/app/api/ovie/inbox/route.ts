@@ -12,7 +12,7 @@ const headers = { 'Cache-Control': 'private, no-store' } as const;
 /** One authorized projection; mutations retain their domain authorization. */
 export async function GET(request: Request): Promise<NextResponse> {
   // A read-only display session may read this projection; nothing else.
-  if (!isDisplayReadRequest(request)) {
+  if (!(await isDisplayReadRequest(request))) {
     let principal;
     try {
       principal = await resolveOviePrincipal(request);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DISPLAY_PROOF_SKEW_SECONDS,
+  DISPLAY_PROOF_MAX_AGE_SECONDS,
+  DISPLAY_PROOF_MAX_FUTURE_SECONDS,
   DISPLAY_SESSION_TTL_SECONDS,
   displayDeviceProof,
   mintDisplaySession,
@@ -37,6 +38,27 @@ describe('parseDisplayDevices', () => {
     expect(parsed.map(item => item.id)).toEqual(['dup-1']);
     expect(parsed[0]?.secrets).toEqual([SECRET]);
   });
+  it('strict: a present-but-invalid revocation field drops the device, never leaves it active', () => {
+    const entry = (extra: Record<string, unknown>) =>
+      parseDisplayDevices(
+        JSON.stringify([{ id: 'air-office', secret: SECRET, ...extra }])
+      );
+    for (const bad of [
+      { disabled: 'true' },
+      { disabled: 1 },
+      { disabled: null },
+      { revokedBefore: '1800000000' },
+      { revokedBefore: -5 },
+      { revokedBefore: null },
+      { revokedBefore: Number.NaN },
+      { previousSecret: 7 },
+      { previousSecret: null },
+    ])
+      expect(entry(bad), JSON.stringify(bad)).toEqual([]);
+    expect(entry({ disabled: true })[0]?.disabled).toBe(true);
+    expect(entry({ disabled: false })[0]?.disabled).toBe(false);
+    expect(entry({ revokedBefore: 0 })).toHaveLength(1);
+  });
 });
 
 describe('verifyDeviceProof', () => {
@@ -62,17 +84,22 @@ describe('verifyDeviceProof', () => {
     expect(verify({ ts: '1' })).toBeNull();
     expect(verify({ ts: ts + 0.5 })).toBeNull();
   });
-  it('rejects stale and future proofs beyond the skew', () => {
-    const edge = DISPLAY_PROOF_SKEW_SECONDS;
+  it('accepts up to 60s old and 5s ahead, nothing beyond (no 121s window)', () => {
+    const old = DISPLAY_PROOF_MAX_AGE_SECONDS;
+    const ahead = DISPLAY_PROOF_MAX_FUTURE_SECONDS;
     expect(
-      verify({ ts: ts - edge, proof: proof(SECRET, ts - edge) })
+      verify({ ts: ts - old, proof: proof(SECRET, ts - old) })
     ).not.toBeNull();
     expect(
-      verify({ ts: ts - edge - 1, proof: proof(SECRET, ts - edge - 1) })
+      verify({ ts: ts - old - 1, proof: proof(SECRET, ts - old - 1) })
     ).toBeNull();
     expect(
-      verify({ ts: ts + edge + 1, proof: proof(SECRET, ts + edge + 1) })
+      verify({ ts: ts + ahead, proof: proof(SECRET, ts + ahead) })
+    ).not.toBeNull();
+    expect(
+      verify({ ts: ts + ahead + 1, proof: proof(SECRET, ts + ahead + 1) })
     ).toBeNull();
+    expect(verify({ ts: ts + 60, proof: proof(SECRET, ts + 60) })).toBeNull();
   });
   it('a proof for one timestamp cannot be reused for another', () => {
     expect(verify({ ts: ts + 1 })).toBeNull();
@@ -104,7 +131,8 @@ describe('display session', () => {
       ...over,
     });
   it('round-trips for the device and expires after the TTL', () => {
-    expect(verify()?.id).toBe('air-office');
+    expect(verify()?.device.id).toBe('air-office');
+    expect(verify()?.iat).toBe(ts);
     expect(minted.expiresAt).toBe(ts + DISPLAY_SESSION_TTL_SECONDS);
     expect(
       verify({ nowMs: NOW + (DISPLAY_SESSION_TTL_SECONDS - 1) * 1000 })

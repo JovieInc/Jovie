@@ -11,8 +11,13 @@ export const DISPLAY_COOKIE = 'ovie_display';
 export const DISPLAY_SCOPE = 'ovie-home-read';
 /** Long enough for a working day, short enough that a stolen cookie ages out. */
 export const DISPLAY_SESSION_TTL_SECONDS = 12 * 60 * 60;
-/** A proof is valid this long either side of the server clock. */
-export const DISPLAY_PROOF_SKEW_SECONDS = 60;
+/** A proof may be this old (the Air's script and network lag)... */
+export const DISPLAY_PROOF_MAX_AGE_SECONDS = 60;
+/** ...but at most this far ahead of the server clock. */
+export const DISPLAY_PROOF_MAX_FUTURE_SECONDS = 5;
+/** Redis TTL for a spent proof: covers the whole acceptance window. */
+export const DISPLAY_PROOF_REPLAY_TTL_SECONDS =
+  DISPLAY_PROOF_MAX_AGE_SECONDS + DISPLAY_PROOF_MAX_FUTURE_SECONDS + 5;
 const MIN_SECRET_LENGTH = 32;
 const DEVICE_ID = /^[a-z0-9][a-z0-9-]{1,39}$/;
 
@@ -27,8 +32,10 @@ export interface DisplayDevice {
 
 /**
  * Parse `OVIE_DISPLAY_DEVICES`: JSON array of
- * `{ id, secret, previousSecret?, revokedBefore?, disabled? }`. Anything
- * malformed is dropped, so a typo can only remove access, never widen it.
+ * `{ id, secret, previousSecret?, revokedBefore?, disabled? }`. Strict: an
+ * entry with any field present but invalid (a string \"true\" for `disabled`,
+ * a non-numeric `revokedBefore`) is dropped whole, so a typo can only remove
+ * access, never leave a revoked device active.
  */
 export function parseDisplayDevices(raw: string | undefined): DisplayDevice[] {
   if (!raw) return [];
@@ -47,19 +54,30 @@ export function parseDisplayDevices(raw: string | undefined): DisplayDevice[] {
     if (typeof id !== 'string' || !DEVICE_ID.test(id)) continue;
     if (typeof secret !== 'string' || secret.length < MIN_SECRET_LENGTH)
       continue;
+    if (disabled !== undefined && typeof disabled !== 'boolean') continue;
+    if (
+      revokedBefore !== undefined &&
+      !(
+        typeof revokedBefore === 'number' &&
+        Number.isFinite(revokedBefore) &&
+        revokedBefore >= 0
+      )
+    )
+      continue;
     const secrets = [secret];
-    if (typeof previousSecret === 'string') {
-      if (previousSecret.length < MIN_SECRET_LENGTH) continue;
+    if (previousSecret !== undefined) {
+      if (
+        typeof previousSecret !== 'string' ||
+        previousSecret.length < MIN_SECRET_LENGTH
+      )
+        continue;
       secrets.push(previousSecret);
     }
     if (devices.some(device => device.id === id)) continue;
     devices.push({
       id,
       secrets,
-      revokedBefore:
-        typeof revokedBefore === 'number' && Number.isFinite(revokedBefore)
-          ? revokedBefore
-          : 0,
+      revokedBefore: revokedBefore ?? 0,
       disabled: disabled === true,
     });
   }
@@ -94,10 +112,9 @@ export function verifyDeviceProof(input: {
   const { deviceId, ts, proof } = input;
   if (typeof deviceId !== 'string' || typeof proof !== 'string') return null;
   if (typeof ts !== 'number' || !Number.isInteger(ts)) return null;
-  if (
-    Math.abs(Math.floor(input.nowMs / 1000) - ts) > DISPLAY_PROOF_SKEW_SECONDS
-  )
-    return null;
+  const age = Math.floor(input.nowMs / 1000) - ts;
+  if (age > DISPLAY_PROOF_MAX_AGE_SECONDS) return null;
+  if (-age > DISPLAY_PROOF_MAX_FUTURE_SECONDS) return null;
   const device = input.devices.find(entry => entry.id === deviceId);
   if (!device || device.disabled) return null;
   // Compare against every secret (no early exit) so timing does not reveal
@@ -126,13 +143,13 @@ export function mintDisplaySession(input: {
   };
 }
 
-/** The device behind a valid, unexpired, unrevoked session, else null. */
+/** The device (and mint time) behind a valid, unexpired, unrevoked session. */
 export function verifyDisplaySession(input: {
   readonly token: string | null | undefined;
   readonly devices: readonly DisplayDevice[];
   readonly key: string;
   readonly nowMs: number;
-}): DisplayDevice | null {
+}): { readonly device: DisplayDevice; readonly iat: number } | null {
   const { token } = input;
   if (!token || input.key.length < MIN_SECRET_LENGTH) return null;
   const parts = token.split('.');
@@ -154,7 +171,7 @@ export function verifyDisplaySession(input: {
   const device = input.devices.find(entry => entry.id === claims.d);
   if (!device || device.disabled || claims.iat < device.revokedBefore)
     return null;
-  return device;
+  return { device, iat: claims.iat };
 }
 
 export function readCookie(
