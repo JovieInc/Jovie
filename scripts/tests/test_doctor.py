@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+from datetime import datetime, timezone
 import os
 import subprocess
 import sys
@@ -328,6 +329,56 @@ class PublicFeedSizeTest(unittest.TestCase):
         # Nothing is lost: the complete evidence is what the details file carries, byte for byte.
         self.assertEqual(len(json.loads(full)["fileOverlap"]["pairs"]), 737)
         self.assertEqual(public["publicProjection"]["fullEvidence"]["bytes"], len(full.encode()))
+
+    def test_conditions_keep_active_and_recent_resolutions_compactly_and_count_the_rest(self):
+        # Gem 2026-10-25: 33 of 52 receipts were resolved, kept forever, each with ~1.5 KB of review bindings.
+        now = 1_800_000_000.0
+        stamp = lambda age: datetime.fromtimestamp(now - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        review = {"outcome": "approved-template", "bindings": {"messageSha256": "f" * 64, "extra": "x" * 1200}}
+        def event(state, resolved_age=None, evidence="e" * 900):
+            row = {"schema": "s", "idempotencyKey": "gem:k:1", "condition": "k", "generation": 1, "state": state,
+                   "severity": "degraded", "owner": "doctor", "firstObservedAt": "2026-10-25T00:00:00Z",
+                   "source": {"producer": "p", "status": "degraded", "observedAt": "t", "freshnessSeconds": 0},
+                   "evidence": evidence, "writingReview": review, "writingDecision": {"d": "x" * 500},
+                   "summerEscalation": {"transport": "linear", "outcome": "requested"}}
+            if resolved_age is not None:
+                row["resolvedAt"] = stamp(resolved_age)
+            return row
+        public = {"conditions": {"live": event("active"), "fresh": event("resolved", 3600),
+                                 "old": event("resolved", 7 * 3600), "undated": event("resolved")}}
+        before = len(json.dumps(public))
+        doctor._compact_conditions(public, now)
+        self.assertEqual(sorted(public["conditions"]), ["fresh", "live"])
+        live = public["conditions"]["live"]
+        self.assertNotIn("writingReview", live)
+        self.assertNotIn("writingDecision", live)
+        self.assertEqual(live["evidence"], "e" * 900, "operational evidence is never trimmed")
+        self.assertEqual(live["summerEscalation"]["outcome"], "requested")
+        self.assertEqual(live["source"]["status"], "degraded")
+        summary = public["conditionsSummary"]
+        self.assertEqual((summary["total"], summary["resolvedOmitted"], summary["byState"]),
+                         (4, 2, {"active": 1, "resolved": 3}))
+        self.assertEqual(summary["ref"]["jsonPointer"], "/conditions")
+        self.assertLess(len(json.dumps(public)), before / 2)
+
+    def test_growth_rate_projects_time_to_cap_and_alerts_under_six_hours(self):
+        cap, now = 262144, 1_000_000.0
+        flat = doctor.feed_growth([[now - 3600, 100000], [now - 1800, 100000]], now, 100000)
+        self.assertEqual((flat["growthBytesPerHour"], flat["secondsToCap"]), (0, None))
+        self.assertIsNone(doctor.feed_growth([[now - 60, 1]], now, 2)["secondsToCap"], "too little history")
+        rising = doctor.feed_growth([[now - 3600, 145000], [now - 1800, 160000]], now, 175000)
+        self.assertEqual(rising["growthBytesPerHour"], 30000)
+        self.assertEqual(rising["secondsToCap"], round((cap - 175000) / (30000 / 3600)))
+        self.assertLess(rising["secondsToCap"], doctor.FEED_GROWTH_ALERT_S)
+        sizes = {"bytes": 175000, "maxBytes": cap, "ratio": 0.668, **rising}
+        alert = doctor.judge(obs(publicFeed=sizes))["public-feed-growth"]
+        self.assertIn("30000 bytes/h", alert)
+        slow = doctor.feed_growth([[now - 3600, 100000], [now - 1800, 100500]], now, 101000)
+        self.assertNotIn("public-feed-growth", doctor.judge(obs(publicFeed={"bytes": 101000, "maxBytes": cap, "ratio": 0.4, **slow})))
+        # The level alert wins when both apply; one alert, not two.
+        both = doctor.judge(obs(publicFeed={**sizes, "bytes": 190000, "ratio": 0.725}))
+        self.assertIn("public-feed-near-limit", both)
+        self.assertNotIn("public-feed-growth", both)
 
     def test_section_sizes_are_measured_and_the_doctor_alerts_before_the_cap(self):
         out = doctor.public_status_projection(realistic_feed(), json.dumps(realistic_feed(), indent=1))

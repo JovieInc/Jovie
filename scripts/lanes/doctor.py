@@ -1023,6 +1023,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["public-feed-near-limit"] = (f"public lanes status feed is {feed_size['bytes']} bytes, "
                                             f"{round(feed_size['ratio'] * 100)}% of the {feed_size['maxBytes']} byte cap "
                                             f"(largest: {top}); past the cap every HUD tile and dead-man check reads unavailable")
+    ttl = feed_size.get("secondsToCap")
+    if isinstance(ttl, (int, float)) and 0 <= ttl < FEED_GROWTH_ALERT_S and "public-feed-near-limit" not in alerts:
+        alerts["public-feed-growth"] = (f"public lanes status feed grows {feed_size.get('growthBytesPerHour')} bytes/h "
+                                        f"and reaches the {feed_size.get('maxBytes')} byte cap in about {round(ttl / 3600, 1)}h "
+                                        f"(now {feed_size.get('bytes')}, {round((feed_size.get('ratio') or 0) * 100)}%)")
     lag = obs.get("installLag") or {}
     if isinstance(lag.get("behindS"), (int, float)) and lag["behindS"] > INSTALL_LAG_ALERT_S:
         alerts["install-lag"] = (f"main's lane bundle {str(lag.get('behindCommit'))[:8]} is {round(lag['behindS'] / 60)}m "
@@ -1962,6 +1967,44 @@ def _compact_overlap(public: dict) -> None:
     }
 
 
+# Conditions grew 54 KB -> 69 KB in about an hour (2026-10-25): 33 of 52 receipts were `resolved`, kept
+# forever locally (generation numbers must survive for idempotency keys), each carrying its writing-review
+# bindings (~1.5 KB). The public feed keeps every active condition and recent resolutions without the heavy
+# review/evidence blobs, plus a count summary; the complete receipts stay in lanes-status-details.json.
+PUBLIC_CONDITION_RESOLVED_KEEP_S = 6 * 3600
+PUBLIC_CONDITION_DROP = ("writingReview", "writingDecision", "recoveryEvidence")  # heavy; full copy in the details file
+
+
+def _compact_conditions(public: dict, now: float | None = None) -> None:
+    conditions = public.get("conditions")
+    if not isinstance(conditions, dict):
+        return
+    now = time.time() if now is None else now
+    kept, omitted = {}, 0
+    for key, event in conditions.items():
+        if not isinstance(event, dict):
+            kept[key] = event
+            continue
+        resolved = event.get("state") == "resolved"
+        if resolved:
+            stamp = event.get("resolvedAt")
+            try:
+                age = now - datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+            except (TypeError, ValueError):
+                age = None
+            if age is None or age > PUBLIC_CONDITION_RESOLVED_KEEP_S:
+                omitted += 1
+                continue
+        row = {name: value for name, value in event.items() if name not in PUBLIC_CONDITION_DROP}
+        kept[key] = row
+    states = Counter(str(event.get("state")) for event in conditions.values() if isinstance(event, dict))
+    public["conditions"] = kept
+    public["conditionsSummary"] = {
+        "total": len(conditions), "byState": dict(states), "resolvedOmitted": omitted,
+        "resolvedKeptForS": PUBLIC_CONDITION_RESOLVED_KEEP_S,
+        "ref": {"recordCount": len(conditions), "jsonPointer": "/conditions"}}
+
+
 def _compact_remediation(public: dict) -> None:
     remediation_block = public.get("remediation")
     rows = remediation_block.get("byFingerprint") if isinstance(remediation_block, dict) else None
@@ -1972,6 +2015,25 @@ def _compact_remediation(public: dict) -> None:
         for key, row in rows.items()}
     remediation_block["byFingerprintRef"] = {"recordCount": len(rows), "jsonPointer": "/remediation/byFingerprint",
                                              "omitted": "ask, recurrence and history text"}
+
+
+FEED_SAMPLE_WINDOW_S = 6 * 3600
+FEED_SAMPLE_MIN_SPAN_S = 20 * 60
+FEED_GROWTH_ALERT_S = 6 * 3600  # alert when the projected time to the cap is under 6 hours
+
+
+def feed_growth(samples: list, now: float, total: int, cap: int = PUBLIC_FEED_MAX_BYTES) -> dict:
+    """Bytes/hour over the retained samples and the projected seconds until the cap. Needs >=3 samples
+    spanning >=20 min; a shrinking or flat feed projects nothing."""
+    window = [row for row in (samples or []) if isinstance(row, list) and len(row) == 2
+              and 0 <= now - row[0] <= FEED_SAMPLE_WINDOW_S]
+    window.append([now, total])
+    span = window[-1][0] - window[0][0]
+    if len(window) < 3 or span < FEED_SAMPLE_MIN_SPAN_S:
+        return {"samples": window, "growthBytesPerHour": None, "secondsToCap": None}
+    rate = (window[-1][1] - window[0][1]) / span  # bytes per second
+    return {"samples": window[-72:], "growthBytesPerHour": round(rate * 3600),
+            "secondsToCap": round((cap - total) / rate) if rate > 0 else None}
 
 
 def feed_section_sizes(text: str) -> dict:
@@ -2012,6 +2074,7 @@ def public_status_projection(feed: dict, full_text: str) -> str:
                 }
     _compact_overlap(public)
     _compact_remediation(public)
+    _compact_conditions(public)
     public["publicProjection"] = {
         "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
     }
@@ -2045,6 +2108,8 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     public_text = public_status_projection(feed, full_text)
     try:
         sizes = feed_section_sizes(public_text)
+        previous_sizes = read_json(host.state / "public-feed-sizes.json", {})
+        sizes.update(feed_growth(previous_sizes.get("samples") or [], time.time(), sizes["bytes"]))
         atomic_write_text(host.state / "public-feed-sizes.json", json.dumps({"at": now_iso(), **sizes}))
     except (OSError, ValueError):
         pass  # a metric never blocks the publish
