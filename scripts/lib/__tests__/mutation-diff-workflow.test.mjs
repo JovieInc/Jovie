@@ -27,7 +27,9 @@ describe('Mutation Diff spare-compute contract', () => {
 
   it('is event-driven: no cron, self-chains through workflow_dispatch only', () => {
     expect(workflow).not.toMatch(/^\s*schedule:/mu);
-    expect(workflow).toMatch(/gh workflow run mutation-diff\.yml --ref main/u);
+    expect(workflow).toMatch(
+      /cli\.ts gh --priority default -- workflow run mutation-diff\.yml --ref main/u
+    );
     expect(workflow).toContain('actions: write');
   });
 
