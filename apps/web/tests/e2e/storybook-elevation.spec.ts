@@ -785,20 +785,19 @@ test.describe('sidebar attention and Settings header', () => {
       await expect(
         page.getByRole('link', { name: 'Inbox', exact: true })
       ).toHaveCount(1);
-      // Current navigation groups Calendar within Work. Preserve every
-      // canonical destination exposed by this default-flags story.
+      // Calendar stays within Work; Identity is permanent without a rollout
+      // override. Preserve every canonical destination in the default story.
       for (const [name, href] of [
         ['Inbox', '/app'],
         ['Work', '/app/library'],
         ['Audience', '/app/contacts?tab=audience'],
+        ['Identity', '/app/presence'],
       ]) {
         const destination = page.getByRole('link', { name, exact: true });
+        await expect(destination).toHaveCount(1);
         await expect(destination).toBeVisible();
         await expect(destination).toHaveAttribute('href', href);
       }
-      await expect(
-        page.getByRole('link', { name: 'Identity', exact: true })
-      ).toHaveCount(0);
     });
   }
 });
