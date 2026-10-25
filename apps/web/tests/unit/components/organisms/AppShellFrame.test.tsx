@@ -3,8 +3,28 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 
 describe('AppShellFrame', () => {
+  it.each([false, true])(
+    'keeps Ovie paint ownership stable while loading: %s',
+    loading => {
+      const { container } = render(
+        loading ? (
+          <AppShellSkeleton brandVariant='ov' />
+        ) : (
+          <AppShellFrame
+            brandVariant='ov'
+            sidebar={null}
+            main={<div>Home</div>}
+          />
+        )
+      );
+      expect(
+        container.querySelector('[data-app-shell-workspace="ov"]')
+      ).toBeInTheDocument();
+    }
+  );
   // JOV-8974: the Electron shell keeps one gutter on every window edge. The
   // body's top padding and the titlebar band's top offset must both come from
   // the shell gap token, never a flush 0 or an invented px literal.

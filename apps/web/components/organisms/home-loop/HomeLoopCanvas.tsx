@@ -24,6 +24,8 @@ import { HomeLoopStageStrip } from './HomeLoopStageStrip';
 export type { HomeLoopCopy } from '@/lib/home-loop/contract';
 
 export interface HomeLoopCanvasProps {
+  /** Replaces the constraint, pulse and timing bands as one composition. */
+  readonly overview?: ReactNode;
   readonly copy: HomeLoopCopy;
   readonly stages: readonly string[];
   readonly constraint: HomeLoopConstraint | null;
@@ -69,6 +71,7 @@ export interface HomeLoopCanvasProps {
  * section reserves its frame, so arriving data never moves a sibling.
  */
 export function HomeLoopCanvas({
+  overview,
   copy,
   stages,
   constraint,
@@ -102,20 +105,24 @@ export function HomeLoopCanvas({
       className='@container flex w-full flex-col gap-3 lg:h-full lg:min-h-0'
       data-testid='home-loop-canvas'
     >
-      <HomeLoopConstraintBanner
-        constraint={loopStatus === 'ready' ? constraint : null}
-        emptyLabel={copy.constraintClear}
-        loading={loopStatus === 'loading'}
-      />
-      <HomeLoopPulse tiles={pulse} loading={loopStatus === 'loading'} />
-      {strip ? (
-        <HomeLoopStageStrip
-          title={copy.latencyTitle ?? 'Stage Time'}
-          items={loopStatus === 'ready' ? strip : []}
-          coverage={loopStatus === 'ready' ? stripCoverage : null}
-          emptyLabel={copy.latencyEmpty ?? 'Not measured'}
-        />
-      ) : null}
+      {overview ?? (
+        <>
+          <HomeLoopConstraintBanner
+            constraint={loopStatus === 'ready' ? constraint : null}
+            emptyLabel={copy.constraintClear}
+            loading={loopStatus === 'loading'}
+          />
+          <HomeLoopPulse tiles={pulse} loading={loopStatus === 'loading'} />
+          {strip ? (
+            <HomeLoopStageStrip
+              title={copy.latencyTitle ?? 'Stage Time'}
+              items={loopStatus === 'ready' ? strip : []}
+              coverage={loopStatus === 'ready' ? stripCoverage : null}
+              emptyLabel={copy.latencyEmpty ?? 'Not measured'}
+            />
+          ) : null}
+        </>
+      )}
       {answer ? (
         <div className='max-h-1/2 shrink-0 overflow-y-auto'>{answer}</div>
       ) : null}
