@@ -1627,6 +1627,11 @@ jobs:
       - name: Package staging desktop app
         if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
         env:
+          # Public DSN is config; the token only uploads sourcemaps (postpackage).
+          DESKTOP_SENTRY_DSN: ${{ vars.DESKTOP_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.DESKTOP_SENTRY_PROJECT }}
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
           JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
@@ -1773,6 +1778,11 @@ jobs:
       - name: Package production desktop app
         if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true' && steps.prepare-production.outputs.quota_deferred != 'true'
         env:
+          # Public DSN is config; the token only uploads sourcemaps (postpackage).
+          DESKTOP_SENTRY_DSN: ${{ vars.DESKTOP_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.DESKTOP_SENTRY_PROJECT }}
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
           JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
@@ -2176,6 +2186,11 @@ jobs:
       - name: Package staging desktop app
         if: ${{ env.ENVIRONMENT == 'staging' && steps.prepare-staging.outputs.quota_deferred != 'true' }}
         env:
+          # Public DSN is config; the token only uploads sourcemaps (postpackage).
+          DESKTOP_SENTRY_DSN: ${{ vars.DESKTOP_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.DESKTOP_SENTRY_PROJECT }}
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
           JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
@@ -2322,6 +2337,11 @@ jobs:
       - name: Package production desktop app
         if: env.ENVIRONMENT == 'production' && steps.prepare-production.outputs.prepared == 'true' && steps.prepare-production.outputs.quota_deferred != 'true'
         env:
+          # Public DSN is config; the token only uploads sourcemaps (postpackage).
+          DESKTOP_SENTRY_DSN: ${{ vars.DESKTOP_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.DESKTOP_SENTRY_PROJECT }}
           JOVIE_DESKTOP_SOURCE_REVISION: ${{ env.RELEASE_SHA }}
           JOVIE_RELEASE_DMG: 'true'
           ELECTRON_ENV: ${{ env.ENVIRONMENT }}
