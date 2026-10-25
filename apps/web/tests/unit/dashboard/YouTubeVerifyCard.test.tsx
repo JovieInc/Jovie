@@ -25,45 +25,36 @@ describe('YouTubeVerifyCard', () => {
     mockSearch.mockReturnValue('');
   });
 
-  it('shows an unverified channel with a one-tap connect to verify', () => {
-    mockQuery.mockReturnValue({ data: { state: 'unverified', channel } });
+  it('asks once, framed by access, only while the owner is waiting', () => {
+    mockQuery.mockReturnValue({
+      data: { state: 'unverified', channel, needsAccess: true },
+    });
     render(
       <YouTubeVerifyCard profileId='11111111-1111-4111-8111-111111111111' />
     );
-    expect(screen.getByTestId('youtube-verify-status').textContent).toBe(
-      'Unverified'
-    );
-    const cta = screen.getByRole('link', {
-      name: 'Connect YouTube to verify',
-    });
+    expect(screen.queryByText('Unverified')).toBeNull();
+    const cta = screen.getByRole('link', { name: 'Connect to get access' });
     const href = new URL(cta.getAttribute('href') ?? '', 'https://x.test');
     expect(href.pathname).toBe('/api/connectors/youtube/authorize');
     expect(href.searchParams.get('creatorProfileId')).toBe(
       '11111111-1111-4111-8111-111111111111'
     );
-    expect(href.searchParams.get('returnTo')).toBe('/app/dashboard/profile');
   });
 
-  it('shows verified without a connect prompt', () => {
-    mockQuery.mockReturnValue({ data: { state: 'verified', channel } });
-    render(<YouTubeVerifyCard profileId='p' />);
-    expect(screen.getByTestId('youtube-verify-status').textContent).toBe(
-      'Verified'
-    );
-    expect(screen.queryByText('Connect YouTube to verify')).toBeNull();
-  });
-
-  it('explains an ownership mismatch and stays unverified', () => {
+  it('only reacts to a failed attempt after the owner acted', () => {
     mockSearch.mockReturnValue('youtube_verification=mismatch');
-    mockQuery.mockReturnValue({ data: { state: 'unverified', channel } });
+    mockQuery.mockReturnValue({
+      data: { state: 'unverified', channel, needsAccess: true },
+    });
     render(<YouTubeVerifyCard profileId='p' />);
-    expect(screen.getByTestId('youtube-verify-mismatch')).toBeTruthy();
-    expect(screen.getByText('Connect YouTube to verify')).toBeTruthy();
+    expect(screen.getByText(/doesn't own Lena Hart/)).toBeTruthy();
   });
 
   it.each([
     ['loading', undefined],
-    ['no candidate', { state: 'none', channel: null }],
+    ['no candidate', { state: 'none', channel: null, needsAccess: false }],
+    ['verified', { state: 'verified', channel, needsAccess: true }],
+    ['already admitted', { state: 'unverified', channel, needsAccess: false }],
   ])('renders nothing when %s', (_label, data) => {
     mockQuery.mockReturnValue({ data });
     const { container } = render(<YouTubeVerifyCard profileId='p' />);

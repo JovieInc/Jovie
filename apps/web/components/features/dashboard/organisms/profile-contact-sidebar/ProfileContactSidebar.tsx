@@ -48,6 +48,7 @@ import {
   useProfileSaveMutation,
   useRemoveSocialLinkMutation,
 } from '@/lib/queries';
+import { useSilentYouTubeLink } from '@/lib/queries/useSilentYouTubeLink';
 import { cn } from '@/lib/utils';
 import type { DetectedLink } from '@/lib/utils/platform-detection';
 import { ProfileAboutTab } from './ProfileAboutTab';
@@ -264,6 +265,7 @@ export function ProfileContactSidebar() {
   const { isOpen, close } = usePreviewPanelState();
   const { previewData, setPreviewData } = usePreviewPanelData();
   const { selectedProfile } = useDashboardData();
+  useSilentYouTubeLink(selectedProfile?.id);
 
   const router = useRouter();
   const pathname = usePathname();

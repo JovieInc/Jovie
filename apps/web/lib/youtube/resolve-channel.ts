@@ -263,3 +263,47 @@ export async function listRecentPublicVideos(
     .sort((a, b) => (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''))
     .slice(0, limit);
 }
+
+interface SearchListResponse {
+  readonly items?: readonly {
+    readonly id?: { readonly channelId?: string };
+    readonly snippet?: {
+      readonly channelTitle?: string;
+      readonly title?: string;
+    };
+  }[];
+}
+
+export interface YouTubeChannelSearchHit {
+  readonly channelId: string;
+  readonly title: string;
+}
+
+/**
+ * Public channel search by name (100 quota units per call, so callers
+ * throttle). Hits are only candidates; they prove nothing on their own.
+ */
+export async function searchYouTubeChannels(
+  query: string,
+  limit: number,
+  fetchImpl: FetchLike = serverFetch
+): Promise<readonly YouTubeChannelSearchHit[]> {
+  const apiKey = readApiKey();
+  const url = new URL(`${YOUTUBE_DATA_API}/search`);
+  url.searchParams.set('part', 'snippet');
+  url.searchParams.set('type', 'channel');
+  url.searchParams.set('q', query.slice(0, MAX_INPUT_LENGTH));
+  url.searchParams.set('maxResults', String(Math.min(Math.max(limit, 1), 10)));
+  url.searchParams.set('key', apiKey);
+  const data = await fetchJson<SearchListResponse>(
+    url,
+    'YouTube search.list',
+    fetchImpl
+  );
+  return (data?.items ?? [])
+    .map(item => ({
+      channelId: item.id?.channelId ?? '',
+      title: item.snippet?.channelTitle ?? item.snippet?.title ?? '',
+    }))
+    .filter(hit => CHANNEL_ID_PATTERN.test(hit.channelId) && hit.title);
+}

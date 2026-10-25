@@ -9,6 +9,8 @@ import { queryKeys } from './keys';
 export interface YouTubeVerificationView {
   readonly state: YouTubeVerificationState;
   readonly channel: { readonly title: string; readonly url: string } | null;
+  /** True while the owner is not yet admitted: the benefit of connecting. */
+  readonly needsAccess: boolean;
 }
 
 export function useYouTubeVerificationQuery(profileId: string) {
