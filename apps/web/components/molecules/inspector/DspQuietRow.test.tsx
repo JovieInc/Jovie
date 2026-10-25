@@ -27,6 +27,15 @@ describe('DspQuietRow', () => {
       'group-hover:opacity-100',
       'group-focus-within:opacity-100'
     );
+    expect(row.querySelector('svg')).toHaveAttribute(
+      'data-slot',
+      'hover-reveal'
+    );
+    expect(row.querySelector('svg')).toHaveClass(
+      'focus-within:opacity-100',
+      'active:opacity-100',
+      'motion-reduce:transition-none'
+    );
     expect(screen.queryByText('Not found')).not.toBeInTheDocument();
     expect(screen.queryByText('Missing')).not.toBeInTheDocument();
   });
