@@ -1,9 +1,6 @@
-import { configure, fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SmartLinksLanding } from './SmartLinksLanding';
-
-// The dial settles over a real-time curve; allow for loaded CI runners.
-configure({ asyncUtilTimeout: 4000 });
 
 vi.mock('next/image', () => ({
   default: (props: { readonly alt: string; readonly src: string }) => (
@@ -12,7 +9,16 @@ vi.mock('next/image', () => ({
 }));
 
 describe('SmartLinksLanding', () => {
-  it('presents the real link, the three-step journey, and a choice that follows the next release', async () => {
+  beforeEach(() => {
+    // Reduced motion snaps the dial instantly, so these flows are deterministic.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+  });
+
+  it('presents the real link, the three-step journey, and a choice that follows the next release', () => {
     render(<SmartLinksLanding />);
     expect(
       screen.getByRole('heading', {
@@ -42,7 +48,7 @@ describe('SmartLinksLanding', () => {
 
     fireEvent.click(screen.getByRole('option', { name: 'Apple Music' }));
     expect(
-      await screen.findByRole('link', {
+      screen.getByRole('link', {
         name: 'Open live Smart Link with Apple Music',
       })
     ).toBeInTheDocument();
