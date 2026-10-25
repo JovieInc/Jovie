@@ -181,19 +181,39 @@ export function parseVerdict(
   };
   const scores = Object.fromEntries(
     RUBRIC_DIMENSIONS.map(dimension => {
-      const score = Number(parsed.scores?.[dimension]);
-      // A missing score is a failing score: judges cannot pass copy by omission.
-      return [dimension, Number.isFinite(score) ? score : 0];
+      const score = parsed.scores?.[dimension];
+      // Missing, coerced or out-of-rubric values cannot approve copy.
+      return [
+        dimension,
+        typeof score === 'number' &&
+        Number.isFinite(score) &&
+        score >= 1 &&
+        score <= 10
+          ? score
+          : 0,
+      ];
     })
   ) as Record<RubricDimension, number>;
+  const validConfidence =
+    typeof parsed.confidence === 'number' &&
+    Number.isFinite(parsed.confidence) &&
+    parsed.confidence >= 0 &&
+    parsed.confidence <= 1;
   return {
     model,
     scores,
-    confidence: Math.min(1, Math.max(0, Number(parsed.confidence) || 0)),
-    pass: RUBRIC_DIMENSIONS.every(dimension => scores[dimension] >= bar),
-    critique: (parsed.critique ?? [])
-      .filter(line => typeof line === 'string')
-      .slice(0, 8),
+    confidence: validConfidence ? parsed.confidence! : 0,
+    pass:
+      validConfidence &&
+      RUBRIC_DIMENSIONS.every(dimension => scores[dimension] >= bar),
+    critique: [
+      ...(validConfidence
+        ? []
+        : ['judge response needs numeric confidence between 0 and 1']),
+      ...(Array.isArray(parsed.critique)
+        ? parsed.critique.filter(line => typeof line === 'string')
+        : []),
+    ].slice(0, 8),
   };
 }
 

@@ -4243,6 +4243,34 @@ if (p.endsWith('/zip')) {
     ]);
   });
 
+  it('registers the app shell root loading boundary for changed-surface certification', () => {
+    const source = 'apps/web/app/app/loading.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.app-loading'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.app-loading',
+      platform: 'web',
+      owner: 'app-shell',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.app-loading',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
   it('registers the app shell root not-found page for changed-surface certification', () => {
     const source = 'apps/web/app/app/not-found.tsx';
     const screen = SCREEN_REGISTRY.find(
@@ -4326,6 +4354,27 @@ if (p.endsWith('/zip')) {
     });
     assert.deepEqual(result.issues, []);
     assert.ok(result.excludedChanges.length >= 4);
+  });
+
+  it('registers the existing sounds page and still requires exact-head rendered evidence', () => {
+    const changedFiles = ['apps/web/app/[username]/[slug]/sounds/page.tsx'];
+    const registration = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+    });
+    assert.deepEqual(registration.issues, []);
+    assert.deepEqual(
+      registration.changedScreens.map(screen => screen.id),
+      ['web.smartlink-sounds']
+    );
+    const certification = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(certification.issues, [
+      'missing exact-head proof for web.smartlink-sounds',
+    ]);
   });
 
   it('rejects missing registration for a changed in-scope screen', () => {

@@ -232,6 +232,24 @@ describe('runVisualReview', () => {
     ).toBeLessThan(4_000);
   });
 
+  it('retains the existing rubric budget with a long active direction', async () => {
+    const pair = judges(0.9);
+    await runVisualReview(request, pair, {
+      references: [],
+      direction: {
+        ...ONE_LIGHT,
+        thesis: 'Preserve the approved composition. '.repeat(100),
+      },
+      findCopies: async () => [],
+    });
+    const [input] = vi.mocked(pair.cheap.run).mock.calls[0] as unknown as [
+      { row: { policyFingerprintSource: object } },
+    ];
+    expect(
+      JSON.stringify(input.row.policyFingerprintSource).length
+    ).toBeLessThan(4_000);
+  });
+
   it('keeps the base rubric without a direction', async () => {
     const pair = judges(0.9);
     await runVisualReview(request, pair);
