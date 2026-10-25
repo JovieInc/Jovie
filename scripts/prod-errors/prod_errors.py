@@ -530,8 +530,12 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
         key = ((issue.get("project") or {}).get("slug"), issue.get("title"))
         sid = str(issue["id"])
         roll = None if linked_linear(issue) else (ledger.get(sid) or {}).get("linear") or groups.get(key)
-        r = handle_issue(issue, ledger, sentry, linear, merges, at, state, rollup=roll,
-                         group_qualifies=totals[key] >= EVENT_THRESHOLD)
+        try:
+            r = handle_issue(issue, ledger, sentry, linear, merges, at, state, rollup=roll,
+                             group_qualifies=totals[key] >= EVENT_THRESHOLD)
+        except Exception as e:  # one bad issue (e.g. a deleted Linear link) must not stop the whole sweep
+            r = "error"
+            sys.stderr.write(f"prod-errors: sentry {sid}: {str(e)[:200]}\n")
         if ledger.get(sid, {}).get("linear") and not linked_linear(issue):
             groups.setdefault(key, ledger[sid]["linear"])
         counts[r] = counts.get(r, 0) + 1

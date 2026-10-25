@@ -123,6 +123,22 @@ class LoopTest(unittest.TestCase):
     def test_apiclient_ledger_lives_under_the_writable_state_dir(self):
         self.assertTrue(os.environ["JOVIE_API_STATE_DIR"].startswith(str(pe.STATE)) or "JOVIE_API_STATE_DIR" in os.environ)
 
+    def test_one_failing_issue_does_not_stop_the_sweep(self):
+        class S(FakeSentry):
+            def top_issues(self_):
+                return [self.issue(id="1", userCount=5), self.issue(id="2", userCount=4)]
+        calls = []
+        real = pe.handle_issue
+        def flaky(issue, *a, **k):
+            calls.append(issue["id"])
+            if issue["id"] == "1":
+                raise RuntimeError("linear: Entity not found: Issue")
+            return real(issue, *a, **k)
+        with mock.patch.object(pe, "gh_json", return_value=[]), mock.patch.object(pe, "handle_issue", flaky):
+            r = pe.sweep(S(), self.l, self.dir)
+        self.assertEqual(calls, ["1", "2"])
+        self.assertEqual(r.get("error"), 1)
+
     def test_query_is_production_only(self):
         urls = []
         s = object.__new__(pe.Sentry)
