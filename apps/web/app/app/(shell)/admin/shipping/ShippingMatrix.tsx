@@ -13,22 +13,11 @@ import {
   EntityHeader,
   EntityHeaderThumbnail,
 } from '@/components/molecules/drawer';
-import { EmptyState } from '@/components/molecules/EmptyState';
 import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
 import { type ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
-
-const SHIPPING_COLUMNS = [
-  'Work',
-  'Stage',
-  'Checks',
-  'Queue',
-  'Owner',
-  'Age',
-  'Last transition',
-] as const;
 
 type TaskFeed = ShippingCockpitProjection['operationalTasks'];
 type Task = TaskFeed['tasks'][number];
@@ -482,7 +471,15 @@ export function ShippingMatrix() {
           >
             <thead>
               <tr className='text-2xs text-tertiary-token'>
-                {SHIPPING_COLUMNS.map(label => (
+                {[
+                  'Work',
+                  'Stage',
+                  'Checks',
+                  'Queue',
+                  'Owner',
+                  'Age',
+                  'Last transition',
+                ].map(label => (
                   <th
                     key={label}
                     scope='col'
@@ -526,10 +523,7 @@ export function ShippingMatrix() {
                     colSpan={7}
                     className='p-6 text-center text-secondary-token'
                   >
-                    <EmptyState
-                      presentation='quiet'
-                      heading={emptyMatrixMessage(query.isError, feed)}
-                    />
+                    {emptyMatrixMessage(query.isError, feed)}
                   </td>
                 </tr>
               ) : (
