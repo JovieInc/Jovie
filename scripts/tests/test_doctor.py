@@ -282,6 +282,14 @@ class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
 
+    def test_install_lag_alerts_only_past_the_measured_threshold(self):
+        late = doctor.judge(obs(installLag={"behindS": doctor.INSTALL_LAG_ALERT_S + 60, "behindCommit": "dcfb270acb83",
+                                            "error": "AdmissionHeld: gate-admission-busy"}))
+        self.assertIn("gate-admission-busy", late["install-lag"])
+        self.assertIn("dcfb270a", late["install-lag"])
+        for lag in ({"behindS": 600}, {"behindS": 0}, {"behindS": None}, {}):
+            self.assertNotIn("install-lag", doctor.judge(obs(installLag=lag)))
+
     def test_failed_event_delivery_is_actionable_and_acknowledgement_clears_it(self):
         failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryExhausted': 0, 'deliveryNextAt': 100}})
         alerts = doctor.judge(failed)
