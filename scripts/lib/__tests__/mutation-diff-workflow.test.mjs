@@ -20,8 +20,16 @@ describe('Mutation Diff spare-compute contract', () => {
     expect(workflow).not.toMatch(/ubuntu-/u);
   });
 
-  it('holds no secrets and never runs on pull requests', () => {
-    expect(workflow).not.toMatch(/\$\{\{\s*secrets\./u);
+  it('confines its one secret to the issue-filing step and never runs on pull requests', () => {
+    const secrets = workflow.match(/\$\{\{\s*secrets\.[A-Z_]+/gu) ?? [];
+    expect(secrets).toHaveLength(1);
+    expect(secrets[0]).toMatch(/LINEAR_API_KEY/u);
+    const step = workflow
+      .split('- name: File survivor issues')[1]
+      .split(/\n {6}- name:/u)[0];
+    expect(step).toMatch(/secrets\.LINEAR_API_KEY/u);
+    expect(step).toMatch(/mutation-sweep-file-issues\.mjs/u);
+    expect(step).not.toMatch(/mutation-sweep\.mjs|stryker|vitest/iu);
     expect(workflow).not.toMatch(/pull_request/u);
   });
 
