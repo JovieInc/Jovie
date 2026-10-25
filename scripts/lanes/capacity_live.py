@@ -168,7 +168,6 @@ def tick(state_dir: Path, now: float | None = None, registry: dict | None = None
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(result, sort_keys=True))
     os.replace(temporary, path)
-    # The coordination layer (fleet_ledger.py burn) reads state/quota-windows.json.
     windows = Path(state_dir) / "state" / "quota-windows.json"
     windows.parent.mkdir(parents=True, exist_ok=True)
     temporary = windows.with_suffix(".tmp")

@@ -85,7 +85,6 @@ def refresh_proof(spec, call, now, attestation=None, registry=None):
     spec = {**spec, "verifiedRemote": proof}
     if not verified(spec, now):
         return None, "owner-attestation-incomplete"
-    # The registry owns the per-run spend cap; an attestation above it never builds a proof.
     cap = capacity_registry.per_run_cap_usd(registry if registry is not None else capacity_registry.load(), "hyperagent")
     if cap is not None and proof["maxCostUsd"] > cap:
         return None, "owner-attestation-exceeds-registry-cap"
