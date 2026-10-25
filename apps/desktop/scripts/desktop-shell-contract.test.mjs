@@ -149,7 +149,6 @@ for (const platform of ['darwin', 'win32']) {
       [
         'Jovie Support',
         'Help Center',
-        'System Status',
         "What's New",
         'separator',
         'Report a Problem',
@@ -160,7 +159,7 @@ for (const platform of ['darwin', 'win32']) {
         items.filter(item => item.label),
         item => item.enabled
       ),
-      [true, true, false, true, false]
+      [true, true, true, false]
     );
     assert.deepEqual(
       opened,
@@ -242,9 +241,13 @@ test('prepared problem report preserves missing metadata, provenance, and URL en
       ...options,
       openExternal: async value => opened.push(value),
     });
-    menu.submenu.find(item => item.label === 'System Status').click();
+    assert.equal(
+      menu.submenu.some(item => item.label === 'System Status'),
+      false,
+      'no status link while status.jov.ie is down'
+    );
     menu.submenu.find(item => item.label === 'Report a Problem').click();
-    assert.deepEqual(opened, ['https://status.jov.ie', url.toString()]);
+    assert.deepEqual(opened, [url.toString()]);
     assert.equal(
       identity.provenance,
       provenance,
