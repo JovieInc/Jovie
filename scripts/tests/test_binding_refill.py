@@ -100,6 +100,23 @@ class RefillTests(unittest.TestCase):
         self.assertEqual(len(moves), 4)
         self.assertEqual(receipt["deficitSince"], 1010.0)
 
+    def test_lyb_ios_rows_wait_while_the_macos_pool_is_loaded_and_other_rows_still_promote(self):
+        rows = [row(n, labels=("agent-ready", "area:iOS")) for n in range(1, 4)] + [row(n) for n in range(4, 9)]
+        self.mirror(rows)
+        (self.state / "macos-pool.json").write_text(json.dumps(
+            {"at": 1005.0, "repos": {"JovieInc/LogYourBody": {"running": 3, "queued": 4}}, "poolCap": 5}))
+        receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
+        self.assertFalse(set(receipt["promoted"]) & {"LYB-1", "LYB-2", "LYB-3"})
+        self.assertTrue(receipt["promoted"])
+        self.assertEqual(receipt["skipped"]["LYB-1"], "macos-admission-hold")
+        self.assertTrue(receipt["macosAdmission"]["hold"])
+
+    def test_lyb_ios_rows_promote_when_the_pool_has_room_or_no_fresh_sample(self):
+        self.mirror([row(n, labels=("agent-ready", "area:iOS")) for n in range(1, 8)])
+        receipt = br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
+        self.assertEqual(len(receipt["promoted"]), 4)
+        self.assertEqual(receipt["macosAdmission"]["reason"], "no-sample")
+
     def test_pending_promotions_count_so_a_second_tick_does_not_double_promote(self):
         self.mirror([row(n) for n in range(1, 8)])
         br.refill(self.lane, self.host, self.binding, FakeClient(), now=1010.0)
