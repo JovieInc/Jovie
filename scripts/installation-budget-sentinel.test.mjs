@@ -33,10 +33,10 @@ test('rejects malformed rate_limit data instead of reporting a healthy budget', 
     assert.throws(() => evaluateBudget(bad, NOW), /malformed/);
 });
 
-test('render is an error below the floor and a notice above it', () => {
+test('render names the installation and errors below the floor', () => {
   assert.match(
-    render(evaluateBudget(core(100), NOW)),
-    /^::error title=GitHub installation budget low::/
+    render(evaluateBudget(core(100), NOW), 'ci-app'),
+    /^::error title=GitHub ci-app budget low::ci-app REST budget 100\/1000/
   );
   assert.match(
     render(evaluateBudget(core(900), NOW)),
@@ -44,27 +44,40 @@ test('render is an error below the floor and a notice above it', () => {
   );
 });
 
-test('main reads /rate_limit, logs one line and never leaks the token', async () => {
+test('main samples the shared and CI App installations separately and never logs a token', async () => {
   const logs = [];
-  const sample = await main({
-    env: { GITHUB_TOKEN: 'tok-secret' },
+  const seen = [];
+  const samples = await main({
+    env: { GITHUB_TOKEN: 'tok-shared', CI_APP_TOKEN: 'tok-app' },
     fetchImpl: async (url, options) => {
       assert.equal(url, 'https://api.github.com/rate_limit');
-      assert.equal(options.headers.authorization, 'Bearer tok-secret');
-      return Response.json({ resources: { core: core(50) } });
+      const token = options.headers.authorization.replace('Bearer ', '');
+      seen.push(token);
+      return Response.json({
+        resources: { core: token === 'tok-shared' ? core(50) : core(900) },
+      });
     },
     log: x => logs.push(x),
     now: () => NOW,
   });
-  assert.equal(sample.low, true);
-  assert.equal(logs.length, 1);
-  assert.doesNotMatch(logs[0], /tok-secret/);
-  await assert.rejects(
-    main({
-      env: {},
-      fetchImpl: async () => new Response(null, { status: 500 }),
-      log: () => {},
-    }),
-    /500/
+  assert.deepEqual(seen, ['tok-shared', 'tok-app']);
+  assert.equal(samples['shared-github-token'].low, true);
+  assert.equal(samples['ci-app'].low, false);
+  assert.match(logs[0], /^::error title=GitHub shared-github-token budget low/);
+  assert.match(logs[1], /^::notice title=GitHub ci-app budget/);
+  assert.doesNotMatch(logs.join('\n'), /tok-/);
+});
+
+test('a missing token or failed read warns instead of alarming or throwing', async () => {
+  const logs = [];
+  await main({
+    env: { GITHUB_TOKEN: 'tok-shared' },
+    fetchImpl: async () => new Response(null, { status: 500 }),
+    log: x => logs.push(x),
+  });
+  assert.match(
+    logs[0],
+    /^::warning::shared-github-token budget sample unavailable \(.*500\)/
   );
+  assert.match(logs[1], /^::warning::ci-app budget not sampled/);
 });

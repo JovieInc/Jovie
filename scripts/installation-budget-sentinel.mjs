@@ -32,12 +32,33 @@ export function evaluateBudget(core, nowMs = Date.now()) {
   };
 }
 
-export function render(sample) {
+export function render(sample, name = 'installation') {
   const pct = (sample.fraction * 100).toFixed(1);
-  const line = `installation REST budget ${sample.remaining}/${sample.limit} (${pct}% left, ${sample.used} used), resets in ${sample.resetInSeconds}s at ${sample.resetIso}`;
+  const line = `${name} REST budget ${sample.remaining}/${sample.limit} (${pct}% left, ${sample.used} used), resets in ${sample.resetInSeconds}s at ${sample.resetIso}`;
   return sample.low
-    ? `::error title=GitHub installation budget low::${line}; PR Fleet Rules, Source Validation and PR Ready defer instead of deciding until it resets.`
-    : `::notice title=GitHub installation budget::${line}`;
+    ? `::error title=GitHub ${name} budget low::${line}; gates that read on it defer instead of deciding until it resets.`
+    : `::notice title=GitHub ${name} budget::${line}`;
+}
+
+// Each installation has its own bucket: the repo-wide GITHUB_TOKEN every
+// workflow shares, and the dedicated CI App that fleet-rule evidence reads on.
+export const INSTALLATIONS = [
+  { name: 'shared-github-token', tokenEnv: 'GITHUB_TOKEN' },
+  { name: 'ci-app', tokenEnv: 'CI_APP_TOKEN' },
+];
+
+async function sampleOne(name, token, { fetchImpl, now }) {
+  const response = await fetchImpl('https://api.github.com/rate_limit', {
+    headers: {
+      authorization: `Bearer ${token}`,
+      accept: 'application/vnd.github+json',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok)
+    throw new Error(`${name} rate_limit read failed (${response.status})`);
+  const body = await response.json();
+  return evaluateBudget(body?.resources?.core, now());
 }
 
 export async function main({
@@ -46,35 +67,35 @@ export async function main({
   log = console.log,
   now = Date.now,
 } = {}) {
-  const response = await fetchImpl('https://api.github.com/rate_limit', {
-    headers: {
-      authorization: `Bearer ${env.GITHUB_TOKEN}`,
-      accept: 'application/vnd.github+json',
-    },
-    signal: AbortSignal.timeout(15000),
-  });
-  if (!response.ok)
-    throw new Error(`rate_limit read failed (${response.status})`);
-  const body = await response.json();
-  const sample = evaluateBudget(body?.resources?.core, now());
-  log(render(sample));
-  if (env.GITHUB_STEP_SUMMARY)
-    appendFileSync(
-      env.GITHUB_STEP_SUMMARY,
-      `- installation budget: remaining=${sample.remaining} limit=${sample.limit} used=${sample.used} reset=${sample.resetIso} low=${sample.low}\n`
-    );
-  if (env.GITHUB_OUTPUT)
-    appendFileSync(
-      env.GITHUB_OUTPUT,
-      `low=${sample.low}\nremaining=${sample.remaining}\nlimit=${sample.limit}\nreset_in_seconds=${sample.resetInSeconds}\n`
-    );
-  return sample;
+  const samples = {};
+  for (const { name, tokenEnv } of INSTALLATIONS) {
+    if (!env[tokenEnv]) {
+      log(`::warning::${name} budget not sampled (no ${tokenEnv})`);
+      continue;
+    }
+    try {
+      const sample = await sampleOne(name, env[tokenEnv], { fetchImpl, now });
+      samples[name] = sample;
+      log(render(sample, name));
+      if (env.GITHUB_STEP_SUMMARY)
+        appendFileSync(
+          env.GITHUB_STEP_SUMMARY,
+          `- ${name} budget: remaining=${sample.remaining} limit=${sample.limit} used=${sample.used} reset=${sample.resetIso} low=${sample.low}\n`
+        );
+      if (env.GITHUB_OUTPUT) {
+        const key = name.replace(/-/g, '_');
+        appendFileSync(
+          env.GITHUB_OUTPUT,
+          `${key}_low=${sample.low}\n${key}_remaining=${sample.remaining}\n${key}_limit=${sample.limit}\n${key}_reset_in_seconds=${sample.resetInSeconds}\n`
+        );
+      }
+    } catch (error) {
+      // A failed read is not an alarm: the next sample covers it.
+      log(`::warning::${name} budget sample unavailable (${error.message})`);
+    }
+  }
+  return samples;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
-  main().catch(error => {
-    // A failed read is not an alarm: the next sample covers it.
-    console.log(
-      `::warning::installation budget sample unavailable (${error.message})`
-    );
-  });
+  await main();

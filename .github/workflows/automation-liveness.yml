@@ -57,16 +57,27 @@ jobs:
       # went red until a manual rerun. GET /rate_limit is free; each sample is a
       # point in the consumption series and alarms below 15% remaining. Reuses
       # this sanctioned ~25m backstop (JOV-INV-042: no new clock).
-      - name: Sample GitHub installation budget
+      - name: Mint CI App read token for budget sample
+        id: ci-app-token
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-contents: read
+
+      - name: Sample GitHub installation budgets
         id: installation-budget
         if: ${{ always() }}
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          CI_APP_TOKEN: ${{ steps.ci-app-token.outputs.token }}
         run: node scripts/installation-budget-sentinel.mjs
 
       - name: Send Slack Alert on Low Installation Budget
-        if: ${{ always() && steps.installation-budget.outputs.low == 'true' }}
+        if: ${{ always() && (steps.installation-budget.outputs.shared_github_token_low == 'true' || steps.installation-budget.outputs.ci_app_low == 'true') }}
         uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
         with:
           status: custom
@@ -74,7 +85,7 @@ jobs:
           author_name: "CI Budget Sentinel"
           custom_payload: |
             {
-              "text": "GitHub installation REST budget below 15%: ${{ steps.installation-budget.outputs.remaining }}/${{ steps.installation-budget.outputs.limit }} left, resets in ${{ steps.installation-budget.outputs.reset_in_seconds }}s. PR gates defer (exit 75) until the reset.",
+              "text": "GitHub REST budget below 15% (shared GITHUB_TOKEN: ${{ steps.installation-budget.outputs.shared_github_token_remaining }}/${{ steps.installation-budget.outputs.shared_github_token_limit }}, CI App: ${{ steps.installation-budget.outputs.ci_app_remaining }}/${{ steps.installation-budget.outputs.ci_app_limit }}). Fleet-rule gates defer (exit 75) until the reset.",
               "attachments": [{ "color": "warning", "fields": [{ "title": "Run", "value": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Details>", "short": false }] }]
             }
         env:
