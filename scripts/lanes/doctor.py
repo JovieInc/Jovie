@@ -245,6 +245,26 @@ def automation_registry(repo: Path, run=subprocess.run) -> list[dict] | None:
     return rows
 
 
+TEAM_RECEIPT = re.compile(r"^[A-Z][A-Z0-9]*$")
+
+
+def _newest_receipt_mtime(path: Path) -> float:
+    """mtime of a receipt. A `<TEAM>` path component is a per-team template (refill/<TEAM>.json): the newest
+    receipt of any team counts. The watcher used to stat the literal `<TEAM>.json`, so gem:backlog-refill and
+    gem:backlog-decompose read `missing` while their receipts were minutes old (2026-10-25)."""
+    if "<TEAM>" not in path.name:
+        return path.stat().st_mtime
+    stem_prefix, _, suffix = path.name.partition("<TEAM>")
+    found = []
+    for candidate in path.parent.glob(f"{stem_prefix}*{suffix}"):
+        team = candidate.name[len(stem_prefix):len(candidate.name) - len(suffix) if suffix else None]
+        if TEAM_RECEIPT.fullmatch(team):
+            found.append(candidate.stat().st_mtime)
+    if not found:
+        raise FileNotFoundError(str(path))
+    return max(found)
+
+
 def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: Path | None = None) -> dict:
     """Host-local receipts of this host's live automations: missing or older than
     maxStalenessMinutes is silence. The hosted automation-liveness check watches Gem."""
@@ -262,7 +282,7 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
         path = Path(location.split(":", 1)[1].replace("~", str(home), 1))
         limit = float(row.get("maxStalenessMinutes") or 0) * 60
         try:
-            age = now - path.stat().st_mtime
+            age = now - _newest_receipt_mtime(path)
         except OSError:
             silent[row["id"]] = {"location": location, "ageS": None}
             continue

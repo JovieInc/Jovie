@@ -558,6 +558,39 @@ class JudgeTest(unittest.TestCase):
                                            "unresolved": {"post-merge-without-merged-evidence": 40}}))
         self.assertIn("40 started JOV issues", loud["started-without-owner"])
 
+    def test_team_templated_receipts_use_the_newest_team_file_and_ignore_sidecars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            state = home / ".local/state/jovie-lanes"
+            (state / "refill").mkdir(parents=True)
+            (state / "decompose").mkdir()
+            now = time.time()
+            (state / "refill" / "JOV.json").write_text("{}")
+            (state / "refill" / "LYB.json").write_text("{}")
+            old = state / "refill" / "LYB.json"
+            os.utime(old, (now - 7200, now - 7200))
+            (state / "refill" / "JOV-rank.json").write_text("{}")  # sidecar, not a team receipt
+            stale_only = state / "decompose" / "LYB.json"
+            stale_only.write_text("{}")
+            os.utime(stale_only, (now - 7200, now - 7200))
+            (state / "decompose" / "seen.json").write_text("{}")  # lowercase: not a team
+            fresh_sidecar = state / "decompose" / "spawn-LYB.json"
+            fresh_sidecar.write_text("{}")
+            row = lambda name, minutes: {"id": f"gem:{name}", "status": "live", "host": "gem", "maxStalenessMinutes": minutes,
+                                         "receipt": {"kind": "host-local",
+                                                     "location": f"gem:~/.local/state/jovie-lanes/{name}/<TEAM>.json"}}
+            watch = doctor.automation_watch([row("refill", 15), row("decompose", 60)], "gem", now, home=home)
+            self.assertNotIn("gem:refill", watch["silent"], "JOV.json is fresh")
+            self.assertEqual(watch["silent"]["gem:decompose"]["ageS"] // 60, 120, "only a stale team receipt counts")
+            (state / "refill" / "JOV.json").unlink()
+            os.utime(state / "refill" / "JOV-rank.json", (now, now))
+            gone = doctor.automation_watch([row("refill", 15)], "gem", now, home=home)
+            self.assertIn("gem:refill", gone["silent"], "a sidecar cannot vouch for a team receipt")
+            for path in (state / "refill").iterdir():
+                path.unlink()
+            missing = doctor.automation_watch([row("refill", 15)], "gem", now, home=home)
+            self.assertIsNone(missing["silent"]["gem:refill"]["ageS"])
+
     def test_registered_host_local_automations_raise_automation_silent(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
