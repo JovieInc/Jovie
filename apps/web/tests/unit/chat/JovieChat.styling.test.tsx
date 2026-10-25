@@ -508,7 +508,7 @@ describe('JovieChat styling regressions', () => {
     );
 
     expect(jovieChatSource).toMatch(
-      /showEmptyGreeting \? \([\s\S]{0,80}<ChatEmptyStateGreeting/
+      /showEmptyGreeting \? \([\s\S]{0,160}<ChatEmptyStateGreeting/
     );
     // FEATURED_SKILL_SUGGESTIONS (an affordance-priority count) is still
     // imported from that module; the JSX component itself is retired.

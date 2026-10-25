@@ -737,6 +737,11 @@ describe('JovieChat empty state', () => {
     expect(getByTestId('chat-input')).toBeTruthy();
     expect(queryByText('Connect Your Music Catalog')).toBeNull();
     expect(queryByTestId('suggested-prompts-rail')).toBeNull();
+    // The shared chat-home rule: the surface is faded out and inert, not cut.
+    expect(getByTestId('chat-home-surface')).toHaveAttribute(
+      'data-chat-home-state',
+      'composing'
+    );
   });
 
   it('hides empty-state suggestions when skill chips are present', () => {
@@ -1050,17 +1055,88 @@ describe('JovieChat living Home canvas (Ovie): HUD first, conversation replaces 
       expect(surface()).toBe('thread');
     });
   });
+});
 
-  it('other personas never use the HUD swap (no data-surface, no remount)', () => {
-    renderWithQueryClient(
-      <JovieChat
-        profileId='profile-1'
-        chatMode='ov'
-        homeCanvas={<div>x</div>}
-      />
+describe.each([
+  {
+    name: 'Jovie chat home',
+    props: {} as Record<string, unknown>,
+  },
+  {
+    name: 'Ovie Home',
+    props: {
+      chatMode: 'ov',
+      homeCanvasMode: 'living',
+      homeCanvas: <div data-testid='content-fixture'>HUD</div>,
+    } as Record<string, unknown>,
+  },
+])('shared chat-home rule: $name', ({ props }) => {
+  const original = { ...mockChatState };
+  const thread = [
+    { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Status?' }] },
+    {
+      id: 'a1',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'All clear.' }],
+    },
+  ];
+  const view = () => <JovieChat profileId='profile-1' {...props} />;
+  const surface = () => screen.getByTestId('chat-home-surface');
+
+  beforeEach(() => {
+    Object.assign(mockChatState, original, { messages: [], input: '' });
+    mockCurrentDraft = createComposerDraft('');
+    mockSearchParams = new URLSearchParams();
+    mockPendingOpportunityCards.length = 0;
+  });
+
+  it('shows the home surface (suggestions and wins, or the HUD) until the user types', () => {
+    renderWithQueryClient(view());
+    expect(surface()).toHaveAttribute('data-chat-home-state', 'home');
+    expect(surface()).not.toHaveAttribute('aria-hidden');
+    expect(surface()).toHaveClass('opacity-100');
+  });
+
+  it('fades out when typing starts and comes back when the composer is emptied', () => {
+    const { rerender } = renderWithQueryClient(view());
+    mockChatState.input = 'Help me with';
+    rerender(view());
+    expect(surface()).toHaveAttribute('data-chat-home-state', 'composing');
+    expect(surface()).toHaveAttribute('aria-hidden', 'true');
+    expect(surface()).toHaveClass('opacity-0', 'pointer-events-none');
+    expect(surface().hasAttribute('inert')).toBe(true);
+    // The composer is untouched and still the normal one.
+    expect(screen.getByTestId('chat-input')).toBeInTheDocument();
+    mockChatState.input = '';
+    rerender(view());
+    expect(surface()).toHaveAttribute('data-chat-home-state', 'home');
+    expect(surface().hasAttribute('inert')).toBe(false);
+  });
+
+  it('the fade removes its animation under reduced motion, never the state change', () => {
+    renderWithQueryClient(view());
+    expect(surface()).toHaveClass('transition-opacity', 'duration-fast');
+    expect(surface()).toHaveClass('motion-reduce:transition-none');
+    expect(screen.getByTestId('chat-message-scroll')).toHaveClass(
+      'animate-in',
+      'fade-in-0',
+      'motion-reduce:animate-none'
     );
-    expect(
-      screen.getByTestId('chat-message-scroll').getAttribute('data-surface')
-    ).toBeNull();
+  });
+
+  it('a sent message makes the thread own the view, with the same surface key', () => {
+    const { rerender } = renderWithQueryClient(view());
+    Object.assign(mockChatState, {
+      messages: thread,
+      hasMessages: true,
+      isSubmitting: true,
+    });
+    rerender(view());
+    expect(screen.getByTestId('chat-message-scroll')).toHaveAttribute(
+      'data-surface',
+      'thread'
+    );
+    expect(screen.queryByTestId('chat-home-surface')).toBeNull();
+    expect(screen.getByTestId('chat-input')).toBeInTheDocument();
   });
 });
