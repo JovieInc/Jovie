@@ -22,6 +22,7 @@ import { fleetVerdict } from '@/lib/ovie/home/fleet-verdict';
 import {
   buildOvieAsks,
   buildOvieHomeShipping,
+  buildUpcomingDefaults,
   ovieAskAction,
   summarizeSourceIssues,
 } from '@/lib/ovie/home/shipping-home';
@@ -342,6 +343,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     { id: 'revenue', updatedAtMs: metrics.dataUpdatedAt, pollMs: 30_000 },
     { id: 'funnel', updatedAtMs: funnel.dataUpdatedAt, pollMs: 60_000 },
   ]);
+  const upcoming = useMemo(
+    () => (inbox.data ? buildUpcomingDefaults(inbox.data, now) : []),
+    [inbox.data, now]
+  );
   const homeView = (
     <OvieCompanyHome
       tiles={tiles}
@@ -355,12 +360,17 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       answers={answers}
       done={home?.done ?? []}
       mergesToday={home?.mergesToday ?? null}
+      upcoming={upcoming}
       delivery={snapshot?.view.delivery ?? null}
       rows={home?.rows ?? null}
       fullscreen={fullscreen.on}
       doneSummary={
         home?.mergesToday != null
-          ? `${home.mergesToday} ${home.mergesToday === 1 ? 'merge' : 'merges'}`
+          ? `${home.mergesToday} ${home.mergesToday === 1 ? 'merge' : 'merges'}${
+              home.mergesToday > home.done.length && home.done.length > 0
+                ? `, newest ${home.done.length} listed`
+                : ''
+            }`
           : null
       }
       loopStatus={loopStatus}

@@ -292,7 +292,7 @@ function sanitizeRuntimeFailures(failures) {
 await mkdir(outDir, { recursive: true });
 const workers = resolveCaptureWorkerCount(process.env.PR_VISUAL_WORKERS);
 // Populated Ovie Home data (no database in this lane). Timestamps in the
-// fixture are 2000-01-01T00:00:SS.000Z and become now + SS seconds per request.
+// fixture are 2000-01-01THH:MM:SS.000Z and become now + that offset per request.
 const ovieFixture = (() => {
   try {
     return JSON.parse(
@@ -304,9 +304,11 @@ const ovieFixture = (() => {
 })();
 const stampFixture = value =>
   JSON.stringify(value).replace(
-    /2000-01-01T00:00:(\d\d)\.000Z/g,
-    (_match, seconds) =>
-      new Date(Date.now() + Number(seconds) * 1000).toISOString()
+    /2000-01-01T(\d\d):(\d\d):(\d\d)\.000Z/g,
+    (_match, hh, mm, ss) =>
+      new Date(
+        Date.now() + (Number(hh) * 3600 + Number(mm) * 60 + Number(ss)) * 1000
+      ).toISOString()
   );
 const browser = await chromium.launch({ headless: true });
 const browserVersion = browser.version();

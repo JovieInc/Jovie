@@ -14,7 +14,10 @@ import { HomeLoopAsksSkeleton } from '@/components/organisms/home-loop/HomeLoopA
 import { HomeLoopDoneChips } from '@/components/organisms/home-loop/HomeLoopStageRows';
 import type { HomeLoopAsk, HomeLoopDoneItem } from '@/lib/home-loop/contract';
 import type { CompanyTile } from '@/lib/ovie/home/company-hud';
-import type { OvieShipRow } from '@/lib/ovie/home/shipping-home';
+import type {
+  OvieShipRow,
+  OvieUpcomingDefault,
+} from '@/lib/ovie/home/shipping-home';
 import type { LastLookedSummary } from '@/lib/ovie/home/since-last-looked';
 import type { DeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { cn } from '@/lib/utils';
@@ -40,6 +43,7 @@ export function OvieCompanyHome({
   mergesToday,
   delivery = null,
   rows = null,
+  upcoming = [],
   fullscreen = false,
   loopStatus,
   answer,
@@ -66,6 +70,8 @@ export function OvieCompanyHome({
   /** In Flight column inputs; absent means unknown, never empty. */
   readonly delivery?: DeliverySummary | null;
   readonly rows?: readonly OvieShipRow[] | null;
+  /** Cards that will ship their default soon; shown under the asks. */
+  readonly upcoming?: readonly OvieUpcomingDefault[];
   /** Full Screen proportions: a 22% vitals row, three columns filling the rest. */
   readonly fullscreen?: boolean;
   readonly loopStatus: HomeLoopSectionStatus;
@@ -117,16 +123,40 @@ export function OvieCompanyHome({
           className='min-h-0'
           testId='home-loop-asks-section'
         >
-          <HomeLoopAsks
-            asks={asks}
-            answers={answers}
-            approveLabel={copy.approveLabel}
-            fit
-            moreHref={asksMoreHref}
-            onApprove={onApprove}
-            onReply={onReply}
-            onFeedback={onFeedback}
-          />
+          <div className='flex min-h-0 flex-1 flex-col gap-3'>
+            <HomeLoopAsks
+              asks={asks}
+              answers={answers}
+              approveLabel={copy.approveLabel}
+              fit
+              moreHref={asksMoreHref}
+              onApprove={onApprove}
+              onReply={onReply}
+              onFeedback={onFeedback}
+            />
+            {upcoming.length > 0 ? (
+              <div
+                className='flex shrink-0 flex-col gap-1'
+                data-testid='ovie-upcoming-defaults'
+              >
+                <h3 className='text-2xs font-medium text-tertiary-token'>
+                  Shipping By Default
+                </h3>
+                <ul className='flex flex-col gap-0.5 text-sm'>
+                  {upcoming.map(item => (
+                    <li key={item.id} className='flex gap-2'>
+                      <span className='min-w-0 text-secondary-token'>
+                        {item.title}
+                      </span>
+                      <span className='shrink-0 text-tertiary-token'>
+                        {item.line}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
         </HomeLoopSection>
         <OvieInFlightColumn
           delivery={delivery}

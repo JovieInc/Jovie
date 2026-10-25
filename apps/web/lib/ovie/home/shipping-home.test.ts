@@ -16,6 +16,7 @@ import {
   buildPulse,
   buildShipRows,
   buildStageLatency,
+  buildUpcomingDefaults,
   mergeDoneWithRecent,
   OVIE_NOT_MEASURED,
   OVIE_SHIP_STAGES,
@@ -720,5 +721,60 @@ describe('mergeDoneWithRecent', () => {
       },
     ]);
     expect(mergeDoneWithRecent([], recent, 1)).toHaveLength(1);
+  });
+});
+
+describe('buildUpcomingDefaults', () => {
+  const NOW = Date.parse('2026-10-25T10:00:00.000Z');
+  const card = (id: string, state: string, deadline: string | null) =>
+    ({
+      id,
+      title: `Card ${id}`,
+      state,
+      decisionDefault: deadline
+        ? {
+            contract: 'jovie.decision-default/v1',
+            decision: 'approve',
+            summary: 'ship it',
+            deadline,
+            declared: true,
+          }
+        : null,
+    }) as never;
+  const inbox = (...cases: unknown[]) => ({ issues: [], cases }) as never;
+
+  it('lists cards that ship their default, soonest first, as "ships default in ..."', () => {
+    const upcoming = buildUpcomingDefaults(
+      inbox(
+        card('late', 'waiting', '2026-10-25T20:00:00.000Z'),
+        card('soon', 'waiting', '2026-10-25T10:45:00.000Z'),
+        card('mid', 'active', '2026-10-25T13:00:00.000Z')
+      ),
+      NOW
+    );
+    expect(upcoming.map(item => [item.id, item.line])).toEqual([
+      ['soon', 'ships default in 45m'],
+      ['mid', 'ships default in 3h'],
+      ['late', 'ships default in 10h'],
+    ]);
+  });
+  it('never lists asks, disposed cards, past deadlines or cards without a default', () => {
+    expect(
+      buildUpcomingDefaults(
+        inbox(
+          card('ask', 'needs_you', '2026-10-25T13:00:00.000Z'),
+          card('done', 'disposed', '2026-10-25T13:00:00.000Z'),
+          card('past', 'waiting', '2026-10-25T09:00:00.000Z'),
+          card('none', 'waiting', null)
+        ),
+        NOW
+      )
+    ).toEqual([]);
+  });
+  it('caps the list', () => {
+    const cases = Array.from({ length: 9 }, (_, i) =>
+      card(`c${i}`, 'waiting', `2026-10-25T${11 + i}:00:00.000Z`)
+    );
+    expect(buildUpcomingDefaults(inbox(...cases), NOW)).toHaveLength(5);
   });
 });

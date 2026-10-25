@@ -654,6 +654,51 @@ function askFromCase(item: OvieInboxCase): OvieAsk {
   };
 }
 
+export interface OvieUpcomingDefault {
+  readonly id: string;
+  readonly title: string;
+  /** "ships default in 3h" */
+  readonly line: string;
+}
+
+function shipsIn(ms: number): string {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? `${hours}h` : `${Math.round(hours / 24)}d`;
+}
+
+/**
+ * Cards that do not need the founder yet but will ship their declared default
+ * at a deadline, soonest first. They fill Blocked On You when there are fewer
+ * asks than room, so the column answers "what ships on its own, and when".
+ */
+export function buildUpcomingDefaults(
+  inbox: OvieInbox,
+  nowMs: number,
+  limit = 5
+): readonly OvieUpcomingDefault[] {
+  return inbox.cases
+    .filter(
+      item =>
+        item.state !== 'needs_you' &&
+        item.state !== 'disposed' &&
+        item.decisionDefault &&
+        Date.parse(item.decisionDefault.deadline) > nowMs
+    )
+    .sort(
+      (a, b) =>
+        Date.parse(a.decisionDefault?.deadline ?? '') -
+        Date.parse(b.decisionDefault?.deadline ?? '')
+    )
+    .slice(0, limit)
+    .map(item => ({
+      id: item.id,
+      title: item.title,
+      line: `ships default in ${shipsIn(Date.parse(item.decisionDefault?.deadline ?? '') - nowMs)}`,
+    }));
+}
+
 /** "Blocked on you": inbox cases that need the founder, in inbox rank order. */
 export function buildOvieAsks(inbox: OvieInbox): readonly OvieAsk[] {
   return inbox.cases

@@ -2,6 +2,10 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { CompanyFunnelInput } from '@/lib/ovie/home/company-hud';
+import {
+  buildOvieAsks,
+  buildUpcomingDefaults,
+} from '@/lib/ovie/home/shipping-home';
 import { INTERACTION_CASE_CONTRACT, type OvieInbox } from '@/lib/ovie/inbox';
 import { unknownProjection } from '@/lib/ovie/shipping-state';
 import { parseShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
@@ -15,8 +19,8 @@ import type { HudMetrics } from '@/types/hud';
 /**
  * Deterministic, populated Ovie Home data for the visual-review capture
  * (the capture environment has no database). Timestamps are tokens the
- * capture script re-stamps per request (2000-01-01T00:00:SS.000Z becomes
- * now plus SS seconds), so the fixture never goes stale.
+ * capture script re-stamps per request (2000-01-01THH:MM:SS.000Z becomes
+ * now plus that offset), so the fixture never goes stale.
  * Run with OVIE_HOME_FIXTURE_OUT=<path> to write it; the test itself always
  * proves the payloads parse with the real parsers, so the fixture cannot rot
  * when the contracts change.
@@ -136,6 +140,69 @@ function shippingPayload() {
             url: repo(23094),
             mergedAt: NOW,
           },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23090,
+            title: 'feat(auth): read-only operator role',
+            url: repo(23090),
+            mergedAt: NOW,
+          },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23087,
+            title: 'fix(ci): capture Ovie Home at its own route',
+            url: repo(23087),
+            mergedAt: NOW,
+          },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23083,
+            title: 'feat(ovie): fast streaming Summer',
+            url: repo(23083),
+            mergedAt: NOW,
+          },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23080,
+            title: 'fix(lanes): recover Hyperagent lane PRs',
+            url: repo(23080),
+            mergedAt: NOW,
+          },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23077,
+            title: 'feat(dogfood): Ovie admin journeys',
+            url: repo(23077),
+            mergedAt: NOW,
+          },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23074,
+            title: 'fix(ovie): make Summer turn failures visible',
+            url: repo(23074),
+            mergedAt: NOW,
+          },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23070,
+            title: 'fix(spotify): rank the artist search',
+            url: repo(23070),
+            mergedAt: NOW,
+          },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23066,
+            title: 'feat(share): one menu for every share',
+            url: repo(23066),
+            mergedAt: NOW,
+          },
+          {
+            repo: 'JovieInc/Jovie',
+            number: 23061,
+            title: 'fix(billing): checkout success state',
+            url: repo(23061),
+            mergedAt: NOW,
+          },
         ],
       },
       mergeQueueDepth: measured(5),
@@ -225,6 +292,81 @@ const inbox: OvieInbox = {
       body: 'Gives production and staging their own lane so preview floods cannot stall production.',
       decisionTarget: { kind: 'summer', id: 'vercel-concurrency' },
     },
+    {
+      contract: INTERACTION_CASE_CONTRACT,
+      id: 'summer:share-menu-copy',
+      kind: 'design',
+      source: { system: 'summer', id: 'share-menu-copy', revision: null },
+      title: 'Share menu copy: shorter labels',
+      recommendation: 'Ship the shorter labels.',
+      owner: null,
+      state: 'waiting',
+      priority: 2,
+      createdAt: '2026-10-25T04:00:00.000Z',
+      nextAction: null,
+      waitingUntil: '2000-01-01T03:00:00.000Z',
+      confidence: null,
+      evidence: [],
+      body: 'Ships its declared default unless you answer first.',
+      decisionTarget: { kind: 'summer', id: 'share-menu-copy' },
+      decisionDefault: {
+        contract: 'jovie.decision-default/v1',
+        decision: 'approve',
+        summary: 'Ship the shorter labels.',
+        deadline: '2000-01-01T03:00:00.000Z',
+        declared: true,
+      },
+    },
+    {
+      contract: INTERACTION_CASE_CONTRACT,
+      id: 'summer:empty-state-art',
+      kind: 'design',
+      source: { system: 'summer', id: 'empty-state-art', revision: null },
+      title: 'Empty state artwork for releases',
+      recommendation: 'Ship the illustrated empty state.',
+      owner: null,
+      state: 'waiting',
+      priority: 2,
+      createdAt: '2026-10-25T04:00:00.000Z',
+      nextAction: null,
+      waitingUntil: '2000-01-01T07:30:00.000Z',
+      confidence: null,
+      evidence: [],
+      body: 'Ships its declared default unless you answer first.',
+      decisionTarget: { kind: 'summer', id: 'empty-state-art' },
+      decisionDefault: {
+        contract: 'jovie.decision-default/v1',
+        decision: 'approve',
+        summary: 'Ship the illustrated empty state.',
+        deadline: '2000-01-01T07:30:00.000Z',
+        declared: true,
+      },
+    },
+    {
+      contract: INTERACTION_CASE_CONTRACT,
+      id: 'summer:onboarding-greeting',
+      kind: 'design',
+      source: { system: 'summer', id: 'onboarding-greeting', revision: null },
+      title: 'Onboarding greeting tone',
+      recommendation: 'Ship the warmer greeting.',
+      owner: null,
+      state: 'waiting',
+      priority: 2,
+      createdAt: '2026-10-25T04:00:00.000Z',
+      nextAction: null,
+      waitingUntil: '2000-01-01T22:00:00.000Z',
+      confidence: null,
+      evidence: [],
+      body: 'Ships its declared default unless you answer first.',
+      decisionTarget: { kind: 'summer', id: 'onboarding-greeting' },
+      decisionDefault: {
+        contract: 'jovie.decision-default/v1',
+        decision: 'approve',
+        summary: 'Ship the warmer greeting.',
+        deadline: '2000-01-01T22:00:00.000Z',
+        declared: true,
+      },
+    },
   ],
 };
 
@@ -242,8 +384,12 @@ describe('Ovie Home capture fixture', () => {
     const fixture = homeCaptureFixture();
     const stamped = JSON.parse(
       JSON.stringify(fixture['/api/hud/shipping-state']).replace(
-        /2000-01-01T00:00:(\d\d)\.000Z/g,
-        (_m, sec) => new Date(Date.now() + Number(sec) * 1000).toISOString()
+        /2000-01-01T(\d\d):(\d\d):(\d\d)\.000Z/g,
+        (_m, hh, mm, ss) =>
+          new Date(
+            Date.now() +
+              (Number(hh) * 3600 + Number(mm) * 60 + Number(ss)) * 1000
+          ).toISOString()
       )
     );
     const view = parseShippingStateProjection(stamped);
@@ -253,7 +399,29 @@ describe('Ovie Home capture fixture', () => {
       expect(view.projection.delivery.merges.today.value).toBe(96);
     }
     expect(parseShippingCockpitProjection(stamped)).not.toBeNull();
-    expect(fixture['/api/ovie/inbox'].cases).toHaveLength(1);
+    const inboxFixture = fixture['/api/ovie/inbox'];
+    expect(buildOvieAsks(inboxFixture)).toHaveLength(1);
+    const upcoming = buildUpcomingDefaults(
+      JSON.parse(
+        JSON.stringify(inboxFixture).replace(
+          /2000-01-01T(\d\d):(\d\d):(\d\d)\.000Z/g,
+          (_m, hh, mm, ss) =>
+            new Date(
+              Date.now() +
+                (Number(hh) * 3600 + Number(mm) * 60 + Number(ss)) * 1000
+            ).toISOString()
+        )
+      ),
+      Date.now()
+    );
+    expect(upcoming.map(item => item.line)).toEqual([
+      'ships default in 3h',
+      'ships default in 8h',
+      'ships default in 22h',
+    ]);
+    expect(
+      fixture['/api/hud/shipping-state'].delivery.merges.recent
+    ).toHaveLength(12);
   });
 
   it('writes the fixture for the capture lane when asked', () => {
