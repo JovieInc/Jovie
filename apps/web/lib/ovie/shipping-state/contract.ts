@@ -413,10 +413,21 @@ export type DeployHealthRepo = {
   readonly lastSuccessAt: string | null;
 };
 
+/** Merge-to-production lag over the trailing 7 days with its target (the tracked metric CI and quota work should reduce). */
+export type DeployLag = {
+  readonly repo: string;
+  readonly p50Min: number | null;
+  readonly p95Min: number | null;
+  readonly samples: number;
+  readonly targetP50Min: number | null;
+  readonly targetP95Min: number | null;
+};
+
 export type DeployHealth = {
   readonly observedAt: string | null;
   readonly healthy: boolean;
   readonly repos: readonly DeployHealthRepo[];
+  readonly lag?: readonly DeployLag[];
 };
 
 export type DeliveryLanes = {
