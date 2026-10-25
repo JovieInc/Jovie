@@ -14,7 +14,7 @@ const settingsPath = path.join(
 );
 const themePath = path.join(
   repoRoot,
-  'apps/ios/Jovie/DesignSystem/JovieTheme.swift'
+  'apps/ios/Packages/JovieKit/Sources/JovieKit/JovieTheme.swift'
 );
 
 test('iOS Settings uses native links, LabeledContent, and Liquid Glass', () => {
