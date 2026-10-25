@@ -7935,6 +7935,37 @@ class LanesReleaseFixtureTest(unittest.TestCase):
                                  ["scripts/lanes/hud.py", "scripts/lanes/hud_fixtures/__snapshots__/live-80x24.txt"])
 
 
+class InstallLagTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        (self.host.state / "current").mkdir()
+        self.bundle = {"sourceCommit": "a" * 40, "bundleDigest": "d" * 64, "objects": {"scripts/lanes": "x" * 40}}
+
+    def lag(self, installed, before, commit_at, error=None):
+        (self.host.state / "current" / ".bundle").write_text(installed)
+        (self.host.state / "current" / ".tree").write_text("t" * 40)
+        with patch.object(lane, "release_identity", return_value=self.bundle), \
+                patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout=f"{commit_at} {'a' * 40}\n", stderr="")), \
+                patch("time.time", return_value=10_000.0), patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("LANES_SELFTEST", None)
+            return lane.install_lag(self.host, before, error)
+
+    def test_an_install_writes_one_merge_to_installed_row(self):
+        result = self.lag("d" * 64, "old1234", 7_000)
+        self.assertEqual(result, {"behindS": 0, "behindCommit": None})
+        [row] = [json.loads(line) for line in (self.host.state / "update-lag.jsonl").read_text().splitlines()]
+        self.assertEqual((row["lagS"], row["commit"], row["from"], row["to"]), (3000, "a" * 40, "old1234", "ttttttt"))
+
+    def test_no_row_when_nothing_changed_and_behind_seconds_when_not_installed(self):
+        self.lag("d" * 64, "ttttttt", 7_000)
+        self.assertFalse((self.host.state / "update-lag.jsonl").exists())
+        result = self.lag("e" * 64, "ttttttt", 7_000, error="AdmissionHeld: gate-admission-busy")
+        self.assertEqual((result["behindS"], result["behindCommit"], result["why"]),
+                         (3000, "a" * 40, "AdmissionHeld: gate-admission-busy"))
+
+
 class UpdateTest(unittest.TestCase):
     def git(self, *args, cwd):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
