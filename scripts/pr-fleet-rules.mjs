@@ -427,6 +427,7 @@ function classifyEvidenceFailure(error) {
 const annotation = value =>
   value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 
+/** @param {Record<string, any>} [options] */
 export async function main({
   args = process.argv.slice(2),
   env = process.env,
