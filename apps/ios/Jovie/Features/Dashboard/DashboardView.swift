@@ -1,3 +1,4 @@
+import JovieKit
 import PassKit
 import SwiftUI
 import UIKit
