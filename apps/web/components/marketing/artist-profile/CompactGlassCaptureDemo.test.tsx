@@ -21,7 +21,7 @@ describe('CompactGlassCaptureDemo', () => {
   it('renders the shared compact-glass material with the real capture copy', () => {
     render(<CompactGlassCaptureDemo />);
 
-    const moduleEl = document.querySelector('.compact-glass-module');
+    const moduleEl = document.querySelector('.compact-capture-module');
     expect(moduleEl).toBeInTheDocument();
     expect(screen.getByText(capture.action.ctaLabel)).toBeInTheDocument();
     expect(screen.getByText(capture.action.detail)).toBeInTheDocument();
