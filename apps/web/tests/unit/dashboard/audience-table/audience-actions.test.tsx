@@ -78,7 +78,7 @@ describe('buildAudienceActions', () => {
     );
   });
 
-  it('keeps notification enabled when a visible fallback channel exists', () => {
+  it('hides phone, export and notification when the person has not shared with the artist', () => {
     const items = buildAudienceActions(
       {
         ...baseMember,
@@ -92,6 +92,12 @@ describe('buildAudienceActions', () => {
     expect(items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'copy-email', disabled: true }),
+        expect.objectContaining({ id: 'copy-phone', disabled: true }),
+        expect.objectContaining({ id: 'export-contact', disabled: true }),
+      ])
+    );
+    expect(items).not.toEqual(
+      expect.arrayContaining([
         expect.objectContaining({ id: 'send-notification' }),
       ])
     );

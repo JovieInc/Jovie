@@ -12,6 +12,10 @@ import {
 } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
+import {
+  applyShareGate,
+  loadSharedContactKeys,
+} from '@/lib/audience/share-gate';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL, createAudienceDataTag } from '@/lib/cache/tags';
@@ -208,7 +212,6 @@ function transformMemberRow(member: {
     // creator who owns the audience. Subscribers override this flag based on
     // artist-email opt-in state (see fetchSubscribersData). New cells must
     // read this flag and fall back to phone/anonymous when false.
-    emailVisibleToArtist: member.email != null,
     spotifyConnected: Boolean(member.spotifyConnected),
     purchaseCount: member.purchaseCount,
     tipAmountTotalCents: member.tipAmountTotalCents ?? 0,
@@ -565,9 +568,11 @@ async function fetchMembersData(
     }
   }
 
+  const sharedKeys = await loadSharedContactKeys(tx, selectedProfileId, rows);
+
   return {
     mode: 'members',
-    rows: rows.map(transformMemberRow),
+    rows: applyShareGate(rows.map(transformMemberRow), sharedKeys),
     total: null,
     page: safe.page,
     pageSize: safe.pageSize,
@@ -746,7 +751,8 @@ async function _fetchSubscribersData(
       referrerHistory: [],
       utmParams: {},
       email: artistEmailState.visibleToArtist ? subscriber.email : null,
-      phone: subscriber.phone,
+      // Level-2 gate: the SMS number is also only artist-visible after share.
+      phone: artistEmailState.optedIn ? subscriber.phone : null,
       jovieEmailSubscribed: type === 'email',
       artistEmailOptedIn: artistEmailState.optedIn,
       artistEmailPendingProvider: artistEmailState.pendingProvider,
