@@ -30,7 +30,7 @@ const CLAIM_PROFILE_WAITLIST_INTENT = {
   label: 'Claim your profile',
   href: APP_ROUTES.START,
   eventName: 'landing_cta_claim_profile',
-  support: 'Limited access. Reserve your name now.',
+  support: 'Free to start. Reserve your name now.',
 } as const satisfies MarketingCtaIntent;
 
 const CLAIM_PROFILE_OPEN_SIGNUP_INTENT = {
