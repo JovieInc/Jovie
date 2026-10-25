@@ -139,7 +139,7 @@ async function assertOvieHome(page, route) {
 async function assertChatHomeTyping(page) {
   const surface = page.getByTestId('chat-home-surface');
   await surface.waitFor({ state: 'attached', timeout: 15_000 });
-  const input = page.getByTestId('chat-input');
+  const input = page.locator(COMPOSER_SELECTOR).first();
   await input.click();
   await page.keyboard.type('Help me plan');
   await page.waitForFunction(
