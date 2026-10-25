@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 import Observation
 
 enum DashboardLoadState: Equatable {
