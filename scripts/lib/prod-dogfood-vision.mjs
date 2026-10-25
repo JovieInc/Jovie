@@ -80,6 +80,8 @@ export const PAGE_EXPECTATIONS = {
 };
 
 export function expectationFor(page) {
+  if (String(page).startsWith('ov-'))
+    return 'Signed-in Ovie operator page: sidebar navigation and a main area with real operational content or an intentional empty state (not blank, a spinner or an error).';
   return (
     PAGE_EXPECTATIONS[page] ?? 'A complete, correctly laid-out product page.'
   );

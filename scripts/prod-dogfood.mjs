@@ -67,6 +67,7 @@ function parseArgs(argv) {
     file: true,
     browser: true,
     metricsOnly: false,
+    authChecks: [],
     runUrl: process.env.RUN_URL ?? '',
   };
   for (let i = 0; i < argv.length; i++) {
@@ -77,7 +78,7 @@ function parseArgs(argv) {
     else if (a === '--no-browser') args.browser = false;
     else if (a === '--metrics-only') args.metricsOnly = true;
     else if (a === '--run-url') args.runUrl = argv[++i];
-    else if (a === '--auth-checks') args.authChecks = argv[++i];
+    else if (a === '--auth-checks') args.authChecks.push(argv[++i]);
     else if (a === '--ingest') args.ingest = argv[++i];
   }
   return args;
@@ -575,8 +576,9 @@ async function main() {
 
   // 5c. Authenticated journeys: written by tests/e2e/prod-dogfood-auth.spec.ts
   // (sanctioned creator-ready identity, same OTP source as the auth smoke).
-  if (args.authChecks && existsSync(args.authChecks)) {
-    const auth = JSON.parse(readFileSync(args.authChecks, 'utf8'));
+  const authFiles = args.authChecks.filter(file => existsSync(file));
+  for (const file of authFiles) {
+    const auth = JSON.parse(readFileSync(file, 'utf8'));
     for (const check of auth.checks) {
       results.set(check.mission, [
         ...(results.get(check.mission) ?? []),
@@ -591,7 +593,8 @@ async function main() {
           mission: check.mission,
         });
     }
-  } else {
+  }
+  if (authFiles.length === 0) {
     evidence.push('authenticated journeys not run (no auth checks file)');
   }
 

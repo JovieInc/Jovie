@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { PRODUCTION_AUTH_SMOKE_EMAIL } from '../../e2e/utils/production-auth-credentials';
+import {
+  PRODUCTION_ADMIN_OBSERVER_EMAIL,
+  PRODUCTION_AUTH_SMOKE_EMAIL,
+} from '../../e2e/utils/production-auth-credentials';
 import {
   extractProductionAuthOtp,
   waitForProductionAuthOtp,
@@ -109,5 +112,27 @@ describe('production Better Auth OTP retrieval', () => {
       'Production Better Auth OTP retrieval refused a non-smoke identity.'
     );
     expect(loadRecord).not.toHaveBeenCalled();
+  });
+
+  it('also serves the read-only Ovie observer identity, and no other', async () => {
+    const loadRecord = vi.fn().mockResolvedValue({
+      value: '123456:0',
+      created_at: new Date(startedAtMs),
+      expires_at: new Date(startedAtMs + 60_000),
+    });
+    await expect(
+      waitForProductionAuthOtp({
+        email: PRODUCTION_ADMIN_OBSERVER_EMAIL,
+        startedAtMs,
+        loadRecord,
+      })
+    ).resolves.toBe('123456');
+    await expect(
+      waitForProductionAuthOtp({
+        email: 'browse+clerk_test@jov.ie',
+        startedAtMs,
+        loadRecord,
+      })
+    ).rejects.toThrow('refused a non-smoke identity');
   });
 });
