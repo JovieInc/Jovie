@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  checkConsentCard,
   checkCookieCardFold,
+  checkEmptyEventsTab,
+  checkHeroNotCropped,
+  checkNoStuckLoader,
   checkOgImageContentType,
+  checkOgQuality,
   checkPendingFixtureRatchet,
   checkServiceDial,
+  checkShareDepth,
+  checkSheetPromises,
   checkSocialMeta,
+  checkTapsToDsp,
   evaluatePerfBudget,
   extractContactRoleLines,
   findBadAltText,
@@ -65,7 +73,7 @@ describe('1. performance budgets + lock_down ratchet', () => {
   it('GREEN: within budget passes (the 1919ms run)', () => {
     expect(
       evaluatePerfBudget(
-        { lcpMs: 1919, jsTransferBytes: 700_000, requestCount: 60, cls: 0 },
+        { lcpMs: 1919, jsTransferBytes: 500_000, requestCount: 55, cls: 0 },
         budgets
       )
     ).toEqual([]);
@@ -319,5 +327,162 @@ describe('9. template matrix + pending-fixture ratchet', () => {
     expect(checkPendingFixtureRatchet(baseline.pendingFixtures, [])).toEqual(
       []
     );
+  });
+});
+
+describe('budgets approved 2026-10-25: JS 600KB, 60 requests', () => {
+  it('RED: 650KB JS and 61 requests fail', () => {
+    expect(
+      evaluatePerfBudget(
+        { jsTransferBytes: 650_000, requestCount: 61 },
+        budgets
+      )
+    ).toHaveLength(2);
+  });
+  it('baseline lock_downs are the approved starting ceilings', () => {
+    expect(budgets.jsTransferBytes.lock_down).toBeLessThanOrEqual(600_000);
+    expect(budgets.requestCount.lock_down).toBeLessThanOrEqual(60);
+  });
+});
+
+describe('finding 1: DSP within 1 tap of home', () => {
+  it('RED: 2-3 taps or unreachable fails', () => {
+    expect(checkTapsToDsp(3)).toHaveLength(1);
+    expect(checkTapsToDsp(2)).toHaveLength(1);
+    expect(checkTapsToDsp(null)).toHaveLength(1);
+  });
+  it('GREEN: 0-1 taps passes', () => {
+    expect(checkTapsToDsp(1)).toEqual([]);
+  });
+});
+
+describe('finding 2: consent card', () => {
+  const card = rect(10, 600, 370, 200);
+  it('RED: 107x28 buttons fail and overlap with the Claim bar fails', () => {
+    const out = checkConsentCard(
+      {
+        rect: card,
+        buttons: [
+          rect(0, 0, 107, 28),
+          rect(0, 0, 107, 28),
+          rect(0, 0, 107, 28),
+        ],
+      },
+      [rect(0, 700, 390, 80)]
+    );
+    expect(out.filter(x => x.message.includes('button'))).toHaveLength(3);
+    expect(out.filter(x => x.message.includes('overlaps'))).toHaveLength(1);
+  });
+  it('GREEN: 44px buttons, no overlap, or no card', () => {
+    expect(
+      checkConsentCard({ rect: card, buttons: [rect(0, 0, 120, 44)] }, [
+        rect(0, 810, 390, 34),
+      ])
+    ).toEqual([]);
+    expect(checkConsentCard(null, [])).toEqual([]);
+  });
+});
+
+describe('finding 4: cropped hero', () => {
+  it('RED: 390x300 render of square art with object-fit cover fails', () => {
+    expect(
+      checkHeroNotCropped(
+        rect(0, 0, 390, 300),
+        { width: 1000, height: 1000 },
+        'cover'
+      )
+    ).toHaveLength(1);
+  });
+  it('GREEN: square render, or contain, passes', () => {
+    expect(
+      checkHeroNotCropped(
+        rect(0, 0, 390, 390),
+        { width: 1000, height: 1000 },
+        'cover'
+      )
+    ).toEqual([]);
+    expect(
+      checkHeroNotCropped(
+        rect(0, 0, 390, 300),
+        { width: 1000, height: 1000 },
+        'contain'
+      )
+    ).toEqual([]);
+  });
+});
+
+describe('finding 6: OG quality + JSON-LD', () => {
+  const ok = {
+    ogImageAlt: 'Neon Skyline cover art',
+    description: 'Listen to Neon Skyline by Dua Lipa',
+    jsonLdTypes: ['MusicRecording'],
+    kind: 'release' as const,
+  };
+  it('RED: generic alt, "Music by" description and missing JSON-LD fail', () => {
+    const out = checkOgQuality({
+      ogImageAlt: 'Public profile preview',
+      description: 'Music by Tim White',
+      jsonLdTypes: ['Person'],
+      kind: 'release',
+    });
+    expect(out.map(x => x.rule)).toEqual([
+      'og-quality',
+      'og-quality',
+      'jsonld-missing',
+    ]);
+  });
+  it('GREEN: real alt/description and JSON-LD pass; profiles need no music JSON-LD', () => {
+    expect(checkOgQuality(ok)).toEqual([]);
+    expect(checkOgQuality({ ...ok, jsonLdTypes: [], kind: 'profile' })).toEqual(
+      []
+    );
+  });
+});
+
+describe('finding 7: updates sheet promises', () => {
+  const copy = 'Get music, shows, merch';
+  it('RED: promises shows and merch that do not exist', () => {
+    expect(
+      checkSheetPromises(copy, { events: false, merch: false })
+    ).toHaveLength(2);
+  });
+  it('GREEN: promises backed by data pass', () => {
+    expect(checkSheetPromises(copy, { events: true, merch: true })).toEqual([]);
+    expect(
+      checkSheetPromises('Get new music', { events: false, merch: false })
+    ).toEqual([]);
+  });
+});
+
+describe('finding 9: stuck loader', () => {
+  it('RED: a loader still visible after the window fails', () => {
+    expect(checkNoStuckLoader(['div.animate-spin'])).toHaveLength(1);
+  });
+  it('GREEN: none visible passes', () => {
+    expect(checkNoStuckLoader([])).toEqual([]);
+  });
+});
+
+describe('finding 10: empty Events tab', () => {
+  it('RED: Events tab with no events fails', () => {
+    expect(
+      checkEmptyEventsTab(['Music', 'Events', 'About'], false)
+    ).toHaveLength(1);
+    expect(checkEmptyEventsTab(['Shows'], false)).toHaveLength(1);
+  });
+  it('GREEN: hidden when empty, shown when events exist', () => {
+    expect(checkEmptyEventsTab(['Music', 'About'], false)).toEqual([]);
+    expect(checkEmptyEventsTab(['Music', 'Events'], true)).toEqual([]);
+  });
+});
+
+describe('finding 11: share within 1 tap', () => {
+  it('RED: 3 taps or absent fails', () => {
+    expect(checkShareDepth(3)).toHaveLength(1);
+    expect(checkShareDepth(null)).toHaveLength(1);
+  });
+  it('GREEN: visible on home (0) or 1 tap passes', () => {
+    expect(checkShareDepth(0)).toEqual([]);
+    expect(checkShareDepth(1)).toEqual([]);
   });
 });

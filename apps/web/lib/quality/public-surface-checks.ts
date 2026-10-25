@@ -34,7 +34,16 @@ export type PublicSurfaceRule =
   | 'meta-missing'
   | 'og-image-type'
   | 'alt-text'
-  | 'fixture-ratchet';
+  | 'fixture-ratchet'
+  | 'consent-card'
+  | 'og-quality'
+  | 'jsonld-missing'
+  | 'hero-cropped'
+  | 'sheet-promise'
+  | 'stuck-loader'
+  | 'empty-events-tab'
+  | 'share-depth'
+  | 'taps-to-dsp';
 
 export interface Violation {
   readonly rule: PublicSurfaceRule;
@@ -78,8 +87,8 @@ export interface PerfBudgets {
  */
 export const PERF_CEILINGS = {
   lcpMs: 4000,
-  jsTransferBytes: 1_000_000,
-  requestCount: 100,
+  jsTransferBytes: 600_000,
+  requestCount: 60,
   cls: 0.05,
 } as const;
 
@@ -579,11 +588,16 @@ export interface PublicSurfaceTemplate {
   /** Seeded in apps/web/tests/seed-test-data.ts; false = pendingFixtures. */
   readonly fixture: 'seeded' | 'pending';
   readonly fixtureNote: string;
+  /** Profile templates: does the fixture carry events / merch? */
+  readonly hasEvents?: boolean;
+  readonly hasMerch?: boolean;
 }
 
 export const PUBLIC_SURFACE_TEMPLATES: readonly PublicSurfaceTemplate[] = [
   {
     id: 'profile-empty',
+    hasEvents: false,
+    hasMerch: false,
     kind: 'profile',
     handle: 'edgecase-empty',
     fixture: 'seeded',
@@ -591,6 +605,8 @@ export const PUBLIC_SURFACE_TEMPLATES: readonly PublicSurfaceTemplate[] = [
   },
   {
     id: 'profile-single-release',
+    hasEvents: true,
+    hasMerch: true,
     kind: 'profile',
     handle: 'edgecase-long',
     fixture: 'seeded',
@@ -598,6 +614,8 @@ export const PUBLIC_SURFACE_TEMPLATES: readonly PublicSurfaceTemplate[] = [
   },
   {
     id: 'profile-many-release',
+    hasEvents: true,
+    hasMerch: true,
     kind: 'profile',
     handle: 'dualipa',
     fixture: 'seeded',
@@ -605,6 +623,8 @@ export const PUBLIC_SURFACE_TEMPLATES: readonly PublicSurfaceTemplate[] = [
   },
   {
     id: 'profile-no-events',
+    hasEvents: false,
+    hasMerch: false,
     kind: 'profile',
     handle: 'testartist',
     fixture: 'seeded',
@@ -663,4 +683,183 @@ export function pendingTemplateIds(
 
 export function formatViolations(violations: readonly Violation[]): string {
   return violations.map(x => `[${x.rule}] ${x.message}`).join('\n');
+}
+
+// ---------------------------------------------------------------------------
+// Findings 1, 2, 4, 6, 7, 9, 10, 11 (objective sub-assertions)
+// ---------------------------------------------------------------------------
+
+/** Finding 1: primary DSP must be reachable in at most `maxTaps` taps. */
+export function checkTapsToDsp(
+  taps: number | null,
+  maxTaps = 1,
+  label = 'home'
+): Violation[] {
+  if (taps === null || taps > maxTaps) {
+    return [
+      v(
+        'taps-to-dsp',
+        `${label}: DSP reachable in ${taps ?? 'no'} taps (max ${maxTaps})`
+      ),
+    ];
+  }
+  return [];
+}
+
+/**
+ * Finding 2: consent card buttons must be >=44px and the card must not
+ * overlap other fixed UI (Claim bar, dock).
+ */
+export function checkConsentCard(
+  card: { rect: Rect; buttons: readonly Rect[] } | null,
+  otherFixedRects: readonly Rect[],
+  label = 'page'
+): Violation[] {
+  if (!card) return [];
+  const out: Violation[] = [];
+  card.buttons.forEach((b, i) => {
+    if (
+      b.width + 0.5 < MIN_TAP_TARGET_PX ||
+      b.height + 0.5 < MIN_TAP_TARGET_PX
+    ) {
+      out.push(
+        v(
+          'consent-card',
+          `${label}: consent button ${i + 1} is ${Math.round(b.width)}x${Math.round(b.height)}px (min 44x44)`
+        )
+      );
+    }
+  });
+  if (otherFixedRects.some(r => rectsOverlap(card.rect, r))) {
+    out.push(
+      v('consent-card', `${label}: consent card overlaps the Claim bar or dock`)
+    );
+  }
+  return out;
+}
+
+/** Finding 4: cover art must not be cropped by object-fit: cover. */
+export function checkHeroNotCropped(
+  rendered: Rect,
+  natural: { width: number; height: number },
+  objectFit: string,
+  tolerance = 0.03,
+  label = 'release'
+): Violation[] {
+  if (natural.width <= 0 || natural.height <= 0 || rendered.height <= 0) {
+    return [];
+  }
+  const diff = Math.abs(
+    rendered.width / rendered.height - natural.width / natural.height
+  );
+  if (objectFit === 'cover' && diff > tolerance) {
+    return [
+      v(
+        'hero-cropped',
+        `${label}: cover art is cropped (rendered ratio differs from natural by ${diff.toFixed(2)})`
+      ),
+    ];
+  }
+  return [];
+}
+
+const GENERIC_OG_ALT =
+  /^(public profile preview|preview|image|cover|artwork|open graph image)$/i;
+const GENERIC_DESCRIPTION = /^music by\b/i;
+
+/** Finding 6: OG alt/description not generic; release pages carry JSON-LD. */
+export function checkOgQuality(input: {
+  readonly ogImageAlt: string | undefined;
+  readonly description: string | undefined;
+  readonly jsonLdTypes: readonly string[];
+  readonly kind: 'profile' | 'release';
+  readonly label?: string;
+}): Violation[] {
+  const label = input.label ?? 'page';
+  const out: Violation[] = [];
+  const alt = input.ogImageAlt?.trim() ?? '';
+  if (!alt || GENERIC_OG_ALT.test(alt)) {
+    out.push(
+      v('og-quality', `${label}: og:image:alt "${alt}" is missing or generic`)
+    );
+  }
+  const description = input.description?.trim() ?? '';
+  if (!description || GENERIC_DESCRIPTION.test(description)) {
+    out.push(
+      v(
+        'og-quality',
+        `${label}: description "${description.slice(0, 40)}" is generic`
+      )
+    );
+  }
+  if (
+    input.kind === 'release' &&
+    !input.jsonLdTypes.some(t => t === 'MusicRecording' || t === 'MusicAlbum')
+  ) {
+    out.push(
+      v('jsonld-missing', `${label}: no MusicRecording/MusicAlbum JSON-LD`)
+    );
+  }
+  return out;
+}
+
+/** Finding 7: updates sheet may not promise shows/merch that do not exist. */
+export function checkSheetPromises(
+  sheetText: string,
+  has: { readonly events: boolean; readonly merch: boolean },
+  label = 'page'
+): Violation[] {
+  const out: Violation[] = [];
+  if (!has.merch && /\bmerch\b/i.test(sheetText)) {
+    out.push(
+      v('sheet-promise', `${label}: sheet promises merch but none exists`)
+    );
+  }
+  if (!has.events && /\b(shows?|tour|events?)\b/i.test(sheetText)) {
+    out.push(
+      v('sheet-promise', `${label}: sheet promises shows but no events exist`)
+    );
+  }
+  return out;
+}
+
+/** Finding 9: no loader still on screen after the settle window. */
+export function checkNoStuckLoader(
+  visibleLoaders: readonly string[],
+  label = 'page'
+): Violation[] {
+  return visibleLoaders.map(l =>
+    v('stuck-loader', `${label}: loader ${l} still visible after settle window`)
+  );
+}
+
+/** Finding 10: an Events tab must not render when there are no events. */
+export function checkEmptyEventsTab(
+  tabLabels: readonly string[],
+  hasEvents: boolean,
+  label = 'profile'
+): Violation[] {
+  if (hasEvents) return [];
+  return tabLabels
+    .filter(t => /^(events|shows|tour)$/i.test(t.trim()))
+    .map(t =>
+      v('empty-events-tab', `${label}: "${t}" tab rendered with no events`)
+    );
+}
+
+/** Finding 11: a share control must be at most `maxTaps` taps from home. */
+export function checkShareDepth(
+  taps: number | null,
+  maxTaps = 1,
+  label = 'home'
+): Violation[] {
+  if (taps === null || taps > maxTaps) {
+    return [
+      v(
+        'share-depth',
+        `${label}: share is ${taps ?? 'not'} reachable in <= ${maxTaps} taps`
+      ),
+    ];
+  }
+  return [];
 }

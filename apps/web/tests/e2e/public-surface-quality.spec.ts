@@ -23,10 +23,18 @@ import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import {
+  checkConsentCard,
   checkCookieCardFold,
+  checkEmptyEventsTab,
+  checkHeroNotCropped,
+  checkNoStuckLoader,
   checkOgImageContentType,
+  checkOgQuality,
   checkServiceDial,
+  checkShareDepth,
+  checkSheetPromises,
   checkSocialMeta,
+  checkTapsToDsp,
   evaluatePerfBudget,
   extractContactRoleLines,
   findBadAltText,
@@ -139,6 +147,17 @@ interface PageData {
   canonical: string | undefined;
   dialPresent: boolean;
   cookieRect: Rect | null;
+  consentButtons: Rect[];
+  fixedRects: Rect[];
+  heroes: Array<{
+    rect: Rect;
+    natural: { width: number; height: number };
+    objectFit: string;
+  }>;
+  jsonLdTypes: string[];
+  tabLabels: string[];
+  loaders: string[];
+  shareVisible: boolean;
 }
 
 async function collectPageData(page: Page): Promise<PageData> {
@@ -215,6 +234,58 @@ async function collectPageData(page: Page): Promise<PageData> {
       if (key && content) meta[key] = content;
     }
     const banner = document.querySelector('[data-testid="cookie-banner"]');
+    const consentButtons = banner
+      ? [...banner.querySelectorAll('button, a[href]')]
+          .filter(isVisible)
+          .map(b => toRect(b.getBoundingClientRect()))
+      : [];
+    const fixedRects = [...document.querySelectorAll('body *')]
+      .filter(
+        el =>
+          !banner?.contains(el) &&
+          el !== banner &&
+          getComputedStyle(el).position === 'fixed' &&
+          isVisible(el)
+      )
+      .map(el => toRect(el.getBoundingClientRect()));
+    const heroes = [...document.images]
+      .filter(img => isVisible(img) && img.getBoundingClientRect().width >= 120)
+      .map(img => ({
+        rect: toRect(img.getBoundingClientRect()),
+        natural: { width: img.naturalWidth, height: img.naturalHeight },
+        objectFit: getComputedStyle(img).objectFit,
+      }));
+    const jsonLdTypes: string[] = [];
+    for (const s of document.querySelectorAll(
+      'script[type="application/ld+json"]'
+    )) {
+      try {
+        const parsed = JSON.parse(s.textContent || 'null');
+        for (const node of Array.isArray(parsed) ? parsed : [parsed]) {
+          const t = node?.['@type'];
+          if (t) jsonLdTypes.push(...[].concat(t));
+        }
+      } catch {
+        // malformed JSON-LD is reported by absence of the expected type
+      }
+    }
+    const tabLabels = [...document.querySelectorAll('[role="tab"]')].map(t =>
+      (t.textContent || '').trim()
+    );
+    const loaders = [
+      ...document.querySelectorAll(
+        '[role="progressbar"], [aria-busy="true"], .animate-spin'
+      ),
+    ]
+      .filter(isVisible)
+      .map(el => el.className?.toString().slice(0, 40) || el.tagName);
+    const shareVisible = [
+      ...document.querySelectorAll('button, a, [role="button"]'),
+    ].some(
+      el =>
+        isVisible(el) &&
+        /share/i.test(el.getAttribute('aria-label') || el.textContent || '')
+    );
 
     return {
       interactive,
@@ -227,6 +298,13 @@ async function collectPageData(page: Page): Promise<PageData> {
         undefined,
       dialPresent:
         document.querySelector('[data-testid="action-dial"]') !== null,
+      consentButtons,
+      fixedRects,
+      heroes,
+      jsonLdTypes,
+      tabLabels,
+      loaders,
+      shareVisible,
       cookieRect:
         banner && isVisible(banner)
           ? toRect(banner.getBoundingClientRect())
@@ -300,6 +378,66 @@ test.describe('public surface quality @public-surface-quality', () => {
           ...checkCookieCardFold(data.cookieRect, VIEWPORT.height, 0.2, label)
         );
 
+        // Finding 2: consent card buttons + overlap with fixed UI
+        violations.push(
+          ...checkConsentCard(
+            data.cookieRect
+              ? { rect: data.cookieRect, buttons: data.consentButtons }
+              : null,
+            data.fixedRects,
+            label
+          )
+        );
+
+        // Finding 6: OG alt/description + JSON-LD
+        violations.push(
+          ...checkOgQuality({
+            ogImageAlt: data.meta['og:image:alt'],
+            description: data.meta['og:description'],
+            jsonLdTypes: data.jsonLdTypes,
+            kind: template.kind,
+            label,
+          })
+        );
+
+        // Finding 9: no loader still spinning after networkidle + settle
+        violations.push(...checkNoStuckLoader(data.loaders, label));
+
+        if (template.kind === 'release') {
+          // Finding 4: hero not cropped
+          for (const hero of data.heroes) {
+            violations.push(
+              ...checkHeroNotCropped(
+                hero.rect,
+                hero.natural,
+                hero.objectFit,
+                0.03,
+                label
+              )
+            );
+          }
+        } else {
+          // Finding 10: no Events tab when the fixture has no events
+          violations.push(
+            ...checkEmptyEventsTab(
+              data.tabLabels,
+              template.hasEvents ?? true,
+              label
+            )
+          );
+          // Finding 11: share control visible on home (0 taps)
+          violations.push(
+            ...checkShareDepth(data.shareVisible ? 0 : null, 1, label)
+          );
+          // Finding 1: featured DSP link on home within 1 tap (visible anchor)
+          if (template.id === 'profile-many-release') {
+            const direct = data.anchors.some(
+              a => a.visible && /spotify\.com|music\.apple\.com/.test(a.href)
+            );
+            violations.push(...checkTapsToDsp(direct ? 0 : null, 1, label));
+          }
+        }
+
         // 1. CLS budget
         violations.push(
           ...evaluatePerfBudget({ cls: await collectCls(page) }, budgets, label)
@@ -334,6 +472,42 @@ test.describe('public surface quality @public-surface-quality', () => {
           .analyze();
         expectNoViolations(findBlockingAxeViolations(results.violations));
       });
+    });
+  }
+
+  // Finding 7: updates sheet copy may not promise shows/merch that do not exist.
+  for (const { template } of routes.filter(
+    r => r.template.kind === 'profile'
+  )) {
+    test(`${template.id}: updates sheet promises only what exists`, async ({
+      page,
+    }) => {
+      const handle = isProdCanary
+        ? process.env.PUBLIC_SURFACE_QUALITY_PROD_PROFILE?.trim() || 'tim'
+        : template.handle;
+      await gotoReady(page, `/${handle}`);
+      const trigger = page
+        .getByRole('button', {
+          name: /get updates|get notified|subscribe|notify/i,
+        })
+        .first();
+      test.skip(
+        (await trigger.count()) === 0,
+        'no updates trigger on this template'
+      );
+      await trigger.click();
+      const sheet = page.getByRole('dialog').first();
+      await sheet.waitFor({ state: 'visible' });
+      expectNoViolations(
+        checkSheetPromises(
+          await sheet.innerText(),
+          {
+            events: template.hasEvents ?? true,
+            merch: template.hasMerch ?? true,
+          },
+          template.id
+        )
+      );
     });
   }
 
