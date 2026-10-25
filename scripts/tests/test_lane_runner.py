@@ -5959,6 +5959,74 @@ class TerminalRevisitTest(unittest.TestCase):
         self.assertEqual([args[3] for args in self.calls if args[:3] == ["gh", "run", "rerun"]], ["11", "22"])
 
 
+class OwnerSettleTest(unittest.TestCase):
+    NOW = 1_800_000_000.0
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+
+    def pr(self, age_s, branch="fix/owner-work", head="a" * 40, number=9):
+        pushed = datetime.fromtimestamp(self.NOW - age_s, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return {"number": number, "headRefOid": head, "headRefName": branch, "state": "OPEN", "isDraft": False,
+                "isCrossRepository": False, "isInMergeQueue": False, "mergeStateStatus": "CLEAN", "labels": [],
+                "lastCommitAt": pushed, "eventKinds": ["red"],
+                "statusCheckRollup": [{"name": "unit", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+
+    def claim(self, pr, **kwargs):
+        with patch("time.time", return_value=self.NOW), patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda target: target), \
+                patch.object(lane.pr_events, "charge_reentry", return_value=True), patch.object(lane, "post_claim"):
+            return lane.claim_red_pr(self.host, "codex", [pr])
+
+    def test_recent_owner_push_defers_the_repair_and_is_measured_once(self):
+        pr = self.pr(age_s=300)
+        self.assertIsNone(self.claim(pr))
+        self.assertIsNone(self.claim(pr))
+        window = json.loads((self.host.state / "owner-settle.json").read_text())["9"]
+        self.assertEqual(window["head"], pr["headRefOid"])
+        self.assertAlmostEqual(window["settleUntil"] - window["firstSeenAt"], lane.pr_events.OWNER_SETTLE_S - 300, delta=1)
+        rows = [json.loads(line) for line in (self.host.state / "runs/owner-settle.jsonl").read_text().splitlines()]
+        self.assertEqual([row["reason"] for row in rows], ["owner-active:head-pushed-within-settle-window"])
+
+    def test_quiet_head_is_repaired(self):
+        pr = self.pr(age_s=lane.pr_events.OWNER_SETTLE_S + 60)
+        self.assertEqual(self.claim(pr), pr)
+        self.assertFalse((self.host.state / "owner-settle.json").exists())
+
+    def test_lane_branch_unreadable_commit_time_and_own_push_never_settle(self):
+        lane_branch = self.pr(age_s=60, branch="codex/jov-9-20261024")
+        self.assertEqual(self.claim(lane_branch), lane_branch)
+        unknown = {k: v for k, v in self.pr(age_s=60).items() if k != "lastCommitAt"}
+        self.assertEqual(self.claim(unknown), unknown)
+        own = self.pr(age_s=60, head="b" * 40)
+        (self.host.state / "fix-attempts.json").write_text(json.dumps({"9": {"sha": "c" * 40, "count": 1,
+                                                                             "pushedHead": "b" * 40, "endedAt": 1}}))
+        self.assertEqual(self.claim(own), own)
+
+    def test_green_pr_is_not_recorded_as_a_deferral(self):
+        pr = {**self.pr(age_s=60), "statusCheckRollup": [{"name": "unit", "status": "COMPLETED", "conclusion": "SUCCESS"}]}
+        self.assertIsNone(self.claim(pr))
+        self.assertFalse((self.host.state / "owner-settle.json").exists())
+
+    def test_event_path_defers_too(self):
+        pr = self.pr(age_s=120)
+        with patch("time.time", return_value=self.NOW), patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda target: target), \
+                patch.object(lane.pr_events, "charge_reentry", return_value=True), patch.object(lane, "post_claim") as claim:
+            self.assertIsNone(lane.pr_events.claim_event_pr(self.host, lane, "codex", [pr]))
+        claim.assert_not_called()
+        self.assertIn("9", json.loads((self.host.state / "owner-settle.json").read_text()))
+
+    def test_window_can_be_disabled(self):
+        pr = self.pr(age_s=5)
+        self.assertIsNone(lane.pr_events.owner_settling(pr, {}, self.NOW, settle_s=0))
+        self.assertGreater(lane.pr_events.owner_settling(pr, {}, self.NOW, settle_s=600), 500)
+
+
 class PrRecoveryCooldownTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -7073,6 +7141,64 @@ class FixRedTest(unittest.TestCase):
             self.assertEqual(receipt["cancellation"]["stage"], "after-agent")
             self.assertEqual((Path(receipt["preservedWorktree"]) / "distinct.py").read_text(), "keep me")
             self.assertFalse(any(cmd[:3] == ["gh", "pr", "merge"] for cmd in calls))
+
+    def test_unpushed_repair_gets_a_specific_reason(self):
+        crash = "Traceback (most recent call last):\nTimeoutError: account/read: app-server response unavailable\n"
+        self.assertEqual(lane.classify_unpushed_repair(1, crash),
+                         ["lane-crash:codex-account-metadata-timeout", "agent-exit:1"])
+        self.assertEqual(lane.classify_unpushed_repair(2, "boom"), ["agent-exit:2"])
+        self.assertEqual(lane.classify_unpushed_repair(0, "NOT-SHIPPABLE: API rate limit exceeded (HTTP 403)")[0][:23],
+                         "agent-declined:infra:AP")
+        self.assertTrue(lane.classify_unpushed_repair(
+            0, "NOT-SHIPPABLE: untouched origin/main fails identically")[0].startswith("agent-declined:base-red:"))
+        self.assertTrue(lane.classify_unpushed_repair(
+            0, "NOT-SHIPPABLE: needs a product call")[0].startswith("agent-declined:other:"))
+        self.assertEqual(lane.classify_unpushed_repair(0, "all green already"), ["no-change:agent-ended-without-push"])
+
+    def run_unpushed(self, tmp, agent_output, returncode):
+        host = lane.Host(state=Path(tmp), repo=Path(tmp))
+        (host.state / "fix-attempts.json").write_text(json.dumps(
+            {"5": {"sha": "h1", "count": 1, "lane": "codex", "at": time.time()}}))
+        def shell(args, **kwargs):
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            log.write(agent_output)
+            return SimpleNamespace(returncode=returncode)
+        with patch.object(lane, "sh", side_effect=shell), patch.object(lane, "run_agent", side_effect=agent), \
+                patch.object(lane, "failure_excerpt", return_value=""), \
+                patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+            receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
+        return receipt, json.loads((host.state / "fix-attempts.json").read_text())["5"]
+
+    def test_codex_wrapper_crash_refunds_the_head_budget_with_a_specific_reason(self):
+        # Gem 2026-10-21..24: 105 of 253 fix-no-change runs were this crash, each charged a
+        # head attempt and recorded with reasons=[].
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt, record = self.run_unpushed(
+                tmp, "TimeoutError: account/read: app-server response unavailable\n", 1)
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(receipt["reasons"][0], "lane-crash:codex-account-metadata-timeout")
+        self.assertEqual(receipt["attemptRefunded"], "lane-crash:codex-account-metadata-timeout")
+        self.assertEqual(record["count"], 0)
+
+    def test_agent_decline_on_infrastructure_or_a_red_main_spends_the_head(self):
+        # 40 repeat runs on a head the agent had already declined (it re-read the same evidence).
+        for text, kind in (("NOT-SHIPPABLE: GitHub API rate limit exceeded", "infra"),
+                           ("NOT-SHIPPABLE: untouched origin/main reproduces it", "base-red")):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                receipt, record = self.run_unpushed(tmp, text + "\n", 0)
+                self.assertTrue(receipt["reasons"][0].startswith(f"agent-declined:{kind}:"))
+                self.assertTrue(lane.pr_events.spent(record, "h1", lane.MAX_FIX_ATTEMPTS))
+                self.assertEqual(record["declined"]["runId"], receipt["runId"])
+
+    def test_other_decline_and_clean_no_change_keep_the_normal_budget(self):
+        for text in ("NOT-SHIPPABLE: needs a product call\n", "done\n"):
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as tmp:
+                receipt, record = self.run_unpushed(tmp, text, 0)
+                self.assertEqual(record["count"], 1)
+                self.assertNotIn("declined", record)
 
     def test_red_pr_waits_for_settled_checks_and_caps_attempts(self):
         pending = self.pr(checks=[{"status": "IN_PROGRESS"}, {"conclusion": "FAILURE"}])
