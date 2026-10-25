@@ -5,7 +5,7 @@
 name: Fleet Rules Evidence
 # The title binds a run to one PR and base so PR Ready can reject a run that merely
 # shares a head sha (a fork or integration-branch PR for the same commit).
-run-name: ${{ github.event_name == 'pull_request_target' && format('fleet-rules #{0} base={1}', github.event.pull_request.number, github.event.pull_request.base.ref) || format('fleet-rules rerun {0}', github.event.workflow_run.id) }}
+run-name: "${{ github.event_name == 'pull_request_target' && format('fleet-rules #{0} base={1}', github.event.pull_request.number, github.event.pull_request.base.ref) || format('fleet-rules rerun {0}', github.event.workflow_run.id) }}"
 
 # 2026-10-24: pr-fleet-rules.mjs read PR evidence on the repo-wide GITHUB_TOKEN
 # bucket every workflow shares, so quota exhaustion turned PR Fleet Rules,
