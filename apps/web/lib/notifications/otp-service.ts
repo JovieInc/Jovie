@@ -10,7 +10,7 @@
  * refactored to use it in a future PR.
  */
 
-import { and, eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, gt, lt } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { db } from '@/lib/db';
 import {
@@ -26,11 +26,6 @@ import {
   hashEmailOtp,
   isValidEmailOtpFormat,
 } from '@/lib/notifications/email-otp';
-import {
-  consumeEmailOtp,
-  EMAIL_OTP_MAX_ATTEMPTS,
-  spendEmailOtpAttempt,
-} from '@/lib/notifications/email-otp-attempts';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import { normalizeSubscriptionEmail } from '@/lib/notifications/validation';
 
@@ -172,6 +167,78 @@ export async function requestEmailOtp(
     });
 
   return { success: true, otpSent: true, otpCode, normalizedEmail };
+}
+
+// ─── OTP Attempts ─────────────────────────────────────────────────────
+
+/** Wrong guesses allowed per sent code (10^6 codes, 10 minute TTL). */
+export const EMAIL_OTP_MAX_ATTEMPTS = 5;
+
+interface CurrentEmailOtp {
+  /** Subscription row id. */
+  readonly id: string;
+  /** The code hash read with the row; ties every write to that exact code. */
+  readonly emailOtpHash: string;
+}
+
+// Transactional OTP writes, not analytics aggregates (metrics-layer guard).
+const otpColumns = notificationSubscriptions;
+
+function isCurrentCode(otp: CurrentEmailOtp) {
+  return and(
+    eq(otpColumns.id, otp.id),
+    eq(otpColumns.emailOtpHash, otp.emailOtpHash)
+  );
+}
+
+/**
+ * Spend one verification attempt atomically, before comparing the code.
+ * Returns false when the code is expired, replaced, or out of attempts.
+ *
+ * Never write back `attempts + 1` from a value read earlier: concurrent
+ * guesses all read the same count and the cap stops holding
+ * (tests/unit/security/credential-attempt-counters.test.ts).
+ */
+export async function spendEmailOtpAttempt(
+  otp: CurrentEmailOtp,
+  now: Date
+): Promise<boolean> {
+  const [spent] = await db
+    .update(otpColumns)
+    .set({
+      emailOtpAttempts: drizzleSql`${otpColumns.emailOtpAttempts} + 1`,
+    })
+    .where(
+      and(
+        isCurrentCode(otp),
+        gt(otpColumns.emailOtpExpiresAt, now),
+        lt(otpColumns.emailOtpAttempts, EMAIL_OTP_MAX_ATTEMPTS)
+      )
+    )
+    .returning({ id: otpColumns.id });
+  return Boolean(spent);
+}
+
+/**
+ * Confirm the subscription and consume exactly this code. Returns false when
+ * a concurrent request already consumed it or a new code replaced it.
+ */
+export async function consumeEmailOtp(
+  otp: CurrentEmailOtp,
+  now: Date
+): Promise<boolean> {
+  const [consumed] = await db
+    .update(otpColumns)
+    .set({
+      confirmedAt: now,
+      confirmationToken: null,
+      emailOtpHash: null,
+      emailOtpExpiresAt: null,
+      emailOtpAttempts: 0,
+    })
+    .where(isCurrentCode(otp))
+    .returning({ id: otpColumns.id });
+  return Boolean(consumed);
 }
 
 // ─── OTP Verify ──────────────────────────────────────────────────────

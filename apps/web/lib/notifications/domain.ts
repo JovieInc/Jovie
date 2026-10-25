@@ -37,14 +37,14 @@ import {
   isValidEmailOtpFormat,
 } from '@/lib/notifications/email-otp';
 import {
-  consumeEmailOtp,
-  EMAIL_OTP_MAX_ATTEMPTS,
-  spendEmailOtpAttempt,
-} from '@/lib/notifications/email-otp-attempts';
-import {
   generateSubscriptionManagementToken,
   verifySubscriptionManagementToken,
 } from '@/lib/notifications/management-token';
+import {
+  consumeEmailOtp,
+  EMAIL_OTP_MAX_ATTEMPTS,
+  spendEmailOtpAttempt,
+} from '@/lib/notifications/otp-service';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import {
   buildErrorResponse,
