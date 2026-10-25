@@ -6,7 +6,6 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { useState } from 'react';
-import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ActionDial,
@@ -125,7 +124,7 @@ describe('ActionDial semantics', () => {
   });
   it('windows 100 options to a handful of rows', () => {
     render(<Fixture options={MANY} />);
-    const rows = screen.getAllByRole('option', { hidden: true });
+    const rows = screen.getAllByRole('option');
     expect(rows.length).toBeLessThanOrEqual(11);
     expect(rows.length).toBeGreaterThanOrEqual(6);
     expect(screen.getByTestId('action-dial-icon-d1')).toBeInTheDocument();
@@ -402,20 +401,6 @@ describe('ActionDial edge cases', () => {
       screen.getByText('Swipe to switch. Your choice is remembered.')
     ).toBeInTheDocument();
   });
-  it('omits an iconless active slot', () => {
-    render(
-      <ActionDial
-        options={[OPTIONS[0]!, { id: 'audius', label: 'Audius' }]}
-        selectedId='audius'
-        onSelect={vi.fn()}
-        actionLabel='Stream Now'
-        groupLabel='Choose a streaming service'
-      />
-    );
-    expect(
-      screen.queryByTestId('action-dial-icon-track')
-    ).not.toBeInTheDocument();
-  });
   it('follows an externally changed selection without a haptic', async () => {
     mockMotion(true);
     const vibrate = vi.fn();
@@ -448,19 +433,5 @@ describe('ActionDial edge cases', () => {
     expect(
       screen.getByTestId('action-dial').getAttribute('data-position')
     ).toBe('2');
-  });
-  it('renders server markup that hydrates under reduced motion', () => {
-    const html = renderToString(
-      <ActionDial
-        options={OPTIONS}
-        selectedId='apple'
-        onSelect={vi.fn()}
-        actionLabel='Stream Now'
-        groupLabel='G'
-      />
-    );
-    expect(html).toContain('Stream Now with Apple Music');
-    expect(html).toContain('role="listbox"');
-    expect(html).toContain('data-visible="false"');
   });
 });

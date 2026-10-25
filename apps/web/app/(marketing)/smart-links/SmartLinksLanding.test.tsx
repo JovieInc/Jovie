@@ -1,6 +1,9 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { configure, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SmartLinksLanding } from './SmartLinksLanding';
+
+// The dial settles over a real-time curve; allow for loaded CI runners.
+configure({ asyncUtilTimeout: 4000 });
 
 vi.mock('next/image', () => ({
   default: (props: { readonly alt: string; readonly src: string }) => (

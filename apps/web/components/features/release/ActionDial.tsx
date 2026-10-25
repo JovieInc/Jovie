@@ -51,7 +51,6 @@ const MIN_HAPTIC_GAP_MS = 24;
 const MIN_PULSE_GAP_MS = 90;
 const TYPEAHEAD_RESET_MS = 700;
 const NO_HAPTIC = Symbol('no-haptic');
-/** Per-device flag: the fan has used the dial, so the visual hint retires. */
 export const DIAL_HINT_SEEN_KEY = 'jovie:dial-hint-seen';
 
 function readHintSeen(): boolean {
@@ -65,16 +64,13 @@ function readHintSeen(): boolean {
 function writeHintSeen(): void {
   try {
     globalThis.localStorage.setItem(DIAL_HINT_SEEN_KEY, '1');
-  } catch {
-    // Storage can be blocked; the hint then simply retires for this session.
-  }
+  } catch {}
 }
 
 interface Gesture {
   readonly id: number;
   readonly startY: number;
   moved: boolean;
-  /** The finger caught a moving dial: that touch only stops it. */
   readonly caught: boolean;
 }
 
@@ -84,7 +80,6 @@ function normalizeWheel(event: WheelEvent): number {
   return event.deltaY;
 }
 
-/** A mechanical wheel notch (one click) rather than a trackpad stream. */
 function isWheelNotch(event: WheelEvent): boolean {
   if (event.deltaMode === 1) return true;
   const magnitude = Math.abs(event.deltaY);
@@ -124,8 +119,7 @@ export function ActionDial({
 
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const [restIndex, setRestIndex] = useState(selectedIndex);
-  // Hidden until storage says this device has not used the dial yet, so a
-  // returning fan never sees it flash.
+  // Hidden until storage says this device has not used the dial yet (no flash).
   const [showHint, setShowHint] = useState(false);
   const hintId = `${uid}-hint`;
   const hintGlyphRef = useRef<HTMLSpanElement | null>(null);
@@ -146,7 +140,6 @@ export function ActionDial({
   const activeIndexRef = useRef(selectedIndex);
   const typeaheadRef = useRef({ text: '', at: 0 });
 
-  // Latest props for the engine callbacks, which outlive a single render.
   const live = useRef({ options, selectedId, onSelect, selectionHaptic });
   useLayoutEffect(() => {
     live.current = { options, selectedId, onSelect, selectionHaptic };
@@ -169,7 +162,6 @@ export function ActionDial({
     const calm = window.matchMedia?.(
       '(prefers-reduced-motion: reduce)'
     ).matches;
-    // One gentle nudge on first view; none under reduced motion.
     if (glyph && !calm && typeof glyph.animate === 'function') {
       glyph.animate(
         [
@@ -243,8 +235,7 @@ export function ActionDial({
         const now = performance.now();
         if (now - lastHapticRef.current >= MIN_HAPTIC_GAP_MS) {
           lastHapticRef.current = now;
-          // A selection tick per item crossed; Android web vibrates, the
-          // iOS and Mac apps route this through their native haptic engine.
+          // Selection tick per item (vibrate on Android; native engine in the iOS app).
           live.current.selectionHaptic();
         }
         if (!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
@@ -265,7 +256,6 @@ export function ActionDial({
       engine.destroy();
       engineRef.current = null;
     };
-    // The engine is rebuilt only when the list size changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [count]);
 
@@ -273,13 +263,10 @@ export function ActionDial({
     engineRef.current?.setReducedMotion(reducedMotion);
   }, [reducedMotion]);
 
-  // Rows enter and leave the window as the centered item changes; place them
-  // at the live position before the next paint.
   useLayoutEffect(() => {
     paint(positionRef.current, engineRef.current?.currentState ?? 'idle');
   }, [activeIndex, paint]);
 
-  // The parent changed the selection (not us): jump there without a tick.
   useEffect(() => {
     const engine = engineRef.current;
     if (!engine || engine.currentState !== 'idle') return;
@@ -292,8 +279,7 @@ export function ActionDial({
     setRestIndex(selectedIndex);
   }, [selectedIndex]);
 
-  // Wheel needs a non-passive listener to claim the scroll; it only does so
-  // while the dial can still move in that direction.
+  // Non-passive so the wheel can claim the scroll, only while the dial can move.
   useEffect(() => {
     const root = rootRef.current;
     if (!root || count < 2) return;
@@ -347,8 +333,7 @@ export function ActionDial({
         if (Math.abs(travel) <= TAP_SLOP_PX) return;
         gesture.moved = true;
         markUsed();
-        // Capture only once it is a drag so a plain tap still reaches the
-        // Stream Now link or a row underneath.
+        // Capture only once it is a drag so a tap still reaches the link or row.
         event.currentTarget.setPointerCapture?.(event.pointerId);
       }
       engine.drag(-travel / ROW_STEP_PX, event.timeStamp);
@@ -363,8 +348,7 @@ export function ActionDial({
       if (!gesture || !engine || gesture.id !== event.pointerId) return;
       gestureRef.current = null;
       if (gesture.moved || gesture.caught) {
-        // A drag, or a touch that only stopped momentum, must not also
-        // activate whatever it ended on.
+        // A drag, or a touch that only stopped momentum, must not also activate.
         suppressClickRef.current = true;
         setTimeout(() => {
           suppressClickRef.current = false;
@@ -441,8 +425,6 @@ export function ActionDial({
 
   if (!active) return null;
 
-  // Rows render at the centered item; the layout effect repaints them at the
-  // live position before the browser paints.
   const position = activeIndex;
   const actionIcon =
     count < 2 || !active.icon ? (
@@ -518,6 +500,7 @@ export function ActionDial({
               const layout = rowLayout(index - position);
               return (
                 // biome-ignore lint/a11y/useFocusableInteractive: options are never focused; the listbox owns focus and points at the active option with aria-activedescendant.
+                // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection is handled on the focused listbox.
                 <div
                   key={option.id}
                   id={`${uid}-${index}`}
@@ -527,10 +510,6 @@ export function ActionDial({
                   }}
                   role='option'
                   aria-selected={index === activeIndex}
-                  // Outer rows are decorative peeks; keeping them out of the
-                  // accessibility tree avoids announcing and contrast-testing
-                  // rows that sit at 20% opacity.
-                  aria-hidden={Math.abs(index - activeIndex) >= 2 || undefined}
                   aria-posinset={index + 1}
                   aria-setsize={count}
                   data-dial-offset={index - activeIndex}

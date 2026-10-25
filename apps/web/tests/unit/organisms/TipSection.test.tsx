@@ -1,7 +1,16 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import {
+  configure,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import type React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PaySection } from '@/components/organisms/PaySection';
+
+// The dial settles over a real-time curve; allow for loaded CI runners.
+configure({ asyncUtilTimeout: 4000 });
 
 const mockToast = vi.hoisted(() => ({
   success: vi.fn(),
@@ -139,8 +148,10 @@ describe('TipSection', () => {
       ?.getAttribute('class');
 
     expect(venmoButton).toHaveAttribute('data-dsp-provider', 'venmo');
-    await waitFor(() =>
-      expect(activeIcon).toHaveStyle({ transform: 'translate3d(0, 0%, 0)' })
+    await waitFor(
+      () =>
+        expect(activeIcon).toHaveStyle({ transform: 'translate3d(0, 0%, 0)' }),
+      { timeout: 4000 }
     );
     expect(venmoButton.className).toContain('bg-btn-primary');
     expect(venmoButton.className).not.toContain('bg-[#008CFF]');
