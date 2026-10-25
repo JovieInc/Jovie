@@ -103,6 +103,11 @@ async function waitForAuthenticatedShell(page, route) {
     await page
       .getByTestId('ovie-company-home')
       .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+    // Populated, not skeletons: a company tile with a measured value.
+    if (ovieFixture)
+      await page
+        .getByTestId('ovie-tile-revenue')
+        .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
     if (route.includes('fullscreen=1'))
       await page
         .getByTestId('ovie-fullscreen')
@@ -167,6 +172,23 @@ function sanitizeRuntimeFailures(failures) {
 
 await mkdir(outDir, { recursive: true });
 const workers = resolveCaptureWorkerCount(process.env.PR_VISUAL_WORKERS);
+// Populated Ovie Home data (no database in this lane). Timestamps in the
+// fixture are 2000-01-01T00:00:SS.000Z and become now + SS seconds per request.
+const ovieFixture = (() => {
+  try {
+    return JSON.parse(
+      readFileSync(join(outDir, 'ovie-home-fixture.json'), 'utf8')
+    );
+  } catch {
+    return null;
+  }
+})();
+const stampFixture = value =>
+  JSON.stringify(value).replace(
+    /2000-01-01T00:00:(\d\d)\.000Z/g,
+    (_match, seconds) =>
+      new Date(Date.now() + Number(seconds) * 1000).toISOString()
+  );
 const browser = await chromium.launch({ headless: true });
 const browserVersion = browser.version();
 const targets = routes.flatMap(route =>
@@ -239,6 +261,19 @@ try {
         sources: false,
       });
       tracingStarted = true;
+      if (isOvieCaptureRoute(route) && ovieFixture)
+        await context.route('**/api/**', async intercepted => {
+          const path = new URL(intercepted.request().url()).pathname;
+          const payload = ovieFixture[path];
+          if (payload === undefined || intercepted.request().method() !== 'GET')
+            return intercepted.continue();
+          return intercepted.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            headers: { 'cache-control': 'no-store' },
+            body: stampFixture(payload),
+          });
+        });
       page = await context.newPage();
       page.on('console', message => {
         if (message.type() === 'error')
