@@ -2441,6 +2441,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/summer-canary/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/summer-canary",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/sync-ai-crawler-analytics/route.ts",
       "kind": "handler",
       "route": "/api/cron/sync-ai-crawler-analytics",
