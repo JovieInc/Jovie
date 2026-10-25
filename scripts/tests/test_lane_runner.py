@@ -7074,6 +7074,64 @@ class FixRedTest(unittest.TestCase):
             self.assertEqual((Path(receipt["preservedWorktree"]) / "distinct.py").read_text(), "keep me")
             self.assertFalse(any(cmd[:3] == ["gh", "pr", "merge"] for cmd in calls))
 
+    def test_unpushed_repair_gets_a_specific_reason(self):
+        crash = "Traceback (most recent call last):\nTimeoutError: account/read: app-server response unavailable\n"
+        self.assertEqual(lane.classify_unpushed_repair(1, crash),
+                         ["lane-crash:codex-account-metadata-timeout", "agent-exit:1"])
+        self.assertEqual(lane.classify_unpushed_repair(2, "boom"), ["agent-exit:2"])
+        self.assertEqual(lane.classify_unpushed_repair(0, "NOT-SHIPPABLE: API rate limit exceeded (HTTP 403)")[0][:23],
+                         "agent-declined:infra:AP")
+        self.assertTrue(lane.classify_unpushed_repair(
+            0, "NOT-SHIPPABLE: untouched origin/main fails identically")[0].startswith("agent-declined:base-red:"))
+        self.assertTrue(lane.classify_unpushed_repair(
+            0, "NOT-SHIPPABLE: needs a product call")[0].startswith("agent-declined:other:"))
+        self.assertEqual(lane.classify_unpushed_repair(0, "all green already"), ["no-change:agent-ended-without-push"])
+
+    def run_unpushed(self, tmp, agent_output, returncode):
+        host = lane.Host(state=Path(tmp), repo=Path(tmp))
+        (host.state / "fix-attempts.json").write_text(json.dumps(
+            {"5": {"sha": "h1", "count": 1, "lane": "codex", "at": time.time()}}))
+        def shell(args, **kwargs):
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True)
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        def agent(cmd, cwd, log, timeout, **kwargs):
+            log.write(agent_output)
+            return SimpleNamespace(returncode=returncode)
+        with patch.object(lane, "sh", side_effect=shell), patch.object(lane, "run_agent", side_effect=agent), \
+                patch.object(lane, "failure_excerpt", return_value=""), \
+                patch.object(lane.disk_guard, "free_pct", return_value=50.0):
+            receipt = lane.fix_red_pr(host, "codex", {"cmd": ["true"]}, self.pr())
+        return receipt, json.loads((host.state / "fix-attempts.json").read_text())["5"]
+
+    def test_codex_wrapper_crash_refunds_the_head_budget_with_a_specific_reason(self):
+        # Gem 2026-10-21..24: 105 of 253 fix-no-change runs were this crash, each charged a
+        # head attempt and recorded with reasons=[].
+        with tempfile.TemporaryDirectory() as tmp:
+            receipt, record = self.run_unpushed(
+                tmp, "TimeoutError: account/read: app-server response unavailable\n", 1)
+        self.assertEqual(receipt["verdict"], "fix-no-change")
+        self.assertEqual(receipt["reasons"][0], "lane-crash:codex-account-metadata-timeout")
+        self.assertEqual(receipt["attemptRefunded"], "lane-crash:codex-account-metadata-timeout")
+        self.assertEqual(record["count"], 0)
+
+    def test_agent_decline_on_infrastructure_or_a_red_main_spends_the_head(self):
+        # 40 repeat runs on a head the agent had already declined (it re-read the same evidence).
+        for text, kind in (("NOT-SHIPPABLE: GitHub API rate limit exceeded", "infra"),
+                           ("NOT-SHIPPABLE: untouched origin/main reproduces it", "base-red")):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as tmp:
+                receipt, record = self.run_unpushed(tmp, text + "\n", 0)
+                self.assertTrue(receipt["reasons"][0].startswith(f"agent-declined:{kind}:"))
+                self.assertTrue(lane.pr_events.spent(record, "h1", lane.MAX_FIX_ATTEMPTS))
+                self.assertEqual(record["declined"]["runId"], receipt["runId"])
+
+    def test_other_decline_and_clean_no_change_keep_the_normal_budget(self):
+        for text in ("NOT-SHIPPABLE: needs a product call\n", "done\n"):
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as tmp:
+                receipt, record = self.run_unpushed(tmp, text, 0)
+                self.assertEqual(record["count"], 1)
+                self.assertNotIn("declined", record)
+
     def test_red_pr_waits_for_settled_checks_and_caps_attempts(self):
         pending = self.pr(checks=[{"status": "IN_PROGRESS"}, {"conclusion": "FAILURE"}])
         green = self.pr(checks=[{"status": "COMPLETED", "conclusion": "SUCCESS"}])
