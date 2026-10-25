@@ -30,4 +30,16 @@ describe('PR-time structural guards', () => {
     expect(merge).not.toContain('ui-story-coverage-allowlist');
     expect(merge).not.toContain('release-lineage-contracts');
   });
+
+  it('runs the design-surfaces invariant merged with base for nav data changes', () => {
+    expect(
+      ids('pull_request', ['apps/web/data/marketingNavigation.ts'])
+    ).toContain('design-surfaces-merged-with-base');
+    expect(ids('pull_request', ['apps/web/lib/foo.ts'])).not.toContain(
+      'design-surfaces-merged-with-base'
+    );
+    expect(
+      ids('merge_group', ['apps/web/data/marketingNavigation.ts'])
+    ).not.toContain('design-surfaces-merged-with-base');
+  });
 });

@@ -323,6 +323,18 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    // Semantic conflicts: a PR that is green alone but red once merged with
+    // main (2026-10-25: the locked footer's nine unbound nav labels, found only
+    // by invariants:check in the merge group, stalled the queue). Run the
+    // design-surfaces invariant on the PR merged with the current base in a
+    // throwaway worktree. A textual merge conflict is left to its own gates.
+    id: 'design-surfaces-merged-with-base',
+    command: `bash -c ${shellQuote('set -euo pipefail; t="$(mktemp -d)"; root="$PWD"; git worktree add -q --detach "$t" HEAD; ln -s "$root/node_modules" "$t/node_modules"; trap \'git worktree remove --force "$t"\' EXIT; cd "$t"; git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true; git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }; node scripts/invariants/design-surfaces.mjs')}`,
+    inputs:
+      /^(?:apps\/web\/data\/|apps\/web\/constants\/routes\.ts$|scripts\/invariants\/design-surfaces)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     id: 'release-lineage-contracts',
     command:
       'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/promotion-journey-evidence.test.mjs lib/__tests__/promotion-gate-wiring.test.mjs',

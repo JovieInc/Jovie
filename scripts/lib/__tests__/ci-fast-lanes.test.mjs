@@ -2389,6 +2389,20 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
+      if (guard.id === 'design-surfaces-merged-with-base') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain('git worktree add');
+        expect(guard.command).toContain(
+          'scripts/invariants/design-surfaces.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/invariants/design-surfaces.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
       if (guard.id === 'external-api-guard') {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/external-api-guard.mjs')
