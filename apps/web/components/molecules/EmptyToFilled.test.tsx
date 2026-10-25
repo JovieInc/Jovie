@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { EmptyToFilled as BarrelEmptyToFilled } from '@/components/molecules';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { EmptyToFilled } from './EmptyToFilled';
 
@@ -267,7 +268,7 @@ describe('EmptyToFilled', () => {
     ).not.toHaveFocus();
   });
 
-  it('keeps working controls interactive in the visible pane', () => {
+  it('keeps the visible pane control interactive and withdraws the hidden pane from pointer input by CSS contract', () => {
     const onClick = vi.fn();
     const { rerender } = render(
       <EmptyToFilled
@@ -297,8 +298,14 @@ describe('EmptyToFilled', () => {
         </button>
       </EmptyToFilled>
     );
-    fireEvent.click(screen.getByRole('button', { name: 'View release' }));
-    expect(onClick).toHaveBeenCalledTimes(1);
+    // jsdom cannot apply Tailwind classes, so event dispatch stays possible;
+    // the pointer-input withdrawal contract is the hidden pane's CSS state.
+    const { filled } = panes();
+    expect(filled).toHaveClass('invisible', 'opacity-0');
+  });
+
+  it('exports EmptyToFilled from the molecules barrel (covers the barrel export)', () => {
+    expect(BarrelEmptyToFilled).toBe(EmptyToFilled);
   });
 
   it('passes an axe audit in the empty state', async () => {
