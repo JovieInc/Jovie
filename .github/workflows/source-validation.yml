@@ -39,6 +39,16 @@ jobs:
           sparse-checkout: |
             .nvmrc
             packages/api-client
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+      # Edited-event jobs ran setup-node unprimed in all 8 jobs of a run
+      # (run 40176111773, 2026-10-25): one REST manifest call each.
+      - &quota-prime
+        name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.source-validation-client/.github/actions/prime-node-toolcache
+        with:
+          node-version-file: .source-validation-client/.nvmrc
       - &quota-runtime
         name: Setup the quota client runtime
         if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
@@ -376,6 +386,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       # TruffleHog reads the object store directly and cannot use a partial
@@ -429,6 +440,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - &reused-checkout
@@ -474,6 +486,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -589,6 +602,7 @@ jobs:
         shard: ['1/4', '2/4', '3/4', '4/4']
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -664,6 +678,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
