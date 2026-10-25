@@ -1,4 +1,5 @@
 import AVFoundation
+import JovieKit
 import SwiftUI
 
 /// Shared background fill for teleprompter control chrome (capsules and
