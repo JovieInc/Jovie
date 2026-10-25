@@ -1,0 +1,4 @@
+#!/bin/sh
+# Thin launcher: Node 24 runs the TypeScript sources directly (type stripping).
+here=$(CDPATH= cd -- "$(dirname -- "$(readlink -f -- "$0")")/.." && pwd)
+exec node --no-warnings "$here/cli.ts" "$@"
