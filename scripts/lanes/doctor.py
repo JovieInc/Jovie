@@ -523,6 +523,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "publicFeed": read_json(state / "public-feed-sizes.json", {}),
         "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
         "linearAppCredential": _linear_app_credential(lane),
         "strandedClaims": stranded_claims,
@@ -956,6 +957,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    feed_size = obs.get("publicFeed") or {}
+    if isinstance(feed_size.get("ratio"), (int, float)) and feed_size["ratio"] >= PUBLIC_FEED_WARN_RATIO:
+        top = ", ".join(f"{name} {size // 1024}K" for name, size in list((feed_size.get("sections") or {}).items())[:3])
+        alerts["public-feed-near-limit"] = (f"public lanes status feed is {feed_size['bytes']} bytes, "
+                                            f"{round(feed_size['ratio'] * 100)}% of the {feed_size['maxBytes']} byte cap "
+                                            f"(largest: {top}); past the cap every HUD tile and dead-man check reads unavailable")
     lag = obs.get("installLag") or {}
     if isinstance(lag.get("behindS"), (int, float)) and lag["behindS"] > INSTALL_LAG_ALERT_S:
         alerts["install-lag"] = (f"main's lane bundle {str(lag.get('behindCommit'))[:8]} is {round(lag['behindS'] / 60)}m "
@@ -1805,6 +1812,56 @@ STATUS_DETAIL_NAME = "lanes-status-details.json"
 STAGE_EVENTS_NAME = "stage-events.ndjson"
 
 
+# 2026-10-25 13:50Z: the public feed hit 410,142 bytes against the 262,144 cap and every HUD tile and
+# dead-man check read "unavailable". Measured sections (lanes-status.json, 557 KB complete):
+# fileOverlap 217 KB (737 pair rows), remediation 82 KB (312 fingerprints, 72 KB of ask text), conditions
+# 54 KB, shippingAttribution 153 KB of per-PR rows before the existing projection. The public feed keeps
+# aggregates, top hotspots and operational identity; every dropped row stays in lanes-status-details.json
+# (same gist) and local state, addressed by a jsonPointer.
+PUBLIC_OVERLAP_TOP = 10
+PUBLIC_FEED_WARN_RATIO = 0.70
+PUBLIC_REMEDIATION_FIELDS = ("state", "issue", "cls", "lane")
+
+
+def _compact_overlap(public: dict) -> None:
+    overlap = public.get("fileOverlap")
+    pairs = overlap.get("pairs") if isinstance(overlap, dict) else None
+    if not isinstance(pairs, list):
+        return
+    rows = [pair for pair in pairs if isinstance(pair, dict)]
+    files = Counter(name for pair in rows for name in pair.get("files") or [] if isinstance(name, str))
+    overlap.pop("pairs")
+    overlap["pairsSummary"] = {
+        "count": len(pairs),
+        "queueOwned": sum(1 for pair in rows if pair.get("queueOwned")),
+        "byAction": dict(Counter(str(pair.get("actionTaken")) for pair in rows)),
+        "topHotspots": [{"file": name, "pairs": count} for name, count in files.most_common(PUBLIC_OVERLAP_TOP)],
+        "pairsRef": {"recordCount": len(pairs), "jsonPointer": "/fileOverlap/pairs"},
+    }
+
+
+def _compact_remediation(public: dict) -> None:
+    remediation_block = public.get("remediation")
+    rows = remediation_block.get("byFingerprint") if isinstance(remediation_block, dict) else None
+    if not isinstance(rows, dict):
+        return
+    remediation_block["byFingerprint"] = {
+        key: ({name: row.get(name) for name in PUBLIC_REMEDIATION_FIELDS} if isinstance(row, dict) else row)
+        for key, row in rows.items()}
+    remediation_block["byFingerprintRef"] = {"recordCount": len(rows), "jsonPointer": "/remediation/byFingerprint",
+                                             "omitted": "ask, recurrence and history text"}
+
+
+def feed_section_sizes(text: str) -> dict:
+    """Bytes per top-level section of the published feed, largest first, with the cap ratio."""
+    data = json.loads(text)
+    sizes = {key: len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+             for key, value in data.items()}
+    total = len(text.encode("utf-8"))
+    return {"bytes": total, "maxBytes": PUBLIC_FEED_MAX_BYTES, "ratio": round(total / PUBLIC_FEED_MAX_BYTES, 3),
+            "sections": dict(sorted(sizes.items(), key=lambda item: -item[1])[:12])}
+
+
 def public_status_projection(feed: dict, full_text: str) -> str:
     """Keep operational fields whole; detailed attribution lives in the same gist."""
     def identity(value, limit):
@@ -1831,6 +1888,8 @@ def public_status_projection(feed: dict, full_text: str) -> str:
                     "recordCount": len(rows),
                     "jsonPointer": f"/shippingAttribution/projects/{index}/pullRequests",
                 }
+    _compact_overlap(public)
+    _compact_remediation(public)
     public["publicProjection"] = {
         "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
     }
@@ -1862,6 +1921,11 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     if body.read_bytes() != full_text.encode("utf-8"):
         raise RuntimeError("status-feed-evidence-readback-changed")
     public_text = public_status_projection(feed, full_text)
+    try:
+        sizes = feed_section_sizes(public_text)
+        atomic_write_text(host.state / "public-feed-sizes.json", json.dumps({"at": now_iso(), **sizes}))
+    except (OSError, ValueError):
+        pass  # a metric never blocks the publish
     packet = {"files": {
         "lanes-status.json": {"content": public_text},
         STATUS_DETAIL_NAME: {"content": full_text},
