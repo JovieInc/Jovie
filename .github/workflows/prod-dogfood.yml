@@ -2,7 +2,7 @@ name: Production Dogfood
 # clock-class: production-liveness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: A hosted observer reads public production pages (GET only, Tim's public profile and public marketing/auth surfaces, no credentials) and holds only the Linear key needed to file or close its own fingerprinted dogfood issues. It never mutates production and never writes a Production Verified marker.
+# necessary-trust-boundary: A hosted observer reads public production pages (GET only, Tim's public profile and public marketing/auth surfaces, no credentials) and signs in only as the sanctioned seeded creator-ready identity through the same Doppler jovie-web/prd secrets as the post-deploy auth smoke (READ-ONLY journeys, no messages sent), holds the Linear key to file or close its own fingerprinted dogfood issues, the AI Gateway key for a cheap vision review, and CRON_SECRET to post its roll-up to the internal Ovie evidence route. It never mutates production and never writes a Production Verified marker.
 # removal-trigger: Remove when the Production Controller dispatches the same mission run on each landed deploy and the 15-minute deploy-detection poll below is redundant.
 #
 # Continuous dogfooding (Tim, 2026-10-25): agents use production like a user,
@@ -88,18 +88,70 @@ jobs:
         if: ${{ steps.seen.outputs.cache-hit != 'true' }}
         uses: ./.github/actions/setup-playwright
 
+      - uses: ./.github/actions/setup-doppler
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+
+      # Vision review costs money: once per deployed SHA, not once per hour.
+      - name: Check whether this SHA was already vision-reviewed
+        id: vision-seen
+        if: ${{ steps.seen.outputs.cache-hit != 'true' && needs.gate.outputs.sha != '' }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .dogfood-vision-seen
+          key: dogfood-vision-${{ needs.gate.outputs.sha }}
+          lookup-only: true
+
+      - name: Resolve CRON_SECRET for the Ovie ingest
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+
+      # Authenticated journeys: the sanctioned seeded creator-ready identity and
+      # production OTP source the post-deploy auth smoke already uses (same
+      # Doppler jovie-web/prd secrets; values are never printed). READ-ONLY.
+      - name: Authenticated dashboard and chat journeys
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        working-directory: apps/web
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          doppler run --project jovie-web --config prd \
+            --only-secrets=E2E_PROD_USER_EMAIL,DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN \
+              CI=true \
+              BASE_URL=https://jov.ie \
+              PLAYWRIGHT_TEST_BASE_URL=https://jov.ie \
+              E2E_SKIP_WEB_SERVER=1 \
+              DOGFOOD_OUT_DIR="$GITHUB_WORKSPACE/out/prod-dogfood" \
+              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values" \
+                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                  pnpm exec playwright test tests/e2e/prod-dogfood-auth.spec.ts --project=chromium --reporter=line
+
       - name: Run the dogfood missions
         if: ${{ steps.seen.outputs.cache-hit != 'true' }}
         id: run
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          DOGFOOD_VISION: ${{ steps.vision-seen.outputs.cache-hit == 'true' && '0' || '1' }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # Exit 2 means defects were found and filed; that is a successful
           # observation, not a broken observer.
           set +e
-          node scripts/prod-dogfood.mjs --out out/prod-dogfood
+          auth_flag=""
+          [ -f out/prod-dogfood/auth-checks.json ] && auth_flag="--auth-checks out/prod-dogfood/auth-checks.json"
+          node scripts/prod-dogfood.mjs --out out/prod-dogfood $auth_flag \
+            --ingest https://jov.ie/api/internal/ovie/dogfood-evidence
           code=$?
           echo "code=$code" >> "$GITHUB_OUTPUT"
           if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then exit "$code"; fi
@@ -115,10 +167,16 @@ jobs:
 
       - name: Remember this SHA for the hour
         if: ${{ success() && needs.gate.outputs.sha != '' && steps.seen.outputs.cache-hit != 'true' }}
-        run: mkdir -p .dogfood-seen && date -u +%FT%TZ > .dogfood-seen/at
+        run: mkdir -p .dogfood-seen .dogfood-vision-seen && date -u +%FT%TZ | tee .dogfood-seen/at .dogfood-vision-seen/at
       - name: Save seen marker
         if: ${{ success() && needs.gate.outputs.sha != '' && steps.seen.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .dogfood-seen
           key: ${{ needs.gate.outputs.key }}
+      - name: Save vision-reviewed marker
+        if: ${{ success() && needs.gate.outputs.sha != '' && steps.seen.outputs.cache-hit != 'true' && steps.vision-seen.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .dogfood-vision-seen
+          key: dogfood-vision-${{ needs.gate.outputs.sha }}

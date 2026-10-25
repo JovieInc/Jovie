@@ -247,6 +247,14 @@ export const INVARIANT_PROPOSALS = {
     'Invariant: every public profile and release page advertises an og:image that returns 200 with an image content type.',
   'profile-interactions':
     'Invariant: the public profile tabs (Home, Music, Events, About) change the view, and Get Updates opens an email capture, with no page errors.',
+  'dashboard-page-clean':
+    'Invariant: every signed-in dashboard page (home, audience, releases, library, earnings, insights) loads for the sanctioned creator identity with content, no page errors and no same-origin 4xx/5xx, at desktop and phone widths.',
+  'chat-surface-ready':
+    'Invariant: the signed-in chat surface renders its conversation area and an enabled composer with no page errors or same-origin 4xx/5xx.',
+  'auth-signin':
+    'Invariant: the sanctioned production identity can sign in through the rendered email-code flow on every deploy.',
+  'vision-review':
+    'Invariant: a vision review of each page screenshot finds no broken layout, clipped text, missing images, error states or placeholder copy; the deterministic check that would have caught this specific defect should be added with the fix.',
   'build-binding':
     'Invariant: /api/health/build-info exposes a full commitSha and deploymentId so every receipt binds to the exact deploy.',
 };
@@ -840,7 +848,7 @@ export const MISSIONS = [
     checks: [],
     automation: 'blocked',
     blocker:
-      'JOV-8809: no sanctioned production auth path for the onboarding robot',
+      'fresh-user signup creates real accounts; covered today by synthetic-monitoring (signup canary + Layer A) which is not SHA-bound. Needs E2E_PROD_SIGNUP_EMAIL_BASE mailbox flow wired into a SHA-bound receipt, or JOV-8809 robot auth path',
     owner: 'auth lane',
   },
   {
@@ -848,22 +856,20 @@ export const MISSIONS = [
     subjectId: 'dashboard-releases',
     product: 'jov',
     title: 'Artist opens the dashboard and sees real releases and audience',
-    checks: [],
-    automation: 'blocked',
+    checks: ['dashboard-page-clean', 'auth-signin'],
+    automation: 'implemented',
     blocker:
-      'needs an authorized production test artist session (read-only fixture)',
-    owner: 'dogfood fixtures',
+      'sanctioned creator-ready sign-in (E2E_PROD_USER_EMAIL + DATABASE_URL via Doppler jovie-web/prd) did not complete',
   },
   {
     id: 'dogfood:chat',
     subjectId: 'journey:chat-agent-turn',
     product: 'jov',
-    title: 'Artist gets a correct chat answer grounded in their profile',
-    checks: [],
-    automation: 'blocked',
+    title: 'Artist opens chat and the composer is ready (no message is sent)',
+    checks: ['chat-surface-ready', 'auth-signin'],
+    automation: 'implemented',
     blocker:
-      'needs the same authorized test artist session; synthetic-chat-turn.spec.ts covers transport only',
-    owner: 'chat lane',
+      'sanctioned creator-ready sign-in did not complete; a grounded-answer turn needs the synthetic-chat-turn spend cap',
   },
   {
     id: 'dogfood:fan-subscribe',
@@ -873,7 +879,7 @@ export const MISSIONS = [
     checks: [],
     automation: 'blocked',
     blocker:
-      'write path: needs a synthetic-audience marker fixture and cleanup (scripts synthetic-audience-markers.ts) on a non-Tim profile',
+      'write path with no sanctioned fixture: needs a non-Tim synthetic profile, a synthetic-audience marker (scripts synthetic-audience-markers.ts) and a cleanup job',
     owner: 'audience lane',
   },
   {
@@ -884,8 +890,18 @@ export const MISSIONS = [
       'Founder opens the Ovie admin views and each shows current, internally consistent data',
     checks: [],
     automation: 'blocked',
-    blocker: 'needs an authorized read-only Ovie admin session',
+    blocker:
+      'no sanctioned admin identity: resolveProductionAuthCredentials() only accepts the creator-ready email. Needs secret E2E_PROD_ADMIN_USER_EMAIL (seeded browse-admin identity as admin in production) in Doppler jovie-web/prd plus allowing it in production-auth-credentials.ts',
     owner: 'ovie stream',
+  },
+  {
+    id: 'dogfood:lyb-web-public',
+    subjectId: 'lyb-core-flows',
+    product: 'lyb',
+    title:
+      'Visitor reaches the LogYourBody public site, sign-in, support and crawl files',
+    checks: ['surface-renders'],
+    automation: 'implemented',
   },
   {
     id: 'dogfood:lyb-core',
@@ -894,20 +910,20 @@ export const MISSIONS = [
     title: 'LogYourBody user logs a weigh-in and sees it in the timeline',
     checks: [],
     automation: 'blocked',
-    blocker: 'needs a LYB production test account and a web/iOS driver',
+    blocker:
+      'LYB is iOS-first with Apple sign-in through Jovie OIDC; it has no production web test account or synthetic workflow. Needs an iOS simulator/device driver with a test Apple ID and a seeded LYB production test user',
     owner: 'lyb lane',
   },
 ];
+
+/** Unverified results of these checks never block certification. */
+const ADVISORY_CHECKS = new Set(['destination-link-live', 'vision-review']);
 
 function outcomeOf(checks, mission) {
   if (mission.automation === 'blocked') return 'blocked';
   if (checks.length === 0) return 'blocked';
   if (checks.some(c => c.status === 'failed')) return 'failed';
-  if (
-    checks.some(
-      c => c.status === 'unverified' && c.id !== 'destination-link-live'
-    )
-  )
+  if (checks.some(c => c.status === 'unverified' && !ADVISORY_CHECKS.has(c.id)))
     return 'blocked';
   return 'passed';
 }

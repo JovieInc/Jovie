@@ -12,6 +12,7 @@
 // profile and public marketing/auth surfaces. No credentials, no writes.
 import {
   appendFileSync,
+  existsSync,
   mkdirSync,
   readFileSync,
   writeFileSync,
@@ -50,6 +51,12 @@ import {
   sameAsUrls,
   weeklyDefectMetrics,
 } from './lib/prod-dogfood.mjs';
+import {
+  expectationFor,
+  reviewScreenshot,
+  sumUsage,
+  visionChecksFor,
+} from './lib/prod-dogfood-vision.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '..');
@@ -71,6 +78,8 @@ function parseArgs(argv) {
     else if (a === '--no-browser') args.browser = false;
     else if (a === '--metrics-only') args.metricsOnly = true;
     else if (a === '--run-url') args.runUrl = argv[++i];
+    else if (a === '--auth-checks') args.authChecks = argv[++i];
+    else if (a === '--ingest') args.ingest = argv[++i];
   }
   return args;
 }
@@ -164,7 +173,16 @@ async function renderedChecks({ browser, urls, viewports, outDir }) {
           path: path.join(outDir, shot),
           fullPage: false,
         });
-        shots.push({ url, viewport: vp.name, file: shot });
+        shots.push({
+          url,
+          viewport: vp.name,
+          file: shot,
+          page:
+            new URL(url).pathname.split('/').filter(Boolean).length > 1
+              ? 'release'
+              : 'profile',
+          mission: 'dogfood:rendered-public-ui',
+        });
         const problems = [];
         if (pageErrors.length)
           problems.push(`page errors: ${pageErrors.slice(0, 3).join(' | ')}`);
@@ -523,6 +541,77 @@ async function main() {
     }
   }
 
+  // 5b. LogYourBody public web (read-only).
+  results.set(
+    'dogfood:lyb-web-public',
+    await checkPublicSurfaces({
+      probe,
+      base: fixtures.lyb.base,
+      surfaces: fixtures.lyb.publicSurfaces,
+    })
+  );
+
+  // 5c. Authenticated journeys: written by tests/e2e/prod-dogfood-auth.spec.ts
+  // (sanctioned creator-ready identity, same OTP source as the auth smoke).
+  if (args.authChecks && existsSync(args.authChecks)) {
+    const auth = JSON.parse(readFileSync(args.authChecks, 'utf8'));
+    for (const check of auth.checks) {
+      results.set(check.mission, [
+        ...(results.get(check.mission) ?? []),
+        check,
+      ]);
+      if (check.screenshot)
+        shots.push({
+          url: check.url ?? `${auth.origin}/`,
+          viewport: check.target.split('#').pop(),
+          file: check.screenshot,
+          page: check.page,
+          mission: check.mission,
+        });
+    }
+  } else {
+    evidence.push('authenticated journeys not run (no auth checks file)');
+  }
+
+  // 5d. Automated vision review of every screenshot (cheap model, confirmed findings only).
+  const visionKey = process.env.AI_GATEWAY_API_KEY ?? '';
+  let visionUsage = null;
+  if (process.env.DOGFOOD_VISION === '0') {
+    evidence.push(
+      'vision review skipped: already reviewed for this deployed SHA'
+    );
+  } else if (!visionKey) {
+    evidence.push('vision review not run: no AI_GATEWAY_API_KEY');
+  } else {
+    const max = Number(process.env.DOGFOOD_VISION_MAX ?? 24);
+    const picked = shots.slice(0, max);
+    const reviews = await mapLimit(picked, 3, async shot => {
+      const withExpectation = {
+        ...shot,
+        expectation: expectationFor(shot.page),
+      };
+      const review = await reviewScreenshot({
+        bytes: readFileSync(path.join(outDir, shot.file)),
+        expectation: withExpectation.expectation,
+        viewport: shot.viewport,
+        apiKey: visionKey,
+        model: process.env.DOGFOOD_VISION_MODEL,
+      });
+      return { shot: withExpectation, review };
+    });
+    for (const { shot, review } of reviews) {
+      const vchecks = visionChecksFor({ shot, review });
+      results.set(shot.mission, [
+        ...(results.get(shot.mission) ?? []),
+        ...vchecks,
+      ]);
+    }
+    visionUsage = sumUsage(reviews.map(r => r.review));
+    evidence.push(
+      `vision review: ${picked.length} screenshots, ${visionUsage.calls} calls, ${visionUsage.prompt_tokens} prompt + ${visionUsage.completion_tokens} completion tokens`
+    );
+  }
+
   // 6. A deploy that moved mid-run cannot certify anything.
   const after = await checkBuildBinding({ probe, base });
   const superseded =
@@ -572,6 +661,36 @@ async function main() {
     path.join(outDir, 'checks.json'),
     `${JSON.stringify({ binding, superseded, evidence, shots, checks: allChecks }, null, 2)}\n`
   );
+
+  // 7b. Ingest into Ovie (Shipping > Production certification). CRON_SECRET comes
+  // from the same Doppler config the synthetic probes use; never printed.
+  const ingestNotes = [];
+  if (args.ingest && process.env.CRON_SECRET) {
+    try {
+      const res = await fetch(args.ingest, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
+        body: JSON.stringify({
+          generatedAt: certification.generatedAt,
+          servedSha: certification.servedSha,
+          runUrl: args.runUrl || null,
+          missions: certification.missions,
+          receipts,
+        }),
+      });
+      ingestNotes.push(
+        `Ovie ingest: HTTP ${res.status}${res.ok ? '' : ` ${(await res.text()).slice(0, 200)}`}`
+      );
+    } catch (error) {
+      ingestNotes.push(
+        `Ovie ingest failed: ${String(error?.message ?? error).split('\n')[0]}`
+      );
+    }
+  } else if (args.ingest)
+    ingestNotes.push('Ovie ingest skipped: no CRON_SECRET');
 
   // 8. File deduped Linear issues; close those whose check now passes.
   const filed = [];
@@ -674,6 +793,7 @@ async function main() {
         : 'dry run (--no-file)'
     );
   }
+  filingNotes.push(...ingestNotes);
   writeFileSync(
     path.join(outDir, 'findings.json'),
     `${JSON.stringify({ findings: findings.map(f => ({ mission: f.mission.id, ...f.check })), filed, closed, notes: filingNotes }, null, 2)}\n`

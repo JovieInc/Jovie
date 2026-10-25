@@ -62,5 +62,38 @@
         "height": 900
       }
     ]
+  },
+  "lyb": {
+    "base": "https://www.logyourbody.com",
+    "publicSurfaces": [
+      {
+        "path": "/",
+        "mustInclude": "LogYourBody"
+      },
+      {
+        "path": "/signin",
+        "mustInclude": ""
+      },
+      {
+        "path": "/security",
+        "mustInclude": ""
+      },
+      {
+        "path": "/support",
+        "mustInclude": ""
+      },
+      {
+        "path": "/download/ios",
+        "mustInclude": ""
+      },
+      {
+        "path": "/robots.txt",
+        "mustInclude": "Sitemap"
+      },
+      {
+        "path": "/sitemap.xml",
+        "mustInclude": "<urlset"
+      }
+    ]
   }
 }
