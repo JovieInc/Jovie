@@ -180,6 +180,18 @@ jobs:
           cp -r "$state_dir/survivor-tasks" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
           cp "$RUNNER_TEMP/baseline-proposal.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
 
+      # The only step that sees a secret. It reads the task JSON the sweep wrote
+      # and never runs Stryker or repo tests.
+      - name: File survivor issues
+        if: ${{ always() && steps.capacity.outputs.run == 'true' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+        run: |
+          node scripts/mutation-sweep-file-issues.mjs \
+            --tasks "$HOME/.local/state/jovie-mutation/survivor-tasks" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
       # No clock: the backlog drains by chaining. The next run starts only if
       # this one made progress and modules remain; a busy host stops the chain
       # (the capacity step skipped), and the next main CI completion restarts it.
