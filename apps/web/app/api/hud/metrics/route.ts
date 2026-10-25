@@ -4,6 +4,7 @@ import { authorizeHud } from '@/lib/auth/hud';
 import { captureError } from '@/lib/error-tracking';
 import { ServerFetchTimeoutError } from '@/lib/http/server-fetch';
 import { buildDegradedHudMetrics, getHudMetrics } from '@/lib/hud/metrics';
+import { isDisplayReadRequest } from '@/lib/ovie/display/server';
 import { logger } from '@/lib/utils/logger';
 import type { HudAccessMode } from '@/types/hud';
 
@@ -16,7 +17,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const kioskToken = request.nextUrl.searchParams.get('kiosk');
-    const auth = await authorizeHud(kioskToken);
+    const auth = (await isDisplayReadRequest(request))
+      ? ({ ok: true, mode: 'kiosk' } as const)
+      : await authorizeHud(kioskToken);
 
     if (!auth.ok) {
       return NextResponse.json(

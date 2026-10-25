@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { authorizeHud } from '@/lib/auth/hud';
 import { captureError } from '@/lib/error-tracking';
 import { scheduleAfter } from '@/lib/next/schedule-after';
+import { isDisplayReadRequest } from '@/lib/ovie/display/server';
 import {
   FORBIDDEN_QUERY_KEYS,
   SHIPPING_STATE_FRESHNESS_MS,
@@ -41,7 +42,9 @@ function hasForbiddenQuery(request: NextRequest): boolean {
 export async function GET(request: NextRequest) {
   try {
     const kioskToken = request.nextUrl.searchParams.get('kiosk');
-    const auth = await authorizeHud(kioskToken);
+    const auth = (await isDisplayReadRequest(request))
+      ? ({ ok: true, mode: 'kiosk' } as const)
+      : await authorizeHud(kioskToken);
     if (!auth.ok) {
       return NextResponse.json(
         { error: 'Unauthorized', state: 'unauthorized' },

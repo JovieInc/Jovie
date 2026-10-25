@@ -1,3 +1,4 @@
+import { isDisplayReadRequest } from '@/lib/ovie/display/server';
 import 'server-only';
 
 import { NextResponse } from 'next/server';
@@ -45,7 +46,9 @@ async function authorizeAdmin(): Promise<Response | null> {
  */
 export async function GET(request: Request): Promise<Response> {
   try {
-    const authResponse = await authorizeAdmin();
+    const authResponse = (await isDisplayReadRequest(request))
+      ? null
+      : await authorizeAdmin();
     if (authResponse) return authResponse;
 
     const funnel = await getFounderFunnelData(parseRange(request));

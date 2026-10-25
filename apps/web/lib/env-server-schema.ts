@@ -250,6 +250,10 @@ export const ServerEnvSchema = z.object({
 
   // HUD (internal kiosk display)
   HUD_KIOSK_TOKEN: z.string().optional(),
+  /** JSON device registry for the read-only office display (lib/ovie/display). */
+  OVIE_DISPLAY_DEVICES: z.string().optional(),
+  /** HMAC key for display session cookies; rotating it signs every display out. */
+  OVIE_DISPLAY_SESSION_KEY: z.string().optional(),
   HUD_STARTUP_NAME: z.string().optional(),
   HUD_STARTUP_LOGO_URL: z.string().url().optional(),
   HUD_GITHUB_TOKEN: z.string().optional(),
@@ -620,6 +624,8 @@ export const ENV_KEYS = [
   'METADATA_HASH_KEY',
   'PII_ENCRYPTION_KEY',
   'HUD_KIOSK_TOKEN',
+  'OVIE_DISPLAY_DEVICES',
+  'OVIE_DISPLAY_SESSION_KEY',
   'HUD_STARTUP_NAME',
   'HUD_STARTUP_LOGO_URL',
   'HUD_GITHUB_TOKEN',
