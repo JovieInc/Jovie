@@ -1,0 +1,66 @@
+name: Ovie Summer Canary
+run-name: Ovie Summer Canary (${{ github.event.schedule || github.event_name }})
+# One real Home-composer message to Summer on production, hourly. A failed run
+# means Tim's first message would fail too (P0 2026-10-25). Variable-gated until
+# E2E_PROD_SUMMER_CANARY_CLERK_USER_ID is in Doppler prd.
+# clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: The probe must hit production jov.ie from outside the deployment with a short-lived founder session JWT minted via Clerk; the deployed app cannot observe its own composer path from the outside, and the GitHub-hosted observer holds only Doppler read and a Slack webhook.
+# removal-trigger: Remove when a first-party production monitor owns an equivalent authenticated Home-composer probe and has delivered alerts for 30 consecutive days.
+
+permissions:
+  contents: read
+
+on:
+  schedule:
+    - cron: '7 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ovie-summer-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Home composer to Summer
+    if: ${{ vars.E2E_PROD_SUMMER_CANARY == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Install Doppler CLI
+        uses: ./.github/actions/setup-doppler
+
+      - name: Send one Home composer message to Summer
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          BASE_URL: https://jov.ie
+          PLAYWRIGHT_TEST_BASE_URL: https://jov.ie
+          E2E_SKIP_WEB_SERVER: '1'
+          E2E_SYNTHETIC_MODE: 'true'
+          E2E_ENVIRONMENT: production
+        run: |
+          doppler run --preserve-env -- pnpm --filter=@jovie/web exec playwright test tests/e2e/synthetic-summer-turn.spec.ts --config=playwright.synthetic.config.ts --project=chromium-synthetic --output=test-results/synthetic-summer-turn
+
+      - name: Send Slack Alert on Failure
+        if: ${{ failure() }}
+        uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
+        with:
+          status: custom
+          channel: '#alerts-production'
+          author_name: 'Ovie Summer Canary'
+          custom_payload: |
+            {
+              "text": "Ovie Home composer to Summer FAILED on production. Tim's first message would fail too.",
+              "attachments": [{ "color": "danger", "fields": [{ "title": "Run", "value": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}", "short": false }] }]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
