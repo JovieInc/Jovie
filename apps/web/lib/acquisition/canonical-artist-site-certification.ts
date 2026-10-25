@@ -13,25 +13,39 @@ export const CANONICAL_PRO_MONTHLY_CENTS = toCents(CANONICAL_PRO_MONTHLY_USD);
 const PRO_DISPLAY_NAME = ARTIST_VISIBILITY_OFFER.pro.displayName;
 
 /**
- * Price claims in a text that contradict the canonical Pro price: dollar
- * amounts ("$199"), cent amounts ("19900 cents") and "<plan name> <cents>"
- * evidence tokens. $0 (free) is never a contradiction.
+ * Recognizes the supported monthly Pro receipt formats, not arbitrary prose:
+ * dollar amounts, USD amounts, cents and "<plan name> [monthly] <cents>".
+ * Call only for the Pro handoff receipt; other receipts can name other amounts.
+ * Zero (free) is never a contradiction.
  */
 export function priceClaimContradictions(text: string): string[] {
   const found: string[] = [];
-  for (const match of text.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/g)) {
+  for (const match of text.matchAll(
+    /(?:\$\s?|\bUSD\s+)(\d[\d,]*(?:\.\d{1,2})?)/gi
+  )) {
     const usd = Number(match[1]?.replace(/,/g, ''));
-    if (usd !== 0 && usd !== CANONICAL_PRO_MONTHLY_USD)
-      found.push(`$${match[1]}`);
+    if (usd !== 0 && usd !== CANONICAL_PRO_MONTHLY_USD) found.push(match[0]);
   }
-  for (const match of text.matchAll(/\b(\d{3,6})\s*cents?\b/gi)) {
-    if (Number(match[1]) !== CANONICAL_PRO_MONTHLY_CENTS)
-      found.push(`${match[1]} cents`);
+  for (const match of text.matchAll(
+    /\b(\d[\d,]*(?:\.\d{1,2})?)\s+dollars?\b/gi
+  )) {
+    const usd = Number(match[1]?.replace(/,/g, ''));
+    if (usd !== 0 && usd !== CANONICAL_PRO_MONTHLY_USD) found.push(match[0]);
   }
-  const named = new RegExp(`${PRO_DISPLAY_NAME}\\s+(\\d{3,6})\\b`, 'g');
+  for (const match of text.matchAll(/\b(\d[\d,]*)\s*cents?\b/gi)) {
+    const cents = Number(match[1]?.replace(/,/g, ''));
+    if (cents !== 0 && cents !== CANONICAL_PRO_MONTHLY_CENTS)
+      found.push(match[0]);
+  }
+  const escapedName = PRO_DISPLAY_NAME.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const named = new RegExp(
+    `${escapedName}\\s+(?:monthly\\s+)?(\\d[\\d,]*)\\b`,
+    'gi'
+  );
   for (const match of text.matchAll(named)) {
-    if (Number(match[1]) !== CANONICAL_PRO_MONTHLY_CENTS)
-      found.push(`${PRO_DISPLAY_NAME} ${match[1]}`);
+    const cents = Number(match[1]?.replace(/,/g, ''));
+    if (cents !== 0 && cents !== CANONICAL_PRO_MONTHLY_CENTS)
+      found.push(match[0]);
   }
   return found;
 }
@@ -200,11 +214,14 @@ export function evaluateCanonicalArtistSiteCertification(
     matches.push(receipt);
     byCheck.set(receipt.checkId, matches);
     integrityFailures.push(...receiptEnvelopeFailures(receipt, input));
-    // A certificate must not contradict its own receipts: any price named in a
-    // receipt's detail or evidence has to be the canonical Pro price.
-    const contradictions = priceClaimContradictions(
-      [receipt.detail, ...receipt.evidence].join('\n')
-    );
+    // Only this receipt asserts the monthly Pro price. Other receipts can carry
+    // unrelated tips, annual totals, budgets or historical amounts.
+    const contradictions =
+      receipt.checkId === 'pro_handoff_199'
+        ? priceClaimContradictions(
+            [receipt.detail, ...receipt.evidence].join('\n')
+          )
+        : [];
     if (contradictions.length > 0)
       integrityFailures.push(
         `${receipt.checkId}: price claim ${[...new Set(contradictions)].join(', ')} contradicts the canonical $${CANONICAL_PRO_MONTHLY_USD}/mo (${CANONICAL_PRO_MONTHLY_CENTS} cents) offer price`

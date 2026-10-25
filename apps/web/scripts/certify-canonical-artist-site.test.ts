@@ -113,7 +113,7 @@ describe('canonical artist-site certification CLI adapter', () => {
       check => check.id === 'pro_handoff_199'
     );
     expect(pro?.detail).toContain('$12 monthly Pro handoff');
-    expect(JSON.stringify(certificate)).not.toContain('$199');
+    expect(pro?.detail).not.toContain('$199');
     expect(certificate.evidenceIntegrityFailures).toEqual([]);
   });
 

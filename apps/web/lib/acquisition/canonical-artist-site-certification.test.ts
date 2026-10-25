@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CANONICAL_ARTIST_SITE_CHECK_DEFINITIONS,
   CANONICAL_ARTIST_SITE_CHECKS,
@@ -192,6 +192,73 @@ describe('canonical artist-site certification (JOV-6572)', () => {
         )
       ).toEqual([]);
     });
+
+    it.each([
+      ['USD 199', 'USD 199'],
+      ['199 dollars', '199 dollars'],
+      ['$1,200', '$1,200'],
+      ['19,900 cents', '19,900 cents'],
+      ['99 cents', '99 cents'],
+      ['Artist Presence monthly 19900', 'Artist Presence monthly 19900'],
+    ])('detects the supported Pro price claim %s', (text, claim) => {
+      expect(priceClaimContradictions(text)).toContain(claim);
+    });
+
+    it('accepts canonical and free amounts in the supported formats', () => {
+      expect(
+        priceClaimContradictions(
+          '$12, USD 12, 12 dollars, 1,200 cents, Artist Presence monthly 1200; $0, 0 cents'
+        )
+      ).toEqual([]);
+    });
+
+    it('treats plan-name regex metacharacters literally', async () => {
+      vi.resetModules();
+      vi.doMock('@/lib/config/plan-prices', async importOriginal => {
+        const actual =
+          await importOriginal<typeof import('@/lib/config/plan-prices')>();
+        return {
+          ...actual,
+          ARTIST_VISIBILITY_OFFER: {
+            ...actual.ARTIST_VISIBILITY_OFFER,
+            pro: {
+              ...actual.ARTIST_VISIBILITY_OFFER.pro,
+              displayName: 'Artist Presence (+)',
+            },
+          },
+        };
+      });
+      try {
+        const { priceClaimContradictions: findClaims } = await import(
+          './canonical-artist-site-certification'
+        );
+        expect(findClaims('Artist Presence (+) monthly 19900')).toEqual([
+          'Artist Presence (+) monthly 19900',
+        ]);
+        expect(findClaims('Artist Presence  monthly 19900')).toEqual([]);
+      } finally {
+        vi.doUnmock('@/lib/config/plan-prices');
+        vi.resetModules();
+      }
+    });
+
+    it.each(['free_state_value', 'payment_entitlement'] as const)(
+      'does not interpret unrelated amounts in %s as monthly Pro prices',
+      checkId => {
+        const result = evaluateCanonicalArtistSiteCertification(
+          input({
+            receipts: patched(checkId, {
+              detail: 'Separate product annual total $144; tip $5; free is $0.',
+              evidence: [
+                'historical campaign budget $1,200; 500 cents refunded',
+              ],
+            }),
+          })
+        );
+        expect(result.status).toBe('GREEN');
+        expect(result.evidenceIntegrityFailures).toEqual([]);
+      }
+    );
 
     it('is RED, never GREEN, when a receipt asserts $199 while its evidence says 1200 cents (the 07:47Z contradiction)', () => {
       const receipts = patched('pro_handoff_199', {
