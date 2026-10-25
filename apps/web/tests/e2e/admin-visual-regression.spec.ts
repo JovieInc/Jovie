@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test';
+import { ADMIN_NAV_REGISTRY } from '@/constants/admin-navigation';
+import { APP_NAME } from '@/constants/app';
 import {
   ensureSignedInUser,
   getAdminCredentials,
@@ -399,6 +401,24 @@ test.describe('admin visual regression', () => {
       await expect(locator).toHaveScreenshot(
         `${surface.snapshotSlug}-mobile.png`
       );
+    });
+  }
+
+  // JOV-8959: page titles come from the same route list as the sidebar. Visual
+  // evidence that every rendered sidebar route names its document title with
+  // its sidebar label (root layout template: `${label} | ${APP_NAME}`).
+  for (const navItem of ADMIN_NAV_REGISTRY) {
+    const surface = ADMIN_RENDER_SURFACES.find(
+      entry => entry.path === navItem.href
+    );
+    if (!surface) continue;
+
+    test(`${surface.name} document title matches its sidebar label`, async ({
+      page,
+    }) => {
+      await openSurface(page, surface, DESKTOP_VIEWPORT);
+
+      await expect(page).toHaveTitle(`${navItem.label} | ${APP_NAME}`);
     });
   }
 });
