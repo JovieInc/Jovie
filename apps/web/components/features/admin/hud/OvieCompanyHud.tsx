@@ -72,9 +72,8 @@ export function OvieCompanyHud({
       <div
         className={cn(
           'grid gap-2',
-          large
-            ? 'min-h-0 flex-1 grid-cols-6 grid-rows-1'
-            : 'grid-cols-2 @3xl:grid-cols-3 @6xl:grid-cols-6'
+          'grid-cols-2 @3xl:grid-cols-3 @6xl:grid-cols-6',
+          large && 'min-h-0 flex-1 @6xl:grid-rows-1'
         )}
       >
         {tiles === null

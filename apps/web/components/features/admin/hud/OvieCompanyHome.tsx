@@ -17,6 +17,7 @@ import type { CompanyTile } from '@/lib/ovie/home/company-hud';
 import type { OvieShipRow } from '@/lib/ovie/home/shipping-home';
 import type { LastLookedSummary } from '@/lib/ovie/home/since-last-looked';
 import type { DeliverySummary } from '@/lib/ovie/shipping-state/contract';
+import { cn } from '@/lib/utils';
 
 /**
  * Ovie Home, YC lens: the company tiles, then what is blocked on the
@@ -84,14 +85,21 @@ export function OvieCompanyHome({
       className='@container flex w-full flex-col gap-3 lg:h-full lg:min-h-0'
       data-testid='ovie-company-home'
     >
-      <div className={fullscreen ? 'min-h-0 shrink-0 basis-[22%]' : undefined}>
+      <div
+        className={fullscreen ? 'min-h-0 shrink-0 @6xl:basis-[22%]' : undefined}
+      >
         <OvieCompanyHud tiles={tiles} since={since} large={fullscreen} />
       </div>
       {answer ? (
         <div className='max-h-1/2 shrink-0 overflow-y-auto'>{answer}</div>
       ) : null}
       <div
-        className='grid grid-cols-1 gap-4 @3xl:grid-cols-2 @6xl:grid-cols-3 @6xl:grid-rows-1 lg:min-h-0 lg:flex-1'
+        // Full Screen reads from across a room: the columns' shared organisms
+        // are sized for a desk, so zoom them rather than fork them.
+        className={cn(
+          'grid grid-cols-1 gap-4 @3xl:grid-cols-2 @6xl:grid-cols-3 @6xl:grid-rows-1 lg:min-h-0 lg:flex-1',
+          fullscreen && '[zoom:1.4]'
+        )}
         data-testid='home-loop-main'
       >
         <HomeLoopSection

@@ -206,9 +206,17 @@ async function waitForAuthenticatedShell(page, route) {
         const tops = [
           ...document.querySelectorAll('[data-testid^="ovie-tile-"]'),
         ].map(el => el.getBoundingClientRect().top);
+        // Real content, not stretched boxes: the lowest text-bearing leaf in
+        // any column.
         const bottoms = [
-          ...document.querySelectorAll('[data-testid$="-section"]'),
-        ].map(el => el.getBoundingClientRect().bottom);
+          ...document.querySelectorAll('[data-testid$="-section"] *'),
+        ]
+          .filter(
+            el =>
+              el.children.length === 0 &&
+              (el.textContent ?? '').trim().length > 0
+          )
+          .map(el => el.getBoundingClientRect().bottom);
         const value = document.querySelector(
           '[data-testid="ovie-tile-revenue"] span.font-semibold'
         );
