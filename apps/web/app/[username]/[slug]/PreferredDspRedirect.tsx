@@ -3,12 +3,9 @@
 import { useEffect } from 'react';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
-import {
-  localizeProviderUrl,
-  readVisitorCountryCookie,
-} from '@/lib/discography/storefront';
 import type { ProviderKey } from '@/lib/discography/types';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
+import { buildRoutingTelemetry } from '@/lib/tracking/routing-telemetry';
 import {
   appendUTMParamsToUrl,
   resolveSmartLinkOutboundUtmParams,
@@ -120,6 +117,11 @@ export function PreferredDspRedirect({
       writeSessionFlag(storageKey);
     }
 
+    const routed = buildRoutingTelemetry({
+      providerId: providerKey,
+      url: matchingLink.url,
+    });
+
     if (artistHandle && tracking?.contentId && tracking?.contentType) {
       postJsonBeacon(
         '/api/track',
@@ -133,6 +135,7 @@ export function PreferredDspRedirect({
             contentId: tracking.contentId,
             provider: providerKey,
             smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+            ...routed.telemetry,
           },
         },
         () => {}
@@ -142,11 +145,7 @@ export function PreferredDspRedirect({
     // Same attribution as an explicit provider tap on the rendered page.
     globalThis.location.replace(
       appendUTMParamsToUrl(
-        localizeProviderUrl(
-          providerKey,
-          matchingLink.url,
-          readVisitorCountryCookie()
-        ),
+        routed.url,
         resolveSmartLinkOutboundUtmParams(searchParams)
       )
     );

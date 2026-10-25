@@ -47,6 +47,11 @@ export interface TrackClickContext {
   smartLinkSlug?: string;
   tipAmount?: number;
   tipAmountCents?: number;
+  /** Opaque per-click routing telemetry (no personal data). */
+  clickId?: string;
+  ttdMs?: number;
+  storefront?: string;
+  visitorCountry?: string;
 }
 
 function normalizeOptionalString(value: unknown): string | undefined {
@@ -217,6 +222,19 @@ function normalizeContext(context: unknown): TrackClickContext | undefined {
     raw.smartLinkSlug.trim().length > 0
   ) {
     normalized.smartLinkSlug = raw.smartLinkSlug.trim();
+  }
+
+  if (typeof raw.clickId === 'string' && /^[\w-]{8,64}$/.test(raw.clickId)) {
+    normalized.clickId = raw.clickId;
+  }
+  if (typeof raw.ttdMs === 'number' && Number.isFinite(raw.ttdMs)) {
+    normalized.ttdMs = Math.min(120_000, Math.max(0, Math.round(raw.ttdMs)));
+  }
+  for (const key of ['storefront', 'visitorCountry'] as const) {
+    const value = raw[key];
+    if (typeof value === 'string' && /^[a-z]{2}$/i.test(value)) {
+      normalized[key] = value.toLowerCase();
+    }
   }
 
   if (

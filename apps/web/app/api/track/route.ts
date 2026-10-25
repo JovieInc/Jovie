@@ -263,6 +263,12 @@ function buildClickMetadata(
     ...(context?.contentId ? { contentId: context.contentId } : {}),
     ...(context?.provider ? { provider: context.provider } : {}),
     ...(context?.smartLinkSlug ? { smartLinkSlug: context.smartLinkSlug } : {}),
+    ...(context?.clickId ? { clickId: context.clickId } : {}),
+    ...(typeof context?.ttdMs === 'number' ? { ttdMs: context.ttdMs } : {}),
+    ...(context?.storefront ? { storefront: context.storefront } : {}),
+    ...(context?.visitorCountry
+      ? { visitorCountry: context.visitorCountry }
+      : {}),
   };
   if (utmParams) {
     metadata.utmParams = utmParams;
