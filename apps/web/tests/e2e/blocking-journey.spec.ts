@@ -197,7 +197,7 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     // button is enabled only once the title reached React state, so retry the
     // fill until that is observable.
     await expect(async () => {
-      await drawer.getByLabel('Title', { exact: true }).fill(releaseTitle);
+      await drawer.locator('#release-title').fill(releaseTitle);
       await expect(createRelease).toBeEnabled({ timeout: 2_000 });
     }).toPass({ timeout: 60_000 });
     await drawer
