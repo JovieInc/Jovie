@@ -209,7 +209,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     !funnel.isPending &&
     loopStatus !== 'loading' &&
     asksStatus !== 'loading';
-  const openAsks = asks.filter(ask => answers[ask.id]?.state !== 'done');
+  // Same rule as the asks section: answered asks leave the count unless the answer failed.
+  const openAsks = asks.filter(
+    ask => !answers[ask.id] || answers[ask.id]?.state === 'failed'
+  );
   const nextDeadlineIso = useMemo(() => {
     const deadlines = (inbox.data?.cases ?? [])
       .map(item => item.decisionDefault?.deadline)
