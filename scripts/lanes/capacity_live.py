@@ -21,6 +21,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import capacity_metrics  # noqa: E402
+import capacity_watch  # noqa: E402
 import capacity_registry  # noqa: E402
 
 INTERVAL_S = 900
@@ -145,12 +147,80 @@ def quota_windows(registry: dict, live: dict, now: float) -> dict:
     return {"schema": "jovie.quota-windows/v1", "generatedAt": _iso(now), "windows": rows}
 
 
+METRICS_INTERVAL_S = 6 * 3600  # one complete merge-window read per six hours, not per tick
+METRICS_FILE = "capacity-metrics.json"
+
+
+def spawn_metrics(state_dir: Path) -> None:
+    """Refresh the metrics in a detached process: the merge window takes tens of seconds and must
+    never delay a dispatch tick."""
+    subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "metrics"], start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     env={**os.environ, "LANES_STATE": str(state_dir)})
+
+
+def metrics_overlay(state_dir: Path, registry: dict, now: float, spawn=None) -> dict:
+    """The last computed metrics; starts a detached refresh when they are older than the interval."""
+    path = state_dir / METRICS_FILE
+    try:
+        current = json.loads(path.read_text())
+    except (OSError, ValueError):
+        current = {}
+    stamp = capacity_registry._epoch(current.get("startedAt") or current.get("readAt")) or 0
+    if now - stamp >= METRICS_INTERVAL_S:
+        # Record the attempt first: a failing refresh retries next interval, never every tick.
+        try:
+            path.write_text(json.dumps({**current, "startedAt": _iso(now)}))
+            (spawn or spawn_metrics)(state_dir)
+        except OSError:
+            pass
+    return current
+
+
+def refresh_metrics(state_dir: Path, now: float | None = None, merge_window=None) -> dict:
+    now = time.time() if now is None else now
+    registry = capacity_registry.load()
+    result = read_metrics(state_dir, registry, now, merge_window) if registry else {"incomplete": "registry-missing"}
+    result.setdefault("readAt", _iso(now))
+    temporary = (state_dir / METRICS_FILE).with_suffix(".tmp")
+    temporary.write_text(json.dumps(result, sort_keys=True))
+    os.replace(temporary, state_dir / METRICS_FILE)
+    return result
+
+
+def read_metrics(state_dir: Path, registry: dict, now: float, merge_window=None) -> dict:
+    """Cost per merged PR by provider. {'incomplete': reason} when the merge window cannot be read in full."""
+    import merge_evidence
+    repository = "JovieInc/Jovie"
+    try:
+        evidence = (merge_window or merge_evidence.collect_shared)(
+            repository, now - capacity_metrics.WINDOW_DAYS * 86400, now, Path(state_dir) / "cache" / "capacity-merge-window.json",
+            collect_fn=lambda repo, lo, hi: merge_evidence.collect(repo, lo, hi, max_pages=80, timeout_s=300))
+    except Exception as error:  # a metrics read never blocks the quota readings
+        return {"incomplete": type(error).__name__}
+    if not evidence.get("complete"):
+        return {"incomplete": str(evidence.get("reason"))}
+    merged = {f"{repository}#{pr['number']}" for pr in evidence.get("prs", [])}
+    try:
+        spend = json.loads((capacity_registry.DEFAULT_PATH.parent / "spend.json").read_text())
+    except (OSError, ValueError):
+        spend = {}
+    rows = capacity_metrics.read_ledger_tail(Path(state_dir) / "runs" / "ledger.jsonl")
+    return {"windowDays": capacity_metrics.WINDOW_DAYS, "mergedInWindow": len(merged), "readAt": _iso(now),
+            "providers": capacity_metrics.compute(registry, rows, merged, spend, now, repository=repository,
+                                                  merged_rows=evidence.get("prs", [])),
+            "unattributed": capacity_metrics.unattributed(
+                rows, evidence.get("prs", []), {p.get("lane") for p in registry.get("providers", []) if p.get("lane")},
+                repository)}
+
+
 def tick(state_dir: Path, now: float | None = None, registry: dict | None = None, grok=read_grok,
-         force: bool = False) -> dict:
+         force: bool = False, spawn=None, agents=None) -> dict:
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
         return {"status": "selftest-skipped"}
     now = time.time() if now is None else now
     path = Path(state_dir) / capacity_registry.LIVE_FILE
+    previous = {}
     try:
         previous = json.loads(path.read_text())
         if not force and now - (capacity_registry._epoch(previous.get("generatedAt")) or 0) < INTERVAL_S:
@@ -165,6 +235,9 @@ def tick(state_dir: Path, now: float | None = None, registry: dict | None = None
     except (OSError, ValueError):
         ledger = {}
     result = collect(registry, ledger if isinstance(ledger, dict) else {}, now, grok)
+    result["metrics"] = metrics_overlay(Path(state_dir), registry, now, spawn)
+    result["watch"] = capacity_watch.read_watch(
+        registry, _iso(now), agents() if agents else capacity_watch.hyperagent_agent_names())
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(result, sort_keys=True))
     os.replace(temporary, path)
@@ -173,9 +246,18 @@ def tick(state_dir: Path, now: float | None = None, registry: dict | None = None
     temporary = windows.with_suffix(".tmp")
     temporary.write_text(json.dumps(quota_windows(registry, result, now), sort_keys=True))
     os.replace(temporary, windows)
+    # Resolved roles (planner, ...) for agents that cannot import the registry: state/roles.json.
+    roles = Path(state_dir) / "state" / "roles.json"
+    temporary = roles.with_suffix(".tmp")
+    temporary.write_text(json.dumps({"schema": "jovie.capacity-roles/v1", "generatedAt": _iso(now),
+                                      "roles": capacity_watch.resolve_roles(registry, result["watch"])}, sort_keys=True))
+    os.replace(temporary, roles)
     return {"status": "written", "accounts": sorted(result["accounts"])}
 
 
 if __name__ == "__main__":
     state = Path(os.environ.get("LANES_STATE") or Path.home() / ".local/state/jovie-lanes")
+    if sys.argv[1:] == ["metrics"]:
+        print(json.dumps({k: v for k, v in refresh_metrics(state).items() if k != "providers"}))
+        sys.exit(0)
     print(json.dumps(tick(state, force="--force" in sys.argv)))

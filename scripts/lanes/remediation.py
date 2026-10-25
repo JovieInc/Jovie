@@ -682,9 +682,12 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
     candidates = []
     for row in qualified:
         seen = availability(row["lane"], row) or {}
-        pressure = max(0.0, float(seen.get("pressure") or 0.0))
+        pace = float(seen.get("paceAdjust") or 0.0)
+        # Quota pressure is never negative; the registry's pace adjustment may discount a lane that is
+        # behind pace on use-or-lose quota (floor: a tenth of its cost), never below that.
+        pressure = max(-0.9, max(0.0, float(seen.get("pressure") or 0.0)) + pace)
         candidates.append({**row, "available": bool(seen.get("ok")), "why": seen.get("why") or "ok",
-                           "pressure": round(pressure, 3),
+                           "pressure": round(pressure, 3), "paceAdjust": round(pace, 3),
                            "effectiveCost": round(row["cost"] * (1 + pressure), 3)})
     candidates.sort(key=lambda row: (row["effectiveCost"], row["tier"], row["index"], row["order"]))
     chosen = next((row for row in candidates if row["available"]), None)
@@ -705,9 +708,9 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
             "reasons": need["reasons"], "notes": notes,
             "chosen": None if chosen is None else {key: chosen[key] for key in
                                                    ("lane", "model", "alias", "capability", "costClass",
-                                                    "cost", "pressure", "effectiveCost")},
+                                                    "cost", "pressure", "paceAdjust", "effectiveCost")},
             "candidates": [{key: row[key] for key in ("lane", "model", "capability", "cost", "pressure",
-                                                      "effectiveCost", "available", "why")}
+                                                      "effectiveCost", "paceAdjust", "available", "why")}
                            for row in candidates],
             "rationale": rationale}
 
