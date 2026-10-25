@@ -1,12 +1,46 @@
 'use client';
 
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
 import { type ChatToken, parseTokens } from '@/lib/chat/tokens';
 import { skillById } from '@/lib/commands/registry';
-import { ChatMarkdown } from './ChatMarkdown';
 import { EntityChipPopover } from './EntityChipPopover';
 import { EntityMentionSpan } from './EntityMentionSpan';
 import { useEntityResolution } from './EntityResolutionProvider';
+
+/**
+ * The markdown engine (streamdown + remark) is ~460 KB decoded and is not
+ * needed to paint an empty chat, so it is a separate chunk. It is requested
+ * once the main thread is idle after load, so the first assistant reply
+ * normally finds it cached; until then the plain text shows in the same box.
+ */
+const loadChatMarkdown = () =>
+  import('./ChatMarkdown').then(module => ({ default: module.ChatMarkdown }));
+const LazyChatMarkdown = lazy(loadChatMarkdown);
+
+if (typeof window !== 'undefined') {
+  const idle = (
+    window as Window & {
+      requestIdleCallback?: (callback: () => void) => number;
+    }
+  ).requestIdleCallback;
+  const warm = () => void loadChatMarkdown();
+  if (idle) idle(warm);
+  else window.setTimeout(warm, 2000);
+}
+
+function ChatMarkdown(props: {
+  readonly content: string;
+  readonly isStreaming?: boolean;
+  readonly inline?: boolean;
+}) {
+  return (
+    <Suspense
+      fallback={<span className='whitespace-pre-wrap'>{props.content}</span>}
+    >
+      <LazyChatMarkdown {...props} />
+    </Suspense>
+  );
+}
 
 function tokenKey(token: ChatToken, index: number): string {
   if (token.type === 'text') return `t:${index}:${token.value.length}`;
