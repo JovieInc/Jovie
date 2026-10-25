@@ -510,6 +510,16 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   X: ['https://x.com/meetjovie'],
   Privacy: ['LEGAL_PRIVACY'],
   Terms: ['LEGAL_TERMS'],
+  // JOV-8925 locked homepage footer.
+  Cookies: ['LEGAL_COOKIES'],
+  DMCA: ['LEGAL_DMCA'],
+  'Your Jovie profile': ['ARTIST_PROFILES'],
+  'Smart links': ['SMART_LINKS'],
+  Updates: ['ARTIST_NOTIFICATIONS'],
+  Payments: ['PAY'],
+  'Contact capture': ['ARTIST_PROFILES'],
+  Audience: ['ARTIST_PROFILES'],
+  Automation: ['LAUNCH'],
 });
 
 function describeDestination(destination) {
