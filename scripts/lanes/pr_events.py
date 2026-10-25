@@ -987,7 +987,8 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh) -> bool:
     updated = with_red_section(viewed.stdout or "", block)
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
         path = Path(tmp) / "body.md"
-        path.write_text(updated)
+        from atomic_state import atomic_write_text
+        atomic_write_text(path, updated)
         if RED_BLOCK_MARKER not in path.read_text():
             return False
         return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
