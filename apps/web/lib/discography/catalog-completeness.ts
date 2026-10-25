@@ -6,13 +6,14 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
+import { classifyForPublication } from './publication-eligibility';
 import { syncReleasesFromSpotify } from './spotify-import';
 
 /**
  * Catalog completeness job. For each claimed artist with a Spotify id it
- *  1. publishes ingested releases whose approval was never set by the artist
- *     (no approval row, or an untouched default draft row), because a release
- *     that exists but is not approved is invisible on the public profile;
+ *  1. reconciles ingested releases with no approval row: provider-verified,
+ *     unambiguous ones are published under the existing import policy,
+ *     ambiguous ones are queued as needs_review (no bulk publishing);
  *  2. re-runs the provider catalog import (idempotent; identity-safe after the
  *     same-title merge fix) so missing release versions are created;
  *  3. reports public-release counts before and after.
@@ -100,6 +101,7 @@ export interface CatalogCompletenessProfileReport {
   readonly publicBefore: number;
   readonly publicAfter: number;
   readonly approvalsPublished: number;
+  readonly queuedForReview: number;
   readonly imported: number;
   readonly importFailed: number;
   readonly spotifyTotal: number;
@@ -123,52 +125,75 @@ async function countPublicReleases(creatorProfileId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
-/** Publish ingested releases the artist never decided on. Returns the count. */
-export async function publishUndecidedIngestedReleases(
-  creatorProfileId: string
-): Promise<number> {
-  const inserted = await db.execute(drizzleSql`
-    INSERT INTO library_asset_approval_statuses
-      (creator_profile_id, asset_id, item_kind, approval_status, profile_visibility)
-    SELECT r.creator_profile_id, r.id::text, 'release', 'approved', 'visible'
+/**
+ * Reconcile ingested releases that have no approval row. Provider-verified,
+ * unambiguous releases are published under the existing import policy;
+ * ambiguous ones go to the `needs_review` queue. Releases that already have a
+ * row (including artist-hidden or archived) are never touched; nothing is
+ * bulk-published.
+ */
+export async function reconcileUndecidedIngestedReleases(
+  creatorProfileId: string,
+  ownerSpotifyId: string | null
+): Promise<{ published: number; queuedForReview: number }> {
+  const all = await db.execute<{
+    id: string;
+    title: string;
+    release_date: Date | null;
+    metadata: unknown;
+    decided: boolean;
+    eligible: boolean;
+  }>(drizzleSql`
+    SELECT r.id, r.title, r.release_date, r.metadata,
+      EXISTS (SELECT 1 FROM library_asset_approval_statuses a
+        WHERE a.creator_profile_id = r.creator_profile_id AND a.asset_id = r.id::text) AS decided,
+      (r.status <> 'draft' AND r.source_type = 'ingested') AS eligible
     FROM discog_releases r
-    WHERE r.creator_profile_id = ${creatorProfileId}
-      AND r.deleted_at IS NULL
-      AND r.status <> 'draft'
-      AND r.source_type = 'ingested'
-      AND NOT EXISTS (
-        SELECT 1 FROM library_asset_approval_statuses a
-        WHERE a.creator_profile_id = r.creator_profile_id AND a.asset_id = r.id::text
-      )
-    ON CONFLICT DO NOTHING
-    RETURNING 1
+    WHERE r.creator_profile_id = ${creatorProfileId} AND r.deleted_at IS NULL
   `);
-  const updated = await db.execute(drizzleSql`
-    UPDATE library_asset_approval_statuses a
-    SET approval_status = 'approved', profile_visibility = 'visible', updated_at = now()
-    FROM discog_releases r
-    WHERE a.creator_profile_id = ${creatorProfileId}
-      AND a.asset_id = r.id::text
-      AND r.creator_profile_id = a.creator_profile_id
-      AND r.deleted_at IS NULL
-      AND r.status <> 'draft'
-      AND r.source_type = 'ingested'
-      AND a.approval_status = 'draft'
-      AND a.updated_at = a.created_at
-    RETURNING 1
-  `);
-  return (inserted.rows?.length ?? 0) + (updated.rows?.length ?? 0);
+  const releases = all.rows.map(r => ({
+    id: r.id,
+    title: r.title,
+    releaseDate: r.release_date ? new Date(r.release_date) : null,
+    metadata: r.metadata,
+  }));
+  let published = 0;
+  let queuedForReview = 0;
+  for (const row of all.rows) {
+    if (row.decided || !row.eligible) continue;
+    const candidate = releases.find(r => r.id === row.id);
+    if (!candidate) continue;
+    const decision = classifyForPublication(
+      candidate,
+      releases,
+      ownerSpotifyId
+    );
+    const inserted = await db.execute(drizzleSql`
+      INSERT INTO library_asset_approval_statuses
+        (creator_profile_id, asset_id, item_kind, approval_status, profile_visibility)
+      VALUES (${creatorProfileId}, ${row.id}, 'release',
+        ${decision === 'publish' ? 'approved' : 'needs_review'}, 'visible')
+      ON CONFLICT DO NOTHING
+      RETURNING 1`);
+    if ((inserted.rows?.length ?? 0) > 0) {
+      if (decision === 'publish') published++;
+      else queuedForReview++;
+    }
+  }
+  return { published, queuedForReview };
 }
 
 export async function runCatalogCompletenessForProfile(profile: {
   readonly id: string;
   readonly username: string;
+  readonly spotify_id?: string | null;
 }): Promise<CatalogCompletenessProfileReport> {
   const base = {
     handle: profile.username,
     publicBefore: 0,
     publicAfter: 0,
     approvalsPublished: 0,
+    queuedForReview: 0,
     imported: 0,
     importFailed: 0,
     spotifyTotal: 0,
@@ -187,9 +212,13 @@ export async function runCatalogCompletenessForProfile(profile: {
       process.env.CATALOG_APPEARS_ON_HANDLES,
       profile.username
     );
-    const approvalsPublished = published
-      ? await publishUndecidedIngestedReleases(profile.id)
-      : 0;
+    const reconciled = published
+      ? await reconcileUndecidedIngestedReleases(
+          profile.id,
+          profile.spotify_id ?? null
+        )
+      : { published: 0, queuedForReview: 0 };
+    const approvalsPublished = reconciled.published;
     const sync = await syncReleasesFromSpotify(profile.id, {
       includeTracks: true,
       includeCoPrimaryAppearsOn: appearsOn,
@@ -200,6 +229,7 @@ export async function runCatalogCompletenessForProfile(profile: {
       publicBefore,
       publicAfter,
       approvalsPublished,
+      queuedForReview: reconciled.queuedForReview,
       imported: sync.imported,
       importFailed: sync.failed,
       spotifyTotal: sync.total,
@@ -234,6 +264,7 @@ export async function runCatalogCompleteness(options: {
     readonly publicBefore: number;
     readonly publicAfter: number;
     readonly approvalsPublished: number;
+    readonly queuedForReview: number;
     readonly imported: number;
     readonly failed: number;
   };
@@ -243,8 +274,12 @@ export async function runCatalogCompleteness(options: {
     options.handles && options.handles.length > 0
       ? drizzleSql`AND lower(username) = ANY(${options.handles.map(h => h.toLowerCase())})`
       : drizzleSql``;
-  const rows = await db.execute<{ id: string; username: string }>(drizzleSql`
-    SELECT id, username FROM ${creatorProfiles}
+  const rows = await db.execute<{
+    id: string;
+    username: string;
+    spotify_id: string | null;
+  }>(drizzleSql`
+    SELECT id, username, spotify_id FROM ${creatorProfiles}
     WHERE spotify_id IS NOT NULL AND is_claimed = true ${handleFilter}
     ORDER BY (settings -> ${CATALOG_COMPLETENESS_STATE_KEY} ->> 'checkedAt') ASC NULLS FIRST,
              updated_at DESC
@@ -275,6 +310,7 @@ export async function runCatalogCompleteness(options: {
       publicBefore: sum(r => r.publicBefore),
       publicAfter: sum(r => r.publicAfter),
       approvalsPublished: sum(r => r.approvalsPublished),
+      queuedForReview: sum(r => r.queuedForReview),
       imported: sum(r => r.imported),
       failed: sum(r => r.importFailed),
     },
