@@ -386,6 +386,9 @@ jobs:
         if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' }}
         with:
           persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         if: ${{ needs.build-web.result == 'success' && needs.e2e-full-matrix.result == 'success' }}
         with:
