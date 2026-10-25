@@ -6720,7 +6720,6 @@ jobs:
       - name: Review golden-path keyframes (visual verdict)
         id: visual_review
         if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' }}
-        continue-on-error: true
         run: |
           cd "$GITHUB_WORKSPACE"
           # JOV-5489: recorded visual review of the golden-path keyframes. A
@@ -6890,14 +6889,6 @@ jobs:
           allow-images: 'true'
           public-images: 'true'
           retention-days: 30
-
-      # A reproduced visual blocker still turns the job red (verdict: visual=failure)
-      # without rewriting the auth/billing journey evidence emitted above.
-      - name: Enforce visual review verdict
-        if: ${{ always() && steps.visual_review.outcome == 'failure' }}
-        run: |
-          echo "::error::Golden path visual review confirmed a blocker (journey evidence is unaffected)."
-          exit 1
 
       - name: Cleanup ephemeral Neon branch
         if: always() && needs.neon-db.result != 'success' && steps.neon-branch.outputs.branch_id != ''

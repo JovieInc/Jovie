@@ -207,17 +207,19 @@ describe('workflow wiring', () => {
     const journey = steps[idx('canonical_journey')];
     const visual = steps[idx('visual_review')];
     const emit = steps.find(s => s.name?.startsWith('Emit journey evidence'));
-    const enforce = steps.find(s => s.name === 'Enforce visual review verdict');
+    const upload = steps.find(s => s.name === 'Upload journey evidence');
     // The journey step (whose outcome becomes auth/billing evidence) never runs the reviewer.
     expect(journey.run).not.toContain('golden-path-visual-review');
     expect(visual.run).toContain('golden-path-visual-review');
-    expect(visual['continue-on-error']).toBe(true);
+    // A failing visual step fails the job directly, with no advisory interval.
+    expect(visual['continue-on-error']).toBeUndefined();
+    expect(visual.if).toContain("steps.canonical_journey.outcome == 'success'");
     expect(idx('visual_review')).toBeGreaterThan(idx('canonical_journey'));
     expect(emit.env.JOURNEY_OUTCOME).toContain('canonical_journey');
     expect(JSON.stringify(emit)).not.toContain('visual_review');
-    // A confirmed visual blocker still fails the job (gate not weakened).
-    expect(enforce.if).toContain("steps.visual_review.outcome == 'failure'");
-    expect(enforce.run).toContain('exit 1');
+    // Evidence is still emitted and uploaded after the visual step fails.
+    expect(emit.if).toBe('${{ always() }}');
+    expect(upload.if).toBe('${{ always() }}');
   });
 
   it('journeys that pass with a failing visual review emit success evidence', () => {
