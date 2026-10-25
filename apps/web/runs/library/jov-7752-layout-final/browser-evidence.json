@@ -1,0 +1,70 @@
+{
+  "capturedAt": "2026-10-05T15:48:52.069376+00:00",
+  "capturedBaseHead": "358c2ebc5cef40dffaf5e96bcb9d8b703b433b6f",
+  "parentHead": "596203622b4f04e1accbe236d1539adcab63e301",
+  "capturedUncommittedPaths": [
+    "apps/web/tests/e2e/storybook-library-density.spec.ts"
+  ],
+  "checks": "4 Playwright tests pass: actual Library+inspector dense19/20/loading, deliberate-red oversized art control, three grid densities and phone breakpoint. Not production/full-mobile certification.",
+  "images": [
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/grid-1-columns.png",
+      "sha256": "58c8ee69aa16c3eb30360e112b9d6f3084aa0ff7e95b6ba6e2305784c50209d3"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/grid-2-columns.png",
+      "sha256": "6ce9c37ff1194bddd8149eb6e0584ce4d07ae938f362272fc40d7e5b9cbe07a0"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/grid-3-columns.png",
+      "sha256": "bdbcb85a6b6bfb5134330673d656b0a0eabf6c0449cbfa3018143c5f48dbf627"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/virtualized-dense-scan-mounted.png",
+      "sha256": "c8f4f0f51c2abd61ea19cfa6fe9819ee4cc23a0d7c5ad00ee1f35f3788ab6380"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/virtualized-dense-scan.png",
+      "sha256": "faa903c7333c21efc851656101b40ba3b875f6ff7db408614a775600c81c9552"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/dense-loading.png",
+      "sha256": "12bb781f851c389532a7a17348720d88857ea8d0d596dd1d949de188db387ccf"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/dense-loading-mounted.png",
+      "sha256": "12bb781f851c389532a7a17348720d88857ea8d0d596dd1d949de188db387ccf"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/dense-scan-with-inspector-mounted.png",
+      "sha256": "ab06cec9020425dfaa20a5068e852f8175412332f69aef9ccc1bb4711b9e4228"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-layout-final/dense-scan-with-inspector.png",
+      "sha256": "def08560e11d11c0adaf9a0dac8c40800cbcd133ea529f05bb0877d0d4c7aa05"
+    }
+  ],
+  "sourceHashes": {
+    "apps/web/app/app/(shell)/library/LibraryLoadingState.test.tsx": "335f59078eb4fb07cb194d8f33036cc2db8ab8fffa093987f67e560ff8c15420",
+    "apps/web/app/app/(shell)/library/LibraryLoadingState.tsx": "9ba700824de15e48827453dbd0f932688c618f1fa9eb8ff88f28f66eea77eb57",
+    "apps/web/app/app/(shell)/library/LibrarySurface.tsx": "d4948c49897373a9a68c4e3747e594cd64eb3e159660219ad989b8ae8a1b9e17",
+    "apps/web/app/app/(shell)/library/library-data.ts": "805daec5daaf8129ced05d6fe589f029cfed3679787a0b3829a34bc0df3c7e8b",
+    "apps/web/app/app/(shell)/library/library-grid-preferences.ts": "819b7314d1da273b717fc033c6b54e510ee454f43fed721d8ee972c9e2006b88",
+    "apps/web/components/features/library/WorkInspector.stories.tsx": "f2ee6481241c3c5b533511c4dd3636d018f29ba07142455a6620e064f6377b37",
+    "apps/web/components/features/library/library-catalog-columns.tsx": "1406d633a7d16b579a7c404e88fa78611d9339799493b82f3be95f28d4cbeca4",
+    "apps/web/components/organisms/table/organisms/UnifiedTable.column-priority.test.tsx": "a14894e5c7000a731c51174c3a3af4d7a22e6293ab9c66ce583969423eb86d84",
+    "apps/web/components/organisms/table/organisms/UnifiedTable.selection-keys.test.tsx": "a3df0c33ca4c5bccf78c90ef54984db85b8eab0fd871fa9b71e1b4d95551c3cf",
+    "apps/web/components/organisms/table/organisms/UnifiedTable.tsx": "7ec41f47f2103f3be34fd3e72db3ba5d641a2b51dc36d4b722271872ced3bd84",
+    "apps/web/components/organisms/table/organisms/useTableKeyboardNav.test.tsx": "8809a489f37aa898cc10582af7440c97e70760b6e84e66b2d376e3da195a1740",
+    "apps/web/components/organisms/table/organisms/useTableKeyboardNav.ts": "0d0e53d4ce2a358e114e488374b0634d1a4f48b802c577f4f5e51e654f645432",
+    "apps/web/styles/system-b-app.css": "6425af99af14e01ab3c0f0493bbc83e1d455fbe5e1d000e184973e9a5978312a",
+    "apps/web/tests/e2e/storybook-library-density.spec.ts": "8365c8a0f76d0d8cf57c87b83a89ff23f7f5e0f2f235f4dc50d7700758b489d9",
+    "apps/web/tests/unit/library/LibrarySurface.test.tsx": "6778f2687fa06e171907cab28d91806d1e7b92c5dd72336b967d9a855fa125ab",
+    "apps/web/tests/unit/library/library-column-priority.test.ts": "03ec659245a2b69405554edd255095f6f8a5f760498a36d685a0c68ad9e1456f",
+    "apps/web/tests/unit/library/library-data.test.ts": "aa5952d9d81478a26413008d69d523ff5428211676bb9eef678c599d009521d2",
+    "apps/web/tests/unit/library/library-grid-preferences.test.ts": "b34b2463d67aaa4c31c9f78acdad3667b21485d096c1744588f4e4653e12993d",
+    "apps/web/tests/unit/library/library-system-b-compliance.test.ts": "708962ae08c1cb3e20a8becf208fe3046bba4d55c6cf853979d8e14e45601c37"
+  },
+  "qualifiedChildCommit": "76a4981533b0b68317cfaa6014d800f120880f2c",
+  "postCaptureChangedSources": []
+}

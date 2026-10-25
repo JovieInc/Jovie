@@ -1,0 +1,53 @@
+{
+  "headBeforeLoadingFixCommit": "b8643673bbd03bfb1acf7f60d13a31c640295656",
+  "images": [
+    {
+      "path": "apps/web/runs/library/jov-7752-dense-final/virtualized-dense-scan-mounted.png",
+      "sha256": "79bf728ba7506e05b3a305b3a9f0837921c2f30612e51651cc1f9e7526422041"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-dense-final/virtualized-dense-scan.png",
+      "sha256": "faa903c7333c21efc851656101b40ba3b875f6ff7db408614a775600c81c9552"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-dense-final/dense-loading.png",
+      "sha256": "12bb781f851c389532a7a17348720d88857ea8d0d596dd1d949de188db387ccf"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-dense-final/dense-loading-mounted.png",
+      "sha256": "12bb781f851c389532a7a17348720d88857ea8d0d596dd1d949de188db387ccf"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-dense-final/dense-scan-with-inspector-mounted.png",
+      "sha256": "d2c3cd2424d934cb67f8dacb8c2e3298ec8cec34e89befcdfa2edce4f4312450"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-dense-final/dense-scan-with-inspector.png",
+      "sha256": "def08560e11d11c0adaf9a0dac8c40800cbcd133ea529f05bb0877d0d4c7aa05"
+    }
+  ],
+  "sourceHashes": {
+    "apps/web/app/app/(shell)/library/LibraryLoadingState.test.tsx": "582ebc24e81b50c7213ad1176196bab95703572440e89dcc0ee3ff6ec0b7beee",
+    "apps/web/app/app/(shell)/library/LibraryLoadingState.tsx": "9ba700824de15e48827453dbd0f932688c618f1fa9eb8ff88f28f66eea77eb57",
+    "apps/web/app/app/(shell)/library/LibrarySurface.tsx": "350d0653e6103cf94d478615be14fb8f424ff083399347650a4427af306a7f38",
+    "apps/web/app/app/(shell)/library/library-grid-preferences.ts": "819b7314d1da273b717fc033c6b54e510ee454f43fed721d8ee972c9e2006b88",
+    "apps/web/components/features/library/WorkInspector.stories.tsx": "f2ee6481241c3c5b533511c4dd3636d018f29ba07142455a6620e064f6377b37",
+    "apps/web/components/features/library/library-catalog-columns.tsx": "1406d633a7d16b579a7c404e88fa78611d9339799493b82f3be95f28d4cbeca4",
+    "apps/web/tests/e2e/storybook-library-density.spec.ts": "204e64be384e33b2267c0c41c6605b067878d48c005873adb17e8f36ea0cfb91",
+    "apps/web/tests/unit/library/LibrarySurface.test.tsx": "6778f2687fa06e171907cab28d91806d1e7b92c5dd72336b967d9a855fa125ab",
+    "apps/web/tests/unit/library/library-column-priority.test.ts": "03ec659245a2b69405554edd255095f6f8a5f760498a36d685a0c68ad9e1456f",
+    "apps/web/tests/unit/library/library-grid-preferences.test.ts": "b34b2463d67aaa4c31c9f78acdad3667b21485d096c1744588f4e4653e12993d"
+  },
+  "qualifiedCommit": "a2adce55e65883cf1f5d6077979de5b9719267ef",
+  "postCaptureChanges": [
+    "apps/web/app/app/(shell)/library/LibraryLoadingState.test.tsx"
+  ],
+  "postCaptureVerification": [
+    "loading resize regression 5/5, 100% statements/75% branches",
+    "test typecheck 687 baseline, no new",
+    "ordinary commit hooks"
+  ],
+  "publishedChildCommit": "bd183c4830459704fc25648590d84249ae4c5ab7",
+  "publishedParentCommit": "99e15c69122eb9caee06e47d3fe35e3512e7a845",
+  "postCaptureHistory": "Rebase onto parent registered-test-only addition; runtime source hashes unchanged."
+}

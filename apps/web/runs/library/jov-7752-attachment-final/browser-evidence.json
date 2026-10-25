@@ -1,0 +1,68 @@
+{
+  "capturedAt": "2026-10-05T18:49:09.731686+00:00",
+  "qualifiedHead": "bd2d90ee19b4a50877688efb6e811b4d1f1d0dc3",
+  "previousHead": "e6730ee7d241285140bbe16efb21ad394a4f9fb0",
+  "sourceHashes": {
+    "apps/web/app/app/(shell)/library/LibraryLoadingState.test.tsx": "335f59078eb4fb07cb194d8f33036cc2db8ab8fffa093987f67e560ff8c15420",
+    "apps/web/app/app/(shell)/library/LibraryLoadingState.tsx": "9ba700824de15e48827453dbd0f932688c618f1fa9eb8ff88f28f66eea77eb57",
+    "apps/web/app/app/(shell)/library/LibrarySurface.tsx": "4b0f2992db7a709545134e240c7cde03bd288d15fa4ef602ac198db371bc9da5",
+    "apps/web/app/app/(shell)/library/library-grid-preferences.ts": "819b7314d1da273b717fc033c6b54e510ee454f43fed721d8ee972c9e2006b88",
+    "apps/web/components/features/library/WorkInspector.stories.tsx": "f2ee6481241c3c5b533511c4dd3636d018f29ba07142455a6620e064f6377b37",
+    "apps/web/components/features/library/library-catalog-columns.tsx": "1406d633a7d16b579a7c404e88fa78611d9339799493b82f3be95f28d4cbeca4",
+    "apps/web/tests/e2e/storybook-library-density.spec.ts": "16867b59b7dd39e10560fd54af13ca6dceac5e5be50d23f309be44293b435aa9",
+    "apps/web/tests/unit/library/LibraryCatalogWaveformCell.test.tsx": "61fb03b41900e2d41259102f0374927a1266e381858e8911ab1370df6af93c3b",
+    "apps/web/tests/unit/library/LibrarySurface.test.tsx": "53e306ba5196d0da1ceec67b7083643ae17798f44b493a7906309a8321ac4fa8",
+    "apps/web/tests/unit/library/library-column-priority.test.ts": "03ec659245a2b69405554edd255095f6f8a5f760498a36d685a0c68ad9e1456f",
+    "apps/web/tests/unit/library/library-grid-preferences.test.ts": "b34b2463d67aaa4c31c9f78acdad3667b21485d096c1744588f4e4653e12993d",
+    "apps/web/tests/unit/e2e/storybook-attachment-names.test.ts": "d410da569c4ad8cb4e371ad6279c2930feb06b8b9c4324c7a3510a6e11b2f660"
+  },
+  "images": [
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/dense-scan-with-inspector-mounted.png",
+      "sha256": "8ac71ec0d0adde446d0ddb32c29eb0cbf16faf7259896215df907d4566ade7d7"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/dense-scan-with-inspector.png",
+      "sha256": "def08560e11d11c0adaf9a0dac8c40800cbcd133ea529f05bb0877d0d4c7aa05"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/virtualized-dense-scan-mounted.png",
+      "sha256": "320b2de7a54c8c152d47784e9460dd7e713ea6fc4a1c296174a4d5d46e4cab84"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/virtualized-dense-scan.png",
+      "sha256": "faa903c7333c21efc851656101b40ba3b875f6ff7db408614a775600c81c9552"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/grid-tab-focus.png",
+      "sha256": "dd58b247d2b340ebe43feb0c22290f1de3128fd230934e30137d3596ee7a859a"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/grid-1-columns.png",
+      "sha256": "920d91938d3544f8b24853eeaa54e70e14b89409263f1ac95fdf703681e97a58"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/grid-2-columns.png",
+      "sha256": "2f9812780cd0e6a8719619815c5f9d2ec09ec6c7b60f37ce5d184d90b8c279eb"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/grid-3-columns.png",
+      "sha256": "12316fd6cddb64e18821c8e0107a880242c64c017fd76e6be918dbf125fad4ca"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/dense-loading-mounted.png",
+      "sha256": "12bb781f851c389532a7a17348720d88857ea8d0d596dd1d949de188db387ccf"
+    },
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/dense-loading.png",
+      "sha256": "12bb781f851c389532a7a17348720d88857ea8d0d596dd1d949de188db387ccf"
+    }
+  ],
+  "attachments": [
+    {
+      "path": "apps/web/runs/library/jov-7752-attachment-final/attachments/.last-run.json",
+      "sha256": "91d1c43004802cd49950d78eb11c8fa7d05da8ffffe219a8b13b2f561bc00903"
+    }
+  ],
+  "checks": "5 Playwright checks pass; existing attachment-name guard red before and green after extension repair; retained actual browser output passes the unchanged artifact guard. Component proof, not production/device certification."
+}
