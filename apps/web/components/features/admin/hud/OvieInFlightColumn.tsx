@@ -3,21 +3,50 @@ import {
   HomeLoopSection,
   type HomeLoopSectionStatus,
 } from '@/components/organisms/home-loop';
+import { plainOutcome } from '@/lib/ovie/home/plain-language';
 import type { OvieShipRow } from '@/lib/ovie/home/shipping-home';
 import type {
   CountMeasurement,
   DeliverySummary,
 } from '@/lib/ovie/shipping-state/contract';
+import { OvieQuietList, type QuietRow } from './OvieQuietList';
 
-const MAX_ROWS = 12;
+/** The few that matter; everything else is a quiet count. */
+const TOP_ROWS = 3;
+const MAX_GROUPS = 3;
 
 const measured = (count: CountMeasurement | undefined): number | null =>
   !count || count.state === 'not-measured' ? null : count.value;
 
+const ATTENTION_RANK = { failing: 0, blocked: 1, retrying: 2 } as const;
+const STAGE_WORDS: Record<OvieShipRow['stage'], string> = {
+  investigating: 'investigating',
+  building: 'building',
+  tested: 'ready to merge',
+  merging: 'merging',
+  deployed: 'deployed',
+  verified: 'verified',
+};
+
+function rank(row: OvieShipRow): number {
+  return row.attention ? ATTENTION_RANK[row.attention] : 3;
+}
+
+function secondaryOf(row: OvieShipRow): string {
+  const state = row.attention
+    ? row.attention === 'failing'
+      ? 'failing checks'
+      : row.attention
+    : STAGE_WORDS[row.stage];
+  return row.pullRequestNumber ? `#${row.pullRequestNumber} · ${state}` : state;
+}
+
 /**
- * Lanes, work in flight and the merge queue. Every figure reads "Unknown" when
- * its source was not measured: an empty list is only ever claimed from a
- * measured zero (the prod Home said "No work in flight" over dozens of PRs).
+ * Group by meaning, not by raw title: "14 open PRs · 2 failing · 3 ready to
+ * merge", then the few rows that matter (failing first). Every figure reads
+ * "Unknown" when its source was not measured; an empty pipeline is claimed
+ * only from a measured zero (prod once said "No work in flight" over dozens
+ * of PRs).
  */
 export function summarizeInFlight(
   delivery: DeliverySummary | null,
@@ -27,33 +56,69 @@ export function summarizeInFlight(
   const slots = measured(delivery?.lanes.slots);
   const queue = measured(delivery?.mergeQueueDepth);
   const inFlight = measured(delivery?.inFlight);
-  const lines: { label: string; value: string }[] = [
-    {
-      label: 'Lanes',
-      value:
-        running === null || slots === null
-          ? 'Unknown'
-          : `${running} of ${slots} running`,
-    },
-    { label: 'Merge Queue', value: queue === null ? 'Unknown' : String(queue) },
-    {
-      label: 'Open Pull Requests',
-      value: inFlight === null ? 'Unknown' : String(inFlight),
-    },
-  ];
   const listed = rows ?? [];
+
+  const groups: [string, number][] = [
+    ['failing', listed.filter(row => row.attention === 'failing').length],
+    ['blocked', listed.filter(row => row.attention === 'blocked').length],
+    ['retrying', listed.filter(row => row.attention === 'retrying').length],
+    [
+      'ready to merge',
+      listed.filter(row => !row.attention && row.stage === 'tested').length,
+    ],
+    [
+      'merging',
+      listed.filter(row => !row.attention && row.stage === 'merging').length,
+    ],
+  ];
+  const groupText = groups
+    .filter(([, n]) => n > 0)
+    .slice(0, MAX_GROUPS)
+    .map(([label, n]) => `${n} ${label}`);
+
+  let headline: string;
+  if (inFlight === null)
+    headline = listed.length > 0 ? `${listed.length} tracked` : 'Unknown';
+  else
+    headline = [
+      `${inFlight} open ${inFlight === 1 ? 'PR' : 'PRs'}`,
+      ...(listed.length > 0 && listed.length < inFlight
+        ? [`${listed.length} tracked`]
+        : []),
+      ...groupText,
+    ].join(' · ');
+
+  const facts = [
+    running === null || slots === null
+      ? 'Lanes unknown'
+      : `${running} of ${slots} lanes running`,
+    queue === null ? 'Merge queue unknown' : `Merge queue ${queue}`,
+  ].join(' · ');
+
   let note: string | null = null;
   if (listed.length === 0) {
     if (inFlight === null) note = 'Unknown: in-flight work was not measured.';
     else if (inFlight === 0) note = 'No work in flight.';
-    else note = `${inFlight} in flight; the list is not available.`;
+    else note = 'The list is not available.';
   }
+
+  const ordered = [...listed].sort(
+    (a, b) => rank(a) - rank(b) || b.stageIndex - a.stageIndex
+  );
+  const top: QuietRow[] = ordered.slice(0, TOP_ROWS).map(row => ({
+    id: row.id,
+    primary: plainOutcome(row.title).text,
+    secondary: secondaryOf(row),
+    attention: Boolean(row.attention),
+    href: row.url,
+  }));
   return {
     count: inFlight,
-    lines,
+    headline,
+    facts,
     note,
-    shown: listed.slice(0, MAX_ROWS),
-    more: Math.max(0, listed.length - MAX_ROWS),
+    top,
+    more: Math.max(0, ordered.length - TOP_ROWS),
   };
 }
 
@@ -69,6 +134,7 @@ export function OvieInFlightColumn({
   onRetry?: () => void;
 }>) {
   const summary = summarizeInFlight(delivery, rows);
+  const unknown = summary.headline === 'Unknown';
   return (
     <HomeLoopSection
       title='In Flight'
@@ -89,25 +155,27 @@ export function OvieInFlightColumn({
       testId='home-loop-inflight-section'
     >
       <div
-        className='flex min-h-0 flex-1 flex-col gap-2 overflow-hidden'
+        className='flex min-h-0 flex-1 flex-col gap-3 overflow-hidden'
         data-testid='ovie-inflight'
       >
-        <dl className='grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm'>
-          {summary.lines.map(line => (
-            <div key={line.label} className='contents'>
-              <dt className='text-tertiary-token'>{line.label}</dt>
-              <dd
-                className={
-                  line.value === 'Unknown'
-                    ? 'text-tertiary-token'
-                    : 'font-medium text-primary-token'
-                }
-              >
-                {line.value}
-              </dd>
-            </div>
-          ))}
-        </dl>
+        <div className='flex flex-col gap-1'>
+          <p
+            className={
+              unknown
+                ? 'text-sm text-tertiary-token'
+                : 'text-sm font-medium text-primary-token'
+            }
+            data-testid='ovie-inflight-headline'
+          >
+            {summary.headline}
+          </p>
+          <p
+            className='text-xs text-tertiary-token'
+            data-testid='ovie-inflight-facts'
+          >
+            {summary.facts}
+          </p>
+        </div>
         {summary.note ? (
           <p
             className='text-sm text-secondary-token'
@@ -116,26 +184,12 @@ export function OvieInFlightColumn({
             {summary.note}
           </p>
         ) : (
-          <ul className='flex min-h-0 flex-col gap-1 overflow-hidden text-sm'>
-            {summary.shown.map(row => (
-              <li key={row.id} className='flex gap-2'>
-                <span className='shrink-0 text-tertiary-token'>
-                  {row.pullRequestNumber
-                    ? `#${row.pullRequestNumber}`
-                    : row.identifier}
-                </span>
-                <span className='min-w-0 text-secondary-token'>
-                  {row.title}
-                </span>
-              </li>
-            ))}
-            {summary.more > 0 ? (
-              <li
-                className='text-tertiary-token'
-                data-testid='ovie-inflight-more'
-              >{`+${summary.more} more`}</li>
-            ) : null}
-          </ul>
+          <OvieQuietList
+            rows={summary.top}
+            more={summary.more}
+            moreLabel='more'
+            testId='ovie-inflight-list'
+          />
         )}
       </div>
     </HomeLoopSection>

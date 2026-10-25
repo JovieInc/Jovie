@@ -280,7 +280,7 @@ describe('OvieHomeCanvas', () => {
     expect(tile('funnel')).toHaveTextContent('3 → 0');
     expect(tile('shipping')).toHaveTextContent('3');
     expect(tile('blocked')).toHaveTextContent('1');
-    expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
+    expect(screen.getByTestId('home-loop-done-section')).toHaveTextContent('3');
   });
 
   it('cuts the ledger from Home: no stage strip, no in-flight board, no pulse counters', async () => {
@@ -637,7 +637,7 @@ describe('OvieHomeCanvas', () => {
     expect(
       screen.getByTestId('home-loop-in-flight-generated')
     ).toHaveTextContent('Shipping Now');
-    expect(screen.queryByTestId('home-loop-done')).toBeNull();
+    expect(screen.queryByTestId('ovie-shipped-list')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Previous Answer' }));
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
@@ -647,7 +647,7 @@ describe('OvieHomeCanvas', () => {
       'Monthly Revenue'
     );
     expect(screen.queryByTestId('home-loop-in-flight-generated')).toBeNull();
-    expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
+    expect(screen.getByTestId('home-loop-done-section')).toHaveTextContent('3');
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
     expect(chat.onOpenTranscript).toHaveBeenCalledOnce();

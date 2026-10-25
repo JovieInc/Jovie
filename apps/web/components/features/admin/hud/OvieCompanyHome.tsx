@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import { OvieCompanyHud } from '@/components/features/admin/hud/OvieCompanyHud';
 import { OvieInFlightColumn } from '@/components/features/admin/hud/OvieInFlightColumn';
+import { OvieQuietList } from '@/components/features/admin/hud/OvieQuietList';
 import {
   type HomeLoopAnswer,
   HomeLoopAsks,
@@ -14,6 +15,7 @@ import { HomeLoopAsksSkeleton } from '@/components/organisms/home-loop/HomeLoopA
 import { HomeLoopDoneChips } from '@/components/organisms/home-loop/HomeLoopStageRows';
 import type { HomeLoopAsk, HomeLoopDoneItem } from '@/lib/home-loop/contract';
 import type { CompanyTile } from '@/lib/ovie/home/company-hud';
+import { plainOutcome } from '@/lib/ovie/home/plain-language';
 import type {
   OvieShipRow,
   OvieUpcomingDefault,
@@ -28,6 +30,9 @@ import { cn } from '@/lib/utils';
  * pulse counters) lives on its own page; this surface is the answer, not the
  * ledger. Generated UI still replaces the shipped list in place.
  */
+/** Fewer, better rows: the newest few outcomes; the rest is a quiet count. */
+const SHIPPED_ROWS = 6;
+
 export function OvieCompanyHome({
   tiles,
   since,
@@ -39,7 +44,6 @@ export function OvieCompanyHome({
   asksMoreHref,
   answers,
   done,
-  doneSummary,
   mergesToday,
   delivery = null,
   rows = null,
@@ -142,18 +146,15 @@ export function OvieCompanyHome({
                 <h3 className='text-2xs font-medium text-tertiary-token'>
                   Shipping By Default
                 </h3>
-                <ul className='flex flex-col gap-0.5 text-sm'>
-                  {upcoming.map(item => (
-                    <li key={item.id} className='flex gap-2'>
-                      <span className='min-w-0 text-secondary-token'>
-                        {item.title}
-                      </span>
-                      <span className='shrink-0 text-tertiary-token'>
-                        {item.line}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
+                <OvieQuietList
+                  testId='ovie-upcoming-list'
+                  rows={upcoming.slice(0, 3).map(item => ({
+                    id: item.id,
+                    primary: plainOutcome(item.title).text,
+                    secondary: item.line,
+                  }))}
+                  more={Math.max(0, upcoming.length - 3)}
+                />
               </div>
             ) : null}
           </div>
@@ -168,7 +169,7 @@ export function OvieCompanyHome({
           title={copy.doneTitle}
           count={mergesToday ?? done.length}
           status={generatedInFlight ? 'ready' : loopStatus}
-          isEmpty={!generatedInFlight && done.length === 0 && !doneSummary}
+          isEmpty={!generatedInFlight && done.length === 0 && !mergesToday}
           emptyLabel={copy.doneEmpty}
           errorLabel={copy.inFlightError}
           onRetry={onRetryLoop}
@@ -178,7 +179,24 @@ export function OvieCompanyHome({
           testId='home-loop-done-section'
         >
           {generatedInFlight ?? (
-            <HomeLoopDoneChips items={done} summary={doneSummary} fit />
+            <OvieQuietList
+              testId='ovie-shipped-list'
+              rows={done.slice(0, SHIPPED_ROWS).map(item => {
+                const outcome = plainOutcome(item.label);
+                return {
+                  id: item.id,
+                  primary: outcome.text,
+                  secondary: outcome.reference,
+                  href: item.url,
+                };
+              })}
+              more={Math.max(
+                0,
+                (mergesToday ?? done.length) -
+                  Math.min(done.length, SHIPPED_ROWS)
+              )}
+              moreLabel='more merges'
+            />
           )}
         </HomeLoopSection>
       </div>
