@@ -8,6 +8,7 @@ import {
   emptyState,
   extractSurvivors,
   MIN_RATCHET_VALID,
+  moduleKey,
   partitionEquivalents,
   pickBatch,
   proposeBaselineEntries,
@@ -181,6 +182,41 @@ describe('survivors', () => {
       )
     );
     expect(validateEquivalents(raw)).toEqual([]);
+  });
+});
+
+describe('moduleKey', () => {
+  it('is the bare source blob when the module has no tests', () => {
+    expect(moduleKey('a'.repeat(40), [])).toBe('a'.repeat(40));
+  });
+
+  it('changes when a test blob changes, so test-only kills are rescored', () => {
+    const before = moduleKey('s', ['t1']);
+    expect(moduleKey('s', ['t2'])).not.toBe(before);
+    expect(moduleKey('s2', ['t1'])).not.toBe(before);
+  });
+
+  it('is independent of test order', () => {
+    expect(moduleKey('s', ['t1', 't2'])).toBe(moduleKey('s', ['t2', 't1']));
+  });
+
+  it('makes pickBatch rank a test-only change first', () => {
+    const state = emptyState();
+    state.modules['lib/a.ts'] = {
+      blob: moduleKey('s', ['t1']),
+      sha: null,
+      at: new Date().toISOString(),
+      status: 'scored',
+      score: 70,
+      valid: 50,
+      killed: 35,
+      survived: 15,
+      durationMs: 1,
+    };
+    const next = [
+      { file: 'lib/a.ts', blob: moduleKey('s', ['t2']), testCount: 1 },
+    ];
+    expect(pickBatch(state, next, { max: 1 })).toEqual(['lib/a.ts']);
   });
 });
 
