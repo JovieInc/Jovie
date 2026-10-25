@@ -205,8 +205,23 @@ export const FORBIDDEN_CLAIM_SHAPES: readonly {
     why: 'Checkout always collects a card.',
   },
   {
+    id: 'annual_billing_offered',
+    pattern:
+      /monthly\s+or\s+annual(?:ly)?|\bbilled\s+annually\b|\bannual\s+(?:plan|billing|price|subscription)\b|\$\s?\d[\d,.]*\s?\/\s?(?:yr|year)\b/i,
+    when: o => !o.plans.pro.annualOffered,
+    why: 'Only monthly billing is offered; there is no annual price.',
+  },
+  {
+    id: 'max_listed_as_plan',
+    pattern:
+      /Free,\s*Pro,?\s+and\s+Max|\bMax\s+(?:plan|monthly|annual)\b|Pro\s+and\s+Max\s+are\s+paid/i,
+    when: o => !o.plans.max.selfServe,
+    why: 'Max is contact-sales, not a self-serve plan.',
+  },
+  {
     id: 'refund_or_guarantee',
-    pattern: /money[- ]back|\brefunds?\b|\bguarantee/i,
+    pattern:
+      /money[- ]back|\brefunds?\b|\b(?:satisfaction|price|results?|income|full)\s+guarantee|\bguaranteed\s+(?:results?|income|refund)/i,
     when: o => o.terms.refund === null && o.terms.guarantee === null,
     why: 'No refund or guarantee policy is published.',
   },
