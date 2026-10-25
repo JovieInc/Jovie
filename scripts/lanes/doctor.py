@@ -957,6 +957,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    gaps = alert_issue_gaps(dict(alerts), ((previous or {}).get("issues") or {}), time.time())
+    if gaps:
+        shown = "; ".join(f"{key} ({why[:80]})" for key, why in list(gaps.items())[:4])
+        alerts["alert-issue-missing"] = (f"{len(gaps)} active doctor alert(s) older than {ALERT_ISSUE_GRACE_S // 60} min "
+                                         f"have no Linear issue: {shown}")
     feed_size = obs.get("publicFeed") or {}
     if isinstance(feed_size.get("ratio"), (int, float)) and feed_size["ratio"] >= PUBLIC_FEED_WARN_RATIO:
         top = ", ".join(f"{name} {size // 1024}K" for name, size in list((feed_size.get("sections") or {}).items())[:3])
@@ -1406,6 +1411,7 @@ class Tracker:
         self.linear, self.host = linear, host_name
         self._team_node = None
         self.last_writing_report = None
+        self.last_error = None  # why the last open() returned no issue id (never swallowed silently)
 
     def title(self, key: str) -> str:
         if key == "bottleneck:merge-queue":
@@ -1497,15 +1503,20 @@ class Tracker:
                 'state:{type:{nin:["completed","canceled"]}}}){nodes{id}}}', {"t": self.title(key)})
             nodes = data["issues"]["nodes"]
             return nodes[0]["id"] if nodes else None
-        except Exception:
+        except Exception as error:
+            self.existing_error = f"{type(error).__name__}: {str(error)[:160]}"
             return None
 
     def open(self, key: str, text: str, condition: dict | None = None) -> str | None:
         self.last_writing_report = None
+        self.last_error = None
+        self.existing_error = None
         found = self.existing(key)
         if found:
             self.apply_alert_label(found, key)
             return found
+        if found is None and getattr(self, "existing_error", None):
+            self.last_error = f"lookup-failed:{self.existing_error}"
         try:
             priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:", "production-deploy:")) or key in (
                 "linear-down", "spawn-exit", "tick-error", "delivery-stalled") else 2
@@ -1533,7 +1544,8 @@ class Tracker:
                        "title": self.title(key),
                        "description": description}})
             return data["issueCreate"]["issue"]["id"]
-        except Exception:
+        except Exception as error:
+            self.last_error = f"create-failed:{type(error).__name__}: {str(error)[:160]}"
             return None
 
     def contradict_invariant(self, event: dict) -> None:
@@ -1596,6 +1608,26 @@ class Tracker:
         return True
 
 
+ALERT_ISSUE_GRACE_S = 15 * 60
+
+
+def alert_issue_gaps(alerts: dict, issues: dict, now: float, grace_s: int = ALERT_ISSUE_GRACE_S) -> dict[str, str]:
+    """Invariant: no active alert older than 15 min without a Linear issue id or a logged reason.
+    Returns key -> why for every violation or visible gap: an alert with no id past the grace (the reason
+    when one is recorded, `untracked` when none is, which is itself a bug)."""
+    gaps = {}
+    for key in alerts:
+        entry = issues.get(key) or {}
+        if entry.get("id"):
+            continue
+        since = entry.get("since")
+        if not isinstance(since, (int, float)):
+            continue  # first sighting this tick: reconcile records it with a reason
+        if now - since >= grace_s:
+            gaps[key] = entry.get("reason") or "untracked"
+    return gaps
+
+
 def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
               conditions: dict[str, dict] | None = None) -> dict:
     """Carry issue ids across ticks; acknowledge remote transitions before advancing receipts."""
@@ -1623,7 +1655,14 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
                 "writingReview": writing_report["review"],
                 "writingDecision": writing_report["decision"],
             }
-        issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
+        if issue_id:
+            issues[key] = {"id": issue_id, "closedAt": None}
+        else:
+            # retry a failed open next tick, but never silently: keep when it started failing and why.
+            reason = (getattr(tracker, "last_error", None) if tracker else None) or ("no-tracker" if tracker is None else "open-returned-no-id")
+            issues[key] = {"id": None, "closedAt": None, "reason": reason,
+                           "since": (entry or {}).get("since") or now}
+            print(f"doctor: no Linear issue for alert {key}: {reason}", file=sys.stderr)
         if tracker and issue_id and conditions and key in conditions:
             contradict = getattr(tracker, "contradict_invariant", None)
             if contradict:
