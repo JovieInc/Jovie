@@ -210,10 +210,9 @@ export async function verifyEmailOtp(
     return { success: false, error: 'Invalid verification code', status: 400 };
   }
 
-  // Already confirmed — idempotent success
-  if (subscription.confirmedAt) {
-    return { success: true, subscriptionId: subscription.id };
-  }
+  // A confirmed subscription still proves ownership with the current code:
+  // request-otp always issues one, and otherwise anyone who knows a confirmed
+  // fan's address could unlock downloads with any 6 digits.
 
   const now = new Date();
 

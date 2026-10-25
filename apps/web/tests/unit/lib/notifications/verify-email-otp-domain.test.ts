@@ -204,4 +204,21 @@ describe('verifyEmailOtp (promo downloads) attempt accounting', () => {
     });
     expect(late.success).toBe(false);
   });
+
+  it('requires the current code even for an already confirmed email', async () => {
+    // A confirmed fan's address must not unlock downloads with any code.
+    row.confirmedAt = new Date('2026-10-01T00:00:00.000Z');
+    const wrong = await verifyEmailOtp({
+      email: EMAIL,
+      creatorProfileId: ARTIST_ID,
+      code: '000000',
+    });
+    expect(wrong.success).toBe(false);
+    const right = await verifyEmailOtp({
+      email: EMAIL,
+      creatorProfileId: ARTIST_ID,
+      code: CODE,
+    });
+    expect(right.success).toBe(true);
+  });
 });
