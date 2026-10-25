@@ -21,6 +21,9 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 EPIC_LABEL = "type:epic"
 HOLD_LABEL = "hold"
@@ -215,7 +218,7 @@ def _decompose(lane, host, name, spec, linear, issue, repo, detail, run_id, work
             raise RuntimeError("git-worktree-add-failed")
         prompt = render_prompt(issue, detail["children"]["nodes"])
         prompt_file = runs / f"{run_id}.prompt.md"
-        prompt_file.write_text(prompt)
+        atomic_write_text(prompt_file, prompt)
         agent = lane.run_agent(lane.template(spec["cmd"], {
             "prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
             "provider_receipt": str(runs / f"{run_id}.provider.jsonl"), "model": str(spec.get("model"))}),

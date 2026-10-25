@@ -526,6 +526,35 @@ class JudgeTest(unittest.TestCase):
                              doctor.judge(obs(automation={"known": False, "silent": {}, "skipped": True}, now=now)))
             self.assertNotIn("automation-registry-unreadable", doctor.judge(obs(now=now)))
 
+    def test_outcome_lane_stall_is_alerted_only_when_owed_receipts_age_out(self):
+        now = 1_800_000_000.0
+        old = doctor.epoch_iso(now - 30 * 3600)
+        fresh = doctor.epoch_iso(now - 3600)
+        capped = {"queued": 7, "status": "budget-exhausted", "at": now - 600, "oldestOwedAt": old,
+                  "spentToday": 30, "perDay": 30}
+        alert = doctor.judge(obs(outcomeQueue=capped, now=now))["outcome-lane-stalled"]
+        self.assertIn("7 Validating", alert)
+        self.assertIn("30/30", alert)
+        silent = {**capped, "status": "drained", "at": now - 3 * 3600}
+        self.assertIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue=silent, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "oldestOwedAt": fresh}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "status": "drained"}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "queued": 0}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(now=now)))
+
+    def test_outcome_queue_status_feeds_the_doctor_alert(self):
+        import outcome_lane
+        with tempfile.TemporaryDirectory() as raw:
+            state = Path(raw)
+            queue = [({"identifier": "JOV-1"}, {"at": "2026-10-23T00:00:00Z"}),
+                     ({"identifier": "JOV-2"}, {"at": "2026-10-22T00:00:00Z"})]
+            outcome_lane.write_queue(state, "budget-exhausted", queue, 1_792_800_000.0, 30)
+            row = json.loads((state / "outcome-queue.json").read_text())
+            self.assertEqual((row["queued"], row["oldestOwedAt"], row["status"]),
+                             (2, "2026-10-22T00:00:00Z", "budget-exhausted"))
+            alerts = doctor.judge(obs(outcomeQueue=row, now=1_792_800_000.0 + 60))
+            self.assertIn("outcome-lane-stalled", alerts)
+
     def test_the_watched_registry_is_the_one_merged_on_main(self):
         # The doctor must read the path the registry actually ships at (#22354: canon/).
         repo = Path(__file__).resolve().parents[2]
@@ -913,6 +942,53 @@ class ReconcileTest(unittest.TestCase):
         verify.assert_called_once_with(reviewed, "disk-low", "4% free", condition, "gem", tracker.title("disk-low"))
         self.assertEqual(state["conditions"]["disk-low"]["writingReview"], reviewed["review"])
         self.assertEqual(state["conditions"]["disk-low"]["writingDecision"], "approved-template")
+
+    def test_an_incident_opens_even_when_the_label_cannot_be_created_or_found(self):
+        issues, forbidden = [], []
+
+        class ForbiddenLabels:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]},
+                                                  "labels": {"nodes": [{"id": "symphony", "name": "symphony"}]}}]}}
+                if "issueLabels(" in query:
+                    return {"issueLabels": {"nodes": []}}
+                if "issueLabelCreate" in query:
+                    forbidden.append(variables)
+                    raise RuntimeError("linear: request rejected (403 FORBIDDEN)")
+                if "issueCreate" in query:
+                    issues.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-9", "identifier": "JOV-9"}}}
+                raise AssertionError(query)
+
+        self.assertEqual(doctor.Tracker(ForbiddenLabels(), "gem").open("production-deploy:lyb", "LYB deploys failing"), "iss-9")
+        self.assertEqual(len(forbidden), 1)
+        self.assertEqual(issues[0]["labelIds"], ["symphony"], "the incident keeps its symphony label and loses only the remediation one")
+
+    def test_an_existing_label_beyond_the_first_fifty_is_found_by_name_and_not_recreated(self):
+        created, issues = [], []
+
+        class ManyLabels:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]},
+                                                  "labels": {"nodes": []}}]}}
+                if "issueLabels(" in query:
+                    return {"issueLabels": {"nodes": [{"id": "old-label", "name": variables["n"]}]}}
+                if "issueLabelCreate" in query:
+                    created.append(variables)
+                    return {}
+                if "issueCreate" in query:
+                    issues.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-8", "identifier": "JOV-8"}}}
+                raise AssertionError(query)
+
+        self.assertEqual(doctor.Tracker(ManyLabels(), "gem").open("production-deploy:lyb", "x"), "iss-8")
+        self.assertEqual((created, issues[0]["labelIds"]), ([], ["old-label"]))
 
     def test_alert_label_is_created_on_open_reopen_and_close(self):
         created = []
