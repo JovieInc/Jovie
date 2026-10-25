@@ -4,22 +4,20 @@
  * Level 1 (Jovie sends): anyone who subscribes receives verified events from
  * Jovie; the artist never sees their email or phone.
  * Level 2 (share with artist): only an explicit share opt-in
- * (notification_subscriptions.artist_email_opt_in_at, later than any
+ * (the artist email opt-in timestamp on the subscription row, later than any
  * revocation) unlocks artist-visible contact details, and with them artist
  * messaging, export, vCard and ad targeting.
  *
  * Every artist-facing surface that returns or exports email/phone must go
  * through this module (enforced by tests/unit/lib/audience/contact-guard.test.ts).
- * The pure helpers are shared by server routes and client code and fail closed.
+ * This file is pure (no database imports) so client components can use the
+ * fail-closed helpers; the database loader lives in share-gate.server.ts.
  *
  * Consent is resolved per person, not per row: for each normalized identifier
  * the latest revocation (artist opt-out or unsubscribe) on ANY duplicate row
  * beats an older opt-in on another row, the same rule the subscriber export
  * uses in lib/notifications/subscriber-export.ts.
  */
-import { and, sql as drizzleSql, inArray, or } from 'drizzle-orm';
-import type { db } from '@/lib/db';
-import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 
 export interface ShareGateContact {
   email: string | null;
@@ -156,58 +154,4 @@ export function canShareContactOut(
 /** Client: strip contact details from a row that is not shared. */
 export function redactUnsharedContact<T extends ShareGateContact>(row: T): T {
   return canShareContactOut(row) ? row : { ...row, email: null, phone: null };
-}
-
-type SelectDb = Pick<typeof db, 'select'>;
-
-/** Load every subscription row (including revoked) for the given identifiers and resolve per person. */
-export async function loadSharedContactKeys(
-  tx: SelectDb,
-  creatorProfileId: string,
-  rows: readonly Pick<ShareGateContact, 'email' | 'phone'>[]
-): Promise<SharedContactKeys> {
-  const emails = [
-    ...new Set(
-      rows.flatMap(r => (r.email ? [normalizeShareEmail(r.email)] : []))
-    ),
-  ];
-  const phones = [
-    ...new Set(
-      rows.flatMap(r => (r.phone ? [normalizeSharePhone(r.phone)] : []))
-    ),
-  ];
-  if (emails.length === 0 && phones.length === 0) return NO_SHARED_CONTACT_KEYS;
-
-  const match = [
-    emails.length
-      ? inArray(
-          drizzleSql<string>`lower(trim(${notificationSubscriptions.email}))`,
-          emails
-        )
-      : undefined,
-    phones.length
-      ? inArray(
-          drizzleSql<string>`trim(${notificationSubscriptions.phone})`,
-          phones
-        )
-      : undefined,
-  ].filter((c): c is NonNullable<typeof c> => c !== undefined);
-
-  const subs = await tx
-    .select({
-      email: notificationSubscriptions.email,
-      phone: notificationSubscriptions.phone,
-      optInAt: notificationSubscriptions.artistEmailOptInAt,
-      optOutAt: notificationSubscriptions.artistEmailOptOutAt,
-      unsubscribedAt: notificationSubscriptions.unsubscribedAt,
-    })
-    .from(notificationSubscriptions)
-    .where(
-      and(
-        drizzleSql`${notificationSubscriptions.creatorProfileId} = ${creatorProfileId}`,
-        or(...match)
-      )
-    );
-
-  return resolveShareKeys(subs);
 }

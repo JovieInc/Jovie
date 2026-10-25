@@ -12,10 +12,8 @@ import {
 } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { z } from 'zod';
-import {
-  applyShareGate,
-  loadSharedContactKeys,
-} from '@/lib/audience/share-gate';
+import { applyShareGate } from '@/lib/audience/share-gate';
+import { loadSharedContactKeys } from '@/lib/audience/share-gate.server';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL, createAudienceDataTag } from '@/lib/cache/tags';

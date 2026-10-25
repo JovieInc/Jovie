@@ -8,10 +8,8 @@
 
 import { and, count, desc, eq, sum } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
-import {
-  applyShareGate,
-  loadSharedContactKeys,
-} from '@/lib/audience/share-gate';
+import { applyShareGate } from '@/lib/audience/share-gate';
+import { loadSharedContactKeys } from '@/lib/audience/share-gate.server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { apiQuery, QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { tips } from '@/lib/db/schema/analytics';

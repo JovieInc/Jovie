@@ -12,8 +12,7 @@ const hoisted = vi.hoisted(() => ({
   captureErrorMock: vi.fn(),
 }));
 
-vi.mock('@/lib/audience/share-gate', async importActual => ({
-  ...(await importActual<typeof import('@/lib/audience/share-gate')>()),
+vi.mock('@/lib/audience/share-gate.server', () => ({
   loadSharedContactKeys: vi.fn(async () => hoisted.sharedKeys),
 }));
 

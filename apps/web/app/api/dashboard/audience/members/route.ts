@@ -11,10 +11,8 @@ import {
 } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import {
-  applyShareGate,
-  loadSharedContactKeys,
-} from '@/lib/audience/share-gate';
+import { applyShareGate } from '@/lib/audience/share-gate';
+import { loadSharedContactKeys } from '@/lib/audience/share-gate.server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import {
   buildCursorCondition,

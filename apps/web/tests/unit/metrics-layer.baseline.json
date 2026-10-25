@@ -249,6 +249,10 @@
       "tables": 8,
       "rates": 0
     },
+    "lib/audience/share-gate.server.ts": {
+      "tables": 1,
+      "rates": 0
+    },
     "lib/chat-usage/metrics.ts": {
       "tables": 0,
       "rates": 1
