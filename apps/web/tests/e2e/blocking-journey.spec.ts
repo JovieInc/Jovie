@@ -169,18 +169,24 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     await page.getByRole('button', { name: 'Create a new release' }).click();
     await page.getByRole('menuitem', { name: 'Add manually' }).click();
     const drawer = page.getByTestId('add-release-sidebar');
-    await drawer.getByLabel('Title', { exact: true }).fill(releaseTitle);
+    const createRelease = drawer.getByRole('button', {
+      name: 'Create Release',
+      exact: true,
+    });
+    // The drawer is a lazy chunk: a fill that lands before React attaches its
+    // handlers changes only the DOM and is reverted on the next render. The
+    // button is enabled only once the title reached React state, so retry the
+    // fill until that is observable.
+    await expect(async () => {
+      await drawer.getByLabel('Title', { exact: true }).fill(releaseTitle);
+      await expect(createRelease).toBeEnabled({ timeout: 2_000 });
+    }).toPass({ timeout: 60_000 });
     await drawer
       .getByRole('button', { name: 'Release Date', exact: true })
       .click();
     await drawer.getByRole('button', { name: /today/i }).click();
-    // Escape closes the whole drawer (and resets the form); the date popover closes on pick.
-    await expect(drawer.getByLabel('Title', { exact: true })).toHaveValue(
-      releaseTitle
-    );
-    await drawer
-      .getByRole('button', { name: 'Create Release', exact: true })
-      .click();
+    await expect(createRelease).toBeEnabled();
+    await createRelease.click();
     await expect(page.getByTestId('release-sidebar')).toContainText(
       releaseTitle
     );
