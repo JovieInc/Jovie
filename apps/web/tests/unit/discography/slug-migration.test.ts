@@ -2,10 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ db: {} }));
+vi.mock('@/lib/profile/public-release-eligibility', () => ({
+  publicReleaseEligibilitySqlPredicate: vi.fn(),
+}));
 
 import {
   buildRenamePlan,
   countByQualifier,
+  isEstablishedSlug,
   type MigrationItem,
   mayApply,
   orderRenames,
@@ -13,6 +17,7 @@ import {
 
 const rel = (over: Partial<MigrationItem> & { id: string }): MigrationItem => ({
   key: over.id,
+  established: false,
   kind: 'release',
   title: 'Seaside Heights',
   currentSlug: 'x',
@@ -111,5 +116,44 @@ describe('mayApply', () => {
     expect(mayApply('', 'tim')).toBe(false);
     expect(mayApply('tim', 'tim')).toBe(true);
     expect(mayApply('*', 'anyone')).toBe(true);
+  });
+});
+
+describe('established URLs are left alone', () => {
+  it('defines established as publicly live and not a numeric suffix', () => {
+    expect(isEstablishedSlug('take-me-over', true)).toBe(true);
+    expect(isEstablishedSlug('seaside-heights', false)).toBe(false);
+    expect(isEstablishedSlug('seaside-heights-3', true)).toBe(false);
+  });
+
+  it('does not rename a live non-numeric slug, even if a better sibling exists', () => {
+    const live = {
+      ...vigel,
+      currentSlug: 'seaside-heights',
+      established: true,
+    };
+    const renames = buildRenamePlan([
+      live,
+      { ...solo, currentSlug: 'seaside-heights-4' },
+    ]);
+    expect(renames.find(r => r.releaseId === 'vigel')).toBeUndefined();
+    expect(renames.find(r => r.releaseId === 'solo')?.to).toBe(
+      'seaside-heights-2020'
+    );
+  });
+
+  it('lets the never-public solo take the bare slug (Tim, /tim/seaside-heights)', () => {
+    const renames = buildRenamePlan([
+      { ...vigel, currentSlug: 'seaside-heights-3', established: false },
+      { ...solo, currentSlug: 'seaside-heights', established: false },
+    ]);
+    expect(renames).toEqual([
+      {
+        releaseId: 'vigel',
+        from: 'seaside-heights-3',
+        to: 'seaside-heights-with-vigel',
+        qualifier: 'co_primary',
+      },
+    ]);
   });
 });

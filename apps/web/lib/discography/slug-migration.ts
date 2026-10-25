@@ -1,8 +1,11 @@
 import 'server-only';
 
-import { sql as drizzleSql } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { discogReleases } from '@/lib/db/schema/content';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import {
+  NUMERIC_SUFFIX,
   planSlugs,
   type SlugAssignment,
   type SlugItem,
@@ -26,6 +29,20 @@ export interface PlannedRename {
 
 export interface MigrationItem extends SlugItem {
   readonly id: string;
+  /**
+   * Established canonical URL: the release is publicly live now and its slug
+   * is not a bug-made numeric suffix. Established URLs are never renamed and
+   * never displaced; only never-public or numeric-suffix slugs are migrated.
+   */
+  readonly established: boolean;
+}
+
+/** Established = publicly live and not a numeric-suffix (bug-made) slug. */
+export function isEstablishedSlug(
+  slug: string,
+  publiclyLive: boolean
+): boolean {
+  return publiclyLive && !NUMERIC_SUFFIX.test(slug);
 }
 
 /** Renames needed to reach the policy slugs; unchanged items are omitted. */
@@ -33,7 +50,8 @@ export function buildRenamePlan(
   items: readonly MigrationItem[],
   reserved: ReadonlySet<string> = new Set()
 ): PlannedRename[] {
-  const plan = planSlugs(items, reserved);
+  const pinned = new Set(items.filter(i => i.established).map(i => i.key));
+  const plan = planSlugs(items, reserved, pinned);
   const renames: PlannedRename[] = [];
   for (const item of items) {
     const next: SlugAssignment | undefined = plan.get(item.key);
@@ -111,8 +129,19 @@ async function loadItems(profile: {
     FROM discog_releases
     WHERE creator_profile_id = ${profile.id} AND deleted_at IS NULL
   `);
+  const live = await db
+    .select({ id: discogReleases.id })
+    .from(discogReleases)
+    .where(
+      and(
+        eq(discogReleases.creatorProfileId, profile.id),
+        publicReleaseEligibilitySqlPredicate()
+      )
+    );
+  const liveIds = new Set(live.map(r => r.id));
   const items: MigrationItem[] = rows.rows.map(r => ({
     id: r.id,
+    established: isEstablishedSlug(r.slug, liveIds.has(r.id)),
     key: r.id,
     kind: 'release',
     title: r.title,
