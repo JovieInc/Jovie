@@ -86,12 +86,12 @@ export const OPERATOR_NAV_GROUP_LABEL =
   'mb-1.5 block ps-(--app-shell-sidebar-label-inset) pe-(--app-shell-sidebar-inset) text-xs font-caption tracking-normal text-sidebar-muted';
 
 /**
- * Ovie has Home and Inbox plus a collapsed Tools group. Primary navigation needs
- * no group label; Tools opens on demand and stays open while one of its
- * destinations is active.
+ * Ovie has five primary destinations plus collapsed Business and Tools groups.
+ * Primary navigation needs no group label; a group opens on demand and stays
+ * open while one of its destinations is active.
  */
 export interface OperatorNavSection {
-  readonly id: 'home' | 'tools';
+  readonly id: 'home' | 'business' | 'tools';
   /** `null`: the group renders without a label. */
   readonly label: string | null;
   readonly collapsible: boolean;
@@ -104,6 +104,12 @@ export const OPERATOR_NAV_SECTIONS: readonly OperatorNavSection[] = [
     label: null,
     collapsible: false,
     items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'workspaces'),
+  },
+  {
+    id: 'business',
+    label: 'Business',
+    collapsible: true,
+    items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'business'),
   },
   {
     id: 'tools',

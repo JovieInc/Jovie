@@ -108,7 +108,7 @@ cover exact entity writes, managers, viewers, ambiguous roles, legacy fallback,
 revoked selection, account-name separation, empty accounts, reloads, cache
 invalidation and rollback. Fixture rows and policies do not certify deployed
 schema, database roles, public browser rendering or query performance. Migration
-0148 requires a trusted owner with RLS bypass capability and fails before
+0149 requires a trusted owner with RLS bypass capability and fails before
 activation if that prerequisite is absent; no role or credential is granted.
 
 **Ship now:** inventory drift detection and the bounded ownership repair.

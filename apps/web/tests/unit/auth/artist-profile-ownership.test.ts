@@ -151,7 +151,7 @@ describe('artist profile ownership on PostgreSQL fixtures', () => {
     await execute(
       await readFile(
         new URL(
-          '../../../drizzle/migrations/0148_canonical_profile_write_access.sql',
+          '../../../drizzle/migrations/0149_canonical_profile_write_access.sql',
           import.meta.url
         ),
         'utf8'
@@ -495,7 +495,7 @@ describe('artist profile ownership on PostgreSQL fixtures', () => {
         execute(
           await readFile(
             new URL(
-              '../../../drizzle/migrations/0148_canonical_profile_write_access.sql',
+              '../../../drizzle/migrations/0149_canonical_profile_write_access.sql',
               import.meta.url
             ),
             'utf8'
