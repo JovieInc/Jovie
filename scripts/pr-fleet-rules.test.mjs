@@ -1019,12 +1019,7 @@ test('no-executable exemption: inert-only diffs with the statement pass; any cod
       paths.map(path => file(path))
     ).errors.filter(error => error.startsWith('red-before-green'));
   assert.deepEqual(
-    errorsFor([
-      'docs/guide.md',
-      'README.md',
-      'canon/automation-registry.jsonl',
-      'config/registry/x.json',
-    ]),
+    errorsFor(['docs/guide.md', 'README.md', 'docs/notes/a.txt']),
     []
   );
   for (const code of [
@@ -1035,6 +1030,9 @@ test('no-executable exemption: inert-only diffs with the statement pass; any cod
     'apps/web/lib/x.test.ts',
     'docs/run.sh',
     'CLAUDE.md',
+    'canon/automation-registry.jsonl',
+    'config/registry/credentials.json',
+    'docs/metrics/shipping-slo-latest.json',
     'apps/web/notes.md',
   ])
     assert.equal(errorsFor(['docs/guide.md', code]).length, 1, code);
