@@ -128,4 +128,20 @@ describe('planSlugs', () => {
     expect(plan.get('r')?.slug).toBe('seaside-heights');
     expect(plan.get('rec')?.slug).toBe('seaside-heights-2020');
   });
+
+  it('keeps an established URL: a newer solo never displaces a published recording', () => {
+    // Vigel is already public at the bare slug; the solo must qualify.
+    const established = { ...vigel, currentSlug: 'seaside-heights' };
+    const plan = planSlugs([established, solo], new Set(), new Set(['vigel']));
+    expect(plan.get('vigel')).toEqual({
+      slug: 'seaside-heights',
+      qualifier: 'established',
+    });
+    expect(plan.get('solo')?.slug).toBe('seaside-heights-2020');
+  });
+
+  it('lets the solo take a bare slug that is not established (never public)', () => {
+    const plan = planSlugs([vigel, solo], new Set(), new Set());
+    expect(plan.get('solo')?.slug).toBe('seaside-heights');
+  });
 });
