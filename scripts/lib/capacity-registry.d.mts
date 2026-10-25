@@ -6,12 +6,19 @@ export type PaceVerdict =
   | 'reset-passed'
   | 'unconfirmed'
   | 'unknown';
-export type CreditVerdict = 'exhausts-before-expiry' | 'unspent-at-expiry' | 'on-pace' | 'unknown';
+export type CreditVerdict =
+  | 'exhausts-before-expiry'
+  | 'unspent-at-expiry'
+  | 'on-pace'
+  | 'unknown';
 
 export interface CapacityRegistry {
   readonly schema: string;
   readonly updatedAt: string;
-  readonly thresholds: { readonly liveMaxAgeHours: number; readonly manualMaxAgeDays: number };
+  readonly thresholds: {
+    readonly liveMaxAgeHours: number;
+    readonly manualMaxAgeDays: number;
+  };
   readonly policies: Record<string, { readonly rule: string }>;
   readonly providers: readonly unknown[];
 }
@@ -80,7 +87,11 @@ export interface ProviderView {
   readonly agents: readonly string[];
   readonly lane: string | null;
   readonly usageModel: string;
-  readonly policy: { readonly id: string; readonly rule: string; readonly delegation?: string };
+  readonly policy: {
+    readonly id: string;
+    readonly rule: string;
+    readonly delegation?: string;
+  };
   readonly limits: Record<string, unknown>;
   readonly decision: Record<string, string> | null;
   readonly metrics: ProviderMetrics | null;
@@ -88,7 +99,10 @@ export interface ProviderView {
   readonly joinedSpend: readonly {
     readonly id: string;
     readonly kind: string;
-    readonly cap: { readonly amountUsd: number; readonly period: string } | null;
+    readonly cap: {
+      readonly amountUsd: number;
+      readonly period: string;
+    } | null;
     readonly snapshot: Record<string, unknown> | null;
   }[];
   readonly monthlyUsd: number;
@@ -139,14 +153,21 @@ export interface RoleCandidate {
 export interface RoleResolution {
   readonly role: string;
   readonly description: string;
-  readonly chosen: { readonly model: string; readonly label: string; readonly pathId: string } | null;
+  readonly chosen: {
+    readonly model: string;
+    readonly label: string;
+    readonly pathId: string;
+  } | null;
   readonly candidates: readonly RoleCandidate[];
 }
 
 export interface CapacityView {
   readonly generatedAt: string;
   readonly providers: readonly ProviderView[];
-  readonly totals: { readonly monthlyUsd: number; readonly stale: readonly string[] };
+  readonly totals: {
+    readonly monthlyUsd: number;
+    readonly stale: readonly string[];
+  };
   readonly metricsMeta: {
     readonly windowDays: number | null;
     readonly mergedInWindow: number | null;
@@ -159,8 +180,16 @@ export interface CapacityView {
 }
 
 export interface LiveOverlay {
-  readonly accounts?: Record<string, { readonly quota?: object; readonly credits?: object }>;
-  readonly watch?: { readonly models?: Record<string, { readonly available: boolean; readonly via?: string }> };
+  readonly accounts?: Record<
+    string,
+    { readonly quota?: object; readonly credits?: object }
+  >;
+  readonly watch?: {
+    readonly models?: Record<
+      string,
+      { readonly available: boolean; readonly via?: string }
+    >;
+  };
   readonly metrics?: {
     readonly windowDays?: number;
     readonly mergedInWindow?: number;
@@ -174,18 +203,33 @@ export const SCHEMA: string;
 export const DAY_MS: number;
 export function validateRegistry(
   registry: unknown,
-  options?: { agentIds?: readonly string[]; spendIds?: readonly string[]; modelIds?: readonly string[] }
+  options?: {
+    agentIds?: readonly string[];
+    spendIds?: readonly string[];
+    modelIds?: readonly string[];
+  }
 ): string[];
 export function evaluateRegistry(
   registry: unknown,
-  options?: { now?: number; live?: LiveOverlay; spend?: { providers?: readonly unknown[] }; models?: { models?: readonly Record<string, unknown>[] } }
+  options?: {
+    now?: number;
+    live?: LiveOverlay;
+    spend?: { providers?: readonly unknown[] };
+    models?: { models?: readonly Record<string, unknown>[] };
+  }
 ): CapacityView;
 export function resolveRole(
   registry: unknown,
   roleId: string,
-  watch?: Record<string, { readonly available?: boolean; readonly via?: string }>
+  watch?: Record<
+    string,
+    { readonly available?: boolean; readonly via?: string }
+  >
 ): RoleResolution | null;
-export function pathRows(registry: unknown, modelRegistry?: { models?: readonly Record<string, unknown>[] }): PathView[];
+export function pathRows(
+  registry: unknown,
+  modelRegistry?: { models?: readonly Record<string, unknown>[] }
+): PathView[];
 export function priceModel(
   registry: unknown,
   modelRegistry: { models?: readonly Record<string, unknown>[] },
