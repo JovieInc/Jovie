@@ -327,11 +327,21 @@ class LoopTest(unittest.TestCase):
             pe.EXPECTED_RUNS = old_expected
 
     def test_ci_cancelled_superseded_by_newer_sha_is_ignored(self):
-        # JOV-8916: those cancelled runs were superseded when a newer main push started a newer
-        # run for a different SHA -- normal concurrency, never a hang. Three sweeps, no issue.
-        runs = [self.ghrun(2, status="in_progress", conclusion=None, headSha="sha-new"),
-                self.ghrun(1, conclusion="cancelled", headSha="sha-old")]
-        self.ci_sweeps([runs, runs, runs])
+        # JOV-8916: each cancelled run was superseded the moment the next main push started a
+        # newer run for a different SHA -- normal concurrency under fast merges, never a hang.
+        # Three DISTINCT superseded cancels (the exact fast-merge incident shape that filed the
+        # false "cancelled 3x in a row" issue) must not alert; repeated sweeps of the same
+        # superseded run stay deduped too.
+        sweep1 = [self.ghrun(2, status="in_progress", conclusion=None, headSha="sha-new1"),
+                  self.ghrun(1, conclusion="cancelled", headSha="sha-old1")]
+        sweep2 = [self.ghrun(3, status="in_progress", conclusion=None, headSha="sha-new2"),
+                  self.ghrun(2, conclusion="cancelled", headSha="sha-new1"),
+                  self.ghrun(1, conclusion="cancelled", headSha="sha-old1")]
+        sweep3 = [self.ghrun(4, status="in_progress", conclusion=None, headSha="sha-new3"),
+                  self.ghrun(3, conclusion="cancelled", headSha="sha-new2"),
+                  self.ghrun(2, conclusion="cancelled", headSha="sha-new1"),
+                  self.ghrun(1, conclusion="cancelled", headSha="sha-old1")]
+        self.ci_sweeps([sweep1, sweep2, sweep3, sweep3])  # 4th sweep: same runs, still deduped
         self.assertEqual(self.l.created, [])
 
     def test_ci_cancelled_with_no_newer_run_still_flags(self):
