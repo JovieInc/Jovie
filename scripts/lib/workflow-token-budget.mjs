@@ -176,10 +176,20 @@ export function countFile(source) {
   return total;
 }
 
-/** @param {string} root */
+/** @typedef {Record<string, number>} RuleCounts */
+/** @typedef {Record<string, RuleCounts>} CountsByFile */
+/** @typedef {Record<string, { calls: number, reason: string }>} DeclaredByFile */
+
+/**
+ * @param {string} root
+ * @returns {{ found: CountsByFile, declared: DeclaredByFile }}
+ */
 export function scanRepo(root) {
+  /** @type {CountsByFile} */
   const found = {};
+  /** @type {DeclaredByFile} */
   const declared = {};
+  /** @type {string[]} */
   const files = [];
   const workflows = join(root, '.github/workflows');
   if (existsSync(workflows))
