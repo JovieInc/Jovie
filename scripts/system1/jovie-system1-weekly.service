@@ -1,0 +1,14 @@
+[Unit]
+Description=Jovie System-1: join outcomes, tune task versions against held-out sets, write the weekly report
+[Service]
+Type=oneshot
+Environment=PATH=/home/timwhite/.local/bin:/usr/local/bin:/usr/bin:/bin
+EnvironmentFile=-/home/timwhite/.config/jovie-system1/env
+WorkingDirectory=/srv/worktrees/codex-worktrees/system1-main
+ExecStartPre=/usr/bin/git -C /srv/worktrees/codex-worktrees/system1-main fetch -q origin main
+ExecStartPre=/usr/bin/git -C /srv/worktrees/codex-worktrees/system1-main checkout -q --detach origin/main
+ExecStart=/usr/bin/node scripts/system1.mjs weekly
+CPUQuota=100%
+MemoryMax=1G
+Nice=10
+TimeoutStartSec=3000

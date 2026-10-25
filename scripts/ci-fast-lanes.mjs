@@ -164,9 +164,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // System-1 router, outcome joins and tuning loop (Jev/Clef): hermetic fakes only.
     id: 'system1',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/system1.test.mjs lib/__tests__/system1-tuning.test.mjs',
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/system1.test.mjs lib/__tests__/system1-tuning.test.mjs lib/__tests__/system1-cli.test.mjs',
     inputs:
-      /^(?:scripts\/system1\.mjs|scripts\/lib\/system1\/[^/]+\.mjs|scripts\/lib\/__tests__\/system1(?:-tuning)?\.test\.mjs|ops\/registry\/system1-tasks\.json|packages\/api-client\/(?:client|contract|store)\.ts)$/u,
+      /^(?:scripts\/system1\.mjs|scripts\/lib\/system1\/[^/]+\.mjs|scripts\/lib\/__tests__\/system1(?:-(?:tuning|cli))?\.test\.mjs|ops\/registry\/system1-tasks\.json|packages\/api-client\/(?:client|contract|store)\.ts)$/u,
     prOnly: false,
   }),
   Object.freeze({

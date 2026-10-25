@@ -163,6 +163,13 @@ export async function main(argv, deps = {}) {
       args.all || cmd === 'weekly' ? Object.keys(registry.tasks) : [args.task];
     const results = [];
     let joined = [];
+    // Model replays need a credential. Weekly on a host without one still joins
+    // outcomes, reports and tunes offline (floors and cutoffs) instead of failing.
+    const env = deps.env ?? process.env;
+    const hasCredential = Boolean(
+      deps.run || env.AI_GATEWAY_API_KEY || env.CLOUDFLARE_WORKERS_AI_TOKEN
+    );
+    const replay = cmd === 'weekly' ? hasCredential : !args['no-replay'];
     if (cmd === 'weekly') {
       const issues = deps.issues ?? loadMirrorIssues(defaultMirrorPaths());
       joined = Object.keys(LABELERS).map(task =>
@@ -176,7 +183,7 @@ export async function main(argv, deps = {}) {
           store,
           task,
           apply: cmd === 'weekly' || Boolean(args.apply),
-          replay: !args['no-replay'],
+          replay,
           tryRoutes: !args['no-routes'],
           now,
           deps: callDeps,
@@ -191,6 +198,7 @@ export async function main(argv, deps = {}) {
       now
     );
     report.outcomeJoin = joined;
+    report.replay = replay ? 'on' : 'off';
     report.tuning = results.map(r => ({
       task: r.task,
       status: r.status,
