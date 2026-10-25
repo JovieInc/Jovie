@@ -10,6 +10,8 @@ Alarms (each names its stage and carries its evidence):
   throughput-merge-group-start-slow  merge-group runs wait > 5 min (p50) for a runner
   throughput-prod-lease-held         a Production Controller run holds the lease > 45 min
   throughput-idle-dominant           one idle/hold reason is > 50% of the last hour's exits
+  throughput-idle-not-demand:<lane>  a lane with eligible demand idled >= 3 times in the hour, every time for a reason
+                                     other than "no demand" (a gate or cap closed on it)
   throughput-no-merge:<repo>         other repos (LogYourBody): a clean ready PR waits > 60 min and nothing merged in 60 min
   throughput-pr-stuck:<repo>         other repos: an open non-draft PR has been conflicted/blocked > 24h
   growth-bound:<id>                  a size/count limit that scales with backlog passed 70%
@@ -36,6 +38,8 @@ MERGE_GROUP_MIN_RUNS = 3
 LEASE_HELD_MIN = 45.0
 IDLE_DOMINANT_FRACTION = 0.5
 IDLE_DOMINANT_MIN_EXITS = 6
+IDLE_NOT_DEMAND_MIN_EXITS = 3
+NO_DEMAND_REASONS = frozenset({"maintenance-only-idle", "no-demand", "pool-empty"})
 GROWTH_ALARM_FRACTION = 0.7
 RELEASE_FLOW_REFRESH_S = 300
 MERGE_GROUP_SAMPLE_RUNS = 3
@@ -219,6 +223,9 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
         ("ledger-bytes", size("runs/ledger.jsonl"), 64_000_000, "bytes",
          "backlog_admission refuses all admission above 64,000,000 bytes (native-attempt-ledger-read-bound); "
          "ledger_archive.py rotation keeps 10 days"),
+        ("api-budget-bytes", size("api-budget.json"), 65536, "bytes",
+         "maintenance_json(limit=65536): the Linear/GitHub budget reads fail closed above 64 KiB"),
+        ("linear-usage-bytes", size("linear-usage.json"), MIB, "bytes", "maintenance_json(limit=1 MiB): usage accounting reads fail closed"),
         ("fix-attempts-bytes", size("fix-attempts.json"), MIB, "bytes",
          "maintenance_json default 1 MiB: fix-attempt accounting reads fail closed"),
         ("held-bytes", size("held.json"), MIB, "bytes", "maintenance_json default 1 MiB: hold reads fail closed"),
@@ -321,6 +328,13 @@ def judge(obs: dict) -> dict[str, str]:
             alerts[f"throughput-pr-stuck:{repo}"] = (
                 f"stage pr-open->ready ({repo}): {len(stuck)} non-draft PR(s) untouched > 24h and not mergeable: "
                 + ", ".join(f"#{pr['number']} {pr['state']} by {pr.get('author') or 'unknown'}" for pr in stuck[:5]))
+    # 4c. Demand exists, so an idle exit must not be for any reason but "no demand".
+    for provider, reasons in sorted((sentinel.get("idleExitsByProvider1h") or {}).items()):
+        total = sum(reasons.values())
+        if demand.get(provider) and total >= IDLE_NOT_DEMAND_MIN_EXITS and not (set(reasons) & NO_DEMAND_REASONS):
+            alerts[f"throughput-idle-not-demand:{provider}"] = (
+                f"stage claim ({provider}): {demand[provider]} eligible issues but {total} idle exits in the last hour, none for "
+                f"lack of demand: {_top(reasons, 5)}; a gate, cap or unreadable input closed the lane")
     # 5. One idle reason dominating the hour while there is demand.
     exits = sentinel.get("idleExits1h") or {}
     total = sum(exits.values())

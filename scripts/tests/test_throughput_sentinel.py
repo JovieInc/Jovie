@@ -35,7 +35,7 @@ def obs(**sentinel):
 class ThroughputSentinelTest(unittest.TestCase):
     def test_no_push_alarm_is_per_lane_and_names_idle_reasons(self):
         alerts = ts.judge(obs(idleExitsByProvider1h={"codex": {"repair-inventory-source-stale": 9}}))
-        self.assertEqual(list(alerts), ["throughput-no-push:JovieInc/Jovie:codex"])  # grok has no demand
+        self.assertEqual(sorted(alerts), ["throughput-idle-not-demand:codex", "throughput-no-push:JovieInc/Jovie:codex"])  # grok has no demand
         self.assertIn("stage claim->push", alerts["throughput-no-push:JovieInc/Jovie:codex"])
         self.assertIn("repair-inventory-source-stale x9", alerts["throughput-no-push:JovieInc/Jovie:codex"])
         self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1})), {})
@@ -143,6 +143,32 @@ class ThroughputSentinelTest(unittest.TestCase):
             failing = lambda args, **kw: SimpleNamespace(returncode=1, stdout="", stderr="boom")
             signal, error = ts.sample_release_flow(Path(raw), NOW + 3600, failing)
             self.assertIn("boom", error)
+
+
+class IdleNotDemandTest(unittest.TestCase):
+    def test_idle_for_any_reason_but_no_demand_while_demand_exists_alarms_per_lane(self):
+        pushed = {"JovieInc/Jovie|codex": 1}
+        gated = obs(pushes1h=pushed, idleExitsByProvider1h={"codex": {"repair-inventory-oversize": 2, "linear-rate-limited": 2}})
+        alert = ts.judge(gated)["throughput-idle-not-demand:codex"]
+        self.assertIn("none for lack of demand", alert)
+        self.assertIn("repair-inventory-oversize x2", alert)
+        mixed = obs(pushes1h=pushed, idleExitsByProvider1h={"codex": {"maintenance-only-idle": 1, "linear-rate-limited": 3}})
+        self.assertNotIn("throughput-idle-not-demand:codex", ts.judge(mixed))
+        few = obs(pushes1h=pushed, idleExitsByProvider1h={"codex": {"linear-rate-limited": 2}})
+        self.assertNotIn("throughput-idle-not-demand:codex", ts.judge(few))
+        nodemand = obs(pushes1h=pushed, idleExitsByProvider1h={"grok": {"linear-rate-limited": 5}})  # grok has no demand
+        self.assertNotIn("throughput-idle-not-demand:grok", ts.judge(nodemand))
+
+    def test_capped_stores_are_measured_against_their_own_limits(self):
+        with tempfile.TemporaryDirectory() as raw:
+            state = Path(raw)
+            (state / "api-budget.json").write_bytes(b"x" * 50000)
+            (state / "linear-usage.json").write_bytes(b"x" * 10)
+            rows = {r["id"]: r for r in ts.growth_bounds(state, {})}
+            self.assertAlmostEqual(rows["api-budget-bytes"]["fraction"], 0.763, places=3)
+            alerts = ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, growth=list(rows.values())))
+            self.assertIn("growth-bound:api-budget-bytes", alerts)
+            self.assertNotIn("growth-bound:linear-usage-bytes", alerts)
 
 
 class RepoFlowTest(unittest.TestCase):
