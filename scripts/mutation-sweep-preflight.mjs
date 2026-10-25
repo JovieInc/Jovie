@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Spare-compute gate for the rolling mutation sweep. Builtins only, so it runs
-// before dependencies are installed. Exit 0: host has capacity. Exit 75: gem is
-// busy (RAM, disk or CPU), skip this run without failing the workflow.
+// before dependencies are installed. CPU is deliberately not gated: the sweep
+// runs at the lowest CPU/IO priority so it only consumes idle capacity. Exit 0: host has capacity. Exit 75: gem is
+// short of RAM or disk, skip this run without failing the workflow.
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -11,7 +12,6 @@ import { fileURLToPath } from 'node:url';
 /** Spare-compute gate: refuse to start when gem is busy. Exit 75 = skip. */
 export function preflight(repoRoot) {
   const minMemGb = Number(process.env.MUTATION_MIN_MEM_GB ?? 8);
-  const maxLoad = Number(process.env.MUTATION_MAX_LOAD ?? 10);
   const minDiskGb = Number(process.env.MUTATION_MIN_DISK_GB ?? 15);
   const problems = [];
   if (existsSync('/proc/meminfo')) {
@@ -24,10 +24,6 @@ export function preflight(repoRoot) {
       problems.push(
         `MemAvailable ${(kb / 1048576).toFixed(1)}GB < ${minMemGb}GB`
       );
-  }
-  if (existsSync('/proc/loadavg')) {
-    const load = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[0]);
-    if (load > maxLoad) problems.push(`load ${load} > ${maxLoad}`);
   }
   const df = spawnSync('df', ['-Pk', repoRoot], { encoding: 'utf8' });
   const avail = Number(

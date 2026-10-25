@@ -49,4 +49,15 @@ describe('Mutation Diff spare-compute contract', () => {
     expect(sweep).toContain('cancel-in-progress: false');
     expect(sweep).toContain('scripts/mutation-sweep-preflight.mjs');
   });
+
+  it('shares idle CPU at the lowest priority instead of gating on a load constant', () => {
+    const sweep = workflow.slice(workflow.indexOf('\n  sweep:'));
+    expect(sweep).toMatch(/nice -n 19 ionice -c3/u);
+    expect(sweep).toMatch(/CPUWeight=1/u);
+    const preflight = readFileSync(
+      resolve(REPO_ROOT, 'scripts/mutation-sweep-preflight.mjs'),
+      'utf8'
+    );
+    expect(preflight).not.toMatch(/loadavg|MAX_LOAD/u);
+  });
 });

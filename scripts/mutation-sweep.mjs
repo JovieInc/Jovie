@@ -24,6 +24,7 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
+import { availableParallelism } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
@@ -41,6 +42,8 @@ import {
   buildSurvivorIssue,
   emptyState,
   extractSurvivors,
+  fileTimeoutMs,
+  medianScoredMs,
   moduleKey,
   normalizeState,
   partitionEquivalents,
@@ -60,7 +63,7 @@ const { values } = parseArgs({
     mode: { type: 'string', default: 'sweep' },
     'max-files': { type: 'string', default: '4' },
     'max-minutes': { type: 'string', default: '60' },
-    'file-timeout-minutes': { type: 'string', default: '25' },
+    'file-timeout-minutes': { type: 'string', default: '90' },
     include: { type: 'string', default: 'lib/,app/api/' },
     'max-loc': { type: 'string', default: '700' },
     files: { type: 'string' },
@@ -77,7 +80,6 @@ const { values } = parseArgs({
 /** Spare-compute gate: refuse to start when gem is busy. Exit 75 = skip. */
 function preflight() {
   const minMemGb = Number(process.env.MUTATION_MIN_MEM_GB ?? 8);
-  const maxLoad = Number(process.env.MUTATION_MAX_LOAD ?? 10);
   const minDiskGb = Number(process.env.MUTATION_MIN_DISK_GB ?? 15);
   const problems = [];
   if (existsSync('/proc/meminfo')) {
@@ -90,10 +92,6 @@ function preflight() {
       problems.push(
         `MemAvailable ${(kb / 1048576).toFixed(1)}GB < ${minMemGb}GB`
       );
-  }
-  if (existsSync('/proc/loadavg')) {
-    const load = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[0]);
-    if (load > maxLoad) problems.push(`load ${load} > ${maxLoad}`);
   }
   const df = spawnSync('df', ['-Pk', repoRoot], { encoding: 'utf8' });
   const avail = Number(
@@ -115,6 +113,14 @@ if (values.preflight) {
   }
   console.log('Host has spare capacity.');
   process.exit(0);
+}
+
+function loadAvg() {
+  try {
+    return Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[0]) || 0;
+  } catch {
+    return 0;
+  }
 }
 
 const num = (/** @type {string} */ name) => {
@@ -300,6 +306,20 @@ for (const file of batch) {
   const reportFile = join(reportDir, `${file.replace(/[^\w.-]+/gu, '_')}.json`);
   rmSync(reportFile, { force: true });
   console.log(`\n=== sweep ${file}`);
+  const prior = state.modules[file];
+  const remainingMs = Math.max(60_000, deadline - Date.now());
+  const timeoutMs = Math.min(
+    remainingMs,
+    fileTimeoutMs({
+      previousMs: prior?.status === 'scored' ? prior.durationMs : null,
+      medianMs: medianScoredMs(state),
+      load: loadAvg(),
+      cores: availableParallelism(),
+      floorMs: 10 * 60_000,
+      ceilMs: num('file-timeout-minutes') * 60_000,
+    })
+  );
+  console.log(`Per-file timeout ${Math.round(timeoutMs / 60_000)} min.`);
   const run = spawnSync(
     process.execPath,
     [
@@ -314,7 +334,7 @@ for (const file of batch) {
     {
       cwd: repoRoot,
       stdio: 'inherit',
-      timeout: num('file-timeout-minutes') * 60_000,
+      timeout: timeoutMs,
       killSignal: 'SIGKILL',
       env: {
         ...process.env,

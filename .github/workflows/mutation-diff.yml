@@ -20,8 +20,8 @@ name: Mutation Diff
 # every main CI completion and chains itself while modules remain. It walks every tested apps/web module
 # over days, persists per-module score + tested SHA on the runner, and turns
 # surviving mutants into bounded "strengthen test" tasks. It checks out
-# `main` only, holds no secrets, and skips when gem is short on RAM, disk or
-# CPU (scripts/mutation-sweep-preflight.mjs).
+# `main` only, holds no secrets, and skips when gem is short on RAM or disk
+# (CPU is shared at the lowest priority, never gated) (scripts/mutation-sweep-preflight.mjs).
 
 on:
   push:
@@ -169,7 +169,13 @@ jobs:
           # Runners share one HOME; serialize on the state file.
           exec 9>"$state_dir/sweep.lock"
           flock -n 9 || { echo "Another sweep holds the state lock; skipping."; exit 0; }
-          nice -n 19 node scripts/mutation-sweep.mjs \
+          # Idle-share only: lowest CPU weight and IO class, so the sweep uses
+          # capacity nobody else wants instead of refusing to start under load.
+          runner=(nice -n 19 ionice -c3)
+          if systemd-run --user --scope -q -p CPUWeight=1 -p IOWeight=1 true 2>/dev/null; then
+            runner=(systemd-run --user --scope -q -p CPUWeight=1 -p IOWeight=1 -- nice -n 19 ionice -c3)
+          fi
+          "${runner[@]}" node scripts/mutation-sweep.mjs \
             --state "$state_dir/sweep-state.json" \
             --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 90 \
             --summary "$GITHUB_STEP_SUMMARY" \

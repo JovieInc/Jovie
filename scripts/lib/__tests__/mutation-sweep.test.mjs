@@ -7,7 +7,9 @@ import {
   buildSurvivorIssue,
   emptyState,
   extractSurvivors,
+  fileTimeoutMs,
   MIN_RATCHET_VALID,
+  medianScoredMs,
   moduleKey,
   partitionEquivalents,
   pickBatch,
@@ -182,6 +184,48 @@ describe('survivors', () => {
       )
     );
     expect(validateEquivalents(raw)).toEqual([]);
+  });
+});
+
+describe('fileTimeoutMs', () => {
+  const base = { cores: 16, floorMs: 600_000, ceilMs: 5_400_000 };
+  it('uses the ceiling when nothing has been observed', () => {
+    expect(fileTimeoutMs({ ...base, load: 3 })).toBe(5_400_000);
+  });
+  it("doubles the module's last duration on an idle host", () => {
+    expect(fileTimeoutMs({ ...base, previousMs: 1_000_000, load: 4 })).toBe(
+      2_000_000
+    );
+  });
+  it('stretches with run-queue pressure per core', () => {
+    expect(fileTimeoutMs({ ...base, previousMs: 1_000_000, load: 48 })).toBe(
+      5_400_000
+    );
+    expect(fileTimeoutMs({ ...base, previousMs: 400_000, load: 32 })).toBe(
+      1_600_000
+    );
+  });
+  it('never drops under the floor', () => {
+    expect(fileTimeoutMs({ ...base, previousMs: 5_000, load: 1 })).toBe(
+      600_000
+    );
+  });
+  it('falls back to the median scored duration', () => {
+    const state = emptyState();
+    for (const [i, ms] of [100, 300, 200].entries())
+      state.modules[`m${i}`] = {
+        blob: 'b',
+        sha: null,
+        at: 'x',
+        status: 'scored',
+        score: 1,
+        valid: 1,
+        killed: 1,
+        survived: 0,
+        durationMs: ms * 1000,
+      };
+    expect(medianScoredMs(state)).toBe(200_000);
+    expect(medianScoredMs(emptyState())).toBeNull();
   });
 });
 

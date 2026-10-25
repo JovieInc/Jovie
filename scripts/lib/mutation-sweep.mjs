@@ -373,6 +373,40 @@ export function moduleKey(sourceBlob, testBlobs) {
 }
 
 /**
+ * Per-file timeout sized from what this host actually did, not a constant.
+ * Basis: the module's own last scored duration, else the median scored
+ * duration, else the ceiling. Scaled by run-queue pressure per core (work at
+ * nice 19 only gets the idle share, so wall time stretches with load), doubled
+ * for headroom, and clamped to [floorMs, ceilMs].
+ * @param {{ previousMs?: number | null, medianMs?: number | null, load: number,
+ *   cores: number, floorMs: number, ceilMs: number }} input
+ */
+export function fileTimeoutMs({
+  previousMs,
+  medianMs,
+  load,
+  cores,
+  floorMs,
+  ceilMs,
+}) {
+  const base = previousMs || medianMs;
+  if (!base) return ceilMs;
+  const pressure = Math.max(1, load / Math.max(1, cores));
+  return Math.round(Math.min(ceilMs, Math.max(floorMs, base * pressure * 2)));
+}
+
+/** Median duration of modules that finished scoring, or null. */
+export function medianScoredMs(
+  /** @type {ReturnType<typeof emptyState>} */ state
+) {
+  const xs = Object.values(state.modules)
+    .filter(m => m.status === 'scored' && m.durationMs > 0)
+    .map(m => m.durationMs)
+    .sort((a, b) => a - b);
+  return xs.length === 0 ? null : xs[Math.floor(xs.length / 2)];
+}
+
+/**
  * Ratchet verdict: a module regresses when its fresh score is under the
  * committed floor (baseline) or, with no floor, under the previous recorded
  * score by more than `slack` points while measured on enough mutants.
