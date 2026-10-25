@@ -799,18 +799,13 @@ export function macLiveness({
 
 /**
  * Public, non-sensitive heartbeat for the automation registry (json-timestamp).
- * Only versions, commit shas and counts: no account, chat or host data.
+ * Counts and timestamps only: no account, URL, version, chat or screen details.
  */
 export function macStatusDoc({ certification, run, now = new Date() }) {
   const byChannel = {};
   for (const [channel, r] of Object.entries(run ?? {})) {
     const rows = certification.rows.filter(x => x.channel === channel);
     byChannel[channel] = {
-      desktopVersion: r.identity?.version ?? null,
-      sourceRevision: r.identity?.sourceRevision ?? null,
-      webCommitSha: r.web?.commitSha ?? null,
-      latestPublishedVersion: r.latestPublishedVersion ?? null,
-      sessionKind: r.sessionKind,
       certified: rows.filter(x => x.status === 'certified').length,
       failing: rows.filter(x => x.status === 'failing').length,
       blocked: rows.filter(x => x.status.startsWith('uncertified')).length,

@@ -154,6 +154,25 @@ function snapshot(cua, pid, windowId, outDir, name, { keepShot }) {
   return snap;
 }
 
+const UPDATE_MODAL = /^(Downloading )?Jovie \S+( Is (Available|Ready))?$/;
+
+/**
+ * Snapshot, and if the update modal is up (it returns after a workspace switch),
+ * press Later first so it cannot swallow the next journey step.
+ */
+async function cleared(cua, pid, wid, outDir, name, opts) {
+  let snap = snapshot(cua, pid, wid, outDir, name, opts);
+  for (let i = 0; i < 2; i++) {
+    const modal = snap.elements.some(
+      e => e.role === 'AXHeading' && UPDATE_MODAL.test(e.label)
+    );
+    if (!modal || !cua.press(pid, snap, 'Later', 'AXButton')) break;
+    await sleep(1000);
+    snap = snapshot(cua, pid, wid, outDir, name, opts);
+  }
+  return snap;
+}
+
 /** Which workspace the sidebar is in: the artist app lists Identity, Ovie does not. */
 export function workspaceOf(snap) {
   return snap.elements.some(e => e.role === 'AXLink' && e.label === 'Identity')
@@ -162,7 +181,7 @@ export function workspaceOf(snap) {
 }
 
 async function switchWorkspace(cua, pid, wid, outDir, target, sleepMs) {
-  const sw = snapshot(cua, pid, wid, outDir, 'pre-ws', { keepShot: null });
+  const sw = await cleared(cua, pid, wid, outDir, 'pre-ws', { keepShot: null });
   if (!cua.press(pid, sw, 'Switch Workspace', 'AXPopUpButton')) return false;
   await sleep(1200);
   const menu = snapshot(cua, pid, wid, outDir, 'ws-menu', { keepShot: null });
@@ -260,7 +279,9 @@ export async function runChannel({
         await switchWorkspace(cua, pid, wid, outDir, 'Jovie', sleepMs);
       const visits = {};
       for (const n of SHELL_NAV) {
-        const cur = snapshot(cua, pid, wid, outDir, 'pre', { keepShot: null });
+        const cur = await cleared(cua, pid, wid, outDir, 'pre', {
+          keepShot: null,
+        });
         if (!cua.press(pid, cur, n.label, 'AXLink')) continue;
         visits[n.label] = await settleSnapshot(
           cua,
@@ -279,7 +300,7 @@ export async function runChannel({
       const bell = visits.Inbox ?? snap;
       add('dogfood:mac-shell', evalInboxLabel(bell, channel));
       // Chat composer: open a new chat (no send) and assert the input.
-      const cur = snapshot(cua, pid, wid, outDir, 'pre-chat', {
+      const cur = await cleared(cua, pid, wid, outDir, 'pre-chat', {
         keepShot: null,
       });
       if (cua.press(pid, cur, 'New Chat', 'AXLink'))

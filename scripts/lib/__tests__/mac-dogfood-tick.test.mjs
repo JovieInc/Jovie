@@ -152,7 +152,6 @@ test('status doc carries counts and versions only', () => {
     run: {
       staging: {
         ...run.staging,
-        sessionKind: 'signed-in',
         latestPublishedVersion: '26.10.17-staging.1.1',
       },
     },
@@ -160,16 +159,10 @@ test('status doc carries counts and versions only', () => {
   });
   assert.equal(doc.schema, 'jovie.mac-dogfood-status/v1');
   assert.equal(doc.at, '2026-10-25T02:32:00.000Z');
-  assert.equal(doc.channels.staging.desktopVersion, '26.10.13-staging.1.1');
   assert.deepEqual(Object.keys(doc.channels.staging).sort(), [
     'blocked',
     'certified',
     'completedAt',
-    'desktopVersion',
     'failing',
-    'latestPublishedVersion',
-    'sessionKind',
-    'sourceRevision',
-    'webCommitSha',
   ]);
 });
