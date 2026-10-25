@@ -85,6 +85,7 @@ const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
 
+/** @type {any[]} */
 let list = [];
 if (values.all)
   for (const r of [...new Set(COVERAGE_ROOTS)])

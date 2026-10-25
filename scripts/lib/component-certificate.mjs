@@ -223,7 +223,9 @@ export function findJank(source, fileName) {
       n.tagName.text === 'img'
     ) {
       const attrs = new Set(
-        n.attributes.properties.filter(ts.isJsxAttribute).map(a => a.name.text)
+        n.attributes.properties
+          .filter(ts.isJsxAttribute)
+          .map(a => (ts.isIdentifier(a.name) ? a.name.text : ''))
       );
       if (
         !(attrs.has('width') && attrs.has('height')) &&
@@ -387,14 +389,7 @@ function crit(id, status, extra = {}) {
 }
 
 /**
- * @param {object} input
- * @param {string} input.path repo-relative component path
- * @param {string} input.source
- * @param {string|null} input.testSource
- * @param {string|null} input.storySource
- * @param {object} input.evidence { mutation, a11y, visual, journeys, benchmark }
- * @param {object} input.waivers { state: reason }
- * @param {object} input.policy
+ * @param {{path: string, source: string, testSource?: string|null, storySource?: string|null, evidence?: any, waivers?: any, policy?: any, packagesUi?: boolean}} input
  */
 export function certifyComponent({
   path,
@@ -643,7 +638,7 @@ export function certifyComponent({
     miss(
       'benchmark',
       'not benchmarked against best-in-class',
-      'Run the benchmark judgment (docs/design-system/benchmark-library.json) and record adopt/adapt/skip per gap'
+      'Run the benchmark judgment and record adopt/adapt/skip per gap'
     );
   } else if (
     b.libraryVersion !== policy.benchmarkLibraryVersion ||
@@ -792,7 +787,7 @@ const isoWeek = iso => {
   const day = t.getUTCDay() || 7;
   t.setUTCDate(t.getUTCDate() + 4 - day);
   const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
-  return `${t.getUTCFullYear()}-W${String(Math.ceil(((t - y0) / 86400000 + 1) / 7)).padStart(2, '0')}`;
+  return `${t.getUTCFullYear()}-W${String(Math.ceil(((t.getTime() - y0.getTime()) / 86400000 + 1) / 7)).padStart(2, '0')}`;
 };
 
 /** Defect -> guard registry check + weekly measure (found by humans vs caught by guards). */
