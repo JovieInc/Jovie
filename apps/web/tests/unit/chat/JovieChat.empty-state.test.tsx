@@ -945,3 +945,122 @@ describe('JovieChat empty state', () => {
     expect(queryByTestId('chat-empty-state-soft-suggestions-slot')).toBeNull();
   });
 });
+
+describe('JovieChat living Home canvas (Ovie): HUD first, conversation replaces it', () => {
+  const thread = [
+    { id: 'u1', role: 'user', parts: [{ type: 'text', text: 'Status?' }] },
+    {
+      id: 'a1',
+      role: 'assistant',
+      parts: [{ type: 'text', text: 'All clear.' }],
+    },
+  ];
+  const original = { ...mockChatState };
+  const view = () => (
+    <JovieChat
+      profileId='profile-1'
+      chatMode='ov'
+      homeCanvasMode='living'
+      homeCanvas={<div data-testid='hud-fixture'>HUD</div>}
+    />
+  );
+  const surface = () =>
+    screen.getByTestId('chat-message-scroll').getAttribute('data-surface');
+
+  beforeEach(() => {
+    Object.assign(mockChatState, original, { messages: [] });
+    mockCurrentDraft = createComposerDraft('');
+    mockSearchParams = new URLSearchParams();
+  });
+
+  it('opens on the HUD with the normal composer, even when a conversation already exists', () => {
+    Object.assign(mockChatState, { messages: thread, hasMessages: true });
+    renderWithQueryClient(view());
+    expect(surface()).toBe('home');
+    expect(screen.getByTestId('hud-fixture')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-input')).toBeInTheDocument();
+    expect(screen.queryByText('All clear.')).toBeNull();
+  });
+
+  it('the first message sent replaces the HUD with the thread, composer kept', () => {
+    const { rerender } = renderWithQueryClient(view());
+    expect(surface()).toBe('home');
+    Object.assign(mockChatState, {
+      messages: thread,
+      hasMessages: true,
+      isSubmitting: true,
+    });
+    rerender(view());
+    expect(surface()).toBe('thread');
+    expect(screen.queryByTestId('hud-fixture')).toBeNull();
+    expect(screen.getByTestId('chat-input')).toBeInTheDocument();
+    expect(screen.getByTestId('chat-back-to-home-canvas')).toHaveTextContent(
+      'Back To Home'
+    );
+  });
+
+  it('the swap fades in and respects reduced motion', () => {
+    renderWithQueryClient(view());
+    const region = screen.getByTestId('chat-message-scroll');
+    expect(region).toHaveClass('animate-in', 'fade-in-0', 'duration-fast');
+    expect(region).toHaveClass('motion-reduce:animate-none');
+  });
+
+  describe('getting back to the HUD', () => {
+    const startThread = () => {
+      const utils = renderWithQueryClient(view());
+      Object.assign(mockChatState, {
+        messages: thread,
+        hasMessages: true,
+        isSubmitting: true,
+      });
+      utils.rerender(view());
+      Object.assign(mockChatState, { isSubmitting: false });
+      utils.rerender(view());
+      expect(surface()).toBe('thread');
+      return utils;
+    };
+
+    it('Back To Home returns to the HUD', () => {
+      startThread();
+      fireEvent.click(screen.getByTestId('chat-back-to-home-canvas'));
+      expect(surface()).toBe('home');
+      expect(screen.getByTestId('hud-fixture')).toBeInTheDocument();
+    });
+
+    it('Esc on an empty composer returns to the HUD', () => {
+      startThread();
+      fireEvent.keyDown(globalThis, { key: 'Escape' });
+      expect(surface()).toBe('home');
+    });
+
+    it('Esc keeps the thread while a draft is typed', () => {
+      const { rerender } = startThread();
+      mockChatState.input = 'half a thought';
+      rerender(view());
+      fireEvent.keyDown(globalThis, { key: 'Escape' });
+      expect(surface()).toBe('thread');
+    });
+
+    it('Esc does nothing while a reply streams', () => {
+      const { rerender } = startThread();
+      Object.assign(mockChatState, { isSubmitting: true });
+      rerender(view());
+      fireEvent.keyDown(globalThis, { key: 'Escape' });
+      expect(surface()).toBe('thread');
+    });
+  });
+
+  it('other personas never use the HUD swap (no data-surface, no remount)', () => {
+    renderWithQueryClient(
+      <JovieChat
+        profileId='profile-1'
+        chatMode='ov'
+        homeCanvas={<div>x</div>}
+      />
+    );
+    expect(
+      screen.getByTestId('chat-message-scroll').getAttribute('data-surface')
+    ).toBeNull();
+  });
+});

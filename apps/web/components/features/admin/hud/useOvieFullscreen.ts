@@ -60,6 +60,16 @@ export function useOvieFullscreen() {
 
   const toggle = useCallback(() => set(!on, true), [on, set]);
 
+  // The main plane (composer included) goes full screen via CSS on <html>.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (on) root.dataset.ovieFullscreen = '1';
+    else delete root.dataset.ovieFullscreen;
+    return () => {
+      delete root.dataset.ovieFullscreen;
+    };
+  }, [on]);
+
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (matchesFullscreenShortcut(event, inDesktopApp)) {
@@ -89,3 +99,5 @@ export function useOvieFullscreen() {
 
   return { on, toggle, inDesktopApp };
 }
+
+export type OvieFullscreenState = ReturnType<typeof useOvieFullscreen>;

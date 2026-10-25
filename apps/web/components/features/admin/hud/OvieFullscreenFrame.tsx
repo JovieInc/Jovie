@@ -1,7 +1,6 @@
 'use client';
 
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   type FullscreenFeedStatus,
   fullscreenDrift,
@@ -12,10 +11,11 @@ import {
 const RELOAD_KEY = 'ovie-fullscreen-reload';
 
 /**
- * Full screen is the same Home, filling the display: the chrome is covered,
- * the surface is scaled for room-distance reading, nudged a few px a minute
- * against burn-in, kept awake, and reloaded after a long outage. Feed
- * staleness is not here: it shows on normal Home too (OvieFeedBanner).
+ * Full Screen scales the HUD for the display. It is the Home canvas only: the
+ * Summer composer below it is the normal shared component, untouched. The
+ * canvas is scaled to whichever axis of its own region is tighter, nudged a few
+ * px a minute against burn-in, kept awake, and reloaded after a long outage.
+ * Feed staleness is not here: it shows on normal Home too (OvieFeedBanner).
  */
 export function OvieFullscreenFrame({
   status,
@@ -26,17 +26,20 @@ export function OvieFullscreenFrame({
   now: number;
   children: ReactNode;
 }>) {
+  const regionRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
   const downSince = useRef<number | null>(null);
 
   useEffect(() => {
+    const region = regionRef.current;
+    if (!region) return;
     const fit = () =>
-      setScale(fullscreenScale(globalThis.innerWidth, globalThis.innerHeight));
+      setScale(fullscreenScale(region.clientWidth, region.clientHeight));
     fit();
-    globalThis.addEventListener('resize', fit);
-    return () => globalThis.removeEventListener('resize', fit);
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(region);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -91,33 +94,28 @@ export function OvieFullscreenFrame({
   }, [status.level, now]);
 
   const drift = fullscreenDrift(now);
-  // Portaled to <body>: the shell has transformed ancestors and its own
-  // stacking, so a fixed child inside it would not cover the sidebar.
-  if (!mounted) return null;
-  return createPortal(
+  return (
     <div
-      className='fixed inset-0 z-[1000] cursor-none select-none overflow-hidden bg-base text-primary-token'
+      ref={regionRef}
+      className='relative h-full min-h-0 w-full overflow-hidden text-primary-token'
       data-testid='ovie-fullscreen'
       data-feed-level={status.level}
     >
       <div
-        // Nothing may truncate in Full Screen (Tim: "runway 3…" is unreadable
-        // across a room): shared organisms use .truncate / line-clamp, so
-        // release them here instead of forking those components.
-        className='origin-top-left p-4 [&_.truncate]:overflow-visible [&_.truncate]:whitespace-normal [&_.truncate]:text-clip [&_[class*=line-clamp]]:line-clamp-none'
+        className='absolute left-0 top-0 origin-top-left p-4 [&_.truncate]:overflow-visible [&_.truncate]:whitespace-normal [&_.truncate]:text-clip [&_[class*=line-clamp]]:line-clamp-none'
         data-testid='ovie-fullscreen-canvas'
         style={{
-          // The scaled canvas is exactly the viewport: (100vw / scale) * scale.
+          // Nothing truncates in Full Screen (shared organisms use .truncate
+          // and line-clamp, so release them here instead of forking them).
           boxSizing: 'border-box',
-          width: `${100 / scale}vw`,
-          height: `${100 / scale}vh`,
+          width: `${100 / scale}%`,
+          height: `${100 / scale}%`,
           transform: `scale(${scale}) translate(${drift.x}px, ${drift.y}px)`,
           transition: 'transform var(--ds-motion-cinematic-duration) linear',
         }}
       >
         {children}
       </div>
-    </div>,
-    document.body
+    </div>
   );
 }

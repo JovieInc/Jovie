@@ -45,11 +45,25 @@ const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
 // ultra-wide viewport is part of what Full Screen promises.
 export const OVIE_HOME_CAPTURE_ROUTE = '/app/ov';
 export const OVIE_FULLSCREEN_CAPTURE_ROUTE = '/app/ov?fullscreen=1';
+// Home -> conversation: the capture types a message and waits for the thread
+// to replace the HUD. `capture=chat` is read by the capture script only.
+export const OVIE_CHAT_CAPTURE_ROUTE = '/app/ov?capture=chat';
+export const OVIE_FULLSCREEN_CHAT_CAPTURE_ROUTE =
+  '/app/ov?fullscreen=1&capture=chat';
+export const OVIE_HOME_CAPTURE_ROUTES = [
+  OVIE_HOME_CAPTURE_ROUTE,
+  OVIE_FULLSCREEN_CAPTURE_ROUTE,
+  OVIE_CHAT_CAPTURE_ROUTE,
+  OVIE_FULLSCREEN_CHAT_CAPTURE_ROUTE,
+];
 // Any Ovie operator-app file: its evidence is the Ovie app, never marketing.
 const OVIE_SURFACE_CAPTURE_FILE =
   /^apps\/web\/(?:components\/features\/admin\/|lib\/ovie\/|app\/app\/\(shell\)\/admin\/|app\/hud\/)/;
 const OVIE_HOME_CAPTURE_FILE =
-  /^apps\/web\/(?:components\/features\/admin\/hud\/(?:Ovie(?:HomeCanvas|CompanyHome|CompanyHud|Fullscreen|FeedBanner)|useOvie)|lib\/ovie\/home\/|app\/app\/\(shell\)\/admin\/chat\/)/;
+  /^apps\/web\/(?:components\/features\/admin\/hud\/(?:Ovie(?:HomeCanvas|CompanyHome|CompanyHud|InFlightColumn|Fullscreen|FeedBanner)|useOvie|GithubHeadroom)|lib\/ovie\/home\/|app\/app\/\(shell\)\/admin\/chat\/)/;
+// The shared chat swaps Ovie's HUD for the thread, so its changes are also
+// evidence on Ovie Home (in addition to the customer chat route).
+const OVIE_CHAT_SWAP_FILE = /^apps\/web\/components\/jovie\/JovieChat\.tsx$/;
 // Changes to the session boundary can leave a public route perfectly healthy
 // while making every authenticated surface unusable. Keep this deliberately
 // narrow: these are the files that establish the app-shell session and route
@@ -118,6 +132,7 @@ export function isOvieCaptureRoute(route) {
 
 /** Viewports a route must be captured at. Ovie Home adds the ultra-wide. */
 export function captureViewportNamesForRoute(route) {
+  if (String(route).includes('capture=chat')) return ['desktop', 'ultrawide'];
   return isOvieCaptureRoute(route)
     ? ['desktop', 'mobile', 'ultrawide']
     : REQUIRED_CAPTURE_VIEWPORTS;
@@ -140,14 +155,14 @@ export function validateRoutesMatchChange(files, routes) {
   const list = Array.isArray(routes) ? routes : [];
   const changed = Array.isArray(files) ? files : [];
   if (
-    changed.some(file => OVIE_HOME_CAPTURE_FILE.test(file)) &&
-    !(
-      list.includes(OVIE_HOME_CAPTURE_ROUTE) &&
-      list.includes(OVIE_FULLSCREEN_CAPTURE_ROUTE)
-    )
+    changed.some(
+      file =>
+        OVIE_HOME_CAPTURE_FILE.test(file) || OVIE_CHAT_SWAP_FILE.test(file)
+    ) &&
+    !OVIE_HOME_CAPTURE_ROUTES.every(route => list.includes(route))
   )
     failures.push(
-      `Ovie Home files changed but routes ${JSON.stringify(list)} do not include ${OVIE_HOME_CAPTURE_ROUTE} and ${OVIE_FULLSCREEN_CAPTURE_ROUTE}`
+      `Ovie Home files changed but routes ${JSON.stringify(list)} do not include ${OVIE_HOME_CAPTURE_ROUTES.join(', ')}`
     );
   if (
     changed.some(file => PUBLIC_CARD_CAPTURE_FILE.test(file)) &&
@@ -260,13 +275,14 @@ export function routeChangedFiles(files) {
     };
   const routes = new Set();
   for (const file of changed) {
+    if (OVIE_CHAT_SWAP_FILE.test(file))
+      for (const ovieRoute of OVIE_HOME_CAPTURE_ROUTES) routes.add(ovieRoute);
     // Route only to fixtures that are present in the production build. Generic
     // UI changes belong on the public home surface; `/demo` and `/demo/admin`
     // require data/authentication that the capture runner intentionally does
     // not invent.
     if (OVIE_HOME_CAPTURE_FILE.test(file)) {
-      routes.add(OVIE_HOME_CAPTURE_ROUTE);
-      routes.add(OVIE_FULLSCREEN_CAPTURE_ROUTE);
+      for (const ovieRoute of OVIE_HOME_CAPTURE_ROUTES) routes.add(ovieRoute);
     } else if (OVIE_SURFACE_CAPTURE_FILE.test(file))
       routes.add(OVIE_HOME_CAPTURE_ROUTE);
     else if (PUBLIC_CARD_CAPTURE_FILE.test(file))

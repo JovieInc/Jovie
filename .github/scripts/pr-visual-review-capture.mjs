@@ -62,6 +62,233 @@ if (!exactHead)
  * authenticated chrome, not the first HTML chunk. JOV-5387 New Chat evidence
  * also requires the loaded empty-state greeting, which is not aria-hidden.
  */
+const OVIE_CHAT_PROMPT = 'What changed since I last looked?';
+
+/** A canned UI message stream so Home -> conversation can be captured without a model. */
+const OVIE_CHAT_STREAM = [
+  { type: 'start', messageId: 'capture-assistant' },
+  { type: 'text-start', id: 'capture-text' },
+  {
+    type: 'text-delta',
+    id: 'capture-text',
+    delta:
+      'Nothing is blocking shipping. 96 merges landed today, one decision is waiting on you, and production is current.',
+  },
+  { type: 'text-end', id: 'capture-text' },
+  { type: 'finish' },
+]
+  .map(chunk => `data: ${JSON.stringify(chunk)}\n\n`)
+  .concat('data: [DONE]\n\n')
+  .join('');
+
+/**
+ * Ovie Home proof (Tim, 2026-10-25): the HUD itself, populated; in Full Screen
+ * the shell main plane fills the display with the normal composer usable; a
+ * sent message replaces the HUD with the conversation. Throws on any miss.
+ */
+async function assertOvieHome(page, route) {
+  const fullscreen = route.includes('fullscreen=1');
+  await page
+    .getByTestId('ovie-company-home')
+    .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+  // Populated, not skeletons: a company tile with a measured value.
+  if (ovieFixture)
+    await page
+      .getByTestId('ovie-tile-revenue')
+      .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+  if (fullscreen)
+    await page
+      .getByTestId('ovie-fullscreen')
+      .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+  // The composer is the normal shared one: visible, in the viewport, and the
+  // topmost element at its own centre (nothing covers it), in both modes.
+  await assertComposerUsable(page, fullscreen);
+  if (fullscreen) await assertFullscreenGeometry(page);
+  if (route.includes('capture=chat')) {
+    const input = page.getByTestId('chat-input');
+    await input.click();
+    await page.keyboard.type(OVIE_CHAT_PROMPT);
+    await page.keyboard.press('Enter');
+    // The HUD disappears and the conversation takes the surface.
+    await page
+      .locator('[data-testid="chat-message-scroll"][data-surface="thread"]')
+      .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+    await page
+      .getByText(OVIE_CHAT_PROMPT)
+      .first()
+      .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+    const hudGone = await page.getByTestId('ovie-company-home').count();
+    if (hudGone !== 0)
+      throw new Error('The HUD is still mounted after a message was sent');
+    await page.waitForTimeout(700);
+    await assertComposerUsable(page, fullscreen);
+    await page
+      .getByTestId('chat-back-to-home-canvas')
+      .waitFor({ state: 'visible', timeout: 5_000 });
+    if (fullscreen) await assertMainPlaneFillsViewport(page);
+  }
+}
+
+async function assertComposerUsable(page, fullscreen) {
+  const result = await page.evaluate(() => {
+    const input = document.querySelector('[data-testid="chat-input"]');
+    if (!input) return { found: false };
+    const box = input.getBoundingClientRect();
+    const top = document.elementFromPoint(
+      box.x + box.width / 2,
+      box.y + box.height / 2
+    );
+    return {
+      found: true,
+      inViewport:
+        box.width > 0 &&
+        box.height > 0 &&
+        box.top >= 0 &&
+        box.bottom <= window.innerHeight + 1 &&
+        box.left >= 0 &&
+        box.right <= window.innerWidth + 1,
+      reachable: Boolean(
+        top &&
+          (input === top ||
+            input.contains(top) ||
+            top.closest('[data-testid="chat-input"]'))
+      ),
+    };
+  });
+  if (!result.found) throw new Error('The Summer composer is not rendered');
+  if (!result.inViewport)
+    throw new Error(
+      `The Summer composer is outside the viewport${fullscreen ? ' in Full Screen' : ''}`
+    );
+  if (!result.reachable)
+    throw new Error(
+      `The Summer composer is covered${fullscreen ? ' in Full Screen' : ''}`
+    );
+}
+
+async function assertMainPlaneFillsViewport(page) {
+  const fits = await page.evaluate(() => {
+    const plane = document.querySelector('[data-app-shell-main-plane="true"]');
+    if (!plane) return { ok: false, why: 'no main plane' };
+    const r = plane.getBoundingClientRect();
+    return {
+      ok:
+        Math.abs(r.width - window.innerWidth) <= 1 &&
+        Math.abs(r.height - window.innerHeight) <= 1 &&
+        document.documentElement.scrollWidth <= window.innerWidth,
+      why: `plane ${Math.round(r.width)}x${Math.round(r.height)} in ${window.innerWidth}x${window.innerHeight}`,
+    };
+  });
+  if (!fits.ok) throw new Error(`Full Screen main plane: ${fits.why}`);
+}
+
+async function assertFullscreenGeometry(page) {
+  const geometry = await page.evaluate(() => {
+    const rect = el => {
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { x: r.x, y: r.y, w: r.width, h: r.height };
+    };
+    const frameEl = document.querySelector('[data-testid="ovie-fullscreen"]');
+    const canvasEl = document.querySelector(
+      '[data-testid="ovie-fullscreen-canvas"]'
+    );
+    const plane = document.querySelector('[data-app-shell-main-plane="true"]');
+    const scale = canvasEl
+      ? canvasEl.getBoundingClientRect().width /
+        Math.max(1, canvasEl.offsetWidth)
+      : 1;
+    const truncated = [];
+    for (const el of frameEl ? frameEl.querySelectorAll('*') : []) {
+      const style = getComputedStyle(el);
+      const clamped = style.webkitLineClamp && style.webkitLineClamp !== 'none';
+      if (style.textOverflow === 'ellipsis' || clamped)
+        truncated.push(
+          `${el.tagName.toLowerCase()}:${(el.textContent ?? '').trim().slice(0, 40)}`
+        );
+    }
+    const tiles = [
+      ...document.querySelectorAll('[data-testid^="ovie-tile-"]'),
+    ].map(el => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left, right: r.right, top: r.top };
+    });
+    // Real content, not stretched boxes: the lowest text-bearing leaf in a column.
+    const bottoms = [
+      ...document.querySelectorAll('[data-testid$="-section"] *'),
+    ]
+      .filter(
+        el =>
+          el.children.length === 0 && (el.textContent ?? '').trim().length > 0
+      )
+      .map(el => el.getBoundingClientRect().bottom);
+    const value = document.querySelector(
+      '[data-testid="ovie-tile-revenue"] span.font-semibold'
+    );
+    return {
+      viewport: { w: window.innerWidth, h: window.innerHeight },
+      plane: rect(plane),
+      frame: rect(frameEl),
+      canvas: rect(canvasEl),
+      tiles,
+      scale,
+      truncated,
+      contentBottom: bottoms.length ? Math.max(...bottoms) : null,
+      valuePx: value
+        ? parseFloat(getComputedStyle(value).fontSize) * scale
+        : null,
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+    };
+  });
+  const { viewport: vp, plane, frame, canvas, tiles, truncated } = geometry;
+  const problems = [];
+  if (!plane || Math.abs(plane.w - vp.w) > 1 || Math.abs(plane.h - vp.h) > 1)
+    problems.push(
+      `main plane ${JSON.stringify(plane)} is not the viewport ${vp.w}x${vp.h}`
+    );
+  if (geometry.overflowX) problems.push('horizontal overflow');
+  if (!frame || !canvas) problems.push('HUD frame missing');
+  else {
+    // The scaled canvas fills its region; drift moves it at most 10 scaled px,
+    // inside its 16 scaled px padding.
+    const slack = Math.ceil(10 * Math.max(1, geometry.scale)) + 1;
+    if (
+      Math.abs(canvas.w - frame.w) > 1 ||
+      Math.abs(canvas.h - frame.h) > 1 ||
+      Math.abs(canvas.x - frame.x) > slack ||
+      Math.abs(canvas.y - frame.y) > slack
+    )
+      problems.push(
+        `canvas ${JSON.stringify(canvas)} does not fill its region ${JSON.stringify(frame)}`
+      );
+  }
+  for (const tile of tiles)
+    if (tile.left < -1 || tile.right > vp.w + 1)
+      problems.push(
+        `tile clipped: ${tile.left.toFixed(0)}..${tile.right.toFixed(0)} of ${vp.w}`
+      );
+  if (tiles.length === 0 && ovieFixture) problems.push('no tiles rendered');
+  if (truncated.length > 0)
+    problems.push(
+      `ellipsis or line clamp in Full Screen: ${truncated.slice(0, 3).join(' | ')}`
+    );
+  if (vp.w >= 3000 && frame) {
+    const top = tiles.length ? Math.min(...tiles.map(tile => tile.top)) : null;
+    const span =
+      top === null || geometry.contentBottom === null
+        ? 0
+        : (geometry.contentBottom - top) / frame.h;
+    if (span < 0.7)
+      problems.push(
+        `content fills ${(span * 100).toFixed(0)}% of the HUD height, need 70%`
+      );
+    if (ovieFixture && (geometry.valuePx === null || geometry.valuePx < 48))
+      problems.push(`tile value renders at ${geometry.valuePx}px, need 48px`);
+  }
+  if (problems.length > 0)
+    throw new Error(`Full Screen geometry: ${problems.join('; ')}`);
+}
+
 async function waitForAuthenticatedShell(page, route) {
   if (!route.startsWith('/app/')) return;
 
@@ -98,158 +325,7 @@ async function waitForAuthenticatedShell(page, route) {
     timeout: AUTHENTICATED_SHELL_WAIT_MS,
   });
 
-  if (isOvieCaptureRoute(route)) {
-    // Ovie Home proof: the company HUD itself, not just the shell around it.
-    await page
-      .getByTestId('ovie-company-home')
-      .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
-    // Populated, not skeletons: a company tile with a measured value.
-    if (ovieFixture)
-      await page
-        .getByTestId('ovie-tile-revenue')
-        .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
-    if (route.includes('fullscreen=1'))
-      await page
-        .getByTestId('ovie-fullscreen')
-        .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
-    if (route.includes('fullscreen=1')) {
-      // Full Screen must cover the shell: no sidebar link may be the topmost
-      // element at its own position.
-      const covered = await page.evaluate(() => {
-        const link = [...document.querySelectorAll('a')].find(
-          el => el.textContent?.trim() === 'Inbox'
-        );
-        if (!link) return true;
-        const box = link.getBoundingClientRect();
-        const top = document.elementFromPoint(
-          box.x + box.width / 2,
-          box.y + box.height / 2
-        );
-        return Boolean(top?.closest('[data-testid="ovie-fullscreen"]'));
-      });
-      if (!covered)
-        throw new Error('Full Screen did not cover the app shell chrome');
-      // Fill guard (Tim, 2026-10-25: at 3440 only the top third was filled and
-      // the right edge clipped). The scaled canvas must be the viewport, with
-      // no horizontal overflow and every tile inside it. Burn-in drift moves
-      // the canvas by at most 10 scaled px, inside its 16 scaled px padding.
-      const geometry = await page.evaluate(() => {
-        const rect = selector => {
-          const el = document.querySelector(selector);
-          if (!el) return null;
-          const r = el.getBoundingClientRect();
-          return { x: r.x, y: r.y, w: r.width, h: r.height };
-        };
-        const frame = document.querySelector('[data-testid="ovie-fullscreen"]');
-        return {
-          viewport: { w: window.innerWidth, h: window.innerHeight },
-          frame: rect('[data-testid="ovie-fullscreen"]'),
-          canvas: rect('[data-testid="ovie-fullscreen-canvas"]'),
-          tiles: [...document.querySelectorAll('[data-testid^="ovie-tile-"]')]
-            .map(el => el.getBoundingClientRect())
-            .map(r => ({ left: r.left, right: r.right, bottom: r.bottom })),
-          overflowX:
-            document.documentElement.scrollWidth > window.innerWidth ||
-            (frame ? frame.scrollWidth > frame.clientWidth : false),
-        };
-      });
-      const { viewport: vp, frame, canvas, tiles, overflowX } = geometry;
-      const scaleGuess = canvas ? canvas.w / Math.max(1, vp.w) : 1;
-      const slack = Math.ceil(10 * Math.max(1, vp.w / 1280)) + 1;
-      const problems = [];
-      if (
-        !frame ||
-        Math.abs(frame.w - vp.w) > 1 ||
-        Math.abs(frame.h - vp.h) > 1
-      )
-        problems.push(
-          `frame ${JSON.stringify(frame)} is not the viewport ${vp.w}x${vp.h}`
-        );
-      if (
-        !canvas ||
-        Math.abs(canvas.w - vp.w) > 1 ||
-        Math.abs(canvas.h - vp.h) > 1 ||
-        Math.abs(canvas.x) > slack ||
-        Math.abs(canvas.y) > slack
-      )
-        problems.push(
-          `canvas ${JSON.stringify(canvas)} does not fill ${vp.w}x${vp.h} (scale ${scaleGuess.toFixed(2)})`
-        );
-      if (overflowX) problems.push('horizontal overflow');
-      for (const tile of tiles)
-        if (tile.left < -1 || tile.right > vp.w + 1)
-          problems.push(
-            `tile clipped: ${tile.left.toFixed(0)}..${tile.right.toFixed(0)} of ${vp.w}`
-          );
-      if (tiles.length === 0 && ovieFixture) problems.push('no tiles rendered');
-      // Wall-reading guards (Tim, 2026-10-25): no ellipsis or clamping, content
-      // fills the height, and values are large enough to read across a room.
-      const wall = await page.evaluate(() => {
-        const frame = document.querySelector('[data-testid="ovie-fullscreen"]');
-        const canvas = document.querySelector(
-          '[data-testid="ovie-fullscreen-canvas"]'
-        );
-        const scale = canvas
-          ? canvas.getBoundingClientRect().width /
-            Math.max(1, canvas.offsetWidth)
-          : 1;
-        const truncated = [];
-        for (const el of frame ? frame.querySelectorAll('*') : []) {
-          const style = getComputedStyle(el);
-          const clamped =
-            style.webkitLineClamp && style.webkitLineClamp !== 'none';
-          if (style.textOverflow === 'ellipsis' || clamped)
-            truncated.push(
-              `${el.tagName.toLowerCase()}:${(el.textContent ?? '').trim().slice(0, 40)}`
-            );
-        }
-        const tops = [
-          ...document.querySelectorAll('[data-testid^="ovie-tile-"]'),
-        ].map(el => el.getBoundingClientRect().top);
-        // Real content, not stretched boxes: the lowest text-bearing leaf in
-        // any column.
-        const bottoms = [
-          ...document.querySelectorAll('[data-testid$="-section"] *'),
-        ]
-          .filter(
-            el =>
-              el.children.length === 0 &&
-              (el.textContent ?? '').trim().length > 0
-          )
-          .map(el => el.getBoundingClientRect().bottom);
-        const value = document.querySelector(
-          '[data-testid="ovie-tile-revenue"] span.font-semibold'
-        );
-        return {
-          scale,
-          truncated,
-          contentTop: tops.length ? Math.min(...tops) : null,
-          contentBottom: bottoms.length ? Math.max(...bottoms) : null,
-          valuePx: value
-            ? parseFloat(getComputedStyle(value).fontSize) * scale
-            : null,
-        };
-      });
-      if (wall.truncated.length > 0)
-        problems.push(
-          `ellipsis or line clamp in Full Screen: ${wall.truncated.slice(0, 3).join(' | ')}`
-        );
-      if (vp.w >= 3000) {
-        const span =
-          wall.contentTop === null || wall.contentBottom === null
-            ? 0
-            : (wall.contentBottom - wall.contentTop) / vp.h;
-        if (span < 0.7)
-          problems.push(
-            `content fills ${(span * 100).toFixed(0)}% of the height, need 70%`
-          );
-        if (ovieFixture && (wall.valuePx === null || wall.valuePx < 48))
-          problems.push(`tile value renders at ${wall.valuePx}px, need 48px`);
-      }
-      if (problems.length > 0)
-        throw new Error(`Full Screen geometry: ${problems.join('; ')}`);
-    }
-  }
+  if (isOvieCaptureRoute(route)) await assertOvieHome(page, route);
 
   if (route === '/app/chat' || route.startsWith('/app/chat/')) {
     // JOV-7150: the loaded empty state is one greeting sentence rendered as
@@ -385,6 +461,20 @@ try {
       if (isOvieCaptureRoute(route) && ovieFixture)
         await context.route('**/api/**', async intercepted => {
           const path = new URL(intercepted.request().url()).pathname;
+          if (
+            route.includes('capture=chat') &&
+            path === '/api/chat' &&
+            intercepted.request().method() === 'POST'
+          )
+            return intercepted.fulfill({
+              status: 200,
+              headers: {
+                'content-type': 'text/event-stream',
+                'cache-control': 'no-store',
+                'x-vercel-ai-ui-message-stream': 'v1',
+              },
+              body: OVIE_CHAT_STREAM,
+            });
           const payload = ovieFixture[path];
           if (payload === undefined || intercepted.request().method() !== 'GET')
             return intercepted.continue();

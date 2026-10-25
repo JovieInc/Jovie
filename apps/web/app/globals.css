@@ -2990,3 +2990,12 @@ body {
     @apply focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-focus/60;
   }
 }
+
+/* Ovie Full Screen: the shell's main plane (header, HUD and the normal Summer
+   composer) fills the display; only the sidebar is covered. */
+html[data-ovie-fullscreen="1"] [data-app-shell-main-plane="true"] {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background-color: var(--color-bg-base);
+}

@@ -124,9 +124,16 @@ describe('bounded PR visual review contract', () => {
       reason: 'ui-change',
       review_status: 'advisory',
     });
+    // The shared chat also drives Ovie Home (HUD to thread), so it adds those routes.
     expect(
       routeChangedFiles(['apps/web/components/jovie/JovieChat.tsx']).routes
-    ).toEqual(['/app/chat']);
+    ).toEqual([
+      '/app/chat',
+      '/app/ov',
+      '/app/ov?capture=chat',
+      '/app/ov?fullscreen=1',
+      '/app/ov?fullscreen=1&capture=chat',
+    ]);
     expect(
       routeChangedFiles(['apps/web/app/app/(shell)/chat/page.tsx']).routes
     ).toEqual(['/app/chat']);
@@ -943,7 +950,12 @@ describe('Ovie Home capture routing (Tim, 2026-10-25)', () => {
   const home = 'apps/web/components/features/admin/hud/OvieHomeCanvas.tsx';
   it('routes Ovie Home files to /app/ov in normal and full screen, never marketing', () => {
     const route = routeChangedFiles([home]);
-    expect(route.routes).toEqual(['/app/ov', '/app/ov?fullscreen=1']);
+    expect(route.routes).toEqual([
+      '/app/ov',
+      '/app/ov?capture=chat',
+      '/app/ov?fullscreen=1',
+      '/app/ov?fullscreen=1&capture=chat',
+    ]);
   });
   it('routes other Ovie app files to /app/ov, not marketing home', () => {
     expect(
@@ -993,5 +1005,31 @@ describe('Ovie Home capture routing (Tim, 2026-10-25)', () => {
       }
     );
     expect(result.failures).toEqual(['missing capture /app/ov::ultrawide']);
+  });
+});
+
+describe('Ovie Home to conversation capture (Tim, 2026-10-25)', () => {
+  it('captures Home to chat at 1440 and 3440 only, normal and Full Screen', () => {
+    for (const route of [
+      '/app/ov?capture=chat',
+      '/app/ov?fullscreen=1&capture=chat',
+    ])
+      expect(captureViewportNamesForRoute(route)).toEqual([
+        'desktop',
+        'ultrawide',
+      ]);
+  });
+  it('shared chat changes are evidence on Ovie Home and on the customer chat route', () => {
+    const routes = routeChangedFiles([
+      'apps/web/components/jovie/JovieChat.tsx',
+    ]).routes;
+    expect(routes).toContain('/app/chat');
+    expect(routes).toContain('/app/ov?capture=chat');
+    expect(
+      validateRoutesMatchChange(
+        ['apps/web/components/jovie/JovieChat.tsx'],
+        ['/app/chat']
+      ).join()
+    ).toMatch(/Ovie Home files changed/);
   });
 });

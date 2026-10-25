@@ -1,13 +1,6 @@
 import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import { HOME_LOOP_UNDO_WINDOW_MS } from '@/components/organisms/home-loop/useUndoableAnswers';
@@ -16,6 +9,7 @@ import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
+import type { OvieFullscreenState } from './useOvieFullscreen';
 
 const toastMock = vi.hoisted(() =>
   Object.assign(vi.fn(), {
@@ -168,14 +162,24 @@ function snapshot() {
   };
 }
 
-function renderCanvas(chat?: HomeCanvasState) {
+const fullscreenStub = (over: Partial<OvieFullscreenState> = {}) => ({
+  on: false,
+  toggle: vi.fn(),
+  inDesktopApp: false,
+  ...over,
+});
+
+function renderCanvas(
+  chat?: HomeCanvasState,
+  fullscreen: OvieFullscreenState = fullscreenStub()
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   const tree = (next?: HomeCanvasState) => (
     <QueryClientProvider client={client}>
       <TooltipProvider>
-        <OvieHomeCanvas chat={next} />
+        <OvieHomeCanvas chat={next} fullscreen={fullscreen} />
       </TooltipProvider>
     </QueryClientProvider>
   );
@@ -682,16 +686,30 @@ describe('OvieHomeCanvas', () => {
 });
 
 describe('Home full screen', () => {
-  it('has a labelled toggle that covers the shell with the same Home, and Esc leaves', async () => {
-    renderCanvas();
-    const { findByTestId, queryByTestId } = screen;
-    const toggle = await findByTestId('ovie-fullscreen-toggle');
-    expect(toggle).toHaveAccessibleName(/Full Screen/);
+  it('has a labelled toggle that asks the owner of the state to flip', async () => {
+    const fullscreen = fullscreenStub();
+    renderCanvas(undefined, fullscreen);
+    const toggle = await screen.findByTestId('ovie-fullscreen-toggle');
+    expect(toggle).toHaveAccessibleName(/^Full Screen/);
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
     fireEvent.click(toggle);
-    expect(await findByTestId('ovie-fullscreen')).toBeInTheDocument();
-    expect(await findByTestId('ovie-company-home')).toBeInTheDocument();
-    fireEvent.keyDown(globalThis, { key: 'Escape' });
-    await waitFor(() => expect(queryByTestId('ovie-fullscreen')).toBeNull());
-    expect(localStorage.getItem('ovie-home-fullscreen')).toBe('0');
+    expect(fullscreen.toggle).toHaveBeenCalledOnce();
+  });
+
+  it('on: scales the same Home inside the frame and offers a way out, no portal', async () => {
+    const fullscreen = fullscreenStub({ on: true });
+    const { container } = renderCanvas(undefined, fullscreen);
+    const frame = await screen.findByTestId('ovie-fullscreen');
+    expect(container.contains(frame)).toBe(true);
+    expect(within(frame).getByTestId('ovie-company-home')).toBeInTheDocument();
+    const exit = screen.getByTestId('ovie-fullscreen-toggle');
+    expect(exit).toHaveAccessibleName(/^Exit Full Screen/);
+    expect(exit).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('off: no frame', async () => {
+    renderCanvas();
+    await screen.findByTestId('ovie-company-home');
+    expect(screen.queryByTestId('ovie-fullscreen')).toBeNull();
   });
 });

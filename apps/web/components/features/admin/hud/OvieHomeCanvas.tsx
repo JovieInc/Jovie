@@ -36,7 +36,7 @@ import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 import { useOvieCompanyQueries } from './useOvieCompanyQueries';
 import { useOvieFeedStatus } from './useOvieFeedStatus';
-import { useOvieFullscreen } from './useOvieFullscreen';
+import type { OvieFullscreenState } from './useOvieFullscreen';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 import { useOvieLastLooked } from './useOvieLastLooked';
 
@@ -74,11 +74,18 @@ async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
 export interface OvieHomeCanvasProps {
   /** Shell chat state; absent when Home renders outside the composer slot. */
   readonly chat?: HomeCanvasState;
+  /**
+   * Full Screen state, owned above the canvas (the canvas unmounts when a
+   * conversation replaces the HUD; Full Screen must survive that).
+   */
+  readonly fullscreen: OvieFullscreenState;
 }
 
-export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
+export function OvieHomeCanvas({
+  chat,
+  fullscreen,
+}: Readonly<OvieHomeCanvasProps>) {
   const queryClient = useQueryClient();
-  const fullscreen = useOvieFullscreen();
   const shipping = useHudShippingStateQuery(null);
   const { metrics, funnel } = useOvieCompanyQueries();
   const inbox = useQuery<OvieInbox>({
@@ -386,14 +393,13 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   const content = (
     <div className='relative flex w-full flex-col gap-2 lg:h-full lg:min-h-0'>
       <OvieFeedBanner status={feedStatus} />
-      {fullscreen.on ? null : (
-        <div className='flex justify-end'>
-          <OvieFullscreenToggle
-            onToggle={fullscreen.toggle}
-            inDesktopApp={fullscreen.inDesktopApp}
-          />
-        </div>
-      )}
+      <div className='flex justify-end'>
+        <OvieFullscreenToggle
+          on={fullscreen.on}
+          onToggle={fullscreen.toggle}
+          inDesktopApp={fullscreen.inDesktopApp}
+        />
+      </div>
       {homeView}
     </div>
   );
