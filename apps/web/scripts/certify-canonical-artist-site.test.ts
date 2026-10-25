@@ -108,12 +108,19 @@ describe('canonical artist-site certification CLI adapter', () => {
     expect(JSON.parse(readFileSync(options.outputPath, 'utf8'))).toEqual(
       certificate
     );
+    // The Pro handoff text is derived from the canonical price, never $199.
+    const pro = certificate.checks.find(
+      check => check.id === 'pro_handoff_199'
+    );
+    expect(pro?.detail).toContain('$12 monthly Pro handoff');
+    expect(JSON.stringify(certificate)).not.toContain('$199');
+    expect(certificate.evidenceIntegrityFailures).toEqual([]);
   });
 
   it.each([
     ['Golden Path regression', { goldenPathStatus: 'failure' }],
     ['premade ownership regression', { claimContractStatus: 'failure' }],
-    ['live $199 regression', { m2Status: 'failure' }],
+    ['live Pro price regression', { m2Status: 'failure' }],
     ['deployed source mismatch', { sourceRevision: 'different-source' }],
   ])('writes RED for %s', (_name, override) => {
     const options = { ...fixture(), ...override };

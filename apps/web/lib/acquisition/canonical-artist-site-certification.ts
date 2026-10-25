@@ -1,4 +1,40 @@
+import { ARTIST_VISIBILITY_OFFER, toCents } from '@/lib/config/plan-prices';
+
 /** JOV-6572 fail-closed certification of the JOV-6571 first-cohort journey. */
+
+/**
+ * Price truth for the Pro handoff. The check id `pro_handoff_199` is a stable
+ * receipt key kept for continuity (the M2 canary step is likewise still named
+ * `pro_checkout_199`); the price itself is always derived from the canonical
+ * plan prices, never typed here.
+ */
+export const CANONICAL_PRO_MONTHLY_USD = ARTIST_VISIBILITY_OFFER.pro.monthlyUsd;
+export const CANONICAL_PRO_MONTHLY_CENTS = toCents(CANONICAL_PRO_MONTHLY_USD);
+const PRO_DISPLAY_NAME = ARTIST_VISIBILITY_OFFER.pro.displayName;
+
+/**
+ * Price claims in a text that contradict the canonical Pro price: dollar
+ * amounts ("$199"), cent amounts ("19900 cents") and "<plan name> <cents>"
+ * evidence tokens. $0 (free) is never a contradiction.
+ */
+export function priceClaimContradictions(text: string): string[] {
+  const found: string[] = [];
+  for (const match of text.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/g)) {
+    const usd = Number(match[1]?.replace(/,/g, ''));
+    if (usd !== 0 && usd !== CANONICAL_PRO_MONTHLY_USD)
+      found.push(`$${match[1]}`);
+  }
+  for (const match of text.matchAll(/\b(\d{3,6})\s*cents?\b/gi)) {
+    if (Number(match[1]) !== CANONICAL_PRO_MONTHLY_CENTS)
+      found.push(`${match[1]} cents`);
+  }
+  const named = new RegExp(`${PRO_DISPLAY_NAME}\\s+(\\d{3,6})\\b`, 'g');
+  for (const match of text.matchAll(named)) {
+    if (Number(match[1]) !== CANONICAL_PRO_MONTHLY_CENTS)
+      found.push(`${PRO_DISPLAY_NAME} ${match[1]}`);
+  }
+  return found;
+}
 
 export const CANONICAL_ARTIST_SITE_CERTIFICATION_CONTRACT =
   'jovie.canonical-artist-site-certification/v1' as const;
@@ -53,7 +89,7 @@ claim_auth_intent state_transitions Claim candidate intent survives the auth bou
 ownership_existing_profile identity Claim attaches to the premade profile without duplication or data loss.
 refresh_back_retry state_transitions Refresh, back, retry, and failed claim states remain recoverable.
 free_state_value revenue Free keeps a durable profile and useful audience capture.
-pro_handoff_199 revenue Eligible artists see a truthful, non-coercive $199/mo handoff.
+pro_handoff_199 revenue Eligible artists see a truthful, non-coercive $${CANONICAL_PRO_MONTHLY_USD}/mo handoff.
 payment_entitlement revenue Checkout, verified entitlement, cancel, and failure states agree.
 immediate_value revenue Claim and verified payment each land in an honest next-value state.
 `.trim();
@@ -164,6 +200,15 @@ export function evaluateCanonicalArtistSiteCertification(
     matches.push(receipt);
     byCheck.set(receipt.checkId, matches);
     integrityFailures.push(...receiptEnvelopeFailures(receipt, input));
+    // A certificate must not contradict its own receipts: any price named in a
+    // receipt's detail or evidence has to be the canonical Pro price.
+    const contradictions = priceClaimContradictions(
+      [receipt.detail, ...receipt.evidence].join('\n')
+    );
+    if (contradictions.length > 0)
+      integrityFailures.push(
+        `${receipt.checkId}: price claim ${[...new Set(contradictions)].join(', ')} contradicts the canonical $${CANONICAL_PRO_MONTHLY_USD}/mo (${CANONICAL_PRO_MONTHLY_CENTS} cents) offer price`
+      );
   }
 
   const promiseDependencies = new Set(input.cohortPromiseDependencies ?? []);
