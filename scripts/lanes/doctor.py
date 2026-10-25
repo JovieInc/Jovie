@@ -1770,6 +1770,14 @@ def public_status_projection(feed: dict, full_text: str) -> str:
                     "recordCount": len(rows),
                     "jsonPointer": f"/shippingAttribution/projects/{index}/pullRequests",
                 }
+    # fileOverlap.pairs grew to ~150 KB (hundreds of active PR pairs) and pushed the
+    # essential feed over the gist cap, which blanked every Ovie lanes read
+    # (2026-10-25). Admission reads runtime state, not this feed; keep mode and
+    # metrics, and point at the full list instead of pretending it is empty.
+    overlap = public.get("fileOverlap")
+    if isinstance(overlap, dict) and isinstance(overlap.get("pairs"), list):
+        rows = overlap.pop("pairs")
+        overlap["pairsRef"] = {"recordCount": len(rows), "jsonPointer": "/fileOverlap/pairs"}
     public["publicProjection"] = {
         "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
     }
