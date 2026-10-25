@@ -67,18 +67,29 @@ export function collectStrings(value: unknown): string[] {
 /**
  * A copy string resolves when it equals, or quotes, a registry claim
  * statement. Short statements (under 8 characters, e.g. "$0") only resolve
- * on exact match so they cannot bless unrelated sentences.
+ * on exact match so they cannot bless unrelated sentences. Matching one
+ * statement never covers a separate metric or comparison in the same string.
+ * This is lexical coverage; semantic review still checks entailment and scope.
  */
 export function resolvesToClaim(
   text: string,
   claims: readonly Claim[]
 ): boolean {
   const normalized = normalizeClaimText(text);
-  return claims.some(claim => {
-    const statement = normalizeClaimText(claim.statement);
-    if (statement === normalized) return true;
-    return statement.length >= 8 && normalized.includes(statement);
-  });
+  const statements = claims.map(claim => normalizeClaimText(claim.statement));
+  if (statements.includes(normalized)) return true;
+  let uncovered = normalized;
+  let matched = false;
+  // Longest first prevents a shorter approved phrase from fragmenting a
+  // longer one. Multiple independently registered statements remain valid.
+  for (const statement of statements.toSorted((a, b) => b.length - a.length)) {
+    if (statement.length < 8 || !uncovered.includes(statement)) continue;
+    uncovered = uncovered.replaceAll(statement, ' ');
+    matched = true;
+  }
+  // Do not apply HAS_LETTER here: an uncovered "$50" is still unsupported,
+  // even when the surrounding words belonged to the approved statement.
+  return matched && !CLAIM_SIGNALS.some(signal => signal.test(uncovered));
 }
 
 export function auditCopyClaims(

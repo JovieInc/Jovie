@@ -93,6 +93,15 @@ class HyperagentLaneTest(unittest.TestCase):
         self.assertEqual(len(self.gates), 1)
         self.assertEqual(sum(n == "create_thread" for n, _ in self.calls), 1)
 
+    def test_awaiting_approval_is_recorded_once_without_resolving(self):
+        self.payload["awaitingApproval"] = True
+        self.run_remote(); self.run_remote()
+        journal = self.path.parent / "hyperagent-approvals.jsonl"
+        rows = [json.loads(l) for l in journal.read_text().splitlines()]
+        self.assertEqual(len(rows), 1); self.assertEqual(rows[0]["state"], "awaiting-approval")
+        self.assertEqual(rows[0]["threadId"], "thread-1")
+        self.assertFalse(any(n == "resolve_approval" for n, _ in self.calls))
+
     def test_restart_resumes_known_thread_without_send_or_create(self):
         self.payload["awaitingApproval"] = True
         self.assertEqual(self.run_remote()["reasons"], ["remote-approval-required"])
