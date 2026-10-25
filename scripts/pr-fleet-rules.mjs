@@ -154,8 +154,10 @@ export function onlyWeakensAssertions(files) {
 // No-executable-behavior exemption for Red-before-green. The file list is verified here, never trusted from the body:
 // every changed path must be documentation or inert data by extension AND location, so one code, test, workflow or
 // script file anywhere in the diff voids it.
-const INERT_EXTENSION = /\.(?:md|mdx|txt|json|jsonl)$/;
-const INERT_LOCATION = /^(?:docs\/|canon\/|config\/registry\/)/;
+// Data files (json/jsonl) are never inert: canon/automation-registry.jsonl, config/registry/ and docs/metrics/*.json are
+// read by liveness, spend and doctor checks at runtime, so a change to them is executable behavior.
+const INERT_EXTENSION = /\.(?:md|mdx|txt)$/;
+const INERT_LOCATION = /^docs\//;
 export const isInertPath = path =>
   (INERT_LOCATION.test(path) && INERT_EXTENSION.test(path)) ||
   (/^[^/]+\.md$/.test(path) && !/^(?:AGENTS|CLAUDE)\.md$/.test(path));
