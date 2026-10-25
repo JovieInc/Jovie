@@ -53,7 +53,8 @@ MOVE_MUTATION = ('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{sta
                  + ROW + '}}}')
 COMMENT_MUTATION = 'mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}'
 RANK_MUTATION = ('mutation($id:String!,$o:Float!){issueUpdate(id:$id,input:{sortOrder:$o}){success issue{id sortOrder}}}')
-LABELS_QUERY = ('query($id:String!){issue(id:$id){labels(first:50){nodes{id name}} team{labels(first:250){nodes{id name}}}}}')
+LABELS_QUERY = ('query($id:String!){issue(id:$id){labels(first:50){nodes{id name}} team{key}}}')
+LABEL_LOOKUP = ('query($n:String!){issueLabels(first:20,filter:{name:{eq:$n}}){nodes{id name team{key}}}}')
 LABEL_MUTATION = ('mutation($id:String!,$l:[String!]!){issueUpdate(id:$id,input:{labelIds:$l}){success issue{id}}}')
 BACKLOG_ORDER_QUERY = ('query($team:String!,$after:String){issues(first:100,after:$after,filter:{team:{key:{eq:$team}},'
                        'state:{type:{eq:"backlog"}}}){pageInfo{hasNextPage endCursor} nodes{id identifier sortOrder}}}')
@@ -390,8 +391,11 @@ def _deliver_label(state: Path, linear, entry: dict) -> str:
     if not isinstance(issue, dict):
         return "remote-missing"
     have = {node["id"] for node in (issue.get("labels") or {}).get("nodes") or []}
-    wanted = next((node["id"] for node in ((issue.get("team") or {}).get("labels") or {}).get("nodes") or []
-                   if node.get("name") == entry["body"]), None)
+    # A label is team-scoped or workspace-wide (team null); the issue's own team wins over a workspace label.
+    nodes = ((linear.gql(LABEL_LOOKUP, {"n": entry["body"]}) or {}).get("issueLabels") or {}).get("nodes") or []
+    team = (issue.get("team") or {}).get("key")
+    wanted = next((n["id"] for n in nodes if (n.get("team") or {}).get("key") == team),
+                  next((n["id"] for n in nodes if not n.get("team")), None))
     if not wanted:
         raise ValueError(f"no label {entry['body']}")
     if wanted in have:
