@@ -6603,6 +6603,16 @@ jobs:
             node .github/scripts/guard-playwright-artifacts.mjs --run -- \
             pnpm --filter @jovie/web exec playwright test \
             --config=playwright.config.journey.ts --project=chromium
+      - name: Upload journey failure evidence
+        if: ${{ failure() && hashFiles('apps/web/test-results/**') != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: blocking-journey-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/
+          if-no-files-found: error
+          retention-days: 7
+          allow-markdown: 'true'
       - name: Delete isolated journey branch
         if: ${{ always() && steps.journey-db.outputs.branch_id != '' }}
         env:
