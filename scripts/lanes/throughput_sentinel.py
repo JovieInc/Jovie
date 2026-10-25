@@ -10,6 +10,8 @@ Alarms (each names its stage and carries its evidence):
   throughput-merge-group-start-slow  merge-group runs wait > 5 min (p50) for a runner
   throughput-prod-lease-held         a Production Controller run holds the lease > 45 min
   throughput-idle-dominant           one idle/hold reason is > 50% of the last hour's exits
+  throughput-no-merge:<repo>         other repos (LogYourBody): a clean ready PR waits > 60 min and nothing merged in 60 min
+  throughput-pr-stuck:<repo>         other repos: an open non-draft PR has been conflicted/blocked > 24h
   growth-bound:<id>                  a size/count limit that scales with backlog passed 70%
 Production-not-reached-in-90-min is the existing production-continuity freshness incident
 (.github/scripts/production-continuity.mjs, threshold lowered to 90 min).
@@ -39,6 +41,11 @@ RELEASE_FLOW_REFRESH_S = 300
 MERGE_GROUP_SAMPLE_RUNS = 3
 PUSH_VERDICTS = frozenset({"pr-opened", "pushed", "fix-pushed", "landing", "verified-not-queued", "decomposed"})
 REPO = "JovieInc/Jovie"
+# Repos the lanes do not claim work in; their demand and merge signals come from GitHub alone.
+WATCHED_REPOS = ("JovieInc/LogYourBody",)
+REPO_REFRESH_S = 300
+CLEAN_WAIT_S = 3600
+PR_STUCK_S = 24 * 3600
 CONTROLLER_WORKFLOW = "production-controller.yml"
 MIB = 1024 * 1024
 
@@ -147,6 +154,41 @@ def sample_release_flow(state: Path, now: float, run=subprocess.run, repo: str =
         return (cached or None), f"{type(error).__name__}: {error}"[:200]
 
 
+def sample_repo_flow(state: Path, repo: str, now: float, run=subprocess.run) -> tuple[dict | None, str | None]:
+    """Open-PR and recent-merge signals for a repo without lane demand (two `gh pr list` reads per 5 min)."""
+    path = Path(state) / f"repo-flow-{repo.rsplit('/', 1)[-1].lower()}.json"
+    try:
+        cached = json.loads(path.read_text())
+    except (OSError, ValueError):
+        cached = {}
+    if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < REPO_REFRESH_S:
+        return cached, None
+
+    def gh(*args):
+        result = run(["gh", *args], capture_output=True, text=True, timeout=60)
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+        return json.loads(result.stdout)
+
+    try:
+        opened = gh("pr", "list", "-R", repo, "--state", "open", "-L", "100", "--json",
+                    "number,isDraft,createdAt,updatedAt,mergeStateStatus,author")
+        merged = gh("pr", "list", "-R", repo, "--state", "merged", "-L", "30", "--json", "number,mergedAt")
+        merged_at = sorted(t for t in (_iso_epoch(row.get("mergedAt")) for row in merged) if t is not None)
+        signal = {"schema": "symphony-repo-flow/v1", "observedAt": now, "repo": repo,
+                  "openPrs": [{"number": row["number"], "draft": bool(row.get("isDraft")),
+                               "state": row.get("mergeStateStatus"), "author": (row.get("author") or {}).get("login"),
+                               "updatedAt": _iso_epoch(row.get("updatedAt"))} for row in opened][:100],
+                  "merged1h": sum(1 for t in merged_at if 0 <= now - t <= 3600),
+                  "lastMergedAt": merged_at[-1] if merged_at else None}
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached or None), f"{type(error).__name__}: {error}"[:200]
+
+
 def growth_bounds(state: Path, limits: dict) -> list[dict]:
     """Backlog-scaled limits with current headroom. `limits` carries values owned by their readers
     (so a reader changing its cap cannot drift from this list): inventoryBytes, worktreeScan."""
@@ -201,11 +243,17 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=sub
             fetch_remote: bool = True) -> dict:
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
     exits = read_idle_exits(state, now)
+    repos, repo_errors = {}, {}
+    for watched in (WATCHED_REPOS if fetch_remote else ()):
+        flow_row, flow_err = sample_repo_flow(state, watched, now, run)
+        repos[watched] = flow_row
+        if flow_err:
+            repo_errors[watched] = flow_err
     return {"pushes1h": pushes_by_lane(receipts, now),
             "idleExits1h": dict(Counter(row["reason"] for row in exits)),
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
-            "releaseFlow": flow, "releaseFlowError": flow_error,
+            "releaseFlow": flow, "releaseFlowError": flow_error, "repos": repos, "repoErrors": repo_errors,
             "growth": growth_bounds(state, limits)}
 
 
@@ -255,6 +303,24 @@ def judge(obs: dict) -> dict[str, str]:
             f"stage deploy: a Production Controller run has held the production lease {flow['leaseHeldMin']} min "
             f"(> {LEASE_HELD_MIN:g}; plain release is ~22 min); runs "
             f"{', '.join(str(i) for i in flow.get('leaseRunIds') or [])}")
+    # 4b. Repos without lane demand: a clean PR that nothing merges, and PRs stuck open.
+    for repo, flow_row in sorted((sentinel.get("repos") or {}).items()):
+        if not flow_row or obs["now"] - float(flow_row.get("observedAt") or 0) > 1800:
+            continue
+        prs = [pr for pr in flow_row.get("openPrs") or [] if not pr.get("draft")]
+        clean = [pr for pr in prs if pr.get("state") == "CLEAN"
+                 and obs["now"] - float(pr.get("updatedAt") or obs["now"]) > CLEAN_WAIT_S]
+        if clean and not flow_row.get("merged1h"):
+            alerts[f"throughput-no-merge:{repo}"] = (
+                f"stage ready->merged ({repo}): {len(clean)} clean non-draft PR(s) "
+                f"({', '.join('#' + str(pr['number']) for pr in clean[:5])}) idle > 60 min and zero merges in the last 60 min; "
+                "check the repo's merge queue enrollment and required checks")
+        stuck = [pr for pr in prs if pr.get("state") in ("DIRTY", "BEHIND", "BLOCKED", "UNKNOWN", "UNSTABLE")
+                 and obs["now"] - float(pr.get("updatedAt") or obs["now"]) > PR_STUCK_S]
+        if stuck:
+            alerts[f"throughput-pr-stuck:{repo}"] = (
+                f"stage pr-open->ready ({repo}): {len(stuck)} non-draft PR(s) untouched > 24h and not mergeable: "
+                + ", ".join(f"#{pr['number']} {pr['state']} by {pr.get('author') or 'unknown'}" for pr in stuck[:5]))
     # 5. One idle reason dominating the hour while there is demand.
     exits = sentinel.get("idleExits1h") or {}
     total = sum(exits.values())

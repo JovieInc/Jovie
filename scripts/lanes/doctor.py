@@ -1733,7 +1733,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "shippingAttribution": attribution,
             "sentinel": {key: (obs.get("sentinel") or {}).get(key) for key in
-                         ("pushes1h", "idleExits1h", "releaseFlow", "growth")},
+                         ("pushes1h", "idleExits1h", "releaseFlow", "growth", "repos")},
             "mergeThroughput": obs.get("mergeThroughput"),
             "mergeThroughputError": obs.get("mergeThroughputError"),
             "mergedWindow": obs.get("mergedWindow"),

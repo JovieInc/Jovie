@@ -145,6 +145,50 @@ class ThroughputSentinelTest(unittest.TestCase):
             self.assertIn("boom", error)
 
 
+class RepoFlowTest(unittest.TestCase):
+    def flow(self, prs, merged1h=0):
+        return {"observedAt": NOW - 60, "openPrs": prs, "merged1h": merged1h}
+
+    def test_clean_pr_with_no_merges_and_stale_conflicts_alarm_per_repo(self):
+        repo = "JovieInc/LogYourBody"
+        old = NOW - 90 * 60
+        clean = {"number": 1, "draft": False, "state": "CLEAN", "author": "a", "updatedAt": old}
+        dirty = {"number": 2, "draft": False, "state": "DIRTY", "author": "app/dependabot", "updatedAt": NOW - 5 * 86400}
+        alerts = ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, repos={repo: self.flow([clean, dirty])}))
+        self.assertIn("#1", alerts[f"throughput-no-merge:{repo}"])
+        self.assertIn("#2 DIRTY by app/dependabot", alerts[f"throughput-pr-stuck:{repo}"])
+        merged = ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, repos={repo: self.flow([clean], merged1h=1)}))
+        self.assertNotIn(f"throughput-no-merge:{repo}", merged)
+        fresh = dict(clean, updatedAt=NOW - 600)
+        self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, repos={repo: self.flow([fresh])})), {})
+        draft = dict(dirty, draft=True)
+        self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, repos={repo: self.flow([draft])})), {})
+        stale = {"observedAt": NOW - 7200, "openPrs": [clean, dirty], "merged1h": 0}
+        self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, repos={repo: stale})), {})
+
+    def test_sampler_reads_two_lists_and_caches(self):
+        calls = []
+
+        def run(args, **kw):
+            calls.append(args)
+            if "open" in args:
+                rows = [{"number": 7, "isDraft": False, "createdAt": iso(NOW - 9), "updatedAt": iso(NOW - 4000),
+                         "mergeStateStatus": "CLEAN", "author": {"login": "tim"}}]
+            else:
+                rows = [{"number": 6, "mergedAt": iso(NOW - 600)}, {"number": 5, "mergedAt": iso(NOW - 9000)}]
+            return SimpleNamespace(returncode=0, stdout=json.dumps(rows), stderr="")
+
+        with tempfile.TemporaryDirectory() as raw:
+            signal, error = ts.sample_repo_flow(Path(raw), "JovieInc/LogYourBody", NOW, run)
+            self.assertIsNone(error)
+            self.assertEqual((signal["merged1h"], signal["openPrs"][0]["state"], len(calls)), (1, "CLEAN", 2))
+            ts.sample_repo_flow(Path(raw), "JovieInc/LogYourBody", NOW + 5, run)
+            self.assertEqual(len(calls), 2)
+            bad = lambda args, **kw: SimpleNamespace(returncode=1, stdout="", stderr="HTTP 502")
+            _, error = ts.sample_repo_flow(Path(raw), "JovieInc/LogYourBody", NOW + 9999, bad)
+            self.assertIn("502", error)
+
+
 class mock_max:
     def __init__(self, module, value):
         self.module, self.value = module, value
