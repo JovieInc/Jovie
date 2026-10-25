@@ -242,6 +242,8 @@ function priceView(plan, now) {
     promoUntil: plan.promoUntil ?? null,
     promoDaysLeft:
       promoUntil === null ? null : Math.max(0, (promoUntil - now) / DAY_MS),
+    billing: plan.billing ?? 'monthly',
+    usdYearly: isNumber(plan.usdYearly) ? plan.usdYearly : null,
     source: plan.source,
     asOf: plan.asOf,
   };
@@ -314,6 +316,18 @@ export function evaluateRegistry(
     const states = accounts
       .flatMap(a => [a.quota?.freshness, a.credits?.freshness])
       .filter(Boolean);
+    // A quota-bearing provider with an active account and no reading at all is unread, not fresh.
+    if (
+      ['capped-quota', 'subscription-pool', 'credits'].includes(
+        provider.usageModel
+      ) &&
+      provider.policy.id !== 'unavailable'
+    ) {
+      for (const a of accounts) {
+        if (a.status === 'active' && !a.quota && !a.credits)
+          states.push('unknown');
+      }
+    }
     return {
       id: provider.id,
       label: provider.label,
@@ -324,6 +338,7 @@ export function evaluateRegistry(
       policy: { ...registry.policies[provider.policy.id], ...provider.policy },
       limits: provider.limits ?? {},
       decision: provider.decision ?? null,
+      metrics: live.metrics?.providers?.[provider.id] ?? null,
       accounts,
       joinedSpend: joined.map(p => ({
         id: p.id,
@@ -339,14 +354,23 @@ export function evaluateRegistry(
           : 'fresh',
     };
   });
-  return {
+  const view = {
     generatedAt: new Date(now).toISOString(),
     providers,
     totals: {
       monthlyUsd: providers.reduce((s, p) => s + p.monthlyUsd, 0),
       stale: providers.filter(p => p.freshness !== 'fresh').map(p => p.id),
     },
+    metricsMeta: live.metrics
+      ? {
+          windowDays: live.metrics.windowDays ?? null,
+          mergedInWindow: live.metrics.mergedInWindow ?? null,
+          readAt: live.metrics.readAt ?? null,
+          incomplete: live.metrics.incomplete ?? null,
+        }
+      : null,
   };
+  return { ...view, alerts: capacityAlerts(view) };
 }
 
 /**
@@ -429,4 +453,54 @@ export function renderCanon(view, registry) {
     ''
   );
   return lines.join('\n');
+}
+
+/**
+ * Alerts that need a human or a router. A credits burn above the pace that lasts to expiry is an
+ * alarm only while cheaper use-or-lose capacity (a capped or pooled quota) is still under pace:
+ * then the credits are paying for work the quota should have taken. When that capacity is at or
+ * ahead of pace the burn is the right allocation and is judged on cost per merge instead (info).
+ */
+export function capacityAlerts(view) {
+  const alerts = [];
+  const spare = view.providers.filter(
+    p =>
+      ['capped-quota', 'subscription-pool'].includes(p.usageModel) &&
+      p.policy.id !== 'unavailable' &&
+      p.accounts.some(
+        a =>
+          a.status === 'active' &&
+          a.quota?.verdict === 'under-burning' &&
+          a.quota.freshness === 'fresh'
+      )
+  );
+  for (const provider of view.providers) {
+    for (const account of provider.accounts) {
+      const credits = account.credits;
+      if (
+        account.status !== 'active' ||
+        credits?.verdict !== 'exhausts-before-expiry'
+      )
+        continue;
+      const burn = credits.burnPerDayUsd;
+      const need = credits.requiredPerDayUsd;
+      const detail = `${provider.label} burns ${usd(burn)}/day against ${usd(need)}/day that lasts to expiry`;
+      alerts.push(
+        spare.length > 0
+          ? {
+              id: `credits-before-cheaper-capacity:${provider.id}`,
+              severity: 'alarm',
+              provider: provider.id,
+              message: `${detail}, while ${spare.map(p => p.label).join(', ')} ${spare.length === 1 ? 'is' : 'are'} under pace: route work there first.`,
+            }
+          : {
+              id: `credits-burn-justified:${provider.id}`,
+              severity: 'info',
+              provider: provider.id,
+              message: `${detail}. Cheaper quota is at or ahead of pace, so judge the burn on cost per merge.`,
+            }
+      );
+    }
+  }
+  return alerts;
 }

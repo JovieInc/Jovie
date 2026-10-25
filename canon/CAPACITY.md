@@ -37,8 +37,8 @@ Plan spend at the snapshot: $715.67/mo across active accounts.
 1. instinct
 2. dots
 3. xai-grok
-4. anthropic-claude
-5. openai-codex
+4. openai-codex
+5. anthropic-claude
 6. muse
 7. cloudflare-credits
 8. hyperagent
