@@ -43,6 +43,8 @@ from atomic_state import atomic_write_text  # noqa: E402
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
+import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
+import throughput_sentinel  # noqa: E402  (no-progress alarms, idle-reason counts, growth bounds)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -62,6 +64,8 @@ FAILED_RUN_ALERT = 10
 # JOV-8931: a relayed red check must be claimed within this window of red_at.
 RED_DISPATCH_CLAIM_GRACE_S = 180
 RED_DISPATCH_LEDGER_LIMIT = 1024 * 1024
+# The doctor judges 24h of receipts; ~8 days of the ledger at 2026-10-24 volume.
+LEDGER_TAIL_BYTES = 16 * 1024 * 1024
 # Repairs that ended before any agent work: each still spends one of the PR's bounded fix
 # attempts (no refunds, by design), so a run of them exhausts PRs on infrastructure alone.
 NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable", "skipped"})
@@ -204,6 +208,8 @@ def _linear_app_credential(lane) -> bool | None:
 # Reading a path that is not on main must alert, never read as "nothing silent" (2026-10-21:
 # the doctor watched ops/automation/registry.jsonl, which never existed, so no row was checked).
 AUTOMATION_REGISTRY = "canon/automation-registry.jsonl"
+OUTCOME_OWED_MAX_S = 24 * 3600
+OUTCOME_QUEUE_SILENT_S = 2 * 3600
 AUTOMATION_LIVENESS_WORKFLOW = "automation-liveness.yml"
 AUTOMATION_LIVENESS_MAX_S = 60 * 60
 AUTOMATION_LIVENESS_TTL_S = 600
@@ -371,7 +377,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     now = sample_clock()
     state = host.state
     tick = read_json(state / "tick.json", {})
-    ledger_evidence = shipping_attribution.read_ledger(state / "runs" / "ledger.jsonl")
+    ledger_evidence = shipping_attribution.read_ledger(state / "runs" / "ledger.jsonl", tail_bytes=LEDGER_TAIL_BYTES)
     ledger_evidence["remoteIngest"] = tick.get("shippingOriginIngest")
     all_receipts = ledger_evidence["rows"]
     receipts = [receipt for receipt in all_receipts
@@ -508,6 +514,11 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "designGate": design_census,
         "fileOverlap": file_overlap.doctor_view(state),
         **automation_observation(host, lane, now),
+        "outcomeQueue": read_json(state / "outcome-queue.json", {}),
+        "sentinel": throughput_sentinel.observe(
+            state, now, receipts,
+            {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
+            fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
         "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
@@ -962,6 +973,25 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         alerts["automation-registry-unreadable"] = (
             f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
             "no Gem host-local automation receipt is being watched")
+    alerts.update(throughput_sentinel.judge(obs))
+    # Closed loop, last hop: Validating issues owing an `outcome` receipt wait on the outcome
+    # lane. Its daily budget exhausted (or the drain gone silent) with owed receipts older than
+    # OUTCOME_OWED_MAX_S used to stall in silence for the rest of the UTC day.
+    queue = obs.get("outcomeQueue") or {}
+    if queue.get("queued"):
+        oldest = _iso_epoch(queue.get("oldestOwedAt"))
+        refreshed = queue.get("at") if isinstance(queue.get("at"), (int, float)) else None
+        owed_age = None if oldest is None else obs["now"] - oldest
+        silent = refreshed is None or obs["now"] - refreshed > OUTCOME_QUEUE_SILENT_S
+        if owed_age is not None and owed_age > OUTCOME_OWED_MAX_S and (
+                queue.get("status") == "budget-exhausted" or silent):
+            cause = (f"daily budget exhausted ({queue.get('spentToday')}/{queue.get('perDay')}; LANES_OUTCOME_PER_DAY)"
+                     if queue.get("status") == "budget-exhausted" and not silent else
+                     "outcome drain has not run for "
+                     + ("ever" if refreshed is None else f"{round((obs['now'] - refreshed) / 60)} min"))
+            alerts["outcome-lane-stalled"] = (
+                f"{queue['queued']} Validating issue(s) owe an outcome receipt, oldest {round(owed_age / 3600)}h; {cause}; "
+                "owner gem-lanes (scripts/lanes/outcome_lane.py)")
     liveness = obs.get("automationLiveness") or {}
     if liveness.get("installed"):
         last = _iso_epoch(liveness.get("lastRunAt"))
@@ -1727,6 +1757,8 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "held_by_reason": obs.get("heldByReason") or {}, "failed_by_reason": obs.get("failedByReason") or {},
             "throughput": throughput, "throughputError": obs.get("mergedAttributionError"),
             "shippingAttribution": attribution,
+            "sentinel": {key: (obs.get("sentinel") or {}).get(key) for key in
+                         ("pushes1h", "idleExits1h", "releaseFlow", "growth", "repos")},
             "mergeThroughput": obs.get("mergeThroughput"),
             "mergeThroughputError": obs.get("mergeThroughputError"),
             "mergedWindow": obs.get("mergedWindow"),
@@ -1956,7 +1988,14 @@ def locked_doctor_write(state: Path, write) -> None:
 def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
     path = host.state / "doctor.json"
     previous = read_json(path, {})
+    rotation = None
+    if not os.environ.get("LANES_SELFTEST") and ledger_archive.due(host.state, time.time()):
+        try:
+            rotation = ledger_archive.rotate(host.state)
+        except (OSError, ValueError) as error:  # the ledger stays as it was; the growth-bound alarm keeps firing
+            rotation = {"status": "error", "error": f"{type(error).__name__}: {error}"[:160]}
     obs = observe(host, lane, codex)
+    obs["ledgerRotation"] = rotation
     # remember when the pool first went empty so the alert needs 30 sustained minutes
     if new_work_empty(obs):
         previous["poolEmptySince"] = previous.get("poolEmptySince") or obs["now"]

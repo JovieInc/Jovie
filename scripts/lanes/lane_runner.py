@@ -73,6 +73,7 @@ import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import outcome_lane  # noqa: E402
+import throughput_sentinel  # noqa: E402
 import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
@@ -7605,6 +7606,42 @@ def repair_inventory_valid(receipt: dict, name: str) -> bool:
             and 0 <= time.time() - stamp < CLAIM_SCAN_TTL_S)
 
 
+def repair_inventory_cause(receipt: dict, name: str, now: float | None = None) -> str | None:
+    """The first reason `repair_inventory_valid` rejects a receipt, or None when it is valid.
+
+    Idle exits used to record one generic `repair-inventory-unknown-or-stale` for every one of
+    these, so a throughput stall could not be attributed (2026-10-24: oversize looked like stale)."""
+    if not isinstance(receipt, dict) or not isinstance(receipt.get("summary"), dict):
+        return "receipt-missing"
+    summary = receipt["summary"]
+    now = time.time() if now is None else now
+    stamp = summary.get("sourceAt")
+    if receipt.get("repository") != REPO_SLUG:
+        return "wrong-repository"
+    if receipt.get("provider") != name:
+        return "wrong-provider"
+    if receipt.get("cacheKey") != "open-prs-labels-v2":
+        return "wrong-cache-key"
+    if receipt.get("cacheRoot") != str(SHARED_CACHE_DIR):
+        return "wrong-cache-root"
+    if receipt.get("sameCallRows") is not True or not isinstance(receipt.get("prs"), list):
+        return "rows-not-same-call"
+    if receipt["prs"] != summary.get("prs"):
+        return "rows-diverged"
+    if summary.get("readable") is not True:
+        return "github-unreadable"
+    if not all(isinstance(pr, dict) and pr.get("labelsComplete") is True for pr in receipt["prs"]):
+        return "labels-incomplete"
+    if type(stamp) not in (int, float) or not math.isfinite(stamp):
+        reason = summary.get("sourceAtReason")
+        return str(reason) if isinstance(reason, str) and reason else "source-unstamped"
+    if now - stamp < 0:
+        return "source-clock-skew"
+    if now - stamp >= CLAIM_SCAN_TTL_S:
+        return "source-stale"
+    return None
+
+
 def overlap_prs_summary() -> list[dict] | None:
     """Cached PR overlap inventory, preserving unreadable rather than certifying empty."""
     prs = open_prs_summary()
@@ -8164,6 +8201,7 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
             os.replace(temporary, path)
         finally:
             temporary.unlink(missing_ok=True)
+        throughput_sentinel.append_idle_exit(host.state, REPO_SLUG, name, reason)
     except (OSError, ValueError):
         pass
     finally:
@@ -8692,7 +8730,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                   f"{REPAIR_INVENTORY_MAX_BYTES} byte limit", file=sys.stderr)
             record_idle_exit(host, name, "repair-inventory-oversize")
         else:
-            record_idle_exit(host, name, "repair-inventory-unknown-or-stale")
+            record_idle_exit(host, name, "repair-inventory-" + (repair_inventory_cause(repair_inventory, name)
+                                                                or "valid-at-recheck"))
         slot.release()
         return 0
     # Every local pass, including one that just claimed a repair. An idle-only sync
