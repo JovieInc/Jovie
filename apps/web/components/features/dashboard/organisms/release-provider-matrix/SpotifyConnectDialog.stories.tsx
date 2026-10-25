@@ -60,7 +60,7 @@ const respondWithResults: SearchResponder = () =>
   jsonResponse([...SEARCH_RESULTS]);
 const respondEmpty: SearchResponder = () => jsonResponse([]);
 const respondUnavailable: SearchResponder = () =>
-  jsonResponse({ error: "Couldn't reach Spotify. Try again." }, 503);
+  jsonResponse({ error: 'Spotify search is unavailable' }, 404);
 const respondForeverPending: SearchResponder = () =>
   new Promise<Response>(() => {});
 

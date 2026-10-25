@@ -539,15 +539,16 @@ export function SpotifyConnectDialog({
     return '';
   }, [isSearchMode, results.length, searchError, searchState, selectedArtist]);
 
-  const primaryLabel = succeeded
-    ? 'Done'
-    : isOffline
-      ? "You're offline"
-      : selectedArtist
-        ? `Connect ${selectedArtist.name}`
-        : 'Connect';
+  const primaryLabel =
+    succeeded || !isSearchMode
+      ? 'Done'
+      : isOffline
+        ? "You're offline"
+        : selectedArtist
+          ? `Connect ${selectedArtist.name}`
+          : 'Connect';
   const primaryDisabled =
-    isOffline || (!succeeded && !selectedArtist && !isPending);
+    isOffline || (isSearchMode && !succeeded && !selectedArtist);
   const escapeHatchFocus = () => inputRef.current?.focus();
   const showEscapeHatch =
     !selectedArtist &&
