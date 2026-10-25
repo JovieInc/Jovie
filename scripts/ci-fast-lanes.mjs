@@ -506,6 +506,7 @@ const structuralPythonRegression = body =>
 
 /** Files of the structural pytest suite (one collection, sharded below). */
 export const STRUCTURAL_PYTEST_FILES = Object.freeze([
+  'scripts/prod-errors/test_prod_errors.py',
   'scripts/tests/test_gh_retry.py',
   'scripts/tests/test_vercel_prebuilt_deploy.py',
   'scripts/tests/test_brand_scrub.py',
