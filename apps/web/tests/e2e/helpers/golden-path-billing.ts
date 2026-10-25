@@ -34,6 +34,15 @@ export interface GoldenPathBillingContext {
   readonly databaseUrl: string;
   readonly email: string;
   readonly handle: string;
+  /**
+   * Runs while this identity is Pro, a stripe customer exists and its
+   * sessions are still valid: the point where a second identity could
+   * observe or alter the first one's entitlement.
+   */
+  readonly isolationProbe?: (state: {
+    readonly stripeCustomerId: string;
+    readonly stripeSubscriptionId: string;
+  }) => Promise<void>;
   readonly page: Page;
   readonly profileId: string;
   readonly spotifyArtistId: string;
@@ -49,6 +58,7 @@ export async function completeGoldenPathBillingJourney({
   databaseUrl,
   email,
   handle,
+  isolationProbe,
   page,
   profileId,
   spotifyArtistId,
@@ -385,6 +395,13 @@ export async function completeGoldenPathBillingJourney({
       stripeSubscriptionId: completed.subscriptionId,
     });
     await expectJourneyContext();
+
+    if (isolationProbe) {
+      await isolationProbe({
+        stripeCustomerId: customerId as string,
+        stripeSubscriptionId: completed.subscriptionId as string,
+      });
+    }
 
     const portalCreatedAfter = Math.floor(Date.now() / 1000) - 60;
     const portalResponse =

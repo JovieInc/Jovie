@@ -756,6 +756,141 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Records an operator approval for a fresh golden-path user as the admin
+ * approval path does: an approved waitlist entry linked to the user plus an
+ * `admin` audit row. Without it a claim is private until proof, which is the
+ * product contract this fixture must not paper over.
+ */
+async function recordOperatorApproval(
+  sql: ReturnType<typeof neon>,
+  betterAuthUserId: string,
+  email: string
+) {
+  const [user] = (await sql`
+    SELECT id, waitlist_entry_id AS "waitlistEntryId"
+    FROM users
+    WHERE better_auth_user_id = ${betterAuthUserId}
+  `) as unknown as { id: string; waitlistEntryId: string | null }[];
+  expect(user, 'Golden Path user must exist before approval').toBeTruthy();
+  const normalized = email.trim().toLowerCase();
+  let entryId = user.waitlistEntryId;
+  if (!entryId) {
+    const [existing] = (await sql`
+      SELECT id FROM waitlist_entries
+      WHERE email_normalized = ${normalized} AND canonical = true
+      LIMIT 1
+    `) as unknown as { id: string }[];
+    entryId = existing?.id ?? null;
+  }
+  if (entryId) {
+    await sql`
+      UPDATE waitlist_entries
+      SET status = 'approved', approved_at = now(), updated_at = now()
+      WHERE id = ${entryId}
+    `;
+  } else {
+    const [created] = (await sql`
+      INSERT INTO waitlist_entries (email, email_normalized, status, source, approved_at)
+      VALUES (${email}, ${normalized}, 'approved', 'golden_path_operator_approval', now())
+      RETURNING id
+    `) as unknown as { id: string }[];
+    entryId = created.id;
+  }
+  await sql`
+    INSERT INTO waitlist_audit_logs (waitlist_entry_id, actor_type, to_status, reason)
+    VALUES (${entryId}, 'admin', 'approved', 'golden-path operator approval fixture')
+  `;
+  await sql`UPDATE users SET waitlist_entry_id = ${entryId} WHERE id = ${user.id}`;
+}
+
+/**
+ * Two-user ownership isolation on the real database. A second, fresh identity
+ * signs up while the first is Pro and owns a live profile. It must see a free
+ * account, no access to the first identity's conversation, no ownership or
+ * Stripe linkage to the first identity's profile and customer, and the first
+ * identity's rows must be untouched afterwards.
+ */
+async function proveSecondIdentityIsolation(input: {
+  readonly browser: import('@playwright/test').Browser;
+  readonly appUserId: string;
+  readonly profileId: string;
+  readonly handle: string;
+  readonly conversationId: string;
+  readonly stripeCustomerId: string;
+  readonly sql: ReturnType<typeof neon>;
+}) {
+  const { sql } = input;
+  const context = await input.browser.newContext({
+    baseURL: process.env.BASE_URL ?? 'http://localhost:3250',
+  });
+  try {
+    const pageB = await context.newPage();
+    await interceptTrackingCalls(pageB);
+    const { betterAuthUserId: secondAuthId } = await createFreshUser(pageB);
+
+    const status = await pageB.request.get('/api/billing/status');
+    expect(status.ok()).toBeTruthy();
+    const statusBody = (await status.json()) as Record<string, unknown>;
+    expect(statusBody.isPro).toBe(false);
+    expect(statusBody.stripeCustomerId ?? null).not.toBe(
+      input.stripeCustomerId
+    );
+
+    const usage = await pageB.request.get('/api/usage/summary');
+    expect(usage.ok()).toBeTruthy();
+    expect(await usage.json()).not.toMatchObject({ plan: 'pro' });
+
+    const foreignConversation = await pageB.request.get(
+      `/api/chat/conversations/${input.conversationId}`
+    );
+    expect([401, 403, 404]).toContain(foreignConversation.status());
+    expect(await foreignConversation.text()).not.toContain(
+      'About 500 monthly listeners'
+    );
+
+    const [second] = (await sql`
+      SELECT id, is_pro AS "isPro", active_profile_id AS "activeProfileId",
+             stripe_customer_id AS "stripeCustomerId"
+      FROM users WHERE better_auth_user_id = ${secondAuthId}
+    `) as unknown as {
+      id: string;
+      isPro: boolean;
+      activeProfileId: string | null;
+      stripeCustomerId: string | null;
+    }[];
+    expect(second.isPro).toBe(false);
+    expect(second.activeProfileId).not.toBe(input.profileId);
+    expect(second.stripeCustomerId).not.toBe(input.stripeCustomerId);
+
+    const [first] = (await sql`
+      SELECT
+        (SELECT user_id FROM creator_profiles WHERE id = ${input.profileId}) AS "profileOwner",
+        (SELECT COUNT(*)::int FROM user_profile_claims
+          WHERE creator_profile_id = ${input.profileId} AND user_id <> ${input.appUserId}) AS "foreignClaims",
+        (SELECT is_pro FROM users WHERE id = ${input.appUserId}) AS "firstIsPro",
+        (SELECT COUNT(*)::int FROM users
+          WHERE stripe_customer_id = ${input.stripeCustomerId}) AS "customerLinks"
+    `) as unknown as {
+      profileOwner: string;
+      foreignClaims: number;
+      firstIsPro: boolean;
+      customerLinks: number;
+    }[];
+    expect(first).toEqual({
+      profileOwner: input.appUserId,
+      foreignClaims: 0,
+      firstIsPro: true,
+      customerLinks: 1,
+    });
+
+    const publicProfile = await pageB.request.get(`/${input.handle}`);
+    expect(publicProfile.status()).toBe(200);
+  } finally {
+    await context.close();
+  }
+}
+
 test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () => {
   test.describe.configure({ mode: 'serial', retries: 0 });
 
@@ -871,6 +1006,12 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       conversationId,
     });
     expect(claimPayload).not.toHaveProperty('readyForCheckout');
+
+    // Private-until-proof (#23277): only an operator approval (an admin audit
+    // row) or a verified claim record publishes a claimed page and attaches
+    // its Spotify identity. This journey certifies the operator-approved
+    // artist, so the approval is recorded the way the admin path records it.
+    await recordOperatorApproval(sql, betterAuthUserId, email);
 
     // Finish the interview as the now-signed-in user. Meaningful free text
     // after the social card is the access-decision turn: the scripted engine
@@ -1262,6 +1403,16 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       databaseUrl: process.env.DATABASE_URL!,
       email,
       handle: uniqueHandle,
+      isolationProbe: state =>
+        proveSecondIdentityIsolation({
+          browser,
+          appUserId,
+          profileId,
+          handle: uniqueHandle,
+          conversationId: String(conversationId),
+          stripeCustomerId: state.stripeCustomerId,
+          sql,
+        }),
       page,
       profileId,
       spotifyArtistId: TEST_SPOTIFY_ARTIST.id,

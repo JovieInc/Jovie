@@ -36,4 +36,19 @@ describe('isSmartLinkCrawler', () => {
       isSmartLinkCrawler(detection('Googlebot/2.1', 'Known crawler detected'))
     ).toBe(true);
   });
+
+  it('never treats a non-bot as a crawler, whatever the reason or UA', () => {
+    expect(
+      isSmartLinkCrawler({
+        ...detection('facebookexternalhit/1.1'),
+        isBot: false,
+      })
+    ).toBe(false);
+    expect(
+      isSmartLinkCrawler({
+        ...detection('Googlebot/2.1', 'Known crawler detected'),
+        isBot: false,
+      })
+    ).toBe(false);
+  });
 });

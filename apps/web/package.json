@@ -131,6 +131,7 @@
     "test:e2e:sentry:red": "node scripts/run-sentry-red-lane.mjs",
     "e2e:smoke": "SMOKE_ONLY=1 playwright test --config=playwright.config.smoke.ts",
     "e2e:smoke:mobile": "SMOKE_ONLY=1 playwright test --config=playwright.config.smoke.mobile.ts",
+    "e2e:public-surface-quality": "playwright test tests/e2e/public-surface-quality.spec.ts --project=chromium",
     "e2e:smoke:tagged": "SMOKE_ONLY=1 E2E_FAST_ITERATION=1 playwright test -g @smoke",
     "e2e:auth-smoke": "SMOKE_ONLY=1 playwright test tests/e2e/smoke-auth.spec.ts --config=playwright.config.smoke.ts",
     "e2e:smoke:noauth": "playwright test -g @smoke --config=playwright.config.noauth.ts",
