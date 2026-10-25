@@ -9416,15 +9416,46 @@ def update(host: Host) -> int:
     Only the `current` symlink moves; running workers finish on their release. The outcome is
     written to update.json so a refused release is an alert, not a traceback in a journal."""
     mirror = host_maintenance(host, refresh_object_mirror)  # before install_release's origin fetch
+    before = read_marker(host)
     try:
         code = install_release(host)
         error = None if code == 0 else "release tests failed"
     except Exception as failure:
         code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
     skills = host_maintenance(host, refresh_codex_skills)
+    lag = host_maintenance(host, lambda h: install_lag(h, before, error))
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
-        at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills)))
+        at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills,
+        behindS=lag.get("behindS"), behindCommit=lag.get("behindCommit"))))
     return code
+
+
+# Install lag is a stage: merge -> installed. Gem releases (59 since 10-23): p50 22 min, p80 85, p95 215,
+# max 251. 10-25: a flaky self-test refusal (07:39) held three builds 90-111 min; a 60 min wait for a
+# gate seat held #23123. update.json carries behindS while a lane-affecting main commit is not
+# installed, update-lag.jsonl one row per install, and the doctor alerts past its INSTALL_LAG_ALERT_S (90 min).
+def install_lag(host: Host, before: str | None, error: str | None) -> dict:
+    """{'behindS', 'behindCommit'} while main's lane bundle is not installed; one lag row per install."""
+    if os.environ.get("LANES_SELFTEST"):
+        return {"status": "selftest-skipped"}
+    bundle = release_identity(host)
+    paths = sorted(bundle["objects"])
+    stamp = lambda ref: sh(["git", "log", "-1", "--format=%ct %H", ref, "--", *paths], cwd=host.repo).stdout.split()
+    marker = host.state / "current" / ".bundle"
+    installed = marker.read_text().strip() if marker.exists() else None
+    now = time.time()
+    newest = stamp(bundle["sourceCommit"])
+    commit_at = float(newest[0]) if newest else None
+    if installed == bundle["bundleDigest"]:
+        after = read_marker(host)
+        if before is not None and after != before and commit_at is not None:
+            row = {"schema": "jovie-install-lag/v1", "at": now_iso(), "commit": bundle["sourceCommit"],
+                   "commitAt": commit_at, "installedAt": now, "lagS": round(now - commit_at), "from": before, "to": after}
+            with open(host.state / "update-lag.jsonl", "a") as out:
+                out.write(json.dumps(row) + "\n")
+        return {"behindS": 0, "behindCommit": None}
+    return {"behindS": round(now - commit_at) if commit_at is not None else None,
+            "behindCommit": bundle["sourceCommit"], "why": error}
 
 
 def release_identity(host: Host) -> dict:

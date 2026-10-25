@@ -507,6 +507,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         **automation_observation(host, lane, now),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
         "linearAppCredential": _linear_app_credential(lane),
         "strandedClaims": stranded_claims,
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
@@ -847,6 +848,10 @@ def admission_repair_holds(obs: dict) -> list[str] | None:
 
 # ---------------------------------------------------------------- judgement
 
+# Measured on Gem (59 releases since 2026-10-23): install lag p50 22 min, p80 85, p95 215. Alert past p80.
+INSTALL_LAG_ALERT_S = 90 * 60
+
+
 def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     """Stable key -> one-line cause. Pure, so every rule has a test."""
     alerts = {}
@@ -935,6 +940,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    lag = obs.get("installLag") or {}
+    if isinstance(lag.get("behindS"), (int, float)) and lag["behindS"] > INSTALL_LAG_ALERT_S:
+        alerts["install-lag"] = (f"main's lane bundle {str(lag.get('behindCommit'))[:8]} is {round(lag['behindS'] / 60)}m "
+                                 f"from installed (alert past {INSTALL_LAG_ALERT_S // 60}m); "
+                                 f"last update: {lag.get('error') or 'waiting on a free gate seat or drain'}")
     if obs.get("linearAppCredential") is False:
         alerts["linear-app-credential-missing"] = (
             "no Jovie Lanes Linear app credential (~/.config/jovie-lanes/linear-app.env); lanes Linear "
