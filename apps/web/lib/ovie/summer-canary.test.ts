@@ -111,3 +111,91 @@ describe('published first-token percentiles', () => {
     ).toBeNull();
   });
 });
+
+describe('incremental first-token measurement', () => {
+  /** A stream whose chunks arrive on a controlled clock: the fixture, not response.text(). */
+  function timedStream(
+    chunks: readonly { at: number; text: string }[],
+    clock: { t: number }
+  ) {
+    const encoder = new TextEncoder();
+    let index = 0;
+    // highWaterMark 0: pull runs only when the reader asks, so the clock moves
+    // exactly when the canary reads each chunk (no read-ahead skew).
+    return new Response(
+      new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            const next = chunks[index++];
+            if (!next) {
+              controller.close();
+              return;
+            }
+            clock.t = next.at;
+            controller.enqueue(encoder.encode(next.text));
+          },
+        },
+        { highWaterMark: 0 }
+      )
+    );
+  }
+  const frame = (event: string, data = '{}') =>
+    `event: ${event}\ndata: ${data}\n\n`;
+
+  it('measures first token at the first delta even when the terminal frame is delayed', async () => {
+    const clock = { t: 0 };
+    const result = await runSummerCanary({
+      principalHash: 'p',
+      now: () => clock.t,
+      fetchChat: (async () =>
+        timedStream(
+          [
+            { at: 300, text: frame('meta', '{"model":"m"}') },
+            { at: 900, text: frame('delta') },
+            { at: 9000, text: frame('done') },
+          ],
+          clock
+        )) as never,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      ttftMs: 900,
+      totalMs: 9000,
+      withinTarget: { p50: true },
+    });
+  });
+
+  it('measures a delayed first token as slow while the terminal follows immediately', async () => {
+    const clock = { t: 0 };
+    const result = await runSummerCanary({
+      principalHash: 'p',
+      now: () => clock.t,
+      fetchChat: (async () =>
+        timedStream(
+          [
+            { at: 100, text: frame('meta') },
+            { at: 6300, text: frame('delta') + frame('done') },
+          ],
+          clock
+        )) as never,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      ttftMs: 6300,
+      totalMs: 6300,
+      withinTarget: { p50: false },
+    });
+  });
+
+  it('does not count a stream truncated before its terminal frame as a pass', async () => {
+    const clock = { t: 0 };
+    expect(
+      await runSummerCanary({
+        principalHash: 'p',
+        now: () => clock.t,
+        fetchChat: (async () =>
+          timedStream([{ at: 400, text: frame('delta') }], clock)) as never,
+      })
+    ).toEqual({ ok: false, code: 'no_done' });
+  });
+});
