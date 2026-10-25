@@ -278,6 +278,71 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(len(alerts), 1)
 
 
+def realistic_feed():
+    """Shaped like the 2026-10-25 live feed that hit 410,142 bytes: 737 overlap pairs (217 KB), 312
+    remediation fingerprints with long ask text (72 KB), 40 conditions (54 KB), per-PR attribution rows."""
+    pairs = [{"actionTaken": "flag", "files": [f"apps/web/components/area{n % 40}/File{n % 97}.tsx", "apps/web/data/shared.ts",
+                                              "apps/web/tests/unit/area/contract.test.ts", f"apps/web/lib/mod{n}.ts"],
+              "first": f"pr:#{22000 + n}", "firstPr": 22000 + n, "later": f"pr:#{23000 - n}", "laterPr": 23000 - n,
+              "observedAt": "2026-10-25T13:55:52.575644+00:00", "policyAction": "flag", "queueOwned": n % 3 == 0,
+              "regenerateFiles": []} for n in range(737)]
+    fingerprints = {f"remediation-fingerprint-{n}": {
+        "state": ("done", "exhausted", "claimed", "human")[n % 4], "issue": f"JOV-{7000 + n}", "cls": "fixable-by-agent",
+        "lane": None, "ask": "needs-human `ccf5eaaa-8705-49f0-b264-ec3558d678b7`: exhausted the lane ladder. " * 3,
+        "recurrence": ["2026-10-24T01:02:03Z"] * 6} for n in range(312)}
+    conditions = {f"condition-{n}": {"schema": "jovie.control-plane-liveness-condition/v1",
+                                    "idempotencyKey": "k" * 64, "condition": "c" * 900} for n in range(40)}
+    rows = [{"repository": "JovieInc/Jovie", "prNumber": n, "title": "fix(area): a typical pull request title (JOV-1)",
+             "headSha": "a" * 40, "mergeCommitSha": "b" * 40, "origin": {"method": "autonomous", "provider": "codex",
+                                                                        "evidence": ["x" * 60] * 4}} for n in range(560)]
+    return {"schema": "symphony-lanes-status/v1", "at": "2026-10-25T15:00:00Z", "host": "gem", "release": "r1",
+            "fileOverlap": {"mode": "flag", "pairs": pairs, "metrics": {"overlap_flags": 18810}},
+            "remediation": {"byFingerprint": fingerprints, "surfaced": [{"pr": n} for n in range(131)]},
+            "conditions": conditions,
+            "shippingAttribution": {"schema": "s", "projects": [{"channel": "Jovie", "mergeCount": 118,
+                                                                 "pullRequests": rows,
+                                                                 "missingOriginReceiptPullRequests": ["u" * 45] * 100}]},
+            "alerts": {"a": "x" * 200}}
+
+
+class PublicFeedSizeTest(unittest.TestCase):
+    def test_realistic_feed_stays_under_seventy_percent_of_the_cap_and_keeps_operational_identity(self):
+        feed = realistic_feed()
+        full = json.dumps(feed, indent=1)
+        self.assertGreater(len(full.encode()), doctor.PUBLIC_FEED_MAX_BYTES * 2, "fixture must reproduce the overflow")
+        out = doctor.public_status_projection(feed, full)
+        public = json.loads(out)
+        self.assertEqual(public["schema"], "symphony-lanes-status/v1")
+        self.assertLess(len(out.encode()), doctor.PUBLIC_FEED_MAX_BYTES * doctor.PUBLIC_FEED_WARN_RATIO)
+        overlap = public["fileOverlap"]
+        self.assertNotIn("pairs", overlap)
+        self.assertEqual(overlap["pairsSummary"]["count"], 737)
+        self.assertLessEqual(len(overlap["pairsSummary"]["topHotspots"]), doctor.PUBLIC_OVERLAP_TOP)
+        self.assertEqual(overlap["pairsSummary"]["topHotspots"][0]["file"], "apps/web/data/shared.ts")
+        self.assertEqual(overlap["pairsSummary"]["pairsRef"]["jsonPointer"], "/fileOverlap/pairs")
+        rows = public["remediation"]["byFingerprint"]
+        self.assertEqual(len(rows), 312)
+        self.assertEqual(set(rows["remediation-fingerprint-2"]), set(doctor.PUBLIC_REMEDIATION_FIELDS))
+        self.assertEqual(public["remediation"]["byFingerprintRef"]["recordCount"], 312)
+        self.assertEqual(len(public["remediation"]["surfaced"]), 131)  # ownership arrays stay whole
+        # Nothing is lost: the complete evidence is what the details file carries, byte for byte.
+        self.assertEqual(len(json.loads(full)["fileOverlap"]["pairs"]), 737)
+        self.assertEqual(public["publicProjection"]["fullEvidence"]["bytes"], len(full.encode()))
+
+    def test_section_sizes_are_measured_and_the_doctor_alerts_before_the_cap(self):
+        out = doctor.public_status_projection(realistic_feed(), json.dumps(realistic_feed(), indent=1))
+        sizes = doctor.feed_section_sizes(out)
+        self.assertEqual(sizes["bytes"], len(out.encode()))
+        self.assertLess(sizes["ratio"], doctor.PUBLIC_FEED_WARN_RATIO)
+        self.assertEqual(next(iter(sizes["sections"])), "conditions")
+        self.assertNotIn("public-feed-near-limit", doctor.judge(obs(publicFeed=sizes)))
+        near = {**sizes, "bytes": 190000, "ratio": 0.725}
+        alert = doctor.judge(obs(publicFeed=near))["public-feed-near-limit"]
+        self.assertIn("72%", alert)
+        self.assertIn("conditions", alert)
+        self.assertNotIn("public-feed-near-limit", doctor.judge(obs(publicFeed={})))
+
+
 class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
