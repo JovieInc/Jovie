@@ -33,36 +33,30 @@ describe('SpotifyConnectDialog System B style guard', () => {
       offenders,
       `SpotifyConnectDialog leaked ${offenders.join(', ')}`
     ).toEqual([]);
-    expect(source).toContain("data-spotify-connect-surface='card'");
-    expect(source).toContain('system-b-spotify-connect-input-shell');
-    expect(source).toContain('system-b-spotify-connect-trailing');
-    expect(source).toContain('system-b-spotify-connect-dropdown');
-    expect(source).toContain('system-b-spotify-connect-result-row');
-    expect(source).toContain('system-b-spotify-connect-paste-row');
   });
 
-  it('keeps dialog primitives token-backed', () => {
-    const source = readWebFile('styles/system-b-app.css');
-    const spotifyConnectCss = source.match(
-      /:where\(\.system-b-spotify-connect-card\)[\s\S]*?(?=\.system-b-release-provider-banner)/
-    )?.[0];
+  it('uses the canonical @jovie/ui atoms instead of raw form controls', () => {
+    const source = readWebFile(
+      'components/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog.tsx'
+    );
 
-    expect(spotifyConnectCss).toBeDefined();
-    expect(spotifyConnectCss).toContain('var(--system-b-app-content-surface)');
-    expect(spotifyConnectCss).toContain('var(--system-b-app-frame-seam)');
-    expect(spotifyConnectCss).toContain('var(--system-b-bg-page)');
-    expect(spotifyConnectCss).toContain('var(--color-border-focus)');
-    expect(spotifyConnectCss).toContain('var(--shadow-popover)');
-    expect(spotifyConnectCss).toContain(
-      '.system-b-spotify-connect-input-shell--active'
-    );
-    expect(spotifyConnectCss).toContain('.system-b-spotify-connect-trailing');
-    expect(spotifyConnectCss).toContain(
-      '.system-b-spotify-connect-result-row--interactive:hover'
-    );
-    expect(spotifyConnectCss).not.toMatch(/--linear-/);
-    expect(spotifyConnectCss).not.toMatch(/\brgba?\(/i);
-    expect(spotifyConnectCss).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/);
-    expect(spotifyConnectCss).not.toMatch(/(?:radial|linear)-gradient/i);
+    // Canonical atoms own the input, buttons, and keycaps.
+    expect(source).toContain("from '@jovie/ui'");
+    expect(source).toContain('<Input');
+    expect(source).toContain('<Button');
+    expect(source).toContain('<Kbd');
+
+    // No raw input/select; result rows follow the repo-canonical
+    // picker-rows combobox option pattern (native button + role='option'),
+    // with keyboard activation flowing through the combobox input.
+    expect(source).not.toMatch(/<input[\s>]/);
+    expect(source).not.toMatch(/<select[\s>]/);
+    expect(source).toContain("role='option'");
+    expect(source).toContain("role='listbox'");
+
+    // One flat surface: the dialog owns the chrome, so the body renders no
+    // nested card, bordered panel, or boxed result list.
+    expect(source).not.toContain('DrawerSurfaceCard');
+    expect(source).not.toContain('system-b-spotify-connect');
   });
 });

@@ -212,40 +212,32 @@ async function assertSearchInteraction(
   });
   await input.fill('tim white');
 
-  const dropdown = page.locator('.system-b-spotify-connect-dropdown');
+  const dropdown = page.locator(
+    '[data-testid="spotify-connect-results-region"]'
+  );
   await expect(dropdown).toBeVisible();
   await expect(dropdown).toHaveCSS('position', 'static');
+  const timWhiteRow = page
+    .locator('[data-testid="spotify-connect-result"]')
+    .filter({ hasText: 'Tim White' });
+  await expect(timWhiteRow).toBeEnabled();
   await expect(
     page
-      .locator('.system-b-spotify-connect-result-row')
-      .filter({ hasText: 'Tim White' })
-  ).toBeEnabled();
-  await expect(
-    page
-      .locator('.system-b-spotify-connect-result-row')
+      .locator('[data-testid="spotify-connect-result"]')
       .filter({ hasText: 'Other Owner' })
   ).toBeDisabled();
 
-  const rows = page.locator('.system-b-spotify-connect-result-row');
+  const rows = page.locator('[data-testid="spotify-connect-result"]');
   await expect(rows).toHaveCount(5);
   const firstRow = rows.nth(0);
   const lastRow = rows.nth(4);
-  const pasteRow = page.locator('.system-b-spotify-connect-paste-row');
-  const searchShell = page.locator('.system-b-spotify-connect-input-shell');
-  const claimButton = page.getByRole('button', {
-    name: 'Connect Spotify',
-    exact: true,
-  });
+  const searchInput = input;
   const dialog = page.locator('[data-slot="dialog-content"]');
-  const resultsList = page.locator(
-    '.system-b-spotify-connect-dropdown > div[aria-hidden="true"]'
-  );
+  const resultsList = page.getByRole('listbox');
 
   await expect(firstRow).toBeVisible();
   await expect(lastRow).toBeAttached();
-  await expect(pasteRow).toBeAttached();
-  await expect(searchShell).toBeVisible();
-  await expect(claimButton).toBeVisible();
+  await expect(searchInput).toBeVisible();
 
   // The initial state is the user's natural entry point. It must not depend on
   // scrollIntoViewIfNeeded(), which can place the first row under the trailing
@@ -256,11 +248,9 @@ async function assertSearchInteraction(
     state: 'initial-top',
     dialog: dialogTopScroll,
     resultsList: resultsTopScroll,
-    searchShell: await measureGeometry(searchShell),
-    claimButton: await measureGeometry(claimButton),
+    searchInput: await measureGeometry(searchInput),
     firstRow: await measureGeometry(firstRow),
     lastRow: await measureGeometry(lastRow),
-    pasteRow: await measureGeometry(pasteRow),
   };
   expect(
     topGeometry.firstRow.fullyInsideClippingIntersection,
@@ -272,11 +262,7 @@ async function assertSearchInteraction(
   ).toBe(true);
   expect(topGeometry.firstRow.clippingAncestorCount).toBeGreaterThan(0);
   expect(
-    rectanglesOverlap(topGeometry.firstRow.rect, topGeometry.searchShell.rect),
-    JSON.stringify(topGeometry)
-  ).toBe(false);
-  expect(
-    rectanglesOverlap(topGeometry.firstRow.rect, topGeometry.claimButton.rect),
+    rectanglesOverlap(topGeometry.firstRow.rect, topGeometry.searchInput.rect),
     JSON.stringify(topGeometry)
   ).toBe(false);
   console.log(`[spotify geometry] ${JSON.stringify(topGeometry)}`);
@@ -292,19 +278,17 @@ async function assertSearchInteraction(
   );
 
   // Reveal the lower results inside their own scroll owner first, then move
-  // the dialog to its outer boundary so the paste action is also reachable in
-  // a short viewport. Both scroll positions are user-accessible states.
+  // the dialog to its outer boundary so the final row is also reachable in a
+  // short viewport. Both scroll positions are user-accessible states.
   const resultsBottomScroll = await scrollToBoundary(resultsList, 'bottom');
   const dialogBottomScroll = await scrollToBoundary(dialog, 'bottom');
   const bottomGeometry = {
     state: 'outer-bottom',
     dialog: dialogBottomScroll,
     resultsList: resultsBottomScroll,
-    searchShell: await measureGeometry(searchShell),
-    claimButton: await measureGeometry(claimButton),
+    searchInput: await measureGeometry(searchInput),
     firstRow: await measureGeometry(firstRow),
     lastRow: await measureGeometry(lastRow),
-    pasteRow: await measureGeometry(pasteRow),
   };
   expect(
     bottomGeometry.lastRow.fullyInsideClippingIntersection,
@@ -315,15 +299,6 @@ async function assertSearchInteraction(
     JSON.stringify(bottomGeometry)
   ).toBe(true);
   expect(bottomGeometry.lastRow.clippingAncestorCount).toBeGreaterThan(0);
-  expect(
-    bottomGeometry.pasteRow.fullyInsideClippingIntersection,
-    JSON.stringify(bottomGeometry)
-  ).toBe(true);
-  expect(
-    bottomGeometry.pasteRow.centerTargetIsElement,
-    JSON.stringify(bottomGeometry)
-  ).toBe(true);
-  expect(bottomGeometry.pasteRow.clippingAncestorCount).toBeGreaterThan(0);
   console.log(`[spotify geometry] ${JSON.stringify(bottomGeometry)}`);
   await attachGeometry(
     testInfo,

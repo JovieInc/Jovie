@@ -18,6 +18,8 @@ interface ReleaseWorkflowOverlaysProps {
   readonly setAmPaletteOpen: (open: boolean) => void;
   readonly spotifySearchOpen: boolean;
   readonly setSpotifySearchOpen: (open: boolean) => void;
+  readonly spotifyConnected?: boolean;
+  readonly spotifyArtistName?: string | null;
   readonly onAppleMusicConnect: (
     artist: AppleMusicArtistSelection
   ) => void | Promise<void>;
@@ -46,6 +48,8 @@ export function ReleaseWorkflowOverlays({
   setAmPaletteOpen,
   spotifySearchOpen,
   setSpotifySearchOpen,
+  spotifyConnected = false,
+  spotifyArtistName = null,
   onAppleMusicConnect,
   onSpotifyConnected,
   onSpotifyImportStart,
@@ -100,6 +104,8 @@ export function ReleaseWorkflowOverlays({
         <SpotifyConnectDialog
           open={spotifySearchOpen}
           onOpenChange={setSpotifySearchOpen}
+          connected={spotifyConnected}
+          connectedArtistName={spotifyArtistName}
           onConnected={onSpotifyConnected}
           onImportStart={onSpotifyImportStart}
         />
