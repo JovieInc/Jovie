@@ -433,16 +433,14 @@ export function ReleaseLandingPage({
             )
           : undefined
       }
-      heroOverlay={
-        <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
-          <div className='min-w-0 flex-1'>
-            <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
-            <SmartLinkArtistLine
-              artist={artist}
-              primaryArtists={primaryArtists}
-              featuredArtists={featuredArtists}
-            />
-          </div>
+      heroMeta={
+        <div className='min-w-0'>
+          <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
+          <SmartLinkArtistLine
+            artist={artist}
+            primaryArtists={primaryArtists}
+            featuredArtists={featuredArtists}
+          />
         </div>
       }
     >

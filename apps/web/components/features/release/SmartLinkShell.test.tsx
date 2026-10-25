@@ -24,6 +24,28 @@ describe('SmartLinkShell', () => {
     expect(image).not.toHaveClass('object-cover');
   });
 
+  it('never renders text inside the art bounds in the below treatment (no text on text)', () => {
+    const { container } = render(
+      <SmartLinkShell
+        artworkUrl='/art.jpg'
+        artworkAlt='Never Say A Word artwork'
+        showMenuButton={false}
+        heroMeta={<h1>Never Say A Word</h1>}
+      >
+        Listen
+      </SmartLinkShell>
+    );
+    const art = screen.getByTestId('smart-link-artwork');
+    expect(art.textContent).toBe('');
+    expect(art).not.toContainElement(
+      screen.getByRole('heading', { level: 1, name: 'Never Say A Word' })
+    );
+    // No gradient or scrim may sit over square art either.
+    expect(
+      container.querySelector('[class*="bg-[linear-gradient"]')
+    ).toBeNull();
+  });
+
   it('uses the banned-icon-safe AudioLines glyph without artwork', () => {
     const { container } = render(
       <SmartLinkShell artworkUrl={null} showMenuButton={false}>

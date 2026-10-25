@@ -107,11 +107,11 @@ describe('SmartLinkShell', () => {
     expect(screen.queryByTestId('next-image')).toBeNull();
   });
 
-  it('renders heroOverlay content in the hero area', () => {
+  it('renders heroMeta content below the art', () => {
     render(
       <SmartLinkShell
         {...defaultProps}
-        heroOverlay={<div data-testid='hero-overlay'>Overlay</div>}
+        heroMeta={<div data-testid='hero-overlay'>Overlay</div>}
       />
     );
     expect(screen.getByTestId('hero-overlay')).toHaveTextContent('Overlay');
