@@ -187,7 +187,7 @@ jobs:
         if: steps.score.outputs.remaining != '' && steps.score.outputs.remaining != '0' && steps.score.outputs.scored != '0'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run mutation-diff.yml --ref main -f mode=sweep -f max_files=6
+        run: node packages/api-client/cli.ts gh --priority default -- workflow run mutation-diff.yml --ref main -f mode=sweep -f max_files=6
 
       - name: Upload sweep state and survivor tasks
         if: ${{ always() && hashFiles('**/sweep-out/*') != '' }}
