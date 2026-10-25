@@ -6,6 +6,11 @@ const PRODUCTION_AUTH_SMOKE_PATH = path.resolve(
   __dirname,
   '../../e2e/smoke-prod-auth.spec.ts'
 );
+// The rendered sign-in moved to a shared util so the dogfood specs reuse it.
+const PRODUCTION_AUTH_SIGNIN_PATH = path.resolve(
+  __dirname,
+  '../../e2e/utils/production-auth-signin.ts'
+);
 
 describe('production auth smoke session contract', () => {
   it('uses one rendered sign-in for dashboard and tab assertions', () => {
@@ -25,8 +30,10 @@ describe('production auth smoke session contract', () => {
     expect(source).not.toContain("readyTestId: 'library-surface'");
     expect(source).toContain("readyView: 'releases'");
     expect(source).toContain('await page.waitForURL(');
-    expect(source.match(/await page.reload\(\{/gu)).toHaveLength(1);
-    expect(source).toContain("'Rendered sign-in reload'");
+    const signIn = fs.readFileSync(PRODUCTION_AUTH_SIGNIN_PATH, 'utf8');
+    expect(signIn.match(/await page.reload\(\{/gu)).toHaveLength(1);
+    expect(signIn).toContain("'Rendered sign-in reload'");
+    expect(source).not.toContain('page.reload(');
     expect(source).toContain('await waitForProductionDashboardContent(');
     expect(
       source.match(/await verifyProductionIosOAuthTokenFlow\(/gu)
