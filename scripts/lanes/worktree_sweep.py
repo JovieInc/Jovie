@@ -18,6 +18,12 @@ It covers lanes, Codex, Conductor, Claude-scratch and manual `jovie-wt-*` checko
   regenerable build output.
 - Preserved repairs (`.jovie-preserved-repair.json`) expire once their PR is closed or
   after `preserved_ttl_s`, through the same backup-then-remove path.
+- Standalone clones (own `.git` directory: ship workspaces, `bindings/*/worktrees/*`,
+  `runs/owner-*/checkout`) retire after 7 idle days only when clean, fully published (on a remote,
+  or already applied to origin/main) and unreferenced; each removal is logged to
+  `disk-reclaim.jsonl` first. A `.sweep-keep` file in a checkout exempts it.
+- Every run publishes per-volume headroom (`disk-headroom.json`, alarm events in `host-alarms.jsonl`
+  at 70% warn / 85% crit) and, daily, `disk-report.json` with the biggest growers.
 """
 from __future__ import annotations
 
@@ -64,7 +70,9 @@ def default_roots(home: Path, state: Path) -> list[Path]:
     """Where agent checkouts live; anything else is out of scope."""
     return [state / "worktrees", state / "bindings", home / ".codex/worktrees", home / "conductor/workspaces",
             home / "jovie-worktrees", home / "worktrees", home / "LogYourBody-wt",
-            home / "jovie-wt-*", Path("/private/tmp/claude-501"), Path("/private/tmp/jovie-*")]
+            home / "jovie-wt-*", Path("/private/tmp/claude-501"), Path("/private/tmp/jovie-*"),
+            home / "codex-worktrees", home / "grok-wt", home / "grok-ship-workspaces",
+            home / "codex-ship-workspaces", home / "wt-*", Path("/srv/worktrees/codex-worktrees")]
 
 
 def default_never(home: Path) -> list[Path]:
@@ -310,7 +318,7 @@ def decide(path: Path, branch: str | None, info: dict, now: float, closed: set[s
 
 def retire(repo: Path, path: Path, branch: str | None, live: set[Path], report: dict, *, run, now: float,
            closed: set[str], idle_s: float, preserved_ttl_s: float, prefix: str, date: str) -> None:
-    if busy(path, live):
+    if busy(path, live) or (path / ".sweep-keep").exists():
         report["kept"] += 1
         return
     info = inspect(path, run)
@@ -433,6 +441,253 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
     return "spawned"
 
 
+# ---- standalone clones, volume headroom and the daily disk report (gem disk incident 2026-10-24) ----
+# Standalone clones (own `.git` directory) are invisible to the linked-worktree sweep above: legacy
+# grok/codex ship workspaces, lanes `bindings/*/worktrees/*` and `runs/owner-*/checkout` held ~130 GB
+# nobody retired. They get the same safety bar: clean (untracked included), nothing unpublished on
+# any branch, no stash, no linked worktrees, no live process, idle for STANDALONE_IDLE_S.
+STANDALONE_IDLE_S = 7 * 86400
+KEEP_MARKER = ".sweep-keep"
+HEADROOM_WARN_PCT = 70
+HEADROOM_CRIT_PCT = 85
+REPORT_INTERVAL_S = 86400
+STATE_REF_MAX_BYTES = 8 * 1024 * 1024
+
+
+def standalone_globs(home: Path, state: Path) -> list[tuple[Path, str]]:
+    return [(home, "grok-ship-workspaces/*/*"), (home, "codex-ship-workspaces/*/*"), (home, "grok-wt/*"),
+            (home, "codex-worktrees/*"), (home, "wt-*"), (Path("/srv/worktrees"), "codex-worktrees/*"), (state, "bindings/*/worktrees/*"),
+            (state, "runs/owner-*/checkout")]
+
+
+def standalone_candidates(home: Path, state: Path, repos: list[Path]) -> list[Path]:
+    """Directories matching a standalone glob that own a `.git` directory (linked worktrees have a file)."""
+    skip = {repo.resolve() for repo in repos}
+    found: list[Path] = []
+    for base, pattern in standalone_globs(home, state):
+        for path in sorted(base.glob(pattern)):
+            try:
+                if (path / ".git").is_dir() and path.resolve() not in skip and path not in found:
+                    found.append(path)
+            except OSError:
+                continue
+    return found
+
+
+def unpublished(path: Path, run) -> str | None:
+    """Reason this clone holds commits no remote has, else None. Unreadable git state counts as unpublished."""
+    refs = git(path, run, "for-each-ref", "--format=%(objectname)", "refs/remotes")
+    if refs.returncode != 0:
+        return "refs-unreadable"
+    shas = sorted(set(refs.stdout.split()))
+    valid: list[str] = []
+    if shas:
+        # Lanes clones carry dangling remote refs (objects living in an alternate); only real commits count.
+        valid = [sha for sha in shas if git(path, run, "cat-file", "-e", f"{sha}^{{commit}}").returncode == 0]
+    tips = git(path, run, "for-each-ref", "--format=%(objectname)", "refs/heads")
+    head = git(path, run, "rev-parse", "HEAD")
+    if tips.returncode != 0 or head.returncode != 0:
+        return "rev-list-failed"
+    main_tree = git(path, run, "rev-parse", "origin/main^{tree}").stdout.strip()
+    open_tips = 0
+    for tip in dict.fromkeys([*tips.stdout.split(), head.stdout.strip()]):
+        ahead = git(path, run, "rev-list", "--count", tip, "--not", *valid)
+        if ahead.returncode != 0:
+            return "rev-list-failed"
+        if ahead.stdout.strip() == "0":
+            continue
+        # Squash-merged work has no remote SHA; merging it into main changes nothing when it already landed.
+        merged = git(path, run, "merge-tree", "--write-tree", "origin/main", tip)
+        if main_tree and merged.returncode == 0 and merged.stdout.split("\n")[0] == main_tree:
+            continue
+        open_tips += 1
+    return None if open_tips == 0 else f"{open_tips}-unpublished"
+
+
+def state_references(state: Path, name: str) -> bool:
+    """True when a lanes state file (json/jsonl/lock directly under state) mentions the checkout name."""
+    needle = name.encode()
+    for pattern in ("*.json", "*.jsonl", "*.lock"):
+        for file in state.glob(pattern):
+            try:
+                if file.stat().st_size <= STATE_REF_MAX_BYTES and needle in file.read_bytes():
+                    return True
+            except OSError:
+                continue
+    return False
+
+
+def newest_touch(path: Path) -> float:
+    newest = 0.0
+    for rel in (".", ".git/HEAD", ".git/index", ".git/logs/HEAD", ".git/FETCH_HEAD"):
+        try:
+            newest = max(newest, (path / rel).stat().st_mtime)
+        except OSError:
+            continue
+    return newest
+
+
+def standalone_verdict(path: Path, live: set[Path], run, now: float, state: Path, idle_s: float) -> str | None:
+    """None when the clone may be deleted, else the first check it failed."""
+    if (path / KEEP_MARKER).exists():
+        return "keep-marker"
+    if busy(path, live):
+        return "busy"
+    if now - newest_touch(path) < idle_s:
+        return "recent"
+    if path.name == "checkout" and not (path.parent / "receipt.json").exists():
+        return "no-receipt"
+    listing = git(path, run, "worktree", "list", "--porcelain")
+    if listing.returncode != 0 or listing.stdout.count("worktree ") != 1:
+        return "linked-worktrees"
+    info = inspect(path, run)
+    if info is None or info["dirty"]:
+        return "dirty"
+    stash = git(path, run, "stash", "list")
+    if stash.returncode != 0 or stash.stdout.strip():
+        return "stash"
+    reason = unpublished(path, run)
+    if reason and info["remote"]:
+        # Stale remote-tracking refs make merged work look unpublished; one fetch settles it.
+        git(path, run, "fetch", "-q", "--prune", info["remote"], timeout=300)
+        reason = unpublished(path, run)
+    if reason:
+        return reason
+    ref = path.parent.name if path.name == "checkout" else path.name
+    if state_references(state, ref):
+        return "state-referenced"
+    return None
+
+
+def tree_kib(path: Path, run) -> int | None:
+    try:
+        result = run(["du", "-sk", "--", str(path)], capture_output=True, text=True, timeout=300)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    try:
+        return int(result.stdout.split()[0])
+    except (IndexError, ValueError):
+        return None
+
+
+def sweep_standalone(home: Path, state: Path, repos: list[Path], never: list[Path], *, run=lifecycle.run,
+                     now: float | None = None, idle_s: float = STANDALONE_IDLE_S,
+                     remove=shutil.rmtree) -> dict:
+    """Delete clean, fully published, idle standalone clones; log each removal (with its size) first."""
+    now = time.time() if now is None else now
+    report = {"removed": [], "kept": {}, "errors": [], "freedKiB": 0}
+    live = live_paths(run)
+    if live is None:
+        report["errors"].append("process-state-unavailable")
+        return report
+    log = state / "disk-reclaim.jsonl"
+    for path in standalone_candidates(home, state, repos):
+        if lifecycle.draining(state):
+            report["drained"] = True
+            break
+        if any(path == n or n in path.parents for n in never):
+            continue
+        try:
+            verdict = standalone_verdict(path, live, run, now, state, idle_s)
+            if verdict:
+                report["kept"][verdict] = report["kept"].get(verdict, 0) + 1
+                continue
+            size = tree_kib(path, run)
+            entry = {"at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                     "path": str(path), "kib": size,
+                     "checks": ["clean", "no-stash", "published", "no-linked-worktrees", "no-live-process",
+                                f"idle>={int(idle_s)}s", "not-in-state"]}
+            with open(log, "a") as handle:  # logged before deletion
+                handle.write(json.dumps(entry) + "\n")
+            remove(path)
+            report["removed"].append(str(path))
+            report["freedKiB"] += size or 0
+        except (OSError, subprocess.SubprocessError) as error:
+            report["errors"].append(f"{path}:{type(error).__name__}"[:200])
+    return report
+
+
+def volumes(home: Path, state: Path, mounts: list[Path] | None = None) -> list[Path]:
+    """Mount points holding agent data: root, the home and state volumes, and every /srv/* mount."""
+    if mounts is None:
+        mounts = [p for p in sorted(Path("/srv").glob("*")) if os.path.ismount(p)] if Path("/srv").is_dir() else []
+    found = [Path("/"), *mounts]
+    for anchor in (home, state):
+        probe = anchor
+        while not os.path.ismount(probe) and probe != probe.parent:
+            probe = probe.parent
+        found.append(probe)
+    return list(dict.fromkeys(found))
+
+
+def headroom(vols: list[Path], *, usage=shutil.disk_usage) -> dict:
+    rows, alarms = [], []
+    for mount in vols:
+        try:
+            total, _, free = usage(mount)
+        except OSError:
+            continue
+        used_pct = round(100 * (total - free) / total, 1) if total else 0.0
+        level = "crit" if used_pct >= HEADROOM_CRIT_PCT else "warn" if used_pct >= HEADROOM_WARN_PCT else "ok"
+        rows.append({"mount": str(mount), "usedPct": used_pct, "freeGiB": round(free / 2**30, 1),
+                     "totalGiB": round(total / 2**30, 1), "level": level})
+        if level != "ok":
+            alarms.append({"mount": str(mount), "level": level, "usedPct": used_pct})
+    return {"volumes": rows, "alarms": alarms, "thresholds": {"warn": HEADROOM_WARN_PCT, "crit": HEADROOM_CRIT_PCT}}
+
+
+def publish_headroom(state: Path, current: dict, now: float) -> None:
+    """state/disk-headroom.json is the sentinel's input; an alarm event is appended on each level change."""
+    path = state / "disk-headroom.json"
+    try:
+        before = {v["mount"]: v["level"] for v in json.loads(path.read_text()).get("volumes", [])}
+    except (OSError, ValueError, AttributeError, KeyError, TypeError):
+        before = {}
+    at = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    path.write_text(json.dumps({"at": at, **current}, indent=1))
+    changed = [v for v in current["volumes"] if v["level"] != before.get(v["mount"], "ok")]
+    if changed:
+        with open(state / "host-alarms.jsonl", "a") as handle:
+            for row in changed:
+                handle.write(json.dumps({"at": at, "kind": "disk-headroom", **row}) + "\n")
+
+
+def report_targets(home: Path, state: Path) -> list[Path]:
+    roots = [state / "runs", state / "worktrees", state / "bindings", state / "releases",
+             state / "preserved-artifacts", state / "cache", home / "codex-worktrees", home / "grok-wt",
+             home / "grok-ship-workspaces", home / "gem-workspace", home / ".cache", home / ".local/share",
+             home / ".npm"]
+    srv = Path("/srv")
+    if srv.is_dir():
+        roots += [p for p in sorted(srv.glob("*")) if p.is_dir()]
+    return [p for p in roots if p.exists()]
+
+
+def daily_report(home: Path, state: Path, now: float, *, run=lifecycle.run, targets: list[Path] | None = None,
+                 interval_s: float = REPORT_INTERVAL_S) -> str:
+    """Per-volume usage plus the biggest growers since the last report; at most once per interval."""
+    path = state / "disk-report.json"
+    try:
+        previous = json.loads(path.read_text())
+    except (OSError, ValueError):
+        previous = {}
+    if now - previous.get("epoch", 0) < interval_s:
+        return "not-due"
+    sizes = {}
+    for target in (targets if targets is not None else report_targets(home, state)):
+        kib = tree_kib(target, lambda args, **kw: run(["nice", "-n", "19", *args], **kw))
+        if kib is not None:
+            sizes[str(target)] = kib
+    before = previous.get("sizes", {})
+    growers = sorted(({"path": p, "gib": round(k / 2**20, 2), "deltaGiB": round((k - before.get(p, k)) / 2**20, 2)}
+                      for p, k in sizes.items()), key=lambda row: row["deltaGiB"], reverse=True)
+    path.write_text(json.dumps({
+        "at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "epoch": now,
+        "volumes": headroom(volumes(home, state))["volumes"], "sizes": sizes,
+        "topGrowers": growers[:10], "largest": sorted(growers, key=lambda r: -r["gib"])[:10]}, indent=1))
+    return "written"
+
+
 def guarded_main(args) -> int:
     ensure_sbin_on_path()
     home = Path.home()
@@ -451,6 +706,11 @@ def guarded_main(args) -> int:
         prefix = sweep_prefix()
         report = sweep(repos, default_roots(home, args.state), default_never(home),
                        closed=closed, prefix=prefix, state=args.state)
+        if not report.get("drained") and not lifecycle.draining(args.state):
+            report["standalone"] = sweep_standalone(home, args.state, repos, default_never(home))
+            now = time.time()
+            publish_headroom(args.state, headroom(volumes(home, args.state)), now)
+            report["dailyReport"] = daily_report(home, args.state, now)
     stamp = args.state / "worktree-sweep.json"
     try:
         started = json.loads(stamp.read_text()).get("startedAt")
