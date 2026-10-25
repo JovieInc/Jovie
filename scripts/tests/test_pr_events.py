@@ -519,11 +519,17 @@ class RelayTest(unittest.TestCase):
 
         for status in ("CLEAN", "HAS_HOOKS", "UNSTABLE"):
             added, shell = success(status)
-            self.assertEqual(added, [(5, "cleared-red")], status)
+            self.assertEqual(added, [(5, "cleared-red"), (5, "enroll-wake")], status)
             delete = ["gh", "api", "-X", "DELETE",
                       f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]
             self.assertIn(delete, shell.calls, status)
             self.assertFalse(events.gh_read_only(delete), status)
+            # JOV-8788: the GITHUB_TOKEN DELETE wakes nothing (recursion guard),
+            # so the relay hands the now-eligible head straight to green enroll.
+            wake = ["gh", "workflow", "run", events.GREEN_ENROLL_WORKFLOW,
+                    "--repo", events.REPO, "--ref", "main", "-f", "pr_number=5"]
+            self.assertIn(wake, shell.calls, status)
+            self.assertFalse(events.gh_read_only(wake), status)
             self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], status)
         for status in ("BLOCKED", "DIRTY", "BEHIND", "UNKNOWN"):
             added, shell = success(status)
@@ -558,6 +564,16 @@ class RelayTest(unittest.TestCase):
                "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
         self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+        self.assertEqual(shell.made("gh", "workflow", "run"), [])
+
+    def test_a_green_success_that_fails_the_enroll_wake_records_it(self):
+        view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "workflow", "run"): (1, "")})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
+                         [(5, "cleared-red"), (5, "enroll-wake-failed")])
+        self.assertEqual(len(shell.made("gh", "workflow", "run")), 1)
 
     def test_a_green_lane_draft_drops_lane_fix_red_and_can_still_be_marked_green(self):
         view = pr(draft=True, merge="CLEAN", labels=["lane-fix-red"], state="OPEN", sha="h1")
