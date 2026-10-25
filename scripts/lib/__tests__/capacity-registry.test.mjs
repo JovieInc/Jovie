@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { buildCanon, check, loadAll } from '../../capacity-registry.mjs';
+import { apiListUsd, subscriptionMarginal } from '../capacity-pricing.mjs';
 import {
   evaluateRegistry,
+  priceModel,
+  resolveRole,
   routingOrder,
   validateRegistry,
 } from '../capacity-registry.mjs';
@@ -260,5 +263,163 @@ describe('validation', () => {
     const inputs = loadAll();
     inputs.registry.providers[0].accounts[0].quota.remainingPercent = 1;
     expect(buildCanon(inputs)).toContain('1% left');
+  });
+});
+
+describe('access-path pricing', () => {
+  const { models } = loadAll();
+  const vectors = JSON.parse(
+    readFileSync(
+      new URL(
+        '../../tests/fixtures/capacity-pricing-vectors.json',
+        import.meta.url
+      ),
+      'utf8'
+    )
+  );
+  const withQuota = usd => {
+    const registry = base();
+    for (const row of registry.pricing.paths) {
+      if (row.accessPath === 'subscription') row.usableQuotaApiUsd = usd;
+    }
+    return registry;
+  };
+  const task = {
+    inputTokens: 1_000_000,
+    outputTokens: 100_000,
+    cachedTokens: 0,
+  };
+
+  it('matches the shared vectors (the Python port asserts the same file)', () => {
+    expect(apiListUsd(vectors.listPrice, vectors.task)).toBeCloseTo(
+      vectors.apiUsd,
+      9
+    );
+    for (const seat of vectors.seats) {
+      const r = subscriptionMarginal(vectors.apiUsd, {
+        usedPercent: seat.usedPercent,
+        elapsedPercent: seat.elapsedPercent,
+        usableQuotaApiUsd: vectors.usableQuotaApiUsd,
+        planWindowUsd: vectors.planWindowUsd,
+        status: seat.status,
+      });
+      expect(r.usd, seat.name).toBeCloseTo(seat.usd, 5);
+      expect(r.class, seat.name).toBe(seat.class);
+      expect(r.routable, seat.name).toBe(seat.routable);
+    }
+  });
+
+  it('prices the same luna task on a Pro seat versus the API, subscription far cheaper while it has headroom', () => {
+    const registry = withQuota(400);
+    const view = evaluateRegistry(registry, {
+      now: NOW,
+      spend: spend(),
+      models,
+    });
+    const rows = priceModel(registry, models, view, 'gpt-5.6-luna', task);
+    const api = rows.find(r => r.accessPath === 'api');
+    const seats = rows.filter(r => r.accessPath === 'subscription');
+    expect(api.usd).toBeCloseTo(0.32, 9);
+    expect(seats).toHaveLength(3);
+    for (const seat of seats) expect(seat.usd).toBeLessThan(api.usd);
+    const byAccount = Object.fromEntries(seats.map(r => [r.account, r]));
+    expect(byAccount['jovie-pro'].usd).toBeLessThan(
+      byAccount['current-login'].usd
+    );
+    expect(byAccount['current-login'].usd).toBeLessThan(
+      byAccount['lyb-pro'].usd
+    );
+    expect(byAccount['lyb-pro'].class).toBe('ahead-of-pace');
+  });
+
+  it('routes to the subsidized seat while it has headroom and to the API once seats are spent', () => {
+    const registry = withQuota(400);
+    const view = evaluateRegistry(registry, {
+      now: NOW,
+      spend: spend(),
+      models,
+    });
+    expect(
+      priceModel(registry, models, view, 'gpt-5.6-luna', task)[0].accessPath
+    ).toBe('subscription');
+    for (const provider of view.providers) {
+      if (provider.id !== 'openai-codex') continue;
+      for (const a of provider.accounts)
+        if (a.quota) a.quota = { ...a.quota, usedPercent: 100 };
+    }
+    const spent = priceModel(registry, models, view, 'gpt-5.6-luna', task);
+    expect(spent[0].accessPath).toBe('api');
+    expect(
+      spent.filter(r => r.accessPath === 'subscription').every(r => !r.routable)
+    ).toBe(true);
+  });
+
+  it('without a measured usable quota it has no USD for a seat but still ranks by pace', () => {
+    const registry = base();
+    const view = evaluateRegistry(registry, {
+      now: NOW,
+      spend: spend(),
+      models,
+    });
+    const rows = priceModel(registry, models, view, 'gpt-5.6-luna', task);
+    const seat = rows.find(r => r.account === 'jovie-pro');
+    expect(seat.usd).toBeNull();
+    expect(seat.reason).toBe('usable-quota-unmeasured');
+    expect(rows[0].accessPath).toBe('subscription');
+    expect(rows.findIndex(r => r.account === 'lyb-pro')).toBeGreaterThan(
+      rows.findIndex(r => r.accessPath === 'api')
+    );
+  });
+
+  it('keeps the same model on two paths as two rows with their own list prices', () => {
+    const view = evaluateRegistry(base(), { now: NOW, spend: spend(), models });
+    const glm = view.paths.filter(r => r.model === 'glm-5.3');
+    expect(glm.map(r => r.accessPath).sort()).toEqual(['api', 'credits']);
+    expect(glm.find(r => r.accessPath === 'credits').list.inUsdPerMTok).toBe(
+      0.3
+    );
+    expect(glm.find(r => r.accessPath === 'api').list.inUsdPerMTok).toBe(
+      0.5625
+    );
+  });
+});
+
+describe('roles', () => {
+  it('uses Kimi K3 as planner today and flips to K3.1 Pro only when the watcher confirms it', () => {
+    const registry = base();
+    expect(resolveRole(registry, 'planner').chosen.model).toBe(
+      'moonshotai/kimi-k3'
+    );
+    expect(
+      resolveRole(registry, 'planner', {
+        'moonshotai/kimi-k3.1-pro': { available: false },
+      }).chosen.model
+    ).toBe('moonshotai/kimi-k3');
+    const flipped = resolveRole(registry, 'planner', {
+      'moonshotai/kimi-k3.1-pro': { available: true, via: 'hyperagent-agent' },
+    });
+    expect(flipped.chosen).toMatchObject({
+      model: 'moonshotai/kimi-k3.1-pro',
+      pathId: 'kimi-k3.1-pro@credits:hyperagent',
+    });
+    expect(resolveRole(registry, 'nobody')).toBeNull();
+  });
+
+  it('rejects a role whose path or a path whose list price does not exist', () => {
+    const registry = base();
+    registry.roles.planner.candidates[0].pathId = 'missing@path';
+    registry.pricing.paths[0].modelRegistryId = 'nope';
+    const { identities, spend: sp, models } = loadAll();
+    const errors = validateRegistry(registry, {
+      agentIds: Object.keys(identities.identities),
+      spendIds: sp.providers.map(p => p.id),
+      modelIds: models.models.map(m => m.id),
+    });
+    expect(errors.join('\n')).toMatch(
+      /pathId missing@path not in pricing.paths/
+    );
+    expect(errors.join('\n')).toMatch(
+      /modelRegistryId nope not in the model registry/
+    );
   });
 });

@@ -32,6 +32,27 @@ Plan spend at the snapshot: $715.67/mo across active accounts.
 - **Devin (free SWE-2)** (unavailable): Not routable: lane disabled, plan lapsed or unverified. Do not route work here. Delegation: Lane disabled in canon/agent-identities.json.
 - **Kimi** (unavailable): Not routable: lane disabled, plan lapsed or unverified. Do not route work here. Delegation: Lane disabled; verify the plan is still paid before counting it.
 
+## Cost by access path
+
+Price every model by how it is accessed. API and credits paths cost tokens times the provider list price. A subscription path costs the plan's window price times the task's share of the usable quota, about a tenth of that while the account is behind its window pace (use it or lose it), the plain share while on pace, and rising linearly to the API list price as the account runs ahead of pace and nears exhaustion; an exhausted or lapsed account costs the API price and is not routable. The same model on two paths is two rows.
+
+| Model | Path | Where | List $/MTok in / out | Note |
+|---|---|---|---|---|
+| gpt-5.6-luna | api | direct | 0.2 / 1.2 |  |
+| gpt-5.6-luna | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 0.2 / 1.2 | Unmeasured: the API-equivalent list-priced usage one weekly window allows. Needs per-run token counts joined to the account's used percent; until then USD is unknown and ranking uses the pace rule alone. |
+| gpt-5.6-terra | api | direct | 2 / 12 |  |
+| gpt-5.6-terra | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 2 / 12 |  |
+| gpt-5.6-sol | api | direct | 5 / 30 |  |
+| gpt-5.6-sol | subscription | openai-codex (current-login, jovie-pro, lyb-pro) | 5 / 30 |  |
+| moonshotai/kimi-k3 | credits | hyperagent (founding-500) | 0.6 / 2 |  |
+| moonshotai/kimi-k3.1-pro | credits | hyperagent (founding-500) | not listed | Gateway catalog per-token price once the model appears; no list price is recorded today |
+| glm-5.3 | credits | hyperagent (founding-500) | 0.3 / 1.2 |  |
+| glm-5.3 | api | vercel-ai-gateway (team-jovie-credits) | 0.5625 / 1.8326 |  |
+
+## Roles
+
+- **planner**: Strategic planning. Summer defers all strategic planning to the preferred model (Tim, 2026-10-25). Now: Kimi K3 (moonshotai/kimi-k3) via kimi-k3@credits:hyperagent. Candidates: Kimi K3.1 Pro watching (preferred); Kimi K3 available.
+
 ## Routing order for non-lane agents
 
 1. instinct
