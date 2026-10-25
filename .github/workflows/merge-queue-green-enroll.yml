@@ -37,8 +37,11 @@ name: Merge Queue Green Enroll
 # manual dispatch scan the complete roster.
 
 on:
+  # Fork PR Gate is not subscribed: Source Validation completed last on 84 of 85
+  # PR heads measured 2026-10-25, and a straggler is re-armed by the main-push
+  # sweep (guard: scripts/lib/__tests__/wake-fanout-contract.test.mjs).
   workflow_run:
-    workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
+    workflows: ['Source Validation', 'CI', 'PR Size Guard']
     types: [completed]
   # ready_for_review: leaving draft emits no check completion (JOV-INV-029:
   # an unchanged head never earns a second CI flight), so this is the wake
