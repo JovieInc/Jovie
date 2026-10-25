@@ -752,7 +752,7 @@ describe('production freshness', () => {
     });
     assert.deepEqual(
       [fresh.healthy, fresh.reason],
-      [true, 'unshipped-for-2292s-within-7200s']
+      [true, 'unshipped-for-2292s-within-5400s']
     );
   });
 
