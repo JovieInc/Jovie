@@ -24,6 +24,7 @@ import hashlib
 import importlib
 import math
 import json
+import types
 import os
 import random
 import re
@@ -142,7 +143,8 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py"]
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py",
+              "scripts/tests/test_backlog_rank.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
@@ -8973,8 +8975,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
             except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
                 tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
             try:  # Todo below target is refilled from the Backlog the sync just refreshed, per team
+                # Every team refills on its own mirror and seats; JOV has no extra binding, so it gets the same
+                # floor-less pass (Summer's governor writes the same Todo moves idempotently).
+                refill_for = [types.SimpleNamespace(key="JOV", excluded=("hold",), min_todo=0), *bindings.extra_bindings(THIS)]
                 tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
-                                         for binding in bindings.extra_bindings(THIS)}
+                                         for binding in refill_for}
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
         try:

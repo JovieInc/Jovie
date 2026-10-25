@@ -402,6 +402,14 @@ def tick(state: Path, linear, admit, transient=(), teams=TEAMS) -> dict:
     return report
 
 
+def _read_loose(path: Path) -> dict:
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
 def status(state: Path, now: float | None = None) -> dict:
     """Mirror age and outbox depth for lanes-status, the HUD and the doctor."""
     now = time.time() if now is None else now
@@ -416,7 +424,13 @@ def status(state: Path, now: float | None = None) -> dict:
     entries = outbox.get("entries") or []
     oldest = min((entry.get("enqueuedAt") or now for entry in entries), default=None)
     claims = _claims(state)
-    return {"mirror": mirrors,
+    backlog = {}
+    for team in TEAMS:
+        row = _read_loose(Path(state) / "refill" / f"{team}.json")
+        if row:
+            backlog[team] = {key: row.get(key) for key in ("todo", "target", "backlog", "ready", "readyAgeDaysP50",
+                                                           "readyAgeDaysP95", "deficitSince", "alarm", "at")}
+    return {"mirror": mirrors, "backlog": backlog,
             "outbox": {"depth": len(entries), "oldestAgeS": round(now - oldest) if oldest else None,
                        "dead": len(outbox.get("dead") or [])},
             "claims": {"active": sum(1 for row in claims.values() if row.get("status") == "active"),
@@ -430,6 +444,10 @@ def alerts(view: dict) -> dict[str, str]:
         if row.get("ageS") is not None and row["ageS"] > STALE_ALERT_S:
             found[f"linear-mirror-stale:{team}"] = (f"Linear mirror {team} last synced {row['ageS'] // 3600}h ago; "
                                                     "dispatch continues from it")
+    for team, row in (view.get("backlog") or {}).items():
+        if row.get("alarm"):
+            found[f"backlog-ready-idle:{team}"] = (f"{team}: {row.get('ready')} agent-ready in Backlog while Todo is "
+                                                   f"{row.get('todo')} of {row.get('target')} since the deficit opened")
     outbox = view.get("outbox") or {}
     if (outbox.get("oldestAgeS") or 0) > STALE_ALERT_S:
         found["linear-outbox-stale"] = (f"Linear outbox: {outbox['depth']} writes waiting, "

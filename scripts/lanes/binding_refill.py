@@ -18,10 +18,16 @@ import re
 import time
 from pathlib import Path
 
+import backlog_rank
+
 READY_LABEL = "agent-ready"
 # Labels that mean a human decision, a human-owned task or a container: never auto-promoted.
 HOLD_LABELS = frozenset({"needs-tim", "tim-action-required", "human-review-required", "type:epic",
-                         "hold", "do-not-merge", "reasoning-job", "codex-blocked"})
+                         "hold", "do-not-merge", "reasoning-job", "codex-blocked", "tim-hold", "gated",
+                         "needs-human-decision", "no-auto", "ws:human-decision"})
+FACTORY_FLOOR = 0.20     # factory share of issue runs below this puts factory work first
+ALARM_AFTER_S = 900      # ready Backlog work with Todo below target for this long is an alarm
+GROOM_KEEP = 25
 MIN_DESCRIPTION = 200
 ACCEPTANCE = re.compile(r"(?i)acceptance|accept\b|\bverif(?:y|ication)\b|required outcome|definition of done|\bdone bar\b")
 # "Blocked by LYB-12", "Sequencing: after LYB-138", "depends on LYB-9": an open referenced issue blocks.
@@ -72,9 +78,12 @@ def skip_reason(row: dict, open_ids: set[str], excluded: frozenset[str], red_lin
     return None
 
 
-def select(rows: list[dict], need: int, excluded=(), red_line=lambda row: False) -> tuple[list[dict], dict]:
-    """The next `need` Backlog rows to promote, highest priority first (Urgent..Low, unset last),
-    oldest first within a priority, plus a reason for every Backlog row left behind."""
+def select(rows: list[dict], need: int, excluded=(), red_line=lambda row: False, now: float | None = None,
+           factory_share: float | None = None) -> tuple[list[dict], dict]:
+    """The next `need` Backlog rows to promote in `backlog_rank` order (value x confidence / effort
+    plus age, factory floor first when the fleet is under it), plus a reason for every Backlog
+    row left behind."""
+    now = time.time() if now is None else now
     excluded = frozenset(label.lower() for label in excluded)
     open_ids = {row["identifier"] for row in rows}
     skipped, ready = {}, []
@@ -86,8 +95,49 @@ def select(rows: list[dict], need: int, excluded=(), red_line=lambda row: False)
             skipped[row["identifier"]] = reason
         else:
             ready.append(row)
-    ready.sort(key=lambda row: ((row.get("priority") or 5), row.get("createdAt") or "", row["identifier"]))
-    return ready[:max(0, need)], skipped
+    return backlog_rank.with_factory_floor(backlog_rank.order(ready, now), need, factory_share, FACTORY_FLOOR), skipped
+
+
+def missing_info(row: dict) -> list[str]:
+    """What stops a Backlog row from being agent-ready, in words a cheap grooming pass can act on.
+    Empty when a human label (needs-tim, epic, hold) keeps it out: that is a human decision."""
+    labels = {label.lower() for label in row.get("labels") or ()}
+    if labels & HOLD_LABELS:
+        return []
+    description = row.get("description") or ""
+    found = []
+    if len(description) < MIN_DESCRIPTION:
+        found.append("description under %d chars: state the problem and the scope" % MIN_DESCRIPTION)
+    if not ACCEPTANCE.search(description):
+        found.append("no acceptance criteria: add a checkable Definition of done")
+    if READY_LABEL not in labels and not found:
+        found.append("groomed but not labelled agent-ready: confirm no human gate, then label")
+    return found
+
+
+def groom_queue(rows: list[dict], now: float, keep: int = GROOM_KEEP) -> list[dict]:
+    """Highest-ranked Backlog rows that are not agent-ready yet, with the specific missing info,
+    for the cheap-model readiness pass (capacity registry routing)."""
+    queue = [row for row in rows if row.get("state") == "Backlog" and missing_info(row)]
+    return [{"id": row["identifier"], "score": backlog_rank.score(row, now), "missing": missing_info(row)}
+            for row in backlog_rank.order(queue, now)[:keep]]
+
+
+def view(rows: list[dict], now: float) -> dict:
+    """Backlog health for one team from the mirror: agent-ready count and age p50/p95 in days."""
+    open_ids = {row["identifier"] for row in rows}
+    ages = []
+    for row in rows:
+        if row.get("state") == "Backlog" and skip_reason(row, open_ids, frozenset()) is None:
+            created = backlog_rank._epoch(row.get("createdAt"))
+            if created:
+                ages.append((now - created) / 86400)
+    ages.sort()
+
+    def pick(q):
+        return round(ages[min(len(ages) - 1, int(q * len(ages)))], 1) if ages else None
+    return {"backlog": sum(1 for row in rows if row.get("state") == "Backlog"), "ready": len(ages),
+            "readyAgeDaysP50": pick(0.5), "readyAgeDaysP95": pick(0.95)}
 
 
 def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None) -> dict:
@@ -99,7 +149,7 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
     todo = lane.linear_sync.todo(state, binding.key)
     pending = lane.linear_sync._pending_moves(state)  # promotions still in the outbox count as Todo
     depth, goal = len(todo), target(state, floor)  # todo() already counts promotions waiting in the outbox
-    path = state / "bindings" / binding.key / "refill.json"
+    path = state / "refill" / f"{binding.key}.json"
     try:
         previous = json.loads(path.read_text())
     except (OSError, ValueError):
@@ -112,6 +162,7 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
         if since:
             receipt["lastRefillLatencyS"] = round(now - since, 1)
         receipt["deficitSince"] = None
+        receipt.update(view(rows, now))
         _write(path, receipt)
         return receipt
     receipt["deficitSince"] = since or now
@@ -120,18 +171,47 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
         receipt["held"] = "mirror-stale"
         _write(path, receipt)
         return receipt
-    picked, skipped = select([row for row in rows if pending.get(row["id"]) != "Todo"], goal - depth, binding.excluded,
-                             lambda row: lane.issue_hits_red_line(_issue(lane, row)))
+    live = [row for row in rows if pending.get(row["id"]) != "Todo"]
+    picked, skipped = select(live, goal - depth, binding.excluded, lambda row: lane.issue_hits_red_line(_issue(lane, row)),
+                             now, _factory_share(state))
     outbox = lane.linear_sync.Outboxed(state, linear)
     for row in picked:
         outbox.move(row["id"], "Todo")
-        outbox.comment(row["id"], f"Backlog refill: promoted to Todo (agent-ready, acceptance criteria present, "
-                                  f"no open blocker; {binding.key} Todo was {depth} of {goal}).")
+        outbox.comment(row["id"], f"Backlog refill: promoted to Todo ({binding.key} Todo was {depth} of {goal}; "
+                                  f"agent-ready, acceptance criteria present, no open blocker). Why ranked here: "
+                                  f"{backlog_rank.explain(row, now)}.")
         receipt["promoted"].append(row["identifier"])
+        _log(state, {"at": now, "team": binding.key, "id": row["identifier"],
+                     "backlogAgeS": round(now - (backlog_rank._epoch(row.get("createdAt")) or now)),
+                     "score": backlog_rank.score(row, now), "factory": backlog_rank.is_factory(row)})
     receipt["skipped"] = dict(sorted(skipped.items())[:100])
     receipt["short"] = max(0, goal - depth - len(picked))
+    receipt["groomQueue"] = groom_queue(live, now)
+    receipt.update(view(rows, now))
+    # Guard: ready work waited in Backlog while Todo sat under target. Promotion normally closes the
+    # deficit within a tick, so a deficit this old means writes are not landing.
+    if receipt["deficitSince"] and now - receipt["deficitSince"] > ALARM_AFTER_S and receipt["ready"] > len(picked):
+        receipt["alarm"] = "ready-work-in-backlog"
     _write(path, receipt)
     return receipt
+
+
+def _factory_share(state: Path) -> float | None:
+    """Measured factory share of recent issue runs, written by the doctor; None when never measured."""
+    try:
+        value = json.loads((Path(state) / "factory-share.json").read_text()).get("share")
+        return float(value) if value is not None else None
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
+def _log(state: Path, row: dict) -> None:
+    """Append-only promotion log: time-in-backlog p50/p95 of promoted work is computed from it."""
+    try:
+        with open(Path(state) / "backlog-promotions.jsonl", "a") as handle:
+            handle.write(json.dumps(row) + "\n")
+    except OSError:
+        pass
 
 
 def _issue(lane, row: dict):
