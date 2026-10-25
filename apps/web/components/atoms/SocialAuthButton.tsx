@@ -1,0 +1,62 @@
+// @coverage-via apps/web/tests/unit/auth/AuthProviderButtons.test.tsx
+'use client';
+
+import Image from 'next/image';
+import {
+  getAuthOAuthProviderLabel,
+  type PrimaryAuthOAuthProvider,
+} from '@/lib/auth/oauth-providers';
+import { cn } from '@/lib/utils';
+
+export interface SocialAuthButtonProps {
+  readonly provider: PrimaryAuthOAuthProvider;
+  readonly disabled?: boolean;
+  readonly onClick?: () => void;
+  readonly pending?: boolean;
+}
+
+/**
+ * Provider buttons are the only branded exceptions on the auth form.
+ * Official artwork and provider-specific treatments live in the shared theme.
+ * Provider artwork and the Google Sans license are bundled under public/auth.
+ */
+const AUTH_PROVIDER_BUTTON_CLASS = cn(
+  'auth-provider-button focus-ring-themed w-full',
+  'transition-[background-color,border-color,color,box-shadow,opacity] duration-subtle ease-out',
+  'enabled:hover:opacity-90'
+);
+
+export function SocialAuthButton({
+  provider,
+  disabled = true,
+  onClick,
+  pending = false,
+}: Readonly<SocialAuthButtonProps>) {
+  const label = getAuthOAuthProviderLabel(provider);
+  const isDisabled = disabled || pending;
+
+  return (
+    <button
+      type='button'
+      disabled={isDisabled}
+      aria-label={pending ? `${label} loading` : undefined}
+      data-auth-provider-slot={provider}
+      data-auth-provider-pending={pending ? 'true' : undefined}
+      onClick={onClick}
+      className={cn(
+        AUTH_PROVIDER_BUTTON_CLASS,
+        pending && 'cursor-wait opacity-75'
+      )}
+    >
+      <Image
+        src={`/auth/${provider}-logo.svg`}
+        width={provider === 'apple' ? 24 : 20}
+        height={provider === 'apple' ? 44 : 20}
+        alt=''
+        aria-hidden='true'
+        unoptimized
+      />
+      <span>{label}</span>
+    </button>
+  );
+}

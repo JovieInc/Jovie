@@ -667,3 +667,51 @@ for (const viewport of authModalViewports) {
     });
   }
 }
+
+test('auth modal portals to body and cycles keyboard focus across its controls', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto(
+    '/iframe.html?id=auth-authmodalshell--transformed-ancestor&viewMode=story'
+  );
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  expect(
+    await dialog.evaluate(element => element.parentElement === document.body)
+  ).toBe(true);
+  const first = dialog.getByRole('button', { name: 'Back to homepage' });
+  const last = dialog.getByRole('button', { name: 'Continue', exact: true });
+  await first.focus();
+  await page.keyboard.press('Shift+Tab');
+  await expect(last).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(first).toBeFocused();
+});
+
+test('modal atom contains long-content scrolling within the viewport', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.goto(
+    '/iframe.html?id=molecules-modal--long-content&viewMode=story'
+  );
+  const dialog = page.getByRole('dialog', { name: 'Example dialog' });
+  await expect(dialog).toBeVisible();
+  const before = await dialog.boundingBox();
+  expect(before).not.toBeNull();
+  expect(Math.abs(before!.x + before!.width / 2 - 384)).toBeLessThanOrEqual(2);
+  expect(Math.abs(before!.y + before!.height / 2 - 512)).toBeLessThanOrEqual(2);
+  expect(
+    await dialog.evaluate(
+      element => element.scrollHeight > element.clientHeight
+    )
+  ).toBe(true);
+  await dialog
+    .getByRole('button', { name: 'Continue' })
+    .scrollIntoViewIfNeeded();
+  await expect(
+    dialog.getByRole('button', { name: 'Continue' })
+  ).toBeInViewport();
+  expect(await dialog.boundingBox()).toEqual(before);
+});

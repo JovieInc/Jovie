@@ -252,26 +252,26 @@ describe('auth shell layout contract', () => {
   it.each(AUTH_LAYOUT_VIEWPORTS)(
     '$name ($width) intercepted modal never mounts the editorial card or a fallback split shell',
     ({ width }) => {
-      const { container, unmount } = render(
+      const { unmount } = render(
         <AuthModalShell ariaLabel='Sign in to Jovie'>
           <div>Modal auth form</div>
         </AuthModalShell>
       );
 
       expect(
-        container.querySelector('[data-auth-modal-shell]')
+        document.body.querySelector('[data-auth-modal-shell]')
       ).toHaveAttribute(
         'data-auth-shell-kind',
         AUTH_SHELL_KIND.interceptedModal
       );
       expect(
-        container.querySelector('[data-auth-layout-variant]')
+        document.body.querySelector('[data-auth-layout-variant]')
       ).not.toBeInTheDocument();
       expect(
         screen.queryByTestId(AUTH_EDITORIAL_CARD_TEST_ID)
       ).not.toBeInTheDocument();
       expect(
-        container.querySelector('[data-auth-editorial-card]')
+        document.body.querySelector('[data-auth-editorial-card]')
       ).not.toBeInTheDocument();
       expect(
         editorialCardExpectedVisible('signin-intercepted-modal', width)

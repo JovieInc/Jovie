@@ -1,11 +1,13 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { AuthAppleIcon } from '@/components/features/auth/atoms';
+import { SocialAuthButton } from '@/components/atoms/SocialAuthButton';
+import { APP_ROUTES } from '@/constants/routes';
 import { AuthLayout } from '@/features/auth';
 import { authClient } from '@/lib/auth/client';
+
+const APPLE_START_ERROR = 'Apple sign in could not be started. Try again.';
 
 export function IdentityPageClient() {
   const searchParams = useSearchParams();
@@ -14,7 +16,9 @@ export function IdentityPageClient() {
     ? 'LogYourBody'
     : 'your account';
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() =>
+    searchParams.has('error') ? APPLE_START_ERROR : null
+  );
   const oauthAttemptRef = useRef(0);
 
   useEffect(() => {
@@ -35,17 +39,28 @@ export function IdentityPageClient() {
     setPending(true);
     setError(null);
     try {
-      const result = await authClient.signIn.social({ provider: 'apple' });
+      // Keep provider errors on this surface, preserving any signed client
+      // authorization query. The server validates/resumes that query. Never
+      // use the downstream redirect_uri as an unvalidated browser callback.
+      const returnParams = new URLSearchParams(searchParams.toString());
+      returnParams.delete('error');
+      returnParams.delete('error_description');
+      const query = returnParams.toString();
+      const result = await authClient.signIn.social({
+        provider: 'apple',
+        callbackURL: APP_ROUTES.HOME,
+        errorCallbackURL: `${APP_ROUTES.IDENTITY}${query ? `?${query}` : ''}`,
+      });
       if (result.error) {
         if (oauthAttemptRef.current !== attempt) return;
 
-        setError('Apple sign in could not be started. Try again.');
+        setError(APPLE_START_ERROR);
         setPending(false);
       }
     } catch {
       if (oauthAttemptRef.current !== attempt) return;
 
-      setError('Apple sign in could not be started. Try again.');
+      setError(APPLE_START_ERROR);
       setPending(false);
     }
   }
@@ -62,15 +77,12 @@ export function IdentityPageClient() {
             Use your Apple ID for a fast, private sign in.
           </p>
         </div>
-        <Button
-          type='button'
+        <SocialAuthButton
+          provider='apple'
           disabled={pending}
+          pending={pending}
           onClick={signInWithApple}
-          className='focus-ring-themed flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-primary-token px-5 font-medium text-inverse disabled:opacity-50'
-        >
-          <AuthAppleIcon className='h-5 w-5' />
-          {pending ? 'Opening Apple…' : 'Continue with Apple'}
-        </Button>
+        />
 
         <div className='min-h-5 text-center' aria-live='polite'>
           {error ? (
