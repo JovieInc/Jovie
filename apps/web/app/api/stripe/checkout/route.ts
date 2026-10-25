@@ -13,10 +13,16 @@ import {
   openFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { CHECKOUT_TERMS_VERSION } from '@/lib/billing/checkout-terms';
+import {
+  resolveTrialCarryEnd,
+  toStripeTrialEnd,
+} from '@/lib/billing/trial-carryover';
 import {
   CLAIM_FLOW_COOKIE,
   claimStateHref,
 } from '@/lib/claim/artist-offer-claim';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { publicEnv } from '@/lib/env-public';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
@@ -173,6 +179,9 @@ export async function POST(request: NextRequest) {
       referralCode?: unknown;
       returnTo?: unknown;
       source?: unknown;
+      termsAccepted?: unknown;
+      termsVersion?: unknown;
+      expectedFirstChargeAt?: unknown;
       claimId?: unknown;
       claim_id?: unknown;
       runId?: unknown;
@@ -313,6 +322,40 @@ export async function POST(request: NextRequest) {
       cancelUrl = `${baseUrl}/billing/cancel`;
     }
 
+    // Mid-trial upgrade (consent flow only): the checkout page showed the
+    // artist either "charged today" or "won't be charged until <date>". Re-derive
+    // it here and refuse to start a session whose billing date differs from
+    // what was displayed, instead of silently charging on a different date.
+    let trialEnd: number | undefined;
+    const consentFlow =
+      checkoutSource === 'onboarding' &&
+      parsedBody.data.termsAccepted === true &&
+      parsedBody.data.termsVersion === CHECKOUT_TERMS_VERSION;
+    if (consentFlow) {
+      const entitlements = await getCurrentUserEntitlements({
+        session: 'fresh',
+      });
+      const carriedEnd = resolveTrialCarryEnd({
+        isTrialing: entitlements.isTrialing,
+        trialEndsAt: entitlements.trialEndsAt,
+      });
+      const shown =
+        typeof parsedBody.data.expectedFirstChargeAt === 'string'
+          ? parsedBody.data.expectedFirstChargeAt
+          : null;
+      if ((carriedEnd?.toISOString() ?? null) !== shown) {
+        return NextResponse.json(
+          {
+            error:
+              'Your billing date changed. Refresh the page to review it before upgrading.',
+            code: 'billing_date_changed',
+          },
+          { status: 409, headers: NO_STORE_HEADERS }
+        );
+      }
+      trialEnd = carriedEnd ? toStripeTrialEnd(carriedEnd) : undefined;
+    }
+
     const session = await withStripeRetry('createCheckoutSession', () =>
       createCheckoutSession({
         customerId,
@@ -323,7 +366,17 @@ export async function POST(request: NextRequest) {
         cancelUrl,
         idempotencyKey,
         referralCode,
+        ...(trialEnd ? { trialEnd } : {}),
         ...(hasCheckoutCorrelation(correlation) ? { correlation } : {}),
+        ...(parsedBody.data.termsAccepted === true &&
+        parsedBody.data.termsVersion === CHECKOUT_TERMS_VERSION
+          ? {
+              termsConsent: {
+                version: CHECKOUT_TERMS_VERSION,
+                acceptedAt: new Date().toISOString(),
+              },
+            }
+          : {}),
       })
     );
 

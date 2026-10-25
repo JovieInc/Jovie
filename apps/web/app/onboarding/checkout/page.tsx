@@ -17,7 +17,9 @@ import {
   validatePlan,
 } from '@/lib/auth/plan-intent';
 import { isSelfServiceOffer } from '@/lib/billing/offer-truth';
+import { resolveTrialCarryEnd } from '@/lib/billing/trial-carryover';
 import { PRICING } from '@/lib/config/pricing';
+import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
   hasOnboardingUpgradeOfferState,
@@ -225,6 +227,21 @@ export default async function OnboardingCheckoutPage({
     redirect(stateRedirect ?? APP_ROUTES.DASHBOARD);
   }
 
+  // Mid-trial upgrade: when the artist is still inside their free trial, the
+  // first charge is deferred to the trial end. The route re-derives the same
+  // date and rejects a mismatch (it is never taken on trust from this page).
+  let firstChargeAt: string | null = null;
+  try {
+    const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
+    firstChargeAt =
+      resolveTrialCarryEnd({
+        isTrialing: entitlements.isTrialing,
+        trialEndsAt: entitlements.trialEndsAt,
+      })?.toISOString() ?? null;
+  } catch {
+    // Unknown trial state: say "charged today", never promise a deferral.
+  }
+
   // Durable server-side "offer seen" receipt, recorded only when the offer
   // will actually render, so the once-per-artist gate above is reliable.
   if (isDefaultUpsell && profileData.id) {
@@ -250,6 +267,7 @@ export default async function OnboardingCheckoutPage({
       spotifyFollowers={profileData.spotifyFollowers}
       isDefaultUpsell={isDefaultUpsell}
       proofFindings={proofFindings}
+      firstChargeAt={firstChargeAt}
     />
   );
 }

@@ -64,6 +64,29 @@ describe('checkout validates billable price before session creation', () => {
       mocks.create.mock.invocationCallOrder[0]
     );
   });
+  it('records the billing-terms consent on session and subscription metadata', async () => {
+    await createCheckoutSession({
+      ...args,
+      termsConsent: {
+        version: 'checkout-terms-test',
+        acceptedAt: '2026-10-25T00:00:00.000Z',
+      },
+    });
+    const params = mocks.create.mock.calls[0]?.[0] as {
+      metadata: Record<string, string>;
+      subscription_data: { metadata: Record<string, string> };
+    };
+    for (const metadata of [
+      params.metadata,
+      params.subscription_data.metadata,
+    ]) {
+      expect(metadata).toMatchObject({
+        terms_version: 'checkout-terms-test',
+        terms_accepted_at: '2026-10-25T00:00:00.000Z',
+      });
+    }
+  });
+
   it('persists optional correlation IDs on session and subscription metadata', async () => {
     await createCheckoutSession({
       ...args,

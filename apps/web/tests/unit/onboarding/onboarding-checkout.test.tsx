@@ -172,6 +172,62 @@ describe('OnboardingCheckoutClient', () => {
     );
   });
 
+  it('shows auto-renew and cancel terms with an unchecked consent that gates the CTA', async () => {
+    const user = userEvent.setup();
+    render(<OnboardingCheckoutClient {...defaultProps} />);
+
+    const terms = screen.getByTestId('checkout-terms');
+    expect(terms).toHaveTextContent(
+      'Your card is charged $39.00 today, then every month until you cancel.'
+    );
+    expect(terms).toHaveTextContent('Cancel anytime in Settings.');
+    const consent = screen.getByRole('checkbox', {
+      name: /I agree to be charged \$39\.00 every month, renewing automatically until I cancel/,
+    });
+    expect(consent).not.toBeChecked();
+    const cta = screen.getByRole('button', {
+      name: 'Upgrade to Artist Presence',
+    });
+    expect(cta).toBeDisabled();
+
+    await user.click(cta);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await user.click(consent);
+    expect(cta).toBeEnabled();
+
+    await user.click(screen.getByRole('radio', { name: /annual/i }));
+    expect(terms).toHaveTextContent('$390.00 today, then every year');
+  });
+
+  it('shows the deferred first-charge date and sends it for server confirmation', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({ url: 'https://checkout.stripe.com/session_trial' }),
+    });
+    render(
+      <OnboardingCheckoutClient
+        {...defaultProps}
+        monthlyAmount={1200}
+        firstChargeAt='2026-10-30T00:00:00.000Z'
+      />
+    );
+
+    expect(screen.getByTestId('checkout-terms')).toHaveTextContent(
+      "you won't be charged until October 30, 2026 UTC"
+    );
+    await user.click(
+      screen.getByRole('checkbox', { name: /starting October 30, 2026 UTC/ })
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.expectedFirstChargeAt).toBe('2026-10-30T00:00:00.000Z');
+  });
+
   it('keeps the checkout upgrade CTA on neutral primary button styling', () => {
     const source = readFileSync(
       resolve(appRoot, checkoutClientSourcePath),
@@ -211,6 +267,9 @@ describe('OnboardingCheckoutClient', () => {
 
     await user.click(screen.getByRole('radio', { name: /annual/i }));
     await user.click(
+      screen.getByRole('checkbox', { name: /I agree to be charged/ })
+    );
+    await user.click(
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     );
 
@@ -225,6 +284,9 @@ describe('OnboardingCheckoutClient', () => {
             humanConfirmed: true,
             returnTo: '/app/chat?from=onboarding&panel=profile',
             source: 'onboarding',
+            termsAccepted: true,
+            termsVersion: 'checkout-terms-2026-10-25',
+            expectedFirstChargeAt: null,
           }),
         })
       );
@@ -251,6 +313,9 @@ describe('OnboardingCheckoutClient', () => {
 
     render(<OnboardingCheckoutClient {...defaultProps} />);
 
+    await user.click(
+      screen.getByRole('checkbox', { name: /I agree to be charged/ })
+    );
     await user.click(
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     );
@@ -393,6 +458,9 @@ describe('OnboardingCheckoutClient', () => {
       <OnboardingCheckoutClient {...defaultProps} profileId={profileId} />
     );
 
+    await user.click(
+      screen.getByRole('checkbox', { name: /I agree to be charged/ })
+    );
     await user.click(
       screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
     );

@@ -40,6 +40,12 @@ vi.mock('@/lib/onboarding/upgrade-offer', () => ({
   hasOnboardingUpgradeOfferState: mocks.hasOfferState,
   recordOnboardingUpgradeOfferEvent: mocks.recordOfferEvent,
 }));
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: async () => ({
+    isTrialing: false,
+    trialEndsAt: null,
+  }),
+}));
 vi.mock('./OnboardingCheckoutClient', () => ({
   OnboardingCheckoutClient: () => null,
 }));

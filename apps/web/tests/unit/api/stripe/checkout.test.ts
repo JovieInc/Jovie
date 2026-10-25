@@ -33,6 +33,11 @@ const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 const mockWithStripeRetry = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
+const mockGetEntitlements = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/entitlements/server', () => ({
+  getCurrentUserEntitlements: mockGetEntitlements,
+}));
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
@@ -94,6 +99,10 @@ import { POST } from '@/app/api/stripe/checkout/route';
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetEntitlements.mockResolvedValue({
+      isTrialing: false,
+      trialEndsAt: null,
+    });
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
     mockGetActivePriceIds.mockReturnValue(['price_123']);
@@ -166,6 +175,70 @@ describe('POST /api/stripe/checkout', () => {
           }
         }
       }
+    });
+  });
+
+  describe('onboarding consent checkout and mid-trial upgrade', () => {
+    const post = (body: Record<string, unknown>) =>
+      POST(
+        new NextRequest('http://localhost/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            priceId: 'price_123',
+            source: 'onboarding',
+            humanConfirmed: true,
+            termsAccepted: true,
+            termsVersion: 'checkout-terms-2026-10-25',
+            ...body,
+          }),
+        })
+      );
+    const trialEnd = new Date(Date.now() + 6 * 24 * 3_600_000);
+    trialEnd.setMilliseconds(0);
+
+    beforeEach(() => {
+      mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+      mockCreateCheckoutSession.mockResolvedValue({
+        id: 'cs_trial',
+        url: 'https://checkout.stripe.com/pay/cs_trial',
+      });
+    });
+
+    it('sets trial_end to the entitlement trial end and records consent', async () => {
+      mockGetEntitlements.mockResolvedValue({
+        isTrialing: true,
+        trialEndsAt: trialEnd.toISOString(),
+      });
+      const response = await post({
+        expectedFirstChargeAt: trialEnd.toISOString(),
+      });
+      expect(response.status).toBe(200);
+      const [call] = mockCreateCheckoutSession.mock.calls.at(-1) ?? [];
+      expect(call.trialEnd).toBe(Math.floor(trialEnd.getTime() / 1000));
+      expect(call.termsConsent).toMatchObject({
+        version: 'checkout-terms-2026-10-25',
+      });
+    });
+
+    it('charges today (no trial_end) when the artist is not trialing and the page said so', async () => {
+      const response = await post({ expectedFirstChargeAt: null });
+      expect(response.status).toBe(200);
+      const [call] = mockCreateCheckoutSession.mock.calls.at(-1) ?? [];
+      expect(call.trialEnd).toBeUndefined();
+    });
+
+    it('refuses with 409 when the displayed billing date no longer matches', async () => {
+      mockGetEntitlements.mockResolvedValue({
+        isTrialing: true,
+        trialEndsAt: trialEnd.toISOString(),
+      });
+      const response = await post({ expectedFirstChargeAt: null });
+      expect(response.status).toBe(409);
+      expect(await response.json()).toMatchObject({
+        code: 'billing_date_changed',
+      });
+      expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
     });
   });
 
