@@ -1,0 +1,124 @@
+name: Production Dogfood
+# clock-class: production-liveness
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: A hosted observer reads public production pages (GET only, Tim's public profile and public marketing/auth surfaces, no credentials) and holds only the Linear key needed to file or close its own fingerprinted dogfood issues. It never mutates production and never writes a Production Verified marker.
+# removal-trigger: Remove when the Production Controller dispatches the same mission run on each landed deploy and the 15-minute deploy-detection poll below is redundant.
+#
+# Continuous dogfooding (Tim, 2026-10-25): agents use production like a user,
+# find defects before Tim does, file them with evidence, and certify missions
+# with receipts bound to the deployed SHA. The 15-minute poll is a deploy
+# detector with a 15-minute dwell SLO, not a test clock: the run itself only
+# starts when the served commit changed or the hourly bucket rolled over
+# (published links can break without a deploy, e.g. a YouTube description edit).
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Run even if this SHA was already dogfooded this hour'
+        required: false
+        default: 'false'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-dogfood
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Read served build
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      key: ${{ steps.decide.outputs.key }}
+      sha: ${{ steps.decide.outputs.sha }}
+    steps:
+      - name: Read the served build
+        id: decide
+        run: |
+          set -euo pipefail
+          body="$(curl -fsS --retry 3 --max-time 20 https://jov.ie/api/health/build-info || true)"
+          sha="$(printf '%s' "$body" | jq -r '.commitSha // empty')"
+          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            # Cannot bind to a build: still run so the failure is filed.
+            echo "key=dogfood-unbound-$(date -u +%Y%m%d%H%M)" >> "$GITHUB_OUTPUT"
+            echo "sha=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "key=dogfood-$sha-$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+
+  dogfood:
+    name: Dogfood production
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Skip when already dogfooded
+        id: seen
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: ${{ needs.gate.outputs.sha != '' && inputs.force != 'true' }}
+        with:
+          path: .dogfood-seen
+          key: ${{ needs.gate.outputs.key }}
+          lookup-only: true
+
+      - name: Checkout code
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Setup Node and pnpm
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Setup Playwright (Chromium)
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+        uses: ./.github/actions/setup-playwright
+
+      - name: Run the dogfood missions
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+        id: run
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # Exit 2 means defects were found and filed; that is a successful
+          # observation, not a broken observer.
+          set +e
+          node scripts/prod-dogfood.mjs --out out/prod-dogfood
+          code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -ne 0 ] && [ "$code" -ne 2 ]; then exit "$code"; fi
+
+      - name: Upload receipts, certification and screenshots
+        if: ${{ always() && steps.seen.outputs.cache-hit != 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: prod-dogfood
+          path: out/prod-dogfood
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Remember this SHA for the hour
+        if: ${{ success() && needs.gate.outputs.sha != '' && steps.seen.outputs.cache-hit != 'true' }}
+        run: mkdir -p .dogfood-seen && date -u +%FT%TZ > .dogfood-seen/at
+      - name: Save seen marker
+        if: ${{ success() && needs.gate.outputs.sha != '' && steps.seen.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .dogfood-seen
+          key: ${{ needs.gate.outputs.key }}

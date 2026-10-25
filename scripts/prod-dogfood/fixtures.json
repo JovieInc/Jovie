@@ -1,0 +1,66 @@
+{
+  "$comment": "Authorized read-only fixtures for the production dogfood agent. Tim's real public artist profile only; no writes, no credentials. Identity ids are copied from apps/web/lib/spotify/blacklist (TIM_WHITE_SPOTIFY_ID) and the verified 2026-10-24 dogfood record.",
+  "base": "https://jov.ie",
+  "artist": {
+    "handle": "tim",
+    "name": "Tim White",
+    "spotifyArtistId": "4Uwpa6zW3zzCSQvooQNksm",
+    "appleArtistId": "859547284",
+    "youtubeChannelIds": [
+      "UC90tJdD38139ytPUdEZVl1A",
+      "UCjJ-tn5dij5FuxR1p4ikDRQ"
+    ],
+    "youtubeHandle": "timwhite"
+  },
+  "publishedLinks": [
+    {
+      "url": "https://jov.ie/tim/take-me-over",
+      "source": "YouTube uz3IZdedIJE description (Take Me Over lyric video, 2024-04-01)"
+    },
+    {
+      "url": "https://jov.ie/tim/seaside-heights",
+      "source": "YouTube dZwdRmqVwrI description (Seaside Heights lyric video, 2024-04-03)"
+    }
+  ],
+  "publicSurfaces": [
+    {
+      "path": "/",
+      "mustInclude": "Jovie"
+    },
+    {
+      "path": "/pricing",
+      "mustInclude": "$"
+    },
+    {
+      "path": "/signin",
+      "mustInclude": "email"
+    },
+    {
+      "path": "/signup",
+      "mustInclude": "email"
+    },
+    {
+      "path": "/robots.txt",
+      "mustInclude": "Sitemap"
+    },
+    {
+      "path": "/sitemap.xml",
+      "mustInclude": "<urlset"
+    }
+  ],
+  "rendered": {
+    "maxReleasePages": 6,
+    "viewports": [
+      {
+        "name": "phone",
+        "width": 390,
+        "height": 844
+      },
+      {
+        "name": "desktop",
+        "width": 1440,
+        "height": 900
+      }
+    ]
+  }
+}
