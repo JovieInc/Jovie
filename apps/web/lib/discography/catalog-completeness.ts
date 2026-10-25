@@ -6,7 +6,13 @@ import { discogReleases } from '@/lib/db/schema/content';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
-import { classifyForPublication } from './publication-eligibility';
+import { getDecidedKeys, getIdentityDecisionRates } from './identity-review';
+import {
+  classifyPublication,
+  type DecisionRate,
+  providerAlbumIdOf,
+  suggestAutoPublishReasons,
+} from './publication-eligibility';
 import { syncReleasesFromSpotify } from './spotify-import';
 
 /**
@@ -151,6 +157,7 @@ export async function reconcileUndecidedIngestedReleases(
     FROM discog_releases r
     WHERE r.creator_profile_id = ${creatorProfileId} AND r.deleted_at IS NULL
   `);
+  const decided = await getDecidedKeys(creatorProfileId);
   const releases = all.rows.map(r => ({
     id: r.id,
     title: r.title,
@@ -161,9 +168,13 @@ export async function reconcileUndecidedIngestedReleases(
   let queuedForReview = 0;
   for (const row of all.rows) {
     if (row.decided || !row.eligible) continue;
+    // The artist already answered "Is this you?" for this release.
+    if (decided.has(providerAlbumIdOf(row.metadata) ?? `release:${row.id}`)) {
+      continue;
+    }
     const candidate = releases.find(r => r.id === row.id);
     if (!candidate) continue;
-    const decision = classifyForPublication(
+    const { decision } = classifyPublication(
       candidate,
       releases,
       ownerSpotifyId
@@ -268,6 +279,15 @@ export async function runCatalogCompleteness(options: {
     readonly imported: number;
     readonly failed: number;
   };
+  /**
+   * Measured "Is this you?" outcomes per reason, and the reasons whose accept
+   * rate is high enough (min sample, low reject rate) to be promoted from a
+   * prompt to auto-publish. Promotion is a deliberate change, never automatic.
+   */
+  readonly identity: {
+    readonly rates: DecisionRate[];
+    readonly autoPublishSuggestions: string[];
+  };
 }> {
   const now = options.now ?? new Date();
   const handleFilter =
@@ -303,7 +323,15 @@ export async function runCatalogCompleteness(options: {
 
   const sum = (pick: (r: CatalogCompletenessProfileReport) => number) =>
     profiles.reduce((acc, r) => acc + pick(r), 0);
+  const rates = await getIdentityDecisionRates().catch(() => []);
   return {
+    identity: {
+      rates,
+      autoPublishSuggestions: suggestAutoPublishReasons(rates, {
+        minDecisions: 20,
+        maxRejectRate: 0.05,
+      }),
+    },
     profiles,
     totals: {
       profiles: profiles.length,

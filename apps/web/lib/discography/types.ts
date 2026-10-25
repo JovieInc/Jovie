@@ -173,6 +173,12 @@ export interface ReleaseViewModel {
   hasVideoLinks?: boolean;
   /** Editable lyrics text stored in release metadata */
   lyrics?: string;
+  /**
+   * Set when the importer was not confident this release is the artist's: the
+   * row shows an "Is this you?" prompt (Accept / Reject) instead of going
+   * public. `provenance` says where it came from and why we are unsure.
+   */
+  identityReview?: { reason: string; provenance: string } | null;
   /** Preview audio URL (typically from the primary track) */
   previewUrl?: string | null;
   /**

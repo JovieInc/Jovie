@@ -40,6 +40,7 @@ import {
 } from './artist-queries';
 import { reconcileCreditedArtistProfiles } from './collaborator-profile-reconciliation';
 import { discoverLinksForRelease } from './discovery';
+import { getDecidedKeys } from './identity-review';
 import {
   getReleasesForProfile,
   type ReleaseWithProviders,
@@ -564,12 +565,20 @@ export async function importReleasesFromSpotify(
           albumsToImport,
           fullAlbumMap
         );
-        result.total = canonicalAlbums.length;
+        // A release the artist rejected ("Is this you?") is never re-imported.
+        const rejectedAlbumIds = await getDecidedKeys(
+          creatorProfileId,
+          'rejected'
+        );
+        const importableAlbums = canonicalAlbums.filter(
+          album => !rejectedAlbumIds.has(album.id)
+        );
+        result.total = importableAlbums.length;
 
         // 3. Import each canonical album
         await importAlbumBatch(
           creatorProfileId,
-          canonicalAlbums,
+          importableAlbums,
           fullAlbumMap,
           effectiveMaxTracksPerRelease,
           result

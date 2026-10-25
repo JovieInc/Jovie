@@ -57,6 +57,11 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
+const mockGetDecidedKeys = vi.fn().mockResolvedValue(new Set<string>());
+vi.mock('@/lib/discography/identity-review', () => ({
+  getDecidedKeys: (...args: unknown[]) => mockGetDecidedKeys(...args),
+}));
+
 const mockGetSpotifyArtistAlbums = vi
   .fn()
   .mockResolvedValue({ albums: [], total: 0, complete: true });
@@ -310,6 +315,42 @@ describe('spotify-import', () => {
         reconciliationError,
         { source: 'spotify_import', creatorProfileId: 'profile-123' }
       );
+    });
+
+    it('never re-imports a release the artist rejected ("Is this you?")', async () => {
+      const album = (id: string) => ({
+        id,
+        name: `Album ${id}`,
+        album_type: 'single',
+        total_tracks: 1,
+        release_date: '2020-05-14',
+        release_date_precision: 'day',
+        artists: [{ id: 'artist-1', name: 'Test Artist' }],
+        images: [],
+      });
+      mockGetSpotifyArtistAlbums.mockResolvedValueOnce({
+        albums: [album('kept'), album('rejected-album')],
+        total: 2,
+        complete: true,
+      });
+      mockGetDecidedKeys.mockResolvedValueOnce(new Set(['rejected-album']));
+      mockUpsertRelease.mockClear();
+
+      const { importReleasesFromSpotify } = await import(
+        '@/lib/discography/spotify-import'
+      );
+      const result = await importReleasesFromSpotify(
+        'profile-123',
+        '6Ghvu1VvMGScGpOUJBAHNH'
+      );
+
+      expect(mockGetDecidedKeys).toHaveBeenCalledWith(
+        'profile-123',
+        'rejected'
+      );
+      expect(result.imported).toBe(1);
+      expect(mockUpsertRelease).toHaveBeenCalledTimes(1);
+      expect(mockUpsertRelease.mock.calls[0]?.[0]?.title).toBe('Album kept');
     });
 
     it('should truncate releases when exceeding max limit', async () => {

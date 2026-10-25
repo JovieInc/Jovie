@@ -1,13 +1,13 @@
 /**
  * Publication eligibility for ingested releases that have no approval row.
  *
- * - publish: provider-verified identity (provider album id, owner is a credited
- *   album artist by provider id) and not an ambiguous duplicate.
- * - review: anything ambiguous (no provider id, owner not credited by id, or
- *   a same-title/same-artists/same-date sibling with another provider id).
- *   These go to the existing `needs_review` queue; nothing is published.
+ * - publish (high confidence): provider-verified identity (provider album id,
+ *   owner is a credited album artist by provider id) and not an ambiguous
+ *   duplicate. Shown publicly.
+ * - review (unsure): everything else. NOT published; shown in the dashboard
+ *   release list as an "Is this you?" row the artist accepts or rejects.
  * Artist decisions are never touched: releases that already have an approval
- * row (including hidden/archived) are not candidates at all.
+ * row (including hidden/archived) or an identity decision are not candidates.
  */
 
 export interface PublicationCandidate {
@@ -19,9 +19,22 @@ export interface PublicationCandidate {
 
 export type PublicationDecision = 'publish' | 'review';
 
+/** Why the importer is (not) confident. Stored with the artist's decision. */
+export type PublicationReason =
+  | 'verified'
+  | 'no_provider_id'
+  | 'owner_not_credited'
+  | 'duplicate_candidate';
+
+export interface PublicationClassification {
+  readonly decision: PublicationDecision;
+  readonly reason: PublicationReason;
+}
+
 function parse(metadata: unknown): {
   spotifyId: string | null;
   artistIds: string[];
+  artistNames: string[];
 } {
   const record =
     metadata && typeof metadata === 'object'
@@ -30,16 +43,20 @@ function parse(metadata: unknown): {
   const artists = Array.isArray(record.spotifyArtists)
     ? record.spotifyArtists
     : [];
+  const entries = artists.filter(
+    (a): a is { id?: unknown; name?: unknown } => !!a && typeof a === 'object'
+  );
   return {
     spotifyId:
       typeof record.spotifyId === 'string' && record.spotifyId.trim() !== ''
         ? record.spotifyId
         : null,
-    artistIds: artists
-      .map(a =>
-        a && typeof a === 'object' ? (a as { id?: unknown }).id : null
-      )
+    artistIds: entries
+      .map(a => a.id)
       .filter((id): id is string => typeof id === 'string' && id !== ''),
+    artistNames: entries
+      .map(a => a.name)
+      .filter((n): n is string => typeof n === 'string' && n !== ''),
   };
 }
 
@@ -51,14 +68,18 @@ const norm = (value: string) =>
 
 const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : '');
 
-export function classifyForPublication(
+export function classifyPublication(
   candidate: PublicationCandidate,
   allReleases: readonly PublicationCandidate[],
   ownerSpotifyId: string | null
-): PublicationDecision {
+): PublicationClassification {
   const own = parse(candidate.metadata);
-  if (!own.spotifyId || !ownerSpotifyId) return 'review';
-  if (!own.artistIds.includes(ownerSpotifyId)) return 'review';
+  if (!own.spotifyId || !ownerSpotifyId) {
+    return { decision: 'review', reason: 'no_provider_id' };
+  }
+  if (!own.artistIds.includes(ownerSpotifyId)) {
+    return { decision: 'review', reason: 'owner_not_credited' };
+  }
 
   const key = (c: PublicationCandidate, ids: string[]) =>
     `${norm(c.title)}|${[...ids].sort().join(',')}|${day(c.releaseDate)}`;
@@ -70,5 +91,70 @@ export function classifyForPublication(
       meta.spotifyId !== own.spotifyId && key(other, meta.artistIds) === mine
     );
   });
-  return duplicate ? 'review' : 'publish';
+  return duplicate
+    ? { decision: 'review', reason: 'duplicate_candidate' }
+    : { decision: 'publish', reason: 'verified' };
+}
+
+export function classifyForPublication(
+  candidate: PublicationCandidate,
+  allReleases: readonly PublicationCandidate[],
+  ownerSpotifyId: string | null
+): PublicationDecision {
+  return classifyPublication(candidate, allReleases, ownerSpotifyId).decision;
+}
+
+/** Provider album id a candidate was imported from, if any. */
+export function providerAlbumIdOf(metadata: unknown): string | null {
+  return parse(metadata).spotifyId;
+}
+
+/** One-line provenance shown on the "Is this you?" row. */
+export function describeProvenance(
+  candidate: PublicationCandidate,
+  reason: PublicationReason
+): string {
+  const meta = parse(candidate.metadata);
+  const year = candidate.releaseDate
+    ? String(candidate.releaseDate.getUTCFullYear())
+    : null;
+  const credited = meta.artistNames.length
+    ? `credited to ${meta.artistNames.join(', ')}`
+    : 'no artist credit on file';
+  const found = meta.spotifyId ? 'Found on Spotify' : 'Found in your catalog';
+  const why: Record<PublicationReason, string> = {
+    verified: '',
+    no_provider_id: 'no Spotify match id',
+    owner_not_credited: "your Spotify artist id isn't credited",
+    duplicate_candidate: 'looks like another release you have',
+  };
+  return [found, year, credited, why[reason] ? `unsure: ${why[reason]}` : null]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+export interface DecisionRate {
+  readonly reason: string;
+  readonly accepted: number;
+  readonly rejected: number;
+}
+
+/**
+ * Tune the confidence bar from measured outcomes: a reason whose artists
+ * accept (nearly) every prompt is safe to promote to auto-publish; one that is
+ * rejected often must stay a prompt. Needs a minimum sample before any change.
+ */
+export function suggestAutoPublishReasons(
+  rates: readonly DecisionRate[],
+  options: { minDecisions: number; maxRejectRate: number }
+): string[] {
+  return rates
+    .filter(r => {
+      const total = r.accepted + r.rejected;
+      return (
+        total >= options.minDecisions &&
+        r.rejected / total <= options.maxRejectRate
+      );
+    })
+    .map(r => r.reason);
 }
