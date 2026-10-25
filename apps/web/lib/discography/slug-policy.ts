@@ -21,6 +21,7 @@
 
 export type SlugQualifier =
   | 'bare'
+  | 'established'
   | 'version'
   | 'co_primary'
   | 'featured'
@@ -167,17 +168,28 @@ export function compareForBareSlug(a: SlugItem, b: SlugItem): number {
 
 /**
  * Assign a slug to every item. `reserved` are slugs that must not be used
- * (for example redirects owned by content outside this plan).
+ * (for example redirects owned by content outside this plan). `pinned` items
+ * have an ESTABLISHED canonical URL (publicly live, not a bug-made numeric
+ * suffix): they keep their slug, never lose the bare slug to a newer or
+ * better-ranked sibling, and everyone else plans around them.
  */
 export function planSlugs(
   items: readonly SlugItem[],
-  reserved: ReadonlySet<string> = new Set()
+  reserved: ReadonlySet<string> = new Set(),
+  pinned: ReadonlySet<string> = new Set()
 ): Map<string, SlugAssignment> {
   const taken = new Set(reserved);
   const result = new Map<string, SlugAssignment>();
 
+  for (const item of items) {
+    if (!pinned.has(item.key)) continue;
+    taken.add(item.currentSlug);
+    result.set(item.key, { slug: item.currentSlug, qualifier: 'established' });
+  }
+
   const groups = new Map<string, SlugItem[]>();
   for (const item of items) {
+    if (pinned.has(item.key)) continue;
     const base = slugify(item.title) || 'untitled';
     groups.set(base, [...(groups.get(base) ?? []), item]);
   }
