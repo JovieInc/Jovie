@@ -6,12 +6,19 @@ export type PaceVerdict =
   | 'reset-passed'
   | 'unconfirmed'
   | 'unknown';
-export type CreditVerdict = 'exhausts-before-expiry' | 'unspent-at-expiry' | 'on-pace' | 'unknown';
+export type CreditVerdict =
+  | 'exhausts-before-expiry'
+  | 'unspent-at-expiry'
+  | 'on-pace'
+  | 'unknown';
 
 export interface CapacityRegistry {
   readonly schema: string;
   readonly updatedAt: string;
-  readonly thresholds: { readonly liveMaxAgeHours: number; readonly manualMaxAgeDays: number };
+  readonly thresholds: {
+    readonly liveMaxAgeHours: number;
+    readonly manualMaxAgeDays: number;
+  };
   readonly policies: Record<string, { readonly rule: string }>;
   readonly providers: readonly unknown[];
 }
@@ -80,7 +87,11 @@ export interface ProviderView {
   readonly agents: readonly string[];
   readonly lane: string | null;
   readonly usageModel: string;
-  readonly policy: { readonly id: string; readonly rule: string; readonly delegation?: string };
+  readonly policy: {
+    readonly id: string;
+    readonly rule: string;
+    readonly delegation?: string;
+  };
   readonly limits: Record<string, unknown>;
   readonly decision: Record<string, string> | null;
   readonly metrics: ProviderMetrics | null;
@@ -88,7 +99,10 @@ export interface ProviderView {
   readonly joinedSpend: readonly {
     readonly id: string;
     readonly kind: string;
-    readonly cap: { readonly amountUsd: number; readonly period: string } | null;
+    readonly cap: {
+      readonly amountUsd: number;
+      readonly period: string;
+    } | null;
     readonly snapshot: Record<string, unknown> | null;
   }[];
   readonly monthlyUsd: number;
@@ -116,7 +130,10 @@ export interface CapacityAlert {
 export interface CapacityView {
   readonly generatedAt: string;
   readonly providers: readonly ProviderView[];
-  readonly totals: { readonly monthlyUsd: number; readonly stale: readonly string[] };
+  readonly totals: {
+    readonly monthlyUsd: number;
+    readonly stale: readonly string[];
+  };
   readonly metricsMeta: {
     readonly windowDays: number | null;
     readonly mergedInWindow: number | null;
@@ -127,7 +144,10 @@ export interface CapacityView {
 }
 
 export interface LiveOverlay {
-  readonly accounts?: Record<string, { readonly quota?: object; readonly credits?: object }>;
+  readonly accounts?: Record<
+    string,
+    { readonly quota?: object; readonly credits?: object }
+  >;
   readonly metrics?: {
     readonly windowDays?: number;
     readonly mergedInWindow?: number;
@@ -145,7 +165,11 @@ export function validateRegistry(
 ): string[];
 export function evaluateRegistry(
   registry: unknown,
-  options?: { now?: number; live?: LiveOverlay; spend?: { providers?: readonly unknown[] } }
+  options?: {
+    now?: number;
+    live?: LiveOverlay;
+    spend?: { providers?: readonly unknown[] };
+  }
 ): CapacityView;
 export function capacityAlerts(view: CapacityView): CapacityAlert[];
 export function routingOrder(
