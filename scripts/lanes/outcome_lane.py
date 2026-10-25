@@ -419,9 +419,13 @@ def help_followups(host, linear, now: float, run=lifecycle.run) -> list[dict]:
                     decision = {"status": "fail", "reason": "help-reply-contradicts",
                                 "items": [{"criterion": res["gap"]["criterion"], "status": "fail",
                                            "evidence": res["gap"]["resolved"]["result"][:500]}]}
-                    record_receipt(Path(host.repo), res["issue"], res["sha"], decision,
-                                   f"{res['issue']} (agent help reply {res['gap']['helpCorr']})",
-                                   {"receiptNotBefore": res.get("episode")}, authorization, run=run)
+                    tree = checkout(host.repo, host.state / "outcome-worktrees", res["sha"], run=run)
+                    try:  # the host clone can predate the receipt CLI; use a checkout of the verified sha
+                        record_receipt(tree, res["issue"], res["sha"], decision,
+                                       f"{res['issue']} (agent help reply {res['gap']['helpCorr']})",
+                                       {"receiptNotBefore": res.get("episode")}, authorization, run=run)
+                    finally:
+                        drop_checkout(host.repo, tree, run=run)
     except lane_errors() as error:  # a Linear hiccup never blocks the drain
         out.append({"error": type(error).__name__})
     return out
