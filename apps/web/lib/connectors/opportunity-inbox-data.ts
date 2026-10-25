@@ -54,7 +54,14 @@ const BASE_SELECTION = {
   createdAt: suggestedActions.createdAt,
 } as const;
 
-function pendingForUser(userId: string): SQL | undefined {
+/**
+ * The one selector for "pending creator-facing Inbox work" (JOV-8968). The
+ * Inbox feed and the sidebar bell count both read through this condition so
+ * attention state can never disagree with what the Inbox actually shows —
+ * workflow recordings (Ovie) and operator-source actions are excluded for
+ * founders using Jovie, not just hidden from the feed.
+ */
+export function pendingForUser(userId: string): SQL | undefined {
   return and(
     eq(suggestedActions.userId, userId),
     eq(suggestedActions.status, 'pending'),

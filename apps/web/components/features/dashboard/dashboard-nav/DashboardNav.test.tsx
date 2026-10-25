@@ -290,6 +290,44 @@ describe('DashboardNav route warming', () => {
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
+  it('reads the bell badge from the shared Inbox count with singular/plural copy (JOV-8968)', () => {
+    const singular = renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        inboxNavigation: { state: 'available', pendingCount: 1 },
+      },
+    });
+    // One pending item reads "1 pending item", and the badge count equals the
+    // shared Inbox availability count — never "1 pending items".
+    const singularBadge = singular.getByRole('status', {
+      name: '1 pending item',
+    });
+    expect(singularBadge).toHaveTextContent('1');
+    singular.unmount();
+
+    const plural = renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        inboxNavigation: { state: 'available', pendingCount: 2 },
+      },
+    });
+    const pluralBadge = plural.getByRole('status', {
+      name: '2 pending items',
+    });
+    expect(pluralBadge).toHaveTextContent('2');
+    plural.unmount();
+
+    const empty = renderDashboardNav({
+      renderFn: render,
+      overrides: {
+        inboxNavigation: { state: 'empty', pendingCount: 0 },
+      },
+    });
+    // Zero pending Inbox work: no badge at all.
+    expect(empty.queryByRole('status')).toBeNull();
+    empty.unmount();
+  });
+
   it('labels the header bell Inbox only when INBOX_HOME is on', () => {
     const view = renderDashboardNav({
       renderFn: render,

@@ -1,3 +1,4 @@
+import { PgDialect } from 'drizzle-orm/pg-core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getDashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 
@@ -32,12 +33,14 @@ const {
   outcomes,
   setupFailures,
   txStates,
+  whereClauses,
   withDbSessionTxMock,
 } = vi.hoisted(() => {
   const cleanupGates = new Map<number, () => Promise<void>>();
   const outcomes: QueryOutcome[] = [];
   const setupFailures = new Map<number, QueryOutcome>();
   const txStates: TxState[] = [];
+  const whereClauses: unknown[] = [];
 
   function createAbortedTxError(): Error & { code?: string } {
     const error = new Error(
@@ -60,7 +63,12 @@ const {
         const builder: Record<string, unknown> = {};
         const chain = () => builder;
         builder.from = chain;
-        builder.where = chain;
+        // JOV-8968: capture every where clause so tests can assert the exact
+        // conditions the dashboard reads run with (shared Inbox selector).
+        builder.where = (clause: unknown) => {
+          whereClauses.push(clause);
+          return builder;
+        };
         builder.limit = chain;
         builder.orderBy = chain;
         // Thenable: drizzle query builders are awaited directly. Once the
@@ -130,6 +138,7 @@ const {
     outcomes,
     setupFailures,
     txStates,
+    whereClauses,
     withDbSessionTxMock,
   };
 });
@@ -415,6 +424,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     outcomes.length = 0;
     setupFailures.clear();
     txStates.length = 0;
+    whereClauses.length = 0;
   });
 
   it('confines a failing supplementary read to its own transaction — no 25P02 cascade', async () => {
@@ -637,7 +647,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     // wraps the PG error — outer message names the query, the 42P01 code and
     // "relation does not exist" live on the cause.
     const driftError = new Error(
-      'Failed query: select count(*) from "suggested_actions" where ("suggested_actions"."user_id" = $1 and "suggested_actions"."status" = $2)',
+      'Failed query: select count(*) from "suggested_actions" where ("suggested_actions"."user_id" = $1 and "suggested_actions"."status" = $2 and ("suggested_actions"."kind" <> $3 and "suggested_actions"."kind" not ilike $4 and "suggested_actions"."kind" not ilike $5 and "suggested_actions"."kind" not ilike $6))',
       {
         cause: Object.assign(
           new Error('relation "suggested_actions" does not exist'),
@@ -678,6 +688,60 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
       height: 1024,
     });
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('reads the Inbox bell count through the shared creator-inbox selector (JOV-8968)', async () => {
+    // The bell's suggested-actions count must run through the Inbox feed's
+    // own pending selector: same owner/status filter plus the creator-inbox
+    // source condition. A pending workflow recording or operator-source
+    // action would otherwise light the bell on an Inbox the creator sees
+    // as empty (JOV-8968: "1 items Need Attention" with a clear Inbox).
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 1 }]), // Inbox suggested-actions count read
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    // One creator-facing pending item: the bell counts it and stays honest
+    // about the singular/plural copy downstream.
+    expect(result.inboxNavigation).toEqual({
+      state: 'available',
+      pendingCount: 1,
+    });
+
+    const dialect = new PgDialect();
+    const rendered = whereClauses.flatMap(clause => {
+      try {
+        return [dialect.sqlToQuery(clause as never)];
+      } catch {
+        // Not every captured clause renders in isolation; skip it.
+        return [];
+      }
+    });
+    const bellCountQueries = rendered.filter(
+      query =>
+        query.sql.includes('"suggested_actions"."kind" <>') &&
+        query.sql.includes('"suggested_actions"."user_id" =')
+    );
+    expect(bellCountQueries.length).toBeGreaterThanOrEqual(1);
+    const [bellCountQuery] = bellCountQueries;
+    // The count read carries the feed's full creator-inbox source condition:
+    // workflow_capture.request recordings and founder./ops./ovie. operator
+    // kinds are excluded, exactly like the Inbox feed.
+    expect(bellCountQuery.sql).toContain('"suggested_actions"."status" =');
+    expect(bellCountQuery.sql).toContain('not ilike');
+    expect(bellCountQuery.params).toContain('pending');
+    expect(bellCountQuery.params).toContain('workflow_capture.request');
+    expect(bellCountQuery.params).toContain('founder.%');
+    expect(bellCountQuery.params).toContain('ops.%');
+    expect(bellCountQuery.params).toContain('ovie.%');
   });
 
   it('degrades the Inbox tour-dates count log-only on statement timeout (JOV-5754)', async () => {
