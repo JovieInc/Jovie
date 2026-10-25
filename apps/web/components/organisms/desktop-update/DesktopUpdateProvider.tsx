@@ -93,9 +93,17 @@ export function DesktopUpdateProvider({
 
   const later = () => {
     setOpen(false);
-    if (availableVersion) {
-      setDismissedVersion(availableVersion);
-      writeDismissedVersion(availableVersion);
+    // JOV-9023: the ready prompt names the version too. Later on it must
+    // record that version, or the next re-check replays available for the
+    // same build (a workspace switch remounts this provider) and the modal
+    // interrupts again minutes after the person said Later.
+    const deferredVersion =
+      state.state === 'available' || state.state === 'ready'
+        ? state.version
+        : null;
+    if (deferredVersion) {
+      setDismissedVersion(deferredVersion);
+      writeDismissedVersion(deferredVersion);
     }
   };
 

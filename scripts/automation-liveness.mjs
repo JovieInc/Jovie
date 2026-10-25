@@ -440,7 +440,7 @@ async function readUnshippedRange(url, { client, fetchImpl, token }) {
  * as old as the oldest missing commit has been on main. Unreadable is unknown
  * (red), never healthy.
  */
-export async function observeProductionFreshness(
+async function observeProductionFreshnessProof(
   receipt,
   { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API, lsRemote }
 ) {
@@ -499,6 +499,30 @@ export async function observeProductionFreshness(
     lastProofAt: landedAt,
     reason: `${compare.body.ahead_by}-commits-unshipped`,
   };
+}
+
+const FEED_BUDGET_MIN_MINUTES = 60;
+const FEED_BUDGET_MAX_MINUTES = 24 * 60;
+
+/**
+ * Production promotion heartbeat with ONE source of truth for its silence budget: the measured p95 of normal
+ * merge-to-production lag, recomputed weekly by the lanes doctor and published in the lanes feed
+ * (`deployHealth.limits[repo].ageS`). Bounded to 1 to 24 hours; an unreadable or out-of-bounds feed falls back to
+ * the receipt's own `fallbackBudgetMinutes` (246, the p95 measured 2026-10-25), never a separate static budget.
+ */
+export async function observeProductionFreshness(receipt, context) {
+  const proof = await observeProductionFreshnessProof(receipt, context);
+  if (!proof.ok || !receipt.limitsUrl) return proof;
+  const feed = await readJson(context.fetchImpl, receipt.limitsUrl);
+  const ageS = feed.ok
+    ? feed.body?.deployHealth?.limits?.[receipt.repo]?.ageS
+    : undefined;
+  const minutes = Number.isFinite(ageS) ? Math.ceil(ageS / 60) : NaN;
+  const budgetMinutes =
+    minutes >= FEED_BUDGET_MIN_MINUTES && minutes <= FEED_BUDGET_MAX_MINUTES
+      ? minutes
+      : receipt.fallbackBudgetMinutes;
+  return { ...proof, budgetMinutes };
 }
 
 /**

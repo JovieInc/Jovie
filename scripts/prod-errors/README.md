@@ -21,11 +21,18 @@ On main, a run cancelled by a newer push (different head SHA in the same concurr
 normal supersession and never alerts; three DISTINCT cancels with no newer run superseding them,
 or a newest run still unfinished past `PROD_ERRORS_RUN_TIMEOUT_S` (2h), alert once per run.
 
-Rules: golden-path flows (checkout, auth, onboarding, public profile/track pages, navigation) trigger
-at any count; others at `PROD_ERRORS_USER_THRESHOLD` (25) users. One Linear issue per Sentry ID
-(labels `sentry:<id>`, `golden-path`). Closed means zero events for 24h after the fix merged; only
-the verifier closes, and a later event reopens and escalates. Money, Stripe, config/env, secrets
-and destructive data get `human-gate` + `hold` and an alert to Tim (🚨 for checkout).
+Rules: only `environment:production` is swept (preview/staging errors are not production errors and never
+page). A production issue qualifies at 1+ user, 3+ events (`PROD_ERRORS_USER_THRESHOLD`,
+`PROD_ERRORS_EVENT_THRESHOLD`), any golden-path flow (checkout, auth, onboarding, public profile/track
+pages, navigation), or Sentry `regressed`/`escalating`. If Sentry's Linear integration already linked a Linear
+issue it is adopted (no duplicate); same project+title issues with no link share ONE rolled-up Linear issue.
+Otherwise one Linear issue per Sentry ID (labels `sentry:<id>`, `golden-path`). Closed means zero events for
+24h after the fix merged; only the verifier closes (with a receipt comment), and a later event reopens and
+escalates. Money, Stripe, config/env, secrets and destructive data get `human-gate` + `hold` and an alert to Tim.
+
+Metrics (every sweep): `sentry-loop-metrics.json` (unresolved prod issues, users/events 24h, first-seen to
+closed p50/p95 hours, regression rate, top by impact; also in `bottleneck-fragment.json` as `sentry_loop`)
+and a trend line in `sentry-loop-metrics.jsonl`.
 
 State: `~/.local/state/jovie-prod-errors/` (`ledger.json`, `heartbeats/`, `alerts.jsonl`,
 `bottleneck-fragment.json` = `pipeline-bottleneck/v1` fields `golden_path_sentry` + `watcher_health`).

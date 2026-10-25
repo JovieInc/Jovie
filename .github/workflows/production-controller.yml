@@ -911,6 +911,7 @@ jobs:
           EXPECTED_VERCEL_ENVIRONMENT=production \
           VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" \
           VERCEL_VERIFY_PUBLIC_SURFACES=true \
+          VERCEL_VERIFY_LINKED_RELEASES=tim \
           VERCEL_PROBE_TIMEOUT_MS=180000 \
             node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar
 
@@ -1555,6 +1556,9 @@ jobs:
           ref: main
           fetch-depth: 0
           persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc

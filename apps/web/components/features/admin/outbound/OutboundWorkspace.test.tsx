@@ -72,6 +72,31 @@ function renderWorkspace() {
 }
 
 describe('OutboundWorkspace', () => {
+  it('keeps table headers through loading and shows one quiet empty line', () => {
+    mockQueue(undefined, { isLoading: true });
+    const { container, rerender } = renderWorkspace();
+    const headers = screen.getAllByRole('columnheader');
+    expect(
+      container.querySelectorAll('[data-slot="skeleton"]').length
+    ).toBeGreaterThan(0);
+    const loadingCells = container.querySelectorAll('tbody tr:first-child td');
+    expect(
+      loadingCells[0]?.querySelector('.system-b-table-skeleton-person-face')
+    ).toBeNull();
+    expect(
+      loadingCells[1]?.querySelector('.system-b-table-skeleton-person-face')
+    ).not.toBeNull();
+    mockQueue(outboundFixtureQueue([]));
+    rerender(
+      <TooltipProvider>
+        <OutboundWorkspace />
+      </TooltipProvider>
+    );
+    expect(screen.getAllByRole('columnheader')).toEqual(headers);
+    expect(screen.getByText('Nobody in Ready to certify')).toBeInTheDocument();
+    expect(container.querySelector('[data-empty-state-card]')).toBeNull();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.panels.length = 0;
