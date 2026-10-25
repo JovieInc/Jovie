@@ -1,0 +1,45 @@
+/* Sanctioned marketing material (JOV-8927). Consumers own geometry only.
+   The header paints the same material on its existing scroll-state layer.
+   No white wash or saturation boost: keep Noir Ion clear rather than gray. */
+.ds-glass,
+.header-nav--docked::before {
+  background:
+    linear-gradient(
+      color-mix(in oklab, var(--noir-ion-ion) 3%, transparent),
+      color-mix(in oklab, var(--noir-ion-ion) 3%, transparent)
+    ),
+    color-mix(in oklab, var(--noir-ion-shell) 82%, transparent);
+  box-shadow: inset 0 1px 0
+    color-mix(in oklab, var(--noir-ion-text-primary) 10%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+@supports not (
+    (backdrop-filter: blur(1px)) or
+    (-webkit-backdrop-filter: blur(1px))
+  ) {
+  .ds-glass,
+  .header-nav--docked::before {
+    background: var(--noir-ion-shell);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+  .ds-glass,
+  .header-nav--docked::before {
+    background: var(--noir-ion-shell);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .ds-glass,
+  .header-nav--docked::before {
+    background: Canvas;
+    box-shadow: inset 0 1px 0 CanvasText;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
