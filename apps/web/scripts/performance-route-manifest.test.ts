@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   canonicalSidebarNavigation,
@@ -210,16 +212,23 @@ describe('performance route manifest', () => {
     ]);
   });
 
-  it('measures canonical chat onboarding at /start, not the legacy form shim', () => {
-    const onboarding = getEndUserPerfRouteManifest().find(
-      route => route.id === 'onboarding'
+  it('does not keep an unthrottled /start budget beside the mobile Lighthouse gate', () => {
+    // The warm, unthrottled budget passed /start at 1.3s while Lighthouse
+    // mobile measured 8.4s on production. One gate for the entry routes.
+    const entryRoutes = getEndUserPerfRouteManifest().filter(
+      route =>
+        route.requiresAuth === false &&
+        (route.path === '/start' || route.path === '/claim')
     );
+    expect(entryRoutes).toEqual([]);
 
-    expect(onboarding?.path).toBe('/start');
-    expect(onboarding?.requiresAuth).toBe(false);
-    expect(onboarding?.readySelectors.content).toContain(
-      '[data-testid="onboarding-chat"]'
-    );
+    const budgets = JSON.parse(
+      readFileSync(
+        join(__dirname, '..', 'performance-entry-budgets.json'),
+        'utf8'
+      )
+    ) as { path: string }[];
+    expect(budgets.map(budget => budget.path)).toContain('/start');
   });
 
   it('holds the brand page to the perceived-latency budget', () => {

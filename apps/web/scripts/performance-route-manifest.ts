@@ -2099,77 +2099,9 @@ const ACCOUNT_BILLING_ROUTES = [
 ] as const satisfies readonly PerfRouteDefinition[];
 
 const ONBOARDING_ROUTES = [
-  {
-    id: 'onboarding',
-    group: 'onboarding',
-    surface: 'onboarding',
-    path: APP_ROUTES.START,
-    requiresAuth: false,
-    warmupStrategy: 'public-route',
-    measureMode: 'page-load',
-    readySelectors: {
-      shell: ['[data-app-shell-frame="true"]'],
-      content: [
-        '[data-testid="onboarding-chat"]',
-        '[data-testid="chat-composer-surface"]',
-      ],
-    },
-    timings: [
-      { metric: 'first-contentful-paint', budget: 900 },
-      { metric: 'largest-contentful-paint', budget: 1300 },
-      { metric: 'cumulative-layout-shift', budget: 0.02 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 1000 },
-    ],
-    resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
-    priority: 1,
-    seedProfile: 'active-user',
-  },
-  {
-    // Golden path entry for an artist who opens a claim link: the pre-built
-    // page they land on (`/[username]?claim=1`). Measured prod 2026-10-25 at
-    // 390: LCP 0.5-1.1s, CLS 0.
-    id: 'claim-link-landing',
-    group: 'onboarding',
-    surface: 'onboarding',
-    path: '/[username]?claim=1',
-    resolvePath: resolveSeededProfilePath,
-    requiresAuth: false,
-    warmupStrategy: 'public-route',
-    measureMode: 'page-load',
-    readySelectors: { content: ['h1'] },
-    viewport: { width: 390, height: 844 },
-    timings: [
-      { metric: 'first-contentful-paint', budget: 900 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 800 },
-    ],
-    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
-    priority: 1,
-    seedProfile: 'tim',
-  },
-  {
-    id: 'claim-search',
-    group: 'onboarding',
-    surface: 'onboarding',
-    path: '/claim',
-    requiresAuth: false,
-    warmupStrategy: 'public-route',
-    measureMode: 'page-load',
-    readySelectors: { content: ['main h1'] },
-    viewport: { width: 390, height: 844 },
-    timings: [
-      { metric: 'first-contentful-paint', budget: 900 },
-      { metric: 'largest-contentful-paint', budget: 1500 },
-      { metric: 'cumulative-layout-shift', budget: 0.05 },
-      { metric: 'first-input-delay', budget: 100 },
-      { metric: 'time-to-first-byte', budget: 800 },
-    ],
-    resourceSizes: DEFAULT_PUBLIC_RESOURCE_BUDGETS,
-    priority: 2,
-  },
+  // `/start` entry LCP is gated by the throttled-mobile Lighthouse check
+  // (apps/web/performance-entry-budgets.json). The unthrottled warm budget that
+  // lived here passed 1.3s while production measured 8.4s on a mid phone.
   {
     id: 'onboarding-checkout',
     group: 'onboarding',
