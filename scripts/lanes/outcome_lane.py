@@ -62,7 +62,7 @@ STATE_FILE = "outcome-lane.json"
 CANDIDATES_QUERY = """query($after:String){issues(first:50,after:$after,
  filter:{team:{key:{eq:"JOV"}},state:{name:{eq:"Validating"}}},orderBy:updatedAt){
  pageInfo{hasNextPage endCursor}
- nodes{id identifier title url description comments(last:20){nodes{body createdAt}}}}}"""
+ nodes{id identifier title url description comments(last:30){nodes{id body createdAt parent{id} user{name}}}}}}"""
 
 
 def now_iso(epoch: float | None = None) -> str:
@@ -373,9 +373,10 @@ def verify(host, lane, linear, issue: dict, ask: dict, run=lifecycle.run) -> dic
             codex_cmd = [sys.executable, str(HERE / "codex_lane.py"), "run"]
             verdict["items"] = esc.escalate(
                 [i for i in verdict["items"] if isinstance(i, dict)], tree=tree, out_dir=work, run=run, env=env,
-                codex_cmd=codex_cmd, linear=linear, issue=issue, mesh_send=getattr(host, "mesh_send", None))
+                codex_cmd=codex_cmd, linear=linear, issue=issue, mesh_send=getattr(host, "mesh_send", None), sha=ask["sha"])
         decision = judge(verdict, issue["identifier"], ask["sha"])
-        gaps = esc.route_gaps(host.state, linear, issue, decision["items"], time.time())
+        gaps = esc.route_gaps(host.state, linear, issue, decision["items"], time.time(), sha=ask["sha"],
+                              episode=ask["manifest"].get("receiptNotBefore"))
         authorization = app_authorization(host.state)
         if authorization is None:
             return {"result": "linear-app-unavailable", "decision": decision["status"], "runId": run_id}
@@ -405,6 +406,35 @@ def ledger(state: Path, issue: str, ask: dict, result: dict) -> None:
         pass  # measurement never blocks a recorded receipt
 
 
+def help_followups(host, linear, now: float, run=lifecycle.run) -> list[dict]:
+    """Re-evaluate items from replies to earlier help requests; a contradiction on an issue still in Validating
+    records a failing outcome receipt (the lifecycle routes it to Rework); Done work only gets the comment."""
+    out = []
+    try:
+        for res in esc.followup_replies(host.state, linear, now):
+            out.append({"issue": res["issue"], "verdict": res["verdict"]})
+            if res["verdict"] == "contradicted" and res["state"] == "Validating" and res.get("sha"):
+                authorization = app_authorization(host.state)
+                if authorization:
+                    decision = {"status": "fail", "reason": "help-reply-contradicts",
+                                "items": [{"criterion": res["gap"]["criterion"], "status": "fail",
+                                           "evidence": res["gap"]["resolved"]["result"][:500]}]}
+                    tree = checkout(host.repo, host.state / "outcome-worktrees", res["sha"], run=run)
+                    try:  # the host clone can predate the receipt CLI; use a checkout of the verified sha
+                        record_receipt(tree, res["issue"], res["sha"], decision,
+                                       f"{res['issue']} (agent help reply {res['gap']['helpCorr']})",
+                                       {"receiptNotBefore": res.get("episode")}, authorization, run=run)
+                    finally:
+                        drop_checkout(host.repo, tree, run=run)
+    except lane_errors() as error:  # a Linear hiccup never blocks the drain
+        out.append({"error": type(error).__name__})
+    return out
+
+
+def lane_errors():
+    return (OSError, ValueError, RuntimeError, KeyError)
+
+
 def drain(host, lane, run=lifecycle.run, now: float | None = None) -> dict:
     """At most PER_DRAIN issues per drain and PER_DAY per UTC day, one at a time per host."""
     if not enabled():
@@ -416,6 +446,7 @@ def drain(host, lane, run=lifecycle.run, now: float | None = None) -> dict:
     try:
         linear = lane.Linear(host.linear_env)
         now = time.time() if now is None else now
+        help_followups(host, linear, now)
         for issue, ask in candidates(linear, host.state, now):
             if len(done) >= PER_DRAIN or lifecycle.draining(host.state):
                 break
@@ -484,7 +515,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
     linear = lane.Linear(host.linear_env)
     team, number = args.identifier.upper().split("-")
     issue = linear.gql('query($t:String!,$n:Float!){issues(first:1,filter:{team:{key:{eq:$t}},number:{eq:$n}})'
-                       '{nodes{id identifier title url description comments(last:20){nodes{body createdAt}}}}}',
+                       '{nodes{id identifier title url description comments(last:30){nodes{id body createdAt parent{id} user{name}}}}}}',
                        {"t": team, "n": float(number)})["issues"]["nodes"][0]
     ask = lifecycle_ask(issue)
     if ask is None:
