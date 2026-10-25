@@ -1,4 +1,5 @@
 import AVKit
+import JovieKit
 import SwiftUI
 import UIKit
 
