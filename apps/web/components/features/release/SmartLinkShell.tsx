@@ -59,6 +59,8 @@ type SmartLinkShellBaseProps = {
   readonly showBrandMark?: boolean;
   readonly returnHref?: string | null;
   readonly returnLabel?: string;
+  /** Exploration only: how square cover art is framed in the hero. */
+  readonly heroTreatment?: 'current' | 'square' | 'blurred';
   /** Wraps the artwork image (e.g., for context menu). Must render a relative h-full w-full container. */
   readonly artworkWrapper?: (img: React.ReactNode) => React.ReactNode;
 };
@@ -133,6 +135,7 @@ export function SmartLinkShell({
   returnHref,
   returnLabel = 'Back',
   artworkWrapper,
+  heroTreatment = 'current',
 }: SmartLinkShellProps) {
   const artworkImage = artworkUrl ? (
     <Image
@@ -151,7 +154,29 @@ export function SmartLinkShell({
     <PublicSurfaceShell ambientMediaUrl={artworkUrl}>
       <PublicSurfaceStage>
         {/* Hero */}
-        <header className='relative w-full shrink-0 aspect-[4/3] md:aspect-square'>
+        <header
+          className={cn(
+            'relative w-full shrink-0',
+            heroTreatment === 'square'
+              ? 'aspect-square'
+              : 'aspect-[4/3] md:aspect-square'
+          )}
+          data-hero-treatment={heroTreatment}
+        >
+          {heroTreatment === 'blurred' && artworkUrl ? (
+            <div
+              className='absolute inset-0 overflow-hidden'
+              aria-hidden='true'
+            >
+              <Image
+                src={artworkUrl}
+                alt=''
+                fill
+                sizes='(max-width: 767px) 100vw, 430px'
+                className='scale-125 object-cover opacity-70 blur-2xl'
+              />
+            </div>
+          ) : null}
           <div className='absolute inset-0'>
             {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
           </div>

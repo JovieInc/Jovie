@@ -92,6 +92,7 @@ interface ReleaseLandingPageProps
     /** URL to the promo download gate page, shown when promo files exist */
     readonly downloadUrl?: string | null;
     readonly initialMenuOpen?: boolean;
+    readonly heroTreatment?: 'current' | 'square' | 'blurred';
   }> {}
 
 function resolveReleaseUtmParams(
@@ -341,6 +342,7 @@ export function ReleaseLandingPage({
   claimBanner = null,
   downloadUrl = null,
   initialMenuOpen = false,
+  heroTreatment,
 }: Readonly<ReleaseLandingPageProps>) {
   const [menuOpen, setMenuOpen] = useState(initialMenuOpen);
   const [shareOpen, setShareOpen] = useState(false);
@@ -415,6 +417,7 @@ export function ReleaseLandingPage({
 
   return (
     <SmartLinkShell
+      heroTreatment={heroTreatment}
       artworkUrl={release.artworkUrl}
       artworkAlt={`${release.title} artwork`}
       onMenuOpen={() => setMenuOpen(true)}
