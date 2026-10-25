@@ -152,7 +152,7 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
 export const FRESHNESS_TARGET_ID = 'jovie-production-freshness';
 export const FRESHNESS_INCIDENT_CLASS = 'production-stale';
 // Fallback only: 246 minutes, the measured p95 of normal merge-to-production lag over the 7 days to 2026-10-25.
-// The live bound is recomputed weekly from the trailing 7 days by the lanes doctor (scripts/lanes/deploy_health.py)
+// The live bound is recomputed weekly from the trailing 7 days by the lanes doctor (its deploy_health module)
 // and read from the public lanes feed (`deployHealth.limits`); see resolveStaleAfterSeconds.
 export const DEFAULT_STALE_AFTER_SECONDS = 14760;
 const MIN_STALE_AFTER_SECONDS = 3600;
