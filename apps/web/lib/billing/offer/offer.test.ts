@@ -4,6 +4,7 @@ import { PLAN_PRICES, toCents } from '@/lib/config/plan-prices';
 import {
   allClaims,
   claim,
+  claims,
   closerLine,
   forbiddenShapeViolations,
   OFFER,
@@ -98,5 +99,40 @@ describe('deliberate red: the original incident sentence is rejected', () => {
       'trial.price_after_trial'
     );
     for (const b of bad) expect(forbiddenShapeViolations(b), b).not.toEqual([]);
+  });
+});
+
+describe('refund policy (Tim, 2026-10-25): no partial refunds', () => {
+  it('renders the cancel and refund claims', () => {
+    expect(claims(['billing.cancel', 'billing.refund'])).toBe(
+      'Cancel anytime and keep Pro to the end of the paid month. No partial refunds.'
+    );
+  });
+
+  it('the checkout closer carries it', () => {
+    expect(closerLine('checkout_now', {})).toContain('No partial refunds.');
+  });
+
+  it('DELIBERATE RED: any other refund promise is rejected', () => {
+    for (const bad of [
+      '30-day money-back guarantee.',
+      'Get a full refund anytime.',
+      'We will refund you if you cancel in the first week.',
+      'Prorated refund on cancel.',
+    ]) {
+      expect(forbiddenShapeViolations(bad).length, bad).toBeGreaterThan(0);
+    }
+    expect(forbiddenShapeViolations('No partial refunds.')).toEqual([]);
+  });
+
+  it('removing the policy removes the claim and forbids all refund talk', () => {
+    const off = {
+      ...OFFER,
+      terms: { ...OFFER.terms, refund: null },
+    } as unknown as typeof OFFER;
+    expect(claims(['billing.refund'], off)).toBe('');
+    expect(forbiddenShapeViolations('No partial refunds.', off)).toContain(
+      'refund_unpublished'
+    );
   });
 });

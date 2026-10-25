@@ -74,8 +74,12 @@ export const OFFER = {
   terms: {
     renewal: 'monthly_until_cancelled',
     cancel: 'anytime_effective_end_of_period',
-    /** No refund or guarantee policy is published. Refund/guarantee prose is therefore forbidden. */
-    refund: null,
+    /**
+     * Tim, 2026-10-25: cancel anytime, keep Pro to the end of the paid month, no
+     * partial refunds. Stripe must cancel at period end with no proration refund
+     * (the live check reads the portal configuration). No guarantee is offered.
+     */
+    refund: 'none_partial_period' as 'none_partial_period' | null,
     guarantee: null,
   },
 } as const;

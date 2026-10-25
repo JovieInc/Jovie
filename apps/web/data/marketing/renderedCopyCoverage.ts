@@ -330,7 +330,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-pro-v1',
         controlHeadline: 'Pro plan',
         headline: 'Artist Presence',
-        body: 'Self-serve. Cancel anytime.',
+        body: 'Self-serve. Cancel anytime and keep Pro to the end of the paid month. No partial refunds.',
         supportingText: [
           'Self-serve',
           '$12/mo',
