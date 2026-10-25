@@ -24,6 +24,7 @@ import hashlib
 import importlib
 import math
 import json
+import types
 import os
 import random
 import re
@@ -49,6 +50,9 @@ import lifecycle  # noqa: E402
 import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -57,6 +61,7 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
 import ownership  # noqa: E402  (started-state live-owner invariant)
@@ -69,13 +74,18 @@ import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import outcome_lane  # noqa: E402
+import throughput_sentinel  # noqa: E402
 import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
+import capacity_live  # noqa: E402  (live quota reads for the capacity registry)
+import capacity_registry  # noqa: E402  (caps and policies come from ops/registry/capacity.json)
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
+import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
@@ -123,7 +133,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -136,10 +146,12 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
-              "scripts/tests/test_capacity_limit.py", "scripts/tests/test_fleet_gate_emitter.py",
+              "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py"]
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py",
+              "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
+              "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
@@ -177,7 +189,7 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted 
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
                   "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
                   "scripts/lib/linear-cooldown.mjs", "ops/registry/credentials.json",
-                  "ops/registry/spend.json", "ops/registry/third-party-grants.jsonl",
+                  "ops/registry/spend.json", "ops/registry/capacity.json", "ops/registry/third-party-grants.jsonl",
                   "ops/registry/inventory.gen.json"]
 # Preserve legacy dated run prefixes; only Hyperagent also owns the exact
 # public 15-hex identity digest generated by run_hyperagent_issue.
@@ -529,8 +541,13 @@ class Host:
         return autoscale.intake_slots(self.state, provider, self.base_slots(provider, default))
 
 
-def load_providers(path: Path = HERE / "providers.json") -> dict:
-    return json.loads(path.read_text())
+def load_providers(path: Path = HERE / "providers.json", registry: dict | None = None) -> dict:
+    """providers.json plus the registry's quota limits (softRuns, windowS, maxRuns): the numbers live in
+    ops/registry/capacity.json, not here. Custom paths (tests) keep their own numbers unless a registry is passed."""
+    providers = json.loads(path.read_text())
+    if registry is None and Path(path) == HERE / "providers.json":
+        registry = capacity_registry.load()
+    return capacity_registry.apply_limits(providers, registry) if registry else providers
 
 
 # ---------------------------------------------------------------- selection
@@ -1955,7 +1972,7 @@ def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
         _chmod_private(scope, 0o700)
         reset_ms = int(reset_s * 1000)
         record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
-        record.write_text(json.dumps({"schema": 1, "resetAt": reset_ms}))
+        atomic_write_text(record, json.dumps({"schema": 1, "resetAt": reset_ms}))
         _chmod_private(record, 0o600)
     except OSError:
         pass
@@ -3145,7 +3162,7 @@ def cool_down(host: Host, name: str, code: int | None = None) -> bool:
         return False
     path = host.state / "cooldown" / name
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+    atomic_write_text(path, str(time.time() + PROVIDER_COOLDOWN_S))
     return True
 
 
@@ -3331,7 +3348,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                     raise OSError("Hyperagent transport unavailable")
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent",
                                        prior_attempts=prior_attempts_context(host, linear, issue))
-                (runs / f"{run_id}.prompt.md").write_text(prompt)
+                atomic_write_text(runs / f"{run_id}.prompt.md", prompt)
                 def boundary(spend, mutations, phase):
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                                {"spend": spend, "mutations": mutations}, coordination=coordination, boundary_id=phase)
@@ -3630,6 +3647,10 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
+UPDATE_DRAIN_REASON = "update-pending-drain"
+STAGING_ADMISSION_WAIT_S = 20.0
+
+
 @contextmanager
 def gate_admission(host: Host, *, staging: bool = False):
     """Serialize seat admission with a non-waiting release proof reservation.
@@ -3640,7 +3661,18 @@ def gate_admission(host: Host, *, staging: bool = False):
     """
     if not staging and lifecycle.draining(host.state):
         raise lifecycle.AdmissionHeld("operator requested natural controller drain")
+    if not staging and update_drain.status(host.state)["active"]:
+        raise lifecycle.AdmissionHeld(UPDATE_DRAIN_REASON)
     admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
+    if staging:
+        # Other workers hold the admission lock for milliseconds while they take a seat; the proof used
+        # to lose to that on the first try. Wait briefly for it, then give up as before.
+        waited = 0.0
+        while not admission.held and waited < STAGING_ADMISSION_WAIT_S:
+            admission.release()
+            time.sleep(0.25)
+            waited += 0.25
+            admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
     seats = []
     try:
         if not admission.held:
@@ -3673,6 +3705,10 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
                         return lock, time.time() - started
                     lock.release()
         except lifecycle.AdmissionHeld as error:
+            if str(error) == UPDATE_DRAIN_REASON:
+                # A pending update is draining the gate: wait in place (bounded by the drain), never cancel.
+                time.sleep(15)
+                continue
             raise RepairStopped(str(error), None, "before-gate-seat") from error
         time.sleep(15)
 
@@ -4227,6 +4263,25 @@ def read_wake_file(path):
     return data
 
 
+def backlog_wake(host: Host) -> dict:
+    """Event-driven Backlog pass: wake files (issue created/updated, outcome gap, Sentry spike, Tim comment,
+    capacity change) trigger a sync, refill and forced re-rank for just the teams named, now."""
+    teams = {"JOV", *(binding.key for binding in bindings.extra_bindings(THIS))}
+    wakes = binding_refill.drain_wakes(host.state, teams)
+    if not wakes or os.environ.get("LANES_SELFTEST"):
+        return {"wakes": len(wakes)}
+    named = sorted({wake["team"] for wake in wakes})
+    client = Linear(host.linear_env)
+    report = {"wakes": len(wakes), "teams": named,
+              "sync": linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), named)}
+    extra = {binding.key: binding for binding in bindings.extra_bindings(THIS)}
+    for team in named:
+        binding = extra.get(team) or types.SimpleNamespace(key=team, excluded=("hold",), min_todo=0)
+        report[team] = {"refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
+                        "rank": binding_refill.rank_pass(THIS, host, binding, client, force=True)}
+    return report
+
+
 def fix_now(host: Host) -> int:
     """Drain the relay's wake dir immediately instead of waiting for the 5-minute
     tick. Same admission as dispatch(): disk, then the first provider with a free
@@ -4236,6 +4291,10 @@ def fix_now(host: Host) -> int:
     wake_dir = host.state / "wake"
     if not wake_dir.is_dir():
         return 0
+    try:  # backlog events share the wake dir and its path unit; a fault here never blocks red repair
+        backlog_wake(host)
+    except (Exception, SystemExit):
+        pass
     for path in sorted(wake_dir.glob("red-*.json"))[:MAX_WAKE_PER_ACTIVATION]:
         marker = path.with_name(path.name + ".claim")
         try:
@@ -4524,7 +4583,7 @@ def load_escalation(host: Host) -> dict:
 def save_escalation(host: Host, data: dict) -> None:
     path = host.state / "escalation.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data))
+    atomic_write_text(path, json.dumps(data))
 
 
 def note_failover(host: Host, previous: str, nxt: str, reason: str) -> None:
@@ -6800,7 +6859,7 @@ def preserve_repair(worktree: Path, receipt: dict) -> None:
                   "headBefore": receipt.get("headBefore"), "at": now_iso()}
         receipt["preservedWorktree"] = str(worktree)
         try:
-            (worktree / disk_guard.PRESERVED_REPAIR).write_text(json.dumps(marker, indent=1))
+            atomic_write_text(worktree / disk_guard.PRESERVED_REPAIR, json.dumps(marker, indent=1))
         except OSError as error:
             receipt["preservationError"] = str(error)[:200]
 
@@ -7173,7 +7232,12 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
-                prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                excerpt = failure_excerpt(pr)
+                try:
+                    pr_events.ensure_red_before_green(pr, excerpt)
+                except (OSError, subprocess.SubprocessError, ValueError):
+                    pass  # evidence is best effort; the repair itself must still run
+                prompt = render_fix_prompt(pr, excerpt)
                 if preserved:
                     prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
                               "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)
@@ -7568,6 +7632,42 @@ def repair_inventory_valid(receipt: dict, name: str) -> bool:
             and 0 <= time.time() - stamp < CLAIM_SCAN_TTL_S)
 
 
+def repair_inventory_cause(receipt: dict, name: str, now: float | None = None) -> str | None:
+    """The first reason `repair_inventory_valid` rejects a receipt, or None when it is valid.
+
+    Idle exits used to record one generic `repair-inventory-unknown-or-stale` for every one of
+    these, so a throughput stall could not be attributed (2026-10-24: oversize looked like stale)."""
+    if not isinstance(receipt, dict) or not isinstance(receipt.get("summary"), dict):
+        return "receipt-missing"
+    summary = receipt["summary"]
+    now = time.time() if now is None else now
+    stamp = summary.get("sourceAt")
+    if receipt.get("repository") != REPO_SLUG:
+        return "wrong-repository"
+    if receipt.get("provider") != name:
+        return "wrong-provider"
+    if receipt.get("cacheKey") != "open-prs-labels-v2":
+        return "wrong-cache-key"
+    if receipt.get("cacheRoot") != str(SHARED_CACHE_DIR):
+        return "wrong-cache-root"
+    if receipt.get("sameCallRows") is not True or not isinstance(receipt.get("prs"), list):
+        return "rows-not-same-call"
+    if receipt["prs"] != summary.get("prs"):
+        return "rows-diverged"
+    if summary.get("readable") is not True:
+        return "github-unreadable"
+    if not all(isinstance(pr, dict) and pr.get("labelsComplete") is True for pr in receipt["prs"]):
+        return "labels-incomplete"
+    if type(stamp) not in (int, float) or not math.isfinite(stamp):
+        reason = summary.get("sourceAtReason")
+        return str(reason) if isinstance(reason, str) and reason else "source-unstamped"
+    if now - stamp < 0:
+        return "source-clock-skew"
+    if now - stamp >= CLAIM_SCAN_TTL_S:
+        return "source-stale"
+    return None
+
+
 def overlap_prs_summary() -> list[dict] | None:
     """Cached PR overlap inventory, preserving unreadable rather than certifying empty."""
     prs = open_prs_summary()
@@ -7773,7 +7873,7 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     marker = host.state / f"sweep-{name}.json"
     if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
         return
-    marker.write_text(json.dumps({"at": now}))
+    atomic_write_text(marker, json.dumps({"at": now}))
     superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
     for pr, keep in superseded:
         if pr_events.maintenance_hold(host, THIS, pr, now):
@@ -8118,7 +8218,16 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         if deferred: blocks[str(deferred["pr"]["number"])] = deferred
         else: blocks = {number: row for number, row in blocks.items() if row.get("terminal", False)}
         data[name] = {"at": now_iso(), "reason": reason, **({"deferredRequeue": blocks} if blocks else {})}
-        path.write_text(json.dumps(data))
+        # Readers (doctor, HUD, the next worker's deferred-requeue scan, test snapshots) do not take
+        # claim.lock. A truncating write_text let them read an empty file: ClaimScanCacheTest failed
+        # ~5% of runs under load with JSONDecodeError and refused the 07:39Z release on Gem.
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            temporary.write_text(json.dumps(data))
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        throughput_sentinel.append_idle_exit(host.state, REPO_SLUG, name, reason)
     except (OSError, ValueError):
         pass
     finally:
@@ -8647,7 +8756,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                   f"{REPAIR_INVENTORY_MAX_BYTES} byte limit", file=sys.stderr)
             record_idle_exit(host, name, "repair-inventory-oversize")
         else:
-            record_idle_exit(host, name, "repair-inventory-unknown-or-stale")
+            record_idle_exit(host, name, "repair-inventory-" + (repair_inventory_cause(repair_inventory, name)
+                                                                or "valid-at-recheck"))
         slot.release()
         return 0
     # Every local pass, including one that just claimed a repair. An idle-only sync
@@ -8778,7 +8888,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             count = failure_record(failures.get(issue.identifier))["count"] + 1
             failures[issue.identifier] = {"count": count, "at": time.time(), "release": release_generation(),
                                           **pr_events.failure_reason(receipt, count >= MAX_FAILURES)}
-            failures_path(host).write_text(json.dumps(failures))
+            atomic_write_text(failures_path(host), json.dumps(failures))
         finally:
             claim.release()
         exhausted = failures[issue.identifier]["count"] >= MAX_FAILURES
@@ -8964,6 +9074,16 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["linearSync"] = linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), teams)
             except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
                 tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
+            try:  # Todo below target is refilled from the Backlog the sync just refreshed, per team
+                # Every team refills on its own mirror and seats; JOV has no extra binding, so it gets the same
+                # floor-less pass (Summer's governor writes the same Todo moves idempotently).
+                refill_for = [types.SimpleNamespace(key="JOV", excluded=("hold",), min_todo=0), *bindings.extra_bindings(THIS)]
+                tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
+                                         for binding in refill_for}
+                tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
+                tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
+            except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
+                tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             tick["linear"] = linear_sync.status(host.state)
         except Exception as error:
@@ -9071,6 +9191,12 @@ def finish_dispatch(host: Host, tick: dict) -> int:
                                     {"status": "not-owner", "owner": owner})
     except Exception as error:  # registry freshness never takes dispatch down
         tick["credentialsSpend"] = {"status": "error", "error": type(error).__name__}
+    try:
+        # Live quota reads (Codex ledger, Grok /usage) for the capacity registry; metadata only.
+        tick["capacityLive"] = (capacity_live.tick(host.state) if HOST == os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]
+                                else {"status": "not-owner"})
+    except Exception as error:  # a registry read never takes dispatch down
+        tick["capacityLive"] = {"status": "error", "error": type(error).__name__}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
         doctor.run(host, sys.modules[__name__], codex_lane_module())
@@ -9349,7 +9475,7 @@ def refresh_codex_skills(host: Host, home: Path | None = None) -> dict:
         return {"status": "timeout"}
     except OSError as error:
         return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
-    receipt.write_text(json.dumps({"installed": wanted, "at": now_iso()}))
+    atomic_write_text(receipt, json.dumps({"installed": wanted, "at": now_iso()}))
     return {"status": "updated", "from": head[:12], "to": wanted[:12]}
 
 
@@ -9367,16 +9493,62 @@ def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
     Only the `current` symlink moves; running workers finish on their release. The outcome is
     written to update.json so a refused release is an alert, not a traceback in a journal."""
+    # Single flight: two updaters take the gate-admission lock and the seats from each other, so each
+    # reads gate-admission-busy (3 concurrent `lane_runner update` at 17:07Z 2026-10-25, one of them a
+    # manual retry loop, kept #23268 from installing). A second caller exits without touching update.json.
+    single = Locked(host.state / "locks" / "update.lock", blocking=False)
+    if not single.held:
+        print("lane update: update already running", file=sys.stderr)
+        return 0
+    try:
+        return _update_locked(host)
+    finally:
+        single.release()
+
+
+def _update_locked(host: Host) -> int:
     mirror = host_maintenance(host, refresh_object_mirror)  # before install_release's origin fetch
+    before = read_marker(host)
     try:
         code = install_release(host)
         error = None if code == 0 else "release tests failed"
     except Exception as failure:
         code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
     skills = host_maintenance(host, refresh_codex_skills)
+    lag = host_maintenance(host, lambda h: install_lag(h, before, error))
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
-        at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills)))
+        at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills,
+        behindS=lag.get("behindS"), behindCommit=lag.get("behindCommit"))))
+    host_maintenance(host, lambda h: update_drain.finish(h.state, lag.get("behindS")) or {"status": "no-drain"})
     return code
+
+
+# Install lag is a stage: merge -> installed. Gem releases (59 since 10-23): p50 22 min, p80 85, p95 215,
+# max 251. 10-25: a flaky self-test refusal (07:39) held three builds 90-111 min; a 60 min wait for a
+# gate seat held #23123. update.json carries behindS while a lane-affecting main commit is not
+# installed, update-lag.jsonl one row per install, and the doctor alerts past its INSTALL_LAG_ALERT_S (90 min).
+def install_lag(host: Host, before: str | None, error: str | None) -> dict:
+    """{'behindS', 'behindCommit'} while main's lane bundle is not installed; one lag row per install."""
+    if os.environ.get("LANES_SELFTEST"):
+        return {"status": "selftest-skipped"}
+    bundle = release_identity(host)
+    paths = sorted(bundle["objects"])
+    stamp = lambda ref: sh(["git", "log", "-1", "--format=%ct %H", ref, "--", *paths], cwd=host.repo).stdout.split()
+    marker = host.state / "current" / ".bundle"
+    installed = marker.read_text().strip() if marker.exists() else None
+    now = time.time()
+    newest = stamp(bundle["sourceCommit"])
+    commit_at = float(newest[0]) if newest else None
+    if installed == bundle["bundleDigest"]:
+        after = read_marker(host)
+        if before is not None and after != before and commit_at is not None:
+            row = {"schema": "jovie-install-lag/v1", "at": now_iso(), "commit": bundle["sourceCommit"],
+                   "commitAt": commit_at, "installedAt": now, "lagS": round(now - commit_at), "from": before, "to": after}
+            with open(host.state / "update-lag.jsonl", "a") as out:
+                out.write(json.dumps(row) + "\n")
+        return {"behindS": 0, "behindCommit": None}
+    return {"behindS": round(now - commit_at) if commit_at is not None else None,
+            "behindCommit": bundle["sourceCommit"], "why": error}
 
 
 def release_identity(host: Host) -> dict:
@@ -10112,7 +10284,7 @@ def install_release(host: Host, *, operator=None) -> int:
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
-                refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
+                atomic_write_text(refused_path, json.dumps({"tree": tree, "at": time.time(), "why": why}))
                 return 1
             # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
             # refused every release for a day because the *installed* installer chose a bare
@@ -10236,7 +10408,7 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     # publisher uses the REST form; Gem 2026-10-20 its 403 froze the public feed). A caller that targets another host
     # (GH_HOST, e.g. the offline real-gh test harness) keeps its own credentials:
     # the Jovie Bot installation token only exists for github.com.
-    shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
+    atomic_write_text(shim, f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
                     f'[ "$1" = api ] && case "$2" in gists|gists/*) exec {real} "$@";; esac\n'
                     f'[ -n "${{GH_HOST:-}}" ] && [ "$GH_HOST" != github.com ] && exec {real} "$@"\n'
                     f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
@@ -10326,7 +10498,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
         path = HERE / "context-manifest.json"
         generated = context_manifest_json()
         if args.write:
-            path.write_text(generated, encoding="utf-8")
+            atomic_write_text(path, generated, encoding="utf-8")
         matched = context_manifest_matches(path)
         print(json.dumps({"schema": "jovie-lane-context-generation/v1", "path": str(path),
                           "sha256": hashlib.sha256(generated.encode("utf-8")).hexdigest(),

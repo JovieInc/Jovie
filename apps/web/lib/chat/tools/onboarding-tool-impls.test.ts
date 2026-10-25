@@ -202,6 +202,69 @@ describe('proposeNextStep controlled access', () => {
   });
 });
 
+describe('golden-path admission gates publishing, not paying', () => {
+  it('still offers checkout after an admit that requires proof', async () => {
+    const lowFollowerMetrics = normalizeArtistMetrics(
+      { spotifyFollowers: 3_200 },
+      { source: 'spotify_api', updatedAt: '2026-07-01T00:00:00.000Z' }
+    );
+    const state = createOnboardingTurnState({
+      sessionId: 'session-golden',
+      turnCount: 1,
+      accessControlled: true,
+      goldenPathVerdict: 'ELIGIBLE',
+      messages: [
+        {
+          ...assistantMessage,
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'confirmSpotifyArtist',
+              toolCallId: 'tool-confirm-low',
+              state: 'output-available',
+              input: { spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm' },
+              output: {
+                action: 'spotify_artist_confirmed',
+                spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+                metrics: lowFollowerMetrics,
+                artist: {
+                  id: '4Uwpa6zW3zzCSQvooQNksm',
+                  name: 'Mid Artist',
+                  imageUrl: null,
+                  followers: 3_200,
+                  metrics: lowFollowerMetrics,
+                  popularity: 30,
+                  genres: [],
+                },
+              },
+            },
+          ],
+        } as UIMessage,
+      ],
+    });
+    const tools = buildOnboardingTools(state);
+    const next = (await (
+      tools.proposeNextStep as unknown as {
+        execute: () => Promise<{
+          decision: { kind: string; proofRequired?: boolean };
+        }>;
+      }
+    ).execute()) as { decision: { kind: string; proofRequired?: boolean } };
+    expect(next.decision).toMatchObject({
+      kind: 'instant_access',
+      proofRequired: true,
+    });
+
+    const checkout = await (
+      tools.proposeCheckout as unknown as {
+        execute: (input: { plan?: string }) => Promise<{ action: string }>;
+      }
+    ).execute({});
+    // Paying never publishes a page; proof does. Checkout stays available.
+    expect(checkout.action).toBe('propose_checkout');
+  });
+});
+
 describe('confirmSpotifyArtist tool (JOV-7134)', () => {
   it('never lets the model confirm or swap an artist id', async () => {
     const state = createOnboardingTurnState({ sessionId: 's', turnCount: 3 });

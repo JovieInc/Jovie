@@ -18,6 +18,7 @@ import { PROOF_CLAIM_FUNNEL_EVENTS } from '@/lib/acquisition/proof-claim-funnel'
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
+import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
@@ -38,6 +39,8 @@ interface OnboardingCheckoutClientProps {
   readonly isDefaultUpsell: boolean;
   /** Computed claim-time proof; empty hides the card (JOV-7794). */
   readonly proofFindings?: readonly ClaimTimeFinding[];
+  /** Free-admission page waiting for ownership proof: say so before paying. */
+  readonly proofPending?: boolean;
 }
 
 // formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
@@ -248,6 +251,7 @@ export function OnboardingCheckoutClient({
   spotifyFollowers,
   isDefaultUpsell,
   proofFindings = [],
+  proofPending = false,
 }: OnboardingCheckoutClientProps) {
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
@@ -375,6 +379,15 @@ export function OnboardingCheckoutClient({
             spotifyFollowers={spotifyFollowers}
             username={username}
           />
+        ) : null}
+
+        {proofPending ? (
+          <p
+            className='mb-6 text-sm text-secondary-token'
+            data-testid='checkout-go-live-terms'
+          >
+            {PROOF_PENDING_TERMS}
+          </p>
         ) : null}
 
         <ClaimTimeProofCard findings={proofFindings} />

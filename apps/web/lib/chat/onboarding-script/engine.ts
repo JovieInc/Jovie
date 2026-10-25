@@ -315,6 +315,8 @@ function decideAccess(
   return decideOnboardingAccess({
     activeRole: state.profileDraft?.activeRole,
     accessControlled: state.accessControlled,
+    goldenPathVerdict: state.goldenPathVerdict,
+    goldenPathHold: state.goldenPathHold,
     spotifyArtistId: state.spotifyArtistId,
     publicProfileUrl: state.publicProfileUrl,
     spotifyFollowers: state.spotifyFollowers,
@@ -435,7 +437,11 @@ function decisionTurn(
         summary: 'Checkout handoff ready.',
       },
     });
-    const line = pick('instant_access');
+    // Golden-path admission keeps the page private until proof: say so, and
+    // checkout stays available (paying never publishes).
+    const line = pick(
+      decision.proofRequired ? 'golden_path_admitted' : 'instant_access'
+    );
     return {
       line,
       text: renderLine(line, {}),
