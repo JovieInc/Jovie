@@ -39,6 +39,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import lifecycle  # noqa: E402
+import outcome_escalation as esc  # noqa: E402
 
 VERDICT_SCHEMA = "jovie.outcome-verdict/v1"
 VERDICT_FILE = "outcome-verdict.json"
@@ -172,19 +173,27 @@ Rules:
   `git merge-base --is-ancestor <sha> $(git rev-parse <buildId>)`). Do not require the ids to be equal.
 - Tests: a successful required CI check on the binding merge commit, or on any later main commit that
   contains it, counts as those tests having run (cite the run URL); otherwise run them yourself.
-- `unverifiable` (not `fail`) is for an item you cannot observe from here: pages behind sign-in
-  (production redirects to /signin), process instructions addressed to the implementing agent (which
-  controller ran, who was assigned, workpad steps) with no record contradicting them, and physical
-  devices. Say what blocked you. `fail` is only for contradicting evidence or behavior shown missing.
+- `unverifiable` is never a shrug. Before using it, try to get the capability: (1) use tools you can run
+  yourself: Playwright (chromium is installed; `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright`), screenshots
+  read with your image tool, HTTP/API reads, logs and telemetry you can query; (2) if a missing signal could
+  be emitted cheaply through an existing metrics path, say which signal, or why it is not cheap; then
+  mark the item `unverifiable` and the lane will itself (3) re-try the URLs in its own browser with a vision
+  read, ask an agent that has the capability (mesh or the lanes escalation surface), and (4) get an adversarial
+  review from a different model for judgement items. For each such item add `"kind": "observable|judgement"`,
+  `"capability": "signed-in-browser|device|telemetry|third-party-console|process-record|taste|other"`, `"urls": [...]`
+  and `"attempts": [{{"step": "telemetry", "result": "<signal added/queued, or why not cheap>"}}]`. An item
+  without a telemetry attempt is rejected as a failure. Items that stay unverifiable are routed as capability
+  gaps with an owner. `fail` is only for contradicting evidence or behavior shown missing.
 - An item that only a human or an outside party can confirm (taste/design approval, an
   outbound message, a purchase or spend, credentials, a third-party console, a physical
   device) is `needs-authority`; name that authority in `evidence`.
-- An item you cannot prove from here is `fail` with what you checked and what was missing.
+- An item you cannot prove from here after those steps is `unverifiable`; one the evidence contradicts is `fail`, with what you checked.
 
 Write exactly one file, `{VERDICT_FILE}`, in the working directory:
 {{"schema": "{VERDICT_SCHEMA}", "issue": "{issue['identifier']}", "sha": "{ask['sha']}",
   "items": [{{"criterion": "<acceptance item, short>", "status": "pass|fail|needs-authority|unverifiable",
-             "evidence": "<concrete proof or what failed>"}}],
+             "evidence": "<concrete proof or what failed>", "kind": "observable|judgement", "capability": "<see above>",
+             "urls": ["<pages you tried>"], "attempts": [{{"step": "telemetry", "result": "<...>"}}]}}],
   "summary": "<one sentence>"}}
 """
 
@@ -209,7 +218,16 @@ def judge(verdict, issue: str, sha: str) -> dict:
             return {"status": "fail", "reason": "verdict-item-malformed", "items": clean}
         if status == "pass" and len(evidence) < 12:
             status, evidence = "fail", f"no concrete evidence given ({evidence or 'empty'})"
-        clean.append({"criterion": criterion[:300], "status": status, "evidence": evidence[:600]})
+        row = {"criterion": criterion[:300], "status": status, "evidence": evidence[:600]}
+        for key in ("kind", "capability", "urls", "attempts"):
+            if item.get(key):
+                row[key] = item[key]
+        if status == "unverifiable":
+            missing = esc.missing_steps(row)
+            if missing:  # no shrugs: the capability must be pursued before an item is left unverifiable
+                row["status"] = "fail"
+                row["evidence"] = (f"unverifiable without escalation (not attempted: {', '.join(missing)}): " + evidence)[:600]
+        clean.append(row)
     failed = [item for item in clean if item["status"] == "fail"
               or (item["status"] == "needs-authority" and not TASTE_RE.search(item["criterion"] + " " + item["evidence"]))]
     residual = [item for item in clean if item["status"] in ("unverifiable", "needs-authority") and item not in failed]
@@ -243,8 +261,11 @@ def receipt_note(decision: dict) -> str:
 
 
 def verdict_comment(issue: str, sha: str, decision: dict, run_id: str) -> str:
-    rows = "\n".join(f"| {item['status']} | {item['criterion'].replace('|', '/')} | "
-                     f"{item['evidence'].replace('|', '/')} |" for item in decision["items"])
+    def evidence(item):
+        tried = "".join(f" Tried {a['step']}: {a['result']}." for a in item.get("attempts") or [] if isinstance(a, dict))
+        return (item["evidence"] + tried).replace("|", "/")
+    rows = "\n".join(f"| {item['status']} | {item['criterion'].replace('|', '/')} | {evidence(item)} |"
+                     for item in decision["items"])
     return (f"{COMMENT_MARKER}\nOutcome lane verification of {issue} on verified production `{sha[:12]}`: "
             f"**{decision['status']}** ({decision['reason']}).\n\n| Result | Acceptance item | Evidence |\n"
             f"| --- | --- | --- |\n{rows or '| fail | (no items) | the verifier produced no itemized verdict |'}\n\n"
@@ -347,7 +368,14 @@ def verify(host, lane, linear, issue: dict, ask: dict, run=lifecycle.run) -> dic
             # (a fail would route it to Rework), retried on the next day's drain.
             return {"result": "verifier-failed", "returncode": done.returncode, "runId": run_id,
                     "durationS": round(time.time() - started)}
+        if isinstance(verdict, dict) and isinstance(verdict.get("items"), list):
+            work = host.state / "runs" / f"{run_id}.escalation"
+            codex_cmd = [sys.executable, str(HERE / "codex_lane.py"), "run"]
+            verdict["items"] = esc.escalate(
+                [i for i in verdict["items"] if isinstance(i, dict)], tree=tree, out_dir=work, run=run, env=env,
+                codex_cmd=codex_cmd, linear=linear, issue=issue, mesh_send=getattr(host, "mesh_send", None))
         decision = judge(verdict, issue["identifier"], ask["sha"])
+        gaps = esc.route_gaps(host.state, linear, issue, decision["items"], time.time())
         authorization = app_authorization(host.state)
         if authorization is None:
             return {"result": "linear-app-unavailable", "decision": decision["status"], "runId": run_id}
@@ -356,7 +384,7 @@ def verify(host, lane, linear, issue: dict, ask: dict, run=lifecycle.run) -> dic
         ok = record_receipt(tree, issue["identifier"], ask["sha"], decision, evidence, ask["manifest"],
                             authorization, run=run)
         return {"result": "recorded" if ok else "receipt-failed", "decision": decision["status"],
-                "reason": decision["reason"], "items": len(decision["items"]), "runId": run_id,
+                "reason": decision["reason"], "items": len(decision["items"]), "gaps": len(gaps), "runId": run_id,
                 "durationS": round(time.time() - started)}
     finally:
         drop_checkout(host.repo, tree, run=run)
