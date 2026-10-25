@@ -1,5 +1,6 @@
 import AVFoundation
 import SwiftUI
+import UIKit
 import WebKit
 
 struct PublicProfileBrowserDestination: Identifiable, Equatable {
@@ -160,6 +161,78 @@ enum PublicProfileBrowserMediaPolicy {
   }
 }
 
+/// Haptic styles the hosted web app may request through the `jovieHaptics`
+/// script message handler. The web side (`apps/web/lib/haptics`) posts
+/// `{ style: "<raw value>" }`; anything else is ignored.
+enum WebHapticStyle: String, CaseIterable {
+  case selection
+  case light
+  case medium
+  case heavy
+  case success
+  case error
+
+  /// Parses a WKScriptMessage body; unknown or malformed bodies return nil.
+  init?(messageBody: Any) {
+    guard
+      let body = messageBody as? [String: Any],
+      let raw = body["style"] as? String,
+      let style = WebHapticStyle(rawValue: raw)
+    else {
+      return nil
+    }
+    self = style
+  }
+}
+
+/// Plays web-requested haptics on the native engine so the release-page
+/// service dial ticks per item like a UIPickerView. Main-frame only.
+@MainActor
+final class WebHapticsMessageHandler: NSObject, WKScriptMessageHandler {
+  static let name = "jovieHaptics"
+
+  private let selection = UISelectionFeedbackGenerator()
+  private let light = UIImpactFeedbackGenerator(style: .light)
+  private let medium = UIImpactFeedbackGenerator(style: .medium)
+  private let heavy = UIImpactFeedbackGenerator(style: .heavy)
+  private let notification = UINotificationFeedbackGenerator()
+
+  func userContentController(
+    _ userContentController: WKUserContentController,
+    didReceive message: WKScriptMessage
+  ) {
+    guard message.frameInfo.isMainFrame, let style = WebHapticStyle(messageBody: message.body) else {
+      return
+    }
+    play(style)
+  }
+
+  func play(_ style: WebHapticStyle) {
+    switch style {
+    case .selection:
+      selection.selectionChanged()
+      selection.prepare()
+    case .light:
+      light.impactOccurred()
+    case .medium:
+      medium.impactOccurred()
+    case .heavy:
+      heavy.impactOccurred()
+    case .success:
+      notification.notificationOccurred(.success)
+    case .error:
+      notification.notificationOccurred(.error)
+    }
+  }
+
+  static func install(on configuration: WKWebViewConfiguration) -> WebHapticsMessageHandler {
+    let handler = WebHapticsMessageHandler()
+    configuration.userContentController.add(handler, name: name)
+    handler.selection.prepare()
+    return handler
+  }
+}
+
 /// Audio-session contract for web playback surfaces. `.playback` keeps audio
 /// audible with the ringer switch off and lets it continue when the app
 /// backgrounds (paired with the `audio` background mode). Deactivation with
@@ -203,6 +276,7 @@ final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationD
 
   let webView: WKWebView
 
+  private let hapticsHandler: WebHapticsMessageHandler
   private let initialURL: URL
   private let policy: PublicProfileURLPolicy
   private var didPresentUITestFailure = false
@@ -214,6 +288,7 @@ final class PublicProfileBrowserModel: NSObject, ObservableObject, WKNavigationD
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .nonPersistent()
     PublicProfileBrowserMediaPolicy.configure(configuration)
+    hapticsHandler = WebHapticsMessageHandler.install(on: configuration)
     webView = WKWebView(frame: .zero, configuration: configuration)
 
     super.init()
