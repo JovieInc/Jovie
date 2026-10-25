@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/nextjs';
 import type { AsyncIterableStream } from 'ai';
 
 import { toWhatwgReadableStream } from '@/lib/ai/stream-normalization';
+import { guardOfferText, OfferStreamGate } from '@/lib/billing/offer/guard';
 import {
   detectSystemPromptLeak,
   PROMPT_DISCLOSURE_REFUSAL,
@@ -44,7 +45,16 @@ export type LeakGuardContext = {
     | 'generateObject'
     | 'streamObject';
   readonly functionId?: string;
+  /** This call may speak about Jovie's offer; enforce the canonical offer claims (billing/offer/guard). */
+  readonly offerGuard?: boolean;
 };
+
+let offerStrictProvider: () => boolean = () => false;
+
+/** Registered by the AI SDK chokepoint: true while the offer kill switch forces fixed templates. */
+export function setOfferGuardStrictProvider(provider: () => boolean): void {
+  offerStrictProvider = provider;
+}
 
 export type LeakGuardResult = {
   readonly text: string;
@@ -134,7 +144,7 @@ function shouldUseFallback(
   return matchedMarkers.includes('fenced_prompt_block');
 }
 
-export function guardModelOutput(
+function guardPromptLeak(
   text: string,
   context?: LeakGuardContext
 ): LeakGuardResult {
@@ -174,6 +184,46 @@ export function guardModelOutput(
     leaked: true,
     action: 'redact',
     matchedMarkers,
+  };
+  logLeakGuardEvent(result, context);
+  return result;
+}
+
+/**
+ * Prompt-leak guard plus, for offer-capable call sites, the offer-claims guard.
+ * `leaked: true` means a guard altered the output.
+ */
+export function guardModelOutput(
+  text: string,
+  context?: LeakGuardContext
+): LeakGuardResult {
+  const leak = guardPromptLeak(text, context);
+  if (
+    !context?.offerGuard ||
+    typeof text !== 'string' ||
+    leak.action === 'fallback'
+  ) {
+    return leak;
+  }
+  const offer = guardOfferText(leak.text, { strict: offerStrictProvider() });
+  if (!offer.replaced) return leak;
+  console.warn(
+    JSON.stringify({
+      event: 'ai_output_offer_guard',
+      violations: offer.violations,
+      strict: offerStrictProvider(),
+      source: context.source,
+      functionId: context.functionId,
+    })
+  );
+  const result: LeakGuardResult = {
+    text: offer.text,
+    leaked: true,
+    action: leak.action === 'none' ? 'redact' : leak.action,
+    matchedMarkers: [
+      ...leak.matchedMarkers,
+      ...offer.violations.map(v => `offer:${v}`),
+    ],
   };
   logLeakGuardEvent(result, context);
   return result;
@@ -447,6 +497,49 @@ function readStreamTextGuardSurface(
   };
 }
 
+function createOfferGatedTextStream(
+  stream: AsyncIterableStream<string>
+): AsyncIterableStream<string> {
+  async function* generator(): AsyncGenerator<string> {
+    const gate = new OfferStreamGate({ strict: offerStrictProvider() });
+    for await (const delta of stream) {
+      const out = gate.push(delta);
+      if (out) yield out;
+    }
+    const rest = gate.flush();
+    if (rest) yield rest;
+  }
+  return toWhatwgReadableStream(generator());
+}
+
+function createOfferGatedDeltaStream<T>(
+  stream: AsyncIterableStream<T>
+): AsyncIterableStream<T> {
+  const withText = (chunk: TextDeltaChunk, out: string): T =>
+    ({
+      ...chunk,
+      ...(chunk.delta !== undefined ? { delta: out } : { text: out }),
+    }) as T;
+  async function* generator(): AsyncGenerator<T> {
+    const gate = new OfferStreamGate({ strict: offerStrictProvider() });
+    let last: TextDeltaChunk | null = null;
+    for await (const chunk of stream) {
+      if (isTextDeltaChunk(chunk)) {
+        last = chunk;
+        const out = gate.push(chunk.delta ?? chunk.text ?? '');
+        if (out) yield withText(chunk, out);
+        continue;
+      }
+      const rest = gate.flush();
+      if (rest && last) yield withText(last, rest);
+      yield chunk;
+    }
+    const rest = gate.flush();
+    if (rest && last) yield withText(last, rest);
+  }
+  return toWhatwgReadableStream(generator());
+}
+
 export function wrapStreamTextResult<TResult>(
   streamResult: TResult,
   context: LeakGuardContext
@@ -458,22 +551,29 @@ export function wrapStreamTextResult<TResult>(
   }
 
   const guardedText = guardTextPromise(surface.text, context);
-  const guardedTextStream = createGuardedTextStream(
-    surface.textStream,
-    context
-  );
-  const guardedFullStream = createGuardedDeltaStream(
-    surface.fullStream,
-    context
-  );
+  const leakTextStream = createGuardedTextStream(surface.textStream, context);
+  const leakFullStream = createGuardedDeltaStream(surface.fullStream, context);
+  const guardedTextStream = context.offerGuard
+    ? createOfferGatedTextStream(leakTextStream)
+    : leakTextStream;
+  const guardedFullStream = context.offerGuard
+    ? createOfferGatedDeltaStream(leakFullStream)
+    : leakFullStream;
 
   return Object.create(result, {
     text: { value: guardedText },
     textStream: { value: guardedTextStream },
     fullStream: { value: guardedFullStream },
     toUIMessageStream: {
-      value: (...args: unknown[]) =>
-        createGuardedDeltaStream(surface.toUIMessageStream(...args), context),
+      value: (...args: unknown[]) => {
+        const guarded = createGuardedDeltaStream(
+          surface.toUIMessageStream(...args),
+          context
+        );
+        return context.offerGuard
+          ? createOfferGatedDeltaStream(guarded)
+          : guarded;
+      },
     },
   }) as TResult;
 }
