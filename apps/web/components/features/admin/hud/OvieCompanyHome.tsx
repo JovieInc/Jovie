@@ -140,7 +140,7 @@ export function OvieCompanyHome({
             />
             {upcoming.length > 0 ? (
               <div
-                className='flex shrink-0 flex-col gap-1'
+                className='hidden shrink-0 flex-col gap-1 @6xl:flex'
                 data-testid='ovie-upcoming-defaults'
               >
                 <h3 className='text-2xs font-medium text-tertiary-token'>

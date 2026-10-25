@@ -62,6 +62,9 @@ if (!exactHead)
  * authenticated chrome, not the first HTML chunk. JOV-5387 New Chat evidence
  * also requires the loaded empty-state greeting, which is not aria-hidden.
  */
+// The real composer field (production builds do not ship test ids).
+const COMPOSER_SELECTOR = 'textarea.system-b-chat-composer-input';
+
 const OVIE_CHAT_PROMPT = 'What changed since I last looked?';
 
 /** A canned UI message stream so Home -> conversation can be captured without a model. */
@@ -105,7 +108,7 @@ async function assertOvieHome(page, route) {
   await assertComposerUsable(page, fullscreen);
   if (fullscreen) await assertFullscreenGeometry(page);
   if (route.includes('capture=chat')) {
-    const input = page.getByTestId('chat-input');
+    const input = page.locator(COMPOSER_SELECTOR).first();
     await input.click();
     await page.keyboard.type(OVIE_CHAT_PROMPT);
     await page.keyboard.press('Enter');
@@ -130,8 +133,8 @@ async function assertOvieHome(page, route) {
 }
 
 async function assertComposerUsable(page, fullscreen) {
-  const result = await page.evaluate(() => {
-    const input = document.querySelector('[data-testid="chat-input"]');
+  const result = await page.evaluate(selector => {
+    const input = document.querySelector(selector);
     if (!input) return { found: false };
     const box = input.getBoundingClientRect();
     const top = document.elementFromPoint(
@@ -148,13 +151,10 @@ async function assertComposerUsable(page, fullscreen) {
         box.left >= 0 &&
         box.right <= window.innerWidth + 1,
       reachable: Boolean(
-        top &&
-          (input === top ||
-            input.contains(top) ||
-            top.closest('[data-testid="chat-input"]'))
+        top && (input === top || input.contains(top) || top.closest(selector))
       ),
     };
-  });
+  }, COMPOSER_SELECTOR);
   if (!result.found) throw new Error('The Summer composer is not rendered');
   if (!result.inViewport)
     throw new Error(
