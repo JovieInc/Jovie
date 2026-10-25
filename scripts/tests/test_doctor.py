@@ -1032,6 +1032,50 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(len(forbidden), 1)
         self.assertEqual(issues[0]["labelIds"], ["symphony"], "the incident keeps its symphony label and loses only the remediation one")
 
+    def test_a_failed_open_is_never_silent_and_keeps_when_it_started(self):
+        # 2026-10-25: production-deploy:lyb sat for ~50 min with no issue; Tracker.open swallowed the error.
+        class Down:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "t", "states": {"nodes": [{"id": "tr", "name": "Triage"}]},
+                                                  "labels": {"nodes": []}}]}}
+                if "issueLabels(" in query or "issueLabelCreate" in query:
+                    return {"issueLabels": {"nodes": []}}
+                raise RuntimeError("linear: 500")
+
+        tracker = doctor.Tracker(Down(), "gem")
+        self.assertIsNone(tracker.open("production-deploy:lyb", "x"))
+        self.assertTrue(tracker.last_error.startswith("create-failed:RuntimeError"))
+        first = doctor.reconcile({"production-deploy:lyb": "x"}, {}, tracker, 1000.0)
+        entry = first["issues"]["production-deploy:lyb"]
+        self.assertEqual((entry["id"], entry["since"]), (None, 1000.0))
+        self.assertIn("create-failed", entry["reason"])
+        second = doctor.reconcile({"production-deploy:lyb": "x"}, first, tracker, 1300.0)
+        self.assertEqual(second["issues"]["production-deploy:lyb"]["since"], 1000.0, "since survives retries")
+
+    def test_invariant_flags_only_alerts_without_an_issue_older_than_fifteen_minutes(self):
+        issues = {"a": {"id": "i1", "closedAt": None},
+                  "b": {"id": None, "closedAt": None, "reason": "create-failed:RuntimeError: 500", "since": 1000.0},
+                  "c": {"id": None, "closedAt": None, "since": 1000.0},
+                  "d": {"id": None, "closedAt": None, "reason": "r", "since": 1500.0}}
+        alerts = {"a": "", "b": "", "c": "", "d": "", "e": ""}
+        gaps = doctor.alert_issue_gaps(alerts, issues, 1000.0 + doctor.ALERT_ISSUE_GRACE_S + 1)
+        self.assertEqual(gaps, {"b": "create-failed:RuntimeError: 500", "c": "untracked"})
+        self.assertEqual(doctor.alert_issue_gaps(alerts, issues, 1000.0 + doctor.ALERT_ISSUE_GRACE_S - 1), {})
+        previous = {"issues": issues}
+        with mock.patch("time.time", return_value=1000.0 + doctor.ALERT_ISSUE_GRACE_S + 1):
+            raised = doctor.judge(obs(tick={"error": "boom"}), previous)
+        self.assertNotIn("alert-issue-missing", raised, "only alerts present this tick count")
+
+    def test_judge_raises_alert_issue_missing_for_a_standing_alert_without_an_issue(self):
+        previous = {"issues": {"tick-error": {"id": None, "closedAt": None, "reason": "create-failed:RuntimeError: 500", "since": 100.0}}}
+        with mock.patch("time.time", return_value=100.0 + doctor.ALERT_ISSUE_GRACE_S + 5):
+            alerts = doctor.judge(obs(tick={"error": "boom"}), previous)
+        self.assertIn("tick-error", alerts)
+        self.assertIn("tick-error (create-failed:RuntimeError: 500)", alerts["alert-issue-missing"])
+
     def test_an_existing_label_beyond_the_first_fifty_is_found_by_name_and_not_recreated(self):
         created, issues = [], []
 
