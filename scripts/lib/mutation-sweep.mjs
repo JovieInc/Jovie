@@ -466,3 +466,52 @@ export function proposeBaselineEntries(state, baseline, source) {
   }
   return out;
 }
+
+/**
+ * Floor raises for modules that already have a floor: a fresh score at least
+ * MIN_RATCHET_VALID strong whose measured-1 beats the committed floor
+ * (lock_up: floors only move up). Same entry shape as proposeBaselineEntries.
+ * @param {ReturnType<typeof emptyState>} state
+ * @param {{ files: Record<string, { floor: number }> }} baseline
+ * @param {{ runId: number, sha: string }} source
+ */
+export function raiseBaselineEntries(state, baseline, source) {
+  /** @type {Record<string, { measured: number, floor: number, valid: number, runId: number, sha: string }>} */
+  const out = {};
+  for (const [file, entry] of Object.entries(state.modules)) {
+    const current = baseline.files[file];
+    if (!current) continue;
+    if (entry.status !== 'scored' || entry.score === null) continue;
+    if (entry.valid < MIN_RATCHET_VALID) continue;
+    const floor = Math.round((entry.score - 1) * 10) / 10;
+    if (!(floor > current.floor)) continue;
+    out[file] = {
+      measured: entry.score,
+      floor,
+      valid: entry.valid,
+      runId: source.runId,
+      sha: entry.sha ?? source.sha,
+    };
+  }
+  return out;
+}
+
+/**
+ * Merge floor additions/raises into a baseline object without mutating it.
+ * Never lowers a floor.
+ * @param {{ files: Record<string, { floor: number }> } & Record<string, unknown>} baseline
+ * @param {Record<string, { floor: number }>} proposal
+ */
+export function mergeFloorProposal(baseline, proposal) {
+  const files = { ...baseline.files };
+  /** @type {string[]} */ const changed = [];
+  for (const [file, entry] of Object.entries(proposal)) {
+    if (files[file] && !(entry.floor > files[file].floor)) continue;
+    files[file] = entry;
+    changed.push(file);
+  }
+  const sorted = Object.fromEntries(
+    Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+  );
+  return { baseline: { ...baseline, files: sorted }, changed };
+}

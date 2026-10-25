@@ -49,6 +49,7 @@ import {
   partitionEquivalents,
   pickBatch,
   proposeBaselineEntries,
+  raiseBaselineEntries,
   ratchetVerdict,
   recordRun,
   validateEquivalents,
@@ -457,10 +458,14 @@ const summary = [
 console.log(`\n${summary}`);
 if (values.summary) appendFileSync(values.summary, summary);
 if (values['propose-baseline']) {
-  const proposal = proposeBaselineEntries(state, baseline, {
+  const source = {
     runId: Number(process.env.GITHUB_RUN_ID ?? 0) || 1,
     sha: headSha,
-  });
+  };
+  const proposal = {
+    ...proposeBaselineEntries(state, baseline, source),
+    ...raiseBaselineEntries(state, baseline, source),
+  };
   writeFileSync(
     values['propose-baseline'],
     `${JSON.stringify(proposal, null, 1)}\n`

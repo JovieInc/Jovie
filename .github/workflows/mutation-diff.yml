@@ -180,11 +180,11 @@ jobs:
             --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 90 \
             --summary "$GITHUB_STEP_SUMMARY" \
             --github-output "$GITHUB_OUTPUT" \
-            --propose-baseline "$RUNNER_TEMP/baseline-proposal.json"
+            --propose-baseline "$state_dir/baseline-proposal.json"
           mkdir -p "$RUNNER_TEMP/sweep-out"
           cp "$state_dir/sweep-state.json" "$state_dir/sweep-state.json.runs.jsonl" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
           cp -r "$state_dir/survivor-tasks" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
-          cp "$RUNNER_TEMP/baseline-proposal.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
+          cp "$state_dir/baseline-proposal.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
 
       # The only step that sees a secret. It reads the task JSON the sweep wrote
       # and never runs Stryker or repo tests.
@@ -220,3 +220,40 @@ jobs:
       - name: Clean sweep scratch
         if: always()
         run: rm -rf apps/web/reports/mutation apps/web/.stryker-tmp "$RUNNER_TEMP/sweep-out"
+
+  # Floors only move up. When a sweep scored a module whose measured-1 beats
+  # its committed floor (or that has none), open one PR for it. Its own job:
+  # the App token never shares a job with Stryker or repo tests, and the
+  # script it runs is builtins-only code from main.
+  floor-pr:
+    name: Propose mutation floors
+    needs: sweep
+    if: ${{ always() && needs.sweep.result == 'success' }}
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    concurrency:
+      group: mutation-floor-pr
+      cancel-in-progress: false
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Generate Jovie Bot token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.AGENTS_APP_ID }}
+          private-key: ${{ secrets.AGENTS_APP_PRIVATE_KEY }}
+
+      - name: Open the floor PR
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node scripts/mutation-open-floor-pr.mjs \
+            --proposal "$HOME/.local/state/jovie-mutation/baseline-proposal.json" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

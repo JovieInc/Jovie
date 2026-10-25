@@ -10,10 +10,12 @@ import {
   fileTimeoutMs,
   MIN_RATCHET_VALID,
   medianScoredMs,
+  mergeFloorProposal,
   moduleKey,
   partitionEquivalents,
   pickBatch,
   proposeBaselineEntries,
+  raiseBaselineEntries,
   ratchetVerdict,
   recordRun,
   SURVIVORS_PER_TASK,
@@ -349,5 +351,59 @@ describe('ratchet', () => {
 describe('spare-compute contract', () => {
   it('preflight reports no problems or plain strings', () => {
     expect(Array.isArray(preflight(REPO_ROOT))).toBe(true);
+  });
+});
+
+describe('floor raises', () => {
+  const src = { runId: 7, sha: 'b'.repeat(40) };
+  const scored = (score, valid, file = 'lib/a.ts') => {
+    const state = emptyState();
+    state.modules[file] = {
+      blob: 'x',
+      sha: 'c'.repeat(40),
+      at: 't',
+      status: 'scored',
+      score,
+      valid,
+      killed: 1,
+      survived: 1,
+      durationMs: 1,
+    };
+    return state;
+  };
+  it('raises an existing floor only when measured-1 beats it', () => {
+    const baseline = { files: { 'lib/a.ts': { floor: 72.5 } } };
+    expect(
+      raiseBaselineEntries(scored(97.9, 189), baseline, src)['lib/a.ts']
+    ).toMatchObject({ measured: 97.9, floor: 96.9, valid: 189, runId: 7 });
+    expect(raiseBaselineEntries(scored(73.5, 189), baseline, src)).toEqual({});
+    expect(raiseBaselineEntries(scored(60, 189), baseline, src)).toEqual({});
+  });
+  it('ignores modules without a floor and too-small samples', () => {
+    expect(raiseBaselineEntries(scored(99, 189), { files: {} }, src)).toEqual(
+      {}
+    );
+    expect(
+      raiseBaselineEntries(
+        scored(99, 2),
+        { files: { 'lib/a.ts': { floor: 1 } } },
+        src
+      )
+    ).toEqual({});
+  });
+  it('merge never lowers a floor and sorts keys', () => {
+    const baseline = {
+      schemaVersion: 1,
+      files: { 'z.ts': { floor: 50 }, 'a.ts': { floor: 80 } },
+    };
+    const { baseline: next, changed } = mergeFloorProposal(baseline, {
+      'z.ts': { floor: 40 },
+      'a.ts': { floor: 90 },
+      'm.ts': { floor: 10 },
+    });
+    expect(changed.sort()).toEqual(['a.ts', 'm.ts']);
+    expect(Object.keys(next.files)).toEqual(['a.ts', 'm.ts', 'z.ts']);
+    expect(next.files['z.ts'].floor).toBe(50);
+    expect(baseline.files['a.ts'].floor).toBe(80);
   });
 });
