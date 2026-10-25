@@ -183,7 +183,7 @@ export function evaluateRegistry(
 export function resolveRole(
   registry: unknown,
   roleId: string,
-  watch?: Record<string, { readonly available?: boolean }>
+  watch?: Record<string, { readonly available?: boolean; readonly via?: string }>
 ): RoleResolution | null;
 export function pathRows(registry: unknown, modelRegistry?: { models?: readonly Record<string, unknown>[] }): PathView[];
 export function priceModel(
