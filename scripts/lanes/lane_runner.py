@@ -24,6 +24,7 @@ import hashlib
 import importlib
 import math
 import json
+from collections import Counter
 import types
 import os
 import random
@@ -5240,6 +5241,46 @@ def _event_delivery_readback(linear, row: dict) -> tuple[bool, dict]:
     return any(label.get("id") == payload["labelId"] for label in nodes), {"issueId": issue["id"], "labelId": payload["labelId"]}
 
 
+# Start deliveries that failed on a precondition no retry can satisfy (the remote issue moved on, this host
+# cannot prove ownership, the attempt budget is spent) used to sit as `failed` forever once their event was no
+# longer claimed: 57 of them, 46 preimage-changed / 7 ownership-unproven / 4 cap-exhausted, up to 3 days old on
+# Gem, kept the "remediation alerts are not being acknowledged" incident open. After a day past the delivery
+# deadline they are retired as `expired`: the row, its error and its age stay in escalation.json and are counted
+# by class in the tick, so the failure is recorded rather than hidden.
+EVENT_START_TERMINAL_ERRORS = frozenset({"event-start-cap-exhausted", "event-start-ownership-unproven",
+                                         "event-start-preimage-changed"})
+EVENT_START_EXPIRE_AFTER_S = 24 * 3600
+
+
+def expire_stale_start_deliveries(host: Host, now: float | None = None) -> dict:
+    """{'expired': n, 'byError': {...}}: retire terminal start-delivery failures a day past their deadline."""
+    now = time.time() if now is None else now
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    try:
+        data = _event_escalation(host)
+        expired = Counter()
+        for row in (data.get("events") or {}).values():
+            delivery = row.get("startDelivery") if isinstance(row, dict) else None
+            if (isinstance(delivery, dict) and delivery.get("status") in {"failed", "sending", "exhausted"}
+                    and delivery.get("error") in EVENT_START_TERMINAL_ERRORS
+                    and not row.get("running")
+                    and now - float(delivery.get("deadline") or now) > EVENT_START_EXPIRE_AFTER_S):
+                expired[delivery["error"]] += 1
+                delivery.update(status="expired", expiredAt=now, expiredFrom=delivery["status"])
+        if expired:
+            _save_event_json(host, "escalation.json", data)
+        return {"expired": sum(expired.values()), "byError": dict(expired)}
+    finally:
+        lock.release()
+
+
+def start_delivery_errors(events: dict) -> dict:
+    """Error class -> count over start deliveries still failed or exhausted."""
+    return dict(Counter(str(row["startDelivery"].get("error") or "unknown") for row in events.values()
+                        if isinstance(row, dict) and (row.get("startDelivery") or {}).get("status") in
+                        {"failed", "sending", "exhausted"}))
+
+
 def _event_delivery_report(data: dict, now: float) -> dict:
     active = [row for row in data["actions"].values()
               if row["status"] not in {"acknowledged", "superseded"}]
@@ -5259,6 +5300,7 @@ def _event_delivery_snapshot(host: Host, now: float) -> dict:
               if isinstance(row, dict)]
     report["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
     report["deliveryExhausted"] += sum(row.get("status") == "exhausted" for row in starts)
+    report["deliveryErrors"] = start_delivery_errors(_event_escalation(host).get("events") or {})
     return report
 
 
@@ -5274,7 +5316,9 @@ def drain_event_delivery(host: Host, linear) -> dict:
     try:
         journal = _event_delivery_state(host)  # Fail closed before changing event rows.
         _recover_event_preparation(host, journal)
-        return _apply_event_plan(linear, {}, host, journal, time.time())
+        expiry = expire_stale_start_deliveries(host)
+        report = _apply_event_plan(linear, {}, host, journal, time.time())
+        return {**report, "deliveryExpired": expiry["expired"], "deliveryExpiredByError": expiry["byError"]}
     finally:
         delivery_lock.release()
 
@@ -5423,6 +5467,7 @@ def claim_remediation_events(host: Host, linear) -> dict:
     try:
         journal = _event_delivery_state(host)  # Fail closed before changing event rows.
         _recover_event_preparation(host, journal)
+        expiry = expire_stale_start_deliveries(host)
         data = _event_escalation(host)
         baseline = json.loads(json.dumps(data.get("events") or {}))
         plan = remediation.plan_labeled_events(issues, data.get("events") or {}, providers, time.time(),
@@ -5490,6 +5535,9 @@ def claim_remediation_events(host: Host, linear) -> dict:
     starts = [row.get("startDelivery") or {} for row in plan["events"].values()]
     delivery["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
     delivery["deliveryExhausted"] += sum(row.get("status") == "exhausted" for row in starts)
+    delivery["deliveryExpired"] = expiry["expired"]
+    delivery["deliveryExpiredByError"] = expiry["byError"]
+    delivery["deliveryErrors"] = start_delivery_errors(plan["events"])
     return {"eventsOpen": summary["eventsOpen"], "eventsClaimed": summary["eventsClaimed"],
             "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"], **delivery}
 
