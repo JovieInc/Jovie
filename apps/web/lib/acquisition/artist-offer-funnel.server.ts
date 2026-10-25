@@ -133,6 +133,10 @@ export async function getArtistOfferFunnelReport(input?: {
     'pending-verification': toDate(row.stages?.['pending-verification']),
     'claim-verified': toDate(row.stages?.['claim-verified']),
     'claim-rejected': toDate(row.stages?.['claim-rejected']),
+    'claim-link-open': toDate(row.stages?.['claim-link-open']),
+    start: toDate(row.stages?.start),
+    claimed: toDate(row.stages?.claimed),
+    'upgrade-viewed': toDate(row.stages?.['upgrade-viewed']),
   }));
 
   const diagnostics = await getFunnelDiagnostics(start, end);

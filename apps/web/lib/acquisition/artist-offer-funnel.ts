@@ -44,7 +44,36 @@ export const ARTIST_OFFER_BRANCH_STAGES = [
 export type ArtistOfferBranchStage =
   (typeof ARTIST_OFFER_BRANCH_STAGES)[number]['stage'];
 
-type ArtistOfferAnyStage = ArtistOfferFunnelStage | ArtistOfferBranchStage;
+/**
+ * Golden-path stages (free-first claim flow). They share the journey table
+ * with the revenue funnel above. `claim-link-open` is an entry cohort (a
+ * creator who arrived from an outreach claim link), not a step every journey
+ * passes through. `claimed` is the page claimed and live at its free-tier
+ * address; `upgrade-viewed` is the first view of the upgrade offer.
+ */
+export const GOLDEN_PATH_ENTRY_STAGE = 'claim-link-open' as const;
+
+export const GOLDEN_PATH_STAGES = [
+  'visit',
+  'start',
+  'sign-in',
+  'claimed',
+  'upgrade-viewed',
+  'checkout',
+  'paid',
+] as const;
+
+export type GoldenPathStage = (typeof GOLDEN_PATH_STAGES)[number];
+export type GoldenPathExtraStage =
+  | typeof GOLDEN_PATH_ENTRY_STAGE
+  | 'start'
+  | 'claimed'
+  | 'upgrade-viewed';
+
+type ArtistOfferAnyStage =
+  | ArtistOfferFunnelStage
+  | ArtistOfferBranchStage
+  | GoldenPathExtraStage;
 
 /** Stages written by producers; the rest are derived from the journey row. */
 export const RECORDED_ARTIST_OFFER_STAGES = [
@@ -56,6 +85,10 @@ export const RECORDED_ARTIST_OFFER_STAGES = [
   'pending-verification',
   'claim-verified',
   'claim-rejected',
+  'claim-link-open',
+  'start',
+  'claimed',
+  'upgrade-viewed',
 ] as const satisfies readonly ArtistOfferAnyStage[];
 
 export type RecordedArtistOfferStage =
@@ -76,7 +109,10 @@ export function stageForFunnelPath(
 ): RecordedArtistOfferStage | null {
   if (!path) return null;
   const normalized = path.split(/[?#]/)[0].replace(/\/+$/, '') || '/';
-  return normalized === '/pricing' ? 'pricing' : null;
+  if (normalized === '/pricing') return 'pricing';
+  if (normalized === '/start') return 'start';
+  if (normalized === '/onboarding/checkout') return 'upgrade-viewed';
+  return null;
 }
 
 /**
@@ -155,6 +191,7 @@ export interface ArtistOfferFunnelReport {
   /** Off-funnel branches (e.g. paid → pending-verification). */
   readonly branches: readonly ArtistOfferBranchSummary[];
   readonly diagnostics: ArtistOfferFunnelDiagnostics;
+  readonly goldenPath?: GoldenPathReport;
 }
 
 /**
@@ -283,5 +320,97 @@ export function buildArtistOfferFunnelReport(input: {
     stages,
     branches,
     diagnostics: input.diagnostics ?? EMPTY_FUNNEL_DIAGNOSTICS,
+    goldenPath: buildGoldenPathReport({
+      totalVisits: input.totalVisits,
+      timelines: input.timelines,
+    }),
+  };
+}
+
+export interface GoldenPathStageSummary {
+  readonly stage: GoldenPathStage;
+  readonly journeys: number;
+  readonly conversionFromPrevious: number | null;
+  readonly conversionFromVisit: number | null;
+  readonly fromPreviousSeconds: DurationSummary;
+}
+
+/** Below this many journeys at a stage, say so instead of reading a rate. */
+export const GOLDEN_PATH_MIN_SAMPLE = 20;
+
+export interface GoldenPathCohortReport {
+  readonly cohort: 'all' | 'claim_link';
+  /** Journeys that entered the cohort (all visits, or claim-link opens). */
+  readonly entered: number;
+  readonly stages: readonly GoldenPathStageSummary[];
+  /** True when the cohort is too small to call any conversion a result. */
+  readonly underpowered: boolean;
+}
+
+export interface GoldenPathReport {
+  readonly schema: 'jovie-golden-path-funnel/v1';
+  readonly minSample: number;
+  readonly cohorts: readonly GoldenPathCohortReport[];
+  /** Stages with no producer yet, so a zero is not a measurement. */
+  readonly uninstrumented: readonly string[];
+}
+
+function buildGoldenPathCohort(
+  cohort: GoldenPathCohortReport['cohort'],
+  entered: number,
+  timelines: readonly ArtistOfferJourneyTimeline[]
+): GoldenPathCohortReport {
+  const reachedCount = (stage: GoldenPathStage): number =>
+    stage === 'visit'
+      ? entered
+      : timelines.filter(timeline => Boolean(timeline[stage])).length;
+  const stages = GOLDEN_PATH_STAGES.map((stage, index) => {
+    const previous = index > 0 ? GOLDEN_PATH_STAGES[index - 1] : null;
+    const fromPrevious: number[] = [];
+    if (previous && previous !== 'visit') {
+      for (const timeline of timelines) {
+        const step = secondsBetween(timeline[previous], timeline[stage]);
+        if (step !== null) fromPrevious.push(step);
+      }
+    }
+    const journeys = reachedCount(stage);
+    return {
+      stage,
+      journeys,
+      conversionFromPrevious: previous
+        ? ratio(journeys, reachedCount(previous))
+        : null,
+      conversionFromVisit: stage === 'visit' ? null : ratio(journeys, entered),
+      fromPreviousSeconds: summarize(fromPrevious),
+    } satisfies GoldenPathStageSummary;
+  });
+  return {
+    cohort,
+    entered,
+    stages,
+    underpowered: entered < GOLDEN_PATH_MIN_SAMPLE,
+  };
+}
+
+/**
+ * Golden-path view over the same journey timelines: all journeys, and the
+ * claim-link cohort (journeys that opened a claim link) with its own
+ * denominator. Pure; the stage list is the contract, not the SQL.
+ */
+export function buildGoldenPathReport(input: {
+  readonly totalVisits: number;
+  readonly timelines: readonly ArtistOfferJourneyTimeline[];
+}): GoldenPathReport {
+  const claimLink = input.timelines.filter(timeline =>
+    Boolean(timeline[GOLDEN_PATH_ENTRY_STAGE])
+  );
+  return {
+    schema: 'jovie-golden-path-funnel/v1',
+    minSample: GOLDEN_PATH_MIN_SAMPLE,
+    cohorts: [
+      buildGoldenPathCohort('all', input.totalVisits, input.timelines),
+      buildGoldenPathCohort('claim_link', claimLink.length, claimLink),
+    ],
+    uninstrumented: ['identity-resolved'],
   };
 }

@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ARTIST_OFFER_FUNNEL_STAGES,
   buildArtistOfferFunnelReport,
+  buildGoldenPathReport,
+  GOLDEN_PATH_MIN_SAMPLE,
+  GOLDEN_PATH_STAGES,
   isOfferLanding,
   isRecordedArtistOfferStage,
   landingPathname,
@@ -207,5 +210,85 @@ describe('artist-offer funnel contract', () => {
     expect(
       buildArtistOfferFunnelReport({ ...base, diagnostics }).diagnostics
     ).toEqual(diagnostics);
+  });
+});
+
+describe('golden-path funnel', () => {
+  it('keeps the stage order the product walks', () => {
+    expect(GOLDEN_PATH_STAGES).toEqual([
+      'visit',
+      'start',
+      'sign-in',
+      'claimed',
+      'upgrade-viewed',
+      'checkout',
+      'paid',
+    ]);
+  });
+
+  it('maps /start and the upgrade card to page-view stages', () => {
+    expect(stageForFunnelPath('/start')).toBe('start');
+    expect(stageForFunnelPath('/start/?claim=1')).toBe('start');
+    expect(stageForFunnelPath('/onboarding/checkout')).toBe('upgrade-viewed');
+    expect(stageForFunnelPath('/starts')).toBeNull();
+  });
+
+  it('records the new stages from producers only', () => {
+    for (const stage of [
+      'claim-link-open',
+      'start',
+      'claimed',
+      'upgrade-viewed',
+    ]) {
+      expect(isRecordedArtistOfferStage(stage)).toBe(true);
+    }
+  });
+
+  it('reports the claim-link cohort against its own denominator', () => {
+    const report = buildGoldenPathReport({
+      totalVisits: 100,
+      timelines: [
+        { 'claim-link-open': at(0), start: at(5), claimed: at(65) },
+        { 'claim-link-open': at(0), start: at(9) },
+        { start: at(0), 'sign-in': at(30), claimed: at(90), paid: at(500) },
+      ],
+    });
+    const all = report.cohorts.find(c => c.cohort === 'all');
+    const link = report.cohorts.find(c => c.cohort === 'claim_link');
+    expect(all?.entered).toBe(100);
+    expect(link?.entered).toBe(2);
+    const linkStart = link?.stages.find(s => s.stage === 'start');
+    expect(linkStart?.journeys).toBe(2);
+    expect(linkStart?.conversionFromPrevious).toBe(1);
+    const linkClaimed = link?.stages.find(s => s.stage === 'claimed');
+    expect(linkClaimed?.journeys).toBe(1);
+    // sign-in was never recorded for the link cohort, so no step timing.
+    expect(linkClaimed?.fromPreviousSeconds.samples).toBe(0);
+    const allClaimed = all?.stages.find(s => s.stage === 'claimed');
+    expect(allClaimed?.fromPreviousSeconds).toEqual({
+      samples: 1,
+      p50: 60,
+      p95: 60,
+    });
+  });
+
+  it('marks small cohorts underpowered instead of reading a rate as a win', () => {
+    const report = buildGoldenPathReport({
+      totalVisits: GOLDEN_PATH_MIN_SAMPLE - 1,
+      timelines: [],
+    });
+    expect(report.cohorts.every(c => c.underpowered)).toBe(true);
+    expect(report.uninstrumented).toContain('identity-resolved');
+  });
+
+  it('rides along on the existing revenue report without changing it', () => {
+    const report = buildArtistOfferFunnelReport({
+      start: t0,
+      end: at(3600),
+      totalVisits: 10,
+      timelines: [],
+    });
+    expect(report.schema).toBe('jovie-artist-offer-funnel/v1');
+    expect(report.goldenPath?.schema).toBe('jovie-golden-path-funnel/v1');
   });
 });
