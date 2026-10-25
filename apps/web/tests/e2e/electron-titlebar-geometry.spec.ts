@@ -151,39 +151,6 @@ test('titlebar DOM has a single sidebar toggle and no second main-cell band', as
   );
 });
 
-test('Electron main panel reaches the native window right and bottom edges', async ({
-  page,
-}) => {
-  test.skip(
-    process.env.E2E_USE_TEST_AUTH_BYPASS !== '1',
-    'Requires E2E_USE_TEST_AUTH_BYPASS=1'
-  );
-  test.setTimeout(180_000);
-
-  await installElectronRuntime(page);
-  await page.setViewportSize({ width: 1350, height: 860 });
-  await gotoShellRoute(page);
-  await waitForSettledShell(page);
-
-  const geometry = await page.locator('#main-content').evaluate(element => {
-    const rect = element.getBoundingClientRect();
-    return {
-      right: rect.right,
-      bottom: rect.bottom,
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-    };
-  });
-
-  expect(geometry.right, 'main panel is flush with the window right edge').toBe(
-    geometry.viewportWidth
-  );
-  expect(
-    geometry.bottom,
-    'main panel is flush with the window bottom edge'
-  ).toBe(geometry.viewportHeight);
-});
-
 test('no duplicate sidebar dock button and titlebar toggle on the same page', async ({
   page,
 }) => {
@@ -397,6 +364,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const settingsColumn = document.querySelector<HTMLElement>(
         '[data-settings-layout-column="true"]'
       );
+      const mainContent = document.querySelector<HTMLElement>('#main-content');
       if (!titlebar || !body || !sidebar || !mainPlane) return null;
 
       const titlebarBox = titlebar.getBoundingClientRect();
@@ -405,6 +373,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const mainPlaneBox = mainPlane.getBoundingClientRect();
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
+      const mainContentBox = mainContent?.getBoundingClientRect();
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
         bodyPaddingLeft: Number.parseFloat(getComputedStyle(body).paddingLeft),
@@ -413,6 +382,10 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
+        mainContentRight: mainContentBox?.right ?? null,
+        mainContentBottom: mainContentBox?.bottom ?? null,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
         settingsShellTop: settingsShellBox?.top ?? null,
         settingsShellCenterX:
           settingsShellBox === undefined
@@ -451,6 +424,22 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
           ((geometry?.bodyTop ?? 0) + (geometry?.bodyPaddingTop ?? 0))
       ),
       `${route} main plane aligns to the body content grid`
+    ).toBeLessThanOrEqual(1);
+    // JOV-8941: the native window owns the right and bottom edges in
+    // Electron, so the main panel meets the window frame instead of reading
+    // as a floating card with a gutter on those edges. Fractional layout can
+    // round rects, so allow the same 1px tolerance the alignment checks use.
+    expect(
+      Math.abs(
+        (geometry?.mainContentRight ?? 0) - (geometry?.viewportWidth ?? 0)
+      ),
+      `${route} main panel is flush with the window right edge (JOV-8941)`
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(
+        (geometry?.mainContentBottom ?? 0) - (geometry?.viewportHeight ?? 0)
+      ),
+      `${route} main panel is flush with the window bottom edge (JOV-8941)`
     ).toBeLessThanOrEqual(1);
 
     if (route.startsWith(APP_ROUTES.SETTINGS)) {
