@@ -412,6 +412,34 @@ describe('buildConstraint', () => {
     });
   });
 
+  it('never says nothing is blocking shipping when its inputs are missing', () => {
+    const base = measuredDelivery();
+    const unmeasured = delivery({
+      ...base,
+      lanes: { ...base.lanes, running: count(0), slots: count(0) },
+    });
+    expect(
+      buildConstraint(
+        delivery({
+          ...base,
+          lanes: {
+            ...base.lanes,
+            running: { state: 'not-measured', value: null },
+            slots: { state: 'not-measured', value: null },
+          },
+        }),
+        [],
+        'fresh'
+      )
+    ).toEqual({ tone: 'warn', text: 'Shipping health is not measured' });
+    expect(buildConstraint(base, [], 'syncing')).toEqual({
+      tone: 'warn',
+      text: 'Work items are still syncing',
+    });
+    // Measured zero is a real reading, not a missing one.
+    expect(buildConstraint(unmeasured, [], 'fresh')).toBeNull();
+  });
+
   it('returns null when nothing needs attention', () => {
     expect(buildConstraint(measuredDelivery(), [], 'fresh')).toBeNull();
   });
@@ -440,7 +468,11 @@ describe('buildOvieHomeShipping', () => {
     });
     expect(home.mergesToday).toBeNull();
     expect(home.done).toEqual([]);
-    expect(home.constraint).toBeNull();
+    // An empty summary is unmeasured, never an all-clear (JOV-9019).
+    expect(home.constraint).toEqual({
+      tone: 'warn',
+      text: 'Shipping health is not measured',
+    });
   });
 });
 

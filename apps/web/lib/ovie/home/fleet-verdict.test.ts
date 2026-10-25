@@ -69,3 +69,35 @@ describe('fleetVerdict', () => {
     );
   });
 });
+
+describe('no false green (JOV-9019)', () => {
+  const measurements = [
+    ['running', count(null), count(2)],
+    ['slots', count(null), count(3)],
+  ] as const;
+
+  it('never reports healthy unless the feed is current and every count is measured', () => {
+    for (const running of [count(null), count(2)]) {
+      for (const slots of [count(null), count(3)]) {
+        for (const stale of [false, true]) {
+          const verdict = fleetVerdict(lanes({ running, slots, stale }));
+          const complete =
+            running.state !== 'not-measured' &&
+            slots.state !== 'not-measured' &&
+            !stale;
+          expect(verdict.level === 'healthy').toBe(complete);
+          if (!complete) expect(verdict.headline).not.toMatch(/healthy|clear/i);
+        }
+      }
+    }
+    expect(measurements).toHaveLength(2);
+  });
+
+  it('keeps alerts louder than missing counts', () => {
+    expect(
+      fleetVerdict(
+        lanes({ running: count(null), slots: count(null), alerts: ['a'] })
+      ).level
+    ).toBe('degraded');
+  });
+});

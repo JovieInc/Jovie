@@ -59,7 +59,10 @@ export function fleetVerdict(lanes: DeliveryLanes): FleetVerdict {
       capacity,
     };
   }
-  if (running === null && slots === null) {
+  // Healthy needs BOTH counts measured: with either missing, "all clear" would
+  // be a guess (JOV-9019: Home said Nothing is blocking shipping while its own
+  // sections said Shipping data could not load).
+  if (running === null || slots === null) {
     return {
       level: 'unknown',
       headline: 'Fleet health not measured',

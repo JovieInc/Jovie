@@ -481,6 +481,12 @@ export function buildConstraint(
 
   if (tasksSyncState === 'failed' || tasksSyncState === 'stale')
     return { tone: 'warn', text: 'Work items are not current' };
+  // No clear verdict without measurements: null means "nothing is blocking
+  // shipping", which may only be said when the fleet and the work feed were read.
+  if (fleet.level === 'unknown')
+    return { tone: 'warn', text: 'Shipping health is not measured' };
+  if (tasksSyncState === 'syncing')
+    return { tone: 'warn', text: 'Work items are still syncing' };
   return null;
 }
 
