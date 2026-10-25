@@ -865,6 +865,22 @@ expired claim. `metrics` reports duplicate overlapping runs, overnight (00-08 UT
 throughput and the factory share of issue runs (floor 20 %). `ownership.reconcile` also releases
 repo-binding claims whose binding issue lock is no longer held.
 
+Also in the same module and companions:
+
+- Lanes skip any issue under an unexpired external claim (`held_back_issues`); the doctor raises
+  `stranded-claims` and records one `fleet-ready.jsonl` row per pass, so `metrics` reports
+  `idleWhileReady` (allowed seat free while work waited) and `throttledMin` (autoscaler cut seats).
+- `fleet_ledger.py gates`: human-gated issues must carry `Default:` and `Deadline:` lines; they park
+  (lanes skip them), come due, or are `unbounded` (a gate that can block forever).
+- `fleet_ledger.py burn` reads `quota-windows.json` and ranks capped agents by how far behind their
+  reset window they are, so quota is spent before it resets.
+- `factory_intake.py`: `state/factory-signals/*.json` (`jovie-factory-signal/v1`: fingerprint, problem,
+  acceptance, metric) become Todo issues labelled `factory`, `ws:symphony-throughput` and
+  `factory-fp:<fp>` on each doctor pass (max 3, deduped by the label). Done means the metric moved.
+- `codex_delegate.py --agent dots -- codex exec ...`: agents that delegate to Codex take a
+  `slots/codex.N` seat under the lanes' admission lock and cap (exit 75 if none) and are logged per
+  agent in `runs/delegations.jsonl`.
+
 ## Tests
 
 ```sh

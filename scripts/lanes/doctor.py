@@ -34,6 +34,7 @@ import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
 import fleet_ledger  # noqa: E402  (claim ledger view, ready-work recorder)
+import factory_intake  # noqa: E402  (fleet-improvement signals -> agent-ready issues)
 import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
@@ -1966,6 +1967,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         except Exception:
             tracker = None
     result = reconcile(alerts, previous, tracker, obs["now"], conditions)
+    if getattr(tracker, "linear", None) is not None:
+        result["factoryIntake"] = factory_intake.run_pass(host.state, tracker.linear)
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["admissionRepairSince"] = previous.get("admissionRepairSince")
     result["deliveryDemandSince"] = previous.get("deliveryDemandSince")

@@ -104,6 +104,33 @@ class FleetLedgerTest(unittest.TestCase):
         self.assertEqual(fl.external_held(self.state, NOW + 30), frozenset({"JOV-3"}))
         self.assertEqual(fl.external_held(self.state, NOW + 90), frozenset())
 
+    def test_gates_park_with_default_and_deadline_and_flag_unbounded_ones(self):
+        def row(n, labels, desc, state="unstarted"):
+            return {"identifier": f"JOV-{n}", "labels": labels, "description": desc, "stateType": state}
+        issues = {str(i): r for i, r in enumerate([
+            row(1, ["needs-human-decision"], "Default: ship option B\nDeadline: 2099-01-01"),
+            row(2, ["tim-hold"], "**Default:** keep flag off\n**Deadline:** 2099-01-01T12:00Z"),
+            row(3, ["needs-human"], "Default: x\nDeadline: 1999-01-01"),
+            row(4, ["gated"], "no decision recorded"),
+            row(5, ["gated"], "Default: x", state="completed"),
+            row(6, ["bug"], "Default: x\nDeadline: 1999-01-01")])}
+        path = self.state / "linear"
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "mirror-JOV.json").write_text(json.dumps({"issues": issues}))
+        out = fl.gate_census(self.state, now=1_800_000_000)
+        self.assertEqual((out["parked"], out["due"], out["unbounded"]), (["JOV-1", "JOV-2"], ["JOV-3"], ["JOV-4"]))
+
+    def test_burn_plan_pushes_work_to_capped_agents_that_are_behind_their_window(self):
+        week = 7 * 86400
+        windows = [{"agent": "muse", "resetAt": NOW + week / 2, "windowS": week, "quota": 100, "used": 10},
+                   {"agent": "grokbot", "resetAt": NOW + week / 2, "windowS": week, "quota": 100, "used": 52},
+                   {"agent": "gone", "resetAt": NOW - 1, "windowS": week, "quota": 100, "used": 0}]
+        plan = fl.burn_plan(windows, NOW)
+        self.assertEqual([p["agent"] for p in plan], ["muse", "grokbot"])
+        self.assertTrue(plan[0]["behind"])
+        self.assertFalse(plan[1]["behind"])
+        self.assertEqual(plan[0]["needPerHour"], round(90 / 84, 2))
+
 
 if __name__ == "__main__":
     unittest.main()

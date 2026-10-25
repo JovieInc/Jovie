@@ -20,6 +20,7 @@ import argparse
 import fcntl
 import json
 import os
+import re
 import sys
 import time
 from collections import Counter
@@ -142,6 +143,28 @@ def ledger(state: Path, now: float | None = None) -> list[dict]:
     return rows
 
 
+def codex_consumption(state: Path, since: float) -> dict:
+    """Per-agent Codex seat use from runs/delegations.jsonl (codex_delegate.py): runs, failures,
+    seat-seconds. Lane runs are in the run ledger; this is the spend by agents that delegate."""
+    out: dict[str, dict] = {}
+    try:
+        lines = (state / "runs" / "delegations.jsonl").read_text().splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        try:
+            row = json.loads(line)
+            if _ts(row["startedAt"]) < since:
+                continue
+        except (ValueError, KeyError):
+            continue
+        agent = out.setdefault(row.get("agent", "?"), {"runs": 0, "failed": 0, "seatSeconds": 0.0})
+        agent["runs"] += 1
+        agent["failed"] += row.get("exit") not in (0, None) and 1 or 0
+        agent["seatSeconds"] = round(agent["seatSeconds"] + float(row.get("seconds") or 0), 1)
+    return out
+
+
 def stranded(state: Path, now: float | None = None) -> list[str]:
     return sorted(r["ident"] for r in ledger(state, now) if r["verdict"] == "stranded")
 
@@ -214,6 +237,53 @@ def idle_while_ready(state: Path, since: float) -> dict:
     return {"coveredMin": round(covered / 60, 1),
             "idleMin": {k: round(v / 60, 1) for k, v in idle.items()},
             "throttledMin": {k: round(v / 60, 1) for k, v in throttled.items()}}
+
+
+GATE_LABELS = frozenset({"needs-human-decision", "needs-human", "needs:human", "human-review-required",
+                         "ws:human-decision", "tim-hold", "hold", "gated"})
+DEADLINE = re.compile(r"^\s*(?:\*\*)?deadline\s*:\s*(?:\*\*)?\s*(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2})(?::\d{2})?)?", re.I | re.M)
+DEFAULT = re.compile(r"^\s*(?:\*\*)?default\s*:\s*(?:\*\*)?\s*(\S.*)$", re.I | re.M)
+
+
+def gate_census(state: Path, now: float | None = None) -> dict:
+    """Human-gated issues never block the queue (lanes skip them); each must carry
+    `Default: <what ships if nobody answers>` and `Deadline: <ISO UTC>` in its description.
+    parked = has both and not due; due = deadline passed, the default should now be applied;
+    unbounded = gated with no default+deadline (a gate that can block forever)."""
+    now = time.time() if now is None else now
+    out: dict[str, list] = {"parked": [], "due": [], "unbounded": []}
+    for team in ("JOV", "LYB"):
+        for row in (_json(state / "linear" / f"mirror-{team}.json", {}).get("issues") or {}).values():
+            labels = {(l if isinstance(l, str) else l.get("name", "")).lower() for l in (row.get("labels") or [])}
+            if not labels & GATE_LABELS or row.get("stateType") in ("completed", "canceled"):
+                continue
+            text = row.get("description") or ""
+            deadline, default = DEADLINE.search(text), DEFAULT.search(text)
+            if not (deadline and default):
+                out["unbounded"].append(row.get("identifier"))
+                continue
+            due = _ts(f"{deadline.group(1)}T{deadline.group(2) or '00:00'}:00Z")
+            out["due" if due <= now else "parked"].append(row.get("identifier"))
+    return {**{k: sorted(v) for k, v in out.items()}, "counts": {k: len(v) for k, v in out.items()}}
+
+
+def burn_plan(windows: list[dict], now: float | None = None) -> list[dict]:
+    """Use-it-or-lose-it pacing for capped agents (Muse, Grokbot...). Each window:
+    {agent, resetAt (epoch), windowS, quota, used} from the capacity registry. `behind` means less of
+    the quota is spent than of the window elapsed: route extra work there now. `needPerHour` is the
+    units/hour that finish the quota exactly at reset."""
+    now = time.time() if now is None else now
+    plan = []
+    for w in windows:
+        left_s = w["resetAt"] - now
+        if left_s <= 0 or w["quota"] <= 0:
+            continue
+        elapsed = min(1.0, max(0.0, 1 - left_s / w["windowS"]))
+        spent = w["used"] / w["quota"]
+        plan.append({"agent": w["agent"], "spentPct": round(100 * spent), "elapsedPct": round(100 * elapsed),
+                     "needPerHour": round((w["quota"] - w["used"]) / (left_s / 3600), 2),
+                     "behind": spent < elapsed - 0.05, "resetInH": round(left_s / 3600, 1)})
+    return sorted(plan, key=lambda r: r["spentPct"] - r["elapsedPct"])
 
 
 def _ts(value: str) -> float:
@@ -317,6 +387,8 @@ def main(argv=None) -> int:
     parser.add_argument("--state", default=os.environ.get("LANES_STATE") or str(Path.home() / ".local/state/jovie-lanes"))
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("ledger")
+    sub.add_parser("gates")
+    sub.add_parser("burn")
     metrics = sub.add_parser("metrics")
     metrics.add_argument("--days", type=float, default=7)
     for name in ("claim", "heartbeat", "release"):
@@ -331,6 +403,10 @@ def main(argv=None) -> int:
     if args.cmd == "ledger":
         rows = ledger(state)
         print(json.dumps({"claims": rows, "verdicts": dict(Counter(r["verdict"] for r in rows))}, indent=1))
+    elif args.cmd == "gates":
+        print(json.dumps(gate_census(state), indent=1))
+    elif args.cmd == "burn":
+        print(json.dumps(burn_plan(_json(state / "quota-windows.json", {}).get("windows") or []), indent=1))
     elif args.cmd == "metrics":
         sys.path.insert(0, str(Path(__file__).resolve().parent))
         import workstreams
@@ -338,6 +414,7 @@ def main(argv=None) -> int:
         dup = duplicate_overlaps(runs)
         print(json.dumps({"days": args.days, "runs": len(runs), "throughput": throughput(runs, args.days),
                           "duplicateOverlaps": {"count": len(dup), "sample": dup[:5]},
+                          "gates": gate_census(state)["counts"],
                           "idleWhileReady": idle_while_ready(state, time.time() - args.days * 86400),
                           "factory": factory_share(runs, mirror_classifier(state, workstreams))}, indent=1))
     else:
