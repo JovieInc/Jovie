@@ -20,6 +20,24 @@ const unitTestRunnerSource = readFileSync(
   'utf8'
 );
 
+test('a failing xcresult report surfaces named test annotations', () => {
+  // JOV-7763: the wrapper must emit one ::error:: annotation per failing
+  // test from the untruncated report, and the emitter must never be able to
+  // change the wrapper's own exit status.
+  assert.match(runXcodebuildSource, /emit-xcresult-failure-annotations\.mjs/);
+  assert.match(
+    runXcodebuildSource,
+    /get test-results tests --path "\$RESULT_BUNDLE_PATH" >"\$xcresult_tests_json" 2>\/dev\/null \|\| true/
+  );
+  assert.match(
+    runXcodebuildSource,
+    /node "\$SCRIPT_DIR\/emit-xcresult-failure-annotations\.mjs" <"\$xcresult_tests_json" \|\| true/
+  );
+  // The generic line stays: the emitter is additive diagnostics, and an
+  // xcresulttool format change must degrade to this, never to silence.
+  assert.match(runXcodebuildSource, /::error::iOS test action failed/);
+});
+
 test('xcodebuild wrapper prints phase timing and bounded timeout diagnostics', () => {
   assert.match(runXcodebuildSource, /run_phase_with_optional_timeout/);
   assert.match(runXcodebuildSource, /iOS phase started_at=/);
