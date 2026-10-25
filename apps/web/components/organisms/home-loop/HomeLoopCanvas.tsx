@@ -97,6 +97,16 @@ export function HomeLoopCanvas({
   const openAsks = asks.filter(
     ask => !answers[ask.id] || answers[ask.id]?.state === 'failed'
   ).length;
+  // The banner never claims the all-clear while the loop read is not ready
+  // or no metric is measured; unknown renders as unknown (JOV-9019).
+  const bannerUnknown =
+    loopStatus === 'loading'
+      ? null
+      : loopStatus === 'error'
+        ? copy.inFlightError
+        : constraint === null && !pulse.some(tile => tile.measured)
+          ? (copy.constraintUnknown ?? 'Shipping status is unknown')
+          : null;
   return (
     <div
       className='@container flex w-full flex-col gap-3 lg:h-full lg:min-h-0'
@@ -106,6 +116,7 @@ export function HomeLoopCanvas({
         constraint={loopStatus === 'ready' ? constraint : null}
         emptyLabel={copy.constraintClear}
         loading={loopStatus === 'loading'}
+        unknownLabel={bannerUnknown}
       />
       <HomeLoopPulse tiles={pulse} loading={loopStatus === 'loading'} />
       {strip ? (
