@@ -32,6 +32,131 @@
       "rule": "Not routable: lane disabled, plan lapsed or unverified. Do not route work here."
     }
   },
+  "roles": {
+    "planner": {
+      "description": "Strategic planning. Summer defers all strategic planning to the preferred model (Tim, 2026-10-25).",
+      "candidates": [
+        {
+          "model": "moonshotai/kimi-k3.1-pro",
+          "label": "Kimi K3.1 Pro",
+          "pathId": "kimi-k3.1-pro@credits:hyperagent",
+          "preferred": true,
+          "availability": {
+            "status": "watching",
+            "watch": {
+              "hyperagentAgentNamePattern": "kimi.*3\\.1.*pro",
+              "gatewayModelId": "moonshotai/kimi-k3.1-pro"
+            },
+            "note": "Flips to available when the live watcher sees a Hyperagent agent for it (list_agents) or the Gateway catalog lists it. The Hyperagent MCP has no model catalog tool, so an agent named for the model is the signal."
+          }
+        },
+        {
+          "model": "moonshotai/kimi-k3",
+          "label": "Kimi K3",
+          "pathId": "kimi-k3@credits:hyperagent",
+          "preferred": false,
+          "availability": {
+            "status": "available",
+            "note": "In the Hyperagent registry today; planner until K3.1 Pro lands."
+          }
+        }
+      ]
+    }
+  },
+  "pricing": {
+    "listPriceSource": "scripts/backlog-orchestrator/config/model-registry.json (list_price_in and list_price_out, USD per million tokens; no cached-input price is recorded, so cached tokens are priced as input)",
+    "subscriptionFloorFraction": 0.1,
+    "paceBandPercent": 10,
+    "rule": "Price every model by how it is accessed. API and credits paths cost tokens times the provider list price. A subscription path costs the plan's window price times the task's share of the usable quota, about a tenth of that while the account is behind its window pace (use it or lose it), the plain share while on pace, and rising linearly to the API list price as the account runs ahead of pace and nears exhaustion; an exhausted or lapsed account costs the API price and is not routable. The same model on two paths is two rows.",
+    "paths": [
+      {
+        "id": "gpt-5.6-luna@api",
+        "model": "gpt-5.6-luna",
+        "accessPath": "api",
+        "modelRegistryId": "codex-luna",
+        "funding": "cash"
+      },
+      {
+        "id": "gpt-5.6-luna@subscription:openai-codex",
+        "model": "gpt-5.6-luna",
+        "accessPath": "subscription",
+        "modelRegistryId": "codex-luna",
+        "provider": "openai-codex",
+        "accounts": ["current-login", "jovie-pro", "lyb-pro"],
+        "usableQuotaApiUsd": null,
+        "usableQuotaNote": "Unmeasured: the API-equivalent list-priced usage one weekly window allows. Needs per-run token counts joined to the account's used percent; until then USD is unknown and ranking uses the pace rule alone."
+      },
+      {
+        "id": "gpt-5.6-terra@api",
+        "model": "gpt-5.6-terra",
+        "accessPath": "api",
+        "modelRegistryId": "codex-terra",
+        "funding": "cash"
+      },
+      {
+        "id": "gpt-5.6-terra@subscription:openai-codex",
+        "model": "gpt-5.6-terra",
+        "accessPath": "subscription",
+        "modelRegistryId": "codex-terra",
+        "provider": "openai-codex",
+        "accounts": ["current-login", "jovie-pro", "lyb-pro"],
+        "usableQuotaApiUsd": null
+      },
+      {
+        "id": "gpt-5.6-sol@api",
+        "model": "gpt-5.6-sol",
+        "accessPath": "api",
+        "modelRegistryId": "codex-sol",
+        "funding": "cash"
+      },
+      {
+        "id": "gpt-5.6-sol@subscription:openai-codex",
+        "model": "gpt-5.6-sol",
+        "accessPath": "subscription",
+        "modelRegistryId": "codex-sol",
+        "provider": "openai-codex",
+        "accounts": ["current-login", "jovie-pro", "lyb-pro"],
+        "usableQuotaApiUsd": null
+      },
+      {
+        "id": "kimi-k3@credits:hyperagent",
+        "model": "moonshotai/kimi-k3",
+        "accessPath": "credits",
+        "modelRegistryId": "hyperagent-kimi-k3",
+        "provider": "hyperagent",
+        "accounts": ["founding-500"],
+        "funding": "given-credits"
+      },
+      {
+        "id": "kimi-k3.1-pro@credits:hyperagent",
+        "model": "moonshotai/kimi-k3.1-pro",
+        "accessPath": "credits",
+        "modelRegistryId": null,
+        "provider": "hyperagent",
+        "accounts": ["founding-500"],
+        "funding": "given-credits",
+        "priceWhenAvailable": "Gateway catalog per-token price once the model appears; no list price is recorded today"
+      },
+      {
+        "id": "glm-5.3@credits:hyperagent",
+        "model": "glm-5.3",
+        "accessPath": "credits",
+        "modelRegistryId": "hyperagent-glm-5.3",
+        "provider": "hyperagent",
+        "accounts": ["founding-500"],
+        "funding": "given-credits"
+      },
+      {
+        "id": "glm-5.3@api:gateway",
+        "model": "glm-5.3",
+        "accessPath": "api",
+        "modelRegistryId": "gateway-glm-5.3",
+        "provider": "vercel-ai-gateway",
+        "accounts": ["team-jovie-credits"],
+        "funding": "prepaid-cash"
+      }
+    ]
+  },
   "providers": [
     {
       "id": "openai-codex",
@@ -348,6 +473,19 @@
         "source": "ops/registry/spend.json",
         "asOf": "2026-10-20"
       },
+      "proposals": [
+        {
+          "id": "workers-ai-token",
+          "status": "proposed-not-authorized",
+          "asOf": "2026-10-25",
+          "account": "the Cloudflare account that holds the Startup Program credits (named in spend.json cloudflare-credits)",
+          "scope": "One account-scoped API token with Workers AI Read and Workers AI Edit only (Cloudflare's REST API doc names both for a custom token; it offers no run-only permission), no zone, R2, Workers or other permission, no user-level scope.",
+          "consumers": ["CI dogfood vision", "gem reviewer", "system-1 router"],
+          "price": "$0.011 per 1,000 neurons after a 10,000 neurons/day free allocation; llama-3.2-11b-vision-instruct $0.049 per M input and $0.676 per M output tokens (cloudflare docs, read 2026-10-25)",
+          "expectedMonthlyCost": "Cash $0 while the Startup credits last ($10,000, expire 2027-06-09, Workers AI sub-cap $50,000, 0% used). Bound: Summer's provider-trial ledger caps Workers AI at $50 per month (0.5% of the credits). Illustration, not a measurement: a vision call of 2k input and 500 output tokens costs about $0.00044, so 1,000 calls a day is about $13 a month. No consumer's call volume is recorded yet.",
+          "authorization": "None. No token creation and no top-up is authorized; this row is facts only."
+        }
+      ],
       "policy": { "id": "spend-credits-before-expiry" },
       "accounts": [
         {
