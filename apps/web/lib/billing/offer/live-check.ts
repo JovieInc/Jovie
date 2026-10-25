@@ -402,7 +402,18 @@ export async function runOfferTruthCheck(
           'fail',
           `portal cancel mode ${String(cancel.mode)}; offer says effective at end of the billing period`,
         ];
-      return ['pass', `portal cancel enabled, mode ${String(cancel.mode)}`];
+      if (
+        offer.terms.refund === 'none_partial_period' &&
+        cancel.proration_behavior !== 'none'
+      )
+        return [
+          'fail',
+          `portal cancel proration_behavior ${String(cancel.proration_behavior)}; offer says no partial refunds, so cancelling must not prorate or refund (expected none)`,
+        ];
+      return [
+        'pass',
+        `portal cancel enabled, mode ${String(cancel.mode)}, proration ${String(cancel.proration_behavior)}`,
+      ];
     });
     await rec.run('stripe_promotions', async () => {
       const { status, json } = await stripe.get(

@@ -77,7 +77,11 @@ const stripeOk = (
             {
               is_default: true,
               features: {
-                subscription_cancel: { enabled: true, mode: 'at_period_end' },
+                subscription_cancel: {
+                  enabled: true,
+                  mode: 'at_period_end',
+                  proration_behavior: 'none',
+                },
               },
             },
           ],
@@ -271,6 +275,31 @@ describe('live offer-truth check', () => {
                 is_default: true,
                 features: {
                   subscription_cancel: { enabled: true, mode: 'immediately' },
+                },
+              },
+            ],
+          },
+        },
+      }),
+    });
+    expect(status(r, 'stripe_portal')).toBe('fail');
+  });
+
+  it('DELIBERATE RED: a portal that prorates on cancel contradicts "no partial refunds"', async () => {
+    const r = await run({
+      stripe: stripeOk({
+        '/v1/billing_portal/configurations': {
+          status: 200,
+          json: {
+            data: [
+              {
+                is_default: true,
+                features: {
+                  subscription_cancel: {
+                    enabled: true,
+                    mode: 'at_period_end',
+                    proration_behavior: 'create_prorations',
+                  },
                 },
               },
             ],

@@ -21,7 +21,8 @@ export type ClaimId =
   | 'billing.charged_at_checkout'
   | 'billing.upgrade_during_trial'
   | 'billing.renewal'
-  | 'billing.cancel';
+  | 'billing.cancel'
+  | 'billing.refund';
 
 interface ClaimDef {
   readonly id: ClaimId;
@@ -101,8 +102,12 @@ const DEFS: readonly ClaimDef[] = [
   {
     id: 'billing.cancel',
     appliesTo: o => o.terms.cancel === 'anytime_effective_end_of_period',
-    render: () =>
-      'Cancel anytime. Access continues to the end of the billing period.',
+    render: () => 'Cancel anytime and keep Pro to the end of the paid month.',
+  },
+  {
+    id: 'billing.refund',
+    appliesTo: o => o.terms.refund === 'none_partial_period',
+    render: () => 'No partial refunds.',
   },
 ];
 
@@ -158,6 +163,7 @@ export function closerLine(
       ...(ctx.trialing ? (['billing.upgrade_during_trial'] as const) : []),
       'billing.renewal',
       'billing.cancel',
+      'billing.refund',
       'price.free',
     ],
     offer
@@ -221,9 +227,22 @@ export const FORBIDDEN_CLAIM_SHAPES: readonly {
   {
     id: 'refund_or_guarantee',
     pattern:
-      /money[- ]back|\brefunds?\b|\b(?:satisfaction|price|results?|income|full)\s+guarantee|\bguaranteed\s+(?:results?|income|refund)/i,
-    when: o => o.terms.refund === null && o.terms.guarantee === null,
-    why: 'No refund or guarantee policy is published.',
+      /money[- ]back|\b(?:satisfaction|price|results?|income|full)\s+guarantee|\bguaranteed\s+(?:results?|income|refund)/i,
+    when: o => o.terms.guarantee === null,
+    why: 'No money-back guarantee is offered.',
+  },
+  {
+    id: 'refund_unpublished',
+    pattern: /\brefunds?\b/i,
+    when: o => o.terms.refund === null,
+    why: 'No refund policy is published.',
+  },
+  {
+    id: 'refund_promise',
+    pattern:
+      /(?<!\bno\s)(?:full|prorated|pro-rated|partial)\s+refund|\brefund(?:s|ed)?\s+(?:within|if|after|for|on)\b|\bwe(?:'ll| will)\s+refund|\brefundable/i,
+    when: o => o.terms.refund === 'none_partial_period',
+    why: 'The only published refund policy is: no partial refunds. No window, full or prorated refund exists.',
   },
 ];
 
