@@ -80,6 +80,8 @@ AGED_PR_S = 7 * 24 * 3600
 MERGE_THROUGHPUT_REFRESH_S = 5 * 60
 MERGE_THROUGHPUT_CACHE_S = 10 * 60
 PROMOTION_SCRIPT = Path(__file__).resolve().parents[1] / "promotion-loss-metrics.mjs"
+QUOTA_DEFERRED_SCRIPT = Path(__file__).resolve().parents[1] / "quota-deferred-heads.mjs"
+QUOTA_DEFERRED_REFRESH_S = 15 * 60  # about 100 REST reads per refresh; the lanes clock calls often
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OPS_REPORT_SCRIPT = Path(__file__).resolve().with_name("ops-report.mjs")
 
@@ -461,6 +463,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             merge_throughput, merge_throughput_error = sample_merge_throughput(state, now)
         except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
             merge_throughput_error = f"{type(error).__name__}: {error}"[:200]
+    quota_deferred, quota_deferred_error = None, None
+    if not os.environ.get("LANES_SELFTEST"):
+        quota_deferred, quota_deferred_error = sample_quota_deferred_heads(state, now)
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
@@ -539,6 +544,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
+        "quotaDeferredHeads": quota_deferred, "quotaDeferredHeadsError": quota_deferred_error,
         "redDispatch": red_dispatch_summary(state, now),
         "failedByReason": failed_by_reason(failures),
         "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
@@ -649,6 +655,35 @@ def sample_merge_throughput(state: Path, now: float, run=lifecycle.run) -> tuple
                 and 0 <= now - observed <= MERGE_THROUGHPUT_CACHE_S:
             return cached, f"{type(error).__name__}: {error}"[:200]
         return None, f"{type(error).__name__}: {error}"[:200]
+
+
+def sample_quota_deferred_heads(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
+    """Open PR heads whose Fleet Rules verdict stayed quota-deferred past an hour (a deferred
+    result is infrastructure, never a verdict, and must have been re-run). Refreshed at most
+    every QUOTA_DEFERRED_REFRESH_S; the script exits 1 when there are any, so both codes parse."""
+    path = Path(state) / "quota-deferred-heads.json"
+    cached = read_json(path, {})
+    observed = cached.get("observedAt")
+    if isinstance(observed, (int, float)) and not isinstance(observed, bool) \
+            and 0 <= now - observed < QUOTA_DEFERRED_REFRESH_S:
+        return cached, None
+    try:
+        result = run(["node", str(QUOTA_DEFERRED_SCRIPT)], capture_output=True, text=True, timeout=240)
+        if result.returncode not in (0, 1):
+            raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+        metric = json.loads(result.stdout)
+        if metric.get("metric") != "quota_deferred_heads_older_than_1h" \
+                or isinstance(metric.get("value"), bool) or not isinstance(metric.get("value"), int):
+            raise ValueError("quota-deferred-heads output missing the metric")
+        signal = {"schema": "jovie-quota-deferred-heads/v1", "observedAt": now,
+                  "value": metric["value"], "heads": (metric.get("heads") or [])[:20]}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached if cached.get("schema") else None), f"{type(error).__name__}: {error}"[:200]
 
 
 def failed_by_reason(failures: dict) -> dict[str, int]:
@@ -1158,6 +1193,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                + (f" ({row['reason']})" if row.get("reason") else "")
                                for row in aged[:8])
             alerts["aged-prs"] = (f"{len(aged)} open PRs are older than {AGED_PR_S // 86400}d: {listed}")
+    deferred = obs.get("quotaDeferredHeads") or {}
+    if deferred.get("value"):
+        listed = ", ".join(f"#{row.get('number')} {row.get('ageMinutes')}m" for row in (deferred.get("heads") or [])[:8])
+        alerts["quota-deferred-heads"] = (f"{deferred['value']} open PR heads sit on a quota-deferred Fleet Rules "
+                                          f"verdict past 1h (never a verdict; the re-run loop is broken): {listed}")
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -1176,6 +1216,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "spawn-exit": "dispatch-provider-workers",
         "hud-stale": "restart-hud-service",
         "orphan-prs": "reconcile-pr-ownership",
+        "quota-deferred-heads": "rerun-quota-deferred-fleet-evidence",
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",

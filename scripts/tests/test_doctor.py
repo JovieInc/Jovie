@@ -2924,3 +2924,33 @@ class RedDispatchAlertTest(unittest.TestCase):
             self.write_ledger(state, [self.dispatched_row(red_epoch=self.NOW - 60)])
             obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
             self.assertFalse(doctor.judge(obs))
+
+
+class QuotaDeferredHeadsTests(unittest.TestCase):
+    def test_alert_names_the_heads_and_is_silent_at_zero(self):
+        deferred = {"value": 2, "heads": [{"number": 7, "ageMinutes": 90}, {"number": 8, "ageMinutes": 70}]}
+        alert = doctor.judge(obs(quotaDeferredHeads=deferred))["quota-deferred-heads"]
+        self.assertIn("2 open PR heads", alert)
+        self.assertIn("#7 90m", alert)
+        self.assertNotIn("quota-deferred-heads", doctor.judge(obs(quotaDeferredHeads={"value": 0, "heads": []})))
+        self.assertNotIn("quota-deferred-heads", doctor.judge(obs()))
+
+    def test_sampler_parses_exit_one_caches_and_keeps_a_stale_read_on_failure(self):
+        import tempfile
+        from types import SimpleNamespace
+        out = json.dumps({"metric": "quota_deferred_heads_older_than_1h", "value": 1,
+                          "heads": [{"number": 9, "ageMinutes": 80}]})
+        calls = []
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout=out, stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            signal, error = doctor.sample_quota_deferred_heads(Path(tmp), 1000.0, run)
+            self.assertEqual((signal["value"], error), (1, None))
+            again, _ = doctor.sample_quota_deferred_heads(Path(tmp), 1100.0, run)
+            self.assertEqual(len(calls), 1, "a fresh cache is not re-read")
+            self.assertEqual(again["value"], 1)
+            broken = lambda *a, **k: SimpleNamespace(returncode=2, stdout="", stderr="boom")
+            stale, error = doctor.sample_quota_deferred_heads(Path(tmp), 5000.0, broken)
+            self.assertEqual(stale["value"], 1)
+            self.assertIn("boom", error)

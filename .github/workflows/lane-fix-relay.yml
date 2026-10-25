@@ -16,6 +16,7 @@ on:
       - Source Validation
       - Fork PR Gate
       - PR Size Guard
+      - PR Fleet Rules
       - CI
       - Golden Path Nightly
       - Golden Path Prod Autofix
