@@ -3,7 +3,6 @@
 import { Button } from '@jovie/ui';
 import type { Virtualizer } from '@tanstack/react-virtual';
 import { memo, type ReactNode, type RefCallback } from 'react';
-import { SummerVoiceControl } from '@/components/features/admin/summer-voice/SummerVoiceControl';
 import { useDesktopChatWorkState } from '@/lib/desktop/chat-work-state';
 import { composerPlaceholderForChatMode } from './chat-composer-copy';
 import {
@@ -173,8 +172,6 @@ export function ChatComposerSurface({
           <ChatFileChips files={otherFiles} onRemove={onRemoveFile} />
         </div>
       ) : null}
-
-      {chatMode === 'ov' ? <SummerVoiceControl /> : null}
 
       <ChatInput
         {...chatInputProps}

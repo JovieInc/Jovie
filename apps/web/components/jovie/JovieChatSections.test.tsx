@@ -244,11 +244,9 @@ describe('ChatThreadMessages collapsed summer failures', () => {
 function renderComposerSurface({
   suppressUsageAlert = false,
   draft,
-  chatMode,
 }: {
   readonly suppressUsageAlert?: boolean;
   readonly draft?: ComposerDraft;
-  readonly chatMode?: 'ov';
 } = {}) {
   const client = new QueryClient({
     defaultOptions: {
@@ -270,7 +268,6 @@ function renderComposerSurface({
 
   const surfaceProps: ComponentProps<typeof ChatComposerSurface> = {
     chatInputProps,
-    chatMode,
     showThreadView: false,
     suppressUsageAlert,
     isRateLimited: false,
@@ -411,20 +408,6 @@ describe('ChatComposerSurface one-chrome-layer wiring', () => {
     expect(
       screen.getByRole('textbox', { name: 'Chat Message Input' })
     ).toBeInTheDocument();
-  });
-});
-
-describe('ChatComposerSurface Summer voice entry', () => {
-  it('shows the voice control only in ov chat mode', () => {
-    renderComposerSurface({ chatMode: 'ov' });
-    expect(screen.getByTestId('summer-voice-control')).toBeInTheDocument();
-  });
-
-  it('keeps the voice control out of the artist chat composer', () => {
-    renderComposerSurface();
-    expect(
-      screen.queryByTestId('summer-voice-control')
-    ).not.toBeInTheDocument();
   });
 });
 
