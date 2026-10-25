@@ -68,4 +68,14 @@ describe('findExistingRelease', () => {
       )?.id
     ).toBe('rel-vigel');
   });
+
+  it('re-verifies a legacy row (no provider id in metadata) through its Spotify link', () => {
+    const legacy = {
+      ...vigelVersion,
+      id: 'rel-legacy',
+      metadata: {},
+      providerLinked: true,
+    };
+    expect(findExistingRelease(incoming(), [legacy])?.id).toBe('rel-legacy');
+  });
 });

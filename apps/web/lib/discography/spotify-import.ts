@@ -969,6 +969,13 @@ async function importSingleRelease(
     fullAlbum?.release_date ?? album.release_date,
     fullAlbum?.release_date_precision ?? album.release_date_precision
   );
+  const spotifyAlbumLinkExists = drizzleSql<boolean>`EXISTS (
+    SELECT 1 FROM provider_links pl
+    WHERE pl.release_id = ${discogReleases.id}
+      AND pl.owner_type = 'release'
+      AND pl.provider_id = 'spotify'
+      AND pl.url LIKE ${`%/album/${album.id}%`}
+  )`;
   const candidateReleases = await db
     .select({
       id: discogReleases.id,
@@ -977,6 +984,7 @@ async function importSingleRelease(
       upc: discogReleases.upc,
       releaseDate: discogReleases.releaseDate,
       metadata: discogReleases.metadata,
+      providerLinked: spotifyAlbumLinkExists.as('provider_linked'),
     })
     .from(discogReleases)
     .where(
@@ -984,6 +992,7 @@ async function importSingleRelease(
         eq(discogReleases.creatorProfileId, creatorProfileId),
         or(
           drizzleSql`${discogReleases.metadata} ->> 'spotifyId' = ${album.id}`,
+          spotifyAlbumLinkExists,
           metadata.sanitizedUpc
             ? eq(discogReleases.upc, metadata.sanitizedUpc)
             : undefined,

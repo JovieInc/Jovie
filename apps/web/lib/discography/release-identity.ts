@@ -15,6 +15,13 @@ export interface ReleaseIdentityCandidate {
   readonly upc: string | null;
   readonly releaseDate: Date | null;
   readonly metadata: unknown;
+  /**
+   * The release already has a Spotify provider link to the incoming album.
+   * Legacy rows created before provider ids were stored in metadata are
+   * identified this way, so a re-import re-verifies them instead of
+   * duplicating them.
+   */
+  readonly providerLinked?: boolean;
 }
 
 export interface IncomingReleaseIdentity {
@@ -79,6 +86,9 @@ export function findExistingRelease<T extends ReleaseIdentityCandidate>(
     c => readMetadata(c.metadata).spotifyId === incoming.providerAlbumId
   );
   if (byProviderId) return byProviderId;
+
+  const byLink = candidates.find(c => c.providerLinked);
+  if (byLink) return byLink;
 
   if (incoming.upc) {
     const byUpc = candidates.find(c => c.upc === incoming.upc);
