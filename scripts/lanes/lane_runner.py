@@ -24,6 +24,7 @@ import hashlib
 import importlib
 import math
 import json
+import types
 import os
 import random
 import re
@@ -142,7 +143,8 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py"]
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py",
+              "scripts/tests/test_backlog_rank.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
@@ -4235,6 +4237,25 @@ def read_wake_file(path):
     return data
 
 
+def backlog_wake(host: Host) -> dict:
+    """Event-driven Backlog pass: wake files (issue created/updated, outcome gap, Sentry spike, Tim comment,
+    capacity change) trigger a sync, refill and forced re-rank for just the teams named, now."""
+    teams = {"JOV", *(binding.key for binding in bindings.extra_bindings(THIS))}
+    wakes = binding_refill.drain_wakes(host.state, teams)
+    if not wakes or os.environ.get("LANES_SELFTEST"):
+        return {"wakes": len(wakes)}
+    named = sorted({wake["team"] for wake in wakes})
+    client = Linear(host.linear_env)
+    report = {"wakes": len(wakes), "teams": named,
+              "sync": linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), named)}
+    extra = {binding.key: binding for binding in bindings.extra_bindings(THIS)}
+    for team in named:
+        binding = extra.get(team) or types.SimpleNamespace(key=team, excluded=("hold",), min_todo=0)
+        report[team] = {"refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
+                        "rank": binding_refill.rank_pass(THIS, host, binding, client, force=True)}
+    return report
+
+
 def fix_now(host: Host) -> int:
     """Drain the relay's wake dir immediately instead of waiting for the 5-minute
     tick. Same admission as dispatch(): disk, then the first provider with a free
@@ -4244,6 +4265,10 @@ def fix_now(host: Host) -> int:
     wake_dir = host.state / "wake"
     if not wake_dir.is_dir():
         return 0
+    try:  # backlog events share the wake dir and its path unit; a fault here never blocks red repair
+        backlog_wake(host)
+    except (Exception, SystemExit):
+        pass
     for path in sorted(wake_dir.glob("red-*.json"))[:MAX_WAKE_PER_ACTIVATION]:
         marker = path.with_name(path.name + ".claim")
         try:
@@ -8973,8 +8998,12 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
             except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
                 tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
             try:  # Todo below target is refilled from the Backlog the sync just refreshed, per team
+                # Every team refills on its own mirror and seats; JOV has no extra binding, so it gets the same
+                # floor-less pass (Summer's governor writes the same Todo moves idempotently).
+                refill_for = [types.SimpleNamespace(key="JOV", excluded=("hold",), min_todo=0), *bindings.extra_bindings(THIS)]
                 tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
-                                         for binding in bindings.extra_bindings(THIS)}
+                                         for binding in refill_for}
+                tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
         try:
