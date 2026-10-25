@@ -51,6 +51,7 @@ Nested `.bak` / `.cursor` / `.factory` / `src` / `test` / `bin` copies are not c
 - **setup-gbrain**: .claude/skills/setup-gbrain/SKILL.md
 - **ship**: .agents/skills/gstack/ship/SKILL.md
 - **sync-gbrain**: .claude/skills/sync-gbrain/SKILL.md
+- **throughput-diagnosis**: .claude/skills/throughput-diagnosis/SKILL.md | .agents/skills/throughput-diagnosis/SKILL.md
 - **tool-discovery**: .claude/skills/tool-discovery/SKILL.md
 - **unfreeze**: .agents/skills/gstack/unfreeze/SKILL.md
 - **vercel-composition-patterns**: .claude/skills/vercel-composition-patterns/SKILL.md | .agents/skills/vercel-composition-patterns/SKILL.md

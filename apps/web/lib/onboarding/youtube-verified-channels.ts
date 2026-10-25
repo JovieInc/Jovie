@@ -1,8 +1,10 @@
 import 'server-only';
 
 import { and, eq } from 'drizzle-orm';
+import { isWaitlistApprovedUserStatus } from '@/lib/auth/canonical-user-state';
 import { CONNECTOR_PROVIDERS } from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
@@ -45,6 +47,8 @@ export async function getVerifiedOwnedYouTubeChannelIds(
 export interface YouTubeVerificationView {
   readonly state: YouTubeVerificationState;
   readonly channel: Pick<YouTubeCandidate, 'title' | 'url'> | null;
+  /** Not yet admitted: the one real reason to ask for a connection. */
+  readonly needsAccess: boolean;
 }
 
 /** Profile-scoped view for the dashboard; fail closed to `none`. */
@@ -59,14 +63,20 @@ export async function getYouTubeVerificationView(input: {
       .where(eq(creatorProfiles.id, input.profileId))
       .limit(1);
     const candidate = readYouTubeCandidateFromSettings(profile?.settings);
-    if (!candidate) return { state: 'none', channel: null };
+    if (!candidate) return { state: 'none', channel: null, needsAccess: false };
     const verified = await getVerifiedOwnedYouTubeChannelIds(input.userId);
+    const [user] = await db
+      .select({ userStatus: users.userStatus })
+      .from(users)
+      .where(eq(users.id, input.userId))
+      .limit(1);
     return {
       state: resolveYouTubeVerificationState(candidate, verified),
       channel: { title: candidate.title, url: candidate.url },
+      needsAccess: !isWaitlistApprovedUserStatus(user?.userStatus),
     };
   } catch (error) {
     void captureError('YouTube verification view failed', error);
-    return { state: 'none', channel: null };
+    return { state: 'none', channel: null, needsAccess: false };
   }
 }

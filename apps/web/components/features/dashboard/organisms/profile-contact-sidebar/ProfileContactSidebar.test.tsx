@@ -77,6 +77,10 @@ const mockState = vi.hoisted(() => ({
   toastError: vi.fn(),
 }));
 
+vi.mock('@/lib/queries/useSilentYouTubeLink', () => ({
+  useSilentYouTubeLink: vi.fn(),
+}));
+
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app/dashboard/profile',
   useRouter: () => ({

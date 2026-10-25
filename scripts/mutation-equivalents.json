@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "note": "Surviving mutants proven behavior-equivalent. Each entry needs a fingerprint from the sweep's survivor task (16 hex chars, line-drift stable) and a justification of at least 20 characters. Suppressed mutants leave the denominator of the module score. Do not use this to hide a missing test.",
+  "entries": []
+}
