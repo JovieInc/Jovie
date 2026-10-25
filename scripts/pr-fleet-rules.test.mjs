@@ -386,8 +386,10 @@ const BRANCH_CODE_TRIGGERS = [
 
 test('contract: no app private key is referenced by a workflow that runs the PR branch copy', () => {
   // Any same-repo branch can edit such a workflow to print the key, and an app
-  // key mints full-installation tokens. Base code only: pull_request_target,
-  // workflow_run, merge_group, push, schedule. These files predate the
+  // key mints full-installation tokens. Fork-safe base code: pull_request_target,
+  // workflow_run, merge_group. (push/workflow_dispatch run the branch copy too,
+  // so repo-level secrets stay writer-reachable until the key moves to a
+  // main-only environment.) These files predate the
   // contract and are tracked debt; the list may only shrink.
   const KNOWN_DEBT = new Map([
     ['fork-pr-gate.yml', 'CI_APP_PRIVATE_KEY'],
