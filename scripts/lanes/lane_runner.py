@@ -7910,6 +7910,35 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict], repair_candidates
     return None
 
 
+OWNER_SETTLE_KEEP_S = 24 * 3600
+
+
+def note_owner_settle(host: Host, pr: dict, left: float, now: float) -> None:
+    """Record one deferral per (PR, head) so the wait is measurable: owner-settle.json keeps the
+    open windows, runs/owner-settle.jsonl one row the first time a head is deferred. Best effort:
+    a failed write never changes the deferral."""
+    key, head = str(pr["number"]), pr.get("headRefOid")
+    fresh = []
+
+    def change(data: dict) -> None:
+        for stale in [k for k, v in data.items() if not isinstance(v, dict)
+                      or now - float(v.get("firstSeenAt") or 0) > OWNER_SETTLE_KEEP_S]:
+            del data[stale]
+        if (data.get(key) or {}).get("head") != head:
+            data[key] = {"head": head, "firstSeenAt": now, "settleUntil": now + left}
+            fresh.append(data[key])
+    try:
+        update_json(host.state / "owner-settle.json", change)
+        if fresh:
+            (host.state / "runs").mkdir(parents=True, exist_ok=True)
+            with open(host.state / "runs" / "owner-settle.jsonl", "a") as out:
+                out.write(json.dumps({"schema": "jovie-owner-settle/v1", "at": now_iso(), "pr": pr["number"],
+                                      "head": head, "branch": pr.get("headRefName"), "settleLeftS": round(left),
+                                      "reason": "owner-active:head-pushed-within-settle-window"}) + "\n")
+    except (OSError, ValueError, TypeError):
+        pass
+
+
 def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict | None:
     """Under the claim lock: pick this lane's red PR and record the attempt before working it."""
     prs = lane_prs(name) if prs is None else prs
@@ -7921,6 +7950,13 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     disabled = set(providers) - set(order)
     prs = [pr for pr in prs if not pr_recovery_held(host, pr, now)
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
+    settled = []
+    for pr in prs:
+        left = pr_events.owner_settling(pr, attempts.get(str(pr["number"]), {}), now)
+        if left is not None and red_pr([pr], attempts, held) is not None:
+            note_owner_settle(host, pr, left, now)  # only a PR a repair would take is a deferral
+            settled.append(pr["number"])
+    prs = [pr for pr in prs if pr["number"] not in settled]
     pr = red_pr(prs, attempts, held)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
