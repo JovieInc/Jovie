@@ -15,7 +15,10 @@ import { pathToFileURL } from 'node:url';
 export const WORKFLOWS = ['PR Fleet Rules', 'Source Validation'];
 export const CAUSES = [
   ['red-before-green', /red-before-green/i],
-  ['changelog', /customer[- ]changelog|changelog decision|customer-note/i],
+  [
+    'changelog',
+    /customer outcome decision missing|customer[- ]changelog|changelog decision|customer-note/i,
+  ],
   [
     'story',
     /component[- ]ship[- ]gate|missing (?:a )?stor(?:y|ies)|\.stories\./i,
@@ -53,9 +56,18 @@ export function census({
     );
     for (const row of rows) runs.push({ ...row, workflow });
   }
-  const failed = runs.filter(
-    run => run.conclusion === 'failure' && run.event === 'pull_request'
+  const byWorkflow = WORKFLOWS.map(workflow =>
+    runs.filter(
+      run =>
+        run.workflow === workflow &&
+        run.conclusion === 'failure' &&
+        run.event === 'pull_request'
+    )
   );
+  // Interleave the workflows so a log-read cap samples every workflow, not just the first one listed.
+  const failed = [];
+  for (let i = 0; byWorkflow.some(list => i < list.length); i++)
+    for (const list of byWorkflow) if (i < list.length) failed.push(list[i]);
   const causes = { 'red-before-green': 0, changelog: 0, story: 0 };
   const branches = new Set();
   let read = 0;

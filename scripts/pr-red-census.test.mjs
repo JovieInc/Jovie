@@ -57,3 +57,25 @@ test('the census counts only failed pull_request runs, bounds log reads and repo
   assert.equal(result.causes['red-before-green'], 1);
   assert.equal(result.distinctBranches, 1);
 });
+
+test('a capped log read samples every workflow, not only the first listed', () => {
+  const row = (id, branch) => ({
+    databaseId: id,
+    conclusion: 'failure',
+    event: 'pull_request',
+    headBranch: branch,
+  });
+  const read = [];
+  const gh = args => {
+    if (args[1] === 'list')
+      return JSON.stringify(
+        args.includes('PR Fleet Rules')
+          ? [row(1, 'a'), row(2, 'b')]
+          : [row(3, 'c'), row(4, 'd')]
+      );
+    read.push(args[2]);
+    return '';
+  };
+  census({ maxLogs: 2, gh, now: Date.UTC(2026, 9, 25) });
+  assert.deepEqual(read, ['1', '3']);
+});
