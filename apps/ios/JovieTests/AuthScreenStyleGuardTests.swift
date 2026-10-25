@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 import Testing
 @testable import Jovie
 
@@ -95,7 +96,7 @@ struct AuthScreenStyleGuardTests {
     let sourceURL = URL(fileURLWithPath: #filePath)
       .deletingLastPathComponent()
       .deletingLastPathComponent()
-      .appendingPathComponent("Jovie/DesignSystem/JovieTheme.swift")
+      .appendingPathComponent("Packages/JovieKit/Sources/JovieKit/JovieTheme.swift")
     let source = try String(contentsOf: sourceURL, encoding: .utf8)
 
     // Canonical Noir Ion values present.
