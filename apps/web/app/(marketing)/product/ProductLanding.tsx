@@ -4,6 +4,7 @@ import {
   MarketingPageShell,
   MarketingSurfaceCard,
 } from '@/components/marketing';
+import { ConnectedComponentsGallery } from '@/components/marketing/ConnectedComponentsGallery';
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductClaimHandleForm } from './ProductClaimHandleForm';
@@ -114,6 +115,7 @@ export function ProductLanding() {
           <ProductClaimCard />
         </MarketingHero>
       </div>
+      <ConnectedComponentsGallery />
       <ProductClose />
     </MarketingPageShell>
   );

@@ -1,0 +1,41 @@
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { CONNECTED_COMPONENTS_COPY } from '@/data/connectedComponentsCopy';
+import { getScreenshotScenario } from '@/lib/screenshots/registry';
+import { ConnectedComponentsGallery } from './ConnectedComponentsGallery';
+
+vi.mock('next/image', () => ({
+  default: (props: Record<string, unknown>) => {
+    const { fill, priority, quality, ...rest } = props;
+    void fill;
+    void priority;
+    void quality;
+    return <img alt='' {...rest} />;
+  },
+}));
+
+describe('ConnectedComponentsGallery', () => {
+  it('renders one real capture per moment, in release order', () => {
+    render(<ConnectedComponentsGallery />);
+    const gallery = screen.getByTestId('connected-components-gallery');
+    expect(gallery).toHaveAttribute('data-count', '3');
+    expect(
+      screen.getByRole('heading', { name: CONNECTED_COMPONENTS_COPY.headline })
+    ).toBeInTheDocument();
+    const titles = [...gallery.querySelectorAll('figcaption span:first-child')];
+    expect(titles.map(node => node.textContent)).toEqual(
+      CONNECTED_COMPONENTS_COPY.states.map(state => state.title)
+    );
+  });
+
+  it('only shows scenarios the screenshot registry captures', () => {
+    for (const state of CONNECTED_COMPONENTS_COPY.states) {
+      expect(getScreenshotScenario(state.scenarioId)).not.toBeNull();
+    }
+  });
+
+  it('states no price, plan, or trial terms (offer truth owns those)', () => {
+    const text = JSON.stringify(CONNECTED_COMPONENTS_COPY);
+    expect(text).not.toMatch(/\$\d|trial|per month|\/mo\b|free/i);
+  });
+});
