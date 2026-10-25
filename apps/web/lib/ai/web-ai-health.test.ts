@@ -126,6 +126,63 @@ describe('runWebAiHealth', () => {
     expect(sdkMocks.generateObject).toHaveBeenCalledTimes(1);
   });
 
+  it('retries one transient Gateway 5xx per surface and keeps the receipt green', async () => {
+    const gateway500 = Object.assign(new Error('Gateway upstream error'), {
+      name: 'GatewayResponseError',
+      status: 500,
+    });
+    const executeProbe = vi
+      .fn()
+      .mockRejectedValueOnce(gateway500)
+      .mockResolvedValue('healthy');
+
+    const receipt = await runWebAiHealth({ executeProbe });
+
+    expect(receipt.status).toBe('passed');
+    expect(receipt.results.every(result => result.ok)).toBe(true);
+    // Five surfaces; the first probe's 500 is retried exactly once.
+    expect(executeProbe).toHaveBeenCalledTimes(6);
+  });
+
+  it('fails a persistent Gateway 500 after one bounded retry, never more', async () => {
+    const gateway500 = Object.assign(new Error('Gateway upstream error'), {
+      name: 'GatewayResponseError',
+      status: 500,
+    });
+    const executeProbe = vi.fn().mockRejectedValue(gateway500);
+
+    const receipt = await runWebAiHealth({ executeProbe });
+
+    expect(receipt.status).toBe('failed');
+    for (const result of receipt.results) {
+      expect(result).toMatchObject({
+        ok: false,
+        failureCause: 'request_error',
+        message: expect.stringContaining('GatewayResponseError:500'),
+      });
+    }
+    // Five surfaces, exactly two attempts each: one retry, no unbounded loop.
+    expect(executeProbe).toHaveBeenCalledTimes(10);
+  });
+
+  it('does not retry a forbidden 403 transport error', async () => {
+    const forbidden403 = Object.assign(new Error('model is forbidden'), {
+      statusCode: 403,
+    });
+    const executeProbe = vi
+      .fn()
+      .mockRejectedValueOnce(forbidden403)
+      .mockResolvedValue('healthy');
+
+    const receipt = await runWebAiHealth({ executeProbe });
+
+    // The rejected probe is NOT retried; the other four probes pass.
+    expect(executeProbe).toHaveBeenCalledTimes(5);
+    const failed = receipt.results.filter(result => !result.ok);
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({ failureCause: 'forbidden_model' });
+  });
+
   it('runs one bounded probe for every production Web AI surface', async () => {
     const executeProbe = vi.fn().mockResolvedValue('healthy');
 
