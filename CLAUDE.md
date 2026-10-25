@@ -85,7 +85,7 @@ gates, or use `--no-verify`.
 
 Select skills by intent; load entries/references. Edit `.tmpl` sources and
 regenerate. Keep provider tuning out of shared policy. CLAUDE.md stays a router.
-Use Playwright for web QA. Message agents: `jovie mesh send/read`. Batch reads;
+Use Playwright only for web QA. Message agents: `jovie mesh send/read`. Batch reads;
 serialize changes. Delegate only when authorized; require evidence to integrate.
 
 Before publication follow `docs/PR_FLOW.md`: coherent draft → rolling CI → review
