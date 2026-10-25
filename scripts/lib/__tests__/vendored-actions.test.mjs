@@ -9,10 +9,12 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import {
   checkVendored,
   loadManifest,
+  stripBuildDirectives,
   VENDOR_ROOT,
   workflowPins,
 } from '../../vendor-actions.mjs';
@@ -31,6 +33,76 @@ function sandbox() {
 }
 
 describe('vendored actions (JOV-8754)', () => {
+  it('removes build directives without changing runtime strings, tokens or licenses', () => {
+    const lint = ['eslint', 'disable-next-line'].join('-');
+    const type = ['@ts', 'ignore'].join('-');
+    const source = [
+      '/*! MIT license: preserve this notice */',
+      `// ${lint} no-console`,
+      `const literal = "// ${lint}";`,
+      `const template = \`/* ${type} */\`;`,
+      `const regex = /https?:\\/\\//; // ${lint}`,
+      `const value = 1/* ${lint} */+2;`,
+      `if (value) { /* ${lint} */`,
+      `  // ${type}`,
+      `  globalThis.result = [literal, template, regex.test('https://example.com'), value];`,
+      '}',
+      '',
+    ].join('\n');
+    const output = stripBuildDirectives(source);
+    expect(output).toContain('/*! MIT license: preserve this notice */');
+    expect(output).toContain(`"// ${lint}"`);
+    expect(output).toContain(`\`/* ${type} */\``);
+    expect(output.split('\n')).toHaveLength(source.split('\n').length);
+    expect(output).not.toContain(`// ${type}`);
+    expect(output).not.toContain(`// ${lint} no-console`);
+    expect(output).not.toContain(`/* ${lint} */`);
+    const before = {};
+    const after = {};
+    runInNewContext(source, before);
+    runInNewContext(output, after);
+    expect(after.result).toEqual(before.result);
+    expect(stripBuildDirectives(output)).toBe(output);
+    expect(() => stripBuildDirectives('const = ;')).toThrow(
+      'invalid vendored JavaScript'
+    );
+  });
+
+  it('requires known processing and original upstream hashes for processed actions', () => {
+    const root = sandbox();
+    try {
+      const manifest = loadManifest(root);
+      const cache = manifest.actions.find(
+        action => action.dir === 'actions-cache'
+      );
+      cache.processing = 'unknown/v1';
+      delete cache.upstreamFiles.LICENSE;
+      writeFileSync(
+        join(root, VENDOR_ROOT, 'manifest.json'),
+        JSON.stringify(manifest)
+      );
+      expect(checkVendored(root)).toContain(
+        'actions-cache: unknown processing unknown/v1'
+      );
+      expect(checkVendored(root)).toContain(
+        'actions-cache/LICENSE: missing upstream hash'
+      );
+      const refreshed = spawnSync(
+        process.execPath,
+        [
+          resolve(repoRoot, 'scripts/vendor-actions.mjs'),
+          '--refresh',
+          'actions-cache',
+        ],
+        { cwd: root, encoding: 'utf8', env: { ...process.env, PATH: '' } }
+      );
+      expect(refreshed.status).toBe(1);
+      expect(refreshed.stderr).toContain('unknown processing unknown/v1');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('match the manifest byte for byte and the SHAs the workflows pin', () => {
     expect(checkVendored(repoRoot)).toEqual([]);
     const pins = workflowPins(repoRoot);

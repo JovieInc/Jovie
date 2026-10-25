@@ -18,6 +18,16 @@
       "sha": "55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
       "files": {
         "LICENSE": "7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32",
+        "dist/restore-only/index.js": "ff63a1040c034a5c97c25cb26b91b15ff4931cb155eb3184d9f6828338e51369",
+        "dist/restore-only/package.json": "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a",
+        "dist/save-only/index.js": "6c6fa2f4f23a5eaa35338a0a6606c3673f125687228d9718978f2226d03f2ff9",
+        "dist/save-only/package.json": "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a",
+        "restore/action.yml": "bb552a94cec165255080b7e13fe3d2051c6c79e321e99435b5859dc7de5e9057",
+        "save/action.yml": "5da400e1a7551cee617339fd1a5281483d71e6c56d86dd117fbd354f047308ec"
+      },
+      "processing": "remove-build-directives/v1",
+      "upstreamFiles": {
+        "LICENSE": "7d070f6b64d9bcc530fe99cc21eaaa4b3c364e0b2d367d7735671fa202a03b32",
         "dist/restore-only/index.js": "8522c6be9a4650a3b1571f7222293f262cc4c4708fbe061d8ed04654d476cf16",
         "dist/restore-only/package.json": "3ca9d4afd21425087cf31893b8f9f63c81b0b8408db5e343ca76e5f8aa26ab9a",
         "dist/save-only/index.js": "0d3cf341a79cdc0a8ce5a71103f46174e12cf4f98db46f15b8e604932eefd487",

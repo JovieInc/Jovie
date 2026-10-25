@@ -27,12 +27,58 @@ import {
   statSync,
   writeFileSync,
 } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const VENDOR_ROOT = '.github/actions/vendor';
 export const MANIFEST_SCHEMA = 'jovie-vendored-actions/v1';
+const BUILD_DIRECTIVES = 'remove-build-directives/v1';
+
+/** Remove build-only comments from runtime bundles; preserve licenses and tokens.
+ * Parse JavaScript so comment-like strings, regexes and templates stay intact.
+ * TypeScript is loaded only for refresh; offline integrity needs no dependencies.
+ */
+export function stripBuildDirectives(source) {
+  const ts = createRequire(import.meta.url)('typescript');
+  const tree = ts.createSourceFile(
+    'bundle.js',
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS
+  );
+  if (tree.parseDiagnostics.length)
+    throw new Error('invalid vendored JavaScript');
+  const ranges = new Map();
+  const collect = node => {
+    for (const range of [
+      ...(ts.getLeadingCommentRanges(source, node.pos) ?? []),
+      ...(ts.getTrailingCommentRanges(source, node.end) ?? []),
+    ]) {
+      if (
+        /^\s*(?:\/\/|\/\*)\s*(?:eslint-|@ts-)(?:disable|ignore|expect-error)\b/.test(
+          source.slice(range.pos, range.end)
+        )
+      )
+        ranges.set(range.pos, range);
+    }
+    for (const child of node.getChildren(tree)) collect(child);
+  };
+  collect(tree);
+  let output = source;
+  for (const { pos, end } of [...ranges.values()].sort((a, b) => b.pos - a.pos))
+    output =
+      output.slice(0, pos) +
+      source.slice(pos, end).replace(/[^\r\n]/g, ' ') +
+      output.slice(end);
+  const lines = source.split('\n');
+  return output
+    .split('\n')
+    .map((line, i) => (line === lines[i] ? line : line.trimEnd()))
+    .join('\n');
+}
 
 const sha256 = path =>
   createHash('sha256').update(readFileSync(path)).digest('hex');
@@ -81,8 +127,15 @@ export function checkVendored(repoRoot) {
   const pins = workflowPins(repoRoot);
   const listed = new Set();
   for (const action of manifest.actions ?? []) {
+    if (action.processing && action.processing !== BUILD_DIRECTIVES)
+      problems.push(`${action.dir}: unknown processing ${action.processing}`);
     const base = resolve(repoRoot, VENDOR_ROOT, action.dir);
     for (const [file, hash] of Object.entries(action.files ?? {})) {
+      if (
+        action.processing &&
+        !/^[a-f0-9]{64}$/.test(action.upstreamFiles?.[file] ?? '')
+      )
+        problems.push(`${action.dir}/${file}: missing upstream hash`);
       listed.add(resolve(base, file));
       let actual;
       try {
@@ -113,6 +166,8 @@ function refresh(repoRoot, dir, shaOverride) {
   const manifest = loadManifest(repoRoot);
   const action = manifest.actions.find(item => item.dir === dir);
   if (!action) throw new Error(`unknown vendored action ${dir}`);
+  if (action.processing && action.processing !== BUILD_DIRECTIVES)
+    throw new Error(`unknown processing ${action.processing}`);
   const pins = workflowPins(repoRoot).get(action.repo);
   if (!shaOverride && pins && pins.size > 1)
     throw new Error(
@@ -136,14 +191,22 @@ function refresh(repoRoot, dir, shaOverride) {
     const base = resolve(repoRoot, VENDOR_ROOT, dir);
     rmSync(base, { recursive: true, force: true });
     const files = {};
+    const upstreamFiles = {};
     for (const file of Object.keys(action.files)) {
       const target = resolve(base, file);
       mkdirSync(dirname(target), { recursive: true });
       copyFileSync(join(work, file.replace(/^/, '')), target);
+      upstreamFiles[file] = sha256(target);
+      if (action.processing === BUILD_DIRECTIVES && file.endsWith('.js'))
+        writeFileSync(
+          target,
+          stripBuildDirectives(readFileSync(target, 'utf8'))
+        );
       files[file] = sha256(target);
     }
     action.sha = sha;
     action.files = files;
+    if (action.processing) action.upstreamFiles = upstreamFiles;
     writeFileSync(
       resolve(repoRoot, VENDOR_ROOT, 'manifest.json'),
       `${JSON.stringify(manifest, null, 2)}\n`

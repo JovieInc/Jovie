@@ -7703,7 +7703,7 @@ async function toBuffer(stream) {
     return Buffer.concat(chunks, length);
 }
 exports.toBuffer = toBuffer;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 async function json(stream) {
     const buf = await toBuffer(stream);
     const str = buf.toString('utf8');
@@ -7783,7 +7783,7 @@ class Agent extends http.Agent {
         if (options) {
             // First check the `secureEndpoint` property explicitly, since this
             // means that a parent `Agent` is "passing through" to this instance.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
             if (typeof options.secureEndpoint === 'boolean') {
                 return options.secureEndpoint;
             }
@@ -7822,12 +7822,12 @@ class Agent extends http.Agent {
         // alternative is to add it as a private property of this class but that
         // will break TypeScript subclassing.
         if (!this.sockets[name]) {
-            // @ts-expect-error `sockets` is readonly in `@types/node`
+
             this.sockets[name] = [];
         }
         const fakeSocket = new net.Socket({ writable: false });
         this.sockets[name].push(fakeSocket);
-        // @ts-expect-error `totalSocketCount` isn't defined in `@types/node`
+
         this.totalSocketCount++;
         return fakeSocket;
     }
@@ -7839,10 +7839,10 @@ class Agent extends http.Agent {
         const index = sockets.indexOf(socket);
         if (index !== -1) {
             sockets.splice(index, 1);
-            // @ts-expect-error  `totalSocketCount` isn't defined in `@types/node`
+
             this.totalSocketCount--;
             if (sockets.length === 0) {
-                // @ts-expect-error `sockets` is readonly in `@types/node`
+
                 delete this.sockets[name];
             }
         }
@@ -7852,10 +7852,10 @@ class Agent extends http.Agent {
     getName(options) {
         const secureEndpoint = this.isSecureEndpoint(options);
         if (secureEndpoint) {
-            // @ts-expect-error `getName()` isn't defined in `@types/node`
+
             return https_1.Agent.prototype.getName.call(this, options);
         }
-        // @ts-expect-error `getName()` isn't defined in `@types/node`
+
         return super.getName(options);
     }
     createSocket(req, options, cb) {
@@ -7871,7 +7871,7 @@ class Agent extends http.Agent {
             this.decrementSockets(name, fakeSocket);
             if (socket instanceof http.Agent) {
                 try {
-                    // @ts-expect-error `addRequest()` isn't defined in `@types/node`
+
                     return socket.addRequest(req, connectOpts);
                 }
                 catch (err) {
@@ -7879,7 +7879,7 @@ class Agent extends http.Agent {
                 }
             }
             this[INTERNAL].currentSocket = socket;
-            // @ts-expect-error `createSocket()` isn't defined in `@types/node`
+
             super.createSocket(req, options, cb);
         }, (err) => {
             this.decrementSockets(name, fakeSocket);
@@ -8331,7 +8331,7 @@ exports.colors = [
  * TODO: add a `localStorage` variable to explicitly enable/disable colors
  */
 
-// eslint-disable-next-line complexity
+
 function useColors() {
 	// NB: In an Electron preload script, document will be defined but not fully
 	// initialized. Since we know we're in Chrome, we'll just detect this case
@@ -8349,7 +8349,7 @@ function useColors() {
 
 	// Is webkit? http://stackoverflow.com/a/16459606/376773
 	// document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
-	// eslint-disable-next-line no-return-assign
+
 	return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
 		// Is firebug? http://stackoverflow.com/a/398120/376773
 		(typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
@@ -8705,7 +8705,7 @@ function setup(env) {
 					searchIndex++;
 					templateIndex++;
 				}
-			} else if (starIndex !== -1) { // eslint-disable-line no-negated-condition
+			} else if (starIndex !== -1) {
 				// Backtrack to the last '*' and try to match more characters
 				templateIndex = starIndex + 1;
 				matchIndex++;
@@ -8843,7 +8843,7 @@ exports.colors = [6, 2, 3, 4, 5, 1];
 
 try {
 	// Optional dependency (as in, doesn't need to be installed, NOT like optionalDependencies in package.json)
-	// eslint-disable-next-line import/no-extraneous-dependencies
+
 	const supportsColor = __nccwpck_require__(1450);
 
 	if (supportsColor && (supportsColor.stderr || supportsColor).level >= 2) {
@@ -9160,7 +9160,7 @@ class HttpProxyAgent extends agent_base_1.Agent {
     addRequest(req, opts) {
         req._header = null;
         this.setRequestProps(req, opts);
-        // @ts-expect-error `addRequest()` isn't defined in `@types/node`
+
         super.addRequest(req, opts);
     }
     setRequestProps(req, opts) {
@@ -15650,7 +15650,7 @@ async function lazyllhttp () {
 
   return await WebAssembly.instantiate(mod, {
     env: {
-      /* eslint-disable camelcase */
+
 
       wasm_on_url: (p, at, len) => {
         /* istanbul ignore next */
@@ -15840,7 +15840,7 @@ class Parser {
         currentBufferRef = data
         currentParser = this
         ret = llhttp.llhttp_execute(this.ptr, currentBufferPtr, data.length)
-        /* eslint-disable-next-line no-useless-catch */
+
       } catch (err) {
         /* istanbul ignore next: difficult to make a test case for */
         throw err
@@ -17104,7 +17104,7 @@ let http2
 try {
   http2 = __nccwpck_require__(2467)
 } catch {
-  // @ts-ignore
+
   http2 = { constants: {} }
 }
 
@@ -18887,7 +18887,7 @@ module.exports = EnvHttpProxyAgent
 /***/ 4660:
 /***/ ((module) => {
 
-/* eslint-disable */
+
 
 
 
@@ -20664,7 +20664,7 @@ class DNSDispatchHandler extends DecoratorHandler {
       }
       case 'ENOTFOUND':
         this.#state.deleteRecord(this.#origin)
-      // eslint-disable-next-line no-fallthrough
+
       default:
         this.#handler.onError(err)
         break
@@ -26312,12 +26312,12 @@ const encoder = new TextEncoder()
  * @see https://mimesniff.spec.whatwg.org/#http-token-code-point
  */
 const HTTP_TOKEN_CODEPOINTS = /^[!#$%&'*+\-.^_|~A-Za-z0-9]+$/
-const HTTP_WHITESPACE_REGEX = /[\u000A\u000D\u0009\u0020]/ // eslint-disable-line
-const ASCII_WHITESPACE_REPLACE_REGEX = /[\u0009\u000A\u000C\u000D\u0020]/g // eslint-disable-line
+const HTTP_WHITESPACE_REGEX = /[\u000A\u000D\u0009\u0020]/
+const ASCII_WHITESPACE_REPLACE_REGEX = /[\u0009\u000A\u000C\u000D\u0020]/g
 /**
  * @see https://mimesniff.spec.whatwg.org/#http-quoted-string-token-code-point
  */
-const HTTP_QUOTED_STRING_TOKENS = /^[\u0009\u0020-\u007E\u0080-\u00FF]+$/ // eslint-disable-line
+const HTTP_QUOTED_STRING_TOKENS = /^[\u0009\u0020-\u007E\u0080-\u00FF]+$/
 
 // https://fetch.spec.whatwg.org/#data-url-processor
 /** @param {URL} dataURL */
@@ -26735,7 +26735,7 @@ function parseMIMEType (input) {
 /** @param {string} data */
 function forgivingBase64 (data) {
   // 1. Remove all ASCII whitespace from data.
-  data = data.replace(ASCII_WHITESPACE_REPLACE_REGEX, '')  // eslint-disable-line
+  data = data.replace(ASCII_WHITESPACE_REPLACE_REGEX, '')
 
   let dataLength = data.length
   // 2. If data’s code point length divides by 4 leaving
@@ -30449,7 +30449,7 @@ async function httpNetworkFetch (
 
   // 7. Let newConnection be "yes" if forceNewConnection is true; otherwise
   // "no".
-  const newConnection = forceNewConnection ? 'yes' : 'no' // eslint-disable-line no-unused-vars
+  const newConnection = forceNewConnection ? 'yes' : 'no'
 
   // 8. Switch on request’s mode:
   if (request.mode === 'websocket') {
@@ -33127,14 +33127,14 @@ function determineRequestsReferrer (request) {
       // 3. Return referrerOrigin.
       return referrerOrigin
     }
-    case 'strict-origin': // eslint-disable-line
+    case 'strict-origin':
       /**
          * 1. If referrerURL is a potentially trustworthy URL and
          * request’s current URL is not a potentially trustworthy URL,
          * then return no referrer.
          * 2. Return referrerOrigin
         */
-    case 'no-referrer-when-downgrade': // eslint-disable-line
+    case 'no-referrer-when-downgrade':
       /**
        * 1. If referrerURL is a potentially trustworthy URL and
        * request’s current URL is not a potentially trustworthy URL,
@@ -33142,7 +33142,7 @@ function determineRequestsReferrer (request) {
        * 2. Return referrerOrigin
       */
 
-    default: // eslint-disable-line
+    default:
       return isNonPotentiallyTrustWorthy ? 'no-referrer' : referrerOrigin
   }
 }
@@ -33610,7 +33610,7 @@ function createIterator (name, kInternalIterator, keyIndex = 0, valueIndex = 1) 
   }
 
   // https://webidl.spec.whatwg.org/#dfn-iterator-prototype-object
-  // @ts-ignore
+
   delete FastIterableIterator.prototype.constructor
 
   Object.setPrototypeOf(FastIterableIterator.prototype, esIteratorPrototype)
@@ -33761,7 +33761,7 @@ function readableStreamClose (controller) {
   }
 }
 
-const invalidIsomorphicEncodeValueRegex = /[^\x00-\xFF]/ // eslint-disable-line
+const invalidIsomorphicEncodeValueRegex = /[^\x00-\xFF]/
 
 /**
  * @see https://infra.spec.whatwg.org/#isomorphic-encode
@@ -39312,7 +39312,7 @@ __nccwpck_require__.d(mappers_namespaceObject, {
 var external_os_ = __nccwpck_require__(857);
 ;// CONCATENATED MODULE: ./node_modules/@actions/core/lib/utils.js
 // We use any as a valid input type
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Sanitizes an input into a string so it can be passed into issueCommand safely
  * @param input input to sanitize into a string
@@ -39445,7 +39445,7 @@ const external_fs_namespaceObject = __WEBPACK_EXTERNAL_createRequire(import.meta
 ;// CONCATENATED MODULE: ./node_modules/@actions/core/lib/file-command.js
 // For internal use, subject to change.
 // We use any as a valid input type
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 
 
@@ -39581,7 +39581,7 @@ var tunnel = __nccwpck_require__(770);
 // EXTERNAL MODULE: ./node_modules/undici/index.js
 var undici = __nccwpck_require__(6752);
 ;// CONCATENATED MODULE: ./node_modules/@actions/http-client/lib/index.js
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 var __awaiter = (undefined && undefined.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -40840,7 +40840,7 @@ function tryGetExecutablePath(filePath, extensions) {
         }
         catch (err) {
             if (err.code !== 'ENOENT') {
-                // eslint-disable-next-line no-console
+
                 console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
             }
         }
@@ -40868,7 +40868,7 @@ function tryGetExecutablePath(filePath, extensions) {
             }
             catch (err) {
                 if (err.code !== 'ENOENT') {
-                    // eslint-disable-next-line no-console
+
                     console.log(`Unexpected error attempting to determine if executable file exists '${filePath}': ${err}`);
                 }
             }
@@ -40886,7 +40886,7 @@ function tryGetExecutablePath(filePath, extensions) {
                         }
                     }
                     catch (err) {
-                        // eslint-disable-next-line no-console
+
                         console.log(`Unexpected error attempting to determine the actual case of the file '${filePath}': ${err}`);
                     }
                     return filePath;
@@ -41221,7 +41221,7 @@ var toolrunner_awaiter = (undefined && undefined.__awaiter) || function (thisArg
 
 
 
-/* eslint-disable @typescript-eslint/unbound-method */
+
 const toolrunner_IS_WINDOWS = process.platform === 'win32';
 /*
  * Class for running command line tools. Handles quoting and arg parsing in a platform agnostic way.
@@ -41975,7 +41975,7 @@ var ExitCode;
  * @param name the name of the variable to set
  * @param val the value of the variable. Non-string values will be converted to a string via JSON.stringify
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function exportVariable(name, val) {
     const convertedVal = toCommandValue(val);
     process.env[name] = convertedVal;
@@ -42094,7 +42094,7 @@ function getBooleanInput(name, options) {
  * @param     name     name of the output to set
  * @param     value    value to store. Non-string values will be converted to a string via JSON.stringify
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function setOutput(name, value) {
     const filePath = process.env['GITHUB_OUTPUT'] || '';
     if (filePath) {
@@ -42216,7 +42216,7 @@ function group(name, fn) {
  * @param     name     name of the state to store
  * @param     value    value to store. Non-string values will be converted to a string via JSON.stringify
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 function saveState(name, value) {
     const filePath = process.env['GITHUB_STATE'] || '';
     if (filePath) {
@@ -43831,7 +43831,7 @@ const context = createLoggerContext({
  * - warning
  * - error
  */
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+
 const TypeSpecRuntimeLogger = context.logger;
 /**
  * Retrieves the currently specified log level.
@@ -44621,7 +44621,7 @@ function isArrayBuffer(body) {
 class ReportTransform extends external_node_stream_.Transform {
     loadedBytes = 0;
     progressCallback;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+
     _transform(chunk, _encoding, callback) {
         this.push(chunk);
         this.loadedBytes += chunk.length;
@@ -44749,7 +44749,7 @@ class NodeHttpClient {
                 }
                 Promise.all([uploadStreamDone, downloadStreamDone])
                     .then(() => {
-                    // eslint-disable-next-line promise/always-return
+
                     if (abortListener) {
                         request.abortSignal?.removeEventListener("abort", abortListener);
                     }
@@ -47841,7 +47841,7 @@ var commonjs_state = __nccwpck_require__(8914);
 ;// CONCATENATED MODULE: ./node_modules/@azure/core-tracing/dist/esm/state.js
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-// @ts-expect-error The recommended approach to sharing module state between ESM and CJS.
+
 // See https://github.com/isaacs/tshy/blob/main/README.md#module-local-state for additional information.
 
 /**
@@ -48005,7 +48005,7 @@ function createTracingClient(options) {
 /**
  * A custom error type for failed pipeline requests.
  */
-// eslint-disable-next-line @typescript-eslint/no-redeclare
+
 const esm_restError_RestError = restError_RestError;
 /**
  * Typeguard for RestError
@@ -50213,7 +50213,7 @@ var state_cjs = __nccwpck_require__(30);
 ;// CONCATENATED MODULE: ./node_modules/@azure/core-client/dist/esm/state.js
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-// @ts-expect-error The recommended approach to sharing module state between ESM and CJS.
+
 // See https://github.com/isaacs/tshy/blob/main/README.md#module-local-state for additional information.
 
 /**
@@ -63242,7 +63242,7 @@ Crc64Hash.prototype['OnFinal'] = Crc64Hash.prototype.OnFinal = /** @suppress {un
 ;// CONCATENATED MODULE: ./node_modules/@azure/storage-common/dist/esm/StorageCRC64Calculator.js
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
-// @ts-expect-error the crc64 js file is auto generated
+
 
 /**
  * Class used to calculator CRC64 checksum
@@ -63824,7 +63824,7 @@ class StructuredMessageDecoding {
  * @param source -
  */
 async function structuredMessageDecodingBrowser(source) {
-    /* eslint-disable no-unused-expressions */
+
     source;
     throw new Error("structuredMessageDecodingBrowser is only for Browser");
 }
@@ -63972,7 +63972,7 @@ class StorageBrowserPolicy extends BaseRequestPolicy {
      * @param options -
      */
     // The base class has a protected constructor. Adding a public one to enable constructing of this class.
-    /* eslint-disable-next-line @typescript-eslint/no-useless-constructor*/
+
     constructor(nextPolicy, options) {
         super(nextPolicy, options);
     }
@@ -64051,7 +64051,7 @@ class AnonymousCredentialPolicy extends CredentialPolicy {
      * @param options -
      */
     // The base class has a protected constructor. Adding a public one to enable constructing of this class.
-    /* eslint-disable-next-line @typescript-eslint/no-useless-constructor*/
+
     constructor(nextPolicy, options) {
         super(nextPolicy, options);
     }
@@ -64544,7 +64544,7 @@ function generateBlockID(blockIDPrefix, blockIndex) {
  */
 async function utils_common_delay(timeInMs, aborter, abortError) {
     return new Promise((resolve, reject) => {
-        /* eslint-disable-next-line prefer-const */
+
         let timeout;
         const abortHandler = () => {
             if (timeout !== undefined) {
@@ -64572,7 +64572,7 @@ async function utils_common_delay(timeInMs, aborter, abortError) {
  * @param padString -
  */
 function padStart(currentString, targetLength, padString = " ") {
-    // @ts-expect-error: TS doesn't know this code needs to run downlevel sometimes
+
     if (String.prototype.padStart) {
         return currentString.padStart(targetLength, padString);
     }
@@ -80252,7 +80252,7 @@ function utils_common_generateBlockID(blockIDPrefix, blockIndex) {
  */
 async function utils_utils_common_delay(timeInMs, aborter, abortError) {
     return new Promise((resolve, reject) => {
-        /* eslint-disable-next-line prefer-const */
+
         let timeout;
         const abortHandler = () => {
             if (timeout !== undefined) {
@@ -80280,7 +80280,7 @@ async function utils_utils_common_delay(timeInMs, aborter, abortError) {
  * @param padString -
  */
 function utils_common_padStart(currentString, targetLength, padString = " ") {
-    // @ts-expect-error: TS doesn't know this code needs to run downlevel sometimes
+
     if (String.prototype.padStart) {
         return currentString.padStart(targetLength, padString);
     }
@@ -83229,7 +83229,7 @@ class AvroParser {
         } while (haveMoreByte && significanceInBit < 28); // bitwise operation only works for 32-bit integers
         if (haveMoreByte) {
             // Switch to float arithmetic
-            // eslint-disable-next-line no-self-assign
+
             zigZagEncoded = zigZagEncoded;
             significanceInFloat = 268435456; // 2 ** 28.
             do {
@@ -83345,7 +83345,7 @@ class AvroType {
     /**
      * Determines the AvroType from the Avro Schema.
      */
-    // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
+
     static fromSchema(schema) {
         if (typeof schema === "string") {
             return AvroType.fromStringSchema(schema);
@@ -83392,7 +83392,7 @@ class AvroType {
                 if (!schema.name) {
                     throw new Error(`Required attribute 'name' doesn't exist on schema: ${schema}`);
                 }
-                // eslint-disable-next-line no-case-declarations
+
                 const fields = {};
                 if (!schema.fields) {
                     throw new Error(`Required attribute 'fields' doesn't exist on schema: ${schema}`);
@@ -83427,7 +83427,7 @@ class AvroPrimitiveType extends AvroType {
         super();
         this._primitive = primitive;
     }
-    // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
+
     read(stream, options = {}) {
         switch (this._primitive) {
             case AvroPrimitive.NULL:
@@ -83457,7 +83457,7 @@ class AvroEnumType extends AvroType {
         super();
         this._symbols = symbols;
     }
-    // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
+
     async read(stream, options = {}) {
         const value = await AvroParser.readInt(stream, options);
         return this._symbols[value];
@@ -83480,7 +83480,7 @@ class AvroMapType extends AvroType {
         super();
         this._itemType = itemType;
     }
-    // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
+
     read(stream, options = {}) {
         const readItemMethod = (s, opts) => {
             return this._itemType.read(s, opts);
@@ -83496,9 +83496,9 @@ class AvroRecordType extends AvroType {
         this._fields = fields;
         this._name = name;
     }
-    // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
+
     async read(stream, options = {}) {
-        // eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
+
         const record = {};
         record["$schema"] = this._name;
         for (const key in this._fields) {
@@ -83531,7 +83531,7 @@ function arraysEqual(a, b) {
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 // TODO: Do a review of non-interfaces
-/* eslint-disable @azure/azure-sdk/ts-use-interface-parameters */
+
 
 
 
@@ -83699,7 +83699,7 @@ class AvroReadableFromStream extends AvroReadable {
         else {
             // register callback to wait for enough data to read
             return new Promise((resolve, reject) => {
-                /* eslint-disable @typescript-eslint/no-use-before-define */
+
                 const cleanUp = () => {
                     this._readable.removeListener("readable", readableCallback);
                     this._readable.removeListener("error", rejectCallback);
@@ -85240,7 +85240,7 @@ class PollerCancelledError extends Error {
  * ```
  *
  */
-// eslint-disable-next-line no-use-before-define
+
 class Poller {
     /**
      * A poller needs to be initialized by passing in at least the basic properties of the `PollOperation<TState, TResult>`.
@@ -86095,7 +86095,7 @@ class BlobClient extends StorageClient_StorageClient {
     }
     constructor(urlOrConnectionString, credentialOrPipelineOrContainerName, blobNameOrOptions, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         options = options || {};
         let pipeline;
@@ -87105,7 +87105,7 @@ class BlobClient extends StorageClient_StorageClient {
      * @param options - Optional parameters.
      * @returns The SAS URI consisting of the URI to the resource represented by this client, followed by the generated SAS token.
      */
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     generateSasStringToSign(options) {
         if (!(this.credential instanceof StorageSharedKeyCredential)) {
             throw new RangeError("Can only generate the SAS when the client is initialized with a shared key credential");
@@ -87229,7 +87229,7 @@ class AppendBlobClient extends BlobClient {
     appendBlobContext;
     constructor(urlOrConnectionString, credentialOrPipelineOrContainerName, blobNameOrOptions, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         // In TypeScript we cannot simply pass all parameters to super() like below so have to duplicate the code instead.
         //   super(s, credentialOrPipelineOrContainerNameOrOptions, blobNameOrOptions, options);
@@ -87538,7 +87538,7 @@ class Clients_BlockBlobClient extends BlobClient {
     blockBlobContext;
     constructor(urlOrConnectionString, credentialOrPipelineOrContainerName, blobNameOrOptions, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         // In TypeScript we cannot simply pass all parameters to super() like below so have to duplicate the code instead.
         //   super(s, credentialOrPipelineOrContainerNameOrOptions, blobNameOrOptions, options);
@@ -88196,7 +88196,7 @@ class PageBlobClient extends BlobClient {
     pageBlobContext;
     constructor(urlOrConnectionString, credentialOrPipelineOrContainerName, blobNameOrOptions, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         // In TypeScript we cannot simply pass all parameters to super() like below so have to duplicate the code instead.
         //   super(s, credentialOrPipelineOrContainerNameOrOptions, blobNameOrOptions, options);
@@ -89475,7 +89475,7 @@ class BlobBatchClient {
     serviceOrContainerContext;
     constructor(url, credentialOrPipeline, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         let pipeline;
         if (isPipelineLike(credentialOrPipeline)) {
@@ -89507,7 +89507,7 @@ class BlobBatchClient {
     }
     async deleteBlobs(urlsOrBlobClients, credentialOrOptions, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         const batch = new BlobBatch();
         for (const urlOrBlobClient of urlsOrBlobClients) {
@@ -89522,7 +89522,7 @@ class BlobBatchClient {
     }
     async setBlobsAccessTier(urlsOrBlobClients, credentialOrTier, tierOrOptions, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         const batch = new BlobBatch();
         for (const urlOrBlobClient of urlsOrBlobClients) {
@@ -89659,7 +89659,7 @@ class ContainerClient extends StorageClient_StorageClient {
     }
     constructor(urlOrConnectionString, credentialOrPipelineOrContainerName, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         let pipeline;
         let url;
@@ -90867,7 +90867,7 @@ class ContainerClient extends StorageClient_StorageClient {
      * @param options - Optional parameters.
      * @returns The SAS URI consisting of the URI to the resource represented by this client, followed by the generated SAS token.
      */
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     generateSasStringToSign(options) {
         if (!(this.credential instanceof StorageSharedKeyCredential)) {
             throw new RangeError("Can only generate the SAS when the client is initialized with a shared key credential");
@@ -91447,7 +91447,7 @@ class BlobServiceClient extends StorageClient_StorageClient {
      */
     static fromConnectionString(connectionString, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         options = options || {};
         const extractedCreds = utils_common_extractConnectionStringParts(connectionString);
@@ -91474,7 +91474,7 @@ class BlobServiceClient extends StorageClient_StorageClient {
     }
     constructor(url, credentialOrPipeline, 
     // Legacy, no fix for eslint error without breaking. Disable it for this interface.
-    /* eslint-disable-next-line @azure/azure-sdk/ts-naming-options*/
+
     options) {
         options = options ?? {};
         let pipeline;
@@ -94839,9 +94839,9 @@ class StateProviderBase {
         }
         return undefined;
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
+
     setState = (key, value) => { };
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     getState = (key) => "";
 }
 class stateProvider_StateProvider extends (/* unused pure expression or super */ null && (StateProviderBase)) {
@@ -94856,7 +94856,7 @@ class NullStateProvider extends StateProviderBase {
     setState = (key, value) => {
         setOutput(this.stateToOutputMap.get(key), value);
     };
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
     getState = (key) => "";
 }
 
