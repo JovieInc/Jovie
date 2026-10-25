@@ -72,6 +72,11 @@ interface CmdKPaletteProps {
    * without baking them into the registry.
    */
   readonly additionalSectionsAfter?: PaletteSection[];
+  /**
+   * Ovie operator palette: customer skills, nav, releases and artists are not
+   * offered; only `additionalSectionsAfter` rows (operator commands) show.
+   */
+  readonly operatorMode?: boolean;
   /** Caller-handled commit for `additionalSectionsAfter` items. */
   readonly onAdditionalSelect?: (id: string) => void;
   /** `main` renders inside the existing shell plane; `dialog` preserves legacy embedding. */
@@ -185,6 +190,7 @@ export function CmdKPalette({
   onAdditionalSelect,
   presentation = 'dialog',
   onHeaderChange,
+  operatorMode = false,
 }: CmdKPaletteProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -210,7 +216,7 @@ export function CmdKPalette({
     isSearching,
     hasSearchError,
     retrySearch,
-  } = useCmdkData(profileId, query, open);
+  } = useCmdkData(profileId, operatorMode ? '' : query, open && !operatorMode);
   const pendingMessage =
     query.trim().length > 0 ? 'Searching…' : 'Loading results…';
   const filteredAdditional = useMemo(
@@ -218,8 +224,11 @@ export function CmdKPalette({
     [query, additionalSectionsAfter]
   );
   const unboundedSections = useMemo<PaletteSection[]>(
-    () => [...registrySections, ...filteredAdditional],
-    [registrySections, filteredAdditional]
+    () =>
+      operatorMode
+        ? filteredAdditional
+        : [...registrySections, ...filteredAdditional],
+    [operatorMode, registrySections, filteredAdditional]
   );
   const allSections = useMemo<PaletteSection[]>(
     () => applyPaletteDefaultLimits(query, unboundedSections),

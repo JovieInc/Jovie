@@ -540,6 +540,50 @@ describe('CommandPalette', () => {
     expect(pushMock).not.toHaveBeenCalled();
   });
 
+  it('offers only operator destinations and tools on Ovie, with G-key hints', async () => {
+    pushMock.mockClear();
+    pathnameMock.mockReturnValue('/app/ov/shipping');
+    render(withDashboard(<CommandPalette />, true));
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+
+    const options = screen.getAllByRole('option');
+    const text = options.map(el => el.textContent ?? '').join('|');
+    for (const label of ['Home', 'Inbox', 'Shipping', 'Fleet', 'Capacity']) {
+      expect(text).toContain(label);
+    }
+    expect(text).toContain('G then F');
+    expect(text).toContain('Open Linear');
+    // Customer rows must not leak into the operator palette.
+    expect(text).not.toContain('Generate album art');
+    expect(text).not.toContain('Contacts');
+
+    const fleet = options.find(el => el.textContent?.includes('Fleet'));
+    fireEvent.mouseDown(fleet!);
+    expect(pushMock).toHaveBeenCalledWith('/app/ov/operations');
+  });
+
+  it('opens external operator tools in a new tab, never in the shell', async () => {
+    const openMock = vi.spyOn(globalThis, 'open').mockReturnValue(null);
+    pushMock.mockClear();
+    pathnameMock.mockReturnValue('/app/ov');
+    render(withDashboard(<CommandPalette />, true));
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+
+    const linear = screen
+      .getAllByRole('option')
+      .find(el => el.textContent?.includes('Open Linear'));
+    fireEvent.mouseDown(linear!);
+    expect(openMock).toHaveBeenCalledWith(
+      'https://linear.app/jovie',
+      '_blank',
+      'noopener,noreferrer'
+    );
+    expect(pushMock).not.toHaveBeenCalled();
+    openMock.mockRestore();
+  });
+
   it('does not leak the workspace action to non-admins', async () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
