@@ -35,7 +35,7 @@ function CohortTable({
 }: Readonly<{ cohort: GoldenPathCohortReport; minSample: number }>) {
   return (
     <div className='min-w-0'>
-      <h3 className='text-app font-semibold text-primary-token'>
+      <h3 className='text-balance text-app font-semibold text-primary-token'>
         {COHORT_LABELS[cohort.cohort]}
       </h3>
       {cohort.underpowered ? (
@@ -79,7 +79,7 @@ export function GoldenPathFunnelPanel({
     <ContentSurfaceCard surface='details'>
       <div className='space-y-4 p-3' data-testid='golden-path-funnel'>
         <div>
-          <h2 className='text-app font-semibold text-primary-token'>
+          <h2 className='text-balance text-app font-semibold text-primary-token'>
             Golden Path Conversion
           </h2>
           <p className='mt-1 text-app text-secondary-token'>
