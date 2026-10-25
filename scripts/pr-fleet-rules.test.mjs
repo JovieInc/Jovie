@@ -315,7 +315,10 @@ test('runner: reads current paginated PR evidence, rejects stale/incomplete read
   await assert.rejects(
     runFleetRules({
       event,
-      request: async () => ({ number: 1, head: { sha: 'b'.repeat(40) } }),
+      request: async path =>
+        path.includes('/files?')
+          ? []
+          : { number: 1, head: { sha: 'b'.repeat(40) }, changed_files: 0 },
     }),
     /head/
   );
@@ -808,7 +811,7 @@ test('runner handles pagination and metadata moving during the read fail-closed'
     return { ...pr(), changed_files: 100, head: event.pull_request.head };
   };
   assert.deepEqual((await runFleetRules({ event, request })).errors, []);
-  assert.equal(reads, 2);
+  assert.equal(reads, 1);
   await assert.rejects(runFleetRules({ event: {}, request }), /metadata/);
   await assert.rejects(
     runFleetRules({
@@ -830,10 +833,10 @@ test('runner handles pagination and metadata moving during the read fail-closed'
           : {
               ...pr(),
               changed_files: 0,
-              head: { sha: ++reads === 1 ? 'a'.repeat(40) : 'b'.repeat(40) },
+              head: { sha: 'b'.repeat(40) },
             },
     }),
-    /changed during read/
+    /head changed/
   );
 });
 
