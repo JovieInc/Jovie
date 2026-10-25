@@ -39,6 +39,9 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import lifecycle  # noqa: E402
 import outcome_lane  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 esc = outcome_lane.esc
 POLICY_PATH = Path(os.environ.get("LANES_TASTE_POLICY", HERE / "taste-policy.json"))
@@ -416,7 +419,7 @@ def run_pass(host, lane, now: float | None = None, dry_run: bool = False, run=li
                 ledger_row(host.state, key, proposal, proposal["status"], proposal["decidedAt"])
                 proposal["ledgered"] = True
         metrics = compute_metrics(state["proposals"])
-        (host.state / METRICS_FILE).write_text(json.dumps({**metrics, "at": now}))
+        atomic_write_text(host.state / METRICS_FILE, json.dumps({**metrics, "at": now}))
     else:
         metrics = compute_metrics(state["proposals"])
     waiting = [{"identifier": i["identifier"], "title": i["title"], **{k: a[k] for k in ("risk", "confidence", "deadlineAt", "held")}}
@@ -463,7 +466,7 @@ def tick(host, lane, spawn=subprocess.Popen) -> dict:
         last = 0
     if time.time() - last < 3600:
         return {"status": "not-due"}
-    stamp.write_text(json.dumps({"at": time.time()}))
+    atomic_write_text(stamp, json.dumps({"at": time.time()}))
     spawn([sys.executable, str(HERE / "taste_default.py"), "run"], stdin=subprocess.DEVNULL,
           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True, **lifecycle.spawn_kwargs())
     return {"status": "spawned"}

@@ -23,6 +23,8 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from atomic_state import atomic_write_text
+
 POOL_FILE = "macos-pool.json"
 HISTORY_FILE = "macos-pool.jsonl"
 REPOS = ("JovieInc/LogYourBody", "JovieInc/Jovie")
@@ -177,5 +179,5 @@ def sample(state: Path, fetch=gh_fetch, now: float | None = None, force: bool = 
     with (state / HISTORY_FILE).open("a") as handle:
         for row in rows:
             handle.write(json.dumps(row, separators=(",", ":")) + "\n")
-    path.write_text(json.dumps(snapshot))
+    atomic_write_text(path, json.dumps(snapshot))
     return {"repos": counts, "poolCap": snapshot["poolCap"], "recorded": len(rows) - 1}

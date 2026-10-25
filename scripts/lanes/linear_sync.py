@@ -309,6 +309,8 @@ def enqueue(state: Path, op: str, issue_id: str, *, target: str | None = None, b
         key = f"label:{issue_id}:{body}"
     elif op == "comment":
         key = "comment:" + hashlib.sha256(f"{issue_id}\0{body}".encode()).hexdigest()[:24]
+    elif op == "create":  # a child issue under issue_id; body is the JSON payload (title, description, priority, labels)
+        key = "create:" + hashlib.sha256(f"{issue_id}\0{json.loads(body)['title']}".encode()).hexdigest()[:24]
     else:
         raise ValueError(f"unknown outbox op {op}")
     with _mutating(_outbox_path(state), OUTBOX) as data:
@@ -384,6 +386,42 @@ def _deliver_comment(state: Path, linear, entry: dict) -> str:
     return "commented"
 
 
+CHILDREN_QUERY = ('query($id:String!){issue(id:$id){team{id key states{nodes{id name}}} '
+                  'children(first:100){nodes{id identifier title}}}}')
+CREATE_MUTATION = 'mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id identifier title}}}'
+
+
+def _deliver_create(state: Path, linear, entry: dict) -> str:
+    """Create one child issue in Backlog. Idempotent: a child with the same title under the parent is the
+    readback, so a lost response or a retry never makes a duplicate."""
+    payload = json.loads(entry["body"])
+    parent = (linear.gql(CHILDREN_QUERY, {"id": entry["issueId"]}) or {}).get("issue")
+    if not isinstance(parent, dict):
+        return "remote-missing"
+    if any(node.get("title") == payload["title"] for node in (parent.get("children") or {}).get("nodes") or []):
+        return "already"
+    team = parent["team"]
+    backlog = next((n["id"] for n in team["states"]["nodes"] if n["name"] == "Backlog"), None)
+    if not backlog:
+        raise ValueError("team has no Backlog state")
+    label_ids = []
+    for name in payload.get("labels") or []:
+        nodes = ((linear.gql(LABEL_LOOKUP, {"n": name}) or {}).get("issueLabels") or {}).get("nodes") or []
+        found = next((n["id"] for n in nodes if (n.get("team") or {}).get("key") == team["key"]),
+                     next((n["id"] for n in nodes if not n.get("team")), None))
+        if not found:
+            raise ValueError(f"no label {name}")
+        label_ids.append(found)
+    _settle(state, entry["key"], sent=True)
+    result = (linear.gql(CREATE_MUTATION, {"i": {
+        "teamId": team["id"], "stateId": backlog, "parentId": entry["issueId"], "title": payload["title"],
+        "description": payload["description"], "priority": int(payload.get("priority") or 0),
+        "labelIds": label_ids}}) or {}).get("issueCreate") or {}
+    if result.get("success") is not True:
+        raise RuntimeError("create not confirmed")
+    return "created"
+
+
 def _deliver_rank(state: Path, linear, entry: dict) -> str:
     result = (linear.gql(RANK_MUTATION, {"id": entry["issueId"], "o": entry["value"]}) or {}).get("issueUpdate") or {}
     after = result.get("issue") if isinstance(result.get("issue"), dict) else {}
@@ -424,7 +462,8 @@ def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT, bu
             outcome = "budget-held"
             break
         try:
-            result = {"move": _deliver_move, "rank": _deliver_rank, "label": _deliver_label}.get(entry["op"], _deliver_comment)(
+            result = {"move": _deliver_move, "rank": _deliver_rank, "label": _deliver_label,
+                  "create": _deliver_create}.get(entry["op"], _deliver_comment)(
                 state, linear, entry)
         except transient:
             outcome = "rate-limited"  # never an attempt: the entry waits for the reset

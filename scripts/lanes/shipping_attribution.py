@@ -69,11 +69,23 @@ def _iso(epoch):
     return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def read_ledger(path: Path) -> dict:
-    """Read the existing append-only ledger and expose corruption as evidence state."""
+def read_ledger(path: Path, tail_bytes: int | None = None) -> dict:
+    """Read the existing append-only ledger and expose corruption as evidence state.
+
+    `tail_bytes` bounds the read to the newest bytes (the doctor judges 24h of receipts; the
+    whole ledger cost ~1s of JSON parsing per pass at 52 MB). The partial first line of a tail
+    is dropped, not counted as corruption."""
     rows, corrupt, latest = [], 0, None
     try:
         with Path(path).open() as handle:
+            if tail_bytes is not None:
+                handle.seek(0, 2)
+                size = handle.tell()
+                if size > tail_bytes:
+                    handle.seek(size - tail_bytes)
+                    handle.readline()  # discard the partial line the cut landed in
+                else:
+                    handle.seek(0)
             for raw in handle:
                 if not raw.strip():
                     continue

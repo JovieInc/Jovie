@@ -76,6 +76,9 @@ CLOCKS = (
     # applies unless client_payload.apply is false; the bot token cannot send workflow_dispatch.
     Clock("staleBranchSweep", "stale-branch-sweep.yml", "clock_stale_branch_sweep", 7 * 86400,
           "stale-branch-sweep-clock.json", github_cron=False),
+    # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).
+    Clock("summerCanary", "ovie-summer-canary.yml", "clock_summer_canary", 3600,
+          "summer-canary-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 
