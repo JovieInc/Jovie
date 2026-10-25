@@ -60,6 +60,16 @@ export const INVARIANT_PROPOSALS = {
     'Invariant: every public profile and release page advertises an og:image that returns 200 with an image content type.',
   'profile-interactions':
     'Invariant: the public profile tabs (Home, Music, Events, About) change the view, and Get Updates opens an email capture, with no page errors.',
+  'ovie-admin-role-fuse':
+    'Invariant: the dogfood observer identity is read-only. A harmless write probe (POST /api/admin/roles with an empty body) must answer 403; 400 means the identity is a full admin and the run stops before browsing.',
+  'ovie-admin-write-refused':
+    'Invariant: a read-only operator cannot write: role grant and revoke and a privileged action are refused with 403.',
+  'ovie-admin-read-api':
+    'Invariant: a read-only operator can read the opted-in Ovie observation APIs (shipping state answers 200).',
+  'ovie-admin-pii-pages-hidden':
+    'Invariant: pages that show PII or live bearer tokens (investors, people, users, waitlist, leads, outreach, interviews, feedback) redirect away for a read-only operator.',
+  'ovie-admin-page-clean':
+    'Invariant: every Ovie admin page renders for the read-only observer with content, no page errors and no same-origin 4xx/5xx.',
   'fan-subscribe-persists':
     'Invariant: a fan can subscribe on a public profile through the rendered email and one-time-code flow and the subscription persists (status API).',
   'fan-subscribe-cleanup':
@@ -196,11 +206,18 @@ export const MISSIONS = [
     subjectId: 'ovie-admin',
     product: 'ovie',
     title:
-      'Founder opens the Ovie admin views and each shows current, internally consistent data',
-    checks: [],
-    automation: 'blocked',
+      'Founder opens the Ovie admin views and each shows current data, and a read-only observer cannot write',
+    checks: [
+      'ovie-admin-role-fuse',
+      'ovie-admin-write-refused',
+      'ovie-admin-read-api',
+      'ovie-admin-pii-pages-hidden',
+      'ovie-admin-page-clean',
+      'auth-signin',
+    ],
+    automation: 'implemented',
     blocker:
-      'no sanctioned admin identity. This is an access change (an admin grant in production) and is the founder decision: seed browse-admin+clerk_test@jov.ie as admin, add E2E_PROD_ADMIN_USER_EMAIL to Doppler jovie-web/prd and allow it in production-auth-credentials.ts',
+      'the seeded browse-admin+clerk_test@jov.ie identity must hold the admin_read_only role (POST /api/admin/roles by a full admin) and exist in production; until then sign-in or the role fuse leaves this unverified or failing',
     owner: 'ovie stream',
   },
   {

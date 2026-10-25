@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PRODUCTION_ADMIN_OBSERVER_EMAIL,
   PRODUCTION_AUTH_SMOKE_EMAIL,
+  resolveProductionAdminObserverCredentials,
   resolveProductionAuthCredentials,
 } from '../../e2e/utils/production-auth-credentials';
 
@@ -87,5 +89,27 @@ describe('production auth credential selection', () => {
     ],
   ])('rejects incomplete cross-pair fixture %#', environment => {
     expect(resolveProductionAuthCredentials(environment)).toBeNull();
+  });
+});
+
+describe('production Ovie observer credentials', () => {
+  it('is the seeded admin persona and needs the OTP database, never a configured email', () => {
+    expect(
+      resolveProductionAdminObserverCredentials({
+        DATABASE_URL: 'postgresql://x/db',
+      })
+    ).toEqual({
+      source: 'primary',
+      email: PRODUCTION_ADMIN_OBSERVER_EMAIL,
+      password: '',
+      verificationCode: '',
+    });
+    expect(resolveProductionAdminObserverCredentials({})).toBeNull();
+    expect(
+      resolveProductionAdminObserverCredentials({ DATABASE_URL: '  ' })
+    ).toBeNull();
+    expect(PRODUCTION_ADMIN_OBSERVER_EMAIL).not.toBe(
+      PRODUCTION_AUTH_SMOKE_EMAIL
+    );
   });
 });

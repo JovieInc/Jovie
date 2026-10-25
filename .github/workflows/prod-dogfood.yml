@@ -154,6 +154,33 @@ jobs:
                 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
                   pnpm exec playwright test tests/e2e/prod-dogfood-auth.spec.ts --project=chromium --reporter=line
 
+      # Ovie admin: the seeded browse-admin identity as a READ-ONLY observer (role
+      # admin_read_only). The spec stops with a P0 finding if a harmless write probe
+      # is not refused with 403, and proves in production that writes are refused.
+      - name: Ovie admin read-only observer journeys
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        working-directory: apps/web
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p tests/.auth
+          echo '{"cookies":[],"origins":[]}' > tests/.auth/user.json
+          doppler run --project jovie-web --config prd \
+            --only-secrets=DATABASE_URL \
+            --no-fallback -- env -u DOPPLER_TOKEN \
+              CI=true \
+              BASE_URL=https://jov.ie \
+              PLAYWRIGHT_TEST_BASE_URL=https://jov.ie \
+              E2E_SKIP_WEB_SERVER=1 \
+              DOGFOOD_OUT_DIR="$GITHUB_WORKSPACE/out/prod-dogfood" \
+              PLAYWRIGHT_DYNAMIC_SECRETS_FILE="$RUNNER_TEMP/playwright-dynamic-cookie-values-admin" \
+                node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+                  pnpm exec playwright test tests/e2e/prod-dogfood-ovie-admin.spec.ts --project=chromium --reporter=line
+
       - name: Run the dogfood missions
         if: ${{ steps.seen.outputs.cache-hit != 'true' }}
         id: run
@@ -173,7 +200,9 @@ jobs:
           # observation, not a broken observer.
           set +e
           auth_flag=""
-          [ -f out/prod-dogfood/auth-checks.json ] && auth_flag="--auth-checks out/prod-dogfood/auth-checks.json"
+          for f in auth-checks admin-checks; do
+            [ -f "out/prod-dogfood/$f.json" ] && auth_flag="$auth_flag --auth-checks out/prod-dogfood/$f.json"
+          done
           node scripts/prod-dogfood.mjs --out out/prod-dogfood $auth_flag \
             --ingest https://jov.ie/api/internal/ovie/dogfood-evidence
           code=$?

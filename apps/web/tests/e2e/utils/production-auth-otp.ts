@@ -1,5 +1,15 @@
 import { neon } from '@neondatabase/serverless';
-import { PRODUCTION_AUTH_SMOKE_EMAIL } from './production-auth-credentials';
+import {
+  PRODUCTION_ADMIN_OBSERVER_EMAIL,
+  PRODUCTION_AUTH_SMOKE_EMAIL,
+} from './production-auth-credentials';
+
+// The only identities whose sign-in code may be read from production: the
+// creator-ready smoke identity and the read-only Ovie observer.
+const PRODUCTION_AUTH_OTP_IDENTITIES: ReadonlySet<string> = new Set([
+  PRODUCTION_AUTH_SMOKE_EMAIL,
+  PRODUCTION_ADMIN_OBSERVER_EMAIL,
+]);
 
 const OTP_PATTERN = /^\d{6}$/;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -102,7 +112,7 @@ export async function waitForProductionAuthOtp({
   readonly pollIntervalMs?: number;
 }): Promise<string> {
   const normalizedEmail = email.trim().toLowerCase();
-  if (normalizedEmail !== PRODUCTION_AUTH_SMOKE_EMAIL) {
+  if (!PRODUCTION_AUTH_OTP_IDENTITIES.has(normalizedEmail)) {
     throw new Error(
       'Production Better Auth OTP retrieval refused a non-smoke identity.'
     );
