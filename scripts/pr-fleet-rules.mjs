@@ -383,6 +383,31 @@ export function mainLocal({
   for (const message of result.errors) log(`fleet-rules (local): ${message}`);
   return result.errors.length === 0 ? 0 : 1;
 }
+// The api-client has already retried inside its own deadline when it throws an
+// exhausted/shed/budget ApiError, so these are GitHub quota or outage answers,
+// never a verdict on the PR.
+const INFRA_FAILURES = new Set(['primary', 'secondary', 'transient']);
+const EX_TEMPFAIL = 75;
+// Printed in the failed step so the lane relay's shared classifier
+// (scripts/lib/github-rate-limit.mjs) reads it as quota and re-runs the check
+// instead of queueing repair work.
+const QUOTA_DEFERRED_MARKER = 'github-quota-deferred';
+const DEFAULT_QUOTA_HOLD_SECONDS = 120;
+
+/** @returns {{ infra: boolean, retryAtMs: number | null }} */
+function classifyEvidenceFailure(error) {
+  const infra =
+    error?.exitCode === EX_TEMPFAIL || INFRA_FAILURES.has(error?.failure);
+  const retryAt = Number(error?.retryAt);
+  return {
+    infra,
+    retryAtMs:
+      infra && Number.isFinite(retryAt) && retryAt > 0 ? retryAt : null,
+  };
+}
+
+const annotation = value =>
+  value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 
 export async function main({
   args = process.argv.slice(2),
@@ -390,19 +415,56 @@ export async function main({
   request = githubRequest,
   log = console.log,
   git,
+  now = Date.now,
+  sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
 } = {}) {
   const warningOnly = args.includes('--warnings-only');
   if (args.includes('--local')) return mainLocal({ args, log, git });
+  // One evidence read can print warnings and enforce errors, so a job that
+  // needs both spends the installation budget once, not twice.
+  const withWarnings = args.includes('--with-warnings');
+  const holdSeconds = Number(env.FLEET_RULES_QUOTA_HOLD_SECONDS);
+  const holdMs =
+    (Number.isFinite(holdSeconds) && holdSeconds >= 0
+      ? holdSeconds
+      : DEFAULT_QUOTA_HOLD_SECONDS) * 1000;
   try {
     const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
-    const result = await runFleetRules({ event, request });
-    const annotation = value =>
-      value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
-    for (const message of warningOnly ? result.warnings : result.errors)
-      log(`::${warningOnly ? 'warning' : 'error'}::${annotation(message)}`);
+    let result;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        result = await runFleetRules({ event, request });
+        break;
+      } catch (error) {
+        const { infra, retryAtMs } = classifyEvidenceFailure(error);
+        const waitMs = retryAtMs === null ? null : retryAtMs - now() + 1000;
+        // Hold once for a reset that lands inside the budget; any other
+        // failure, or a reset past it, is reported below and never passes.
+        if (!infra || attempt > 1 || waitMs === null || waitMs > holdMs)
+          throw error;
+        log(
+          `::notice title=GitHub API hold::Holding ${Math.ceil(
+            Math.max(waitMs, 0) / 1000
+          )}s for the installation quota reset before reading PR evidence.`
+        );
+        await sleep(Math.max(waitMs, 0));
+      }
+    }
+    if (withWarnings || warningOnly)
+      for (const message of result.warnings)
+        log(`::warning::${annotation(message)}`);
+    if (!warningOnly)
+      for (const message of result.errors)
+        log(`::error::${annotation(message)}`);
     return warningOnly || result.errors.length === 0 ? 0 : 1;
-  } catch {
+  } catch (error) {
     // Never print API bodies or request errors containing credentials/PR data.
+    if (!warningOnly && classifyEvidenceFailure(error).infra) {
+      log(
+        `::error::Fleet rule evidence unavailable: GitHub API quota or outage (${QUOTA_DEFERRED_MARKER}); not a verdict on this PR. Re-run after the quota resets.`
+      );
+      return EX_TEMPFAIL;
+    }
     log(
       `::${warningOnly ? 'warning' : 'error'}::Fleet rule evidence unavailable; re-run with current PR metadata.`
     );
