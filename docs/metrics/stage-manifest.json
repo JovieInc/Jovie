@@ -12,13 +12,41 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "chat-comparison": {
+      "entityId": "source SHA (build) or source SHA:attempt (smoke)",
+      "stages": [
+        {
+          "id": "build",
+          "meaning": "production standalone build",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        },
+        {
+          "id": "smoke",
+          "meaning": "eight-worker smoke attempt",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "smoke attempt finished",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        }
+      ]
+    },
     "shipping": {
       "entityId": "owner/repo#pr (Linear identifier in actor-independent joins)",
       "description": "One unit of shipped work: Linear issue to production-verified PR.",
       "endToEnd": [
         ["issue", "verified"],
         ["pr-open", "merged"],
-        ["merged", "verified"]
+        ["merged", "verified"],
+        ["verified", "closed"],
+        ["merged", "closed"]
       ],
       "stages": [
         {
@@ -115,6 +143,13 @@
           "producer": "production-controller.yml",
           "status": "derived",
           "source": "github-controller"
+        },
+        {
+          "id": "closed",
+          "meaning": "Linear issue reached Done at or after production verification; verified to closed is the closure lag",
+          "producer": "linear-sync-on-merge.yml",
+          "status": "derived",
+          "source": "linear-history"
         }
       ]
     },
@@ -473,6 +508,11 @@
     }
   },
   "sources": {
+    "chat-comparison-receipts": {
+      "kind": "events",
+      "url": null,
+      "owner": "JOV-8719"
+    },
     "github-pr": {
       "kind": "derived",
       "description": "GraphQL merged-PR search with timeline items and commit check suites (28d window)."
