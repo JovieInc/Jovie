@@ -1273,7 +1273,9 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "- You are unattended: nobody will answer a question. Never stop to ask; choose the",
         "  non-interactive path. Apart from `/autoplan`, do not run gstack or other skill",
         "  workflows (ship, review, qa, upgrade) and do not upgrade any tooling: commit with git",
-        "  and open the PR with `gh pr create --draft`.",
+        "  and open the PR with `node scripts/pr-create.mjs --draft` (same flags as `gh pr create`;",
+        "  `--print-template` gives the body). It runs the PR body rules locally and refuses with the exact",
+        "  text to add: changelog decision, `## Red-before-green` for fix PRs (real red output), a story for UI.",
         "- Remove any git worktrees you create when done (`git worktree remove`); the host",
         "  reclaims idle ones, but ENOSPC once took every lane down at once.",
         *sensitive_contract,
@@ -3623,14 +3625,16 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
             return pending("pr-publication-unconfirmed")
         # The push's own hooks can take minutes; a stop during them still bars the PR open.
         require_publishable(host, branch, "before-pr-create")
+        pr_title = f"fix: {issue.title[:80]} ({issue.identifier})"
+        pr_body = (f"Refs {issue.identifier}.\n\n"
+                   f"<!-- linear-issue-id:{issue.id} -->\n"
+                   f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                   "Lane implementation; verification by the lane gate. "
+                   "Runtime and commissioning acceptance remain with the issue owner.")
+        fleet_rules_preflight(worktree, pr_title, pr_body, log)
         try:
             sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
-                "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
-                "--body", f"Refs {issue.identifier}.\n\n"
-                f"<!-- linear-issue-id:{issue.id} -->\n"
-                f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
-                "Lane implementation; verification by the lane gate. "
-                "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
+                "--title", pr_title, "--body", pr_body], cwd=worktree, log=log)
         except (subprocess.TimeoutExpired, OSError):
             pass  # A create may have landed remotely; reconcile once, never resend.
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
@@ -3642,6 +3646,30 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG,
             "--add-label", SENSITIVE_PR_LABEL], log=log)
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
+
+
+def fleet_rules_preflight(worktree: Path, title: str, body: str, log=None) -> list[str]:
+    """Run the PR-body fleet rules locally (same script CI runs, no API) on the body a lane is about to submit.
+
+    Non-blocking: the PR opens as a draft either way. Findings go to the run log so a known-red body (every
+    `fix:` lane PR needs a Red-before-green section) is visible before CI, and the fix-red lane has the
+    exact rule names. An unavailable script or git never stops publication."""
+    script = Path(worktree) / "scripts" / "pr-fleet-rules.mjs"
+    if not script.exists():
+        return []
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
+            handle.write(body)
+        done = sh(["node", str(script), "--local", "--title", title, "--body-file", handle.name, "--base", "origin/main"],
+                  cwd=worktree, timeout=60, log=log)
+        os.unlink(handle.name)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    lines = [line for line in (done.stdout or "").splitlines() if line.startswith("fleet-rules (local):")]
+    if log is not None and lines:
+        log.write("fleet-rules preflight found " + str(len(lines)) + " issue(s) before the first push:\n" + "\n".join(lines) + "\n")
+        log.flush()
+    return lines
 
 
 @contextmanager
@@ -5259,6 +5287,59 @@ def _event_delivery_snapshot(host: Host, now: float) -> dict:
     report["deliveryFailed"] += sum(row.get("status") in {"failed", "sending"} for row in starts)
     report["deliveryExhausted"] += sum(row.get("status") == "exhausted" for row in starts)
     return report
+
+
+def settle_obsolete_start_deliveries(host: Host, linear, now: float | None = None, limit: int = 30) -> dict:
+    """Close start deliveries that can never be acknowledged, each with a recorded reason.
+
+    Gem 2026-10-25: the doctor said "Remediation alerts are not being acknowledged (57 failed delivery
+    records)" for days. All 57 were `startDelivery` rows that failed with a terminal error before the
+    terminal rule existed (event-start-preimage-changed 46, ownership-unproven 7, cap-exhausted 4) and
+    that nothing revisits: 39 belonged to events already done or exhausted, 18 to events claimed by a lane
+    that never calls claim_labeled_event. A start that no longer applies is closed `superseded` with
+    `closedReason`; one whose issue is still Todo gets a fresh delivery once; one whose remote moved on
+    ends its event as exhausted (it stays in eventsExhausted, which has its own alarm)."""
+    now = time.time() if now is None else now
+    lock = Locked(host.state / "claim.lock", blocking=True)
+    closed = {"event-ended": 0, "remote-moved-on": 0, "reset": 0, "unread": 0}
+    try:
+        data = _event_escalation(host)
+        reads = 0
+        for fingerprint, row in (data.get("events") or {}).items():
+            delivery = row.get("startDelivery") if isinstance(row, dict) else None
+            if not isinstance(delivery, dict) or delivery.get("status") not in {"failed", "sending", "exhausted"} or row.get("running"):
+                continue
+            if row.get("status") in {"done", "exhausted"}:
+                delivery.update(status="superseded", closedAt=now, closedReason=f"event-{row['status']}: its generation ended, so the start no longer applies")
+                closed["event-ended"] += 1
+                continue
+            if reads >= limit or not row.get("issueId"):
+                continue
+            reads += 1
+            try:
+                remote = linear.gql('query($id:String!){issue(id:$id){id state{id name}}}', {"id": row["issueId"]})
+                state = (remote.get("issue") or {}).get("state") if isinstance(remote, dict) else None
+            except (Exception, SystemExit):
+                state = None
+            if not isinstance(state, dict):
+                closed["unread"] += 1
+                continue
+            if state.get("id") == row.get("startedStateId"):
+                continue  # already started remotely: the owning lane's claim path proves or releases it
+            if state.get("name") == "Todo":
+                row["priorStartDeliveries"] = [*(row.get("priorStartDeliveries") or []), delivery][-20:]
+                row.pop("startDelivery", None)  # one fresh delivery: the issue is still startable
+                closed["reset"] += 1
+                continue
+            delivery.update(status="superseded", closedAt=now,
+                            closedReason=f"remote-moved-on: the issue is now {state.get('name')}, not the Todo preimage")
+            row.update(status="exhausted", lane=None, running=False, release=False, exhaustedReason="remote-moved-on")
+            closed["remote-moved-on"] += 1
+        if any(closed[key] for key in ("event-ended", "remote-moved-on", "reset")):
+            _save_event_json(host, "escalation.json", data)
+    finally:
+        lock.release()
+    return closed
 
 
 def drain_event_delivery(host: Host, linear) -> dict:
@@ -8987,6 +9068,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["shippingOriginIngest"] = collect_shipping_origin(host.state)
             except Exception as error:
                 tick["shippingOriginIngest"] = {"errors": [f"{type(error).__name__}:{error}"[:200]]}
+        if not os.environ.get("LANES_SELFTEST"):
+            try:
+                tick["remediationStartSettled"] = settle_obsolete_start_deliveries(host, Linear(host.linear_env))
+            except (Exception, SystemExit) as error:  # settling stale starts never takes spawn down
+                tick["remediationStartSettledError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             tick["remediationEvents"] = claim_remediation_events(host, Linear(host.linear_env))
         except (Exception, SystemExit) as error:  # the label scan (or a missing key) never takes spawn down

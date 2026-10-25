@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // One policy for PR feedback, native admission, and durable delivery receipts.
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -150,6 +151,19 @@ export function onlyWeakensAssertions(files) {
   return weakened;
 }
 
+// No-executable-behavior exemption for Red-before-green. The file list is verified here, never trusted from the body:
+// every changed path must be documentation or inert data by extension AND location, so one code, test, workflow or
+// script file anywhere in the diff voids it.
+// Data files (json/jsonl) are never inert: canon/automation-registry.jsonl, config/registry/ and docs/metrics/*.json are
+// read by liveness, spend and doctor checks at runtime, so a change to them is executable behavior.
+const INERT_EXTENSION = /\.(?:md|mdx|txt)$/;
+const INERT_LOCATION = /^docs\//;
+export const isInertPath = path =>
+  (INERT_LOCATION.test(path) && INERT_EXTENSION.test(path)) ||
+  (/^[^/]+\.md$/.test(path) && !/^(?:AGENTS|CLAUDE)\.md$/.test(path));
+export const NO_EXECUTABLE_STATEMENT =
+  /^\s*(?:-\s*)?Failing command:\s*`?none \(no executable change\)`?\s*$/im;
+
 export function evaluateFleetRules({
   pr,
   files,
@@ -188,7 +202,11 @@ export function evaluateFleetRules({
         )
       ));
   const red = section(body, 'Red-before-green');
-  if (repair && !exempt) {
+  const noExecutable =
+    paths.length > 0 &&
+    paths.every(isInertPath) &&
+    NO_EXECUTABLE_STATEMENT.test(red);
+  if (repair && !exempt && !noExecutable) {
     const command = field(red, 'Failing command').replace(/`/g, '');
     const output =
       /```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```/i.test(
@@ -301,6 +319,86 @@ export async function githubRequest(path, { store } = {}) {
     throw new Error(`GitHub evidence request failed (${response.status})`);
   return response.json();
 }
+const GIT_STATUS = {
+  A: 'added',
+  M: 'modified',
+  D: 'removed',
+  R: 'renamed',
+  C: 'copied',
+  T: 'modified',
+};
+
+/**
+ * The changed files of HEAD against `base`, shaped like the pulls files API, from local git only.
+ * @param {{ base?: string, cwd?: string, git?: (args: string[], cwd: string) => string }} [options]
+ */
+export function localFiles({
+  base = 'origin/main',
+  cwd = process.cwd(),
+  git = (args, dir) =>
+    execFileSync('git', args, {
+      cwd: dir,
+      encoding: 'utf8',
+      maxBuffer: 64 << 20,
+    }),
+} = {}) {
+  return git(['diff', '--name-status', '-M', `${base}...HEAD`], cwd)
+    .split('\n')
+    .filter(Boolean)
+    .map(line => {
+      const [code, first, second] = line.split('\t');
+      const filename = second ?? first;
+      return {
+        filename,
+        status: GIT_STATUS[code[0]] ?? 'modified',
+        ...(second ? { previous_filename: first } : {}),
+        patch: git(['diff', '-U0', `${base}...HEAD`, '--', filename], cwd),
+      };
+    });
+}
+
+/**
+ * Run the PR-body rules before a push, with no API: title and body come from the caller, files from git.
+ * A lane runs this on the body it is about to submit so a known-red body is never the first thing CI sees.
+ * @param {Record<string, any>} [options]
+ */
+export function evaluateLocal({
+  title,
+  body,
+  labels = [],
+  base,
+  cwd,
+  git,
+} = {}) {
+  return evaluateFleetRules({
+    pr: { title, body, labels },
+    files: localFiles({ base, cwd, git }),
+  });
+}
+
+function flagValue(args, name) {
+  const index = args.indexOf(name);
+  return index === -1 ? '' : String(args[index + 1] ?? '');
+}
+
+export function mainLocal({
+  args,
+  log,
+  git,
+  read = readFileSync,
+  cwd = process.cwd(),
+}) {
+  const result = evaluateLocal({
+    title: flagValue(args, '--title'),
+    body: read(flagValue(args, '--body-file'), 'utf8'),
+    labels: flagValue(args, '--labels').split(',').filter(Boolean),
+    base: flagValue(args, '--base') || undefined,
+    cwd,
+    git,
+  });
+  for (const message of result.errors) log(`fleet-rules (local): ${message}`);
+  return result.errors.length === 0 ? 0 : 1;
+}
 // The api-client has already retried inside its own deadline when it throws an
 // exhausted/shed/budget ApiError, so these are GitHub quota or outage answers,
 // never a verdict on the PR.
@@ -327,15 +425,18 @@ function classifyEvidenceFailure(error) {
 const annotation = value =>
   value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
 
+/** @param {Record<string, any>} [options] */
 export async function main({
   args = process.argv.slice(2),
   env = process.env,
   request = githubRequest,
   log = console.log,
+  git,
   now = Date.now,
   sleep = ms => new Promise(resolve => setTimeout(resolve, ms)),
 } = {}) {
   const warningOnly = args.includes('--warnings-only');
+  if (args.includes('--local')) return mainLocal({ args, log, git });
   // One evidence read can print warnings and enforce errors, so a job that
   // needs both spends the installation budget once, not twice.
   const withWarnings = args.includes('--with-warnings');

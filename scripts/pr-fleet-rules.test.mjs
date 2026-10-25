@@ -14,9 +14,12 @@ import test from 'node:test';
 import { MemoryLedgerStore } from '../packages/api-client/store.ts';
 import {
   evaluateFleetRules,
+  evaluateLocal,
   githubRequest,
   hasPremiseEvidence,
+  isInertPath,
   isLockedArea,
+  localFiles,
   main,
   onlyWeakensAssertions,
   runFleetRules,
@@ -917,4 +920,133 @@ test('missing test patches and placeholder decision references cannot bypass blo
     ).errors,
     []
   );
+});
+
+const fakeGit = (args, _cwd) => {
+  if (args.includes('--name-status'))
+    return 'M\tscripts/lanes/x.py\nA\tscripts/tests/test_x.py\nR100\told/name.py\tnew/name.py\nD\tgone.txt\nT\ttyped.py\n';
+  return `+++ patch for ${args.at(-1)}\n`;
+};
+
+test('local: files come from git alone, shaped like the pulls files API', () => {
+  const files = localFiles({ base: 'origin/main', cwd: '/x', git: fakeGit });
+  assert.deepEqual(
+    files.map(f => [f.filename, f.status, f.previous_filename]),
+    [
+      ['scripts/lanes/x.py', 'modified', undefined],
+      ['scripts/tests/test_x.py', 'added', undefined],
+      ['new/name.py', 'renamed', 'old/name.py'],
+      ['gone.txt', 'removed', undefined],
+      ['typed.py', 'modified', undefined],
+    ]
+  );
+  assert.match(files[0].patch, /patch for scripts\/lanes\/x.py/);
+});
+
+test('local: the body a lane is about to submit is checked before the first push', () => {
+  const bad = evaluateLocal({
+    title: 'fix: lane work (JOV-1)',
+    body: 'Refs JOV-1.',
+    git: fakeGit,
+  });
+  assert.ok(bad.errors.some(e => e.startsWith('red-before-green')));
+  const good = evaluateLocal({
+    title: 'fix: lane work (JOV-1)',
+    body: `${red}\n\n${proof}`,
+    git: fakeGit,
+  });
+  assert.deepEqual(good.errors, []);
+  assert.deepEqual(
+    evaluateLocal({ title: 'feat: x', body: proof, git: fakeGit }).errors,
+    []
+  );
+});
+
+test('local: --local prints the rule failures and exits non-zero without any API call', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-local-'));
+  try {
+    const bodyFile = join(dir, 'body.md');
+    writeFileSync(bodyFile, 'Refs JOV-1.');
+    const lines = [];
+    const request = () => {
+      throw new Error('no API in local mode');
+    };
+    const code = await main({
+      args: [
+        '--local',
+        '--title',
+        'fix: lane work',
+        '--body-file',
+        bodyFile,
+        '--labels',
+        'bug,lane',
+      ],
+      log: line => lines.push(line),
+      request,
+      git: fakeGit,
+    });
+    assert.equal(code, 1);
+    assert.match(lines[0], /^fleet-rules \(local\): red-before-green/);
+    writeFileSync(bodyFile, `${red}\n\n${proof}`);
+    const ok = await main({
+      args: [
+        '--local',
+        '--title',
+        'fix: lane work',
+        '--body-file',
+        bodyFile,
+        '--base',
+        'origin/dev',
+      ],
+      log: line => lines.push(line),
+      request,
+      git: fakeGit,
+    });
+    assert.equal(ok, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('local: default git reads the real repository without throwing', () => {
+  const files = localFiles({ base: 'HEAD', cwd: process.cwd() });
+  assert.deepEqual(files, []);
+});
+
+test('no-executable exemption: inert-only diffs with the statement pass; any code file voids it; the body alone is not trusted', () => {
+  const stated =
+    '## Red-before-green\nFailing command: none (no executable change)\n\n## Blast radius\nWhat could break: nothing runs.\nProof: docs only.';
+  const fix = body => pr({ title: 'fix(docs): typo', body });
+  const errorsFor = (paths, body = stated) =>
+    check(
+      fix(body),
+      paths.map(path => file(path))
+    ).errors.filter(error => error.startsWith('red-before-green'));
+  assert.deepEqual(
+    errorsFor(['docs/guide.md', 'README.md', 'docs/notes/a.txt']),
+    []
+  );
+  for (const code of [
+    'apps/web/lib/x.ts',
+    'scripts/x.mjs',
+    'docs/tool.ts',
+    '.github/workflows/ci.yml',
+    'apps/web/lib/x.test.ts',
+    'docs/run.sh',
+    'CLAUDE.md',
+    'canon/automation-registry.jsonl',
+    'config/registry/credentials.json',
+    'docs/metrics/shipping-slo-latest.json',
+    'apps/web/notes.md',
+  ])
+    assert.equal(errorsFor(['docs/guide.md', code]).length, 1, code);
+  assert.equal(
+    errorsFor(
+      ['docs/guide.md'],
+      '## Blast radius\nWhat could break: nothing.\nProof: docs.'
+    ).length,
+    1
+  );
+  assert.equal(errorsFor([]).length, 1);
+  assert.equal(isInertPath('docs/a.md'), true);
 });

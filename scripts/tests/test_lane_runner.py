@@ -7959,6 +7959,29 @@ class LanesReleaseFixtureTest(unittest.TestCase):
                                  ["scripts/lanes/hud.py", "scripts/lanes/hud_fixtures/__snapshots__/live-80x24.txt"])
 
 
+class FleetRulesPreflightTest(unittest.TestCase):
+    def test_known_red_bodies_are_reported_before_the_first_push_and_never_block(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tree = Path(raw)
+            (tree / "scripts").mkdir()
+            self.assertEqual(lane.fleet_rules_preflight(tree, "fix: x", "Refs JOV-1."), [], "no script, no preflight")
+            (tree / "scripts/pr-fleet-rules.mjs").write_text("// stub")
+            seen = []
+            def fake_sh(args, **kw):
+                seen.append(args)
+                body = Path(args[args.index("--body-file") + 1]).read_text()
+                self.assertEqual(body, "Refs JOV-1.")
+                return subprocess.CompletedProcess(args, 1, "fleet-rules (local): red-before-green: include Failing command.\nunrelated\n", "")
+            log = io.StringIO()
+            with patch.object(lane, "sh", fake_sh):
+                lines = lane.fleet_rules_preflight(tree, "fix: x", "Refs JOV-1.", log)
+            self.assertEqual(lines, ["fleet-rules (local): red-before-green: include Failing command."])
+            self.assertIn("preflight found 1 issue", log.getvalue())
+            self.assertIn("--local", seen[0])
+            with patch.object(lane, "sh", side_effect=OSError("no node")):
+                self.assertEqual(lane.fleet_rules_preflight(tree, "fix: x", "b", None), [])
+
+
 class InstallLagTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -12763,6 +12786,50 @@ class EventDeliveryTest(unittest.TestCase):
         event = lane.load_escalation(self.host)['events']['fp']
         self.assertEqual((event['startDelivery']['status'], event['startDelivery']['error']),
                          ('exhausted', 'event-start-preimage-changed'))
+
+    def test_obsolete_start_deliveries_are_closed_with_a_reason_not_left_failing(self):
+        # Gem 2026-10-25: 57 failed start deliveries (39 on finished events, 18 on events no lane revisits)
+        # kept the doctor on "alerts are not being acknowledged".
+        self.events.update({
+            'ended': {**self.events['fp'], 'status': 'done', 'startDelivery': {'status': 'failed', 'error': 'event-start-preimage-changed', 'attempts': 1}},
+            'dead': {**self.events['fp'], 'status': 'exhausted', 'startDelivery': {'status': 'failed', 'error': 'event-start-ownership-unproven', 'attempts': 2}},
+            'moved': {**self.events['fp'], 'status': 'claimed', 'lane': 'grok', 'issueId': 'issue', 'startedStateId': 'started',
+                      'startDelivery': {'status': 'failed', 'error': 'event-start-preimage-changed', 'attempts': 0}},
+            'startable': {**self.events['fp'], 'status': 'claimed', 'lane': 'grok', 'issueId': 'issue2', 'startedStateId': 'started',
+                          'startDelivery': {'status': 'failed', 'error': 'event-start-cap-exhausted', 'attempts': 3}},
+            'running': {**self.events['fp'], 'status': 'claimed', 'running': True, 'issueId': 'issue',
+                        'startDelivery': {'status': 'failed', 'error': 'x'}}})
+        lane.save_escalation(self.host, {'events': self.events})
+        remote = {'issue': {'id': 'issue', 'state': {'id': 'done-J', 'name': 'Done'}}}
+        remote2 = {'issue': {'id': 'issue2', 'state': {'id': 'todo-J', 'name': 'Todo'}}}
+        linear = SimpleNamespace(gql=lambda q, v: remote if v['id'] == 'issue' else remote2)
+        before = lane._event_delivery_snapshot(self.host, 500)
+        self.assertEqual(before["deliveryFailed"], 5)
+        result = lane.settle_obsolete_start_deliveries(self.host, linear, now=500)
+        self.assertEqual(result, {'event-ended': 2, 'remote-moved-on': 1, 'reset': 1, 'unread': 0})
+        events = lane.load_escalation(self.host)['events']
+        self.assertEqual(events['ended']['startDelivery']['status'], 'superseded')
+        self.assertIn('event-done', events['ended']['startDelivery']['closedReason'])
+        self.assertIn('event-exhausted', events['dead']['startDelivery']['closedReason'])
+        self.assertEqual((events['moved']['status'], events['moved']['exhaustedReason'], events['moved']['lane']), ('exhausted', 'remote-moved-on', None))
+        self.assertIn('Done', events['moved']['startDelivery']['closedReason'])
+        self.assertNotIn('startDelivery', events['startable'])
+        self.assertEqual(events['startable']['priorStartDeliveries'][0]['error'], 'event-start-cap-exhausted')
+        self.assertEqual(events['running']['startDelivery']['status'], 'failed', 'a running event is left to its worker')
+        after = lane._event_delivery_snapshot(self.host, 600)
+        self.assertEqual((after['deliveryFailed'], after['deliveryExhausted']), (1, 0), 'only the running event still reports')
+        again = lane.settle_obsolete_start_deliveries(self.host, linear, now=700)
+        self.assertEqual(again, {'event-ended': 0, 'remote-moved-on': 0, 'reset': 0, 'unread': 0}, 'idempotent')
+
+    def test_unreadable_remote_leaves_the_start_delivery_for_the_next_pass(self):
+        self.events['fp'].update(status='claimed', lane='grok', issueId='issue', startedStateId='started',
+                                 startDelivery={'status': 'failed', 'error': 'event-start-preimage-changed', 'attempts': 0})
+        lane.save_escalation(self.host, {'events': self.events})
+        def broken(q, v):
+            raise OSError('linear down')
+        result = lane.settle_obsolete_start_deliveries(self.host, SimpleNamespace(gql=broken), now=10)
+        self.assertEqual(result['unread'], 1)
+        self.assertEqual(lane.load_escalation(self.host)['events']['fp']['startDelivery']['status'], 'failed')
 
     def test_exhausted_start_delivery_is_reported(self):
         self.start_delivery_event({'attempts': 3, 'status': 'exhausted'})

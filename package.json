@@ -219,6 +219,7 @@
     "agent-web:test": "node --test scripts/agent-web-contract.test.mjs",
     "ci:taste-guard": "node scripts/taste-label-guard.mjs",
     "ci:taste-guard:sweep": "node scripts/taste-label-guard.mjs sweep",
+    "pr:create": "node scripts/pr-create.mjs",
     "pr:conflict:dry-run": "node scripts/pr-conflict-handler.mjs --dry-run",
     "pr:conflict:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__/pr-conflict-handler.test.mjs",
     "ci:harness:test": "vitest --root scripts --config vitest.config.mts run lib/__tests__",
