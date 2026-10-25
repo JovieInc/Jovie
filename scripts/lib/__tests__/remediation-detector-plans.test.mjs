@@ -106,7 +106,9 @@ async function matrixIntake({
       return reply(typeof run === 'function' ? run(++runReads) : run);
     }
     expect(String(url)).toBe('https://api.linear.app/graphql');
-    expect(init.headers.Authorization).toBe('lin_intercepted_matrix_fixture');
+    expect(init.headers.Authorization).toBe(
+      'lin_api_intercepted_matrix_fixture'
+    );
     const { query, variables } = JSON.parse(init.body);
     if (query.includes('FindRemediationForGreen'))
       return reply({
@@ -152,7 +154,7 @@ async function matrixIntake({
     throw new Error(`unexpected intercepted query: ${query}`);
   });
   const values = {
-    LINEAR_API_KEY: 'lin_intercepted_matrix_fixture',
+    LINEAR_API_KEY: 'lin_api_intercepted_matrix_fixture',
     GITHUB_TOKEN: 'gh_intercepted_matrix_fixture',
     GITHUB_OUTPUT: join(dir, 'outputs'),
     GITHUB_REPOSITORY: 'JovieInc/Jovie',
