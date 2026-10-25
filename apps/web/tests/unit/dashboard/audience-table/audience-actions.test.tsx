@@ -16,7 +16,6 @@ const baseMember: AudienceMember = {
   referrerHistory: [],
   utmParams: {},
   email: 'tim@example.com',
-  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
   purchaseCount: 0,
@@ -79,7 +78,7 @@ describe('buildAudienceActions', () => {
     );
   });
 
-  it('hides phone, export and notification when the person has not shared with the artist', () => {
+  it('does not offer messaging for a member who has not shared with the artist', () => {
     const items = buildAudienceActions(
       {
         ...baseMember,
@@ -93,8 +92,6 @@ describe('buildAudienceActions', () => {
     expect(items).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ id: 'copy-email', disabled: true }),
-        expect.objectContaining({ id: 'copy-phone', disabled: true }),
-        expect.objectContaining({ id: 'export-contact', disabled: true }),
       ])
     );
     expect(items).not.toEqual(

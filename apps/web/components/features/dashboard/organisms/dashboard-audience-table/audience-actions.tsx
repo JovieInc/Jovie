@@ -2,7 +2,6 @@
 
 import { Bell, Copy, Download, Eye, Phone, UserMinus } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
-import { canShareContactOut } from '@/lib/audience/share-gate';
 import type { AudienceMember } from '@/types';
 import {
   canMessageAudienceMember,
@@ -63,7 +62,7 @@ export function buildAudienceActions(
       label: 'Copy Phone',
       icon: ICON_PHONE,
       onClick: () => callbacks.onCopyPhone(member),
-      disabled: !member.phone || !canShareContactOut(member),
+      disabled: !member.phone,
     },
   ];
 
@@ -85,7 +84,6 @@ export function buildAudienceActions(
       label: 'Export As vCard',
       icon: ICON_DOWNLOAD,
       onClick: () => callbacks.onExportVCard(member),
-      disabled: !canShareContactOut(member),
     },
     // ── Destructive group ──
     { type: 'separator' as const },

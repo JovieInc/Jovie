@@ -10,7 +10,6 @@ import { MapPin, Monitor, Smartphone, Tablet } from 'lucide-react';
 import { DrawerPropertyRow } from '@/components/molecules/drawer';
 import { AudienceIntentBadge } from '@/features/dashboard/atoms/AudienceIntentBadge';
 import { CopyableField } from '@/features/ui/CopyableField';
-import { canShareContactOut } from '@/lib/audience/share-gate';
 import { formatLongDate } from '@/lib/utils/audience';
 import type { AudienceMember } from '@/types';
 import { EMPTY_VALUE_FALLBACK, formatDeviceTypeLabel } from './utils';
@@ -101,7 +100,7 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
       <DrawerPropertyRow
         label='Email'
         value={
-          member.email && canShareContactOut(member) ? (
+          member.email ? (
             <CopyableField value={member.email} label='Email' />
           ) : (
             <span className='text-secondary-token'>{EMPTY_VALUE_FALLBACK}</span>
@@ -111,7 +110,7 @@ export function AudienceMemberDetails({ member }: AudienceMemberDetailsProps) {
       <DrawerPropertyRow
         label='Phone'
         value={
-          member.phone && canShareContactOut(member) ? (
+          member.phone ? (
             <CopyableField value={member.phone} label='Phone' />
           ) : (
             <span className='text-secondary-token'>{EMPTY_VALUE_FALLBACK}</span>
