@@ -700,9 +700,9 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
           sleep: async ms => sleeps.push(ms),
         }),
         75,
-        label
+        String(label)
       );
-      assert.deepEqual(sleeps, [], label);
+      assert.deepEqual(sleeps, [], String(label));
       assert.match(String(logs.at(-1)), /github-quota-deferred/);
       assert.doesNotMatch(String(logs.at(-1)), /secret detail/);
     }
