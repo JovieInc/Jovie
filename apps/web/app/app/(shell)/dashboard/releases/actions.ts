@@ -17,12 +17,14 @@ import { hasReleaseClickAnalytics } from '@/lib/db/queries/analytics';
 import {
   discogRecordings,
   discogReleases,
+  discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
 import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { normalizeEditableIsrc } from '@/lib/discography/editable-isrc';
+import { purgeOrphanRecordings } from '@/lib/discography/live-catalog';
 import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
@@ -1960,9 +1962,18 @@ export async function deleteRelease(params: DeleteReleaseParams): Promise<{
       creatorProfileId: profile.id,
     });
   } else {
+    const recordingRows = await db
+      .select({ recordingId: discogReleaseTracks.recordingId })
+      .from(discogReleaseTracks)
+      .where(eq(discogReleaseTracks.releaseId, params.releaseId));
     await db
       .delete(discogReleases)
       .where(eq(discogReleases.id, params.releaseId));
+    // Deleted songs must not survive as orphan recordings in any agent read.
+    await purgeOrphanRecordings(
+      profile.id,
+      recordingRows.map(row => row.recordingId)
+    );
   }
 
   // Invalidate cache and revalidate path
