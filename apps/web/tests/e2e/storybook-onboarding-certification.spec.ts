@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 
 // Read the budget without importing the Node ESM producer into Playwright's CJS loader.
 const gateSource = readFileSync(
@@ -135,7 +136,7 @@ for (const viewport of [
         expect(metrics.overflow).toBeLessThanOrEqual(1);
         const axe = await new AxeBuilder({ page })
           .include('#storybook-root')
-          .withTags(['wcag2a', 'wcag2aa'])
+          .options(wcag22AaAxeOptions())
           .analyze();
         expect(axe.violations).toEqual([]);
         expect(errors).toEqual([]);
