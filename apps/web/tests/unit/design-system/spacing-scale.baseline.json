@@ -6,16 +6,16 @@
   },
   "conservative": {
     "armed": true,
-    "count": 590,
+    "count": 584,
     "perFamily": {
-      "marketing": 46,
+      "marketing": 40,
       "web-shell": 243,
       "web-other": 290,
       "packages/ui": 11
     },
     "perUtility": {
-      "gap-2.5": 67,
-      "gap-3.5": 13,
+      "gap-2.5": 66,
+      "gap-3.5": 12,
       "mb-2.5": 9,
       "mt-2.5": 14,
       "my-2.5": 1,
@@ -29,8 +29,8 @@
       "pr-3.5": 2,
       "pt-2.5": 8,
       "px-2.5": 196,
-      "px-3.5": 40,
-      "py-2.5": 113,
+      "px-3.5": 37,
+      "py-2.5": 112,
       "py-3.5": 28,
       "space-y-2.5": 30,
       "space-y-3.5": 3

@@ -28,6 +28,21 @@ import { LINK_ANALYTICS_COPY } from '@/data/linkAnalyticsCopy';
 import { LinkAnalyticsLanding } from './LinkAnalyticsLanding';
 
 describe('LinkAnalyticsLanding', () => {
+  it('shows a dated demo with a time series, complete providers, and recent clicks', () => {
+    render(<LinkAnalyticsLanding />);
+    expect(screen.getByRole('button', { name: '7 days' })).toBeVisible();
+    expect(screen.getByRole('button', { name: '30 days' })).toBeVisible();
+    expect(
+      screen.getByRole('img', { name: /clicks over time/i })
+    ).toBeVisible();
+    expect(screen.getByText('Apple Music')).toBeVisible();
+    expect(
+      screen.getByRole('heading', { name: 'Recent clicks' })
+    ).toBeVisible();
+    expect(screen.getByText('Demo data · Oct 23, 2026 · UTC')).toBeVisible();
+    expect(screen.getByRole('heading', { name: /UTM.*ISRC/ })).toBeVisible();
+  });
+
   it('renders the live analytics panel in the hero', () => {
     render(<LinkAnalyticsLanding />);
 
@@ -67,7 +82,7 @@ describe('LinkAnalyticsLanding', () => {
   it('server-renders the analytics panel without wall-clock text', () => {
     const html = renderToString(<LinkAnalyticsLanding />);
 
-    expect(html).toContain('Aug 20, 2026');
+    expect(html).toContain('Oct 23, 2026');
     expect(html).not.toMatch(/(?:just now)|(?:\d+\s?(?:m|h|d|w|mo|y)\s?ago)/u);
   });
 });

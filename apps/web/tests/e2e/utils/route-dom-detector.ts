@@ -14,6 +14,7 @@ export type RouteDomFindingKind =
   | 'container-width-sheet'
   | 'unreachable-content'
   | 'raw-control'
+  | 'stray-before-h1'
   // Marketing taste invariants (ui.md, DESIGN_INVARIANTS.md). Ratcheted by
   // route-dom-marketing-baseline.json until existing routes are fixed.
   | 'nested-decorative-surface'
@@ -119,10 +120,22 @@ export async function inspectRouteDom(
             : '';
         return `${element.tagName.toLowerCase()}${suffix}`;
       };
+      const isScreenReaderOnly = (element: Element): boolean => {
+        const rect = element.getBoundingClientRect();
+        const style = getComputedStyle(element);
+        return (
+          rect.width <= 1 &&
+          rect.height <= 1 &&
+          (style.clip === 'rect(0px, 0px, 0px, 0px)' ||
+            style.clipPath === 'inset(50%)')
+        );
+      };
       const isRendered = (element: Element): boolean => {
         const rect = element.getBoundingClientRect();
         if (rect.width <= 0 || rect.height <= 0) return false;
         const style = getComputedStyle(element);
+        // Screen-reader-only text is accessible but has no painted ink.
+        if (isScreenReaderOnly(element)) return false;
         return (
           style.display !== 'none' &&
           style.visibility !== 'hidden' &&
@@ -321,6 +334,86 @@ export async function inspectRouteDom(
       }
 
       if (surface === 'marketing') {
+        // Inspect text nodes so raw JSX text and nested wrappers are both
+        // covered. A compact label in the heading's own intro is intentional;
+        // detached text, raw JSX and nested wrappers still count as debris.
+        const firstHeading = root.querySelector('h1');
+        if (firstHeading) {
+          const previous = firstHeading.previousElementSibling;
+          const headingStyle = getComputedStyle(firstHeading);
+          const labelStyle = previous ? getComputedStyle(previous) : null;
+          const labelRect = previous?.getBoundingClientRect();
+          const labelRange = document.createRange();
+          if (previous) labelRange.selectNodeContents(previous);
+          const headingLabel =
+            previous &&
+            previous.matches('p, span, div') &&
+            previous.children.length === 0 &&
+            previous.parentElement !== root &&
+            firstHeading
+              .closest('section, header, hgroup')
+              ?.contains(previous) &&
+            labelStyle &&
+            labelRect &&
+            Number.parseFloat(labelStyle.fontSize) <
+              Number.parseFloat(headingStyle.fontSize) &&
+            labelRange.getBoundingClientRect().height <=
+              (Number.parseFloat(labelStyle.lineHeight) ||
+                Number.parseFloat(labelStyle.fontSize) * 1.5) &&
+            labelRect.bottom <= firstHeading.getBoundingClientRect().top
+              ? previous
+              : null;
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+          const strayParents = new Set<Element>();
+          let node = walker.nextNode();
+          while (node) {
+            if (firstHeading.contains(node)) break;
+            const parent = node.parentElement;
+            if (
+              normalizedText(node.textContent) &&
+              parent &&
+              parent !== headingLabel &&
+              !parent.closest(
+                'nav[aria-label="Breadcrumb" i],script,style,template,noscript'
+              ) &&
+              !optedOut(parent)
+            ) {
+              const range = document.createRange();
+              range.selectNodeContents(node);
+              const visibleText = Array.from(range.getClientRects()).some(
+                rect => rect.width > 1 && rect.height > 1
+              );
+              let visibleAncestors = true;
+              for (
+                let ancestor: Element | null = parent;
+                ancestor;
+                ancestor = ancestor.parentElement
+              ) {
+                const style = getComputedStyle(ancestor);
+                if (
+                  ancestor.hasAttribute('hidden') ||
+                  isScreenReaderOnly(ancestor) ||
+                  style.display === 'none' ||
+                  style.visibility !== 'visible' ||
+                  Number.parseFloat(style.opacity || '1') === 0
+                ) {
+                  visibleAncestors = false;
+                  break;
+                }
+              }
+              if (visibleText && visibleAncestors) strayParents.add(parent);
+            }
+            node = walker.nextNode();
+          }
+          if (strayParents.size) {
+            findings.push({
+              kind: 'stray-before-h1',
+              message:
+                'Visible text precedes the first page heading outside its compact label or approved breadcrumbs.',
+              elements: [...strayParents].map(describe),
+            });
+          }
+        }
         const visibleIn = (element: Element): boolean =>
           isRendered(element) &&
           !optedOut(element) &&
@@ -427,16 +520,6 @@ export async function inspectRouteDom(
           }
           const style = getComputedStyle(heading);
           const headingRect = heading.getBoundingClientRect();
-          // Tailwind's sr-only headings remain accessible but have no visible
-          // ink, just as in the image-contrast detector.
-          if (
-            headingRect.width <= 1 &&
-            headingRect.height <= 1 &&
-            (style.clip === 'rect(0px, 0px, 0px, 0px)' ||
-              style.clipPath === 'inset(50%)')
-          ) {
-            continue;
-          }
           const clamp = style.getPropertyValue('-webkit-line-clamp');
           const clipsY =
             style.overflowY === 'hidden' || style.overflowY === 'clip';

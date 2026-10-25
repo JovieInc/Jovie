@@ -24,6 +24,27 @@ const mockRelease: Release = {
 const RELATIVE_TEXT = /(?:just now)|(?:\d+\s?(?:m|h|d|w|mo|y)\s?ago)/u;
 
 describe('ReleaseSmartLinkAnalytics', () => {
+  it('keeps the fixture date after hydration for a static demo', () => {
+    render(
+      <ReleaseSmartLinkAnalytics
+        release={mockRelease}
+        fixedLastClickDate
+        analyticsOverride={{
+          totalClicks: 12,
+          last7DaysClicks: 3,
+          lastClickAt: '2026-10-23T15:04:00.000Z',
+          providerClicks: [{ provider: 'spotify', clicks: 12 }],
+        }}
+      />
+    );
+    expect(
+      screen.getByTestId('drawer-analytics-metric-value-last-click')
+    ).toHaveTextContent('Oct 23, 2026');
+    expect(
+      screen.getByTestId('drawer-analytics-metric-value-last-click')
+    ).not.toHaveTextContent(RELATIVE_TEXT);
+  });
+
   it('renders the production profile host in the smart link, never a loopback URL', () => {
     const profileHost = new URL(BASE_URL).host;
 

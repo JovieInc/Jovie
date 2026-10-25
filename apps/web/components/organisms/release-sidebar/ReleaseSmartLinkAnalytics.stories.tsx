@@ -68,3 +68,11 @@ export const Empty: Story = {
     analyticsOverride: emptyAnalytics,
   },
 };
+
+export const StaticDemo: Story = {
+  args: {
+    analyticsOverride: readyAnalytics,
+    fixedLastClickDate: true,
+    variant: 'flat',
+  },
+};

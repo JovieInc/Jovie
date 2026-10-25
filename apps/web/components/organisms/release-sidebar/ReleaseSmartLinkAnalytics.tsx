@@ -92,6 +92,8 @@ interface ReleaseSmartLinkAnalyticsProps {
   readonly analyticsOverride?: ReleaseSidebarAnalytics | null;
   readonly artistName?: string | null;
   readonly variant?: 'card' | 'flat';
+  /** Static demos keep their fixture date after hydration. */
+  readonly fixedLastClickDate?: boolean;
 }
 
 function getReleaseAnalyticsState({
@@ -214,6 +216,7 @@ export function ReleaseSmartLinkAnalytics({
   analyticsOverride,
   artistName,
   variant = 'card',
+  fixedLastClickDate = false,
 }: ReleaseSmartLinkAnalyticsProps) {
   const [data, setData] = useState<ReleaseSidebarAnalytics | null>(
     analyticsOverride ?? null
@@ -290,7 +293,7 @@ export function ReleaseSmartLinkAnalytics({
           id: 'last-click',
           label: 'Last Click',
           value: lastClickAt
-            ? hasHydrated
+            ? hasHydrated && !fixedLastClickDate
               ? formatTimeAgo(lastClickAt)
               : formatShortDateUTC(lastClickAt)
             : '—',
