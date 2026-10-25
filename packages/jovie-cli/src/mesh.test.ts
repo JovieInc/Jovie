@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
 import { EventEmitter } from 'node:events';
+import { mkdtemp, readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const child = vi.hoisted(() => ({
@@ -663,5 +666,52 @@ describe('macOS keychain adapter', () => {
     const second = await meshRespond({}, deps);
     expect(second.replied).toHaveLength(0);
     expect(posts).toHaveLength(2);
+  });
+
+  it('drops free text into the watched inbox file once and never replies', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'mesh-inbox-'));
+    const mailbox = {
+      ok: true,
+      hasMore: false,
+      messages: [
+        {
+          senderKind: 'codex',
+          correlationId: 'free-text-0002',
+          bodySha256: 'c'.repeat(64),
+          quotedBody: JSON.stringify('please read JOV-7998'),
+          quotedRefs: '[]',
+          receivedAt: NOW.toISOString(),
+        },
+      ],
+    };
+    let posts = 0;
+    const fetchImpl: FetchImplementation = async (_input, init) => {
+      if (init?.method === 'POST') posts += 1;
+      return new Response(JSON.stringify(mailbox), { status: 200 });
+    };
+    let handled: Record<string, string> = {};
+    const stateStore = {
+      load: async () => handled,
+      save: async (_kind: string, next: Record<string, string>) => {
+        handled = { ...next };
+      },
+    };
+    const deps = {
+      env: { ...env, JOVIE_MESH_INBOX_DIR: dir },
+      fetchImpl,
+      now: () => NOW,
+      stateStore,
+    };
+    expect((await meshRespond({}, deps)).inboxed).toBe(1);
+    expect((await meshRespond({}, deps)).inboxed).toBe(0);
+    const lines = (await readFile(join(dir, 'claude.jsonl'), 'utf8'))
+      .trim()
+      .split('\n');
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0] ?? '{}')).toMatchObject({
+      dataNotInstructions: true,
+      senderKind: 'codex',
+    });
+    expect(posts).toBe(0);
   });
 });

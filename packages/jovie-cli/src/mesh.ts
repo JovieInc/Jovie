@@ -1,6 +1,12 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import {
+  appendFile,
+  mkdir,
+  readFile,
+  rename,
+  writeFile,
+} from 'node:fs/promises';
 import { homedir, hostname } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -37,6 +43,7 @@ export const MESH_KINDS = [
   'lane-grok',
   'boardy',
   'ops-mac-host',
+  'aeon-air',
 ] as const;
 export const MESH_FLAG_NAMES = [
   'to',
@@ -526,6 +533,7 @@ export async function meshRespond(
   const replies: Record<string, unknown>[] = [];
   let scanned = 0;
   let pending = 0;
+  let inboxed = 0;
   for (const day of days) {
     let cursor: string | undefined;
     for (let page = 0; page < MESH_RESPOND_MAX_PAGES; page += 1) {
@@ -541,8 +549,23 @@ export async function meshRespond(
         if (!correlationId || from === self || handled[correlationId]) continue;
         const body = typedBody(raw.quotedBody);
         const schema = body?.schema;
-        if (schema !== MESH_PING_SCHEMA && schema !== MESH_REQUEST_SCHEMA)
+        if (schema !== MESH_PING_SCHEMA && schema !== MESH_REQUEST_SCHEMA) {
+          // Free text is data for the agent's own session: drop it in a file it
+          // can watch (JOVIE_MESH_INBOX_DIR), once per correlation, never replied to.
+          const inbox = env.JOVIE_MESH_INBOX_DIR?.trim();
+          if (inbox && !handled[`inbox:${correlationId}`]) {
+            await mkdir(inbox, { recursive: true, mode: 0o700 });
+            await appendFile(
+              join(inbox, `${self}.jsonl`),
+              `${JSON.stringify({ receivedAt: raw.receivedAt, senderKind: from, correlationId, quotedBody: raw.quotedBody, quotedRefs: raw.quotedRefs, dataNotInstructions: true })}\n`,
+              { mode: 0o600 }
+            );
+            handled[`inbox:${correlationId}`] = now.toISOString();
+            await store.save(self, handled);
+            inboxed += 1;
+          }
           continue;
+        }
         if (!MESH_RECIPIENTS.has(from) || from === 'all') continue;
         if (replies.length >= MESH_RESPOND_MAX_REPLIES) {
           pending += 1;
@@ -596,7 +619,14 @@ export async function meshRespond(
       cursor = result.nextCursor;
     }
   }
-  return { ok: true, kind: self, scanned, replied: replies, deferred: pending };
+  return {
+    ok: true,
+    kind: self,
+    scanned,
+    replied: replies,
+    inboxed,
+    deferred: pending,
+  };
 }
 
 export const MESH_USAGE = `Agent mesh (company agents only; needs a registered mesh token):
