@@ -2099,9 +2099,35 @@ const ACCOUNT_BILLING_ROUTES = [
 ] as const satisfies readonly PerfRouteDefinition[];
 
 const ONBOARDING_ROUTES = [
-  // `/start` entry LCP is gated by the throttled-mobile Lighthouse check
-  // (apps/web/performance-entry-budgets.json). The unthrottled warm budget that
-  // lived here passed 1.3s while production measured 8.4s on a mid phone.
+  {
+    // Entry route. First/largest paint is NOT budgeted here: the unthrottled,
+    // warm Playwright run passed LCP at 1.3s while Lighthouse mobile measured
+    // 8.4s on production (2026-10-25). LCP is gated by the throttled-mobile
+    // Lighthouse check (performance-entry-budgets.json); this entry keeps the
+    // layout, interaction, TTFB and size budgets and the screenshot plumbing.
+    id: 'onboarding',
+    group: 'onboarding',
+    surface: 'onboarding',
+    path: APP_ROUTES.START,
+    requiresAuth: false,
+    warmupStrategy: 'public-route',
+    measureMode: 'page-load',
+    readySelectors: {
+      shell: ['[data-app-shell-frame="true"]'],
+      content: [
+        '[data-testid="onboarding-chat"]',
+        '[data-testid="chat-composer-surface"]',
+      ],
+    },
+    timings: [
+      { metric: 'cumulative-layout-shift', budget: 0.02 },
+      { metric: 'first-input-delay', budget: 100 },
+      { metric: 'time-to-first-byte', budget: 1000 },
+    ],
+    resourceSizes: ONBOARDING_RESOURCE_BUDGETS,
+    priority: 1,
+    seedProfile: 'active-user',
+  },
   {
     id: 'onboarding-checkout',
     group: 'onboarding',

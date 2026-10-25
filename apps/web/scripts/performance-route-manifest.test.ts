@@ -212,15 +212,17 @@ describe('performance route manifest', () => {
     ]);
   });
 
-  it('does not keep an unthrottled /start budget beside the mobile Lighthouse gate', () => {
-    // The warm, unthrottled budget passed /start at 1.3s while Lighthouse
-    // mobile measured 8.4s on production. One gate for the entry routes.
-    const entryRoutes = getEndUserPerfRouteManifest().filter(
-      route =>
-        route.requiresAuth === false &&
-        (route.path === '/start' || route.path === '/claim')
+  it('does not budget /start paint in the unthrottled Playwright run beside the mobile Lighthouse gate', () => {
+    // The warm, unthrottled budget passed /start LCP at 1.3s while Lighthouse
+    // mobile measured 8.4s on production. Paint lives in one gate only.
+    const onboarding = getEndUserPerfRouteManifest().find(
+      route => route.id === 'onboarding'
     );
-    expect(entryRoutes).toEqual([]);
+    expect(onboarding?.path).toBe('/start');
+    expect(onboarding?.requiresAuth).toBe(false);
+    const metrics = getRouteTimingBudgets(onboarding!).map(t => t.metric);
+    expect(metrics).not.toContain('largest-contentful-paint');
+    expect(metrics).not.toContain('first-contentful-paint');
 
     const budgets = JSON.parse(
       readFileSync(
