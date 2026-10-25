@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => route.path,
   useRouter: () => ({ replace }),
 }));
-vi.mock('@/components/feedback', () => ({ toast: { error } }));
+vi.mock('@/components/feedback/toast', () => ({ toast: { error } }));
 vi.mock('./electron-bridge', () => ({
   getElectronAPI: () => api.current,
   recoverApplicationDocument: replace,
@@ -118,6 +118,35 @@ describe('desktop hosted route recovery', () => {
     );
     expect(screen.queryByText('profile escape')).toBeNull();
     expect(replace).toHaveBeenCalledWith('/app/chat?thread=1#latest');
+    open.mockRestore();
+  });
+
+  it('keeps an older shell launched at the supported start route inside the boundary', () => {
+    Reflect.deleteProperty(api.current, 'navigationBoundaryVersion');
+    route.path = '/start';
+    globalThis.history.replaceState({}, '', '/start');
+    const open = vi.spyOn(globalThis, 'open').mockImplementation(() => null);
+    const { rerender } = render(
+      <DesktopRouteBoundary>
+        <div>start</div>
+      </DesktopRouteBoundary>
+    );
+    route.path = '/app/chat';
+    globalThis.history.replaceState({}, '', '/app/chat');
+    rerender(
+      <DesktopRouteBoundary>
+        <div>product</div>
+      </DesktopRouteBoundary>
+    );
+    route.path = '/blog';
+    globalThis.history.replaceState({}, '', '/blog');
+    rerender(
+      <DesktopRouteBoundary>
+        <div>public escape</div>
+      </DesktopRouteBoundary>
+    );
+    expect(screen.queryByText('public escape')).toBeNull();
+    expect(replace).toHaveBeenCalledWith('/app/chat');
     open.mockRestore();
   });
 

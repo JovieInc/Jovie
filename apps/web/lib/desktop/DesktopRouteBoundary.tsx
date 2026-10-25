@@ -9,7 +9,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { toast } from '@/components/feedback';
 import routes from '../../../desktop/src/application-routes.json';
 import { isAllowedPublicProfilePath } from '../../../desktop/src/navigation';
 import {
@@ -54,7 +53,9 @@ export function DesktopRouteBoundary({
   const isElectron = useIsElectronRuntime();
   const [legacyProfilePreview] = useState(
     () =>
-      !api?.navigationBoundaryVersion && isAllowedPublicProfilePath(pathname)
+      !api?.navigationBoundaryVersion &&
+      !isSupportedDesktopPath(pathname) &&
+      isAllowedPublicProfilePath(pathname)
   );
   const isMainShell =
     isElectron &&
@@ -64,16 +65,23 @@ export function DesktopRouteBoundary({
 
   useEffect(() => {
     if (!isMainShell) return;
-    const failed = (url: string) =>
-      toast.error('Could not open this page in your browser.', {
-        id: 'desktop-browser-handoff',
-        action: {
-          label: 'Try again',
-          onClick: () => {
-            void handoff(url);
-          },
-        },
-      });
+    const failed = (url: string) => {
+      void import('@/components/feedback/toast')
+        .then(({ toast }) =>
+          toast.error('Could not open this page in your browser.', {
+            id: 'desktop-browser-handoff',
+            action: {
+              label: 'Try again',
+              onClick: () => {
+                void handoff(url);
+              },
+            },
+          })
+        )
+        .catch(error => {
+          console.error('Could not load desktop navigation feedback.', error);
+        });
+    };
     const handoff = async (url: string) => {
       if (api?.routeNavigation && api.windowRole !== 'auth') {
         try {
