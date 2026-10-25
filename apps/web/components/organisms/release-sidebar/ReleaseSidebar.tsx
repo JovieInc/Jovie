@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/organisms/release-sidebar/ReleaseSidebar-links.interaction.test.tsx
+
 /**
  * ReleaseSidebar Component
  *
@@ -18,9 +20,7 @@ import {
   DrawerCardActionBar,
   DrawerSection,
   DrawerSplitButton,
-  DrawerTabbedCard,
-  DrawerTabs,
-  EntitySidebarShell,
+  EntityTabbedRail,
 } from '@/components/molecules/drawer';
 import { convertToCommonDropdownItems } from '@/components/organisms/table';
 import { buildReleaseTasksRoute } from '@/constants/routes';
@@ -613,18 +613,21 @@ export function ReleaseSidebar({
   }
 
   return (
-    <EntitySidebarShell
+    <EntityTabbedRail
       isOpen={isOpen}
       width={width ?? 344}
       ariaLabel='Release details'
-      scrollStrategy='shell'
       onKeyDown={handleKeyDown}
       contextMenuItems={contextMenuItems}
-      data-testid='release-sidebar'
-      workspaceSurface='raised'
-      headerMode='minimal'
-      hideMinimalHeaderBar
-      entityHeaderSurface='flat'
+      testId='release-sidebar'
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      tabOptions={releaseTabOptions}
+      tabsAriaLabel='Release sidebar tabs'
+      tabOverflowMode='scroll'
+      tabbedCardTestId='release-tabbed-card'
+      sectionKind='details'
+      controls={activeTab === 'dsps' ? platformCardActions : undefined}
       entityHeader={
         release ? (
           <ReleaseEntityHeader
@@ -663,29 +666,7 @@ export function ReleaseSidebar({
       isEmpty={!release}
       emptyMessage='Select a release in the table to view its details.'
     >
-      {release && (
-        <div className='space-y-2.5'>
-          <DrawerTabbedCard
-            testId='release-tabbed-card'
-            sectionKind='details'
-            tabs={
-              <DrawerTabs
-                value={activeTab}
-                onValueChange={value =>
-                  setActiveTab(value as ReleaseSidebarTab)
-                }
-                options={releaseTabOptions}
-                ariaLabel='Release sidebar tabs'
-                overflowMode='scroll'
-                distribution='fill'
-              />
-            }
-            controls={activeTab === 'dsps' ? platformCardActions : undefined}
-          >
-            {renderTabContent()}
-          </DrawerTabbedCard>
-        </div>
-      )}
-    </EntitySidebarShell>
+      {release ? renderTabContent() : null}
+    </EntityTabbedRail>
   );
 }

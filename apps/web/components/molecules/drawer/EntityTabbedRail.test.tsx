@@ -8,13 +8,25 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({
     children,
     className,
+    id,
+    width,
+    onKeyDown,
     'data-testid': testId,
   }: {
     readonly children: ReactNode;
     readonly className?: string;
+    readonly id?: string;
+    readonly width?: number;
+    readonly onKeyDown?: (event: KeyboardEvent) => void;
     readonly 'data-testid'?: string;
   }) => (
-    <aside className={className} data-testid={testId ?? 'right-drawer'}>
+    <aside
+      id={id}
+      className={className}
+      style={{ width }}
+      onKeyDown={event => onKeyDown?.(event.nativeEvent)}
+      data-testid={testId ?? 'right-drawer'}
+    >
       {children}
     </aside>
   ),
@@ -26,6 +38,59 @@ const TABS = [
 ];
 
 describe('EntityTabbedRail', () => {
+  it('retains entity targeting, width, dismissal and tab actions in the shared shell', async () => {
+    const addLink = vi.fn();
+    const onKeyDown = vi.fn();
+    const onTabChange = vi.fn();
+    const { container } = render(
+      <EntityTabbedRail
+        id='shell-artist-profile-rail'
+        width={344}
+        onKeyDown={onKeyDown}
+        isOpen
+        ariaLabel='Profile details'
+        activeTab='details'
+        onTabChange={onTabChange}
+        tabOptions={TABS}
+        tabsAriaLabel='Profile tabs'
+        tabActions={
+          <button type='button' onClick={addLink}>
+            Add link
+          </button>
+        }
+        tabbedCardTestId='profile-card'
+      >
+        <input aria-label='Bio' defaultValue='Unsaved bio' />
+      </EntityTabbedRail>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add link' }));
+    expect(addLink).toHaveBeenCalledOnce();
+    expect(onTabChange).not.toHaveBeenCalled();
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByRole('textbox', { name: 'Bio' })).toHaveValue(
+      'Unsaved bio'
+    );
+    const rail = screen.getByTestId('right-drawer');
+    expect(rail).toHaveAttribute('id', 'shell-artist-profile-rail');
+    expect(rail).toHaveStyle({ width: '344px' });
+    expect(rail.querySelector('[data-scroll-strategy]')).toHaveAttribute(
+      'data-scroll-strategy',
+      'child'
+    );
+    expect(
+      screen.getByTestId('profile-card-scroll-region')
+    ).not.toContainElement(screen.getByRole('tablist'));
+    fireEvent.keyDown(rail, { key: 'Escape' });
+    expect(onKeyDown).toHaveBeenCalledWith(
+      expect.objectContaining({ key: 'Escape' })
+    );
+    await expectNoA11yViolations(container);
+  });
+
   it('inherits canonical drawer geometry while keeping rail content flat', async () => {
     const onTabChange = vi.fn();
     const { container } = render(
