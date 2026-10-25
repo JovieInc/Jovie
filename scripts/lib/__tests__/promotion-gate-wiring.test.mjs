@@ -201,6 +201,57 @@ describe('workflow wiring', () => {
     expect(tooling.with['sparse-checkout-cone-mode']).toBe(false);
     expect(tooling.with.ref).not.toContain('expected_sha');
   });
+  it('visual review is a separate verdict that cannot rewrite journey evidence', () => {
+    const steps = yaml('ci.yml').jobs['ci-golden-path'].steps;
+    const idx = id => steps.findIndex(s => s.id === id);
+    const journey = steps[idx('canonical_journey')];
+    const visual = steps[idx('visual_review')];
+    const emit = steps.find(s => s.name?.startsWith('Emit journey evidence'));
+    const enforce = steps.find(s => s.name === 'Enforce visual review verdict');
+    // The journey step (whose outcome becomes auth/billing evidence) never runs the reviewer.
+    expect(journey.run).not.toContain('golden-path-visual-review');
+    expect(visual.run).toContain('golden-path-visual-review');
+    expect(visual['continue-on-error']).toBe(true);
+    expect(idx('visual_review')).toBeGreaterThan(idx('canonical_journey'));
+    expect(emit.env.JOURNEY_OUTCOME).toContain('canonical_journey');
+    expect(JSON.stringify(emit)).not.toContain('visual_review');
+    // A confirmed visual blocker still fails the job (gate not weakened).
+    expect(enforce.if).toContain("steps.visual_review.outcome == 'failure'");
+    expect(enforce.run).toContain('exit 1');
+  });
+
+  it('journeys that pass with a failing visual review emit success evidence', () => {
+    const docs = buildJourneyEvidence({
+      report: {
+        suites: [
+          {
+            specs: [
+              {
+                file: 'golden-path.spec.ts',
+                tests: [
+                  {
+                    status: 'expected',
+                    expectedStatus: 'passed',
+                    results: [{ status: 'passed' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      candidateSha: 'a'.repeat(40),
+      runId: '1',
+      runUrl: 'https://example.test/run/1',
+      stepOutcome: 'success',
+      stripeMode: 'test',
+    });
+    expect(docs.map(d => [d.journey, d.conclusion])).toEqual([
+      ['auth', 'success'],
+      ['billing', 'success'],
+    ]);
+  });
+
   it('Golden Path lane uploads exact-SHA evidence on every outcome', () => {
     const golden = yaml('ci.yml').jobs['ci-golden-path'];
     const steps = golden.steps;
