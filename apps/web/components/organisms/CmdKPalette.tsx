@@ -85,7 +85,12 @@ interface CmdKPaletteProps {
   readonly onHeaderChange?: (header: ReactNode | null) => void;
 }
 
-function useCmdkData(profileId: string, query: string, open: boolean) {
+function useCmdkData(
+  profileId: string,
+  query: string,
+  open: boolean,
+  operatorMode = false
+) {
   const youtubeWorkspaceNav = useAppFlag('YOUTUBE_WORKSPACE_NAV');
   const jovieWorkNav = useAppFlag('JOVIE_WORK_NAV');
   const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
@@ -179,6 +184,16 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
     }
   };
 
+  // The operator palette runs no customer queries; their error or pending
+  // state must never leak into it ("Some results could not load", JOV-9020).
+  if (operatorMode) {
+    return {
+      sections,
+      isSearching: false,
+      hasSearchError: false,
+      retrySearch,
+    };
+  }
   return { sections, isSearching, hasSearchError, retrySearch };
 }
 
@@ -216,7 +231,12 @@ export function CmdKPalette({
     isSearching,
     hasSearchError,
     retrySearch,
-  } = useCmdkData(profileId, operatorMode ? '' : query, open && !operatorMode);
+  } = useCmdkData(
+    profileId,
+    operatorMode ? '' : query,
+    open && !operatorMode,
+    operatorMode
+  );
   const pendingMessage =
     query.trim().length > 0 ? 'Searching…' : 'Loading results…';
   const filteredAdditional = useMemo(

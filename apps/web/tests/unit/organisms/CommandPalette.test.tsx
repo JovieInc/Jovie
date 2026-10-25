@@ -70,6 +70,19 @@ vi.mock('@jovie/ui', () => ({
   DialogContent: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
   ),
+  Button: ({
+    children,
+    onClick,
+    disabled,
+  }: {
+    children: ReactNode;
+    onClick?: () => void;
+    disabled?: boolean;
+  }) => (
+    <button type='button' onClick={onClick} disabled={disabled}>
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock('@radix-ui/react-dialog', () => ({
@@ -77,8 +90,15 @@ vi.mock('@radix-ui/react-dialog', () => ({
   Description: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
+const releasesState = vi.hoisted(() => ({
+  data: [] as unknown[],
+  isLoading: false,
+  isFetching: false,
+  isError: false,
+  refetch: () => Promise.resolve(),
+}));
 vi.mock('@/lib/queries/useReleasesQuery', () => ({
-  useReleasesQuery: () => ({ data: [], isLoading: false }),
+  useReleasesQuery: () => releasesState,
 }));
 
 vi.mock('@/lib/queries/useArtistSearchQuery', () => ({
@@ -561,6 +581,27 @@ describe('CommandPalette', () => {
     const fleet = options.find(el => el.textContent?.includes('Fleet'));
     fireEvent.mouseDown(fleet!);
     expect(pushMock).toHaveBeenCalledWith('/app/ov/operations');
+  });
+
+  it('never shows a customer query failure in the operator palette (JOV-9020)', async () => {
+    releasesState.isError = true;
+    try {
+      pathnameMock.mockReturnValue('/app/ov');
+      const ov = render(withDashboard(<CommandPalette />, true));
+      fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+      await screen.findByTestId('cmdk-main-plane');
+      expect(screen.queryByText(/could not load/i)).not.toBeInTheDocument();
+      ov.unmount();
+
+      // The same failure still surfaces for customers.
+      pathnameMock.mockReturnValue('/app');
+      render(withDashboard(<CommandPalette />, true));
+      fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+      await screen.findByTestId('cmdk-main-plane');
+      expect(screen.getByText(/could not load/i)).toBeInTheDocument();
+    } finally {
+      releasesState.isError = false;
+    }
   });
 
   it('opens external operator tools in a new tab, never in the shell', async () => {
