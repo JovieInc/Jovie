@@ -40,7 +40,9 @@ vi.mock(
 
 import {
   HeaderActionsProvider,
+  type HeaderSearchAdapter,
   useHeaderActions,
+  useRegisterHeaderSearch,
 } from '@/contexts/HeaderActionsContext';
 import { segmentedAccessibleName } from '@/tests/utils/accessible-name';
 
@@ -644,5 +646,88 @@ describe('CommandPalette preload', () => {
   it('warms the palette chunk at idle so the first open is instant', async () => {
     render(withDashboard(<CommandPalette />));
     await waitFor(() => expect(preloadCommandPaletteChunk).toHaveBeenCalled());
+  });
+});
+
+describe('CommandPalette per-view filter surface (JOV-8792)', () => {
+  function TaskFilterRegistration({
+    adapter,
+  }: {
+    readonly adapter: HeaderSearchAdapter;
+  }) {
+    useRegisterHeaderSearch(adapter);
+    return null;
+  }
+
+  const buildAdapter = () =>
+    ({
+      key: 'tasks',
+      pills: [],
+      onPillsChange: vi.fn(),
+      artistOptions: [],
+      titleOptions: ['Tonight'],
+      albumOptions: [],
+      totalCount: 3,
+      visibleCount: 3,
+      triggerLabel: 'Filter Tasks',
+      ariaLabel: 'Filter Tasks',
+      placeholder: 'Search tasks',
+      allowedFields: ['title'] as const,
+    }) satisfies HeaderSearchAdapter;
+
+  it('surfaces the route-registered filter adapter as a palette entry', async () => {
+    render(
+      withDashboard(
+        <>
+          <CommandPalette />
+          <TaskFilterRegistration adapter={buildAdapter()} />
+        </>
+      )
+    );
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+    expect(
+      await screen.findByRole('option', { name: /Filter Tasks/ })
+    ).toBeInTheDocument();
+  });
+
+  it('routes palette filter commits into the registered view adapter', async () => {
+    const adapter = buildAdapter();
+    render(
+      withDashboard(
+        <>
+          <CommandPalette />
+          <TaskFilterRegistration adapter={adapter} />
+        </>
+      )
+    );
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+
+    fireEvent.mouseDown(
+      await screen.findByRole('option', { name: /Filter Tasks/ })
+    );
+    const filterInput = await screen.findByRole('combobox', {
+      name: 'Filter Tasks',
+    });
+    fireEvent.change(filterInput, { target: { value: 'Tonight' } });
+    fireEvent.mouseDown(await screen.findByRole('option', { name: /Tonight/ }));
+
+    expect(adapter.onPillsChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        field: 'title',
+        op: 'is',
+        values: ['Tonight'],
+      }),
+    ]);
+  });
+
+  it('keeps the palette free of filter entries without a registered adapter', async () => {
+    render(withDashboard(<CommandPalette />));
+    fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+    expect(
+      screen.queryByRole('option', { name: /Filter the current view/ })
+    ).toBeNull();
   });
 });
