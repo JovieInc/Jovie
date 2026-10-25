@@ -4356,6 +4356,27 @@ if (p.endsWith('/zip')) {
     assert.ok(result.excludedChanges.length >= 4);
   });
 
+  it('registers the existing sounds page and still requires exact-head rendered evidence', () => {
+    const changedFiles = ['apps/web/app/[username]/[slug]/sounds/page.tsx'];
+    const registration = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+    });
+    assert.deepEqual(registration.issues, []);
+    assert.deepEqual(
+      registration.changedScreens.map(screen => screen.id),
+      ['web.smartlink-sounds']
+    );
+    const certification = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(certification.issues, [
+      'missing exact-head proof for web.smartlink-sounds',
+    ]);
+  });
+
   it('rejects missing registration for a changed in-scope screen', () => {
     const added = 'apps/web/app/(home)/unregistered/page.tsx';
     const result = evaluateChangedScreens({

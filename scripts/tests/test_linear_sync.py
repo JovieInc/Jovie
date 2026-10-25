@@ -184,6 +184,25 @@ class OutboxTest(Base):
         self.assertEqual(ls.status(self.state)["outbox"]["depth"], 0)
         self.assertEqual(ls.claim_status(self.state, "id-1"), "active")
 
+    def test_one_flush_drains_far_more_than_ten_entries_until_the_wall_budget_ends(self):
+        # Gem 2026-10-25: 504 pending writes, arrivals 80-175 per 30 min, 10 delivered per tick.
+        ls.claim(self.state, "id-1", "JOV-1", "codex")
+        for index in range(25):
+            ls.enqueue(self.state, "comment", "id-1", body=f"note {index}")
+        linear = FakeLinear([{"commentCreate": {"success": True}}] * 25)
+        report = ls.flush(self.state, linear, lambda n: True, (Limited,))
+        self.assertEqual((report["outcome"], len(report["delivered"])), ("drained", 25))
+        for index in range(3):
+            ls.enqueue(self.state, "comment", "id-1", body=f"later {index}")
+        held = ls.flush(self.state, FakeLinear([]), lambda n: True, (Limited,), budget_s=-1)
+        self.assertEqual((held["outcome"], held["delivered"]), ("partial", []))
+        self.assertEqual(ls.status(self.state)["outbox"]["depth"], 3)
+
+    def test_outbox_alert_fires_at_an_hour(self):
+        view = {"outbox": {"depth": 400, "oldestAgeS": 3700, "dead": 0}}
+        self.assertIn("linear-outbox-stale", ls.alerts(view))
+        self.assertNotIn("linear-outbox-stale", ls.alerts({"outbox": {"depth": 9, "oldestAgeS": 600, "dead": 0}}))
+
     def test_budget_rate_limit_and_errors_keep_the_entry_without_failing_work(self):
         ls.claim(self.state, "id-1", "JOV-1", "codex")
         ls.enqueue(self.state, "move", "id-1", target="In Progress")
