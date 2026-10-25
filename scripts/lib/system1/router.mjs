@@ -122,10 +122,12 @@ function costOf(route, inputTokens, outputTokens = 0) {
   );
 }
 
-function spentToday(store, task, now) {
+/** Spend today, production and tuning replays counted separately so tuning never starves production. */
+function spentToday(store, task, now, replay) {
   const day = new Date(now()).toISOString().slice(0, 10);
   return store
     .calls({ task, since: `${day}T00:00:00.000Z` })
+    .filter(c => Boolean(c.replay) === replay)
     .reduce((sum, c) => sum + (c.costUsd ?? 0), 0);
 }
 
@@ -237,9 +239,12 @@ export async function system1Call(request, deps = {}) {
     });
   }
 
+  const cap = request.replay
+    ? (task.tuneDailyCapUsd ?? task.dailyCapUsd)
+    : task.dailyCapUsd;
   if (
-    task.dailyCapUsd &&
-    spentToday(store, request.task, now) >= task.dailyCapUsd
+    cap &&
+    spentToday(store, request.task, now, Boolean(request.replay)) >= cap
   ) {
     const row = {
       ...base,
