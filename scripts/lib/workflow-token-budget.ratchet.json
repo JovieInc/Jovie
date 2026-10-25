@@ -1,0 +1,208 @@
+{
+  "schema": "jovie-workflow-token-budget-ratchet/v1",
+  "entries": {
+    ".github/workflows/actions-cache-gc.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/agent-harness-health-report.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/automation-liveness.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 1
+    },
+    ".github/workflows/ci-duration-ratchet.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/ci-shard-contract-canary.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/ci.yml": {
+      "setup-node-manifest": 4,
+      "script-default-token": 1,
+      "token-api-call": 2
+    },
+    ".github/workflows/cli-chaos-nightly.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/codeowners-drift.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/controller-quota-replay.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/dependabot-auto-merge.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 3
+    },
+    ".github/workflows/dependabot-pin-sync.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/deprecation-intake.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 1
+    },
+    ".github/workflows/design-governance.yml": {
+      "setup-node-manifest": 2,
+      "token-api-call": 1
+    },
+    ".github/workflows/desktop-release.yml": {
+      "setup-node-manifest": 3,
+      "token-api-call": 4
+    },
+    ".github/workflows/eve-pilot.yml": {
+      "setup-node-manifest": 2
+    },
+    ".github/workflows/fleet-rules-evidence.yml": {
+      "setup-node-manifest": 2,
+      "token-api-call": 1
+    },
+    ".github/workflows/golden-path-prod-autofix.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/help-center-recertification.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/ios-testflight.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/jovie-agent-release.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 1
+    },
+    ".github/workflows/legacy-human-hold-scrub.yml": {
+      "token-api-call": 3
+    },
+    ".github/workflows/linear-sync-on-merge.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 1
+    },
+    ".github/workflows/marketing-certification-producer.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/merge-queue-green-enroll.yml": {
+      "setup-node-manifest": 4,
+      "token-api-call": 1
+    },
+    ".github/workflows/mutation-diff.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/node-runtime-compatibility.yml": {
+      "setup-node-manifest": 2,
+      "token-api-call": 2
+    },
+    ".github/workflows/node-runtime-freshness.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/npm-publish.yml": {
+      "setup-node-manifest": 2
+    },
+    ".github/workflows/observability-issue.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/pen-still-diff.yml": {
+      "setup-node-manifest": 2
+    },
+    ".github/workflows/pen-token-parity.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/pr-conflict-handler.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 5
+    },
+    ".github/workflows/pr-fleet-rules.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/pr-preparation-canary.yml": {
+      "setup-node-manifest": 2
+    },
+    ".github/workflows/pr-review-learn.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/pr-review.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/pr-size-guard-label-override.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/pr-targets-main.yml": {
+      "script-default-token": 1
+    },
+    ".github/workflows/production-continuity.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/production-controller-health.yml": {
+      "token-api-call": 2
+    },
+    ".github/workflows/production-controller.yml": {
+      "setup-node-manifest": 2,
+      "token-api-call": 2
+    },
+    ".github/workflows/production-marker-recovery.yml": {
+      "token-api-call": 3
+    },
+    ".github/workflows/quality-gap-finder.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/remediation-sweep.yml": {
+      "setup-node-manifest": 2,
+      "token-api-call": 1
+    },
+    ".github/workflows/rolling-ci-dispatch.yml": {
+      "setup-node-manifest": 3,
+      "token-api-call": 1
+    },
+    ".github/workflows/runner-health-monitor.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/safe-pr-remediation.yml": {
+      "setup-node-manifest": 2
+    },
+    ".github/workflows/screenshots.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 1
+    },
+    ".github/workflows/security-suppression-audit.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/sentry-autofix-recurrence.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/shipping-slo.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/source-validation.yml": {
+      "setup-node-manifest": 7,
+      "token-api-call": 7
+    },
+    ".github/workflows/staging-controller.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 1
+    },
+    ".github/workflows/stale-branch-sweep.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/workflows/synthetic-monitoring.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/test-flakiness-report.yml": {
+      "setup-node-manifest": 2
+    },
+    ".github/workflows/visual-a11y.yml": {
+      "setup-node-manifest": 1,
+      "token-api-call": 1
+    },
+    ".github/workflows/visual-regression.yml": {
+      "token-api-call": 1
+    },
+    ".github/workflows/voc-mine.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/actions/setup-node-pnpm/action.yml": {
+      "setup-node-manifest": 1
+    },
+    ".github/actions/skip-if-unchanged/action.yml": {
+      "token-api-call": 1
+    }
+  }
+}
