@@ -67,6 +67,8 @@
       "cmd": [
         "hyperagent",
         "execute",
+        "--role",
+        "research",
         "--model",
         "grok-4.7",
         "--agent-id",
@@ -88,6 +90,8 @@
     "cmd": [
       "hyperagent",
       "execute",
+      "--role",
+      "research",
       "--model",
       "z-ai/glm-5.3",
       "--agent-id",
@@ -108,6 +112,8 @@
     "cmd": [
       "hyperagent",
       "execute",
+      "--role",
+      "research",
       "--model",
       "astra",
       "--agent-id",
