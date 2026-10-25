@@ -57,6 +57,12 @@ export function OnboardingSessionBoundary({
     identity: string;
     revision: number;
   } | null>(null);
+  // Read by the restore effect only to skip a server-seeded first load, so
+  // the effect depends on identity and revision alone.
+  const loadedRef = useRef(loaded);
+  useLayoutEffect(() => {
+    loadedRef.current = loaded;
+  }, [loaded]);
   const [actionPending, setActionPending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [chatBusy, setChatBusy] = useState(false);
@@ -70,7 +76,8 @@ export function OnboardingSessionBoundary({
     if (!identity) return;
     initialIdentity.current ??= identity;
     // The server already resolved this exact identity and revision.
-    if (loaded?.identity === identity && loaded.revision === revision) return;
+    const seeded = loadedRef.current;
+    if (seeded?.identity === identity && seeded.revision === revision) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     let cancelled = false;
@@ -111,8 +118,6 @@ export function OnboardingSessionBoundary({
       clearTimeout(timeout);
       controller.abort();
     };
-    // `loaded` is read only to skip the seeded first load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity, revision]);
 
   const runAction = async (action: 'restart' | 'logout') => {
