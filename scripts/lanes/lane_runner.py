@@ -50,6 +50,9 @@ import lifecycle  # noqa: E402
 import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -80,6 +83,7 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
@@ -127,7 +131,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -144,7 +148,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
               "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py",
-              "scripts/tests/test_backlog_rank.py"]
+              "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
@@ -1967,7 +1971,7 @@ def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
         _chmod_private(scope, 0o700)
         reset_ms = int(reset_s * 1000)
         record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
-        record.write_text(json.dumps({"schema": 1, "resetAt": reset_ms}))
+        atomic_write_text(record, json.dumps({"schema": 1, "resetAt": reset_ms}))
         _chmod_private(record, 0o600)
     except OSError:
         pass
@@ -3157,7 +3161,7 @@ def cool_down(host: Host, name: str, code: int | None = None) -> bool:
         return False
     path = host.state / "cooldown" / name
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+    atomic_write_text(path, str(time.time() + PROVIDER_COOLDOWN_S))
     return True
 
 
@@ -3343,7 +3347,7 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                     raise OSError("Hyperagent transport unavailable")
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent",
                                        prior_attempts=prior_attempts_context(host, linear, issue))
-                (runs / f"{run_id}.prompt.md").write_text(prompt)
+                atomic_write_text(runs / f"{run_id}.prompt.md", prompt)
                 def boundary(spend, mutations, phase):
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                                {"spend": spend, "mutations": mutations}, coordination=coordination, boundary_id=phase)
@@ -4585,7 +4589,7 @@ def load_escalation(host: Host) -> dict:
 def save_escalation(host: Host, data: dict) -> None:
     path = host.state / "escalation.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data))
+    atomic_write_text(path, json.dumps(data))
 
 
 def note_failover(host: Host, previous: str, nxt: str, reason: str) -> None:
@@ -6914,7 +6918,7 @@ def preserve_repair(worktree: Path, receipt: dict) -> None:
                   "headBefore": receipt.get("headBefore"), "at": now_iso()}
         receipt["preservedWorktree"] = str(worktree)
         try:
-            (worktree / disk_guard.PRESERVED_REPAIR).write_text(json.dumps(marker, indent=1))
+            atomic_write_text(worktree / disk_guard.PRESERVED_REPAIR, json.dumps(marker, indent=1))
         except OSError as error:
             receipt["preservationError"] = str(error)[:200]
 
@@ -7887,7 +7891,7 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     marker = host.state / f"sweep-{name}.json"
     if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
         return
-    marker.write_text(json.dumps({"at": now}))
+    atomic_write_text(marker, json.dumps({"at": now}))
     superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
     for pr, keep in superseded:
         if pr_events.maintenance_hold(host, THIS, pr, now):
@@ -8232,7 +8236,15 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         if deferred: blocks[str(deferred["pr"]["number"])] = deferred
         else: blocks = {number: row for number, row in blocks.items() if row.get("terminal", False)}
         data[name] = {"at": now_iso(), "reason": reason, **({"deferredRequeue": blocks} if blocks else {})}
-        path.write_text(json.dumps(data))
+        # Readers (doctor, HUD, the next worker's deferred-requeue scan, test snapshots) do not take
+        # claim.lock. A truncating write_text let them read an empty file: ClaimScanCacheTest failed
+        # ~5% of runs under load with JSONDecodeError and refused the 07:39Z release on Gem.
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            temporary.write_text(json.dumps(data))
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
     except (OSError, ValueError):
         pass
     finally:
@@ -8892,7 +8904,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             count = failure_record(failures.get(issue.identifier))["count"] + 1
             failures[issue.identifier] = {"count": count, "at": time.time(), "release": release_generation(),
                                           **pr_events.failure_reason(receipt, count >= MAX_FAILURES)}
-            failures_path(host).write_text(json.dumps(failures))
+            atomic_write_text(failures_path(host), json.dumps(failures))
         finally:
             claim.release()
         exhausted = failures[issue.identifier]["count"] >= MAX_FAILURES
@@ -9090,6 +9102,7 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
                                          for binding in refill_for}
                 tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
+                tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
         try:
@@ -9483,7 +9496,7 @@ def refresh_codex_skills(host: Host, home: Path | None = None) -> dict:
         return {"status": "timeout"}
     except OSError as error:
         return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
-    receipt.write_text(json.dumps({"installed": wanted, "at": now_iso()}))
+    atomic_write_text(receipt, json.dumps({"installed": wanted, "at": now_iso()}))
     return {"status": "updated", "from": head[:12], "to": wanted[:12]}
 
 
@@ -10277,7 +10290,7 @@ def install_release(host: Host, *, operator=None) -> int:
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
-                refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
+                atomic_write_text(refused_path, json.dumps({"tree": tree, "at": time.time(), "why": why}))
                 return 1
             # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
             # refused every release for a day because the *installed* installer chose a bare
@@ -10401,7 +10414,7 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     # publisher uses the REST form; Gem 2026-10-20 its 403 froze the public feed). A caller that targets another host
     # (GH_HOST, e.g. the offline real-gh test harness) keeps its own credentials:
     # the Jovie Bot installation token only exists for github.com.
-    shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
+    atomic_write_text(shim, f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
                     f'[ "$1" = api ] && case "$2" in gists|gists/*) exec {real} "$@";; esac\n'
                     f'[ -n "${{GH_HOST:-}}" ] && [ "$GH_HOST" != github.com ] && exec {real} "$@"\n'
                     f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
@@ -10491,7 +10504,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
         path = HERE / "context-manifest.json"
         generated = context_manifest_json()
         if args.write:
-            path.write_text(generated, encoding="utf-8")
+            atomic_write_text(path, generated, encoding="utf-8")
         matched = context_manifest_matches(path)
         print(json.dumps({"schema": "jovie-lane-context-generation/v1", "path": str(path),
                           "sha256": hashlib.sha256(generated.encode("utf-8")).hexdigest(),
