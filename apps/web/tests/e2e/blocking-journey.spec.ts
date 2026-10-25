@@ -177,19 +177,82 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     // handlers changes only the DOM and is reverted on the next render. The
     // button is enabled only once the title reached React state, so retry the
     // fill until that is observable.
+    await page.evaluate(() => {
+      const w = window as unknown as { __log: string[] };
+      w.__log = [];
+      const t0 = performance.now();
+      new MutationObserver(ms => {
+        for (const m of ms) {
+          for (const n of m.removedNodes) {
+            if (
+              n instanceof Element &&
+              (n.id === 'release-title' || n.querySelector('#release-title'))
+            )
+              w.__log.push('removed@' + Math.round(performance.now() - t0));
+          }
+          for (const n of m.addedNodes) {
+            if (
+              n instanceof Element &&
+              (n.id === 'release-title' || n.querySelector('#release-title'))
+            )
+              w.__log.push('added@' + Math.round(performance.now() - t0));
+          }
+        }
+      }).observe(document.body, { childList: true, subtree: true });
+      document.addEventListener(
+        'input',
+        e => {
+          const el = e.target as HTMLInputElement;
+          if (el.id === 'release-title')
+            w.__log.push(
+              'input:' + el.value + '@' + Math.round(performance.now() - t0)
+            );
+        },
+        true
+      );
+      setInterval(() => {
+        const el = document.querySelector(
+          '#release-title'
+        ) as HTMLInputElement | null;
+        w.__log.push(
+          'v:' +
+            (el ? el.value : 'none') +
+            '@' +
+            Math.round(performance.now() - t0)
+        );
+        if (w.__log.length > 400) w.__log.shift();
+      }, 250);
+    });
     try {
-    await expect(async () => {
-      await drawer.getByLabel('Title', { exact: true }).fill(releaseTitle);
-      await expect(createRelease).toBeEnabled({ timeout: 2_000 });
-    }).toPass({ timeout: 20_000 });
+      await expect(async () => {
+        await drawer.getByLabel('Title', { exact: true }).fill(releaseTitle);
+        await expect(createRelease).toBeEnabled({ timeout: 2_000 });
+      }).toPass({ timeout: 20_000 });
     } catch (e) {
       const info = await page.evaluate(() => ({
         url: location.href,
-        drawers: document.querySelectorAll('[data-testid="add-release-sidebar"]').length,
-        inputs: [...document.querySelectorAll('#release-title')].map(i => ({ v: (i as HTMLInputElement).value, ro: (i as HTMLInputElement).readOnly, dis: (i as HTMLInputElement).disabled, keys: Object.keys(i).filter(k => k.startsWith('__react')) })),
-        html: document.querySelector('[data-testid="add-release-sidebar"]')?.outerHTML.slice(0, 2500),
+        drawers: document.querySelectorAll(
+          '[data-testid="add-release-sidebar"]'
+        ).length,
+        inputs: [...document.querySelectorAll('#release-title')].map(i => ({
+          v: (i as HTMLInputElement).value,
+          ro: (i as HTMLInputElement).readOnly,
+          dis: (i as HTMLInputElement).disabled,
+          keys: Object.keys(i).filter(k => k.startsWith('__react')),
+        })),
+        html: document
+          .querySelector('[data-testid="add-release-sidebar"]')
+          ?.outerHTML.slice(0, 2500),
       }));
-      console.log('DIAG', JSON.stringify(info));
+      console.log('DIAG', JSON.stringify({ ...info, html: undefined }));
+      console.log(
+        'DIAGLOG',
+        JSON.stringify(
+          await page.evaluate(
+            () => (window as unknown as { __log: string[] }).__log
+          )
+        )
+      );
       throw e;
     }
     await drawer
