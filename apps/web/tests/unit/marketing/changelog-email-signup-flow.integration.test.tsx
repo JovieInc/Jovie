@@ -314,15 +314,17 @@ describe('changelog email signup connected flow (component + API + mail sink)', 
   it('shows the typo address, refuses an early resend, and corrects through the real flow', async () => {
     render(<ChangelogEmailSignup />);
 
-    // 1. Submit a typo'd address through the real subscribe route.
+    // 1. Submit a typo'd address through the real subscribe route. The typo
+    // lives in the LOCAL part so every send stays inside the controlled
+    // @example.com domain.
     fireEvent.change(screen.getByLabelText('Email Address'), {
-      target: { value: 'artist@exmaple.com' },
+      target: { value: 'artits@example.com' },
     });
     fireEvent.submit(screen.getByTestId('changelog-subscribe-form'));
 
     const panel = await screen.findByTestId('changelog-confirmation-sent');
-    expect(within(panel).getByText('artist@exmaple.com')).toBeInTheDocument();
-    expect(mailSink.sends.map(send => send.to)).toEqual(['artist@exmaple.com']);
+    expect(within(panel).getByText('artits@example.com')).toBeInTheDocument();
+    expect(mailSink.sends.map(send => send.to)).toEqual(['artits@example.com']);
     // The confirmation went out with a real uuid token over the sink.
     expect(mailSink.sends[0].text).toMatch(
       /\/api\/changelog\/verify\?token=[0-9a-f-]{36}/i
@@ -339,7 +341,7 @@ describe('changelog email signup connected flow (component + API + mail sink)', 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Please wait before resending.'
     );
-    expect(within(panel).getByText('artist@exmaple.com')).toBeInTheDocument();
+    expect(within(panel).getByText('artits@example.com')).toBeInTheDocument();
     expect(mailSink.sends).toHaveLength(1);
 
     // 3. Correct the typo: the input is prefilled with the submitted address,
@@ -348,7 +350,7 @@ describe('changelog email signup connected flow (component + API + mail sink)', 
       within(panel).getByRole('button', { name: 'Use A Different Email' })
     );
     const input = screen.getByLabelText('Email Address');
-    expect(input).toHaveValue('artist@exmaple.com');
+    expect(input).toHaveValue('artits@example.com');
     await waitFor(() => expect(input).toHaveFocus());
 
     fireEvent.change(input, { target: { value: 'artist@example.com' } });
@@ -361,13 +363,13 @@ describe('changelog email signup connected flow (component + API + mail sink)', 
       within(correctedPanel).getByText('artist@example.com')
     ).toBeInTheDocument();
     expect(mailSink.sends.map(send => send.to)).toEqual([
-      'artist@exmaple.com',
+      'artits@example.com',
       'artist@example.com',
     ]);
     // The corrected address is a brand-new subscriber row, never a transfer of
     // the typo'd row's confirmation.
     expect(store.rows.map(row => row.email)).toEqual([
-      'artist@exmaple.com',
+      'artits@example.com',
       'artist@example.com',
     ]);
     expect(store.rows.every(row => row.verified === false)).toBe(true);
@@ -394,7 +396,7 @@ describe('changelog email signup connected flow (component + API + mail sink)', 
       ).toBeInTheDocument();
     });
     expect(mailSink.sends.map(send => send.to)).toEqual([
-      'artist@exmaple.com',
+      'artits@example.com',
       'artist@example.com',
       'artist@example.com',
     ]);
