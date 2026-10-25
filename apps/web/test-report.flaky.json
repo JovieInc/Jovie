@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 2,
+  "label": "",
+  "flaky": [],
+  "run": {
+    "repository": null,
+    "headSha": null,
+    "runId": null,
+    "runAttempt": null,
+    "event": null,
+    "job": null
+  },
+  "generatedAt": "2026-10-05T15:48:08.336Z",
+  "complete": true,
+  "executions": [
+    {
+      "file": "tests/unit/home/HomepageIdentityHero.test.tsx",
+      "fileHash": "4a8b124ba7b9565b60dc2b0ad59abd9624780fc816c6bd067e8cf75489439e6e",
+      "executedCount": 7,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    }
+  ]
+}
