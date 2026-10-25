@@ -61,6 +61,13 @@ flagged only when both sides have enough samples (10 recent, 20 baseline), the
 ratio exceeds 1.25 and the absolute increase is at least 60s. Thresholds live
 in the manifest `regression` block.
 
+**Issue closure (`shipping:closed`).** `closed` is the terminal shipping stage: the
+Linear issue's first transition to a completed state (Done) at or after the PR's
+production verification. `verified` therefore carries the closure lag (verified to Done)
+as its dwell, and a verified PR whose issue is still open shows as an open `verified`
+stage. Done transitions before verification (manual closes, earlier PRs of a reworked
+issue) are ignored.
+
 ## Outputs
 
 - `docs/metrics/stage-timings-latest.json` (`jovie-stage-timings-compact/v1`): table committed by the snapshot bot PR.

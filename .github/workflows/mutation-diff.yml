@@ -12,6 +12,16 @@ name: Mutation Diff
 # that file's floor. Files without a floor stay advisory. The job also fails
 # when Stryker itself breaks, so a dead harness cannot pass as a clean run.
 # Not a merge-queue required check: it does not run on pull requests.
+#
+# Spare-compute rule (2026-10-24): every job here runs ONLY on the gem
+# self-hosted pool (jovie-fixed) and never falls back to hosted runners, so
+# merge-wave CI keeps all of HOSTED_RUNNER_CAPACITY. When the pool is busy the
+# job waits. No cron (JOV-INV-042): the rolling sweep (job `sweep`) starts on
+# every main CI completion and chains itself while modules remain. It walks every tested apps/web module
+# over days, persists per-module score + tested SHA on the runner, and turns
+# surviving mutants into bounded "strengthen test" tasks. It checks out
+# `main` only, holds no secrets, and skips when gem is short on RAM, disk or
+# CPU (scripts/mutation-sweep-preflight.mjs).
 
 on:
   push:
@@ -28,11 +38,27 @@ on:
       - 'apps/web/lib/idempotency.ts'
       - 'apps/web/lib/stripe/**'
       - 'apps/web/proxy.ts'
+  # Event-driven incremental sweep: after main CI settles, re-score every
+  # module whose source changed since it was last scored. The sweep checks out
+  # `main` itself, so a fork branch named main cannot supply code.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
+      mode:
+        description: diff (mutate the given files), sweep (rolling batch, changed modules first) or incremental (changed modules only)
+        default: diff
+        type: choice
+        options: [diff, sweep, incremental]
       files:
-        description: Space-separated repo paths to mutate (e.g. apps/web/lib/cron/auth.ts)
-        required: true
+        description: 'diff mode: space-separated repo paths to mutate (e.g. apps/web/lib/cron/auth.ts)'
+        required: false
+        type: string
+      max_files:
+        description: 'sweep modes: modules to score this run'
+        default: '6'
         type: string
 
 permissions: {}
@@ -43,7 +69,9 @@ permissions: {}
 jobs:
   mutate:
     name: Mutate changed high-risk source
-    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'diff' && github.ref == 'refs/heads/main')
+    # Self-hosted only, no hosted fallback: waits for a free gem runner.
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 45
     permissions:
       contents: read
@@ -86,3 +114,103 @@ jobs:
           name: mutation-diff-${{ github.run_id }}
           path: apps/web/reports/mutation/diff/
           retention-days: 14
+
+  sweep:
+    name: Rolling mutation sweep
+    if: >-
+      github.ref == 'refs/heads/main' && (
+        (github.event_name == 'workflow_dispatch' && inputs.mode != 'diff') ||
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+      )
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      # Self-chaining only: workflow_dispatch is the one event GITHUB_TOKEN may start.
+      actions: write
+    # One sweep at a time. Later triggers queue (one pending) rather than
+    # cancel a run that is mid-module.
+    concurrency:
+      group: mutation-sweep
+      cancel-in-progress: false
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      # Spare compute only: exit 75 means gem is busy, so skip without failing.
+      - name: Check gem has spare capacity
+        id: capacity
+        run: |
+          set +e
+          node scripts/mutation-sweep-preflight.mjs
+          code=$?
+          if [ "$code" -eq 75 ]; then echo "run=false" >> "$GITHUB_OUTPUT"; exit 0; fi
+          [ "$code" -eq 0 ] || exit "$code"
+          echo "run=true" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Node.js and pnpm
+        if: steps.capacity.outputs.run == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Score the next modules
+        id: score
+        if: steps.capacity.outputs.run == 'true'
+        env:
+          CI: 'true'
+          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'sweep' }}
+          MAX_FILES: ${{ github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6' }}
+        run: |
+          set -euo pipefail
+          state_dir="$HOME/.local/state/jovie-mutation"
+          mkdir -p "$state_dir"
+          # Runners share one HOME; serialize on the state file.
+          exec 9>"$state_dir/sweep.lock"
+          flock -n 9 || { echo "Another sweep holds the state lock; skipping."; exit 0; }
+          nice -n 19 node scripts/mutation-sweep.mjs \
+            --state "$state_dir/sweep-state.json" \
+            --mode "$MODE" --max-files "$MAX_FILES" --max-minutes 90 \
+            --summary "$GITHUB_STEP_SUMMARY" \
+            --github-output "$GITHUB_OUTPUT" \
+            --propose-baseline "$RUNNER_TEMP/baseline-proposal.json"
+          mkdir -p "$RUNNER_TEMP/sweep-out"
+          cp "$state_dir/sweep-state.json" "$state_dir/sweep-state.json.runs.jsonl" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
+          cp -r "$state_dir/survivor-tasks" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
+          cp "$RUNNER_TEMP/baseline-proposal.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
+
+      # The only step that sees a secret. It reads the task JSON the sweep wrote
+      # and never runs Stryker or repo tests.
+      - name: File survivor issues
+        if: ${{ always() && steps.capacity.outputs.run == 'true' }}
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+        run: |
+          node scripts/mutation-sweep-file-issues.mjs \
+            --tasks "$HOME/.local/state/jovie-mutation/survivor-tasks" \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+
+      # No clock: the backlog drains by chaining. The next run starts only if
+      # this one made progress and modules remain; a busy host stops the chain
+      # (the capacity step skipped), and the next main CI completion restarts it.
+      - name: Chain the next batch
+        if: steps.score.outputs.remaining != '' && steps.score.outputs.remaining != '0' && steps.score.outputs.scored != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node packages/api-client/cli.ts gh --priority default -- workflow run mutation-diff.yml --ref main -f mode=sweep -f max_files=6
+
+      - name: Upload sweep state and survivor tasks
+        if: ${{ always() && hashFiles('**/sweep-out/*') != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: mutation-sweep-${{ github.run_id }}
+          path: ${{ runner.temp }}/sweep-out/
+          retention-days: 30
+
+      # The persistent workspace keeps node_modules for the next run; the
+      # Stryker sandbox, reports and per-module coverage must not accumulate.
+      - name: Clean sweep scratch
+        if: always()
+        run: rm -rf apps/web/reports/mutation apps/web/.stryker-tmp "$RUNNER_TEMP/sweep-out"

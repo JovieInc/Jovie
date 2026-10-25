@@ -41,7 +41,10 @@ STATE = Path(os.environ.get("PROD_ERRORS_STATE", Path.home() / ".local/state/jov
 SENTRY_API = os.environ.get("SENTRY_API", f"https://{provider_spec('sentry')['hosts'][0]}/api/0")
 LINEAR_API = LINEAR_API_URL
 REPO = os.environ.get("PROD_ERRORS_REPO", "JovieInc/Jovie")
-USER_THRESHOLD = int(os.environ.get("PROD_ERRORS_USER_THRESHOLD", "25"))
+USER_THRESHOLD = int(os.environ.get("PROD_ERRORS_USER_THRESHOLD", "1"))
+EVENT_THRESHOLD = int(os.environ.get("PROD_ERRORS_EVENT_THRESHOLD", "3"))
+# Only production counts. Preview/staging/dev errors are recorded as ignored with this reason, never silenced silently.
+ENVIRONMENT = os.environ.get("PROD_ERRORS_ENVIRONMENT", "production")
 CLAIM_S = int(os.environ.get("PROD_ERRORS_CLAIM_S", str(4 * 3600)))
 QUIET_S = 24 * 3600
 # A main run still in progress past this is a hang, even if nothing cancelled it.
@@ -136,7 +139,19 @@ def human_gate(issue: dict, trace: str = "") -> str | None:
 
 
 def qualifies(issue: dict) -> bool:
-    return is_synthetic(issue) or golden_flow(issue) is not None or int(issue.get("userCount") or 0) >= USER_THRESHOLD
+    return (is_synthetic(issue) or golden_flow(issue) is not None
+            or int(issue.get("userCount") or 0) >= USER_THRESHOLD
+            or int(issue.get("count") or 0) >= EVENT_THRESHOLD
+            or issue.get("substatus") in ("regressed", "escalating"))
+
+
+def linked_linear(issue: dict) -> str | None:
+    """A Linear issue already attached by Sentry's Linear integration (annotations); adopt, never duplicate."""
+    for a in issue.get("annotations") or []:
+        m = re.search(r"/issue/(JOV-\d+)", str(a.get("url") if isinstance(a, dict) else a))
+        if m:
+            return m.group(1)
+    return None
 
 
 def is_synthetic(issue: dict) -> bool:
@@ -226,8 +241,8 @@ class Sentry:
         return res.json() if res.text else {}
 
     def top_issues(self) -> list[dict]:
-        q = urllib.parse.urlencode({"query": "is:unresolved", "statsPeriod": "24h", "sort": "user",
-                                    "limit": 100, "project": -1, "environment": []}, doseq=True)
+        q = urllib.parse.urlencode({"query": f"is:unresolved environment:{ENVIRONMENT}", "statsPeriod": "24h", "sort": "user",
+                                    "limit": 100, "project": -1}, doseq=True)
         return self._call("GET", f"{SENTRY_API}/organizations/{self.org}/issues/?{q}")
 
     def issue(self, iid: str) -> dict:
@@ -359,9 +374,9 @@ def issue_body(issue: dict, flow: str | None, trace: str, suspects: list[dict], 
 
 
 def handle_issue(issue: dict, ledger: dict, sentry: Sentry, linear: Linear, merges: list[dict],
-                 at: float, state: Path = STATE) -> str:
+                 at: float, state: Path = STATE, rollup: str | None = None, group_qualifies: bool = False) -> str:
     sid = str(issue["id"])
-    if not qualifies(issue):
+    if not (group_qualifies or qualifies(issue)):
         return "below-threshold"
     entry = ledger.get(sid)
     last_seen = parse_ts(issue.get("lastSeen")) or at
@@ -374,14 +389,21 @@ def handle_issue(issue: dict, ledger: dict, sentry: Sentry, linear: Linear, merg
         labels = [f"sentry:{sid}", "prod-error"] + (["golden-path"] if flow else [])
         labels += ["human-gate", "hold"] if gate else ["agent-ready"]
         synthetic = is_synthetic(issue)
-        ident = linear.find_by_label(f"sentry:{sid}")
+        ident = linear.find_by_label(f"sentry:{sid}") or rollup or linked_linear(issue)
+        adopted = bool(ident) and not synthetic
         if not ident and not synthetic:
             ident = linear.create(f"[Sentry {sid}] {issue.get('title')}",
                                   issue_body(issue, flow, trace, suspects, gate), labels, 1 if flow else 2)
         entry = ledger[sid] = {"sentryId": sid, "linear": ident, "flow": flow, "gate": gate, "synthetic": synthetic,
                                "status": "deployed" if synthetic else "claimed", "openedAt": at,
                                "claimExpiresAt": at + CLAIM_S, "title": issue.get("title"),
-                               "users": issue.get("userCount"), "lastSeen": last_seen}
+                               "users": issue.get("userCount"), "lastSeen": last_seen,
+                               "firstSeen": first, "project": (issue.get("project") or {}).get("slug"),
+                               "adopted": adopted}
+        if adopted and ident:
+            linear.comment(ident, f"Tracked by the prod-errors loop (Sentry {sid}, {issue.get('userCount')} users, "
+                           f"{issue.get('count')} events). Closing is done only by the post-deploy verifier after 24h "
+                           "with zero events; a later event reopens this issue and escalates.")
         if synthetic:
             entry["deployedAt"] = at
         elif gate:
@@ -424,9 +446,12 @@ def advance(ledger: dict, linear: Linear, sentry: Sentry, prs: list[dict], at: f
                 sentry.resolve(sid)
             except Exception:
                 pass
-            if e.get("linear"):
+            shared = any(o is not e and o.get("linear") == e.get("linear") and o["status"] != "closed"
+                         for o in ledger.values())
+            if e.get("linear") and not shared:
                 linear.set_state(e["linear"], "completed")
-                linear.comment(e["linear"], "Closed by gem post-deploy verifier: zero events for 24h after deploy.")
+                linear.comment(e["linear"], "Closed by gem post-deploy verifier: zero events for 24h after deploy "
+                               f"(Sentry {sid} resolved; receipt: deployed {iso(e['deployedAt'])}, closed {iso(at)}).")
 
 
 def golden_path_sentry(ledger: dict) -> dict:
@@ -440,9 +465,41 @@ def golden_path_sentry(ledger: dict) -> dict:
                           key=lambda x: -int(x["users"] or 0))[:5]}
 
 
+def pct(xs: list[float], q: float) -> float | None:
+    xs = sorted(xs)
+    return round(xs[min(len(xs) - 1, int(q * len(xs)))], 1) if xs else None
+
+
+def loop_metrics(ledger: dict, issues: list[dict], at: float) -> dict:
+    """unresolved-by-impact, first-seen -> closed (hours, p50/p95), regression rate; fed to Ovie Fleet."""
+    real = [e for e in ledger.values() if not e.get("synthetic")]
+    closed = [e for e in real if e.get("closedAt") and e.get("firstSeen")]
+    ttf = [(e["closedAt"] - e["firstSeen"]) / 3600 for e in closed]
+    return {"at": iso(at), "environment": ENVIRONMENT, "unresolvedProd": len(issues),
+            "usersAffected24h": sum(int(i.get("userCount") or 0) for i in issues),
+            "events24h": sum(int(i.get("count") or 0) for i in issues),
+            "tracked": len(real), "closed": len(closed),
+            "withLinear": sum(bool(e.get("linear")) for e in real),
+            "firstSeenToFixHours": {"p50": pct(ttf, 0.5), "p95": pct(ttf, 0.95)},
+            "regressionRate": round(sum(bool(e.get("reopens")) for e in real) / len(real), 3) if real else None,
+            "top": [{"id": i.get("shortId") or i["id"], "users": int(i.get("userCount") or 0),
+                     "events": int(i.get("count") or 0), "title": str(i.get("title"))[:80]}
+                    for i in sorted(issues, key=lambda i: -int(i.get("userCount") or 0))[:10]]}
+
+
+def record_metrics(ledger: dict, issues: list[dict], at: float, state: Path = STATE) -> dict:
+    m = loop_metrics(ledger, issues, at)
+    write_json(state / "sentry-loop-metrics.json", m)
+    with open(state / "sentry-loop-metrics.jsonl", "a") as f:  # trend: one line per sweep
+        f.write(json.dumps({k: m[k] for k in ("at", "unresolvedProd", "usersAffected24h", "events24h",
+                                              "firstSeenToFixHours", "regressionRate")}) + "\n")
+    return m
+
+
 def write_bottleneck(ledger: dict, state: Path = STATE) -> dict:
     frag = {"schema": "pipeline-bottleneck/v1", "fragment": "prod-errors", "producer": "gem:jovie-prod-errors",
             "updatedAt": iso(now()), "golden_path_sentry": golden_path_sentry(ledger),
+            "sentry_loop": read_json(state / "sentry-loop-metrics.json", {}),
             "watcher_health": watcher_health(state)}
     write_json(state / "bottleneck-fragment.json", frag)
     return frag
@@ -462,11 +519,23 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
     prs = gh_json(["pr", "list", "-R", REPO, "--state", "all", "--search", "Sentry in:body", "--limit", "100",
                    "--json", "number,title,body,headRefName,mergedAt"]) or []
     counts: dict[str, int] = {}
-    for issue in issues.values():
-        r = handle_issue(issue, ledger, sentry, linear, merges, at, state)
+    groups: dict[tuple, str] = {}  # same project+title, no Linear link yet -> ONE rolled-up Linear issue
+    totals: dict[tuple, int] = {}
+    for i in issues.values():
+        k = ((i.get("project") or {}).get("slug"), i.get("title"))
+        totals[k] = totals.get(k, 0) + int(i.get("count") or 0)
+    for issue in sorted(issues.values(), key=lambda i: -int(i.get("userCount") or 0)):
+        key = ((issue.get("project") or {}).get("slug"), issue.get("title"))
+        sid = str(issue["id"])
+        roll = None if linked_linear(issue) else (ledger.get(sid) or {}).get("linear") or groups.get(key)
+        r = handle_issue(issue, ledger, sentry, linear, merges, at, state, rollup=roll,
+                         group_qualifies=totals[key] >= EVENT_THRESHOLD)
+        if ledger.get(sid, {}).get("linear") and not linked_linear(issue):
+            groups.setdefault(key, ledger[sid]["linear"])
         counts[r] = counts.get(r, 0) + 1
     advance(ledger, linear, sentry, prs, at, state)
     write_json(state / "ledger.json", ledger)
+    record_metrics(ledger, list(issues.values()), at, state)
     for f in inbox:
         f.unlink(missing_ok=True)
     return counts
