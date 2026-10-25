@@ -329,7 +329,7 @@ async function ensureDbUser(betterAuthUserId: string) {
       async () => {
         const [user] = await sql`
           UPDATE users
-          SET user_status = 'waitlist_approved', updated_at = NOW()
+          SET user_status = 'waitlist_approved', name = COALESCE(name, 'Golden Path Artist'), updated_at = NOW()
           WHERE better_auth_user_id = ${betterAuthUserId}
           RETURNING id
         `;
