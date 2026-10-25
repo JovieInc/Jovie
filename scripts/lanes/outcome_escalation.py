@@ -23,6 +23,9 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 STEPS = ("tools", "telemetry", "agent-help", "adversarial")
 PROBE_TIMEOUT_S = 120
@@ -101,7 +104,7 @@ def browser_probe(tree: Path, url: str, out_dir: Path, run, env: dict) -> dict:
     out_dir.mkdir(parents=True, exist_ok=True)
     shot = out_dir / ("probe-" + re.sub(r"[^A-Za-z0-9]+", "-", url)[-60:] + ".png")
     try:
-        script.write_text(PROBE_JS)
+        atomic_write_text(script, PROBE_JS)
         done = run(["node", str(script), url, str(shot)], cwd=str(web), env={**env, "PLAYWRIGHT_BROWSERS_PATH": "/opt/ms-playwright"},
                    capture_output=True, text=True, timeout=PROBE_TIMEOUT_S)
         last = (done.stdout or "").strip().splitlines()[-1:] or [""]
@@ -118,7 +121,7 @@ def vision_read(shot: str | None, out_dir: Path, run, env: dict, codex_cmd: list
     answer = Path(out_dir) / "vision.txt"
     prompt = Path(out_dir) / "vision.prompt.md"
     answer.unlink(missing_ok=True)
-    prompt.write_text(f"Open the image file {shot} with your image viewing tool and describe, in at most 6 short lines, "
+    atomic_write_text(prompt, f"Open the image file {shot} with your image viewing tool and describe, in at most 6 short lines, "
                       f"exactly which UI states, text and layout are visible. Write only that description to {answer}. "
                       "Do nothing else.")
     try:
