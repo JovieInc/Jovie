@@ -7,7 +7,6 @@ import { NextResponse } from 'next/server';
 import { offerSnapshot } from '@/lib/billing/offer';
 
 export const runtime = 'nodejs';
-export const revalidate = 60;
 
 export function GET() {
   const snapshot = offerSnapshot();
