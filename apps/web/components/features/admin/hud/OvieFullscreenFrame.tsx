@@ -101,7 +101,10 @@ export function OvieFullscreenFrame({
       data-feed-level={status.level}
     >
       <div
-        className='origin-top-left p-4'
+        // Nothing may truncate in Full Screen (Tim: "runway 3…" is unreadable
+        // across a room): shared organisms use .truncate / line-clamp, so
+        // release them here instead of forking those components.
+        className='origin-top-left p-4 [&_.truncate]:overflow-visible [&_.truncate]:whitespace-normal [&_.truncate]:text-clip [&_[class*=line-clamp]]:line-clamp-none'
         data-testid='ovie-fullscreen-canvas'
         style={{
           // The scaled canvas is exactly the viewport: (100vw / scale) * scale.

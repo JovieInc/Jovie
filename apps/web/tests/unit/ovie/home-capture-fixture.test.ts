@@ -28,6 +28,43 @@ const measured = (value: number) =>
     ? ({ state: 'measured-zero', value: 0 } as const)
     : ({ state: 'measured-nonzero', value } as const);
 
+const TASK_TITLES: [string, string][] = [
+  ['running', 'feat(ovie): add the office display session'],
+  ['running', 'fix(lanes): recover Hyperagent lane PRs'],
+  ['in-review', 'feat(auth): read-only operator role for Ovie admin'],
+  ['in-review', 'fix(ovie): make Summer turn failures visible'],
+  ['merge-queued', 'fix(ci): capture Ovie Home at its own route'],
+  ['running', 'feat(dogfood): Ovie admin journeys with an observer'],
+  ['blocked', 'fix(onboarding): Spotify artist confirmation'],
+  ['in-review', 'feat(ovie): fast streaming Summer in the composer'],
+];
+
+function inFlightTasks() {
+  return TASK_TITLES.map(([workflowState, title], index) => ({
+    id: `linear:JOV-${9100 + index}`,
+    linearIdentifier: `JOV-${9100 + index}`,
+    linearUrl: `https://linear.app/jovie/issue/JOV-${9100 + index}`,
+    title,
+    workflowState,
+    priority: 'medium' as const,
+    attempt: null,
+    retryAt: null,
+    sourceRevision: null,
+    updatedAt: NOW,
+    pullRequest: {
+      number: 23200 - index,
+      url: `https://github.com/JovieInc/Jovie/pull/${23200 - index}`,
+      branch: null,
+      agent: null,
+      isDraft: false,
+      checks: { rollup: 'pending' as const, failing: [] },
+      queuePosition: null,
+      queueState: null,
+      createdAt: NOW,
+    },
+  }));
+}
+
 function shippingPayload() {
   const base = unknownProjection({
     sequence: 12,
@@ -49,6 +86,7 @@ function shippingPayload() {
       observedAt: NOW,
       lastSyncedAt: NOW,
       freshnessDeadline: DEADLINE,
+      tasks: inFlightTasks(),
     },
     delivery: {
       ...delivery,

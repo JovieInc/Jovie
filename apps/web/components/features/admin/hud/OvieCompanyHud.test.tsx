@@ -30,6 +30,27 @@ const tiles = [
   }),
 ];
 
+describe('OvieCompanyHud large (Full Screen)', () => {
+  it('never truncates: no .truncate element, long lines wrap, values are text-5xl', () => {
+    const { container } = render(
+      <OvieCompanyHud
+        large
+        since={null}
+        tiles={[
+          tile({
+            line: '$18,400 cash · $6,100/mo burn · runway 3.0 months and a very long tail',
+          }),
+        ]}
+      />
+    );
+    expect(container.querySelector('.truncate')).toBeNull();
+    expect(screen.getByTestId('ovie-tile-alive')).toHaveTextContent(
+      'runway 3.0 months and a very long tail'
+    );
+    expect(container.querySelector('.text-5xl')).not.toBeNull();
+  });
+});
+
 describe('OvieCompanyHud', () => {
   it('shows one value and one line per tile and no detail until opened', () => {
     render(<OvieCompanyHud tiles={tiles} since={null} />);

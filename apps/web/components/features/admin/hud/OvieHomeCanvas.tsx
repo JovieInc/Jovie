@@ -355,6 +355,9 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       answers={answers}
       done={home?.done ?? []}
       mergesToday={home?.mergesToday ?? null}
+      delivery={snapshot?.view.delivery ?? null}
+      rows={home?.rows ?? null}
+      fullscreen={fullscreen.on}
       doneSummary={
         home?.mergesToday != null
           ? `${home.mergesToday} ${home.mergesToday === 1 ? 'merge' : 'merges'}`

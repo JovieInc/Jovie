@@ -23,6 +23,9 @@ const TONE_LABEL: Record<CompanyTileTone, string> = {
 
 const SLOTS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
 
+const LARGE_TILE_FRAME =
+  'flex h-full min-h-0 min-w-0 flex-col justify-between gap-2 rounded-lg bg-surface-1 px-4 py-3 text-left';
+
 const TILE_FRAME =
   'flex h-24 min-w-0 flex-col justify-between gap-1 rounded-lg bg-surface-1 px-3 py-2 text-left';
 
@@ -47,10 +50,13 @@ function SinceLine({ since }: Readonly<{ since: LastLookedSummary }>) {
 export function OvieCompanyHud({
   tiles,
   since,
+  large = false,
 }: Readonly<{
   /** `null` while the sources load. */
   readonly tiles: readonly CompanyTile[] | null;
   readonly since: LastLookedSummary | null;
+  /** Full Screen: six tiles fill their row, values read from across a room, no ellipsis. */
+  readonly large?: boolean;
 }>) {
   const [openId, setOpenId] = useState<CompanyTile['id'] | null>(null);
   const panelId = useId();
@@ -58,12 +64,19 @@ export function OvieCompanyHud({
   return (
     <section
       aria-label='Company'
-      className='flex flex-col gap-2'
+      className={cn('flex flex-col gap-2', large && 'h-full min-h-0')}
       data-testid='ovie-company-hud'
       aria-busy={tiles === null}
     >
       {since ? <SinceLine since={since} /> : null}
-      <div className='grid grid-cols-2 gap-2 @3xl:grid-cols-3 @6xl:grid-cols-6'>
+      <div
+        className={cn(
+          'grid gap-2',
+          large
+            ? 'min-h-0 flex-1 grid-cols-6 grid-rows-1'
+            : 'grid-cols-2 @3xl:grid-cols-3 @6xl:grid-cols-6'
+        )}
+      >
         {tiles === null
           ? SLOTS.map(slot => (
               <div
@@ -83,7 +96,7 @@ export function OvieCompanyHud({
                   key={tile.id}
                   type='button'
                   className={cn(
-                    TILE_FRAME,
+                    large ? LARGE_TILE_FRAME : TILE_FRAME,
                     'transition-colors duration-subtle hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
                     expanded && 'bg-surface-2'
                   )}
@@ -99,29 +112,45 @@ export function OvieCompanyHud({
                   }}
                 >
                   <span className='flex items-center justify-between gap-2'>
-                    <span className='truncate text-2xs text-tertiary-token'>
+                    <span
+                      className={cn(
+                        'text-tertiary-token',
+                        large ? 'text-base' : 'truncate text-2xs'
+                      )}
+                    >
                       {tile.label}
                     </span>
                     <span
                       role='img'
                       aria-label={TONE_LABEL[tile.tone]}
                       className={cn(
-                        'size-1.5 shrink-0 rounded-full',
+                        large ? 'size-3' : 'size-1.5',
+                        'shrink-0 rounded-full',
                         TONE_DOT[tile.tone]
                       )}
                     />
                   </span>
                   <span
                     className={cn(
-                      'truncate font-semibold tabular-nums leading-tight',
+                      'font-semibold tabular-nums leading-tight',
+                      !large && 'truncate',
                       tile.measured
-                        ? 'text-xl text-primary-token'
-                        : 'text-sm text-tertiary-token'
+                        ? large
+                          ? 'text-5xl text-primary-token'
+                          : 'text-xl text-primary-token'
+                        : large
+                          ? 'text-2xl text-tertiary-token'
+                          : 'text-sm text-tertiary-token'
                     )}
                   >
                     {tile.value}
                   </span>
-                  <span className='truncate text-2xs text-secondary-token'>
+                  <span
+                    className={cn(
+                      'text-secondary-token',
+                      large ? 'text-base leading-snug' : 'truncate text-2xs'
+                    )}
+                  >
                     {tile.line}
                   </span>
                 </button>

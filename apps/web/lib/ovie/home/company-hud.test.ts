@@ -233,6 +233,14 @@ describe('buildCompanyTiles', () => {
     ).toBe('Nothing needs your decision');
   });
 
+  it('the Blocked On You subtitle agrees with the section: waiting means waiting', () => {
+    const tile = (openAsks: number, nextDeadlineIso: string | null) =>
+      byId(buildCompanyTiles(inputs({ openAsks, nextDeadlineIso })), 'blocked');
+    expect(tile(1, null)?.line).toBe('waiting on you, no default time set');
+    expect(tile(1, null)?.line).not.toMatch(/nothing/i);
+    expect(tile(0, null)?.line).toBe('Nothing needs your decision');
+  });
+
   it('says Not measured for every missing source, never a calm default', () => {
     const tiles = buildCompanyTiles(
       inputs({

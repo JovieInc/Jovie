@@ -358,7 +358,7 @@ function blockedTile(
       'Decisions could not load.'
     );
   }
-  let deadline = 'nothing waiting on a default';
+  let deadline = 'waiting on you, no default time set';
   if (nextDeadlineIso) {
     const ms = Date.parse(nextDeadlineIso) - nowMs;
     deadline =

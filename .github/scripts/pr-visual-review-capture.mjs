@@ -182,6 +182,62 @@ async function waitForAuthenticatedShell(page, route) {
             `tile clipped: ${tile.left.toFixed(0)}..${tile.right.toFixed(0)} of ${vp.w}`
           );
       if (tiles.length === 0 && ovieFixture) problems.push('no tiles rendered');
+      // Wall-reading guards (Tim, 2026-10-25): no ellipsis or clamping, content
+      // fills the height, and values are large enough to read across a room.
+      const wall = await page.evaluate(() => {
+        const frame = document.querySelector('[data-testid="ovie-fullscreen"]');
+        const canvas = document.querySelector(
+          '[data-testid="ovie-fullscreen-canvas"]'
+        );
+        const scale = canvas
+          ? canvas.getBoundingClientRect().width /
+            Math.max(1, canvas.offsetWidth)
+          : 1;
+        const truncated = [];
+        for (const el of frame ? frame.querySelectorAll('*') : []) {
+          const style = getComputedStyle(el);
+          const clamped =
+            style.webkitLineClamp && style.webkitLineClamp !== 'none';
+          if (style.textOverflow === 'ellipsis' || clamped)
+            truncated.push(
+              `${el.tagName.toLowerCase()}:${(el.textContent ?? '').trim().slice(0, 40)}`
+            );
+        }
+        const tops = [
+          ...document.querySelectorAll('[data-testid^="ovie-tile-"]'),
+        ].map(el => el.getBoundingClientRect().top);
+        const bottoms = [
+          ...document.querySelectorAll('[data-testid$="-section"]'),
+        ].map(el => el.getBoundingClientRect().bottom);
+        const value = document.querySelector(
+          '[data-testid="ovie-tile-revenue"] span.font-semibold'
+        );
+        return {
+          scale,
+          truncated,
+          contentTop: tops.length ? Math.min(...tops) : null,
+          contentBottom: bottoms.length ? Math.max(...bottoms) : null,
+          valuePx: value
+            ? parseFloat(getComputedStyle(value).fontSize) * scale
+            : null,
+        };
+      });
+      if (wall.truncated.length > 0)
+        problems.push(
+          `ellipsis or line clamp in Full Screen: ${wall.truncated.slice(0, 3).join(' | ')}`
+        );
+      if (vp.w >= 3000) {
+        const span =
+          wall.contentTop === null || wall.contentBottom === null
+            ? 0
+            : (wall.contentBottom - wall.contentTop) / vp.h;
+        if (span < 0.7)
+          problems.push(
+            `content fills ${(span * 100).toFixed(0)}% of the height, need 70%`
+          );
+        if (ovieFixture && (wall.valuePx === null || wall.valuePx < 48))
+          problems.push(`tile value renders at ${wall.valuePx}px, need 48px`);
+      }
       if (problems.length > 0)
         throw new Error(`Full Screen geometry: ${problems.join('; ')}`);
     }
