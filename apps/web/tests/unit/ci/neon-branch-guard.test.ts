@@ -44,6 +44,9 @@ describe('Neon branch deletion guard', () => {
       'master',
       'br-main',
       'br-production',
+      'development',
+      'Preview',
+      'staging',
       'backup',
       'backup-2026-10-24',
       'Backup-pre-migration',
@@ -197,7 +200,10 @@ describe('Neon branch inventory reader', () => {
       run('keep-me', ok([branch('keep-me', { protected: true })])).status
     ).toBe(1);
     expect(run('pr-1-' + RUN, down).status).toBe(1);
-    expect(run('pr-1-' + RUN, ok([branch('pr-1-' + RUN)])).status).toBe(0);
+    const good = run('pr-1-' + RUN, ok([branch('pr-1-' + RUN)]));
+    expect(good.status).toBe(0);
+    // stdout is exactly the resolved branch id; callers delete by it
+    expect(good.stdout.trim()).toBe('br-pr-1-' + RUN);
   });
 });
 
@@ -206,7 +212,8 @@ describe('Deliberate-red: legacy reaper would delete these, the guarded one must
 
   async function reap(
     branches: unknown[],
-    protectedBranches = new Set<string>()
+    protectedBranches = new Set<string>(),
+    headBranch = 'release'
   ) {
     const deletes: string[] = [];
     const request = vi.fn(
@@ -214,7 +221,7 @@ describe('Deliberate-red: legacy reaper would delete these, the guarded one must
         if (url.includes('/branches?')) return { branches };
         if (url.includes('/endpoints?')) return { endpoints: [] };
         if (url.includes('/actions/runs/'))
-          return { ...completed, head_branch: 'release' };
+          return { ...completed, head_branch: headBranch };
         if (options.method === 'DELETE') {
           deletes.push(decodeURIComponent(url.split('/branches/')[1]));
           return null;
@@ -248,8 +255,11 @@ describe('Deliberate-red: legacy reaper would delete these, the guarded one must
   });
 
   it('keeps backup-* branches even when the name carries a completed run id', async () => {
+    // Red on legacy code: the owning run's head branch is `backup`, so the
+    // generic <prefix>-<run>-<attempt> ownership check passes and old code
+    // issued a DELETE for a manual backup.
     const backup = branch(`backup-${RUN}-1`);
-    expect(await reap([backup])).toEqual([]);
+    expect(await reap([backup], new Set(), 'backup')).toEqual([]);
   });
 
   it('keeps production/main/prod when callers omit them from the skip list', async () => {
@@ -304,40 +314,82 @@ describe('Neon deleters are wired through the guard', () => {
   it('PR-close cleanup checks the guard for prefix and exact matches', () => {
     const wf = read('.github/workflows/neon-ephemeral-branch-cleanup.yml');
     expect(wf.match(/--assert-deletable/g)?.length).toBe(2);
-    expect(wf).toContain('production|prod|br-main');
+    expect(wf).toContain('production|prod|development|preview|staging|br-main');
   });
 
-  it('no workflow deletes a Neon branch without a run-id-derived name or the guard', () => {
-    // The run-scoped deleters build BRANCH_NAME from github.run_id only; they
-    // cannot name production/backup. Any new deleter must be listed here.
-    const allowed = new Map([
-      ['.github/actions/neon-branch-cleanup/action.yml', 'guard'],
-      ['.github/workflows/neon-ephemeral-branch-cleanup.yml', 'guard'],
-      ['.github/workflows/visual-regression.yml', 'run-id'],
-      ['.github/workflows/e2e-full-matrix.yml', 'run-id'],
-      ['.github/workflows/nightly-tests.yml', 'run-id'],
+  it('every Neon branch delete site (neonctl, curl -X DELETE, method DELETE) is inventoried', () => {
+    // guard: delete goes through --assert-deletable and the resolved id.
+    // run-id: deletes a branch named from github.run_id by the job that made it.
+    // created-id: deletes the branch id output by this job's own create step.
+    const sites = new Map<string, { kind: string; count: number }>([
+      [
+        '.github/actions/neon-branch-cleanup/action.yml',
+        { kind: 'guard', count: 1 },
+      ],
+      [
+        '.github/workflows/neon-ephemeral-branch-cleanup.yml',
+        { kind: 'guard', count: 2 },
+      ],
+      ['scripts/ci/neon-orphan-reaper.mjs', { kind: 'guard', count: 1 }],
+      ['.github/workflows/visual-regression.yml', { kind: 'run-id', count: 1 }],
+      ['.github/workflows/e2e-full-matrix.yml', { kind: 'run-id', count: 1 }],
+      ['.github/workflows/nightly-tests.yml', { kind: 'run-id', count: 1 }],
+      ['.github/workflows/ci.yml', { kind: 'created-id', count: 3 }],
+      [
+        '.github/workflows/claim-checkout-dogfood.yml',
+        { kind: 'created-id', count: 1 },
+      ],
     ]);
-    const out = spawnSync(
+    const deletePattern =
+      /neonctl branches delete|-X DELETE|--request DELETE|method: 'DELETE'/g;
+    const candidates = spawnSync(
       'grep',
       [
-        '-rl',
-        'neonctl branches delete',
+        '-rlEi',
+        'neonctl|console\\.neon\\.tech|NEON_API_KEY',
         '.github',
+        'scripts',
         '--include=*.yml',
         '--include=*.sh',
+        '--include=*.mjs',
+        '--include=*.js',
       ],
       { cwd: repoRoot, encoding: 'utf8' }
     )
       .stdout.split('\n')
-      .filter(Boolean);
-    for (const file of out) expect(allowed.has(file), file).toBe(true);
-    for (const [file, kind] of allowed) {
-      if (kind !== 'run-id') continue;
-      const line = read(file)
-        .split('\n')
-        .find(l => /^\s*BRANCH_NAME:/.test(l));
-      expect(line, file).toMatch(/(visual-regression|nightly-e2e|e2e-full)-/);
-      expect(line, file).toContain('github.run_id');
+      .filter(f => f && !/\.test\.|__tests__/.test(f));
+    const found = new Map<string, number>();
+    for (const file of candidates) {
+      const n = read(file).match(deletePattern)?.length ?? 0;
+      if (n > 0) found.set(file, n);
+    }
+    for (const [file, n] of found) {
+      expect(sites.has(file), `unlisted Neon delete site: ${file}`).toBe(true);
+      expect(n, file).toBe(sites.get(file)!.count);
+    }
+    expect([...found.keys()].sort()).toEqual([...sites.keys()].sort());
+
+    for (const [file, { kind }] of sites) {
+      const text = read(file);
+      if (kind === 'run-id') {
+        const line = text.split('\n').find(l => /^\s*BRANCH_NAME:/.test(l));
+        expect(line, file).toMatch(/(visual-regression|nightly-e2e|e2e-full)-/);
+        expect(line, file).toContain('github.run_id');
+      }
+      if (kind === 'created-id') {
+        const deletes = text
+          .split('\n')
+          .flatMap((l, i, all) =>
+            /-X DELETE/.test(l) ? [all.slice(i, i + 5).join('\n')] : []
+          );
+        for (const block of deletes) {
+          expect(block, file).toContain('steps.neon-branch.outputs.branch_id');
+        }
+      }
+      if (kind === 'guard' && file.endsWith('.yml')) {
+        expect(text, file).toContain('--assert-deletable');
+        expect(text, file).toMatch(/branches delete "\$(branch_id|EXACT_ID)"/);
+      }
     }
   });
 });

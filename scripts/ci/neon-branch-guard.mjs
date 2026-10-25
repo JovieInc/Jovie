@@ -8,7 +8,8 @@
 // Never deletable, regardless of who calls:
 //   - the project's default branch (Neon `default: true`)
 //   - any protected branch (Neon `protected: true`)
-//   - production / prod / main (any case), plus the legacy br-main / br-production
+//   - production / prod / main / master / development / preview / staging (any
+//     case), plus the legacy br-main / br-production
 //   - backup-* branches (manual /neon-backup snapshots)
 
 export const RESERVED_BRANCH_NAMES = Object.freeze([
@@ -18,6 +19,9 @@ export const RESERVED_BRANCH_NAMES = Object.freeze([
   'master',
   'br-main',
   'br-production',
+  'development',
+  'preview',
+  'staging',
 ]);
 
 const BACKUP_RE = /^backup([-_.]|$)/i;
@@ -72,5 +76,6 @@ export function evaluateBranchNameAgainstInventory(branches, name) {
       reason: matches.length === 0 ? 'not-in-inventory' : 'ambiguous-name',
     };
   }
-  return evaluateBranchDeletion(matches[0]);
+  const verdict = evaluateBranchDeletion(matches[0]);
+  return verdict.deletable ? { ...verdict, branchId: matches[0].id } : verdict;
 }

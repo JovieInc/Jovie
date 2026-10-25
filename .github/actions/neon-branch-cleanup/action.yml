@@ -128,7 +128,7 @@ runs:
 
           # Hard-coded floor, independent of what the caller passed in.
           case "$(echo "$branch_name" | tr '[:upper:]' '[:lower:]')" in
-            production|prod|main|master|br-main|br-production|backup|backup-*|backup_*|backup.*)
+            production|prod|main|master|development|preview|staging|br-main|br-production|backup|backup-*|backup_*|backup.*)
               is_protected_branch=true
               ;;
           esac
@@ -184,8 +184,8 @@ runs:
 
           # Neon is the authority on default/protected. Fail closed when the
           # flags cannot be read or the branch is default/protected/reserved.
-          if ! node "$GITHUB_WORKSPACE/scripts/ci/neon-orphan-reaper.mjs" \
-            --assert-deletable "$branch_name"; then
+          if ! branch_id=$(node "$GITHUB_WORKSPACE/scripts/ci/neon-orphan-reaper.mjs" \
+            --assert-deletable "$branch_name") || [ -z "$branch_id" ]; then
             echo "Skipping branch that is default, protected, reserved, or unverifiable: $branch_name"
             continue
           fi
@@ -198,7 +198,7 @@ runs:
           fi
 
           echo "Deleting old ephemeral branch: $branch_name"
-          if npx neonctl branches delete "$branch_name" \
+          if npx neonctl branches delete "$branch_id" \
             --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
             DELETED_COUNT=$((DELETED_COUNT + 1))
             echo "  Deleted successfully"

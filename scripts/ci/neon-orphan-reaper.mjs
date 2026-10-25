@@ -401,9 +401,12 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    console.log(
+    // stdout is exactly the resolved branch id: callers delete by this id, so
+    // the name that was checked cannot be re-resolved to a different branch.
+    console.error(
       `Neon branch ${process.argv[3]} is deletable (${result.reason}).`
     );
+    console.log(result.branchId);
     return;
   }
   if (process.argv[2] === '--prove-completed-owner') {

@@ -62,7 +62,7 @@ jobs:
         run: |
           NAME="${{ steps.sanitize.outputs.name }}"
           case "$(echo "$NAME" | tr '[:upper:]' '[:lower:]')" in
-            main|master|production|prod|br-main|br-production|backup|backup-*|backup_*|backup.*)
+            main|master|production|prod|development|preview|staging|br-main|br-production|backup|backup-*|backup_*|backup.*)
               echo "Protected Neon branch '$NAME'; skipping delete." >&2
               echo "skip=true" >> "$GITHUB_OUTPUT"
               ;;
@@ -108,12 +108,12 @@ jobs:
           : > "$DELETED_FILE"
           DELETED_COUNT=0
           for branch in $MATCHING_BRANCHES; do
-            if ! node scripts/ci/neon-orphan-reaper.mjs --assert-deletable "$branch"; then
+            if ! branch_id=$(node scripts/ci/neon-orphan-reaper.mjs --assert-deletable "$branch") || [ -z "$branch_id" ]; then
               echo "Keeping $branch: default, protected, reserved, or unverifiable."
               continue
             fi
             echo "Deleting Neon branch: $branch"
-            if pnpm dlx neonctl branches delete "$branch" --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
+            if pnpm dlx neonctl branches delete "$branch_id" --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
               echo "  Deleted successfully"
               echo "$branch" >> "$DELETED_FILE"
               DELETED_COUNT=$((DELETED_COUNT + 1))
@@ -122,14 +122,19 @@ jobs:
             fi
           done
 
-          if [ -n "$EXACT_MATCH" ] && ! node scripts/ci/neon-orphan-reaper.mjs --assert-deletable "$EXACT_MATCH"; then
-            echo "Keeping $EXACT_MATCH: default, protected, reserved, or unverifiable."
-            EXACT_MATCH=""
+          EXACT_ID=""
+          if [ -n "$EXACT_MATCH" ]; then
+            if EXACT_ID=$(node scripts/ci/neon-orphan-reaper.mjs --assert-deletable "$EXACT_MATCH") && [ -n "$EXACT_ID" ]; then
+              :
+            else
+              echo "Keeping $EXACT_MATCH: default, protected, reserved, or unverifiable."
+              EXACT_MATCH=""
+            fi
           fi
 
           if [ -n "$EXACT_MATCH" ]; then
             echo "Deleting exactly-matching Neon branch: $EXACT_MATCH"
-            if pnpm dlx neonctl branches delete "$EXACT_MATCH" --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
+            if pnpm dlx neonctl branches delete "$EXACT_ID" --project-id "$NEON_PROJECT_ID" 2>/dev/null; then
               echo "  Deleted successfully"
               echo "$EXACT_MATCH" >> "$DELETED_FILE"
               DELETED_COUNT=$((DELETED_COUNT + 1))
