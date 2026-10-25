@@ -321,14 +321,14 @@ test('route navigation keeps the shell attached and inspects rendered materials 
         document.documentElement.classList.toggle('dark', value === 'dark'),
       theme
     );
-    // [sidebar link, page heading, pathname]. The root link is `Inbox` since
-    // #20840 (header still titles `/app` as Home via breadcrumb-labels), and
+    // [sidebar link, page heading, pathname]. The root link is `Home`,
+    // matching the `/app` breadcrumb title since the nav IA naming rule, and
     // the Identity destination is titled `Profiles` since #20953.
     for (const [linkName, heading, pathname] of [
-      ['New Chat', 'New Chat', '/app/chat'],
+      ['Chat', 'Chat', '/app/chat'],
       ['Identity', 'Profiles', '/app/presence'],
       ['Work', 'Work', '/app/library'],
-      ['Inbox', 'Home', '/app'],
+      ['Home', 'Home', '/app'],
     ] as const) {
       await page.getByRole('link', { name: linkName, exact: true }).click();
       await page.waitForURL(url => url.pathname === pathname);
@@ -356,14 +356,14 @@ test('route navigation keeps the shell attached and inspects rendered materials 
 test('chat profile stays mounted through closed, opening and interrupted exits', async ({
   page,
 }, testInfo) => {
-  await page.getByRole('link', { name: 'New Chat', exact: true }).click();
+  await page.getByRole('link', { name: 'Chat', exact: true }).click();
   // E2E chat intentionally disables this surface unless its existing
   // profile fixture parameter is set; production enables it by default.
   await gotoAuthenticatedChatRoute(page, {
     path: '/app/chat?panel=profile',
   });
   await expect(
-    page.getByRole('heading', { name: 'New Chat', exact: true })
+    page.getByRole('heading', { name: 'Chat', exact: true })
   ).toBeVisible();
   await page
     .locator('[data-app-shell-frame]')

@@ -62,7 +62,7 @@ export function ChatsEmptyState({ query }: Readonly<{ query: string }>) {
       }
       action={{
         href: APP_ROUTES.CHAT,
-        label: 'New Chat',
+        label: 'Chat',
         variant: 'secondary',
       }}
       className='min-h-72'
@@ -183,7 +183,7 @@ export function ChatsPageClient() {
                 </Button>
               ) : null}
               <Button asChild variant='secondary' size='sm'>
-                <Link href={APP_ROUTES.CHAT}>New Chat</Link>
+                <Link href={APP_ROUTES.CHAT}>Chat</Link>
               </Button>
             </>
           }

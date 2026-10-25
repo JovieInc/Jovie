@@ -25,7 +25,7 @@ describe('useAuthRouteConfig', () => {
 
     expect(result.current.breadcrumbs).toEqual([
       {
-        label: 'New Chat',
+        label: 'Chat',
         href: '/app/chat/conv-123',
       },
     ]);

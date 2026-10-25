@@ -106,7 +106,7 @@ describe('SidebarThreadsSection', () => {
     );
 
     expect(
-      screen.getByRole('button', { name: 'New Chat' }).querySelector('svg')
+      screen.getByRole('button', { name: 'Chat' }).querySelector('svg')
     ).toHaveClass('size-3.5');
   });
 
@@ -359,7 +359,7 @@ describe('SidebarThreadsSection', () => {
     );
 
     const newThreadButton = screen.getByRole('button', {
-      name: 'New Chat',
+      name: 'Chat',
     });
 
     expect(newThreadButton).toHaveClass(
@@ -386,7 +386,7 @@ describe('SidebarThreadsSection', () => {
           activeThreadId={null}
           state={state}
           newThreadAction={
-            <a href={APP_ROUTES.CHAT} aria-label='New Chat'>
+            <a href={APP_ROUTES.CHAT} aria-label='Chat'>
               +
             </a>
           }
@@ -394,12 +394,12 @@ describe('SidebarThreadsSection', () => {
           collapsed={false}
         />
       );
-      const create = screen.getByRole('link', { name: 'New Chat' });
+      const create = screen.getByRole('link', { name: 'Chat' });
       expect(create.parentElement).toHaveAttribute(
         'data-sidebar-history-header'
       );
-      expect(screen.queryByRole('button', { name: 'New Chat' })).toBeNull();
-      expect(screen.queryByText('New Chat')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Chat' })).toBeNull();
+      expect(screen.queryByText('Chat')).toBeNull();
       expect(
         screen.queryByRole('button', { name: 'Filter Unread Chats' })
       ).toBeNull();
@@ -522,7 +522,7 @@ describe('founder-locked calm sidebar history', () => {
         collapsed={false}
       />
     );
-    const create = screen.getByRole('button', { name: 'New Chat' });
+    const create = screen.getByRole('button', { name: 'Chat' });
     expect(create.querySelector('svg')).not.toBeNull();
     expect(create.parentElement).toHaveAttribute('data-sidebar-history-header');
     expect(screen.getByText('Today')).toBeInTheDocument();

@@ -455,7 +455,7 @@ export function SidebarThreadsSection({
               type='button'
               variant='ghost'
               size='icon-xs'
-              aria-label='New Chat'
+              aria-label='Chat'
               onClick={onNewThread}
               className='shrink-0'
             >

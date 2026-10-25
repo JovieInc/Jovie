@@ -20,7 +20,7 @@ test.skip(
 
 // Identity stays off the rail while PROFILES_WORKSPACE defaults off. The
 // creator-ready persona does not receive the admin default-on exception.
-const CANONICAL_LABELS = ['Inbox', 'Work', 'Audience'] as const;
+const CANONICAL_LABELS = ['Home', 'Work', 'Audience'] as const;
 
 const CANONICAL_HREFS = [
   APP_ROUTES.DASHBOARD,
@@ -209,7 +209,7 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
   }
 
   const navBeforeFilter = await desktopNav.boundingBox();
-  await desktopNav.getByRole('link', { name: 'New Chat' }).focus();
+  await desktopNav.getByRole('link', { name: 'Chat' }).focus();
   const navAfterFilter = await desktopNav.boundingBox();
   // Receipt for the focus-stability contract: both snapshots travel with the
   // run so a shift names its axis and magnitude (the focus-induced sub-pixel

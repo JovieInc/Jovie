@@ -18,7 +18,7 @@ vi.mock('@/app/app/(shell)/chat/ChatPageClient', () => ({
 }));
 
 const CANONICAL_NAV = [
-  ['Inbox', APP_ROUTES.DASHBOARD],
+  ['Home', APP_ROUTES.DASHBOARD],
   ['Identity', APP_ROUTES.PRESENCE],
   ['Work', APP_ROUTES.LIBRARY],
   ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
@@ -96,7 +96,7 @@ describe('DashboardNav', () => {
     expect(queryByRole('link', { name: 'Settings' })).toBeNull();
   });
 
-  it('places search, Inbox, and New Chat together before navigation', () => {
+  it('places search, Inbox, and Chat together before navigation', () => {
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
       navChildren: <button type='button'>Search</button>,
@@ -107,7 +107,7 @@ describe('DashboardNav', () => {
     if (!(inbox instanceof HTMLElement)) return;
     expect(inbox).toHaveAccessibleName('Inbox');
     const search = getByRole('button', { name: 'Search' });
-    const newChat = getByRole('link', { name: 'New Chat' });
+    const newChat = getByRole('link', { name: 'Chat' });
 
     expect(
       search.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING
@@ -132,7 +132,7 @@ describe('DashboardNav', () => {
         link.getAttribute('href'),
       ])
     ).toEqual([
-      ['Inbox', APP_ROUTES.DASHBOARD],
+      ['Home', APP_ROUTES.DASHBOARD],
       ['Work', APP_ROUTES.LIBRARY],
       ['Audience', APP_ROUTES.CONTACTS_AUDIENCE],
     ]);
@@ -153,7 +153,7 @@ describe('DashboardNav', () => {
     expect(
       document.querySelector('[data-navigation-item-id="inbox"]')
     ).toHaveAccessibleName('Inbox');
-    expect(getByRole('link', { name: 'New Chat' })).toBeInTheDocument();
+    expect(getByRole('link', { name: 'Chat' })).toBeInTheDocument();
   });
 
   it('gives Home sole current-page ownership at the shell root', () => {
@@ -278,7 +278,7 @@ describe('DashboardNav', () => {
       'aria-current',
       'page'
     );
-    expect(work.getByRole('link', { name: 'New Chat' })).not.toHaveAttribute(
+    expect(work.getByRole('link', { name: 'Chat' })).not.toHaveAttribute(
       'aria-current'
     );
     work.unmount();
@@ -301,7 +301,7 @@ describe('DashboardNav', () => {
     );
   });
 
-  it('uses New Chat consistently for the elevated nav action and page title', async () => {
+  it('uses Chat consistently for the elevated nav action and page title', async () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.CHAT);
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
@@ -316,8 +316,8 @@ describe('DashboardNav', () => {
       ),
     });
 
-    expect(title).toBe('New Chat');
-    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+    expect(title).toBe('Chat');
+    expect(getByRole('link', { name: 'Chat' })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -327,23 +327,23 @@ describe('DashboardNav', () => {
     expect(getAllByRole('heading', { name: title, level: 1 })).toHaveLength(1);
   });
 
-  it('does not mark New Chat active on a chat thread', () => {
+  it('does not mark Chat active on a chat thread', () => {
     mockUsePathname.mockReturnValue(`${APP_ROUTES.CHAT}/thread-123`);
     const { getByRole } = renderDashboardNav({ renderFn: fastRender });
 
     expect(
-      getByRole('link', { name: 'New Chat' }).getAttribute('aria-current')
+      getByRole('link', { name: 'Chat' }).getAttribute('aria-current')
     ).toBeNull();
   });
 
-  it('keeps inactive New Chat distinct from a selected navigation row', () => {
+  it('keeps inactive Chat distinct from a selected navigation row', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.LIBRARY);
     const { getByRole } = renderDashboardNav({
       renderFn: fastRender,
     });
 
     const work = getByRole('link', { name: 'Work' });
-    const chatLink = getByRole('link', { name: 'New Chat' });
+    const chatLink = getByRole('link', { name: 'Chat' });
     expect(work).toHaveAttribute('aria-current', 'page');
     expect(work).toHaveClass('bg-sidebar-accent-active');
     expect(chatLink).toHaveClass('size-6', 'rounded-md', 'text-sidebar-muted');
@@ -409,9 +409,9 @@ describe('DashboardNav', () => {
     });
 
     expect(primaryLinks(container)).toHaveLength(4);
-    // JOV-8017: New Chat retains command ownership in the icon rail.
+    // JOV-8017: Chat retains command ownership in the icon rail.
     // The composed Storybook spec verifies its painted geometry through motion.
-    expect(getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+    expect(getByRole('link', { name: 'Chat' })).toHaveAttribute(
       'href',
       APP_ROUTES.CHAT
     );
@@ -435,7 +435,7 @@ describe('DashboardNav', () => {
     expect(getAllByText('Account').length).toBeGreaterThan(0);
     expect(getAllByText('Artist').length).toBeGreaterThan(0);
     expect(
-      getByRole('link', { name: 'Audience & Tracking' }).getAttribute('href')
+      getByRole('link', { name: 'Audience & tracking' }).getAttribute('href')
     ).toBe(APP_ROUTES.SETTINGS_AUDIENCE);
     expect(queryByText('Workspace')).toBeNull();
   });

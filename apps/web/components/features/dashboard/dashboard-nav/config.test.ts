@@ -3,19 +3,30 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   artistNavigation,
   artistSettingsNavigation,
+  audienceNavItem,
   CUSTOMER_NAV_CAPACITY,
+  calendarNavItem,
   canonicalSidebarNavigation,
+  chatNavItem,
+  contactsNavItem,
   desktopMoreNavigation,
   desktopPrimaryNavigation,
+  homeNavItem,
+  inboxNavItem,
+  linksNavItem,
   mobileExpandedNavigation,
   mobilePrimaryNavigation,
   partitionCustomerNavigation,
+  paymentsNavItem,
   primaryNavigation,
+  settingsNavItem,
   settingsNavigation,
+  tasksNavItem,
+  userSettingsNavigation,
 } from './config';
 
 const CANONICAL_NAVIGATION = [
-  ['home', 'Inbox', APP_ROUTES.DASHBOARD],
+  ['home', 'Home', APP_ROUTES.DASHBOARD],
   ['presence', 'Identity', APP_ROUTES.PRESENCE],
   ['library', 'Work', APP_ROUTES.LIBRARY],
   ['audience', 'Audience', APP_ROUTES.CONTACTS_AUDIENCE],
@@ -134,5 +145,117 @@ describe('canonical customer shell navigation', () => {
     expect(APP_ROUTES.TASKS).toBe('/app/tasks');
     expect(APP_ROUTES.LIBRARY).toBe('/app/library');
     expect(APP_ROUTES.CALENDAR).toBe('/app/calendar');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Nav IA naming guard (ds-cert:nav-ia-naming)
+//
+// docs/design-system/rail-registry.json is not on main yet, so the allowed
+// names live in this local constant. Every label the customer navigation
+// renders must resolve to one of these sentence-case names.
+// ---------------------------------------------------------------------------
+
+const ALLOWED_NAV_LABELS = [
+  'Account',
+  'Analytics',
+  'Audience',
+  'Audience & tracking',
+  'Billing & subscription',
+  'Calendar',
+  'Chat',
+  'Connections',
+  'Contacts',
+  'Data & privacy',
+  'Home',
+  'Identity',
+  'Inbox',
+  'Links',
+  'Payments',
+  'Profile',
+  'Referral',
+  'Settings',
+  'Touring',
+  'Usage stats',
+  'Work',
+] as const;
+
+/** Labels retired by the nav IA naming rule; they must never come back. */
+const RETIRED_NAV_LABELS = [
+  'New Chat',
+  'Usage Stats',
+  'Billing & Subscription',
+  'Data & Privacy',
+  'Audience & Tracking',
+] as const;
+
+/** Every nav item this config exports, across all navigation contexts. */
+const ALL_NAV_ITEMS = [
+  inboxNavItem,
+  chatNavItem,
+  homeNavItem,
+  ...primaryNavigation,
+  contactsNavItem,
+  linksNavItem,
+  audienceNavItem,
+  calendarNavItem,
+  tasksNavItem,
+  settingsNavItem,
+  paymentsNavItem,
+  ...userSettingsNavigation,
+  ...artistSettingsNavigation,
+];
+
+/**
+ * Items that co-render in one rail: the Inbox attention row, the Chat create
+ * row, the primary roots, and the Settings row. Duplicate labels here are
+ * the duplicate-row defect this guard exists to catch.
+ */
+const ROOT_RAIL_ITEMS = [
+  ...new Map(
+    [inboxNavItem, chatNavItem, settingsNavItem, ...primaryNavigation].map(
+      item => [item.id, item]
+    )
+  ).values(),
+];
+
+describe('nav IA naming guard (ds-cert:nav-ia-naming)', () => {
+  it('renders only allowed sentence-case nav labels', () => {
+    for (const item of ALL_NAV_ITEMS) {
+      expect(
+        ALLOWED_NAV_LABELS,
+        `label "${item.name}" (id: ${item.id}) must be in the allowed nav names list`
+      ).toContain(item.name);
+    }
+  });
+
+  it('never resurrects a retired label', () => {
+    const labels = ALL_NAV_ITEMS.map(item => item.name);
+    for (const retired of RETIRED_NAV_LABELS) {
+      expect(labels).not.toContain(retired);
+    }
+  });
+
+  it('keeps labels unique across the co-rendered root rail', () => {
+    const labels = ROOT_RAIL_ITEMS.map(item => item.name);
+    expect(new Set(labels).size).toBe(labels.length);
+
+    const ids = ROOT_RAIL_ITEMS.map(item => item.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('keeps labels unique within each exported navigation set', () => {
+    for (const [name, items] of [
+      ['primaryNavigation', primaryNavigation],
+      ['settingsNavigation', settingsNavigation],
+      ['userSettingsNavigation', userSettingsNavigation],
+      ['artistSettingsNavigation', artistSettingsNavigation],
+      ['mobileExpandedNavigation', mobileExpandedNavigation],
+    ] as const) {
+      const labels = items.map(item => item.name);
+      expect(new Set(labels).size, `${name} must not repeat a label`).toBe(
+        labels.length
+      );
+    }
   });
 });

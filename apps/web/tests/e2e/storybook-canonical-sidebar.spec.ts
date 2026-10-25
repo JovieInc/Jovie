@@ -10,7 +10,7 @@ test('collapsed demo keeps its command allocation and stages secondary controls'
   );
   const nav = page.getByRole('navigation', { name: 'Dashboard Navigation' });
   await expect(nav).toBeVisible({ timeout: 60_000 });
-  const create = nav.getByRole('link', { name: 'New Chat' });
+  const create = nav.getByRole('link', { name: 'Chat' });
   const before = await create.boundingBox();
   await page
     .getByRole('button', { name: 'Collapse sidebar', exact: true })
@@ -26,7 +26,9 @@ test('collapsed demo keeps its command allocation and stages secondary controls'
   const secondary = page.locator('[data-sidebar-search-slot] > [inert]');
   await expect(secondary).toHaveAttribute('aria-hidden', 'true');
   await expect(
-    nav.getByRole('link', { name: 'Inbox', exact: true })
+    nav
+      .getByRole('link', { name: 'Home', exact: true })
+      .and(page.locator('[data-navigation-item-id="home"]'))
   ).toHaveCount(1);
 });
 
@@ -53,23 +55,23 @@ for (const theme of ['dark', 'light']) {
       page.viewportSize()!.height,
       0
     );
-    // The Inbox row (canonical `home` destination), not the slot's Inbox bell.
+    // The Home row (canonical `home` destination), not the slot's Inbox bell.
     const home = nav
-      .getByRole('link', { name: 'Inbox', exact: true })
+      .getByRole('link', { name: 'Home', exact: true })
       .and(page.locator('[data-navigation-item-id="home"]'));
     const row = await home.boundingBox();
     expect(row!.height).toBe(28);
-    const create = nav.getByRole('link', { name: 'New Chat' });
+    const create = nav.getByRole('link', { name: 'Chat' });
     await expect(create).toHaveCount(1);
     await expect(create).toHaveAttribute('href', '/app/chat');
     await expect(nav.locator('[data-sidebar-history-header]')).toContainText(
       'Today'
     );
     await expect(
-      nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
+      nav.locator('[data-sidebar-search-slot] [aria-label="Chat"]')
     ).toHaveCount(1);
     await expect(
-      nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
+      nav.locator('[data-sidebar-search-slot] [aria-label="Chat"]')
     ).toHaveCount(1);
     await expect(
       nav.getByRole('button', { name: 'Filter Unread Chats' })
@@ -405,7 +407,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         name: 'Dashboard Navigation',
       });
       await expect(nav).toBeVisible({ timeout: 60_000 });
-      const create = nav.getByRole('link', { name: 'New Chat', exact: true });
+      const create = nav.getByRole('link', { name: 'Chat', exact: true });
       const draft = page.getByRole('textbox', { name: 'Campaign Draft' });
       await draft.fill('Preserve this campaign draft');
       await draft.evaluate(element => {
@@ -413,11 +415,11 @@ for (const history of ['composed-history', 'composed-empty-history']) {
       });
       const expanded = await readSidebarAnchors(page);
       const headingAction = nav.locator(
-        '[data-sidebar-search-slot] [aria-label="New Chat"]'
+        '[data-sidebar-search-slot] [aria-label="Chat"]'
       );
       await expect(headingAction).toHaveCount(1);
       await expect(create).toHaveCount(1);
-      await expect(nav.getByText('New Chat', { exact: true })).toHaveCount(0);
+      await expect(nav.getByText('Chat', { exact: true })).toHaveCount(0);
       await expect(
         nav.getByRole('button', { name: 'Filter Unread Chats' })
       ).toHaveCount(0);
@@ -437,7 +439,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         element.addEventListener(
           'click',
           event => {
-            if ((event.target as Element).closest('[aria-label="New Chat"]')) {
+            if ((event.target as Element).closest('[aria-label="Chat"]')) {
               event.preventDefault();
               element.dataset.creationCount = String(
                 Number(element.dataset.creationCount) + 1
@@ -458,7 +460,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
           .click();
         await expect(create).toHaveCount(1);
         await expect(
-          nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
+          nav.locator('[data-sidebar-search-slot] [aria-label="Chat"]')
         ).toHaveCount(1);
         expectStableSidebar(expanded, await readSidebarAnchors(page));
         if (cycle === 0)
@@ -509,7 +511,7 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         page.getByRole('button', { name: 'Expand sidebar', exact: true })
       ).toBeVisible();
       await expect(
-        nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
+        nav.locator('[data-sidebar-search-slot] [aria-label="Chat"]')
       ).toHaveCount(1);
       await expect(draft).toHaveValue('Preserve this campaign draft');
     });
@@ -525,11 +527,11 @@ test('mobile history keeps direct creation access in a short drawer', async ({
   );
   const nav = page.getByRole('navigation', { name: 'Dashboard Navigation' });
   await expect(nav).toBeVisible({ timeout: 60_000 });
-  const create = nav.getByRole('link', { name: 'New Chat', exact: true });
+  const create = nav.getByRole('link', { name: 'Chat', exact: true });
   await expect(create).toHaveCount(1);
   await expect(create).toHaveAttribute('href', '/app/chat');
   await expect(
-    nav.locator('[data-sidebar-search-slot] [aria-label="New Chat"]')
+    nav.locator('[data-sidebar-search-slot] [aria-label="Chat"]')
   ).toHaveCount(1);
   await create.focus();
   await expect(create).toBeFocused();

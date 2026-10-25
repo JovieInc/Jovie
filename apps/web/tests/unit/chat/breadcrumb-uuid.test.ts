@@ -3,8 +3,8 @@ import { getDemoBreadcrumbSegment } from '@/hooks/useAuthRouteConfig';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 
 describe('getBreadcrumbLabel', () => {
-  it('returns "New Chat" for the chat segment', () => {
-    expect(getBreadcrumbLabel('chat')).toBe('New Chat');
+  it('returns "Chat" for the chat segment', () => {
+    expect(getBreadcrumbLabel('chat')).toBe('Chat');
   });
 
   it('returns "Dashboard" for the dashboard segment', () => {

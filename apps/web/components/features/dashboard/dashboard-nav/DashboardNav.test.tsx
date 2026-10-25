@@ -116,17 +116,19 @@ describe('DashboardNav route warming', () => {
       appFlags: { PROFILES_WORKSPACE: true },
     });
 
-    for (const label of ['New Chat', 'Identity', 'Work', 'Audience']) {
+    for (const label of ['Chat', 'Identity', 'Work', 'Audience']) {
       expect(screen.getByRole('link', { name: label })).toHaveAttribute(
         'data-prefetch',
         'false'
       );
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
-    expect(homeLinks).toHaveLength(2);
-    for (const link of homeLinks) {
+    const inboxAttention = screen.getAllByRole('link', { name: 'Inbox' });
+    expect(inboxAttention).toHaveLength(1);
+    for (const link of inboxAttention) {
       expect(link).toHaveAttribute('data-prefetch', 'false');
     }
+    const home = screen.getByRole('link', { name: 'Home' });
+    expect(home).toHaveAttribute('data-prefetch', 'false');
     for (const label of ['Library', 'Links', 'Contacts', 'Calendar', 'Tasks']) {
       expect(
         screen.queryByRole('link', { name: label })
@@ -134,7 +136,7 @@ describe('DashboardNav route warming', () => {
     }
   });
 
-  it('acknowledges New Chat immediately while retaining authenticated content', () => {
+  it('acknowledges Chat immediately while retaining authenticated content', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
     renderDashboardNav({
       renderFn: render,
@@ -143,7 +145,7 @@ describe('DashboardNav route warming', () => {
       ),
     });
 
-    const newChat = screen.getByRole('link', { name: 'New Chat' });
+    const newChat = screen.getByRole('link', { name: 'Chat' });
     newChat.addEventListener('click', event => event.preventDefault());
     fireEvent.click(newChat);
 
@@ -228,7 +230,7 @@ describe('DashboardNav route warming', () => {
   it('clears a pending acknowledgment immediately when connectivity is lost', () => {
     mockUsePathname.mockReturnValue(APP_ROUTES.DASHBOARD);
     renderDashboardNav({ renderFn: render });
-    const link = screen.getByRole('link', { name: 'New Chat' });
+    const link = screen.getByRole('link', { name: 'Chat' });
     link.addEventListener('click', event => event.preventDefault());
     fireEvent.click(link);
     expect(link).toHaveAttribute('aria-busy', 'true');
@@ -300,17 +302,17 @@ describe('DashboardNav route warming', () => {
     ).toHaveAccessibleName('Inbox');
   });
 
-  // JOV-6181: the rail's New Chat affordance must never carry the terminal
+  // JOV-6181: the rail's Chat affordance must never carry the terminal
   // label fade — on the compact create treatment it sheared the trailing "t"
   // ("Chat" -> "Cha") with rail space free. The canonical rail renders the
   // action icon-only inside the search slot; this walks the real production
-  // tree so any future labelled New Chat row stays unmasked.
-  it('keeps the New Chat affordance unmasked in the production rail', () => {
+  // tree so any future labelled Chat row stays unmasked.
+  it('keeps the Chat affordance unmasked in the production rail', () => {
     const { container } = renderDashboardNav({ renderFn: render });
 
-    const newChatAction = screen.getByRole('link', { name: 'New Chat' });
+    const newChatAction = screen.getByRole('link', { name: 'Chat' });
     expect(newChatAction).toBeInTheDocument();
-    expect(newChatAction).toHaveAttribute('aria-label', 'New Chat');
+    expect(newChatAction).toHaveAttribute('aria-label', 'Chat');
     expect(newChatAction.className).toContain('focus-visible:ring-inset');
     expect(newChatAction.closest('nav')?.className).not.toContain(
       'transform-gpu'
@@ -326,19 +328,19 @@ describe('DashboardNav route warming', () => {
     const nav = container.querySelector('nav');
     expect(nav).not.toBeNull();
     for (const el of Array.from(nav?.querySelectorAll('*') ?? [])) {
-      if (el.textContent?.trim() === 'New Chat') {
+      if (el.textContent?.trim() === 'Chat') {
         expect(el.className).not.toContain('mask-image');
       }
     }
   });
 
-  it('retains New Chat while secondary commands leave collapsed keyboard and AX navigation', () => {
+  it('retains Chat while secondary commands leave collapsed keyboard and AX navigation', () => {
     const view = renderDashboardNav({
       renderFn: render,
       sidebarProps: { defaultOpen: false },
       navChildren: <button type='button'>Search fixture</button>,
     });
-    const create = view.getByRole('link', { name: 'New Chat' });
+    const create = view.getByRole('link', { name: 'Chat' });
     expect(create.closest('[inert], [aria-hidden="true"]')).toBeNull();
     expect(view.queryByRole('button', { name: 'Search fixture' })).toBeNull();
     const secondary = view.container.querySelector(
@@ -352,13 +354,11 @@ describe('DashboardNav route warming', () => {
 
   it('keeps the one canonical action at the top in expanded and compact modes', () => {
     const view = renderDashboardNav({ renderFn: render });
-    const expanded = screen.getByRole('link', { name: 'New Chat' });
+    const expanded = screen.getByRole('link', { name: 'Chat' });
     expect(expanded).toHaveAttribute('href', APP_ROUTES.CHAT);
     expect(expanded.parentElement).toHaveAttribute('data-sidebar-search-slot');
     expect(
-      document.querySelector(
-        '[data-sidebar-search-slot] a[aria-label="New Chat"]'
-      )
+      document.querySelector('[data-sidebar-search-slot] a[aria-label="Chat"]')
     ).toBe(expanded);
     expect(
       screen.queryByRole('button', { name: 'Filter Unread Chats' })
@@ -368,27 +368,27 @@ describe('DashboardNav route warming', () => {
       renderFn: render,
       sidebarProps: { defaultOpen: false },
     });
-    const compact = screen.getByRole('link', { name: 'New Chat' });
+    const compact = screen.getByRole('link', { name: 'Chat' });
     expect(compact.closest('[data-sidebar-search-slot]')).not.toBeNull();
     expect(compact).toHaveAttribute('href', expanded.getAttribute('href'));
   });
 
   it('preserves the mounted action and focus through sidebar changes', () => {
     renderDashboardNav({ renderFn: render, children: <CollapseFixture /> });
-    const create = screen.getByRole('link', { name: 'New Chat' });
+    const create = screen.getByRole('link', { name: 'Chat' });
     create.focus();
     expect(create).toHaveFocus();
     fireEvent.click(
       screen.getByRole('button', { name: 'Toggle Fixture Rail' })
     );
-    const compact = screen.getByRole('link', { name: 'New Chat' });
+    const compact = screen.getByRole('link', { name: 'Chat' });
     expect(compact.closest('[data-sidebar-search-slot]')).not.toBeNull();
     expect(compact).toBe(create);
     expect(compact).toHaveFocus();
     fireEvent.click(
       screen.getByRole('button', { name: 'Toggle Fixture Rail' })
     );
-    const expanded = screen.getByRole('link', { name: 'New Chat' });
+    const expanded = screen.getByRole('link', { name: 'Chat' });
     expect(expanded.parentElement).toHaveAttribute('data-sidebar-search-slot');
     expect(expanded).toBe(create);
     expect(expanded).toHaveFocus();

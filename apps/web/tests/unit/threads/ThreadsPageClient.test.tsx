@@ -92,7 +92,7 @@ describe('ChatsPageClient', () => {
       limit: 50,
     });
     expect(screen.queryByRole('heading', { name: 'Threads' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'New Chat' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Chat' })).toHaveAttribute(
       'href',
       APP_ROUTES.CHAT
     );
@@ -182,7 +182,7 @@ describe('ChatsPageClient', () => {
     expect(screen.getByTestId('chats-empty-state')).not.toHaveClass(
       'border-dashed'
     );
-    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(2);
+    expect(screen.getAllByRole('link', { name: 'Chat' })).toHaveLength(2);
   });
 
   it('opens per-chat actions from the hover menu and right-click', async () => {

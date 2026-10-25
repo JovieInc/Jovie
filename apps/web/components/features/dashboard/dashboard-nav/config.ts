@@ -46,7 +46,7 @@ export const inboxNavItem: NavItem = {
 };
 
 export const chatNavItem: NavItem = {
-  name: 'New Chat',
+  name: 'Chat',
   href: APP_ROUTES.CHAT,
   id: 'chat',
   icon: SquarePen,
@@ -57,7 +57,7 @@ export const chatNavItem: NavItem = {
 };
 
 export const homeNavItem: NavItem = {
-  name: 'Inbox',
+  name: 'Home',
   href: APP_ROUTES.DASHBOARD,
   id: 'home',
   icon: Home,
@@ -216,7 +216,7 @@ export const userSettingsNavigation: SettingsNavItem[] = [
     description: 'Manage account-authorized services',
   },
   {
-    name: 'Usage Stats',
+    name: 'Usage stats',
     href: APP_ROUTES.SETTINGS_USAGE,
     id: 'usage',
     admission: {
@@ -231,7 +231,7 @@ export const userSettingsNavigation: SettingsNavItem[] = [
     icon: Gauge,
   },
   {
-    name: 'Billing & Subscription',
+    name: 'Billing & subscription',
     href: APP_ROUTES.SETTINGS_BILLING,
     id: 'billing',
     admission: {
@@ -260,7 +260,7 @@ export const userSettingsNavigation: SettingsNavItem[] = [
     description: 'Share your link and earn on referred artists',
   },
   {
-    name: 'Data & Privacy',
+    name: 'Data & privacy',
     href: APP_ROUTES.SETTINGS_DATA_PRIVACY,
     id: 'data-privacy',
     admission: {
@@ -350,7 +350,7 @@ export const artistSettingsNavigation: SettingsNavItem[] = [
     icon: PieChart,
   },
   {
-    name: 'Audience & Tracking',
+    name: 'Audience & tracking',
     href: APP_ROUTES.SETTINGS_AUDIENCE,
     id: 'audience-tracking',
     admission: {

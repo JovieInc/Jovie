@@ -102,11 +102,11 @@ describe('dashboard metadata generation', () => {
     expect(metadata.title).toBe('Home');
   });
 
-  it('uses the visible New Chat title for the chat home route', async () => {
+  it('uses the visible Chat title for the chat home route', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/chat/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('New Chat');
+    expect(metadata.title).toBe('Chat');
   });
 
   it('uses conversation title for chat thread metadata when present', async () => {

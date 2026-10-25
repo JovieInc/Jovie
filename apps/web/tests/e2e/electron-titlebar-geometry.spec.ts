@@ -95,7 +95,7 @@ async function assertElectronShellControls(
   await expect(
     page.locator('header a[aria-label="New Conversation"]')
   ).toHaveCount(0);
-  await expect(page.getByRole('link', { name: 'New Chat' })).toHaveCount(
+  await expect(page.getByRole('link', { name: 'Chat' })).toHaveCount(
     expectedNewChatRows
   );
 }
@@ -173,7 +173,7 @@ test('no duplicate sidebar dock button and titlebar toggle on the same page', as
   await expect(
     page.locator('[data-testid="electron-sidebar-toggle"]')
   ).toHaveCount(1);
-  await expect(page.getByRole('link', { name: 'New Chat' })).toHaveCount(1);
+  await expect(page.getByRole('link', { name: 'Chat' })).toHaveCount(1);
 
   // The titlebar sidebar toggle must be present (it is the canonical one in Electron).
   const titlebarToggle = page.locator(
@@ -471,7 +471,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       );
       expect(
         chatGrid,
-        'New Chat renders both the greeting and the composer'
+        'Chat renders both the greeting and the composer'
       ).not.toBeNull();
       expect(chatGrid?.centerDelta ?? 99).toBeLessThanOrEqual(1);
       expect(chatGrid?.starterLeftInset ?? -1).toBeGreaterThanOrEqual(0);

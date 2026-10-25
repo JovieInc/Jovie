@@ -52,13 +52,13 @@ export const Active: Story = {
   },
 };
 
-// Elevated New Chat create row (JOV-6181): the primary tone drops the
+// Elevated Chat create row (JOV-6181): the primary tone drops the
 // terminal label fade so the full label renders on the compact w-fit pill.
 export const PrimaryCreate: Story = {
   args: {
     item: {
       id: 'chat',
-      name: 'New Chat',
+      name: 'Chat',
       href: '/app/chat',
       icon: SquarePen,
       tone: 'primary',

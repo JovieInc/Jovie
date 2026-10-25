@@ -22,7 +22,7 @@ vi.mock('@/lib/queries/prefetch-dashboard', () => ({
   prefetchForRoute: prefetchForRouteMock,
 }));
 
-const PRIMARY_LABELS = ['New Chat', 'Identity', 'Work', 'Audience'] as const;
+const PRIMARY_LABELS = ['Chat', 'Identity', 'Work', 'Audience'] as const;
 
 describe('DashboardNav interactions', () => {
   afterEach(() => {
@@ -42,20 +42,22 @@ describe('DashboardNav interactions', () => {
       expect(link.querySelector('svg')).toBeTruthy();
       expect(link).toHaveAccessibleName(label);
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
-    expect(homeLinks).toHaveLength(2);
-    for (const link of homeLinks) {
+    const inboxAttention = screen.getAllByRole('link', { name: 'Inbox' });
+    expect(inboxAttention).toHaveLength(1);
+    for (const link of inboxAttention) {
       expect(link.querySelector('svg')).toBeTruthy();
     }
+    const home = screen.getByRole('link', { name: 'Home' });
+    expect(home.querySelector('svg')).toBeTruthy();
   });
 
-  it('keeps New Chat a compact create CTA with a larger utility-to-navigation gap', () => {
+  it('keeps Chat a compact create CTA with a larger utility-to-navigation gap', () => {
     const { container } = renderDashboardNav({
       renderFn: render,
       navChildren: <button type='button'>Search</button>,
     });
 
-    const newChat = screen.getByRole('link', { name: 'New Chat' });
+    const newChat = screen.getByRole('link', { name: 'Chat' });
     const searchSlot = container.querySelector<HTMLElement>(
       '[data-sidebar-search-slot="true"]'
     );
@@ -178,7 +180,7 @@ describe('DashboardNav interactions', () => {
     );
   });
 
-  it('keeps compact loading and empty thread states free of duplicate New Chat controls', () => {
+  it('keeps compact loading and empty thread states free of duplicate Chat controls', () => {
     mockUseChatConversationsQuery.mockReturnValue({
       data: undefined,
       isLoading: true,
@@ -200,8 +202,8 @@ describe('DashboardNav interactions', () => {
       renderFn: render,
     });
 
-    expect(screen.getAllByRole('link', { name: 'New Chat' })).toHaveLength(1);
-    expect(screen.queryByRole('button', { name: 'New Chat' })).toBeNull();
+    expect(screen.getAllByRole('link', { name: 'Chat' })).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: 'Chat' })).toBeNull();
   });
 
   it('marks an active thread read without changing primary navigation', async () => {
@@ -229,7 +231,7 @@ describe('DashboardNav interactions', () => {
         JSON.parse(localStorage.getItem('jovie:sidebar-thread-read-at')!)
       ).toMatchObject({ 'thread-1': '2026-05-12T00:00:00.000Z' });
     });
-    expect(screen.getByRole('link', { name: 'New Chat' })).not.toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Chat' })).not.toHaveAttribute(
       'aria-current'
     );
   });

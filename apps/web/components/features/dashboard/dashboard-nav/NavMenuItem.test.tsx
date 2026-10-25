@@ -43,16 +43,16 @@ describe('NavMenuItem', () => {
     expect(label.className).not.toContain('justify-self-start');
   });
 
-  // JOV-6181 (desktop rail companion): the compact New Chat create row is
+  // JOV-6181 (desktop rail companion): the compact Chat create row is
   // w-fit with an auto-sized label track, so its span hugs the text — the
   // full-track terminal fade would shear the trailing glyph ("Chat" -> "Cha")
   // with rail space free. Primary/secondary create tones keep the raw clip.
-  it('keeps the New Chat primary rail label off the terminal fade', () => {
+  it('keeps the Chat primary rail label off the terminal fade', () => {
     render(
       <NavMenuItem
         item={{
           id: 'chat',
-          name: 'New Chat',
+          name: 'Chat',
           href: '/app/chat',
           icon: SquarePen,
           tone: 'primary',
@@ -61,7 +61,7 @@ describe('NavMenuItem', () => {
       />
     );
 
-    const label = screen.getByText('New Chat');
+    const label = screen.getByText('Chat');
     expect(label.className).toContain('w-full');
     expect(label.className).toContain('justify-self-stretch');
     expect(label.className).toContain('overflow-hidden');
@@ -72,12 +72,12 @@ describe('NavMenuItem', () => {
   // config regression (tone dropped, renamed label) cannot silently re-expose
   // the fade on the row the production rail hands to NavMenuItem.
   it('keeps the configured chatNavItem label unmasked', () => {
-    expect(chatNavItem.name).toBe('New Chat');
+    expect(chatNavItem.name).toBe('Chat');
     expect(chatNavItem.tone).toBe('primary');
 
     render(<NavMenuItem item={chatNavItem} isActive={false} />);
 
-    const label = screen.getByText('New Chat');
+    const label = screen.getByText('Chat');
     expect(label.className).not.toContain('mask-image');
   });
 

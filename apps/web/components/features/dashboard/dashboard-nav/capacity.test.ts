@@ -134,7 +134,7 @@ describe('partitionCustomerNavigation', () => {
     const items: NavItem[] = [
       {
         id: 'chat',
-        name: 'New Chat',
+        name: 'Chat',
         href: APP_ROUTES.CHAT,
         icon: SquarePen,
         tier: 'core',

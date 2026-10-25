@@ -444,7 +444,7 @@ export function DashboardNav({
           : undefined
       }
       prefetch={false}
-      aria-label='New Chat'
+      aria-label='Chat'
       data-navigation-item-id={chatNavItem.id}
       data-navigation-pending={
         pendingNavigation?.itemId === chatNavItem.id || undefined
