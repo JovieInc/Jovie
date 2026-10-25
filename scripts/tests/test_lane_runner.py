@@ -7207,10 +7207,11 @@ class FixRedTest(unittest.TestCase):
         def shell(args, **kwargs):
             if args[:3] == ["git", "worktree", "add"]:
                 Path(args[-2]).mkdir(parents=True)
-            out = log_text if args[:3] == ["gh", "run", "view"] else ""
-            return SimpleNamespace(returncode=0, stdout=out, stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
         agent = Mock(return_value=SimpleNamespace(returncode=0))
-        with patch.object(lane, "sh", side_effect=shell), patch.object(lane, "run_agent", agent), \
+        budgeted = lambda args, **kwargs: SimpleNamespace(returncode=0, stdout=log_text, stderr="")
+        with patch.object(lane, "sh", side_effect=shell), patch.object(lane, "gh_call", side_effect=budgeted), \
+                patch.object(lane, "run_agent", agent), \
                 patch.object(lane, "_rerun_failed", return_value=rerun) as again, \
                 patch.object(lane, "failure_excerpt", return_value=""), \
                 patch.object(lane.disk_guard, "free_pct", return_value=50.0):

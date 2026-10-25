@@ -57,6 +57,7 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
 import ownership  # noqa: E402  (started-state live-owner invariant)
@@ -141,7 +142,8 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_linear_sync.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
+RELEASE_EXTRAS = ["scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py", "packages/api-client/providers.json",
+                  "scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
@@ -6432,7 +6434,7 @@ def infra_only_red(host: Host, pr: dict) -> str | None:
         job = re.search(r"/job/(\d+)", check.get("detailsUrl") or "")
         if not job:
             return None
-        log = sh(["gh", "run", "view", "--repo", REPO_SLUG, "--job", job.group(1), "--log-failed"], timeout=120)
+        log = gh_call(["run", "view", "--repo", REPO_SLUG, "--job", job.group(1), "--log-failed"])
         hit = PLATFORM_RED_TEXT.search(log.stdout or "") if log.returncode == 0 else None
         if not hit:
             return None
