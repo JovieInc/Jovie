@@ -8,11 +8,50 @@ vi.mock('@/lib/ovie/summer-shadow-client', () => ({
 import { runSummerCanary } from './summer-canary';
 
 const sse = (...events: string[]) =>
-  new Response(events.map(e => `event: ${e}\ndata: {}\n\n`).join(''));
+  new Response(
+    events
+      .map(e => {
+        const data =
+          e === 'done'
+            ? '{"timing":{"authMs":40,"queueMs":1,"setupMs":5,"modelMs":900,"uptimeS":3.2}}'
+            : e === 'meta'
+              ? '{"model":"zai/glm-5.3-flash"}'
+              : '{}';
+        return `event: ${e}\ndata: ${data}\n\n`;
+      })
+      .join('')
+  );
 const run = (fetchChat: unknown) =>
   runSummerCanary({ principalHash: 'p', fetchChat: fetchChat as never });
 
 describe('summer canary', () => {
+  it('records first-token time separately from total, with the server hop trace', async () => {
+    let t = 0;
+    const result = await runSummerCanary({
+      principalHash: 'p',
+      now: () => (t += 100),
+      fetchChat: (async () => sse('meta', 'delta', 'done')) as never,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      model: 'zai/glm-5.3-flash',
+      server: { authMs: 40, modelMs: 900, uptimeS: 3.2 },
+    });
+    if (!result.ok) throw new Error('unreachable');
+    expect(result.ttftMs).toBeLessThan(result.totalMs);
+    expect(result.headersMs).toBeLessThanOrEqual(result.ttftMs);
+  });
+
+  it('flags a first token slower than the 1.5 s p50 target', async () => {
+    let t = 0;
+    const result = await runSummerCanary({
+      principalHash: 'p',
+      now: () => (t += 2000),
+      fetchChat: (async () => sse('meta', 'delta', 'done')) as never,
+    });
+    expect(result).toMatchObject({ ok: true, withinTarget: { p50: false } });
+  });
+
   it('passes on text then done, and sends no history', async () => {
     const fetchChat = vi.fn(async () => sse('meta', 'delta', 'done'));
     expect((await run(fetchChat)).ok).toBe(true);
