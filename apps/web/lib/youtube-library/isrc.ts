@@ -27,6 +27,8 @@ export interface CatalogRecording {
   readonly isrc: string | null;
   readonly releaseId: string | null;
   readonly title: string;
+  /** Recording duration, used to choose between same-title versions. */
+  readonly durationMs?: number | null;
 }
 
 export interface ResolveReleaseLinkInput {

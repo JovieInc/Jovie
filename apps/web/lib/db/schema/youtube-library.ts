@@ -69,6 +69,7 @@ export const youtubeMatchSourceEnum = pgEnum('youtube_match_source', [
   'distributor_data',
   'first_party_release',
   'manual',
+  'title_match',
 ]);
 
 // ============================================================================

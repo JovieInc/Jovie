@@ -26,6 +26,7 @@ import {
   drizzleYouTubeLibraryRepository,
   type YouTubeLibraryRepository,
 } from './repository';
+import { resolveTitleReleaseLink } from './title-link';
 import type {
   YouTubeChannelVideo,
   YouTubeLibraryProvider,
@@ -384,7 +385,25 @@ async function syncReleaseLinks(ctx: SyncReleaseLinksContext): Promise<number> {
       video: { title: video.title, description: video.description },
       catalog,
     });
-    if (!resolved) continue;
+    if (!resolved) {
+      const titled = resolveTitleReleaseLink({
+        video: { title: video.title, durationSeconds: video.durationSeconds },
+        catalog,
+      });
+      if (titled) {
+        linkRows.push({
+          videoId: videoPk,
+          releaseId: titled.releaseId,
+          recordingId: titled.recordingId,
+          isrc: null,
+          matchSource: titled.matchSource,
+          confidence: titled.confidence.toFixed(4),
+          status: titled.status,
+          rationale: titled.rationale,
+        });
+      }
+      continue;
+    }
     linkRows.push({
       videoId: videoPk,
       releaseId: resolved.releaseId,

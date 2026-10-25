@@ -1,0 +1,1 @@
+ALTER TYPE "public"."youtube_match_source" ADD VALUE IF NOT EXISTS 'title_match' AFTER 'manual';

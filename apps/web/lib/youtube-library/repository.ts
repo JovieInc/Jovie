@@ -196,6 +196,7 @@ export const drizzleYouTubeLibraryRepository: YouTubeLibraryRepository = {
         id: discogRecordings.id,
         isrc: discogRecordings.isrc,
         title: discogRecordings.title,
+        durationMs: discogRecordings.durationMs,
         releaseId: discogReleaseTracks.releaseId,
       })
       .from(discogRecordings)
