@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 2,
+  "label": "",
+  "flaky": [],
+  "run": {
+    "repository": null,
+    "headSha": null,
+    "runId": null,
+    "runAttempt": null,
+    "event": null,
+    "job": null
+  },
+  "generatedAt": "2026-10-05T13:57:23.199Z",
+  "complete": true,
+  "executions": [
+    {
+      "file": "components/marketing/MarketingHeroPhoto.test.tsx",
+      "fileHash": "3b6957ea9fe1d4a693f3df892a309c51bed4d9725e8850609ff7fe5ca0c889b8",
+      "executedCount": 2,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    },
+    {
+      "file": "app/(marketing)/product/ProductClaimHandleForm.test.tsx",
+      "fileHash": "35d6f3df2f83a68668d61e83b4a8e5210227d9a48f18b03c4289788dbf89bdce",
+      "executedCount": 7,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    },
+    {
+      "file": "tests/unit/home/HomepageIdentityHero.test.tsx",
+      "fileHash": "4375eee7f075ed5f0213a18c4ed6661b7e11de162e68bb813731345c975e3df7",
+      "executedCount": 6,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    },
+    {
+      "file": "tests/unit/home/homepage-v3-page.test.tsx",
+      "fileHash": "5489279c022d25b2d5b20dc35f78988602156342a187da5a084a88605cac4dbc",
+      "executedCount": 2,
+      "skippedCount": 0,
+      "retryCount": 0,
+      "outcome": "clean",
+      "complete": true,
+      "failures": []
+    }
+  ]
+}
