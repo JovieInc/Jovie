@@ -187,6 +187,13 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     await page.goto(APP_ROUTES.RELEASES);
     await page.getByRole('button', { name: 'Create a new release' }).click();
     await page.getByRole('menuitem', { name: 'Add manually' }).click();
+    // The dropdown returns focus to its trigger and the drawer mounts its own
+    // autofocused input while it closes. Typing before both settle sends the
+    // tail of the title to the trigger (observed: "Golde"), so wait for the
+    // menu to be gone and focus to rest on the title input first.
+    await expect(
+      page.getByRole('menuitem', { name: 'Add manually' })
+    ).toBeHidden();
     const drawer = page.getByTestId('add-release-sidebar');
     const createRelease = drawer.getByRole('button', {
       name: 'Create Release',
@@ -195,7 +202,7 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     const titleInput = drawer.locator('#release-title');
     await expect(titleInput).toBeVisible();
     await expect(titleInput).toBeEditable();
-    await titleInput.click();
+    await expect(titleInput).toBeFocused();
     await titleInput.pressSequentially(releaseTitle, { delay: 25 });
     await expect(titleInput).toHaveValue(releaseTitle);
     await expect(createRelease).toBeEnabled();
