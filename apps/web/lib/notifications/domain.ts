@@ -40,6 +40,11 @@ import {
   generateSubscriptionManagementToken,
   verifySubscriptionManagementToken,
 } from '@/lib/notifications/management-token';
+import {
+  consumeEmailOtp,
+  EMAIL_OTP_MAX_ATTEMPTS,
+  spendEmailOtpAttempt,
+} from '@/lib/notifications/otp-service';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import {
   buildErrorResponse,
@@ -915,30 +920,25 @@ export const verifyEmailOtpDomain = async (
     return buildValidationErrorResponse('Code expired. Request a new code.');
   }
 
-  if ((subscription.emailOtpAttempts ?? 0) >= 5) {
-    return buildValidationErrorResponse(
-      'Too many attempts. Request a new code.'
-    );
+  const tooManyAttempts = () =>
+    buildValidationErrorResponse('Too many attempts. Request a new code.');
+  if ((subscription.emailOtpAttempts ?? 0) >= EMAIL_OTP_MAX_ATTEMPTS) {
+    return tooManyAttempts();
   }
 
+  const currentOtp = {
+    id: subscription.id,
+    emailOtpHash: subscription.emailOtpHash,
+  };
+  if (!(await spendEmailOtpAttempt(currentOtp, now))) return tooManyAttempts();
+
   if (hashEmailOtp(parsed.data.otp_code) !== subscription.emailOtpHash) {
-    await db
-      .update(notificationSubscriptions)
-      .set({ emailOtpAttempts: (subscription.emailOtpAttempts ?? 0) + 1 })
-      .where(eq(notificationSubscriptions.id, subscription.id));
     return buildValidationErrorResponse('Invalid verification code');
   }
 
-  await db
-    .update(notificationSubscriptions)
-    .set({
-      confirmedAt: now,
-      confirmationToken: null,
-      emailOtpHash: null,
-      emailOtpExpiresAt: null,
-      emailOtpAttempts: 0,
-    })
-    .where(eq(notificationSubscriptions.id, subscription.id));
+  if (!(await consumeEmailOtp(currentOtp, now))) {
+    return buildValidationErrorResponse('Invalid verification code');
+  }
 
   // Subscribe-time audience upsert is best-effort; ensure a row exists after
   // confirmation so Pro creators see the fan in audience immediately.
