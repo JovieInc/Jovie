@@ -61,6 +61,10 @@ Hard product and marketing rules. Not aesthetic taste.
 5. Profile/avatar: no overlay except an approved tiny verification badge on an approved avatar component.
 6. Press photo: designed one-sheet ok only if it does not cover a face.
 7. Ad/marketing scale is not web scale. Pills and type can go larger.
+8. No text on text (founder-locked 2026-10-25). Our text never overlays artwork
+   that carries text. Release heroes show clean square art and render title and
+   artist below it in normal flow, aligned to the art edges; the h1 stays in the
+   DOM. Guard: `SmartLinkShell.test.tsx` ("no text on text").
 
 ### Logo asset normalization (founder-global 2026-08-12)
 

@@ -12,7 +12,10 @@ import { ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { type ReactNode, useCallback } from 'react';
-import { ARTWORK_FIT_CLASSNAME } from '@/components/atoms/ArtworkFrame';
+import {
+  ARTWORK_FIT_CLASSNAME,
+  ArtworkFrame,
+} from '@/components/atoms/ArtworkFrame';
 import { Icon } from '@/components/atoms/Icon';
 import {
   PublicSurfaceHeader,
@@ -60,7 +63,7 @@ type SmartLinkShellBaseProps = {
   readonly returnHref?: string | null;
   readonly returnLabel?: string;
   /** Exploration only: how square cover art is framed in the hero. */
-  readonly heroTreatment?: 'current' | 'square' | 'blurred';
+  readonly heroTreatment?: 'current' | 'square' | 'blurred' | 'below';
   /** Wraps the artwork image (e.g., for context menu). Must render a relative h-full w-full container. */
   readonly artworkWrapper?: (img: React.ReactNode) => React.ReactNode;
 };
@@ -157,9 +160,10 @@ export function SmartLinkShell({
         <header
           className={cn(
             'relative w-full shrink-0',
-            heroTreatment === 'square'
-              ? 'aspect-square'
-              : 'aspect-[4/3] md:aspect-square'
+            heroTreatment === 'below' && 'pb-1',
+            heroTreatment === 'square' && 'aspect-square',
+            (heroTreatment === 'current' || heroTreatment === 'blurred') &&
+              'aspect-[4/3] md:aspect-square'
           )}
           data-hero-treatment={heroTreatment}
         >
@@ -177,13 +181,17 @@ export function SmartLinkShell({
               />
             </div>
           ) : null}
-          <div className='absolute inset-0'>
-            {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
-          </div>
+          {heroTreatment !== 'below' && (
+            <>
+              <div className='absolute inset-0'>
+                {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
+              </div>
 
-          {/* Vignettes */}
-          <div className='pointer-events-none absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45)_0%,rgba(0,0,0,0.15)_55%,transparent_100%)]' />
-          <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(to_top,var(--profile-stage-bg,rgba(8,9,10,1))_0%,rgba(5,6,8,0.75)_45%,transparent_100%)]' />
+              {/* Vignettes */}
+              <div className='pointer-events-none absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45)_0%,rgba(0,0,0,0.15)_55%,transparent_100%)]' />
+              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(to_top,var(--profile-stage-bg,rgba(8,9,10,1))_0%,rgba(5,6,8,0.75)_45%,transparent_100%)]' />
+            </>
+          )}
 
           <PublicSurfaceHeader
             className='px-5 pt-[max(env(safe-area-inset-top),20px)]'
@@ -205,6 +213,21 @@ export function SmartLinkShell({
               showMenuButton,
             })}
           />
+
+          {heroTreatment === 'below' && (
+            // "No text on text": clean square art, no overlay or gradient on
+            // it. Title and artist render below in normal flow, aligned to
+            // the art edges (DESIGN.md, Do not fuck with art).
+            <div className='relative px-5 pt-4'>
+              <ArtworkFrame
+                size='hero'
+                className='aspect-square w-full'
+                data-testid='smart-link-artwork'
+              >
+                {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
+              </ArtworkFrame>
+            </div>
+          )}
 
           {/* Hero overlay */}
           {heroOverlay}

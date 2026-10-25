@@ -92,7 +92,7 @@ interface ReleaseLandingPageProps
     /** URL to the promo download gate page, shown when promo files exist */
     readonly downloadUrl?: string | null;
     readonly initialMenuOpen?: boolean;
-    readonly heroTreatment?: 'current' | 'square' | 'blurred';
+    readonly heroTreatment?: 'current' | 'square' | 'blurred' | 'below';
   }> {}
 
 function resolveReleaseUtmParams(
@@ -437,9 +437,23 @@ export function ReleaseLandingPage({
           : undefined
       }
       heroOverlay={
-        <div className='absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'>
+        <div
+          className={
+            heroTreatment === 'below'
+              ? 'relative z-10 px-5 pb-1 pt-6'
+              : 'absolute inset-x-0 bottom-5 z-10 flex items-end justify-between px-5'
+          }
+        >
           <div className='min-w-0 flex-1'>
-            <h1 className={SMART_LINK_HERO_TITLE_CLASS}>{release.title}</h1>
+            <h1
+              className={
+                heroTreatment === 'below'
+                  ? 'text-2xl font-semibold leading-8 tracking-tight text-(--color-text-tooltip)'
+                  : SMART_LINK_HERO_TITLE_CLASS
+              }
+            >
+              {release.title}
+            </h1>
             <SmartLinkArtistLine
               artist={artist}
               primaryArtists={primaryArtists}
