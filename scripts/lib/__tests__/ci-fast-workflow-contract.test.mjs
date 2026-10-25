@@ -567,6 +567,7 @@ describe('ci-fast bounded parallel workflow', () => {
         run: 'true',
         spotify: 'false',
         kbd: 'false',
+        chat_tooltip_rail: 'false',
         crawler: 'true',
         desktop_update: 'false',
         overlay: 'false',
@@ -601,6 +602,128 @@ describe('ci-fast bounded parallel workflow', () => {
       expect(chosen.stdout.trim().split('\n')).toEqual([
         'tests/e2e/storybook-ai-crawler.spec.ts',
       ]);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('selects the composed chat tooltip rail proof for its shell owners', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(
+      /CHAT_TOOLTIP_RAIL_STORYBOOK_PATTERN='([^']+)'/
+    )?.[1];
+    expect(pattern).toBeTruthy();
+    for (const path of [
+      'apps/web/components/shell/SidebarThreadsSection.tsx',
+      'apps/web/components/shell/SidebarThreadsSection.stories.tsx',
+      'apps/web/components/shell/SidebarThreadsSection.test.tsx',
+      'apps/web/components/shell/Tooltip.tsx',
+      'apps/web/components/shell/Tooltip.stories.tsx',
+      'apps/web/components/shell/useRailPreview.ts',
+      'apps/web/components/shell/useRailPreview.test.tsx',
+      'apps/web/components/shell/rail-motion.ts',
+      'apps/web/app/app/(shell)/threads/ThreadsPageClient.tsx',
+      'apps/web/components/organisms/UnifiedSidebar.stories.tsx',
+      'apps/web/tests/e2e/storybook-chat-tooltip-rail.spec.ts',
+    ]) {
+      expect(
+        spawnSync('grep', ['-qE', pattern], {
+          input: `${path}\n`,
+          encoding: 'utf8',
+        }).status,
+        path
+      ).toBe(0);
+    }
+    expect(
+      spawnSync('grep', ['-qE', pattern], {
+        input: 'apps/web/components/shell/SidebarNavItem.tsx\n',
+        encoding: 'utf8',
+      }).status
+    ).not.toBe(0);
+
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Start ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'chat-rail-storybook-selection-'));
+    try {
+      const output = join(root, 'output');
+      const result = spawnSync(
+        'bash',
+        ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            CHANGED_PATHS:
+              'apps/web/components/shell/SidebarThreadsSection.tsx',
+            RUNNER_TEMP: root,
+            GITHUB_OUTPUT: output,
+          },
+        }
+      );
+      expect(result.status, result.stderr).toBe(0);
+      expect(
+        Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        )
+      ).toEqual({
+        run: 'true',
+        spotify: 'false',
+        kbd: 'false',
+        chat_tooltip_rail: 'true',
+        crawler: 'false',
+        desktop_update: 'false',
+        overlay: 'false',
+        privacy: 'false',
+        tasks: 'false',
+      });
+
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CHAT_TOOLTIP_RAIL: 'true',
+            RUN_CRAWLER: 'false',
+            RUN_OVERLAY: 'false',
+            RUN_TASKS: 'false',
+            RUN_PRIVACY: 'false',
+          },
+        }
+      );
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim().split('\n')).toEqual([
+        'tests/e2e/storybook-chat-tooltip-rail.spec.ts',
+      ]);
+      const chatRailSpec = 'tests/e2e/storybook-chat-tooltip-rail.spec.ts';
+      expect(
+        existsSync(resolve(REPO_ROOT, 'apps/web', chatRailSpec)),
+        chatRailSpec
+      ).toBe(true);
+      expect(
+        jobBlock('ci-storybook-surfaces', 'ci-cross-product-integration')
+      ).toContain(chatRailSpec);
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
@@ -772,6 +895,7 @@ describe('ci-fast bounded parallel workflow', () => {
         run: 'true',
         spotify: 'false',
         kbd: 'false',
+        chat_tooltip_rail: 'false',
         crawler: 'false',
         overlay: 'false',
         tasks: 'true',
