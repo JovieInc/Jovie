@@ -46,6 +46,83 @@ function verifiedBrandDealPayload(
 }
 
 describe('mapSuggestedActionToInboxCard', () => {
+  const entityRow = (payload: unknown) =>
+    mapSuggestedActionToInboxCard({
+      id: 'suggestion-entity',
+      kind: 'suggestion',
+      payload,
+      rationale: 'Review the source',
+      createdAt: new Date('2026-10-24T00:00:00Z'),
+    });
+
+  it.each(['artist', 'release', 'track', 'profile'] as const)(
+    'preserves explicit %s context through inbox mapping',
+    kind => {
+      expect(
+        entityRow({
+          entity: {
+            kind,
+            id: ' entity-1 ',
+            label: ' Entity Name ',
+            imageUrl: 'https://i.scdn.co/art.jpg',
+          },
+        }).entity
+      ).toEqual({
+        kind,
+        id: 'entity-1',
+        label: 'Entity Name',
+        imageUrl: 'https://i.scdn.co/art.jpg',
+      });
+    }
+  );
+
+  it.each([
+    undefined,
+    null,
+    'entity',
+    {},
+    { kind: 'event', id: '1', label: 'Event' },
+    { kind: 'artist', id: ' ', label: 'Name' },
+    { kind: 'track', id: '1', label: ' ' },
+    { kind: 'profile', id: 1, label: 'Name' },
+  ])('ignores incomplete or unsupported identity %j', entity => {
+    expect(entityRow({ entity }).entity).toBeUndefined();
+  });
+
+  it.each([
+    'https://example.com/art.jpg',
+    'http://i.scdn.co/art.jpg',
+    'https://i.scdn.co:8443/art.jpg',
+    Object.assign(new URL('https://i.scdn.co/art.jpg'), {
+      username: 'fixture-user',
+      password: 'fixture-password',
+    }).toString(),
+    'https://i.scdn.co.evil.test/art.jpg',
+    'javascript:alert(1)',
+    'data:image/png;base64,AAAA',
+    '/relative.jpg',
+    'not a URL',
+    null,
+  ])('keeps identity but uses fallback for invalid media %j', imageUrl => {
+    expect(
+      entityRow({
+        entity: { kind: 'release', id: '1', label: 'Release', imageUrl },
+      }).entity
+    ).toEqual({ kind: 'release', id: '1', label: 'Release' });
+  });
+
+  it.each([
+    null,
+    undefined,
+    'invalid',
+    { privateRefs: { profileId: 'private' }, title: 'Artist Name' },
+  ])(
+    'does not infer identity from missing payload or private references %j',
+    payload => {
+      expect(entityRow(payload).entity).toBeUndefined();
+    }
+  );
+
   it('maps an evidence-backed YouTube candidate into the swipe review surface', () => {
     const card = mapSuggestedActionToInboxCard({
       id: 'candidate-1',

@@ -15,6 +15,56 @@ const CARD = {
 };
 
 describe('OpportunityInboxCard', () => {
+  it.each(['artist', 'release', 'track', 'profile'] as const)(
+    'shows shared %s identity without changing approve or dismiss targets',
+    kind => {
+      const onApprove = vi.fn();
+      const onDismiss = vi.fn();
+      render(
+        <OpportunityInboxCard
+          card={{
+            ...CARD,
+            entity: {
+              kind,
+              id: 'entity-1',
+              label: 'Entity Name',
+            },
+          }}
+          onApprove={onApprove}
+          onDismiss={onDismiss}
+          onFeedback={vi.fn()}
+        />
+      );
+      expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
+        'Entity Name'
+      );
+      expect(
+        screen
+          .getByTestId('entity-header')
+          .querySelector('[data-entity-header-thumbnail-variant]')
+      ).toHaveAttribute(
+        'data-entity-header-thumbnail-variant',
+        kind === 'artist' || kind === 'profile' ? 'person' : 'artwork'
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Review pitch/ }));
+      fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+      expect(onApprove).toHaveBeenCalledWith(CARD.id);
+      expect(onDismiss).toHaveBeenCalledWith(CARD.id);
+    }
+  );
+
+  it('leaves legacy cards without an invented identity', () => {
+    render(
+      <OpportunityInboxCard
+        card={CARD}
+        onApprove={vi.fn()}
+        onDismiss={vi.fn()}
+        onFeedback={vi.fn()}
+      />
+    );
+    expect(screen.queryByTestId('entity-header')).not.toBeInTheDocument();
+  });
+
   it('renders card metadata, copy, and actions', () => {
     render(
       <OpportunityInboxCard

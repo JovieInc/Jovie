@@ -98,6 +98,38 @@ const SOCIAL_REPLY_CARD: OpportunityInboxCardViewModel = {
 };
 
 describe('creator inbox composition', () => {
+  it.each([false, true])(
+    'preserves entity context with stack interactions %s',
+    enableStackInteractions => {
+      render(
+        <OpportunityInboxFeed
+          cards={[
+            {
+              ...SUGGESTION_CARD,
+              entity: {
+                kind: 'release',
+                id: 'release-1',
+                label: 'Release Name',
+              },
+            },
+          ]}
+          onApprove={vi.fn()}
+          onDismiss={vi.fn()}
+          onFeedback={vi.fn()}
+          enableStackInteractions={enableStackInteractions}
+        />
+      );
+      expect(screen.getByTestId('entity-header-title')).toHaveTextContent(
+        'Release Name'
+      );
+      expect(
+        screen
+          .getByTestId('entity-header')
+          .querySelector('[data-entity-header-thumbnail-variant]')
+      ).toHaveAttribute('data-entity-header-thumbnail-variant', 'artwork');
+    }
+  );
+
   it('uses creator decisions without a founder stack or recorder when Inbox Home is on', () => {
     render(
       <OpportunityInboxFeed

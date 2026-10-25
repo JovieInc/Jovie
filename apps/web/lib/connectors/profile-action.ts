@@ -55,6 +55,15 @@ export const profileActionProposalSchema = z.strictObject({
 
 export const profileActionPayloadSchema = z
   .strictObject({
+    // Display snapshot only; never an execution target or consent input.
+    entity: z
+      .strictObject({
+        kind: z.literal('profile'),
+        id: z.string().uuid(),
+        label: z.string().trim().min(1),
+        imageUrl: z.string().optional(),
+      })
+      .optional(),
     proposal: profileActionProposalSchema,
     previewChecksum: checksum,
     consent: z

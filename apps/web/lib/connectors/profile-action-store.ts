@@ -99,6 +99,7 @@ export async function proposeProfileAction(input: {
   });
   const id = randomUUID();
   const payload = profileActionPayloadSchema.parse({
+    entity: state.entity,
     proposal,
     previewChecksum: profilePreviewChecksum({
       id,
