@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -85,7 +85,7 @@ const completedMessageProps = {
 };
 
 describe('ChatMessage memoization', () => {
-  it('skips re-render when unrelated sibling props change', () => {
+  it('skips re-render when unrelated sibling props change', async () => {
     markdownRenderCount.current = 0;
 
     const streamingMessageProps = {
@@ -102,7 +102,8 @@ describe('ChatMessage memoization', () => {
       </>
     );
 
-    expect(markdownRenderCount.current).toBe(2);
+    // The markdown engine is a lazy chunk: wait for it to resolve.
+    await waitFor(() => expect(markdownRenderCount.current).toBe(2));
 
     rerender(
       <>
@@ -114,6 +115,6 @@ describe('ChatMessage memoization', () => {
       </>
     );
 
-    expect(markdownRenderCount.current).toBe(3);
+    await waitFor(() => expect(markdownRenderCount.current).toBe(3));
   });
 });
