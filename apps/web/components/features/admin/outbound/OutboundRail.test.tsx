@@ -52,6 +52,33 @@ function renderRail(overrides: Partial<OutboundRailProps> = {}) {
 }
 
 describe('OutboundRail', () => {
+  it('blocks approval and says so when no recipient is on file (A17)', () => {
+    renderRail({ row: outboundFixtureRow({ channel: null }) });
+    expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
+    expect(screen.getByText('No reachable channel.')).toBeInTheDocument();
+  });
+
+  it('explains an unreachable lead with no draft', () => {
+    renderRail({ row: outboundFixtureRow({ channel: null, message: null }) });
+    expect(screen.getByTestId('outbound-message-empty')).toHaveTextContent(
+      'No reachable channel'
+    );
+  });
+
+  it('lists missing evidence and the non-artist flag', () => {
+    renderRail({
+      row: outboundFixtureRow({
+        view: 'flagged',
+        flags: ['possible_non_artist'],
+        entityNote: 'Looks like a label or distributor',
+        missingEvidence: ['dsp', 'search'],
+      }),
+    });
+    const box = screen.getByTestId('outbound-eligibility');
+    expect(box).toHaveTextContent('Looks like a label or distributor');
+    expect(box).toHaveTextContent('Needs evidence: dsp, search.');
+  });
+
   it('blocks approval until the current facts are certified', () => {
     const props = renderRail({ certification: certification('needs_review') });
     expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
@@ -107,17 +134,6 @@ describe('OutboundRail', () => {
       screen.getByText('Resolve the conflict to approve.')
     ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve' })).toBeDisabled();
-  });
-
-  it('says when there is no way to reach someone', () => {
-    renderRail({
-      row: outboundFixtureRow({ channel: null, message: null }),
-    });
-    expect(
-      screen.getByText(
-        'No email or Instagram on file, so there is no way to reach them.'
-      )
-    ).toBeInTheDocument();
   });
 
   it('offers a refresh while evidence is missing on a built profile', () => {

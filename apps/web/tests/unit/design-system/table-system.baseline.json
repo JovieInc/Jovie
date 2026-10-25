@@ -16,8 +16,6 @@
     "components/organisms/ComparisonPageContent.tsx": 1
   },
   "rawRowHeight": {
-    "components/features/dashboard/organisms/ReleaseTablePendingShell.tsx": 1,
-    "components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx": 1,
-    "components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix.tsx": 1
+    "components/features/dashboard/organisms/dsp-presence/DspPresenceTable.tsx": 1
   }
 }

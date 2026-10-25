@@ -174,6 +174,26 @@ describe('external API guard', () => {
     ).toMatch(/github-script/);
   });
 
+  it('requires shell command recommendations to use the shared client', () => {
+    const path = 'scripts/security/scan-secrets.sh';
+    expect(
+      check(
+        scan(
+          path,
+          'echo "Run history scans in CI (gh workflow run security.yml)"'
+        )
+      )[0]
+    ).toMatch(/scan-secrets\.sh:1 gh-shell: 1 direct call/);
+    expect(
+      check(
+        scan(
+          path,
+          'echo "Run node packages/api-client/cli.ts gh --priority repair -- workflow run security.yml"'
+        )
+      )
+    ).toEqual([]);
+  });
+
   it('accepts the client layer and its shell entry point', () => {
     expect(
       check(

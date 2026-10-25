@@ -2,16 +2,18 @@ import type { Metadata } from 'next';
 import { AboutPageContent } from '@/components/organisms/AboutPageContent';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import {
   buildBreadcrumbSchema,
   buildFaqSchema,
   buildOrganizationSchema,
 } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: ABOUT_COPY.metadataTitle,
+  title: documentTitle(ABOUT_COPY.metadataTitle),
   description: ABOUT_COPY.metadataDescription,
   keywords: [...ABOUT_COPY.keywords],
   alternates: {
@@ -22,6 +24,11 @@ export const metadata: Metadata = {
     description: ABOUT_COPY.openGraphDescription,
     url: `${BASE_URL}/about`,
     type: 'website',
+    images: [marketingOgImage('about')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('about').url],
   },
 };
 

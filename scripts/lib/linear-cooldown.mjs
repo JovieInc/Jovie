@@ -122,7 +122,14 @@ function stateError() {
 }
 
 async function privateDirectory(path, repair = false) {
-  await fs.mkdir(path, { recursive: true, mode: 0o700 });
+  try {
+    await fs.mkdir(path, { recursive: true, mode: 0o700 });
+  } catch (error) {
+    // Concurrent publishers mkdir one scope together. Node reports that race
+    // as EEXIST. The stat check below still fail-closes a file, a symlink,
+    // or a directory this process does not own.
+    if (error?.code !== 'EEXIST') throw error;
+  }
   if (repair) {
     try {
       const current = await fs.lstat(path);

@@ -17,6 +17,7 @@ import {
 } from 'react';
 import { useOptionalChatEntityPanel } from '@/app/app/(shell)/chat/ChatEntityPanelContext';
 import { ChatThreadNavigationRail } from '@/components/features/chat/navigation-rail';
+import { chatTranscriptRangeWithPinnedTail } from '@/components/jovie/chat-transcript-range';
 import { AUDIO_FILE_ACCEPT } from '@/lib/audio/constants';
 import {
   CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
@@ -43,14 +44,15 @@ import { ChatEmptyStateGreeting } from './components/ChatEmptyStateGreeting';
 import { ChatPinnedOpportunityHeader } from './components/ChatPinnedOpportunityHeader';
 import { ChatProvidersRegistrar } from './components/ChatProvidersRegistrar';
 import { EntityResolutionProvider } from './components/EntityResolutionProvider';
+import { ChatStickScrollButton } from './components/ScrollToBottom';
 import {
   useChatFileAttachments,
   useChatJankMonitor,
   useJovieChatController,
-  useStickToBottom,
 } from './hooks';
 import { useChatRailContextTargets } from './hooks/useChatRailContextTargets';
 import { useComposerDraftIntent } from './hooks/useComposerDraft';
+import { useStickToBottomController } from './hooks/useStickToBottom';
 import {
   CHAT_COMPOSER_DOCK_CLASSNAME,
   CHAT_COMPOSER_SCROLL_FADE_CLASSNAME,
@@ -154,14 +156,20 @@ export function JovieChat({
 
   // ─── Sticky scroll via ResizeObserver ────────────────────────────
   const {
-    isStuckToBottom,
     setStuckToBottom,
+    subscribe: subscribeStuckToBottom,
+    getSnapshot: getStuckToBottom,
     totalSizeRef,
     scrollContainerRef,
     bottomSentinelRef,
-  } = useStickToBottom(messages.length);
-  const isStuckToBottomRef = useRef(isStuckToBottom);
-  isStuckToBottomRef.current = isStuckToBottom;
+  } = useStickToBottomController(messages.length);
+  const isStuckToBottomRef = useRef(true);
+  useEffect(() => {
+    isStuckToBottomRef.current = getStuckToBottom();
+    return subscribeStuckToBottom(() => {
+      isStuckToBottomRef.current = getStuckToBottom();
+    });
+  }, [getStuckToBottom, subscribeStuckToBottom]);
 
   // ─── Chat jank instrumentation (flag-gated) ─────────────────
   const jankMonitorEnabled = useAppFlag('CHAT_JANK_MONITOR');
@@ -171,7 +179,11 @@ export function JovieChat({
     conversationId: activeConversationId,
     messages,
     status,
-    isStuckToBottom,
+    // The boolean is ignored while the store subscription is set. Reading
+    // stick state here would re-render the transcript on every sentinel cross.
+    isStuckToBottom: true,
+    subscribeStuckToBottom,
+    getStuckToBottom,
     scrollContainerRef,
     enabled: jankMonitorEnabled,
   });
@@ -367,6 +379,9 @@ export function JovieChat({
     getScrollElement: () => scrollContainerRef.current,
     estimateSize: () => CHAT_TRANSCRIPT_ROW_ESTIMATE_PX,
     overscan: CHAT_TRANSCRIPT_WINDOW.overscanRowCount,
+    // JOV-8481: a window that excludes the last message must still mount the
+    // newest row, or scrollIntoView to the live tail finds no element.
+    rangeExtractor: chatTranscriptRangeWithPinnedTail,
     // The scroll viewport mounts after history resolves; seed from the live
     // scrollTop so a scroll that landed before the offset observer attached
     // isn't replayed as offset 0 (JOV-6702).
@@ -952,7 +967,7 @@ export function JovieChat({
                   <ChatEmptyStateComposerRegion
                     stableDocked
                     fullBleed
-                    alignAbove='top'
+                    alignAbove={livingCanvas ? 'fill' : 'top'}
                     above={
                       typeof homeCanvas === 'function'
                         ? homeCanvas({
@@ -1017,6 +1032,7 @@ export function JovieChat({
                     onUnpin={handleUnpinOpportunity}
                   />
                 ) : null}
+                {/* Stick updates render ChatStickScrollButton only. */}
                 <ChatThreadMessages
                   messages={messages}
                   shouldVirtualizeMessages={shouldVirtualizeMessages}
@@ -1034,11 +1050,16 @@ export function JovieChat({
                   profileId={profileId}
                   knownMessageIds={knownMessageIdsRef.current}
                   inlineChatError={inlineChatError}
-                  isStuckToBottom={isStuckToBottom}
+                  isStuckToBottom
                   onScrollToBottom={() => scrollToBottom()}
                   conversationId={activeConversationId ?? conversationId}
                   collapsedFailureCount={collapsedSummerFailureCount}
                   onShowCollapsedFailures={showCollapsedSummerFailures}
+                />
+                <ChatStickScrollButton
+                  subscribe={subscribeStuckToBottom}
+                  getSnapshot={getStuckToBottom}
+                  onClick={() => scrollToBottom()}
                 />
               </>
             )}

@@ -60,6 +60,11 @@
   /* DS_FOUNDATION_V1: canonical semantic aliases (do not redefine downstream) */
   --ds-public-content-max: 1298px; /* canonical public/marketing width */
   --ds-prose-max: 680px; /* prose exception */
+  /* One boxed public width. Header, hero, sections and footer all use it, so
+     their content edges line up. The only exception is the full-bleed
+     override (.public-container--bleed). Enforced by
+     scripts/invariants/art-direction/container-width.mjs. */
+  --ds-public-gutter: 1.5rem;
 
   /* Marketing display type scale (System B public surfaces). One canonical
      ramp for hero display, section titles, and ledes so marketing pages share
@@ -106,9 +111,19 @@
   --app-shell-sidebar-icon-size: 1rem;
   --app-shell-sidebar-badge-font-size: 0.5rem;
   --app-shell-sidebar-history-font-size: 0.78125rem;
+  /* One optical column from the rail. 12px inset, 8px icon gap, 28px rows.
+     History aliases the nav tracks so titles share the label column. */
+  --app-shell-sidebar-inset: 0.75rem;
+  --app-shell-sidebar-icon-gap: var(--space-2);
+  --app-shell-sidebar-row-height: 1.75rem;
+  --app-shell-sidebar-label-inset: calc(
+    var(--app-shell-sidebar-inset) +
+    var(--app-shell-sidebar-icon-size) +
+    var(--app-shell-sidebar-icon-gap)
+  );
   --app-shell-sidebar-nav-grid: var(--app-shell-sidebar-icon-size)
-    minmax(0, 1fr);
-  --app-shell-sidebar-history-grid: minmax(0, 1fr) auto var(--space-5);
+    minmax(0, 1fr) minmax(0, auto);
+  --app-shell-sidebar-history-grid: var(--app-shell-sidebar-nav-grid);
   --app-shell-header-height: 44px;
   --app-shell-header-padding-x: 12px;
   --app-shell-footer-row-height: calc(var(--space-6) + var(--space-1-5));
@@ -150,7 +165,7 @@
   --app-shell-sidebar-accent-active-rgb: 236 238 241;
   --app-shell-sidebar-item-foreground-rgb: 88 90 96;
   --app-shell-sidebar-item-icon-rgb: 122 125 132;
-  --app-shell-sidebar-muted-rgb: 112 116 124;
+  --app-shell-sidebar-muted-rgb: 98 104 114;
 
   /* System B semantic aliases for public app surfaces. Keep page-level recipes
      on these names instead of route-local Tailwind literals. */
@@ -3546,4 +3561,36 @@ html:not(.dark) .smart-link-powered-by {
   .icon-glyph:hover {
     background-color: var(--icon-glyph-hover-surface, var(--color-surface-1));
   }
+}
+
+/* Public boxed container: the single marketing and public content width.
+   The box IS the content edge (no inner padding), so header, hero, sections
+   and footer content all start at the same x. Gutter steps 24 / 32 / 40px
+   and applies as the viewport margin below the box width. Do not set
+   max-width or horizontal padding on a marketing container any other way. */
+@media (min-width: 640px) {
+  :root {
+    --ds-public-gutter: 2rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --ds-public-gutter: 2.5rem;
+  }
+}
+
+.public-container {
+  width: min(
+    100% -
+    (var(--ds-public-gutter) * 2),
+    var(--ds-public-content-max)
+  );
+  margin-inline: auto;
+}
+
+/* The one full-bleed override: edge to edge with no box and no gutter. */
+.public-container--bleed {
+  width: 100%;
+  max-width: none;
 }

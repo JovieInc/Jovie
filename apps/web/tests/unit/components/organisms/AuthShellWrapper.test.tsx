@@ -325,6 +325,30 @@ describe('AuthShellWrapper', () => {
     );
   });
 
+  it('default-opens the profile settings companion so history can restore it', () => {
+    useAuthRouteConfigMock.mockReturnValue({
+      section: 'settings',
+      isProfileSettings: true,
+      breadcrumbs: [],
+      showMobileTabs: false,
+      isTableRoute: false,
+      isDemoRoute: false,
+      isChatRoute: false,
+      isLyricsRoute: false,
+    });
+
+    render(
+      <AuthShellWrapper previewPanelDefaultOpen>
+        <div>child content</div>
+      </AuthShellWrapper>
+    );
+
+    expect(previewPanelProviderMock).toHaveBeenCalledWith(
+      expect.objectContaining({ defaultOpen: true, enabled: true }),
+      undefined
+    );
+  });
+
   it('does not default-open preview panel on chat routes', () => {
     useAuthRouteConfigMock.mockReturnValue({
       section: 'dashboard',

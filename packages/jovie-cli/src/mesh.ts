@@ -26,6 +26,7 @@ export const MESH_KINDS = [
   'codex',
   'devin',
   'muse',
+  'lola',
 ] as const;
 export const MESH_FLAG_NAMES = [
   'to',

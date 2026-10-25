@@ -31,7 +31,6 @@ const BRAND_LOGO_PRODUCTION_SOURCES = [
   'components/features/dev/DevToolbar.tsx',
   'components/features/demo/DemoShell.tsx',
   'components/features/waitlist/WaitlistIntakeChat.tsx',
-  'components/features/home/HomeV1Design.tsx',
   'app/app/(shell)/profiles/ProfilesWorkspace.tsx',
 ] as const;
 

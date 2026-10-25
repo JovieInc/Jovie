@@ -75,6 +75,31 @@ describe('claim audit primitives', () => {
     expect(resolvesToClaim('Save $0 to $50 a month', claims)).toBe(false);
   });
 
+  it('does not let an approved phrase cover a separate unsupported metric', () => {
+    const claims = [
+      claim('Unlimited smart links'),
+      claim('Trusted by 100 artists'),
+    ];
+    for (const extra of [
+      'Trusted by 50,000 artists.',
+      'Save $50.',
+      '3x more saves.',
+      'Better than the old way.',
+    ]) {
+      const text = `Unlimited smart links. ${extra}`;
+      expect(resolvesToClaim(text, claims), text).toBe(false);
+      expect(auditCopyClaims({ 'fixture.ts': { text } }, claims)).toHaveLength(
+        1
+      );
+    }
+    expect(
+      resolvesToClaim(
+        'Get unlimited smart links today. Trusted by 100 artists.',
+        claims
+      )
+    ).toBe(true);
+  });
+
   it('collects nested strings once and tolerates cycles', () => {
     const cyclic: Record<string, unknown> = { a: 'one', b: ['two', 3, null] };
     cyclic.self = cyclic;
@@ -154,7 +179,7 @@ describe('marketing copy claim coverage', () => {
     ).toBeUndefined();
 
     const homepageSource = readFileSync(
-      path.join(__dirname, '../homepageIdentityCopy.ts'),
+      path.join(__dirname, '../homepageCopy.ts'),
       'utf8'
     );
     const companySource = readFileSync(

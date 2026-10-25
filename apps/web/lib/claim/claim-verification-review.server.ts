@@ -10,7 +10,7 @@ import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { syncReleasesFromSpotify } from '@/lib/discography/spotify-import';
 import { captureError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
-import { summerCardId } from '@/lib/ovie/summer-cards';
+import { summerCardId } from '@/lib/ovie/summer-card-digest';
 import {
   decideSummerCard,
   submitSummerCard,
@@ -315,7 +315,9 @@ export async function decideClaimVerification(input: {
     if (!row.subscriptionId) return { outcome: 'no_subscription' };
     const refund = await refundFirstMonthAndCancel({
       subscriptionId: row.subscriptionId,
-      idempotencyKey: `claim-verification-reject:${input.profileId}`,
+      // Per subscription: a profile re-requested and rejected again inside
+      // Stripe's 24h idempotency window refunds its own charge.
+      idempotencyKey: `claim-verification-reject:${input.profileId}:${row.subscriptionId}`,
     });
     refundId = refund.refundId;
   }

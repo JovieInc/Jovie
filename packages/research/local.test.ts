@@ -1,8 +1,8 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   createProviderClients,
@@ -61,6 +61,26 @@ describe('local sources', () => {
     expect(
       (await searchRepo(root, 'hyperagent lane health proof')).map(h => h.title)
     ).toEqual(['scripts/lanes/hyperagent_lane.py', 'docs/other.md']);
+  });
+
+  it('searches repository files when ripgrep is unavailable', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'repo-'));
+    mkdirSync(join(root, 'docs'));
+    writeFileSync(
+      join(root, 'docs', 'research.md'),
+      'hyperagent lane health proof\n'
+    );
+    vi.stubEnv('PATH', join(root, 'missing-bin'));
+    try {
+      const hits = await searchRepo(root, 'hyperagent lane health proof');
+      expect(hits.map(hit => hit.title)).toEqual(['docs/research.md']);
+      expect(hits[0].snippet).toContain('hyperagent lane health proof');
+      // Subsequent calls also use the fallback once rg is known to be missing.
+      expect(await searchRepo(root, 'hyperagent')).toEqual(hits);
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('sends keyword queries to gbrain and filters weak decision matches', async () => {

@@ -22,6 +22,22 @@ import {
   CommandPaletteMainSurface,
 } from '@/components/organisms/CommandPalette';
 import { HeaderSearchSurfaceFromContext } from '@/components/shell/HeaderSearchSurfaceFromContext';
+
+const preloadCommandPaletteChunk = vi.hoisted(() =>
+  vi.fn(() => Promise.resolve())
+);
+
+vi.mock(
+  '@/components/organisms/command-palette-events',
+  async importOriginal => {
+    const actual =
+      await importOriginal<
+        typeof import('@/components/organisms/command-palette-events')
+      >();
+    return { ...actual, preloadCommandPaletteChunk };
+  }
+);
+
 import {
   HeaderActionsProvider,
   useHeaderActions,
@@ -345,6 +361,22 @@ describe('CommandPalette', () => {
     await waitFor(() => expect(origin).toHaveFocus());
   });
 
+  it('opens on Cmd+K from a non-editor control that stops bubbling', async () => {
+    render(
+      withDashboard(
+        <>
+          <button type='button'>Drawer action</button>
+          <CommandPalette />
+        </>
+      )
+    );
+    const button = screen.getByRole('button', { name: 'Drawer action' });
+    button.addEventListener('keydown', event => event.stopPropagation());
+    button.focus();
+    fireEvent.keyDown(button, { key: 'k', metaKey: true });
+    await screen.findByTestId('cmdk-main-plane');
+  });
+
   it('opens the same main plane from the sidebar Search trigger', async () => {
     render(
       withDashboard(
@@ -436,7 +468,7 @@ describe('CommandPalette', () => {
     await screen.findByTestId('cmdk-main-plane');
     expect(screen.getByText('Recent Chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
-    expect(screen.getByText('Untitled chat')).toBeInTheDocument();
+    expect(screen.getByText('Conversation')).toBeInTheDocument();
     expect(screen.getByText('Active chat')).toBeVisible();
     expect(screen.getByText('Needs attention')).toBeVisible();
     expect(screen.queryByText('Hidden default chat')).toBeNull();
@@ -605,5 +637,12 @@ describe('CommandPalette', () => {
     });
     expect(screen.queryByTestId('cmdk-main-plane')).toBeNull();
     await waitFor(() => expect(origin).toHaveFocus());
+  });
+});
+
+describe('CommandPalette preload', () => {
+  it('warms the palette chunk at idle so the first open is instant', async () => {
+    render(withDashboard(<CommandPalette />));
+    await waitFor(() => expect(preloadCommandPaletteChunk).toHaveBeenCalled());
   });
 });

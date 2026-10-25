@@ -1,6 +1,28 @@
 {
   "schema": "jovie.signal-sources/v1",
   "notes": "Curated changelog watch list. kind: feed (RSS/Atom), html-links (new links matching pattern), html-headings (new h2/h3 entries on a release-notes page). Disabled entries record why.",
+  "x": {
+    "notes": "INTERNAL USE ONLY (Tim 2026-10-21): read through the Grok CLI's X search on Tim's SuperGrok seat (scripts/signals/x_grok.py). It cannot read bookmarks; bookmarks come from the browser-export inbox. One backstop poll per watcher run; kill switch SIGNALS_X_DISABLED=1.",
+    "enabled": true,
+    "accounts": [
+      "AnthropicAI",
+      "claudeai",
+      "OpenAI",
+      "OpenAIDevs",
+      "xai",
+      "GoogleDeepMind",
+      "MistralAI",
+      "AIatMeta",
+      "vercel",
+      "supabase",
+      "Cloudflare",
+      "linear",
+      "github",
+      "Linktree_",
+      "Bandsintown"
+    ],
+    "queries": []
+  },
   "sources": [
     {
       "id": "anthropic-news",

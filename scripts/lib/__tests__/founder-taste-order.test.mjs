@@ -151,6 +151,48 @@ describe('founder taste work order (JOV-7759 x JOV-7703)', () => {
     ).toEqual([]);
   });
 
+  it('accepts on silence past the deadline, and a founder decision still wins', () => {
+    const filed = order();
+    expect(filed.founderAsk.defaultIfSilent).toMatch(
+      /^Accept: the live build stays/
+    );
+    expect(filed.founderAsk.defaultDecision).toBe('approve');
+    expect(Date.parse(filed.budget.deadline) - Date.parse(NOW)).toBe(
+      48 * 60 * 60 * 1000
+    );
+    const description = renderTasteOrder(filed);
+    const deadline = filed.budget.deadline;
+    const before = new Date(Date.parse(deadline) - 1000).toISOString();
+    const after = new Date(Date.parse(deadline) + 1000).toISOString();
+    // Inside the deadline, silence is not a decision.
+    expect(
+      tasteReceiptsFromResults(description, [], 'JOV-1', undefined, before)
+    ).toEqual([]);
+    // Past it, the default accepts the exact build, recorded at the deadline.
+    expect(
+      tasteReceiptsFromResults(description, [], 'JOV-1', undefined, after)
+    ).toEqual([
+      {
+        kind: 'founder-taste',
+        status: 'pass',
+        sha: BUILD,
+        evidence: `default-if-silent: no founder decision on ${filed.orderId} by its deadline ${deadline}`,
+        recordedAt: new Date(Date.parse(deadline)).toISOString(),
+      },
+    ]);
+    // A founder rejection is never overridden by the default.
+    const rejected = summerDecides(sealWorkOrder(filed), 'rejected', 'No.');
+    expect(
+      tasteReceiptsFromResults(
+        description,
+        commentsFor(rejected.result),
+        'JOV-1',
+        undefined,
+        after
+      )
+    ).toEqual([expect.objectContaining({ status: 'fail', note: 'No.' })]);
+  });
+
   it('ignores results for an edited order, another issue, or another revision', () => {
     const filed = order();
     const sealed = sealWorkOrder(filed);

@@ -7,6 +7,7 @@ import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
 import { captureError } from '@/lib/error-tracking';
 import { ExtractionError } from '@/lib/ingestion/strategies/base';
+import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 import {
   LEAD_QUALIFICATION_CONCURRENCY,
   LINKTREE_FETCH_DELAY_MS,
@@ -84,7 +85,7 @@ async function processOneLead(
       .set({
         status: qualification.status,
         sourcePlatform: qualification.sourcePlatform,
-        displayName: qualification.displayName,
+        displayName: cleanScrapedDisplayName(qualification.displayName),
         bio: qualification.bio,
         avatarUrl: qualification.avatarUrl,
         contactEmail: qualification.contactEmail,

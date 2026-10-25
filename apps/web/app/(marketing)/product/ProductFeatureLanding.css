@@ -1,0 +1,13 @@
+.product-feature-glow {
+  height: 36rem;
+}
+
+/* The marketing shell clamps every h1 to two painted lines at zero
+   specificity. This class keeps the page title complete. */
+.product-feature-title {
+  display: block;
+  max-block-size: none;
+  overflow: visible;
+  -webkit-box-orient: initial;
+  -webkit-line-clamp: unset;
+}
