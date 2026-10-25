@@ -8,6 +8,10 @@
 
 import { and, count, desc, eq, sum } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import {
+  applyShareGate,
+  loadSharedContactKeys,
+} from '@/lib/audience/share-gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { apiQuery, QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import { tips } from '@/lib/db/schema/analytics';
@@ -93,16 +97,28 @@ export async function GET() {
         .orderBy(desc(tips.createdAt))
         .limit(50);
 
+      // Level-2 gate: tipper identity is only shown for people who share with
+      // this artist; everyone else is an anonymized row with the amount only.
+      const shareKeys = await loadSharedContactKeys(
+        tx,
+        profile.id,
+        tippers.map(t => ({ email: t.contactEmail, phone: null }))
+      );
+      const gatedTippers = applyShareGate(
+        tippers.map(t => ({ ...t, email: t.contactEmail, phone: null })),
+        shareKeys
+      );
+
       const response: EarningsResponse = {
         stats: {
           totalRevenueCents,
           totalTips,
           averageTipCents,
         },
-        tippers: tippers.map(t => ({
+        tippers: gatedTippers.map(t => ({
           id: t.id,
-          tipperName: t.tipperName,
-          contactEmail: t.contactEmail,
+          tipperName: t.emailVisibleToArtist ? t.tipperName : null,
+          contactEmail: t.emailVisibleToArtist ? t.contactEmail : null,
           amountCents: t.amountCents,
           createdAt: t.createdAt.toISOString(),
         })),

@@ -39,7 +39,7 @@ export function maskAudiencePhone(phone: string): string {
 export function getAudienceVisibleEmail(
   member: Pick<AudienceMember, 'email' | 'emailVisibleToArtist'>
 ): string | null {
-  return member.emailVisibleToArtist === false ? null : member.email;
+  return member.emailVisibleToArtist === true ? member.email : null;
 }
 
 export function isAudienceMemberAnonymous(
@@ -100,7 +100,7 @@ export function getAudienceIdentityChip(
   if (visibleEmail && visibleEmail !== displayName) {
     return visibleEmail;
   }
-  if (member.phone && member.emailVisibleToArtist !== false) {
+  if (member.phone && member.emailVisibleToArtist === true) {
     return maskAudiencePhone(member.phone);
   }
   return null;
@@ -111,7 +111,7 @@ export function isAudienceMemberReachable(
 ): boolean {
   return Boolean(
     getAudienceVisibleEmail(member) ||
-      (member.emailVisibleToArtist !== false && member.phone)
+      (member.emailVisibleToArtist === true && member.phone)
   );
 }
 

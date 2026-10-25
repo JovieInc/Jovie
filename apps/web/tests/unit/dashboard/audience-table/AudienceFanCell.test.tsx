@@ -57,6 +57,7 @@ describe('AudienceFanCell', () => {
           ...baseMember,
           displayName: 'dj_night_owl',
           email: null,
+          emailVisibleToArtist: true,
           // 8 digits — not a real international number; do not invent a CC.
           phone: '+15551005',
         }}
@@ -72,6 +73,7 @@ describe('AudienceFanCell', () => {
           ...baseMember,
           displayName: 'someone',
           email: null,
+          emailVisibleToArtist: true,
           phone: '+12025551234',
         }}
       />
