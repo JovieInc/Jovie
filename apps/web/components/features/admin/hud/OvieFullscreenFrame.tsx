@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   type FullscreenFeedStatus,
   fullscreenDrift,
@@ -26,6 +27,8 @@ export function OvieFullscreenFrame({
   children: ReactNode;
 }>) {
   const [scale, setScale] = useState(1);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const downSince = useRef<number | null>(null);
 
   useEffect(() => {
@@ -87,9 +90,12 @@ export function OvieFullscreenFrame({
   }, [status.level, now]);
 
   const drift = fullscreenDrift(now);
-  return (
+  // Portaled to <body>: the shell has transformed ancestors and its own
+  // stacking, so a fixed child inside it would not cover the sidebar.
+  if (!mounted) return null;
+  return createPortal(
     <div
-      className='fixed inset-0 z-50 cursor-none select-none overflow-hidden bg-base p-4 text-primary-token'
+      className='fixed inset-0 z-[1000] cursor-none select-none overflow-hidden bg-base p-4 text-primary-token'
       data-testid='ovie-fullscreen'
       data-feed-level={status.level}
     >
@@ -104,6 +110,7 @@ export function OvieFullscreenFrame({
       >
         {children}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

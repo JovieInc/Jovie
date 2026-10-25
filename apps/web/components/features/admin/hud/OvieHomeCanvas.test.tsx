@@ -663,7 +663,7 @@ describe('Home full screen', () => {
     renderCanvas();
     const { findByTestId, queryByTestId } = screen;
     const toggle = await findByTestId('ovie-fullscreen-toggle');
-    expect(toggle).toHaveAccessibleName(/Full screen/);
+    expect(toggle).toHaveAccessibleName(/Full Screen/);
     fireEvent.click(toggle);
     expect(await findByTestId('ovie-fullscreen')).toBeInTheDocument();
     expect(await findByTestId('ovie-company-home')).toBeInTheDocument();

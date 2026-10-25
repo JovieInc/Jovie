@@ -107,6 +107,24 @@ async function waitForAuthenticatedShell(page, route) {
       await page
         .getByTestId('ovie-fullscreen')
         .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+    if (route.includes('fullscreen=1')) {
+      // Full Screen must cover the shell: no sidebar link may be the topmost
+      // element at its own position.
+      const covered = await page.evaluate(() => {
+        const link = [...document.querySelectorAll('a')].find(
+          el => el.textContent?.trim() === 'Inbox'
+        );
+        if (!link) return true;
+        const box = link.getBoundingClientRect();
+        const top = document.elementFromPoint(
+          box.x + box.width / 2,
+          box.y + box.height / 2
+        );
+        return Boolean(top?.closest('[data-testid="ovie-fullscreen"]'));
+      });
+      if (!covered)
+        throw new Error('Full Screen did not cover the app shell chrome');
+    }
   }
 
   if (route === '/app/chat' || route.startsWith('/app/chat/')) {
