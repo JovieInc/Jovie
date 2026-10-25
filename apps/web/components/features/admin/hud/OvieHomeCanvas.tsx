@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { toast } from '@/components/feedback';
 import { ChatOpsDataCard } from '@/components/jovie/components/ChatOpsDataCard';
@@ -29,10 +28,14 @@ import {
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { OvieCompanyHome } from './OvieCompanyHome';
-import { OvieWallFrame } from './OvieWallFrame';
+import { OvieFeedBanner } from './OvieFeedBanner';
+import { OvieFullscreenFrame } from './OvieFullscreenFrame';
+import { OvieFullscreenToggle } from './OvieFullscreenToggle';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 import { useOvieCompanyQueries } from './useOvieCompanyQueries';
+import { useOvieFeedStatus } from './useOvieFeedStatus';
+import { useOvieFullscreen } from './useOvieFullscreen';
 import { useOvieHomeReadyTiming } from './useOvieHomeReadyTiming';
 import { useOvieLastLooked } from './useOvieLastLooked';
 
@@ -74,7 +77,7 @@ export interface OvieHomeCanvasProps {
 
 export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   const queryClient = useQueryClient();
-  const wall = useSearchParams()?.get('wall') === '1';
+  const fullscreen = useOvieFullscreen();
   const shipping = useHudShippingStateQuery(null);
   const { metrics, funnel } = useOvieCompanyQueries();
   const inbox = useQuery<OvieInbox>({
@@ -326,9 +329,15 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     </div>
   ) : undefined;
 
-  const body = (
+  // Poll intervals match each query above; staleness is judged against them.
+  const { status: feedStatus, now } = useOvieFeedStatus([
+    { id: 'shipping', updatedAtMs: shipping.dataUpdatedAt, pollMs: 6_000 },
+    { id: 'decisions', updatedAtMs: inbox.dataUpdatedAt, pollMs: 30_000 },
+    { id: 'revenue', updatedAtMs: metrics.dataUpdatedAt, pollMs: 30_000 },
+    { id: 'funnel', updatedAtMs: funnel.dataUpdatedAt, pollMs: 60_000 },
+  ]);
+  const homeView = (
     <OvieCompanyHome
-      wall={wall}
       tiles={tiles}
       since={since}
       copy={OVIE_HOME_COPY}
@@ -354,18 +363,24 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       onRetryLoop={() => void shipping.refetch()}
     />
   );
-  if (!wall) return body;
-  // Poll intervals match each query above; the frame judges staleness from them.
+  const content = (
+    <div className='relative flex w-full flex-col gap-2 lg:h-full lg:min-h-0'>
+      <OvieFeedBanner status={feedStatus} />
+      {fullscreen.on ? null : (
+        <div className='flex justify-end'>
+          <OvieFullscreenToggle
+            onToggle={fullscreen.toggle}
+            inDesktopApp={fullscreen.inDesktopApp}
+          />
+        </div>
+      )}
+      {homeView}
+    </div>
+  );
+  if (!fullscreen.on) return content;
   return (
-    <OvieWallFrame
-      feeds={[
-        { id: 'shipping', updatedAtMs: shipping.dataUpdatedAt, pollMs: 6_000 },
-        { id: 'decisions', updatedAtMs: inbox.dataUpdatedAt, pollMs: 30_000 },
-        { id: 'revenue', updatedAtMs: metrics.dataUpdatedAt, pollMs: 30_000 },
-        { id: 'funnel', updatedAtMs: funnel.dataUpdatedAt, pollMs: 60_000 },
-      ]}
-    >
-      {body}
-    </OvieWallFrame>
+    <OvieFullscreenFrame status={feedStatus} now={now}>
+      {content}
+    </OvieFullscreenFrame>
   );
 }

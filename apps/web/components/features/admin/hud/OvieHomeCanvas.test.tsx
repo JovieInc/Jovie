@@ -1,5 +1,13 @@
+import { TooltipProvider } from '@jovie/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
 import { HOME_LOOP_UNDO_WINDOW_MS } from '@/components/organisms/home-loop/useUndoableAnswers';
@@ -166,7 +174,9 @@ function renderCanvas(chat?: HomeCanvasState) {
   });
   return render(
     <QueryClientProvider client={client}>
-      <OvieHomeCanvas chat={chat} />
+      <TooltipProvider>
+        <OvieHomeCanvas chat={chat} />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
@@ -645,5 +655,20 @@ describe('OvieHomeCanvas', () => {
       'pending'
     );
     expect(screen.getByTestId('home-loop-answer-pending')).toBeVisible();
+  });
+});
+
+describe('Home full screen', () => {
+  it('has a labelled toggle that covers the shell with the same Home, and Esc leaves', async () => {
+    renderCanvas();
+    const { findByTestId, queryByTestId } = screen;
+    const toggle = await findByTestId('ovie-fullscreen-toggle');
+    expect(toggle).toHaveAccessibleName(/Full screen/);
+    fireEvent.click(toggle);
+    expect(await findByTestId('ovie-fullscreen')).toBeInTheDocument();
+    expect(await findByTestId('ovie-company-home')).toBeInTheDocument();
+    fireEvent.keyDown(globalThis, { key: 'Escape' });
+    await waitFor(() => expect(queryByTestId('ovie-fullscreen')).toBeNull());
+    expect(localStorage.getItem('ovie-home-fullscreen')).toBe('0');
   });
 });

@@ -112,12 +112,4 @@ describe('OvieCompanyHud', () => {
       'false'
     );
   });
-
-  it('wall mode shows every tile read-only with details visible and no buttons', () => {
-    render(<OvieCompanyHud tiles={tiles} since={null} wall />);
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
-    expect(screen.getByTestId('ovie-tile-alive')).toHaveTextContent(
-      'Revenue growth is not yet outpacing burn.'
-    );
-  });
 });
