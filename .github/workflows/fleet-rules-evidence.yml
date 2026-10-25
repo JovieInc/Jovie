@@ -97,6 +97,7 @@ jobs:
     permissions:
       contents: read
       actions: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -122,6 +123,7 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          PR_NUMBER: ${{ github.event.workflow_run.pull_requests[0].number }}
         run: |
           set -euo pipefail
           [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 0
@@ -152,6 +154,19 @@ jobs:
           elif [ "$concl" = failure ] && [[ "$ev_id" =~ ^[1-9][0-9]*$ ]] && [ "$attempt" -lt 3 ]; then
             ghx api -X POST "repos/$REPOSITORY/actions/runs/$ev_id/rerun-failed-jobs" >/dev/null \
               && echo "Re-ran fleet evidence run $ev_id (attempt $attempt)."
+          elif [ "$concl" = missing ] && [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]]; then
+            # No evidence run exists for this head: the PR predates this
+            # workflow, or its pull_request_target event was lost. A re-run
+            # needs an existing run, so fire a fresh pull_request_target
+            # (labeled) event instead. The verdict then re-runs PR Ready itself.
+            # Skipped while an evidence run for this head is still in flight.
+            inflight="$(node packages/api-client/cli.ts gh --priority repair -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&per_page=10" \
+              --jq '[.workflow_runs[] | select(.status != "completed")] | length')"
+            if [ "$inflight" = 0 ]; then
+              node packages/api-client/cli.ts gh --priority repair -- api -X DELETE "repos/$REPOSITORY/issues/$PR_NUMBER/labels/fleet-evidence-backfill" >/dev/null 2>&1 || true
+              node packages/api-client/cli.ts gh --priority repair -- api -X POST "repos/$REPOSITORY/issues/$PR_NUMBER/labels" -f 'labels[]=fleet-evidence-backfill' >/dev/null \
+                && echo "Fleet evidence missing for $HEAD_SHA; re-fired it via the fleet-evidence-backfill label on #$PR_NUMBER."
+            fi
           else
             echo "Fleet evidence for $HEAD_SHA is $concl (attempt ${attempt:-0}); nothing to re-run."
           fi
