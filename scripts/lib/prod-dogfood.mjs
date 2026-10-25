@@ -48,7 +48,10 @@ export function fingerprintFor({ mission, check, target }) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '');
-  return `dogfood-${slug(mission)}-${slug(check)}-${sha8(target)}`.slice(0, 70);
+  return `dogfood-${slug(String(mission).replace(/^dogfood:/, ''))}-${slug(check)}-${sha8(target)}`.slice(
+    0,
+    70
+  );
 }
 
 const ENTITIES = {
@@ -1059,7 +1062,13 @@ export function findingIssue({
   ];
   return {
     fingerprint: fp,
-    title: `[${fp}] ${check.summary}`,
+    title: `[${fp}] ${check.summary} (${(() => {
+      try {
+        return new URL(check.url ?? check.target).pathname;
+      } catch {
+        return check.target;
+      }
+    })()})`,
     description: lines.join('\n'),
     priority: sev.priority,
   };
