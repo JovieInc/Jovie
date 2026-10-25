@@ -81,7 +81,7 @@ def read_grok(now: float, run=subprocess.run, sleep=time.sleep, binary: Path = G
     session = f"capacity-grok-{uuid.uuid4().hex[:8]}"
     tmux = lambda *args: run(["tmux", *args], capture_output=True, text=True, timeout=15)  # noqa: E731
     try:
-        if tmux("new-session", "-d", "-s", session, "-x", "140", "-y", "50", str(binary)).returncode != 0:
+        if tmux("new-session", "-d", "-s", session, "-c", str(Path.home()), "-x", "140", "-y", "50", str(binary)).returncode != 0:
             return None
         screen = ""
         for _ in range(20):
