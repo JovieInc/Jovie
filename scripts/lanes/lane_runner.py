@@ -85,6 +85,7 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
@@ -149,7 +150,7 @@ LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_lanes_at
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py",
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
@@ -9089,6 +9090,10 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["linearSync"] = linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), teams)
             except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
                 tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
+            try:  # measure the shared hosted-macOS pool (throttled); the LYB refill below reads it
+                tick["macosPool"] = macos_pool.sample(host.state)
+            except (Exception, SystemExit) as error:  # a sampling fault never blocks dispatch
+                tick["macosPoolError"] = f"{type(error).__name__}: {error}"[:200]
             try:  # Todo below target is refilled from the Backlog the sync just refreshed, per team
                 # Every team refills on its own mirror and seats; JOV has no extra binding, so it gets the same
                 # floor-less pass (Summer's governor writes the same Todo moves idempotently).
