@@ -31,6 +31,7 @@ export type ScriptStepId =
   | 'handle'
   | 'ask_audience'
   | 'instant_access'
+  | 'golden_path_admitted'
   | 'waitlist'
   | 'done'
   | 'stream_error'
@@ -102,6 +103,12 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'You clear the bar. Checkout takes about a minute. The free tier is available if you want to start there.'
   ),
 
+  line(
+    'golden_path_admitted',
+    'v1',
+    'You clear the bar. Your page goes live once we confirm it is you, and it stays private and yours to edit until then. Checkout takes about a minute and paying does not change that. The free tier is available if you want to start there.'
+  ),
+
   line('waitlist', 'v3', ONBOARDING_WAITLIST_RECEIPT),
 
   line(
@@ -162,6 +169,7 @@ export const SCRIPT_STEP_IDS: readonly ScriptStepId[] = [
   'handle',
   'ask_audience',
   'instant_access',
+  'golden_path_admitted',
   'waitlist',
   'done',
   'stream_error',

@@ -5,7 +5,7 @@ name: Source Validation
 # removal-trigger: Remove the lookup when body-dependent decisions leave Source Validation or GitHub stops re-running pull_request workflows on metadata-only edits.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
     branches: [main, 'integration/**']
 permissions:
   contents: read
@@ -39,6 +39,18 @@ jobs:
           sparse-checkout: |
             .nvmrc
             packages/api-client
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+      # Edited-event jobs ran setup-node unprimed in all 8 jobs of a run
+      # (run 40176111773, 2026-10-25): one REST manifest call each.
+      - &quota-prime
+        name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
+        # A run step, not `uses:`: the client checkout path does not exist when
+        # workflow references are validated, so a local action there is rejected.
+        env:
+          NODE_VERSION_FILE: .source-validation-client/.nvmrc
+        run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
       - &quota-runtime
         name: Setup the quota client runtime
         if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
@@ -98,6 +110,9 @@ jobs:
           filter: blob:none
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
+      # Body/label-dependent policy always runs, including exact-head proof reuse.
+      # PR fleet rules are decided by the Fleet Rules Evidence workflow (base code
+      # only, dedicated CI App budget); PR Ready reads its status below.
       - name: Validate performance policy source bindings
         run: node scripts/invariants/performance-factory.mjs
       - name: Measure actual installed source dependency graph
@@ -231,6 +246,28 @@ jobs:
           # The classifier only runs when invoked as its own entry point; a
           # missing receipt means it never ran, which must not read as a pass.
           test -s "$lane_dir/receipt.json"
+      # actionlint also runs in the merge group (ci-fast), but a workflow edit
+      # that fails it there ejects the whole group (#23060: an unquoted
+      # run-name with " #" was read as a YAML comment). Lint at PR time so
+      # the author sees it before enqueue. Same checksum-pinned toolchain.
+      - name: Lint changed workflows and actions (actionlint)
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          SHELLCHECK_OPTS: >-
+            --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "$BASE_BRANCH"
+          base_sha="$(git merge-base "origin/$BASE_BRANCH" HEAD)"
+          if [ -z "$(git diff --name-only "$base_sha" HEAD -- .github/workflows .github/actions)" ]; then
+            echo "No workflow or action changes; actionlint not applicable."
+            exit 0
+          fi
+          bash .github/scripts/run-actionlint.sh
       # Read-only restore of the web tsc incremental state that
       # tsc-cache-warm.yml writes on main. A pull_request can read that
       # default-branch cache; merge_group already restores it in ci-fast.
@@ -351,6 +388,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       # TruffleHog reads the object store directly and cannot use a partial
@@ -404,6 +442,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - &reused-checkout
@@ -449,6 +488,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -564,6 +604,7 @@ jobs:
         shard: ['1/4', '2/4', '3/4', '4/4']
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -639,6 +680,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -690,8 +732,70 @@ jobs:
     if: ${{ always() }}
     needs: [deterministic, security, migration, coverage, unit, a11y]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Require every source proof
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
         run: test "$RESULTS" = 'success,success,success,success,success,success'
+      # Fleet-rule evidence is read by .github/workflows/fleet-rules-evidence.yml
+      # (pull_request_target: base-branch code only, so no PR branch can reach
+      # the CI App key) on the dedicated CI App installation budget. This step
+      # trusts that workflow's RUNS, never a commit status: any branch can post
+      # a status named anything, but only main's copy of the workflow can
+      # produce a pull_request_target run of fleet-rules-evidence.yml. The
+      # newest run for this head must have completed after this PR event
+      # (stale pre-edit verdicts read as missing). Missing, in-flight or
+      # deferred evidence exits 75 with github-quota-deferred; the evidence
+      # workflow re-runs this job when it finishes, so nothing polls.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            packages/api-client
+            .github/workflows/fleet-rules-evidence.yml
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+          sparse-checkout-cone-mode: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ (always() && github.event_name == 'pull_request') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        with:
+          node-version-file: .nvmrc
+      - name: Require fleet-rule evidence
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO_ID: ${{ github.event.pull_request.head.repo.id }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_UPDATED_AT: ${{ github.event.pull_request.updated_at }}
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Fleet rule evidence needs an exact head sha'; exit 1; }
+          # Bootstrap: pull_request_target runs the evidence workflow from main, so
+          # until it exists on main no PR can have a run. main's checkout (above)
+          # decides this, never the PR's tree. Once the file lands this branch is dead.
+          if [ ! -f .github/workflows/fleet-rules-evidence.yml ]; then
+            echo '::notice::fleet-rules-evidence.yml is not on main yet; PR Fleet Rules still enforces this PR. Bootstrap window closes when it lands.'
+            exit 0
+          fi
+          floor="$(date -u -d "$EVENT_UPDATED_AT" +%s)"
+          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
+          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          IFS=$'\t' read -r status conclusion url <<<"$row"
+          case "$status/$conclusion" in
+            completed/success) echo "Fleet rules passed: $url" ;;
+            completed/failure) echo "::error::Fleet rules did not pass or were deferred (read the Fleet Rules Evidence run: $url)"; exit 1 ;;
+            *) echo "::error::Fleet rule evidence is ${status:-missing} (github-quota-deferred or not yet complete); not a verdict on this PR. It re-runs automatically when the evidence run finishes."; exit 75 ;;
+          esac

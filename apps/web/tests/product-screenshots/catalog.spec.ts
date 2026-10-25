@@ -22,6 +22,7 @@ import { optimizePngLosslessly } from '../../scripts/png-optimization';
 import { syncScreenshotPublicExport } from '../../scripts/sync-screenshot-public-export';
 import { replaceWithAtomicSibling } from './atomic-output';
 import {
+  assertImagesReadyForCapture,
   assertNoDevOverlays,
   CATALOG_OUTPUT_DIR,
   hideTransientUI,
@@ -374,6 +375,7 @@ test.describe('Screenshot Catalog', () => {
       const catalogPath = join(CATALOG_OUTPUT_DIR, `${scenario.id}.png`);
       const imageChanged = await captureOnlyWhenImagesReady(
         () => prepareImagesForScreenshot(page),
+        () => assertImagesReadyForCapture(page),
         () => captureCatalogImage(page, preparedScenario, catalogPath)
       );
 

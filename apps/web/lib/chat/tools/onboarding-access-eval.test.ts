@@ -203,3 +203,68 @@ describe('decideOnboardingAccess (single gate, JOV-7144)', () => {
     expect(decideOnboardingAccess(base).kind).toBe('instant_access');
   });
 });
+
+describe('decideOnboardingAccess golden-path admission (Tim 2026-10-25)', () => {
+  const controlled = {
+    accessControlled: true,
+    spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+    spotifyFollowers: 3_200,
+    signals: [],
+    turnCount: 1,
+  };
+
+  it('admits a resolved, non-high-profile artist when the golden path is green', () => {
+    const decision = decideOnboardingAccess({
+      ...controlled,
+      goldenPathVerdict: 'ELIGIBLE',
+    });
+    expect(decision.kind).toBe('instant_access');
+    expect(decision.rationale).toBe('golden_path_admit_resolved_artist');
+  });
+
+  it.each([undefined, null, 'BLOCKED', 'UNKNOWN'] as const)(
+    'still waitlists under the controlled gate when the verdict is %s',
+    goldenPathVerdict => {
+      expect(
+        decideOnboardingAccess({ ...controlled, goldenPathVerdict }).kind
+      ).toBe('waitlist');
+    }
+  );
+
+  it('never admits an unresolved identity or a high-profile artist', () => {
+    expect(
+      decideOnboardingAccess({
+        ...controlled,
+        spotifyArtistId: null,
+        goldenPathVerdict: 'ELIGIBLE',
+      }).kind
+    ).not.toBe('instant_access');
+    expect(
+      decideOnboardingAccess({
+        ...controlled,
+        spotifyFollowers: 40_000_000,
+        goldenPathVerdict: 'ELIGIBLE',
+      }).kind
+    ).toBe('waitlist');
+  });
+
+  it('keeps the capacity hold reason on the waitlist decision even when the verdict is green', () => {
+    const decision = decideOnboardingAccess({
+      ...controlled,
+      goldenPathVerdict: 'ELIGIBLE',
+      goldenPathHold: 'hold_capacity_full',
+    });
+    expect(decision.kind).toBe('waitlist');
+    expect(decision.goldenPathHold).toBe('hold_capacity_full');
+  });
+
+  it('records why an unresolved identity was held', () => {
+    const decision = decideOnboardingAccess({
+      ...controlled,
+      spotifyArtistId: null,
+      publicProfileUrl: 'https://example.com',
+      goldenPathVerdict: 'ELIGIBLE',
+    });
+    expect(decision.goldenPathHold).toBe('hold_identity_unresolved');
+  });
+});

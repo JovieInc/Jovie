@@ -496,7 +496,7 @@ function fixture() {
     complete: true,
     pr: {
       number: 7,
-      title: 'fix(automation): preserve commissioning acceptance',
+      title: 'feat(automation): preserve commissioning acceptance',
       body: /** @type {string | null} */ ('Refs JOV-7300.'),
       state: 'open',
       draft: false,
@@ -1220,7 +1220,7 @@ test('a red, foreign, or unreadable predecessor runs the full source contract', 
 test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
   const workflow = sourceValidationWorkflow();
   const gate = "steps.reuse.outputs.reuse != 'true'";
-  const [client, runtime, reuseStep] = workflow.jobs.deterministic.steps;
+  const [client, prime, runtime, reuseStep] = workflow.jobs.deterministic.steps;
   assert.equal(client.with.ref, '${{ github.event.pull_request.base.sha }}');
   assert.equal(client.with['persist-credentials'], false);
   assert.match(client.with['sparse-checkout'], /packages\/api-client/);
@@ -1228,7 +1228,16 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     runtime.with['node-version-file'],
     '.source-validation-client/.nvmrc'
   );
+  // The quota-client runtime is primed from nodejs.org so a metadata edit does
+  // not spend a GITHUB_TOKEN manifest call in each of the jobs (2026-10-25).
+  assert.match(prime.run, /prime-node-toolcache\/prime\.sh/);
+  assert.equal(prime.env.NODE_VERSION_FILE, '.source-validation-client/.nvmrc');
+  assert.match(
+    client.with['sparse-checkout'],
+    /prime-node-toolcache\/prime\.sh/
+  );
   assert.equal(client.if, reuseStep.if);
+  assert.match(prime.if, /github\.event\.action == 'edited'/);
   assert.equal(runtime.if, reuseStep.if);
   assert.equal(reuseStep.id, 'reuse');
   // Base retargets change the compared tree, so they never reuse a proof.
@@ -1237,8 +1246,10 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     "${{ github.event.action == 'edited' && !github.event.changes.base }}"
   );
   for (const job of ['security', 'migration', 'coverage', 'unit']) {
-    const [jobClient, jobRuntime, first, ...rest] = workflow.jobs[job].steps;
+    const [jobClient, jobPrime, jobRuntime, first, ...rest] =
+      workflow.jobs[job].steps;
     assert.deepEqual(jobClient, client, job);
+    assert.deepEqual(jobPrime, prime, job);
     assert.deepEqual(jobRuntime, runtime, job);
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
@@ -1262,6 +1273,13 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     'Measure actual installed source dependency graph',
     'Preserve exact source dependency evidence',
   ];
+  // Fleet evidence is a status read in `ready`, produced by the base-branch
+  // Fleet Rules Evidence workflow; it never depends on proof reuse.
+  assert.ok(
+    workflow.jobs.ready.steps.some(
+      step => step.name === 'Require fleet-rule evidence'
+    )
+  );
   const deterministic = workflow.jobs.deterministic.steps;
   for (const name of always) {
     const step = deterministic.find(candidate => candidate.name === name);
@@ -1587,4 +1605,29 @@ test('UI-path axe gate blocks PR Ready and stays quiet for non-UI diffs', () => 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('fleet metadata rules block native auto-merge admission until evidence is supplied', () => {
+  const input = fixture();
+  input.pr.title = 'fix(automation): repair gate';
+  const result = evaluateSourceAdmission(input);
+  assert.equal(result.allowed, false);
+  assert.ok(result.blockers.some(x => x.startsWith('red-before-green:')));
+  input.pr.body =
+    '## Red-before-green\nFailing command: `node --test scripts/fix.test.mjs`\nFailing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123';
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  input.files = [{ filename: 'apps/web/lib/auth/session.ts' }];
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.some(x =>
+      x.startsWith('locked-areas:')
+    )
+  );
+  input.pr.body += '\n## Locked areas\nGBrain: jovie-auth';
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  input.pr.body += '\n## Done receipt\nProduction verified.';
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.some(x =>
+      x.startsWith('done-receipt:')
+    )
+  );
 });
