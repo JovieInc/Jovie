@@ -4287,6 +4287,16 @@ class WorkerTest(unittest.TestCase):
         self.assertIsNone(lane.claim_labeled_event(self.host, "devin", self.linear))
         self.assertFalse(lane.load_escalation(self.host)["events"]["disk-low"].get("running"))
 
+    def test_external_agent_claim_holds_an_issue_out_of_the_lane_pool(self):
+        import fleet_ledger
+        self.assertTrue(fleet_ledger.external_claim(self.host.state, "JOV-41", "lola", ttl_s=600))
+        held = lane.held_back_issues(self.host)
+        self.assertIn("JOV-41", held)
+        pool = [issue("JOV-41", priority=1), issue("JOV-42", priority=3)]
+        self.assertEqual(lane.pick_issue(pool, {}, held_back=held).identifier, "JOV-42")
+        self.assertTrue(fleet_ledger.external_release(self.host.state, "JOV-41", "lola"))
+        self.assertNotIn("JOV-41", lane.held_back_issues(self.host))
+
     def test_failures_retry_then_park_in_todo_until_the_next_release(self):
         lane.run_issue = lambda *a: {"verdict": "held", "reasons": ["code-change-without-test"]}
         for _ in range(3):

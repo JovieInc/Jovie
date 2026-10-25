@@ -565,7 +565,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_provider_economics.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_provider_economics.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
     ' '
   )
 );
@@ -619,9 +619,29 @@ export const LANES_PYTEST_SHARDS = Object.freeze([
   },
 ]);
 
+/**
+ * Retry a lanes pytest shard's failed nodes once, only when one to three
+ * nodes failed (a wider failure is a real regression, never retried).
+ * Merge-group ejections of unrelated product PRs came from timing-sensitive
+ * lanes tests: test_update_installs_tested_release_and_only_moves_the_symlink
+ * ejected 7 distinct PRs in 17h, each discarding the groups queued behind it.
+ * A deterministic failure fails twice and still fails the shard; a pass on the
+ * retry is surfaced as a ::warning naming the node so the flake stays visible.
+ * POSIX sh: the shard output goes through a log file because sh has no
+ * pipefail. Coverage from the retry appends to the shard's data file.
+ */
+export const LANES_RETRY_FUNCTION =
+  'lanes_retry() { lr_id="$1"; lr_rc="$2"; lr_log="$3"; ' +
+  'if [ "$lr_rc" -eq 0 ] || [ "$lr_rc" -eq 5 ]; then return "$lr_rc"; fi; ' +
+  'lr_nodes="$(sed -n \'s/^FAILED \\(scripts\\/[^ ]*\\).*/\\1/p\' "$lr_log" | sort -u)"; ' +
+  'lr_n="$(printf \'%s\\n\' "$lr_nodes" | grep -c .)"; ' +
+  'if [ "$lr_n" -lt 1 ] || [ "$lr_n" -gt 3 ]; then return "$lr_rc"; fi; ' +
+  'echo "::warning title=lanes pytest retry::shard $lr_id retried $lr_n failed node(s) once: $(printf \'%s \' $lr_nodes)"; ' +
+  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes-$lr_id.coverage" python3 -m coverage run -a --branch -m pytest $lr_nodes -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-$lr_id-retry"; }; ';
+
 /** @param {{ id: string, files: readonly string[], keyword?: string }} shard */
 const lanesCoverageShard = ({ id, files, keyword }) =>
-  `COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.coverage" python3 -m coverage run --branch -m pytest ${files.join(' ')} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${id}"${keyword ? ` -k "${keyword}"` : ''}`;
+  `{ lanes_log="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.log"; PYTEST_ADDOPTS=-rf COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.coverage" python3 -m coverage run --branch -m pytest ${files.join(' ')} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${id}"${keyword ? ` -k "${keyword}"` : ''} > "$lanes_log" 2>&1; lanes_rc=$?; cat "$lanes_log"; lanes_retry ${id} "$lanes_rc" "$lanes_log"; }`;
 
 const [LANES_LAST_SHARD] = LANES_PYTEST_SHARDS.slice(-1);
 const LANES_BACKGROUND_SHARDS = LANES_PYTEST_SHARDS.slice(0, -1);
@@ -629,7 +649,7 @@ const LANES_BACKGROUND_SHARDS = LANES_PYTEST_SHARDS.slice(0, -1);
 // the command. The first non-zero shard status is the command's status (the
 // qualifiers in automation-verify read pytest/coverage exit codes), and it
 // fails the command before coverage is combined.
-const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(LANES_LAST_SHARD)}; lanes_status=$?; ${LANES_BACKGROUND_SHARDS.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine ${LANES_PYTEST_SHARDS.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
+const LANES_COVERAGE_RUN = `{ ${LANES_RETRY_FUNCTION}${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(LANES_LAST_SHARD)}; lanes_status=$?; ${LANES_BACKGROUND_SHARDS.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine ${LANES_PYTEST_SHARDS.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
 
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
@@ -656,6 +676,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/provider_economics.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/qualification_guard.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/claude_lane.py" --fail-under=95',
@@ -894,6 +915,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/domain-expiry.test.mjs',
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
+  'scripts/lib/__tests__/capacity-registry.test.mjs',
   'scripts/lib/__tests__/remediation-sweep.test.mjs',
   'scripts/lib/__tests__/remediation-sweep-workflow-contract.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',

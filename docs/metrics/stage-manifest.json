@@ -432,6 +432,29 @@
         }
       ]
     },
+    "taste-decision": {
+      "entityId": "JOV issue identifier awaiting a founder-taste receipt",
+      "description": "A founder-taste wait ending in a founder decision or the risk- and confidence-scaled default (scripts/lanes/taste-policy.json).",
+      "endToEnd": [["waiting", "decided"]],
+      "stages": [
+        {
+          "id": "waiting",
+          "meaning": "issue entered Validating owing a founder-taste receipt, until a decision or the default shipped",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "decided",
+          "meaning": "founder-taste receipt recorded (founder decision or default-accepted)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
+    },
     "claim-dogfood": {
       "entityId": "claim-checkout-dogfood#<run id>@<run attempt>",
       "description": "One browser dogfood of the $12 artist claim (Stripe test mode, fixture artists): from the staging deploy (or dispatch) that made it due to the journey verdict.",
