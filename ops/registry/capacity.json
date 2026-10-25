@@ -473,6 +473,19 @@
         "source": "ops/registry/spend.json",
         "asOf": "2026-10-20"
       },
+      "proposals": [
+        {
+          "id": "workers-ai-token",
+          "status": "proposed-not-authorized",
+          "asOf": "2026-10-25",
+          "account": "the Cloudflare account that holds the Startup Program credits (named in spend.json cloudflare-credits)",
+          "scope": "One account-scoped API token with Workers AI Read and Workers AI Edit only (Cloudflare's REST API doc names both for a custom token; it offers no run-only permission), no zone, R2, Workers or other permission, no user-level scope.",
+          "consumers": ["CI dogfood vision", "gem reviewer", "system-1 router"],
+          "price": "$0.011 per 1,000 neurons after a 10,000 neurons/day free allocation; llama-3.2-11b-vision-instruct $0.049 per M input and $0.676 per M output tokens (cloudflare docs, read 2026-10-25)",
+          "expectedMonthlyCost": "Cash $0 while the Startup credits last ($10,000, expire 2027-06-09, Workers AI sub-cap $50,000, 0% used). Bound: Summer's provider-trial ledger caps Workers AI at $50 per month (0.5% of the credits). Illustration, not a measurement: a vision call of 2k input and 500 output tokens costs about $0.00044, so 1,000 calls a day is about $13 a month. No consumer's call volume is recorded yet.",
+          "authorization": "None. No token creation and no top-up is authorized; this row is facts only."
+        }
+      ],
       "policy": { "id": "spend-credits-before-expiry" },
       "accounts": [
         {
