@@ -200,9 +200,23 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
 
   const tokens = await page.evaluate(() => {
     const rootStyle = getComputedStyle(document.documentElement);
+    // Custom properties compute to their substituted token stream, not a
+    // resolved length: a token declared as calc() (the traffic-light safe
+    // width) never matches a bare px literal via getPropertyValue. Plain px
+    // tokens read directly; anything else resolves through a hidden probe
+    // element so the calc computes to its used px width.
     const readPx = (name: string) => {
       const raw = rootStyle.getPropertyValue(name).trim();
-      const match = /^([\d.]+)px$/.exec(raw);
+      const direct = /^([\d.]+)px$/.exec(raw);
+      if (direct) return Number.parseFloat(direct[1]);
+      const probe = document.createElement('div');
+      probe.style.position = 'absolute';
+      probe.style.visibility = 'hidden';
+      probe.style.width = `var(${name})`;
+      document.documentElement.appendChild(probe);
+      const used = getComputedStyle(probe).width;
+      probe.remove();
+      const match = /^([\d.]+)px$/.exec(used);
       return match ? Number.parseFloat(match[1]) : null;
     };
     return {
@@ -211,15 +225,18 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
       trafficLightX: readPx('--electron-traffic-light-x'),
       trafficLightY: readPx('--electron-traffic-light-y'),
       sidebarWidth: readPx('--electron-sidebar-width'),
+      shellGap: readPx('--app-shell-gap'),
       collapsedSidebarWidth: readPx('--electron-sidebar-collapsed-width'),
     };
   });
 
   // If we can read the token, check the sidebar column width matches.
   expect(tokens.titlebarHeight).toBe(40);
-  expect(tokens.trafficLightSafeWidth).toBe(72);
+  expect(tokens.trafficLightSafeWidth).toBe(70);
   expect(tokens.trafficLightX).toBe(20);
-  expect(tokens.trafficLightY).toBe(17);
+  // JOV-8974: the titlebar band sits one shell gap below the window top, so
+  // the native lights ride down with it (native y 17 + the top gutter).
+  expect(tokens.trafficLightY).toBe(17 + (tokens.shellGap ?? 0));
   expect(tokens.collapsedSidebarWidth).toBe(52);
 
   if (tokens.sidebarWidth !== null && tokens.sidebarWidth > 0) {
@@ -238,16 +255,18 @@ test('titlebar sidebar-cell width matches CSS sidebar-width token (rail alignmen
     ).toBeGreaterThan(0);
 
     if (box !== null) {
-      // Inside Electron the titlebar is visible. The row spans exactly the
-      // sidebar column; its shell-gap padding insets the cell to the rail's
-      // own content edge, so measure the row's border box against the token.
+      // Inside Electron the titlebar is visible. Padding-left is the shell
+      // gap, and the border box includes that gap so the content box matches
+      // the rail [gap, gap + sidebar].
       const rowBox = await page
         .locator('[data-testid="electron-titlebar-row"]')
         .boundingBox();
       expect(rowBox).not.toBeNull();
+      const expectedRowWidth =
+        (tokens.sidebarWidth ?? 0) + (tokens.shellGap ?? 0);
       expect(
-        Math.abs((rowBox?.width ?? 0) - tokens.sidebarWidth),
-        `titlebar row width (${rowBox?.width}px) matches sidebar-width token (${tokens.sidebarWidth}px)`
+        Math.abs((rowBox?.width ?? 0) - expectedRowWidth),
+        `titlebar row width (${rowBox?.width}px) matches sidebar + shell gap (${expectedRowWidth}px)`
       ).toBeLessThanOrEqual(1);
       expect(
         box.width,
@@ -345,6 +364,7 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const settingsColumn = document.querySelector<HTMLElement>(
         '[data-settings-layout-column="true"]'
       );
+      const mainContent = document.querySelector<HTMLElement>('#main-content');
       if (!titlebar || !body || !sidebar || !mainPlane) return null;
 
       const titlebarBox = titlebar.getBoundingClientRect();
@@ -353,13 +373,19 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
       const mainPlaneBox = mainPlane.getBoundingClientRect();
       const settingsShellBox = settingsShell?.getBoundingClientRect();
       const settingsColumnBox = settingsColumn?.getBoundingClientRect();
+      const mainContentBox = mainContent?.getBoundingClientRect();
       return {
         bodyPaddingTop: Number.parseFloat(getComputedStyle(body).paddingTop),
+        bodyPaddingLeft: Number.parseFloat(getComputedStyle(body).paddingLeft),
         titlebarTop: titlebarBox.top,
         titlebarBottom: titlebarBox.bottom,
         bodyTop: bodyBox.top,
         sidebarTop: sidebarBox.top,
         mainPlaneTop: mainPlaneBox.top,
+        mainContentRight: mainContentBox?.right ?? null,
+        mainContentBottom: mainContentBox?.bottom ?? null,
+        viewportWidth: window.innerWidth,
+        viewportHeight: window.innerHeight,
         settingsShellTop: settingsShellBox?.top ?? null,
         settingsShellCenterX:
           settingsShellBox === undefined
@@ -376,19 +402,44 @@ test('Electron shell keeps one control contract across chat, calendar, tasks, li
     expect(geometry, `${route} exposes shell geometry`).not.toBeNull();
     expect(
       geometry?.bodyPaddingTop,
-      `${route} has no second top-gap owner`
-    ).toBe(0);
+      `${route} body top gutter equals the side gutters (JOV-8974)`
+    ).toBe(geometry?.bodyPaddingLeft);
     expect(
-      Math.abs((geometry?.titlebarTop ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} body shares the titlebar top edge`
+      Math.abs(
+        (geometry?.titlebarTop ?? 0) -
+          ((geometry?.bodyTop ?? 0) + (geometry?.bodyPaddingTop ?? 0))
+      ),
+      `${route} titlebar band sits at the top gutter edge`
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs((geometry?.sidebarTop ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} sidebar aligns to the body grid`
+      Math.abs(
+        (geometry?.sidebarTop ?? 0) -
+          ((geometry?.bodyTop ?? 0) + (geometry?.bodyPaddingTop ?? 0))
+      ),
+      `${route} sidebar aligns to the body content grid`
     ).toBeLessThanOrEqual(1);
     expect(
-      Math.abs((geometry?.mainPlaneTop ?? 0) - (geometry?.bodyTop ?? 0)),
-      `${route} main plane aligns to the body grid`
+      Math.abs(
+        (geometry?.mainPlaneTop ?? 0) -
+          ((geometry?.bodyTop ?? 0) + (geometry?.bodyPaddingTop ?? 0))
+      ),
+      `${route} main plane aligns to the body content grid`
+    ).toBeLessThanOrEqual(1);
+    // JOV-8941: the native window owns the right and bottom edges in
+    // Electron, so the main panel meets the window frame instead of reading
+    // as a floating card with a gutter on those edges. Fractional layout can
+    // round rects, so allow the same 1px tolerance the alignment checks use.
+    expect(
+      Math.abs(
+        (geometry?.mainContentRight ?? 0) - (geometry?.viewportWidth ?? 0)
+      ),
+      `${route} main panel is flush with the window right edge (JOV-8941)`
+    ).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(
+        (geometry?.mainContentBottom ?? 0) - (geometry?.viewportHeight ?? 0)
+      ),
+      `${route} main panel is flush with the window bottom edge (JOV-8941)`
     ).toBeLessThanOrEqual(1);
 
     if (route.startsWith(APP_ROUTES.SETTINGS)) {

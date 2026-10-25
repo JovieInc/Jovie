@@ -303,6 +303,62 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertEqual(observed["sourceGate"]["ancestorSha"], "c" * 40)
         self.assertIn("fell back to the newest real Main Release Ready attempt", observed["error"])
 
+    def test_observe_main_uses_recent_ci_before_exact_gate_materializes(self):
+        """JOV-8148: no check/job exists yet on the newly merged main head."""
+        now = MODULE.datetime(2026, 10, 22, 14, 18, tzinfo=MODULE.UTC)
+        for case, expected in (
+            ("success", "green"),
+            ("failure", "red"),
+            ("timed_out", "red"),
+            ("skipped", "unknown"),
+            ("missing", "unknown"),
+            ("stale", "unknown"),
+            ("offline", "unknown"),
+        ):
+            with self.subTest(case=case):
+                exact_response = _main_fixture([], combined_state="pending")
+
+                def github_response(repo: str, endpoint: str):
+                    if endpoint.startswith("actions/workflows/ci.yml/runs?"):
+                        if case == "offline":
+                            raise OSError("GitHub observation unavailable")
+                        return {"workflow_runs": [] if case == "missing" else [{
+                            "id": 424245,
+                            "head_sha": "b" * 40,
+                            "created_at": "2026-10-22T10:00:00Z"
+                            if case == "stale" else "2026-10-22T13:55:21Z",
+                        }]}
+                    if endpoint == "actions/runs/424245/jobs?per_page=100":
+                        self.assertNotEqual(case, "stale")
+                        return {"jobs": [{
+                            "name": "Main Release Ready",
+                            "status": "completed",
+                            "conclusion": case,
+                            "started_at": "2026-10-22T13:56:00Z",
+                            "completed_at": "2026-10-22T13:56:38Z",
+                        }]}
+                    return exact_response(repo, endpoint)
+
+                with (
+                    mock.patch.object(MODULE, "gh_json", side_effect=github_response) as github,
+                    mock.patch.object(MODULE, "utc_now", return_value=now),
+                ):
+                    observed = MODULE.observe_main("JovieInc/Jovie")
+
+                self.assertEqual(observed["status"], expected)
+                self.assertEqual(observed["sha"], MAIN_SHA)
+                github.assert_any_call(
+                    "JovieInc/Jovie",
+                    "actions/workflows/ci.yml/runs?branch=main&event=push&per_page=10",
+                )
+                self.assertEqual(observed["requiredChecks"][0]["verdict"], "missing")
+                if expected in {"green", "red"}:
+                    self.assertEqual(observed["sourceGate"]["ancestorSha"], "b" * 40)
+                    self.assertEqual(observed["sourceGate"]["source"], "ancestor-ci-workflow-job")
+                else:
+                    self.assertEqual(observed["reason"], "required-check-missing")
+                    self.assertIn("no completed real attempt", observed["error"])
+
     def test_observe_main_ancestor_fallback_fails_closed_when_bound_exceeded(self):
         """No real attempt within the freshness bound: main stays unknown."""
 
@@ -387,23 +443,15 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         self.assertNotIn("error", observed)
 
     def test_observe_main_preserves_exact_sha_when_release_gate_is_missing(self):
-        def github_response(_repo: str, endpoint: str):
-            if endpoint == "branches/main":
-                return {"commit": {"sha": MAIN_SHA}}
-            if endpoint == f"commits/{MAIN_SHA}/status":
-                return {"state": "success"}
-            if endpoint.startswith(f"commits/{MAIN_SHA}/check-runs?"):
-                return {"check_runs": []}
-            if endpoint.startswith("actions/runs?"):
-                return {"workflow_runs": []}
-            raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
-
-        with mock.patch.object(MODULE, "gh_json", side_effect=github_response):
+        with mock.patch.object(
+            MODULE, "gh_json", side_effect=_main_fixture([], combined_state="success")
+        ):
             observed = MODULE.observe_main("JovieInc/Jovie")
 
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
-        self.assertIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
 
     def test_observe_main_retries_transient_502_then_reads_release_ready(self):
         """JOV-8338: a fast GitHub 502 on the release-ready read is retried.
@@ -518,8 +566,11 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
         covered by the poll tests.
         """
 
+        calls: list[str] = []
+
         def run(command, **_kwargs):
             endpoint = command[-1]
+            calls.append(endpoint)
             if endpoint.endswith("/branches/main"):
                 body = {"commit": {"sha": MAIN_SHA}}
             elif endpoint.endswith(f"/commits/{MAIN_SHA}/status"):
@@ -527,6 +578,10 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
             elif f"/commits/{MAIN_SHA}/check-runs?" in endpoint:
                 body = {"total_count": 0, "check_runs": []}
             elif "/actions/runs?" in endpoint:
+                body = {"total_count": 0, "workflow_runs": []}
+            elif endpoint.startswith("repos/JovieInc/Jovie/actions/artifacts?"):
+                body = {"artifacts": []}
+            elif "/actions/workflows/ci.yml/runs?" in endpoint:
                 body = {"total_count": 0, "workflow_runs": []}
             else:
                 raise AssertionError(f"unexpected GitHub endpoint: {endpoint}")
@@ -543,17 +598,31 @@ class MainReleaseReadySelectionTests(unittest.TestCase):
                     "FLEET_GATE_RELEASE_READY_POLL_SECONDS": "0",
                 },
             ),
-            mock.patch.object(MODULE.subprocess, "run", side_effect=run) as run_mock,
+            mock.patch.object(MODULE.subprocess, "run", side_effect=run),
             mock.patch.object(MODULE.time, "sleep") as sleep,
         ):
             observed = MODULE.observe_main("JovieInc/Jovie")
 
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
-        self.assertIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
+        self.assertIn("unresolved: missing", observed["error"])
         sleep.assert_not_called()
-        # Branch, status, unfiltered check-runs, name-filtered check-runs, push jobs.
-        self.assertEqual(run_mock.call_count, 5)
+        # Absent checks stay on the unresolved path: marker plus ancestor
+        # history, with no 5xx retry. Empty history still fails closed.
+        self.assertEqual(
+            [endpoint.split("repos/JovieInc/Jovie/", 1)[-1] for endpoint in calls],
+            [
+                "branches/main",
+                f"commits/{MAIN_SHA}/status",
+                f"commits/{MAIN_SHA}/check-runs?per_page=100&page=1",
+                f"commits/{MAIN_SHA}/check-runs?check_name=Main%20Release%20Ready&filter=all&per_page=100&page=1",
+                f"actions/runs?head_sha={MAIN_SHA}&event=push&per_page=30",
+                f"actions/artifacts?per_page=100&name=production-generation-verified-{MAIN_SHA}",
+                "actions/workflows/ci.yml/runs?branch=main&event=push&per_page=10",
+            ],
+        )
 
     def test_observe_main_red_check_fails_closed_without_retry(self):
         def run(command, **_kwargs):
@@ -972,7 +1041,9 @@ class MainReleaseReadyPageAndPollTests(unittest.TestCase):
 
         self.assertEqual(observed["status"], "unknown")
         self.assertEqual(observed["sha"], MAIN_SHA)
-        self.assertIn("Main Release Ready check is missing", observed["error"])
+        self.assertEqual(observed["reason"], "required-check-missing")
+        self.assertIn("no completed real attempt", observed["error"])
+        self.assertIn("unresolved: missing", observed["error"])
         self.assertEqual(sleeps, [5, 5])
         self.assertLessEqual(sum(sleeps), 10)
         self.assertEqual(observations["n"], 3)
@@ -6029,6 +6100,187 @@ class NativeControllerObservationTest(unittest.TestCase):
             with self.subTest(failure=type(failure).__name__), \
                     mock.patch.object(MODULE.subprocess, "run", side_effect=failure):
                 self.assertEqual(MODULE.observe_native_controller(self.state, self.now)["status"], "failed")
+
+
+class WorkObservationTests(unittest.TestCase):
+    def test_raw_inputs_are_bounded_regular_and_descriptor_identity_is_stable(self):
+        import signal
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "evidence.json"
+            self.assertIsNone(MODULE._work_input_digest(path))
+            path.write_bytes(b'{"actual":true}\\n')
+            self.assertEqual(MODULE._work_input_digest(path), hashlib.sha256(path.read_bytes()).hexdigest())
+            path.unlink(); path.mkdir()
+            with self.assertRaises((ValueError, OSError)): MODULE._work_input_digest(path)
+            path.rmdir(); path.symlink_to(pathlib.Path(tmp) / "absent")
+            with self.assertRaises((ValueError, OSError)): MODULE._work_input_digest(path)
+            path.unlink(); os.mkfifo(path)
+            def deadline(*_): raise TimeoutError("bounded-read-blocked-on-FIFO")
+            previous = signal.signal(signal.SIGALRM, deadline)
+            signal.setitimer(signal.ITIMER_REAL, 2)
+            try:
+                with self.assertRaises(ValueError): MODULE._work_input_digest(path)
+            finally:
+                signal.setitimer(signal.ITIMER_REAL, 0)
+                signal.signal(signal.SIGALRM, previous)
+            path.unlink(); path.touch()
+            with path.open("wb") as handle: handle.truncate(1024 * 1024 + 1)
+            with self.assertRaisesRegex(ValueError, "bounded-regular"): MODULE._work_input_digest(path)
+            path.write_bytes(b"original")
+            original_open = os.open
+            descriptors = []
+            def opened(*args, **kwargs):
+                self.assertTrue(args[1] & os.O_NONBLOCK)
+                self.assertTrue(args[1] & os.O_NOFOLLOW)
+                fd = original_open(*args, **kwargs); descriptors.append(fd)
+                return fd
+            replacement = path.with_name("replacement")
+            replacement.write_bytes(b"original")
+            original_fdopen = os.fdopen
+            @contextlib.contextmanager
+            def replaced(fd, *args, **kwargs):
+                with original_fdopen(fd, *args, **kwargs) as handle:
+                    class Changed:
+                        def read(self, limit):
+                            raw = handle.read(limit)
+                            replacement.replace(path)
+                            return raw
+                    yield Changed()
+            with mock.patch.object(MODULE.os, "open", side_effect=opened), mock.patch.object(MODULE.os, "fdopen", side_effect=replaced):
+                with self.assertRaisesRegex(ValueError, "changed-during-read"): MODULE._work_input_digest(path)
+            for fd in descriptors:
+                with self.assertRaises(OSError): os.fstat(fd)
+            with mock.patch.object(MODULE.os, "open", side_effect=FileNotFoundError):
+                with self.assertRaises(FileNotFoundError): MODULE._work_input_digest(path)
+
+    @contextlib.contextmanager
+    def inputs(self):
+        with tempfile.TemporaryDirectory() as tmp, contextlib.ExitStack() as stack:
+            state = pathlib.Path(tmp) / "gate"
+            args = argparse.Namespace(repo="JovieInc/Jovie", state_dir=state,
+                integrity_receipt=None, concurrency_evidence=None, independent_review_receipt=None,
+                native_controller_state_dir=pathlib.Path(tmp) / "lanes", queue_target=15,
+                symphony_url="http://127.0.0.1:4041/api/v1/state", production_url="https://jov.ie",
+                lease_guard_bin="fixture-report", model_registry=None)
+            for name, value in {"observe_main": GREEN_SIGNALS["main"],
+                    "observe_concurrency": GREEN_SIGNALS["concurrencyEvidence"],
+                    "observe_controller": GREEN_SIGNALS["controller"],
+                    "observe_closure_health": GREEN_SIGNALS["closureHealth"],
+                    "previous_closure_health": None, "observe_production": GREEN_SIGNALS["production"],
+                    "observe_integrity": GREEN_SIGNALS["integrity"],
+                    "observe_queue": GREEN_SIGNALS["queue"], "observe_ci_audit": {},
+                    "observe_lease": {"status": "unknown"}}.items():
+                stack.enter_context(mock.patch.object(MODULE, name, return_value=value))
+            for name in ("write_queue_snapshot", "write_independent_review_receipt", "_write_github_cache",
+                    "refresh_independent_review_receipt", "persist_live_receipt", "apply_concurrency_ratchet",
+                    "write_receipt", "observe_capacity_workpad", "observe_fallback_seats", "observe_lease"):
+                stack.enter_context(mock.patch.object(MODULE, name, side_effect=AssertionError("forbidden:" + name)))
+            yield args
+
+    def test_real_work_projection_never_publishes_or_probes_other_capabilities(self):
+        with self.inputs() as args:
+            result = MODULE.observe_work_admission(args)
+            self.assertEqual(result["schema"], "jovie.fleet-work-observation/v1")
+            self.assertEqual(result["mainSha"], MAIN_SHA)
+            self.assertTrue(result["workAdmission"]["newImplementationAllowed"])
+            self.assertFalse(result["authorizesTransition"])
+            self.assertFalse(result["authorizesDispatch"])
+            self.assertNotIn("concurrency", result)
+            self.assertNotIn("promotionAdmission", result)
+            self.assertEqual(result["gateSHA256"], hashlib.sha256(GATE.read_bytes()).hexdigest())
+            MODULE.observe_queue.assert_called_once()
+            self.assertIsNone(MODULE.observe_queue.call_args.kwargs["snapshot_path"])
+            self.assertIsNone(MODULE.observe_controller.call_args.kwargs["snapshot_path"])
+            self.assertFalse(state_has_files(args.state_dir))
+
+    def test_observation_start_is_retained_and_replay_observes_again(self):
+        from datetime import timedelta
+        with self.inputs() as args:
+            start = MODULE.utc_now()
+            with mock.patch.object(MODULE, "utc_now", side_effect=[start, start + timedelta(seconds=7),
+                    start + timedelta(seconds=20), start + timedelta(seconds=23)]):
+                first = MODULE.observe_work_admission(args)
+                second = MODULE.observe_work_admission(args)
+            self.assertEqual(first["observedAt"], MODULE.isoformat(start))
+            self.assertEqual(second["observedAt"], MODULE.isoformat(start + timedelta(seconds=20)))
+            self.assertEqual(MODULE.observe_main.call_count, 2)
+
+    def test_input_drift_or_observer_failure_never_returns_retained_pass(self):
+        with self.inputs() as args:
+            path = args.state_dir.parent / "integrity.json"
+            path.write_text("before")
+            MODULE.observe_main.side_effect = lambda repo: (path.write_text("after"), GREEN_SIGNALS["main"])[1]
+            with self.assertRaisesRegex(ValueError, "work-observation-input-changed"):
+                MODULE.observe_work_admission(args)
+            MODULE.observe_main.side_effect = OSError("fixture unavailable")
+            with self.assertRaises(OSError): MODULE.observe_work_admission(args)
+            self.assertFalse(MODULE._WORK_OBSERVATION_ONLY.get())
+
+    def test_github_observation_disables_both_cache_read_and_write(self):
+        with self.inputs() as args, mock.patch.object(MODULE, "_read_github_cache", side_effect=AssertionError("cache")), \
+                mock.patch.object(MODULE, "_gh_api", return_value=_gh_completed(["gh"], 'HTTP/2.0 200 OK\nETag: v1\n\n{"ok":true}')):
+            MODULE.observe_main.side_effect = lambda repo: (MODULE.gh_json(repo, "fixture"), GREEN_SIGNALS["main"])[1]
+            self.assertEqual(MODULE.observe_work_admission(args)["mainSha"], MAIN_SHA)
+
+    def test_new_closure_and_integrity_holds_survive_unchanged_generation(self):
+        with self.inputs() as args:
+            MODULE.observe_closure_health.return_value = {**GREEN_SIGNALS["closureHealth"], "newIssueIntakeAllowed": False}
+            result = MODULE.observe_work_admission(args)
+            self.assertFalse(result["closureAdmission"]["newIssueIntakeAllowed"])
+            MODULE.observe_integrity.return_value = {"status": "invalid"}
+            self.assertFalse(MODULE.observe_work_admission(args)["workAdmission"]["newImplementationAllowed"])
+
+    def test_unobserved_display_and_provider_fields_do_not_widen_work_policy(self):
+        with self.inputs() as args:
+            result = MODULE.observe_work_admission(args)
+            for available in (True, False):
+                signals = {**GREEN_SIGNALS,
+                    "capacityWorkpad": {"schema": MODULE.CAPACITY_WORKPAD_SCHEMA, "selected": ["JOV-1"], "mainSha": MAIN_SHA},
+                    "fallbackSeats": fallback_seat_signal(available, available)}
+                normal = MODULE.evaluate(signals, result["observedAt"])
+                for key, value in result["workAdmission"].items():
+                    self.assertEqual(value, normal["workAdmission"][key])
+
+    def test_unobserved_lease_report_has_no_work_or_closure_decision_effect(self):
+        with self.inputs() as args:
+            result = MODULE.observe_work_admission(args)
+            MODULE.observe_lease.assert_not_called()
+            for lease in ({"status": "ok", "capacity": {"available": 999}},
+                          {"status": "unknown"}, {"status": "failed"}):
+                normal = MODULE.evaluate({**GREEN_SIGNALS, "lease": lease,
+                    "capacityWorkpad": {"schema": MODULE.CAPACITY_WORKPAD_SCHEMA, "selected": [], "mainSha": MAIN_SHA},
+                    "fallbackSeats": fallback_seat_signal(False, False)}, result["observedAt"])
+                self.assertEqual(result["workAdmission"], {key: normal["workAdmission"][key] for key in result["workAdmission"]})
+                self.assertEqual(result["closureAdmission"]["newIssueIntakeAllowed"], normal["closureAdmission"]["newIssueIntakeAllowed"])
+
+    def test_cli_observation_rejects_evaluate_json_or_other_modes_before_observers(self):
+        for flags in (["--dry-run"], ["--evaluate-json", "{}"]):
+            with self.subTest(flags=flags), mock.patch.object(sys, "argv", ["gate", "--observe-work-admission", *flags]), \
+                    mock.patch.object(MODULE, "observe_signals") as observe, contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as held: MODULE.main()
+                self.assertEqual(held.exception.code, 2)
+                observe.assert_not_called()
+
+    def test_real_cli_entry_emits_only_private_work_evidence(self):
+        with self.inputs() as args:
+            args.observe_work_admission = True
+            output = io.StringIO()
+            with mock.patch.object(MODULE, "parse_args", return_value=args), contextlib.redirect_stdout(output):
+                self.assertEqual(MODULE.main(), 0)
+            result = json.loads(output.getvalue())
+            self.assertEqual(result["schema"], "jovie.fleet-work-observation/v1")
+            self.assertFalse(result["authorizesDispatch"])
+            self.assertFalse(result["authorizesTransition"])
+            MODULE.observe_main.assert_called_once()
+
+    def test_unknown_main_does_not_create_an_in_memory_review_pass(self):
+        with self.inputs() as args:
+            verdict = MODULE.observe_work_review(args.state_dir / "absent", {"status": "unknown", "sha": MAIN_SHA}, MODULE.utc_now())
+            self.assertFalse(verdict["accepted"])
+
+
+def state_has_files(path):
+    return path.exists() and any(path.rglob("*"))
 
 
 if __name__ == "__main__":

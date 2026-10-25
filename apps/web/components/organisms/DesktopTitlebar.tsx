@@ -167,7 +167,7 @@ export function DesktopTitlebar() {
         <div
           data-testid='electron-titlebar-sidebar-cell'
           data-electron-no-drag='true'
-          className='flex w-full min-w-0 items-center gap-1.5 px-2.5'
+          className='flex w-full min-w-0 items-center gap-(--app-shell-sidebar-icon-gap)'
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
         >
           <div
@@ -179,22 +179,33 @@ export function DesktopTitlebar() {
           />
           {/* Single canonical sidebar toggle for Electron: the same rail
               control primitive the header uses in the browser. Buttons are
-              no-drag via the Electron drag-region CSS. */}
-          <RailToggleButton
-            side='left'
-            controlsId='shell-left-rail'
-            open={sidebarToggleOpen}
-            pinned={isMobile ? sidebarCtx?.openMobile : sidebarCtx?.open}
-            openLabel={
-              sidebarCtx?.isPreview ? 'Pin sidebar' : 'Collapse sidebar'
-            }
-            closedLabel='Expand sidebar'
-            onToggle={() => toggleSidebar?.()}
-            disabled={!toggleSidebar}
-            shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
-            dataTestId='electron-sidebar-toggle'
-            iconTestId='electron-sidebar-toggle-icon'
-          />
+              no-drag via the Electron drag-region CSS.
+              While the sidebar context has not mounted (streaming shell
+              skeleton, provider-less hosts) the canonical control has no
+              toggle to call. Render placeholder chrome instead of a disabled
+              button: a disabled canonical control is unfocusable and inert,
+              so it must not exist under the canonical test id. */}
+          {toggleSidebar ? (
+            <RailToggleButton
+              side='left'
+              controlsId='shell-left-rail'
+              open={sidebarToggleOpen}
+              pinned={isMobile ? sidebarCtx?.openMobile : sidebarCtx?.open}
+              openLabel={
+                sidebarCtx?.isPreview ? 'Pin sidebar' : 'Collapse sidebar'
+              }
+              closedLabel='Expand sidebar'
+              onToggle={toggleSidebar}
+              shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
+              dataTestId='electron-sidebar-toggle'
+              iconTestId='electron-sidebar-toggle-icon'
+            />
+          ) : (
+            <div
+              aria-hidden='true'
+              className='skeleton h-7 w-7 shrink-0 rounded-full'
+            />
+          )}
           <div
             data-testid='electron-nav-pill'
             className='flex shrink-0 items-center gap-0.5'

@@ -49,7 +49,7 @@ const validId = value => Number.isSafeInteger(value) && value > 0;
 // The sleeps below total 150s, which covers the ~117s lag before that row
 // was visible. This does not accept any other conclusion, repository,
 // workflow, head, or digest.
-const PRODUCER_LAG_DELAYS_MS = Object.freeze([
+export const PRODUCER_LAG_DELAYS_MS = Object.freeze([
   10_000, 20_000, 30_000, 30_000, 30_000, 30_000,
 ]);
 const TERMINAL_JOB_CONCLUSIONS = new Set([

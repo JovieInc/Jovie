@@ -241,7 +241,7 @@ describe('mapSuggestedActionToInboxCard', () => {
       createdAt: new Date('2026-06-28T10:00:00.000Z'),
     });
 
-    expect(card.title).toBe('Untitled suggestion');
+    expect(card.title).toBe('Suggestion');
     expect(card.why).toBe('Jovie found a booking signal worth your review.');
     expect(card.primaryActionLabel).toBe('Approve');
     expect(card.signalType).toBe('other');

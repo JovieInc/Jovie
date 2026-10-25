@@ -17,7 +17,10 @@ export type HomeLoopTone = 'good' | 'warn' | 'bad' | 'neutral';
 /** The single highest-severity condition, always named in text. */
 export interface HomeLoopConstraint {
   readonly tone: Exclude<HomeLoopTone, 'good' | 'neutral'>;
+  /** Plain operator copy; never a raw diagnostic or filesystem path. */
   readonly text: string;
+  /** Where the full diagnostic lives; rendered as a "Details" link. */
+  readonly detailsHref?: string;
 }
 
 export interface HomeLoopTile<Key extends string = string> {
@@ -78,6 +81,14 @@ export interface HomeLoopAsk {
   /** A written reply (request changes) is accepted for this ask. */
   readonly canReply: boolean;
   readonly evidence: readonly string[];
+  /**
+   * A review ask (certify, accept): the primary action is offered only with
+   * evidence attached. Without links or a summary the card says "Evidence
+   * missing" and the action is disabled.
+   */
+  readonly requiresEvidence?: boolean;
+  /** One-line evidence summary shown inline on review asks. */
+  readonly evidenceSummary?: string | null;
   /**
    * What happens if the founder stays silent until `deadline`
    * (`jovie.decision-default/v1`). `null` means no default yet.
@@ -211,4 +222,15 @@ export function rememberTiles<Key extends string>(
         : { value: tile.value, was: previous?.was ?? null };
   }
   return next;
+}
+
+/** A review ask with nothing to review: no evidence links and no summary. */
+export function isAskEvidenceMissing(
+  ask: Pick<HomeLoopAsk, 'requiresEvidence' | 'evidence' | 'evidenceSummary'>
+): boolean {
+  return (
+    ask.requiresEvidence === true &&
+    ask.evidence.length === 0 &&
+    !ask.evidenceSummary?.trim()
+  );
 }

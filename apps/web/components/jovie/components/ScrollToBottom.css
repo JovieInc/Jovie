@@ -17,9 +17,12 @@
   color: var(--color-text-secondary-token);
   padding: 0;
   transform: translateX(-50%);
-  backdrop-filter: blur(8px);
   box-shadow: 0 10px 32px -20px
     color-mix(in oklab, var(--system-b-accent-cyan) 35%, black 65%);
+  /* Compositor-only entrance. A JS animation, or backdrop-filter over the
+     scrolling transcript, drops a frame on the chat scroll ratchet. */
+  animation: system-b-scroll-to-bottom-in var(--duration-fast)
+    var(--ease-subtle);
   transition:
     background-color var(--duration-fast) var(--ease-subtle),
     color var(--duration-fast) var(--ease-subtle),
@@ -38,6 +41,24 @@
     0 10px 32px -20px
     color-mix(in oklab, var(--system-b-accent-cyan) 35%, black 65%),
     0 0 0 2px color-mix(in oklab, var(--system-b-accent-cyan) 20%, transparent);
+}
+
+@keyframes system-b-scroll-to-bottom-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(.system-b-scroll-to-bottom) {
+    animation: none;
+  }
 }
 
 :where(.system-b-scroll-to-bottom-icon) {

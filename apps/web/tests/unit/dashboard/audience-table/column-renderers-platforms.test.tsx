@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { TooltipProvider } from '@jovie/ui';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
@@ -19,6 +21,7 @@ function createMember(): AudienceMember {
     referrerHistory: [{ url: 'https://instagram.com/jovie' }],
     utmParams: { source: 'instagram', medium: 'social' },
     email: 'taylor@example.com',
+    emailVisibleToArtist: true,
     phone: null,
     spotifyConnected: false,
     purchaseCount: 0,
@@ -51,5 +54,22 @@ describe('renderPlatformsCell', () => {
 
     const icons = container.querySelectorAll('svg');
     expect(icons.length).toBe(3);
+  });
+});
+
+describe('intent subtitle tokens', () => {
+  it('renders intent levels on Ion tokens, never raw emerald or amber', () => {
+    const webRoot = resolve(__dirname, '../../../..');
+    const source = readFileSync(
+      resolve(
+        webRoot,
+        'components/features/dashboard/organisms/dashboard-audience-table/utils/column-renderers.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toMatch(/emerald-|amber-|orange-|cyan-/);
+    expect(source).toContain('font-caption text-success');
+    expect(source).toContain('font-caption text-secondary-token');
   });
 });

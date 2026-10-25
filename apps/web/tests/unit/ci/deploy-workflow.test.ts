@@ -21,8 +21,25 @@ import {
 
 type CheckoutStep = {
   uses?: string;
-  with?: { ref?: string; 'persist-credentials'?: boolean };
+  with?: {
+    ref?: string;
+    repository?: string;
+    path?: string;
+    'persist-credentials'?: boolean;
+  };
 };
+
+const CANDIDATE_CHECKOUT_REF = '${{ inputs.expected_sha }}';
+
+/** The gate CLIs are checked out from the workflow file, not the candidate. */
+function isTrustedGateToolingCheckout(step: CheckoutStep): boolean {
+  return (
+    step.with?.ref === '${{ job.workflow_sha }}' &&
+    step.with?.repository === '${{ job.workflow_repository }}' &&
+    step.with?.path === 'promotion-gate-tooling' &&
+    step.with?.['persist-credentials'] === false
+  );
+}
 
 function assertAuthorizedCheckouts(workflow: string) {
   const parsed = parseYaml(workflow) as {
@@ -34,8 +51,9 @@ function assertAuthorizedCheckouts(workflow: string) {
   expect(checkouts.length).toBeGreaterThan(0);
   for (const step of checkouts) {
     expect(step.uses).toMatch(/^actions\/checkout@[a-f0-9]{40}$/);
-    expect(step.with?.ref).toBe('${{ inputs.expected_sha }}');
     expect(step.with?.['persist-credentials']).toBe(false);
+    if (isTrustedGateToolingCheckout(step)) continue;
+    expect(step.with?.ref).toBe(CANDIDATE_CHECKOUT_REF);
   }
 }
 
@@ -813,7 +831,7 @@ describe('deploy workflow Vercel env resolution', () => {
     }
   });
 
-  it('keeps exact-build performance proof deployable without optional auth credentials', () => {
+  it('enforces qualified exact-build budgets while allowing optional auth credentials to be unconfigured', () => {
     const workflow = readFileSync(productionReleaseWorkflowPath, 'utf8');
     const promotionJob = getJobBlock(workflow, 'promote-production');
     const setupStep = getStepBlock(
@@ -861,12 +879,17 @@ describe('deploy workflow Vercel env resolution', () => {
     );
     expect(performanceStep).toContain('--auth-path "$auth_state"');
     expect(performanceStep).toContain('--runs 3');
-    expect(performanceStep).toContain(
+    expect(performanceStep).not.toContain(
       'echo "::warning::Canonical six-route browser budgets failed on the exact staged build."'
     );
-    expect(performanceStep).toContain('performance_status=warn');
     expect(performanceStep).not.toContain(
-      'fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build."'
+      'authenticated_performance_status=warn'
+    );
+    expect(performanceStep).toContain(
+      'fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build (JOV-8557)."'
+    );
+    expect(performanceStep).toContain(
+      'authenticated_performance_status=passed'
     );
     for (const routeId of [
       'creator-inbox-nav',
@@ -1611,6 +1634,9 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(promoteJob).toContain(
       'steps.stage-production.outputs.failure_subtype || steps.performance-gate.outputs.failure_subtype || steps.promote.outputs.failure_subtype || steps.verify-production.outputs.failure_subtype'
     );
+    expect(promoteJob).toContain(
+      'steps.verify-production.outputs.failure_subtype || steps.journey-gate.outputs.failure_subtype'
+    );
     expect(domainGuardStep).toContain('id: domain-guard');
     expect(domainGuardStep).toContain(
       'node .github/scripts/verify-vercel-production-domains.mjs'
@@ -1628,6 +1654,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(stageStep).toContain('bootstrap-cookie-jar');
     expect(stageStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
     expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(stageStep).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
     expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).not.toContain('STAGED_RESPONSE');
@@ -1792,6 +1819,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
 
     expect(publicSmoke).toContain('bootstrap-cookie-jar');
     expect(publicSmoke).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(publicSmoke).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(publicSmoke).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
     expect(publicSmoke).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
     expect(publicSmoke).not.toContain('x-vercel-protection-bypass');
@@ -4177,6 +4205,7 @@ describe('production promotion exact-artifact contract', () => {
       '[ "$production_deploy_target" != "production" ]'
     );
     expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).toContain('production_deployment_url_b64=');
     expect(stageStep).not.toContain(
@@ -4194,8 +4223,14 @@ describe('production promotion exact-artifact contract', () => {
     expect(finalCurrentStep).not.toContain(
       'Refusing stale production promotion'
     );
+    // The closed lineage predicate stays in the step. The live if repeats it
+    // inside one ${{ }} with the journey gate: text after }} is always true
+    // (actions/runner#1173), so the gate cannot be appended outside.
     expect(promoteStep).toContain(
       "if: ${{ steps.final-current.outputs.is_current == 'true' }}"
+    );
+    expect(promoteStep).toContain(
+      "if: ${{ steps.final-current.outputs.is_current == 'true' && steps.journey-gate.outcome == 'success' }}"
     );
     expect(promoteJob).toContain(
       'promotion_sha: ${{ steps.promote.outputs.promotion_sha || steps.final-current.outputs.superseded_sha || steps.mutation-head.outputs.superseded_sha }}'
@@ -4650,6 +4685,19 @@ describe('production promotion exact-artifact contract', () => {
       { ...safe, with: { 'persist-credentials': false } },
       { ...safe, with: { ...safe.with, 'persist-credentials': true } },
       { ...safe, uses: 'actions/checkout@v7' },
+      {
+        ...safe,
+        with: { ...safe.with, ref: '${{ job.workflow_sha }}' },
+      },
+      {
+        ...safe,
+        with: {
+          ...safe.with,
+          ref: '${{ job.workflow_sha }}',
+          repository: '${{ job.workflow_repository }}',
+          path: 'not-the-gate-tooling',
+        },
+      },
     ]) {
       expect(() =>
         assertAuthorizedCheckouts(

@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { redeemWaitlistInviteToken } from '@/lib/waitlist/redeem';
+import { drizzleColumns } from '@/tests/unit/auth/drizzle-predicate';
+
+const APP_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
 const mockWithSerializableRetry = vi.hoisted(() => vi.fn());
 const mockWithSystemIngestionSession = vi.hoisted(() => vi.fn());
@@ -27,18 +30,15 @@ type Row = Record<string, unknown>;
 function createTxMock(selectResults: Row[][]) {
   const selectQueue = [...selectResults];
   const insertValues = vi.fn().mockResolvedValue(undefined);
-  const select = vi.fn(() => ({
-    from: vi.fn(() => ({
-      where: vi.fn(() => ({
-        for: vi.fn(() => ({
-          limit: vi
-            .fn()
-            .mockImplementation(() =>
-              Promise.resolve(selectQueue.shift() ?? [])
-            ),
-        })),
-      })),
+  const where = vi.fn(() => ({
+    for: vi.fn(() => ({
+      limit: vi
+        .fn()
+        .mockImplementation(() => Promise.resolve(selectQueue.shift() ?? [])),
     })),
+  }));
+  const select = vi.fn(() => ({
+    from: vi.fn(() => ({ where })),
   }));
 
   return {
@@ -50,6 +50,7 @@ function createTxMock(selectResults: Row[][]) {
       values: insertValues,
     })),
     insertValues,
+    where,
   } as never;
 }
 
@@ -179,20 +180,29 @@ describe('redeemWaitlistInviteToken', () => {
 
     const result = await redeemWaitlistInviteToken({
       token: inviteToken,
-      clerkUserId: 'clerk_123',
+      clerkUserId: APP_USER_ID,
       verifiedEmails: ['primary@example.com', 'Invited@Example.com'],
     });
 
     expect(result).toEqual({
       outcome: 'approved',
       entryId: 'entry-1',
-      clerkId: 'clerk_123',
+      clerkId: APP_USER_ID,
     });
     const txWithInsert = tx as unknown as {
       insertValues: ReturnType<typeof vi.fn>;
+      where: ReturnType<typeof vi.fn>;
     };
     expect(txWithInsert.insertValues).toHaveBeenCalledWith(
-      expect.objectContaining({ email: 'Invited@Example.com' })
+      expect.objectContaining({ id: APP_USER_ID, email: 'Invited@Example.com' })
     );
+    expect(txWithInsert.insertValues.mock.calls[0]?.[0]).not.toHaveProperty(
+      'clerkId'
+    );
+    const columns = txWithInsert.where.mock.calls.flatMap(call =>
+      drizzleColumns(call[0])
+    );
+    expect(columns).toContain('users.id');
+    expect(columns).not.toContain('users.clerk_id');
   });
 });

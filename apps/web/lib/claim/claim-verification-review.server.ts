@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { randomUUID } from 'node:crypto';
 import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { BASE_URL } from '@/constants/domains';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
@@ -152,7 +153,101 @@ export type ClaimVerificationDecisionResult =
       readonly record: ClaimVerificationRecord;
     }
   | { readonly outcome: 'identity_conflict' }
-  | { readonly outcome: 'no_subscription' };
+  | { readonly outcome: 'no_subscription' }
+  /** Another decision holds the claim right now; nothing was changed. */
+  | { readonly outcome: 'in_progress' };
+
+/**
+ * A decision reserves the claim before any side effect (Stripe refund, identity
+ * link), so approve and reject can never both run. A decision that crashes
+ * mid-flight frees the claim after this long.
+ */
+export const CLAIM_DECISION_LEASE_MS = 10 * 60 * 1000;
+const DECISION_LEASE_KEY = 'decisionLease';
+
+const claimStatusSql = drizzleSql`${creatorProfiles.settings}->${CLAIM_VERIFICATION_SETTINGS_KEY}->>'status'`;
+const claimLeaseSql = drizzleSql`${creatorProfiles.settings}->${CLAIM_VERIFICATION_SETTINGS_KEY}->${DECISION_LEASE_KEY}`;
+
+function holdsDecisionLease(leaseId: string) {
+  return drizzleSql`${claimLeaseSql}->>'id' = ${leaseId}`;
+}
+
+/** Settings with the transient lease removed, so it never reaches a record. */
+function withoutDecisionLease(settings: unknown): Record<string, unknown> {
+  const base =
+    settings && typeof settings === 'object' && !Array.isArray(settings)
+      ? (settings as Record<string, unknown>)
+      : {};
+  const raw = base[CLAIM_VERIFICATION_SETTINGS_KEY];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return base;
+  const { [DECISION_LEASE_KEY]: _lease, ...record } = raw as Record<
+    string,
+    unknown
+  >;
+  return { ...base, [CLAIM_VERIFICATION_SETTINGS_KEY]: record };
+}
+
+/**
+ * Atomically reserve a pending claim for one decision. Returns the settings as
+ * locked (fresh, not a stale snapshot), or null when the claim is no longer
+ * pending or another live decision holds it.
+ */
+async function reserveClaimDecision(input: {
+  readonly profileId: string;
+  readonly leaseId: string;
+  readonly now: Date;
+}): Promise<Record<string, unknown> | null> {
+  const staleBefore = new Date(
+    input.now.getTime() - CLAIM_DECISION_LEASE_MS
+  ).toISOString();
+  const lease = JSON.stringify({
+    id: input.leaseId,
+    at: input.now.toISOString(),
+  });
+  const [row] = await db
+    .update(creatorProfiles)
+    .set({
+      settings: drizzleSql`jsonb_set(${creatorProfiles.settings}, ARRAY[${CLAIM_VERIFICATION_SETTINGS_KEY}, ${DECISION_LEASE_KEY}]::text[], ${lease}::jsonb)`,
+    })
+    .where(
+      and(
+        eq(creatorProfiles.id, input.profileId),
+        drizzleSql`${claimStatusSql} = 'pending_verification'`,
+        drizzleSql`(${claimLeaseSql} IS NULL OR (${claimLeaseSql}->>'at')::timestamptz < ${staleBefore}::timestamptz)`
+      )
+    )
+    .returning({ settings: creatorProfiles.settings });
+  return row ? withoutDecisionLease(row.settings) : null;
+}
+
+/** Free the claim after a decision that changed nothing, so it can be retried. */
+async function releaseClaimDecision(
+  profileId: string,
+  leaseId: string
+): Promise<void> {
+  try {
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: drizzleSql`${creatorProfiles.settings} #- ARRAY[${CLAIM_VERIFICATION_SETTINGS_KEY}, ${DECISION_LEASE_KEY}]::text[]`,
+      })
+      .where(
+        and(eq(creatorProfiles.id, profileId), holdsDecisionLease(leaseId))
+      );
+  } catch (error) {
+    // The lease expires on its own; a retry works after CLAIM_DECISION_LEASE_MS.
+    await captureError('Claim decision lease release failed', error, {
+      route: 'lib/claim/claim-verification-review.server',
+    });
+  }
+}
+
+class ClaimDecisionLeaseLostError extends Error {
+  constructor() {
+    super('Claim decision lease lost before the decision was recorded');
+    this.name = 'ClaimDecisionLeaseLostError';
+  }
+}
 
 /**
  * High-reach artists usually already have a prebuilt, unclaimed profile that
@@ -228,6 +323,7 @@ async function linkVerifiedArtist(input: {
   readonly profileId: string;
   readonly settings: unknown;
   readonly next: ClaimVerificationRecord;
+  readonly leaseId: string;
 }): Promise<string[]> {
   const { next } = input;
   const base =
@@ -239,7 +335,7 @@ async function linkVerifiedArtist(input: {
       spotifyArtistId: next.spotifyArtistId,
       toProfileId: input.profileId,
     });
-    await tx
+    const [linked] = await tx
       .update(creatorProfiles)
       .set({
         spotifyId: next.spotifyArtistId,
@@ -255,7 +351,15 @@ async function linkVerifiedArtist(input: {
         ),
         updatedAt: new Date(),
       })
-      .where(eq(creatorProfiles.id, input.profileId));
+      .where(
+        and(
+          eq(creatorProfiles.id, input.profileId),
+          holdsDecisionLease(input.leaseId)
+        )
+      )
+      .returning({ id: creatorProfiles.id });
+    // Rolls back the identity release too.
+    if (!linked) throw new ClaimDecisionLeaseLostError();
     return released;
   });
 }
@@ -304,56 +408,97 @@ export async function decideClaimVerification(input: {
     .limit(1);
   if (!row) return { outcome: 'not_found' };
 
-  const current = readClaimVerification(row.settings);
-  if (!current) return { outcome: 'not_found' };
-  if (current.status !== 'pending_verification') {
-    return { outcome: 'not_pending', record: current };
+  const snapshot = readClaimVerification(row.settings);
+  if (!snapshot) return { outcome: 'not_found' };
+  if (snapshot.status !== 'pending_verification') {
+    return { outcome: 'not_pending', record: snapshot };
+  }
+  if (input.decision === 'reject' && !row.subscriptionId) {
+    return { outcome: 'no_subscription' };
   }
 
-  let refundId: string | null = null;
-  if (input.decision === 'reject') {
-    if (!row.subscriptionId) return { outcome: 'no_subscription' };
-    const refund = await refundFirstMonthAndCancel({
-      subscriptionId: row.subscriptionId,
-      // Per subscription: a profile re-requested and rejected again inside
-      // Stripe's 24h idempotency window refunds its own charge.
-      idempotencyKey: `claim-verification-reject:${input.profileId}:${row.subscriptionId}`,
-    });
-    refundId = refund.refundId;
-  }
-
-  const next = decideClaimVerificationRecord(current, {
-    decision: input.decision,
-    decidedAt: now,
-    decidedBy: input.decidedBy,
-    reason: input.reason ?? null,
-    refundId,
+  // Reserve before any side effect: the snapshot above is only a cheap
+  // pre-check, and two concurrent decisions can both have read it.
+  const leaseId = randomUUID();
+  const settings = await reserveClaimDecision({
+    profileId: input.profileId,
+    leaseId,
+    now,
   });
-  if (!next) return { outcome: 'not_pending', record: current };
-
-  let releasedHandles: string[] = [];
-  if (input.decision === 'approve') {
-    try {
-      releasedHandles = await linkVerifiedArtist({
-        profileId: input.profileId,
-        settings: row.settings,
-        next,
-      });
-    } catch (error) {
-      if (error instanceof SpotifyProfileIdentityConflictError) {
-        return { outcome: 'identity_conflict' };
-      }
-      throw error;
-    }
-  } else {
-    await db
-      .update(creatorProfiles)
-      .set({
-        settings: withClaimVerification(row.settings, next),
-        updatedAt: now,
-      })
-      .where(eq(creatorProfiles.id, input.profileId));
+  if (!settings) return { outcome: 'in_progress' };
+  const current = readClaimVerification(settings);
+  if (!current) {
+    await releaseClaimDecision(input.profileId, leaseId);
+    return { outcome: 'not_found' };
   }
+
+  let next: ClaimVerificationRecord | null = null;
+  let releasedHandles: string[] = [];
+  let refundId: string | null = null;
+  try {
+    if (input.decision === 'reject' && row.subscriptionId) {
+      const refund = await refundFirstMonthAndCancel({
+        subscriptionId: row.subscriptionId,
+        // Per subscription: a profile re-requested and rejected again inside
+        // Stripe's 24h idempotency window refunds its own charge.
+        idempotencyKey: `claim-verification-reject:${input.profileId}:${row.subscriptionId}`,
+      });
+      refundId = refund.refundId;
+    }
+
+    next = decideClaimVerificationRecord(current, {
+      decision: input.decision,
+      decidedAt: now,
+      decidedBy: input.decidedBy,
+      reason: input.reason ?? null,
+      refundId,
+    });
+    if (!next) {
+      await releaseClaimDecision(input.profileId, leaseId);
+      return { outcome: 'not_pending', record: current };
+    }
+
+    if (input.decision === 'approve') {
+      try {
+        releasedHandles = await linkVerifiedArtist({
+          profileId: input.profileId,
+          settings,
+          next,
+          leaseId,
+        });
+      } catch (error) {
+        if (error instanceof SpotifyProfileIdentityConflictError) {
+          await releaseClaimDecision(input.profileId, leaseId);
+          return { outcome: 'identity_conflict' };
+        }
+        throw error;
+      }
+    } else {
+      const [recorded] = await db
+        .update(creatorProfiles)
+        .set({
+          settings: withClaimVerification(settings, next),
+          updatedAt: now,
+        })
+        .where(
+          and(
+            eq(creatorProfiles.id, input.profileId),
+            holdsDecisionLease(leaseId)
+          )
+        )
+        .returning({ id: creatorProfiles.id });
+      if (!recorded) throw new ClaimDecisionLeaseLostError();
+    }
+  } catch (error) {
+    // Nothing was recorded: free the claim so the operator can retry. A
+    // retried reject reuses the Stripe idempotency key, so it never refunds
+    // twice.
+    if (!(error instanceof ClaimDecisionLeaseLostError)) {
+      await releaseClaimDecision(input.profileId, leaseId);
+    }
+    throw error;
+  }
+  if (!next) return { outcome: 'not_pending', record: current };
 
   logger.info('Claim verification decided', {
     profileId: input.profileId,

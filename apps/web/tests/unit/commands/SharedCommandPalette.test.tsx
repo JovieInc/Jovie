@@ -21,7 +21,7 @@ import {
   fuzzyMatch,
   PaletteList,
 } from '@/components/organisms/SharedCommandPalette';
-import { APP_ROUTES } from '@/constants/routes';
+import { APP_ROUTES, buildLibraryViewRoute } from '@/constants/routes';
 import { useSequentialShortcuts } from '@/hooks/useSequentialShortcuts';
 import {
   commandsForSurface,
@@ -296,8 +296,9 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       ),
     });
     expect(selected).toHaveClass('system-b-table-row-shell');
-    expect(selected).toHaveClass('min-h-11');
-    expect(selected).toHaveClass('py-1.5');
+    expect(selected).toHaveClass('min-h-8');
+    expect(selected).toHaveClass('h-8');
+    expect(selected).toHaveClass('py-0');
     expect(selected).toHaveClass('system-b-table-row-selected');
     expect(selected).not.toHaveClass('system-b-picker-row');
     expect(selected.querySelector('.system-b-picker-art')).toBeNull();
@@ -475,7 +476,7 @@ describe('SharedCommandPalette (cmd+k surface)', () => {
       );
     expect(releasesNav).toBeDefined();
     fireEvent.mouseDown(releasesNav!);
-    expect(pushMock).toHaveBeenCalledWith(APP_ROUTES.RELEASES);
+    expect(pushMock).toHaveBeenCalledWith(buildLibraryViewRoute('releases'));
   });
 
   it.each(['pointer', 'keyboard'] as const)(

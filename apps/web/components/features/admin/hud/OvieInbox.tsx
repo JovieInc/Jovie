@@ -1,10 +1,16 @@
 'use client';
 
+import { LoadingSkeleton } from '@jovie/ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { FounderReviewRecorder } from '@/components/features/opportunity-inbox/FounderReviewRecorder';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { DrawerButton } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
+import {
+  redactFilesystemPaths,
+  summarizeSourceIssues,
+} from '@/lib/ovie/home/operator-copy';
 import {
   type OvieInbox as Inbox,
   inboxDecisionRequest,
@@ -124,7 +130,21 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
         <div className='mt-3 min-h-0 flex-1 overflow-y-auto'>
           <div className='space-y-3' aria-busy={query.isPending || submitting}>
             {query.isPending ? (
-              <p role='status'>Loading decisions…</p>
+              <div role='status' aria-label='Loading Decisions…'>
+                <LoadingSkeleton announce={false} height='h-5' width='w-48' />
+                <LoadingSkeleton announce={false} className='mt-2' />
+                <LoadingSkeleton
+                  announce={false}
+                  className='mt-3'
+                  width='w-3/4'
+                />
+                <LoadingSkeleton
+                  announce={false}
+                  className='mt-3'
+                  height='h-8'
+                  width='w-24'
+                />
+              </div>
             ) : query.isError ? (
               <div role='alert'>
                 <p>{query.error.message}</p>
@@ -233,16 +253,23 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
                 )}
               </article>
             ) : caseId !== undefined ? (
-              <p role='status'>
-                This decision is not in the current inbox. Refresh to check its
-                status.
-              </p>
+              <EmptyState
+                presentation='quiet'
+                heading='This decision is not in the current inbox. Refresh to check its status.'
+                action={{
+                  label: 'Refresh',
+                  onClick: () => void query.refetch(),
+                }}
+              />
             ) : (
-              <p role='status'>
-                {query.data?.issues.length
-                  ? 'No pending decisions in connected sources.'
-                  : 'No pending founder decisions.'}
-              </p>
+              <EmptyState
+                presentation='quiet'
+                heading={
+                  query.data?.issues.length
+                    ? 'No pending decisions in connected sources.'
+                    : 'No pending founder decisions.'
+                }
+              />
             )}
             {error ? (
               <p role='alert' className='text-xs text-error'>
@@ -250,9 +277,7 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
               </p>
             ) : null}
             {query.data?.issues.length ? (
-              <p role='status' className='text-xs text-secondary-token'>
-                Some sources are unavailable. {query.data.issues.join(' ')}
-              </p>
+              <SourceIssues issues={query.data.issues} />
             ) : null}
           </div>
           <details
@@ -271,5 +296,41 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
         </div>
       </div>
     </ContentSurfaceCard>
+  );
+}
+
+/**
+ * One line for the warning; several issues (one per uncertified component,
+ * say) stay behind a disclosure instead of inlining every name.
+ */
+function SourceIssues({
+  issues,
+}: Readonly<{ readonly issues: readonly string[] }>) {
+  const visibleIssues = [
+    ...new Set(
+      issues.map(issue => redactFilesystemPaths(issue.trim())).filter(Boolean)
+    ),
+  ];
+  const summary = summarizeSourceIssues(visibleIssues);
+  if (!summary) return null;
+  if (visibleIssues.length <= 1)
+    return (
+      <p role='status' className='text-xs text-secondary-token'>
+        {summary}
+      </p>
+    );
+  return (
+    <details
+      role='status'
+      className='text-xs text-secondary-token'
+      data-testid='ovie-inbox-source-issues'
+    >
+      <summary className='cursor-pointer'>{summary}</summary>
+      <ul className='mt-1 flex flex-col gap-0.5 pl-3 text-tertiary-token'>
+        {visibleIssues.map(issue => (
+          <li key={issue}>{issue}</li>
+        ))}
+      </ul>
+    </details>
   );
 }

@@ -6,9 +6,11 @@ import { useEffect } from 'react';
 import { ContentMetricRow } from '@/components/molecules/ContentMetricRow';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { computeRatePercent } from '@/lib/analytics/metrics';
+import { redactFilesystemPaths } from '@/lib/ovie/home/operator-copy';
 import type {
   CapacityHorizonLease,
   CountMeasurement,
+  DeliveryLanes,
 } from '@/lib/ovie/shipping-state';
 import type {
   ShippingFlag,
@@ -83,6 +85,16 @@ function formatCertifiedHead(certifiedHead: Delivery['certifiedHead']): string {
   return certifiedHead.sha ? certifiedHead.sha.slice(0, 7) : NOT_MEASURED;
 }
 
+function formatLybDeploy(health: DeliveryLanes['deployHealth']): string {
+  const lyb = health?.repos.find(repo => repo.repo === 'JovieInc/LogYourBody');
+  if (!lyb) return NOT_MEASURED;
+  const behind =
+    lyb.behindMain === null ? NOT_MEASURED : `${lyb.behindMain} behind`;
+  return lyb.status === 'failing'
+    ? `Failing x${lyb.failedStreak}, ${behind}`
+    : behind;
+}
+
 const SUMMER_LABEL = { up: 'Up', down: 'Down', degraded: 'Degraded' } as const;
 
 function formatAge(seconds: number | null): string | null {
@@ -117,8 +129,11 @@ function CapacityLeaseRow({ row }: { readonly row: CapacityHorizonLease }) {
         {row.forecast.sustainablePercentPerHour ?? '?'}%/h · unused{' '}
         {row.forecast.projectedUnused ?? '?'}% · coverage{' '}
         {row.forecast.qualifiedWork.length} · {row.concurrency ?? '?'}{' '}
-        concurrency · {row.compatibility.cli ?? '?'}+
-        {row.compatibility.harness ?? '?'} · {row.freshness.status}
+        concurrency ·{' '}
+        {row.compatibility.cli
+          ? row.compatibility.cli.split(/[\\/]/).at(-1)
+          : '?'}
+        +{row.compatibility.harness ?? '?'} · {row.freshness.status}
       </p>
       {/* axe nested-interactive (WCAG 4.1.2): <summary> is itself a native
           toggle control, so the Linear link must sit outside it rather than
@@ -248,6 +263,7 @@ function ShippingStateBody({
     ['Staging', formatProduction(delivery.staging)],
     ['Production', formatProduction(delivery.production)],
     ['Behind Main', formatCount(delivery.production.behindMain)],
+    ['LYB Deploy', formatLybDeploy(delivery.lanes.deployHealth)],
     ['CI Green', formatMeaning(view.ciGreen)],
     [
       'Summer',
@@ -306,7 +322,7 @@ function ShippingStateBody({
         </p>
       )}
       <p className='min-h-4 truncate text-2xs leading-4 text-secondary-token'>
-        {delivery.lanes.alerts.join(' · ')}
+        {delivery.lanes.alerts.map(redactFilesystemPaths).join(' · ')}
       </p>
       <p
         className='min-h-4 break-words text-2xs leading-4 text-tertiary-token'

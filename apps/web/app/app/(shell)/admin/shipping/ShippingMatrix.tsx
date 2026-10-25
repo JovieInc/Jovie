@@ -1,6 +1,6 @@
 'use client';
 
-import { Button } from '@jovie/ui';
+import { Button, LoadingSkeleton } from '@jovie/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ExternalLink, GitPullRequest } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -13,13 +13,22 @@ import {
   EntityHeader,
   EntityHeaderThumbnail,
 } from '@/components/molecules/drawer';
+import { EmptyState } from '@/components/molecules/EmptyState';
 import { AdminDetailRail } from '@/features/admin/layout/AdminDetailRail';
-import {
-  parseShippingCockpitProjection,
-  type ShippingCockpitProjection,
-} from '@/lib/ovie/shipping-state/client';
+import { type ShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
+import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
+
+const SHIPPING_COLUMNS = [
+  'Work',
+  'Stage',
+  'Checks',
+  'Queue',
+  'Owner',
+  'Age',
+  'Last transition',
+] as const;
 
 type TaskFeed = ShippingCockpitProjection['operationalTasks'];
 type Task = TaskFeed['tasks'][number];
@@ -416,27 +425,7 @@ export function ShippingMatrix() {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
-  const query = useQuery({
-    queryKey: ['ovie', 'shipping-state'],
-    queryFn: async ({ signal }) => {
-      const response = await fetch('/api/hud/shipping-state', {
-        signal,
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        throw new Error(
-          `Shipping observation unavailable (${response.status})`
-        );
-      }
-      const data = parseShippingCockpitProjection(await response.json());
-      if (!data) throw new Error('Shipping receipt could not be validated');
-      return data;
-    },
-    staleTime: 0,
-    gcTime: 60 * 1000,
-    retry: false,
-    refetchOnWindowFocus: true,
-  });
+  const query = useQuery(shippingStateQueryOptions);
   const [selectedId, setSelectedId] = useState<MatrixRow['id'] | null>(null);
   const feed = query.data?.operationalTasks;
   const rows = feed ? buildMatrixRows(feed, now) : [];
@@ -483,22 +472,17 @@ export function ShippingMatrix() {
             {query.isFetching ? 'Refreshing' : 'Refresh'}
           </Button>
         </div>
-        <div className='overflow-x-auto'>
+        <div
+          className='h-64 overflow-auto'
+          data-testid='shipping-matrix-viewport'
+        >
           <table
             className='w-full text-left text-xs tabular-nums'
             aria-labelledby='shipping-matrix-title'
           >
             <thead>
               <tr className='text-2xs text-tertiary-token'>
-                {[
-                  'Work',
-                  'Stage',
-                  'Checks',
-                  'Queue',
-                  'Owner',
-                  'Age',
-                  'Last transition',
-                ].map(label => (
+                {SHIPPING_COLUMNS.map(label => (
                   <th
                     key={label}
                     scope='col'
@@ -510,13 +494,42 @@ export function ShippingMatrix() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && !query.isPending ? (
+              {query.isPending ? (
+                ['first', 'second', 'third', 'fourth', 'fifth'].map(row => (
+                  <tr
+                    key={`loading-${row}`}
+                    className='border-t border-subtle'
+                    aria-busy='true'
+                  >
+                    {[
+                      'work',
+                      'stage',
+                      'checks',
+                      'queue',
+                      'owner',
+                      'age',
+                      'transition',
+                    ].map(column => (
+                      <td key={`loading-${column}`} className='p-2'>
+                        <LoadingSkeleton
+                          height='h-4'
+                          width='w-full'
+                          announce={false}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : rows.length === 0 ? (
                 <tr className='border-t border-subtle'>
                   <td
                     colSpan={7}
                     className='p-6 text-center text-secondary-token'
                   >
-                    {emptyMatrixMessage(query.isError, feed)}
+                    <EmptyState
+                      presentation='quiet'
+                      heading={emptyMatrixMessage(query.isError, feed)}
+                    />
                   </td>
                 </tr>
               ) : (

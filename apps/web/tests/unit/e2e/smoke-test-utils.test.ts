@@ -45,6 +45,18 @@ describe('smoke-test-utils', () => {
         )
       ).toBe(false);
     });
+
+    it('treats Firefox fetch aborts like Chrome net::ERR_* noise', () => {
+      expect(
+        isExpectedError('NetworkError when attempting to fetch resource.')
+      ).toBe(true);
+      expect(isTransientNavigationError(new Error('NS_BINDING_ABORTED'))).toBe(
+        true
+      );
+      expect(
+        isExpectedError('TypeError: Failed to parse the profile payload')
+      ).toBe(false);
+    });
   });
 
   describe('isExpectedWarning', () => {
