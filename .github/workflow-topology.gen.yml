@@ -1153,6 +1153,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:certify
     jobCount: 3
+  - name: Security Advisory Loop (Linear devin lane)
+    path: .github/workflows/security-advisory-loop.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - schedule
+      - workflow_dispatch
+    terminalReceipt: job:loop
+    jobCount: 1
   - name: Security Suppression Audit
     path: .github/workflows/security-suppression-audit.yml
     active: true

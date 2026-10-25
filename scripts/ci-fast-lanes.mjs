@@ -710,6 +710,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/company-assets/company-assets.test.mjs',
   'scripts/deprecation-intake.test.mjs',
   'scripts/deprecation-clearance.test.mjs',
+  'scripts/security-advisory-intake.test.mjs',
   'scripts/design-authority-guard.test.mjs',
   'scripts/evals/artist-identity.test.mjs',
   'scripts/evals/gtm-lead-copy.test.mjs',
