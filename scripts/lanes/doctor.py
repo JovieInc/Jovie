@@ -508,7 +508,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
         "sentinel": throughput_sentinel.observe(
             state, now, receipts,
-            {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
+            {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024),
+             "publicFeedBytes": PUBLIC_FEED_MAX_BYTES},
             run=lifecycle.run, fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
@@ -1776,8 +1777,8 @@ STATUS_DETAIL_NAME = "lanes-status-details.json"
 STAGE_EVENTS_NAME = "stage-events.ndjson"
 
 
-def public_status_projection(feed: dict, full_text: str) -> str:
-    """Keep operational fields whole; detailed attribution lives in the same gist."""
+def public_status_candidate(feed: dict, full_text: str) -> str:
+    """Keep operational fields whole; detailed attribution lives in the same gist. Size is NOT capped here."""
     def identity(value, limit):
         return value if isinstance(value, str) and len(value) <= limit else None
 
@@ -1814,8 +1815,15 @@ def public_status_projection(feed: dict, full_text: str) -> str:
         "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
     }
     text = json.dumps(public, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    return text
+
+
+def public_status_projection(feed: dict, full_text: str) -> str:
+    """The feed to publish: the candidate while it fits the gist cap, else an explicit unavailable stub."""
+    text = public_status_candidate(feed, full_text)
     if len(text.encode("utf-8")) <= PUBLIC_FEED_MAX_BYTES:
         return text
+    evidence = json.loads(text)["publicProjection"]["fullEvidence"]
     # Never trim operational ownership/hold/attempt arrays to pretend they fit.
     # Existing schema-checking readers reject this as unknown, not an empty fleet.
     return json.dumps({
@@ -1841,6 +1849,11 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     if body.read_bytes() != full_text.encode("utf-8"):
         raise RuntimeError("status-feed-evidence-readback-changed")
     public_text = public_status_projection(feed, full_text)
+    # Candidate size (before the cap check) feeds the sentinel's growth-bound alarm,
+    # so the feed warns well before it flips to the unavailable stub.
+    (host.state / "lanes-status-public.json").write_text(
+        json.dumps({"bytes": len(public_status_candidate(feed, full_text).encode("utf-8")),
+                    "at": feed.get("at")}), encoding="utf-8")
     packet = {"files": {
         "lanes-status.json": {"content": public_text},
         STATUS_DETAIL_NAME: {"content": full_text},

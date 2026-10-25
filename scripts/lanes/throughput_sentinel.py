@@ -217,9 +217,19 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
             return None
         return value if isinstance(value, int) else None
 
+    def public_feed_bytes() -> int | None:
+        try:
+            value = json.loads((state / "lanes-status-public.json").read_text()).get("bytes")
+        except (OSError, ValueError):
+            return None
+        return value if isinstance(value, int) else None
+
     rows = [
         ("repair-inventory-bytes", size("cache/open-prs-labels-v2.json"), limits.get("inventoryBytes", 16 * MIB),
          "bytes", "lane_runner.REPAIR_INVENTORY_MAX_BYTES: every repair worker idles when exceeded (JOV 2026-10-24, 154 PRs)"),
+        ("public-status-feed-bytes", public_feed_bytes(), limits.get("publicFeedBytes", 256 * 1024), "bytes",
+         "doctor.public_status_projection: above the cap the gist feed becomes an unavailable stub and every "
+         "Ovie lanes read fails (2026-10-25, 302 KB against 256 KB)"),
         ("ledger-bytes", size("runs/ledger.jsonl"), 64_000_000, "bytes",
          "backlog_admission refuses all admission above 64,000,000 bytes (native-attempt-ledger-read-bound); "
          "ledger_archive.py rotation keeps 10 days"),

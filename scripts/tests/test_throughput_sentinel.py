@@ -159,6 +159,21 @@ class IdleNotDemandTest(unittest.TestCase):
         nodemand = obs(pushes1h=pushed, idleExitsByProvider1h={"grok": {"linear-rate-limited": 5}})  # grok has no demand
         self.assertNotIn("throughput-idle-not-demand:grok", ts.judge(nodemand))
 
+    def test_public_status_feed_warns_before_it_flips_to_the_stub(self):
+        with tempfile.TemporaryDirectory() as raw:
+            state = Path(raw)
+            limits = {"publicFeedBytes": 1000}
+            (state / "lanes-status-public.json").write_text(json.dumps({"bytes": 600}))
+            rows = {r["id"]: r for r in ts.growth_bounds(state, limits)}
+            self.assertNotIn("growth-bound:public-status-feed-bytes",
+                             ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, growth=list(rows.values()))))
+            (state / "lanes-status-public.json").write_text(json.dumps({"bytes": 760}))
+            rows = {r["id"]: r for r in ts.growth_bounds(state, limits)}
+            alerts = ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, growth=list(rows.values())))
+            self.assertIn("76%", alerts["growth-bound:public-status-feed-bytes"])
+            (state / "lanes-status-public.json").unlink()
+            self.assertIsNone({r["id"]: r for r in ts.growth_bounds(state, limits)}["public-status-feed-bytes"]["fraction"])
+
     def test_capped_stores_are_measured_against_their_own_limits(self):
         with tempfile.TemporaryDirectory() as raw:
             state = Path(raw)
