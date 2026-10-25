@@ -262,20 +262,23 @@ describe('adaptive job access and current offer', () => {
     });
   });
 
-  it('rejects an unavailable paid offer even with current artist qualification', async () => {
-    const state = createOnboardingTurnState({
-      sessionId: 'artist-offer',
-      turnCount: 3,
-      messages: [assistantMessage],
-    });
-    const tools = buildOnboardingTools(state);
-    await expect(
-      tools.proposeCheckout.execute?.({ plan: 'pro' }, {} as never)
-    ).resolves.toMatchObject({ action: 'checkout_unavailable' });
-    await expect(
-      tools.proposeCheckout.execute?.({ plan: 'free' }, {} as never)
-    ).resolves.toMatchObject({ action: 'propose_checkout', plan: 'free' });
-  });
+  it.each(['free', 'pro'] as const)(
+    'rejects Max and permits self-service %s for a qualified artist',
+    async plan => {
+      const state = createOnboardingTurnState({
+        sessionId: 'artist-offer',
+        turnCount: 3,
+        messages: [assistantMessage],
+      });
+      const tools = buildOnboardingTools(state);
+      await expect(
+        tools.proposeCheckout.execute?.({ plan: 'max' }, {} as never)
+      ).resolves.toMatchObject({ action: 'checkout_unavailable' });
+      await expect(
+        tools.proposeCheckout.execute?.({ plan }, {} as never)
+      ).resolves.toMatchObject({ action: 'propose_checkout', plan });
+    }
+  );
 });
 
 describe('confirmed artist field provenance', () => {
