@@ -1412,6 +1412,16 @@ class Tracker:
                 {})["teams"]["nodes"][0]
         return self._team_node
 
+    def _label_by_name(self, name: str) -> str | None:
+        try:
+            data = self.linear.gql(
+                'query($n:String!){issueLabels(first:1,filter:{team:{key:{eq:"JOV"}},name:{eq:$n}}){nodes{id name}}}',
+                {"n": name})
+            node = (((data or {}).get("issueLabels") or {}).get("nodes") or [None])[0]
+            return node["id"] if node and node.get("id") else None
+        except Exception:  # noqa: BLE001
+            return None
+
     def _remediation_label_id(self, key: str) -> str | None:
         """`remediation:<slug>` on the JOV team. Created when missing, color #E5484D."""
         if not remediation.escalation_enabled():
@@ -1423,9 +1433,18 @@ class Tracker:
         for label in team["labels"]["nodes"]:
             if label.get("name") == name and label.get("id"):
                 return label["id"]
-        created = self.linear.gql(
-            'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){issueLabel{id name}}}',
-            {"i": {"teamId": team["id"], "name": name, "color": remediation.REMEDIATION_LABEL_COLOR}})
+        # The team query returns only the first 50 labels; the team has far more, so look the name up directly
+        # before creating (the lanes app is FORBIDDEN from creating labels, which used to abort the whole incident).
+        found = self._label_by_name(name)
+        if found:
+            team["labels"]["nodes"].append({"id": found, "name": name})
+            return found
+        try:
+            created = self.linear.gql(
+                'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){issueLabel{id name}}}',
+                {"i": {"teamId": team["id"], "name": name, "color": remediation.REMEDIATION_LABEL_COLOR}})
+        except Exception:  # noqa: BLE001 - a label is decoration; the incident still opens without it
+            return None
         label = ((created or {}).get("issueLabelCreate") or {}).get("issueLabel") or {}
         if not label.get("id"):
             return None
@@ -1486,7 +1505,10 @@ class Tracker:
             team = self._team()
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
-            remediation_label = self._remediation_label_id(key)
+            try:
+                remediation_label = self._remediation_label_id(key)
+            except Exception:  # noqa: BLE001 - never lose an incident over its label
+                remediation_label = None
             if remediation_label:
                 labels.append(remediation_label)
             description = (f"**{text}**\n\nHost `{self.host}`, {now_iso()}. Raised by `scripts/lanes/doctor.py`; "

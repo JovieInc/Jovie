@@ -92,18 +92,19 @@ def window(store: dict, now: float) -> list[dict]:
 def update_limits(store: dict, now: float) -> dict:
     """Recompute the alarm limits from the trailing 7 days once a week (and when none exist yet)."""
     current = store.get("limits")
-    if current and now - current.get("computedAt", 0) < WEEK_S:
+    if current and current.get("complete") and now - current.get("computedAt", 0) < WEEK_S:
         return store
     rows = window(store, now)
-    if len(rows) >= MIN_SAMPLES:
+    # Never freeze a week of limits from a partial backfill (the first live pass held only the newest 20 deploys).
+    if len(rows) >= MIN_SAMPLES and not store.get("backlog"):
         store["limits"] = {"commits": math.ceil(pct([r["commits"] for r in rows], 0.95)),
-                           "ageS": math.ceil(pct([r["ageS"] for r in rows], 0.95)), "computedAt": now, "n": len(rows)}
+                           "ageS": math.ceil(pct([r["ageS"] for r in rows], 0.95)), "computedAt": now, "n": len(rows), "complete": True}
     return store
 
 
 def limits_or_seed(store: dict, seed_commits: int, seed_age_s: int) -> dict:
     limits = store.get("limits")
-    if limits:
+    if limits and limits.get("complete"):
         return {**limits, "source": "measured-7d"}
     return {"commits": seed_commits, "ageS": seed_age_s, "computedAt": None, "n": 0, "source": "seed"}
 

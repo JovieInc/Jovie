@@ -943,6 +943,53 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(state["conditions"]["disk-low"]["writingReview"], reviewed["review"])
         self.assertEqual(state["conditions"]["disk-low"]["writingDecision"], "approved-template")
 
+    def test_an_incident_opens_even_when_the_label_cannot_be_created_or_found(self):
+        issues, forbidden = [], []
+
+        class ForbiddenLabels:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]},
+                                                  "labels": {"nodes": [{"id": "symphony", "name": "symphony"}]}}]}}
+                if "issueLabels(" in query:
+                    return {"issueLabels": {"nodes": []}}
+                if "issueLabelCreate" in query:
+                    forbidden.append(variables)
+                    raise RuntimeError("linear: request rejected (403 FORBIDDEN)")
+                if "issueCreate" in query:
+                    issues.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-9", "identifier": "JOV-9"}}}
+                raise AssertionError(query)
+
+        self.assertEqual(doctor.Tracker(ForbiddenLabels(), "gem").open("production-deploy:lyb", "LYB deploys failing"), "iss-9")
+        self.assertEqual(len(forbidden), 1)
+        self.assertEqual(issues[0]["labelIds"], ["symphony"], "the incident keeps its symphony label and loses only the remediation one")
+
+    def test_an_existing_label_beyond_the_first_fifty_is_found_by_name_and_not_recreated(self):
+        created, issues = [], []
+
+        class ManyLabels:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]},
+                                                  "labels": {"nodes": []}}]}}
+                if "issueLabels(" in query:
+                    return {"issueLabels": {"nodes": [{"id": "old-label", "name": variables["n"]}]}}
+                if "issueLabelCreate" in query:
+                    created.append(variables)
+                    return {}
+                if "issueCreate" in query:
+                    issues.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-8", "identifier": "JOV-8"}}}
+                raise AssertionError(query)
+
+        self.assertEqual(doctor.Tracker(ManyLabels(), "gem").open("production-deploy:lyb", "x"), "iss-8")
+        self.assertEqual((created, issues[0]["labelIds"]), ([], ["old-label"]))
+
     def test_alert_label_is_created_on_open_reopen_and_close(self):
         created = []
         added = []

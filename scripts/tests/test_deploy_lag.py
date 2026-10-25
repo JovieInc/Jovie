@@ -61,6 +61,19 @@ class MeasuredLimitsTest(unittest.TestCase):
         store = dl.update_limits(store, later)
         self.assertGreater(store["limits"]["ageS"], frozen["ageS"], "recomputed after a week from the trailing 7 days")
 
+    def test_a_partial_backfill_never_freezes_limits(self):
+        runs, gh = deploys(60, lambda i: 600)
+        store = dl.update_limits(dl.collect({}, REPO, runs, NOW, gh), NOW)
+        self.assertGreater(store["backlog"], 0)
+        self.assertNotIn("limits", store)
+        store["limits"] = {"commits": 1, "ageS": 1, "computedAt": NOW, "n": 20}  # written by the first live release
+        self.assertEqual(dl.limits_or_seed(store, 6, 14760)["source"], "seed")
+        for _ in range(2):
+            store = dl.collect(store, REPO, runs, NOW, gh)
+        store = dl.update_limits(store, NOW)
+        self.assertTrue(store["limits"]["complete"])
+        self.assertEqual(store["limits"]["n"], 59)
+
     def test_fewer_than_twenty_samples_keep_the_seed(self):
         runs, gh = deploys(10, lambda i: 600)
         store = dl.update_limits(dl.collect({}, REPO, runs, NOW, gh), NOW)
