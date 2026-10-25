@@ -39,8 +39,29 @@ export interface PricedPath {
   readonly reason: string;
   readonly funding?: string | null;
 }
-export function apiListUsd(prices: ListPrice | { inUsdPerMTok: number; outUsdPerMTok: number; cachedUsdPerMTok?: number | null }, task: Task): number;
-export function listPrices(modelRegistry: { models?: readonly Record<string, unknown>[] }): Record<string, ListPrice>;
-export function subscriptionMarginal(apiUsd: number, seat: Seat, options?: { floorFraction?: number; band?: number }): Omit<PricedPath, 'id' | 'accessPath'>;
-export function priceTask(row: PathRow, prices: Record<string, ListPrice>, task: Task, seat?: Seat, options?: { floorFraction?: number; band?: number }): PricedPath;
+export function apiListUsd(
+  prices:
+    | ListPrice
+    | {
+        inUsdPerMTok: number;
+        outUsdPerMTok: number;
+        cachedUsdPerMTok?: number | null;
+      },
+  task: Task
+): number;
+export function listPrices(modelRegistry: {
+  models?: readonly Record<string, unknown>[];
+}): Record<string, ListPrice>;
+export function subscriptionMarginal(
+  apiUsd: number,
+  seat: Seat,
+  options?: { floorFraction?: number; band?: number }
+): Omit<PricedPath, 'id' | 'accessPath'>;
+export function priceTask(
+  row: PathRow,
+  prices: Record<string, ListPrice>,
+  task: Task,
+  seat?: Seat,
+  options?: { floorFraction?: number; band?: number }
+): PricedPath;
 export function rankPaths(priced: readonly PricedPath[]): PricedPath[];

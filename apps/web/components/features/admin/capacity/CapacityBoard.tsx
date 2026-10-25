@@ -330,10 +330,17 @@ function ValueCard({
     body = `Merge window unreadable (${meta.incomplete}); no counts are shown rather than partial ones.`;
   } else if (!metrics) {
     body = 'No lane runs recorded for this provider.';
-  } else if (metrics.mergedCreated === 0) {
+  } else if (
+    metrics.mergedCreated === 0 &&
+    !metrics.mergedAgentProven &&
+    !metrics.mergedAgentInferred
+  ) {
     body = `No lane-receipted merges in ${metrics.windowDays} days (${metrics.runs} runs). Work started outside the lanes, such as agent threads, is not in lane receipts.`;
   } else {
     body = `${metrics.mergedCreated} merged PRs created, ${metrics.mergedRepaired} repaired, in ${metrics.windowDays} days.`;
+    if (metrics.mergedAgentProven || metrics.mergedAgentInferred) {
+      body += ` Plus ${metrics.mergedAgentProven ?? 0} agent-thread merges proven by a thread id or Agent-Path trailer and ${metrics.mergedAgentInferred ?? 0} inferred from the glm/ branch prefix. Cost per merge is an estimate: the recorded credit burn divided by all of them.`;
+    }
   }
   return (
     <ContentSurfaceCard surface='details' data-testid='capacity-value'>
@@ -362,7 +369,9 @@ function ValueCard({
               hint={
                 metrics.costPerMergedUsd === null
                   ? 'no merges to divide by'
-                  : 'created PRs'
+                  : metrics.costScope
+                    ? 'estimate: credit burn over all attributed merges'
+                    : 'created PRs'
               }
             />
           </div>
