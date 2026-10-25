@@ -141,7 +141,8 @@ def record_approval(call, thread, issue, journal_dir, clock=time.time):
 
 
 def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
-        timeout=1800, clock=time.time, pause=time.sleep, before_dispatch=lambda: None, refresh=None):
+        timeout=1800, clock=time.time, pause=time.sleep, before_dispatch=lambda: None, refresh=None,
+        find_branch_pr=None):
     """One existing attempt: create once, read/resume its thread, gate its same PR.
 
     Settings proof must be refreshed even on resume. The file lock spans the
@@ -209,7 +210,11 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                 try:
                     created = call("create_thread", {"agentId": proof["agentId"],
                         "message": prompt + f"\nUse branch {branch}. Include <!-- linear-issue-id:{issue} --> and "
-                        f"{marker} in the PR body. Return the PR URL and head: FULL_SHA.",
+                        f"{marker} and these trailer lines in the PR body: `Agent-Path: hyperagent/{proof['agentId']}` "
+                        "and `Dispatch ID: thread <your thread id>`. Checkpoint early: a turn is capped at $10 and "
+                        "half of lane threads hit it with no PR and lost everything. After your first working "
+                        f"commit, and before spending more than $6, push `{branch}` and open the draft PR (a WIP "
+                        "title is fine; keep refining the same branch). Return the PR URL and head: FULL_SHA.",
                         "namingHint": f"{issue} {hashlib.sha256(attempt.encode()).hexdigest()[:16]}"})
                     thread = created.get("threadId") or created.get("thread_id") or (created.get("thread") or {}).get("id")
                     if not isinstance(thread, str) or not thread:
@@ -237,19 +242,38 @@ def run(spec, issue, attempt, branch, prompt, receipt_path, call, find_pr, gate,
                 text = "\n".join(m["content"] for m in messages if isinstance(m, dict)
                                  and m.get("role") == "assistant" and isinstance(m.get("content"), str))
                 urls = set(re.findall(r"https://github\.com/[^\s/]+/[^\s/]+/pull/\d+", text))
+                pr = None
+                if len(urls) != 1 and find_branch_pr is not None:
+                    # Gem 2026-10-25: 9 of 47 stuck threads had opened the PR (the reply never repeated
+                    # the URL once the turn hit its model budget). The attempt's own branch is the
+                    # authoritative handle; a URL the agent did name must still be this PR.
+                    found = find_branch_pr(branch)
+                    if found and (not urls or found.get("url") in urls):
+                        pr, urls = found, {found["url"]}
                 if len(urls) != 1:
+                    declined = re.findall(r"NOT-SHIPPABLE:\s*(.+)", text)
+                    if declined and not urls:
+                        # An explicit decline (already fixed on main, no repo-side delta) is an outcome,
+                        # not a missing PR: 16 of 47 threads.
+                        return {"verdict": "not-shippable", "reasons": [declined[-1].strip()[:500]],
+                                "remoteThreadId": thread, "remoteAgentId": proof["agentId"]}
+                    if not urls and "model budget" in str((messages[-1] if messages else {}).get("content")):
+                        return held("remote-budget-exhausted", thread)
                     return held("remote-pr-ambiguous" if urls else "remote-pr-missing", thread)
                 url = urls.pop()
                 if not re.fullmatch(r"https://github\.com/JovieInc/Jovie/pull/\d+", url):
                     return held("remote-pr-attribution-mismatch", thread)
-                pr = find_pr(int(url.rsplit("/", 1)[1]))
+                pr = pr or find_pr(int(url.rsplit("/", 1)[1]))
                 heads = set(re.findall(r"\bhead:\s*([a-f0-9]{40})\b", text))
                 issue_pattern = rf"(?<![A-Za-z0-9]){re.escape(issue)}(?![A-Za-z0-9])"
                 if (pr.get("url") != url or pr.get("state") != "OPEN" or pr.get("headRefName") != branch
                     or not re.search(issue_pattern, pr.get("title", ""))
                     or f"<!-- linear-issue-id:{issue} -->" not in pr.get("body", "")
                     or marker not in pr.get("body", "")
-                    or heads != {pr.get("headRefOid")}):
+                    # 11 of 47 threads opened a correct PR but never printed `head: <sha>`. URL, branch,
+                    # issue title and both body markers are verified; an absent head claim adds no
+                    # evidence, a stated one must still match the PR head.
+                    or (heads and heads != {pr.get("headRefOid")})):
                     return held("remote-pr-attribution-mismatch", thread)
                 spec = fresh(spec)
                 if not verified(spec, clock()) or spec["verifiedRemote"]["agentId"] != proof["agentId"]:

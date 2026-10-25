@@ -54,6 +54,53 @@ class HyperagentLaneTest(unittest.TestCase):
     def tick(self, seconds):
         self.now += seconds
 
+    def set_text(self, text, last=None):
+        messages = [{"role": "assistant", "content": text}]
+        if last:
+            messages.append(last)
+        self.payload = {**self.payload, "messages": messages}
+
+    def test_pr_without_a_head_claim_is_gated_but_a_wrong_head_claim_is_not(self):
+        # Gem 2026-10-25: 11 of 47 threads opened a correct PR and never printed `head: <sha>`.
+        self.set_text("https://github.com/JovieInc/Jovie/pull/7")
+        self.assertEqual(self.run_remote()["verdict"], "verified-not-queued")
+        self.setUp()
+        self.set_text("https://github.com/JovieInc/Jovie/pull/7 head: " + "b" * 40)
+        self.assertEqual(self.run_remote()["reasons"], ["remote-pr-attribution-mismatch"])
+
+    def test_budget_capped_thread_that_opened_the_pr_is_found_by_its_branch(self):
+        self.set_text("working", {"role": "error", "content": "This turn reached its model budget of $10.00."})
+        found = []
+        def by_branch(branch):
+            found.append(branch)
+            return self.pr
+        result = self.run_remote(find_branch_pr=by_branch)
+        self.assertEqual(found, ["hyperagent/jov-6871-attempt"])
+        self.assertEqual(result["verdict"], "verified-not-queued")
+
+    def test_budget_cap_without_any_pr_has_its_own_reason(self):
+        self.set_text("working", {"role": "error", "content": "This turn reached its model budget of $10.00."})
+        result = self.run_remote(find_branch_pr=lambda branch: None)
+        self.assertEqual((result["verdict"], result["reasons"]), ("remote-held", ["remote-budget-exhausted"]))
+
+    def test_explicit_decline_is_an_outcome_not_a_missing_pr(self):
+        self.set_text("No PR opened.\nNOT-SHIPPABLE: already fixed on main by #22869")
+        result = self.run_remote(find_branch_pr=lambda branch: None)
+        self.assertEqual(result["verdict"], "not-shippable")
+        self.assertIn("already fixed", result["reasons"][0])
+
+    def test_plain_missing_pr_stays_held(self):
+        self.set_text("done")
+        self.assertEqual(self.run_remote(find_branch_pr=lambda branch: None)["reasons"], ["remote-pr-missing"])
+
+    def test_dispatch_asks_for_trailers_and_an_early_checkpoint(self):
+        self.payload = {**self.payload, "isRunning": False}
+        self.run_remote()
+        message = next(args["message"] for name, args in self.calls if name == "create_thread")
+        self.assertIn("Agent-Path: hyperagent/agent-1", message)
+        self.assertIn("Dispatch ID: thread", message)
+        self.assertIn("before spending more than $6", message)
+
     def test_remote_pr_is_gated_without_local_commits(self):
         result = self.run_remote()
         self.assertEqual(result["verdict"], "verified-not-queued")
@@ -273,13 +320,24 @@ class ProductionRemoteEntryTest(unittest.TestCase):
         attest = patch.object(remote, "ATTESTATION", self.attestation)
         attest.start()
         self.addCleanup(attest.stop)
+        self.edits = []
         def read(args, **kwargs):
             self.assertEqual(args[:3], ["gh", "pr", "view"])
             return type("Read", (), {"returncode": 0, "stdout": json.dumps(self.pr)})()
+        def budgeted(args, **kwargs):  # gh_call: the Agent-Path stamp and the branch lookup
+            reply = lambda out: type("Read", (), {"returncode": 0, "stdout": out})()
+            if args[:2] == ["pr", "edit"]:
+                self.edits.append(args)
+                return reply("")
+            if args[:2] == ["pr", "list"]:
+                return reply("[]")
+            self.assertEqual(args[:2], ["pr", "view"])
+            return reply(self.pr["body"])
         def adopt(host, provider, pr):
             self.gates.append((provider, pr))
             return {"verdict": "verified-not-queued", "pr": 7, "prUrl": pr["url"], "headSha": pr["headRefOid"]}
         for patcher in [patch.object(lane, "sh", side_effect=read),
+                        patch.object(lane, "gh_call", side_effect=budgeted),
                         patch.object(lane, "context_pack", return_value="fixture context"),
                         patch.object(lane, "adopt_pr", side_effect=adopt),
                         patch("runpy.run_path", return_value={"mcp_call": self.call}),
