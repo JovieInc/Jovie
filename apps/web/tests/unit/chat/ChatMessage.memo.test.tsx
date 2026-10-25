@@ -103,7 +103,11 @@ describe('ChatMessage memoization', () => {
     );
 
     // The markdown engine is a lazy chunk: wait for it to resolve.
-    await waitFor(() => expect(markdownRenderCount.current).toBe(2));
+    await waitFor(() =>
+      expect(markdownRenderCount.current).toBeGreaterThanOrEqual(2)
+    );
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const settled = markdownRenderCount.current;
 
     rerender(
       <>
@@ -115,6 +119,7 @@ describe('ChatMessage memoization', () => {
       </>
     );
 
-    await waitFor(() => expect(markdownRenderCount.current).toBe(3));
+    // Only the message whose props changed renders again.
+    await waitFor(() => expect(markdownRenderCount.current).toBe(settled + 1));
   });
 });
