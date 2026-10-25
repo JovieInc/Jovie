@@ -3,6 +3,7 @@ import 'server-only';
 import { handleUploadPresigned } from '@vercel/blob/client';
 import { NextRequest, NextResponse } from 'next/server';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
+import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 
 type GetBlobPresignedToken = NonNullable<
@@ -34,6 +35,12 @@ export async function handleBlobPresignedUploadTokenRequest(
       err instanceof Error && CLIENT_ERROR_MESSAGES.has(err.message);
     const message =
       isClientError && err instanceof Error ? err.message : 'Upload failed';
+    // The client only sees an opaque "presigned URL" failure; keep the real
+    // cause in Sentry so a rejected upload is never undiagnosable.
+    captureError('Blob presigned upload token request failed', err, {
+      route: new URL(request.url).pathname,
+      clientError: isClientError,
+    });
 
     return NextResponse.json(
       { error: message },

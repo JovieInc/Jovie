@@ -82,6 +82,30 @@ function renderManifest(
 }
 
 describe('ChatUploadManifest', () => {
+  it('never says "Upload complete" when every file failed (contradictory-state guard)', () => {
+    const failed = {
+      ...uploadingFile,
+      status: 'failed' as const,
+      progress: 0,
+      error: "Couldn't start uploading festival-master.wav. Try again.",
+    };
+    renderManifest({
+      files: [failed],
+      isUploading: false,
+      aggregate: {
+        total: 1,
+        done: 0,
+        overallPct: 0,
+        speed: '0 B/s',
+        eta: '',
+      },
+    });
+
+    expect(screen.queryByText('Upload complete')).toBeNull();
+    expect(screen.getByText('Upload failed')).toBeDefined();
+    expect(screen.queryByText('0%')).toBeNull();
+  });
+
   it('renders canonical semantic progress for aggregate and per-file upload state', () => {
     renderManifest();
 

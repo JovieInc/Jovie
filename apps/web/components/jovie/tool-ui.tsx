@@ -258,12 +258,13 @@ function ToolActivityRow({
     !isLockedToolEvent(event) &&
     (status === 'unknown' ||
       (event.state === 'succeeded' && status === 'pending'));
+  // Never render raw tool status ("<tool>: status unknown", "Completion has
+  // not been confirmed"). An unconfirmed row reuses the tool's own friendly
+  // in-progress copy; the unknown case is filtered out before render.
   const title = unconfirmed
-    ? `${getToolUiConfig(event.toolName).label}: ${status === 'pending' ? 'saving result' : 'status unknown'}`
+    ? getToolUiConfig(event.toolName).loadingTitle
     : getToolStatusTitle(event);
-  const body = unconfirmed
-    ? 'Completion has not been confirmed.'
-    : getToolStatusBody(event);
+  const body = unconfirmed ? '' : getToolStatusBody(event);
   const nextStep = getToolStatusNextStep(event);
   const isError = event.state === 'failed' || event.state === 'denied';
   const isLocked = isLockedToolEvent(event);
@@ -344,7 +345,7 @@ function ToolActivityRow({
 }
 
 function ToolActivityFeed({
-  events,
+  events: allEvents,
   statuses,
   variant,
   feedback,
@@ -354,6 +355,13 @@ function ToolActivityFeed({
   variant: ToolRendererVariant;
   feedback?: ChatToolFeedbackContext;
 }>) {
+  // Rows whose status was never confirmed carry no user-meaningful state;
+  // render nothing rather than raw tool status.
+  const events = allEvents.filter(
+    event =>
+      isLockedToolEvent(event) ||
+      (statuses.get(event.toolCallId) ?? 'unknown') !== 'unknown'
+  );
   if (events.length === 0) {
     return null;
   }

@@ -508,7 +508,7 @@ describe('InlineChatArea tool invocation rendering', () => {
     expect(mockHandleRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('renders a compact status row for unknown tools', () => {
+  it('never renders raw tool status for unconfirmed tools', () => {
     mockMessages = [
       {
         id: 'msg-1',
@@ -529,12 +529,11 @@ describe('InlineChatArea tool invocation rendering', () => {
 
     renderInlineChat();
 
-    const statusRow = screen.getByTestId('tool-status-row');
-    expect(statusRow.getAttribute('data-tool-name')).toBe('summarizeAudience');
-    expect(statusRow).toHaveAttribute('data-operation-status', 'unknown');
-    expect(
-      screen.getByText('Completion has not been confirmed.')
-    ).toBeDefined();
+    // Guard (defect: "Merch source: status unknown"): unconfirmed tool state
+    // is never surfaced as raw status text.
+    expect(screen.queryByTestId('tool-status-row')).toBeNull();
+    expect(screen.queryByText(/status unknown/i)).toBeNull();
+    expect(screen.queryByText(/not been confirmed/i)).toBeNull();
   });
 });
 

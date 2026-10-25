@@ -26,6 +26,23 @@ function formatUploadProgress(progress: number): string {
   return `${Math.round(clampUploadProgress(progress))}%`;
 }
 
+export type UploadOutcome = 'uploading' | 'complete' | 'failed' | 'partial';
+
+/**
+ * One truthful header state for the manifest. "Upload complete" is only
+ * allowed when at least one file actually landed and none failed.
+ */
+export function resolveUploadOutcome(
+  files: readonly Pick<PendingFile, 'status'>[],
+  isUploading: boolean
+): UploadOutcome {
+  if (isUploading) return 'uploading';
+  const failed = files.filter(f => f.status === 'failed').length;
+  const ready = files.filter(f => f.status === 'ready').length;
+  if (failed === 0) return 'complete';
+  return ready === 0 ? 'failed' : 'partial';
+}
+
 function aggregateProgressLabel(done: number, total: number): string {
   return `Upload progress: ${done} of ${total} files complete`;
 }
@@ -175,7 +192,22 @@ export function ChatUploadManifest({
   const hasDuplicates = duplicateCount > 0;
   const progressLabel = aggregateProgressLabel(aggregate.done, aggregate.total);
   const aggregateProgress = clampUploadProgress(aggregate.overallPct);
-  const aggregateProgressText = formatUploadProgress(aggregate.overallPct);
+  const outcome = resolveUploadOutcome(files, isUploading);
+  const failedCount = files.filter(f => f.status === 'failed').length;
+  const aggregateProgressText =
+    outcome === 'failed' || outcome === 'partial'
+      ? `${failedCount} failed`
+      : formatUploadProgress(aggregate.overallPct);
+  const headerTitle = {
+    uploading: `Uploading ${aggregate.total} files`,
+    complete: 'Upload complete',
+    failed: failedCount > 1 ? 'Uploads failed' : 'Upload failed',
+    partial: `${aggregate.done} uploaded, ${failedCount} failed`,
+  }[outcome];
+  const headerDetail =
+    outcome === 'failed'
+      ? 'Nothing was attached. Remove the file and try again.'
+      : `${aggregate.done} done · ${aggregate.speed} · ${aggregate.eta}`;
 
   if (files.length === 0) return null;
 
@@ -233,21 +265,19 @@ export function ChatUploadManifest({
       {/* Header */}
       <div className='flex items-center gap-3 px-3.5 py-3'>
         <span className='flex h-6 w-6 items-center justify-center rounded-lg bg-accent-purple-subtle'>
-          {isUploading ? (
+          {outcome === 'uploading' ? (
             <Loader2 className='h-3.5 w-3.5 animate-spin text-accent-purple' />
-          ) : (
+          ) : outcome === 'complete' ? (
             <Check className='h-3.5 w-3.5 text-accent-green' />
+          ) : (
+            <AlertCircle className='h-3.5 w-3.5 text-error' />
           )}
         </span>
         <div className='min-w-0 flex-1'>
           <p className='text-xs font-medium text-primary-token'>
-            {isUploading
-              ? `Uploading ${aggregate.total} files`
-              : `Upload complete`}
+            {headerTitle}
           </p>
-          <p className='text-xs text-tertiary-token'>
-            {aggregate.done} done · {aggregate.speed} · {aggregate.eta}
-          </p>
+          <p className='text-xs text-tertiary-token'>{headerDetail}</p>
         </div>
         <span className='text-xs font-semibold tabular-nums text-primary-token'>
           {aggregateProgressText}
