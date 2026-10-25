@@ -30,9 +30,10 @@ projections apply; this endpoint adds no source fields.
 `resolved`, `no_match` and `ambiguous` return HTTP 200 with the domain object
 directly. Results include links and provenance, real candidates and available
 MusicBrainz metadata. Missing identifiers remain null. The existing aggregate
-confidence is a heuristic, not calibrated assurance. Embedded release groups can
-be incomplete (`releaseGroupsComplete`). These provider IDs are not persisted
-canonical entity IDs; response confidence is not identity or account ownership.
+confidence is a heuristic, not calibrated assurance. Public artist metadata is
+limited to core identity fields; release groups and expanded social relationships
+are unavailable. These provider IDs are not persisted canonical entity IDs;
+response confidence is not identity or account ownership.
 
 Failures return `{"error":{"code":"UPSTREAM_FAILURE","retryable":true}}`.
 HTTP 400 covers invalid JSON/input, 403 denied Origin, 408 body timeout, 413 body
