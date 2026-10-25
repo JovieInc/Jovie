@@ -990,6 +990,121 @@ class OutcomeLaneTest(unittest.TestCase):
         long = outcome.judge(verdict(*[item("fail", "x" * 500) for _ in range(10)]), "JOV-7771", SHA)
         self.assertLessEqual(len(outcome.receipt_note(long)), outcome.NOTE_LIMIT)
 
+    def test_unobservable_items_are_residual_not_failures_but_need_a_proven_majority(self):
+        item = lambda status, criterion="c", evidence="apps/web/x.ts:1 shows the fix in place": {
+            "criterion": criterion, "status": status, "evidence": evidence}
+        verdict = lambda *items: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": list(items)}
+        escalated = lambda **kw: {**item("unverifiable", "signed-in page", "redirects to /signin"), "attempts": [
+            {"step": "tools", "result": "playwright: /signin"}, {"step": "telemetry", "result": "not cheap: needs auth fixture"},
+            {"step": "agent-help", "result": "linear-comment delivered=True"}], **kw}
+        mixed = outcome.judge(verdict(item("pass"), item("pass"), escalated()), "JOV-7771", SHA)
+        self.assertEqual((mixed["status"], mixed["reason"]), ("pass", "verified-with-residual"))
+        note = outcome.receipt_note(mixed)
+        self.assertIn("2 of 3 acceptance items verified", note)
+        self.assertIn("residual (unverifiable): signed-in page", note)
+        taste = outcome.judge(verdict(item("pass"), item("pass"), item("needs-authority", "Founder accepts the casing taste", "Tim decides")),
+                              "JOV-7771", SHA)
+        self.assertEqual(taste["status"], "pass", "taste is covered by the founder-taste receipt")
+        outbound = outcome.judge(verdict(item("pass"), item("pass"), item("needs-authority", "Send the announcement email", "outbound")),
+                                 "JOV-7771", SHA)
+        self.assertEqual(outbound["status"], "fail", "a human or outbound action is still a failed acceptance")
+        thin = outcome.judge(verdict(item("pass"), escalated(criterion="a"), escalated(criterion="b")), "JOV-7771", SHA)
+        self.assertEqual((thin["status"], thin["reason"]), ("fail", "too-little-verified"))
+        contradicted = outcome.judge(verdict(item("pass"), item("pass"), item("fail")), "JOV-7771", SHA)
+        self.assertEqual(contradicted["status"], "fail")
+
+    def test_unverifiable_without_escalation_is_a_failure_and_judgement_needs_a_second_model(self):
+        base = {"criterion": "signed-in page", "status": "unverifiable", "evidence": "redirects to /signin"}
+        verdict = lambda *items: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": list(items) + [
+            {"criterion": "p%d" % n, "status": "pass", "evidence": "apps/web/x.ts:1 shows the fix in place"} for n in range(3)]}
+        shrug = outcome.judge(verdict(base), "JOV-7771", SHA)
+        self.assertEqual(shrug["status"], "fail")
+        self.assertIn("not attempted: tools, telemetry, agent-help", shrug["items"][0]["evidence"])
+        done = [{"step": "tools", "result": "x"}, {"step": "telemetry", "result": "y"}, {"step": "agent-help", "result": "z"}]
+        self.assertEqual(outcome.judge(verdict({**base, "attempts": done}), "JOV-7771", SHA)["status"], "pass")
+        taste = outcome.judge(verdict({**base, "kind": "judgement", "attempts": done}), "JOV-7771", SHA)
+        self.assertEqual(taste["status"], "fail")
+        self.assertIn("adversarial", taste["items"][0]["evidence"])
+        self.assertEqual(outcome.judge(verdict({**base, "kind": "judgement", "attempts": done + [
+            {"step": "adversarial", "result": "unavailable: no second-model reviewer configured"}]}), "JOV-7771", SHA)["status"], "pass")
+
+    def test_an_unloadable_page_gets_a_browser_vision_and_agent_help_attempt_then_a_routed_gap(self):
+        esc = outcome.esc
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        tree, out, state = Path(tmp.name) / "tree", Path(tmp.name) / "out", Path(tmp.name) / "state"
+        (tree / "apps/web").mkdir(parents=True)
+        out.mkdir()
+        state.mkdir()
+        calls, comments = [], []
+        probe = {"url": "https://jov.ie/app/tasks", "ok": True, "status": 200, "finalUrl": "https://jov.ie/signin?redirect_url=%2Fapp%2Ftasks",
+                 "title": "Sign in", "text": "Log in to Jovie Send sign-in code", "screenshot": str(out / "shot.png")}
+
+        def run(args, **kw):
+            calls.append((list(args), kw))
+            joined = " ".join(map(str, args))
+            if ".outcome-probe.mjs" in joined:
+                (out / "shot.png").write_bytes(b"png")
+                return subprocess.CompletedProcess(args, 0, json.dumps(probe) + "\n", "")
+            if "codex_lane.py" in joined and "vision.prompt.md" in joined:
+                (out / "vision.txt").write_text("A sign-in form with an email field")
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        class Linear:
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        issue = {"id": "u1", "identifier": "JOV-7771"}
+        item = {"criterion": "Task due chips render at mobile and desktop", "status": "unverifiable", "kind": "observable",
+                "capability": "signed-in-browser", "evidence": "GET https://jov.ie/app/tasks redirects to /signin",
+                "attempts": [{"step": "telemetry", "result": "not cheap: needs an auth fixture"}]}
+        done = esc.escalate([item], tree=tree, out_dir=out, run=run, env={}, codex_cmd=["python3", "codex_lane.py", "run"],
+                            linear=Linear(), issue=issue)
+        steps = {a["step"]: a["result"] for a in done[0]["attempts"]}
+        self.assertEqual(done[0]["status"], "unverifiable")
+        self.assertIn("playwright+vision", steps["tools"])
+        self.assertIn("sign-in form", steps["tools"])
+        self.assertIn("linear-comment delivered=True", steps["agent-help"])
+        self.assertIn("telemetry", steps)
+        self.assertTrue(any(".outcome-probe.mjs" in " ".join(map(str, a)) for a, _ in calls), "Playwright probe ran")
+        self.assertTrue(any("vision.prompt.md" in " ".join(map(str, a)) for a, _ in calls), "vision read ran")
+        self.assertIn(esc.HELP_MARKER, comments[0])
+        self.assertIn("https://jov.ie/app/tasks", comments[0])
+        self.assertEqual(esc.missing_steps(done[0]), [])
+        gaps = esc.route_gaps(state, Linear(), issue, done, 1.0)
+        self.assertEqual((gaps[0]["capability"], gaps[0]["owner"]), ("signed-in-browser", "golden-path (authqaprod fixture)"))
+        self.assertIn(esc.GAP_MARKER, comments[-1])
+        self.assertIn("JOV-7771", json.loads((state / esc.GAP_FILE).read_text()))
+        # A page that loads fine for the lane's browser was observable: the shrug becomes a failure.
+        probe.update(finalUrl="https://jov.ie/app/tasks", text="Tasks due today 3")
+        flipped = esc.escalate([item], tree=tree, out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        self.assertEqual(flipped[0]["status"], "fail")
+        self.assertIn("observable but not observed", flipped[0]["evidence"])
+        # Judgement items also ask a second model; without one configured the gap is recorded as such.
+        judgement = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
+                                 out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        self.assertIn("no second-model reviewer", {a["step"]: a["result"] for a in judgement[0]["attempts"]}["adversarial"])
+
+    def test_verifier_gets_node24_dependencies_and_the_binding_rules(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(outcome.Path, "home", return_value=Path(home)):
+            for version in ("v22.23.2", "v24.15.0", "v24.22.1", "v24.9.0"):
+                (Path(home) / ".nvm/versions/node" / version / "bin").mkdir(parents=True)
+            self.assertTrue(outcome.node24_path().endswith("v24.22.1/bin"))
+            seen = []
+            def run(args, **kw):
+                seen.append((args, kw))
+                return subprocess.CompletedProcess(args, 0, "", "")
+            self.assertIsNone(outcome.prepare_tree(Path(home), run=run))
+            self.assertEqual(seen[0][0][:3], ["pnpm", "install", "--frozen-lockfile"])
+            self.assertTrue(seen[0][1]["env"]["PATH"].startswith(outcome.node24_path()))
+            failing = lambda args, **kw: subprocess.CompletedProcess(args, 1, "", "ERR_PNPM_NO_OFFLINE_TARBALL")
+            self.assertIn("ERR_PNPM_NO_OFFLINE_TARBALL", outcome.prepare_tree(Path(home), run=failing))
+        text = outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}})
+        for needle in ("is an ancestor of that build", "counts as those tests having run", "`unverifiable` is never a shrug",
+                       "Node 24 is first on PATH"):
+            self.assertIn(needle, text)
+        self.assertIn("NOT installed (boom)", outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}}, "NOT installed (boom)"))
+
     def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
