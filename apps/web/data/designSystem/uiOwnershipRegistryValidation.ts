@@ -102,6 +102,11 @@ export const loadProductionSwiftSources = (
   if (!repoRoot) return [];
   const sources: UINativeSwiftSource[] = [];
   collectSwiftSources(join(repoRoot, 'apps/ios/Jovie'), repoRoot, sources);
+  collectSwiftSources(
+    join(repoRoot, 'apps/ios/Packages/JovieKit/Sources'),
+    repoRoot,
+    sources
+  );
   return sources.sort((left, right) => left.path.localeCompare(right.path));
 };
 
