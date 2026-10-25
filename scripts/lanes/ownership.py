@@ -81,6 +81,30 @@ def acquire_run_lease(state: Path, issue_id: str, identifier: str, lane: str):
     return handle
 
 
+def _flock_state(path: Path) -> str:
+    try:
+        with open(path, "a") as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return "live"
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    except OSError:
+        return "live"  # unreadable lease evidence never releases ownership
+    return "ended"
+
+
+def binding_lease(state: Path, identifier: str) -> str | None:
+    """Repo bindings (LYB, ...) hold `bindings/<KEY>/issue.<IDENT>.lock` for the life of a run
+    instead of a run lease. `live` while held, `ended` once taken and dropped, None if never."""
+    found = None
+    for path in (state / "bindings").glob(f"*/issue.{identifier}.lock"):
+        if _flock_state(path) == "live":
+            return "live"
+        found = "ended"
+    return found
+
+
 def run_lease(state: Path, issue_id: str) -> str | None:
     """`live` while a worker holds it, `ended` once it was taken and released, None if never."""
     path = _lease_dir(state) / f"{issue_id}.lock"
@@ -312,7 +336,11 @@ def reconcile(state: Path, repo: Path, open_prs: frozenset[str] | None, *, run=s
             continue
         lease = run_lease(state, issue_id)
         ident = str(claim.get("identifier") or "").upper()
-        if lease == "live" or ident in worktrees or not ident.startswith(team + "-"):
+        if not ident.startswith(team + "-"):
+            # Another team's claim (a repo binding): its lock is the binding issue lock. Without
+            # this a binding run that died left its claim `active` forever (LYB-180: 238 h).
+            lease = binding_lease(state, ident) or lease
+        if lease == "live" or ident in worktrees:
             continue
         if lease is None and now - claim["claimedAt"] < LEGACY_RUN_GRACE_S:
             continue

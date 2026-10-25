@@ -20,6 +20,11 @@ test.describe('Chat performance probe paint and readiness contract', () => {
       assistant: 'Reply',
     });
     await page.evaluate(() => {
+      (
+        window as Window & {
+          __jovieChatPerformanceProbe?: { markSend: () => void };
+        }
+      ).__jovieChatPerformanceProbe!.markSend();
       for (const [testId, text] of [
         ['chat-user-bubble', 'Sent'],
         ['chat-message-reply', 'Reply'],
@@ -60,6 +65,11 @@ test.describe('Chat performance probe paint and readiness contract', () => {
       assistant: 'Reply',
     });
     await page.evaluate(() => {
+      (
+        window as Window & {
+          __jovieChatPerformanceProbe?: { markSend: () => void };
+        }
+      ).__jovieChatPerformanceProbe!.markSend();
       for (const [testId, text] of [
         ['chat-user-bubble', 'Sent'],
         ['chat-message-reply', 'Reply'],

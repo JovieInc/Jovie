@@ -12,13 +12,41 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
+    "chat-comparison": {
+      "entityId": "source SHA (build) or source SHA:attempt (smoke)",
+      "stages": [
+        {
+          "id": "build",
+          "meaning": "production standalone build",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        },
+        {
+          "id": "smoke",
+          "meaning": "eight-worker smoke attempt",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        },
+        {
+          "id": "finished",
+          "meaning": "smoke attempt finished",
+          "producer": "compare-chat-performance.ts",
+          "status": "pushed",
+          "source": "chat-comparison-receipts"
+        }
+      ]
+    },
     "shipping": {
       "entityId": "owner/repo#pr (Linear identifier in actor-independent joins)",
       "description": "One unit of shipped work: Linear issue to production-verified PR.",
       "endToEnd": [
         ["issue", "verified"],
         ["pr-open", "merged"],
-        ["merged", "verified"]
+        ["merged", "verified"],
+        ["verified", "closed"],
+        ["merged", "closed"]
       ],
       "stages": [
         {
@@ -115,6 +143,13 @@
           "producer": "production-controller.yml",
           "status": "derived",
           "source": "github-controller"
+        },
+        {
+          "id": "closed",
+          "meaning": "Linear issue reached Done at or after production verification; verified to closed is the closure lag",
+          "producer": "linear-sync-on-merge.yml",
+          "status": "derived",
+          "source": "linear-history"
         }
       ]
     },
@@ -418,6 +453,29 @@
         }
       ]
     },
+    "taste-decision": {
+      "entityId": "JOV issue identifier awaiting a founder-taste receipt",
+      "description": "A founder-taste wait ending in a founder decision or the risk- and confidence-scaled default (scripts/lanes/taste-policy.json).",
+      "endToEnd": [["waiting", "decided"]],
+      "stages": [
+        {
+          "id": "waiting",
+          "meaning": "issue entered Validating owing a founder-taste receipt, until a decision or the default shipped",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "decided",
+          "meaning": "founder-taste receipt recorded (founder decision or default-accepted)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
+    },
     "claim-dogfood": {
       "entityId": "claim-checkout-dogfood#<run id>@<run attempt>",
       "description": "One browser dogfood of the $12 artist claim (Stripe test mode, fixture artists): from the staging deploy (or dispatch) that made it due to the journey verdict.",
@@ -471,6 +529,11 @@
     }
   },
   "sources": {
+    "chat-comparison-receipts": {
+      "kind": "events",
+      "url": null,
+      "owner": "JOV-8719"
+    },
     "github-pr": {
       "kind": "derived",
       "description": "GraphQL merged-PR search with timeline items and commit check suites (28d window)."

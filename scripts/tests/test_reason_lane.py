@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import re
@@ -989,6 +990,255 @@ class OutcomeLaneTest(unittest.TestCase):
             self.assertEqual(outcome.judge(broken, "JOV-7771", SHA)["status"], "fail")
         long = outcome.judge(verdict(*[item("fail", "x" * 500) for _ in range(10)]), "JOV-7771", SHA)
         self.assertLessEqual(len(outcome.receipt_note(long)), outcome.NOTE_LIMIT)
+
+    def test_unobservable_items_are_residual_not_failures_but_need_a_proven_majority(self):
+        item = lambda status, criterion="c", evidence="apps/web/x.ts:1 shows the fix in place": {
+            "criterion": criterion, "status": status, "evidence": evidence}
+        verdict = lambda *items: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": list(items)}
+        escalated = lambda **kw: {**item("unverifiable", "signed-in page", "redirects to /signin"), "attempts": [
+            {"step": "tools", "result": "playwright: /signin"}, {"step": "telemetry", "result": "not cheap: needs auth fixture"},
+            {"step": "agent-help", "result": "linear-comment delivered=True"}], **kw}
+        mixed = outcome.judge(verdict(item("pass"), item("pass"), escalated()), "JOV-7771", SHA)
+        self.assertEqual((mixed["status"], mixed["reason"]), ("pass", "verified-with-residual"))
+        note = outcome.receipt_note(mixed)
+        self.assertIn("2 of 3 acceptance items verified", note)
+        self.assertIn("residual (unverifiable): signed-in page", note)
+        taste = outcome.judge(verdict(item("pass"), item("pass"), item("needs-authority", "Founder accepts the casing taste", "Tim decides")),
+                              "JOV-7771", SHA)
+        self.assertEqual(taste["status"], "pass", "taste is covered by the founder-taste receipt")
+        outbound = outcome.judge(verdict(item("pass"), item("pass"), item("needs-authority", "Send the announcement email", "outbound")),
+                                 "JOV-7771", SHA)
+        self.assertEqual(outbound["status"], "fail", "a human or outbound action is still a failed acceptance")
+        thin = outcome.judge(verdict(item("pass"), escalated(criterion="a"), escalated(criterion="b")), "JOV-7771", SHA)
+        self.assertEqual((thin["status"], thin["reason"]), ("fail", "too-little-verified"))
+        contradicted = outcome.judge(verdict(item("pass"), item("pass"), item("fail")), "JOV-7771", SHA)
+        self.assertEqual(contradicted["status"], "fail")
+
+    def test_unverifiable_without_escalation_is_a_failure_and_judgement_needs_a_second_model(self):
+        base = {"criterion": "signed-in page", "status": "unverifiable", "evidence": "redirects to /signin"}
+        verdict = lambda *items: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": list(items) + [
+            {"criterion": "p%d" % n, "status": "pass", "evidence": "apps/web/x.ts:1 shows the fix in place"} for n in range(3)]}
+        shrug = outcome.judge(verdict(base), "JOV-7771", SHA)
+        self.assertEqual(shrug["status"], "fail")
+        self.assertIn("not attempted: tools, telemetry, agent-help", shrug["items"][0]["evidence"])
+        done = [{"step": "tools", "result": "x"}, {"step": "telemetry", "result": "y"}, {"step": "agent-help", "result": "z"}]
+        self.assertEqual(outcome.judge(verdict({**base, "attempts": done}), "JOV-7771", SHA)["status"], "pass")
+        taste = outcome.judge(verdict({**base, "kind": "judgement", "attempts": done}), "JOV-7771", SHA)
+        self.assertEqual(taste["status"], "fail")
+        self.assertIn("adversarial", taste["items"][0]["evidence"])
+        self.assertEqual(outcome.judge(verdict({**base, "kind": "judgement", "attempts": done + [
+            {"step": "adversarial", "result": "unavailable: no second-model reviewer configured"}]}), "JOV-7771", SHA)["status"], "pass")
+
+    def test_an_unloadable_page_gets_a_browser_vision_and_agent_help_attempt_then_a_routed_gap(self):
+        esc = outcome.esc
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        tree, out, state = Path(tmp.name) / "tree", Path(tmp.name) / "out", Path(tmp.name) / "state"
+        (tree / "apps/web").mkdir(parents=True)
+        out.mkdir()
+        state.mkdir()
+        calls, comments = [], []
+        probe = {"url": "https://jov.ie/app/tasks", "ok": True, "status": 200, "finalUrl": "https://jov.ie/signin?redirect_url=%2Fapp%2Ftasks",
+                 "title": "Sign in", "text": "Log in to Jovie Send sign-in code", "screenshot": str(out / "shot.png")}
+
+        def run(args, **kw):
+            calls.append((list(args), kw))
+            joined = " ".join(map(str, args))
+            if ".outcome-probe.mjs" in joined:
+                (out / "shot.png").write_bytes(b"png")
+                return subprocess.CompletedProcess(args, 0, json.dumps(probe) + "\n", "")
+            if "codex_lane.py" in joined and "vision.prompt.md" in joined:
+                (out / "vision.txt").write_text("A sign-in form with an email field")
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        class Linear:
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        issue = {"id": "u1", "identifier": "JOV-7771"}
+        item = {"criterion": "Task due chips render at mobile and desktop", "status": "unverifiable", "kind": "observable",
+                "capability": "signed-in-browser", "evidence": "GET https://jov.ie/app/tasks redirects to /signin",
+                "attempts": [{"step": "telemetry", "result": "not cheap: needs an auth fixture"}]}
+        done = esc.escalate([item], tree=tree, out_dir=out, run=run, env={}, codex_cmd=["python3", "codex_lane.py", "run"],
+                            linear=Linear(), issue=issue)
+        steps = {a["step"]: a["result"] for a in done[0]["attempts"]}
+        self.assertEqual(done[0]["status"], "unverifiable")
+        self.assertIn("playwright+vision", steps["tools"])
+        self.assertIn("sign-in form", steps["tools"])
+        self.assertIn("linear-comment delivered=True", steps["agent-help"])
+        self.assertIn("telemetry", steps)
+        self.assertTrue(any(".outcome-probe.mjs" in " ".join(map(str, a)) for a, _ in calls), "Playwright probe ran")
+        self.assertTrue(any("vision.prompt.md" in " ".join(map(str, a)) for a, _ in calls), "vision read ran")
+        self.assertIn(esc.HELP_MARKER, comments[0])
+        self.assertIn("https://jov.ie/app/tasks", comments[0])
+        self.assertEqual(esc.missing_steps(done[0]), [])
+        gaps = esc.route_gaps(state, Linear(), issue, done, 1.0)
+        self.assertEqual((gaps[0]["capability"], gaps[0]["owner"]), ("signed-in-browser", "golden-path (authqaprod fixture)"))
+        self.assertIn(esc.GAP_MARKER, comments[-1])
+        self.assertIn("JOV-7771", json.loads((state / esc.GAP_FILE).read_text()))
+        # A page that loads fine for the lane's browser was observable: the shrug becomes a failure.
+        probe.update(finalUrl="https://jov.ie/app/tasks", text="Tasks due today 3")
+        flipped = esc.escalate([item], tree=tree, out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        self.assertEqual(flipped[0]["status"], "fail")
+        self.assertIn("observable but not observed", flipped[0]["evidence"])
+        # Judgement items also ask a second model; without one configured the gap is recorded as such.
+        with patch.object(esc, "gateway_key", return_value=None):
+            judgement = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
+                                     out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        with patch.object(esc, "gateway_key", return_value=None):
+            unconfigured = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
+                                        out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        self.assertIn("no AI Gateway key", {a["step"]: a["result"] for a in unconfigured[0]["attempts"]}["adversarial"])
+
+    def gateway(self, verdict, reason="because", prompt_tokens=1000, completion_tokens=100, calls=None):
+        def urlopen(request, timeout=0):
+            if calls is not None:
+                calls.append(json.loads(request.data))
+            body = {"choices": [{"message": {"content": json.dumps({"verdict": verdict, "reason": reason})}}],
+                    "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}}
+            return io.BytesIO(json.dumps(body).encode())
+        return urlopen
+
+    def test_adversarial_reviewer_defaults_on_through_the_gateway_with_a_different_family(self):
+        esc = outcome.esc
+        self.assertEqual(esc.DEFAULT_ADVERSARIAL_MODEL, "openai/gpt-6.1-sol")
+        calls = []
+        with patch.object(esc, "gateway_key", return_value="k"), patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("LANES_OUTCOME_ADVERSARIAL_MODEL", None)
+            review = esc.adversarial_review({"criterion": "c", "evidence": "e"}, urlopen=self.gateway("contradicted", calls=calls))
+            self.assertEqual((review["ran"], review["verdict"], calls[0]["model"]), (True, "contradicted", "openai/gpt-6.1-sol"))
+            self.assertIn("$0.0030", review["result"])
+            with patch.dict(os.environ, {"LANES_OUTCOME_ADVERSARIAL_MODEL": "off"}):
+                self.assertIn("disabled", esc.adversarial_review({"criterion": "c"})["result"])
+            bad = esc.gateway_judge("q", "openai/gpt-6.1-sol", urlopen=self.gateway("maybe"))
+            self.assertFalse(bad["ran"])
+        with patch.object(esc, "gateway_key", return_value=None):
+            self.assertIn("no AI Gateway key", esc.adversarial_review({"criterion": "c"})["result"])
+
+    def test_the_default_gateway_read_goes_through_the_shared_client_with_the_contract_host(self):
+        esc = outcome.esc
+        seen = {}
+        class Response:
+            status = 200
+            def json(self):
+                return {"choices": [{"message": {"content": json.dumps({"verdict": "supported", "reason": "r"})}}], "usage": {}}
+        class Client:
+            def __init__(self, provider, credential, authorize=None, **kw):
+                seen["provider"] = provider
+                headers = {}
+                authorize(headers)
+                seen["auth"] = headers["Authorization"]
+            def request(self, url, **kw):
+                seen["url"] = url
+                seen["priority"] = kw.get("priority")
+                return Response()
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import apiclient
+        with patch.object(esc, "gateway_key", return_value="k"), patch.object(apiclient, "ApiClient", Client):
+            verdict = esc.gateway_judge("q", "openai/gpt-6.1-sol")
+        self.assertEqual(verdict["verdict"], "supported")
+        self.assertEqual((seen["provider"], seen["auth"], seen["priority"]), ("ai-gateway", "Bearer k", "report"))
+        self.assertEqual(seen["url"], "https://ai-gateway.vercel.sh/v1/chat/completions")
+
+    def help_thread(self, corr, reply_body=None, *, child=True):
+        request = {"id": "c-req", "createdAt": "2026-10-25T01:00:00Z", "body": f"<!-- outcome-help-request:v1 corr={corr} -->\nplease look"}
+        nodes = [request]
+        if reply_body is not None:
+            nodes.append({"id": "c-rep", "createdAt": "2026-10-25T02:00:00Z", "user": {"name": "Instinct"},
+                          "body": reply_body if child else f"corr:{corr} {reply_body}", "parent": {"id": "c-req"} if child else None})
+        return nodes
+
+    def test_a_reply_to_the_help_request_re_evaluates_the_item_on_the_next_run(self):
+        esc = outcome.esc
+        item = {"criterion": "Task due chips render", "status": "unverifiable", "kind": "observable", "capability": "signed-in-browser",
+                "evidence": "redirects to /signin", "attempts": [{"step": "telemetry", "result": "not cheap"}]}
+        corr = esc.correlation_id("u1", item, SHA)
+        comments = []
+
+        class Linear:
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        probe_run = lambda args, **kw: subprocess.CompletedProcess(args, 1, "", "no browser")
+        base = dict(tree=Path(tmp.name), out_dir=Path(tmp.name) / "o", run=probe_run, env={}, codex_cmd=["x"], linear=Linear(), sha=SHA)
+        for child in (True, False):
+            issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr, "Signed in as the fixture: 3 chips visible, due Today/Tomorrow", child=child)}}
+            with patch.object(esc, "gateway_key", return_value="k"):
+                done = esc.escalate([item], issue=issue, urlopen=self.gateway("supported"), **base)
+            self.assertEqual(done[0]["status"], "pass", f"child={child}")
+            self.assertIn("observed by Instinct", done[0]["evidence"])
+            steps = {a["step"]: a["result"] for a in done[0]["attempts"]}
+            self.assertIn(f"reply from Instinct to {corr}", steps["agent-help"])
+            self.assertFalse(comments, "no second help request is posted once a reply exists")
+            with patch.object(esc, "gateway_key", return_value="k"):
+                contradicted = esc.escalate([item], issue=issue, urlopen=self.gateway("contradicted"), **base)
+            self.assertEqual(contradicted[0]["status"], "fail")
+            with patch.object(esc, "gateway_key", return_value="k"):
+                vague = esc.escalate([item], issue=issue, urlopen=self.gateway("insufficient"), **base)
+            self.assertEqual(vague[0]["status"], "unverifiable")
+        pending = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr)}}
+        waiting = esc.escalate([item], issue=pending, **base)
+        self.assertIn("no reply yet, not re-posted", {a["step"]: a["result"] for a in waiting[0]["attempts"]}["agent-help"])
+        self.assertFalse(comments)
+
+    def test_followup_closes_the_loop_between_verifications_and_fails_a_contradicted_validating_issue(self):
+        esc = outcome.esc
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        item = {"criterion": "Task due chips render", "evidence": "redirects to /signin"}
+        corr = esc.correlation_id("u1", item, SHA)
+        (state / esc.GAP_FILE).write_text(json.dumps({"JOV-7771": {"sha": SHA, "episode": None, "gaps": [
+            {"criterion": item["criterion"], "evidence": item["evidence"], "helpCorr": corr, "capability": "signed-in-browser"},
+            {"criterion": "other", "helpCorr": None}]}}))
+        thread = self.help_thread(corr, "Signed in: the chips are missing on mobile")
+        comments = []
+
+        class Linear:
+            def gql(self, query, variables):
+                return {"issue": {"id": "u1", "identifier": variables["id"], "state": {"name": "Validating"},
+                                  "comments": {"nodes": thread}}}
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        with patch.object(esc, "gateway_key", return_value="k"):
+            resolved = esc.followup_replies(state, Linear(), 5.0, urlopen=self.gateway("contradicted"))
+        self.assertEqual([(r["issue"], r["verdict"], r["state"]) for r in resolved], [("JOV-7771", "contradicted", "Validating")])
+        self.assertIn(esc.RESOLUTION_MARKER, comments[0])
+        stored = json.loads((state / esc.GAP_FILE).read_text())["JOV-7771"]["gaps"][0]
+        self.assertEqual(stored["resolved"]["verdict"], "contradicted")
+        with patch.object(esc, "gateway_key", return_value="k"):
+            self.assertEqual(esc.followup_replies(state, Linear(), 6.0, urlopen=self.gateway("supported")), [], "resolved once")
+        # The lane records a failing outcome receipt for a contradicted issue still in Validating.
+        calls = []
+        host = SimpleNamespace(state=state, repo=state / "repo")
+        with patch.object(outcome, "app_authorization", return_value="Bearer app"), \
+                patch.object(outcome.esc, "followup_replies", return_value=resolved):
+            outcome.help_followups(host, Linear(), 7.0, run=lambda a, **k: calls.append(a) or subprocess.CompletedProcess(a, 0, "", ""))
+        receipt = next(a for a in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a)))
+        self.assertEqual(receipt[receipt.index("--status") + 1], "fail")
+
+    def test_verifier_gets_node24_dependencies_and_the_binding_rules(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(outcome.Path, "home", return_value=Path(home)):
+            for version in ("v22.23.2", "v24.15.0", "v24.22.1", "v24.9.0"):
+                (Path(home) / ".nvm/versions/node" / version / "bin").mkdir(parents=True)
+            self.assertTrue(outcome.node24_path().endswith("v24.22.1/bin"))
+            seen = []
+            def run(args, **kw):
+                seen.append((args, kw))
+                return subprocess.CompletedProcess(args, 0, "", "")
+            self.assertIsNone(outcome.prepare_tree(Path(home), run=run))
+            self.assertEqual(seen[0][0][:3], ["pnpm", "install", "--frozen-lockfile"])
+            self.assertTrue(seen[0][1]["env"]["PATH"].startswith(outcome.node24_path()))
+            failing = lambda args, **kw: subprocess.CompletedProcess(args, 1, "", "ERR_PNPM_NO_OFFLINE_TARBALL")
+            self.assertIn("ERR_PNPM_NO_OFFLINE_TARBALL", outcome.prepare_tree(Path(home), run=failing))
+        text = outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}})
+        for needle in ("is an ancestor of that build", "counts as those tests having run", "`unverifiable` is never a shrug",
+                       "Node 24 is first on PATH"):
+            self.assertIn(needle, text)
+        self.assertIn("NOT installed (boom)", outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}}, "NOT installed (boom)"))
 
     def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None):
         tmp = tempfile.TemporaryDirectory()
