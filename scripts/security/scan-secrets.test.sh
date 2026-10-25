@@ -429,3 +429,27 @@ grep -q 'Secret scan repair refused' "$TEST_ROOT/gitleaks-corruption.publication
   || fail 'local repair refusal must explain how to run history scans'
 
 echo 'PASS: scan-secrets corruption recovery regression tests'
+
+# A pinned `uses: owner/repo@<40 hex>` line trips the GitHubOauth2 detector on
+# a slice of the SHA. Only an unverified finding on exactly such a line is
+# dropped; any other finding fails (2026-10-25, replaces a whole-file exclude).
+PIN_ROOT="$(mktemp -d)"
+cat >"$PIN_ROOT/wf.yml" <<'YML'
+steps:
+  - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+  - run: echo 3a2844b7e9c422d3c10d
+YML
+cat >"$PIN_ROOT/trufflehog" <<STUB
+#!/usr/bin/env bash
+finding() { printf '{"DetectorName":"GitHubOauth2","Verified":false,"Raw":"3a2844b7e9c422d3c10d","SourceMetadata":{"Data":{"Filesystem":{"file":"%s","line":%s}}}}\n' "$PIN_ROOT/wf.yml" "\$1"; }
+finding "\${PIN_LINE:-2}"
+STUB
+chmod +x "$PIN_ROOT/trufflehog"
+pin_scan() {
+  PIN_LINE="$1" TRUFFLEHOG_BIN="$PIN_ROOT/trufflehog" bash -c \
+    "source <(sed -n '/^trufflehog_filesystem_scan()/,/^}/p' '$SCAN_SCRIPT'); trufflehog_filesystem_scan '$PIN_ROOT/wf.yml'" >/dev/null 2>&1
+}
+pin_scan 2 || fail 'an unverified finding on a uses: pin line must be dropped'
+if pin_scan 3; then fail 'an unverified finding on a non-pin line must still fail'; fi
+rm -rf "$PIN_ROOT"
+echo 'PASS: trufflehog action-pin false positives are filtered per line'

@@ -183,6 +183,38 @@ is_trufflehog_excluded() {
   return 1
 }
 
+# Filesystem scan for a file list. A pinned action reference
+# (`uses: owner/repo@<40 hex>`) trips the GitHubOauth2 detector on a 20-hex
+# slice of the SHA (unverified, never a credential), and trufflehog ignores
+# inline `trufflehog:ignore` markers here (verified 2026-10-25), so excluding
+# the whole file was the only switch. Instead drop only an UNVERIFIED finding
+# whose line is exactly a `uses:` pin containing the matched text; every other
+# finding in the same file still fails the scan.
+trufflehog_filesystem_scan() {
+  local out kept file line raw text
+  out="$(mktemp)"
+  "$TRUFFLEHOG_BIN" filesystem "$@" --no-verification --json >"$out" || true
+  kept=0
+  while IFS= read -r finding; do
+    [[ -z "$finding" ]] && continue
+    file="$(jq -r '.SourceMetadata.Data.Filesystem.file // ""' <<<"$finding" 2>/dev/null || true)"
+    line="$(jq -r '.SourceMetadata.Data.Filesystem.line // 0' <<<"$finding" 2>/dev/null || true)"
+    raw="$(jq -r '.Raw // ""' <<<"$finding" 2>/dev/null || true)"
+    if [[ "$(jq -r '.Verified // false' <<<"$finding" 2>/dev/null)" == false \
+      && -n "$file" && "$line" =~ ^[1-9][0-9]*$ && ${#raw} -ge 16 ]]; then
+      text="$(sed -n "${line}p" "$file")"
+      if [[ "$text" =~ ^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*[^[:space:]]+@[0-9a-f]{40}([[:space:]]|$) \
+        && "$text" == *"$raw"* ]]; then
+        continue
+      fi
+    fi
+    kept=$((kept + 1))
+    echo "Found unverified result: ${file}:${line} (detector $(jq -r '.DetectorName // "?"' <<<"$finding" 2>/dev/null))" >&2
+  done <"$out"
+  rm -f "$out"
+  [[ "$kept" -eq 0 ]]
+}
+
 run_trufflehog_pre_commit() {
   local -a staged_files=()
   local file
@@ -202,11 +234,7 @@ run_trufflehog_pre_commit() {
   # --exclude-globs is git-mode-only (verified on 3.95.5 and 3.95.9:
   # filesystem mode rejects the flag). The staged list above was already
   # filtered through is_trufflehog_excluded, which honors the same file.
-  # shellcheck disable=SC2048,SC2086
-  "$TRUFFLEHOG_BIN" filesystem \
-    ${staged_files[@]} \
-    --no-verification \
-    --fail
+  trufflehog_filesystem_scan "${staged_files[@]}"
 }
 
 run_trufflehog_publication() {
@@ -231,11 +259,7 @@ run_trufflehog_publication() {
   fi
 
   echo "Running bootstrap-safe trufflehog filesystem scan on ${#changed_files[@]} changed file(s)..."
-  # shellcheck disable=SC2048,SC2086
-  "$TRUFFLEHOG_BIN" filesystem \
-    ${changed_files[@]} \
-    --no-verification \
-    --fail
+  trufflehog_filesystem_scan "${changed_files[@]}"
 }
 
 # trufflehog `git file://…` internally clones the local repo. On persistent
