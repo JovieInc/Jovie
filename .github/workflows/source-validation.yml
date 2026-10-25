@@ -399,22 +399,27 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - &reused-setup
-        if: steps.reuse.outputs.reuse != 'true'
-        uses: ./.github/actions/setup-node-pnpm
-      - name: Scan the exact source diff
+      # Secret-bearing steps run FIRST, before any PR-controlled code executes
+      # on this runner (the local setup action and every scripts/ entrypoint
+      # below come from the PR head). A same-repository PR could otherwise
+      # read LINEAR_API_KEY or the Jovie Bot key from its own head scripts or
+      # poison the runner via GITHUB_ENV/PATH. The gate itself runs from the
+      # base branch copy; the head tree is only data.
+      - name: Run the security gate from trusted base code
         if: steps.reuse.outputs.reuse != 'true'
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
-          ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
-          ./scripts/security/verify-gitleaks-coverage.sh
-          node scripts/golden-path-lock.mjs merge-gate
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_REF"
+          base_sha="$(git merge-base "origin/$BASE_REF" HEAD)"
+          trusted="$RUNNER_TEMP/trusted-security"
+          mkdir -p "$trusted"
+          git archive "origin/$BASE_REF" scripts/security scripts/lib | tar -x -C "$trusted"
           git diff --name-only "$base_sha" HEAD > "$RUNNER_TEMP/security-gate-files.txt"
-          node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
+          node "$trusted/scripts/security/security-gate.mjs" --changed-files "$RUNNER_TEMP/security-gate-files.txt"
       # Hosted GITHUB_TOKEN compare returns 403 on this public repository.
       # A contents:read Jovie Bot installation token returns 200. Severity
       # and the GPL/AGPL denylist stay blocking. The minted token is
@@ -433,6 +438,17 @@ jobs:
         with:
           repo-token: ${{ steps.dependency-review-token.outputs.token }}
           config-file: ./.github/dependency-review-config.yml
+      - &reused-setup
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Scan the exact source diff
+        if: steps.reuse.outputs.reuse != 'true'
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
+          ./scripts/security/verify-gitleaks-coverage.sh
+          node scripts/golden-path-lock.mjs merge-gate
   migration:
     name: Migration Guard
     runs-on: ubuntu-latest
