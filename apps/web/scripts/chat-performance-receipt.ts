@@ -5,6 +5,10 @@ import type {
   ChatProbeSnapshot,
   ChatProbeTiming,
 } from '../tests/helpers/chat-performance-probe';
+import {
+  CHAT_ENVIRONMENT_MAX_SCALE,
+  CHAT_ENVIRONMENT_REFERENCE_FRAME_MS,
+} from './chat-performance-environment';
 import type { InteractionLatencyReport } from './performance-interaction-report';
 
 export const FAILURE_HEAD = '53d1da25f70cb94797d6a23acf75cc4990bc8580';
@@ -77,6 +81,34 @@ function entries(values: readonly ChatProbeTiming[]) {
 }
 
 /** Construct the publication shape explicitly. Never spread browser/report input. */
+function validatedCalibration(
+  calibration:
+    | {
+        readonly settledFrameGapsMs: readonly number[];
+        readonly environmentScale: number;
+      }
+    | undefined
+) {
+  if (!calibration) return null;
+  const scale = calibration.environmentScale;
+  if (
+    !Number.isFinite(scale) ||
+    scale < 1 ||
+    scale > CHAT_ENVIRONMENT_MAX_SCALE
+  ) {
+    throw new Error('Invalid environment scale');
+  }
+  return {
+    settledFrameGapsMs: calibration.settledFrameGapsMs.map(gap => {
+      const value = timing(gap);
+      if (value === null || value <= 0) throw new Error('Invalid frame gap');
+      return value;
+    }),
+    environmentScale: scale,
+    referenceFrameMs: CHAT_ENVIRONMENT_REFERENCE_FRAME_MS,
+  };
+}
+
 export function chatAttemptReceipt(input: {
   binding: ChatRunBinding;
   browser: string;
@@ -88,6 +120,10 @@ export function chatAttemptReceipt(input: {
     fulfillAwaitMs: number;
   }[];
   report?: InteractionLatencyReport;
+  calibration?: {
+    readonly settledFrameGapsMs: readonly number[];
+    readonly environmentScale: number;
+  };
 }) {
   if (!/^\d+(?:\.\d+){1,3}$/.test(input.browser))
     throw new Error('Invalid browser version');
@@ -127,6 +163,7 @@ export function chatAttemptReceipt(input: {
         ? 'complete'
         : 'incomplete',
     budgetStatus: input.report?.status ?? 'pending',
+    environmentCalibration: validatedCalibration(input.calibration),
     summary: summary
       ? {
           feedbackP50Ms: timing(summary.p50FirstFeedbackMs ?? undefined),

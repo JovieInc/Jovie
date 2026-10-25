@@ -127,6 +127,40 @@ export interface CapacityAlert {
   readonly message: string;
 }
 
+import type { ListPrice, PricedPath, Task } from './capacity-pricing.mjs';
+
+export interface PathView {
+  readonly id: string;
+  readonly model: string;
+  readonly accessPath: 'api' | 'credits' | 'subscription';
+  readonly provider: string | null;
+  readonly accounts: readonly string[];
+  readonly funding: string | null;
+  readonly list: ListPrice | null;
+  readonly usableQuotaApiUsd: number | null;
+  readonly note: string | null;
+}
+
+export interface RoleCandidate {
+  readonly model: string;
+  readonly label: string;
+  readonly pathId: string;
+  readonly preferred: boolean;
+  readonly state: string;
+  readonly evidence: Record<string, unknown> | null;
+}
+
+export interface RoleResolution {
+  readonly role: string;
+  readonly description: string;
+  readonly chosen: {
+    readonly model: string;
+    readonly label: string;
+    readonly pathId: string;
+  } | null;
+  readonly candidates: readonly RoleCandidate[];
+}
+
 export interface CapacityView {
   readonly generatedAt: string;
   readonly providers: readonly ProviderView[];
@@ -141,6 +175,8 @@ export interface CapacityView {
     readonly incomplete: string | null;
   } | null;
   readonly alerts: readonly CapacityAlert[];
+  readonly paths: readonly PathView[];
+  readonly roles: Record<string, RoleResolution | null>;
 }
 
 export interface LiveOverlay {
@@ -148,6 +184,12 @@ export interface LiveOverlay {
     string,
     { readonly quota?: object; readonly credits?: object }
   >;
+  readonly watch?: {
+    readonly models?: Record<
+      string,
+      { readonly available: boolean; readonly via?: string }
+    >;
+  };
   readonly metrics?: {
     readonly windowDays?: number;
     readonly mergedInWindow?: number;
@@ -161,7 +203,11 @@ export const SCHEMA: string;
 export const DAY_MS: number;
 export function validateRegistry(
   registry: unknown,
-  options?: { agentIds?: readonly string[]; spendIds?: readonly string[] }
+  options?: {
+    agentIds?: readonly string[];
+    spendIds?: readonly string[];
+    modelIds?: readonly string[];
+  }
 ): string[];
 export function evaluateRegistry(
   registry: unknown,
@@ -169,8 +215,29 @@ export function evaluateRegistry(
     now?: number;
     live?: LiveOverlay;
     spend?: { providers?: readonly unknown[] };
+    models?: { models?: readonly Record<string, unknown>[] };
   }
 ): CapacityView;
+export function resolveRole(
+  registry: unknown,
+  roleId: string,
+  watch?: Record<
+    string,
+    { readonly available?: boolean; readonly via?: string }
+  >
+): RoleResolution | null;
+export function pathRows(
+  registry: unknown,
+  modelRegistry?: { models?: readonly Record<string, unknown>[] }
+): PathView[];
+export function priceModel(
+  registry: unknown,
+  modelRegistry: { models?: readonly Record<string, unknown>[] },
+  view: CapacityView,
+  model: string,
+  task: Task,
+  options?: unknown
+): (PricedPath & { account: string | null })[];
 export function capacityAlerts(view: CapacityView): CapacityAlert[];
 export function routingOrder(
   view: CapacityView

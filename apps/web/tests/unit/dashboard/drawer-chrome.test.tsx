@@ -49,6 +49,7 @@ const audienceMember: AudienceMember = {
   referrerHistory: [],
   utmParams: {},
   email: 'alex@example.com',
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
   purchaseCount: 0,

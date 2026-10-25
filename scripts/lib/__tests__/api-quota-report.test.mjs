@@ -6,10 +6,50 @@ import {
   jobSeconds,
   parseQuotaNotice,
   percentile,
+  summarizeHeadroom,
   summarizeQuota,
 } from '../api-quota-report.mjs';
 
 describe('api quota report', () => {
+  it('summarizes hourly headroom with the share of empty samples', () => {
+    const hour = 1792551600; // hour aligned
+    const sample = (bucket, remaining, offset) =>
+      parseQuotaNotice(
+        `bucket=${bucket} remaining=${remaining} limit=1000 used=1 reset=1 at=${hour + offset}`
+      );
+    expect(
+      summarizeHeadroom([
+        sample('github-token', 400, 0),
+        sample('github-token', 0, 600),
+        sample('github-token', 0, 1200),
+        sample('github-token', 100, 3500),
+        sample('github-token', 900, 3700),
+        null,
+      ])
+    ).toEqual([
+      {
+        bucket: 'github-token',
+        windowStart: new Date(hour * 1000).toISOString(),
+        limit: 1000,
+        samples: 4,
+        minRemaining: 0,
+        medianRemaining: 0,
+        exhaustedSamples: 2,
+        emptyShare: 0.5,
+      },
+      {
+        bucket: 'github-token',
+        windowStart: new Date((hour + 3600) * 1000).toISOString(),
+        limit: 1000,
+        samples: 1,
+        minRemaining: 900,
+        medianRemaining: 900,
+        exhaustedSamples: 0,
+        emptyShare: 0,
+      },
+    ]);
+  });
+
   it('parses the enroll job quota notice for both buckets', () => {
     expect(
       parseQuotaNotice(
