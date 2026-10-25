@@ -363,3 +363,113 @@ export const claimBody = (
   extra = ''
 ) =>
   `🤖 lane claim kind=fix sha=${sha} host=${host} at=${at}${extra ? ` ${extra}` : ''}`;
+
+// ---- Deterministic rungs (no model) --------------------------------------------------------
+
+/** Which fleet-rule errors a PR-body red carries, from the check's own annotations. */
+export function fleetKinds(log) {
+  const text = String(log ?? '');
+  const kinds = [];
+  if (/Fleet rule evidence unavailable/.test(text))
+    kinds.push('evidence-unavailable');
+  if (/red-before-green:/.test(text)) kinds.push('red-before-green');
+  if (/locked-areas:/.test(text)) kinds.push('locked-areas');
+  if (/done-receipt:/.test(text)) kinds.push('done-receipt');
+  if (/assertions:/.test(text)) kinds.push('assertions');
+  return kinds;
+}
+
+/**
+ * The command a failed step ran, read from the runner's own `##[group]Run <cmd>` header that
+ * precedes the first `##[error]`. Redacted; null when the log does not show one.
+ */
+export function commandFromLog(rawLog) {
+  const lines = String(rawLog ?? '')
+    .replace(/\u001b\[[0-9;]*m/g, '')
+    .split('\n');
+  const err = lines.findIndex(l => l.includes('##[error]'));
+  if (err < 0) return null;
+  let start = -1;
+  for (let i = err; i >= 0; i--)
+    if (/##\[group\]Run /.test(lines[i])) {
+      start = i;
+      break;
+    }
+  if (start < 0) return null;
+  const cmd = [];
+  for (let i = start; i < err && cmd.length < 4; i++) {
+    const l = lines[i].replace(/^\S+Z\s/, '').replace(/^.*##\[group\]Run /, '');
+    if (/^(shell|env):/.test(l.trim()) || l.includes('##[endgroup]')) break;
+    if (l.trim() && !/^set -[a-z]+/.test(l.trim()) && !cmd.includes(l.trim()))
+      cmd.push(l.trim());
+  }
+  // A multi-line script step hides which command failed; naming its first lines would mislead.
+  if (cmd.length !== 1) return null;
+  const out = cmd
+    .join(' ')
+    .replace(/\$\{\{[^}]*\}\}/g, '')
+    .slice(0, 240);
+  return /(secret|token|password|key)=\S+/i.test(out) || out.length < 3
+    ? null
+    : out;
+}
+
+const RBG_HEADING = /^#{1,6}\s*Red-before-green\s*$/im;
+/**
+ * Adds `Failing command:` and `Failing run (before fix):` under `## Red-before-green`, only where
+ * the field is empty or a placeholder. Existing real values are never overwritten.
+ */
+export function fillRedBeforeGreen(body, { command, runUrl }) {
+  const src = String(body ?? '');
+  const fields = `Failing command: \`${command}\`\nFailing run (before fix): ${runUrl}`;
+  if (!RBG_HEADING.test(src))
+    return `${src.trimEnd()}\n\n## Red-before-green\n\n${fields}\n`;
+  return src.replace(
+    /^(#{1,6}\s*Red-before-green\s*\n)([\s\S]*?)(?=^#{1,6}\s|$(?![\s\S]))/im,
+    (_, head, rest) => {
+      const keep = rest
+        .split('\n')
+        .filter(
+          l =>
+            !/^\s*(?:-\s*)?Failing (?:command|run \(before fix\)):\s*(?:<[^>]*>|todo|tbd|n\/?a|none)?\s*$/i.test(
+              l
+            )
+        )
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n');
+      const have = c =>
+        new RegExp(`^\\s*(?:-\\s*)?${c}:\\s*\\S`, 'im').test(keep);
+      const add = [
+        have('Failing command') ? null : `Failing command: \`${command}\``,
+        have('Failing run \\(before fix\\)')
+          ? null
+          : `Failing run (before fix): ${runUrl}`,
+      ].filter(Boolean);
+      return `${head}\n${add.join('\n')}\n${keep.trimStart()}`;
+    }
+  );
+}
+
+export const FORMAT_LIMITS = Object.freeze({
+  maxFiles: 25,
+  maxFileBytes: 200000,
+  maxChangedLines: 600,
+});
+export const BIOME_EXT = /\.(?:[cm]?[jt]sx?|json|jsonc|css)$/;
+/** Guards for formatter output: protected paths and diff size only (no model, no Jev). */
+export function guardFormatterOutput(files) {
+  const v = [];
+  const paths = Object.keys(files);
+  if (!paths.length) v.push('empty-patch');
+  if (paths.length > FORMAT_LIMITS.maxFiles)
+    v.push(`too-many-files:${paths.length}`);
+  let changed = 0;
+  for (const p of paths) {
+    if (pathDenied(p)) v.push(`denied-path:${p}`);
+    const d = lineDiff(files[p].before, files[p].after);
+    changed += d.removed.length + d.added.length;
+  }
+  if (changed > FORMAT_LIMITS.maxChangedLines)
+    v.push(`too-many-lines:${changed}`);
+  return v;
+}

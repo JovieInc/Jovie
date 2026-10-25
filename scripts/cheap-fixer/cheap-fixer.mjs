@@ -9,8 +9,17 @@
  * Env: GH_TOKEN (read), GH_PUSH_TOKEN (push mode), AI_GATEWAY_API_KEY, REPO, EVENT_PATH,
  *      MODE=shadow|push, PUSH_CLASSES=comma list, OUT_DIR, REPLAY=1 (historical run, judge-only).
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { createApiClient } from '../../packages/api-client/client.ts';
 import { providerSpec } from '../../packages/api-client/contract.ts';
 import { createGitHubClient } from '../../packages/api-client/github.ts';
@@ -23,12 +32,18 @@ import {
 import {
   activeClaims,
   applyEdits,
+  BIOME_EXT,
   buildPrompt,
   CLAIM_HOST,
   CLASSES,
   claimBody,
   classifyDetail,
+  commandFromLog,
   costUsd,
+  FORMAT_LIMITS,
+  fillRedBeforeGreen,
+  fleetKinds,
+  guardFormatterOutput,
   guardPatch,
   HOLD_LABELS,
   LIMITS,
@@ -194,8 +209,28 @@ async function main() {
     step,
     failedJobs: jobs.map(j => j.name),
   });
-  if (!CLASSES.includes(failureClass)) finish('handoff-unfixable-class');
-  if (MODE === 'push' && !PUSH_CLASSES.has(failureClass))
+  // Rung and action: deterministic rungs first, the model only for typecheck/test-like classes.
+  const kinds = failureClass === 'pr_metadata' ? fleetKinds(rawLog) : [];
+  const biomeRed =
+    failureClass === 'format' ||
+    (failureClass === 'lint' && /biome/i.test(logTail));
+  let rung = 'model';
+  let action = failureClass;
+  if (failureClass === 'pr_metadata') {
+    rung = 'fleet';
+    action = kinds.includes('evidence-unavailable')
+      ? 'fleet_rerun'
+      : kinds.includes('red-before-green')
+        ? 'fleet_body'
+        : 'fleet_handoff';
+  } else if (biomeRed) {
+    rung = 'formatter';
+    action = failureClass;
+  } else if (!CLASSES.includes(failureClass)) {
+    finish('handoff-unfixable-class');
+  }
+  Object.assign(receipt, { rung, action, fleetKinds: kinds });
+  if (MODE === 'push' && !PUSH_CLASSES.has(action))
     finish('handoff-class-not-enabled');
 
   // Only push mode fences the head: shadow must never stop the lanes from working.
@@ -243,8 +278,235 @@ async function main() {
     finish(`handoff-${why}`, extra);
   };
 
-  // Files: only ones the PR changed (plus snapshots named in the log).
+  // One verified, non-forced commit (createCommitOnBranch fails if the head moved).
+  const pushFiles = async (files, headline, detail) => {
+    const fresh = await get(`repos/${REPO}/pulls/${number}`);
+    if (
+      fresh.head.sha !== sha ||
+      fresh.labels.some(l => HOLD_LABELS.has(l.name.toLowerCase()))
+    )
+      await handoff('head-moved-or-held');
+    const data = await writer.graphql(
+      `mutation CheapFix($input: CreateCommitOnBranchInput!) {
+        createCommitOnBranch(input: $input) { commit { oid } }
+      }`,
+      {
+        input: {
+          branch: { repositoryNameWithOwner: REPO, branchName: pr.head.ref },
+          expectedHeadOid: sha,
+          message: {
+            headline,
+            body: `${detail}\n\nRun ${process.env.GITHUB_RUN_ID ?? ''}.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`,
+          },
+          fileChanges: {
+            additions: Object.entries(files).map(([path, f]) => ({
+              path,
+              contents: Buffer.from(f.after).toString('base64'),
+            })),
+          },
+        },
+      },
+      call
+    );
+    mark('pushed');
+    // The claim is fenced to the old head; deleting it keeps the PR clean for the lanes if the new head goes red.
+    await release();
+    finish('pushed', { pushedSha: data.createCommitOnBranch.commit.oid });
+  };
+  const comment = async body => {
+    const marker = `<!-- cheap-fixer:${sha} -->`;
+    const existing = await get(
+      `repos/${REPO}/issues/${number}/comments?per_page=100`
+    );
+    if (existing.some(c => c.body?.includes(marker))) return false;
+    await writer.rest(
+      'POST',
+      `repos/${REPO}/issues/${number}/comments`,
+      { body: `${marker}\n${body}` },
+      call
+    );
+    return true;
+  };
+
+  // Rung: PR-body / fleet-rule reds. Facts only; a missing fact is named, never invented.
+  if (rung === 'fleet') {
+    const annotations = [...rawLog.matchAll(/##\[error\](.+)/g)]
+      .map(m => m[1].trim())
+      .filter(m => !/^Process completed/.test(m))
+      .slice(0, 5);
+    receipt.annotations = annotations;
+    if (action === 'fleet_rerun') {
+      // The rule script threw before evaluating (head moved, incomplete read, API quota): re-run, change nothing.
+      if (run.run_attempt !== 1 || pr.head.sha !== sha)
+        await handoff('rerun-not-eligible');
+      if (MODE === 'shadow') finish('shadow-would-rerun');
+      await writer.rest(
+        'POST',
+        `repos/${REPO}/actions/runs/${run.id}/rerun-failed-jobs`,
+        undefined,
+        call
+      );
+      mark('rerun');
+      await release();
+      finish('rerun-requested');
+    }
+    if (action === 'fleet_body') {
+      const { evaluateFleetRules } = await import('../pr-fleet-rules.mjs');
+      const required = new Set([
+        'Source Validation',
+        'CI',
+        'Changed-Evidence Test Suites',
+      ]);
+      const runs = (
+        await get(
+          `repos/${REPO}/actions/runs?event=pull_request&branch=${encodeURIComponent(pr.head.ref)}&status=failure&per_page=50`
+        )
+      ).workflow_runs.filter(
+        r =>
+          required.has(r.name) &&
+          r.head_sha !== sha &&
+          r.id !== run.id &&
+          Date.parse(r.created_at) < Date.parse(run.created_at)
+      );
+      let evidence = null;
+      for (const prior of runs.slice(0, 5)) {
+        const priorJobs = (
+          await get(
+            `repos/${REPO}/actions/runs/${prior.id}/jobs?per_page=100&filter=latest`
+          )
+        ).jobs.filter(
+          j =>
+            j.conclusion === 'failure' &&
+            !/^(PR Ready|PR Fleet Rules)|\bgate\b/i.test(j.name) &&
+            !j.steps?.some(
+              s => s.conclusion === 'failure' && /fleet rules/i.test(s.name)
+            )
+        );
+        for (const j of priorJobs.slice(0, 2)) {
+          const priorLog = (
+            await reader.rest(
+              'GET',
+              `repos/${REPO}/actions/jobs/${j.id}/logs`,
+              undefined,
+              call
+            )
+          ).text;
+          const command = commandFromLog(priorLog);
+          const priorClass = classifyDetail(
+            curateLogTail(priorLog).slice(-LIMITS.logTailBytes)
+          ).name;
+          if (command && CLASSES.includes(priorClass)) {
+            evidence = {
+              command,
+              runUrl: prior.html_url,
+              job: j.name,
+              priorClass,
+            };
+            break;
+          }
+        }
+        if (evidence) break;
+      }
+      receipt.evidence = evidence;
+      if (!evidence) {
+        const msg = `PR metadata check "${annotations[0] ?? 'red-before-green'}" needs a fact the automation cannot derive: the failing command and a red run from before the fix. No earlier failed required run with a readable command exists on this branch. Add \`Failing command:\` and \`Failing run (before fix): <URL>\` under \`## Red-before-green\`.`;
+        if (MODE === 'push' && PUSH_CLASSES.has('fleet_handoff'))
+          await comment(`🤖 cheap-fixer: ${msg}`);
+        await handoff('missing-facts', { missing: msg });
+      }
+      const body = fillRedBeforeGreen(pr.body, evidence);
+      const files = await get(
+        `repos/${REPO}/pulls/${number}/files?per_page=100`
+      );
+      const after = evaluateFleetRules({
+        pr: { ...pr, body },
+        files,
+        repository: REPO,
+      });
+      receipt.remainingErrors = after.errors;
+      if (after.errors.some(e => e.startsWith('red-before-green')))
+        await handoff('body-still-red');
+      receipt.bodyDiff = { before: pr.body ?? '', after: body };
+      if (MODE === 'shadow') finish('shadow-body-proposed');
+      await writer.rest(
+        'PATCH',
+        `repos/${REPO}/pulls/${number}`,
+        { body },
+        call
+      );
+      mark('body-updated');
+      await release();
+      finish('body-updated');
+    }
+    // locked-areas, done-receipt, assertions: a human or lane owns the missing fact.
+    const msg = `PR metadata check is red and needs facts automation must not invent: ${annotations.join(' | ') || 'see the PR Fleet Rules job'}.`;
+    if (MODE === 'push' && PUSH_CLASSES.has('fleet_handoff'))
+      await comment(`🤖 cheap-fixer: ${msg}`);
+    await handoff('metadata-needs-human-fact', { missing: msg });
+  }
+
+  // Rung: formatter. The repo's own biome, trusted config from main, PR files as data; no PR code runs.
   const changed = await get(`repos/${REPO}/pulls/${number}/files?per_page=100`);
+  if (rung === 'formatter') {
+    const candidates = changed
+      .filter(f => f.status !== 'removed' && BIOME_EXT.test(f.filename))
+      .map(f => f.filename);
+    if (!candidates.length || candidates.length > FORMAT_LIMITS.maxFiles)
+      await handoff('formatter-file-count', { count: candidates.length });
+    const dir = mkdtempSync(join(tmpdir(), 'cheap-fixer-fmt-'));
+    copyFileSync('biome.json', join(dir, 'biome.json'));
+    writeFileSync(join(dir, '.gitignore'), ''); // biome's vcs.useIgnoreFile needs one in the scratch root
+    execFileSync('git', ['init', '-q'], { cwd: dir });
+    const before = {};
+    for (const p of candidates) {
+      const f = await get(`repos/${REPO}/contents/${encodeURI(p)}?ref=${sha}`);
+      if (f.size > FORMAT_LIMITS.maxFileBytes || f.encoding !== 'base64')
+        await handoff('formatter-file-size', { path: p });
+      before[p] = Buffer.from(f.content, 'base64').toString('utf8');
+      mkdirSync(dirname(join(dir, p)), { recursive: true });
+      writeFileSync(join(dir, p), before[p]);
+    }
+    const biome =
+      process.env.BIOME_BIN || join(process.cwd(), 'node_modules/.bin/biome');
+    const biomeRun = args => {
+      try {
+        execFileSync(biome, args, { cwd: dir, stdio: 'pipe', timeout: 120000 });
+        return 0;
+      } catch (e) {
+        receipt.biomeOutput =
+          `${e.stdout ?? ''}${e.stderr ?? ''}${e.message}`.slice(-900);
+        return e.status ?? 1;
+      }
+    };
+    biomeRun(['check', '--write', '--no-errors-on-unmatched', ...candidates]);
+    const verifyStatus = biomeRun([
+      'check',
+      '--no-errors-on-unmatched',
+      ...candidates,
+    ]);
+    mark('formatter');
+    if (verifyStatus !== 0) await handoff('formatter-still-red');
+    const files = {};
+    for (const p of candidates) {
+      const after = readFileSync(join(dir, p), 'utf8');
+      if (after !== before[p]) files[p] = { before: before[p], after };
+    }
+    const violations = guardFormatterOutput(files);
+    const diff = Object.entries(files)
+      .map(([p, f]) => unifiedDiff(p, f.before, f.after))
+      .filter(Boolean)
+      .join('\n');
+    Object.assign(receipt, { diff, files: Object.keys(files) });
+    if (violations.length) await handoff('guard-violation', { violations });
+    if (MODE === 'shadow') finish('shadow-proposed');
+    await pushFiles(
+      files,
+      `chore(ci): apply biome ${failureClass} fixes (cheap-fixer) for #${number}`,
+      'Deterministic: biome check --write on files this PR changed, trusted config from main; check passes afterwards.'
+    );
+  }
+
+  // Files: only ones the PR changed (plus snapshots named in the log).
   const changedInPr = new Set(
     changed.filter(f => f.status !== 'removed').map(f => f.filename)
   );
@@ -338,40 +600,11 @@ async function main() {
 
   if (MODE === 'shadow') finish('shadow-proposed');
 
-  // Push: one verified, non-forced commit (createCommitOnBranch fails if the head moved).
-  const fresh = await get(`repos/${REPO}/pulls/${number}`);
-  if (
-    fresh.head.sha !== sha ||
-    fresh.labels.some(l => HOLD_LABELS.has(l.name.toLowerCase()))
-  )
-    await handoff('head-moved-or-held');
-  const message = `fix(ci): ${failureClass} fix from cheap-fixer for #${number}`;
-  const data = await writer.graphql(
-    `mutation CheapFix($input: CreateCommitOnBranchInput!) {
-      createCommitOnBranch(input: $input) { commit { oid } }
-    }`,
-    {
-      input: {
-        branch: { repositoryNameWithOwner: REPO, branchName: pr.head.ref },
-        expectedHeadOid: sha,
-        message: {
-          headline: message,
-          body: `${receipt.explanation}\n\nJev verdict: approve (${decision.confidence?.toFixed?.(2)}). Run ${process.env.GITHUB_RUN_ID ?? ''}.\n\nCo-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>`,
-        },
-        fileChanges: {
-          additions: Object.entries(applied.files).map(([path, f]) => ({
-            path,
-            contents: Buffer.from(f.after).toString('base64'),
-          })),
-        },
-      },
-    },
-    call
+  await pushFiles(
+    applied.files,
+    `fix(ci): ${failureClass} fix from cheap-fixer for #${number}`,
+    `${receipt.explanation}\n\nJev verdict: approve (${decision.confidence?.toFixed?.(2)}).`
   );
-  mark('pushed');
-  // The claim is fenced to the old head; deleting it keeps the PR clean for the lanes if the new head goes red.
-  await release();
-  finish('pushed', { pushedSha: data.createCommitOnBranch.commit.oid });
 }
 
 main().catch(e => {
