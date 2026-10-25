@@ -24,6 +24,7 @@ import {
   isInstantlyOutboundEnabled,
   isOutreachQuietHours,
 } from '@/lib/leads/outbound-gates';
+import { outreachApprovedWhere } from '@/lib/leads/outreach-eligible-status';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   evaluateOutboundSend,
@@ -68,7 +69,7 @@ function getPendingEmailWhereClause(now = new Date()) {
   return and(
     or(eq(leads.outreachRoute, 'email'), eq(leads.outreachRoute, 'both')),
     eq(leads.outreachStatus, 'pending'),
-    eq(leads.status, 'approved'),
+    outreachApprovedWhere,
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),

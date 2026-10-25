@@ -28,6 +28,7 @@ import {
   OUTREACH_QUEUE_CLAIM_TTL_MS,
   processOutreachBatch,
 } from '@/lib/leads/outreach-batch';
+import { outreachApprovedWhere } from '@/lib/leads/outreach-eligible-status';
 import { getOvieOperatorEntitlements } from '@/lib/ovie/privacy-lock/access';
 import { outreachListQuerySchema } from '@/lib/validation/lead-schemas';
 
@@ -91,7 +92,7 @@ function getPendingEmailWhereClause(
   return and(
     getOutreachRouteWhereClause('email'),
     eq(leads.outreachStatus, 'pending'),
-    eq(leads.status, 'approved'),
+    outreachApprovedWhere,
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),
