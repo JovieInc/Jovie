@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 import SwiftUI
 
 /// Chat card for a video-recording proposal. "Record in app" opens the
