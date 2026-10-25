@@ -35,6 +35,8 @@
   --app-shell-content-max-reading: 56rem;
   --app-shell-content-max-form: 50rem;
   --profile-shell-max-width: 430px;
+  --profile-desktop-max-width: 1040px;
+  --profile-desktop-height: 600px;
   --profile-shell-header-max-width: 38rem;
   --profile-shell-card-radius: 24px;
   --profile-card-radius: 22px;
@@ -1157,6 +1159,111 @@
   .profile-viewport--desktop-surface:not(.profile-viewport--embedded)
     .public-profile-layout-desktop-shell {
     display: flex;
+  }
+}
+
+/* Desktop artist profile (Tim, 2026-10-25): a calm two-column composition at
+   >= 1024px on the compact surface. Identity (portrait, name, Get Updates,
+   socials) sits left; the single featured card sits right and takes the room.
+   Home is the only two-column state; other tabs keep a readable column. CSS
+   only: the DOM is identical to mobile, so < 1024px is untouched. Embedded
+   previews and the flagged wide surface are excluded. Spacing is on the 4/8
+   grid (gap 64, inset 48, columns 320 / fluid). */
+@media (min-width: 1024px) {
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-layout-frame--compact {
+    max-width: min(
+      100%,
+      calc(var(--profile-desktop-max-width) + (var(--page-pad) * 2))
+    );
+    padding-inline: max(var(--page-pad), env(safe-area-inset-left));
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell {
+    max-width: min(100%, var(--profile-desktop-max-width));
+    height: min(
+      var(--profile-desktop-height),
+      calc(100dvh - (var(--page-pad) * 2))
+    );
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll {
+    display: grid;
+    grid-template-columns: minmax(0, 320px) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    column-gap: 64px;
+    align-items: center;
+    align-content: stretch;
+    padding-inline: 48px;
+    /* Clear the top-right menu so it never touches the featured card. */
+    padding-top: 56px;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    > [data-testid="profile-identity-header"] {
+    grid-column: 1;
+    grid-row: 1;
+    padding-bottom: 0;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    > [data-testid="profile-home-rail"] {
+    grid-column: 2;
+    grid-row: 1;
+    flex: none;
+    width: 100%;
+    max-width: 560px;
+    justify-self: center;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    [data-profile-home-mode="true"]
+    .profile-home-content-scroll
+    > [data-testid="profile-jovie-branding"] {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  /* Non-Home tabs keep one readable column inside the wider shell. */
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    [data-testid="profile-compact-surface"]:not([data-mode="profile"])
+    .profile-content-scroll-region
+    > * {
+    margin-inline: auto;
+    max-width: 560px;
+    width: 100%;
+  }
+
+  .profile-viewport:not(.profile-viewport--embedded):not(
+      .profile-viewport--desktop-surface
+    )
+    .public-profile-compact-shell
+    .profile-floating-tab-bar {
+    margin-inline: auto;
+    max-width: 400px;
+    width: 100%;
   }
 }
 
