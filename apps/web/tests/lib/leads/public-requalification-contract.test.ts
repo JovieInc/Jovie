@@ -130,6 +130,18 @@ describe('public requalification contract', () => {
         ]),
       },
       commercialDecision: { state: 'review_needed' },
+      commercialContext: null,
+      ranking: {
+        payScore: null,
+        rank: null,
+        costs: null,
+        nextAction: 'hold',
+        unknowns: expect.arrayContaining([
+          'offer_context_missing',
+          'cost_unknown',
+        ]),
+        requiredApprovals: ['tim_outbound_approval'],
+      },
       contactDecisions: [
         expect.objectContaining({
           channel: 'public-profile',
