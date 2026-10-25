@@ -571,14 +571,39 @@ XCODEBUILD_STATUS=$?
 set -e
 
 if [[ -n "$RESULT_BUNDLE_PATH" && "$XCODEBUILD_STATUS" -ne 0 && -d "$RESULT_BUNDLE_PATH" ]]; then
+  # Capture the full tests report once: the log group below is truncated for
+  # display, while the annotation emitter needs the untruncated JSON. A
+  # mktemp failure must never change this script's exit status, so every
+  # use of the temp file is guarded and the generic error still fires.
+  xcresult_tests_json="$(mktemp 2>/dev/null || true)"
+  if [[ -n "$xcresult_tests_json" ]]; then
+    xcrun xcresulttool get test-results tests --path "$RESULT_BUNDLE_PATH" >"$xcresult_tests_json" 2>/dev/null || true
+  fi
   echo "::group::xcresult summary (xcodebuild exit $XCODEBUILD_STATUS)"
   xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE_PATH" 2>/dev/null | head -c 8000 || true
   echo
   echo "::endgroup::"
   echo "::group::xcresult failing tests"
-  xcrun xcresulttool get test-results tests --path "$RESULT_BUNDLE_PATH" 2>/dev/null | head -c 16000 || true
+  if [[ -n "$xcresult_tests_json" ]]; then
+    head -c 16000 "$xcresult_tests_json" || true
+  else
+    xcrun xcresulttool get test-results tests --path "$RESULT_BUNDLE_PATH" 2>/dev/null | head -c 16000 || true
+  fi
   echo
   echo "::endgroup::"
+  # JOV-7763 / JOV-5371: the groups above are only readable through
+  # admin-gated job logs, so remote triage of an exit-65 regression saw
+  # nothing but the generic error below. Emit each failing test as its own
+  # check-run annotation from the untruncated report. Diagnostics only:
+  # any emitter failure degrades to the generic error line and never
+  # changes this script's exit status.
+  if command -v node >/dev/null 2>&1 \
+    && [[ -n "$xcresult_tests_json" && -s "$xcresult_tests_json" ]]; then
+    node "$SCRIPT_DIR/emit-xcresult-failure-annotations.mjs" <"$xcresult_tests_json" || true
+  fi
+  if [[ -n "$xcresult_tests_json" ]]; then
+    rm -f "$xcresult_tests_json"
+  fi
   echo "::error::iOS test action failed (xcodebuild exit $XCODEBUILD_STATUS); see xcresult groups above and result bundle $RESULT_BUNDLE_PATH"
 fi
 
