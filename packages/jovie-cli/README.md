@@ -41,7 +41,7 @@ automated install. A repository build is not proof that npm has the package.
 that Spotify artist. Otherwise it creates an unclaimed profile. The response
 has `profileUrl` and, when unclaimed, a `claimUrl`. The claim URL is not an
 ownership token: the artist still verifies that they own the Spotify artist.
-Creation is anonymous and rate limited per IP.
+Creation works anonymously with an IP quota, or with an API key and an account quota (see API key authentication below).
 
 `music resolve` returns provider links with provenance, ambiguity candidates, and
 core MusicBrainz artist facts when an exact URL relation or MBID identifies the
@@ -332,3 +332,16 @@ from this source directory.
 The workflow must prove the public registry version, provenance metadata,
 maintainer ownership, a fresh exact-version install, and a critical installed
 command before the release is considered available.
+
+
+### API key authentication
+
+Create a key in **Settings → Account → API keys**. Copy it when it appears;
+Jovie stores a hash and shows the raw key only once. New keys expire after 90 days.
+Set `JOVIE_API_KEY` in the CLI process or stdio MCP server environment. It is sent
+as a bearer credential over HTTPS (HTTP is allowed only for loopback development).
+`jovie profile create` then uses a shared account budget of 100 requests/hour,
+instead of the anonymous 10 requests/hour per IP, and records the creating account.
+Attribution does not claim ownership of an artist. Revoke a key in Account settings
+to stop its access. With no key configured, public commands continue anonymously.
+OAuth login and owner-action commands remain tracked in JOV-8731.

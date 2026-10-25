@@ -55,12 +55,13 @@ describe('ingestSocialPlatformUrl collision handling', () => {
   it('allocates a new handle instead of merging for untrusted callers', async () => {
     await ingestSocialPlatformUrl('https://instagram.com/someartist', {
       allocateNewHandleOnCollision: true,
+      createdByUserId: 'app-user',
     });
     expect(hoisted.handleExisting).not.toHaveBeenCalled();
     expect(hoisted.createNew).toHaveBeenCalledWith(
       expect.anything(),
       'someartist_1',
-      expect.anything()
+      expect.objectContaining({ createdByUserId: 'app-user' })
     );
   });
 });

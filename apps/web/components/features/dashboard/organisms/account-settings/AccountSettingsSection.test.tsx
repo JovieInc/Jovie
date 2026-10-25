@@ -20,6 +20,10 @@ vi.mock('@/features/dashboard/organisms/SettingsNotificationsSection', () => ({
   ),
 }));
 
+vi.mock('./ApiKeysCard', () => ({
+  ApiKeysCard: () => <div data-testid='api-keys-card' />,
+}));
+
 vi.mock('./SessionManagementCard', () => ({
   SessionManagementCard: () => <div data-testid='session-management-card' />,
 }));

@@ -24,6 +24,7 @@ interface JsonRpcMessage {
 
 export interface McpContext {
   readonly version: string;
+  readonly apiKey?: string;
   readonly workerToken?: string;
   readonly baseUrl: string;
   readonly fetchImpl?: FetchImplementation;
@@ -149,6 +150,7 @@ async function callTool(
       },
       {
         baseUrl: context.baseUrl,
+        apiKey: context.apiKey,
         workerToken: context.workerToken,
         fetchImpl: context.fetchImpl,
         timeoutMs: context.timeoutMs,

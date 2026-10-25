@@ -115,6 +115,10 @@ export const creatorProfiles = pgTable(
   'creator_profiles',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Attribution is separate from ownership/claims for agent-created profiles.
+    createdByUserId: uuid('created_by_user_id').references(() => users.id, {
+      onDelete: 'set null',
+    }),
     // @deprecated — ownership now tracked via userProfileClaims join table.
     // Kept for backward compatibility during migration. Will be removed once
     // all consumers are migrated to use userProfileClaims/activeProfileId.

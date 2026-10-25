@@ -68,6 +68,7 @@ describe('createNewSocialProfile', () => {
       } as never,
       'artistone',
       {
+        createdByUserId: 'app-user',
         handle: 'artist-one',
         normalizedHandle: 'artist-one',
         platformId: 'instagram',
@@ -78,6 +79,9 @@ describe('createNewSocialProfile', () => {
       }
     );
 
+    expect(insertCreatorValues).toHaveBeenCalledWith(
+      expect.objectContaining({ createdByUserId: 'app-user', isClaimed: false })
+    );
     expect(response.status).toBe(200);
     expect(mockInvalidateProfileCache).toHaveBeenCalledWith('artistone');
     expect(mockInvalidateProfileCache).toHaveBeenCalledTimes(1);

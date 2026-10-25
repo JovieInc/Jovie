@@ -180,6 +180,16 @@ export type ArtistOpenApiDocument = {
     Record<string, Partial<Record<'get' | 'post', OpenApiOperation>>>
   >;
   readonly components: {
+    readonly securitySchemes: Readonly<
+      Record<
+        string,
+        {
+          readonly type: 'http';
+          readonly scheme: 'bearer';
+          readonly description: string;
+        }
+      >
+    >;
     readonly schemas: Readonly<Record<string, JsonSchema>>;
   };
   readonly 'x-jovie-versioning': typeof API_VERSIONING_POLICY;
@@ -289,6 +299,14 @@ export const ARTIST_OPENAPI_DOCUMENT: ArtistOpenApiDocument = {
     },
   },
   components: {
+    securitySchemes: {
+      AgentApiKey: {
+        type: 'http',
+        scheme: 'bearer',
+        description:
+          'Optional account API key from Settings → Account. Set JOVIE_API_KEY for CLI/MCP. Grants attribution and an account quota, not artist ownership.',
+      },
+    },
     schemas: {
       ...PUBLIC_AGENT_SCHEMAS,
       ArtistApiIndex: {
