@@ -47,7 +47,10 @@ describe('runSilentYouTubeLink', () => {
     const result = await runSilentYouTubeLink(d, 'p1');
     expect(result).toEqual({ status: 'linked', channelId: 'UCown' });
     expect(d.insertLink).toHaveBeenCalledWith(
-      expect.objectContaining({ url: 'https://www.youtube.com/@lenahart' })
+      expect.objectContaining({
+        url: 'https://www.youtube.com/@lenahart',
+        state: 'active',
+      })
     );
     expect(d.markChecked).toHaveBeenCalledWith('p1', NOW);
   });
@@ -65,7 +68,7 @@ describe('runSilentYouTubeLink', () => {
     expect(d.insertLink).not.toHaveBeenCalled();
   });
 
-  it('NEGATIVE: two proven own channels are ambiguous and link nothing', async () => {
+  it('sends two equally proven own channels to owner review, never public', async () => {
     const d = deps({
       loadEvidence: async id => ({
         channelId: id,
@@ -74,8 +77,17 @@ describe('runSilentYouTubeLink', () => {
         videoTitles: ['Midnight Drive', 'Paper Hearts'],
       }),
     });
-    expect(await runSilentYouTubeLink(d, 'p1')).toEqual({ status: 'no_match' });
-    expect(d.insertLink).not.toHaveBeenCalled();
+    expect(await runSilentYouTubeLink(d, 'p1')).toEqual({
+      status: 'needs_review',
+      channelIds: ['UCown', 'UCfake'],
+    });
+    expect(d.insertLink).toHaveBeenCalledTimes(2);
+    expect(d.insertLink).toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'suggested' })
+    );
+    expect(d.insertLink).not.toHaveBeenCalledWith(
+      expect.objectContaining({ state: 'active' })
+    );
   });
 
   it('respects an existing or owner-rejected youtube link row', async () => {

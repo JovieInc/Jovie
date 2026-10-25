@@ -82,21 +82,27 @@ const productionDeps: SilentLinkDeps = {
       handle: channel.handle,
     };
   },
-  async insertLink({ profileId, usernameNormalized, url, title, match }) {
+  async insertLink({
+    profileId,
+    usernameNormalized,
+    url,
+    title,
+    match,
+    state,
+  }) {
     // Best-effort single writer: the 24h throttle plus this re-check keep
     // duplicates out; a transaction would need an RLS actor for no real gain.
     const inserted = await (async () => {
       const existing = await db
-        .select({ id: socialLinks.id })
+        .select({ url: socialLinks.url })
         .from(socialLinks)
         .where(
           and(
             eq(socialLinks.creatorProfileId, profileId),
             eq(socialLinks.platform, 'youtube')
           )
-        )
-        .limit(1);
-      if (existing.length > 0) return false;
+        );
+      if (existing.some(row => row.url === url)) return false;
       const [order] = await db
         .select({ maxOrder: max(socialLinks.sortOrder) })
         .from(socialLinks)
@@ -108,9 +114,9 @@ const productionDeps: SilentLinkDeps = {
         url,
         displayText: title,
         sortOrder: (order?.maxOrder ?? -1) + 1,
-        isActive: true,
-        state: 'active',
-        confidence: '0.90',
+        isActive: state === 'active',
+        state,
+        confidence: state === 'active' ? '0.90' : '0.60',
         sourcePlatform: 'youtube_catalog_match',
         sourceType: 'ingested',
         // Ownership is NOT proven here; verificationStatus stays unverified.
@@ -121,7 +127,8 @@ const productionDeps: SilentLinkDeps = {
       });
       return true;
     })();
-    if (inserted) await invalidateProfileCache(usernameNormalized);
+    if (inserted && state === 'active')
+      await invalidateProfileCache(usernameNormalized);
   },
   async markChecked(profileId, at) {
     await db

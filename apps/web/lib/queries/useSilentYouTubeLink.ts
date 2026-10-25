@@ -21,7 +21,8 @@ export function useSilentYouTubeLink(profileId: string | undefined): void {
     )
       .then(res => (res.ok ? res.json() : null))
       .then((body: { status?: string } | null) => {
-        if (body?.status !== 'linked') return;
+        if (body?.status !== 'linked' && body?.status !== 'needs_review')
+          return;
         void queryClient.invalidateQueries({
           queryKey: queryKeys.dashboard.socialLinks(),
         });

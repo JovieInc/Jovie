@@ -28,7 +28,8 @@ export type SilentLinkResult =
         | 'no_profile'
         | 'provider_unavailable';
     }
-  | { readonly status: 'no_match' };
+  | { readonly status: 'no_match' }
+  | { readonly status: 'needs_review'; readonly channelIds: readonly string[] };
 
 export interface SilentLinkDeps {
   now(): Date;
@@ -58,6 +59,8 @@ export interface SilentLinkDeps {
     url: string;
     title: string;
     match: ChannelMatch;
+    /** `active` shows on the profile; `suggested` waits for the owner. */
+    state: 'active' | 'suggested';
   }): Promise<void>;
   markChecked(profileId: string, at: Date): Promise<void>;
 }
@@ -142,17 +145,39 @@ export async function runSilentYouTubeLink(
   await deps.markChecked(profileId, now);
 
   const chosen = pickProvenChannel(matches, typed?.channelId);
-  if (!chosen) return { status: 'no_match' };
-  const found = evidenceById.get(chosen.channelId);
-  const url = found?.handle
-    ? `https://www.youtube.com/@${found.handle}`
-    : `https://www.youtube.com/channel/${chosen.channelId}`;
+  const urlFor = (channelId: string) => {
+    const info = evidenceById.get(channelId);
+    return info?.handle
+      ? `https://www.youtube.com/@${info.handle}`
+      : `https://www.youtube.com/channel/${channelId}`;
+  };
+  if (!chosen) {
+    // Several channels carry the catalog and none is clearly the artist's:
+    // never guess publicly; queue them as owner-review suggestions.
+    const ambiguous = matches.filter(match => match.proven).slice(0, 3);
+    if (ambiguous.length === 0) return { status: 'no_match' };
+    for (const match of ambiguous) {
+      await deps.insertLink({
+        profileId,
+        usernameNormalized: profile.usernameNormalized,
+        url: urlFor(match.channelId),
+        title: evidenceById.get(match.channelId)?.title ?? artistName,
+        match,
+        state: 'suggested',
+      });
+    }
+    return {
+      status: 'needs_review',
+      channelIds: ambiguous.map(match => match.channelId),
+    };
+  }
   await deps.insertLink({
     profileId,
     usernameNormalized: profile.usernameNormalized,
-    url,
-    title: found?.title ?? artistName,
+    url: urlFor(chosen.channelId),
+    title: evidenceById.get(chosen.channelId)?.title ?? artistName,
     match: chosen,
+    state: 'active',
   });
   return { status: 'linked', channelId: chosen.channelId };
 }
