@@ -5959,6 +5959,74 @@ class TerminalRevisitTest(unittest.TestCase):
         self.assertEqual([args[3] for args in self.calls if args[:3] == ["gh", "run", "rerun"]], ["11", "22"])
 
 
+class OwnerSettleTest(unittest.TestCase):
+    NOW = 1_800_000_000.0
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+
+    def pr(self, age_s, branch="fix/owner-work", head="a" * 40, number=9):
+        pushed = datetime.fromtimestamp(self.NOW - age_s, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return {"number": number, "headRefOid": head, "headRefName": branch, "state": "OPEN", "isDraft": False,
+                "isCrossRepository": False, "isInMergeQueue": False, "mergeStateStatus": "CLEAN", "labels": [],
+                "lastCommitAt": pushed, "eventKinds": ["red"],
+                "statusCheckRollup": [{"name": "unit", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+
+    def claim(self, pr, **kwargs):
+        with patch("time.time", return_value=self.NOW), patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda target: target), \
+                patch.object(lane.pr_events, "charge_reentry", return_value=True), patch.object(lane, "post_claim"):
+            return lane.claim_red_pr(self.host, "codex", [pr])
+
+    def test_recent_owner_push_defers_the_repair_and_is_measured_once(self):
+        pr = self.pr(age_s=300)
+        self.assertIsNone(self.claim(pr))
+        self.assertIsNone(self.claim(pr))
+        window = json.loads((self.host.state / "owner-settle.json").read_text())["9"]
+        self.assertEqual(window["head"], pr["headRefOid"])
+        self.assertAlmostEqual(window["settleUntil"] - window["firstSeenAt"], lane.pr_events.OWNER_SETTLE_S - 300, delta=1)
+        rows = [json.loads(line) for line in (self.host.state / "runs/owner-settle.jsonl").read_text().splitlines()]
+        self.assertEqual([row["reason"] for row in rows], ["owner-active:head-pushed-within-settle-window"])
+
+    def test_quiet_head_is_repaired(self):
+        pr = self.pr(age_s=lane.pr_events.OWNER_SETTLE_S + 60)
+        self.assertEqual(self.claim(pr), pr)
+        self.assertFalse((self.host.state / "owner-settle.json").exists())
+
+    def test_lane_branch_unreadable_commit_time_and_own_push_never_settle(self):
+        lane_branch = self.pr(age_s=60, branch="codex/jov-9-20261024")
+        self.assertEqual(self.claim(lane_branch), lane_branch)
+        unknown = {k: v for k, v in self.pr(age_s=60).items() if k != "lastCommitAt"}
+        self.assertEqual(self.claim(unknown), unknown)
+        own = self.pr(age_s=60, head="b" * 40)
+        (self.host.state / "fix-attempts.json").write_text(json.dumps({"9": {"sha": "c" * 40, "count": 1,
+                                                                             "pushedHead": "b" * 40, "endedAt": 1}}))
+        self.assertEqual(self.claim(own), own)
+
+    def test_green_pr_is_not_recorded_as_a_deferral(self):
+        pr = {**self.pr(age_s=60), "statusCheckRollup": [{"name": "unit", "status": "COMPLETED", "conclusion": "SUCCESS"}]}
+        self.assertIsNone(self.claim(pr))
+        self.assertFalse((self.host.state / "owner-settle.json").exists())
+
+    def test_event_path_defers_too(self):
+        pr = self.pr(age_s=120)
+        with patch("time.time", return_value=self.NOW), patch.object(lane, "load_providers", return_value={"codex": {}}), \
+                patch.object(lane, "claimed_elsewhere", return_value=False), \
+                patch.object(lane, "reconcile_fix_target", side_effect=lambda target: target), \
+                patch.object(lane.pr_events, "charge_reentry", return_value=True), patch.object(lane, "post_claim") as claim:
+            self.assertIsNone(lane.pr_events.claim_event_pr(self.host, lane, "codex", [pr]))
+        claim.assert_not_called()
+        self.assertIn("9", json.loads((self.host.state / "owner-settle.json").read_text()))
+
+    def test_window_can_be_disabled(self):
+        pr = self.pr(age_s=5)
+        self.assertIsNone(lane.pr_events.owner_settling(pr, {}, self.NOW, settle_s=0))
+        self.assertGreater(lane.pr_events.owner_settling(pr, {}, self.NOW, settle_s=600), 500)
+
+
 class PrRecoveryCooldownTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

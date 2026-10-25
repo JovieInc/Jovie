@@ -12,8 +12,10 @@ It covers lanes, Codex, Conductor, Claude-scratch and manual `jovie-wt-*` checko
   has been idle for `idle_s`. Idle is the newest reflog entry or dirty-file mtime, never the
   directory mtime (git status and maintenance bump those).
 - Dirty or unpushed state is first committed off-index (`commit-tree`, no hooks, the
-  checkout is untouched) and pushed as `refs/jovie-preserved/sweep/<host>/<name>-<date>` (never a branch). If that push fails,
-  the checkout stays and loses only regenerable build output.
+  checkout is untouched) and pushed as `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>`
+  (never a branch). A snapshot that is not proven secret-free is not published and the
+  checkout stays untouched. If the push fails, the checkout stays and loses only
+  regenerable build output.
 - Preserved repairs (`.jovie-preserved-repair.json`) expire once their PR is closed or
   after `preserved_ttl_s`, through the same backup-then-remove path.
 """
@@ -219,8 +221,8 @@ def scan_snapshot(path: Path, run, remote: str, sha: str) -> str | None:
 
 def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
     """Snapshot the checkout (tracked + untracked, minus build output) to
-    refs/jovie-preserved/<prefix>/<name>-<date>; returns that full ref. Raises SnapshotHeld
-    when the snapshot is not proven secret-free (the ref is public)."""
+    refs/jovie-preserved/<prefix>/<name>-<date>-<snapshot>; returns that full ref.
+    Raises SnapshotHeld when the snapshot is not proven secret-free (the ref is public)."""
     head = git(path, run, "rev-parse", "HEAD").stdout.strip()
     if not head or not info["remote"]:
         return None
@@ -248,8 +250,14 @@ def backup(path: Path, info: dict, run, prefix: str, date: str) -> str | None:
     name = path.name if path.name not in {"Jovie", "LogYourBody"} else f"{path.parent.name}-{path.name}"
     if held := scan_snapshot(path, run, info["remote"], sha):
         raise SnapshotHeld(name, held)
-    ref = f"{PRESERVED_REF}{prefix}/{re.sub(r'[^A-Za-z0-9._-]', '-', name)}-{date}"
-    pushed = git(path, run, "push", "--force", "-q", info["remote"], f"{sha}:{ref}", timeout=900)
+    # Leave room for the date, snapshot and Git's ref lock suffix on long checkout names.
+    name = re.sub(r"[^A-Za-z0-9._-]", "-", name)[:160]
+    ref = f"{PRESERVED_REF}{prefix}/{name}-{date}-{sha}"
+    # Same-named checkouts and repeated sweeps must never overwrite an earlier snapshot.
+    # The empty expected value permits only creation (or an already identical ref),
+    # including when another writer races this push. Normal pre-push hooks still run.
+    pushed = git(path, run, "push", "-q", f"--force-with-lease={ref}:", info["remote"],
+                 f"{sha}:{ref}", timeout=900)
     return ref if pushed.returncode == 0 else None
 
 

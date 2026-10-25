@@ -1350,6 +1350,32 @@ def pr_breaker_open(host, number: int, now: float) -> bool:
         return False
 
 
+# Owner quiet window. A non-lane writer (Tim's sessions, Cursor, bots) was still pushing while a
+# lane repaired the PR in 111 of 199 cancelled fix runs (Gem ledger, 3.5 days to 2026-10-25,
+# 21 agent-hours): `target-head-superseded` by a push the lane could not see coming. The
+# head commit age at dispatch measures the owner cadence: 73 of those 112 cancels started
+# within 30 min of the head being pushed, against 59 of 148 productive runs, which only wait.
+OWNER_SETTLE_S = int(os.environ.get("LANES_OWNER_SETTLE_S", "1800"))
+
+
+def owner_settling(pr: dict, record: dict, now: float, settle_s: int | None = None) -> float | None:
+    """Seconds left of the owner's quiet window, else None. Pure: callers log the deferral.
+
+    Only a non-lane branch settles: a lane's own PR is pushed by lanes, whose claims already
+    arbitrate. A head the lane itself pushed never settles, and a PR with no readable head
+    commit time is never deferred (no evidence is not an owner)."""
+    settle_s = OWNER_SETTLE_S if settle_s is None else settle_s
+    if settle_s <= 0 or LANE_BRANCH.match(pr.get("headRefName") or ""):
+        return None
+    if pr.get("headRefOid") and pr.get("headRefOid") == record.get("pushedHead"):
+        return None
+    pushed = iso_ts(pr.get("lastCommitAt"))
+    if pushed is None:
+        return None
+    left = min(pushed + settle_s - now, settle_s)
+    return left if left > 0 else None
+
+
 def terminal_reason(pr: dict, record: dict, max_attempts: int, *, allow_reentry: bool = False) -> str | None:
     """Observation never consumes exhaustion. Only a repair claim may receipt a proven new head."""
     sha = pr.get("headRefOid")
@@ -1584,6 +1610,9 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
 
         if spent(record, pr["headRefOid"], lane.MAX_FIX_ATTEMPTS) or in_flight(record, pr, now):
             continue
+        if (left := owner_settling(pr, record, now)) is not None:
+            lane.note_owner_settle(host, pr, left, now)
+            continue  # The writer is still pushing; the head's checks restart on every push.
         if pr_breaker_open(host, pr["number"], now):
             continue  # 3 unproductive runs in 24h across heads: one factory signal is filed instead
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
