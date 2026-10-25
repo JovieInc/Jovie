@@ -338,7 +338,12 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
   assert.match(workflow, /types: \[opened, edited, synchronize, labeled/);
   assert.match(workflow, /merge_group:/);
   assert.doesNotMatch(workflow, /continue-on-error:/);
-  assert.match(workflow, /exit 0/);
+  // One evidence read for warnings and enforcement, not two.
+  assert.equal(
+    (workflow.match(/run: node scripts\/pr-fleet-rules\.mjs/g) ?? []).length,
+    1
+  );
+  assert.match(workflow, /pr-fleet-rules\.mjs --with-warnings/);
   assert.doesNotMatch(workflow, /secrets\.|: write/);
 });
 
@@ -350,7 +355,12 @@ test('CLI warning mode always returns zero, even when evidence or policy fails',
   try {
     writeFileSync(path, JSON.stringify(event));
     assert.equal(
-      await main({ args: [], env, request: api(pr()), log: x => logs.push(x) }),
+      await main({
+        args: [],
+        env,
+        request: api(pr()),
+        log: x => logs.push(x),
+      }),
       0
     );
     assert.equal(
@@ -399,6 +409,149 @@ test('CLI warning mode always returns zero, even when evidence or policy fails',
       await main({ args: ['--warnings-only'], env, log: x => logs.push(x) }),
       0
     );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('quota or outage evidence failures hold once, then defer with the relay marker and never pass', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-quota-'));
+  const path = join(dir, 'event.json');
+  const env = { GITHUB_EVENT_PATH: path };
+  const quota = (retryAt = null, failure = 'primary') =>
+    Object.assign(new Error('github exhausted: secret detail'), {
+      failure,
+      retryAt,
+      exitCode: 75,
+    });
+  const T0 = 1_000_000_000_000;
+  try {
+    writeFileSync(path, JSON.stringify(event));
+    // Reset inside the hold budget: wait once, then read the evidence.
+    {
+      const logs = [];
+      const sleeps = [];
+      let reads = 0;
+      const inner = api(pr());
+      const request = async (...args) => {
+        if (reads++ === 0) throw quota(T0 + 30_000);
+        return inner(...args);
+      };
+      assert.equal(
+        await main({
+          args: ['--with-warnings'],
+          env,
+          request,
+          log: x => logs.push(x),
+          now: () => T0,
+          sleep: async ms => sleeps.push(ms),
+        }),
+        0
+      );
+      assert.deepEqual(sleeps, [31_000]);
+      assert.match(logs[0], /^::notice title=GitHub API hold::/);
+    }
+    // Default clock and sleep: a reset that already passed holds zero seconds.
+    {
+      let reads = 0;
+      const inner = api(pr());
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async (...args) => {
+            if (reads++ === 0) throw quota(Date.now() - 5_000);
+            return inner(...args);
+          },
+          log: () => {},
+        }),
+        0
+      );
+    }
+    // Reset past the budget, a second failure, or no reset time: distinct
+    // transient status, marker for the relay, no secret detail, never pass.
+    for (const [label, retryAt] of [
+      ['reset past the budget', T0 + 3_000_000],
+      ['unknown reset', null],
+    ]) {
+      const logs = [];
+      const sleeps = [];
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async () => {
+            throw quota(retryAt);
+          },
+          log: x => logs.push(x),
+          now: () => T0,
+          sleep: async ms => sleeps.push(ms),
+        }),
+        75,
+        label
+      );
+      assert.deepEqual(sleeps, [], label);
+      assert.match(logs.at(-1), /github-quota-deferred/);
+      assert.doesNotMatch(logs.at(-1), /secret detail/);
+    }
+    {
+      const logs = [];
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async () => {
+            throw quota(T0 + 1_000, 'transient');
+          },
+          log: x => logs.push(x),
+          now: () => T0,
+          sleep: async () => {},
+        }),
+        75
+      );
+      assert.match(logs.at(-1), /github-quota-deferred/);
+    }
+    // A real policy red or an unclassified read failure keeps the old status.
+    {
+      const logs = [];
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async () => {
+            throw new Error('malformed');
+          },
+          log: x => logs.push(x),
+        }),
+        1
+      );
+      assert.doesNotMatch(logs.at(-1), /github-quota-deferred/);
+    }
+    // Warning-only mode never blocks, even on quota.
+    assert.equal(
+      await main({
+        args: ['--warnings-only'],
+        env,
+        request: async () => {
+          throw quota();
+        },
+        log: () => {},
+      }),
+      0
+    );
+    // --with-warnings prints the warning and still enforces the error.
+    const logs = [];
+    assert.equal(
+      await main({
+        args: ['--with-warnings'],
+        env,
+        request: api(pr({ title: 'fix: broken', body: '' })),
+        log: x => logs.push(x),
+      }),
+      1
+    );
+    assert.ok(logs.some(x => x.startsWith('::warning::blast-radius')));
+    assert.ok(logs.some(x => x.startsWith('::error::red-before-green')));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
