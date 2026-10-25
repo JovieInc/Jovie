@@ -7,7 +7,8 @@ from pathlib import Path
 
 
 def atomic_write_text(path, text: str, encoding: str = "utf-8") -> None:
-    path = Path(path)
+    # A symlinked state file must keep pointing at its target: replace the target, never the link.
+    path = Path(os.path.realpath(path))
     staged = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     try:
         staged.write_text(text, encoding=encoding)

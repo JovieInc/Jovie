@@ -82,5 +82,29 @@ class AtomicStateGuardTest(unittest.TestCase):
                 atomic_write_text(missing, "x")
 
 
+    def test_a_symlinked_state_file_keeps_its_link_and_the_target_is_replaced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            real = Path(tmp) / "elsewhere" / "state.json"
+            real.parent.mkdir()
+            real.write_text("old")
+            link = Path(tmp) / "state.json"
+            link.symlink_to(real)
+            atomic_write_text(link, "new")
+            self.assertTrue(link.is_symlink())
+            self.assertEqual(link.resolve(), real.resolve())
+            self.assertEqual(real.read_text(), "new")
+            self.assertEqual(sorted(p.name for p in Path(tmp).iterdir()), ["elsewhere", "state.json"])
+            self.assertEqual([p.name for p in real.parent.iterdir()], ["state.json"])
+
+    def test_a_symlinked_directory_receives_the_write_inside_the_real_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            real_dir = Path(tmp) / "release"
+            real_dir.mkdir()
+            (Path(tmp) / "current").symlink_to(real_dir, target_is_directory=True)
+            atomic_write_text(Path(tmp) / "current" / "x.json", "{}")
+            self.assertEqual((real_dir / "x.json").read_text(), "{}")
+            self.assertTrue((Path(tmp) / "current").is_symlink())
+
+
 if __name__ == "__main__":
     unittest.main()
