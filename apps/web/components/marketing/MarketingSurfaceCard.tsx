@@ -79,30 +79,20 @@ export function MarketingSurfaceCard({
       }
       className={cn(
         'marketing-rounded-frame relative',
-        resolvedChrome === 'framed' && 'border backdrop-blur-sm',
+        resolvedChrome === 'framed' && 'border ds-glass',
         VARIANT_CLASS_NAMES[variant],
         className
       )}
       style={aspectRatio ? { aspectRatio } : undefined}
     >
-      <div
-        aria-hidden='true'
-        className={cn(
-          'pointer-events-none absolute inset-0',
-          GLOW_CLASS_NAMES[glowTone]
-        )}
-      />
-      {resolvedChrome === 'framed' ? (
-        <>
-          <div
-            aria-hidden='true'
-            className='pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.55),transparent)]'
-          />
-          <div
-            aria-hidden='true'
-            className='pointer-events-none absolute inset-px rounded-[inherit] border border-white/6'
-          />
-        </>
+      {resolvedChrome === 'full-bleed' ? (
+        <div
+          aria-hidden='true'
+          className={cn(
+            'pointer-events-none absolute inset-0',
+            GLOW_CLASS_NAMES[glowTone]
+          )}
+        />
       ) : null}
 
       {label || stateLabel ? (
@@ -145,10 +135,12 @@ export function MarketingSurfaceCard({
         </div>
       ) : null}
 
-      <div
-        aria-hidden='true'
-        className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent_24%,transparent_74%,rgba(0,0,0,0.18))]'
-      />
+      {resolvedChrome === 'full-bleed' ? (
+        <div
+          aria-hidden='true'
+          className='pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),transparent_24%,transparent_74%,rgba(0,0,0,0.18))]'
+        />
+      ) : null}
     </div>
   );
 }
