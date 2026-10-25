@@ -208,7 +208,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'signup',
     route: '/signup',
     source: 'apps/web/lib/billing/offer-truth.ts',
-    copy: 'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.',
+    copy: 'Your Jovie profile stays free forever and keeps audience capture.',
     nature: 'offer',
     capabilityIds: ['public-profile'],
   },

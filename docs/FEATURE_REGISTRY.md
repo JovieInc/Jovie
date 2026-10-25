@@ -101,7 +101,6 @@ create rollout flags, billing entitlements, or admin certification items.
 | AI Assistant | Merch creation tools | Shipped (internal v1 default-on) | Trial/Pro/Max | Former key: `merch_mvp` | Entitlement-backed (`canAccessMerchCreation`); generates exactly 3 deterministic production-art options |
 | AI Connectors | Gmail booking email to Google Calendar auto-add | Shipped (internal v1 default-on) | Internal team | Former key: `ai_connectors_beta` | Product rollout flag defaults on |
 | Mobile App | iOS internal TestFlight app | Shipped | Authenticated users | None | Internal v1 install access; public marketing remains off |
-| Brand | Remove Jovie branding | Shipped | Pro+ | None | Entitlement-backed (`canRemoveBranding`) |
 | Growth (Coming Soon) | A/B testing | Planned | Growth | None | Smart link variant testing |
 | Growth (Coming Soon) | Automated follow-ups | Planned | Growth | None | Auto-follow-up emails to fans |
 | Growth (Coming Soon) | Catalog monitoring | Planned | Growth | None | Monitor catalog across DSPs |
