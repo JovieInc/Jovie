@@ -36,7 +36,18 @@ export function journeysRequired(range) {
   if (!range || range.schema !== 'jovie.release-range-risk/v1') return true;
   if (range.unknown === true) return true;
   const a = range.affects ?? {};
-  return a.auth === true || a.billing === true || a.unknown === true;
+  // Every golden-path surface is a promotion input: sign-in, billing, the
+  // public profile and release pages, the proxy that routes them, and the
+  // database that holds the claim. Docs-, tests- and tooling-only ranges stay
+  // exempt because they grade as none of these.
+  return (
+    a.auth === true ||
+    a.billing === true ||
+    a.publicUi === true ||
+    a.proxy === true ||
+    a.database === true ||
+    a.unknown === true
+  );
 }
 
 function validateEvidence(ev, journey, range, nowMs, freshnessMs) {

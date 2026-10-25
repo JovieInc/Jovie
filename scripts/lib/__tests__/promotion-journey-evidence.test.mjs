@@ -99,6 +99,13 @@ describe('promotion journey gate: deliberate-red failures', () => {
     expect(run([], range({}, { unknown: true })).decision).toBe('blocked');
     expect(run([], range({ auth: true })).decision).toBe('blocked');
   });
+  it.each(['publicUi', 'proxy', 'database'])(
+    'blocks a %s range without exact-SHA journey evidence (golden path is a promotion input)',
+    surface => {
+      expect(run([], range({ [surface]: true })).decision).toBe('blocked');
+      expect(run(set(), range({ [surface]: true })).decision).toBe('pass');
+    }
+  );
   it('blocks a missing or malformed range artifact', () => {
     expect(run(set(), null).decision).toBe('blocked');
   });
