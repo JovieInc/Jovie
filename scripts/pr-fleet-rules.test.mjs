@@ -341,7 +341,15 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
   // Required enforcement reads the evidence status; the key never lives here.
   const readyJob = source.slice(source.indexOf('\n  ready:'));
   assert.match(readyJob, /name: Require fleet-rule evidence/);
-  assert.match(readyJob, /context == "Fleet Rules Evidence"/);
+  // Trust the evidence workflow's runs (only main's copy can produce them),
+  // never a commit status any branch could post.
+  assert.match(readyJob, /fleet-rules-evidence\.yml\/runs\?head_sha=/);
+  assert.match(readyJob, /event=pull_request_target/);
+  assert.doesNotMatch(readyJob, /\/statuses/);
+  assert.match(
+    readyJob,
+    /EVENT_UPDATED_AT: \$\{\{ github\.event\.pull_request\.updated_at \}\}/
+  );
   assert.doesNotMatch(source, /pr-fleet-rules\.mjs/);
   assert.doesNotMatch(readyJob, /create-github-app-token|CI_APP/);
   assert.match(workflow, /types: \[opened, edited, synchronize, labeled/);
@@ -357,39 +365,82 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
 });
 
 const WORKFLOWS_DIR = '.github/workflows';
+const workflowFiles = () =>
+  readdirSync(WORKFLOWS_DIR).filter(f => /\.ya?ml$/.test(f));
 const triggersOf = text => {
-  const from = text.slice(text.search(/^on:/m) + 3);
+  const start = text.search(/^["']?on["']?:/m);
+  const from = text.slice(start).replace(/^["']?on["']?:/, '');
   const next = from.search(/^\S/m);
-  const on = next < 0 ? from : from.slice(0, next);
-  return new Set([...on.matchAll(/^ {2}([a-z_]+):/gm)].map(m => m[1]));
+  const block = next < 0 ? from : from.slice(0, next);
+  // Block form (`  pull_request:`), inline list (`[a, b]`) or scalar (`on: a`).
+  const keys = [...block.matchAll(/^ {2}([a-z_]+):/gm)].map(m => m[1]);
+  const inline = block.match(/^\s*\[?([a-z_,\s]+)\]?\s*$/m)?.[1] ?? '';
+  return new Set([...keys, ...inline.split(/[,\s]+/).filter(Boolean)]);
 };
+// Triggers that execute the PR branch's own copy of the workflow with secrets.
+const BRANCH_CODE_TRIGGERS = [
+  'pull_request',
+  'pull_request_review',
+  'pull_request_review_comment',
+];
 
-test('contract: the CI App private key is never referenced by a pull_request-triggered workflow', () => {
-  // pull_request runs the PR branch's own copy of the workflow with secrets
-  // for same-repo branches, so any branch could edit it to print the key. Base
-  // code only: pull_request_target, workflow_run, merge_group, push, schedule.
-  // fork-pr-gate.yml predates this contract and is tracked debt (its
-  // pull_request trigger overlaps pull_request_target): remove it from the
-  // allowlist when that trigger goes. The list may only shrink.
-  const KNOWN_DEBT = new Set(['fork-pr-gate.yml']);
-  const offenders = [];
-  for (const name of readdirSync(WORKFLOWS_DIR).filter(f =>
-    f.endsWith('.yml')
-  )) {
+test('contract: no app private key is referenced by a workflow that runs the PR branch copy', () => {
+  // Any same-repo branch can edit such a workflow to print the key, and an app
+  // key mints full-installation tokens. Base code only: pull_request_target,
+  // workflow_run, merge_group, push, schedule. These files predate the
+  // contract and are tracked debt; the list may only shrink.
+  const KNOWN_DEBT = new Map([
+    ['fork-pr-gate.yml', 'CI_APP_PRIVATE_KEY'],
+    ['lane-fix-relay.yml', 'SYMPHONY_APP_PRIVATE_KEY'],
+    ['source-validation.yml', 'JOVIE_BOT_PRIVATE_KEY'],
+  ]);
+  const found = new Map();
+  for (const name of workflowFiles()) {
     const text = readFileSync(join(WORKFLOWS_DIR, name), 'utf8');
-    if (triggersOf(text).has('pull_request') && /CI_APP_PRIVATE_KEY/.test(text))
-      offenders.push(name);
+    const triggers = triggersOf(text);
+    if (!BRANCH_CODE_TRIGGERS.some(t => triggers.has(t))) continue;
+    const keys = [
+      ...new Set(text.match(/secrets\.[A-Z0-9_]*PRIVATE_KEY/g) ?? []),
+    ].map(k => k.replace('secrets.', ''));
+    if (keys.length) found.set(name, keys.join(','));
   }
-  assert.deepEqual(
-    offenders.filter(name => !KNOWN_DEBT.has(name)),
-    [],
-    'move the CI App token mint into a pull_request_target/workflow_run workflow'
+  const fresh = [...found].filter(
+    ([name, keys]) => KNOWN_DEBT.get(name) !== keys
   );
-  for (const name of KNOWN_DEBT)
+  assert.deepEqual(
+    fresh,
+    [],
+    'move the token mint into a pull_request_target/workflow_run workflow'
+  );
+  for (const name of KNOWN_DEBT.keys())
     assert.ok(
-      offenders.includes(name),
-      `${name} no longer references the key from a pull_request workflow: drop it from KNOWN_DEBT`
+      found.has(name),
+      `${name} no longer exposes a key to branch code: drop it from KNOWN_DEBT`
     );
+  // CI_APP_PRIVATE_KEY specifically: only the Fork PR Gate debt remains.
+  assert.deepEqual(
+    [...found]
+      .filter(([, keys]) => keys.includes('CI_APP_PRIVATE_KEY'))
+      .map(([n]) => n),
+    ['fork-pr-gate.yml']
+  );
+});
+
+test('contract: triggersOf reads block, inline and scalar forms', () => {
+  assert.deepEqual(
+    [
+      ...triggersOf(
+        'name: x\non:\n  pull_request:\n    types: [a]\n  group: y\njobs: {}'
+      ),
+    ].sort(),
+    ['group', 'pull_request']
+  );
+  assert.ok(
+    triggersOf('on: [pull_request, push]\njobs: {}').has('pull_request')
+  );
+  assert.ok(
+    triggersOf('on: pull_request_review\njobs: {}').has('pull_request_review')
+  );
 });
 
 test('contract: Fleet Rules Evidence is base-branch code only and never hands the key to setup-node', () => {
@@ -409,11 +460,16 @@ test('contract: Fleet Rules Evidence is base-branch code only and never hands th
     /permission-contents: read\n\s+permission-pull-requests: read/
   );
   assert.doesNotMatch(text, /permission-[a-z-]+: write/);
-  // The only checkout is main, sparse, without persisted credentials.
-  assert.equal((text.match(/actions\/checkout@/g) ?? []).length, 1);
-  assert.match(
-    text,
-    /ref: main\n\s+fetch-depth: 1\n\s+persist-credentials: false\n\s+sparse-checkout:/
+  // Every checkout is main, sparse, without persisted credentials.
+  const checkouts = (text.match(/actions\/checkout@/g) ?? []).length;
+  assert.ok(checkouts >= 1);
+  assert.equal(
+    (
+      text.match(
+        /ref: main\n\s+fetch-depth: 1\n\s+persist-credentials: false\n\s+sparse-checkout:/g
+      ) ?? []
+    ).length,
+    checkouts
   );
   assert.doesNotMatch(text, /github\.event\.pull_request\.head\.(ref|repo)/);
   // setup-node keeps its default token; the minted token never reaches it.
@@ -433,12 +489,11 @@ test('verdict script maps exit codes to statuses and never turns a deferral into
   const dir = mkdtempSync(join(tmpdir(), 'fleet-verdict-'));
   try {
     mkdirSync(join(dir, 'scripts'));
-    mkdirSync(join(dir, 'bin'));
     const posts = join(dir, 'posts.log');
+    // Stand-in for packages/api-client/cli.ts: records the gh arguments.
     writeFileSync(
-      join(dir, 'bin', 'gh'),
-      `#!/usr/bin/env bash\necho "$*" >> "${posts}"\n`,
-      { mode: 0o755 }
+      join(dir, 'client.mjs'),
+      `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(posts)}, process.argv.slice(2).join(' ') + '\\n');\n`
     );
     const run = (code, lines) => {
       writeFileSync(posts, '');
@@ -453,7 +508,8 @@ test('verdict script maps exit codes to statuses and never turns a deferral into
           cwd: dir,
           encoding: 'utf8',
           env: {
-            PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
+            PATH: process.env.PATH,
+            API_CLIENT: join(dir, 'client.mjs'),
             GH_TOKEN: 'gh-token-value',
             FLEET_TOKEN: 'app-token-value',
             REPOSITORY: 'o/r',
@@ -470,9 +526,12 @@ test('verdict script maps exit codes to statuses and never turns a deferral into
     };
     const green = run(0, '');
     assert.equal(green.status, 0);
-    assert.match(green.posts, /statuses\/a{40} .*state=success/);
+    assert.match(
+      green.posts,
+      /gh --priority merge -- api -X POST repos\/o\/r\/statuses\/a{40} .*state=success/
+    );
     const red = run(1, '::error::red-before-green: add a command');
-    assert.equal(red.status, 0);
+    assert.equal(red.status, 1);
     assert.match(
       red.posts,
       /state=failure.*description=red-before-green: add a command/

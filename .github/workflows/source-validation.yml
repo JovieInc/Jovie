@@ -693,6 +693,9 @@ jobs:
     if: ${{ always() }}
     needs: [deterministic, security, migration, coverage, unit, a11y]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Require every source proof
         env:
@@ -700,11 +703,14 @@ jobs:
         run: test "$RESULTS" = 'success,success,success,success,success,success'
       # Fleet-rule evidence is read by .github/workflows/fleet-rules-evidence.yml
       # (pull_request_target: base-branch code only, so no PR branch can reach
-      # the CI App key) on the dedicated CI App installation budget, then
-      # posted as the "Fleet Rules Evidence" commit status. One status read here
-      # on github.token. Missing or deferred evidence fails with the
-      # github-quota-deferred marker; the evidence workflow re-runs this
-      # workflow's failed jobs the moment it posts a verdict, so nothing polls.
+      # the CI App key) on the dedicated CI App installation budget. This step
+      # trusts that workflow's RUNS, never a commit status: any branch can post
+      # a status named anything, but only main's copy of the workflow can
+      # produce a pull_request_target run of fleet-rules-evidence.yml. The
+      # newest run for this head must have completed after this PR event
+      # (stale pre-edit verdicts read as missing). Missing, in-flight or
+      # deferred evidence exits 75 with github-quota-deferred; the evidence
+      # workflow re-runs this job when it finishes, so nothing polls.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ always() && github.event_name == 'pull_request' }}
         with:
@@ -725,15 +731,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_UPDATED_AT: ${{ github.event.pull_request.updated_at }}
         run: |
           set -euo pipefail
           [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Fleet rule evidence needs an exact head sha'; exit 1; }
-          row="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/commits/$HEAD_SHA/statuses?per_page=100" \
-            --jq '[.[] | select(.context == "Fleet Rules Evidence")] | sort_by(.created_at) | last // {state: "missing", description: ""} | "\(.state)\t\(.description)"')"
-          state="${row%%$'\t'*}"
-          description="${row#*$'\t'}"
-          case "$state" in
-            success) echo "Fleet rules passed: $description" ;;
-            failure) echo "::error::Fleet rules failed: $description (details in the Fleet Rules Evidence check)"; exit 1 ;;
-            *) echo "::error::Fleet rule evidence is $state (github-quota-deferred or not yet posted); not a verdict on this PR. It re-runs automatically when the evidence status posts."; exit 75 ;;
+          floor="$(date -u -d "$EVENT_UPDATED_AT" +%s)"
+          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
+          row="$(jq -r --argjson floor "$floor" '[.workflow_runs[] | select((.created_at | fromdateiso8601) >= ($floor - 10))] | sort_by(.created_at) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          IFS=$'\t' read -r status conclusion url <<<"$row"
+          case "$status/$conclusion" in
+            completed/success) echo "Fleet rules passed: $url" ;;
+            completed/failure) echo "::error::Fleet rules did not pass or were deferred (read the Fleet Rules Evidence run: $url)"; exit 1 ;;
+            *) echo "::error::Fleet rule evidence is ${status:-missing} (github-quota-deferred or not yet complete); not a verdict on this PR. It re-runs automatically when the evidence run finishes."; exit 75 ;;
           esac
