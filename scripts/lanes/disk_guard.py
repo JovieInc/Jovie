@@ -33,6 +33,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
 import worktree_pool  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 # One threshold (Gem 2026-10-12 04:12Z): autoscale stops growth at or below this free %, so the
 # sweep must already run there. At exactly 15% growth was blocked and nothing was reclaimed
@@ -440,7 +443,7 @@ def maybe_sweep(host, free: float | None, *, now: float | None = None,
     if now - last < SWEEP_INTERVAL_S:
         return "not-due"
     host.state.mkdir(parents=True, exist_ok=True)
-    stamp.write_text(json.dumps({"startedAt": now}))
+    atomic_write_text(stamp, json.dumps({"startedAt": now}))
     popen([sys.executable, str(Path(__file__).resolve()), "--state", str(host.state),
            "--repo", str(host.repo)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
           stderr=subprocess.DEVNULL, start_new_session=True)
@@ -516,7 +519,7 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
     report["reason"] = "disk-unobservable" if pct is None else "disk-critical" if report["critical"] else "disk-available"
     try:
         host.state.mkdir(parents=True, exist_ok=True)
-        (host.state / "disk-pressure.json").write_text(json.dumps(report, indent=1))
+        atomic_write_text(host.state / "disk-pressure.json", json.dumps(report, indent=1))
     except OSError:
         pass
     return report
