@@ -99,10 +99,8 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-node-pnpm
       # Body/label-dependent policy always runs, including exact-head proof reuse.
-      - name: Enforce PR fleet rules
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/pr-fleet-rules.mjs
+      # PR fleet rules are enforced in the `ready` job on the dedicated CI App
+      # installation budget, with no PR code in its workspace.
       - name: Validate performance policy source bindings
         run: node scripts/invariants/performance-factory.mjs
       - name: Measure actual installed source dependency graph
@@ -700,3 +698,43 @@ jobs:
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
         run: test "$RESULTS" = 'success,success,success,success,success,success'
+      # Fleet-rule evidence on the dedicated CI App installation's own REST
+      # budget, not the repo-wide GITHUB_TOKEN bucket every workflow shares
+      # (2026-10-24: that bucket ran dry and this gate went red on a dozen
+      # PRs). This job holds no PR code: the workspace is main's policy script
+      # and api-client only, and the token is read-only. A fork PR (no secrets)
+      # or failed mint falls back to github.token, so evidence is never
+      # skipped. Quota exhaustion exits 75 with a github-quota-deferred marker
+      # that the lane relay re-runs instead of queueing repair. It runs after
+      # the aggregate so ready's first step stays the exact-result check.
+      - name: Mint CI App read token for fleet evidence
+        id: fleet-token
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ always() }}
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/pr-fleet-rules.mjs
+            packages/api-client
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ always() }}
+        with:
+          node-version-file: .nvmrc
+          token: ${{ steps.fleet-token.outputs.token || github.token }}
+      - name: Enforce PR fleet rules
+        if: ${{ always() }}
+        env:
+          GITHUB_TOKEN: ${{ steps.fleet-token.outputs.token || github.token }}
+        run: node scripts/pr-fleet-rules.mjs --with-warnings

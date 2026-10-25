@@ -330,9 +330,26 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
     'utf8'
   );
   const workflow = readFileSync('.github/workflows/pr-fleet-rules.yml', 'utf8');
+  // Required enforcement runs in the PR Ready job (no PR code in its
+  // workspace) on the dedicated CI App installation budget, read-only scopes,
+  // with a github.token fallback for forks and failed mints.
+  const readyJob = source.slice(source.indexOf('\n  ready:'));
+  assert.match(readyJob, /create-github-app-token@/);
   assert.match(
+    readyJob,
+    /private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/
+  );
+  assert.equal((readyJob.match(/secrets\./g) ?? []).length, 1);
+  assert.match(readyJob, /permission-pull-requests: read/);
+  assert.match(readyJob, /ref: main/);
+  assert.doesNotMatch(readyJob, /github\.event\.pull_request\.head|: write/);
+  assert.match(
+    readyJob,
+    /GITHUB_TOKEN: \$\{\{ steps\.fleet-token\.outputs\.token \|\| github\.token \}\}\n\s+run: node scripts\/pr-fleet-rules\.mjs --with-warnings/
+  );
+  assert.doesNotMatch(
     source,
-    /name: Enforce PR fleet rules[\s\S]*?run: node scripts\/pr-fleet-rules.mjs/
+    /GITHUB_TOKEN: \$\{\{ github\.token \}\}\n\s+run: node scripts\/pr-fleet-rules/
   );
   assert.match(source, /needs: \[deterministic,/);
   assert.match(workflow, /types: \[opened, edited, synchronize, labeled/);
