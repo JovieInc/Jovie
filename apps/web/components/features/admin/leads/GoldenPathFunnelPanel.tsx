@@ -96,6 +96,15 @@ export function GoldenPathFunnelPanel({
                 minSample={report.minSample}
               />
             ))}
+            {report.stalledStages.length > 0 ? (
+              <p role='alert' className='text-app text-accent-red'>
+                No events this week despite upstream traffic:{' '}
+                {report.stalledStages
+                  .map(stage => STAGE_LABELS[stage] ?? stage)
+                  .join(', ')}
+                . The step is broken or not instrumented.
+              </p>
+            ) : null}
             {report.uninstrumented.length > 0 ? (
               <p className='text-app text-secondary-token'>
                 Not measured yet: {report.uninstrumented.join(', ')}.

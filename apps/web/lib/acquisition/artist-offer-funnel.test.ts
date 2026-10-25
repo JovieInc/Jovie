@@ -3,6 +3,7 @@ import {
   ARTIST_OFFER_FUNNEL_STAGES,
   buildArtistOfferFunnelReport,
   buildGoldenPathReport,
+  findStalledGoldenPathStages,
   GOLDEN_PATH_MIN_SAMPLE,
   GOLDEN_PATH_STAGES,
   isOfferLanding,
@@ -290,5 +291,62 @@ describe('golden-path funnel', () => {
     });
     expect(report.schema).toBe('jovie-artist-offer-funnel/v1');
     expect(report.goldenPath?.schema).toBe('jovie-golden-path-funnel/v1');
+  });
+});
+
+describe('golden-path weekly coverage invariant', () => {
+  const now = new Date('2026-10-25T12:00:00.000Z');
+  const recent = new Date('2026-10-24T12:00:00.000Z');
+  const journeys = (count: number, stages: Record<string, Date>) =>
+    Array.from({ length: count }, () => ({ ...stages }));
+
+  it('flags a stage with upstream traffic and zero events this week', () => {
+    // The sign-in stage read 0 while /start had real traffic.
+    const stalled = findStalledGoldenPathStages({
+      now,
+      visitsLast7d: 500,
+      timelines: journeys(GOLDEN_PATH_MIN_SAMPLE, { start: recent }),
+    });
+    expect(stalled).toContain('sign-in');
+    expect(stalled).not.toContain('start');
+  });
+
+  it('flags start when visits have traffic but no /start views', () => {
+    expect(
+      findStalledGoldenPathStages({ now, visitsLast7d: 100, timelines: [] })
+    ).toEqual(['start']);
+  });
+
+  it('stays quiet without upstream traffic or with fresh events', () => {
+    expect(
+      findStalledGoldenPathStages({ now, visitsLast7d: 5, timelines: [] })
+    ).toEqual([]);
+    const healthy = findStalledGoldenPathStages({
+      now,
+      visitsLast7d: 100,
+      timelines: journeys(GOLDEN_PATH_MIN_SAMPLE, {
+        start: recent,
+        'sign-in': recent,
+        claimed: recent,
+        'upgrade-viewed': recent,
+        checkout: recent,
+        paid: recent,
+      }),
+    });
+    expect(healthy).toEqual([]);
+  });
+
+  it('ignores events older than a week', () => {
+    const old = new Date('2026-10-01T00:00:00.000Z');
+    expect(
+      findStalledGoldenPathStages({
+        now,
+        visitsLast7d: 0,
+        timelines: journeys(GOLDEN_PATH_MIN_SAMPLE, {
+          start: recent,
+          'sign-in': old,
+        }),
+      })
+    ).toContain('sign-in');
   });
 });
