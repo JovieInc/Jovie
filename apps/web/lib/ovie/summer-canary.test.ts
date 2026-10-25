@@ -5,7 +5,7 @@ vi.mock('@/lib/ovie/summer-shadow-client', () => ({
   fetchSummerShadow: vi.fn(),
 }));
 
-import { runSummerCanary } from './summer-canary';
+import { readSummerTtftSummary, runSummerCanary } from './summer-canary';
 
 const sse = (...events: string[]) =>
   new Response(
@@ -76,5 +76,38 @@ describe('summer canary', () => {
         })
       ).ok
     ).toBe(false);
+  });
+});
+
+describe('published first-token percentiles', () => {
+  const metrics = (routes: unknown, status = 200) =>
+    (async () => Response.json({ routes }, { status })) as never;
+
+  it('reports p50/p95 per route against the 1.5 s / 3 s targets', async () => {
+    const summary = await readSummerTtftSummary(
+      metrics({
+        chat: { ok: 40, ttftMs: { p50: 1200, p95: 2800 } },
+        voice: { ok: 5, ttftMs: { p50: 6200, p95: 6500 } },
+        plan: { ok: 0, ttftMs: { p50: null, p95: null } },
+      }),
+      'p'
+    );
+    expect(summary).toEqual([
+      { route: 'chat', sample: 40, p50: 1200, p95: 2800, withinTarget: true },
+      { route: 'voice', sample: 5, p50: 6200, p95: 6500, withinTarget: false },
+      { route: 'plan', sample: 0, p50: null, p95: null, withinTarget: null },
+    ]);
+  });
+
+  it('returns null when the metrics read fails', async () => {
+    expect(await readSummerTtftSummary(metrics({}, 503), 'p')).toBeNull();
+    expect(
+      await readSummerTtftSummary(
+        (async () => {
+          throw new Error('net');
+        }) as never,
+        'p'
+      )
+    ).toBeNull();
   });
 });
