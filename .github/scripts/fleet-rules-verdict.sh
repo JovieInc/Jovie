@@ -9,7 +9,7 @@
 # No commit status is posted. It was informational (nothing read it) and it was
 # written with github.token, so an empty repo-wide GITHUB_TOKEN bucket turned a
 # verdict already read on the CI App budget into exit 75 (run 40164178818,
-# 2026-10-25 05:07Z: "github-quota-deferred: gh api -X primary"). Every
+# 2026-10-25 05:07Z: the github-quota-deferred warning on the status POST). Every
 # github.token call left here is best-effort and cannot change the verdict.
 set -uo pipefail
 
