@@ -28,6 +28,9 @@ import time
 from pathlib import Path
 
 import backlog_rank
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 READY_LABEL = "agent-ready"
 # Labels that mean a human decision, a human-owned task or a container: never auto-promoted.
@@ -323,7 +326,7 @@ def _factory_share(state: Path, now: float | None = None) -> float | None:
         except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
             share = None
     try:
-        cache.write_text(json.dumps({"at": now, "share": share}))
+        atomic_write_text(cache, json.dumps({"at": now, "share": share}))
     except OSError:
         pass
     return share

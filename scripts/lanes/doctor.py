@@ -37,6 +37,9 @@ import fleet_ledger  # noqa: E402  (claim ledger view, ready-work recorder)
 import factory_intake  # noqa: E402  (fleet-improvement signals -> agent-ready issues)
 import factory_signals  # noqa: E402  (recurring-alarm adapter)
 import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
@@ -1819,7 +1822,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         raise RuntimeError("status-gist-record-unavailable")
     full_text = json.dumps(feed, indent=1, ensure_ascii=False, allow_nan=False)
     body = host.state / "lanes-status.json"
-    body.write_text(full_text, encoding="utf-8")
+    atomic_write_text(body, full_text, encoding="utf-8")
     if body.read_bytes() != full_text.encode("utf-8"):
         raise RuntimeError("status-feed-evidence-readback-changed")
     public_text = public_status_projection(feed, full_text)
@@ -1841,7 +1844,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     elif not isinstance(record.get("id"), str) or not re.fullmatch(r"[a-f0-9]{1,64}", record["id"]):
         raise RuntimeError("status-gist-record-unavailable")
     packet_text = json.dumps(packet, ensure_ascii=False, allow_nan=False)
-    packet_path.write_text(packet_text, encoding="utf-8")
+    atomic_write_text(packet_path, packet_text, encoding="utf-8")
     lane.load_github_env()
 
     def api(endpoint, method, input_path=None):
@@ -1858,7 +1861,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
 
     if created_now:
         # An uncertain create must not create another gist on the next tick.
-        path.write_text(json.dumps({
+        atomic_write_text(path, json.dumps({
             "creationAttemptedAt": now_iso(),
             "payloadSha256": hashlib.sha256(packet_text.encode("utf-8")).hexdigest(),
         }), encoding="utf-8")
@@ -1872,7 +1875,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         except (ValueError, AttributeError):
             raise RuntimeError("status-gist-create-unconfirmed") from None
         # Retain the known identity even if subsequent readback is unavailable.
-        path.write_text(json.dumps(record), encoding="utf-8")
+        atomic_write_text(path, json.dumps(record), encoding="utf-8")
     else:
         api(f"gists/{record['id']}", "PATCH", packet_path)
 
@@ -1900,7 +1903,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         "publicFeedSha256": hashlib.sha256(public_text.encode("utf-8")).hexdigest(),
         **({"stageEventsSha256": stage_digest} if STAGE_EVENTS_NAME in packet["files"] else {}),
     })
-    path.write_text(json.dumps(record), encoding="utf-8")
+    atomic_write_text(path, json.dumps(record), encoding="utf-8")
     if created_now:
         try:
             lane.Linear(host.linear_env).comment(
