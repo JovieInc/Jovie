@@ -63,7 +63,7 @@ describe('CommandPalettePanel', () => {
 
     expect(screen.getByTestId('shared-command-palette')).toHaveAttribute(
       'data-committed-command',
-      'go-work'
+      'go-presence'
     );
     expect(screen.queryByText('Artists')).toBeNull();
   });
