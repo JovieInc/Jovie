@@ -48,18 +48,16 @@ function CohortTable({
         {cohort.stages.map(stage => (
           <li
             key={stage.stage}
-            className='grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 py-1.5 sm:grid-cols-[10rem_4rem_5rem_1fr]'
+            className='flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1.5'
           >
-            <span className='text-primary-token'>
+            <span className='w-40 shrink-0 text-primary-token'>
               {STAGE_LABELS[stage.stage] ?? stage.stage}
             </span>
-            <span className='text-right tabular-nums sm:text-left'>
-              {stage.journeys}
-            </span>
-            <span className='tabular-nums text-secondary-token'>
+            <span className='w-14 shrink-0 tabular-nums'>{stage.journeys}</span>
+            <span className='w-16 shrink-0 tabular-nums text-secondary-token'>
               {stage.stage === 'visit' ? '' : pct(stage.conversionFromPrevious)}
             </span>
-            <span className='col-span-2 text-secondary-token sm:col-span-1'>
+            <span className='min-w-0 flex-1 text-secondary-token'>
               {stage.stage === 'visit'
                 ? ''
                 : seconds(stage.fromPreviousSeconds)}
