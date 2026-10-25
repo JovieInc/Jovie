@@ -29,7 +29,8 @@ import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
  * 2. Dashboard loads with real data (not empty state)
  * 3. The LogYourBody iOS public client completes a real PKCE token exchange
  * 4. Userinfo, refresh-token rotation, and token revocation work
- * 5. Navigation between key tabs works
+ * 5. The identity owns a claimed profile that renders publicly
+ * 6. Navigation between key tabs works
  *
  * Max ~3min total. No golden path, no content gate, no admin tests.
  *
@@ -390,6 +391,32 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       page.context().request,
       expectedOrigin
     );
+
+    // Claim: the signed-in identity must own a claimed profile and that profile
+    // must be live on its public URL. A sign-in that lands on a dashboard with
+    // no claimed profile, or a claimed handle that 404s, breaks the artist
+    // golden path even though the dashboard shell renders.
+    const profileResponse = await page
+      .context()
+      .request.get(`${expectedOrigin}/api/dashboard/profile`);
+    expect(
+      profileResponse.status(),
+      'Signed-in identity must resolve its claimed profile'
+    ).toBe(200);
+    const claimedUsername = (
+      (await profileResponse.json()) as { profile?: { username?: unknown } }
+    ).profile?.username;
+    expect(typeof claimedUsername, 'Claimed profile has no handle').toBe(
+      'string'
+    );
+    expect(String(claimedUsername).length).toBeGreaterThan(0);
+    const publicResponse = await page
+      .context()
+      .request.get(`${expectedOrigin}/${claimedUsername}`);
+    expect(
+      publicResponse.status(),
+      `Claimed profile /${claimedUsername} must render publicly`
+    ).toBe(200);
 
     const tabs = [
       {

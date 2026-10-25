@@ -60,6 +60,10 @@ export const INVARIANT_PROPOSALS = {
     'Invariant: every public profile and release page advertises an og:image that returns 200 with an image content type.',
   'profile-interactions':
     'Invariant: the public profile tabs (Home, Music, Events, About) change the view, and Get Updates opens an email capture, with no page errors.',
+  'fan-subscribe-persists':
+    'Invariant: a fan can subscribe on a public profile through the rendered email and one-time-code flow and the subscription persists (status API).',
+  'fan-subscribe-cleanup':
+    'Invariant: every synthetic fan the dogfood agent creates (+dogfood- marker) is removed through the product unsubscribe API; stragglers are swept by cleanup-synthetic-audience.ts.',
   'dashboard-page-clean':
     'Invariant: every signed-in dashboard page (home, audience, releases, library, earnings, insights) loads for the sanctioned creator identity with content, no page errors and no same-origin 4xx/5xx, at desktop and phone widths.',
   'chat-surface-ready':
@@ -179,11 +183,12 @@ export const MISSIONS = [
     id: 'dogfood:fan-subscribe',
     subjectId: 'dashboard-audience',
     product: 'jov',
-    title: 'Fan subscribes on a profile and the contact persists',
-    checks: [],
-    automation: 'blocked',
+    title:
+      'Fan subscribes on a profile and the subscription persists, then is removed',
+    checks: ['fan-subscribe-persists', 'fan-subscribe-cleanup'],
+    automation: 'implemented',
     blocker:
-      'write path with no sanctioned fixture: needs a non-Tim synthetic profile, a synthetic-audience marker (scripts synthetic-audience-markers.ts) and a cleanup job',
+      'needs the synthetic mailbox secrets the signup canary uses (E2E_PROD_SIGNUP_EMAIL_BASE, E2E_PROD_MAILBOX_PROVIDER, E2E_PROD_OTP_CHECK_ORIGIN/TOKEN/URL) so the fan one-time code can be read',
     owner: 'audience lane',
   },
   {
@@ -195,7 +200,7 @@ export const MISSIONS = [
     checks: [],
     automation: 'blocked',
     blocker:
-      'no sanctioned admin identity: resolveProductionAuthCredentials() only accepts the creator-ready email. Needs secret E2E_PROD_ADMIN_USER_EMAIL (seeded browse-admin identity as admin in production) in Doppler jovie-web/prd plus allowing it in production-auth-credentials.ts',
+      'no sanctioned admin identity. This is an access change (an admin grant in production) and is the founder decision: seed browse-admin+clerk_test@jov.ie as admin, add E2E_PROD_ADMIN_USER_EMAIL to Doppler jovie-web/prd and allow it in production-auth-credentials.ts',
     owner: 'ovie stream',
   },
   {

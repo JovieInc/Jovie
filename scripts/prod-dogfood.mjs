@@ -56,6 +56,7 @@ import {
 import {
   expectationFor,
   reviewScreenshot,
+  selectVisionProvider,
   sumUsage,
   visionChecksFor,
 } from './lib/prod-dogfood-vision.mjs';
@@ -576,14 +577,16 @@ async function main() {
   }
 
   // 5d. Automated vision review of every screenshot (cheap model, confirmed findings only).
-  const visionKey = process.env.AI_GATEWAY_API_KEY ?? '';
+  const visionProvider = selectVisionProvider(process.env);
   let visionUsage = null;
   if (process.env.DOGFOOD_VISION === '0') {
     evidence.push(
       'vision review skipped: already reviewed for this deployed SHA'
     );
-  } else if (!visionKey) {
-    evidence.push('vision review not run: no AI_GATEWAY_API_KEY');
+  } else if (!visionProvider) {
+    evidence.push(
+      'vision review not run: no CLOUDFLARE_WORKERS_AI_TOKEN or AI_GATEWAY_API_KEY'
+    );
   } else {
     const max = Number(process.env.DOGFOOD_VISION_MAX ?? 24);
     const picked = shots.slice(0, max);
@@ -596,8 +599,7 @@ async function main() {
         bytes: readFileSync(path.join(outDir, shot.file)),
         expectation: withExpectation.expectation,
         viewport: shot.viewport,
-        apiKey: visionKey,
-        model: process.env.DOGFOOD_VISION_MODEL,
+        provider: visionProvider,
       });
       return { shot: withExpectation, review };
     });
@@ -610,7 +612,7 @@ async function main() {
     }
     visionUsage = sumUsage(reviews.map(r => r.review));
     evidence.push(
-      `vision review: ${picked.length} screenshots, ${visionUsage.calls} calls, ${visionUsage.prompt_tokens} prompt + ${visionUsage.completion_tokens} completion tokens`
+      `vision review (${visionProvider.id}): ${picked.length} screenshots, ${visionUsage.calls} calls, ${visionUsage.prompt_tokens} prompt + ${visionUsage.completion_tokens} completion tokens, $${visionUsage.usd.toFixed(5)} (${(visionUsage.usd / Math.max(picked.length, 1)).toFixed(6)} per verdict)`
     );
   }
 

@@ -108,6 +108,25 @@ jobs:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
 
+      # Synthetic mailbox for the fan-subscribe journey (same names the signup canary
+      # uses; GitHub secret wins, Doppler jovie-web/prd is the fallback; never printed).
+      - name: Resolve synthetic mailbox secrets
+        if: ${{ steps.seen.outputs.cache-hit != 'true' }}
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          E2E_PROD_MAILBOX_PROVIDER: ${{ secrets.E2E_PROD_MAILBOX_PROVIDER }}
+          E2E_PROD_OTP_CHECK_ORIGIN: ${{ secrets.E2E_PROD_OTP_CHECK_ORIGIN }}
+          E2E_PROD_OTP_CHECK_TOKEN: ${{ secrets.E2E_PROD_OTP_CHECK_TOKEN }}
+          E2E_PROD_OTP_CHECK_URL: ${{ secrets.E2E_PROD_OTP_CHECK_URL }}
+          E2E_PROD_SIGNUP_EMAIL_BASE: ${{ secrets.E2E_PROD_SIGNUP_EMAIL_BASE }}
+        run: |
+          node .github/scripts/resolve-synthetic-secrets.mjs \
+            --name E2E_PROD_MAILBOX_PROVIDER \
+            --name E2E_PROD_OTP_CHECK_ORIGIN \
+            --name E2E_PROD_OTP_CHECK_TOKEN \
+            --name E2E_PROD_OTP_CHECK_URL \
+            --name E2E_PROD_SIGNUP_EMAIL_BASE
+
       # Authenticated journeys: the sanctioned seeded creator-ready identity and
       # production OTP source the post-deploy auth smoke already uses (same
       # Doppler jovie-web/prd secrets; values are never printed). READ-ONLY.
@@ -140,6 +159,9 @@ jobs:
         id: run
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          # Cheapest passing vision provider wins (see prod-dogfood-vision.mjs): Workers AI
+          # credits when the token exists, else the allowlisted Gateway model.
+          CLOUDFLARE_WORKERS_AI_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_AI_TOKEN }}
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           DOGFOOD_VISION: ${{ steps.vision-seen.outputs.cache-hit == 'true' && '0' || '1' }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
