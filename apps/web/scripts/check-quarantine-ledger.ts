@@ -19,6 +19,15 @@ function main() {
   if (!isQuarantineLedgerValid(parsed)) {
     process.exit(1);
   }
+
+  // An expired entry no longer buys extra retries, so it is dead weight that
+  // hides an unfixed flake. Fix the test or remove the entry.
+  if (parsed.summary.expiredCount > 0) {
+    console.error(
+      `Quarantine ledger has ${parsed.summary.expiredCount} expired entries; fix the test or remove the entry.`
+    );
+    process.exit(1);
+  }
 }
 
 main();
