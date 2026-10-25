@@ -73,6 +73,7 @@ import credentials_spend  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
+import pr_body  # noqa: E402  (one PR-body builder for every lane PR path)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
@@ -137,7 +138,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py"]
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_pr_body.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
@@ -3520,6 +3521,62 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     return receipt
 
 
+def changed_files(worktree: Path) -> list[str]:
+    out = sh(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=worktree)
+    return [line for line in out.stdout.splitlines() if line.strip()] if out.returncode == 0 else []
+
+
+def lane_pr_body(issue, branch: str, worktree: Path, log, *, existing: str | None = None,
+                 pr: dict | None = None):
+    """Body for a lane-opened (or fix-refreshed) Jovie PR, built by pr_body from lane facts.
+    The first failing run is produced here (the PR's changed tests, run on origin/main) when
+    absent; whatever cannot be produced comes back as `actions`, logged and never faked."""
+    files = changed_files(worktree)
+    if pr is not None:
+        title = pr.get("title") or ""
+    else:
+        title = f"fix: {issue.title[:80]} ({issue.identifier})"
+    labels = pr_events.label_names(pr) if pr else []
+    red = pr_body.failing_run_evidence(pr, REPO_SLUG) if pr else None
+    reason = "pr-check-run"
+    if red is None and pr_body.is_repair(title, labels) and not pr_body.exempt(files, labels):
+        modules = Path.home() / "codex-worktrees" / "opus-lanes-inv" / "node_modules"
+        try:
+            red, reason = pr_body.capture_red(sh, worktree, "origin/main",
+                                              [f for f in files if pr_body.TEST_FILE.search(f)], modules=modules)
+        except (subprocess.SubprocessError, OSError):
+            red, reason = None, "red-capture-error"
+    if existing is None:
+        built = pr_body.build_body(title=title, identifier=issue.identifier, issue_id=issue.id, files=files,
+                                   lane_note="Lane implementation; verification by the lane gate. "
+                                             "Runtime and commissioning acceptance remain with the issue owner.",
+                                   red=red)
+    else:
+        built = pr_body.refresh_body(existing, title=title, files=files, labels=labels, red=red)
+    if log is not None:
+        log.write(f"== pr-body: red={'yes' if red else 'no'} ({reason}) actions={built.actions}\n")
+    return built
+
+
+def refresh_pr_body(pr: dict, worktree: Path, log, issue=None) -> list[str]:
+    """Bring an existing lane PR's body up to the fleet rules; returns the still-open actions.
+    Never touches a held PR; edits only when the body actually changes."""
+    if {l.lower() for l in pr_events.label_names(pr)} & pr_body.HOLD_LABELS:
+        return []
+    view = sh(["gh", "pr", "view", str(pr["number"]), "--repo", REPO_SLUG, "--json", "body,title"], log=log)
+    try:
+        current = json.loads(view.stdout) if view.returncode == 0 else None
+    except ValueError:
+        current = None
+    if not isinstance(current, dict) or not isinstance(current.get("body"), str):
+        return ["pr-body-unreadable"]
+    built = lane_pr_body(issue, pr.get("headRefName", ""), worktree, log, existing=current["body"],
+                         pr={**pr, "title": current.get("title") or pr.get("title")})
+    if built.body.strip() != current["body"].strip():
+        sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG, "--body", built.body], log=log)
+    return built.actions
+
+
 def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, started: float,
                     opened: bool = False, sensitive: bool = False) -> dict:
     """Independent of the agent's own claim: find its PR, re-derive the diff, run checks, then land."""
@@ -3568,13 +3625,10 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         # The push's own hooks can take minutes; a stop during them still bars the PR open.
         require_publishable(host, branch, "before-pr-create")
         try:
+            built = lane_pr_body(issue, branch, worktree, log)
             sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
                 "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
-                "--body", f"Refs {issue.identifier}.\n\n"
-                f"<!-- linear-issue-id:{issue.id} -->\n"
-                f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
-                "Lane implementation; verification by the lane gate. "
-                "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
+                "--body", built.body], cwd=worktree, log=log)
         except (subprocess.TimeoutExpired, OSError):
             pass  # A create may have landed remotely; reconcile once, never resend.
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
@@ -3585,6 +3639,10 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
             "--color", "B60205", "--description", "Guarded auth/billing/infra lane policy"], log=log)
         sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG,
             "--add-label", SENSITIVE_PR_LABEL], log=log)
+    try:
+        refresh_pr_body(pr, worktree, log, issue=issue)
+    except (subprocess.SubprocessError, OSError):
+        pass  # body upkeep never blocks the gate; the fleet-rules check still reports
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
@@ -5937,6 +5995,10 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
         "  `## Premise check` (Assumption / Falsifying test / Result). A retry is not a falsifier.",
         "- For bug fixes and CI repairs, retain pre-fix red evidence in `## Red-before-green`:",
         "  Failing command plus a red-output snippet or Failing run (before fix) URL.",
+        "- Keep the PR body current on every push (`scripts/lanes/pr_body.py` documents the shape):",
+        "  `## Red-before-green` (the exact failing command, replacing a job-name placeholder), `## Premise check`,",
+        "  `## Blast radius`, `Regression test: <path>`, and for locked areas `GBrain:` or `Locking PR:`.",
+        "  Record only what you observed; if a fact does not exist yet, produce it (run the check) first.",
         f"- Immediately before every install or push, use `gh api graphql` to read PR #{pr['number']} in {REPO_SLUG}:",
         "  request state, headRefOid and isInMergeQueue. The pr view JSON command does not expose queue ownership.",
         "  Continue only while OPEN with isInMergeQueue=false; otherwise stop and preserve local changes, without install or push.",
@@ -7163,6 +7225,10 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                verdict="fix-pushed" if pushed else "fix-no-change")
             if pushed:
                 verify_target({**pr, "headRefOid": after}, "before-push-effects")
+                try:
+                    receipt["prBodyActions"] = refresh_pr_body(pr, worktree, log)
+                except (subprocess.SubprocessError, OSError):
+                    receipt["prBodyActions"] = ["pr-body-refresh-error"]
                 labels = {label.lower() for label in pr_events.label_names(pr)}
                 resolved = [kind for kind in pr_events.FIX_KINDS if pr_events.PREFIX + kind in labels]
                 if resolved:
