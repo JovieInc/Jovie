@@ -245,7 +245,7 @@ const deliveryMergesSchema = z.object({
         mergedAt: z.string(),
       })
     )
-    .max(12)
+    .max(50)
     .optional()
     .default([]),
 });
