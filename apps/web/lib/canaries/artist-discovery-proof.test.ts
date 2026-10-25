@@ -165,7 +165,30 @@ describe('creator discovery proof', () => {
       missingLinks: [],
       latestMatches: true,
     });
+    expect(
+      inspectDiscoveryGuide({
+        document,
+        guide: guide.replace('**Title**: Song', '**Title**: Verse\nChorus'),
+        api: { ...api, releases: [{ ...item, title: 'Verse\nChorus' }] },
+        profileUrl,
+        artistName: 'Tim White',
+      }).latestMatches
+    ).toBe(true);
     expect(check(guide.replace('Unclaimed', 'Claimed')).identity).toBe(false);
+    for (const [field, value] of [
+      ['Canonical URL', profileUrl],
+      ['Claim status', 'Unclaimed'],
+      ['Jovie verification', 'Not verified'],
+    ]) {
+      expect(
+        check(
+          guide.replace(
+            `**${field}**: ${value}`,
+            `**${field}**: ${value}/other`
+          )
+        ).identity
+      ).toBe(false);
+    }
     expect(
       check(guide.replace(item.url, `${profileUrl}/releases`)).latestMatches
     ).toBe(false);

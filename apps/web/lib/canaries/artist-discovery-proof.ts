@@ -105,6 +105,18 @@ export function inspectPublicItem(
   };
 }
 
+/** Compare complete guide fields so a longer destination or status cannot pass. */
+function guideFieldMatches(guide: string, label: string, value: string) {
+  const lines = guide.split('\n');
+  return lines.some((line, index) => {
+    const field = /^- \*\*([^*]+)\*\*: (.*)$/.exec(line);
+    if (field?.[1] !== label) return false;
+    // Titles can contain newlines; compare their entire serialized value.
+    const fieldValue = [field[2], ...lines.slice(index + 1)].join('\n');
+    return fieldValue === value || fieldValue.startsWith(`${value}\n`);
+  });
+}
+
 export function inspectDiscoveryGuide(input: {
   document: Document;
   guide: string;
@@ -117,12 +129,16 @@ export function inspectDiscoveryGuide(input: {
     api.artist.profileUrl === profileUrl &&
     api.artist.name === artistName &&
     guide.startsWith(`# ${artistName}\n`) &&
-    guide.includes(`**Canonical URL**: ${profileUrl}`) &&
-    guide.includes(
-      `**Claim status**: ${api.artist.isClaimed ? 'Claimed' : 'Unclaimed'}`
+    guideFieldMatches(guide, 'Canonical URL', profileUrl) &&
+    guideFieldMatches(
+      guide,
+      'Claim status',
+      api.artist.isClaimed ? 'Claimed' : 'Unclaimed'
     ) &&
-    guide.includes(
-      `**Jovie verification**: ${api.artist.isVerified ? 'Verified' : 'Not verified'}`
+    guideFieldMatches(
+      guide,
+      'Jovie verification',
+      api.artist.isVerified ? 'Verified' : 'Not verified'
     ) &&
     publicJsonLd(document).some(
       node =>
@@ -149,10 +165,10 @@ export function inspectDiscoveryGuide(input: {
     ? api.releases.length === 0
     : api.releases.some(
         item =>
-          latest.includes(`**Link**: ${item.url}\n`) &&
-          latest.includes(`**Title**: ${item.title}\n`) &&
+          guideFieldMatches(latest, 'Link', item.url) &&
+          guideFieldMatches(latest, 'Title', item.title) &&
           (!item.releaseDate ||
-            latest.includes(`**Released**: ${item.releaseDate}\n`))
+            guideFieldMatches(latest, 'Released', item.releaseDate))
       );
   return { identity, missingLinks, latestMatches };
 }
