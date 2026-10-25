@@ -345,7 +345,8 @@ describe('access-path pricing', () => {
     for (const provider of view.providers) {
       if (provider.id !== 'openai-codex') continue;
       for (const a of provider.accounts)
-        if (a.quota) a.quota = { ...a.quota, usedPercent: 100 };
+        if (a.quota)
+          Object.assign(a, { quota: { ...a.quota, usedPercent: 100 } });
     }
     const spent = priceModel(registry, models, view, 'gpt-5.6-luna', task);
     expect(spent[0].accessPath).toBe('api');
