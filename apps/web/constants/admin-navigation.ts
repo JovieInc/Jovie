@@ -52,6 +52,7 @@ export type AdminWorkspaceId =
   | 'feature_registry'
   | 'screenshots'
   | 'costs'
+  | 'capacity'
   | 'revenue_lift'
   | 'share_studio'
   | 'system_map'
@@ -90,6 +91,7 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'investors',
   'share_studio',
   'costs',
+  'capacity',
   'revenue_lift',
 ] as const satisfies readonly AdminWorkspaceId[];
 
@@ -216,6 +218,14 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_COSTS,
     description:
       'Company infra, AI gateway, Neon, and vendor spend (30-day view)',
+    section: 'utilities',
+  },
+  {
+    id: 'capacity',
+    label: 'Capacity',
+    href: APP_ROUTES.ADMIN_CAPACITY,
+    description:
+      'Agent plans, cost, remaining quota and credits, and pace per provider',
     section: 'utilities',
   },
   {

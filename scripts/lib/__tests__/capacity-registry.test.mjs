@@ -127,6 +127,17 @@ describe('evaluation', () => {
     expect(pick(older)).toBe(43);
   });
 
+  it('marks quota-bearing providers with no reading as unread, not fresh', () => {
+    const view = evaluateRegistry(base(), { now: NOW, spend: spend() });
+    expect(find(view, 'muse').freshness).toBe('unknown');
+    expect(find(view, 'anthropic-claude').freshness).toBe('unknown');
+    expect(find(view, 'dots').freshness).toBe('fresh');
+    expect(find(view, 'kimi').freshness).toBe('fresh');
+    expect(view.totals.stale).toEqual(
+      expect.arrayContaining(['muse', 'anthropic-claude'])
+    );
+  });
+
   it('ends a promo price at promoUntil', () => {
     const registry = base();
     const view = evaluateRegistry(registry, {

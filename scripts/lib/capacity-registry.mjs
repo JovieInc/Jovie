@@ -242,6 +242,8 @@ function priceView(plan, now) {
     promoUntil: plan.promoUntil ?? null,
     promoDaysLeft:
       promoUntil === null ? null : Math.max(0, (promoUntil - now) / DAY_MS),
+    billing: plan.billing ?? 'monthly',
+    usdYearly: isNumber(plan.usdYearly) ? plan.usdYearly : null,
     source: plan.source,
     asOf: plan.asOf,
   };
@@ -314,6 +316,18 @@ export function evaluateRegistry(
     const states = accounts
       .flatMap(a => [a.quota?.freshness, a.credits?.freshness])
       .filter(Boolean);
+    // A quota-bearing provider with an active account and no reading at all is unread, not fresh.
+    if (
+      ['capped-quota', 'subscription-pool', 'credits'].includes(
+        provider.usageModel
+      ) &&
+      provider.policy.id !== 'unavailable'
+    ) {
+      for (const a of accounts) {
+        if (a.status === 'active' && !a.quota && !a.credits)
+          states.push('unknown');
+      }
+    }
     return {
       id: provider.id,
       label: provider.label,
