@@ -1,6 +1,7 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import {
   boolean,
+  check,
   index,
   integer,
   pgTable,
@@ -34,6 +35,10 @@ export const users = pgTable(
     waitlistEntryId: uuid('waitlist_entry_id'),
 
     isAdmin: boolean('is_admin').default(false).notNull(),
+    // Read-only operator role (null for everyone else). A read-only operator is NOT
+    // an admin: isAdmin() stays false, so every mutation gate denies by default;
+    // only explicit read opt-ins (lib/admin/roles.ts getAdminAccess) admit it.
+    adminRole: text('admin_role'),
     isPro: boolean('is_pro').default(false),
     plan: text('plan').default('free'), // 'free' | 'trial' | 'pro' | 'max'
     stripeCustomerId: text('stripe_customer_id').unique(),
@@ -68,6 +73,14 @@ export const users = pgTable(
     activeProfileIdx: index('idx_users_active_profile_id')
       .on(table.activeProfileId)
       .where(drizzleSql`active_profile_id IS NOT NULL`),
+    adminRoleCheck: check(
+      'users_admin_role_check',
+      drizzleSql`${table.adminRole} IS NULL OR ${table.adminRole} = 'read_only'`
+    ),
+    adminRoleExclusiveCheck: check(
+      'users_admin_role_exclusive_check',
+      drizzleSql`NOT (${table.isAdmin} AND ${table.adminRole} IS NOT NULL)`
+    ),
   })
 );
 

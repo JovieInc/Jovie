@@ -14,7 +14,7 @@ import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';
  * Grant admin role to a user
  *
  * Requires: Admin privileges
- * Body: { userId: string, role: 'admin' }
+ * Body: { userId: string, role: 'admin' | 'admin_read_only' }
  */
 export async function POST(request: Request) {
   // Require admin privileges
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { userId: targetUserId } = validation.data;
+    const { userId: targetUserId, role } = validation.data;
 
     // Get user to verify they exist and get internal ID
     const user = await getUserByClerkId(db, targetUserId);
@@ -42,16 +42,26 @@ export async function POST(request: Request) {
 
     // Update user's admin status
     const now = new Date();
-    await db
-      .update(users)
-      .set({
-        isAdmin: true,
-        isPro: true,
-        plan: 'max',
-        billingUpdatedAt: now,
-        updatedAt: now,
-      })
-      .where(eq(users.id, user.id));
+    if (role === 'admin_read_only') {
+      // Read-only operator: never an admin (isAdmin false also demotes a full
+      // admin), no plan or billing change.
+      await db
+        .update(users)
+        .set({ isAdmin: false, adminRole: 'read_only', updatedAt: now })
+        .where(eq(users.id, user.id));
+    } else {
+      await db
+        .update(users)
+        .set({
+          isAdmin: true,
+          adminRole: null,
+          isPro: true,
+          plan: 'max',
+          billingUpdatedAt: now,
+          updatedAt: now,
+        })
+        .where(eq(users.id, user.id));
+    }
 
     const updatedUser = { id: user.id, clerkId: user.clerkId };
 
@@ -73,7 +83,8 @@ export async function POST(request: Request) {
       user: {
         id: updatedUser.id,
         clerkId: updatedUser.clerkId,
-        isAdmin: true,
+        isAdmin: role === 'admin',
+        adminRole: role === 'admin_read_only' ? 'read_only' : null,
       },
     });
   } catch (error) {
@@ -94,7 +105,7 @@ export async function POST(request: Request) {
  * Revoke admin role from a user
  *
  * Requires: Admin privileges
- * Body: { userId: string, role: 'admin' }
+ * Body: { userId: string, role: 'admin' | 'admin_read_only' }
  */
 export async function DELETE(request: Request) {
   // Require admin privileges
@@ -112,7 +123,7 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const { userId: targetUserId } = validation.data;
+    const { userId: targetUserId, role } = validation.data;
     const { userId: currentAdminId } = await getCachedAuth({
       session: 'fresh',
     });
@@ -134,10 +145,11 @@ export async function DELETE(request: Request) {
     // Update user's admin status
     await db
       .update(users)
-      .set({
-        isAdmin: false,
-        updatedAt: new Date(),
-      })
+      .set(
+        role === 'admin_read_only'
+          ? { adminRole: null, updatedAt: new Date() }
+          : { isAdmin: false, updatedAt: new Date() }
+      )
       .where(eq(users.id, user.id));
 
     const updatedUser = { id: user.id, clerkId: user.clerkId };
@@ -156,6 +168,7 @@ export async function DELETE(request: Request) {
         id: updatedUser.id,
         clerkId: updatedUser.clerkId,
         isAdmin: false,
+        adminRole: role === 'admin_read_only' ? null : undefined,
       },
     });
   } catch (error) {

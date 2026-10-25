@@ -3,14 +3,20 @@ import 'server-only';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
-import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
+import {
+  isAdmin as checkAdminRole,
+  hasAdminReadAccess,
+} from '@/lib/admin/roles';
 import { getFreshAuth } from '@/lib/auth/cached';
 import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
 
 export interface AdminPageAccess {
   readonly userId: string | null;
   readonly isAuthenticated: boolean;
+  /** Full admin: may mutate. */
   readonly hasAdminRole: boolean;
+  /** Full admin or read-only operator: may view admin pages. */
+  readonly hasAdminReadRole: boolean;
 }
 
 /**
@@ -28,25 +34,28 @@ export const getCurrentAdminPageAccess = cache(
         userId: null,
         isAuthenticated: false,
         hasAdminRole: false,
+        hasAdminReadRole: false,
       };
     }
 
+    const hasAdminRole = await checkAdminRole(userId);
     return {
       userId,
       isAuthenticated: true,
-      hasAdminRole: await checkAdminRole(userId),
+      hasAdminRole,
+      hasAdminReadRole: hasAdminRole || (await hasAdminReadAccess(userId)),
     };
   }
 );
 
 /**
- * Authoritative page-level read gate. Next may render layouts and pages in
+ * Authoritative page-level read gate (full admins and read-only operators). Next may render layouts and pages in
  * parallel, so protected page/DAL work must await this before starting.
  */
 export async function requireCurrentAdminPageAccess(): Promise<string> {
   const access = await getCurrentAdminPageAccess();
 
-  if (!access.isAuthenticated || !access.userId || !access.hasAdminRole) {
+  if (!access.isAuthenticated || !access.userId || !access.hasAdminReadRole) {
     redirect(APP_ROUTES.DASHBOARD);
   }
 

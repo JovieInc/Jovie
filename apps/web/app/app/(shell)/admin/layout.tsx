@@ -21,7 +21,7 @@ export default async function AdminLayout({
   if (
     !adminAccess.isAuthenticated ||
     !adminAccess.userId ||
-    !adminAccess.hasAdminRole
+    !adminAccess.hasAdminReadRole
   ) {
     redirect(APP_ROUTES.DASHBOARD);
   }

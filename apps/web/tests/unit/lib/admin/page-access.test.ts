@@ -8,15 +8,21 @@ import {
 const ACTOR_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const TARGET_UUID = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 
-const { mockPrivacy, mockGetCachedAuth, mockIsAdmin, mockRedirect } =
-  vi.hoisted(() => ({
-    mockPrivacy: vi.fn(),
-    mockGetCachedAuth: vi.fn(),
-    mockIsAdmin: vi.fn(),
-    mockRedirect: vi.fn((href: string) => {
-      throw new Error(`NEXT_REDIRECT:${href}`);
-    }),
-  }));
+const {
+  mockPrivacy,
+  mockGetCachedAuth,
+  mockIsAdmin,
+  mockHasReadAccess,
+  mockRedirect,
+} = vi.hoisted(() => ({
+  mockPrivacy: vi.fn(),
+  mockHasReadAccess: vi.fn(),
+  mockGetCachedAuth: vi.fn(),
+  mockIsAdmin: vi.fn(),
+  mockRedirect: vi.fn((href: string) => {
+    throw new Error(`NEXT_REDIRECT:${href}`);
+  }),
+}));
 
 vi.mock('@/lib/ovie/privacy-lock/server', () => ({
   assertOviePrivacyUnlocked: mockPrivacy,
@@ -30,12 +36,14 @@ vi.mock('@/lib/auth/cached', () => ({
 
 vi.mock('@/lib/admin/roles', () => ({
   isAdmin: mockIsAdmin,
+  hasAdminReadAccess: mockHasReadAccess,
 }));
 
 describe('getCurrentAdminPageAccess', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPrivacy.mockResolvedValue(undefined);
+    mockHasReadAccess.mockResolvedValue(false);
   });
 
   it('returns signed-out access without querying admin role', async () => {
@@ -45,6 +53,7 @@ describe('getCurrentAdminPageAccess', () => {
       userId: null,
       isAuthenticated: false,
       hasAdminRole: false,
+      hasAdminReadRole: false,
     });
     expect(mockIsAdmin).not.toHaveBeenCalled();
   });
@@ -60,6 +69,7 @@ describe('getCurrentAdminPageAccess', () => {
       userId: 'user_admin',
       isAuthenticated: true,
       hasAdminRole: true,
+      hasAdminReadRole: true,
     });
     expect(mockIsAdmin).toHaveBeenCalledWith('user_admin');
   });
@@ -88,6 +98,7 @@ describe('getCurrentAdminPageAccess', () => {
       userId: 'user_member',
       isAuthenticated: true,
       hasAdminRole: false,
+      hasAdminReadRole: false,
     });
   });
 
@@ -114,5 +125,22 @@ describe('getCurrentAdminPageAccess', () => {
     await expect(requireCurrentAdminPageAccess()).rejects.toThrow(
       'Privacy locked'
     );
+  });
+
+  it('lets a read-only operator view admin pages without being an admin', async () => {
+    mockGetCachedAuth.mockResolvedValue({
+      userId: 'ro-user',
+      sessionId: 'ro-session',
+    });
+    mockIsAdmin.mockResolvedValue(false);
+    mockHasReadAccess.mockResolvedValue(true);
+
+    await expect(getCurrentAdminPageAccess()).resolves.toEqual({
+      userId: 'ro-user',
+      isAuthenticated: true,
+      hasAdminRole: false,
+      hasAdminReadRole: true,
+    });
+    await expect(requireCurrentAdminPageAccess()).resolves.toBe('ro-user');
   });
 });

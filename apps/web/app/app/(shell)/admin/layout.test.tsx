@@ -37,6 +37,7 @@ describe('AdminLayout', () => {
       userId: 'user_admin',
       isAuthenticated: true,
       hasAdminRole: true,
+      hasAdminReadRole: true,
     });
 
     render(
@@ -54,6 +55,7 @@ describe('AdminLayout', () => {
       userId: 'user_member',
       isAuthenticated: true,
       hasAdminRole: false,
+      hasAdminReadRole: false,
     });
 
     await expect(

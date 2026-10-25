@@ -12,7 +12,11 @@ export type HudAuthResult =
 
 export async function authorizeHud(
   kioskToken: string | null,
-  options?: { session?: 'cookie' | 'fresh'; privileged?: boolean }
+  options?: {
+    session?: 'cookie' | 'fresh';
+    privileged?: boolean;
+    access?: 'read' | 'write';
+  }
 ): Promise<HudAuthResult> {
   const expectedToken = env.HUD_KIOSK_TOKEN;
   if (kioskToken && kioskToken === expectedToken) {
@@ -34,6 +38,7 @@ export async function authorizeHud(
   try {
     const denied = await requireOvieApiAccess({
       privileged: options?.privileged ?? false,
+      access: options?.access,
     });
     if (!denied) return { ok: true, mode: 'admin' };
   } catch {

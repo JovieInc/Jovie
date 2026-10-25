@@ -15,7 +15,7 @@ const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
  * Requires: Admin privileges
  */
 export async function GET() {
-  const authError = await requireOvieApiAccess();
+  const authError = await requireOvieApiAccess({ access: 'read' });
   if (authError) return authError;
 
   const token = env.VERCEL_API_TOKEN;

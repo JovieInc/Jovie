@@ -9,7 +9,7 @@ export const runtime = 'nodejs';
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 export async function GET(): Promise<Response> {
-  const denied = await requireAdminHudApiAccess();
+  const denied = await requireAdminHudApiAccess({ access: 'read' });
   if (denied) return denied;
 
   try {

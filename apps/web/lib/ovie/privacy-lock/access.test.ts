@@ -3,13 +3,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({
   auth: vi.fn(),
   role: vi.fn(),
+  access: vi.fn(),
   mfa: vi.fn(),
   privacy: vi.fn(),
   ent: vi.fn(),
 }));
 vi.mock('@/lib/db', () => ({ db: {} }));
 vi.mock('@/lib/auth/cached', () => ({ getFreshAuth: m.auth }));
-vi.mock('@/lib/admin/roles', () => ({ isAdmin: m.role }));
+vi.mock('@/lib/admin/roles', () => ({
+  isAdmin: m.role,
+  getAdminAccess: m.access,
+}));
 vi.mock('@/lib/admin/mfa', () => ({ hasRecentAdminMfaReverification: m.mfa }));
 vi.mock('@/lib/entitlements/server', () => ({
   getCurrentUserEntitlements: m.ent,
@@ -26,6 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   m.auth.mockResolvedValue({ userId: 'u1', sessionId: 's1' });
   m.role.mockResolvedValue(true);
+  m.access.mockResolvedValue('none');
   m.mfa.mockResolvedValue(false);
   m.privacy.mockResolvedValue(undefined);
   m.ent.mockResolvedValue({
@@ -116,5 +121,50 @@ describe('Ovie optional privacy and independent action authorization', () => {
       'Privacy storage unavailable'
     );
     expect(m.ent).not.toHaveBeenCalled();
+  });
+});
+
+describe('read-only operator role', () => {
+  beforeEach(() => {
+    m.role.mockResolvedValue(false);
+    m.access.mockResolvedValue('read');
+  });
+
+  it('is refused by default: every gate that does not opt in is a write gate', async () => {
+    expect((await requireOvieApiAccess())?.status).toBe(403);
+    expect((await requireOvieApiAccess({ access: 'write' }))?.status).toBe(403);
+  });
+
+  it('is refused for privileged actions even when it asks for read', async () => {
+    expect(
+      (await requireOvieApiAccess({ privileged: true, access: 'read' }))?.status
+    ).toBe(403);
+    expect((await requireOvieApiAccess({ privileged: true }))?.status).toBe(
+      403
+    );
+    expect(m.mfa).not.toHaveBeenCalled();
+  });
+
+  it('is admitted only to an explicit read, and still obeys the privacy lock', async () => {
+    expect(await requireOvieApiAccess({ access: 'read' })).toBeNull();
+    m.privacy.mockRejectedValue(
+      new OviePrivacyLockError('PRIVACY_UNLOCK_REQUIRED', 'Locked')
+    );
+    expect((await requireOvieApiAccess({ access: 'read' }))?.status).toBe(403);
+  });
+
+  it('does not let an unprivileged user read, even with access read', async () => {
+    m.access.mockResolvedValue('none');
+    expect((await requireOvieApiAccess({ access: 'read' }))?.status).toBe(403);
+  });
+
+  it('observes as admin only for purpose read; default entitlements stay non-admin', async () => {
+    expect(
+      (await getOvieOperatorEntitlements({ purpose: 'read' })).isAdmin
+    ).toBe(true);
+    expect((await getOvieOperatorEntitlements()).isAdmin).toBe(false);
+    expect(
+      (await getOvieOperatorEntitlements({ session: 'fresh' })).isAdmin
+    ).toBe(false);
   });
 });

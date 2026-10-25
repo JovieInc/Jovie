@@ -2,17 +2,36 @@ import 'server-only';
 // @coverage-via apps/web/lib/ovie/privacy-lock/access.test.ts
 import { NextResponse } from 'next/server';
 import { hasRecentAdminMfaReverification } from '@/lib/admin/mfa';
-import { isAdmin } from '@/lib/admin/roles';
+import { getAdminAccess, isAdmin } from '@/lib/admin/roles';
 import { getFreshAuth } from '@/lib/auth/cached';
 import { getCurrentUserEntitlements } from '@/lib/entitlements/server';
 import { assertOviePrivacyUnlocked, OviePrivacyLockError } from './server';
-export async function requireOvieApiAccess(options?: { privileged?: boolean }) {
+/**
+ * `access: 'write'` (the default) admits full admins only. `access: 'read'` also
+ * admits read-only operators and must only be passed from GET/HEAD handlers
+ * (admin-read-only-contract.test.ts enforces this). A privileged action is always
+ * a write.
+ */
+export async function requireOvieApiAccess(options?: {
+  privileged?: boolean;
+  access?: 'read' | 'write';
+}) {
   try {
     const auth = await getFreshAuth();
     if (!auth.userId || !auth.sessionId)
       throw new OviePrivacyLockError('UNAUTHORIZED', 'Please sign in.', 401);
-    if (!(await isAdmin(auth.userId)))
-      throw new OviePrivacyLockError('FORBIDDEN', 'Admin access required.');
+    if (options?.privileged && options.access === 'read')
+      throw new OviePrivacyLockError(
+        'FORBIDDEN',
+        'A privileged action cannot be a read.'
+      );
+    if (!(await isAdmin(auth.userId))) {
+      const readOnly =
+        options?.access === 'read' &&
+        (await getAdminAccess(auth.userId)) === 'read';
+      if (!readOnly)
+        throw new OviePrivacyLockError('FORBIDDEN', 'Admin access required.');
+    }
     if (options?.privileged && !(await hasRecentAdminMfaReverification(auth)))
       throw new OviePrivacyLockError(
         'PASSKEY_STEP_UP_REQUIRED',
@@ -49,7 +68,16 @@ export async function getOvieOperatorEntitlements(options?: {
   purpose?: 'read';
 }) {
   const auth = await getFreshAuth();
-  if (!auth.userId || !auth.sessionId || !(await isAdmin(auth.userId))) {
+  const readOnlyObserver =
+    options?.purpose === 'read' &&
+    Boolean(auth.userId && auth.sessionId) &&
+    !(await isAdmin(auth.userId as string)) &&
+    (await getAdminAccess(auth.userId as string)) === 'read';
+  if (
+    !auth.userId ||
+    !auth.sessionId ||
+    (!readOnlyObserver && !(await isAdmin(auth.userId)))
+  ) {
     const entitlements = await getCurrentUserEntitlements({ session: 'fresh' });
     return { ...entitlements, isAdmin: false };
   }

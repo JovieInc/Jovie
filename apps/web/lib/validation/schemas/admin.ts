@@ -21,9 +21,10 @@ import { httpUrlSchema, uuidSchema } from './base';
 
 /**
  * Admin role literal type.
- * Currently only 'admin' role is supported.
+ * 'admin' is full access; 'admin_read_only' may view Ovie admin surfaces and cannot
+ * mutate anything (users.admin_role = 'read_only', is_admin stays false).
  */
-export const adminRoleLiteral = z.literal('admin');
+export const adminRoleLiteral = z.enum(['admin', 'admin_read_only']);
 
 /**
  * Inferred TypeScript type for admin role.
