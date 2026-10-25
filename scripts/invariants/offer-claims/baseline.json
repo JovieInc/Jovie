@@ -135,7 +135,7 @@
     "trial_claim": 3,
     "no_card_claim": 1,
     "cancel_claim": 1,
-    "refund_guarantee_claim": 1
+    "refund_guarantee_claim": 2
   },
   "apps/web/content/published-claims.ts": {
     "trial_claim": 1
@@ -161,20 +161,17 @@
     "free_forever_claim": 4,
     "recurring_price": 4,
     "plan_price": 3,
-    "billing_claim": 4,
-    "cancel_claim": 1
+    "billing_claim": 4
   },
   "apps/web/data/marketingCtaIntents.ts": {
     "no_card_claim": 1
   },
   "apps/web/data/product-truth/golden-path-claims.ts": {
     "free_forever_claim": 1,
-    "cancel_claim": 1,
     "refund_guarantee_claim": 1
   },
   "apps/web/data/product-truth/golden-path-proof.gen.json": {
     "free_forever_claim": 1,
-    "cancel_claim": 1,
     "refund_guarantee_claim": 3
   },
   "apps/web/data/product-truth/registry.ts": {
@@ -217,7 +214,6 @@
   "apps/web/lib/billing/offer-truth.ts": {
     "trial_claim": 2,
     "no_card_claim": 1,
-    "cancel_claim": 1,
     "free_forever_claim": 2,
     "billing_claim": 2
   },
