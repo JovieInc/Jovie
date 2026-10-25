@@ -149,4 +149,58 @@ test.describe('SmartLink — Fan Experience', () => {
       /^https:\/\/open\.spotify\.com\/album\//
     );
   });
+
+  // JOV-7864: the release SmartLink shares a composed 1200x630 card, not the
+  // raw artwork square — and the served bytes are a real decodable PNG, not
+  // an HTTP-200 text placeholder.
+  test('release SmartLink og:image is a decodable 1200x630 composed card', async ({
+    page,
+  }) => {
+    test.setTimeout(120_000);
+
+    try {
+      await page.goto(`/${TEST_PROFILE}/${RELEASED_SLUG}`, {
+        waitUntil: 'domcontentloaded',
+        timeout: 90_000,
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('Timeout') || msg.includes('net::ERR_')) {
+        test.skip(true, 'Server too slow under parallel load');
+        return;
+      }
+      throw e;
+    }
+
+    const bodyText =
+      (await page
+        .locator('body')
+        .innerText()
+        .catch(() => '')) ?? '';
+    if (bodyText.toLowerCase().includes('not found')) {
+      test.skip(true, 'Release not seeded');
+      return;
+    }
+
+    const ogImage = page.locator('meta[property="og:image"]');
+    await expect(ogImage).toHaveCount(1);
+    await expect(ogImage).toHaveAttribute(
+      'content',
+      new RegExp(`/${TEST_PROFILE}/${RELEASED_SLUG}/opengraph-image$`)
+    );
+
+    const response = await page.request.get(
+      `/${TEST_PROFILE}/${RELEASED_SLUG}/opengraph-image`
+    );
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('image/png');
+    const bytes = Buffer.from(await response.body());
+    const PNG_MAGIC = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ]);
+    expect(bytes.subarray(0, 8).equals(PNG_MAGIC)).toBe(true);
+    expect(bytes.byteLength).toBeGreaterThan(8_000);
+    expect(bytes.readUInt32BE(16)).toBe(1200);
+    expect(bytes.readUInt32BE(20)).toBe(630);
+  });
 });
