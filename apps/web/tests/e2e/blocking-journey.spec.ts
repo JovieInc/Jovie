@@ -213,9 +213,9 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     await drawer.getByRole('button', { name: /today/i }).click();
     await expect(createRelease).toBeEnabled();
     await createRelease.click();
-    await expect(page.getByTestId('release-sidebar')).toContainText(
-      releaseTitle
-    );
+    // Creating from the drawer closes it and offers the post-create plan; it
+    // does not open the release sidebar. The new release is listed.
+    await expect(page.getByText(releaseTitle).first()).toBeVisible();
     const rows = await sql`
       SELECT dr.slug, dr.source_type FROM discog_releases dr
       JOIN creator_profiles cp ON cp.id = dr.creator_profile_id
