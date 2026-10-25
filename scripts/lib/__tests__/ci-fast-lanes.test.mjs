@@ -2121,7 +2121,12 @@ describe('source-read guard selection', () => {
   it.each([
     [
       'pull_request',
-      ['web-source-read-tests', 'script-contracts', 'gate-weakening-detector'],
+      [
+        'web-source-read-tests',
+        'script-contracts',
+        'merged-with-base-invariants',
+        'gate-weakening-detector',
+      ],
     ],
     ['merge_group', []],
     ['push', []],
@@ -2228,6 +2233,10 @@ describe('source-read guard selection', () => {
       ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
+      ...(/^(?:apps\/web\/components\/|packages\/ui\/)/u.test(path)
+        ? ['ui-story-coverage-allowlist']
+        : []),
+      'merged-with-base-invariants',
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
       'gate-weakening-detector',
     ]);
@@ -2381,6 +2390,20 @@ describe('source-read guard selection', () => {
         expect(
           readFileSync(
             join(REPO_ROOT, 'scripts/codex-cloud-setup.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'merged-with-base-invariants') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain('git worktree add');
+        expect(guard.command).toContain(
+          'scripts/invariants/design-surfaces.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/invariants/design-surfaces.test.mjs'),
             'utf8'
           )
         ).toContain("from 'node:test'");
