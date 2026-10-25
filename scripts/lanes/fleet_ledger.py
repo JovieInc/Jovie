@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+"""Fleet work ledger: one read-only view of who holds what, and how well the fleet is covered.
+
+Reuses what exists, adds no orchestrator:
+- lanes run leases        <state>/linear/run-leases/<issue-id>.lock (flock, owner json)
+- repo-binding leases     <state>/bindings/<KEY>/issue.<IDENT>.lock (flock)
+- the claim ledger        <state>/linear/claims.json
+- external agent claims   <state>/fleet-claims/<IDENT>.json  (Lola / Hyperagent threads / Summer:
+  `claim` writes owner + heartbeat + ttl, `heartbeat` renews, `release` removes; a claim with no
+  heartbeat for its ttl is `expired` and is not honoured by anyone checking the ledger)
+- the run ledger          <state>/runs/ledger.jsonl (jovie-lane-run/v1)
+
+`ledger` lists every claim with a liveness verdict (live / stranded / expired). `metrics`
+measures duplicate overlapping runs, overnight (00-08 UTC) vs daytime throughput and the share
+of runs spent on factory (fleet-improving) work. Stdlib only; never takes a lock it can block on.
+"""
+from __future__ import annotations
+
+import argparse
+import fcntl
+import json
+import os
+import sys
+import time
+from collections import Counter
+from datetime import datetime, timezone
+from pathlib import Path
+
+STRANDED_S = 3 * 3600            # active claim with no live lease for this long is stranded
+EXTERNAL_TTL_S = 30 * 60         # default external claim ttl; renewed by `heartbeat`
+OVERLAP_S = 60                   # overlap shorter than this is handoff jitter, not a duplicate
+# A run is factory work when its issue classifies into one of these workstreams (workstreams.RANK).
+FACTORY_WORKSTREAMS = frozenset({"ci", "symphony-throughput", "release-deploy", "ovie-ops"})
+FACTORY_TARGET_SHARE = 0.20      # floor; raise only while measured factory ROI is positive
+NON_AGENT_KINDS = frozenset({"outcome-verify", "outcome"})  # timers, not agent hours
+
+
+def _flock(path: Path) -> str:
+    """`live` while some process holds the lock, `ended` if it exists and is free, `none`."""
+    if not path.exists():
+        return "none"
+    try:
+        with open(path, "a") as handle:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_SH | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return "live"
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    except OSError:
+        return "live"  # unreadable evidence never frees a claim
+    return "ended"
+
+
+def _json(path: Path, default):
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return default
+
+
+def external_dir(state: Path) -> Path:
+    return state / "fleet-claims"
+
+
+def external_claim(state: Path, ident: str, agent: str, note: str = "", ttl_s: int = EXTERNAL_TTL_S,
+                   now: float | None = None) -> bool:
+    """Take `ident` for a non-lane agent. False if another agent holds an unexpired claim."""
+    now = time.time() if now is None else now
+    path = external_dir(state) / f"{ident}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a+") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)  # short critical section: read-modify-write only
+        handle.seek(0)
+        try:
+            held = json.loads(handle.read() or "{}")
+        except ValueError:
+            held = {}
+        if held and held.get("agent") != agent and now - held.get("heartbeatAt", 0) < held.get("ttlS", ttl_s):
+            return False
+        claimed = held.get("claimedAt") if held.get("agent") == agent else now
+        handle.seek(0)
+        handle.truncate()
+        handle.write(json.dumps({"ident": ident, "agent": agent, "note": note, "ttlS": ttl_s,
+                                 "claimedAt": claimed, "heartbeatAt": now}))
+    return True
+
+
+def external_heartbeat(state: Path, ident: str, agent: str, now: float | None = None) -> bool:
+    now = time.time() if now is None else now
+    path = external_dir(state) / f"{ident}.json"
+    held = _json(path, {})
+    if held.get("agent") != agent:
+        return False
+    held["heartbeatAt"] = now
+    path.write_text(json.dumps(held))
+    return True
+
+
+def external_release(state: Path, ident: str, agent: str) -> bool:
+    path = external_dir(state) / f"{ident}.json"
+    if _json(path, {}).get("agent") != agent:
+        return False
+    path.unlink(missing_ok=True)
+    return True
+
+
+def external_active(state: Path, ident: str, now: float | None = None) -> dict | None:
+    """The unexpired external claim on `ident`, or None. What lanes/agents check before starting."""
+    now = time.time() if now is None else now
+    held = _json(external_dir(state) / f"{ident}.json", {})
+    if held and now - held.get("heartbeatAt", 0) < held.get("ttlS", EXTERNAL_TTL_S):
+        return held
+    return None
+
+
+def ledger(state: Path, now: float | None = None) -> list[dict]:
+    """Every claim from every source with a liveness verdict."""
+    now = time.time() if now is None else now
+    rows: list[dict] = []
+    claims = (_json(state / "linear" / "claims.json", {}).get("claims") or {})
+    for issue_id, claim in claims.items():
+        if claim.get("status") != "active":
+            continue
+        ident = str(claim.get("identifier") or "")
+        run = _flock(state / "linear" / "run-leases" / f"{issue_id}.lock")
+        binding = "none"
+        for path in (state / "bindings").glob(f"*/issue.{ident}.lock"):
+            verdict = _flock(path)
+            binding = "live" if verdict == "live" else (binding if binding == "live" else verdict)
+        live = "live" in (run, binding)
+        age = now - (claim.get("claimedAt") or now)
+        rows.append({"source": "lanes-claim", "ident": ident, "agent": claim.get("lane"), "ageS": round(age),
+                     "verdict": "live" if live else "stranded" if age > STRANDED_S else "starting"})
+    for path in sorted(external_dir(state).glob("*.json")):
+        held = _json(path, {})
+        if not held:
+            continue
+        fresh = external_active(state, held.get("ident", path.stem), now) is not None
+        rows.append({"source": "external-claim", "ident": held.get("ident", path.stem), "agent": held.get("agent"),
+                     "ageS": round(now - held.get("claimedAt", now)), "verdict": "live" if fresh else "expired",
+                     "note": held.get("note", "")})
+    return rows
+
+
+def _ts(value: str) -> float:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+
+
+def read_runs(state: Path, since: float) -> list[dict]:
+    runs = []
+    try:
+        lines = (state / "runs" / "ledger.jsonl").read_text().splitlines()
+    except OSError:
+        return runs
+    for line in lines:
+        if '"jovie-lane-run/v1"' not in line:
+            continue
+        try:
+            row = json.loads(line)
+            start, end = _ts(row["startedAt"]), _ts(row["endedAt"])
+        except (ValueError, KeyError, TypeError):
+            continue
+        if start >= since and end >= start:
+            runs.append({**row, "_s": start, "_e": end})
+    return runs
+
+
+def duplicate_overlaps(runs: list[dict]) -> list[dict]:
+    """Different runs working the same PR/issue at the same time (a duplicate claim)."""
+    by_key: dict[str, list[dict]] = {}
+    for run in runs:
+        key = f"pr:{run['pr']}" if run.get("pr") else (f"issue:{run['issue']}" if run.get("issue") else None)
+        if key and run.get("kind") not in NON_AGENT_KINDS:
+            by_key.setdefault(key, []).append(run)
+    found = []
+    for key, items in by_key.items():
+        items.sort(key=lambda r: r["_s"])
+        for i, a in enumerate(items):
+            for b in items[i + 1:]:
+                if b["_s"] >= a["_e"] - OVERLAP_S:
+                    break
+                if a["runId"] != b["runId"]:
+                    found.append({"key": key, "a": a["runId"], "b": b["runId"], "providers": [a["provider"], b["provider"]],
+                                  "overlapS": round(min(a["_e"], b["_e"]) - b["_s"])})
+    return found
+
+
+def _median(values: list[float]) -> float:
+    values = sorted(values)
+    return values[len(values) // 2] if values else 0.0
+
+
+def throughput(runs: list[dict], days: float) -> dict:
+    """Runs and productive runs per clock hour, overnight (00-08 UTC) vs day. Productive = the run
+    pushed or opened something (fix-pushed, pr-opened, landing)."""
+    productive = {"fix-pushed", "pr-opened", "landing", "success"}
+    out = {}
+    for name, hours in (("overnight_00_08", range(0, 8)), ("day_08_24", range(8, 24))):
+        mine = [r for r in runs if r.get("kind") not in NON_AGENT_KINDS
+                and datetime.fromtimestamp(r["_s"], timezone.utc).hour in hours]
+        agent_h = sum(min(r["_e"] - r["_s"], 4 * 3600) for r in mine) / 3600  # a run is capped at 4 h
+        clock_h = days * len(hours)
+        out[name] = {"runs": len(mine), "runsPerHour": round(len(mine) / clock_h, 2),
+                     "productivePerHour": round(sum(r.get("verdict") in productive for r in mine) / clock_h, 3),
+                     "agentHoursPerHour": round(agent_h / clock_h, 2),
+                     "medianRunMin": round(_median([r["_e"] - r["_s"] for r in mine]) / 60, 1)}
+    return out
+
+
+def factory_share(runs: list[dict], classify) -> dict:
+    """Share of agent runs on factory work. `classify(run)` returns a workstream key or None."""
+    counts = Counter()
+    for run in runs:
+        if run.get("kind") in NON_AGENT_KINDS:
+            continue
+        key = classify(run)
+        counts["repair" if key == "repair" else "factory" if key in FACTORY_WORKSTREAMS
+               else "product" if key else "unclassified"] += 1
+    classified = counts["factory"] + counts["product"]
+    share = counts["factory"] / classified if classified else 0.0
+    return {**counts, "share": round(share, 3), "target": FACTORY_TARGET_SHARE,
+            "belowTarget": share < FACTORY_TARGET_SHARE}
+
+
+def mirror_classifier(state: Path, workstreams):
+    titles = {}
+    for team in ("JOV", "LYB"):
+        for row in (_json(state / "linear" / f"mirror-{team}.json", {}).get("issues") or {}).values():
+            titles[row.get("identifier")] = (row.get("title") or "", [l if isinstance(l, str) else l.get("name", "")
+                                             for l in (row.get("labels") or [])])
+
+    def classify(run: dict):
+        ident = run.get("issue") if isinstance(run.get("issue"), str) else None
+        if ident in titles:
+            return workstreams.classify(*titles[ident])
+        # Fix-red / adopt runs repair someone's open PR: neither new product nor factory work.
+        return "repair" if run.get("kind") in ("fix-red", "adopt") else None
+    return classify
+
+
+def main(argv=None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--state", default=os.environ.get("LANES_STATE") or str(Path.home() / ".local/state/jovie-lanes"))
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("ledger")
+    metrics = sub.add_parser("metrics")
+    metrics.add_argument("--days", type=float, default=7)
+    for name in ("claim", "heartbeat", "release"):
+        cmd = sub.add_parser(name)
+        cmd.add_argument("ident")
+        cmd.add_argument("--agent", required=True)
+        if name == "claim":
+            cmd.add_argument("--note", default="")
+            cmd.add_argument("--ttl", type=int, default=EXTERNAL_TTL_S)
+    args = parser.parse_args(argv)
+    state = Path(args.state)
+    if args.cmd == "ledger":
+        rows = ledger(state)
+        print(json.dumps({"claims": rows, "verdicts": dict(Counter(r["verdict"] for r in rows))}, indent=1))
+    elif args.cmd == "metrics":
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import workstreams
+        runs = read_runs(state, time.time() - args.days * 86400)
+        dup = duplicate_overlaps(runs)
+        print(json.dumps({"days": args.days, "runs": len(runs), "throughput": throughput(runs, args.days),
+                          "duplicateOverlaps": {"count": len(dup), "sample": dup[:5]},
+                          "factory": factory_share(runs, mirror_classifier(state, workstreams))}, indent=1))
+    else:
+        ok = (external_claim(state, args.ident, args.agent, args.note, args.ttl) if args.cmd == "claim"
+              else external_heartbeat(state, args.ident, args.agent) if args.cmd == "heartbeat"
+              else external_release(state, args.ident, args.agent))
+        print(json.dumps({"ok": ok}))
+        return 0 if ok else 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
