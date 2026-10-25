@@ -23,7 +23,6 @@
 
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { load } from 'js-yaml';
 
 export const RATCHET_PATH = 'scripts/lib/workflow-token-budget.ratchet.json';
 export const RATCHET_SCHEMA = 'jovie-workflow-token-budget-ratchet/v1';
@@ -39,8 +38,6 @@ const DECLARATION =
 const TOKEN = /\bgithub\.token\b|secrets\.GITHUB_TOKEN\b/;
 const API_CALL =
   /\bgh\s+(?:api|pr|run|issue|release|workflow|label|repo|search)\b|packages\/api-client\/cli|api\.github\.com|createGitHubClient|\bapiclient\b/;
-const IGNORED_USES =
-  /^(?:actions\/(?:checkout|cache|upload-artifact|download-artifact)|\.\/)/;
 
 /** @param {string} source */
 export function declaredBudget(source) {
@@ -48,51 +45,74 @@ export function declaredBudget(source) {
   return match ? { calls: Number(match[1]), reason: match[2].trim() } : null;
 }
 
-function isHosted(runsOn) {
-  return !/self-hosted/i.test(JSON.stringify(runsOn ?? ''));
+function isHosted(jobText) {
+  const runsOn = /^\s*runs-on:\s*(.*(?:\n\s+[-\[].*)*)/m.exec(jobText);
+  return !/self-hosted/i.test(runsOn?.[1] ?? '');
 }
 
 /**
- * @param {unknown[]} steps
+ * Split a block of YAML text into step blocks. Dependency free on purpose: the
+ * guard runs in PR Fleet Rules, which installs nothing. A step starts at a
+ * "- " line at the indentation of the first list item under `steps:`.
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function stepBlocks(text) {
+  const lines = text.split('\n');
+  const start = lines.findIndex(line => /^\s*steps:\s*$/.test(line));
+  if (start < 0) return [];
+  const stepsIndent = lines[start].search(/\S/);
+  const blocks = [];
+  let current = null;
+  let itemIndent = null;
+  for (const line of lines.slice(start + 1)) {
+    const indent = line.search(/\S/);
+    if (indent >= 0 && indent <= stepsIndent && !/^\s*#/.test(line)) break;
+    if (
+      indent >= 0 &&
+      /^\s*- /.test(line) &&
+      (itemIndent === null || indent === itemIndent)
+    ) {
+      itemIndent = indent;
+      current = [line];
+      blocks.push(current);
+    } else if (current) current.push(line);
+  }
+  return blocks.map(block => block.join('\n'));
+}
+
+/**
+ * @param {string[]} steps step blocks
  * @param {{ hosted: boolean, tokenInScope: boolean }} scope
  * @returns {Record<string, number>}
  */
 export function countSteps(steps, { hosted, tokenInScope }) {
-  const counts = {
-    'setup-node-manifest': 0,
-    'script-default-token': 0,
-    'token-api-call': 0,
-  };
+  const counts = empty();
   let primed = false;
-  for (const raw of Array.isArray(steps) ? steps : []) {
-    const step = /** @type {Record<string, any>} */ (raw ?? {});
-    const uses = typeof step.uses === 'string' ? step.uses : '';
+  for (const raw of steps) {
+    const text = raw
+      .split('\n')
+      .filter(line => !/^\s*#/.test(line))
+      .join('\n');
+    const uses =
+      /^\s*(?:-\s+)?(?:name:.*\n\s+)?(?:if:.*\n\s+)?uses:\s*(\S+)/m.exec(
+        text
+      )?.[1] ?? '';
+    const hasToken = TOKEN.test(text);
     if (uses.includes(PRIME_ACTION)) primed = true;
     if (uses.startsWith('actions/setup-node@') && hosted && !primed)
       counts['setup-node-manifest'] += 1;
     if (
       uses.startsWith('actions/github-script@') &&
-      !step.with?.['github-token']
+      !/github-token:/.test(text)
     )
       counts['script-default-token'] += 1;
-    if (typeof step.run === 'string' && API_CALL.test(step.run)) {
-      const stepEnv = JSON.stringify(step.env ?? {});
-      if (
-        TOKEN.test(stepEnv) ||
-        (tokenInScope && !/GH_TOKEN|GITHUB_TOKEN/.test(stepEnv))
-      )
-        counts['token-api-call'] += 1;
-    }
     if (
-      uses &&
-      !IGNORED_USES.test(uses) &&
-      !uses.startsWith('actions/github-script@')
+      /^\s*(?:-\s+)?(?:\w[\w-]*:.*\n\s+)*run:/m.test(text) &&
+      API_CALL.test(text)
     ) {
-      // A third-party action handed github.token for API reads.
-      if (
-        TOKEN.test(JSON.stringify(step.with ?? {})) &&
-        API_CALL.test(JSON.stringify(step.with ?? {}))
-      )
+      const tokenEnv = /\b(?:GH_TOKEN|GITHUB_TOKEN)\b/.test(text);
+      if (hasToken || (tokenInScope && !tokenEnv))
         counts['token-api-call'] += 1;
     }
   }
@@ -103,34 +123,53 @@ const add = (a, b) => {
   for (const rule of RULES) a[rule] += b[rule] ?? 0;
   return a;
 };
-const empty = () => ({
-  'setup-node-manifest': 0,
-  'script-default-token': 0,
-  'token-api-call': 0,
-});
+function empty() {
+  return {
+    'setup-node-manifest': 0,
+    'script-default-token': 0,
+    'token-api-call': 0,
+  };
+}
 
 /**
  * @param {string} source workflow or composite-action YAML
  * @returns {Record<string, number>}
  */
 export function countFile(source) {
-  const doc = /** @type {Record<string, any>} */ (load(source) ?? {});
   const total = empty();
-  if (doc.runs?.steps) {
+  if (
+    /^runs:\s*$/m.test(source) &&
+    /^\s+using:\s*['"]?composite/m.test(source)
+  ) {
     // Composite action: the caller's runner is unknown; assume hosted.
     return add(
       total,
-      countSteps(doc.runs.steps, { hosted: true, tokenInScope: false })
+      countSteps(stepBlocks(source), { hosted: true, tokenInScope: false })
     );
   }
-  const workflowToken = TOKEN.test(JSON.stringify(doc.env ?? {}));
-  for (const job of Object.values(doc.jobs ?? {})) {
-    const j = /** @type {Record<string, any>} */ (job ?? {});
+  const jobsAt = source.search(/^jobs:\s*$/m);
+  if (jobsAt < 0) return total;
+  const head = source.slice(0, jobsAt);
+  const workflowToken = TOKEN.test(
+    /^env:\s*\n((?:[ \t]+.*\n?|\n)*)/m.exec(head)?.[1] ?? ''
+  );
+  const jobs = source.slice(jobsAt).split('\n').slice(1);
+  /** @type {string[][]} */
+  const groups = [];
+  for (const line of jobs) {
+    if (/^ {2}[\w-]+:\s*(?:#.*)?$/.test(line)) groups.push([line]);
+    else if (groups.length) groups[groups.length - 1].push(line);
+  }
+  for (const group of groups) {
+    const text = group.join('\n');
+    const beforeSteps = text.split(/^\s*steps:\s*$/m)[0];
+    const jobEnv =
+      /^\s+env:\s*\n((?:\s{6,}.*\n?)*)/m.exec(beforeSteps)?.[1] ?? '';
     add(
       total,
-      countSteps(j.steps, {
-        hosted: isHosted(j['runs-on']),
-        tokenInScope: workflowToken || TOKEN.test(JSON.stringify(j.env ?? {})),
+      countSteps(stepBlocks(text), {
+        hosted: isHosted(beforeSteps),
+        tokenInScope: workflowToken || TOKEN.test(jobEnv),
       })
     );
   }

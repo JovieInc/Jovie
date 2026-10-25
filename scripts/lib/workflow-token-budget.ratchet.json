@@ -172,8 +172,8 @@
       "setup-node-manifest": 1
     },
     ".github/workflows/source-validation.yml": {
-      "setup-node-manifest": 7,
-      "token-api-call": 7
+      "setup-node-manifest": 2,
+      "token-api-call": 2
     },
     ".github/workflows/staging-controller.yml": {
       "setup-node-manifest": 1,
