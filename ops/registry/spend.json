@@ -1,7 +1,7 @@
 {
   "schema": "jovie.spend-ledger/v1",
   "description": "Per-provider balance, burn, runway and caps. Metadata only. Snapshots are dated readings; the live check overlays fresh reads where a read path exists.",
-  "updatedAt": "2026-10-25T02:45:00Z",
+  "updatedAt": "2026-10-21T02:40:00Z",
   "thresholds": {
     "runwayAlertDays": 14,
     "capAlertPercents": [50, 80, 100],
@@ -16,15 +16,15 @@
       "kind": "prepaid-credit",
       "cap": null,
       "snapshot": {
-        "observedAt": "2026-10-25T02:42:00Z",
-        "balanceUsd": 12.06,
-        "totalUsedUsd": null,
-        "source": "Vercel dashboard, jovie team AI Gateway overview (browser read; the live /v1/credits read has failed with no-gateway-token on every lanes check)"
+        "observedAt": "2026-10-20T19:51:34Z",
+        "balanceUsd": 21.23,
+        "totalUsedUsd": 559.4,
+        "source": "ai-gateway /v1/credits via short-lived OIDC token"
       },
       "burnPerDayUsd": {
-        "value": 2.04,
-        "source": "observed balance fall $21.23 (2026-10-20T19:51Z) to $12.06 (2026-10-25T02:42Z) over 4.3 days; no top-up",
-        "observedAt": "2026-10-25T02:42:00Z"
+        "value": 1.4,
+        "source": "operator-estimate-2026-10-20",
+        "observedAt": "2026-10-20T20:10:00Z"
       },
       "readPath": {
         "method": "GET https://ai-gateway.vercel.sh/v1/credits with AI_GATEWAY_API_KEY or VERCEL_OIDC_TOKEN",
@@ -158,7 +158,7 @@
         "observedAt": "2026-10-20T19:00:00Z"
       },
       "readPath": {
-        "method": "GET https://api.vercel.com/v1/billing/charges?teamId=…",
+        "method": "GET https://api.vercel.com/v1/billing/charges?teamId=\u2026",
         "live": null
       },
       "notes": "Spend Management cap amount and its 50/75/100% notifications live in the dashboard (docs/COST_MONITORING.md Layer 0); the cap value is not readable by API."
