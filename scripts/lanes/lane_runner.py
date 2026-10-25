@@ -60,6 +60,7 @@ import hyperagent_lane  # noqa: E402
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
 import ownership  # noqa: E402  (started-state live-owner invariant)
+import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
@@ -6588,6 +6589,7 @@ def held_back_issues(host: Host, now: float | None = None) -> frozenset[str]:
         cooldowns = {}
     held = {identifier for identifier, row in (cooldowns if isinstance(cooldowns, dict) else {}).items()
             if isinstance(row, dict) and isinstance(row.get("until"), (int, float)) and row["until"] > now}
+    held |= fleet_ledger.external_held(host.state, now)  # Lola/Hyperagent/Summer hold it: do not duplicate
     for marker_path in (host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}"):
         try:
             marker = json.loads(marker_path.read_text())

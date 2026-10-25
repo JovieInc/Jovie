@@ -142,6 +142,80 @@ def ledger(state: Path, now: float | None = None) -> list[dict]:
     return rows
 
 
+def stranded(state: Path, now: float | None = None) -> list[str]:
+    return sorted(r["ident"] for r in ledger(state, now) if r["verdict"] == "stranded")
+
+
+def external_held(state: Path, now: float | None = None) -> frozenset[str]:
+    """Identifiers some non-lane agent holds under an unexpired claim: lanes must not take them."""
+    now = time.time() if now is None else now
+    held = set()
+    for path in external_dir(state).glob("*.json"):
+        row = _json(path, {})
+        if row.get("ident") and external_active(state, row["ident"], now):
+            held.add(row["ident"])
+    return frozenset(held)
+
+
+READY_FILE = "fleet-ready.jsonl"
+READY_MAX_BYTES = 4 * 1024 * 1024
+READY_MAX_GAP_S = 15 * 60        # a gap longer than this means the recorder was down: not counted
+
+
+def record_ready(state: Path, now: float, capacity: dict, ready_by_provider: dict | None) -> None:
+    """One row per doctor pass: eligible work and seats per provider, so idle-while-ready is
+    measurable. Best effort; a recorder failure must never fail the doctor."""
+    row = {"at": round(now), "p": {name: {"ready": (ready_by_provider or {}).get(name),
+                                          "slots": seats.get("slots"), "running": seats.get("running"),
+                                          "base": seats.get("base")}
+                                   for name, seats in (capacity or {}).items()}}
+    path = state / READY_FILE
+    try:
+        if path.exists() and path.stat().st_size > READY_MAX_BYTES:
+            keep = path.read_text().splitlines()[-(READY_MAX_BYTES // 400):]
+            path.write_text("\n".join(keep) + "\n")
+        with open(path, "a") as handle:
+            handle.write(json.dumps(row, separators=(",", ":")) + "\n")
+    except OSError:
+        pass
+
+
+def idle_while_ready(state: Path, since: float) -> dict:
+    """Minutes (per provider) with eligible work, an allowed seat free (`idle`) or a seat the
+    autoscaler removed (`throttled`: base > slots). Intervals are the time to the next row."""
+    rows = []
+    try:
+        for line in (state / READY_FILE).read_text().splitlines():
+            try:
+                row = json.loads(line)
+            except ValueError:
+                continue
+            if row.get("at", 0) >= since:
+                rows.append(row)
+    except OSError:
+        return {"coveredMin": 0, "idleMin": {}, "throttledMin": {}}
+    rows.sort(key=lambda r: r["at"])
+    idle: Counter = Counter()
+    throttled: Counter = Counter()
+    covered = 0.0
+    for a, b in zip(rows, rows[1:]):
+        dt = b["at"] - a["at"]
+        if dt <= 0 or dt > READY_MAX_GAP_S:
+            continue
+        covered += dt
+        for name, seat in (a.get("p") or {}).items():
+            ready, slots, running = seat.get("ready"), seat.get("slots"), seat.get("running")
+            if not ready or slots is None or running is None:
+                continue
+            if running < min(slots, ready):
+                idle[name] += dt
+            elif (seat.get("base") or 0) > slots and running < min(seat["base"], ready):
+                throttled[name] += dt
+    return {"coveredMin": round(covered / 60, 1),
+            "idleMin": {k: round(v / 60, 1) for k, v in idle.items()},
+            "throttledMin": {k: round(v / 60, 1) for k, v in throttled.items()}}
+
+
 def _ts(value: str) -> float:
     return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
 
@@ -264,6 +338,7 @@ def main(argv=None) -> int:
         dup = duplicate_overlaps(runs)
         print(json.dumps({"days": args.days, "runs": len(runs), "throughput": throughput(runs, args.days),
                           "duplicateOverlaps": {"count": len(dup), "sample": dup[:5]},
+                          "idleWhileReady": idle_while_ready(state, time.time() - args.days * 86400),
                           "factory": factory_share(runs, mirror_classifier(state, workstreams))}, indent=1))
     else:
         ok = (external_claim(state, args.ident, args.agent, args.note, args.ttl) if args.cmd == "claim"

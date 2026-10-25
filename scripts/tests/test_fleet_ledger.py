@@ -83,6 +83,27 @@ class FleetLedgerTest(unittest.TestCase):
         keys = iter(["general"] * 5)
         self.assertTrue(fl.factory_share([run(str(i), 0, 1) for i in range(5)], lambda r: next(keys))["belowTarget"])
 
+    def test_ready_recorder_measures_idle_and_throttled_minutes_and_skips_recorder_gaps(self):
+        def row(at, ready, slots, running, base=None):
+            fl.record_ready(self.state, NOW + at, {"codex": {"slots": slots, "running": running, "base": base or slots}},
+                            {"codex": ready})
+        row(0, 5, 3, 1)        # 2 seats idle with work waiting: 5 min idle
+        row(300, 5, 3, 3)      # saturated: nothing
+        row(600, 5, 1, 1, base=3)  # autoscaler removed seats while work waits: 5 min throttled
+        row(900, 0, 3, 0)      # no work: idle but not ready
+        row(5000, 4, 3, 0)     # recorder was down for >15 min: that gap is not counted
+        out = fl.idle_while_ready(self.state, NOW)
+        self.assertEqual(out["idleMin"], {"codex": 5.0})
+        self.assertEqual(out["throttledMin"], {"codex": 5.0})
+        self.assertEqual(out["coveredMin"], 15.0)
+
+    def test_stranded_and_external_held_helpers(self):
+        self.claims(a={"identifier": "LYB-1", "lane": "codex", "status": "active", "claimedAt": NOW - 9 * 3600})
+        self.assertEqual(fl.stranded(self.state, NOW), ["LYB-1"])
+        fl.external_claim(self.state, "JOV-3", "lola", ttl_s=60, now=NOW)
+        self.assertEqual(fl.external_held(self.state, NOW + 30), frozenset({"JOV-3"}))
+        self.assertEqual(fl.external_held(self.state, NOW + 90), frozenset())
+
 
 if __name__ == "__main__":
     unittest.main()

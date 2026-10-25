@@ -33,6 +33,7 @@ import design_gate  # noqa: E402  (design-brief admission census)
 import gh_app_token  # noqa: E402  (canonical GitHub read-budget floor)
 import merge_evidence  # noqa: E402  (shared complete merge-window reader)
 import file_overlap  # noqa: E402
+import fleet_ledger  # noqa: E402  (claim ledger view, ready-work recorder)
 import linear_sync  # noqa: E402  (local Linear mirror and outbox status)
 import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
@@ -459,6 +460,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         pass
     gate_waits = [r["gateWaitS"] for r in receipts if isinstance(r.get("gateWaitS"), (int, float))]
     open_numbers = open_pr_numbers()
+    stranded_claims = fleet_ledger.stranded(state, now)
+    if not os.environ.get("LANES_SELFTEST"):
+        fleet_ledger.record_ready(state, now, capacity_by_provider, eligible_by_provider)
     return {
         "now": now, "tick": tick, "tickAge": age_s(tick.get("at"), now),
         "gateTimeouts24h": sum(1 for r in receipts if r.get("verdict") == "gate-timeout"),
@@ -502,6 +506,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
         "linearAppCredential": _linear_app_credential(lane),
+        "strandedClaims": stranded_claims,
         "ownership": {key: value for key, value in read_json(state / "ownership.json", {}).items()
                       if key not in ("ownerlessSince", "evidenceNoted", "moved", "claimsReleased")},
         "merged24h": merged, "mergedAttributionError": merged_error,
@@ -963,6 +968,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             f"{owned['overGrace']} started JOV issues have had no live owner past the grace period "
             f"(oldest {round((owned.get('oldestOwnerlessS') or 0) / 3600, 1)}h; unresolved "
             f"{owned.get('unresolved') or {}}); ownership.reconcile moves them each tick")
+    if obs.get("strandedClaims"):
+        alerts["stranded-claims"] = (
+            f"{len(obs['strandedClaims'])} active claims have had no live lease for over "
+            f"{fleet_ledger.STRANDED_S // 3600}h ({', '.join(obs['strandedClaims'][:6])}); "
+            "ownership.reconcile releases them; if this persists the release path is broken")
     if obs.get("linearError"):
         alerts["linear-down"] = f"Linear unreadable: {obs['linearError']}"
     elif obs.get("linearSkipped") or obs.get("pool") is None:
