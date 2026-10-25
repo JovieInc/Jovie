@@ -45,7 +45,7 @@ const PRO_PRICE_DISPLAY = formatPublicPriceDisplay(getPublicPriceClaim('pro'));
 
 export const ONBOARDING_PRICING_TRUTH = [
   `Free: ${FREE_PROFILE_TRUTH}`,
-  `${getPlanDisplayName('pro')}: ${PRO_PRICE_DISPLAY}. Billed when you subscribe and renews monthly until cancelled. ${PRO_SELF_SERVE_TRUTH}`,
+  `${getPlanDisplayName('pro')}: ${PRO_PRICE_DISPLAY}. Card required at checkout, billed at once, renews monthly until cancelled. ${PRO_SELF_SERVE_TRUTH}`,
   'Never mention a trial or a no-card start. Checkout is a paid subscription that collects a card and bills at once.',
   `Max: ${MAX_EARLY_ACCESS_TRUTH}`,
   'Quote only these facts. Never cite other prices, discounts, or comparisons.',
@@ -58,7 +58,7 @@ export const ONBOARDING_CALIBRATION_EXAMPLES = {
     'This artist released music two weeks ago. A profile can put that release beside the links people need. What are you trying to improve?',
   softCommit: 'Want me to set this up?',
   waitlist: ONBOARDING_WAITLIST_RECEIPT,
-  checkoutCloser: `${getPlanDisplayName('pro')} is ${PRO_PRICE_DISPLAY}, billed when you subscribe and renewing until you cancel; the free profile stays free. Want to start there?`,
+  checkoutCloser: `${getPlanDisplayName('pro')} is ${PRO_PRICE_DISPLAY}, card required at checkout, renews monthly, cancel anytime; the free profile stays free. Want to start there?`,
 } as const;
 
 /**
