@@ -166,14 +166,15 @@ export function selectRealtimeProvider(
  */
 export function resolveFailureLadder(
   state: VoiceGatewayState,
-  providers: readonly RealtimeProviderDescriptor[]
+  providers: readonly RealtimeProviderDescriptor[],
+  maxReconnectAttempts = MAX_PROVIDER_RECONNECT_ATTEMPTS
 ):
   | { readonly step: 'reconnect' }
   | { readonly step: 'failover'; readonly providerId: RealtimeProviderId }
   | { readonly step: 'degrade'; readonly mode: 'push-to-talk' | 'text' } {
   if (
     state.providerId !== null &&
-    state.reconnectAttempts < MAX_PROVIDER_RECONNECT_ATTEMPTS
+    state.reconnectAttempts < maxReconnectAttempts
   ) {
     return { step: 'reconnect' };
   }
