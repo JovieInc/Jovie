@@ -13,6 +13,7 @@ import { pathToFileURL } from 'node:url';
 import { runGh } from '../packages/api-client/gh.ts';
 
 export const WORKFLOWS = ['PR Fleet Rules', 'Source Validation'];
+/** @type {Array<[string, RegExp]>} */
 export const CAUSES = [
   ['red-before-green', /red-before-green/i],
   [
@@ -28,6 +29,7 @@ export const CAUSES = [
 export const classify = log =>
   CAUSES.filter(([, pattern]) => pattern.test(log)).map(([name]) => name);
 
+/** @param {Record<string, any>} [options] */
 export async function census({
   hours = 24,
   maxLogs = 120,
