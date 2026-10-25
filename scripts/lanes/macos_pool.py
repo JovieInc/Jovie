@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import os
-import subprocess
+import sys
 import time
 from datetime import datetime
 from pathlib import Path
@@ -114,10 +114,16 @@ def partition_ios(rows: list[dict], hold: bool) -> tuple[list[dict], dict]:
 
 
 def gh_fetch(path: str, timeout: int = 40):
-    result = subprocess.run(["gh", "api", path], capture_output=True, text=True, timeout=timeout)
-    if result.returncode != 0:
-        raise RuntimeError((result.stderr or result.stdout).strip()[-100:] or f"gh exit {result.returncode}")
-    return json.loads(result.stdout or "null")
+    """One GitHub read through the shared client layer (budget, breaker, backoff); 'poll' priority
+    is shed first. A deferral raises, so `sample` leaves the old snapshot to age out."""
+    scripts = str(Path(__file__).resolve().parents[1])
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient.gh import run_gh
+    done = run_gh(["api", path], priority="poll")
+    if done["code"] != 0:
+        raise RuntimeError(((done.get("stderr") or done.get("stdout") or "").strip()[-100:]) or f"gh exit {done['code']}")
+    return json.loads(done["stdout"] or "null")
 
 
 def _open_jobs(repo: str, fetch) -> list[dict]:
