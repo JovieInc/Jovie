@@ -1,4 +1,5 @@
 import AppKit
+import JovieKit
 import SwiftUI
 
 /// Local plain-text editing. Enter, paste, selection and undo remain AppKit actions.
