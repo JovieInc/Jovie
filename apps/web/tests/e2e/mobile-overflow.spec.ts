@@ -8,6 +8,7 @@ import {
 import { APP_ROUTES } from '@/constants/routes';
 import { setTestAuthBypassSession } from '../helpers/auth';
 import {
+  expectNoChildOverlap,
   expectNoDocumentOverflow,
   waitForPendingNextRedirect,
 } from './utils/mobile-overflow';
@@ -371,6 +372,7 @@ async function assertSurfaceDoesNotOverflow(
 ): Promise<void> {
   await waitForNetworkIdle(page, { timeout: 10_000, idleTime: 300 });
   await expectNoDocumentOverflow(page, testInfo, `${label} initial`);
+  await expectNoChildOverlap(page, `${label} initial`);
   await assertFocusedStatesDoNotOverflow(page, testInfo, label);
 }
 

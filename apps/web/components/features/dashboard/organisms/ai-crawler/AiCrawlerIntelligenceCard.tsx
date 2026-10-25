@@ -106,7 +106,7 @@ export function AiCrawlerIntelligenceCard({
           aria-hidden='true'
         />
       )}
-      <span className='shrink-0 text-sm font-semibold text-primary-token'>
+      <span className='min-w-0 truncate text-sm font-semibold text-primary-token'>
         {CRAWLER_READ_DISCLOSURE.label}
       </span>
       <span className='min-w-0 flex-1 truncate text-left text-2xs text-tertiary-token'>
@@ -116,7 +116,7 @@ export function AiCrawlerIntelligenceCard({
       </span>
       <span className='sr-only'>{CRAWLER_READ_DISCLOSURE.description}</span>
       {model.status ? (
-        <span className='inline-flex shrink-0 items-center gap-1.5 rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium text-secondary-token'>
+        <span className='inline-flex shrink-0 items-center gap-1.5 max-[479px]:hidden rounded-full border border-subtle bg-surface-0 px-2 py-0.5 text-3xs font-medium text-secondary-token'>
           <span
             className='h-1.5 w-1.5 shrink-0 rounded-full'
             style={{ background: statusDotVar(model.status.tone) }}
@@ -131,16 +131,22 @@ export function AiCrawlerIntelligenceCard({
   if (showTeaser) {
     return (
       <div
-        className={cn(ROW_CLASS, className)}
+        className={cn(ROW_CLASS, 'flex-wrap', className)}
         data-testid='ai-crawler-intelligence-card'
+        data-no-child-overlap=''
       >
+        {/* min-w forces the Upgrade button to wrap below instead of overlapping at 390px */}
         <div
-          className='flex min-w-0 flex-1 items-center gap-3'
+          className='flex min-w-56 flex-1 items-center gap-3'
           data-testid='ai-crawler-card-teaser'
+          data-no-child-overlap=''
         >
           {rowContent}
         </div>
-        <UpgradeButton size='sm'>{`Upgrade to ${PRO_PLAN_DISPLAY_NAME}`}</UpgradeButton>
+        <UpgradeButton
+          size='sm'
+          className='ml-auto'
+        >{`Upgrade to ${PRO_PLAN_DISPLAY_NAME}`}</UpgradeButton>
       </div>
     );
   }
