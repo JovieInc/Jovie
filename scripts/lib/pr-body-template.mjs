@@ -30,7 +30,10 @@ export const isRepair = ({ title = '', labels = [] } = {}) =>
   REPAIR_TITLE.test(title) ||
   labels.some(label => REPAIR_LABELS.has(String(label).toLowerCase()));
 
-/** The body a new PR starts from. `TODO` fields fail the rules until the author replaces them. */
+/**
+ * The body a new PR starts from. `TODO` fields fail the rules until the author replaces them.
+ * @param {Record<string, any>} [options]
+ */
 export function buildBody({
   identifier,
   issueId,
@@ -81,6 +84,7 @@ const HINTS = {
     'Restore the weakened assertions and show the repair with a real red-to-green test.',
 };
 
+/** @param {{ base: string, cwd: string }} options */
 function runShipGate({ base, cwd }) {
   const done = spawnSync(
     process.execPath,
@@ -103,6 +107,7 @@ function runShipGate({ base, cwd }) {
 /**
  * Run the three rules locally. Returns `{ errors: [{ rule, message, add }] }`; empty means the PR will not
  * be red on these. `gate` is injectable for tests.
+ * @param {Record<string, any>} [options]
  */
 export function preflight({
   title,

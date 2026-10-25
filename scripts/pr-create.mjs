@@ -31,6 +31,7 @@ const without = (args, names) => {
   return out;
 };
 
+/** @param {Record<string, any>} [options] */
 export async function main({
   args = process.argv.slice(2),
   log = console.log,
