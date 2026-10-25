@@ -43,8 +43,10 @@ provider error text or input excerpts. Transient failures include `Retry-After`.
 Every response has a server-generated `X-Request-Id`, v1 policy `Link`, quota
 policy and `Cache-Control: no-store`; remaining/reset headers appear when the
 durable quota store is available. The shared public-artist quota is 100 requests
-per IP per 60 seconds. Body size is 16,384 bytes; body reads have 5 seconds and
-provider work has 45 seconds. Disconnecting cancels provider work.
+per IP per 60 seconds across this resource and existing public profile reads;
+lookup traffic consumes the same bucket, and a quota-store outage affects both. Body size is 16,384 bytes; body reads have 5 seconds and
+provider work has 45 seconds. Provider work is canceled when the server runtime propagates a client
+disconnect. Deployed disconnect propagation remains commissioning work in JOV-8745.
 
 Retries can repeat upstream reads and return newer provider facts. There is no
 durable replay snapshot or asynchronous poll/cancel resource in this slice.
@@ -70,6 +72,5 @@ For an existing `jovie music resolve '<input>' --json` or MCP integration, prese
 the same request fields. REST HTTP failures correspond to MCP
 `result.structuredContent.error`, while REST domain results equal MCP
 `structuredContent` and CLI JSON directly. The CLI continues to use the existing
-MCP transport. Transport presence does not prove semantic parity with Musicfetch,
-Chartmetric or Social Blade. Migrate buyer workflows using the JOV-7822 matrix;
+MCP transport. Transport presence does not prove semantic parity with other data providers. Migrate buyer workflows using the JOV-7822 matrix;
 do not translate proprietary metrics or promise drop-in vendor compatibility.

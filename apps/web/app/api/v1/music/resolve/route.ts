@@ -55,8 +55,8 @@ export async function POST(request: Request) {
       {
         status: statusByCode[code],
         headers: {
-          ...headers,
           ...(retryable ? { 'Retry-After': '60' } : {}),
+          ...headers,
         },
       }
     );

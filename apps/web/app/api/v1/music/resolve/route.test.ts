@@ -143,9 +143,33 @@ describe('versioned public music resolve HTTP contract', () => {
         },
       });
       expect(response.headers.get('Retry-After')).toBe('60');
+      if (state !== 'limited') {
+        expect(response.headers.get('RateLimit')).toBeNull();
+        expect(response.headers.get('X-RateLimit-Remaining')).toBeNull();
+        expect(response.headers.get('X-RateLimit-Reset')).toBeNull();
+      }
       expect(mocks.resolve).not.toHaveBeenCalled();
     }
   );
+
+  it('keeps retry timing aligned with the actual quota reset', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-25T00:00:00Z'));
+    mocks.limit.mockResolvedValue({
+      success: false,
+      limit: 100,
+      remaining: 0,
+      reset: new Date(Date.now() + 17_000),
+    });
+    const response = await POST(request());
+    expect(response.status).toBe(429);
+    expect(await checked(response)).toEqual({
+      error: { code: 'RATE_LIMITED', retryable: true },
+    });
+    expect(response.headers.get('RateLimit')).toBe('"public-artist";r=0;t=17');
+    expect(response.headers.get('Retry-After')).toBe('17');
+    expect(mocks.resolve).not.toHaveBeenCalled();
+  });
 
   it('rejects hostile origins and non-JSON bodies with structured errors', async () => {
     const denied = await POST(
