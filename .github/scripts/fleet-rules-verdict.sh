@@ -25,9 +25,9 @@ trap 'rm -f "$out"' EXIT
 # wakes this job again, so PR Ready would stay red on it for good (2026-10-25:
 # #22978, #23005, #23089). Retry in the job, with a growing pause, before giving up;
 # the doctor's quota-deferred-heads alert covers whatever is still deferred after.
-MAX_DEFERRED_RETRIES="${FLEET_DEFERRED_RETRIES:-4}"
-BACKOFF_STEP_S="${FLEET_DEFERRED_BACKOFF_STEP_S:-60}"
-BACKOFF_CAP_S="${FLEET_DEFERRED_BACKOFF_CAP_S:-240}"
+MAX_DEFERRED_RETRIES="${FLEET_DEFERRED_RETRIES:-3}"
+BACKOFF_STEP_S="${FLEET_DEFERRED_BACKOFF_STEP_S:-20}"
+BACKOFF_CAP_S="${FLEET_DEFERRED_BACKOFF_CAP_S:-80}"
 retry=0
 set +e
 while :; do

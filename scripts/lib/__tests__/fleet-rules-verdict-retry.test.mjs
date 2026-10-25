@@ -63,7 +63,7 @@ test('a policy failure is decisive and is not retried', () => {
 });
 
 test('a read that stays deferred stops at the retry cap and still reports 75', () => {
-  assert.deepEqual(verdict([75]), { status: 75, runs: 5 });
+  assert.deepEqual(verdict([75]), { status: 75, runs: 4 });
   assert.deepEqual(verdict([75], { FLEET_DEFERRED_RETRIES: '1' }), {
     status: 75,
     runs: 2,
