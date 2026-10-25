@@ -223,5 +223,22 @@ class WakeTests(unittest.TestCase):
             refill.write_wake(state, "JOV", "because")
 
 
+class GroomApplyTests(unittest.TestCase):
+    def test_apply_queues_label_and_comment_and_marks_checked(self):
+        import groom_pass
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        for team in ("JOV", "LYB"):
+            path = ls.mirror_path(state, team); path.parent.mkdir(parents=True, exist_ok=True)
+            rows = [row(1)] if team == "JOV" else []
+            path.write_text(json.dumps({"schema": ls.MIRROR, "syncedAt": NOW, "issues": {r["id"]: r for r in rows}}))
+        done = groom_pass.apply(state, [{"id": "JOV-1", "verdict": "ready", "rationale": "One scoped PR."},
+                                        {"id": "JOV-1", "verdict": "error"}, {"id": "JOV-9", "verdict": "ready", "rationale": "x"}])
+        self.assertEqual(done, ["JOV-1"])
+        entries = json.loads((state / "linear" / "outbox.json").read_text())["entries"]
+        self.assertEqual(sorted((e["op"], e.get("body", "")[:30]) for e in entries),
+                         [("comment", "Readiness pass (grok-4.7): age"), ("label", "agent-ready"), ("label", "readiness-checked")])
+
+
 if __name__ == "__main__":
     unittest.main()

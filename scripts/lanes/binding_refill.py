@@ -8,6 +8,12 @@ just refreshed the local mirror, so a deficit is seen within one tick of the Lin
 that caused it, with no extra Linear read. Only issues a human or groomer already marked
 `agent-ready` are promoted; everything else stays Backlog and is reported as the reason.
 
+Ownership (Tim 2026-10-25, one owner per queue): this refill is the ONLY writer of Backlog -> Todo and of
+Backlog order for both teams. Summer's backlog governor (summer-config summer-backlog-governor.ts, JOV-7073) is an
+observer for JOV: it ranks supply and "delegates every Todo admission to the existing guarded Gem writer", never
+transitioning an issue itself, so it defers to this module by construction. If the governor ever gains a writer it
+must call this module's `select`, not its own ordering.
+
 Pure selection (`select`) is separate from the write (`refill`), which goes through the
 outbox like every other lane write (readback, retry, never overwrites a remote decision).
 """
