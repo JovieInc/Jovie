@@ -18,7 +18,7 @@ describe('SmartLinksLanding', () => {
     }));
   });
 
-  it('presents the real link, the three-step journey, and a choice that follows the next release', () => {
+  it('presents the real link, the three-step journey and a demo dial that never links out', () => {
     render(<SmartLinksLanding />);
     expect(
       screen.getByRole('heading', {
@@ -36,9 +36,7 @@ describe('SmartLinksLanding', () => {
       'max-w-62',
       'overflow-hidden'
     );
-    expect(screen.getByTestId('action-dial').querySelector('div')).toHaveClass(
-      'min-h-53'
-    );
+    expect(screen.getByTestId('dial-demo')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Open the live example' })
     ).toHaveAttribute('href', '/tim/never-say-a-word?noredirect=1');
@@ -46,27 +44,13 @@ describe('SmartLinksLanding', () => {
       screen.getByRole('heading', { name: 'Choose an app once' })
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('option', { name: 'Apple Music' }));
-    expect(
-      screen.getByRole('link', {
-        name: 'Open live Smart Link with Apple Music',
-      })
-    ).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole('button', { name: 'See the next release →' })
     );
     expect(
       screen.getByRole('img', { name: 'The Deep End cover art' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', {
-        name: 'Open live Smart Link with Apple Music',
-      })
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('link', {
-        name: 'Open live Smart Link with Apple Music',
-      })
-    ).toHaveAttribute('href', '/tim/the-deep-end?noredirect=1');
+    // The dial is a demo: it never links out; the live example link stays.
+    expect(screen.getByTestId('dial-demo').querySelector('a[href]')).toBeNull();
   });
 });

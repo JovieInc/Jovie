@@ -1,4 +1,5 @@
 import { DSP_LINKS_COPY } from '@/data/dspLinksCopy';
+import { DialDemo } from '@/features/release/DialDemo';
 import { ProductFeatureLanding } from '../ProductFeatureLanding';
 import { DspLinksList } from './DspLinksList';
 
@@ -9,6 +10,7 @@ export function DspLinksLanding() {
       owner='apps/web/app/(marketing)/product/dsp-links/DspLinksLanding.tsx'
       copy={DSP_LINKS_COPY}
     >
+      <DialDemo className='mb-6' />
       <DspLinksList />
     </ProductFeatureLanding>
   );

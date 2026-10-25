@@ -2,12 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { DSP_LOGO_CONFIG } from '@/components/atoms/DspLogo';
-import {
-  ActionDial,
-  type ActionDialOption,
-} from '@/features/release/ActionDial';
+import { useState } from 'react';
+import { DialDemo } from '@/features/release/DialDemo';
 
 const RELEASES = [
   {
@@ -22,40 +18,9 @@ const RELEASES = [
   },
 ] as const;
 
-const SERVICES = [
-  { id: 'spotify', label: 'Spotify' },
-  { id: 'apple_music', label: 'Apple Music' },
-  { id: 'deezer', label: 'Deezer' },
-] as const;
-
 export function SmartLinksDemo() {
   const [releaseIndex, setReleaseIndex] = useState(0);
-  const [selectedId, setSelectedId] = useState('spotify');
   const release = RELEASES[releaseIndex]!;
-  const options = useMemo<ActionDialOption[]>(
-    () =>
-      SERVICES.map(service => {
-        const logo = DSP_LOGO_CONFIG[service.id];
-        return {
-          id: service.id,
-          label: service.label,
-          href: release.href,
-          icon: logo?.iconPath ? (
-            <svg
-              viewBox='0 0 24 24'
-              fill='currentColor'
-              className='h-5 w-5'
-              style={{ color: logo.color }}
-              aria-hidden='true'
-            >
-              <path d={logo.iconPath} />
-            </svg>
-          ) : undefined,
-        };
-      }),
-    [release.href]
-  );
-
   return (
     <div
       className='mx-auto w-full max-w-sm rounded-4xl border border-white/10 bg-surface-0 p-4 shadow-card-elevated sm:p-6'
@@ -85,14 +50,7 @@ export function SmartLinksDemo() {
         <p className='text-sm text-tertiary-token'>Tim White</p>
       </div>
       <div className='mt-3'>
-        <ActionDial
-          options={options}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          actionLabel='Open live Smart Link'
-          groupLabel='Try the streaming service dial'
-          hint='Swipe, tap, or use arrow keys. Your selection follows the next release.'
-        />
+        <DialDemo hint='Swipe, flick, or use arrow keys to try it.' />
       </div>
       <div className='mt-2 flex items-center justify-between gap-3 border-t border-white/10 pt-4'>
         <button
