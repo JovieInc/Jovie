@@ -91,6 +91,31 @@ describe('central Inbox bell', () => {
   });
 
   it.each([
+    [1, 'Inbox — 1 Item Needs Attention'],
+    [2, 'Inbox — 2 Items Need Attention'],
+  ])(
+    'reads the shared Inbox count for %d pending item(s) with matching copy (JOV-8968)',
+    (pendingCount, name) => {
+      render(
+        <SidebarInboxLink availability={{ state: 'available', pendingCount }} />
+      );
+      // The count in the bell label equals the shared Inbox availability
+      // count, and singular/plural copy matches it — never "1 Items".
+      const link = screen.getByRole('link', { name });
+      expect(link).toHaveAttribute('data-inbox-attention', 'available');
+    }
+  );
+
+  it('reads the shared Inbox count for an empty Inbox (JOV-8968)', () => {
+    render(
+      <SidebarInboxLink availability={{ state: 'empty', pendingCount: 0 }} />
+    );
+    const link = screen.getByRole('link', { name: 'Inbox — All Caught Up' });
+    expect(link).toHaveAttribute('data-inbox-attention', 'empty');
+    expect(link.textContent).not.toMatch(/\d/);
+  });
+
+  it.each([
     [{ state: 'empty' as const, pendingCount: 0 }, 'Inbox — All Caught Up'],
     [
       { state: 'unknown' as const, pendingCount: null },

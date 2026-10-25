@@ -15,8 +15,15 @@ export function SidebarInboxLink({
 }) {
   const hasRuntimeUpdate = Boolean(useRuntimeUpdate()?.available);
   const pending = availability?.state === 'available';
+  // JOV-8968: the count in the bell label comes straight from the shared
+  // Inbox availability source; singular/plural copy must match it (JOV-9018).
+  const pendingCount = availability?.pendingCount ?? 0;
+  const needsAttentionLabel =
+    pendingCount === 1
+      ? '1 Item Needs Attention'
+      : `${pendingCount} Items Need Attention`;
   const label = pending
-    ? `Inbox — ${availability?.pendingCount} Items Need Attention`
+    ? `Inbox — ${needsAttentionLabel}`
     : availability?.state === 'empty'
       ? 'Inbox — All Caught Up'
       : 'Inbox — Status Unavailable';
