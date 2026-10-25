@@ -32,7 +32,8 @@ function writeStored(on: boolean): void {
  * app it also enters native fullscreen (needs the user gesture, so it applies
  * on toggle, not on a persisted reload).
  */
-export function useOvieFullscreen() {
+export function useOvieFullscreen(options?: { readonly force?: boolean }) {
+  const force = options?.force === true;
   const fromUrl = useSearchParams()?.get('fullscreen') === '1';
   const [on, setOn] = useState(false);
   const [inDesktopApp, setInDesktopApp] = useState(false);
@@ -40,8 +41,8 @@ export function useOvieFullscreen() {
 
   useEffect(() => {
     setInDesktopApp(isElectronRuntime());
-    setOn(fromUrl || readStored());
-  }, [fromUrl]);
+    setOn(force || fromUrl || readStored());
+  }, [force, fromUrl]);
 
   const set = useCallback((next: boolean, gesture: boolean) => {
     setOn(next);
@@ -62,6 +63,7 @@ export function useOvieFullscreen() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      if (force) return;
       if (matchesFullscreenShortcut(event, inDesktopApp)) {
         event.preventDefault();
         set(!on, true);
@@ -85,7 +87,7 @@ export function useOvieFullscreen() {
       globalThis.removeEventListener(FULLSCREEN_TOGGLE_EVENT, onEvent);
       document.removeEventListener('fullscreenchange', onNativeChange);
     };
-  }, [inDesktopApp, on, set]);
+  }, [force, inDesktopApp, on, set]);
 
   return { on, toggle, inDesktopApp };
 }

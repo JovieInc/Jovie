@@ -73,11 +73,16 @@ async function fetchInbox(signal: AbortSignal): Promise<OvieInbox> {
 export interface OvieHomeCanvasProps {
   /** Shell chat state; absent when Home renders outside the composer slot. */
   readonly chat?: HomeCanvasState;
+  /** Office display: always Full Screen, no toggle. */
+  readonly display?: boolean;
 }
 
-export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
+export function OvieHomeCanvas({
+  chat,
+  display = false,
+}: Readonly<OvieHomeCanvasProps>) {
   const queryClient = useQueryClient();
-  const fullscreen = useOvieFullscreen();
+  const fullscreen = useOvieFullscreen({ force: display });
   const shipping = useHudShippingStateQuery(null);
   const { metrics, funnel } = useOvieCompanyQueries();
   const inbox = useQuery<OvieInbox>({
