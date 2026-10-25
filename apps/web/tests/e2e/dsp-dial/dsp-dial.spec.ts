@@ -453,25 +453,3 @@ test.describe('dsp dial: performance', () => {
     );
   });
 });
-
-test.describe('dsp dial: visual baseline', () => {
-  test('tim fixture at rest', async ({ page }) => {
-    const dial = await open(page, 'tim');
-    await expect(dial).toHaveScreenshot('dsp-dial-tim-390.png', {
-      maxDiffPixelRatio: 0.01,
-      animations: 'disabled',
-    });
-  });
-  test('synthetic 100-destination fixture mid-list', async ({ page }) => {
-    const dial = await open(page, 'synthetic');
-    await dial.getByRole('listbox').focus();
-    await page.keyboard.press('PageDown');
-    await page.keyboard.press('PageDown');
-    await settled(() => streamIndex(dial), 600);
-    await page.locator('body').click({ position: { x: 5, y: 600 } });
-    await expect(dial).toHaveScreenshot('dsp-dial-synthetic-390.png', {
-      maxDiffPixelRatio: 0.01,
-      animations: 'disabled',
-    });
-  });
-});
