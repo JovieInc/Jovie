@@ -330,7 +330,15 @@
         "softRuns": 24,
         "windowS": 86400,
         "perRunCapUsd": 10,
-        "perTurnBudgetUsd": 10
+        "perTurnBudgetUsd": 10,
+        "laneSlots": {
+          "value": 1,
+          "previous": 10,
+          "setAt": "2026-10-25T06:02:19Z",
+          "setBy": "run-waste worker",
+          "reason": "0 merged hyperagent/* PRs since 10-18 against 71 glm/* merges.",
+          "raiseWhen": "PR 23184 is live and hyperagent/* PRs actually merge."
+        }
       },
       "accounts": [
         {

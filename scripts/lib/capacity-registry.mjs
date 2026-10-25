@@ -491,6 +491,12 @@ export function laneRoutingOrder(view, context = {}) {
   } else {
     reasons.push('Codex on pace; cost per merge is not higher than Hyperagent');
   }
+  const slots = hyper?.limits?.laneSlots?.value;
+  if (first === 'hyperagent' && Number.isFinite(slots)) {
+    reasons.push(
+      `Hyperagent lane is capped at ${slots} slot(s) until hyperagent/* PRs merge`
+    );
+  }
   const cloud = codex?.offGem?.status === 'configured';
   return {
     order:
@@ -498,6 +504,7 @@ export function laneRoutingOrder(view, context = {}) {
         ? ['openai-codex', 'hyperagent']
         : ['hyperagent', 'openai-codex'],
     reasons,
+    hyperagentSlots: Number.isFinite(slots) ? slots : null,
     codexWhere: context.gemLoaded
       ? cloud
         ? 'codex-cloud'

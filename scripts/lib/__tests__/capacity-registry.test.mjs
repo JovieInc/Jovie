@@ -469,3 +469,31 @@ describe('lane routing (Tim 2026-10-25)', () => {
     expect(result.codexWhere).toBe('gem-throttled');
   });
 });
+
+describe('Hyperagent slot cap', () => {
+  it('reports the one-slot cap when Hyperagent is first', () => {
+    const view = {
+      providers: [
+        {
+          id: 'openai-codex',
+          accounts: [{ quota: { verdict: 'over-burning' } }],
+        },
+        {
+          id: 'hyperagent',
+          accounts: [],
+          limits: { laneSlots: { value: 1 } },
+        },
+      ],
+    };
+    const result = laneRoutingOrder(view);
+    expect(result.order[0]).toBe('hyperagent');
+    expect(result.hyperagentSlots).toBe(1);
+    expect(result.reasons.join(' ')).toContain('capped at 1 slot');
+  });
+
+  it('is recorded in the committed registry', () => {
+    const { registry } = loadAll();
+    const hyper = registry.providers.find(p => p.id === 'hyperagent');
+    expect(hyper.limits.laneSlots).toMatchObject({ value: 1, previous: 10 });
+  });
+});

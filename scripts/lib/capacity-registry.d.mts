@@ -254,5 +254,6 @@ export function laneRoutingOrder(
 ): {
   order: ('openai-codex' | 'hyperagent')[];
   reasons: string[];
+  hyperagentSlots: number | null;
   codexWhere: 'gem' | 'gem-throttled' | 'codex-cloud';
 };
