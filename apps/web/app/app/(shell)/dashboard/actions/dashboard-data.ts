@@ -919,7 +919,17 @@ async function fetchDashboardBaseWithSession(
   };
 }
 
-/** Retry only this pure read after an idle-terminated setup has closed. */
+/**
+ * Retry only this pure read after an idle-terminated setup or a dropped
+ * connection has closed (JOV-8837).
+ *
+ * A read-only transaction's COMMIT can die on the wire after a Neon
+ * idle-in-transaction timeout without a 25P03 SQLSTATE or idle text —
+ * Drizzle then surfaces `Failed query: commit` wrapping a lost connection,
+ * which the idle-only predicate never recovers. The callback already
+ * succeeded and wrote nothing, so replaying this side-effect-free read once
+ * is unambiguous (JOV-3775 forbids replay only for uncertain writes).
+ */
 async function fetchAvatarQualityWithSession(
   clerkUserId: string,
   profileId: string
@@ -939,11 +949,13 @@ async function fetchAvatarQualityWithSession(
   try {
     return await read();
   } catch (error) {
-    if (
-      !isIdleTransactionTermination(error) ||
-      performance.now() >= retryDeadline
-    )
-      throw error;
+    // Same recovery admission as the distribution read: idle termination, or
+    // a transient transport failure that is not a PostgreSQL timeout (a
+    // statement timeout replaying immediately would only double the wait).
+    const recoverable =
+      isIdleTransactionTermination(error) ||
+      (isRetryableError(error) && !isPostgresTimeoutError(error));
+    if (!recoverable || performance.now() >= retryDeadline) throw error;
 
     // The first wrapper has completed rollback/release. RLS reporting remains
     // intact; only this side-effect-free avatar read gets one fresh attempt.
