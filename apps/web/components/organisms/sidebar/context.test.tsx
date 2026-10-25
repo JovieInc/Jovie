@@ -21,6 +21,7 @@ function Controls() {
       data-rail-toggle='left'
       data-preview={sidebar.isPreview}
       data-state={sidebar.state}
+      data-is-mobile={sidebar.isMobile}
       data-mobile-open={sidebar.openMobile}
       data-desktop-open={sidebar.open}
     >
@@ -122,5 +123,99 @@ describe('explicit sidebar activation', () => {
     expect(control).toHaveAttribute('data-desktop-open', 'false');
     fireEvent.click(control);
     expect(control).toHaveAttribute('data-mobile-open', 'false');
+  });
+});
+
+describe('desktop runtime compact windows (JOV-8942)', () => {
+  afterEach(() => {
+    Reflect.deleteProperty(document.documentElement.dataset, 'desktopRuntime');
+  });
+
+  it('never adopts the mobile shell in the Electron runtime at a compact width', () => {
+    viewport.mobile = true;
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    render(
+      <SidebarProvider defaultOpen={false}>
+        <Controls />
+      </SidebarProvider>
+    );
+
+    const control = screen.getByRole('button');
+    expect(control).toHaveAttribute('data-is-mobile', 'false');
+    // The desktop pin is the only toggle in the desktop runtime; the mobile
+    // sheet stays closed through activation.
+    fireEvent.click(control);
+    expect(control).toHaveAttribute('data-mobile-open', 'false');
+    expect(control).toHaveAttribute('data-desktop-open', 'true');
+    fireEvent.click(control);
+    expect(control).toHaveAttribute('data-desktop-open', 'false');
+  });
+
+  it('collapses the rail to the icon rail on a compact window and restores the pin when it widens', () => {
+    viewport.mobile = true;
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    const { rerender } = render(
+      <SidebarProvider defaultOpen>
+        <Controls />
+      </SidebarProvider>
+    );
+
+    const control = screen.getByRole('button');
+    expect(control).toHaveAttribute('data-is-mobile', 'false');
+    // Entering the compact range auto-collapses the pinned rail to icons.
+    expect(control).toHaveAttribute('data-desktop-open', 'false');
+    expect(control).toHaveAttribute('data-state', 'closed');
+
+    viewport.mobile = false;
+    rerender(
+      <SidebarProvider defaultOpen>
+        <Controls />
+      </SidebarProvider>
+    );
+    // Widening restores the pin the window had before shrinking.
+    expect(control).toHaveAttribute('data-desktop-open', 'true');
+    expect(control).toHaveAttribute('data-state', 'open');
+  });
+
+  it('keeps a rail the user reopened on a compact window open after it widens', () => {
+    viewport.mobile = true;
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    const { rerender } = render(
+      <SidebarProvider defaultOpen>
+        <Controls />
+      </SidebarProvider>
+    );
+
+    const control = screen.getByRole('button');
+    expect(control).toHaveAttribute('data-desktop-open', 'false');
+    // The user re-expands the icon rail while the window is still compact.
+    fireEvent.click(control);
+    expect(control).toHaveAttribute('data-desktop-open', 'true');
+
+    viewport.mobile = false;
+    rerender(
+      <SidebarProvider defaultOpen>
+        <Controls />
+      </SidebarProvider>
+    );
+    // Their live intent wins: widening never force-collapses the rail.
+    expect(control).toHaveAttribute('data-desktop-open', 'true');
+  });
+
+  it('keeps the mobile shell in the browser at a compact width', () => {
+    viewport.mobile = true;
+    render(
+      <SidebarProvider defaultOpen>
+        <Controls />
+      </SidebarProvider>
+    );
+
+    const control = screen.getByRole('button');
+    expect(control).toHaveAttribute('data-is-mobile', 'true');
+    expect(control).toHaveAttribute('data-mobile-open', 'false');
+    // A compact browser window still opens the mobile sheet.
+    fireEvent.click(control);
+    expect(control).toHaveAttribute('data-mobile-open', 'true');
+    expect(control).toHaveAttribute('data-desktop-open', 'true');
   });
 });

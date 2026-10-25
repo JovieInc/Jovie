@@ -326,4 +326,30 @@ describe('AuthShell canonical wiring', () => {
       'data-content-class'
     );
   });
+
+  it('never mounts the customer bottom tab bar in the Electron runtime (JOV-8942)', () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    renderAuthShell(true);
+
+    // A desktop window never renders the mobile bottom tab bar, even when the
+    // route would show one in the browser at a compact width.
+    expect(
+      screen.queryByRole('navigation', { name: 'Dashboard Tabs' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-shell-frame')).not.toHaveAttribute(
+      'data-content-class'
+    );
+  });
+
+  it('never mounts the OV bottom navigation in the Electron runtime (JOV-8942)', () => {
+    document.documentElement.dataset.desktopRuntime = 'electron';
+    renderOvAuthShell();
+
+    expect(
+      screen.queryByRole('navigation', { name: 'OV Mobile Navigation' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByTestId('app-shell-frame')).not.toHaveAttribute(
+      'data-content-class'
+    );
+  });
 });
