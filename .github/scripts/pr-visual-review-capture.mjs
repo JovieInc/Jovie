@@ -7,7 +7,11 @@ import { chromium } from 'playwright';
 import {
   blockingCaptureRuntimeFailures,
   buildCaptureArtifactPaths,
+  CAPTURE_VIEWPORTS,
   CRITICAL_JOURNEY_CAPTURE_SCHEMA,
+  capturePersonaForRoute,
+  captureViewportNamesForRoute,
+  isOvieCaptureRoute,
   MAX_CAPTURE_WORKERS,
   resolveCaptureJourneyId,
   resolveCaptureWorkerCount,
@@ -15,6 +19,7 @@ import {
   sanitizeCaptureText,
   summarizeScriptedCaptures,
   validateCaptureManifest,
+  validateRoutesMatchChange,
 } from './pr-visual-review.mjs';
 
 const baseUrl = process.env.BASE_URL ?? 'http://127.0.0.1:3100';
@@ -40,10 +45,7 @@ const exactHead = (() => {
 
   return isExactSha(process.env.GITHUB_SHA) ? process.env.GITHUB_SHA : null;
 })();
-const viewports = {
-  desktop: { width: 1440, height: 900 },
-  mobile: { width: 390, height: 844 },
-};
+const viewports = CAPTURE_VIEWPORTS;
 const AUTHENTICATED_SHELL_WAIT_MS = 30_000;
 const NEW_CHAT_EMPTY_WAIT_MS = 15_000;
 const CAPTURE_TIMEOUT_MS = 45_000;
@@ -96,6 +98,17 @@ async function waitForAuthenticatedShell(page, route) {
     timeout: AUTHENTICATED_SHELL_WAIT_MS,
   });
 
+  if (isOvieCaptureRoute(route)) {
+    // Ovie Home proof: the company HUD itself, not just the shell around it.
+    await page
+      .getByTestId('ovie-company-home')
+      .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+    if (route.includes('fullscreen=1'))
+      await page
+        .getByTestId('ovie-fullscreen')
+        .waitFor({ state: 'visible', timeout: AUTHENTICATED_SHELL_WAIT_MS });
+  }
+
   if (route === '/app/chat' || route.startsWith('/app/chat/')) {
     // JOV-7150: the loaded empty state is one greeting sentence rendered as
     // chat-empty-state-greeting-text. The loading still-frame only renders an
@@ -139,10 +152,10 @@ const workers = resolveCaptureWorkerCount(process.env.PR_VISUAL_WORKERS);
 const browser = await chromium.launch({ headless: true });
 const browserVersion = browser.version();
 const targets = routes.flatMap(route =>
-  Object.entries(viewports).map(([viewportName, viewport]) => ({
+  captureViewportNamesForRoute(route).map(viewportName => ({
     route,
     viewportName,
-    viewport,
+    viewport: viewports[viewportName],
   }))
 );
 let failureCount = 0;
@@ -229,9 +242,9 @@ try {
       });
       const url = new URL(route, baseUrl).toString();
       if (route.startsWith('/app/')) {
-        actions.push('bootstrap-creator-ready-session');
+        actions.push(`bootstrap-${capturePersonaForRoute(route)}-session`);
         const authEntryUrl = new URL(
-          `/api/dev/test-auth/enter?persona=creator-ready&redirect=${encodeURIComponent(route)}`,
+          `/api/dev/test-auth/enter?persona=${capturePersonaForRoute(route)}&redirect=${encodeURIComponent(route)}`,
           baseUrl
         );
         const authResponse = await context.request.get(
@@ -380,9 +393,17 @@ await writeFile(
 );
 const validation = validateCaptureManifest(evidenceManifest, {
   routes,
-  viewportNames: Object.keys(viewports),
+  viewportNamesForRoute: captureViewportNamesForRoute,
 });
-const validationFailures = validation.failures;
+const validationFailures = [...validation.failures];
+try {
+  const routing = JSON.parse(
+    readFileSync(join(outDir, 'routing.json'), 'utf8')
+  );
+  validationFailures.push(...validateRoutesMatchChange(routing.files, routes));
+} catch {
+  // No routing receipt (local run): the route/file guard cannot run.
+}
 if (validationFailures.length > 0) {
   await writeFile(
     join(outDir, 'capture-validation.json'),
