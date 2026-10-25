@@ -22,7 +22,6 @@ import {
 } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const statusByCode: Record<MusicResolveFailure['error']['code'], number> = {
