@@ -353,7 +353,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(29);
+    expect(LANES_PYTEST_FILES).toHaveLength(30);
+    expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
     expect(command).toContain(
       'coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90'
@@ -366,6 +367,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
       combine
+    );
+    expect(command).toContain(
+      'python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90'
     );
   });
 
