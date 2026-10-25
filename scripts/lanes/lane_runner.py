@@ -910,6 +910,17 @@ def recent_lane_runs(host: "Host", name: str, window_s: float, now: float, tail_
 
 
 def quota_pressure(host: "Host", name: str, spec: dict, now: float) -> dict:
+    """quota_window_pressure plus the registry's pace adjustment (`paceAdjust`, may be negative):
+    a lane behind pace on use-or-lose quota is cheap to route to, a pool ahead of pace costs more."""
+    seen = quota_window_pressure(host, name, spec, now)
+    if seen.get("ok"):
+        pace = capacity_registry.pace_adjust(capacity_registry.load(), host.state, name, now)
+        if pace["adjust"]:
+            seen = {**seen, "paceAdjust": pace["adjust"], "why": f"{seen.get('why')}; {pace['why']}"}
+    return seen
+
+
+def quota_window_pressure(host: "Host", name: str, spec: dict, now: float) -> dict:
     """{ok, why, pressure}: how much of the lane's quota window is spent. Pressure raises the
     effective cost of subscription and credit lanes as they fill; a bank removes them."""
     quota = spec.get("quota") or {}
@@ -976,7 +987,8 @@ def lane_availability(host: "Host", self_name: str, providers: dict, now: float 
                   and now - last_at < IDLE_BLOCK_S):
                 verdict = {"ok": False, "why": f"blocked:{last['reason']}", "pressure": 0}
             elif not slot_free(host, name, slots):
-                verdict = {"ok": False, "why": "saturated", "pressure": quota["pressure"]}
+                verdict = {"ok": False, "why": "saturated", "pressure": quota["pressure"],
+                           "paceAdjust": quota.get("paceAdjust", 0)}
         cache[name] = verdict
         return verdict
 

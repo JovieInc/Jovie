@@ -148,3 +148,60 @@ def routing_order(registry: dict, now: float, state_dir: Path | None = None) -> 
         rows.append({"provider": provider["id"], "rank": rank, "verdicts": verdicts,
                      "freshness": "stale" if "stale" in states else "unknown" if not states else "fresh"})
     return sorted(rows, key=lambda r: (r["rank"], r["freshness"] != "fresh"))
+
+
+# ---------------------------------------------------------------- pace-aware routing
+PACE_FREE_FLOOR = -0.9  # a lane behind pace on use-or-lose quota costs a tenth: the quota is sunk
+PACE_AHEAD_CAP = 0.5
+
+
+def _quota_delta(quota: dict, now: float, max_age_s: float) -> float | None:
+    """used% minus elapsed% of the window for a routing-fresh live reading, else None."""
+    observed = _epoch(quota.get("observedAt"))
+    resets, window = _epoch(quota.get("resetsAt")), quota.get("windowMins")
+    used = quota.get("usedPercent")
+    if used is None and isinstance(quota.get("remainingPercent"), (int, float)):
+        used = 100 - quota["remainingPercent"]
+    if observed is None or now - observed > max_age_s or used is None or resets is None or not window or resets <= now:
+        return None
+    elapsed = min(100.0, max(0.0, (now - (resets - window * 60)) / (window * 60) * 100))
+    return used - elapsed
+
+
+def live_deltas(registry: dict, state_dir: Path | None, provider_id: str, now: float) -> dict:
+    """{account_id: used-minus-elapsed points} from the LIVE overlay only, for active accounts whose
+    reading is newer than thresholds.routingMaxAgeMinutes. The reviewed registry snapshot is history,
+    never a routing measurement."""
+    max_age = float((registry.get("thresholds") or {}).get("routingMaxAgeMinutes", 120)) * 60
+    live = read_live(state_dir).get("accounts") or {}
+    provider = next((p for p in registry.get("providers", []) if p.get("id") == provider_id), {})
+    out = {}
+    for account in provider.get("accounts", []):
+        quota = (live.get(f"{provider_id}/{account['id']}") or {}).get("quota")
+        if account.get("status", "active") == "active" and quota:
+            delta = _quota_delta(quota, now, max_age)
+            if delta is not None:
+                out[account["id"]] = delta
+    return out
+
+
+def pace_adjust(registry: dict, state_dir: Path | None, lane: str, now: float) -> dict:
+    """Routing pressure adjustment for a lane from its provider's pace policy.
+
+    free-when-behind (use-or-lose quota): mean account delta below -PACE_BAND -> effective cost x0.1
+    until the lane is back within the band. back-off-when-ahead (shared pool): mean delta above 0
+    adds delta/100 (capped), so a pool burning faster than its window costs more. Lanes, slots and
+    cooldowns stay authoritative; this only orders candidates."""
+    provider = provider_for_lane(registry, lane)
+    mode = ((registry.get("policies") or {}).get((provider.get("policy") or {}).get("id")) or {}).get("paceRouting")
+    if not provider or not mode:
+        return {"adjust": 0.0, "why": "no-pace-policy", "deltas": {}}
+    deltas = live_deltas(registry, state_dir, provider["id"], now)
+    if not deltas:
+        return {"adjust": 0.0, "why": "no-fresh-live-reading", "deltas": {}}
+    mean = sum(deltas.values()) / len(deltas)
+    if mode == "free-when-behind" and mean < -PACE_BAND:
+        return {"adjust": PACE_FREE_FLOOR, "why": f"behind-pace:{mean:.0f}pts", "deltas": deltas}
+    if mode == "back-off-when-ahead" and mean > 0:
+        return {"adjust": round(min(PACE_AHEAD_CAP, mean / 100), 3), "why": f"ahead-of-pace:{mean:.0f}pts", "deltas": deltas}
+    return {"adjust": 0.0, "why": f"on-pace:{mean:.0f}pts", "deltas": deltas}

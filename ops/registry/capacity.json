@@ -4,16 +4,20 @@
   "updatedAt": "2026-10-25T01:30:00Z",
   "thresholds": {
     "liveMaxAgeHours": 24,
-    "manualMaxAgeDays": 8
+    "manualMaxAgeDays": 8,
+    "routingMaxAgeMinutes": 120
   },
   "policies": {
     "preserve-shared-pool": {
+      "paceRouting": "back-off-when-ahead",
       "rule": "Shared pool: lanes lease one account per run. Do not delegate work that can run on an uncapped own model. Below 30% weekly remaining on the pool, send non-lane agents only Codex-free work."
     },
     "burn-before-reset": {
+      "paceRouting": "free-when-behind",
       "rule": "Capped quota: spend it fully before each reset; unused quota at reset is lost. Route eligible work here first while under pace."
     },
     "use-full-quota": {
+      "paceRouting": "free-when-behind",
       "rule": "Promo-priced plan: use the whole quota every week; the discount ends in December 2026."
     },
     "uncapped-own-model": {

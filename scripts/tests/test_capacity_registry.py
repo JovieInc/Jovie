@@ -106,6 +106,88 @@ class LaneReadsRegistry(unittest.TestCase):
             self.assertEqual((proof, reason), (None, "owner-attestation-exceeds-registry-cap"))
 
 
+def write_live(state: Path, rows: dict) -> None:
+    (state / "capacity-live.json").write_text(json.dumps({"accounts": rows}))
+
+
+def grok_row(used=63, observed=NOW - 60):
+    return {"xai-grok/supergrok-heavy": {"quota": {"usedPercent": used, "windowMins": 10080, "resetsAt": "2026-10-26T21:01:00Z",
+                                                  "observedAt": CL._iso(observed), "live": "grok-usage"}}}
+
+
+def codex_rows(current, jovie, lyb, observed=NOW - 60):
+    def row(used):
+        return {"quota": {"usedPercent": used, "windowMins": 10080, "resetsAt": "2026-10-30T17:41:00Z",
+                          "observedAt": CL._iso(observed), "live": "codex-ledger"}}
+    return {"openai-codex/current-login": row(current), "openai-codex/jovie-pro": row(jovie), "openai-codex/lyb-pro": row(lyb)}
+
+
+class PaceRouting(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.state = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_use_or_lose_quota_behind_pace_is_nearly_free_until_caught_up(self):
+        write_live(self.state, grok_row(63))
+        behind = CR.pace_adjust(REGISTRY, self.state, "grok", NOW)
+        self.assertEqual(behind["adjust"], CR.PACE_FREE_FLOOR)
+        self.assertIn("behind-pace", behind["why"])
+        write_live(self.state, grok_row(72))
+        self.assertEqual(CR.pace_adjust(REGISTRY, self.state, "grok", NOW)["adjust"], 0.0)
+
+    def test_shared_pool_ahead_of_pace_costs_more_and_never_gets_a_discount(self):
+        write_live(self.state, codex_rows(22, 16, 57))
+        ahead = CR.pace_adjust(REGISTRY, self.state, "codex", NOW)
+        self.assertGreater(ahead["adjust"], 0)
+        self.assertLessEqual(ahead["adjust"], CR.PACE_AHEAD_CAP)
+        write_live(self.state, codex_rows(2, 2, 2))
+        self.assertEqual(CR.pace_adjust(REGISTRY, self.state, "codex", NOW)["adjust"], 0.0)
+
+    def test_only_fresh_live_readings_count_never_the_registry_snapshot(self):
+        self.assertEqual(CR.pace_adjust(REGISTRY, self.state, "grok", NOW)["why"], "no-fresh-live-reading")
+        write_live(self.state, grok_row(63, observed=NOW - 3 * 3600))
+        self.assertEqual(CR.pace_adjust(REGISTRY, self.state, "grok", NOW)["adjust"], 0.0)
+        self.assertEqual(CR.pace_adjust(REGISTRY, self.state, "claude", NOW)["why"], "no-pace-policy")
+
+    def test_a_lapsed_account_never_counts(self):
+        registry = json.loads(json.dumps(REGISTRY))
+        write_live(self.state, {**codex_rows(22, 16, 57), "openai-codex/tim-jov-ie": {"quota": {
+            "usedPercent": 100, "windowMins": 10080, "resetsAt": "2026-10-30T17:41:00Z", "observedAt": CL._iso(NOW - 60)}}})
+        self.assertNotIn("tim-jov-ie", CR.live_deltas(registry, self.state, "openai-codex", NOW))
+
+    def test_routing_shifts_standard_work_to_grok_while_it_is_behind_pace(self):
+        import lane_runner as lane
+        import remediation
+        providers = lane.load_providers(registry=REGISTRY)
+        policy = json.loads((ROOT / "scripts/lanes/routing.json").read_text())
+        host = SimpleNamespace(state=self.state)
+        issue = {"identifier": "JOV-1", "title": "Fix the thing", "description": "", "labels": []}
+
+        def decide():
+            availability = lambda name, _route: lane.quota_pressure(host, name, providers[name], NOW)  # noqa: E731
+            return remediation.route_issue(issue, providers, policy, availability, only_lanes={"grok", "hyperagent"})
+
+        self.assertEqual(decide()["chosen"]["lane"], "hyperagent")
+        write_live(self.state, grok_row(63))
+        shifted = decide()
+        self.assertEqual(shifted["chosen"]["lane"], "grok")
+        self.assertEqual(shifted["chosen"]["paceAdjust"], CR.PACE_FREE_FLOOR)
+        self.assertLess(shifted["chosen"]["effectiveCost"], 1)
+        write_live(self.state, grok_row(80))
+        self.assertEqual(decide()["chosen"]["lane"], "hyperagent")
+
+    def test_codex_leases_the_account_behind_pace_and_backs_off_the_one_ahead(self):
+        CX = load("codex_lane", register=False)
+        state = {n: {"lastUsed": t} for n, t in (("current-login", 3), ("jovie-pro", 2), ("lyb-pro", 1))}
+        with patch.object(CX, "available", return_value=True), patch.object(CX, "reverify_auth_bank", side_effect=lambda s, n: s), \
+                patch.object(CX, "lease", side_effect=lambda name: name):
+            names = ["current-login", "jovie-pro", "lyb-pro"]
+            self.assertEqual(CX.pick(state, NOW, names, deltas={})[0], "lyb-pro")  # plain LRU
+            self.assertEqual(CX.pick(state, NOW, names, deltas={"lyb-pro": 38, "jovie-pro": -3, "current-login": 3})[0], "jovie-pro")
+            self.assertEqual(CX.pick(state, NOW, names, deltas={"lyb-pro": 38, "jovie-pro": 30, "current-login": -25})[0], "current-login")
+
+
 class CoordinationRules(unittest.TestCase):
     def test_delegation_rule_for_non_lane_agents(self):
         rule = CR.delegation_rule(REGISTRY, "dots")
