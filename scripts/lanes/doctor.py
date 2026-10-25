@@ -44,7 +44,8 @@ import remediation  # noqa: E402
 import shipping_attribution  # noqa: E402  (company merge provenance report)
 import stage_events  # noqa: E402  (jovie-stage-event/v1 rows for the stage collector)
 import ledger_archive  # noqa: E402  (bounded runs/ledger.jsonl)
-import throughput_sentinel  # noqa: E402  (no-progress alarms, idle-reason counts, growth bounds)
+import throughput_sentinel  # noqa: E402
+import deploy_health  # noqa: E402  (production deploy failure and lag incidents, Jovie + LogYourBody)
 
 COOL_OFF_S = 6 * 3600
 NO_LANDING_S = 6 * 3600
@@ -515,6 +516,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "fileOverlap": file_overlap.doctor_view(state),
         **automation_observation(host, lane, now),
         "outcomeQueue": read_json(state / "outcome-queue.json", {}),
+        "deployHealth": deploy_health.sample(state, now)[0] if not os.environ.get("LANES_SELFTEST") else None,
         "sentinel": throughput_sentinel.observe(
             state, now, receipts,
             {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
@@ -974,6 +976,7 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             f"origin/main:{AUTOMATION_REGISTRY} is unreadable ({watched.get('error') or 'missing or not JSONL'}); "
             "no Gem host-local automation receipt is being watched")
     alerts.update(throughput_sentinel.judge(obs))
+    alerts.update(deploy_health.judge(obs.get("deployHealth"), obs.get("now") or time.time()))
     # Closed loop, last hop: Validating issues owing an `outcome` receipt wait on the outcome
     # lane. Its daily budget exhausted (or the drain gone silent) with owed receipts older than
     # OUTCOME_OWED_MAX_S used to stall in silence for the rest of the UTC day.
@@ -1409,6 +1412,16 @@ class Tracker:
                 {})["teams"]["nodes"][0]
         return self._team_node
 
+    def _label_by_name(self, name: str) -> str | None:
+        try:
+            data = self.linear.gql(
+                'query($n:String!){issueLabels(first:1,filter:{team:{key:{eq:"JOV"}},name:{eq:$n}}){nodes{id name}}}',
+                {"n": name})
+            node = (((data or {}).get("issueLabels") or {}).get("nodes") or [None])[0]
+            return node["id"] if node and node.get("id") else None
+        except Exception:  # noqa: BLE001
+            return None
+
     def _remediation_label_id(self, key: str) -> str | None:
         """`remediation:<slug>` on the JOV team. Created when missing, color #E5484D."""
         if not remediation.escalation_enabled():
@@ -1420,9 +1433,18 @@ class Tracker:
         for label in team["labels"]["nodes"]:
             if label.get("name") == name and label.get("id"):
                 return label["id"]
-        created = self.linear.gql(
-            'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){issueLabel{id name}}}',
-            {"i": {"teamId": team["id"], "name": name, "color": remediation.REMEDIATION_LABEL_COLOR}})
+        # The team query returns only the first 50 labels; the team has far more, so look the name up directly
+        # before creating (the lanes app is FORBIDDEN from creating labels, which used to abort the whole incident).
+        found = self._label_by_name(name)
+        if found:
+            team["labels"]["nodes"].append({"id": found, "name": name})
+            return found
+        try:
+            created = self.linear.gql(
+                'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){issueLabel{id name}}}',
+                {"i": {"teamId": team["id"], "name": name, "color": remediation.REMEDIATION_LABEL_COLOR}})
+        except Exception:  # noqa: BLE001 - a label is decoration; the incident still opens without it
+            return None
         label = ((created or {}).get("issueLabelCreate") or {}).get("issueLabel") or {}
         if not label.get("id"):
             return None
@@ -1478,12 +1500,15 @@ class Tracker:
             self.apply_alert_label(found, key)
             return found
         try:
-            priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:")) or key in (
+            priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:", "production-deploy:")) or key in (
                 "linear-down", "spawn-exit", "tick-error", "delivery-stalled") else 2
             team = self._team()
             triage = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Triage")
             labels = [l["id"] for l in team["labels"]["nodes"] if l["name"] == "symphony"]
-            remediation_label = self._remediation_label_id(key)
+            try:
+                remediation_label = self._remediation_label_id(key)
+            except Exception:  # noqa: BLE001 - never lose an incident over its label
+                remediation_label = None
             if remediation_label:
                 labels.append(remediation_label)
             description = (f"**{text}**\n\nHost `{self.host}`, {now_iso()}. Raised by `scripts/lanes/doctor.py`; "
@@ -1731,6 +1756,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
         obs.get("now") or time.time())
     return {"schema": "symphony-lanes-status/v1", "at": now_iso(), "host": lane.HOST, "release": tick.get("release"),
             "fileOverlap": overlap, "linear": obs.get("linearSync") or tick.get("linear"),
+            "deployHealth": deploy_health.feed_block(obs.get("deployHealth"), obs.get("now") or time.time()),
             "ownership": obs.get("ownership"),
             "lanes": counts, "providerPayloads": obs.get("providerPayloads"), "running": sum(c["running"] for c in counts.values()),
             "idle": sum(max(0, c["slots"] - c["running"]) for c in counts.values()),
