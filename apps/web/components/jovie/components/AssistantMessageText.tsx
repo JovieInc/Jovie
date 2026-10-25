@@ -1,6 +1,6 @@
 'use client';
 
-import { lazy, Suspense, useMemo } from 'react';
+import { lazy, memo, Suspense, useMemo } from 'react';
 import { type ChatToken, parseTokens } from '@/lib/chat/tokens';
 import { skillById } from '@/lib/commands/registry';
 import { EntityChipPopover } from './EntityChipPopover';
@@ -28,7 +28,7 @@ if (typeof window !== 'undefined') {
   else window.setTimeout(warm, 2000);
 }
 
-function ChatMarkdown(props: {
+const ChatMarkdown = memo(function ChatMarkdown(props: {
   readonly content: string;
   readonly isStreaming?: boolean;
   readonly inline?: boolean;
@@ -40,7 +40,7 @@ function ChatMarkdown(props: {
       <LazyChatMarkdown {...props} />
     </Suspense>
   );
-}
+});
 
 function tokenKey(token: ChatToken, index: number): string {
   if (token.type === 'text') return `t:${index}:${token.value.length}`;

@@ -58,6 +58,7 @@ vi.mock('@/hooks/useClipboard', () => ({
 vi.mock('@/components/jovie/components/ChatMarkdown', () => ({
   ChatMarkdown: ({ content }: { content: string }) => {
     markdownRenderCount.current += 1;
+    console.log('MD', content);
     return <div data-testid='chat-markdown'>{content}</div>;
   },
 }));
@@ -94,32 +95,33 @@ describe('ChatMessage memoization', () => {
       parts: [{ type: 'text' as const, text: 'Streaming' }],
       isStreaming: true,
     };
-
-    const { rerender } = render(
-      <>
-        <ChatMessage {...completedMessageProps} />
-        <ChatMessage {...streamingMessageProps} />
-      </>
-    );
-
-    // The markdown engine is a lazy chunk: wait for it to resolve.
-    await waitFor(() =>
-      expect(markdownRenderCount.current).toBeGreaterThanOrEqual(2)
-    );
-    await new Promise(resolve => setTimeout(resolve, 0));
-    const settled = markdownRenderCount.current;
-
-    rerender(
+    const tree = (text: string) => (
       <>
         <ChatMessage {...completedMessageProps} />
         <ChatMessage
           {...streamingMessageProps}
-          parts={[{ type: 'text' as const, text: 'Streaming longer' }]}
+          parts={[{ type: 'text' as const, text }]}
         />
       </>
     );
+    const settle = () => new Promise(resolve => setTimeout(resolve, 20));
 
-    // Only the message whose props changed renders again.
-    await waitFor(() => expect(markdownRenderCount.current).toBe(settled + 1));
+    const { rerender } = render(tree('Streaming'));
+    // The markdown engine is a lazy chunk: wait for it to resolve.
+    await waitFor(() =>
+      expect(markdownRenderCount.current).toBeGreaterThanOrEqual(2)
+    );
+    // One warm-up update lets the lazy boundaries finish settling.
+    rerender(tree('Streaming a bit longer'));
+    await settle();
+
+    // Steady state: every streamed update re-renders only the message whose
+    // props changed, never the completed one.
+    for (const text of ['Streaming longer', 'Streaming even longer']) {
+      const before = markdownRenderCount.current;
+      rerender(tree(text));
+      await settle();
+      expect(markdownRenderCount.current).toBe(before + 1);
+    }
   });
 });
