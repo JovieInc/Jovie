@@ -961,18 +961,6 @@ nodes:
       - pull_request
     terminalReceipt: job:capture
     jobCount: 1
-  - name: Production Dogfood
-    path: .github/workflows/prod-dogfood.yml
-    active: true
-    category: production-verification
-    authoritativeProducer: Production Controller
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - schedule
-      - workflow_dispatch
-    terminalReceipt: job:dogfood
-    jobCount: 2
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml
     active: true
