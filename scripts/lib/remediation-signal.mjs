@@ -158,22 +158,7 @@ export async function readLoginMatrixEvidence({
     runUrl !== `https://github.com/${repository}/actions/runs/${runId}`
   )
     return hold('matrix_context_unavailable');
-  const base = `https://api.github.com/repos/${repository}/actions/runs/${runId}`;
-  const read = async url => {
-    const response = await fetchImpl(url, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        Authorization: `Bearer ${token}`,
-      },
-      redirect: 'error',
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!response.ok) throw new Error('matrix-read-unavailable');
-    return {
-      data: await response.json(),
-      hasNext: /;\s*rel="next"/.test(response.headers.get('link') ?? ''),
-    };
-  };
+  const base = `/repos/${repository}/actions/runs/${runId}`;
   /** @param {unknown} run */
   const matchesRun = run =>
     isRecord(run) &&
@@ -186,6 +171,29 @@ export async function readLoginMatrixEvidence({
     isRecord(run.repository) &&
     run.repository.full_name === repository;
   try {
+    const { createGitHubClient } = await import(
+      '../../packages/api-client/github.ts'
+    );
+    const client = createGitHubClient({
+      token,
+      fetch: (url, options) =>
+        fetchImpl(url, { ...options, redirect: 'error' }),
+    });
+    const read = async path => {
+      const response = await client.rest('GET', path, undefined, {
+        priority: 'repair',
+        timeoutMs: 10_000,
+        maxAttempts: 1,
+        maxWaitMs: 0,
+        conditional: false,
+      });
+      if (response.status < 200 || response.status >= 300)
+        throw new Error('matrix-read-unavailable');
+      return {
+        data: response.json(),
+        hasNext: /;\s*rel="next"/.test(response.headers.get('link') ?? ''),
+      };
+    };
     // This is the latest run record, not an archived attempt: stale delivery
     // cannot borrow an earlier attempt's successful siblings.
     const { data: run } = await read(base);

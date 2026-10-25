@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import {
+  existsSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -97,6 +98,13 @@ async function matrixIntake({
   const fetchImpl = vi.fn(async (url, init) => {
     requests.push(String(url));
     if (String(url).startsWith('https://api.github.com/')) {
+      const headers = new Headers(init.headers);
+      expect(headers.get('authorization')).toBe(
+        'Bearer gh_intercepted_matrix_fixture'
+      );
+      expect(headers.has('if-none-match')).toBe(false);
+      expect(init.redirect).toBe('error');
+      expect(init.signal).toBeInstanceOf(AbortSignal);
       if (String(url).includes('/jobs?')) {
         const number = Number(new URL(url).searchParams.get('page'));
         return page
@@ -154,6 +162,8 @@ async function matrixIntake({
     throw new Error(`unexpected intercepted query: ${query}`);
   });
   const values = {
+    JOVIE_API_STATE: '',
+    JOVIE_API_STATE_DIR: join(dir, 'api-state'),
     LINEAR_API_KEY: 'lin_api_intercepted_matrix_fixture',
     GITHUB_TOKEN: 'gh_intercepted_matrix_fixture',
     GITHUB_OUTPUT: join(dir, 'outputs'),
@@ -194,6 +204,11 @@ async function matrixIntake({
       state,
       signalState: readFileSync(stateFile, 'utf8').trim(),
       result: JSON.parse(log.mock.calls.at(-1)[0]),
+      apiLedger: existsSync(join(dir, 'api-state/api-ledger/github.json'))
+        ? JSON.parse(
+            readFileSync(join(dir, 'api-state/api-ledger/github.json'), 'utf8')
+          )
+        : null,
     };
   } finally {
     log.mockRestore();
@@ -205,6 +220,38 @@ async function matrixIntake({
 }
 
 describe('login matrix producer clearance', () => {
+  it('accounts all three fresh provider reads in the shared repair ledger', async () => {
+    const result = await matrixIntake();
+    expect(result.apiLedger).toMatchObject({
+      schema: 'jovie-api-ledger/v1',
+      provider: 'github',
+    });
+    const credentials = Object.values(result.apiLedger.credentials);
+    expect(credentials).toHaveLength(1);
+    const attempts = Object.values(credentials[0].usage).reduce(
+      (total, hour) => total + (hour.repair?.attempts ?? 0),
+      0
+    );
+    expect(attempts).toBe(3);
+    expect(
+      result.requests.filter(url => url.includes('/actions/runs/'))
+    ).toHaveLength(3);
+    expect(result.signalState).toBe('green');
+  });
+
+  it.each([429, 503])(
+    'holds on provider HTTP %s without clearing or retrying',
+    async status => {
+      const result = await matrixIntake({
+        page: () => new Response('unavailable', { status }),
+      });
+      expect(result.result.reason).toBe('matrix_evidence_unavailable');
+      expect(result.effects).toEqual([]);
+      expect(result.signalState).toBe('red');
+      expect(result.requests).toHaveLength(2);
+    }
+  );
+
   it.each([
     'queued',
     'in_progress',
