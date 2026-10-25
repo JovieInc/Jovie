@@ -1,12 +1,12 @@
 import 'server-only';
 
-import { env } from '@/lib/env-server';
+import { getStripePriceIds } from '@/lib/stripe/price-ids';
 import { ARTIST_VISIBILITY_OFFER, PLAN_PRICES, toCents } from './plan-prices';
 
 export const PRICING = {
   pro: {
     monthly: {
-      priceId: env.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY,
+      priceId: getStripePriceIds().artistVisibilityProMonthly,
       amount: toCents(PLAN_PRICES.pro.monthly),
       label: ARTIST_VISIBILITY_OFFER.pro.displayName,
       entitlementPlan: 'pro',
@@ -14,7 +14,7 @@ export const PRICING = {
       interval: 'month',
     },
     annual: {
-      priceId: env.STRIPE_PRICE_PRO_ANNUAL || env.STRIPE_PRICE_PRO_YEARLY,
+      priceId: getStripePriceIds().proAnnual || getStripePriceIds().proYearly,
       amount: toCents(PLAN_PRICES.pro.yearly),
       label: `${ARTIST_VISIBILITY_OFFER.pro.displayName} Annual`,
       entitlementPlan: 'pro',
@@ -24,7 +24,8 @@ export const PRICING = {
   },
   max: {
     monthly: {
-      priceId: env.STRIPE_PRICE_MAX_MONTHLY || env.STRIPE_PRICE_GROWTH_MONTHLY,
+      priceId:
+        getStripePriceIds().maxMonthly || getStripePriceIds().growthMonthly,
       amount: toCents(PLAN_PRICES.max.monthly),
       label: 'Max Monthly',
       entitlementPlan: 'max',
@@ -32,7 +33,8 @@ export const PRICING = {
       interval: 'month',
     },
     annual: {
-      priceId: env.STRIPE_PRICE_MAX_YEARLY || env.STRIPE_PRICE_GROWTH_YEARLY,
+      priceId:
+        getStripePriceIds().maxYearly || getStripePriceIds().growthYearly,
       amount: toCents(PLAN_PRICES.max.yearly),
       label: 'Max Annual',
       entitlementPlan: 'max',

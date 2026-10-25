@@ -27,7 +27,11 @@ import {
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
   FAILURE_RETRY_CONTEXT,
+  FETCH_STEP,
+  FETCH_TIMEOUT_MESSAGE,
+  FETCH_TIMEOUT_TITLE,
   failureReceiptStatus,
+  fetchTimeoutEvidence,
   humanFailureReleaseIntent,
   humanReleaseDisposition,
   isHeldWorkflowFailure,
@@ -793,6 +797,125 @@ process.stdout.write(JSON.stringify(result));
     }
   }
 );
+
+it('CLI attributes against a successful ahead ci-fast (remaining) job even when the ahead run failed elsewhere (JOV-8760)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'failure-hold-ahead-success-'));
+  try {
+    const logs = resolve(import.meta.dirname, 'fixtures/ahead-attribution');
+    const aheadLog = readFileSync(
+      join(logs, 'ahead-22328-lanes-flake.txt'),
+      'utf8'
+    );
+    // A ci-fast (remaining) job that SUCCEEDED has no failed structural
+    // commands and reports every lane as success. Build that log from the
+    // 2026-10-21 ahead fixture by dropping its one failing command.
+    const successfulAhead = aheadLog
+      .split('\n')
+      .filter(line => !/^\| 58 \|/.test(line))
+      .filter(line => !line.includes('Structural command 58/58 failed'))
+      .filter(line => !line.startsWith('[ci-fast] 1 lane(s) failed'))
+      .map(line =>
+        line.replace(
+          '[ci-fast] structural: failure (311.9s)',
+          '[ci-fast] structural: success (311.9s)'
+        )
+      )
+      .join('\n');
+    expect(successfulAhead).not.toBe(aheadLog);
+    expect(successfulAhead).not.toContain('exit 1');
+    expect(successfulAhead).toContain('| 31 | 149.1s | pass |');
+    const aheadLogPath = join(dir, 'ahead-success.txt');
+    writeFileSync(aheadLogPath, successfulAhead);
+    const fixturePath = join(dir, 'fixture.json');
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({
+        run,
+        timeline,
+        source: SOURCE,
+        currentLog: join(logs, 'poison-22331-api-guard.txt'),
+        aheadLog: aheadLogPath,
+      })
+    );
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+const failed = id => [
+  { id, name: 'ci-fast (remaining)', conclusion: 'failure',
+    steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] },
+  { id: id + 1, name: 'PR Ready', conclusion: 'failure',
+    steps: [{ name: 'Evaluate combined-head checks', conclusion: 'failure' }] },
+];
+// The ahead run failed in a Unit Tests shard while its ci-fast (remaining)
+// job succeeded — the successful log is the evidence (JOV-8760).
+const aheadJobs = [
+  { id: 21, name: 'ci-fast (remaining)', conclusion: 'success' },
+  { id: 23, name: 'Unit Tests (1/4)', conclusion: 'failure' },
+  { id: 22, name: 'PR Ready', conclusion: 'failure' },
+];
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].endsWith('/actions/jobs/11/logs')) { process.stdout.write(fs.readFileSync(fixture.currentLog, 'utf8')); process.exit(0); }
+else if (args[1].endsWith('/actions/jobs/21/logs')) { process.stdout.write(fs.readFileSync(fixture.aheadLog, 'utf8')); process.exit(0); }
+else if (args[1].includes('/compare/')) result = { status: 'behind' };
+else if (args[1].includes('/actions/runs?head_sha=')) result = { workflow_runs: [
+  { id: 900, workflow_id: 178737329, created_at: '2026-10-12T08:43:05Z', conclusion: 'failure' },
+] };
+else if (args[1].includes('/runs/900/jobs?')) result = { jobs: args[1].includes('page=1') ? aheadJobs : [] };
+else if (args[1].includes('/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(11) : [] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+      { mode: 0o755 }
+    );
+    const eventPath = join(dir, 'event.json');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        repository: { full_name: REPOSITORY },
+        workflow_run: { id: run.id },
+      })
+    );
+    const execution = spawnSync(
+      process.execPath,
+      [
+        resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+        '--event-path',
+        eventPath,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          HOLD_TEST_FIXTURE: fixturePath,
+          GITHUB_OUTPUT: join(dir, 'output'),
+        },
+      }
+    );
+    expect(execution.status, execution.stderr).toBe(0);
+    const receipt = JSON.parse(execution.stdout);
+    expect(receipt.aheadEntryUnproven).toBeFalsy();
+    expect(receipt.statusWritten).toBe(true);
+    expect(receipt.aheadAttribution).toEqual({
+      attributable: true,
+      reason: 'failing-signals-passed-on-ahead-run',
+    });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 it.each([
   ['behind', 'in_progress', true],
@@ -2300,5 +2423,324 @@ describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => 
         }
       )
     ).rejects.toThrow(/terminal merge-group CI failure/);
+  });
+});
+
+describe('base-branch fetch timeout (merge-group infrastructure)', () => {
+  const TIMEOUT_TEXT = [
+    'Process completed with exit code 1.',
+    FETCH_TIMEOUT_MESSAGE,
+  ].join('\n');
+  const CASCADE = [
+    'Require every ci-fast lane group to pass',
+    'Join exact lane results',
+    'Evaluate combined-head checks',
+  ];
+  const classifyFetch = (failedSteps, fetchTimeoutText = TIMEOUT_TEXT) =>
+    classifyMergeGroupFailure({
+      conclusion: 'failure',
+      failedSteps,
+      fetchTimeoutText,
+    });
+  const timeoutNote = (overrides = {}) => ({
+    annotation_level: 'failure',
+    title: FETCH_TIMEOUT_TITLE,
+    message: FETCH_TIMEOUT_MESSAGE,
+    ...overrides,
+  });
+  const exitNote = {
+    annotation_level: 'failure',
+    title: '',
+    message: 'Process completed with exit code 1.',
+  };
+  const fetchJob = (overrides = {}) => ({
+    id: 9,
+    run_id: run.id,
+    run_attempt: run.run_attempt,
+    check_run_url: 'https://api.github.com/repos/JovieInc/Jovie/check-runs/77',
+    steps: [{ name: FETCH_STEP, conclusion: 'failure' }],
+    ...overrides,
+  });
+
+  it('classifies only the exact fetch timeout as transient infrastructure', () => {
+    expect(classifyFetch([FETCH_STEP])).toBe('transient-infrastructure');
+    expect(classifyFetch([FETCH_STEP, ...CASCADE])).toBe(
+      'transient-infrastructure'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Post Checkout', 'Complete job'])).toBe(
+      'transient-infrastructure'
+    );
+  });
+
+  it('keeps every other failure of the fetch step unclassified (fail closed)', () => {
+    for (const text of [
+      '',
+      'Process completed with exit code 1.',
+      'Process completed with exit code 1.\ngit fetch exited 128',
+      `${FETCH_TIMEOUT_MESSAGE} (retrying)`,
+      `prefix ${FETCH_TIMEOUT_MESSAGE}`,
+      `${FETCH_TIMEOUT_MESSAGE}\nanother failure`,
+      'background fetch did not finish within 300s',
+    ]) {
+      expect(classifyFetch([FETCH_STEP], text)).toBe('unclassified');
+    }
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [FETCH_STEP],
+      })
+    ).toBe('unclassified');
+  });
+
+  it('lets a stronger failure win over the fetch timeout', () => {
+    expect(classifyFetch([FETCH_STEP, 'Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Run unit tests'])).toBe(
+      'retryable-product'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Await ci-fast lanes'])).toBe(
+      'unclassified'
+    );
+    expect(
+      classifyFetch([FETCH_STEP, 'Run ./.github/actions/setup-node-pnpm'])
+    ).toBe('unclassified');
+    expect(classifyFetch([FETCH_STEP, WORKFLOW_LOAD_STEP])).toBe(
+      'deterministic-source'
+    );
+  });
+
+  it('never reclassifies the structural lane or the cascade without the fetch step', () => {
+    expect(classifyFetch(['Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classifyFetch(CASCADE)).toBe('unclassified');
+    expect(classifyFetch(['Await ci-fast lanes', ...CASCADE])).toBe(
+      'unclassified'
+    );
+  });
+
+  it('reads timeout evidence only from the exact run and attempt', () => {
+    const read = notes => vi.fn(() => notes);
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], read([exitNote, timeoutNote()]))
+    ).toBe(TIMEOUT_TEXT);
+    for (const job of [
+      fetchJob({ run_id: run.id + 1 }),
+      fetchJob({ run_attempt: run.run_attempt + 1 }),
+      fetchJob({ run_id: undefined }),
+      fetchJob({ run_attempt: undefined }),
+    ]) {
+      const reader = read([exitNote, timeoutNote()]);
+      expect(fetchTimeoutEvidence(run, [job], reader)).toBe('');
+      expect(reader).not.toHaveBeenCalled();
+    }
+    // A timeout on another job of the run does not cover a fetch failure elsewhere.
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob(), fetchJob({ id: 10 })], job =>
+        job.id === 9 ? [exitNote, timeoutNote()] : [exitNote]
+      )
+    ).toBe('');
+  });
+
+  it('fails closed on missing, partial or unreadable evidence', () => {
+    expect(fetchTimeoutEvidence(run, [], () => [timeoutNote()])).toBe('');
+    expect(
+      fetchTimeoutEvidence(
+        run,
+        [
+          {
+            ...fetchJob(),
+            steps: [{ name: FETCH_STEP, conclusion: 'success' }],
+          },
+        ],
+        () => [timeoutNote()]
+      )
+    ).toBe('');
+    expect(fetchTimeoutEvidence(run, undefined, () => [timeoutNote()])).toBe(
+      ''
+    );
+    for (const notes of [
+      [],
+      [exitNote],
+      [exitNote, timeoutNote({ title: 'Other title' })],
+      [exitNote, timeoutNote({ title: undefined })],
+      [
+        exitNote,
+        timeoutNote(),
+        { annotation_level: 'failure', message: 'git fetch exited 128' },
+      ],
+      [exitNote, timeoutNote({ message: undefined })],
+      [exitNote, timeoutNote({ message: `${FETCH_TIMEOUT_MESSAGE}.` })],
+      null,
+      'unreadable',
+    ]) {
+      expect(
+        fetchTimeoutEvidence(
+          run,
+          [fetchJob()],
+          () => /** @type {any} */ (notes)
+        )
+      ).toBe('');
+    }
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], () => {
+        throw new Error('annotations unavailable');
+      })
+    ).toBe('');
+    // Non-failure annotations (notices) are ignored.
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], () => [
+        exitNote,
+        timeoutNote(),
+        {
+          annotation_level: 'notice',
+          message: 'ubuntu-latest label will migrate',
+        },
+      ])
+    ).toBe(TIMEOUT_TEXT);
+  });
+
+  it('retries a fetch timeout once, then holds on a repeat via the existing budget', async () => {
+    const io = () => ({
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => ({
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: false,
+        mergeQueueEntry: null,
+        autoMergeRequest: null,
+      })),
+      dequeuePullRequest: vi.fn(),
+      disableAutoMerge: vi.fn(),
+    });
+    const first = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: [FETCH_STEP, ...CASCADE],
+        fetchTimeoutText: TIMEOUT_TEXT,
+        statuses: [],
+      },
+      io()
+    );
+    expect(first).toMatchObject({
+      classification: 'transient-infrastructure',
+      failureNumber: 1,
+      retryDisposition: 'one-queue-authority-retry',
+    });
+    const infra = (number, runId) =>
+      status({ classification: 'transient-infrastructure', number, runId });
+    const spent = runId =>
+      status({
+        runId,
+        context: FAILURE_RETRY_CONTEXT,
+        description: retrySpentDescription({ runId, runAttempt: 1 }),
+      });
+    expect(disposition([infra(1, 123)])).toMatchObject({
+      action: 'retry-once',
+      reason: 'bounded-infrastructure-recovery',
+    });
+    // The retry was spent and the same timeout repeated: no second free retry.
+    expect(disposition([infra(1, 123), spent(123)])).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    expect(
+      disposition([infra(1, 123), spent(123), infra(2, 124), spent(124)])
+    ).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    // Without the signature, the same step failure is held at once.
+    const unproven = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: [FETCH_STEP, ...CASCADE], statuses: [] },
+      io()
+    );
+    expect(unproven).toMatchObject({
+      classification: 'unclassified',
+      retryDisposition: 'blocked-until-new-source-head',
+    });
+  });
+
+  // Replays run 39561016233 (PR #22390): ci-fast (remaining) hit the fetch
+  // timeout and the aggregate jobs only reported it.
+  describe('real run 39561016233 shape', () => {
+    const realRun = { ...run, id: 39561016233, run_attempt: 1 };
+    const job = (id, name, step, overrides = {}) => ({
+      id,
+      name,
+      run_id: 39561016233,
+      run_attempt: 1,
+      check_run_url: `https://api.github.com/repos/JovieInc/Jovie/check-runs/${id}`,
+      steps: [{ name: step, conclusion: 'failure' }],
+      ...overrides,
+    });
+    const jobs = [
+      job(119092450020, 'ci-fast (remaining)', FETCH_STEP),
+      job(119096342018, 'ci-fast', 'Require every ci-fast lane group to pass'),
+      job(119096374291, 'Product Lane Receipt', 'Join exact lane results'),
+      job(119096483064, 'PR Ready', 'Evaluate combined-head checks'),
+    ];
+    const closed = lanes => ({
+      annotation_level: 'failure',
+      title: 'ci-fast failed closed',
+      message: lanes,
+    });
+    const closedOnlyRemaining =
+      'typecheck=success remaining=failure profile-browser=success structural-python=success structural-web=success';
+    const annotations = (closedLine = closedOnlyRemaining) => ({
+      119092450020: [exitNote, timeoutNote()],
+      119096342018: [exitNote, closed(closedLine)],
+      119096374291: [exitNote],
+      119096483064: [
+        exitNote,
+        {
+          annotation_level: 'failure',
+          message:
+            'ci-fast did not pass on the merge-group combined head (result: failure)',
+        },
+      ],
+    });
+    const replay = (notes, jobList = jobs) => {
+      const text = fetchTimeoutEvidence(
+        realRun,
+        jobList,
+        j => notes[j.id] ?? []
+      );
+      return classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: jobList.flatMap(j => j.steps.map(s => s.name)),
+        fetchTimeoutText: text,
+      });
+    };
+
+    it('classifies the real fetch timeout as transient infrastructure', () => {
+      expect(replay(annotations())).toBe('transient-infrastructure');
+    });
+
+    it('does not reclassify when another lane of the failed-closed line failed', () => {
+      for (const line of [
+        closedOnlyRemaining.replace(
+          'structural-web=success',
+          'structural-web=failure'
+        ),
+        closedOnlyRemaining.replace('typecheck=success', 'typecheck=cancelled'),
+        'remaining=success typecheck=success',
+        'not a lane line',
+      ]) {
+        expect(replay(annotations(line))).toBe('unclassified');
+      }
+      const missing = annotations();
+      missing[119096342018] = [exitNote];
+      expect(replay(missing)).toBe('unclassified');
+    });
+
+    it('rejects an aggregate job from another attempt', () => {
+      const other = jobs.map(j =>
+        j.id === 119096342018 ? { ...j, run_attempt: 2 } : j
+      );
+      expect(replay(annotations(), other)).toBe('unclassified');
+    });
   });
 });

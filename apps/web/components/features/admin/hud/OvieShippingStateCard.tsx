@@ -10,6 +10,7 @@ import { redactFilesystemPaths } from '@/lib/ovie/home/operator-copy';
 import type {
   CapacityHorizonLease,
   CountMeasurement,
+  DeliveryLanes,
 } from '@/lib/ovie/shipping-state';
 import type {
   ShippingFlag,
@@ -82,6 +83,16 @@ function formatProduction(production: Delivery['production']): string {
 
 function formatCertifiedHead(certifiedHead: Delivery['certifiedHead']): string {
   return certifiedHead.sha ? certifiedHead.sha.slice(0, 7) : NOT_MEASURED;
+}
+
+function formatLybDeploy(health: DeliveryLanes['deployHealth']): string {
+  const lyb = health?.repos.find(repo => repo.repo === 'JovieInc/LogYourBody');
+  if (!lyb) return NOT_MEASURED;
+  const behind =
+    lyb.behindMain === null ? NOT_MEASURED : `${lyb.behindMain} behind`;
+  return lyb.status === 'failing'
+    ? `Failing x${lyb.failedStreak}, ${behind}`
+    : behind;
 }
 
 const SUMMER_LABEL = { up: 'Up', down: 'Down', degraded: 'Degraded' } as const;
@@ -252,6 +263,7 @@ function ShippingStateBody({
     ['Staging', formatProduction(delivery.staging)],
     ['Production', formatProduction(delivery.production)],
     ['Behind Main', formatCount(delivery.production.behindMain)],
+    ['LYB Deploy', formatLybDeploy(delivery.lanes.deployHealth)],
     ['CI Green', formatMeaning(view.ciGreen)],
     [
       'Summer',

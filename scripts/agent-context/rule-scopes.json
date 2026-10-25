@@ -53,7 +53,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "f946155ee825bd90ecab6f451012b05f69fe819e0e615748c8d07be5f6580199"
+    "bodySha256": "46fa336beeef6a6d9bfba990205368a7af77f17a50a405ef4451d303bf706a81"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -166,7 +166,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "07808bc5df7c7a6f5ffbaba2c2547ca58d6223b47f976708a4abe960a754dea3"
+    "bodySha256": "a3607894c34105c8152b296e3a26cfbdd01d8d9b4db61841119849217ba3ef9c"
   },
   {
     "file": ".claude/rules/ui.md",
