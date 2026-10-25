@@ -7,24 +7,52 @@ import { APP_ROUTES } from '@/constants/routes';
 import { useJovieAuth } from '@/hooks/useJovieAuth';
 import { OnboardingShell, type OnboardingShellProps } from './OnboardingShell';
 
-interface Snapshot {
+export interface OnboardingSessionSnapshot {
   readonly identityId: string | null;
   readonly conversationId: string | null;
   readonly owned: boolean;
   readonly messages: UIMessage[];
 }
+type Snapshot = OnboardingSessionSnapshot;
+
+export interface OnboardingSessionBoundaryProps extends OnboardingShellProps {
+  /**
+   * Server-resolved snapshot for a visitor with no account and no onboarding
+   * cookie, whose restored conversation is known to be empty. Skips the
+   * hydrate -> auth -> fetch waterfall so the real chat paints with the HTML
+   * instead of "Restoring your conversation". Ignored if the client resolves
+   * to a different identity.
+   */
+  readonly initialSnapshot?: OnboardingSessionSnapshot;
+}
 
 /** Resolve history before mounting useChat, and discard it on identity changes. */
-export function OnboardingSessionBoundary(props: OnboardingShellProps) {
+export function OnboardingSessionBoundary({
+  initialSnapshot,
+  ...props
+}: OnboardingSessionBoundaryProps) {
   const { isLoaded, isSignedIn, userId, signOut } = useJovieAuth();
-  const identity = isLoaded ? (userId ?? 'anonymous') : null;
+  const identity = isLoaded
+    ? (userId ?? 'anonymous')
+    : initialSnapshot
+      ? 'anonymous'
+      : null;
   const [revision, setRevision] = useState(0);
   const [loaded, setLoaded] = useState<{
     identity: string;
     revision: number;
     snapshot: Snapshot;
     allowHandoff: boolean;
-  } | null>(null);
+  } | null>(
+    initialSnapshot
+      ? {
+          identity: 'anonymous',
+          revision: 0,
+          snapshot: initialSnapshot,
+          allowHandoff: true,
+        }
+      : null
+  );
   const [failure, setFailure] = useState<{
     identity: string;
     revision: number;
@@ -41,6 +69,8 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
   useEffect(() => {
     if (!identity) return;
     initialIdentity.current ??= identity;
+    // The server already resolved this exact identity and revision.
+    if (loaded?.identity === identity && loaded.revision === revision) return;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
     let cancelled = false;
@@ -81,6 +111,8 @@ export function OnboardingSessionBoundary(props: OnboardingShellProps) {
       clearTimeout(timeout);
       controller.abort();
     };
+    // `loaded` is read only to skip the seeded first load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity, revision]);
 
   const runAction = async (action: 'restart' | 'logout') => {
