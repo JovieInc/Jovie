@@ -1,0 +1,106 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Fleet-rule evidence (PR body/labels/files) is read on the dedicated CI App installation budget by base-branch code only, then published as a commit status the required PR Ready aggregate reads.
+# removal-trigger: Remove when the repo-wide GITHUB_TOKEN bucket no longer starves PR evidence reads, or GitHub offers per-workflow API budgets.
+name: Fleet Rules Evidence
+
+# 2026-10-24: pr-fleet-rules.mjs read PR evidence on the repo-wide GITHUB_TOKEN
+# bucket every workflow shares, so quota exhaustion turned PR Fleet Rules,
+# Source Validation and PR Ready red on a dozen PRs. It now reads on the
+# dedicated CI App installation's own budget.
+#
+# SECURITY: pull_request_target runs this workflow from the BASE branch, so a
+# PR branch can never edit it, and the only checkout is main's policy script and
+# api-client (sparse, persist-credentials: false). No PR code, no PR-controlled
+# value is interpolated into a shell, and the CI App key is never present in any
+# pull_request-triggered workflow (see scripts/pr-fleet-rules.test.mjs). The
+# minted token is read-only (contents, pull-requests); the verdict is posted with
+# github.token. A failed mint falls back to github.token, so evidence is never
+# skipped.
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, labeled, unlabeled, reopened]
+  # A verdict can land before Source Validation finishes (PR Ready then reads
+  # "missing") or after it (PR Ready already red). Either way the failed jobs
+  # are re-run once the status exists, so there is no polling.
+  workflow_run:
+    workflows: [Source Validation]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  group: fleet-rules-evidence-${{ github.event.pull_request.number || github.event.workflow_run.head_sha }}-${{ github.event_name }}
+  # A newer revision supersedes an older read; the verdict is per head sha.
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+
+jobs:
+  evidence:
+    name: Fleet Rules Evidence
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      statuses: write
+      actions: write
+    steps:
+      - name: Mint CI App read token for fleet evidence
+        id: fleet-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/pr-fleet-rules.mjs
+            packages/api-client
+            .github/scripts/fleet-rules-verdict.sh
+          sparse-checkout-cone-mode: false
+      # No token input: setup-node keeps its default github.token, never the CI App token.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Read evidence and publish the Fleet Rules Evidence status
+        env:
+          FLEET_TOKEN: ${{ steps.fleet-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/fleet-rules-verdict.sh
+
+  rerun:
+    name: Re-run Source Validation after a verdict
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.run_attempt < 4
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      statuses: read
+      actions: write
+    steps:
+      - name: Re-run when a verdict exists for this exact head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 0
+          state="$(gh api "repos/$REPOSITORY/commits/$HEAD_SHA/statuses?per_page=100" \
+            --jq '[.[] | select(.context == "Fleet Rules Evidence")] | sort_by(.created_at) | last | .state // "missing"')"
+          if [ "$state" = success ]; then
+            gh api -X POST "repos/$REPOSITORY/actions/runs/$RUN_ID/rerun-failed-jobs" >/dev/null \
+              && echo "Re-ran failed jobs of run $RUN_ID: fleet evidence is green for $HEAD_SHA."
+          else
+            echo "Fleet evidence for $HEAD_SHA is $state; not re-running."
+          fi

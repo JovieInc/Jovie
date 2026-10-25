@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -330,28 +337,13 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
     'utf8'
   );
   const workflow = readFileSync('.github/workflows/pr-fleet-rules.yml', 'utf8');
-  // Required enforcement runs in the PR Ready job (no PR code in its
-  // workspace) on the dedicated CI App installation budget, read-only scopes,
-  // with a github.token fallback for forks and failed mints.
-  const readyJob = source.slice(source.indexOf('\n  ready:'));
-  assert.match(readyJob, /create-github-app-token@/);
-  assert.match(
-    readyJob,
-    /private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/
-  );
-  assert.equal((readyJob.match(/secrets\./g) ?? []).length, 1);
-  assert.match(readyJob, /permission-pull-requests: read/);
-  assert.match(readyJob, /ref: main/);
-  assert.doesNotMatch(readyJob, /github\.event\.pull_request\.head|: write/);
-  assert.match(
-    readyJob,
-    /GITHUB_TOKEN: \$\{\{ steps\.fleet-token\.outputs\.token \|\| github\.token \}\}\n\s+run: node scripts\/pr-fleet-rules\.mjs --with-warnings/
-  );
-  assert.doesNotMatch(
-    source,
-    /GITHUB_TOKEN: \$\{\{ github\.token \}\}\n\s+run: node scripts\/pr-fleet-rules/
-  );
   assert.match(source, /needs: \[deterministic,/);
+  // Required enforcement reads the evidence status; the key never lives here.
+  const readyJob = source.slice(source.indexOf('\n  ready:'));
+  assert.match(readyJob, /name: Require fleet-rule evidence/);
+  assert.match(readyJob, /context == "Fleet Rules Evidence"/);
+  assert.doesNotMatch(source, /pr-fleet-rules\.mjs/);
+  assert.doesNotMatch(readyJob, /create-github-app-token|CI_APP/);
   assert.match(workflow, /types: \[opened, edited, synchronize, labeled/);
   assert.match(workflow, /merge_group:/);
   assert.doesNotMatch(workflow, /continue-on-error:/);
@@ -362,6 +354,146 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
   );
   assert.match(workflow, /pr-fleet-rules\.mjs --with-warnings/);
   assert.doesNotMatch(workflow, /secrets\.|: write/);
+});
+
+const WORKFLOWS_DIR = '.github/workflows';
+const triggersOf = text => {
+  const from = text.slice(text.search(/^on:/m) + 3);
+  const next = from.search(/^\S/m);
+  const on = next < 0 ? from : from.slice(0, next);
+  return new Set([...on.matchAll(/^ {2}([a-z_]+):/gm)].map(m => m[1]));
+};
+
+test('contract: the CI App private key is never referenced by a pull_request-triggered workflow', () => {
+  // pull_request runs the PR branch's own copy of the workflow with secrets
+  // for same-repo branches, so any branch could edit it to print the key. Base
+  // code only: pull_request_target, workflow_run, merge_group, push, schedule.
+  // fork-pr-gate.yml predates this contract and is tracked debt (its
+  // pull_request trigger overlaps pull_request_target): remove it from the
+  // allowlist when that trigger goes. The list may only shrink.
+  const KNOWN_DEBT = new Set(['fork-pr-gate.yml']);
+  const offenders = [];
+  for (const name of readdirSync(WORKFLOWS_DIR).filter(f =>
+    f.endsWith('.yml')
+  )) {
+    const text = readFileSync(join(WORKFLOWS_DIR, name), 'utf8');
+    if (triggersOf(text).has('pull_request') && /CI_APP_PRIVATE_KEY/.test(text))
+      offenders.push(name);
+  }
+  assert.deepEqual(
+    offenders.filter(name => !KNOWN_DEBT.has(name)),
+    [],
+    'move the CI App token mint into a pull_request_target/workflow_run workflow'
+  );
+  for (const name of KNOWN_DEBT)
+    assert.ok(
+      offenders.includes(name),
+      `${name} no longer references the key from a pull_request workflow: drop it from KNOWN_DEBT`
+    );
+});
+
+test('contract: Fleet Rules Evidence is base-branch code only and never hands the key to setup-node', () => {
+  const text = readFileSync(
+    join(WORKFLOWS_DIR, 'fleet-rules-evidence.yml'),
+    'utf8'
+  );
+  const triggers = triggersOf(text);
+  assert.deepEqual([...triggers].sort(), [
+    'pull_request_target',
+    'workflow_run',
+  ]);
+  assert.equal((text.match(/secrets\./g) ?? []).length, 1);
+  assert.match(text, /private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/);
+  assert.match(
+    text,
+    /permission-contents: read\n\s+permission-pull-requests: read/
+  );
+  assert.doesNotMatch(text, /permission-[a-z-]+: write/);
+  // The only checkout is main, sparse, without persisted credentials.
+  assert.equal((text.match(/actions\/checkout@/g) ?? []).length, 1);
+  assert.match(
+    text,
+    /ref: main\n\s+fetch-depth: 1\n\s+persist-credentials: false\n\s+sparse-checkout:/
+  );
+  assert.doesNotMatch(text, /github\.event\.pull_request\.head\.(ref|repo)/);
+  // setup-node keeps its default token; the minted token never reaches it.
+  const setupNode = text.slice(
+    text.indexOf('actions/setup-node@'),
+    text.indexOf('- name: Read evidence')
+  );
+  assert.doesNotMatch(setupNode, /token:|fleet-token/);
+  // The minted token is only passed to the evidence script, as FLEET_TOKEN.
+  assert.equal(
+    (text.match(/steps\.fleet-token\.outputs\.token/g) ?? []).length,
+    1
+  );
+});
+
+test('verdict script maps exit codes to statuses and never turns a deferral into a pass', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-verdict-'));
+  try {
+    mkdirSync(join(dir, 'scripts'));
+    mkdirSync(join(dir, 'bin'));
+    const posts = join(dir, 'posts.log');
+    writeFileSync(
+      join(dir, 'bin', 'gh'),
+      `#!/usr/bin/env bash\necho "$*" >> "${posts}"\n`,
+      { mode: 0o755 }
+    );
+    const run = (code, lines) => {
+      writeFileSync(posts, '');
+      writeFileSync(
+        join(dir, 'scripts', 'pr-fleet-rules.mjs'),
+        `console.log(${JSON.stringify(lines)}); process.exitCode = ${code};`
+      );
+      const done = spawnSync(
+        'bash',
+        [join(process.cwd(), '.github/scripts/fleet-rules-verdict.sh')],
+        {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            PATH: `${join(dir, 'bin')}:${process.env.PATH}`,
+            GH_TOKEN: 'gh-token-value',
+            FLEET_TOKEN: 'app-token-value',
+            REPOSITORY: 'o/r',
+            HEAD_SHA: 'a'.repeat(40),
+            RUN_URL: 'https://example.test/run',
+          },
+        }
+      );
+      return {
+        status: done.status,
+        posts: readFileSync(posts, 'utf8'),
+        out: done.stdout + done.stderr,
+      };
+    };
+    const green = run(0, '');
+    assert.equal(green.status, 0);
+    assert.match(green.posts, /statuses\/a{40} .*state=success/);
+    const red = run(1, '::error::red-before-green: add a command');
+    assert.equal(red.status, 0);
+    assert.match(
+      red.posts,
+      /state=failure.*description=red-before-green: add a command/
+    );
+    const deferred = run(
+      75,
+      '::error::Fleet rule evidence unavailable (github-quota-deferred)'
+    );
+    assert.equal(deferred.status, 75);
+    assert.match(
+      deferred.posts,
+      /state=error.*description=github-quota-deferred/
+    );
+    assert.doesNotMatch(deferred.posts, /state=success/);
+    assert.doesNotMatch(
+      green.out + red.out + deferred.out,
+      /app-token-value|gh-token-value/
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('CLI warning mode always returns zero, even when evidence or policy fails', async () => {

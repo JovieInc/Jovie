@@ -1262,12 +1262,13 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     'Measure actual installed source dependency graph',
     'Preserve exact source dependency evidence',
   ];
-  // Fleet evidence runs in `ready` on the dedicated CI App budget, never gated by reuse.
-  const fleetStep = workflow.jobs.ready.steps.find(
-    step => step.name === 'Enforce PR fleet rules'
+  // Fleet evidence is a status read in `ready`, produced by the base-branch
+  // Fleet Rules Evidence workflow; it never depends on proof reuse.
+  assert.ok(
+    workflow.jobs.ready.steps.some(
+      step => step.name === 'Require fleet-rule evidence'
+    )
   );
-  assert.ok(fleetStep);
-  assert.equal(fleetStep.if, '${{ always() }}');
   const deterministic = workflow.jobs.deterministic.steps;
   for (const name of always) {
     const step = deterministic.find(candidate => candidate.name === name);
