@@ -130,6 +130,39 @@ class RealLogYourBodyHistoryTest(unittest.TestCase):
         self.assertEqual(state_at(with_cancel, end)["failedStreak"], 15)
 
 
+JOVIE = "JovieInc/Jovie"
+# Real Jovie `production-controller.yml` runs on main, 2026-10-25 (created_at, conclusion). The 04:46:39Z failure was
+# followed by no completed run until the queue behind it started at 06:36Z (production blocked by a visual-review
+# failure counted as a journey failure).
+JOVIE_HISTORY = [
+    ("2026-10-25T04:46:39Z", "failure"),
+    ("2026-10-25T04:39:57Z", "success"),
+    ("2026-10-25T03:57:25Z", "success"),
+    ("2026-10-25T03:17:43Z", "success"),
+    ("2026-10-25T03:17:09Z", "success"),
+    ("2026-10-25T03:16:34Z", "success"),
+    ("2026-10-25T03:00:51Z", "success"),
+]
+
+
+class RealJovieControllerHistoryTest(unittest.TestCase):
+    def state(self, at: str) -> dict:
+        now = epoch(at)
+        return dh.evaluate(JOVIE, runs_until(JOVIE_HISTORY, now), None, now)
+
+    def test_the_production_controller_failure_raises_the_jovie_incident_and_it_persists_through_the_stall(self):
+        quiet = epoch("2026-10-25T04:45:00Z")
+        self.assertEqual(dh.judge({"observedAt": quiet, "repos": {JOVIE: self.state("2026-10-25T04:45:00Z")}}, quiet), {})
+        for at in ("2026-10-25T04:47:00Z", "2026-10-25T05:41:00Z", "2026-10-25T06:40:00Z"):
+            now = epoch(at)
+            alerts = dh.judge({"observedAt": now, "repos": {JOVIE: self.state(at)}}, now)
+            self.assertEqual(list(alerts), ["production-deploy:jovie"], at)
+            self.assertIn("since 2026-10-25T04:46:39Z", alerts["production-deploy:jovie"])
+
+    def test_measured_limits_are_per_repo(self):
+        self.assertEqual((dh.REPOS[JOVIE]["behindCommits"], dh.REPOS[LYB]["behindCommits"]), (6, 5))
+
+
 class LagTest(unittest.TestCase):
     NOW = epoch("2026-10-25T12:00:00Z")
 
@@ -140,16 +173,17 @@ class LagTest(unittest.TestCase):
         return {"observedAt": self.NOW, "repos": {LYB: state}}
 
     def test_more_than_the_commit_limit_or_two_hours_raises_the_same_key(self):
-        quiet = dh.judge(self.sample(3, 600), self.NOW)
+        quiet = dh.judge(self.sample(dh.REPOS[LYB]["behindCommits"], 600), self.NOW)
         self.assertEqual(quiet, {})
-        by_count = dh.judge(self.sample(dh.BEHIND_COMMITS + 1, 600), self.NOW)
-        by_age = dh.judge(self.sample(2, dh.BEHIND_MAX_AGE_S + 60), self.NOW)
+        spec = dh.REPOS[LYB]
+        by_count = dh.judge(self.sample(spec["behindCommits"] + 1, 600), self.NOW)
+        by_age = dh.judge(self.sample(2, spec["behindMaxAgeS"] + 60), self.NOW)
         self.assertEqual((list(by_count), list(by_age)), (["production-deploy:lyb"], ["production-deploy:lyb"]))
         self.assertIn("commits behind", by_count["production-deploy:lyb"])
         self.assertIn("min old", by_age["production-deploy:lyb"])
 
     def test_old_age_with_nothing_unshipped_is_not_lag(self):
-        self.assertEqual(dh.judge(self.sample(0, dh.BEHIND_MAX_AGE_S + 600), self.NOW), {})
+        self.assertEqual(dh.judge(self.sample(0, dh.REPOS[LYB]["behindMaxAgeS"] + 600), self.NOW), {})
 
 
 class SamplerTest(unittest.TestCase):

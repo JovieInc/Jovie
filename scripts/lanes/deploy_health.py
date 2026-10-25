@@ -5,8 +5,8 @@ for about two days. Each repo's production workflow is read every 5 minutes, and
 (`production-deploy:<repo>`) is raised through the doctor's Tracker when either
 
   * the latest real deploy run failed (the key names the failed streak, when it began, the last success), or
-  * production lags main: the last successful deploy's commit is more than BEHIND_COMMITS behind, or the oldest
-    commit it lacks is more than BEHIND_MAX_AGE_S old.
+  * production lags main: the last successful deploy's commit is more than the repo's measured p95 batch size
+    behind, or the oldest commit it lacks is older than the repo's measured p95 deploy lag (see REPOS).
 
 The doctor closes the incident when the condition clears, which is the next successful deploy. The same sample is
 published in the lanes status feed (`deployHealth`), which is both the Ovie "Production is X behind" source for
@@ -20,13 +20,16 @@ from pathlib import Path
 
 import throughput_sentinel as sentinel
 
+# Lag limits are the measured p95 of NORMAL deploys over the 7 days to 2026-10-25T07:00Z (successful deploy after a
+# successful deploy; commits = batch size, age = oldest commit in the batch to deploy completion), not guesses:
+#   Jovie (465 runs, 187 samples): commits p50 2 / p95 6 / max 16; age p50 56 min / p95 246 min / max 317 min
+#   LogYourBody (50 runs, 34 samples): commits p50 2 / p95 5 / max 5; age p50 36 min / p95 183 min / max 2946 min
+# Method: per successful deploy that follows a successful deploy, compare previous deploy head..this head; remeasure when cadence changes.
 REPOS = {
-    "JovieInc/Jovie": {"label": "jovie", "workflow": "production-controller.yml"},
-    "JovieInc/LogYourBody": {"label": "lyb", "workflow": "deploy.yml"},
+    "JovieInc/Jovie": {"label": "jovie", "workflow": "production-controller.yml", "behindCommits": 6, "behindMaxAgeS": 246 * 60},
+    "JovieInc/LogYourBody": {"label": "lyb", "workflow": "deploy.yml", "behindCommits": 5, "behindMaxAgeS": 183 * 60},
 }
 REFRESH_S = 300
-BEHIND_COMMITS = 15       # Jovie ships ~6 merges/h: 15 is ~2.5h of unshipped main. Tune from stage-timings.
-BEHIND_MAX_AGE_S = 7200   # Tim 2026-10-25: more than 2 hours
 STALE_S = 1800            # a sample older than this is the sampler's own dead-man
 FAILED = {"failure", "timed_out", "startup_failure"}
 STREAK_SHOWN = 3
@@ -69,6 +72,8 @@ def evaluate(repo: str, runs: list[dict], compare: dict | None, now: float) -> d
 
 
 def reasons(state: dict, now: float) -> list[str]:
+    spec = REPOS.get(state.get("repo"), {})
+    max_commits, max_age = spec.get("behindCommits", 6), spec.get("behindMaxAgeS", 246 * 60)
     out = []
     if state.get("status") == "failing":
         since = state.get("failingSince")
@@ -76,10 +81,10 @@ def reasons(state: dict, now: float) -> list[str]:
         out.append(f"{state['failedStreak']} consecutive production deploy failure(s) since {since} (last success {last}; "
                    f"latest failure {state.get('lastFailureUrl')})")
     behind, age = state.get("behindMain"), state.get("oldestUnshippedAge")
-    if isinstance(behind, int) and behind > BEHIND_COMMITS:
-        out.append(f"production is {behind} commits behind main (limit {BEHIND_COMMITS})")
-    if isinstance(age, int) and age > BEHIND_MAX_AGE_S and (behind or 0) > 0:
-        out.append(f"the oldest commit production lacks is {age // 60} min old (limit {BEHIND_MAX_AGE_S // 60})")
+    if isinstance(behind, int) and behind > max_commits:
+        out.append(f"production is {behind} commits behind main (limit {max_commits})")
+    if isinstance(age, int) and age > max_age and (behind or 0) > 0:
+        out.append(f"the oldest commit production lacks is {age // 60} min old (limit {max_age // 60})")
     return out
 
 
