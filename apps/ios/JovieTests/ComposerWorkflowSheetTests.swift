@@ -1,3 +1,4 @@
+import JovieKit
 import Testing
 import XCTest
 @testable import Jovie
