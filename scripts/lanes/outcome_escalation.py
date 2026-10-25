@@ -19,6 +19,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 import urllib.request
 from pathlib import Path
@@ -29,7 +30,6 @@ VISION_TIMEOUT_S = 600
 HELP_MARKER = "<!-- outcome-help-request:v1"
 GAP_MARKER = "<!-- outcome-capability-gap:v1 -->"
 GAP_FILE = "outcome-gaps.json"
-GATEWAY_URL = "https://ai-gateway.vercel.sh/v1/chat/completions"
 GATEWAY_ENV = Path(os.environ.get("AI_GATEWAY_LANE_ENV", Path.home() / ".config/jovie-lanes/ai-gateway.env"))
 # Measured 2026-10-25 on 12 real and seeded verdict items (supported / contradicted / insufficient):
 # openai/gpt-6.1-sol 9/12 correct at $0.0013 per correct verdict, 3.2s; zai/glm-5.3 7/12 at $0.0073, 13.8s.
@@ -170,7 +170,32 @@ def adversarial_model() -> str | None:
     return None if model.lower() in ("", "off", "0", "false") else model
 
 
-def gateway_judge(question: str, model: str, urlopen=urllib.request.urlopen, timeout: int = 90) -> dict:
+def _gateway_host() -> str:
+    scripts = str(Path(__file__).resolve().parents[1])
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient.contract import provider_spec
+    return provider_spec("ai-gateway")["hosts"][0]
+
+
+def _gateway_request(body: bytes, key: str, timeout: int):
+    """POST through the shared client layer (budget, breaker, backoff; host from the provider contract) and return the
+    parsed JSON. `urlopen` below is a test seam only."""
+    scripts = str(Path(__file__).resolve().parents[1])
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient import ApiClient
+    from apiclient.contract import provider_spec
+    url = f"https://{provider_spec('ai-gateway')['hosts'][0]}/v1/chat/completions"
+    client = ApiClient("ai-gateway", key, authorize=lambda headers: headers.update({"Authorization": "Bearer " + key}))
+    response = client.request(url, method="POST", headers={"Content-Type": "application/json"}, body=body.decode(),
+                              priority="report", timeout_ms=timeout * 1000)
+    if response.status >= 400:
+        raise RuntimeError(f"gateway HTTP {response.status}")
+    return response.json()
+
+
+def gateway_judge(question: str, model: str, urlopen=None, timeout: int = 90) -> dict:
     """One strict three-way verdict from a model of another family through the AI Gateway."""
     key = gateway_key()
     if not key:
@@ -180,10 +205,14 @@ def gateway_judge(question: str, model: str, urlopen=urllib.request.urlopen, tim
               "proves the criterion; contradicted = it shows the criterion is false; insufficient = it establishes neither.\n" + question)
     body = json.dumps({"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0,
                        "max_tokens": 2000}).encode()
-    request = urllib.request.Request(GATEWAY_URL, body, {"Authorization": "Bearer " + key, "Content-Type": "application/json"})
     try:
-        with urlopen(request, timeout=timeout) as response:
-            data = json.load(response)
+        if urlopen is None:
+            data = _gateway_request(body, key, timeout)
+        else:
+            request = urllib.request.Request(f"https://{_gateway_host()}/v1/chat/completions", body,
+                                             {"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+            with urlopen(request, timeout=timeout) as response:
+                data = json.load(response)
         text = data["choices"][0]["message"]["content"]
         parsed = json.loads(text[text.index("{"):text.rindex("}") + 1])
         verdict = parsed.get("verdict")
@@ -198,7 +227,7 @@ def gateway_judge(question: str, model: str, urlopen=urllib.request.urlopen, tim
             "result": f"{model}: {verdict} - {str(parsed.get('reason') or '')[:160]} (${cost:.4f})"}
 
 
-def adversarial_review(item: dict, run=None, env=None, codex_cmd=None, out_dir=None, urlopen=urllib.request.urlopen) -> dict:
+def adversarial_review(item: dict, run=None, env=None, codex_cmd=None, out_dir=None, urlopen=None) -> dict:
     """A different-family model reviews a judgement item from the recorded evidence."""
     model = adversarial_model()
     if model is None:
@@ -222,7 +251,7 @@ def find_help(comments: list[dict], corr: str) -> dict | None:
     return {"request": request, "replies": replies}
 
 
-def evaluate_reply(item: dict, reply_text: str, urlopen=urllib.request.urlopen) -> dict:
+def evaluate_reply(item: dict, reply_text: str, urlopen=None) -> dict:
     """Re-evaluate an item from an agent's reply (strict: a reply that only asserts is insufficient)."""
     model = adversarial_model() or DEFAULT_ADVERSARIAL_MODEL
     return gateway_judge(f"Criterion: {item['criterion']}\nWhy the verifier could not observe it: {item.get('evidence')}\n"
@@ -231,7 +260,7 @@ def evaluate_reply(item: dict, reply_text: str, urlopen=urllib.request.urlopen) 
 
 
 def escalate(items: list[dict], *, tree: Path, out_dir: Path, run, env: dict, codex_cmd: list[str], linear, issue: dict,
-             mesh_send=None, sha: str = "", urlopen=urllib.request.urlopen) -> list[dict]:
+             mesh_send=None, sha: str = "", urlopen=None) -> list[dict]:
     """Attach `attempts` to every unverifiable item (the model supplies its telemetry attempt). May flip an item
     the probe shows to be observable to `fail` ("observable but not observed")."""
     result = []
@@ -352,7 +381,7 @@ def read_gaps(state: Path) -> dict:
         return {}
 
 
-def followup_replies(state: Path, linear, now: float, limit: int = 15, urlopen=urllib.request.urlopen) -> list[dict]:
+def followup_replies(state: Path, linear, now: float, limit: int = 15, urlopen=None) -> list[dict]:
     """Close help loops between verifications: for each gap with an open help request, read the issue's
     comments, and when a reply arrived re-evaluate the item. Supported or contradicted resolves the gap
     (comment + ledger). Returns the resolutions so the caller can act on a contradiction."""

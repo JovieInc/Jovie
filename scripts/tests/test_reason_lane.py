@@ -1115,6 +1115,31 @@ class OutcomeLaneTest(unittest.TestCase):
         with patch.object(esc, "gateway_key", return_value=None):
             self.assertIn("no AI Gateway key", esc.adversarial_review({"criterion": "c"})["result"])
 
+    def test_the_default_gateway_read_goes_through_the_shared_client_with_the_contract_host(self):
+        esc = outcome.esc
+        seen = {}
+        class Response:
+            status = 200
+            def json(self):
+                return {"choices": [{"message": {"content": json.dumps({"verdict": "supported", "reason": "r"})}}], "usage": {}}
+        class Client:
+            def __init__(self, provider, credential, authorize=None, **kw):
+                seen["provider"] = provider
+                headers = {}
+                authorize(headers)
+                seen["auth"] = headers["Authorization"]
+            def request(self, url, **kw):
+                seen["url"] = url
+                seen["priority"] = kw.get("priority")
+                return Response()
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import apiclient
+        with patch.object(esc, "gateway_key", return_value="k"), patch.object(apiclient, "ApiClient", Client):
+            verdict = esc.gateway_judge("q", "openai/gpt-6.1-sol")
+        self.assertEqual(verdict["verdict"], "supported")
+        self.assertEqual((seen["provider"], seen["auth"], seen["priority"]), ("ai-gateway", "Bearer k", "report"))
+        self.assertEqual(seen["url"], "https://ai-gateway.vercel.sh/v1/chat/completions")
+
     def help_thread(self, corr, reply_body=None, *, child=True):
         request = {"id": "c-req", "createdAt": "2026-10-25T01:00:00Z", "body": f"<!-- outcome-help-request:v1 corr={corr} -->\nplease look"}
         nodes = [request]

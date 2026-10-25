@@ -141,7 +141,10 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_linear_sync.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
+RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
+                  "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
+                  "packages/api-client/providers.json",
+                  "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
