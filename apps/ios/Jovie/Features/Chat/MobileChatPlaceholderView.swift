@@ -1,3 +1,4 @@
+import JovieKit
 import SwiftUI
 
 // Rendered by AppContentView while the ChatRepository is unavailable
