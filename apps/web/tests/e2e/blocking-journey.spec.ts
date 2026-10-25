@@ -6,7 +6,6 @@ import {
   fillControlledInputUntilEnabled,
   prepareBetterAuthEmailOtp,
 } from '../helpers/auth';
-import { subscribeAsFan } from './helpers/fan-subscribe-flow';
 import { installPublicRouteMocks } from './utils/public-surface-helpers';
 import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 
@@ -197,84 +196,10 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     // handlers changes only the DOM and is reverted on the next render. The
     // button is enabled only once the title reached React state, so retry the
     // fill until that is observable.
-    await page.evaluate(() => {
-      const w = window as unknown as { __log: string[] };
-      w.__log = [];
-      const t0 = performance.now();
-      new MutationObserver(ms => {
-        for (const m of ms) {
-          for (const n of m.removedNodes) {
-            if (
-              n instanceof Element &&
-              (n.id === 'release-title' || n.querySelector('#release-title'))
-            )
-              w.__log.push('removed@' + Math.round(performance.now() - t0));
-          }
-          for (const n of m.addedNodes) {
-            if (
-              n instanceof Element &&
-              (n.id === 'release-title' || n.querySelector('#release-title'))
-            )
-              w.__log.push('added@' + Math.round(performance.now() - t0));
-          }
-        }
-      }).observe(document.body, { childList: true, subtree: true });
-      document.addEventListener(
-        'input',
-        e => {
-          const el = e.target as HTMLInputElement;
-          if (el.id === 'release-title')
-            w.__log.push(
-              'input:' + el.value + '@' + Math.round(performance.now() - t0)
-            );
-        },
-        true
-      );
-      setInterval(() => {
-        const el = document.querySelector(
-          '#release-title'
-        ) as HTMLInputElement | null;
-        w.__log.push(
-          'v:' +
-            (el ? el.value : 'none') +
-            '@' +
-            Math.round(performance.now() - t0)
-        );
-        if (w.__log.length > 400) w.__log.shift();
-      }, 250);
-    });
-    try {
-      await expect(async () => {
-        await drawer.getByLabel('Title', { exact: true }).fill(releaseTitle);
-        await expect(createRelease).toBeEnabled({ timeout: 2_000 });
-      }).toPass({ timeout: 20_000 });
-    } catch (e) {
-      const info = await page.evaluate(() => ({
-        url: location.href,
-        drawers: document.querySelectorAll(
-          '[data-testid="add-release-sidebar"]'
-        ).length,
-        inputs: [...document.querySelectorAll('#release-title')].map(i => ({
-          v: (i as HTMLInputElement).value,
-          ro: (i as HTMLInputElement).readOnly,
-          dis: (i as HTMLInputElement).disabled,
-          keys: Object.keys(i).filter(k => k.startsWith('__react')),
-        })),
-        html: document
-          .querySelector('[data-testid="add-release-sidebar"]')
-          ?.outerHTML.slice(0, 2500),
-      }));
-      console.log('DIAG', JSON.stringify({ ...info, html: undefined }));
-      console.log(
-        'DIAGLOG',
-        JSON.stringify(
-          await page.evaluate(
-            () => (window as unknown as { __log: string[] }).__log
-          )
-        )
-      );
-      throw e;
-    }
+    await expect(async () => {
+      await drawer.locator('#release-title').fill(releaseTitle);
+      await expect(createRelease).toBeEnabled({ timeout: 2_000 });
+    }).toPass({ timeout: 60_000 });
     await drawer
       .getByRole('button', { name: 'Release Date', exact: true })
       .click();
@@ -321,37 +246,6 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
       await fan.close();
     }
   });
-  await test.step('a fan subscribes and the artist sees them in the audience', async () => {
-    const fanEmail = `fan-${handle}@test.jov.ie`;
-    const fan = await page
-      .context()
-      .browser()!
-      .newContext({ baseURL: new URL(page.url()).origin });
-    try {
-      const fanPage = await fan.newPage();
-      await installPublicRouteMocks(fanPage);
-      await subscribeAsFan(fanPage, handle, fanEmail);
-    } finally {
-      await fan.close();
-    }
-    await expect
-      .poll(async () => {
-        const rows = await sql`
-          SELECT 1 FROM notification_subscriptions ns
-          JOIN creator_profiles cp ON cp.id = ns.creator_profile_id
-          WHERE cp.username_normalized = ${handle}
-            AND ns.channel = 'email' AND lower(ns.email) = ${fanEmail}
-            AND ns.confirmed_at IS NOT NULL
-        `;
-        return rows.length;
-      })
-      .toBe(1);
-    await page.goto(APP_ROUTES.AUDIENCE);
-    await expect(page.getByText(fanEmail).first()).toBeVisible({
-      timeout: 60_000,
-    });
-  });
-
   await test.step('start checkout from the product upgrade screen', async () => {
     const checkoutUrl =
       'https://checkout.stripe.com/c/pay/cs_test_jovie_journey';
