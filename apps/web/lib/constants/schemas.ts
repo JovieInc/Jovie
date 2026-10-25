@@ -241,7 +241,8 @@ const LISTEN_ACTION_PRIORITY: readonly string[] = [
 
 export function buildListenActions(
   providerLinks: Array<{ providerId: string; url: string }>,
-  providerLabels?: Record<string, { label: string }>
+  providerLabels?: Record<string, { label: string }>,
+  maxActions = 5
 ): Array<Record<string, unknown>> {
   return [...providerLinks]
     .filter(link => link.url)
@@ -250,7 +251,7 @@ export function buildListenActions(
       const bi = LISTEN_ACTION_PRIORITY.indexOf(b.providerId);
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     })
-    .slice(0, 5)
+    .slice(0, maxActions)
     .map(link => ({
       '@type': 'ListenAction',
       target: {

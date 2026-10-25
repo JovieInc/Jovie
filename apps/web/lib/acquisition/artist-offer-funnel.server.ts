@@ -133,15 +133,30 @@ export async function getArtistOfferFunnelReport(input?: {
     'pending-verification': toDate(row.stages?.['pending-verification']),
     'claim-verified': toDate(row.stages?.['claim-verified']),
     'claim-rejected': toDate(row.stages?.['claim-rejected']),
+    'claim-link-open': toDate(row.stages?.['claim-link-open']),
+    start: toDate(row.stages?.start),
+    claimed: toDate(row.stages?.claimed),
+    'upgrade-viewed': toDate(row.stages?.['upgrade-viewed']),
   }));
 
   const diagnostics = await getFunnelDiagnostics(start, end);
+  const weekStart = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const weekResult = await db.execute(drizzleSql`
+    SELECT count(*)::int AS visits
+    FROM acquisition_journeys
+    WHERE captured_at >= ${weekStart} AND captured_at < ${end}
+      AND consent_revoked_at IS NULL
+  `);
+  const visitsLast7d = Number(
+    rowsOf<{ visits: number }>(weekResult)[0]?.visits ?? 0
+  );
   return buildArtistOfferFunnelReport({
     start,
     end,
     totalVisits,
     timelines,
     diagnostics,
+    visitsLast7d,
   });
 }
 
