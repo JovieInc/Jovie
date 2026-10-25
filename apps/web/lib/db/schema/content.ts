@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   decimal,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -673,9 +674,7 @@ export const releaseIdentityDecisions = pgTable(
   'release_identity_decisions',
   {
     id: uuid('id').primaryKey().defaultRandom(),
-    creatorProfileId: uuid('creator_profile_id')
-      .notNull()
-      .references(() => creatorProfiles.id, { onDelete: 'cascade' }),
+    creatorProfileId: uuid('creator_profile_id').notNull(),
     providerAlbumId: text('provider_album_id').notNull(),
     releaseId: uuid('release_id'),
     /** 'accepted' | 'rejected' */
@@ -686,6 +685,12 @@ export const releaseIdentityDecisions = pgTable(
     decidedAt: timestamp('decided_at').defaultNow().notNull(),
   },
   table => ({
+    // Explicit name: the generated one exceeds Postgres' 63-byte limit.
+    creatorProfileFk: foreignKey({
+      name: 'release_identity_decisions_profile_fk',
+      columns: [table.creatorProfileId],
+      foreignColumns: [creatorProfiles.id],
+    }).onDelete('cascade'),
     creatorAlbumUnique: uniqueIndex(
       'release_identity_decisions_creator_album_unique'
     ).on(table.creatorProfileId, table.providerAlbumId),

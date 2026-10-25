@@ -1,5 +1,5 @@
 {
-  "id": "6afe0432-9da8-4403-b27d-97e4503d340a",
+  "id": "33561bc7-531c-4f2c-b588-048ae5de1c57",
   "prevId": "bd022021-ee74-4ecd-91ff-69a6d6977b4c",
   "version": "7",
   "dialect": "postgresql",
@@ -34074,8 +34074,8 @@
         }
       },
       "foreignKeys": {
-        "release_identity_decisions_creator_profile_id_creator_profiles_id_fk": {
-          "name": "release_identity_decisions_creator_profile_id_creator_profiles_id_fk",
+        "release_identity_decisions_profile_fk": {
+          "name": "release_identity_decisions_profile_fk",
           "tableFrom": "release_identity_decisions",
           "tableTo": "creator_profiles",
           "columnsFrom": [
