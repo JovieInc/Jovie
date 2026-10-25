@@ -151,7 +151,7 @@ describe('MarketingHeader', () => {
     );
     // The shared public CTA follows the waitlist-on front-door contract on /signup.
     expect(
-      screen.getByRole('link', { name: 'Request access' })
+      screen.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/signup');
   });
 
@@ -228,7 +228,7 @@ describe('MarketingHeader', () => {
       'marketing-glass'
     );
     expect(
-      screen.getByRole('link', { name: 'Request access' })
+      screen.getByRole('link', { name: 'Claim your profile' })
     ).toHaveAttribute('href', '/signup');
     expect(screen.queryByRole('link', { name: 'Get started' })).toBeNull();
   });
