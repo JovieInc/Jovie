@@ -8575,7 +8575,13 @@ def jovie_repair_pending(host: Host, now: float | None = None) -> bool:
     refreshes the record (a record only goes stale when other work starves the Jovie path)."""
     now = time.time() if now is None else now
     lanes = read_json(host.state / "maintenance-demand.json").get("lanes")
-    for row in (lanes.values() if isinstance(lanes, dict) else ()):
+    # Only a lane that repairs Jovie PRs can prove Jovie has none. record_maintenance_demand runs
+    # only for such lanes (`local = spec.get("repairs") is not False`), and this filter keeps a
+    # non-repairing lane's row, should one ever be written, from unblocking LYB intake.
+    providers = read_json(HERE / "providers.json")
+    for lane_name, row in (lanes.items() if isinstance(lanes, dict) else ()):
+        if (providers.get(lane_name) or {}).get("repairs") is False:
+            continue
         at, pending = (row or {}).get("observedAt"), (row or {}).get("pending")
         if type(at) in (int, float) and 0 <= now - at <= MAINTENANCE_DEMAND_MAX_AGE_S \
                 and type(pending) is int and pending == 0:
