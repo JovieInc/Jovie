@@ -40,6 +40,17 @@ describe('ArtistProfileMonetizationSection source contract', () => {
       screen.getByRole('region', { name: 'Monetization Card Carousel' })
     ).toBeInTheDocument();
 
+    const previous = screen.getByRole('button', {
+      name: 'Scroll Monetization Left',
+    });
+    const next = screen.getByRole('button', {
+      name: 'Scroll Monetization Right',
+    });
+    expect(previous).toBeDisabled();
+    expect(next).toBeEnabled();
+    expect(previous).toHaveClass('ds-glass');
+    expect(next).toHaveClass('ds-glass');
+
     const cards = screen.getAllByRole('article');
     expect(cards).toHaveLength(MONETIZATION_CARDS.length);
 
