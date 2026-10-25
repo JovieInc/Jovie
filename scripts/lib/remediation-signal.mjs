@@ -172,6 +172,12 @@ export function decideMonitorSignal({ conclusion, fingerprint = '' }) {
   }
   if (conclusion === 'failure' || conclusion === 'cancelled')
     return { action: 'red' };
+  if (conclusion === 'unknown') {
+    // Required evidence was unreadable (JOV-7694: unknown behaves as RED, never
+    // green). Hold: do not resolve an open incident and do not record green.
+    // It is reported, not skipped silently, and a verified red still files.
+    return { action: 'hold', reason: 'unknown_evidence' };
+  }
   return { action: 'skip' };
 }
 
@@ -240,6 +246,9 @@ export async function applyRemediationDecision(decision = {}, context = {}) {
   const { fingerprint, source, runUrl, detail, apiKey, fetchImpl } = context;
   if (!decision || decision.action === 'skip') {
     return { ok: true, action: 'skip' };
+  }
+  if (decision.action === 'hold') {
+    return { ok: true, action: 'hold', reason: decision.reason ?? 'hold' };
   }
   if (decision.action === 'red') {
     const key = decision.fingerprint || fingerprint;
