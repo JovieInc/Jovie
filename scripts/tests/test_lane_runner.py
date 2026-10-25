@@ -13,7 +13,6 @@ import dataclasses
 import fcntl
 import concurrent.futures
 import io
-import types
 import signal
 import socket
 import shutil
@@ -7947,42 +7946,6 @@ class FleetRulesPreflightTest(unittest.TestCase):
             self.assertIn("--local", seen[0])
             with patch.object(lane, "sh", side_effect=OSError("no node")):
                 self.assertEqual(lane.fleet_rules_preflight(tree, "fix: x", "b", None), [])
-
-
-class PrCreatePreflightTest(unittest.TestCase):
-    ISSUE = types.SimpleNamespace(identifier="JOV-1", id="uuid-1", title="Thing")
-
-    def tree(self, raw):
-        tree = Path(raw)
-        (tree / "scripts").mkdir()
-        (tree / "scripts/pr-create.mjs").write_text("// stub")
-        return tree
-
-    def test_body_comes_from_the_template_and_takes_real_red_evidence_from_commits(self):
-        template = ("Refs JOV-1.\n\n<!-- customer-changelog/v1 {\"releaseWorthy\":false} -->\n\n## Red-before-green\n"
-                    "Failing command: TODO\n\n## Blast radius\nWhat could break: TODO\nProof: TODO\n")
-        commit = "fix: x\n\n## Red-before-green\nFailing command: `pytest t.py`\n```text\nFAIL boom\n```\n"
-        def fake_sh(args, **kw):
-            return subprocess.CompletedProcess(args, 0, template if "--print-template" in args else commit, "")
-        with tempfile.TemporaryDirectory() as raw, patch.object(lane, "sh", fake_sh):
-            body = lane.lane_pr_body(self.tree(raw), self.ISSUE, "fix: x")
-            self.assertIn("customer-changelog/v1", body)
-            self.assertIn("FAIL boom", body)
-            self.assertNotIn("TODO", body)
-            fake_sh_no_red = lambda args, **kw: subprocess.CompletedProcess(args, 0, template if "--print-template" in args else "fix: x\n", "")
-            with patch.object(lane, "sh", fake_sh_no_red):
-                self.assertIn("Failing command: TODO", lane.lane_pr_body(self.tree_again(raw), self.ISSUE, "fix: x"))
-
-    def tree_again(self, raw):
-        return Path(raw)
-
-    def test_the_preflight_returns_exact_instructions_when_the_wrapper_refuses(self):
-        out = "pr-preflight [red-before-green]: missing\n  add: Add a ## Red-before-green section\nnoise\n"
-        log = io.StringIO()
-        with tempfile.TemporaryDirectory() as raw, patch.object(lane, "sh", lambda args, **kw: subprocess.CompletedProcess(args, 1, out, "")):
-            lines = lane.fleet_rules_preflight(self.tree(raw), "fix: x", "b", log)
-        self.assertEqual(lines, ["pr-preflight [red-before-green]: missing", "  add: Add a ## Red-before-green section"])
-        self.assertIn("1 issue(s)", log.getvalue())
 
 
 class UpdateTest(unittest.TestCase):

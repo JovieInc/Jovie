@@ -3608,12 +3608,12 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         # The push's own hooks can take minutes; a stop during them still bars the PR open.
         require_publishable(host, branch, "before-pr-create")
         pr_title = f"fix: {issue.title[:80]} ({issue.identifier})"
-        pr_body = lane_pr_body(worktree, issue, pr_title, log)
-        blockers = fleet_rules_preflight(worktree, pr_title, pr_body, log)
-        if blockers and (worktree / "scripts" / "pr-create.mjs").exists():
-            # Same rules CI runs, found before the PR exists: no PR, no red run. The log carries the exact text to add.
-            rules = sorted({m.group(1) for line in blockers if (m := re.match(r"pr-preflight \[([^\]]+)\]", line))})
-            return pending("pr-preflight:" + ",".join(rules))
+        pr_body = (f"Refs {issue.identifier}.\n\n"
+                   f"<!-- linear-issue-id:{issue.id} -->\n"
+                   f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                   "Lane implementation; verification by the lane gate. "
+                   "Runtime and commissioning acceptance remain with the issue owner.")
+        fleet_rules_preflight(worktree, pr_title, pr_body, log)
         try:
             sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
                 "--title", pr_title, "--body", pr_body], cwd=worktree, log=log)
@@ -3630,65 +3630,26 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
-def lane_pr_body(worktree: Path, issue: Issue, title: str, log=None) -> str:
-    """The body a lane submits: the shared template (changelog decision, Blast radius, Red-before-green for fix
-    PRs). Real red output is taken from a `## Red-before-green` section in the branch's commit messages; there is
-    deliberately no invented placeholder, so a missing one fails the preflight with instructions."""
-    summary = ("Lane implementation; verification by the lane gate. "
-               "Runtime and commissioning acceptance remain with the issue owner.")
-    fallback = (f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
-                f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n{summary}\n")
-    script = Path(worktree) / "scripts" / "pr-create.mjs"
-    if not script.exists():
-        return fallback
-    try:
-        done = sh(["node", str(script), "--print-template", "--title", title, "--identifier", issue.identifier,
-                   "--issue-id", issue.id, "--summary", summary], cwd=worktree, timeout=60, log=log)
-        body = done.stdout or ""
-        if "customer-changelog/v1" not in body:
-            return fallback
-        commits = sh(["git", "log", "origin/main..HEAD", "--format=%B"], cwd=worktree, timeout=60, log=log).stdout or ""
-    except (OSError, subprocess.SubprocessError):
-        return fallback
-    body = body.replace("What could break: TODO", "What could break: the surface named in the diff; the lane gate and CI cover it.")
-    body = body.replace("Proof: TODO", "Proof: lane gate and the required CI checks on this head.")
-    red = re.search(r"(?ms)^## Red-before-green\s*\n.*?(?=^## |\Z)", commits)
-    if red and "## Red-before-green" in body:
-        head = body.index("## Red-before-green")
-        tail = body.index("## Blast radius")
-        body = body[:head] + red.group(0).rstrip() + "\n\n" + body[tail:]
-    return body
-
-
 def fleet_rules_preflight(worktree: Path, title: str, body: str, log=None) -> list[str]:
-    """Run the PR body rules locally (the script CI runs, no API) on the body a lane is about to submit.
+    """Run the PR-body fleet rules locally (same script CI runs, no API) on the body a lane is about to submit.
 
-    With scripts/pr-create.mjs present this covers the changelog decision, Red-before-green and the Storybook
-    story, and the caller refuses to create the PR on any finding (lines are `pr-preflight [rule]: ...` plus
-    the exact `add:` text). Without it, the older fleet-rules-only check logs and never blocks. An unavailable
-    script or git never stops publication."""
-    wrapper = Path(worktree) / "scripts" / "pr-create.mjs"
+    Non-blocking: the PR opens as a draft either way. Findings go to the run log so a known-red body (every
+    `fix:` lane PR needs a Red-before-green section) is visible before CI, and the fix-red lane has the
+    exact rule names. An unavailable script or git never stops publication."""
     script = Path(worktree) / "scripts" / "pr-fleet-rules.mjs"
-    if not wrapper.exists() and not script.exists():
+    if not script.exists():
         return []
     try:
         with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
             handle.write(body)
-        if wrapper.exists():
-            done = sh(["node", str(wrapper), "--check", "--title", title, "--body-file", handle.name, "--base-ref", "origin/main"],
-                      cwd=worktree, timeout=180, log=log)
-            prefix = ("pr-preflight [", "  add:")
-        else:
-            done = sh(["node", str(script), "--local", "--title", title, "--body-file", handle.name, "--base", "origin/main"],
-                      cwd=worktree, timeout=60, log=log)
-            prefix = ("fleet-rules (local):",)
+        done = sh(["node", str(script), "--local", "--title", title, "--body-file", handle.name, "--base", "origin/main"],
+                  cwd=worktree, timeout=60, log=log)
         os.unlink(handle.name)
     except (OSError, subprocess.SubprocessError):
         return []
-    lines = [line for line in (done.stdout or "").splitlines() if line.startswith(prefix)]
+    lines = [line for line in (done.stdout or "").splitlines() if line.startswith("fleet-rules (local):")]
     if log is not None and lines:
-        count = sum(1 for line in lines if not line.startswith("  add:"))
-        log.write(f"PR preflight found {count} issue(s) before the first push:\n" + "\n".join(lines) + "\n")
+        log.write("fleet-rules preflight found " + str(len(lines)) + " issue(s) before the first push:\n" + "\n".join(lines) + "\n")
         log.flush()
     return lines
 
