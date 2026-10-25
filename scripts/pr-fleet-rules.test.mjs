@@ -671,7 +671,7 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
           env,
           request: async (...args) => {
             if (reads++ === 0) throw quota(Date.now() - 5_000);
-            return inner(args[0]);
+            return inner(...args);
           },
           log: () => {},
         }),
@@ -684,9 +684,7 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
       ['reset past the budget', T0 + 3_000_000],
       ['unknown reset', null],
     ]) {
-      /** @type {string[]} */
       const logs = [];
-      /** @type {number[]} */
       const sleeps = [];
       assert.equal(
         await main({
@@ -700,11 +698,11 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
           sleep: async ms => sleeps.push(ms),
         }),
         75,
-        String(label)
+        label
       );
-      assert.deepEqual(sleeps, [], String(label));
-      assert.match(String(logs.at(-1)), /github-quota-deferred/);
-      assert.doesNotMatch(String(logs.at(-1)), /secret detail/);
+      assert.deepEqual(sleeps, [], label);
+      assert.match(logs.at(-1), /github-quota-deferred/);
+      assert.doesNotMatch(logs.at(-1), /secret detail/);
     }
     {
       const logs = [];
