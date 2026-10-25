@@ -174,7 +174,10 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
       .getByRole('button', { name: 'Release Date', exact: true })
       .click();
     await drawer.getByRole('button', { name: /today/i }).click();
-    await page.keyboard.press('Escape');
+    // Escape closes the whole drawer (and resets the form); the date popover closes on pick.
+    await expect(drawer.getByLabel('Title', { exact: true })).toHaveValue(
+      releaseTitle
+    );
     await drawer
       .getByRole('button', { name: 'Create Release', exact: true })
       .click();
