@@ -165,12 +165,19 @@ const isCommitCount = value => Number.isSafeInteger(value) && value >= 0;
 
 /**
  * Production freshness: how long has main carried commits that production
- * lacks? Reads the live SHA from build-info and the unshipped range from the
- * GitHub compare API. When either source is unreadable the result is
- * `healthy: null` (unknown) with a reason, never healthy: absence of evidence
- * is not evidence of freshness (JOV-7694, JOV-7674). An unknown does not page
- * or file by itself, but it cannot report healthy or resolve an incident.
- * Runtime outages are reported by the jovie-production target.
+ * lacks? Reads the live SHA from build-info, the unshipped range from the
+ * GitHub compare API, and each unshipped commit's main arrival from the
+ * landing ledger (the CI runs fired by pushes to main). The committer date
+ * alone is not arrival evidence: merge-queue landings keep their original
+ * timestamps, so a commit authored long before it merged would otherwise
+ * count its queue residence as release lag (JOV-7674, 2026-10-25: a commit
+ * authored 12:25 reached main 13:45 and the 90-minute bound paged a
+ * 21-minute release as a 101-minute stall). When any source is unreadable
+ * the result is `healthy: null` (unknown) with a reason, never healthy:
+ * absence of evidence is not evidence of freshness (JOV-7694, JOV-7674).
+ * An unknown does not page or file by itself, but it cannot report healthy
+ * or resolve an incident. Runtime outages are reported by the
+ * jovie-production target.
  */
 export async function observeProductionFreshness({
   buildInfoUrl = DEFAULT_TARGETS[0].url,
@@ -193,6 +200,7 @@ export async function observeProductionFreshness({
     mainSha: null,
     unshippedCommits: 0,
     oldestUnshippedAt: null,
+    unshippedArrivedAt: null,
     unshippedAgeSeconds: 0,
   };
   const unknownResult = extra => ({ ...base, ...extra, healthy: null });
@@ -244,7 +252,6 @@ export async function observeProductionFreshness({
     githubHeaders
   );
   const unshippedCommits = compare?.ahead_by;
-  const oldestUnshippedAt = compare?.commits?.[0]?.commit?.committer?.date;
   if (!isCommitCount(unshippedCommits)) {
     return unknownResult({
       liveSha,
@@ -255,19 +262,83 @@ export async function observeProductionFreshness({
   if (unshippedCommits === 0) {
     return { ...base, liveSha, mainSha, reason: 'production-current' };
   }
-  const oldestEpoch =
-    typeof oldestUnshippedAt === 'string' ? Date.parse(oldestUnshippedAt) : NaN;
-  if (!Number.isFinite(oldestEpoch)) {
+  const rangeCommits = Array.isArray(compare?.commits) ? compare.commits : [];
+  const rangeShas = new Set(rangeCommits.map(item => item?.sha).filter(isSha));
+  const oldestUnshippedAt =
+    typeof rangeCommits[0]?.commit?.committer?.date === 'string'
+      ? rangeCommits[0].commit.committer.date
+      : null;
+  if (rangeShas.size === 0) {
     return unknownResult({
       liveSha,
       mainSha,
       unshippedCommits,
-      reason: 'unshipped-age-unreadable',
+      reason: 'unshipped-range-unreadable',
     });
   }
+  // Main arrival comes from the landing ledger: every push that moves main
+  // fires a CI run (ci.yml: push: branches: [main], no path filter), and a
+  // run whose head is an unshipped commit marks the push that carried it and
+  // every unshipped commit before it, including batch pushes whose tip is a
+  // later commit in the same range.
+  const landingLedger = await readJson(
+    `${githubApiUrl}/repos/${repository}/actions/workflows/ci.yml/runs?branch=main&event=push&per_page=100`,
+    githubHeaders
+  );
+  const ledgerRuns = Array.isArray(landingLedger?.workflow_runs)
+    ? landingLedger.workflow_runs
+    : null;
+  if (!ledgerRuns) {
+    return unknownResult({
+      liveSha,
+      mainSha,
+      unshippedCommits,
+      reason: 'unshipped-arrival-unreadable',
+    });
+  }
+  const nowMs = new Date(now).getTime();
+  const landingTimes = ledgerRuns
+    .filter(run => isSha(run?.head_sha) && rangeShas.has(run.head_sha))
+    .flatMap(run => {
+      const ms = Date.parse(run?.created_at ?? '');
+      return Number.isFinite(ms) ? [ms] : [];
+    });
+  if (landingTimes.length === 0) {
+    // No unshipped commit landed within the ledger page, so the landing is
+    // older than the ledger's oldest entry. When that entry already clears
+    // the stale bound the arrival is provably past it; otherwise the arrival
+    // is unknown and, per JOV-7694, absence of evidence is not a page.
+    const horizonTimes = ledgerRuns
+      .map(run => Date.parse(run?.created_at ?? ''))
+      .filter(Number.isFinite);
+    const horizonAgeSeconds =
+      horizonTimes.length > 0
+        ? Math.max(0, Math.floor((nowMs - Math.min(...horizonTimes)) / 1000))
+        : null;
+    if (horizonAgeSeconds != null && horizonAgeSeconds >= staleAfterSeconds) {
+      return {
+        ...base,
+        healthy: false,
+        incidentClass: FRESHNESS_INCIDENT_CLASS,
+        reason: 'unshipped-past-landing-ledger',
+        liveSha,
+        mainSha,
+        unshippedCommits,
+        oldestUnshippedAt,
+        unshippedAgeSeconds: horizonAgeSeconds,
+      };
+    }
+    return unknownResult({
+      liveSha,
+      mainSha,
+      unshippedCommits,
+      reason: 'unshipped-arrival-unreadable',
+    });
+  }
+  const arrivedMs = Math.min(...landingTimes);
   const unshippedAgeSeconds = Math.max(
     0,
-    Math.floor((new Date(now).getTime() - oldestEpoch) / 1000)
+    Math.floor((nowMs - arrivedMs) / 1000)
   );
   const stale = unshippedAgeSeconds >= staleAfterSeconds;
   return {
@@ -281,6 +352,7 @@ export async function observeProductionFreshness({
     mainSha,
     unshippedCommits,
     oldestUnshippedAt,
+    unshippedArrivedAt: new Date(arrivedMs).toISOString(),
     unshippedAgeSeconds,
   };
 }
