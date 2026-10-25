@@ -79,6 +79,20 @@ describe('fast Summer speaker', () => {
     ]);
   });
 
+  it('falls back to Eve when the stream ends without any text', async () => {
+    const speaker = createFallbackSummerSpeaker({
+      eve,
+      fetchChat: async () =>
+        sse([
+          ['meta', {}],
+          ['done', {}],
+        ]),
+    });
+    expect(await collect(speaker)).toEqual([
+      { type: 'text-delta', text: 'from eve' },
+    ]);
+  });
+
   it('reports failure when the stream errors after text was shown', async () => {
     const speaker = createFallbackSummerSpeaker({
       eve,

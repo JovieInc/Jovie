@@ -1,7 +1,7 @@
 'use client';
 
 import { Mic, Square } from 'lucide-react';
-import { useSummerVoice } from './useSummerVoice';
+import { type SummerVoiceState, useSummerVoice } from './useSummerVoice';
 
 const ERROR_COPY: Record<string, string> = {
   voice_not_configured: 'Voice is not set up yet.',
@@ -23,8 +23,15 @@ const STATUS_COPY = {
  * interrupts her immediately. Shows the last turn latency so voice speed is
  * visible while it is being tuned.
  */
-export function SummerVoiceControl() {
-  const { state, start, stop } = useSummerVoice();
+export function SummerVoiceControlView({
+  state,
+  start,
+  stop,
+}: Readonly<{
+  state: SummerVoiceState;
+  start: () => void;
+  stop: () => void;
+}>) {
   const active = state.status !== 'idle' && state.status !== 'error';
 
   return (
@@ -47,7 +54,7 @@ export function SummerVoiceControl() {
       )}
       <button
         type='button'
-        onClick={active ? stop : () => void start()}
+        onClick={active ? stop : start}
         aria-pressed={active}
         aria-label={active ? 'End voice conversation' : 'Talk to Summer'}
         className='inline-flex h-7 w-7 items-center justify-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 data-[active=true]:text-primary-token'
@@ -60,5 +67,16 @@ export function SummerVoiceControl() {
         )}
       </button>
     </div>
+  );
+}
+
+export function SummerVoiceControl() {
+  const { state, start, stop } = useSummerVoice();
+  return (
+    <SummerVoiceControlView
+      state={state}
+      start={() => void start()}
+      stop={stop}
+    />
   );
 }

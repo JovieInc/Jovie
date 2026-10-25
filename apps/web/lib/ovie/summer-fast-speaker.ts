@@ -119,20 +119,22 @@ export function createFallbackSummerSpeaker(input: {
         return;
       }
       let sawText = false;
+      let failed = false;
       for await (const frame of parseSseFrames(response.body)) {
         if (frame.event === 'delta' && typeof frame.data.text === 'string') {
           sawText = true;
           yield { type: 'text-delta', text: frame.data.text };
         } else if (frame.event === 'error') {
-          if (!sawText) {
-            // Nothing shown yet: the durable path can still answer.
-            yield* input.eve.speak(turn);
-            return;
-          }
-          yield { type: 'error', state: 'failure' };
-          return;
+          failed = true;
+          break;
         }
       }
+      if (!sawText) {
+        // Nothing shown (error or an empty stream): the durable path can still answer.
+        yield* input.eve.speak(turn);
+        return;
+      }
+      if (failed) yield { type: 'error', state: 'failure' };
     },
   };
 }
