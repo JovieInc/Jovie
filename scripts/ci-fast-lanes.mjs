@@ -802,6 +802,7 @@ export const ASSURANCE_MATRIX_COVERAGE_COMMAND =
 export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && ${CODEX_BOOTSTRAP_COVERAGE_COMMAND} && ${ASSURANCE_MATRIX_COVERAGE_COMMAND} && node --import tsx --test --test-isolation=none scripts/content-os/project.test.mts scripts/lib/__tests__/lesson-analysis.test.mjs && pnpm --filter @jovie/copy exec vitest run --config vitest.config.mts transport.test.ts judge.test.ts && node --test ${SCRIPT_CONTRACT_NODE_TESTS.filter(test => test !== 'scripts/invariants/assurance-matrix.test.mjs').join(' ')}`;
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
+  'scripts/lib/__tests__/prod-dogfood-checks.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
