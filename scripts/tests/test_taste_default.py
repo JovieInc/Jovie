@@ -127,7 +127,9 @@ class TasteDefaultTest(unittest.TestCase):
             host = SimpleNamespace(state=Path(raw))
             spawned = []
             spawn = lambda *a, **k: spawned.append(a)
-            with patch.dict("os.environ", {}, clear=False):
+            clean = {k: v for k, v in __import__("os").environ.items()
+                     if k not in ("LANES_SELFTEST", "LANES_EXECUTION_BACKEND", "LANES_TASTE_DEFAULT")}
+            with patch.dict("os.environ", clean, clear=True):
                 self.assertEqual(td.tick(host, None, spawn=spawn)["status"], "spawned")
                 self.assertEqual(td.tick(host, None, spawn=spawn)["status"], "not-due")
             with patch.dict("os.environ", {"LANES_SELFTEST": "1"}):
