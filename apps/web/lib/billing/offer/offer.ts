@@ -66,7 +66,9 @@ export const OFFER = {
     paymentMethodCollection: 'always',
     chargedAt: 'checkout',
     /** What a mid-trial upgrade does. Flip to 'carry_remaining_days' together with `trial_end`. */
-    upgradeDuringTrial: 'billing_starts_today',
+    upgradeDuringTrial: 'billing_starts_today' as
+      | 'billing_starts_today'
+      | 'carry_remaining_days',
     promotionCodesAllowed: true,
   },
   terms: {
