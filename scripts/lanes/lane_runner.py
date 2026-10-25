@@ -80,6 +80,7 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
@@ -144,7 +145,7 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
               "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py",
-              "scripts/tests/test_backlog_rank.py"]
+              "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
@@ -9012,6 +9013,7 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
                                          for binding in refill_for}
                 tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
+                tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
         try:
