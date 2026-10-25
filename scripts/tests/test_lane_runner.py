@@ -5959,6 +5959,61 @@ class TerminalRevisitTest(unittest.TestCase):
         self.assertEqual([args[3] for args in self.calls if args[:3] == ["gh", "run", "rerun"]], ["11", "22"])
 
 
+class ProviderBreakerTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name), repo=Path(self.tmp.name))
+        (self.host.state / "runs").mkdir()
+
+    def write(self, *rows):
+        with open(self.host.state / "runs/ledger.jsonl", "w") as out:
+            for row in rows:
+                out.write(json.dumps({"provider": "hyperagent", "startedAt": "2026-10-25T00:00:00Z", **row}) + "\n")
+
+    def held(self, reason="remote-pr-missing"):
+        return {"verdict": "remote-held", "reasons": [reason], "endedAt": "2026-10-25T00:00:00Z"}
+
+    NOW = 1792886400.0 + 600  # 2026-10-25T00:10:00Z
+
+    def test_five_no_pr_runs_open_the_breaker_and_a_pr_or_decline_does_not_count(self):
+        self.write(*[self.held() for _ in range(4)])
+        self.assertFalse(lane.provider_breaker(self.host, "hyperagent", self.NOW)["open"])
+        self.write(*[self.held() for _ in range(5)])
+        state = lane.provider_breaker(self.host, "hyperagent", self.NOW)
+        self.assertEqual((state["open"], state["streak"], state["reason"]), (True, 5, "provider-pr-breaker"))
+        self.write(*[self.held() for _ in range(4)], {"verdict": "not-shippable", "reasons": ["fixed"]}, self.held())
+        self.assertEqual(lane.provider_breaker(self.host, "hyperagent", self.NOW)["streak"], 5)
+        self.write(self.held(), *[self.held() for _ in range(5)], {"verdict": "landing", "pr": 9})
+        self.assertFalse(lane.provider_breaker(self.host, "hyperagent", self.NOW)["open"])
+
+    def test_probe_is_admitted_after_the_cool_off_and_other_providers_are_ignored(self):
+        self.write(*[self.held() for _ in range(5)])
+        later = self.NOW + lane.PROVIDER_BREAKER_PROBE_S
+        self.assertEqual(lane.provider_breaker(self.host, "hyperagent", later)["reason"], "probe")
+        self.assertFalse(lane.provider_breaker(self.host, "hyperagent", later)["open"])
+        self.assertFalse(lane.provider_breaker(self.host, "codex", self.NOW)["open"])
+
+    def test_agent_path_is_stamped_once_with_the_dispatch_id(self):
+        calls = []
+        def shell(args, **kwargs):
+            calls.append(args)
+            body = "Refs JOV-1.\n" if args[:3] == ["gh", "pr", "view"] else ""
+            return SimpleNamespace(returncode=0, stdout=body, stderr="")
+        with patch.object(lane, "sh", side_effect=shell):
+            self.assertTrue(lane.stamp_agent_path(5, "hyperagent", "agent-1", "thread-9"))
+        edit = next(args for args in calls if args[:3] == ["gh", "pr", "edit"])
+        self.assertIn("Agent-Path: hyperagent/agent-1\nDispatch ID: thread thread-9", edit[edit.index("--body") + 1])
+        calls.clear()
+        with patch.object(lane, "sh", return_value=SimpleNamespace(returncode=0, stdout="x\n\nAgent-Path: codex/a\n", stderr="")) as run:
+            self.assertFalse(lane.stamp_agent_path(5, "codex", "a"))
+        self.assertEqual(run.call_count, 1)
+
+    def test_account_comes_from_the_lease_else_the_remote_agent(self):
+        self.assertEqual(lane.agent_account("codex", [{"event": "account-leased", "account": "jovie-pro"}]), "jovie-pro")
+        self.assertEqual(lane.agent_account("hyperagent", None, {"remoteAgentId": "ag1"}), "ag1")
+
+
 class OwnerSettleTest(unittest.TestCase):
     NOW = 1_800_000_000.0
 

@@ -3268,6 +3268,85 @@ def require_publishable(host: Host, branch: str | None, stage: str) -> None:
 
 # ---------------------------------------------------------------- one run
 
+AGENT_PATH_RE = re.compile(r"^Agent-Path:\s*\S+/\S+\s*$", re.MULTILINE)
+
+
+def agent_account(provider: str, evidence: list[dict] | None, receipt: dict | None = None) -> str:
+    """The account behind a run: the leased codex/claude account, else the remote agent id."""
+    leased = next((row for row in reversed(evidence or []) if row.get("event") == "account-leased"), None)
+    if leased and leased.get("account"):
+        return str(leased["account"])
+    return str((receipt or {}).get("remoteAgentId") or "default")
+
+
+def stamp_agent_path(number, provider: str, account: str, dispatch: str | None = None) -> bool:
+    """Append `Agent-Path: <provider>/<account>` to an agent-spawned PR body once. Best effort and
+    idempotent: attribution must never change a run's outcome."""
+    try:
+        viewed = sh(["gh", "pr", "view", str(number), "--repo", REPO_SLUG, "--json", "body", "--jq", ".body"], timeout=60)
+        if viewed.returncode:
+            return False
+        body = viewed.stdout.rstrip("\n")
+        if AGENT_PATH_RE.search(body):
+            return False
+        edited = sh(["gh", "pr", "edit", str(number), "--repo", REPO_SLUG,
+                     "--body", f"{body}\n\nAgent-Path: {provider}/{account}\n"
+                     + (f"Dispatch ID: thread {dispatch}\n" if dispatch else "")], timeout=60)
+        return edited.returncode == 0
+    except (subprocess.SubprocessError, OSError):
+        return False
+
+
+# Provider PR breaker. Hyperagent: 97 runs, 0 merged PRs in 7 days (~$333); 45 remote threads never
+# produced a PR the lane could use. Stop starting runs on a provider whose last N runs produced no PR;
+# one probe run is admitted after the cool-off so a repaired provider can close the breaker.
+PROVIDER_BREAKER_RUNS = 5
+PROVIDER_BREAKER_PROBE_S = 6 * 3600
+PROVIDER_BREAKER_TAIL_BYTES = 4_000_000
+NO_PR_REASONS = frozenset({"remote-pr-missing", "remote-budget-exhausted", "remote-pr-attribution-mismatch",
+                           "remote-pr-ambiguous", "remote-running-timeout"})
+
+
+def provider_breaker(host: Host, provider: str, now: float | None = None) -> dict:
+    """{'open': bool, 'streak': int, 'reason': ...} from the run ledger tail. A run with a PR closes
+    the streak; a decline (not-shippable) is neutral; only no-PR holds count."""
+    now = time.time() if now is None else now
+    path = host.state / "runs" / "ledger.jsonl"
+    streak, newest = 0, None
+    try:
+        with path.open("rb") as handle:
+            handle.seek(0, os.SEEK_END)
+            start = max(0, handle.tell() - PROVIDER_BREAKER_TAIL_BYTES)
+            handle.seek(start)
+            lines = handle.read().decode("utf-8", "replace").splitlines()[1 if start else 0:]
+    except OSError:
+        return {"open": False, "streak": 0, "reason": None}
+    for line in reversed(lines):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if row.get("provider") != provider or row.get("kind") not in (None, "issue") or "verdict" not in row:
+            continue
+        if row.get("pr") or row.get("prUrl"):
+            break
+        reason = (row.get("reasons") or [""])[0]
+        if row.get("verdict") == "not-shippable":
+            continue
+        if row.get("verdict") == "remote-held" and reason in NO_PR_REASONS:
+            streak += 1
+            newest = newest or created_at_epoch(row.get("endedAt") or row.get("startedAt"))
+            continue
+        if row.get("verdict") in ("remote-held", "skipped", "held"):
+            continue  # preflight/approval/active holds say nothing about PR production
+        break
+    if streak < PROVIDER_BREAKER_RUNS:
+        return {"open": False, "streak": streak, "reason": None}
+    if newest is not None and now - newest >= PROVIDER_BREAKER_PROBE_S:
+        return {"open": False, "streak": streak, "reason": "probe"}
+    return {"open": True, "streak": streak, "reason": "provider-pr-breaker"}
+
+
 def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | None = None) -> dict:
     """Use the same execution contract and gate for remote work, without local-code failover."""
     import runpy
@@ -3337,6 +3416,11 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                     if result.returncode:
                         raise RuntimeError("PR read unavailable")
                     return json.loads(result.stdout)
+                def find_branch_pr(head_branch):
+                    result = sh(["gh", "pr", "list", "--repo", REPO_SLUG, "--head", head_branch, "--state", "open",
+                                 "--json", "number,url,state,title,body,headRefName,headRefOid"])
+                    rows = json.loads(result.stdout or "[]") if result.returncode == 0 else []
+                    return rows[0] if len(rows) == 1 else None
                 def gate(pr):
                     boundary(0, 1, "hyperagent-adopt")
                     # Existing adoption owns its isolated checkout, diff policy,
@@ -3345,9 +3429,11 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                 receipt["offer"]["accepted"] = True
                 receipt.update(hyperagent_lane.run(spec, issue.identifier, claimed["fencingToken"], branch, prompt,
                     evidence, api["mcp_call"], find_pr, gate, timeout=host.agent_timeout,
-                    before_dispatch=lambda: boundary(1, 1, "hyperagent-create"), refresh=refresh))
+                    before_dispatch=lambda: boundary(1, 1, "hyperagent-create"), refresh=refresh,
+                    find_branch_pr=find_branch_pr))
                 if receipt["verdict"] != "remote-held":
-                    result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") else "failed_unknown"
+                    result = "succeeded" if receipt["verdict"] in ("landing", "verified-not-queued", "held", "gate-timeout") \
+                        else "no_op_stale" if receipt["verdict"] == "not-shippable" else "failed_unknown"
                     receipt["execution"] = execution_attempt.finish(runs / "execution-attempts.jsonl", ident,
                         claimed["fencingToken"], result, {"evidenceDigest": execution_attempt.digest(receipt),
                             "costs": {"apiCost": None}, "dependencies": ["hyperagent"],
@@ -3356,6 +3442,9 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
             # Never expose OAuth errors, call another model, or call an unknown
             # create outcome cancelled. Its durable journal remains authoritative.
             receipt.update(hold("remote-adapter-unavailable"))
+    if receipt.get("pr"):
+        stamp_agent_path(receipt["pr"], "hyperagent", agent_account("hyperagent", None, receipt),
+                         receipt.get("remoteThreadId"))
     receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": receipt.get("pr"),
                    "prUrl": receipt.get("prUrl"), "commit": receipt.get("headSha")})
     with (runs / "ledger.jsonl").open("a") as ledger:
@@ -3536,6 +3625,8 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 "replanConditions": ["rate-limit", "usage-limit", "authentication-failure"],
                 "sourceGaps": ["allocator alternatives and marginal value not recorded"],
             }
+    if receipt.get("pr"):
+        stamp_agent_path(receipt["pr"], name, agent_account(name, evidence))
     receipt["endedAt"] = now_iso()
     verdict = receipt.get("verdict")
     receipt["result"] = {"verdict": verdict, "commit": receipt.get("headSha"), "pr": receipt.get("pr"),
@@ -6969,7 +7060,11 @@ def fix_red_pr(host: Host, name: str, spec: dict, pr: dict) -> dict:
     lock = Locked(host.state / "locks" / f"repair-pr-{pr['number']}.lock", blocking=False)
     opened: dict = {}
     try:
-        return _fix_red_pr(host, name, spec, pr, branch_held=lock.held, opened=opened)
+        receipt = _fix_red_pr(host, name, spec, pr, branch_held=lock.held, opened=opened)
+        if receipt.get("verdict") == "fix-pushed":
+            stamp_agent_path(pr["number"], name, agent_account(
+                name, read_provider_evidence(host.state / "runs" / f"{receipt['runId']}.provider.jsonl")))
+        return receipt
     except BaseException as error:
         end_abandoned_attempt(host, opened, error)
         raise
@@ -8572,6 +8667,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
                 pass  # Retried on the next idle pass; it never blocks new work.
         budget = None if red or adopt or labeled or maintenance_only else read_new_issue_budget(name, host.base_slots(name, spec.get("slots", 1)))
+        if budget is not None and budget["allowed"] and name in EPIC_REMOTE_LANES:
+            breaker = provider_breaker(host, name)
+            if breaker["open"]:
+                budget = {**budget, "allowed": False, "reason": breaker["reason"], "streak": breaker["streak"]}
         blocked = budget is not None and not budget["allowed"]
         in_flight = None if red or adopt or blocked or labeled or maintenance_only else in_flight_issues()
         overlap_blocked = False
