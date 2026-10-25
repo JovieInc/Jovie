@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { FleetVerdictPanel } from '@/components/features/admin/hud/FleetVerdictPanel';
+import { GithubHeadroomTile } from '@/components/features/admin/hud/GithubHeadroomTile';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
@@ -22,6 +23,9 @@ export default async function OperationsPage() {
       testId='founder-operations-page'
     >
       <FleetVerdictPanel />
+      {/* Feed lands with #23218 (api-quota-report.mjs headroom --json); until
+          then this reads Unknown, never a calm default. */}
+      <GithubHeadroomTile report={null} nowMs={Date.now()} />
       <HudSystemHealthStrip metrics={metrics} presentation='page' />
       <OperationalTasksPanel presentation='page' />
       <nav aria-label='Related Operations'>
