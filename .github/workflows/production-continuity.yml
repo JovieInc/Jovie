@@ -59,6 +59,7 @@ jobs:
         # production SHA against main; it reaches GitHub only, never jov.ie.
         env:
           GH_TOKEN: ${{ github.token }}
+          PRODUCTION_LIMITS_FEED_URL: ${{ vars.PRODUCTION_LIMITS_FEED_URL }}
         run: >-
           node .github/scripts/production-continuity.mjs
           --output "$RUNNER_TEMP/production-continuity.json"
