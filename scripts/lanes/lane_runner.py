@@ -68,6 +68,7 @@ import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import outcome_lane  # noqa: E402
+import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -1378,6 +1379,43 @@ def not_shippable_reason(output: str) -> str | None:
     """The agent's explicit decline, e.g. already fixed on main; routed to Triage, never retried."""
     found = re.findall(r"NOT-SHIPPABLE:\s*(.+)", output)
     return found[-1].strip()[:500] if found else None
+
+
+# Why a fix run that pushed nothing changed nothing (Gem ledger, 253 fix-no-change runs in
+# 3.5 days all carried reasons=[]): 105 were a codex_lane crash before the agent started
+# (account/read app-server timeout, exit 1), 112 were the agent's own NOT-SHIPPABLE decline
+# (infrastructure red or a failure main already has), 17 found the head already green. A
+# specific reason lets the budget, the backoff and the ledger treat each differently.
+LANE_CRASH_SIGNATURES = (
+    ("codex-account-metadata-timeout", re.compile(r"TimeoutError: account/read: app-server response unavailable")),
+)
+DECLINE_INFRA = re.compile(
+    r"rate limit|HTTP 40[38]|HTTP 5\d\d|infrastructure|timed out fetching|outage|flak|Doppler",
+    re.IGNORECASE)
+DECLINE_BASE_RED = re.compile(
+    r"origin/main|untouched main|\bmain\b|merge base|pre-existing|preexisting|inherited|unrelated|"
+    r"identically|already fixed", re.IGNORECASE)
+
+
+def classify_unpushed_repair(exit_code, log_text: str) -> list[str]:
+    """Specific reason codes for a fix run that pushed nothing. The first code is the cause.
+
+    lane-crash:<signature>      the provider wrapper died before an agent worked (attempt refunded)
+    agent-exit:<n>              the agent exited non-zero without pushing
+    agent-declined:<class>:<why> NOT-SHIPPABLE; class infra | base-red | other (infra and
+                                base-red spend the head's budget: a second read declines again)
+    no-change:agent-ended-without-push  the agent finished cleanly and pushed nothing
+    """
+    if exit_code not in (0, None):
+        for name, pattern in LANE_CRASH_SIGNATURES:
+            if pattern.search(log_text):
+                return [f"lane-crash:{name}", f"agent-exit:{exit_code}"]
+        return [f"agent-exit:{exit_code}"]
+    declined = not_shippable_reason(log_text)
+    if declined:
+        kind = "infra" if DECLINE_INFRA.search(declined) else "base-red" if DECLINE_BASE_RED.search(declined) else "other"
+        return [f"agent-declined:{kind}:{declined[:160]}"]
+    return ["no-change:agent-ended-without-push"]
 
 
 def parse_numstat(text: str) -> list[Change]:
@@ -6484,6 +6522,10 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
     if verdict == "skipped":
         reason = str((receipt.get("reasons") or [""])[0])
         return reason if reason.startswith("worktree-unavailable") else None
+    if verdict == "fix-no-change":
+        # The provider wrapper died before any agent worked: the head's budget paid for nothing.
+        reason = str((receipt.get("reasons") or [""])[0])
+        return reason if reason.startswith("lane-crash:") else None
     # `cancelled` keeps its charge: a queued, merged or superseded target is a repair
     # outcome, not host infrastructure spending the budget (the doctor never counts it).
     if verdict == "reconcile-unavailable":
@@ -6498,7 +6540,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 # handoffs: the precondition (an unreadable target, a failed checkout) is host infrastructure,
 # not the PR, and an immediate next-tick re-claim would crash-loop the same failure (Gem
 # 2026-10-23: 7 target-state-unavailable + 6 worktree-unavailable stops in 24h).
-INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable"})
+INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash"})
 
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
@@ -6515,6 +6557,14 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
                        repairHeadBefore=receipt.get("headBefore"), repairVerdict=receipt.get("verdict"))
         if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter"):
             attempt["pushedHead"] = receipt["headAfter"]
+        if str((receipt.get("reasons") or [""])[0]).startswith(("agent-declined:infra:", "agent-declined:base-red:")) \
+                and type(attempt.get("count")) is int:
+            # The agent read this head's failure and declined it (infrastructure, or a red main
+            # already has). A second attempt on the same head re-read the same evidence and
+            # declined again 40 times in 3.5 days; a new head or a moved main is the re-entry.
+            attempt["count"] = max(attempt["count"], MAX_FIX_ATTEMPTS)
+            attempt["declined"] = {"reason": str(receipt["reasons"][0])[:200], "runId": receipt.get("runId"),
+                                   "at": time.time()}
         if (refund := unworked_fix_attempt(receipt)) \
                 and type(attempt.get("count")) is int and attempt["count"] > 0:
             attempt["count"] -= 1
@@ -7240,6 +7290,10 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             if not rewritten:
                 receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                                verdict="fix-pushed" if pushed else "fix-no-change")
+                if not pushed and agent is not None:
+                    log.flush()
+                    receipt["reasons"] = classify_unpushed_repair(
+                        agent.returncode, (runs / f"{run_id}.log").read_text(errors="replace")[-20000:])
             if pushed:
                 verify_target({**pr, "headRefOid": after}, "before-push-effects")
                 labels = {label.lower() for label in pr_events.label_names(pr)}
@@ -7988,6 +8042,35 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict], repair_candidates
     return None
 
 
+OWNER_SETTLE_KEEP_S = 24 * 3600
+
+
+def note_owner_settle(host: Host, pr: dict, left: float, now: float) -> None:
+    """Record one deferral per (PR, head) so the wait is measurable: owner-settle.json keeps the
+    open windows, runs/owner-settle.jsonl one row the first time a head is deferred. Best effort:
+    a failed write never changes the deferral."""
+    key, head = str(pr["number"]), pr.get("headRefOid")
+    fresh = []
+
+    def change(data: dict) -> None:
+        for stale in [k for k, v in data.items() if not isinstance(v, dict)
+                      or now - float(v.get("firstSeenAt") or 0) > OWNER_SETTLE_KEEP_S]:
+            del data[stale]
+        if (data.get(key) or {}).get("head") != head:
+            data[key] = {"head": head, "firstSeenAt": now, "settleUntil": now + left}
+            fresh.append(data[key])
+    try:
+        update_json(host.state / "owner-settle.json", change)
+        if fresh:
+            (host.state / "runs").mkdir(parents=True, exist_ok=True)
+            with open(host.state / "runs" / "owner-settle.jsonl", "a") as out:
+                out.write(json.dumps({"schema": "jovie-owner-settle/v1", "at": now_iso(), "pr": pr["number"],
+                                      "head": head, "branch": pr.get("headRefName"), "settleLeftS": round(left),
+                                      "reason": "owner-active:head-pushed-within-settle-window"}) + "\n")
+    except (OSError, ValueError, TypeError):
+        pass
+
+
 def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict | None:
     """Under the claim lock: pick this lane's red PR and record the attempt before working it."""
     prs = lane_prs(name) if prs is None else prs
@@ -7999,6 +8082,13 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     disabled = set(providers) - set(order)
     prs = [pr for pr in prs if not pr_recovery_held(host, pr, now)
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
+    settled = []
+    for pr in prs:
+        left = pr_events.owner_settling(pr, attempts.get(str(pr["number"]), {}), now)
+        if left is not None and red_pr([pr], attempts, held) is not None:
+            note_owner_settle(host, pr, left, now)  # only a PR a repair would take is a deferral
+            settled.append(pr["number"])
+    prs = [pr for pr in prs if pr["number"] not in settled]
     pr = red_pr(prs, attempts, held)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
@@ -9004,6 +9094,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                            {"status": "not-owner", "owner": owner})
     except (Exception, SystemExit) as error:  # outcome verification never takes dispatch down
         tick["outcomeError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
+        tick["tasteDefault"] = (taste_default.tick(host, THIS) if HOST == owner else
+                                {"status": "not-owner", "owner": owner})
+    except (Exception, SystemExit) as error:  # taste defaults never take dispatch down
+        tick["tasteDefaultError"] = f"{type(error).__name__}: {error}"[:200]
     try:
         if not os.environ.get("LANES_SELFTEST"):  # a release self-test never writes to Linear
             teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]

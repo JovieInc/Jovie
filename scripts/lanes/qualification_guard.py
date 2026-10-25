@@ -118,6 +118,7 @@ REVIEWED_FIXTURE_SHA256 = (
     "be680e72198db2174f6c0ac5fe05157a4a03f7bd791941c9254f13b21d0686fb",  # 5db1a60 (#22010)
     "cea3f65dc681620b08138f4c1f35a6695083196c60e79e6a021da02b0a05851b",  # #22495 (scan stub in setUp)
     "e533ec43dfa16b7d869712515bcf724e671a4fa438d3ba11608f9747e70d12aa",  # 2f3af5b (#22373)
+    "56bfa0e0502c8d07ffa56e9b7f038fefaa000c58973af7589cfc90f19e6db66f",  # #22345 (snapshots plus JOV-8517 fixture isolation)
 )
 DEFAULT_POLICY = SafetyPolicy(
     "5db1a60487c0a29dda45315d9aa5da14493d9409",
