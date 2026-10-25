@@ -29,9 +29,14 @@ import {
   MAC_CHANNELS,
   MAC_MISSIONS,
   macCertification,
+  macStatusDoc,
+  navMatches,
   normalizeSnapshot,
+  ovieSettled,
+  parseHidIdleSeconds,
   SAFE_PRESS,
   SHELL_NAV,
+  shouldRun,
 } from './lib/mac-dogfood.mjs';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -149,6 +154,41 @@ function snapshot(cua, pid, windowId, outDir, name, { keepShot }) {
   return snap;
 }
 
+/** Which workspace the sidebar is in: the artist app lists Identity, Ovie does not. */
+export function workspaceOf(snap) {
+  return snap.elements.some(e => e.role === 'AXLink' && e.label === 'Identity')
+    ? 'Jovie'
+    : 'OV';
+}
+
+async function switchWorkspace(cua, pid, wid, outDir, target, sleepMs) {
+  const sw = snapshot(cua, pid, wid, outDir, 'pre-ws', { keepShot: null });
+  if (!cua.press(pid, sw, 'Switch Workspace', 'AXPopUpButton')) return false;
+  await sleep(1200);
+  const menu = snapshot(cua, pid, wid, outDir, 'ws-menu', { keepShot: null });
+  if (!cua.press(pid, menu, target, 'AXMenuItem')) return false;
+  await sleep(sleepMs + 2000);
+  return true;
+}
+
+/** Poll until `until(snap)` holds (or the timeout), then capture the final snapshot. */
+async function settleSnapshot(
+  cua,
+  pid,
+  wid,
+  outDir,
+  name,
+  { keepShot, until, timeoutMs = 20_000, stepMs = 1000 }
+) {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    const probe = normalizeSnapshot(cua.state(pid, wid));
+    if (until(probe)) break;
+    await sleep(stepMs);
+  }
+  return snapshot(cua, pid, wid, outDir, name, { keepShot });
+}
+
 /**
  * Run every implemented journey for one channel. The session already on the Mac
  * decides which journeys apply: `sessionKind` is `founder` (Tim's own session:
@@ -215,14 +255,24 @@ export async function runChannel({
         add('dogfood:mac-signin', evalSignInOptions(opts, channel));
       }
     } else if (sessionKind === 'signed-in') {
+      const startWorkspace = workspaceOf(snap);
+      if (startWorkspace !== 'Jovie')
+        await switchWorkspace(cua, pid, wid, outDir, 'Jovie', sleepMs);
       const visits = {};
       for (const n of SHELL_NAV) {
         const cur = snapshot(cua, pid, wid, outDir, 'pre', { keepShot: null });
         if (!cua.press(pid, cur, n.label, 'AXLink')) continue;
-        await sleep(sleepMs + 1000);
-        visits[n.label] = snapshot(cua, pid, wid, outDir, `nav-${n.label}`, {
-          keepShot: privateDir,
-        });
+        visits[n.label] = await settleSnapshot(
+          cua,
+          pid,
+          wid,
+          outDir,
+          `nav-${n.label}`,
+          {
+            keepShot: privateDir,
+            until: x => navMatches(n.label, x),
+          }
+        );
       }
       add('dogfood:mac-shell', evalShellNav(visits, channel));
       add('dogfood:mac-shell', evalShellClean(visits, channel));
@@ -239,30 +289,24 @@ export async function runChannel({
       });
       add('dogfood:mac-chat', evalComposer(chat, channel));
       // Ovie Home (admin workspace) when the workspace switcher offers OV; then return.
-      const sw = snapshot(cua, pid, wid, outDir, 'pre-ov', { keepShot: null });
-      if (cua.press(pid, sw, 'Switch Workspace', 'AXPopUpButton')) {
-        await sleep(1200);
-        const menu = snapshot(cua, pid, wid, outDir, 'ws-menu', {
-          keepShot: null,
+      if (await switchWorkspace(cua, pid, wid, outDir, 'OV', sleepMs + 1000)) {
+        const ov = await settleSnapshot(cua, pid, wid, outDir, 'ovie-home', {
+          keepShot: privateDir,
+          until: ovieSettled,
+          timeoutMs: 30_000,
         });
-        if (cua.press(pid, menu, 'OV', 'AXMenuItem')) {
-          await sleep(sleepMs + 3000);
-          const ov = snapshot(cua, pid, wid, outDir, 'ovie-home', {
-            keepShot: privateDir,
-          });
+        if (workspaceOf(ov) === 'OV')
           add('dogfood:mac-ovie-shipping', evalOvieNoFalseGreen(ov, channel));
-          const back = snapshot(cua, pid, wid, outDir, 'pre-back', {
-            keepShot: null,
-          });
-          if (cua.press(pid, back, 'Switch Workspace', 'AXPopUpButton')) {
-            await sleep(1200);
-            const m2 = snapshot(cua, pid, wid, outDir, 'ws-menu2', {
-              keepShot: null,
-            });
-            cua.press(pid, m2, 'Jovie', 'AXMenuItem');
-          }
-        }
+        if (startWorkspace === 'Jovie')
+          await switchWorkspace(cua, pid, wid, outDir, 'Jovie', sleepMs);
       }
+      if (
+        startWorkspace === 'OV' &&
+        workspaceOf(
+          snapshot(cua, pid, wid, outDir, 'end', { keepShot: null })
+        ) !== 'OV'
+      )
+        await switchWorkspace(cua, pid, wid, outDir, 'OV', sleepMs);
     }
   }
   const completedAt = now().toISOString();
@@ -279,6 +323,13 @@ export async function runChannel({
       (mission.needs === 'signed-out' && sessionKind === 'signed-out') ||
       ((mission.needs === 'signed-in' || mission.needs === 'admin') &&
         sessionKind === 'signed-in');
+    if (mission.automation === 'implemented' && applies && list.length === 0)
+      list.push({
+        id: mission.checks[0] ?? 'journey',
+        target: `desktop:${channel}`,
+        status: 'unverified',
+        summary: 'journey was not reached (a required control was missing)',
+      });
     if (mission.automation === 'implemented' && !applies) {
       list.length = 0;
       list.push({
@@ -325,12 +376,49 @@ export async function main(argv = process.argv.slice(2)) {
     if (argv[i] === '--channel') args.channel = argv[++i];
     else if (argv[i] === '--out') args.out = argv[++i];
   }
+  const statePath =
+    args.state ??
+    path.join(os.homedir(), '.local/state/jovie-mac-dogfood/last.json');
+  if (args.tick) {
+    const channelsNow =
+      args.channel === 'both' ? ['staging', 'production'] : [args.channel];
+    const installed = {};
+    const latest = {};
+    for (const ch of channelsNow) {
+      const id = readBuildIdentity(ch);
+      installed[ch] = {
+        version: id?.version ?? null,
+        sourceRevision: id?.sourceRevision ?? null,
+      };
+      latest[ch] = await latestPublished(ch);
+    }
+    let idleSeconds = null;
+    try {
+      idleSeconds = parseHidIdleSeconds(
+        execFileSync('ioreg', ['-c', 'IOHIDSystem'], {
+          encoding: 'utf8',
+          timeout: 10_000,
+        })
+      );
+    } catch {}
+    const decision = shouldRun({
+      state: readJson(statePath),
+      installed,
+      latest,
+      maxAgeMinutes: args.maxAge ?? 720,
+      idleSeconds,
+      requireIdleSeconds: (args.idleMin ?? 10) * 60,
+    });
+    console.log(JSON.stringify({ tick: decision }));
+    if (!decision.run) return;
+  }
   mkdirSync(args.out, { recursive: true });
   const cua = createCua();
   const channels =
     args.channel === 'both' ? ['staging', 'production'] : [args.channel];
   const results = {};
   const findings = [];
+  const allChecks = [];
   for (const ch of channels) {
     if (!existsSync(MAC_CHANNELS[ch].appPath)) {
       console.error(`skip ${ch}: ${MAC_CHANNELS[ch].appPath} is not installed`);
@@ -338,9 +426,11 @@ export async function main(argv = process.argv.slice(2)) {
     }
     results[ch] = await runChannel({ channel: ch, cua, outDir: args.out });
     for (const r of results[ch].receipts)
-      for (const c of r.checks)
+      for (const c of r.checks) {
+        allChecks.push({ channel: ch, mission: r.mission.id, check: c });
         if (c.status === 'failed')
           findings.push({ channel: ch, mission: r.mission.id, check: c });
+      }
   }
   const certification = macCertification({
     channels: Object.fromEntries(
@@ -369,6 +459,10 @@ export async function main(argv = process.argv.slice(2)) {
     )}\n`
   );
   writeFileSync(
+    path.join(args.out, 'checks.json'),
+    `${JSON.stringify(allChecks, null, 2)}\n`
+  );
+  writeFileSync(
     path.join(args.out, 'findings.json'),
     `${JSON.stringify(findings, null, 2)}\n`
   );
@@ -392,6 +486,48 @@ export async function main(argv = process.argv.slice(2)) {
       2
     )}\n`
   );
+  mkdirSync(path.dirname(statePath), { recursive: true });
+  writeFileSync(
+    statePath,
+    `${JSON.stringify({ completedAt: new Date().toISOString(), installed: Object.fromEntries(Object.entries(results).map(([ch, r]) => [ch, { version: r.identity?.version ?? null, sourceRevision: r.identity?.sourceRevision ?? null }])), latest: Object.fromEntries(Object.entries(results).map(([ch, r]) => [ch, r.latestPublishedVersion])) }, null, 2)}\n`
+  );
+  const runDoc = Object.fromEntries(
+    Object.entries(results).map(([ch, r]) => [
+      ch,
+      {
+        identity: r.identity,
+        web: r.web,
+        sessionKind: r.sessionKind,
+        latestPublishedVersion: r.latestPublishedVersion,
+        startedAt: r.startedAt,
+        completedAt: r.completedAt,
+      },
+    ])
+  );
+  const status = macStatusDoc({ certification, run: runDoc });
+  writeFileSync(
+    path.join(args.out, 'mac-status.json'),
+    `${JSON.stringify(status, null, 2)}\n`
+  );
+  if (args.statusGist) {
+    try {
+      execFileSync(
+        'gh',
+        [
+          'api',
+          '-X',
+          'PATCH',
+          `gists/${args.statusGist}`,
+          '-F',
+          `files[mac-status.json][content]=@${path.join(args.out, 'mac-status.json')}`,
+        ],
+        { stdio: 'pipe', timeout: 60_000 }
+      );
+    } catch (err) {
+      console.error(`status gist publish failed: ${err.message}`);
+      process.exitCode = 1;
+    }
+  }
   console.log(
     `certified ${certification.certified}/${certification.total}; findings ${findings.length}; out ${args.out}`
   );

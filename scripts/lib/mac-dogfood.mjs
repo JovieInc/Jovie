@@ -490,12 +490,35 @@ export function evalComposer(snap, channel) {
       );
 }
 
+/** Ovie Home has left its skeletons once the pulse tiles carry their labels. */
+export function ovieSettled(snap) {
+  return Boolean(
+    find(snap, 'AXStaticText', 'Prod') && find(snap, 'AXStaticText', 'Queue')
+  );
+}
+
+/** A sidebar destination is open when the window title and heading both match. */
+export function navMatches(label, snap) {
+  const n = NAV.find(x => x.label === label);
+  return Boolean(
+    n &&
+      n.title.test(snap.title) &&
+      snap.elements.some(e => e.role === 'AXHeading' && n.heading.test(e.label))
+  );
+}
+
 /**
  * Ovie Home: the all-clear must not render while a section reports it could not
  * load or every metric is unmeasured (unknown is not healthy).
  */
 export function evalOvieNoFalseGreen(snap, channel) {
   const target = `desktop:${channel}:ovie-home`;
+  if (!ovieSettled(snap))
+    return unverified(
+      'ovie-no-false-green',
+      target,
+      'Ovie Home had not finished loading, so nothing was asserted'
+    );
   if (!find(snap, 'AXStaticText', /^Nothing is blocking shipping$/))
     return pass('ovie-no-false-green', target, 'no all-clear shown');
   const loadErrors = snap.elements.filter(
@@ -674,29 +697,33 @@ export function macCertification({ channels, generatedAt }) {
 
 // ---------- findings ----------
 
-export function macFindingIssue({
-  check,
-  mission,
-  channel,
-  identity,
-  web,
-  runNote,
-}) {
+/** One defect = one issue across release lanes: the fingerprint ignores the channel. */
+export function macTargetKey(target) {
+  return String(target).replace(/^desktop:[a-z]+:/, 'desktop:');
+}
+
+/** `observed` lists every lane where the check failed: [{channel, identity, web}]. */
+export function macFindingIssue({ check, mission, observed, runNote }) {
   const fp = fingerprintFor({
     mission: mission.id,
     check: check.id,
-    target: `${channel}:${check.target}`,
+    target: macTargetKey(check.target),
   });
   const sev = SEVERITY[check.severity] ?? SEVERITY.P2;
+  const lanes = observed.map(
+    o =>
+      `- ${o.channel}: desktop ${o.identity?.version ?? 'unknown'} @ ${o.identity?.sourceRevision ?? 'unverified'}; web ${o.web?.commitSha ?? 'unknown'} (${o.web?.environment ?? 'unknown'})`
+  );
   const lines = [
     '## Found by the Mac dogfood agent (before a human did)',
     '',
     `- Mission: ${mission.id} (${mission.title})`,
     `- Severity: ${sev.label}`,
-    `- Surface: ${check.target}`,
-    `- Desktop build: ${identity?.version ?? 'unknown'} (${channel}) @ ${identity?.sourceRevision ?? 'unverified'}`,
-    `- Web build it loaded: ${web?.commitSha ?? 'unknown'} (${web?.environment ?? 'unknown'})`,
+    `- Surface: ${macTargetKey(check.target)}`,
     `- Run: ${runNote ?? 'local cua-driver run'}`,
+    '',
+    '## Observed on (desktop build and the web build it loaded)',
+    ...lanes,
     '',
     '## Expected',
     check.expected ?? '',
@@ -712,13 +739,13 @@ export function macFindingIssue({
     MAC_INVARIANT_PROPOSALS[check.id] ??
       'Add a deterministic Mac dogfood check for this defect class.',
     '',
-    'Evidence is the accessibility tree assertion above; founder-session screenshots are never attached. This issue closes itself when the Mac dogfood agent next verifies the check passing on a later run.',
+    'Evidence is the accessibility tree assertion above; founder-session screenshots are never attached. This issue closes itself when the Mac dogfood agent next verifies the check passing on every lane it ran.',
     '',
     `Fingerprint: ${fp}`,
   ];
   return {
     fingerprint: fp,
-    title: `[${fp}] ${check.summary} (Mac ${channel})`,
+    title: `[${fp}] ${check.summary}`,
     description: lines.join('\n'),
     priority: sev.priority,
   };
@@ -768,4 +795,85 @@ export function macLiveness({
         ageMinutes,
         reason: `newest Mac receipt is ${ageMinutes} min old (max ${maxStalenessMinutes})`,
       };
+}
+
+/**
+ * Public, non-sensitive heartbeat for the automation registry (json-timestamp).
+ * Only versions, commit shas and counts: no account, chat or host data.
+ */
+export function macStatusDoc({ certification, run, now = new Date() }) {
+  const byChannel = {};
+  for (const [channel, r] of Object.entries(run ?? {})) {
+    const rows = certification.rows.filter(x => x.channel === channel);
+    byChannel[channel] = {
+      desktopVersion: r.identity?.version ?? null,
+      sourceRevision: r.identity?.sourceRevision ?? null,
+      webCommitSha: r.web?.commitSha ?? null,
+      latestPublishedVersion: r.latestPublishedVersion ?? null,
+      sessionKind: r.sessionKind,
+      certified: rows.filter(x => x.status === 'certified').length,
+      failing: rows.filter(x => x.status === 'failing').length,
+      blocked: rows.filter(x => x.status.startsWith('uncertified')).length,
+      completedAt: r.completedAt ?? null,
+    };
+  }
+  return {
+    schema: 'jovie.mac-dogfood-status/v1',
+    at: now.toISOString(),
+    certified: certification.certified,
+    total: certification.total,
+    channels: byChannel,
+  };
+}
+
+/** Seconds since the last keyboard/mouse input, from `ioreg -c IOHIDSystem` output. */
+export function parseHidIdleSeconds(ioregText) {
+  const m = /"HIDIdleTime"\s*=\s*(\d+)/.exec(String(ioregText ?? ''));
+  return m ? Math.floor(Number(m[1]) / 1e9) : null;
+}
+
+/**
+ * Tick decision. The runner is event-driven by what it can observe (an installed
+ * build changed, a newer build was published) with a time backstop; it never
+ * drives the apps while the person is at the keyboard.
+ */
+export function shouldRun({
+  state,
+  installed,
+  latest,
+  now = new Date(),
+  maxAgeMinutes,
+  idleSeconds,
+  requireIdleSeconds,
+}) {
+  if (idleSeconds != null && idleSeconds < requireIdleSeconds)
+    return {
+      run: false,
+      reason: `user-active (idle ${idleSeconds}s < ${requireIdleSeconds}s)`,
+    };
+  if (!state?.completedAt) return { run: true, reason: 'first run' };
+  for (const ch of Object.keys(installed)) {
+    const was = state.installed?.[ch];
+    const is = installed[ch];
+    if (
+      was?.version !== is?.version ||
+      was?.sourceRevision !== is?.sourceRevision
+    )
+      return { run: true, reason: `installed ${ch} build changed` };
+    if (latest[ch] && state.latest?.[ch] !== latest[ch])
+      return {
+        run: true,
+        reason: `new ${ch} release published (${latest[ch]})`,
+      };
+  }
+  const ageMin = (now.getTime() - Date.parse(state.completedAt)) / 60000;
+  if (ageMin >= maxAgeMinutes)
+    return {
+      run: true,
+      reason: `backstop (${Math.round(ageMin)} min since last run)`,
+    };
+  return {
+    run: false,
+    reason: `nothing changed (${Math.round(ageMin)} min since last run)`,
+  };
 }

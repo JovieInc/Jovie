@@ -807,6 +807,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/prod-dogfood-checks.test.mjs',
   'scripts/lib/__tests__/mac-dogfood.test.mjs',
   'scripts/lib/__tests__/mac-dogfood-run.test.mjs',
+  'scripts/lib/__tests__/mac-dogfood-tick.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',

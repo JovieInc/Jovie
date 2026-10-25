@@ -211,6 +211,8 @@ test('composer must be a labeled text area', () => {
 test('Ovie all-clear with failed sections is a false green (observed 2026-10-25)', () => {
   const observed = normalizeSnapshot(
     state('Home | Jovie', [
+      el('AXStaticText', 'Prod'),
+      el('AXStaticText', 'Queue'),
       el('AXStaticText', 'Nothing is blocking shipping'),
       ...Array.from({ length: 8 }, () => el('AXStaticText', 'Not measured')),
       el('AXStaticText', 'Shipping data could not load.'),
@@ -222,13 +224,23 @@ test('Ovie all-clear with failed sections is a false green (observed 2026-10-25)
   assert.match(r.actual, /2 "could not load"/);
   const healthy = normalizeSnapshot(
     state('Home | Jovie', [
+      el('AXStaticText', 'Prod'),
+      el('AXStaticText', 'Queue'),
       el('AXStaticText', 'Nothing is blocking shipping'),
       el('AXStaticText', '12m'),
     ])
   );
   assert.equal(evalOvieNoFalseGreen(healthy, 'staging').status, 'passed');
+  const loading = normalizeSnapshot(
+    state('Home | Jovie', [el('AXHeading', 'Ov')])
+  );
+  assert.equal(evalOvieNoFalseGreen(loading, 'staging').status, 'unverified');
   const unknown = normalizeSnapshot(
-    state('Home', [el('AXStaticText', 'Shipping data is disconnected')])
+    state('Home', [
+      el('AXStaticText', 'Prod'),
+      el('AXStaticText', 'Queue'),
+      el('AXStaticText', 'Shipping data is disconnected'),
+    ])
   );
   assert.equal(evalOvieNoFalseGreen(unknown, 'staging').status, 'passed');
 });
@@ -351,6 +363,8 @@ test('finding issue is deduped by fingerprint and carries both builds', () => {
   const check = evalOvieNoFalseGreen(
     normalizeSnapshot(
       state('Home', [
+        el('AXStaticText', 'Prod'),
+        el('AXStaticText', 'Queue'),
         el('AXStaticText', 'Nothing is blocking shipping'),
         el('AXStaticText', 'Shipping data could not load.'),
       ])
@@ -360,23 +374,27 @@ test('finding issue is deduped by fingerprint and carries both builds', () => {
   const a = macFindingIssue({
     check,
     mission,
-    channel: 'staging',
-    identity: stagingIdentity,
-    web: { commitSha: 'c'.repeat(40) },
+    observed: [
+      {
+        channel: 'staging',
+        identity: stagingIdentity,
+        web: { commitSha: 'c'.repeat(40) },
+      },
+      { channel: 'production', identity: { version: '26.10.16' }, web: null },
+    ],
   });
   const b = macFindingIssue({
-    check,
+    check: { ...check, target: 'desktop:production:ovie-home' },
     mission,
-    channel: 'staging',
-    identity: { ...stagingIdentity, version: '26.10.17-staging.1.1' },
-    web: null,
+    observed: [{ channel: 'production', identity: null, web: null }],
   });
   assert.equal(a.fingerprint, b.fingerprint);
   assert.match(
     a.title,
     /^\[dogfood-mac-ovie-shipping-ovie-no-false-green-[0-9a-f]{8}\]/
   );
-  assert.match(a.description, /Desktop build: 26\.10\.13-staging/);
+  assert.match(a.description, /staging: desktop 26\.10\.13-staging/);
+  assert.match(a.description, /production: desktop 26\.10\.16/);
   assert.match(a.description, /never attached/);
   assert.equal(a.priority, 3);
 });
