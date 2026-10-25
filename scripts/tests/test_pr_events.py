@@ -2917,6 +2917,6 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
 
     def test_ensure_edits_only_an_incomplete_body(self):
         for body, edits in (("## Summary\nx", 1), (events.red_before_green_block(self.PR), 0)):
-            shell = Shell({("gh", "pr", "view"): (0, body), ("gh", "pr", "edit"): (0, "")})
+            shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
             events.ensure_red_before_green(self.PR, "FAIL x", shell)
-            self.assertEqual(len(shell.made("gh", "pr", "edit")), edits)
+            self.assertEqual(len(shell.made("pr", "edit")), edits)

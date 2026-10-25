@@ -966,12 +966,22 @@ def with_red_section(body: str, block: str) -> str:
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
 
 
-def ensure_red_before_green(pr: dict, excerpt: str = "", sh=run) -> bool:
+def api_gh(args, **_):
+    """gh through the shared client layer (budget, breaker, backoff); subprocess-shaped result."""
+    scripts = str(HERE.parent)
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient.gh import run_gh
+    done = run_gh(list(args), priority="repair")
+    return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
+
+
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh) -> bool:
     """Write the evidence block into the PR body when its section is missing or incomplete."""
     block = red_before_green_block(pr, excerpt)
     if not block or not isinstance(pr.get("number"), int):
         return False
-    viewed = sh(["gh", "pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
+    viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0 or red_section_complete(viewed.stdout or ""):
         return False
     updated = with_red_section(viewed.stdout or "", block)
@@ -980,7 +990,7 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=run) -> bool:
         path.write_text(updated)
         if RED_BLOCK_MARKER not in path.read_text():
             return False
-        return sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
+        return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
 
 
 HOLD_DEQUEUE = "dequeued-by-hand"
