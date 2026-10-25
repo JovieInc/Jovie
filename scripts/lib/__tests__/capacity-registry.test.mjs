@@ -156,6 +156,70 @@ describe('evaluation', () => {
   });
 });
 
+describe('alerts and value metrics', () => {
+  it('alarms when credits burn past the lasting pace while use-or-lose quota is under pace', () => {
+    const view = evaluateRegistry(base(), { now: NOW, spend: spend() });
+    expect(view.alerts).toHaveLength(1);
+    expect(view.alerts[0]).toMatchObject({
+      severity: 'alarm',
+      provider: 'hyperagent',
+    });
+    expect(view.alerts[0].message).toMatch(
+      /\$47\.6\/day against \$21\.35\/day/
+    );
+    expect(view.alerts[0].message).toMatch(/Grok/);
+  });
+
+  it('downgrades to a note when cheaper quota is at pace or its reading is stale', () => {
+    const registry = base();
+    registry.providers.find(
+      p => p.id === 'xai-grok'
+    ).accounts[0].quota.usedPercent = 74;
+    const onPace = evaluateRegistry(registry, { now: NOW, spend: spend() });
+    expect(onPace.alerts.map(a => a.severity)).toEqual(['info']);
+    const stale = evaluateRegistry(base(), {
+      now: NOW + 3 * 86_400_000,
+      spend: spend(),
+    });
+    expect(stale.alerts.every(a => a.severity === 'info')).toBe(true);
+  });
+
+  it('carries live cost-per-merge metrics to the provider and flags an incomplete window', () => {
+    const live = {
+      metrics: {
+        windowDays: 7,
+        mergedInWindow: 619,
+        readAt: '2026-10-25T01:27:44Z',
+        providers: {
+          'openai-codex': {
+            windowDays: 7,
+            runs: 10,
+            prsCreated: 5,
+            mergedCreated: 4,
+            mergedRepaired: 1,
+            costUsd: 138,
+            costBasis: 'amortized-plan',
+            costPerMergedUsd: 34.5,
+          },
+        },
+      },
+    };
+    const view = evaluateRegistry(base(), { now: NOW, spend: spend(), live });
+    expect(find(view, 'openai-codex').metrics.costPerMergedUsd).toBe(34.5);
+    expect(find(view, 'xai-grok').metrics).toBeNull();
+    expect(view.metricsMeta.mergedInWindow).toBe(619);
+    const incomplete = evaluateRegistry(base(), {
+      now: NOW,
+      spend: spend(),
+      live: { metrics: { incomplete: 'max_pages_reached' } },
+    });
+    expect(incomplete.metricsMeta.incomplete).toBe('max_pages_reached');
+    expect(
+      evaluateRegistry(base(), { now: NOW, spend: spend() }).metricsMeta
+    ).toBeNull();
+  });
+});
+
 describe('routing order', () => {
   it('puts uncapped own models first, then under-pace capped quota, then the pool, and skips unavailable lanes', () => {
     const view = evaluateRegistry(base(), { now: NOW, spend: spend() });

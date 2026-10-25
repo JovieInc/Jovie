@@ -61,6 +61,89 @@ describe('formatters', () => {
   });
 });
 
+const liveMetrics = {
+  metrics: {
+    windowDays: 7,
+    mergedInWindow: 619,
+    readAt: '2026-10-25T01:27:44Z',
+    providers: {
+      'openai-codex': {
+        windowDays: 7,
+        runs: 1377,
+        prsCreated: 100,
+        mergedCreated: 51,
+        mergedRepaired: 201,
+        costUsd: 137.99,
+        costBasis: 'amortized-plan',
+        costPerMergedUsd: 2.71,
+      },
+      hyperagent: {
+        windowDays: 7,
+        runs: 11,
+        prsCreated: 0,
+        mergedCreated: 0,
+        mergedRepaired: 0,
+        costUsd: 333.2,
+        costBasis: 'credit-burn-estimate',
+        costPerMergedUsd: null,
+      },
+    },
+  },
+};
+
+function boardWith(selectedId: string, live: object | null) {
+  const v = evaluateRegistry(ops, { now: NOW, spend, live: live ?? {} });
+  return render(
+    <CapacityBoard
+      view={v}
+      order={routingOrder(v)}
+      selectedId={selectedId}
+      basePath='/app/ov/capacity'
+      now={NOW}
+      registryUpdatedAt={ops.updatedAt}
+      liveOverlay={live ? 'applied' : 'none'}
+    />
+  );
+}
+
+describe('value and alerts', () => {
+  it('raises the credits alarm while Grok is under pace', () => {
+    board('hyperagent');
+    const alerts = screen.getByTestId('capacity-alerts');
+    expect(within(alerts).getByRole('alert').textContent).toMatch(
+      /Hyperagent .* under pace: route work there first/
+    );
+  });
+
+  it('shows cost per merge with its basis when the overlay carries metrics', () => {
+    boardWith('openai-codex', liveMetrics);
+    const value = screen.getByTestId('capacity-value');
+    expect(value.textContent).toMatch(/\$2\.71/);
+    expect(value.textContent).toMatch(/amortized-plan/);
+    expect(value.textContent).toMatch(/51 merged PRs created, 201 repaired/);
+  });
+
+  it('says plainly when there are no lane-receipted merges instead of showing zero cost per merge', () => {
+    boardWith('hyperagent', liveMetrics);
+    const value = screen.getByTestId('capacity-value');
+    expect(value.textContent).toMatch(/No lane-receipted merges in 7 days/);
+    expect(value.textContent).toMatch(/not in lane receipts/);
+    expect(value.textContent).not.toMatch(/\$0 /);
+  });
+
+  it('is explicit when the value is not measured or the window is incomplete', () => {
+    board('openai-codex');
+    expect(screen.getByTestId('capacity-value').textContent).toMatch(
+      /Not measured here/
+    );
+    document.body.innerHTML = '';
+    boardWith('openai-codex', { metrics: { incomplete: 'max_pages_reached' } });
+    expect(screen.getByTestId('capacity-value').textContent).toMatch(
+      /Merge window unreadable \(max_pages_reached\)/
+    );
+  });
+});
+
 describe('CapacityBoard', () => {
   it('shows one screen per provider with a link for each', () => {
     board('openai-codex');

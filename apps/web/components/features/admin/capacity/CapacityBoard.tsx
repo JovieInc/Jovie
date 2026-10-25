@@ -3,6 +3,7 @@ import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
 import type {
   AccountView,
+  CapacityAlert,
   CapacityView,
   ProviderView,
 } from '../../../../../../scripts/lib/capacity-registry.mjs';
@@ -314,10 +315,98 @@ function LimitsList({ limits }: Readonly<{ limits: Record<string, unknown> }>) {
   );
 }
 
+function ValueCard({
+  provider,
+  meta,
+}: Readonly<{
+  provider: ProviderView;
+  meta: CapacityView['metricsMeta'];
+}>) {
+  const metrics = provider.metrics;
+  let body: string;
+  if (!meta) {
+    body = 'Not measured here: needs the live overlay from the lanes host.';
+  } else if (meta.incomplete) {
+    body = `Merge window unreadable (${meta.incomplete}); no counts are shown rather than partial ones.`;
+  } else if (!metrics) {
+    body = 'No lane runs recorded for this provider.';
+  } else if (metrics.mergedCreated === 0) {
+    body = `No lane-receipted merges in ${metrics.windowDays} days (${metrics.runs} runs). Work started outside the lanes, such as agent threads, is not in lane receipts.`;
+  } else {
+    body = `${metrics.mergedCreated} merged PRs created, ${metrics.mergedRepaired} repaired, in ${metrics.windowDays} days.`;
+  }
+  return (
+    <ContentSurfaceCard surface='details' data-testid='capacity-value'>
+      <div className='space-y-3 p-4'>
+        <p className='text-xs font-caption text-tertiary-token'>
+          Value (lane receipts and merged PRs)
+        </p>
+        {metrics && meta && !meta.incomplete ? (
+          <div className='grid grid-cols-2 gap-4 sm:grid-cols-4'>
+            <Stat
+              label='Merged Created'
+              value={String(metrics.mergedCreated)}
+            />
+            <Stat
+              label='Merged Repaired'
+              value={String(metrics.mergedRepaired)}
+            />
+            <Stat
+              label='Cost In Window'
+              value={formatUsd(metrics.costUsd)}
+              hint={metrics.costBasis}
+            />
+            <Stat
+              label='Cost Per Merge'
+              value={formatUsd(metrics.costPerMergedUsd)}
+              hint={
+                metrics.costPerMergedUsd === null
+                  ? 'no merges to divide by'
+                  : 'created PRs'
+              }
+            />
+          </div>
+        ) : null}
+        <p className='text-app text-secondary-token'>{body}</p>
+      </div>
+    </ContentSurfaceCard>
+  );
+}
+
+function AlertBanner({
+  alerts,
+}: Readonly<{ alerts: readonly CapacityAlert[] }>) {
+  if (alerts.length === 0) return null;
+  return (
+    <ul className='space-y-2' data-testid='capacity-alerts'>
+      {alerts.map(alert => (
+        <li
+          key={alert.id}
+          role={alert.severity === 'alarm' ? 'alert' : undefined}
+          className={cn(
+            'rounded-lg border border-subtle bg-surface-0 p-3 text-app',
+            alert.severity === 'alarm' ? 'text-error' : 'text-secondary-token'
+          )}
+        >
+          <span className='mr-2 text-2xs font-semibold uppercase'>
+            {alert.severity === 'alarm' ? 'Alarm' : 'Note'}
+          </span>
+          {alert.message}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ProviderScreen({
   provider,
   now,
-}: Readonly<{ provider: ProviderView; now: number }>) {
+  meta,
+}: Readonly<{
+  provider: ProviderView;
+  now: number;
+  meta: CapacityView['metricsMeta'];
+}>) {
   return (
     <section
       className='space-y-4'
@@ -361,6 +450,7 @@ function ProviderScreen({
           ) : null}
         </div>
       </ContentSurfaceCard>
+      {provider.lane ? <ValueCard provider={provider} meta={meta} /> : null}
       <div className='grid gap-4 lg:grid-cols-2'>
         {provider.accounts.map(account => (
           <AccountCard key={account.id} account={account} now={now} />
@@ -407,6 +497,7 @@ export function CapacityBoard({
   const stale = view.providers.filter(p => p.freshness !== 'fresh');
   return (
     <div className='space-y-4' data-testid='capacity-board'>
+      <AlertBanner alerts={view.alerts} />
       <ContentSurfaceCard surface='details'>
         <div className='grid grid-cols-2 gap-4 p-4 sm:grid-cols-4'>
           <Stat
@@ -461,7 +552,9 @@ export function CapacityBoard({
         })}
       </nav>
 
-      {selected ? <ProviderScreen provider={selected} now={now} /> : null}
+      {selected ? (
+        <ProviderScreen provider={selected} now={now} meta={view.metricsMeta} />
+      ) : null}
 
       <ContentSurfaceCard surface='details'>
         <div className='space-y-2 p-4'>

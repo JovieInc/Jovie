@@ -83,6 +83,7 @@ export interface ProviderView {
   readonly policy: { readonly id: string; readonly rule: string; readonly delegation?: string };
   readonly limits: Record<string, unknown>;
   readonly decision: Record<string, string> | null;
+  readonly metrics: ProviderMetrics | null;
   readonly accounts: readonly AccountView[];
   readonly joinedSpend: readonly {
     readonly id: string;
@@ -94,14 +95,46 @@ export interface ProviderView {
   readonly freshness: Freshness;
 }
 
+export interface ProviderMetrics {
+  readonly windowDays: number;
+  readonly runs: number;
+  readonly prsCreated: number;
+  readonly mergedCreated: number;
+  readonly mergedRepaired: number;
+  readonly costUsd: number | null;
+  readonly costBasis: string;
+  readonly costPerMergedUsd: number | null;
+}
+
+export interface CapacityAlert {
+  readonly id: string;
+  readonly severity: 'alarm' | 'info';
+  readonly provider: string;
+  readonly message: string;
+}
+
 export interface CapacityView {
   readonly generatedAt: string;
   readonly providers: readonly ProviderView[];
   readonly totals: { readonly monthlyUsd: number; readonly stale: readonly string[] };
+  readonly metricsMeta: {
+    readonly windowDays: number | null;
+    readonly mergedInWindow: number | null;
+    readonly readAt: string | null;
+    readonly incomplete: string | null;
+  } | null;
+  readonly alerts: readonly CapacityAlert[];
 }
 
 export interface LiveOverlay {
   readonly accounts?: Record<string, { readonly quota?: object; readonly credits?: object }>;
+  readonly metrics?: {
+    readonly windowDays?: number;
+    readonly mergedInWindow?: number;
+    readonly readAt?: string;
+    readonly incomplete?: string;
+    readonly providers?: Record<string, ProviderMetrics>;
+  };
 }
 
 export const SCHEMA: string;
@@ -114,6 +147,7 @@ export function evaluateRegistry(
   registry: unknown,
   options?: { now?: number; live?: LiveOverlay; spend?: { providers?: readonly unknown[] } }
 ): CapacityView;
+export function capacityAlerts(view: CapacityView): CapacityAlert[];
 export function routingOrder(
   view: CapacityView
 ): readonly { id: string; rank: number; freshness: Freshness }[];
