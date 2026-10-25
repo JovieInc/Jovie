@@ -2014,6 +2014,23 @@ class PublishTest(unittest.TestCase):
         self.assertEqual(self.api.write_count, 1)
         self.assertEqual(len(self.api.calls), 2, "one atomic write and one independent readback")
 
+    def test_file_overlap_pairs_move_to_details_so_the_essential_feed_still_fits(self):
+        feed = self.feed(0)
+        feed["fileOverlap"] = {
+            "mode": "flag",
+            "metrics": {"flags": 3},
+            "pairs": [{"a": 1000 + i, "b": 2000 + i, "files": ["apps/web/x%d.ts" % i] * 6} for i in range(2500)],
+        }
+        self.assertGreater(len(json.dumps(feed).encode()), 256 * 1024)
+        doctor.publish_status(self.host, self.lane, feed)
+        public = json.loads(self.api.files["lanes-status.json"])
+        self.assertEqual(public["schema"], feed["schema"], "the feed must publish, not collapse to unavailable")
+        overlap = public["fileOverlap"]
+        self.assertNotIn("pairs", overlap, "omitted detail must never masquerade as an empty array")
+        self.assertEqual(overlap["pairsRef"], {"recordCount": 2500, "jsonPointer": "/fileOverlap/pairs"})
+        self.assertEqual((overlap["mode"], overlap["metrics"]), ("flag", {"flags": 3}))
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+
     def test_essential_oversize_is_explicit_unavailable_without_fake_empty_counts(self):
         feed = self.feed(0)
         feed["conditions"]["source-unknown"]["evidence"] = "x" * (256 * 1024)
