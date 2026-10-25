@@ -54,7 +54,12 @@ describe('reviewScreenshot', () => {
     bytes,
     expectation: expectationFor('profile'),
     viewport: 'phone',
-    apiKey: 'k',
+    provider: {
+      kind: 'glm',
+      id: 'glm-5.3-flash',
+      model: 'zai/glm-5.3-flash',
+      token: 'k',
+    },
   };
   it('keeps only findings the second pass confirms', async () => {
     const { fetchImpl, calls } = gateway([
