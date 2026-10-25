@@ -827,6 +827,18 @@ nodes:
       - repository_dispatch
     terminalReceipt: job:sync-issue
     jobCount: 1
+  - name: Ovie Summer Canary
+    path: .github/workflows/ovie-summer-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:canary
+    jobCount: 1
   - name: Pen still diff (advisory)
     path: .github/workflows/pen-still-diff.yml
     active: true
