@@ -22,6 +22,7 @@ export type ClaimId =
   | 'billing.upgrade_during_trial'
   | 'billing.renewal'
   | 'billing.cancel'
+  | 'billing.cancel_short'
   | 'billing.refund';
 
 interface ClaimDef {
@@ -103,6 +104,11 @@ const DEFS: readonly ClaimDef[] = [
     id: 'billing.cancel',
     appliesTo: o => o.terms.cancel === 'anytime_effective_end_of_period',
     render: () => 'Cancel anytime and keep Pro to the end of the paid month.',
+  },
+  {
+    id: 'billing.cancel_short',
+    appliesTo: o => o.terms.cancel === 'anytime_effective_end_of_period',
+    render: () => 'Cancel anytime.',
   },
   {
     id: 'billing.refund',

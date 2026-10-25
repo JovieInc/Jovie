@@ -331,7 +331,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-pro-v1',
         controlHeadline: 'Pro plan',
         headline: 'Artist Presence',
-        body: `Self-serve. ${claims(['billing.cancel', 'billing.refund'])}`,
+        body: `Self-serve. ${claims(['billing.cancel_short', 'billing.refund'])}`,
         supportingText: [
           'Self-serve',
           '$12/mo',
