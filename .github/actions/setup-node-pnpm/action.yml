@@ -102,6 +102,16 @@ runs:
     # out after all tests had passed. An exact node_modules hit needs no
     # store, so the store restore is skipped then too. merge_group skips it:
     # its post-job save cost ~16s/job and no later run can read it.
+    # setup-node fetches the node-versions manifest through the GitHub REST API
+    # on every run where the exact .nvmrc release is not on the hosted image,
+    # which spends the repo-wide GITHUB_TOKEN quota (about 1,000 calls/hour)
+    # once per job, and three times over when that quota is dry (2026-10-25:
+    # 10 jobs per Source Validation run, hundreds of runs an hour). Priming the
+    # toolcache from nodejs.org makes setup-node log "Found in cache" instead.
+    - name: Prime Node toolcache (no GitHub API manifest call)
+      if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && hashFiles('.github/actions/prime-node-toolcache/action.yml') != ''
+      uses: ./.github/actions/prime-node-toolcache
+
     - name: Setup Node.js with pnpm cache
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
       uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
