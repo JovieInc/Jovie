@@ -13,21 +13,31 @@ numbers — budgets live in the sources below and in the GBrain page, not here.
 | 2 | `apps/web/.lighthouserc.json` | Production Lighthouse for `/` and `/tim` | production-controller / postdeploy — perf assertions warn; only accessibility ≥ 0.9 errors |
 | 3 | `apps/web/.lighthouserc.{dashboard,onboarding,admin,chat,public-launch,pr}.json` | Per-surface Lighthouse thresholds (error level) | `ci.yml` `ci-lighthouse-*` jobs — `workflow_dispatch` only |
 | 4 | `apps/web/scripts/performance-interaction-manifest.ts` | Interaction latency / dropped frames (jank) classes | `perf:interactions` — manual |
-| 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/compare-chunks.ts` | Initial-JS growth ratchet: fails closed when `bundle-baseline.json` is missing, malformed, or still the empty placeholder (JOV-8555) | Not invoked by any workflow yet (baseline capture + workflow wiring pending). Targets, never gates |
+| 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/route-js-budget.mjs` | Per-route-group initialJS budgets (JOV-8561): each group's `initialJS_gzip_kb` is the target; the operative per-group ceiling is the downward-only `groups` ratchet in `apps/web/scripts/route-js-budgets.json`, enforced per route group in the build lanes. `compare-chunks.ts` owns the growth ratchet (JOV-8555) and telemetry budgets; its former max-across-routes budget check is removed | `route-js-budget.mjs` in `ci.yml` Build + Layout and `source-validation.yml` — any over-budget group fails the job. The `compare-chunks` growth-ratchet workflow wiring stays pending (JOV-8555) |
 
-Rows 1–4 define certified surfaces; row 5 numbers are citable targets only. Where two live
-sources disagree, the stricter number governs and the file is named in the audit report.
+Rows 1–4 define certified surfaces; row 5's group initialJS budgets are enforced per
+route group by route-js-budget since JOV-8561; its remaining numbers (lcp/fcp/cls/tti)
+are citable targets only. Where two live sources disagree, the stricter number
+governs and the file is named in the audit report.
 The only current row 1 advisory exceptions are bounded by the graduation policy below.
 
 `apps/web/scripts/route-js-budget.mjs` blocks finished builds on per-route gzip
-budgets. Marketing targets are tighter; unlisted routes use the default.
+budgets, and since JOV-8561 also on per-route-group initialJS budgets. Marketing targets are tighter; unlisted routes use the default.
 Targets and measured baselines shrink; raises require an unexpired registry
 override for the exact key. Initial measurements (2026-10-23) allow at most 2%
 headroom. Lower baselines after reductions and delete them at the target.
-Profiles remain visible in server HTML before JavaScript. Row 5 stays unwired: no
-workflow invokes compare-chunks, and the in-script growth ratchet now fails
-closed on an unwired baseline (JOV-8555), so the first wired run fails loudly
-until the baseline is captured with `pnpm --filter @jovie/web
+Profiles remain visible in server HTML before JavaScript. Since JOV-8561 every
+measured route is also attributed to a `route-budgets.json` group (admin:
+`/app/admin*`, dashboard: other `/app` routes, marketing: the firstLoad
+`marketingRoutes` patterns, public: every other first-load route) and checked
+against that group's own `groups.<group>.baselineKb` ceiling in
+`route-js-budgets.json` — never the max ceiling across groups — with the
+group's `initialJS_gzip_kb` as the target. Raising a group baseline or a
+group target needs the same unexpired override (owner, reason, Linear ID,
+expiry, evidence). The compare-chunks growth-ratchet wiring stays pending:
+no workflow invokes compare-chunks yet, and the in-script growth ratchet now
+fails closed on an unwired baseline (JOV-8555), so the first wired run fails
+loudly until the baseline is captured with `pnpm --filter @jovie/web
 compare-chunks:snapshot` after a clean build.
 
 | Route | Measured KB | Baseline KB | Target KB |
@@ -131,7 +141,10 @@ decisions and update the existing workflow enforcement in the same change.
    Never add a parallel tool.
 2. Unknown is red: no measurement in 7 days on a certified surface is a FAIL.
 3. Budgets move one way: raising a row 1–3 number needs founder approval and a Linear ID in
-   the file's note; lowering is free.
+   the file's note; lowering is free. The route-group initialJS ratchet (JOV-8561) follows the
+   same one-way rule: `route-js-budgets.json` group baselines and `route-budgets.json` group
+   `initialJS_gzip_kb` targets raise only with a founder-approved unexpired `raises` override
+   carrying the Linear ID.
 4. Weight budgets are transfer (compressed) bytes, per `performance-budgets-guard.ts`.
 5. INP is measured (`apps/web/lib/monitoring/web-vitals.ts`), not budgeted, until a repo
    file names an INP budget.

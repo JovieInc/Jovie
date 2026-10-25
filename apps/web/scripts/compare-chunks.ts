@@ -17,6 +17,14 @@
  * JOV-8555: the initial-JS growth ratchet is fail-closed. A missing, malformed,
  * or placeholder (never-captured) bundle baseline fails the run instead of
  * silently skipping growth detection.
+ *
+ * JOV-8561: per-route-group initial-JS budgets are owned and enforced by
+ * apps/web/scripts/route-js-budget.mjs (ci.yml Build + Layout and
+ * source-validation build lanes) — every route is attributed to a
+ * route-budgets.json group and checked against that group's own ceiling in
+ * apps/web/scripts/route-js-budgets.json. The budget check that used to live
+ * here took Math.max across all route groups, so marketing and public could
+ * grow to the admin ceiling unnoticed; it is removed rather than duplicated.
  */
 
 import { execSync } from 'node:child_process';
@@ -33,17 +41,11 @@ const BASELINE_PATH = join(
 const BUILD_MANIFEST_PATH = join(WEB_ROOT, '.next/build-manifest.json');
 // Reserved for future app-router manifest comparison
 // const APP_BUILD_MANIFEST_PATH = join(WEB_ROOT, '.next/app-build-manifest.json');
-const ROUTE_BUDGETS_PATH = join(
-  WEB_ROOT,
-  '../../docs/performance/route-budgets.json'
-);
 const TELEMETRY_BUDGETS_PATH = join(
   WEB_ROOT,
   '../../docs/performance/telemetry-budgets.json'
 );
 
-// Initial JS budget (bytes) — fail CI if total exceeds this
-const DEFAULT_INITIAL_JS_BUDGET_KB = 250;
 const GROWTH_THRESHOLD_PERCENT = 10;
 
 /**
@@ -427,28 +429,13 @@ function compare(): void {
     baselineError = error instanceof Error ? error.message : String(error);
   }
 
-  // Load route budgets
-  let budgetKB = DEFAULT_INITIAL_JS_BUDGET_KB;
-  if (existsSync(ROUTE_BUDGETS_PATH)) {
-    try {
-      const routeBudgets = JSON.parse(
-        readFileSync(ROUTE_BUDGETS_PATH, 'utf-8')
-      );
-      // Use the highest budget (admin) as the overall threshold
-      budgetKB = Math.max(
-        ...Object.values(
-          routeBudgets.routes as Record<
-            string,
-            { budgets: { initialJS_gzip_kb: number } }
-          >
-        ).map(r => r.budgets.initialJS_gzip_kb)
-      );
-    } catch {
-      // Use default
-    }
-  }
+  // Load route budgets — JOV-8561: the per-route-group initialJS budgets from
+  // docs/performance/route-budgets.json are enforced by
+  // apps/web/scripts/route-js-budget.mjs in the build lanes, against each
+  // group's own ceiling in apps/web/scripts/route-js-budgets.json. The former
+  // Math.max-across-routes ceiling here let marketing/public routes grow to
+  // the admin budget unnoticed, so it is removed rather than duplicated.
 
-  const budgetBytes = budgetKB * 1024;
   let hasFailure = false;
 
   console.log('## Bundle Size Report\n');
@@ -456,7 +443,6 @@ function compare(): void {
   console.log(`|--------|-------|`);
   console.log(`| Total JS | ${formatBytes(currentTotal)} |`);
   console.log(`| Chunks | ${Object.keys(currentChunks).length} |`);
-  console.log(`| Budget | ${formatBytes(budgetBytes)} |`);
 
   if (baseline && baseline.totalInitialJS_bytes > 0) {
     const delta = currentTotal - baseline.totalInitialJS_bytes;
@@ -539,20 +525,6 @@ function compare(): void {
       `\n❌ BUNDLE BASELINE UNWIRED: ${baselineError ?? 'docs/performance/bundle-baseline.json is missing, malformed, or still the empty placeholder'}, so initial-JS growth detection cannot run. Capture it with \`pnpm --filter @jovie/web compare-chunks:snapshot\` after a clean build and commit the result.`
     );
     hasFailure = true;
-  }
-
-  // Budget check
-  // Note: currentTotal is uncompressed; budget is gzip. Rough estimate: gzip ≈ 30% of uncompressed.
-  const estimatedGzip = currentTotal * 0.3;
-  if (estimatedGzip > budgetBytes) {
-    console.log(
-      `\n❌ BUDGET EXCEEDED: Estimated gzip size ${formatBytes(estimatedGzip)} > ${formatBytes(budgetBytes)} budget`
-    );
-    hasFailure = true;
-  } else {
-    console.log(
-      `\n✅ Within budget: ~${formatBytes(estimatedGzip)} gzip < ${formatBytes(budgetBytes)}`
-    );
   }
 
   // Telemetry contribution budgets (JOV-6585): explicit compressed and
