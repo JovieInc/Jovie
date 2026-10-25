@@ -1,3 +1,4 @@
+import JovieKit
 import SwiftUI
 
 // Keep chat-model mapping beside its consumers so the shared theme compiles
