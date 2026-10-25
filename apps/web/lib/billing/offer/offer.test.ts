@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PRO_TRIAL_DURATION_DAYS } from '@/lib/billing/offer-truth';
 import { PLAN_PRICES, toCents } from '@/lib/config/plan-prices';
@@ -134,5 +136,15 @@ describe('refund policy (Tim, 2026-10-25): no partial refunds', () => {
     expect(forbiddenShapeViolations('No partial refunds.', off)).toContain(
       'refund_unpublished'
     );
+  });
+});
+
+describe('legal terms carry the registered claims verbatim', () => {
+  it('terms.md contains billing.cancel and billing.refund', () => {
+    const terms = readFileSync(
+      resolve(__dirname, '../../../content/legal/terms.md'),
+      'utf8'
+    );
+    expect(terms).toContain(claims(['billing.cancel', 'billing.refund']));
   });
 });
