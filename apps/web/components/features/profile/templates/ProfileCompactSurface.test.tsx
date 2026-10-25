@@ -331,7 +331,9 @@ describe('ProfileCompactSurface', () => {
     renderSurface();
 
     const branding = screen.getByTestId('profile-jovie-branding');
-    const link = within(branding).getByRole('link', { name: /Jovie home/i });
+    const link = within(branding).getByRole('link', {
+      name: /Made with Jovie/i,
+    });
     expect(link).toHaveAttribute(
       'href',
       `/?utm_source=profile&utm_artist=${artist.handle}`
