@@ -72,6 +72,57 @@ export const isAdmin = cache(async function isAdmin(
 });
 
 /**
+ * Operator access level. `isAdmin()` above answers only "full admin" and is what
+ * every mutation gate uses, so a read-only operator is denied everywhere by
+ * default. Read gates opt in explicitly through `hasAdminReadAccess` /
+ * `getAdminAccess` (page access, `requireAdmin({ access: 'read' })`,
+ * `requireOvieApiAccess({ access: 'read' })`, `getOvieOperatorEntitlements({
+ * purpose: 'read' })`).
+ */
+export type AdminAccess = 'none' | 'read' | 'full';
+
+async function queryAdminAccessFromDB(userId: string): Promise<AdminAccess> {
+  const [user] = await db
+    .select({
+      isAdmin: users.isAdmin,
+      adminRole: users.adminRole,
+      userStatus: users.userStatus,
+      deletedAt: users.deletedAt,
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!user) return 'none';
+  if (checkUserStatus(user.userStatus, user.deletedAt).isBlocked) return 'none';
+  if (user.isAdmin) return 'full';
+  return user.adminRole === 'read_only' ? 'read' : 'none';
+}
+
+export const getAdminAccess = cache(async function getAdminAccess(
+  userId: string
+): Promise<AdminAccess> {
+  if (!userId) return 'none';
+  if (isVisualCaptureSyntheticAuthEnabled()) {
+    return (await isSyntheticCaptureAdmin(userId)) ? 'full' : 'none';
+  }
+  try {
+    return await queryAdminAccessFromDB(userId);
+  } catch (error) {
+    captureWarning(
+      '[admin/roles] Database query failed, treating as no admin access',
+      error,
+      { userId }
+    );
+    return 'none';
+  }
+});
+
+export async function hasAdminReadAccess(userId: string): Promise<boolean> {
+  return (await getAdminAccess(userId)) !== 'none';
+}
+
+/**
  * Deletes a leftover `admin:role:*` key. `isAdmin` does not read Redis.
  * Grant and revoke still delete the key so an older instance during
  * rollout cannot keep a cached denial.

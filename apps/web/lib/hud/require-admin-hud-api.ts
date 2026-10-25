@@ -4,8 +4,10 @@ import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
 export async function requireAdminHudApiAccess(options?: {
   session?: 'cookie' | 'fresh';
   privileged?: boolean;
+  access?: 'read' | 'write';
 }) {
   return requireOvieApiAccess({
     privileged: options?.privileged ?? false,
+    access: options?.access,
   });
 }

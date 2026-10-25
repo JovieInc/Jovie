@@ -53,6 +53,7 @@ describe('app shell mode', () => {
       userId: 'user_admin',
       isAuthenticated: true,
       hasAdminRole: true,
+      hasAdminReadRole: true,
     });
 
     await expect(requireAppShellModeAccess('ov')).resolves.toBeUndefined();
@@ -66,8 +67,14 @@ describe('app shell mode', () => {
       userId: 'user_member',
       isAuthenticated: true,
       hasAdminRole: false,
+      hasAdminReadRole: false,
     },
-    { userId: null, isAuthenticated: false, hasAdminRole: false },
+    {
+      userId: null,
+      isAuthenticated: false,
+      hasAdminRole: false,
+      hasAdminReadRole: false,
+    },
   ])(
     'redirects unauthorized OV requests before shell data renders',
     async access => {

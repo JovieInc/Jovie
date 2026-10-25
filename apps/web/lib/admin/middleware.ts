@@ -6,7 +6,7 @@ import { maskUserIdForLog } from '@/lib/auth/mask-user-id';
 import { captureWarning } from '@/lib/error-tracking';
 import { privacyErrorResponse } from '@/lib/ovie/privacy-lock/access';
 import { assertOviePrivacyUnlocked } from '@/lib/ovie/privacy-lock/server';
-import { isAdmin } from './roles';
+import { getAdminAccess, isAdmin } from './roles';
 
 /**
  * Admin route protection middleware
@@ -30,6 +30,12 @@ import { isAdmin } from './roles';
  */
 export async function requireAdmin(options?: {
   session?: 'cookie' | 'fresh';
+  /**
+   * 'write' (default) admits full admins only. 'read' also admits read-only
+   * operators and must only be passed from GET/HEAD handlers
+   * (admin-read-only-contract.test.ts enforces this).
+   */
+  access?: 'read' | 'write';
 }): Promise<NextResponse | null> {
   const readAuth = options?.session === 'fresh' ? getFreshAuth : getCachedAuth;
   const auth = await readAuth();
@@ -54,7 +60,10 @@ export async function requireAdmin(options?: {
   }
 
   // Check admin status
-  const userIsAdmin = await isAdmin(adminUserId);
+  let userIsAdmin = await isAdmin(adminUserId);
+  if (!userIsAdmin && options?.access === 'read') {
+    userIsAdmin = (await getAdminAccess(adminUserId)) === 'read';
+  }
 
   // Mask user ID for logging to prevent PII exposure
   const maskedUserId = maskUserIdForLog(adminUserId);

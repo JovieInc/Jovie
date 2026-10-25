@@ -37,6 +37,8 @@ vi.mock('@/lib/auth/status-checker', () => ({
 
 import {
   clearAdminCache,
+  getAdminAccess,
+  hasAdminReadAccess,
   invalidateAdminCache,
   isAdmin,
 } from '@/lib/admin/roles';
@@ -44,6 +46,7 @@ import * as dbModule from '@/lib/db';
 
 interface MockAdminRow {
   readonly isAdmin: boolean;
+  readonly adminRole?: string | null;
   readonly userStatus: string;
   readonly deletedAt: Date | null;
 }
@@ -65,6 +68,61 @@ function mockDbResult(rows: MockAdminRow[]) {
     limit: mockLimit,
   });
 }
+
+describe('Admin access levels (read-only operator role)', () => {
+  beforeEach(() => {
+    clearAdminCache();
+    vi.clearAllMocks();
+    mockGetCachedDevTestAuthSession.mockResolvedValue(null);
+    mockCheckUserStatus.mockReturnValue({ isBlocked: false });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const row = (over: Partial<MockAdminRow>): MockAdminRow => ({
+    isAdmin: false,
+    adminRole: null,
+    userStatus: 'active',
+    deletedAt: null,
+    ...over,
+  });
+
+  it('maps full admins, read-only operators and everyone else', async () => {
+    mockDbResult([row({ isAdmin: true })]);
+    expect(await getAdminAccess('full-user')).toBe('full');
+    mockDbResult([row({ adminRole: 'read_only' })]);
+    expect(await getAdminAccess('ro-user')).toBe('read');
+    mockDbResult([row({})]);
+    expect(await getAdminAccess('plain-user')).toBe('none');
+    mockDbResult([]);
+    expect(await getAdminAccess('missing-user')).toBe('none');
+  });
+
+  it('never treats a read-only operator as an admin: isAdmin stays false', async () => {
+    mockDbResult([row({ adminRole: 'read_only' })]);
+    expect(await isAdmin('ro-user-2')).toBe(false);
+    mockDbResult([row({ adminRole: 'read_only' })]);
+    expect(await hasAdminReadAccess('ro-user-3')).toBe(true);
+  });
+
+  it('denies a blocked or deleted read-only operator and unknown role values', async () => {
+    mockCheckUserStatus.mockReturnValue({ isBlocked: true });
+    mockDbResult([row({ adminRole: 'read_only', userStatus: 'banned' })]);
+    expect(await getAdminAccess('blocked-ro')).toBe('none');
+    mockCheckUserStatus.mockReturnValue({ isBlocked: false });
+    mockDbResult([row({ adminRole: 'write_anything' })]);
+    expect(await getAdminAccess('odd-role')).toBe('none');
+  });
+
+  it('fails closed when the database errors', async () => {
+    vi.spyOn(dbModule.db, 'select').mockImplementation(() => {
+      throw new Error('db down');
+    });
+    expect(await getAdminAccess('db-error-user')).toBe('none');
+  });
+});
 
 describe('Admin Roles', () => {
   beforeEach(() => {

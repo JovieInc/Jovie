@@ -12,7 +12,7 @@ export default async function InboxPage({
 }: Readonly<{
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
-  await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess({ access: 'read' });
   const { case: requestedCase } = await searchParams;
   // Repeated/empty case parameters must not fall back to a different decision.
   const caseId = Array.isArray(requestedCase) ? '' : requestedCase;

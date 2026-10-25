@@ -120,6 +120,7 @@ describe('AppShellLayout OV mode', () => {
       userId: 'user_test',
       isAuthenticated: true,
       hasAdminRole: false,
+      hasAdminReadRole: false,
     });
 
     await expect(
@@ -138,6 +139,7 @@ describe('AppShellLayout OV mode', () => {
       userId: 'user_test',
       isAuthenticated: true,
       hasAdminRole: true,
+      hasAdminReadRole: true,
     });
 
     render(await AppShellLayout({ children: <div>OV content</div> }));

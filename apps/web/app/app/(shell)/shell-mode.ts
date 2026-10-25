@@ -28,7 +28,7 @@ export async function requireAppShellModeAccess(
   if (
     !access.isAuthenticated ||
     !access.userId ||
-    !canAccessAppShellWorkspace(workspace, { isAdmin: access.hasAdminRole })
+    !canAccessAppShellWorkspace(workspace, { isAdmin: access.hasAdminReadRole })
   ) {
     redirect(APP_ROUTES.DASHBOARD);
   }

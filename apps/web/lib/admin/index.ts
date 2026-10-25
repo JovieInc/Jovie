@@ -22,4 +22,11 @@ export {
   startImpersonation,
 } from './impersonation';
 export { checkIsAdmin, requireAdmin } from './middleware';
-export { clearAdminCache, invalidateAdminCache, isAdmin } from './roles';
+export type { AdminAccess } from './roles';
+export {
+  clearAdminCache,
+  getAdminAccess,
+  hasAdminReadAccess,
+  invalidateAdminCache,
+  isAdmin,
+} from './roles';

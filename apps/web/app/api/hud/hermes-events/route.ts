@@ -22,7 +22,7 @@ function authorizePost(request: NextRequest): boolean {
 export async function GET(request: NextRequest) {
   try {
     const kioskToken = request.nextUrl.searchParams.get('kiosk');
-    const auth = await authorizeHud(kioskToken);
+    const auth = await authorizeHud(kioskToken, { access: 'read' });
     if (!auth.ok) {
       return NextResponse.json(
         { error: 'Unauthorized' },
