@@ -87,6 +87,14 @@ describe('checkout validates billable price before session creation', () => {
     }
   });
 
+  it('defers the first charge with trial_end only when a mid-trial upgrade passes one', async () => {
+    await createCheckoutSession({ ...args, trialEnd: 1_793_000_000 });
+    const params = mocks.create.mock.calls[0]?.[0] as {
+      subscription_data: { trial_end?: number };
+    };
+    expect(params.subscription_data.trial_end).toBe(1_793_000_000);
+  });
+
   it('persists optional correlation IDs on session and subscription metadata', async () => {
     await createCheckoutSession({
       ...args,
