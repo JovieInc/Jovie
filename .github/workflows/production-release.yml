@@ -1171,6 +1171,7 @@ jobs:
             EXPECTED_VERCEL_ENVIRONMENT=production \
             VERCEL_PROBE_COOKIE_JAR="$staged_cookie_jar" \
             VERCEL_VERIFY_PUBLIC_SURFACES=true \
+            VERCEL_VERIFY_LINKED_RELEASES=tim \
             VERCEL_PROBE_TIMEOUT_MS=180000 \
             node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar; then
             fail_stage "Staged protected-origin exact build or semantic public-surface verification failed." staged_production_canary_failed
