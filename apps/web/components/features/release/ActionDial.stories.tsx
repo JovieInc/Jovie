@@ -61,19 +61,3 @@ export const OneService: Story = {
 export const DisabledAction: Story = {
   args: { disabled: true },
 };
-
-const hundred: ActionDialOption[] = Array.from({ length: 100 }, (_, index) => ({
-  id: `destination-${index + 1}`,
-  label: `Destination ${String(index + 1).padStart(3, '0')}`,
-  href: `https://example.com/${index + 1}`,
-}));
-
-/** 100 destinations: windowed reel, momentum, keyboard Home/End/PageUp/PageDown. */
-export const HundredDestinations: Story = {
-  args: { options: hundred, selectedId: 'destination-1' },
-};
-
-/** Selection starts mid-list; the reel places itself there without a haptic tick. */
-export const MidListSelected: Story = {
-  args: { options: hundred, selectedId: 'destination-50' },
-};

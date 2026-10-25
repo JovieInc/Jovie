@@ -518,7 +518,6 @@ export function ActionDial({
               const layout = rowLayout(index - position);
               return (
                 // biome-ignore lint/a11y/useFocusableInteractive: options are never focused; the listbox owns focus and points at the active option with aria-activedescendant.
-                // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection is handled on the focused listbox.
                 <div
                   key={option.id}
                   id={`${uid}-${index}`}
@@ -528,6 +527,10 @@ export function ActionDial({
                   }}
                   role='option'
                   aria-selected={index === activeIndex}
+                  // Outer rows are decorative peeks; keeping them out of the
+                  // accessibility tree avoids announcing and contrast-testing
+                  // rows that sit at 20% opacity.
+                  aria-hidden={Math.abs(index - activeIndex) >= 2 || undefined}
                   aria-posinset={index + 1}
                   aria-setsize={count}
                   data-dial-offset={index - activeIndex}
