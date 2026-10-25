@@ -1,10 +1,31 @@
 {
   "_comment": "Ratchet floor for closed-loop thresholds (scripts/lib/__tests__/loop-health-registry.test.mjs). A loop definition may be stricter than its floor, never looser. Tighten both together; loosening needs an explicit, reviewed edit to this file with a reason in the PR.",
   "email-deliverability": {
-    "dns-authentication": { "op": "max", "threshold": 0 },
-    "bounce-rate-7d": { "op": "max", "threshold": 2 },
-    "complaint-rate-7d": { "op": "max", "threshold": 0.1 },
-    "complaints-absolute-7d": { "op": "max", "threshold": 2 },
-    "signin-delivery-p95": { "op": "max", "threshold": 60 }
+    "dns-authentication": {
+      "op": "max",
+      "threshold": 0
+    },
+    "bounce-rate-7d": {
+      "op": "max",
+      "threshold": 2
+    },
+    "complaint-rate-7d": {
+      "op": "max",
+      "threshold": 0.1
+    },
+    "complaints-absolute-7d": {
+      "op": "max",
+      "threshold": 2
+    },
+    "signin-delivery-p95": {
+      "op": "max",
+      "threshold": 60
+    }
+  },
+  "status-page": {
+    "status-page-reachable": {
+      "op": "max",
+      "threshold": 0
+    }
   }
 }
