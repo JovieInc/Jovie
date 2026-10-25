@@ -1328,6 +1328,28 @@ def spent(record: dict, sha: str, max_attempts: int) -> bool:
     return record.get("count", 0) >= max_attempts and same_generation(record, sha)
 
 
+BREAKER_STREAK = 3
+BREAKER_WINDOW_S = 24 * 3600
+
+
+def breaker_streak(runs: list, now: float) -> int:
+    streak = 0
+    for at, productive in reversed([row for row in runs if isinstance(row, list) and len(row) == 2
+                                    and now - float(row[0]) < BREAKER_WINDOW_S]):
+        if productive:
+            break
+        streak += 1
+    return streak
+
+
+def pr_breaker_open(host, number: int, now: float) -> bool:
+    try:
+        data = json.loads((host.state / "pr-breaker.json").read_text())
+        return breaker_streak((data.get(str(number)) or {}).get("runs") or [], now) >= BREAKER_STREAK
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
+
+
 def terminal_reason(pr: dict, record: dict, max_attempts: int, *, allow_reentry: bool = False) -> str | None:
     """Observation never consumes exhaustion. Only a repair claim may receipt a proven new head."""
     sha = pr.get("headRefOid")
@@ -1562,6 +1584,8 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
 
         if spent(record, pr["headRefOid"], lane.MAX_FIX_ATTEMPTS) or in_flight(record, pr, now):
             continue
+        if pr_breaker_open(host, pr["number"], now):
+            continue  # 3 unproductive runs in 24h across heads: one factory signal is filed instead
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \
                 and str(pr["number"]) not in read_state(host, "synced.json"):

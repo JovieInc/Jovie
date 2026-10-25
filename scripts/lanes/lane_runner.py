@@ -6405,6 +6405,117 @@ def repair_target_node(pr: dict, live) -> dict | None:
         return None
 
 
+# remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
+# fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
+# design gate to a model (test_engineering_credential_removal_is_not_a_founder_gate).
+PLATFORM_RED_TEXT = re.compile(
+    remediation.INFRA_TEXT.pattern + r"|API rate limit exceeded|HTTP 408|you must provide a token|"
+    r"timed out fetching|lost communication with the server|ECONNRESET", re.IGNORECASE)
+
+
+def infra_only_red(host: Host, pr: dict) -> str | None:
+    """The infrastructure signature when every real red check on this head failed for a platform
+    reason (rate limit, HTTP 408, missing token, runner loss), else None. 52 of 253 fix-no-change
+    runs were an agent reading such a log and declining; a rerun costs no agent. One rerun per
+    head: a head that is still infra-red after it goes to the agent as before."""
+    kinds = set(pr.get("eventKinds") or [])
+    if pr.get("gateEvidence") or pr.get("queueFailure") or kinds & {"conflict", "review", "dequeued"} \
+            or pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        return None
+    real = [check for check in pr.get("statusCheckRollup") or []
+            if check.get("conclusion") in RED and not remediation._aggregate(check)]
+    if not real:
+        return None
+    found = set()
+    for check in real:
+        job = re.search(r"/job/(\d+)", check.get("detailsUrl") or "")
+        if not job:
+            return None
+        log = sh(["gh", "run", "view", "--repo", REPO_SLUG, "--job", job.group(1), "--log-failed"], timeout=120)
+        hit = PLATFORM_RED_TEXT.search(log.stdout or "") if log.returncode == 0 else None
+        if not hit:
+            return None
+        found.add(re.sub(r"\W+", "-", hit.group(0).lower()).strip("-"))
+    return "+".join(sorted(found))[:60]
+
+
+def claim_infra_rerun(host: Host, pr: dict) -> bool:
+    """True once per (PR, head): the caller may rerun instead of dispatching an agent."""
+    taken = []
+    def change(data: dict) -> None:
+        if data.get(str(pr["number"])) != pr["headRefOid"]:
+            data[str(pr["number"])] = pr["headRefOid"]
+            taken.append(True)
+    try:
+        update_json(host.state / "infra-reruns.json", change)
+    except (OSError, ValueError):
+        return False
+    return bool(taken)
+
+
+# Per-PR circuit breaker across heads. Gem ledger, 762 fix runs: after 3 consecutive unproductive
+# runs on a PR inside 24 h the next run pushed 7% of the time (13 of 192), against 27% for a first
+# run; 52% of all runs went to PRs the lane never pushed. A new head does not reset the streak.
+BREAKER_STREAK = pr_events.BREAKER_STREAK
+BREAKER_WINDOW_S = pr_events.BREAKER_WINDOW_S
+breaker_streak = pr_events.breaker_streak
+pr_breaker_open = pr_events.pr_breaker_open
+
+
+def note_breaker_run(host: Host, pr: dict, receipt: dict, now: float | None = None) -> None:
+    """Record one finished run; the run that completes the streak files one factory signal."""
+    now = time.time() if now is None else now
+    if receipt.get("attemptRefunded") or receipt.get("verdict") in ("recovery-handoff", "reconcile-unavailable", "skipped"):
+        return  # no agent work was charged to the PR
+    productive = receipt.get("verdict") in ("fix-pushed", "pr-opened")
+    opened = []
+    def change(data: dict) -> None:
+        entry = data.setdefault(str(pr["number"]), {"runs": []})
+        entry["runs"] = [row for row in entry.get("runs", []) if now - float(row[0]) < BREAKER_WINDOW_S]
+        entry["runs"].append([now, productive])
+        entry["lastRunId"] = receipt.get("runId")
+        if breaker_streak(entry["runs"], now) == BREAKER_STREAK and not entry.get("signalAt"):
+            entry["signalAt"] = now
+            opened.append(entry)
+        elif productive:
+            entry.pop("signalAt", None)
+        for stale in [k for k, v in data.items() if not v.get("runs")]:
+            del data[stale]
+    try:
+        update_json(host.state / "pr-breaker.json", change)
+        if opened:
+            (host.state / "runs").mkdir(parents=True, exist_ok=True)
+            row = {"schema": "jovie-factory-signal/v1", "at": now_iso(), "source": "pr-breaker",
+                   "fingerprint": hashlib.sha256(f"pr-breaker:{pr['number']}:{int(now // BREAKER_WINDOW_S)}".encode()).hexdigest()[:16],
+                   "ws": "ci", "subject": {"pr": pr["number"]},
+                   "evidence": {"excerpt": f"PR #{pr['number']}: {BREAKER_STREAK} consecutive unproductive fix runs in 24h; "
+                                            f"last verdict {receipt.get('verdict')} reasons {(receipt.get('reasons') or [])[:2]}; "
+                                            f"last run {receipt.get('runId')}. Lanes stopped repairing it; a human or a "
+                                            "different approach is needed."}}
+            with open(host.state / "runs" / "factory-signals.jsonl", "a") as out:
+                out.write(json.dumps(row) + "\n")
+    except (OSError, ValueError, TypeError):
+        pass
+
+
+def file_breaker_signals(host: Host, linear) -> int:
+    """File each unfiled breaker signal as one remediation intake issue (idempotent by fingerprint)."""
+    path = host.state / "runs" / "factory-signals.jsonl"
+    if not path.exists():
+        return 0
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    filed = 0
+    for row in rows:
+        if row.get("filedAt") or row.get("source") != "pr-breaker":
+            continue
+        if pr_events.ensure_linear_intake(linear, row):
+            row["filedAt"] = now_iso()
+            filed += 1
+    if filed:
+        path.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    return filed
+
+
 def fix_request_source(pr: dict) -> dict:
     """Keep the evidence that requested repair even when its target has become terminal."""
     return {
@@ -6441,7 +6552,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
         return str((receipt.get("reasons") or ["recovery-handoff"])[0])
     if verdict == "skipped":
         reason = str((receipt.get("reasons") or [""])[0])
-        return reason if reason.startswith("worktree-unavailable") else None
+        return reason if reason.startswith(("worktree-unavailable", "infra-rerun:")) else None
     if verdict == "fix-no-change":
         # The provider wrapper died before any agent worked: the head's budget paid for nothing.
         reason = str((receipt.get("reasons") or [""])[0])
@@ -6460,7 +6571,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 # handoffs: the precondition (an unreadable target, a failed checkout) is host infrastructure,
 # not the PR, and an immediate next-tick re-claim would crash-loop the same failure (Gem
 # 2026-10-23: 7 target-state-unavailable + 6 worktree-unavailable stops in 24h).
-INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash"})
+INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash", "infra-rerun"})
 
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
@@ -6495,6 +6606,7 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
             requeued = handoff or refund in pr_events.UNRESUMABLE_PRESERVED \
                 or refund.split(":", 1)[0] in INFRA_PRECONDITION_REASONS
     update_json(host.state / "fix-attempts.json", finish)
+    note_breaker_run(host, pr, receipt)
     if requeued:
         try:
             path = (receipt.get("recovery") or {}).get("worktree") \
@@ -7041,6 +7153,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
     pr = live
+    infra = infra_only_red(host, pr) if branch_held else None
+    if infra and claim_infra_rerun(host, pr) and _rerun_failed(pr):
+        receipt.update(verdict="skipped", reasons=[f"infra-rerun:{infra}"], endedAt=now_iso(),
+                       result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
+        end_local_fix_attempt(host, pr, receipt)
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
+        return receipt
     failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
                "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
     ident = execution_attempt.identity("pr-remediation",
@@ -7971,7 +8091,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
-    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now)
+    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now)
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     pr = red_pr(prs, attempts, held)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
@@ -8516,6 +8636,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             if not maintenance_only:
                 linear = Linear(host.linear_env)
             if local:
+                linear_optional(file_breaker_signals, host, linear)
                 linear_optional(escalate_exhausted, host,
                                 list({pr["number"]: pr for pr in candidates + events + rung_candidates}.values()), linear,
                                 **({"model_only": True} if maintenance_only else {}),
