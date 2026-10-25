@@ -26,8 +26,24 @@
   min-height: var(--public-shell-header-offset);
 }
 
-/* Shared docked material for every marketing presentation
-   (marketing-glass and the homepage-embedded bar). */
+/* Shared docked geometry for every marketing presentation
+   (marketing-glass and the homepage-embedded bar). The material itself
+   lives in styles/primitives/glass.css (JOV-8927). */
+.header-nav--docked {
+  /* Keep both the sticky bar and its glass rim inside the public box. */
+  width: min(
+    calc(100% - var(--ds-public-gutter) * 2),
+    var(--ds-public-content-max)
+  ) !important;
+  margin-inline: auto;
+  border: 0 !important;
+}
+
+.header-nav--docked > nav {
+  /* The header owns the gutter; do not apply it a second time to its row. */
+  width: 100% !important;
+}
+
 .header-nav--docked::before {
   position: absolute;
   inset: 0;
