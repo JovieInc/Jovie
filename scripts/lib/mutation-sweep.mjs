@@ -358,6 +358,21 @@ export function recordRun(state, file, run) {
 }
 
 /**
+ * Rescore key for a module: its source blob plus the blobs of its same-stem
+ * test files, so a test-only change (the survivor-kill case) is rescored and
+ * can move the ratchet, not just a source change. Without tests the key is the
+ * bare source blob.
+ * @param {string} sourceBlob
+ * @param {string[]} testBlobs
+ */
+export function moduleKey(sourceBlob, testBlobs) {
+  if (!sourceBlob || testBlobs.length === 0) return sourceBlob;
+  return createHash('sha1')
+    .update([sourceBlob, ...[...testBlobs].sort()].join('\n'))
+    .digest('hex');
+}
+
+/**
  * Ratchet verdict: a module regresses when its fresh score is under the
  * committed floor (baseline) or, with no floor, under the previous recorded
  * score by more than `slack` points while measured on enough mutants.
