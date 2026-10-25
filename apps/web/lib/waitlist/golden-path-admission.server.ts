@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import {
   isProofBlockingPublication,
@@ -9,7 +9,7 @@ import {
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
-import { waitlistEntries } from '@/lib/db/schema/waitlist';
+import { waitlistAuditLogs } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
 import {
   countOpenCohortLearnings,
@@ -118,13 +118,26 @@ export async function decideGoldenPathAdmissionForArtist(input: {
 }
 
 /**
+ * Approval reasons written by the system, not an operator. The golden path
+ * and the auto-accept drain admit on account signals only, which is not proof
+ * the person owns the artist; an admin approval is operator proof.
+ */
+export const SYSTEM_APPROVAL_REASONS: ReadonlySet<string> = new Set([
+  'qualified_golden_path_resolved_artist',
+  'auto_accept_after_days',
+  'qualified_auto_accept',
+  'qualified_interview_signal',
+]);
+
+/**
  * True while this user's page must stay private until ownership is proven.
  * The durable source is the proof-only claim verification stored on the
  * profile (it survives signup, redeem and admin status writes). Before any
- * profile exists, the fresh admission decision on the waitlist entry decides.
- * Once the operator verifies, this is false and the page may be public.
+ * profile exists, the user's latest approval audit row decides: a system
+ * approval (golden path, drain) needs proof, an admin approval is operator
+ * proof. Once the operator verifies, this is false.
  */
-export async function isGoldenPathAdmittedUser(
+export async function requiresProofBeforePublic(
   appUserId: string
 ): Promise<boolean> {
   const [profile] = await db
@@ -136,16 +149,31 @@ export async function isGoldenPathAdmittedUser(
   const record = readClaimVerification(profile?.settings);
   if (record?.proofOnly) return record.status !== 'verified';
 
-  const [row] = await db
-    .select({ statusReason: waitlistEntries.statusReason })
+  const [approval] = await db
+    .select({
+      reason: waitlistAuditLogs.reason,
+      actorType: waitlistAuditLogs.actorType,
+    })
     .from(users)
-    .innerJoin(waitlistEntries, eq(waitlistEntries.id, users.waitlistEntryId))
-    .where(eq(users.id, appUserId))
+    .innerJoin(
+      waitlistAuditLogs,
+      eq(waitlistAuditLogs.waitlistEntryId, users.waitlistEntryId)
+    )
+    .where(
+      and(
+        eq(users.id, appUserId),
+        inArray(waitlistAuditLogs.toStatus, ['approved', 'invited'])
+      )
+    )
+    .orderBy(desc(waitlistAuditLogs.createdAt))
     .limit(1);
-  return row?.statusReason === 'qualified_golden_path_resolved_artist';
+  return (
+    approval?.actorType !== 'admin' &&
+    SYSTEM_APPROVAL_REASONS.has(approval?.reason ?? '')
+  );
 }
 
-/** Checkout is never offered while a free-admission page is unproven. */
+/** True while any of the user's profiles is private awaiting proof. */
 export async function hasProofPendingProfile(
   appUserId: string
 ): Promise<boolean> {

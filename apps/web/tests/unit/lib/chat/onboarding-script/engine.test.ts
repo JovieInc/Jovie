@@ -374,7 +374,7 @@ describe('decideFallbackTurn', () => {
     );
   });
 
-  it('admits a resolved artist under the controlled gate with no checkout and the private-until-proof line', async () => {
+  it('admits a resolved artist under the controlled gate with checkout and the go-live terms', async () => {
     const messages = [
       ...baseThroughArtist(),
       assistant('Handle locked.', [HANDLE_CONFIRMED, SOCIAL_ATTACHED]),
@@ -390,8 +390,9 @@ describe('decideFallbackTurn', () => {
     const turn = await decideFallbackTurn({ uiMessages: messages, state });
 
     expect(turn.line.stepId).toBe('golden_path_admitted');
-    expect(turn.text).toContain('private');
-    expect(turn.toolEvents.map(event => event.toolName)).not.toContain(
+    expect(turn.text).toContain('goes live once we confirm it is you');
+    // Gate publishing, not paying: checkout is offered right after the decision.
+    expect(turn.toolEvents.map(event => event.toolName)).toContain(
       'proposeCheckout'
     );
     const next = turn.toolEvents.find(

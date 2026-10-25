@@ -36,7 +36,7 @@ const {
   mockIsWaitlistGateEnabled: vi.fn(),
 }));
 
-const mockIsGoldenPathAdmittedUser = vi.hoisted(() =>
+const mockRequiresProofBeforePublic = vi.hoisted(() =>
   vi.fn().mockResolvedValue(false)
 );
 const mockDecideGoldenPathAdmission = vi.hoisted(() =>
@@ -47,7 +47,7 @@ const mockDecideGoldenPathAdmission = vi.hoisted(() =>
 );
 vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
   decideGoldenPathAdmissionForArtist: mockDecideGoldenPathAdmission,
-  isGoldenPathAdmittedUser: mockIsGoldenPathAdmittedUser,
+  requiresProofBeforePublic: mockRequiresProofBeforePublic,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -850,7 +850,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
 
   describe('golden-path admission keeps the page private until proof', () => {
     beforeEach(() => {
-      mockIsGoldenPathAdmittedUser.mockResolvedValue(true);
+      mockRequiresProofBeforePublic.mockResolvedValue(true);
       mockMaterializeClaimedOnboardingProfile.mockResolvedValue({
         profileId: 'profile-1',
         handle: 'someartist',
@@ -858,7 +858,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
       });
     });
 
-    it('materializes unproven, reports proofPending and never unlocks checkout', async () => {
+    it('materializes unproven, reports proofPending and still hands off to checkout', async () => {
       setupDbSelectForCandidates(
         [{ id: 'conv_gp', createdAt: new Date('2026-05-01') }],
         waitlistDecisionMessageRows()
@@ -879,7 +879,8 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
         expect.objectContaining({ visibility: 'unproven' })
       );
       expect(body.proofPending).toBe(true);
-      expect(body).not.toHaveProperty('readyForCheckout');
+      // Paying never publishes; the offer states the terms.
+      expect(body.readyForCheckout).toBe(true);
     });
 
     it('still materializes unproven on the already-approved retry path', async () => {
@@ -906,7 +907,7 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     });
 
     it('leaves every other approved user on the public path', async () => {
-      mockIsGoldenPathAdmittedUser.mockResolvedValue(false);
+      mockRequiresProofBeforePublic.mockResolvedValue(false);
       setupDbSelectForCandidates(
         [{ id: 'conv_other', createdAt: new Date('2026-05-01') }],
         waitlistDecisionMessageRows()

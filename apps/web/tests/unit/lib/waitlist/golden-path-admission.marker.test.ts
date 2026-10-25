@@ -19,8 +19,10 @@ vi.mock('@/lib/waitlist/cohort-learnings', () => ({
   MAX_OPEN_COHORT_LEARNINGS: 3,
 }));
 vi.mock('drizzle-orm', () => ({
+  and: (...c: unknown[]) => c,
   desc: (c: unknown) => c,
   eq: (a: unknown, b: unknown) => ({ a, b }),
+  inArray: (a: unknown, b: unknown) => ({ a, b }),
 }));
 vi.mock('@/lib/db/schema/auth', () => ({
   users: { id: 'users.id', waitlistEntryId: 'users.waitlist_entry_id' },
@@ -33,7 +35,13 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   },
 }));
 vi.mock('@/lib/db/schema/waitlist', () => ({
-  waitlistEntries: { id: 'we.id', statusReason: 'we.status_reason' },
+  waitlistAuditLogs: {
+    waitlistEntryId: 'wal.entry_id',
+    reason: 'wal.reason',
+    actorType: 'wal.actor_type',
+    toStatus: 'wal.to_status',
+    createdAt: 'wal.created_at',
+  },
 }));
 vi.mock('@/lib/db', () => {
   const chain = () => {
@@ -52,7 +60,7 @@ vi.mock('@/lib/db', () => {
 
 import {
   hasProofPendingProfile,
-  isGoldenPathAdmittedUser,
+  requiresProofBeforePublic,
 } from '@/lib/waitlist/golden-path-admission.server';
 
 const proofRecord = (status: string) =>
@@ -68,35 +76,46 @@ const proofRecord = (status: string) =>
     status,
   } as never);
 
-describe('isGoldenPathAdmittedUser keeps the marker after the waitlist reason is overwritten', () => {
+describe('requiresProofBeforePublic keeps the marker after the waitlist reason is overwritten', () => {
   beforeEach(() => {
     mocks.rows = [];
   });
 
-  it('stays unproven from the profile record even when the entry reason changed', async () => {
+  it('stays unproven from the profile record whatever the waitlist rows say', async () => {
     mocks.rows = [[{ settings: proofRecord('pending_verification') }]];
-    expect(await isGoldenPathAdmittedUser('user-1')).toBe(true);
+    expect(await requiresProofBeforePublic('user-1')).toBe(true);
   });
 
   it('is proven once the operator verified', async () => {
-    mocks.rows = [
-      [{ settings: proofRecord('verified') }],
-      [{ statusReason: 'onboarding_completed' }],
-    ];
-    expect(await isGoldenPathAdmittedUser('user-1')).toBe(false);
+    mocks.rows = [[{ settings: proofRecord('verified') }]];
+    expect(await requiresProofBeforePublic('user-1')).toBe(false);
   });
 
-  it('uses the fresh admission decision before any profile exists', async () => {
+  it('requires proof for every system approval, from the audit row, even after signup rewrote the reason', async () => {
+    for (const reason of [
+      'qualified_golden_path_resolved_artist',
+      'auto_accept_after_days',
+      'qualified_auto_accept',
+      'qualified_interview_signal',
+    ]) {
+      mocks.rows = [[], [{ reason, actorType: 'job' }]];
+      expect(await requiresProofBeforePublic('user-1')).toBe(true);
+    }
+  });
+
+  it('treats an admin approval as operator proof', async () => {
     mocks.rows = [
       [],
-      [{ statusReason: 'qualified_golden_path_resolved_artist' }],
+      [{ reason: 'qualified_auto_accept', actorType: 'admin' }],
     ];
-    expect(await isGoldenPathAdmittedUser('user-1')).toBe(true);
+    expect(await requiresProofBeforePublic('user-1')).toBe(false);
+    mocks.rows = [[], [{ reason: 'approved', actorType: 'admin' }]];
+    expect(await requiresProofBeforePublic('user-1')).toBe(false);
   });
 
-  it('is false for every other approval', async () => {
-    mocks.rows = [[], [{ statusReason: 'auto_accept_after_days' }]];
-    expect(await isGoldenPathAdmittedUser('user-1')).toBe(false);
+  it('does not require proof when there was no system approval', async () => {
+    mocks.rows = [[], []];
+    expect(await requiresProofBeforePublic('user-1')).toBe(false);
   });
 
   it('blocks checkout while any profile is unproven', async () => {

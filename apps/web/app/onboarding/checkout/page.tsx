@@ -17,7 +17,6 @@ import {
   validatePlan,
 } from '@/lib/auth/plan-intent';
 import { isSelfServiceOffer } from '@/lib/billing/offer-truth';
-import { claimStateHref } from '@/lib/claim/artist-offer-claim';
 import { PRICING } from '@/lib/config/pricing';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import {
@@ -175,14 +174,11 @@ export default async function OnboardingCheckoutPage({
     // Profile load failed — proceed with empty data
   }
 
-  // Free-admission pages are private until ownership is proven: no offer,
-  // organic or explicit, until then.
-  if (
-    authResult.dbUserId &&
-    (await hasProofPendingProfile(authResult.dbUserId))
-  ) {
-    redirect(claimStateHref('proof_pending'));
-  }
+  // Paying never publishes a page; proof does. A free-admission page that is
+  // waiting for proof may still check out, and says so plainly.
+  const proofPending = Boolean(
+    authResult.dbUserId && (await hasProofPendingProfile(authResult.dbUserId))
+  );
 
   // Smart plan recommendation only for organic users with no expressed paid intent.
   // If the user has a paid-intent cookie (e.g., founding), preserve it — don't override
@@ -208,7 +204,7 @@ export default async function OnboardingCheckoutPage({
   // already active — never a premature offer over an empty preview.
   // Explicit paid intent (source=intent) is unaffected — it is
   // artist-initiated checkout, not an offer impression.
-  if (isDefaultUpsell && !profileLive) {
+  if (isDefaultUpsell && !profileLive && !proofPending) {
     redirect(getRedirectForState(authResult.state) ?? APP_ROUTES.START);
   }
 
@@ -261,6 +257,7 @@ export default async function OnboardingCheckoutPage({
       spotifyFollowers={profileData.spotifyFollowers}
       isDefaultUpsell={isDefaultUpsell}
       proofFindings={proofFindings}
+      proofPending={proofPending}
     />
   );
 }

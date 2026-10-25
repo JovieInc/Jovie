@@ -106,7 +106,7 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
   line(
     'golden_path_admitted',
     'v1',
-    'You are in. Before a page goes public we confirm it belongs to the artist, so yours is saved and private for now. Nothing is charged.'
+    'You clear the bar. Your page goes live once we confirm it is you, and it stays private and yours to edit until then. Checkout takes about a minute and paying does not change that. The free tier is available if you want to start there.'
   ),
 
   line('waitlist', 'v3', ONBOARDING_WAITLIST_RECEIPT),

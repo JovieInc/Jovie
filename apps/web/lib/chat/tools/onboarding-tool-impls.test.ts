@@ -198,8 +198,8 @@ describe('proposeNextStep controlled access', () => {
   });
 });
 
-describe('golden-path admission keeps checkout off the table until proof', () => {
-  it('refuses proposeCheckout after an admit that requires proof', async () => {
+describe('golden-path admission gates publishing, not paying', () => {
+  it('still offers checkout after an admit that requires proof', async () => {
     const lowFollowerMetrics = normalizeArtistMetrics(
       { spotifyFollowers: 3_200 },
       { source: 'spotify_api', updatedAt: '2026-07-01T00:00:00.000Z' }
@@ -256,7 +256,8 @@ describe('golden-path admission keeps checkout off the table until proof', () =>
         execute: (input: { plan?: string }) => Promise<{ action: string }>;
       }
     ).execute({});
-    expect(checkout.action).toBe('checkout_unavailable');
+    // Paying never publishes a page; proof does. Checkout stays available.
+    expect(checkout.action).toBe('propose_checkout');
   });
 });
 

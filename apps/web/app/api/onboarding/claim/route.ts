@@ -30,7 +30,7 @@ import {
 import { scoreAdmissionCandidate } from '@/lib/waitlist/admission-score';
 import {
   decideGoldenPathAdmissionForArtist,
-  isGoldenPathAdmittedUser,
+  requiresProofBeforePublic,
 } from '@/lib/waitlist/golden-path-admission.server';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
@@ -230,7 +230,7 @@ async function resolveClaimHandoff(params: {
   if (!params.mustWaitlist) {
     // A retry, a recovered response or an already-approved user must not
     // publish what a golden-path admission left private.
-    const proofPending = await isGoldenPathAdmittedUser(params.appUserId);
+    const proofPending = await requiresProofBeforePublic(params.appUserId);
     return {
       profile: await materializeClaimedOnboardingProfile({
         userId: params.appUserId,
@@ -312,7 +312,7 @@ async function resolveClaimHandoff(params: {
 
   // Golden-path admission is account access, not proof of ownership: the page
   // stays private until the claim-verification review publishes it.
-  const proofPending = await isGoldenPathAdmittedUser(params.appUserId);
+  const proofPending = await requiresProofBeforePublic(params.appUserId);
   return {
     profile: await materializeClaimedOnboardingProfile({
       userId: params.appUserId,
@@ -338,7 +338,6 @@ function claimHandoffPayload(
     terminalKind !== null &&
     !handoff.waitlist &&
     !handoff.profileError &&
-    !handoff.proofPending &&
     Boolean(handoff.profile?.profileId);
   return {
     ...(handoff.profileError

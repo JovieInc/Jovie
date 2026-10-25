@@ -75,8 +75,6 @@ export interface OnboardingTurnState {
   /** Golden-path verdict for this turn; null holds the artist (fail closed). */
   goldenPathVerdict?: GoldenPathVerdict | null;
   goldenPathHold?: GoldenPathAdmissionReason | null;
-  /** Set by proposeNextStep when the admit keeps the page private until proof. */
-  proofRequired?: boolean;
   /** Set when confirmSpotifyArtist is called. */
   spotifyArtistId: string | null;
   /**
@@ -573,7 +571,6 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
           signals: state.signals,
           turnCount: state.turnCount,
         });
-        if (decision.proofRequired) state.proofRequired = true;
         if (decision.rationale === 'public_profile_required_for_waitlist') {
           return {
             action: 'propose_next_step' as const,
@@ -597,14 +594,6 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.proposeCheckout.description,
       inputSchema: TOOL_SCHEMAS.proposeCheckout.inputSchema,
       execute: async ({ plan }) => {
-        if (state.proofRequired) {
-          // Never promise checkout before ownership is proven.
-          return {
-            action: 'checkout_unavailable' as const,
-            summary:
-              "Checkout is not offered until the page is confirmed as the artist's.",
-          };
-        }
         const handoffUrl = plan
           ? `/onboarding/checkout?plan=${encodeURIComponent(plan)}`
           : '/onboarding/checkout';
