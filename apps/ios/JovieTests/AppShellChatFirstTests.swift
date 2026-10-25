@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 import SwiftUI
 import Testing
 @testable import Jovie
