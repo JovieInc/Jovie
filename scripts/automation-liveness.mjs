@@ -34,7 +34,6 @@ import { ADMISSION_BLOCKING_LABELS } from './lib/admission-hold-labels.mjs';
 import {
   evaluateLiveness,
   livenessDecisions,
-  livenessFingerprint,
   loadRegistry,
   readPath,
   runStageEvents,
@@ -999,13 +998,15 @@ export async function main({
   if (env.GITHUB_STEP_SUMMARY)
     appendFileSync(env.GITHUB_STEP_SUMMARY, summary(report));
 
-  const state = { ...previous };
-  for (const row of report.results) {
-    if (row.critical)
-      state[livenessFingerprint(row.id)] =
-        row.status === 'fresh' ? 'green' : 'red';
-  }
+  // The persisted alert state is the APPLIED state, never an observation
+  // (JOV-8843). Only a run that can file may write it at all: a diagnostic
+  // run (no --file) or a disabled-intake run (REMEDIATION_INTAKE_DISABLED=1)
+  // leaves the persisted fingerprints untouched, so a healthy observation
+  // cannot flip a filed red fingerprint green before the Linear recovery
+  // lands — otherwise the next filing run sees green, emits no green
+  // decision, and the open alert stays unresolved forever.
   if (args.file && env.REMEDIATION_INTAKE_DISABLED !== '1') {
+    const state = { ...previous };
     const { applyRemediationDecisionWithRetry } = await import(
       './lib/remediation-signal.mjs'
     );
@@ -1020,14 +1021,15 @@ export async function main({
       process.stdout.write(
         `${JSON.stringify({ fingerprint: decision.fingerprint, action: decision.action, ok: result.ok, reason: 'reason' in result ? result.reason : null })}\n`
       );
-      // Keep the prior state when filing failed so the next run retries.
-      if (!result.ok)
+      // Advance the applied state only after the mutation succeeds; a
+      // failed filing keeps the prior state so the next run retries it.
+      if (result.ok)
         state[decision.fingerprint] =
-          previous[decision.fingerprint] ?? 'unknown';
+          decision.action === 'green' ? 'green' : 'red';
     }
+    if (args.previous)
+      writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
-  if (args.previous)
-    writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   process.stdout.write(
     `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id) })}\n`
   );
