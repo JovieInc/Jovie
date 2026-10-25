@@ -163,7 +163,7 @@ describe('generateProfileStructuredData', () => {
 
   it('emits MusicGroup + Person and music wording for an artist profile', () => {
     const data = generateProfileStructuredData(
-      { ...BASE_PROFILE, bio: null },
+      { ...BASE_PROFILE, bio: null, location: null },
       null,
       MOCK_LINKS
     );
