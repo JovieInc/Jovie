@@ -57,7 +57,7 @@ export function SummerVoiceControlView({
         onClick={active ? stop : start}
         aria-pressed={active}
         aria-label={active ? 'End voice conversation' : 'Talk to Summer'}
-        className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 data-[active=true]:text-primary-token'
+        className='inline-flex h-10 w-10 items-center justify-center rounded-full border border-subtle bg-surface-1 text-secondary-token transition-colors hover:text-primary-token focus-visible:outline-2 focus-visible:outline-offset-2 aria-pressed:text-primary-token'
         data-active={active}
       >
         {active ? (
