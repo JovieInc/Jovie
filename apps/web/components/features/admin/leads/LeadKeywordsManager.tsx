@@ -15,6 +15,7 @@ import {
   useSeedLeadKeywordsMutation,
   useToggleLeadKeywordMutation,
 } from '@/lib/queries';
+import { pluralize } from '@/lib/utils/pluralize';
 
 interface LeadKeywordsManagerProps {
   readonly embedded?: boolean;
@@ -136,7 +137,7 @@ export function LeadKeywordsManager({
               </div>
               <div className='flex items-center gap-2'>
                 <Badge variant='secondary' className='text-2xs'>
-                  {keyword.resultsFoundTotal} Results
+                  {pluralize(keyword.resultsFoundTotal, 'Result')}
                 </Badge>
                 <Button
                   type='button'
