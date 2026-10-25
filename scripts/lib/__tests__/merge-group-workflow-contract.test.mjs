@@ -4863,7 +4863,7 @@ describe('blocking golden-path browser journey', () => {
     expect(config).toContain('workers: 1');
     expect(config).not.toContain('E2E_USE_TEST_AUTH_BYPASS');
     const spec = readFileSync(
-      resolve(REPO_ROOT, 'apps/web/tests/e2e/blocking-journey.spec.ts'),
+      resolve(REPO_ROOT, 'apps/web/tests/e2e/blocking-journey.journey.ts'),
       'utf8'
     );
     expect(spec).not.toMatch(/test\.(skip|fixme|only)\s*\(/);

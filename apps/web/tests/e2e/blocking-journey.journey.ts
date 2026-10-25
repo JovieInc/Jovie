@@ -23,6 +23,7 @@ test.afterEach(async ({}, info) => {
   `;
 });
 
+// The .journey.ts suffix keeps this isolated-database test in its dedicated suite.
 // Real signup, onboarding, and writes. Only telemetry and the final Stripe
 // boundary are mocked; music enrichment continues through the existing provider.
 test('signup -> onboarding -> profile/link -> smart link -> public profile -> checkout', async ({
