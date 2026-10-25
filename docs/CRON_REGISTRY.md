@@ -108,6 +108,7 @@ Source of truth: `apps/web/vercel.json`. The Vercel project's Root Directory is 
 | `/api/cron/public-profile-canary` | `13 6 * * *` | Daily at 06:13 UTC |
 | `/api/cron/auth-signup-onboarding-canary` | `23 6 * * *` | Daily at 06:23 UTC (JOV-1871) |
 | `/api/cron/artist-daily-snapshots` | `15 9 * * *` | Daily at 09:15 UTC. No-op unless `ARTIST_DAILY_SNAPSHOTS` is true. YouTube Data API statistics when `YOUTUBE_DATA_API_KEY` is set; Wikimedia pageviews. Social HTML waits for isolated egress. |
+| `/api/cron/catalog-completeness` | `*/30 * * * *` | Every 30 minutes. Re-imports the stalest claimed artist catalogs (time-budgeted), publishes ingested releases the artist never decided on, reports public-release counts before/after. `?handles=tim` runs those handles only. |
 
 `cleanup-sms-intents` was folded into `daily-maintenance` as a sub-job per JOV-1901 (see AUTOMATION_AUDIT.md). Other cron route files exist as standalone endpoints whose logic is called as sub-jobs of `frequent` or `daily-maintenance`. `apps/web/vercel.json` is the schedule source of truth.
 
@@ -190,6 +191,7 @@ These have their own Vercel schedule OR exist as callable endpoints (also invoke
 | `/api/cron/public-profile-canary` | 30s | Lightweight HTTP health check: GET /tim, /tim/alerts, /tim/pay, POST /api/audience/visit; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1872) | — |
 | `/api/cron/auth-signup-onboarding-canary` | 30s | Lightweight HTTP golden-path check: GET /signup, /signin, /start, POST /api/chat onboarding probe; emits Sentry breadcrumb + writes Redis key for admin ops panel (JOV-1871) | — |
 | `/api/cron/artist-daily-snapshots` | 300s | Append-only official-API snapshots for a capped batch of known artists. Default-off (`ARTIST_DAILY_SNAPSHOTS`). Social HTML is not fetched from core. Failures fingerprint as `remediation:artist-snapshots`. | — |
+| `/api/cron/catalog-completeness` | 300s | Idempotent Spotify catalog re-import per artist; stops starting profiles after 200s; per-profile failures are captured and stamped so one artist cannot starve the queue. | — |
 
 ## LLM Model Usage in Web App Crons
 
