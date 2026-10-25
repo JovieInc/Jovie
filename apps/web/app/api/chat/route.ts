@@ -69,6 +69,7 @@ import {
   detectAlbumArtGenerationIntent,
   resolveAlbumArtCapability,
 } from '@/lib/chat/album-art-capability';
+import { fetchCatalogTrackTitlesForChat } from '@/lib/chat/catalog-titles';
 import { assertChatToolsRegistered } from '@/lib/chat/chat-tool-inventory';
 import {
   buildLockedToolPromptInfo,
@@ -86,10 +87,7 @@ import {
   updateOwnedReleaseGeneratedPitches,
   updateOwnedReleaseMetadata,
 } from '@/lib/chat/release-writes';
-import {
-  fetchCatalogTrackTitlesForChat,
-  fetchReleasesForChat,
-} from '@/lib/chat/releases';
+import { fetchReleasesForChat } from '@/lib/chat/releases';
 import {
   extractUIMessageText,
   parseChatRequestBody,
