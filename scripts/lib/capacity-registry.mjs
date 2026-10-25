@@ -447,6 +447,65 @@ export function routingOrder(view) {
     .sort((a, b) => a.rank - b.rank || (a.freshness === 'fresh' ? -1 : 1));
 }
 
+/**
+ * Lane routing (Tim, 2026-10-25): unused Codex quota is lost, so Codex seats behind pace are the first
+ * choice for lane work. Hyperagent when Codex has no headroom (every account ahead of pace or exhausted),
+ * when the task needs a model Codex lacks, or when launch-critical time-to-merge matters and gem is loaded.
+ * Remaining ties go to the lower measured cost per merge. Where Codex runs is separate: off gem
+ * (`codex cloud`) only when the registry records a configured cloud environment, else on gem.
+ *
+ * @param {object} view evaluateRegistry() output
+ * @param {{ gemLoaded?: boolean, launchCritical?: boolean, needsModelCodexLacks?: boolean }} [context]
+ */
+export function laneRoutingOrder(view, context = {}) {
+  const codex = view.providers.find(p => p.id === 'openai-codex');
+  const hyper = view.providers.find(p => p.id === 'hyperagent');
+  const verdicts = (codex?.accounts ?? []).map(a => a.quota?.verdict);
+  const behind = verdicts.filter(
+    v => v === 'under-burning' || v === 'reset-passed'
+  ).length;
+  const onPace = verdicts.filter(v => v === 'on-pace').length;
+  const codexHeadroom = behind + onPace > 0;
+  const cost = provider =>
+    provider?.metrics?.costPerMergedUsd ?? Number.POSITIVE_INFINITY;
+  const reasons = [];
+  let first = 'openai-codex';
+  if (context.needsModelCodexLacks) {
+    first = 'hyperagent';
+    reasons.push('task needs a model Codex lacks');
+  } else if (!codexHeadroom) {
+    first = 'hyperagent';
+    reasons.push('every Codex account is ahead of pace or exhausted');
+  } else if (context.launchCritical && context.gemLoaded) {
+    first = 'hyperagent';
+    reasons.push(
+      'launch-critical work while gem is loaded: Hyperagent runs in parallel off gem'
+    );
+  } else if (behind > 0) {
+    reasons.push(`${behind} Codex account(s) behind pace: use it or lose it`);
+  } else if (cost(hyper) < cost(codex)) {
+    first = 'hyperagent';
+    reasons.push(
+      'Codex only on pace and Hyperagent has the lower measured cost per merge'
+    );
+  } else {
+    reasons.push('Codex on pace; cost per merge is not higher than Hyperagent');
+  }
+  const cloud = codex?.offGem?.status === 'configured';
+  return {
+    order:
+      first === 'openai-codex'
+        ? ['openai-codex', 'hyperagent']
+        : ['hyperagent', 'openai-codex'],
+    reasons,
+    codexWhere: context.gemLoaded
+      ? cloud
+        ? 'codex-cloud'
+        : 'gem-throttled'
+      : 'gem',
+  };
+}
+
 const usd = value =>
   value === null || value === undefined
     ? 'n/a'

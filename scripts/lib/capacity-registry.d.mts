@@ -243,3 +243,16 @@ export function routingOrder(
   view: CapacityView
 ): readonly { id: string; rank: number; freshness: Freshness }[];
 export function renderCanon(view: CapacityView, registry: unknown): string;
+
+export function laneRoutingOrder(
+  view: CapacityView,
+  context?: {
+    gemLoaded?: boolean;
+    launchCritical?: boolean;
+    needsModelCodexLacks?: boolean;
+  }
+): {
+  order: ('openai-codex' | 'hyperagent')[];
+  reasons: string[];
+  codexWhere: 'gem' | 'gem-throttled' | 'codex-cloud';
+};

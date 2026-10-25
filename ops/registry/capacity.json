@@ -168,6 +168,11 @@
       "vendor": "openai",
       "lane": "codex",
       "agents": ["lane-codex", "codex-session"],
+      "offGem": {
+        "status": "cli-present-no-environment",
+        "note": "codex-cli 0.162.1 has codex cloud exec, status, list, apply and diff, and list authenticates on gem (current-login: no tasks). exec requires --env, a Codex Cloud environment connected to the repo; none is recorded. Cloud runs return a diff to apply on gem, so push and PR steps still run there. Whether cloud tasks draw the same weekly Codex window is not verified here. Status becomes configured only when an environment id is recorded and one task is observed end to end.",
+        "asOf": "2026-10-25"
+      },
       "usageModel": "subscription-pool",
       "plan": {
         "name": "ChatGPT Pro",

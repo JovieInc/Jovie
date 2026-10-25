@@ -4,6 +4,7 @@ import { buildCanon, check, loadAll } from '../../capacity-registry.mjs';
 import { apiListUsd, subscriptionMarginal } from '../capacity-pricing.mjs';
 import {
   evaluateRegistry,
+  laneRoutingOrder,
   priceModel,
   resolveRole,
   routingOrder,
@@ -422,5 +423,49 @@ describe('roles', () => {
     expect(errors.join('\n')).toMatch(
       /modelRegistryId nope not in the model registry/
     );
+  });
+});
+
+describe('lane routing (Tim 2026-10-25)', () => {
+  const view = codexVerdicts => ({
+    providers: [
+      {
+        id: 'openai-codex',
+        metrics: { costPerMergedUsd: 2.71 },
+        accounts: codexVerdicts.map(verdict => ({ quota: { verdict } })),
+      },
+      { id: 'hyperagent', metrics: { costPerMergedUsd: 4.76 }, accounts: [] },
+    ],
+  });
+
+  it('prefers a Codex account behind pace', () => {
+    expect(
+      laneRoutingOrder(view(['under-burning', 'over-burning'])).order[0]
+    ).toBe('openai-codex');
+  });
+
+  it('falls to Hyperagent when every Codex account is ahead of pace', () => {
+    expect(
+      laneRoutingOrder(view(['over-burning', 'over-burning'])).order[0]
+    ).toBe('hyperagent');
+  });
+
+  it('uses Hyperagent for a model Codex lacks and for launch-critical work while gem is loaded', () => {
+    const v = view(['under-burning']);
+    expect(laneRoutingOrder(v, { needsModelCodexLacks: true }).order[0]).toBe(
+      'hyperagent'
+    );
+    expect(
+      laneRoutingOrder(v, { launchCritical: true, gemLoaded: true }).order[0]
+    ).toBe('hyperagent');
+    expect(laneRoutingOrder(v, { launchCritical: true }).order[0]).toBe(
+      'openai-codex'
+    );
+  });
+
+  it('breaks on-pace ties by measured cost per merge and never claims codex cloud without an environment', () => {
+    const result = laneRoutingOrder(view(['on-pace']), { gemLoaded: true });
+    expect(result.order[0]).toBe('openai-codex');
+    expect(result.codexWhere).toBe('gem-throttled');
   });
 });

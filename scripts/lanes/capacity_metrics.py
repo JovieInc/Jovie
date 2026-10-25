@@ -48,7 +48,7 @@ def read_ledger_tail(path: Path, tail_bytes: int = TAIL_BYTES) -> list[dict]:
 # One convention for agent-originated PRs (Tim and the coordinator, 2026-10-25): the PR body carries
 # `Agent-Path: <provider>/<account>` and, for Hyperagent threads, `Dispatch ID: thread <id>`.
 AGENT_PATH = re.compile(r"^\s*Agent-Path:\s*([a-z0-9][a-z0-9._-]*)\s*/\s*([A-Za-z0-9._:-]+)\s*$", re.M)
-THREAD_ID = re.compile(r"Dispatch ID:\s*thread\s+(cmv[a-z0-9]{12,24})\b", re.I)
+THREAD_ID = re.compile(r"Dispatch ID:?\s*thread\s+(cmv[a-z0-9]{12,24})\b", re.I)
 
 
 def agent_provider(row: dict) -> tuple[str | None, str | None]:
