@@ -65,6 +65,10 @@ run_publication() {
   git diff --check "${publication_base}..HEAD"
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
+  # Every workflow-related contract in one pass (topology, ownership, cron
+  # freeze, automation registry, stage manifest, ...) instead of one CI round
+  # trip each. A no-op when the push touches no workflow-related file.
+  node scripts/ci-workflow-preflight.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs
 }
 
