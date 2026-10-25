@@ -70,7 +70,8 @@ jobs:
             packages/api-client
             .github/scripts/fleet-rules-verdict.sh
             .github/scripts/fleet-rules-rerun.sh
-            .github/actions/prime-node-toolcache
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
       # No token input: setup-node keeps its default github.token, never the CI App token.
       - name: Prime Node toolcache (no GitHub API manifest call)
@@ -106,7 +107,8 @@ jobs:
             .nvmrc
             packages/api-client
             .github/scripts/fleet-rules-rerun.sh
-            .github/actions/prime-node-toolcache
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}

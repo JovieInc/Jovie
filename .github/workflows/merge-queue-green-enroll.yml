@@ -116,7 +116,8 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
-            .github/actions/prime-node-toolcache
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)
@@ -832,7 +833,8 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
-            .github/actions/prime-node-toolcache
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)
@@ -894,7 +896,8 @@ jobs:
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs
-            .github/actions/prime-node-toolcache
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)
@@ -1019,7 +1022,8 @@ jobs:
             scripts/merge-group-victim-rearm.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
-            .github/actions/prime-node-toolcache
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)

@@ -5,6 +5,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -123,4 +124,24 @@ test('the composite action wires the script and the version file input', () => {
   );
   assert.match(action, /node-version-file:[\s\S]*default: \.nvmrc/);
   assert.match(action, /run: bash "\$GITHUB_ACTION_PATH\/prime\.sh"/);
+});
+
+test('sparse checkouts list the action files, never the directory (tests copy entries as files)', () => {
+  // 2026-10-25: a directory entry ejected #23217 from three merge groups
+  // (EISDIR in linear-sync-on-merge.test.mjs). PR CI never runs that lane.
+  const dir = '.github/workflows';
+  for (const name of readdirSync(dir)) {
+    if (!/\.ya?ml$/.test(name)) continue;
+    const text = readFileSync(join(dir, name), 'utf8');
+    assert.doesNotMatch(
+      text,
+      /^ +\.github\/actions\/prime-node-toolcache\/?$/m,
+      `${name} lists the action directory in a sparse checkout`
+    );
+    for (const block of text.match(/sparse-checkout: \|\n(?: +.+\n)+/g) ?? []) {
+      if (!block.includes('prime-node-toolcache')) continue;
+      assert.match(block, /prime-node-toolcache\/action\.yml/, name);
+      assert.match(block, /prime-node-toolcache\/prime\.sh/, name);
+    }
+  }
 });

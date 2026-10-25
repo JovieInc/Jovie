@@ -100,7 +100,8 @@ jobs:
             packages/api-client/policy.ts
             packages/api-client/providers.json
             packages/api-client/store.ts
-            .github/actions/prime-node-toolcache
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
       - name: Prime Node toolcache (no GitHub API manifest call)

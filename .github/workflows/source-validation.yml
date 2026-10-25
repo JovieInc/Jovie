@@ -743,7 +743,8 @@ jobs:
             .nvmrc
             packages/api-client
             .github/workflows/fleet-rules-evidence.yml
-            .github/actions/prime-node-toolcache
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ (always() && github.event_name == 'pull_request') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
