@@ -207,3 +207,89 @@ export async function expectNoDocumentOverflow(
     )}`
   ).toHaveLength(0);
 }
+
+export interface ChildOverlapViolation {
+  readonly container: string;
+  readonly kind: 'overlap' | 'escapes-container';
+  readonly a: string;
+  readonly b: string | null;
+}
+
+/**
+ * Layout guard for opt-in containers. Any element marked
+ * `data-no-child-overlap` must keep its visible direct children from
+ * intersecting each other and from poking out past the right edge of the
+ * container. Catches the "button covers the title" class of mobile defect
+ * that document overflow checks cannot see (Audience banner at 390px,
+ * 2026-10-24).
+ */
+export async function getChildOverlapViolations(
+  page: Page
+): Promise<ChildOverlapViolation[]> {
+  return page.evaluate(() => {
+    const TOLERANCE = 1;
+    const describe = (el: Element) => {
+      const testId = el.getAttribute('data-testid');
+      const text = (el.textContent ?? '').trim().slice(0, 30);
+      return `${el.tagName.toLowerCase()}${testId ? `[${testId}]` : ''}:${text}`;
+    };
+    const out: {
+      container: string;
+      kind: 'overlap' | 'escapes-container';
+      a: string;
+      b: string | null;
+    }[] = [];
+    for (const container of document.querySelectorAll(
+      '[data-no-child-overlap]'
+    )) {
+      const cRect = container.getBoundingClientRect();
+      if (cRect.width === 0 || cRect.height === 0) continue;
+      const kids = [...container.children]
+        .map(el => ({ el, r: el.getBoundingClientRect() }))
+        .filter(
+          ({ el, r }) =>
+            r.width > 0 &&
+            r.height > 0 &&
+            getComputedStyle(el).visibility !== 'hidden'
+        );
+      for (const { el, r } of kids) {
+        if (r.right > cRect.right + TOLERANCE) {
+          out.push({
+            container: describe(container),
+            kind: 'escapes-container',
+            a: describe(el),
+            b: null,
+          });
+        }
+      }
+      for (let i = 0; i < kids.length; i += 1) {
+        for (let j = i + 1; j < kids.length; j += 1) {
+          const a = kids[i].r;
+          const b = kids[j].r;
+          const w = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+          const h = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+          if (w > TOLERANCE && h > TOLERANCE) {
+            out.push({
+              container: describe(container),
+              kind: 'overlap',
+              a: describe(kids[i].el),
+              b: describe(kids[j].el),
+            });
+          }
+        }
+      }
+    }
+    return out;
+  });
+}
+
+export async function expectNoChildOverlap(
+  page: Page,
+  label: string
+): Promise<void> {
+  const violations = await getChildOverlapViolations(page);
+  expect(
+    violations,
+    `${label}: children of [data-no-child-overlap] containers must not overlap or escape`
+  ).toEqual([]);
+}

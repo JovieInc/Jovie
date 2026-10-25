@@ -100,7 +100,7 @@ export function getAudienceIdentityChip(
   if (visibleEmail && visibleEmail !== displayName) {
     return visibleEmail;
   }
-  if (member.phone) {
+  if (member.phone && member.emailVisibleToArtist !== false) {
     return maskAudiencePhone(member.phone);
   }
   return null;
@@ -109,7 +109,10 @@ export function getAudienceIdentityChip(
 export function isAudienceMemberReachable(
   member: Pick<AudienceMember, 'email' | 'emailVisibleToArtist' | 'phone'>
 ): boolean {
-  return Boolean(getAudienceVisibleEmail(member) || member.phone);
+  return Boolean(
+    getAudienceVisibleEmail(member) ||
+      (member.emailVisibleToArtist !== false && member.phone)
+  );
 }
 
 export function getAudienceDisplayState({
