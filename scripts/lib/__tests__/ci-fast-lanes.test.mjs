@@ -2228,6 +2228,9 @@ describe('source-read guard selection', () => {
       ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
+      ...(/^(?:apps\/web\/components\/|packages\/ui\/)/u.test(path)
+        ? ['ui-story-coverage-allowlist']
+        : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
       'gate-weakening-detector',
     ]);

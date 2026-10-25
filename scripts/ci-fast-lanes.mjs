@@ -310,6 +310,27 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: true,
   }),
   Object.freeze({
+    // Structural-lane tests that read the tree and never ran on the source PR
+    // (merge-group ejections, 2026-10-23..25: ui-story allowlist drift 5 of
+    // 12 sampled structural failures, release-range-risk 3 of 12 on one PR
+    // re-enqueued three times). Pull requests only: merge groups run them in
+    // the structural lane already.
+    id: 'ui-story-coverage-allowlist',
+    command:
+      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/visual-ci-harness.test.ts',
+    inputs:
+      /^(?:apps\/web\/components\/|packages\/ui\/|\.github\/ui-story-coverage-policy\.json$|scripts\/ui-story-coverage-policy\.mjs$)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    id: 'release-lineage-contracts',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/release-lineage-gate.test.mjs lib/__tests__/release-risk-policy.test.mjs lib/__tests__/release-range-risk.test.mjs lib/__tests__/promotion-journey-evidence.test.mjs lib/__tests__/promotion-gate-wiring.test.mjs',
+    inputs:
+      /^scripts\/(?:lib\/(?:__tests__\/)?(?:release-|recheck-main-lineage|production-release|staging-|promotion-|journey-evidence)|promotion-)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     id: 'copy-leak',
     // Trusted-base scanner/policy, checked against the PR checkout. PR Ready
     // inherits Source Validation failures; merge groups and main also run it.
