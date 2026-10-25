@@ -4,6 +4,21 @@ import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { CaptureActionPill } from './captureShared';
 
 describe('CaptureActionPill demonstration states', () => {
+  it.each(['idle', 'typing', 'submitting', 'done'] as const)(
+    'retains the same glass live region in the %s phase',
+    phase => {
+      const { container } = render(
+        <CaptureActionPill
+          capture={ARTIST_PROFILE_COPY.capture}
+          phase={phase}
+        />
+      );
+      const region = container.querySelector('[aria-live="polite"]');
+      expect(region).toHaveClass('ds-glass');
+      expect(region).toHaveAttribute('data-phase', phase);
+      expect(container.querySelector('form')).toBeNull();
+    }
+  );
   it('shows typed example input and submission without a real form control', () => {
     const { container, rerender } = render(
       <CaptureActionPill capture={ARTIST_PROFILE_COPY.capture} phase='typing' />
