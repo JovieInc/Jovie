@@ -15,7 +15,7 @@ export const MAC_NODE_ONLY_RULES = Object.freeze(
 );
 
 /**
- * @param {{ classifications?: Array<{ rule?: string, affectedProducts?: string[] }> }} receipt
+ * @param {{ classifications?: readonly Record<string, any>[] }} receipt
  * @returns {boolean} true when the Mac lane needs a macOS runner
  */
 export function macNativeRequired(receipt) {
