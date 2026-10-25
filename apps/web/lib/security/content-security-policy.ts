@@ -130,6 +130,9 @@ const STATIC_CSP_PARTS = {
     'https://challenges.cloudflare.com',
     'https://vercel.live',
     'wss://ws-us3.pusher.com',
+    // Summer voice (ElevenLabs Agents) WebSocket
+    'https://api.elevenlabs.io',
+    'wss://api.elevenlabs.io',
     'https://r2.leadsy.ai',
     'https://wvbknd.leadsy.ai',
     'https://api.instantly.ai',

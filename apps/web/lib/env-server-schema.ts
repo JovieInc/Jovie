@@ -372,6 +372,8 @@ export const ServerEnvSchema = z.object({
   // ElevenLabs (voice clone, promo TTS, voice pipeline webhooks)
   ELEVENLABS_API_KEY: z.string().optional(),
   ELEVENLABS_WEBHOOK_SECRET: z.string().optional(),
+  /** ElevenLabs agent id for Summer voice (docs/SUMMER_VOICE.md). */
+  ELEVENLABS_SUMMER_AGENT_ID: z.string().optional(),
 
   /** Set to `1` to allow local Sentry bootstrap in dev/test/E2E. */
   JOVIE_ENABLE_LOCAL_SENTRY: z.enum(['0', '1']).optional(),
@@ -697,6 +699,7 @@ export const ENV_KEYS = [
   'OPENAI_API_KEY',
   'ELEVENLABS_API_KEY',
   'ELEVENLABS_WEBHOOK_SECRET',
+  'ELEVENLABS_SUMMER_AGENT_ID',
   'JOVIE_ENABLE_LOCAL_SENTRY',
   'AGNOST_ORG_ID',
   'JOVIE_ENABLE_AGNOST',
