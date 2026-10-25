@@ -104,21 +104,42 @@ class FleetLedgerTest(unittest.TestCase):
         self.assertEqual(fl.external_held(self.state, NOW + 30), frozenset({"JOV-3"}))
         self.assertEqual(fl.external_held(self.state, NOW + 90), frozenset())
 
+    def mirror(self, rows):
+        path = self.state / "linear"
+        path.mkdir(parents=True, exist_ok=True)
+        (path / "mirror-JOV.json").write_text(json.dumps({"issues": {f"id-{r['identifier']}": r for r in rows}}))
+
     def test_gates_park_with_default_and_deadline_and_flag_unbounded_ones(self):
-        def row(n, labels, desc, state="unstarted"):
-            return {"identifier": f"JOV-{n}", "labels": labels, "description": desc, "stateType": state}
-        issues = {str(i): r for i, r in enumerate([
+        def row(n, labels, desc, state="unstarted", title="t"):
+            return {"identifier": f"JOV-{n}", "labels": labels, "description": desc, "stateType": state, "title": title}
+        self.mirror([
             row(1, ["needs-human-decision"], "Default: ship option B\nDeadline: 2099-01-01"),
             row(2, ["tim-hold"], "**Default:** keep flag off\n**Deadline:** 2099-01-01T12:00Z"),
             row(3, ["needs-human"], "Default: x\nDeadline: 1999-01-01"),
             row(4, ["gated"], "no decision recorded"),
             row(5, ["gated"], "Default: x", state="completed"),
-            row(6, ["bug"], "Default: x\nDeadline: 1999-01-01")])}
-        path = self.state / "linear"
-        path.mkdir(parents=True, exist_ok=True)
-        (path / "mirror-JOV.json").write_text(json.dumps({"issues": issues}))
+            row(6, ["bug"], "Default: x\nDeadline: 1999-01-01"),
+            row(7, ["needs:human", "tim-approved"], "approved already"),
+            row(8, ["ws:human-decision"], "a workstream label is not a gate")])
         out = fl.gate_census(self.state, now=1_800_000_000)
         self.assertEqual((out["parked"], out["due"], out["unbounded"]), (["JOV-1", "JOV-2"], ["JOV-3"], ["JOV-4"]))
+
+    def test_deadline_follows_tims_risk_and_confidence_rule(self):
+        self.assertEqual([fl.gate_deadline_h(r, c) for r, c in (("low", "high"), ("low", "low"), ("med", "med"), ("high", "low"))],
+                         [2.0, 8.0, 24.0, 144.0])
+
+    def test_propose_unbounded_bounds_every_gate_once_and_queues_a_comment(self):
+        self.mirror([{"identifier": "JOV-9", "labels": ["quality-gap:needs-tim"], "description": "", "stateType": "backlog", "title": "x"},
+                     {"identifier": "JOV-10", "labels": ["human-review-required"], "description": "", "stateType": "unstarted",
+                      "title": "Publish the first public package"}])
+        made = fl.propose_unbounded(self.state, now=NOW)
+        self.assertEqual({m["ident"]: (m["risk"], m["confidence"]) for m in made}, {"JOV-9": ("low", "med"), "JOV-10": ("high", "low")})
+        self.assertTrue([m for m in made if m["ident"] == "JOV-10"][0]["irreversible"])
+        outbox = json.loads((self.state / "linear" / "outbox.json").read_text())["entries"]
+        self.assertEqual([e["op"] for e in outbox], ["comment", "comment"])
+        self.assertIn("Deadline: ", outbox[0]["body"])
+        self.assertEqual(fl.gate_census(self.state, NOW)["counts"], {"parked": 2, "due": 0, "unbounded": 0})
+        self.assertEqual(fl.propose_unbounded(self.state, now=NOW), [], "idempotent: nothing left to bound")
 
     def test_burn_plan_pushes_work_to_capped_agents_that_are_behind_their_window(self):
         week = 7 * 86400

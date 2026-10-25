@@ -240,31 +240,110 @@ def idle_while_ready(state: Path, since: float) -> dict:
 
 
 GATE_LABELS = frozenset({"needs-human-decision", "needs-human", "needs:human", "human-review-required",
-                         "ws:human-decision", "tim-hold", "hold", "gated"})
+                         "quality-gap:needs-tim", "tim-hold", "hold", "gated"})
+APPROVED_LABELS = frozenset({"tim-approved"})   # an approved gate is no gate
 DEADLINE = re.compile(r"^\s*(?:\*\*)?deadline\s*:\s*(?:\*\*)?\s*(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2})(?::\d{2})?)?", re.I | re.M)
 DEFAULT = re.compile(r"^\s*(?:\*\*)?default\s*:\s*(?:\*\*)?\s*(\S.*)$", re.I | re.M)
+GATE_FILE = "gate-proposals.json"
+# Tim's rule (2026-10-25): unanswered taste ships its default after base(risk) x confidence.
+BASE_H = {"low": 4, "med": 24, "high": 72}
+CONFIDENCE_X = {"high": 0.5, "med": 1.0, "low": 2.0}
+HIGH_RISK_LABELS = frozenset({"billing", "no-auto", "auth", "security", "credentials"})
+
+
+def gate_deadline_h(risk: str, confidence: str) -> float:
+    return BASE_H[risk] * CONFIDENCE_X[confidence]
+
+
+def propose_gate(row: dict, now: float) -> dict:
+    """A default, risk, confidence and deadline for a gate nobody bounded. Heuristic and reversible:
+    the closed-loop worker's mechanism applies it at the deadline; Tim's answer always wins."""
+    labels = {(l if isinstance(l, str) else l.get("name", "")).lower() for l in (row.get("labels") or [])}
+    title = row.get("title") or ""
+    if "quality-gap:needs-tim" in labels:
+        risk, conf = "low", "med"
+        default = "accept the finder's proposal (move to Todo); a canceled fingerprint is never re-proposed"
+    elif re.search(r"\b(publish|npm|release)\b", title, re.I) and "human-review-required" in labels:
+        risk, conf, irreversible = "high", "low", True
+        default = "do NOT publish (irreversible external action): keep parked and re-ask; ships only on explicit approval"
+        return {"risk": risk, "confidence": conf, "default": default, "irreversible": True,
+                "deadline": _iso(now + gate_deadline_h(risk, conf) * 3600), "proposedAt": _iso(now)}
+    elif labels & HIGH_RISK_LABELS:
+        risk, conf = "high", "low"
+        default = "do not change billing/auth behaviour; agents may only build behind a flag that is off"
+    else:
+        risk, conf = "med", "low"
+        default = "proceed with the narrowest reversible option and record the choice in the issue"
+    return {"risk": risk, "confidence": conf, "default": default, "irreversible": False,
+            "deadline": _iso(now + gate_deadline_h(risk, conf) * 3600), "proposedAt": _iso(now)}
+
+
+def _iso(epoch: float) -> str:
+    return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%MZ")
+
+
+def gate_comment(ident: str, proposal: dict) -> str:
+    return (f"gate-proposal (fleet coordination): nothing should wait on a human forever.\n\n"
+            f"Default: {proposal['default']}\nRisk: {proposal['risk']}\nConfidence: {proposal['confidence']}\n"
+            f"Deadline: {proposal['deadline']}\n\n"
+            f"Deadline = base(risk: low 4h / med 24h / high 72h) x confidence (high 0.5 / med 1 / low 2) from "
+            f"{proposal['proposedAt']}. Reply or change the label to override; unanswered, the closed-loop worker "
+            f"applies the default at the deadline."
+            + ("\n\nThis is an irreversible external action: the default is to keep it parked, never to ship it." if proposal.get("irreversible") else ""))
 
 
 def gate_census(state: Path, now: float | None = None) -> dict:
-    """Human-gated issues never block the queue (lanes skip them); each must carry
-    `Default: <what ships if nobody answers>` and `Deadline: <ISO UTC>` in its description.
-    parked = has both and not due; due = deadline passed, the default should now be applied;
-    unbounded = gated with no default+deadline (a gate that can block forever)."""
+    """Human-gated issues never block the queue (lanes skip them); each needs a default and a
+    deadline, in its description (`Default:` / `Deadline:`) or in state/gate-proposals.json (written
+    by `gates --propose`, which also posts the proposal as a comment). parked = bounded and not
+    due; due = deadline passed, the default should now be applied; unbounded = can block forever."""
     now = time.time() if now is None else now
+    proposals = _json(state / GATE_FILE, {})
     out: dict[str, list] = {"parked": [], "due": [], "unbounded": []}
+    rows = {}
     for team in ("JOV", "LYB"):
-        for row in (_json(state / "linear" / f"mirror-{team}.json", {}).get("issues") or {}).values():
-            labels = {(l if isinstance(l, str) else l.get("name", "")).lower() for l in (row.get("labels") or [])}
-            if not labels & GATE_LABELS or row.get("stateType") in ("completed", "canceled"):
-                continue
-            text = row.get("description") or ""
-            deadline, default = DEADLINE.search(text), DEFAULT.search(text)
-            if not (deadline and default):
-                out["unbounded"].append(row.get("identifier"))
-                continue
+        rows.update(_json(state / "linear" / f"mirror-{team}.json", {}).get("issues") or {})
+    for issue_id, row in rows.items():
+        labels = {(l if isinstance(l, str) else l.get("name", "")).lower() for l in (row.get("labels") or [])}
+        if not labels & GATE_LABELS or labels & APPROVED_LABELS or row.get("stateType") in ("completed", "canceled"):
+            continue
+        ident, text = row.get("identifier"), row.get("description") or ""
+        deadline, default = DEADLINE.search(text), DEFAULT.search(text)
+        proposal = proposals.get(ident)
+        if deadline and default:
             due = _ts(f"{deadline.group(1)}T{deadline.group(2) or '00:00'}:00Z")
-            out["due" if due <= now else "parked"].append(row.get("identifier"))
+        elif proposal:
+            due = _ts(proposal["deadline"].replace("Z", ":00Z") if len(proposal["deadline"]) == 17 else proposal["deadline"])
+        else:
+            out["unbounded"].append(ident)
+            continue
+        out["due" if due <= now else "parked"].append(ident)
     return {**{k: sorted(v) for k, v in out.items()}, "counts": {k: len(v) for k, v in out.items()}}
+
+
+def propose_unbounded(state: Path, now: float | None = None, post: bool = True) -> list[dict]:
+    """Bound every unbounded gate: store the proposal and queue one Linear comment (outbox)."""
+    now = time.time() if now is None else now
+    census = gate_census(state, now)
+    proposals = _json(state / GATE_FILE, {})
+    by_ident = {}
+    for team in ("JOV", "LYB"):
+        for issue_id, row in (_json(state / "linear" / f"mirror-{team}.json", {}).get("issues") or {}).items():
+            by_ident[row.get("identifier")] = (issue_id, row)
+    made = []
+    for ident in census["unbounded"]:
+        issue_id, row = by_ident[ident]
+        proposal = propose_gate(row, now)
+        proposals[ident] = proposal
+        if post:
+            import linear_sync
+            linear_sync.enqueue(state, "comment", issue_id, body=gate_comment(ident, proposal))
+        made.append({"ident": ident, **proposal})
+    if made:
+        tmp = state / (GATE_FILE + ".tmp")
+        tmp.write_text(json.dumps(proposals, indent=1))
+        tmp.replace(state / GATE_FILE)
+    return made
 
 
 def burn_plan(windows: list[dict], now: float | None = None) -> list[dict]:
@@ -387,7 +466,8 @@ def main(argv=None) -> int:
     parser.add_argument("--state", default=os.environ.get("LANES_STATE") or str(Path.home() / ".local/state/jovie-lanes"))
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("ledger")
-    sub.add_parser("gates")
+    gates = sub.add_parser("gates")
+    gates.add_argument("--propose", action="store_true", help="bound every unbounded gate (writes + queues comments)")
     sub.add_parser("burn")
     metrics = sub.add_parser("metrics")
     metrics.add_argument("--days", type=float, default=7)
@@ -404,7 +484,8 @@ def main(argv=None) -> int:
         rows = ledger(state)
         print(json.dumps({"claims": rows, "verdicts": dict(Counter(r["verdict"] for r in rows))}, indent=1))
     elif args.cmd == "gates":
-        print(json.dumps(gate_census(state), indent=1))
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        print(json.dumps(propose_unbounded(state) if args.propose else gate_census(state), indent=1))
     elif args.cmd == "burn":
         print(json.dumps(burn_plan(_json(state / "quota-windows.json", {}).get("windows") or []), indent=1))
     elif args.cmd == "metrics":
