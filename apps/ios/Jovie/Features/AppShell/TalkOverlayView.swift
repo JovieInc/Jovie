@@ -1,3 +1,4 @@
+import JovieKit
 import SwiftUI
 
 /// Full-screen Talk overlay (JOV-3636 / #10380). Single global voice entry from
