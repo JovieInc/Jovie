@@ -362,6 +362,7 @@ export function localFiles({
 /**
  * Run the PR-body rules before a push, with no API: title and body come from the caller, files from git.
  * A lane runs this on the body it is about to submit so a known-red body is never the first thing CI sees.
+ * @param {Record<string, any>} [options]
  */
 export function evaluateLocal({
   title,
