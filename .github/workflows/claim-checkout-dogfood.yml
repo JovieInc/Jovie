@@ -80,7 +80,7 @@ jobs:
           branch_name: claim-dogfood-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production
+          protected_branches: main,production,prod,development,preview,br-main,br-production
           expires_in_hours: '2'
 
       - name: Resolve DATABASE_URL
