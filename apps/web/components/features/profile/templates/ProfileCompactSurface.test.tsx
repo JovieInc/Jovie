@@ -315,6 +315,13 @@ describe('ProfileCompactSurface', () => {
       'href',
       '/start'
     );
+    // WCAG 2.5.3 / axe label-content-name-mismatch: the accessible name
+    // starts with the visible "jov.ie/you" text.
+    expect(
+      screen
+        .getByTestId('profile-proof-claim-bar-cta')
+        .getAttribute('aria-label')
+    ).toBe('jov.ie/you Claim yours');
     // Rides inside the dock, directly above the nav, so it moves with it.
     expect(bar.nextElementSibling).toBe(
       screen.getByTestId('profile-bottom-nav')

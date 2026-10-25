@@ -900,6 +900,7 @@ export function ProfileCompactSurface({
                   <ProofClaimCtaLink
                     href={proofClaimCta.href}
                     label={proofClaimCta.label}
+                    ariaLabel={`jov.ie/you ${proofClaimCta.label}`}
                     testId='profile-proof-claim-bar-cta'
                     className='flex h-11 w-full items-center justify-between rounded-full border border-(--profile-dock-border) bg-(--profile-dock-solid-bg) px-4 text-sm font-medium text-white/88 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
                   >
