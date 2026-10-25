@@ -331,7 +331,10 @@ for (const file of batch) {
     const survivors = extractSurvivors(
       file,
       readFileSync(join(webRoot, file), 'utf8'),
-      mutants
+      // Stryker reports carry full spans; the diff-lib Mutant typedef is narrower.
+      /** @type {Parameters<typeof extractSurvivors>[2]} */ (
+        /** @type {unknown} */ (mutants)
+      )
     );
     const { real, equivalent } = partitionEquivalents(survivors, equivalents);
     entry = recordRun(state, file, {

@@ -21,7 +21,7 @@ export function emptyState() {
  * @property {string} blob git blob hash of the source when last scored
  * @property {string | null} sha commit the run tested
  * @property {string} at ISO timestamp of the run
- * @property {'scored' | 'error' | 'untested'} status
+ * @property {string} status scored | error | untested
  * @property {number | null} score
  * @property {number} valid
  * @property {number} killed
@@ -320,7 +320,7 @@ export function buildSurvivorIssue(file, real, meta) {
  * @param {ReturnType<typeof emptyState>} state
  * @param {string} file
  * @param {{ blob: string, sha: string | null, at: string, durationMs: number,
- *   mutants?: Parameters<typeof scoreMutants>[0], equivalent?: number, error?: string }} run
+ *   mutants?: { status: string }[], equivalent?: number, error?: string }} run
  */
 export function recordRun(state, file, run) {
   /** @type {ModuleState} */

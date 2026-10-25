@@ -478,7 +478,7 @@ export function readTestSources(webRoot) {
  *   targetExecution?: ReturnType<typeof readTargetExecution> }} FileResult
  */
 
-/** @param {Mutant[]} mutants */
+/** @param {{ status: string }[]} mutants */
 export function scoreMutants(mutants) {
   /** @type {Record<string, number>} */
   const counts = {};
