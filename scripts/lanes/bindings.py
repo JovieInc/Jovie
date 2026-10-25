@@ -38,6 +38,8 @@ import os
 import re
 import time
 import uuid
+
+import pr_body  # sibling module of the release
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -860,12 +862,14 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
     if git("rev-list", "--count", "origin/main..HEAD") in ("", "0"):
         return {"verdict": "no-change", "reasons": ["no-commits"]}
     push_with_retry(git, branch)
+    diff = lane.sh(["git", "diff", "--name-only", "origin/main...HEAD"], cwd=worktree)
+    files = [line for line in (diff.stdout or "").splitlines() if line.strip()] if diff.returncode == 0 else []
+    built = pr_body.build_body(title=f"fix: {issue.title[:80]} ({issue.identifier})", identifier=issue.identifier,
+                               issue_id=issue.id, files=files,
+                               lane_note=f"Lane implementation (binding {binding.key}); {binding.slug} required checks gate merge.")
     created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
-                       "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
-                       "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
-                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
-                                 f"Lane implementation (binding {binding.key}); {binding.slug} required checks "
-                                 "gate merge."])
+                       "--title", f"fix: {issue.title[:80]} ({issue.identifier})", "--body", built.body],
+                      cwd=worktree)
     url = (created.stdout or "").strip().splitlines()[-1:] if created.returncode == 0 else []
     if not url:
         return {"verdict": "failed", "reasons": ["pr-create-failed"], "headSha": git("rev-parse", "HEAD")}

@@ -10854,6 +10854,41 @@ time.sleep(30)
             self.assert_gone(handles)
 
 
+class LanePrBodyRefreshTest(unittest.TestCase):
+    """refresh_pr_body edits only a changed body and never a held PR (fleet-rules red class)."""
+    PR = {"number": 7, "headRefName": "codex/x", "title": "fix: x", "labels": [],
+          "statusCheckRollup": [{"name": "unit", "conclusion": "FAILURE",
+                                 "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/99/job/1"}]}
+
+    def run_refresh(self, pr, body, files):
+        calls = []
+
+        def fake(args, *rest, **kwargs):
+            calls.append(args)
+            if args[:3] == ["gh", "pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=json.dumps({"body": body, "title": "fix: x"}), stderr="")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        with patch.object(lane, "sh", side_effect=fake), patch.object(lane, "changed_files", return_value=files):
+            actions = lane.refresh_pr_body(pr, Path("."), None)
+        return actions, calls
+
+    def test_edits_body_with_failing_run_then_is_stable(self):
+        files = ["apps/web/lib/x.ts", "apps/web/tests/unit/x.test.ts"]
+        actions, calls = self.run_refresh(self.PR, "Refs JOV-1.", files)
+        self.assertEqual(actions, [])
+        edit = next(args for args in calls if args[:3] == ["gh", "pr", "edit"])
+        body = edit[edit.index("--body") + 1]
+        self.assertIn("Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/99", body)
+        again, calls = self.run_refresh(self.PR, body, files)
+        self.assertEqual(again, [])
+        self.assertFalse(any(args[:3] == ["gh", "pr", "edit"] for args in calls))
+
+    def test_held_pr_is_never_edited(self):
+        held = {**self.PR, "labels": [{"name": "tim-hold"}]}
+        actions, calls = self.run_refresh(held, "Refs JOV-1.", ["a.ts"])
+        self.assertEqual((actions, calls), ([], []))
+
+
 if __name__ == "__main__":
     unittest.main()
 
