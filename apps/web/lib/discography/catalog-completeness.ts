@@ -223,6 +223,12 @@ export async function runCatalogCompletenessForProfile(profile: {
       process.env.CATALOG_APPEARS_ON_HANDLES,
       profile.username
     );
+    // Import first: a re-import re-verifies legacy rows (fresh provider id and
+    // credits), so only releases that stay unverified reach the prompt.
+    const sync = await syncReleasesFromSpotify(profile.id, {
+      includeTracks: true,
+      includeCoPrimaryAppearsOn: appearsOn,
+    });
     const reconciled = published
       ? await reconcileUndecidedIngestedReleases(
           profile.id,
@@ -230,10 +236,6 @@ export async function runCatalogCompletenessForProfile(profile: {
         )
       : { published: 0, queuedForReview: 0 };
     const approvalsPublished = reconciled.published;
-    const sync = await syncReleasesFromSpotify(profile.id, {
-      includeTracks: true,
-      includeCoPrimaryAppearsOn: appearsOn,
-    });
     const publicAfter = await countPublicReleases(profile.id);
     return {
       ...base,

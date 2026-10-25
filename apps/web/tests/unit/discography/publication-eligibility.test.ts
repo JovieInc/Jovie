@@ -77,9 +77,20 @@ describe('describeProvenance', () => {
       },
     });
     expect(describeProvenance(r, 'owner_not_credited')).toBe(
-      "Found on Spotify · 2020 · credited to Someone Else · unsure: your Spotify artist id isn't credited"
+      "Found on Spotify · 2020 · Credited to Someone Else, and we can't confirm that's you"
     );
   });
+  it('uses plain language for the other reasons', () => {
+    const r = rel('x');
+    expect(describeProvenance(r, 'duplicate_candidate')).toContain(
+      'Looks like a version of a release you already have'
+    );
+    expect(describeProvenance(r, 'no_provider_id')).toContain(
+      "We couldn't match this to a Spotify release"
+    );
+    expect(describeProvenance(r, 'owner_not_credited')).not.toContain('unsure');
+  });
+
   it('exposes the provider album id', () => {
     expect(providerAlbumIdOf(rel('x').metadata)).toBe('sp-x');
   });

@@ -118,19 +118,17 @@ export function describeProvenance(
   const year = candidate.releaseDate
     ? String(candidate.releaseDate.getUTCFullYear())
     : null;
-  const credited = meta.artistNames.length
-    ? `credited to ${meta.artistNames.join(', ')}`
-    : 'no artist credit on file';
   const found = meta.spotifyId ? 'Found on Spotify' : 'Found in your catalog';
+  const names = meta.artistNames.join(' & ');
   const why: Record<PublicationReason, string> = {
     verified: '',
-    no_provider_id: 'no Spotify match id',
-    owner_not_credited: "your Spotify artist id isn't credited",
-    duplicate_candidate: 'looks like another release you have',
+    no_provider_id: "We couldn't match this to a Spotify release",
+    owner_not_credited: names
+      ? `Credited to ${names}, and we can't confirm that's you`
+      : "We can't confirm who this is credited to",
+    duplicate_candidate: 'Looks like a version of a release you already have',
   };
-  return [found, year, credited, why[reason] ? `unsure: ${why[reason]}` : null]
-    .filter(Boolean)
-    .join(' · ');
+  return [found, year, why[reason] || null].filter(Boolean).join(' · ');
 }
 
 export interface DecisionRate {
