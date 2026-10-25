@@ -129,6 +129,61 @@ async function waitForAuthenticatedShell(page, route) {
       });
       if (!covered)
         throw new Error('Full Screen did not cover the app shell chrome');
+      // Fill guard (Tim, 2026-10-25: at 3440 only the top third was filled and
+      // the right edge clipped). The scaled canvas must be the viewport, with
+      // no horizontal overflow and every tile inside it. Burn-in drift moves
+      // the canvas by at most 10 scaled px, inside its 16 scaled px padding.
+      const geometry = await page.evaluate(() => {
+        const rect = selector => {
+          const el = document.querySelector(selector);
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { x: r.x, y: r.y, w: r.width, h: r.height };
+        };
+        const frame = document.querySelector('[data-testid="ovie-fullscreen"]');
+        return {
+          viewport: { w: window.innerWidth, h: window.innerHeight },
+          frame: rect('[data-testid="ovie-fullscreen"]'),
+          canvas: rect('[data-testid="ovie-fullscreen-canvas"]'),
+          tiles: [...document.querySelectorAll('[data-testid^="ovie-tile-"]')]
+            .map(el => el.getBoundingClientRect())
+            .map(r => ({ left: r.left, right: r.right, bottom: r.bottom })),
+          overflowX:
+            document.documentElement.scrollWidth > window.innerWidth ||
+            (frame ? frame.scrollWidth > frame.clientWidth : false),
+        };
+      });
+      const { viewport: vp, frame, canvas, tiles, overflowX } = geometry;
+      const scaleGuess = canvas ? canvas.w / Math.max(1, vp.w) : 1;
+      const slack = Math.ceil(10 * Math.max(1, vp.w / 1280)) + 1;
+      const problems = [];
+      if (
+        !frame ||
+        Math.abs(frame.w - vp.w) > 1 ||
+        Math.abs(frame.h - vp.h) > 1
+      )
+        problems.push(
+          `frame ${JSON.stringify(frame)} is not the viewport ${vp.w}x${vp.h}`
+        );
+      if (
+        !canvas ||
+        Math.abs(canvas.w - vp.w) > 1 ||
+        Math.abs(canvas.h - vp.h) > 1 ||
+        Math.abs(canvas.x) > slack ||
+        Math.abs(canvas.y) > slack
+      )
+        problems.push(
+          `canvas ${JSON.stringify(canvas)} does not fill ${vp.w}x${vp.h} (scale ${scaleGuess.toFixed(2)})`
+        );
+      if (overflowX) problems.push('horizontal overflow');
+      for (const tile of tiles)
+        if (tile.left < -1 || tile.right > vp.w + 1)
+          problems.push(
+            `tile clipped: ${tile.left.toFixed(0)}..${tile.right.toFixed(0)} of ${vp.w}`
+          );
+      if (tiles.length === 0 && ovieFixture) problems.push('no tiles rendered');
+      if (problems.length > 0)
+        throw new Error(`Full Screen geometry: ${problems.join('; ')}`);
     }
   }
 

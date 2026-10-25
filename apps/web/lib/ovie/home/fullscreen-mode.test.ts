@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  FULLSCREEN_CANVAS_PADDING_PX,
+  FULLSCREEN_DRIFT_MAX_PX,
   FULLSCREEN_RELOAD_AFTER_DOWN_MS,
   FULLSCREEN_RELOAD_COOLDOWN_MS,
   type FullscreenShortcutEvent,
@@ -55,16 +57,34 @@ describe('fullscreenFeedStatus', () => {
 });
 
 describe('fullscreenScale', () => {
-  it('scales the ultra-wides and never shrinks', () => {
-    expect(fullscreenScale(5120)).toBe(2.5);
-    expect(fullscreenScale(3440)).toBe(1.68);
-    expect(fullscreenScale(1280)).toBe(1);
-    expect(fullscreenScale(Number.NaN)).toBe(1);
-    expect(fullscreenScale(99_999)).toBe(3);
+  it('scales by the tighter axis so the canvas always fits, never shrinks', () => {
+    expect(fullscreenScale(3440, 1440)).toBe(2);
+    expect(fullscreenScale(5120, 2160)).toBe(3);
+    expect(fullscreenScale(1920, 1080)).toBe(1.5);
+    expect(fullscreenScale(1440, 900)).toBe(1.13);
+    expect(fullscreenScale(390, 844)).toBe(1);
+    expect(fullscreenScale(Number.NaN, 900)).toBe(1);
+    expect(fullscreenScale(99_999, 99_999)).toBe(3);
+  });
+  it('the scaled canvas never exceeds the viewport on either axis', () => {
+    for (const [w, h] of [
+      [3440, 1440],
+      [5120, 2160],
+      [1920, 1080],
+      [2560, 1080],
+      [800, 1200],
+    ] as const) {
+      const scale = fullscreenScale(w, h);
+      expect(1280 * scale).toBeLessThanOrEqual(Math.max(w, 1280));
+      expect(720 * scale).toBeLessThanOrEqual(Math.max(h, 720));
+    }
   });
 });
 
 describe('fullscreenDrift', () => {
+  it('stays inside the canvas padding, so drift can never clip content', () => {
+    expect(FULLSCREEN_DRIFT_MAX_PX).toBeLessThan(FULLSCREEN_CANVAS_PADDING_PX);
+  });
   it('stays within the amplitude and holds for a minute', () => {
     for (let m = 0; m < 600; m++) {
       const { x, y } = fullscreenDrift(m * 60_000, 10);

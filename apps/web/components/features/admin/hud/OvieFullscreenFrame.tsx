@@ -32,7 +32,8 @@ export function OvieFullscreenFrame({
   const downSince = useRef<number | null>(null);
 
   useEffect(() => {
-    const fit = () => setScale(fullscreenScale(globalThis.innerWidth));
+    const fit = () =>
+      setScale(fullscreenScale(globalThis.innerWidth, globalThis.innerHeight));
     fit();
     globalThis.addEventListener('resize', fit);
     return () => globalThis.removeEventListener('resize', fit);
@@ -95,15 +96,18 @@ export function OvieFullscreenFrame({
   if (!mounted) return null;
   return createPortal(
     <div
-      className='fixed inset-0 z-[1000] cursor-none select-none overflow-hidden bg-base p-4 text-primary-token'
+      className='fixed inset-0 z-[1000] cursor-none select-none overflow-hidden bg-base text-primary-token'
       data-testid='ovie-fullscreen'
       data-feed-level={status.level}
     >
       <div
-        className='origin-top-left'
+        className='origin-top-left p-4'
+        data-testid='ovie-fullscreen-canvas'
         style={{
-          width: `${100 / scale}%`,
-          height: `${100 / scale}%`,
+          // The scaled canvas is exactly the viewport: (100vw / scale) * scale.
+          boxSizing: 'border-box',
+          width: `${100 / scale}vw`,
+          height: `${100 / scale}vh`,
           transform: `scale(${scale}) translate(${drift.x}px, ${drift.y}px)`,
           transition: 'transform var(--ds-motion-cinematic-duration) linear',
         }}

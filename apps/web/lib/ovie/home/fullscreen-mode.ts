@@ -75,17 +75,32 @@ export function formatFeedAge(ageMs: number | null): string {
   return `${Math.round(minutes / 60)}h`;
 }
 
-/** Design width the HUD is laid out for; wider screens scale up from it. */
-export const FULLSCREEN_BASE_WIDTH_PX = 2048;
+/**
+ * The HUD is laid out for a 1280x720 canvas and scaled to the display, by
+ * whichever axis is tighter, so the scaled canvas always fits and the type is
+ * as large as the display allows: 3440x1440 -> 2x, 5120x2160 -> 3x, 1920x1080
+ * -> 1.5x, and phones stay 1x. Scaling the whole surface keeps every ratio and
+ * token, so there is no separate type scale to drift.
+ */
+export const FULLSCREEN_BASE_WIDTH_PX = 1280;
+export const FULLSCREEN_BASE_HEIGHT_PX = 720;
 export const FULLSCREEN_MAX_SCALE = 3;
 
-/**
- * 5120 wide -> 2.5x, 3440 -> 1.68x, 1920 -> 1x. Scaling the whole surface keeps
- * every ratio and token, so there is no second separate type scale to drift.
- */
-export function fullscreenScale(viewportWidthPx: number): number {
-  if (!Number.isFinite(viewportWidthPx) || viewportWidthPx <= 0) return 1;
-  const raw = viewportWidthPx / FULLSCREEN_BASE_WIDTH_PX;
+export function fullscreenScale(
+  viewportWidthPx: number,
+  viewportHeightPx: number
+): number {
+  if (
+    !Number.isFinite(viewportWidthPx) ||
+    !Number.isFinite(viewportHeightPx) ||
+    viewportWidthPx <= 0 ||
+    viewportHeightPx <= 0
+  )
+    return 1;
+  const raw = Math.min(
+    viewportWidthPx / FULLSCREEN_BASE_WIDTH_PX,
+    viewportHeightPx / FULLSCREEN_BASE_HEIGHT_PX
+  );
   return Math.min(
     FULLSCREEN_MAX_SCALE,
     Math.max(1, Math.round(raw * 100) / 100)
@@ -96,9 +111,13 @@ export function fullscreenScale(viewportWidthPx: number): number {
  * Burn-in drift: shift the whole surface a few px once a minute, along a path
  * that never repeats within an hour. No animation of content, only position.
  */
+/** Drift must stay inside the canvas padding (p-4 = 16px) so no content ever clips. */
+export const FULLSCREEN_DRIFT_MAX_PX = 10;
+export const FULLSCREEN_CANVAS_PADDING_PX = 16;
+
 export function fullscreenDrift(
   nowMs: number,
-  amplitudePx = 10
+  amplitudePx = FULLSCREEN_DRIFT_MAX_PX
 ): { readonly x: number; readonly y: number } {
   const minute = Math.floor(nowMs / 60_000);
   return {
