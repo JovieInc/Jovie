@@ -118,42 +118,31 @@ export async function decideGoldenPathAdmissionForArtist(input: {
 }
 
 /**
- * Approval reasons written by the system, not an operator. The golden path
- * and the auto-accept drain admit on account signals only, which is not proof
- * the person owns the artist; an admin approval is operator proof.
- */
-export const SYSTEM_APPROVAL_REASONS: ReadonlySet<string> = new Set([
-  'qualified_golden_path_resolved_artist',
-  'auto_accept_after_days',
-  'qualified_auto_accept',
-  'qualified_interview_signal',
-]);
-
-/**
  * True while this user's page must stay private until ownership is proven.
- * The durable source is the proof-only claim verification stored on the
- * profile (it survives signup, redeem and admin status writes). Before any
- * profile exists, the user's latest approval audit row decides: a system
- * approval (golden path, drain) needs proof, an admin approval is operator
- * proof. Once the operator verifies, this is false.
+ * Fail closed: a self-picked artist identity needs proof unless an operator
+ * already vouched for it. Two things count as operator proof: the operator
+ * verified the claim (the durable proof-only record on the profile), or an
+ * admin approved the waitlist entry. Every other route (golden path, the
+ * auto-accept drain, invite redemption, interview or open-signup admission)
+ * needs proof, including reasons added later.
  */
 export async function requiresProofBeforePublic(
   appUserId: string
 ): Promise<boolean> {
-  const [profile] = await db
+  const profiles = await db
     .select({ settings: creatorProfiles.settings })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.userId, appUserId))
-    .orderBy(desc(creatorProfiles.createdAt))
-    .limit(1);
-  const record = readClaimVerification(profile?.settings);
-  if (record?.proofOnly) return record.status !== 'verified';
+    .orderBy(desc(creatorProfiles.createdAt));
+  const records = profiles
+    .map(profile => readClaimVerification(profile.settings))
+    .filter(record => record?.proofOnly === true);
+  if (records.length > 0) {
+    return records.some(record => record?.status !== 'verified');
+  }
 
-  const [approval] = await db
-    .select({
-      reason: waitlistAuditLogs.reason,
-      actorType: waitlistAuditLogs.actorType,
-    })
+  const [adminApproval] = await db
+    .select({ id: waitlistAuditLogs.id })
     .from(users)
     .innerJoin(
       waitlistAuditLogs,
@@ -162,15 +151,12 @@ export async function requiresProofBeforePublic(
     .where(
       and(
         eq(users.id, appUserId),
+        eq(waitlistAuditLogs.actorType, 'admin'),
         inArray(waitlistAuditLogs.toStatus, ['approved', 'invited'])
       )
     )
-    .orderBy(desc(waitlistAuditLogs.createdAt))
     .limit(1);
-  return (
-    approval?.actorType !== 'admin' &&
-    SYSTEM_APPROVAL_REASONS.has(approval?.reason ?? '')
-  );
+  return !adminApproval;
 }
 
 /** True while any of the user's profiles is private awaiting proof. */

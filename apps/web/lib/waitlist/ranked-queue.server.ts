@@ -34,7 +34,7 @@ export async function getRankedWaitlistQueue(): Promise<RankedQueue> {
         )
       )
       .orderBy(
-        drizzleSql`coalesce((${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score')::numeric, -1) desc`,
+        drizzleSql`coalesce(CASE WHEN (${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score') ~ '^[0-9]+(\\.[0-9]+)?$' THEN (${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score')::numeric END, -1) desc`,
         desc(waitlistEntries.waitlistedAt)
       )
       .limit(QUEUE_LIMIT),

@@ -2,6 +2,7 @@ import 'server-only';
 
 import { desc, eq } from 'drizzle-orm';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import { generateProofCode } from '@/lib/claim/proof-code';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
@@ -135,6 +136,47 @@ export async function requestClaimVerification(input: {
   if (!row) throw new Error('Profile not found');
 
   const existing = readClaimVerification(row.settings);
+  // A different artist never overwrites a request that is open or paid: that
+  // would wipe a payment timestamp and its refund path.
+  if (
+    existing &&
+    existing.spotifyArtistId !== input.spotifyArtistId &&
+    (existing.paidAt !== null ||
+      existing.status === 'pending_verification' ||
+      existing.status === 'awaiting_payment')
+  ) {
+    return existing;
+  }
+  // A free admission for the same artist as an unpaid awaiting request becomes
+  // proof-only: private until verified, open for review now.
+  if (
+    existing &&
+    existing.spotifyArtistId === input.spotifyArtistId &&
+    existing.status === 'awaiting_payment' &&
+    input.proofOnly &&
+    !existing.proofOnly
+  ) {
+    const merged: ClaimVerificationRecord = {
+      ...existing,
+      status: 'pending_verification',
+      proofOnly: true,
+      proofCode: generateProofCode(),
+    };
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: withClaimVerification(row.settings, merged),
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, input.profileId));
+    await fileClaimVerificationCard({
+      profileId: input.profileId,
+      handle: row.handle,
+      record: merged,
+      requesterEmail: await readRequesterEmail(input.profileId),
+    });
+    return merged;
+  }
   if (existing && existing.spotifyArtistId === input.spotifyArtistId) {
     const paid = input.paid
       ? markClaimVerificationPaid(existing, now, input.acquisitionId)
@@ -179,6 +221,7 @@ export async function requestClaimVerification(input: {
       reach: input.reach,
       paid: input.paid,
       proofOnly: input.proofOnly,
+      proofCode: input.proofOnly ? generateProofCode() : undefined,
       now,
     }),
     acquisitionId: input.acquisitionId ?? null,

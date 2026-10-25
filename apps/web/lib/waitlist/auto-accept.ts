@@ -173,7 +173,7 @@ export async function runWaitlistAutoAccept(
     // Best leads first: highest admission score, then the longest waiting.
     // Entries without a score sort last, in their old order.
     .orderBy(
-      drizzleSql`coalesce((${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score')::numeric, -1) desc`,
+      drizzleSql`coalesce(CASE WHEN (${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score') ~ '^[0-9]+(\\.[0-9]+)?$' THEN (${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score')::numeric END, -1) desc`,
       asc(waitlistEntries.waitlistedAt),
       asc(waitlistEntries.createdAt)
     )

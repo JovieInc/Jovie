@@ -41,14 +41,14 @@ import {
 /** Summer card idempotency keys for claim cards start with this. */
 export const CLAIM_VERIFICATION_CARD_PREFIX = 'claim-verification_';
 
-export function claimVerificationCardKey(profileId: string): string {
-  return `${CLAIM_VERIFICATION_CARD_PREFIX}${profileId}`;
+export function claimVerificationCardKey(profileId: string, round = 0): string {
+  return `${CLAIM_VERIFICATION_CARD_PREFIX}${profileId}${round > 0 ? `.r${round}` : ''}`;
 }
 
 /** Profile id from a claim card's idempotency key, or null for other cards. */
 export function profileIdFromClaimCardKey(key: string): string | null {
   return key.startsWith(CLAIM_VERIFICATION_CARD_PREFIX)
-    ? key.slice(CLAIM_VERIFICATION_CARD_PREFIX.length) || null
+    ? key.slice(CLAIM_VERIFICATION_CARD_PREFIX.length).split('.')[0] || null
     : null;
 }
 
@@ -76,7 +76,10 @@ export async function fileClaimVerificationCard(input: {
   ].filter((url): url is string => url !== null);
 
   const result = await submitSummerCard({
-    idempotencyKey: claimVerificationCardKey(input.profileId),
+    idempotencyKey: claimVerificationCardKey(
+      input.profileId,
+      record.reopenCount ?? 0
+    ),
     kind: 'decision',
     product: 'jov',
     title: `Verify artist claim: ${artist}`.slice(0, 120),
@@ -425,8 +428,9 @@ export async function decideClaimVerification(input: {
   if (snapshot.status !== 'pending_verification') {
     return { outcome: 'not_pending', record: snapshot };
   }
-  // A paid request is refunded on reject and needs its subscription. A
-  // proof-only request (free admission, private page) has nothing to refund.
+  // A paid high-reach request must have its subscription to refund. A
+  // proof-only request may or may not have one: it is free to admit, and the
+  // artist may have paid since (checkout is allowed while proof is pending).
   if (
     input.decision === 'reject' &&
     snapshot.paidAt !== null &&
@@ -454,10 +458,13 @@ export async function decideClaimVerification(input: {
   let releasedHandles: string[] = [];
   let refundId: string | null = null;
   try {
+    // Paid high-reach and paying proof-only artists get the same remedy: the
+    // first month is refunded and the subscription is cancelled, as the terms
+    // at checkout promise.
     if (
       input.decision === 'reject' &&
       row.subscriptionId &&
-      current.paidAt !== null
+      (current.paidAt !== null || current.proofOnly === true)
     ) {
       const refund = await refundFirstMonthAndCancel({
         subscriptionId: row.subscriptionId,
@@ -538,7 +545,9 @@ export async function decideClaimVerification(input: {
     // Keep Tim's queue truthful when the decision came from the admin API.
     try {
       await decideSummerCard({
-        id: summerCardId(claimVerificationCardKey(input.profileId)),
+        id: summerCardId(
+          claimVerificationCardKey(input.profileId, current.reopenCount ?? 0)
+        ),
         decision: input.decision,
         comment: input.reason ?? null,
         decidedBy: input.decidedBy,

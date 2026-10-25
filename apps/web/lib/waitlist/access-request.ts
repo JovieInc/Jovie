@@ -284,7 +284,8 @@ async function listPendingScoresDesc(
 ): Promise<number[]> {
   if (limit <= 0) return [];
   const result = await tx.execute(drizzleSql`
-    SELECT (qualification_inputs -> 'admissionScore' ->> 'score')::numeric AS score
+    SELECT CASE WHEN (qualification_inputs -> 'admissionScore' ->> 'score') ~ '^[0-9]+(\\.[0-9]+)?$'
+                THEN (qualification_inputs -> 'admissionScore' ->> 'score')::numeric END AS score
     FROM waitlist_entries
     WHERE canonical = true
       AND status = 'waitlisted'
@@ -292,7 +293,7 @@ async function listPendingScoresDesc(
       -- today cannot crowd out someone who can be admitted now.
       AND spotify_url IS NOT NULL
       AND waitlisted_at <= now() - make_interval(days => ${afterDays}::int)
-      AND qualification_inputs -> 'admissionScore' ->> 'score' IS NOT NULL
+      AND (qualification_inputs -> 'admissionScore' ->> 'score') ~ '^[0-9]+(\\.[0-9]+)?$'
     ORDER BY score DESC
     LIMIT ${limit}
   `);

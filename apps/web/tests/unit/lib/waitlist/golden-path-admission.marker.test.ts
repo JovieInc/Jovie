@@ -91,31 +91,23 @@ describe('requiresProofBeforePublic keeps the marker after the waitlist reason i
     expect(await requiresProofBeforePublic('user-1')).toBe(false);
   });
 
-  it('requires proof for every system approval, from the audit row, even after signup rewrote the reason', async () => {
-    for (const reason of [
-      'qualified_golden_path_resolved_artist',
-      'auto_accept_after_days',
-      'qualified_auto_accept',
-      'qualified_interview_signal',
-    ]) {
-      mocks.rows = [[], [{ reason, actorType: 'job' }]];
-      expect(await requiresProofBeforePublic('user-1')).toBe(true);
-    }
+  it('fails closed: every non-admin route needs proof, including the invite redemption that follows a drain', async () => {
+    // No proof-only record yet and no admin approval row: the golden path, the
+    // auto-accept drain, invite_redeemed, open signup and any future reason.
+    mocks.rows = [[], []];
+    expect(await requiresProofBeforePublic('user-1')).toBe(true);
   });
 
   it('treats an admin approval as operator proof', async () => {
-    mocks.rows = [
-      [],
-      [{ reason: 'qualified_auto_accept', actorType: 'admin' }],
-    ];
-    expect(await requiresProofBeforePublic('user-1')).toBe(false);
-    mocks.rows = [[], [{ reason: 'approved', actorType: 'admin' }]];
+    mocks.rows = [[], [{ id: 'audit-1' }]];
     expect(await requiresProofBeforePublic('user-1')).toBe(false);
   });
 
-  it('does not require proof when there was no system approval', async () => {
-    mocks.rows = [[], []];
-    expect(await requiresProofBeforePublic('user-1')).toBe(false);
+  it('checks every profile the user has, not only the newest', async () => {
+    mocks.rows = [
+      [{ settings: {} }, { settings: proofRecord('pending_verification') }],
+    ];
+    expect(await requiresProofBeforePublic('user-1')).toBe(true);
   });
 
   it('blocks checkout while any profile is unproven', async () => {

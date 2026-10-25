@@ -71,8 +71,6 @@ interface ClaimResponse {
    * may navigate off /start — bare `claimed`/`alreadyClaimed` may not.
    */
   readonly readyForCheckout?: boolean;
-  /** Admitted, page private until ownership is proven. */
-  readonly proofPending?: boolean;
 }
 
 const MAX_RETRIES = 3;

@@ -40,7 +40,6 @@ const SPOTIFY_ARTIST_ID_PATTERN = /^[0-9A-Za-z]{22}$/;
 export const CLAIM_PAGE_STATES = [
   'already_claimed',
   'verification_required',
-  'proof_pending',
   'already_subscribed',
   'checkout_canceled',
   'unavailable',

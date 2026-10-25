@@ -442,7 +442,7 @@ describe('claim verification review', () => {
       now: new Date('2026-10-21T08:00:00.000Z'),
     });
 
-    it('can be rejected without a subscription and never refunds', async () => {
+    it('can be rejected without a subscription and refunds nothing', async () => {
       queueProfile(proofOnly, null);
       const result = await decideClaimVerification({
         profileId: PROFILE,
@@ -457,15 +457,15 @@ describe('claim verification review', () => {
       expect(mocks.refund).not.toHaveBeenCalled();
     });
 
-    it('never refunds a proof-only request even if the account later has a subscription', async () => {
-      queueProfile(proofOnly, 'sub_other');
+    it('cancels and refunds a proof-only artist who paid while waiting, as the terms promise', async () => {
+      queueProfile(proofOnly, 'sub_paid_after_admission');
       await decideClaimVerification({
         profileId: PROFILE,
         decision: 'reject',
         decidedBy: 'tim@jov.ie',
         now,
       });
-      expect(mocks.refund).not.toHaveBeenCalled();
+      expect(mocks.refund).toHaveBeenCalledTimes(1);
     });
 
     it('approval is what publishes the page', async () => {

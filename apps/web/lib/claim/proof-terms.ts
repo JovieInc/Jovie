@@ -9,4 +9,4 @@ export const PROOF_REVIEW_WINDOW: string | null = null;
 
 export const PROOF_PENDING_TERMS = `Your page goes live once we confirm it's you${
   PROOF_REVIEW_WINDOW ? `, usually within ${PROOF_REVIEW_WINDOW}` : ''
-}. Paying does not change that, and you can use everything privately in the meantime.`;
+}. Paying does not change that, and you can use everything privately in the meantime. If we can't confirm it's you, we cancel your subscription and refund your first month.`;

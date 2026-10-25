@@ -507,7 +507,7 @@ async function materializeProfile({
   waitlistEntryId = null,
 }: MaterializeClaimedOnboardingProfileInput): Promise<MaterializeClaimedOnboardingProfileResult> {
   const reserved = visibility === 'reserved';
-  const unproven = visibility === 'unproven';
+  const requestedUnproven = visibility === 'unproven';
   // Auth first (no DB): refuse anonymous materialize / reserve success.
   const { userId: authenticatedUserId } = requireVerifiedOwnerForReservation({
     userId,
@@ -538,8 +538,11 @@ async function materializeProfile({
 
   const { state, verification } = await holdHighReachArtistForVerification(
     deriveClaimedOnboardingStateFromMessageRows(messageRows),
-    { forceHold: unproven }
+    { forceHold: requestedUnproven }
   );
+  // Proof is about an artist identity. With none to hold, there is nothing
+  // to prove and the page is ordinary (never private with no way out).
+  const unproven = requestedUnproven && verification !== null;
   if (!hasMaterializableState(state)) {
     return { profileId: null, handle: null, status: 'skipped' };
   }
