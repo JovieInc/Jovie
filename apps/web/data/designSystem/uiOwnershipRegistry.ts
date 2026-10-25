@@ -284,7 +284,7 @@ const appShellIos = [
   'apps/ios/Jovie/Features/AppShell/AppShellTabBar.swift',
 ] as const;
 const nativeButtonStyleSource =
-  'apps/ios/Jovie/DesignSystem/JovieTheme.swift' as const;
+  'apps/ios/Packages/JovieKit/Sources/JovieKit/JovieTheme.swift' as const;
 const nativeButtonStyleTests = [
   'apps/ios/JovieTests/AppShellTabBarTests.swift',
 ] as const;
