@@ -126,6 +126,7 @@ export function ActionDial({
   const usedRef = useRef(false);
 
   const rootRef = useRef<HTMLFieldSetElement | null>(null);
+  const listboxRef = useRef<HTMLDivElement | null>(null);
   const actionRef = useRef<HTMLDivElement | null>(null);
   const engineRef = useRef<DialEngine | null>(null);
   const rowRefs = useRef(new Map<number, HTMLElement>());
@@ -256,12 +257,7 @@ export function ActionDial({
       engine.destroy();
       engineRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [count]);
-
-  useEffect(() => {
-    engineRef.current?.setReducedMotion(reducedMotion);
-  }, [reducedMotion]);
+  }, [count, reducedMotion, paint, pulse]);
 
   useLayoutEffect(() => {
     paint(positionRef.current, engineRef.current?.currentState ?? 'idle');
@@ -486,6 +482,7 @@ export function ActionDial({
       >
         {count > 1 ? (
           <div
+            ref={listboxRef}
             role='listbox'
             tabIndex={0}
             aria-label={groupLabel}
@@ -499,8 +496,6 @@ export function ActionDial({
             {windowed.map(([index, option]) => {
               const layout = rowLayout(index - position);
               return (
-                // biome-ignore lint/a11y/useFocusableInteractive: options are never focused; the listbox owns focus and points at the active option with aria-activedescendant.
-                // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard selection is handled on the focused listbox.
                 <div
                   key={option.id}
                   id={`${uid}-${index}`}
@@ -509,6 +504,7 @@ export function ActionDial({
                     else rowRefs.current.delete(index);
                   }}
                   role='option'
+                  tabIndex={-1}
                   aria-selected={index === activeIndex}
                   aria-posinset={index + 1}
                   aria-setsize={count}
@@ -524,6 +520,13 @@ export function ActionDial({
                   onClick={() => {
                     if (suppressClickRef.current) return;
                     markUsed();
+                    engineRef.current?.moveTo(index);
+                    listboxRef.current?.focus({ preventScroll: true });
+                  }}
+                  onKeyDown={event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    event.stopPropagation();
                     engineRef.current?.moveTo(index);
                   }}
                 >
