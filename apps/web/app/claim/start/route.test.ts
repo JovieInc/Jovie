@@ -42,7 +42,14 @@ vi.mock('@/lib/db', () => {
   return { db: { select: () => chain() } };
 });
 
-const { GET } = await import('./route');
+const { GET, runtime } = await import('./route');
+const {
+  BILLING_INTERVAL_COOKIE,
+  CLAIM_FLOW_COOKIE,
+  CLAIM_FLOW_COOKIE_MAX_AGE_SECONDS,
+  PLAN_INTENT_COOKIE,
+  PLAN_INTENT_MAX_AGE_SECONDS,
+} = await import('@/lib/claim/artist-offer-claim');
 
 const SPOTIFY_ID = '4Z8W4fKeB5YxbusRsdQVPb';
 
@@ -205,5 +212,128 @@ describe('GET /claim/start', () => {
 
     mocks.limit.mockResolvedValue({ success: false });
     expect((await GET(request(`spotify=${SPOTIFY_ID}`))).status).toBe(429);
+  });
+
+  it('runs on the node runtime', () => {
+    expect(runtime).toBe('nodejs');
+  });
+
+  it('rate limits per client IP and answers 429 with a message', async () => {
+    mocks.limit.mockResolvedValue({ success: false });
+    const response = await GET(request(`spotify=${SPOTIFY_ID}`));
+    expect(mocks.limit).toHaveBeenCalledWith('claim-start:203.0.113.7');
+    expect(response.status).toBe(429);
+    expect(await response.text()).toBe('Too many requests');
+    expect(mocks.recordStage).not.toHaveBeenCalled();
+  });
+
+  it('writes each claim cookie with exact scope, lifetime and flags over https', async () => {
+    const response = await GET(request('new=1'));
+    const plan = response.cookies.get(PLAN_INTENT_COOKIE);
+    const interval = response.cookies.get(BILLING_INTERVAL_COOKIE);
+    const flow = response.cookies.get(CLAIM_FLOW_COOKIE);
+    expect(plan).toMatchObject({
+      value: 'pro',
+      path: '/',
+      sameSite: 'lax',
+      secure: true,
+      maxAge: PLAN_INTENT_MAX_AGE_SECONDS,
+    });
+    expect(interval).toMatchObject({
+      value: 'month',
+      path: '/',
+      sameSite: 'lax',
+      secure: true,
+      maxAge: PLAN_INTENT_MAX_AGE_SECONDS,
+    });
+    expect(flow).toMatchObject({
+      value: '1',
+      path: '/',
+      sameSite: 'lax',
+      secure: true,
+      httpOnly: true,
+      maxAge: CLAIM_FLOW_COOKIE_MAX_AGE_SECONDS,
+    });
+    expect(plan?.httpOnly).toBeFalsy();
+    expect(interval?.httpOnly).toBeFalsy();
+  });
+
+  it('does not mark claim cookies secure over plain http', async () => {
+    const response = await GET(
+      new NextRequest('http://localhost/claim/start?new=1')
+    );
+    for (const name of [
+      PLAN_INTENT_COOKIE,
+      BILLING_INTERVAL_COOKIE,
+      CLAIM_FLOW_COOKIE,
+    ]) {
+      expect(response.cookies.get(name)?.secure).toBeFalsy();
+    }
+  });
+
+  it('sends a signed-in artist without a claimed profile to start, not checkout', async () => {
+    mocks.auth.mockResolvedValue({ userId: 'user-1' });
+    mocks.entitlements.mockResolvedValue({ isPro: false, isTrialing: false });
+    mocks.dbRows = [[{ isClaimed: false }]];
+    const response = await GET(request('new=1'));
+    expect(location(response)).toBe('/start');
+    expect(mocks.captureError).not.toHaveBeenCalled();
+  });
+
+  it('treats a signed-in user with no profile row as unclaimed without failing', async () => {
+    mocks.auth.mockResolvedValue({ userId: 'user-1' });
+    mocks.entitlements.mockResolvedValue({ isPro: false, isTrialing: false });
+    mocks.dbRows = [[]];
+    const response = await GET(request('new=1'));
+    expect(location(response)).toBe('/start');
+    expect(mocks.captureError).not.toHaveBeenCalled();
+  });
+
+  it('ignores the spotify param when a new profile is requested', async () => {
+    const response = await GET(request(`new=1&spotify=${SPOTIFY_ID}`));
+    expect(mocks.getArtist).not.toHaveBeenCalled();
+    expect(location(response)).toBe('/signup?plan=pro&interval=month');
+  });
+
+  it('prefers the stored profile name over the Spotify name when reach is looked up', async () => {
+    mocks.getArtist.mockResolvedValue({
+      name: 'Spotify Name',
+      followerCount: 80_000_000,
+    });
+    mocks.dbRows = [
+      [
+        {
+          username: 'indie',
+          isClaimed: false,
+          followers: null,
+          displayName: 'Stored Name',
+        },
+      ],
+    ];
+    const response = await GET(request(`spotify=${SPOTIFY_ID}`));
+    const target = new URL(location(response), 'https://jov.ie');
+    expect(target.pathname).toBe('/signup');
+    expect(target.searchParams.get('artist_name')).toBe('Stored Name');
+  });
+
+  it('fails closed without capturing an error when the Spotify lookup throws', async () => {
+    mocks.getArtist.mockRejectedValue(new Error('spotify down'));
+    const response = await GET(request(`spotify=${SPOTIFY_ID}`));
+    expect(location(response)).toBe('/claim?state=unavailable');
+    expect(mocks.captureError).not.toHaveBeenCalled();
+  });
+
+  it('captures unexpected failures and still fails closed', async () => {
+    const boom = new Error('entitlements exploded');
+    mocks.auth.mockResolvedValue({ userId: 'user-1' });
+    mocks.entitlements.mockRejectedValue(boom);
+    mocks.dbRows = [[{ isClaimed: true }]];
+    const response = await GET(request('new=1'));
+    expect(location(response)).toBe('/claim?state=unavailable');
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      'Self-serve claim start failed',
+      boom,
+      { route: '/claim/start' }
+    );
   });
 });

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "description": "Public-surface quality ratchet. Numbers only ever go DOWN (enforced by tests/unit/lib/quality/public-surface-checks.test.ts). Update via intentional PR.",
+  "perf": {
+    "lcpMs": { "lock_down": 4000, "target": 2500 },
+    "jsTransferBytes": { "lock_down": 1000000, "target": 600000 },
+    "requestCount": { "lock_down": 100, "target": 60 },
+    "cls": { "lock_down": 0.05, "target": 0.05 }
+  },
+  "tapTargetMinPx": 44,
+  "pendingFixtures": ["release-no-services"]
+}
