@@ -154,7 +154,7 @@ test('design path selection covers web, native, motion, and governance surfaces'
     'apps/web/components/jovie/ChatAnalyticsCard.tsx',
     'apps/web/styles/design-system.css',
     'packages/ui/theme/tokens.ts',
-    'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
+    'apps/ios/Packages/JovieKit/Sources/JovieKit/JovieTheme.swift',
     'apps/macos/MenuMonitor/Sources/MenuMonitor/MenuMonitorApp.swift',
     'packages/hyperframes/templates/metric-card.html',
     MANIFEST_PATH,
