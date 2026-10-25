@@ -52,9 +52,9 @@ describe('marketing header CTA consistency', () => {
   it('keeps artist-profiles on the shared waitlist CTA', () => {
     expect(
       resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILES, true)
-    ).toEqual({ label: 'Request access', href: APP_ROUTES.SIGNUP });
+    ).toEqual({ label: 'Claim your profile', href: APP_ROUTES.SIGNUP });
     expect(
       resolveMarketingHeaderPrimaryCta(APP_ROUTES.ARTIST_PROFILE_LEGACY, true)
-    ).toEqual({ label: 'Request access', href: APP_ROUTES.SIGNUP });
+    ).toEqual({ label: 'Claim your profile', href: APP_ROUTES.SIGNUP });
   });
 });
