@@ -764,6 +764,237 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
   });
 
+  it('degrades the Inbox count read log-only on transient connection failures (JOV-8845)', async () => {
+    // Prod fingerprint of Sentry issue JOVIE-WEB-YH / Linear JOV-8845: the
+    // Neon serverless websocket crashed mid-statement and Drizzle named the
+    // first statement issued on the broken connection —
+    // set_config('statement_timeout', $1, true) — hiding the transport cause
+    // on the error chain. The Inbox badge count is designed to fail open, so
+    // the event is log-only (same rationale as the JOV-5754 timeouts).
+    const transportError = new Error(
+      "Failed query: SELECT set_config('statement_timeout', $1, true)",
+      { cause: new Error('server conn crashed?') }
+    );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      fail(transportError), // Inbox suggested-actions count read fails
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    // The shell still renders and the Inbox fails open — never hidden by a
+    // transient infrastructure failure.
+    expect(result.inboxNavigation).toEqual({
+      state: 'unknown',
+      pendingCount: null,
+    });
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('transient connection error')
+    );
+
+    // Sibling reads are unaffected.
+    expect(result.hasSocialLinks).toBe(true);
+    expect(result.hasMusicLinks).toBe(true);
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 1024,
+      height: 1024,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('degrades social link existence log-only on transient connection failures (JOV-8845)', async () => {
+    // set_config is the first statement of the social-links read transaction;
+    // a Neon websocket crash rejects it before the existence read runs.
+    const transportError = new Error(
+      "Failed query: SELECT set_config('statement_timeout', $1, true)",
+      { cause: new Error('server conn crashed?') }
+    );
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      if (ms === 8000 && txStates.length === 2) {
+        throw transportError;
+      }
+    });
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // Inbox suggested-actions count
+      ok([{ count: 0 }]), // Inbox tour-dates count
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    // The supplementary read fails open to "no links".
+    expect(result.hasSocialLinks).toBe(false);
+    expect(result.hasMusicLinks).toBe(false);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('transient connection error'),
+      expect.anything()
+    );
+
+    // Sibling reads are unaffected.
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 1024,
+      height: 1024,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('degrades avatar quality log-only on transient connection failures (JOV-8845)', async () => {
+    // set_config is the first statement of the avatar-quality read
+    // transaction; the Drizzle-wrapped transport cause slips past the
+    // internal JOV-2285 guard (it only matches transport text on the outer
+    // message) and lands in the caller's fail-soft catch.
+    const transportError = new Error(
+      "Failed query: SELECT set_config('statement_timeout', $1, true)",
+      { cause: new Error('server conn crashed?') }
+    );
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      if (ms === 5000 && txStates.length === 3) {
+        throw transportError;
+      }
+    });
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // Inbox suggested-actions count
+      ok([{ count: 0 }]), // Inbox tour-dates count
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    // The supplementary read fails open to UNKNOWN_AVATAR_QUALITY.
+    expect(result.avatarQuality).toEqual({
+      status: 'unknown',
+      width: null,
+      height: null,
+    });
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('transient connection error')
+    );
+
+    // Sibling reads are unaffected.
+    expect(result.hasSocialLinks).toBe(true);
+    expect(result.hasMusicLinks).toBe(true);
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('degrades tipping stats log-only on transient connection failures (JOV-8845)', async () => {
+    const transportError = new Error(
+      'Failed query: select coalesce(sum("tips"."amount_cents"), 0) from "tips" where "tips"."creator_profile_id" = $1',
+      { cause: new Error('server conn crashed?') }
+    );
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // Inbox suggested-actions count
+      ok([{ count: 0 }]), // Inbox tour-dates count
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      fail(transportError), // tipping totals read fails on a transport blip
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    // The supplementary read fails open to empty stats.
+    expect(result.tippingStats).toEqual({
+      tipClicks: 0,
+      qrTipClicks: 0,
+      linkTipClicks: 0,
+      tipsSubmitted: 0,
+      totalReceivedCents: 0,
+      monthReceivedCents: 0,
+    });
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('transient connection error')
+    );
+
+    // Sibling reads are unaffected.
+    expect(result.hasSocialLinks).toBe(true);
+    expect(result.hasMusicLinks).toBe(true);
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 1024,
+      height: 1024,
+    });
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+  });
+
+  it('degrades the distribution activation read log-only on transient connection failures (JOV-8845)', async () => {
+    // The bio-link read retries transient failures once; after the retry
+    // also fails, the failure is log-only instead of filing a
+    // set_config-titled Sentry issue.
+    const transportError = new Error(
+      "Failed query: SELECT set_config('statement_timeout', $1, true)",
+      { cause: new Error('server conn crashed?') }
+    );
+    const { setStatementTimeout } = await import('@/lib/db/query-timeout');
+    vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
+      if (ms === 8000 && txStates.length >= 5) {
+        throw transportError;
+      }
+    });
+    outcomes.push(
+      ok([userRow]),
+      ok([dashboardProfile]),
+      ok([{ sidebarCollapsed: false }]),
+      ok([{ count: 0 }]), // Inbox suggested-actions count
+      ok([{ count: 0 }]), // Inbox tour-dates count
+      ok([{ hasLinks: true, hasMusicLinks: true }]),
+      ok([{ width: 1024, height: 1024 }]),
+      ok([{ totalReceived: 100, monthReceived: 50, tipsSubmitted: 2 }]),
+      ok([{ total: 3, qr: 1, link: 2 }])
+    );
+
+    const result = await getDashboardData();
+
+    // The activation read fails open: no activation timestamps, no dashboard
+    // error, and no Sentry event.
+    expect(result.bioLinkActivation?.activatedAt).toBeNull();
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('transient connection error'),
+      expect.anything()
+    );
+
+    // Sibling reads are unaffected; the retried read opened one extra tx.
+    expect(result.hasSocialLinks).toBe(true);
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 1024,
+      height: 1024,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+  });
+
   it('confines an avatar-quality failure — tipping stats still load', async () => {
     const realAvatarError = new Error('boom: profile_photos read failed');
     outcomes.push(
