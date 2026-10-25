@@ -45,7 +45,8 @@ jobs:
     name: Fleet Rules Evidence
     if: github.event_name == 'pull_request_target' && github.event.pull_request.base.ref == 'main'
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    # Up to four quota-deferred retries (60+120+180+240s of pause) around the 3-minute read.
+    timeout-minutes: 20
     permissions:
       contents: read
       actions: write
