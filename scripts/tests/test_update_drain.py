@@ -121,5 +121,31 @@ class UpdateDrainTest(unittest.TestCase):
         self.assertEqual(drain.drain_bound_s(self.state), drain.BOUND_MIN_S)
 
 
+class SingleFlightUpdateTest(unittest.TestCase):
+    def test_a_second_update_exits_without_running_or_touching_update_json(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            (host.state / "update.json").write_text('{"ok": false, "marker": "first"}')
+            first = lane.Locked(host.state / "locks" / "update.lock", blocking=False)
+            self.assertTrue(first.held)
+            try:
+                with patch.object(lane, "install_release") as install, \
+                        patch.object(lane, "refresh_object_mirror") as mirror:
+                    self.assertEqual(lane.update(host), 0)
+                install.assert_not_called()
+                mirror.assert_not_called()
+                self.assertEqual(json.loads((host.state / "update.json").read_text())["marker"], "first")
+            finally:
+                first.release()
+            # Once the first updater is done the lock is free again and update runs.
+            with patch.object(lane, "install_release", return_value=0) as install, \
+                    patch.object(lane, "refresh_object_mirror", return_value={"status": "x"}), \
+                    patch.object(lane, "refresh_codex_skills", return_value={"status": "x"}):
+                self.assertEqual(lane.update(host), 0)
+            install.assert_called_once()
+            self.assertTrue(json.loads((host.state / "update.json").read_text())["ok"])
+
+
 if __name__ == "__main__":
     unittest.main()
