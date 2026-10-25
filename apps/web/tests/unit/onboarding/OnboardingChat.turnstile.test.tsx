@@ -515,6 +515,37 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.sendMessage).toHaveBeenCalledTimes(1);
   });
 
+  it('confirms a pasted Spotify artist link as exact identity and leaves plain text alone', async () => {
+    const link = 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm';
+    const { unmount } = render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+    const input = screen.getByLabelText('Chat Message Input');
+    fireEvent.change(input, { target: { value: link } });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await waitFor(() =>
+      expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+        text: link,
+        metadata: { spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm' },
+      })
+    );
+    unmount();
+    chatMocks.sendMessage.mockClear();
+
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+    fireEvent.change(screen.getByLabelText('Chat Message Input'), {
+      target: { value: 'I make indie pop' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Send message' }));
+    await waitFor(() =>
+      expect(chatMocks.sendMessage).toHaveBeenCalledWith({
+        text: 'I make indie pop',
+      })
+    );
+  });
+
   it('auto-submits a queued first message once verification resolves', async () => {
     function DeferredTokenHarness() {
       const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
