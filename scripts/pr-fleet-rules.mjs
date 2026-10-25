@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // One policy for PR feedback, native admission, and durable delivery receipts.
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
@@ -303,13 +304,95 @@ export async function githubRequest(path, { store } = {}) {
     throw new Error(`GitHub evidence request failed (${response.status})`);
   return response.json();
 }
+const GIT_STATUS = {
+  A: 'added',
+  M: 'modified',
+  D: 'removed',
+  R: 'renamed',
+  C: 'copied',
+  T: 'modified',
+};
+
+/**
+ * The changed files of HEAD against `base`, shaped like the pulls files API, from local git only.
+ * @param {{ base?: string, cwd?: string, git?: (args: string[], cwd: string) => string }} [options]
+ */
+export function localFiles({
+  base = 'origin/main',
+  cwd = process.cwd(),
+  git = (args, dir) =>
+    execFileSync('git', args, {
+      cwd: dir,
+      encoding: 'utf8',
+      maxBuffer: 64 << 20,
+    }),
+} = {}) {
+  return git(['diff', '--name-status', '-M', `${base}...HEAD`], cwd)
+    .split('\n')
+    .filter(Boolean)
+    .map(line => {
+      const [code, first, second] = line.split('\t');
+      const filename = second ?? first;
+      return {
+        filename,
+        status: GIT_STATUS[code[0]] ?? 'modified',
+        ...(second ? { previous_filename: first } : {}),
+        patch: git(['diff', '-U0', `${base}...HEAD`, '--', filename], cwd),
+      };
+    });
+}
+
+/**
+ * Run the PR-body rules before a push, with no API: title and body come from the caller, files from git.
+ * A lane runs this on the body it is about to submit so a known-red body is never the first thing CI sees.
+ */
+export function evaluateLocal({
+  title,
+  body,
+  labels = [],
+  base,
+  cwd,
+  git,
+} = {}) {
+  return evaluateFleetRules({
+    pr: { title, body, labels },
+    files: localFiles({ base, cwd, git }),
+  });
+}
+
+function flagValue(args, name) {
+  const index = args.indexOf(name);
+  return index === -1 ? '' : String(args[index + 1] ?? '');
+}
+
+export function mainLocal({
+  args,
+  log,
+  git,
+  read = readFileSync,
+  cwd = process.cwd(),
+}) {
+  const result = evaluateLocal({
+    title: flagValue(args, '--title'),
+    body: read(flagValue(args, '--body-file'), 'utf8'),
+    labels: flagValue(args, '--labels').split(',').filter(Boolean),
+    base: flagValue(args, '--base') || undefined,
+    cwd,
+    git,
+  });
+  for (const message of result.errors) log(`fleet-rules (local): ${message}`);
+  return result.errors.length === 0 ? 0 : 1;
+}
+
 export async function main({
   args = process.argv.slice(2),
   env = process.env,
   request = githubRequest,
   log = console.log,
+  git,
 } = {}) {
   const warningOnly = args.includes('--warnings-only');
+  if (args.includes('--local')) return mainLocal({ args, log, git });
   try {
     const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
     const result = await runFleetRules({ event, request });

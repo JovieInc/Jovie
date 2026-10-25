@@ -7,9 +7,11 @@ import test from 'node:test';
 import { MemoryLedgerStore } from '../packages/api-client/store.ts';
 import {
   evaluateFleetRules,
+  evaluateLocal,
   githubRequest,
   hasPremiseEvidence,
   isLockedArea,
+  localFiles,
   main,
   onlyWeakensAssertions,
   runFleetRules,
@@ -548,4 +550,95 @@ test('missing test patches and placeholder decision references cannot bypass blo
     ).errors,
     []
   );
+});
+
+const fakeGit = (args, _cwd) => {
+  if (args.includes('--name-status'))
+    return 'M\tscripts/lanes/x.py\nA\tscripts/tests/test_x.py\nR100\told/name.py\tnew/name.py\nD\tgone.txt\nT\ttyped.py\n';
+  return `+++ patch for ${args.at(-1)}\n`;
+};
+
+test('local: files come from git alone, shaped like the pulls files API', () => {
+  const files = localFiles({ base: 'origin/main', cwd: '/x', git: fakeGit });
+  assert.deepEqual(
+    files.map(f => [f.filename, f.status, f.previous_filename]),
+    [
+      ['scripts/lanes/x.py', 'modified', undefined],
+      ['scripts/tests/test_x.py', 'added', undefined],
+      ['new/name.py', 'renamed', 'old/name.py'],
+      ['gone.txt', 'removed', undefined],
+      ['typed.py', 'modified', undefined],
+    ]
+  );
+  assert.match(files[0].patch, /patch for scripts\/lanes\/x.py/);
+});
+
+test('local: the body a lane is about to submit is checked before the first push', () => {
+  const bad = evaluateLocal({
+    title: 'fix: lane work (JOV-1)',
+    body: 'Refs JOV-1.',
+    git: fakeGit,
+  });
+  assert.ok(bad.errors.some(e => e.startsWith('red-before-green')));
+  const good = evaluateLocal({
+    title: 'fix: lane work (JOV-1)',
+    body: `${red}\n\n${proof}`,
+    git: fakeGit,
+  });
+  assert.deepEqual(good.errors, []);
+  assert.deepEqual(
+    evaluateLocal({ title: 'feat: x', body: proof, git: fakeGit }).errors,
+    []
+  );
+});
+
+test('local: --local prints the rule failures and exits non-zero without any API call', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-local-'));
+  try {
+    const bodyFile = join(dir, 'body.md');
+    writeFileSync(bodyFile, 'Refs JOV-1.');
+    const lines = [];
+    const request = () => {
+      throw new Error('no API in local mode');
+    };
+    const code = await main({
+      args: [
+        '--local',
+        '--title',
+        'fix: lane work',
+        '--body-file',
+        bodyFile,
+        '--labels',
+        'bug,lane',
+      ],
+      log: line => lines.push(line),
+      request,
+      git: fakeGit,
+    });
+    assert.equal(code, 1);
+    assert.match(lines[0], /^fleet-rules \(local\): red-before-green/);
+    writeFileSync(bodyFile, `${red}\n\n${proof}`);
+    const ok = await main({
+      args: [
+        '--local',
+        '--title',
+        'fix: lane work',
+        '--body-file',
+        bodyFile,
+        '--base',
+        'origin/dev',
+      ],
+      log: line => lines.push(line),
+      request,
+      git: fakeGit,
+    });
+    assert.equal(ok, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('local: default git reads the real repository without throwing', () => {
+  const files = localFiles({ base: 'HEAD', cwd: process.cwd() });
+  assert.deepEqual(files, []);
 });

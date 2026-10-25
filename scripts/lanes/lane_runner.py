@@ -3567,14 +3567,16 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
             return pending("pr-publication-unconfirmed")
         # The push's own hooks can take minutes; a stop during them still bars the PR open.
         require_publishable(host, branch, "before-pr-create")
+        pr_title = f"fix: {issue.title[:80]} ({issue.identifier})"
+        pr_body = (f"Refs {issue.identifier}.\n\n"
+                   f"<!-- linear-issue-id:{issue.id} -->\n"
+                   f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                   "Lane implementation; verification by the lane gate. "
+                   "Runtime and commissioning acceptance remain with the issue owner.")
+        fleet_rules_preflight(worktree, pr_title, pr_body, log)
         try:
             sh(["gh", "pr", "create", "--repo", REPO_SLUG, "--draft", "--head", branch,
-                "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
-                "--body", f"Refs {issue.identifier}.\n\n"
-                f"<!-- linear-issue-id:{issue.id} -->\n"
-                f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
-                "Lane implementation; verification by the lane gate. "
-                "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
+                "--title", pr_title, "--body", pr_body], cwd=worktree, log=log)
         except (subprocess.TimeoutExpired, OSError):
             pass  # A create may have landed remotely; reconcile once, never resend.
         return verify_and_land(host, issue, branch, worktree, log, started, opened=True, sensitive=sensitive)
@@ -3586,6 +3588,30 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
         sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO_SLUG,
             "--add-label", SENSITIVE_PR_LABEL], log=log)
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
+
+
+def fleet_rules_preflight(worktree: Path, title: str, body: str, log=None) -> list[str]:
+    """Run the PR-body fleet rules locally (same script CI runs, no API) on the body a lane is about to submit.
+
+    Non-blocking: the PR opens as a draft either way. Findings go to the run log so a known-red body (every
+    `fix:` lane PR needs a Red-before-green section) is visible before CI, and the fix-red lane has the
+    exact rule names. An unavailable script or git never stops publication."""
+    script = Path(worktree) / "scripts" / "pr-fleet-rules.mjs"
+    if not script.exists():
+        return []
+    try:
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
+            handle.write(body)
+        done = sh(["node", str(script), "--local", "--title", title, "--body-file", handle.name, "--base", "origin/main"],
+                  cwd=worktree, timeout=60, log=log)
+        os.unlink(handle.name)
+    except (OSError, subprocess.SubprocessError):
+        return []
+    lines = [line for line in (done.stdout or "").splitlines() if line.startswith("fleet-rules (local):")]
+    if log is not None and lines:
+        log.write("fleet-rules preflight found " + str(len(lines)) + " issue(s) before the first push:\n" + "\n".join(lines) + "\n")
+        log.flush()
+    return lines
 
 
 @contextmanager

@@ -7799,6 +7799,29 @@ class LanesReleaseFixtureTest(unittest.TestCase):
                                  ["scripts/lanes/hud.py", "scripts/lanes/hud_fixtures/__snapshots__/live-80x24.txt"])
 
 
+class FleetRulesPreflightTest(unittest.TestCase):
+    def test_known_red_bodies_are_reported_before_the_first_push_and_never_block(self):
+        with tempfile.TemporaryDirectory() as raw:
+            tree = Path(raw)
+            (tree / "scripts").mkdir()
+            self.assertEqual(lane.fleet_rules_preflight(tree, "fix: x", "Refs JOV-1."), [], "no script, no preflight")
+            (tree / "scripts/pr-fleet-rules.mjs").write_text("// stub")
+            seen = []
+            def fake_sh(args, **kw):
+                seen.append(args)
+                body = Path(args[args.index("--body-file") + 1]).read_text()
+                self.assertEqual(body, "Refs JOV-1.")
+                return subprocess.CompletedProcess(args, 1, "fleet-rules (local): red-before-green: include Failing command.\nunrelated\n", "")
+            log = io.StringIO()
+            with patch.object(lane, "sh", fake_sh):
+                lines = lane.fleet_rules_preflight(tree, "fix: x", "Refs JOV-1.", log)
+            self.assertEqual(lines, ["fleet-rules (local): red-before-green: include Failing command."])
+            self.assertIn("preflight found 1 issue", log.getvalue())
+            self.assertIn("--local", seen[0])
+            with patch.object(lane, "sh", side_effect=OSError("no node")):
+                self.assertEqual(lane.fleet_rules_preflight(tree, "fix: x", "b", None), [])
+
+
 class UpdateTest(unittest.TestCase):
     def git(self, *args, cwd):
         subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True)
