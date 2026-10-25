@@ -239,6 +239,19 @@ class GroomApplyTests(unittest.TestCase):
         self.assertEqual(sorted((e["op"], e.get("body", "")[:30]) for e in entries),
                          [("comment", "Readiness pass (grok-4.7): age"), ("label", "agent-ready"), ("label", "readiness-checked")])
 
+    def test_not_ready_comments_only_for_urgent_or_high(self):
+        import groom_pass
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        for team in ("JOV", "LYB"):
+            path = ls.mirror_path(state, team); path.parent.mkdir(parents=True, exist_ok=True)
+            rows = [dict(row(1), priority=3), dict(row(2), priority=1)] if team == "JOV" else []
+            path.write_text(json.dumps({"schema": ls.MIRROR, "syncedAt": NOW, "issues": {r["id"]: r for r in rows}}))
+        groom_pass.apply(state, [{"id": "JOV-1", "verdict": "not_ready", "rationale": "r"}, {"id": "JOV-2", "verdict": "not_ready", "rationale": "r"}])
+        ops = sorted((e["op"], e["issue"] if "issue" in e else e.get("issueId")) for e in json.loads((state / "linear" / "outbox.json").read_text())["entries"])
+        self.assertEqual(sum(1 for op, _ in ops if op == "comment"), 1)
+        self.assertEqual(sum(1 for op, _ in ops if op == "label"), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

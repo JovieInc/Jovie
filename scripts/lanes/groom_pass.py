@@ -42,7 +42,7 @@ def apply(state, verdicts, outbox_enqueue=None):
         if verdict["verdict"] == "ready":
             enqueue("label", row["id"], body="agent-ready")
             enqueue("comment", row["id"], body=f"Readiness pass ({verdict.get('model', MODEL)}): agent-ready. {verdict['rationale']}")
-        else:
+        elif row["priority"] in (1, 2):  # only Urgent/High earn a comment; the rest are labelled silently so 400 bots-notes never hit the team
             missing = "\n".join(f"- {item}" for item in verdict.get("missing") or [verdict["rationale"]])
             enqueue("comment", row["id"], body=f"Readiness pass ({verdict.get('model', MODEL)}): not agent-ready yet. {verdict['rationale']}\n\nMissing:\n{missing}")
         enqueue("label", row["id"], body=CHECKED_LABEL)
