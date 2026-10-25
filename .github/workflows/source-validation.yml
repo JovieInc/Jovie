@@ -46,9 +46,11 @@ jobs:
       - &quota-prime
         name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ github.event.action == 'edited' && !github.event.changes.base && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
-        uses: ./.source-validation-client/.github/actions/prime-node-toolcache
-        with:
-          node-version-file: .source-validation-client/.nvmrc
+        # A run step, not `uses:`: the client checkout path does not exist when
+        # workflow references are validated, so a local action there is rejected.
+        env:
+          NODE_VERSION_FILE: .source-validation-client/.nvmrc
+        run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
       - &quota-runtime
         name: Setup the quota client runtime
         if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
