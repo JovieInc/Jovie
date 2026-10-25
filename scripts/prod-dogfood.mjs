@@ -368,14 +368,37 @@ async function fetchYoutubeLinks(probe, handle) {
   return { links, gaps };
 }
 
-async function linearDefectRows({ apiKey, weeks = 5, fetchImpl = fetch }) {
+// The team filter is an IDComparator: the variable must be ID!, not String!
+// (Linear rejects String! with HTTP 400, which once made filing, auto-close and
+// the metric silently never run). Guarded by prod-dogfood-filer.test.mjs.
+export const DEFECT_ROWS_QUERY = `query($team:ID!,$since:DateTimeOrDuration!,$after:String){ issues(first:100, after:$after, filter:{ team:{id:{eq:$team}}, createdAt:{gte:$since}, labels:{ name:{ in:["dogfood-agent","escaped-defect"] } } }){ pageInfo{hasNextPage endCursor} nodes{ identifier createdAt labels{nodes{name}} } } }`;
+export const OPEN_ISSUES_QUERY = `query($team:ID!,$after:String){ issues(first:100, after:$after, filter:{ team:{id:{eq:$team}}, labels:{name:{eq:"dogfood-agent"}}, state:{type:{nin:["completed","canceled"]}} }){ pageInfo{hasNextPage endCursor} nodes{ identifier title url } } }`;
+
+/** 0 clean, 2 defects found and filed, 3 the filer itself failed (loud, never silent). */
+export function exitCodeFor({ findings, filerFailures }) {
+  if (filerFailures.length > 0) return 3;
+  return findings > 0 ? 2 : 0;
+}
+
+/** Why a Linear call failed, including the GraphQL error text when there is one. */
+export function linearFailureReason(result) {
+  const message = result.data?.errors?.[0]?.message;
+  const base = result.reason ?? `status ${result.status}`;
+  return message ? `${base}: ${String(message).slice(0, 160)}` : base;
+}
+
+export async function linearDefectRows({
+  apiKey,
+  weeks = 5,
+  fetchImpl = fetch,
+}) {
   const since = new Date(Date.now() - weeks * 7 * 86_400_000).toISOString();
   const rows = [];
   let after = null;
   for (let page = 0; page < 10; page++) {
     const result = await linearRequest({
       key: apiKey,
-      query: `query($team:String!,$since:DateTimeOrDuration!,$after:String){ issues(first:100, after:$after, filter:{ team:{id:{eq:$team}}, createdAt:{gte:$since}, labels:{ name:{ in:["dogfood-agent","escaped-defect"] } } }){ pageInfo{hasNextPage endCursor} nodes{ identifier createdAt labels{nodes{name}} } } }`,
+      query: DEFECT_ROWS_QUERY,
       variables: { team: JOVIE_TEAM_ID, since, after },
       fetchImpl,
     });
@@ -384,7 +407,7 @@ async function linearDefectRows({ apiKey, weeks = 5, fetchImpl = fetch }) {
       return {
         ok: false,
         rows,
-        reason: result.reason ?? `status ${result.status}`,
+        reason: linearFailureReason(result),
       };
     rows.push(
       ...data.nodes.map(n => ({
@@ -399,19 +422,19 @@ async function linearDefectRows({ apiKey, weeks = 5, fetchImpl = fetch }) {
   return { ok: true, rows };
 }
 
-async function openDogfoodIssues({ apiKey, fetchImpl = fetch }) {
+export async function openDogfoodIssues({ apiKey, fetchImpl = fetch }) {
   const out = [];
   let after = null;
   for (let page = 0; page < 5; page++) {
     const result = await linearRequest({
       key: apiKey,
-      query: `query($team:String!,$after:String){ issues(first:100, after:$after, filter:{ team:{id:{eq:$team}}, labels:{name:{eq:"dogfood-agent"}}, state:{type:{nin:["completed","canceled"]}} }){ pageInfo{hasNextPage endCursor} nodes{ identifier title url } } }`,
+      query: OPEN_ISSUES_QUERY,
       variables: { team: JOVIE_TEAM_ID, after },
       fetchImpl,
     });
     const data = result.data?.data?.issues;
     if (!result.ok || !data)
-      return { ok: false, reason: result.reason ?? `status ${result.status}` };
+      return { ok: false, reason: linearFailureReason(result) };
     out.push(...data.nodes);
     if (!data.pageInfo.hasNextPage) break;
     after = data.pageInfo.endCursor;
@@ -696,6 +719,11 @@ async function main() {
   const filed = [];
   const closed = [];
   const filingNotes = [];
+  const filerFailures = [];
+  const failFiler = message => {
+    filerFailures.push(message);
+    console.error(`::error title=prod-dogfood filer::${message}`);
+  };
   const failingFps = new Set(
     findings.map(f =>
       fingerprintFor({
@@ -760,6 +788,8 @@ async function main() {
         reopenTerminal: true,
         apiKey,
       });
+      if (!res.ok)
+        failFiler(`could not file ${issue.fingerprint}: ${res.reason}`);
       filed.push({
         fingerprint: issue.fingerprint,
         ok: res.ok,
@@ -780,11 +810,22 @@ async function main() {
           runId: process.env.GITHUB_RUN_ID ?? completedAt,
           apiKey,
         });
+        if (!res.ok) failFiler(`could not close ${fp}: ${res.reason}`);
         closed.push({ fingerprint: fp, ok: res.ok, id: issue.identifier });
       }
-    } else
-      filingNotes.push(`could not list open dogfood issues: ${open.reason}`);
+    } else {
+      failFiler(`could not list open dogfood issues: ${open.reason}`);
+    }
   } else {
+    if (
+      args.file &&
+      !superseded &&
+      process.env.DOGFOOD_REQUIRE_FILING === '1'
+    ) {
+      failFiler(
+        'filing is required here but LINEAR_API_KEY is missing or remediation triggers are disabled'
+      );
+    }
     filingNotes.push(
       args.file
         ? superseded
@@ -796,7 +837,7 @@ async function main() {
   filingNotes.push(...ingestNotes);
   writeFileSync(
     path.join(outDir, 'findings.json'),
-    `${JSON.stringify({ findings: findings.map(f => ({ mission: f.mission.id, ...f.check })), filed, closed, notes: filingNotes }, null, 2)}\n`
+    `${JSON.stringify({ findings: findings.map(f => ({ mission: f.mission.id, ...f.check })), filed, closed, notes: filingNotes, filerFailures }, null, 2)}\n`
   );
 
   // 9. Summary (job summary + stdout).
@@ -804,6 +845,8 @@ async function main() {
   if (apiKey) {
     const got = await linearDefectRows({ apiKey });
     if (got.ok) metrics = weeklyDefectMetrics(got.rows);
+    else if (args.file)
+      failFiler(`weekly agent-vs-Tim metric unavailable: ${got.reason}`);
   }
   const summary = renderSummary({
     binding,
@@ -820,7 +863,7 @@ async function main() {
   if (process.env.GITHUB_STEP_SUMMARY)
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
   console.log(summary);
-  process.exitCode = findings.length > 0 ? 2 : 0;
+  process.exitCode = exitCodeFor({ findings: findings.length, filerFailures });
 }
 
 function renderSummary({
