@@ -40,6 +40,20 @@ jobs:
       eligible: ${{ steps.source.outputs.eligible }}
       staging_artifact_id: ${{ steps.source.outputs.staging_artifact_id }}
     steps:
+      # Release-lease reads run on the Jovie Bot installation's own REST budget
+      # (read-only scopes, as fleet-promotion already does), not the repo-wide
+      # GITHUB_TOKEN bucket. 2026-10-25 00:59Z: this step held the production
+      # lease 17 minutes waiting for that bucket's hourly reset. A failed mint
+      # falls back to github.token, so the gate never reads less than before.
+      - name: Mint read-only Jovie Bot token for lease reads
+        id: read-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -49,7 +63,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with: {node-version: 24.22.1}
       - id: source
-        env: {GH_TOKEN: "${{ github.token }}"}
+        env: {GH_TOKEN: "${{ steps.read-token.outputs.token || github.token }}"}
         run: node .github/scripts/staging-release-source.mjs
   # Event-driven supersession, with no wait: main itself is the
   # release-lineage event log. This generation proceeds the moment its exact
@@ -80,6 +94,20 @@ jobs:
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
     steps:
+      # Release-lease reads run on the Jovie Bot installation's own REST budget
+      # (read-only scopes, as fleet-promotion already does), not the repo-wide
+      # GITHUB_TOKEN bucket. 2026-10-25 00:59Z: this step held the production
+      # lease 17 minutes waiting for that bucket's hourly reset. A failed mint
+      # falls back to github.token, so the gate never reads less than before.
+      - name: Mint read-only Jovie Bot token for lease reads
+        id: read-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -91,7 +119,7 @@ jobs:
       - name: Evaluate event-driven supersession
         id: coalesce
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token || github.token }}
           EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           # Starvation bound for the forward-only lineage gate: once main has
@@ -373,10 +401,24 @@ jobs:
           EOF
           chmod +x "$shim/gh"
           echo "$shim" >> "$GITHUB_PATH"
+      # Release-lease reads run on the Jovie Bot installation's own REST budget
+      # (read-only scopes, as fleet-promotion already does), not the repo-wide
+      # GITHUB_TOKEN bucket. 2026-10-25 00:59Z: this step held the production
+      # lease 17 minutes waiting for that bucket's hourly reset. A failed mint
+      # falls back to github.token, so the gate never reads less than before.
+      - name: Mint read-only Jovie Bot token for lease reads
+        id: read-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token || github.token }}
           EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           EXACT_STAGING_ARTIFACT_ID: ${{ needs.release-source.outputs.staging_artifact_id }}
