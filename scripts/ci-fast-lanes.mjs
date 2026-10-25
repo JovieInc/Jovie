@@ -538,6 +538,7 @@ const structuralPythonRegression = body =>
 
 /** Files of the structural pytest suite (one collection, sharded below). */
 export const STRUCTURAL_PYTEST_FILES = Object.freeze([
+  'scripts/prod-errors/test_prod_errors.py',
   'scripts/tests/test_gh_retry.py',
   'scripts/tests/test_vercel_prebuilt_deploy.py',
   'scripts/tests/test_brand_scrub.py',
@@ -975,6 +976,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/typecheck-singleflight.test.mjs',
   'scripts/lib/__tests__/typecheck-performance.test.mjs',
   'scripts/lib/__tests__/ui-story-coverage-policy.test.mjs',
+  'scripts/lib/__tests__/ci-fast-pr-structural-guards.test.mjs',
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
