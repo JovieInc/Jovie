@@ -234,6 +234,28 @@ jobs:
           # The classifier only runs when invoked as its own entry point; a
           # missing receipt means it never ran, which must not read as a pass.
           test -s "$lane_dir/receipt.json"
+      # actionlint also runs in the merge group (ci-fast), but a workflow edit
+      # that fails it there ejects the whole group (#23060: an unquoted
+      # run-name with " #" was read as a YAML comment). Lint at PR time so
+      # the author sees it before enqueue. Same checksum-pinned toolchain.
+      - name: Lint changed workflows and actions (actionlint)
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          SHELLCHECK_OPTS: >-
+            --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "$BASE_BRANCH"
+          base_sha="$(git merge-base "origin/$BASE_BRANCH" HEAD)"
+          if [ -z "$(git diff --name-only "$base_sha" HEAD -- .github/workflows .github/actions)" ]; then
+            echo "No workflow or action changes; actionlint not applicable."
+            exit 0
+          fi
+          bash .github/scripts/run-actionlint.sh
       # Read-only restore of the web tsc incremental state that
       # tsc-cache-warm.yml writes on main. A pull_request can read that
       # default-branch cache; merge_group already restores it in ci-fast.
@@ -721,7 +743,12 @@ jobs:
             .nvmrc
             packages/api-client
             .github/workflows/fleet-rules-evidence.yml
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ (always() && github.event_name == 'pull_request') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ always() && github.event_name == 'pull_request' }}
         with:

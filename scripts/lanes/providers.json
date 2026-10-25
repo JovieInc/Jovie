@@ -89,9 +89,7 @@
       }
     ],
     "quota": {
-      "source": "claude-lane",
-      "windowS": 18000,
-      "softRuns": 12
+      "source": "claude-lane"
     },
     "health": ["python3", "{here}/claude_lane.py", "health"],
     "healthy": "available: true",
@@ -127,9 +125,7 @@
       }
     ],
     "quota": {
-      "source": "ledger",
-      "windowS": 86400,
-      "softRuns": 24
+      "source": "ledger"
     },
     "health": ["python3", "{here}/hyperagent_lane.py", "health"],
     "healthy": "available: true",

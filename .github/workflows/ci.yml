@@ -493,6 +493,9 @@ jobs:
       # Both checks are dependency-free (node: built-ins only) and read the
       # checked-out manifests/lockfile directly; the full dependency install only
       # added ~40s of setup before the actual check ran.
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
@@ -5908,6 +5911,9 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git cat-file -e "${COVERAGE_BASE}^{commit}"
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ (needs.ci-path-changes.outputs.has_web_coverage_changes == 'true') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Setup Node for the changed-behavior ratchet
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0

@@ -6,6 +6,11 @@ const hoisted = vi.hoisted(() => ({
   getCard: vi.fn(),
   decideClaim: vi.fn(),
   captureError: vi.fn(),
+  requireOvieApiAccess: vi.fn(),
+}));
+
+vi.mock('@/lib/ovie/privacy-lock/access', () => ({
+  requireOvieApiAccess: hoisted.requireOvieApiAccess,
 }));
 
 vi.mock('@/lib/ovie/mcp/principal', () => ({
@@ -37,14 +42,19 @@ const admin = {
   isAdmin: true,
   subject: 'user-1',
   email: 'founder@jov.ie',
-  scopes: [],
+  scopes: ['ovie:read', 'ovie:write'],
 };
+const CLAIM_PROFILE = '11111111-2222-4333-8444-555555555555';
 
-function call(body: unknown, id = CARD_ID) {
+function call(
+  body: unknown,
+  id = CARD_ID,
+  extraHeaders: Record<string, string> = {}
+) {
   return POST(
     new Request(`https://jov.ie/api/ovie/summer-cards/${id}/decision`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', ...extraHeaders },
       body: JSON.stringify(body),
     }),
     { params: Promise.resolve({ id }) }
@@ -55,6 +65,7 @@ describe('POST /api/ovie/summer-cards/[id]/decision', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.resolvePrincipal.mockResolvedValue(admin);
+    hoisted.requireOvieApiAccess.mockResolvedValue(null);
     hoisted.getCard.mockResolvedValue({
       id: CARD_ID,
       idempotencyKey: 'summer-outbound-123',
@@ -176,5 +187,98 @@ describe('POST /api/ovie/summer-cards/[id]/decision', () => {
     hoisted.decide.mockResolvedValue({ outcome: 'not_found' });
     const response = await call({ decision: 'reject' });
     expect(response.status).toBe(404);
+  });
+
+  it('returns 403 for a principal without the ovie:write scope', async () => {
+    // An `ovie:read` OAuth token must never record decisions, and above all
+    // never approve a claim or refund a subscription.
+    hoisted.resolvePrincipal.mockResolvedValue({
+      ...admin,
+      scopes: ['ovie:read'],
+    });
+    hoisted.getCard.mockResolvedValue({
+      id: CARD_ID,
+      idempotencyKey: `claim-verification_${CLAIM_PROFILE}`,
+      status: 'pending',
+    });
+    const response = await call({ decision: 'reject' }, CARD_ID, {
+      authorization: 'Bearer read-only-token',
+    });
+    expect(response.status).toBe(403);
+    expect(hoisted.decideClaim).not.toHaveBeenCalled();
+    expect(hoisted.decide).not.toHaveBeenCalled();
+  });
+
+  it('requires a fresh passkey step-up before a session decides a claim card', async () => {
+    hoisted.getCard.mockResolvedValue({
+      id: CARD_ID,
+      idempotencyKey: `claim-verification_${CLAIM_PROFILE}`,
+      status: 'pending',
+    });
+    hoisted.requireOvieApiAccess.mockResolvedValue(
+      Response.json(
+        { error: 'Verify your passkey.', code: 'PASSKEY_STEP_UP_REQUIRED' },
+        { status: 403 }
+      )
+    );
+
+    const response = await call({ decision: 'reject' });
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toMatchObject({
+      code: 'PASSKEY_STEP_UP_REQUIRED',
+    });
+    expect(hoisted.requireOvieApiAccess).toHaveBeenCalledWith({
+      privileged: true,
+    });
+    expect(hoisted.decideClaim).not.toHaveBeenCalled();
+    expect(hoisted.decide).not.toHaveBeenCalled();
+  });
+
+  it('does not ask for a step-up on ordinary Summer cards', async () => {
+    hoisted.decide.mockResolvedValue({
+      outcome: 'decided',
+      card: { id: CARD_ID, status: 'approved' },
+    });
+    const response = await call({ decision: 'approve' });
+    expect(response.status).toBe(200);
+    expect(hoisted.requireOvieApiAccess).not.toHaveBeenCalled();
+  });
+
+  it('lets a write-scoped bearer decide a claim card without a session step-up', async () => {
+    hoisted.getCard.mockResolvedValue({
+      id: CARD_ID,
+      idempotencyKey: `claim-verification_${CLAIM_PROFILE}`,
+      status: 'pending',
+    });
+    hoisted.decideClaim.mockResolvedValue({
+      outcome: 'decided',
+      record: { status: 'verified' },
+    });
+    hoisted.decide.mockResolvedValue({
+      outcome: 'decided',
+      card: { id: CARD_ID, status: 'approved' },
+    });
+    const response = await call({ decision: 'approve' }, CARD_ID, {
+      authorization: 'Bearer lander-token',
+    });
+    expect(response.status).toBe(200);
+    expect(hoisted.requireOvieApiAccess).not.toHaveBeenCalled();
+    expect(hoisted.decideClaim).toHaveBeenCalled();
+  });
+
+  it('leaves the card pending while another decision holds the claim', async () => {
+    hoisted.getCard.mockResolvedValue({
+      id: CARD_ID,
+      idempotencyKey: `claim-verification_${CLAIM_PROFILE}`,
+      status: 'pending',
+    });
+    hoisted.decideClaim.mockResolvedValue({ outcome: 'in_progress' });
+    const response = await call({ decision: 'approve' });
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'decision_in_progress',
+    });
+    expect(hoisted.decide).not.toHaveBeenCalled();
   });
 });
