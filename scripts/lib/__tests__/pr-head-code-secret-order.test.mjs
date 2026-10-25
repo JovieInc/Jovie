@@ -1,41 +1,60 @@
-// Guard (JOV-7998 secrets audit): a pull_request workflow job that runs PR-head
-// code must not hold secrets once that code can execute. Head code could read
-// the secret from its environment or poison the runner (GITHUB_ENV, PATH) for
-// later steps. Secret-bearing steps must come before the first head-code step,
-// and the security gate must run from the trusted base copy.
+// Guard (JOV-7998 secrets audit). A job that executes PR-head code must hold no
+// secrets: the runner keeps every referenced secret in memory for the whole
+// job, so step ordering is not a boundary. Secrets live in `security-trusted`,
+// which only ever runs base-commit code and must never execute PR code.
 import { readFileSync } from 'node:fs';
-import { expect, it } from 'vitest';
+import { load } from 'js-yaml';
+import { describe, expect, it } from 'vitest';
 
-const workflow = readFileSync(
-  new URL('../../../.github/workflows/source-validation.yml', import.meta.url),
-  'utf8'
+const wf = load(
+  readFileSync(
+    new URL(
+      '../../../.github/workflows/source-validation.yml',
+      import.meta.url
+    ),
+    'utf8'
+  )
 );
+const text = job => JSON.stringify(job);
 
-function jobText(name) {
-  const start = workflow.indexOf(`\n  ${name}:\n`);
-  expect(start).not.toBe(-1);
-  const rest = workflow.slice(start + 1);
-  const next = rest.slice(1).search(/\n  [a-z][a-z0-9_-]*:\n/);
-  return next === -1 ? rest : rest.slice(0, next + 1);
-}
+describe('Source Validation secret boundary', () => {
+  it('jobs that run PR-head code reference no secrets in any form', () => {
+    for (const name of [
+      'deterministic',
+      'security',
+      'migration',
+      'coverage',
+      'unit',
+      'a11y',
+    ]) {
+      const job = wf.jobs[name];
+      expect(job, name).toBeDefined();
+      expect(
+        /\$\{\{[^}]*\bsecrets\b/.test(text(job)),
+        `${name} references secrets`
+      ).toBe(false);
+    }
+  });
 
-it('Security Evidence: no secret is referenced after PR-head code can run', () => {
-  const job = jobText('security');
-  const firstHeadCode = job.indexOf('uses: ./.github/actions/setup-node-pnpm');
-  expect(firstHeadCode).not.toBe(-1);
-  const after = job.slice(firstHeadCode);
-  expect(/secrets\.[A-Z_]+/.test(after)).toBe(false);
-});
+  it('the trusted job never checks out or executes the PR head', () => {
+    const job = wf.jobs['security-trusted'];
+    const steps = job.steps;
+    const checkouts = steps.filter(s =>
+      String(s.uses ?? '').includes('actions/checkout')
+    );
+    for (const c of checkouts) {
+      expect(String(c.with.ref)).toMatch(/pull_request\.base\.sha/);
+    }
+    expect(steps.some(s => String(s.uses ?? '').startsWith('./'))).toBe(false);
+    expect(
+      /pnpm|npm (ci|install)|yarn/.test(steps.map(s => s.run ?? '').join('\n'))
+    ).toBe(false);
+    const gate = steps.map(s => s.run ?? '').join('\n');
+    expect(gate).toMatch(/node scripts\/security\/security-gate\.mjs/);
+    expect(gate).toMatch(/git fetch --no-tags origin "\$HEAD_SHA"/);
+  });
 
-it('Security Evidence: the gate runs from the trusted base archive', () => {
-  const job = jobText('security');
-  expect(job).toMatch(
-    /git archive "origin\/\$BASE_REF" scripts\/security scripts\/lib/
-  );
-  expect(job).toMatch(
-    /node "\$trusted\/scripts\/security\/security-gate\.mjs"/
-  );
-  expect(/\n\s+node scripts\/security\/security-gate\.mjs/.test(job)).toBe(
-    false
-  );
+  it('PR Ready requires the trusted job', () => {
+    expect(wf.jobs.ready.needs).toContain('security-trusted');
+  });
 });

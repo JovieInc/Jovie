@@ -399,31 +399,58 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
-      # Secret-bearing steps run FIRST, before any PR-controlled code executes
-      # on this runner (the local setup action and every scripts/ entrypoint
-      # below come from the PR head). A same-repository PR could otherwise
-      # read LINEAR_API_KEY or the Jovie Bot key from its own head scripts or
-      # poison the runner via GITHUB_ENV/PATH. The gate itself runs from the
-      # base branch copy; the head tree is only data.
+      # This job executes PR-head code and therefore holds NO secrets. The
+      # secret-bearing gate and dependency review live in `security-trusted`,
+      # which never executes PR code (a runner keeps every referenced secret in
+      # process memory for the whole job, so step ordering alone is not enough).
+      - &reused-setup
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Scan the exact source diff
+        if: steps.reuse.outputs.reuse != 'true'
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
+          ./scripts/security/verify-gitleaks-coverage.sh
+          node scripts/golden-path-lock.mjs merge-gate
+  security-trusted:
+    name: Security Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - *quota-client
+      - *quota-prime
+      - *quota-runtime
+      - *proof-reuse
+      # Base commit only. The PR head is fetched as objects for a name-only
+      # diff and is never checked out, installed or executed in this job.
+      - if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: false
       - name: Run the security gate from trusted base code
         if: steps.reuse.outputs.reuse != 'true'
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           SECURITY_GATE_ENABLED: ${{ vars.SECURITY_GATE_ENABLED }}
-          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          git fetch --no-tags origin "$BASE_REF"
-          base_sha="$(git merge-base "origin/$BASE_REF" HEAD)"
-          trusted="$RUNNER_TEMP/trusted-security"
-          mkdir -p "$trusted"
-          git archive "origin/$BASE_REF" scripts/security scripts/lib | tar -x -C "$trusted"
-          git diff --name-only "$base_sha" HEAD > "$RUNNER_TEMP/security-gate-files.txt"
-          node "$trusted/scripts/security/security-gate.mjs" --changed-files "$RUNNER_TEMP/security-gate-files.txt"
+          git fetch --no-tags origin "$HEAD_SHA"
+          base_sha="$(git merge-base HEAD "$HEAD_SHA")"
+          git -c core.quotePath=false diff --name-only "$base_sha" "$HEAD_SHA" > "$RUNNER_TEMP/security-gate-files.txt"
+          node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
       # Hosted GITHUB_TOKEN compare returns 403 on this public repository.
       # A contents:read Jovie Bot installation token returns 200. Severity
       # and the GPL/AGPL denylist stay blocking. The minted token is
-      # contents:read only; an empty key fails the mint closed.
+      # contents:read only; an empty key fails the mint closed. The config
+      # file comes from the base checkout, not the PR.
       - name: Mint dependency review read token
         id: dependency-review-token
         if: steps.reuse.outputs.reuse != 'true'
@@ -438,17 +465,6 @@ jobs:
         with:
           repo-token: ${{ steps.dependency-review-token.outputs.token }}
           config-file: ./.github/dependency-review-config.yml
-      - &reused-setup
-        if: steps.reuse.outputs.reuse != 'true'
-        uses: ./.github/actions/setup-node-pnpm
-      - name: Scan the exact source diff
-        if: steps.reuse.outputs.reuse != 'true'
-        run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
-          ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
-          ./scripts/security/verify-gitleaks-coverage.sh
-          node scripts/golden-path-lock.mjs merge-gate
   migration:
     name: Migration Guard
     runs-on: ubuntu-latest
@@ -746,7 +762,7 @@ jobs:
   ready:
     name: PR Ready
     if: ${{ always() }}
-    needs: [deterministic, security, migration, coverage, unit, a11y]
+    needs: [deterministic, security, security-trusted, migration, coverage, unit, a11y]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -755,7 +771,7 @@ jobs:
       - name: Require every source proof
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
-        run: test "$RESULTS" = 'success,success,success,success,success,success'
+        run: test "$RESULTS" = 'success,success,success,success,success,success,success'
       # Fleet-rule evidence is read by .github/workflows/fleet-rules-evidence.yml
       # (pull_request_target: base-branch code only, so no PR branch can reach
       # the CI App key) on the dedicated CI App installation budget. This step

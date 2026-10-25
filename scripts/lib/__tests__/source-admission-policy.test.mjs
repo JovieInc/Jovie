@@ -1314,7 +1314,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   }
   assert.equal(
     workflow.jobs.ready.steps[0].run,
-    'test "$RESULTS" = \'success,success,success,success,success,success\''
+    'test "$RESULTS" = \'success,success,success,success,success,success,success\''
   );
 });
 
@@ -1534,6 +1534,7 @@ test('UI-path axe gate blocks PR Ready and stays quiet for non-UI diffs', () => 
   assert.deepEqual(workflow.jobs.ready.needs, [
     'deterministic',
     'security',
+    'security-trusted',
     'migration',
     'coverage',
     'unit',
