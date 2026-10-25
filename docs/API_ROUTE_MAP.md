@@ -329,6 +329,7 @@ needs an auditable PR-body marker line — `api-breaking: <reason>`.
 | `/api/health/homepage` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy:true,timestamp}` and does not fetch featured creators |
 | `/api/health/keys` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy,timestamp}` (503 when a required key is missing) with no key labels |
 | `/api/health/redis` | GET | `admin` or `CRON_SECRET` | Redis write/read operability (protected to prevent quota burn) |
+| `/api/health/revenue-spine` | GET | `public` | Runtime receipt for the revenue-spine failure contract (JOV-8249). Executes the real contract builder for all nine stages in the serving process; no user attribution, no Sentry probe emission, never cached |
 
 ### HUD
 
