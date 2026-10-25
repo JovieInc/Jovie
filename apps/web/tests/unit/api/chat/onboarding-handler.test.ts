@@ -27,6 +27,10 @@ const hoisted = vi.hoisted(() => ({
   dbOnConflictDoUpdateMock: vi.fn(),
 }));
 
+vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
+  readGoldenPathTurnContext: async () => ({ verdict: null, holdReason: null }),
+}));
+
 vi.mock('server-only', () => ({}));
 
 vi.mock('@/lib/profile/spotify-profile-identity', () => ({
