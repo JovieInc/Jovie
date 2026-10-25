@@ -24,6 +24,8 @@ import json
 import os
 import statistics
 import subprocess
+import sys
+from types import SimpleNamespace
 import time
 from collections import Counter
 from datetime import datetime, timezone
@@ -109,14 +111,26 @@ def pushes_by_lane(receipts: list[dict], now: float) -> dict[str, int]:
     return dict(counts)
 
 
+def _budgeted_gh(args, **_):
+    """gh through the shared client layer (budget, breaker, jittered backoff; 'poll' priority is shed first).
+    Returns a subprocess-shaped result so callers and tests keep one shape; a deferral is an error, not a verdict."""
+    scripts = str(Path(__file__).resolve().parents[1])
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient.gh import run_gh
+    done = run_gh(list(args), priority="poll")
+    return SimpleNamespace(returncode=done["code"], stdout=done["stdout"], stderr=done["stderr"])
+
+
 def _gh_json(run, path: str):
-    result = run(["gh", "api", path], capture_output=True, text=True, timeout=60)
+    run = run or _budgeted_gh
+    result = run(["api", path], capture_output=True, text=True, timeout=60)
     if result.returncode != 0:
         raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
     return json.loads(result.stdout)
 
 
-def sample_release_flow(state: Path, now: float, run=subprocess.run, repo: str = REPO) -> tuple[dict | None, str | None]:
+def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> tuple[dict | None, str | None]:
     """Merge-group runner wait and Production Controller lease age; two REST reads per 5 min."""
     path = Path(state) / "release-flow.json"
     try:
@@ -158,7 +172,7 @@ def sample_release_flow(state: Path, now: float, run=subprocess.run, repo: str =
         return (cached or None), f"{type(error).__name__}: {error}"[:200]
 
 
-def sample_repo_flow(state: Path, repo: str, now: float, run=subprocess.run) -> tuple[dict | None, str | None]:
+def sample_repo_flow(state: Path, repo: str, now: float, run=None) -> tuple[dict | None, str | None]:
     """Open-PR and recent-merge signals for a repo without lane demand (two `gh pr list` reads per 5 min)."""
     path = Path(state) / f"repo-flow-{repo.rsplit('/', 1)[-1].lower()}.json"
     try:
@@ -168,8 +182,10 @@ def sample_repo_flow(state: Path, repo: str, now: float, run=subprocess.run) -> 
     if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < REPO_REFRESH_S:
         return cached, None
 
+    run = run or _budgeted_gh
+
     def gh(*args):
-        result = run(["gh", *args], capture_output=True, text=True, timeout=60)
+        result = run(list(args), capture_output=True, text=True, timeout=60)
         if result.returncode != 0:
             raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
         return json.loads(result.stdout)
@@ -246,7 +262,7 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
     return out
 
 
-def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=subprocess.run,
+def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=None,
             fetch_remote: bool = True) -> dict:
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
     exits = read_idle_exits(state, now)

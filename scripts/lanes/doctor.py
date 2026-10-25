@@ -509,7 +509,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "sentinel": throughput_sentinel.observe(
             state, now, receipts,
             {"inventoryBytes": getattr(lane, "REPAIR_INVENTORY_MAX_BYTES", 16 * 1024 * 1024)},
-            run=lifecycle.run, fetch_remote=not os.environ.get("LANES_SELFTEST")),
+            fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
         "linearAppCredential": _linear_app_credential(lane),

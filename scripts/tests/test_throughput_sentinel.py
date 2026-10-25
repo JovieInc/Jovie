@@ -5,6 +5,7 @@ import importlib.util
 import json
 import sys
 import tempfile
+from unittest import mock
 import time
 import unittest
 from pathlib import Path
@@ -191,6 +192,19 @@ class RepoFlowTest(unittest.TestCase):
         self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, repos={repo: self.flow([draft])})), {})
         stale = {"observedAt": NOW - 7200, "openPrs": [clean, dirty], "merged1h": 0}
         self.assertEqual(ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, repos={repo: stale})), {})
+
+    def test_the_default_gh_reader_goes_through_the_shared_client_at_poll_priority(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import apiclient.gh as client
+        seen = []
+        def fake(args, priority="default", **kw):
+            seen.append((args, priority))
+            return {"code": 75, "stdout": "", "stderr": "github-quota-deferred", "deferred": True}
+        with mock.patch.object(client, "run_gh", fake), tempfile.TemporaryDirectory() as raw:
+            _, error = ts.sample_repo_flow(Path(raw), "JovieInc/LogYourBody", NOW)
+        self.assertEqual(seen[0][1], "poll")
+        self.assertEqual(seen[0][0][:2], ["pr", "list"])
+        self.assertIn("deferred", error)
 
     def test_sampler_reads_two_lists_and_caches(self):
         calls = []
