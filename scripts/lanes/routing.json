@@ -47,7 +47,8 @@
       "gate": "github-required-checks",
       "install": ["pnpm", "install", "--frozen-lockfile", "--prefer-offline"],
       "reviewState": "In Review",
-      "reservedSeats": 1
+      "reservedSeats": 1,
+      "minTodo": 10
     }
   }
 }

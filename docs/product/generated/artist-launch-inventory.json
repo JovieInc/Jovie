@@ -2548,7 +2548,7 @@
       "source": "apps/web/app/api/dashboard/audience/subscribers/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/subscribers",
-      "methods": ["GET", "POST"],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
