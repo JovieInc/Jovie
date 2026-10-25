@@ -1,3 +1,4 @@
+import JovieKit
 import SwiftUI
 
 struct MobileChatMerchOptionsView: View {
