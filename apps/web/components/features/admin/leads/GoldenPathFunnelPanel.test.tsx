@@ -20,4 +20,13 @@ describe('GoldenPathFunnelPanel', () => {
     render(<GoldenPathFunnelPanel report={null} />);
     expect(screen.getByText(/could not be read/)).toBeTruthy();
   });
+
+  it('raises an alert for a stage with upstream traffic and no events', () => {
+    const report = {
+      ...buildGoldenPathReport({ totalVisits: 5, timelines: [] }),
+      stalledStages: ['sign-in' as const],
+    };
+    render(<GoldenPathFunnelPanel report={report} />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Signed in');
+  });
 });

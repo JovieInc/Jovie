@@ -256,6 +256,7 @@ export function buildArtistOfferFunnelReport(input: {
   readonly totalVisits: number;
   readonly timelines: readonly ArtistOfferJourneyTimeline[];
   readonly diagnostics?: ArtistOfferFunnelDiagnostics;
+  readonly visitsLast7d?: number;
 }): ArtistOfferFunnelReport {
   const counts = new Map<ArtistOfferFunnelStage, number>();
   counts.set('visit', input.totalVisits);
@@ -323,6 +324,8 @@ export function buildArtistOfferFunnelReport(input: {
     goldenPath: buildGoldenPathReport({
       totalVisits: input.totalVisits,
       timelines: input.timelines,
+      visitsLast7d: input.visitsLast7d,
+      now: input.end,
     }),
   };
 }
@@ -350,6 +353,14 @@ export interface GoldenPathCohortReport {
 export interface GoldenPathReport {
   readonly schema: 'jovie-golden-path-funnel/v1';
   readonly minSample: number;
+  /**
+   * Invariant: once the previous stage has real traffic this week, every stage
+   * must record at least one event this week. A stage listed here has upstream
+   * traffic and zero events: broken instrumentation or a dead step, not a
+   * conversion rate. (The sign-in stage read 0 for months because linking
+   * never matched a user.)
+   */
+  readonly stalledStages: readonly GoldenPathStage[];
   readonly cohorts: readonly GoldenPathCohortReport[];
   /** Stages with no producer yet, so a zero is not a measurement. */
   readonly uninstrumented: readonly string[];
@@ -397,9 +408,39 @@ function buildGoldenPathCohort(
  * claim-link cohort (journeys that opened a claim link) with its own
  * denominator. Pure; the stage list is the contract, not the SQL.
  */
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Pure: stages with weekly upstream traffic and no events this week. */
+export function findStalledGoldenPathStages(input: {
+  readonly timelines: readonly ArtistOfferJourneyTimeline[];
+  /** Consented journeys first seen in the last 7 days; omit to skip `start`. */
+  readonly visitsLast7d?: number;
+  readonly now: Date;
+}): GoldenPathStage[] {
+  const since = input.now.getTime() - WEEK_MS;
+  const inWeek = (stage: GoldenPathStage): number =>
+    input.timelines.filter(timeline => {
+      const at = timeline[stage];
+      return at ? at.getTime() >= since : false;
+    }).length;
+  const stalled: GoldenPathStage[] = [];
+  GOLDEN_PATH_STAGES.forEach((stage, index) => {
+    if (index === 0) return;
+    const previous = GOLDEN_PATH_STAGES[index - 1];
+    const upstream =
+      previous === 'visit' ? (input.visitsLast7d ?? 0) : inWeek(previous);
+    if (upstream >= GOLDEN_PATH_MIN_SAMPLE && inWeek(stage) === 0) {
+      stalled.push(stage);
+    }
+  });
+  return stalled;
+}
+
 export function buildGoldenPathReport(input: {
   readonly totalVisits: number;
   readonly timelines: readonly ArtistOfferJourneyTimeline[];
+  readonly visitsLast7d?: number;
+  readonly now?: Date;
 }): GoldenPathReport {
   const claimLink = input.timelines.filter(timeline =>
     Boolean(timeline[GOLDEN_PATH_ENTRY_STAGE])
@@ -407,6 +448,11 @@ export function buildGoldenPathReport(input: {
   return {
     schema: 'jovie-golden-path-funnel/v1',
     minSample: GOLDEN_PATH_MIN_SAMPLE,
+    stalledStages: findStalledGoldenPathStages({
+      timelines: input.timelines,
+      visitsLast7d: input.visitsLast7d,
+      now: input.now ?? new Date(),
+    }),
     cohorts: [
       buildGoldenPathCohort('all', input.totalVisits, input.timelines),
       buildGoldenPathCohort('claim_link', claimLink.length, claimLink),
