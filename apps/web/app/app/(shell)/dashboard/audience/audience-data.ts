@@ -568,11 +568,11 @@ async function fetchMembersData(
     }
   }
 
-  const sharedKeys = await loadSharedContactKeys(tx, selectedProfileId, rows);
-
+  // Contact details are redacted per request in getAudienceServerData, outside
+  // the 5-minute cache, so a revoked share never outlives the revocation.
   return {
     mode: 'members',
-    rows: applyShareGate(rows.map(transformMemberRow), sharedKeys),
+    rows: rows.map(transformMemberRow),
     total: null,
     page: safe.page,
     pageSize: safe.pageSize,
@@ -917,7 +917,7 @@ export async function getAudienceServerData(params: {
     segmentsKey,
   ];
 
-  return unstable_cache(
+  const cached = await unstable_cache(
     () =>
       fetchAudienceData(
         userId,
@@ -937,6 +937,22 @@ export async function getAudienceServerData(params: {
       ],
     }
   )();
+
+  // Level-2 gate, evaluated fresh on every request (never cached): only people
+  // who currently share with this artist keep email/phone.
+  if (cached.mode !== 'members') return cached;
+  const gatedRows = await withDbSessionTx(
+    async tx => {
+      const keys = await loadSharedContactKeys(
+        tx,
+        selectedProfileId,
+        cached.rows
+      );
+      return applyShareGate(cached.rows, keys);
+    },
+    { clerkUserId: userId }
+  );
+  return { ...cached, rows: gatedRows };
 }
 
 export function getAudienceUrlSearchParams(searchParams: SearchParams) {
