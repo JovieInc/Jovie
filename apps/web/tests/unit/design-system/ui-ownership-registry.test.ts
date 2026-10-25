@@ -176,13 +176,15 @@ describe('cross-surface UI ownership registry', () => {
     ).not.toContain('apps/ios/Jovie/Features/Settings/SettingsView.swift');
     expect(nativeButtonBindings).toMatchObject([
       {
-        sourcePath: 'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
+        sourcePath:
+          'apps/ios/Packages/JovieKit/Sources/JovieKit/JovieTheme.swift',
         swiftType: 'JoviePillButtonStyle',
         semanticRole: 'pill-action',
         testEvidence: ['apps/ios/JovieTests/AppShellTabBarTests.swift'],
       },
       {
-        sourcePath: 'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
+        sourcePath:
+          'apps/ios/Packages/JovieKit/Sources/JovieKit/JovieTheme.swift',
         swiftType: 'JoviePressFeedbackButtonStyle',
         semanticRole: 'plain-content-press-feedback',
         testEvidence: ['apps/ios/JovieTests/AppShellTabBarTests.swift'],
@@ -190,7 +192,8 @@ describe('cross-surface UI ownership registry', () => {
     ]);
     expect(nativeIconBindings).toMatchObject([
       {
-        sourcePath: 'apps/ios/Jovie/DesignSystem/JovieTheme.swift',
+        sourcePath:
+          'apps/ios/Packages/JovieKit/Sources/JovieKit/JovieTheme.swift',
         swiftType: 'JovieIconButtonStyle',
         semanticRole: 'icon-action',
         testEvidence: ['apps/ios/JovieTests/AppShellTabBarTests.swift'],
@@ -555,7 +558,9 @@ describe('cross-surface UI ownership registry', () => {
         ...adapter,
         nativeBindings: adapter.nativeBindings?.map(binding => ({
           ...binding,
-          testEvidence: ['apps/ios/Jovie/DesignSystem/JovieTheme.swift'],
+          testEvidence: [
+            'apps/ios/Packages/JovieKit/Sources/JovieKit/JovieTheme.swift',
+          ],
         })),
       })),
     }));
