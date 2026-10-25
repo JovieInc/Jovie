@@ -19,6 +19,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from collections import Counter
 from datetime import datetime, timezone
@@ -2091,13 +2092,97 @@ def public_status_projection(feed: dict, full_text: str) -> str:
     }, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
+def _status_gist_raw_readback(stored: dict, name: str, expected: str, deadline: float) -> None:
+    """Read only this API snapshot's immutable file, through the shared budget client."""
+    scripts = str(Path(__file__).resolve().parents[1])
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient import ApiClient, ApiError
+
+    actual = stored["files"][name]
+    owner = (stored.get("owner") or {}).get("login")
+    raw_url = actual.get("raw_url")
+    expected_bytes = expected.encode("utf-8")
+    if (name not in ("lanes-status.json", STATUS_DETAIL_NAME) or
+            not isinstance(owner, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,39}", owner) or
+            not isinstance(raw_url, str) or not re.fullmatch(
+                rf"https://gist\.githubusercontent\.com/{re.escape(owner)}/{re.escape(stored['id'])}"
+                rf"/raw/[a-f0-9]{{40}}/{re.escape(name)}", raw_url) or
+            type(actual.get("size")) is not int or actual["size"] != len(expected_bytes)):
+        raise ValueError("untrusted or incomplete gist raw evidence")
+
+    def transport(method, url, headers, body, timeout_s):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError("gist raw deadline exceeded")
+        version = lifecycle.run(["curl", "--disable", "--version"],
+                                capture_output=True, text=True, timeout=remaining)
+        match = re.match(r"curl (\d+)\.(\d+)\.(\d+)\b", version.stdout)
+        if version.returncode != 0 or not match or tuple(map(int, match.groups())) < (8, 4, 0):
+            raise ValueError("gist raw transfer requires curl 8.4 or newer")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError("gist raw deadline exceeded")
+        # curl has a whole-transfer deadline, unlike a per-socket idle timeout.
+        # No redirects, curlrc, credentials or arbitrary URL input. The expected
+        # length is also the download ceiling, including for chunked responses.
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "raw"
+            try:
+                result = lifecycle.run([
+                    "curl", "--disable", "--silent", "--show-error", "--proto", "=https",
+                    "--max-redirs", "0", "--max-time", str(remaining),
+                    "--max-filesize", str(len(expected_bytes)), "--output", str(output),
+                    "--write-out", "%{http_code}", "--url", raw_url,
+                ], capture_output=True, text=True, timeout=remaining)
+            except subprocess.TimeoutExpired:
+                raise OSError("gist raw transfer timed out") from None
+            if result.returncode != 0 or not re.fullmatch(r"[1-5][0-9]{2}", result.stdout):
+                raise OSError("gist raw transfer unconfirmed")
+            if result.stdout != "200":
+                # Let the shared client account for rate limits and server failures.
+                return int(result.stdout), {}, ""
+            with output.open("rb") as handle:
+                content = handle.read(len(expected_bytes) + 1)
+        if (time.monotonic() >= deadline or len(content) != len(expected_bytes) or
+                content != expected_bytes or hashlib.sha256(content).digest() !=
+                hashlib.sha256(expected_bytes).digest()):
+            raise ValueError("incomplete or changed gist raw evidence")
+        return 200, {}, content.decode("utf-8")
+
+    remaining_ms = int((deadline - time.monotonic()) * 1000)
+    if remaining_ms <= 0:
+        raise ValueError("gist raw deadline exceeded")
+    # Raw gist reads are anonymous; never forward the API's bearer credential.
+    try:
+        response = ApiClient("github", "anonymous-gist-raw", transport=transport).request(
+            raw_url, priority="report", max_attempts=1, max_wait_ms=0,
+            timeout_ms=remaining_ms, conditional=False)
+        if response.status != 200:
+            raise ValueError("gist raw transfer unconfirmed")
+    except ApiError:
+        raise ValueError("gist raw readback unavailable") from None
+
+
 def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> str | None:
     """Publish one bounded status view plus complete evidence in the existing gist."""
     if not PRIMARY_FLAG.exists():
         return None
+    # A readback belongs to one publisher generation, including its final local
+    # receipt. Never let a second tick change the packet between check and write.
+    with (host.state / "status-gist-publish.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError("status-gist-publish-in-progress") from None
+        return _publish_status(host, lane, feed, tracking_issue)
+
+
+def _publish_status(host, lane, feed: dict, tracking_issue: str) -> str:
     deadline = time.monotonic() + 60
     path = host.state / "status-gist.json"
-    record = json.loads(path.read_text()) if path.exists() else {}
+    record_generation = path.read_bytes() if path.exists() else b"{}"
+    record = json.loads(record_generation)
     if not isinstance(record, dict):
         raise RuntimeError("status-gist-record-unavailable")
     full_text = json.dumps(feed, indent=1, ensure_ascii=False, allow_nan=False)
@@ -2163,6 +2248,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
             raise RuntimeError("status-gist-create-unconfirmed") from None
         # Retain the known identity even if subsequent readback is unavailable.
         atomic_write_text(path, json.dumps(record), encoding="utf-8")
+        record_generation = json.dumps(record).encode("utf-8")
     else:
         api(f"gists/{record['id']}", "PATCH", packet_path)
 
@@ -2172,6 +2258,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         files = stored.get("files")
         if stored.get("id") != record["id"] or not isinstance(files, dict):
             raise ValueError("gist identity mismatch")
+        raw_readback = False
         for name, expected in packet["files"].items():
             actual = files.get(name)
             if not isinstance(actual, dict):
@@ -2180,9 +2267,14 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
                 # The API truncates files over 1 MB; the full size is the readback there.
                 if actual.get("size") != len(expected["content"].encode("utf-8")):
                     raise ValueError("incomplete or changed gist evidence")
+            elif actual.get("truncated") is True:
+                _status_gist_raw_readback(stored, name, expected["content"], deadline)
+                raw_readback = True
             elif actual.get("truncated") is not False or actual.get("content") != expected["content"]:
                 raise ValueError("incomplete or changed gist evidence")
-    except (ValueError, AttributeError):
+        if raw_readback and json.loads(api(f"gists/{record['id']}", "GET").stdout) != stored:
+            raise ValueError("gist generation changed during raw readback")
+    except (ValueError, AttributeError, OSError, subprocess.TimeoutExpired):
         raise RuntimeError("status-gist-readback-unconfirmed") from None
     record.update({
         "verifiedAt": now_iso(),
@@ -2190,6 +2282,10 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         "publicFeedSha256": hashlib.sha256(public_text.encode("utf-8")).hexdigest(),
         **({"stageEventsSha256": stage_digest} if STAGE_EVENTS_NAME in packet["files"] else {}),
     })
+    if (time.monotonic() >= deadline or path.read_bytes() != record_generation or
+            body.read_bytes() != full_text.encode("utf-8") or
+            packet_path.read_bytes() != packet_text.encode("utf-8")):
+        raise RuntimeError("status-gist-readback-unconfirmed")
     atomic_write_text(path, json.dumps(record), encoding="utf-8")
     if created_now:
         try:
