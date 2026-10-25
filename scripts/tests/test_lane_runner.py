@@ -2229,6 +2229,30 @@ def repair_inventory_process(root, role, entered, release, preclaim, done, outpu
         done.set();raise
 
 
+class IdleExitAtomicityTest(unittest.TestCase):
+    def test_worker_idle_is_replaced_whole_so_lock_free_readers_never_see_a_torn_file(self):
+        # Gem 2026-10-25: a truncating write let a concurrent reader parse an empty file
+        # (JSONDecodeError in ClaimScanCacheTest, ~5% of runs under load; refused a release).
+        with tempfile.TemporaryDirectory() as tmp:
+            host = lane.Host(state=Path(tmp), repo=Path(tmp))
+            path = host.state / "worker-idle.json"
+            path.write_text(json.dumps({"grok": {"at": "x", "reason": "old"}}))
+            seen = []
+            real = os.replace
+            def checked(source, destination):
+                if Path(destination) == path:
+                    seen.append((json.loads(Path(source).read_text()), json.loads(path.read_text())))
+                return real(source, destination)
+            with patch.object(os, "replace", side_effect=checked):
+                lane.record_idle_exit(host, "codex", "none-eligible")
+            self.assertEqual(len(seen), 1, "the new content must be staged whole and swapped in")
+            staged, current = seen[0]
+            self.assertEqual(set(staged), {"grok", "codex"})
+            self.assertEqual(current, {"grok": {"at": "x", "reason": "old"}})
+            self.assertEqual(json.loads(path.read_text())["codex"]["reason"], "none-eligible")
+            self.assertEqual([p.name for p in host.state.iterdir() if p.name.endswith(".tmp")], [])
+
+
 class ClaimScanCacheTest(unittest.TestCase):
     def test_repair_receipt_copies_same_call_rows_without_later_metadata_donation(self):
         now = self.clock['now']
