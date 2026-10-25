@@ -14,6 +14,7 @@ export const PRODUCTION_BLOCKED_API_PREFIXES = [
 export const PRODUCTION_BLOCKED_PAGE_PREFIXES = [
   '/demo/',
   '/dev/',
+  '/engineering/preview/',
   '/exp/',
   '/sandbox',
   '/spinner-test',
@@ -24,6 +25,8 @@ export const PRODUCTION_BLOCKED_PAGE_PREFIXES = [
 /** Exact page paths outside the prefix lists above. */
 export const PRODUCTION_BLOCKED_PAGE_EXACT = [
   '/demo',
+  // Draft engineering stories (lib/engineering-publication.ts selectPreviewStories).
+  '/engineering/preview',
   '/sandbox',
   '/spinner-test',
   '/sentry-example-page',
