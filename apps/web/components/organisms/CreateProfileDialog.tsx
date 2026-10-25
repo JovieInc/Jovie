@@ -88,7 +88,7 @@ export function CreateIdentityDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className='sm:max-w-100'>
         <DialogHeader>
-          <DialogTitle>Add Artist Identity</DialogTitle>
+          <DialogTitle>Add artist identity</DialogTitle>
           <DialogDescription>
             Create an artist identity you can switch to from the sidebar.
           </DialogDescription>
@@ -96,7 +96,7 @@ export function CreateIdentityDialog({
 
         <form onSubmit={handleSubmit} className='space-y-4'>
           <div className='space-y-2'>
-            <Label htmlFor='create-profile-display-name'>Display Name</Label>
+            <Label htmlFor='create-profile-display-name'>Display name</Label>
             <Input
               id='create-profile-display-name'
               type='text'
@@ -148,7 +148,7 @@ export function CreateIdentityDialog({
               loading={isPending}
               disabled={isPending || !displayName.trim() || !username.trim()}
             >
-              Create Identity
+              Create identity
             </Button>
           </DialogFooter>
         </form>

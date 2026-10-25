@@ -290,7 +290,7 @@ function buildDropdownItems({
     items.push({
       type: 'action',
       id: 'download-ios',
-      label: 'Install iOS Alpha',
+      label: 'Install iOS alpha',
       icon: Smartphone,
       onClick: () => {
         const href =
@@ -304,7 +304,7 @@ function buildDropdownItems({
     items.push({
       type: 'action' as const,
       id: 'download-desktop',
-      label: 'Download Desktop App',
+      label: 'Download desktop app',
       icon: Monitor,
       onClick: () => {
         window.open(APP_ROUTES.DOWNLOAD, '_blank', 'noopener,noreferrer');
@@ -319,7 +319,7 @@ function buildDropdownItems({
     learnMoreItems.push({
       type: 'action',
       id: 'keyboard-shortcuts',
-      label: 'Keyboard Shortcuts',
+      label: 'Keyboard shortcuts',
       icon: Keyboard,
       onClick: handleOpenShortcuts,
       shortcut: `${GLYPH_CMD} /`,
@@ -331,7 +331,7 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'privacy-policy',
-      label: 'Privacy Policy',
+      label: 'Privacy policy',
       icon: Shield,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_PRIVACY, '_blank', 'noopener,noreferrer'),
@@ -339,7 +339,7 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'terms-of-service',
-      label: 'Terms Of Service',
+      label: 'Terms of service',
       icon: FileCheck2,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_TERMS, '_blank', 'noopener,noreferrer'),
@@ -347,7 +347,7 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'cookie-policy',
-      label: 'Cookie Policy',
+      label: 'Cookie policy',
       icon: Cookie,
       onClick: () =>
         window.open(APP_ROUTES.LEGAL_COOKIES, '_blank', 'noopener,noreferrer'),
@@ -365,7 +365,7 @@ function buildDropdownItems({
     learnMoreItems.push({
       type: 'action',
       id: 'cookie-settings',
-      label: 'Cookie Settings',
+      label: 'Cookie settings',
       icon: Settings,
       onClick: () =>
         globalThis.dispatchEvent(new CustomEvent('jv:cookie:open')),
@@ -375,7 +375,7 @@ function buildDropdownItems({
   const learnMoreSubmenu: CommonDropdownSubmenu = {
     type: 'submenu',
     id: 'learn-more',
-    label: 'Learn More',
+    label: 'Learn more',
     icon: HelpCircle,
     items: learnMoreItems,
   };
@@ -458,7 +458,7 @@ function buildDropdownItems({
     {
       type: 'action',
       id: 'feedback',
-      label: 'Send Feedback',
+      label: 'Send feedback',
       icon: MessageSquare,
       onClick: () => setIsFeedbackOpen(true),
     },

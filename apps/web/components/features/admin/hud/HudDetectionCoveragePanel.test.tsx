@@ -13,11 +13,11 @@ describe('HudDetectionCoveragePanel', () => {
     expect(
       screen.getByTestId('hud-detection-coverage-panel')
     ).toBeInTheDocument();
-    expect(screen.getByText('Detector Coverage')).toBeInTheDocument();
-    expect(screen.getByText('Founder Rescue Rate')).toBeInTheDocument();
-    expect(screen.getByText('Median Failure → Detection')).toBeInTheDocument();
-    expect(screen.getByText('Recent Blind Spots')).toBeInTheDocument();
-    expect(screen.getByText('Recent Founder Rescues')).toBeInTheDocument();
+    expect(screen.getByText('Detector coverage')).toBeInTheDocument();
+    expect(screen.getByText('Founder rescue rate')).toBeInTheDocument();
+    expect(screen.getByText('Median failure → detection')).toBeInTheDocument();
+    expect(screen.getByText('Recent blind spots')).toBeInTheDocument();
+    expect(screen.getByText('Recent founder rescues')).toBeInTheDocument();
     expect(screen.getByText('JOV-7207')).toBeInTheDocument();
     expect(
       screen.getAllByText(snapshot.nextCapability?.title ?? '').length

@@ -16,7 +16,7 @@ describe('Audience workspace evals on the Contacts page', () => {
     render(<AudienceTableLoadingShell />);
 
     expect(screen.getByTestId('dashboard-audience-loading')).toBeVisible();
-    expect(screen.getByLabelText('Loading Audience')).toBeVisible();
+    expect(screen.getByLabelText('Loading audience')).toBeVisible();
     // Dense 32px rows with the people-row face skeleton (JOV-7798).
     expect(
       document.querySelector('table[data-table-row-mode="dense"]')

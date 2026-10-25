@@ -11,7 +11,7 @@ export function InboxRuntimeNotification() {
   if (!update?.available) return null;
   return (
     <section
-      aria-label='App Updates'
+      aria-label='App updates'
       className='mb-3'
       data-testid='inbox-runtime-notification'
     >

@@ -2,7 +2,7 @@
  * ESLint rule to enforce canonical casing for UI labels.
  *
  * DESIGN.md → Text Casing:
- * - Title Case for labels, headings, buttons, badges, nav items, column headers
+ * - Sentence case for labels, headings, buttons, badges, nav items, column headers
  * - Sentence case for body text, descriptions, tooltips, and toasts
  *
  * Allow intentional exceptions with an inline comment:
@@ -14,56 +14,54 @@
 
 'use strict';
 
+const path = require('node:path');
+const baseline = require('./canonical-ui-label-casing.baseline.json');
+
 const {
   HEADING_ELEMENTS,
   SENTENCE_CASE_COMPONENTS,
   SENTENCE_CASE_OBJECT_KEYS,
   SENTENCE_CASE_PROPS,
-  TITLE_CASE_COMPONENTS,
-  TITLE_CASE_OBJECT_KEYS,
-  TITLE_CASE_PROPS,
+  LABEL_COMPONENTS,
+  LABEL_OBJECT_KEYS,
+  LABEL_PROPS,
   getJsxAttributeName,
   getJsxElementName,
   getStringFromJsxAttributeValue,
   getStringLiteralValue,
   hasAllowlistComment,
   isSentenceCase,
-  isTitleCase,
   isToastCall,
   isUiScopedFile,
-  toCanonicalTitleCase,
+  toCanonicalSentenceCase,
 } = require('./canonical-ui-label-casing-utils');
+
+const runAllowances = new WeakMap();
 
 /**
  * @param {import('eslint').Rule.RuleContext} context
  * @param {import('@typescript-eslint/types').TSESTree.Node} node
  * @param {string} value
- * @param {'title' | 'sentence'} expectedCasing
  * @param {string} contextLabel
  */
-function reportCasingViolation(
-  context,
-  node,
-  value,
-  expectedCasing,
-  contextLabel
-) {
+function reportCasingViolation(context, node, value, contextLabel) {
   if (hasAllowlistComment(node, context)) return;
 
-  const isValid =
-    expectedCasing === 'title' ? isTitleCase(value) : isSentenceCase(value);
-  if (isValid) return;
+  if (isSentenceCase(value)) return;
+  const key = `${contextLabel}: ${value.replace(/\s+/g, ' ').trim()}`;
+  const allowances = runAllowances.get(context);
+  if (allowances?.[key] > 0) {
+    allowances[key]--;
+    return;
+  }
 
   context.report({
     node,
-    messageId: expectedCasing === 'title' ? 'useTitleCase' : 'useSentenceCase',
+    messageId: 'useSentenceCase',
     data: {
       contextLabel,
       value,
-      suggestion:
-        expectedCasing === 'title'
-          ? toCanonicalTitleCase(value)
-          : value.charAt(0).toUpperCase() + value.slice(1),
+      suggestion: toCanonicalSentenceCase(value),
     },
   });
 }
@@ -101,12 +99,10 @@ module.exports = {
     type: 'problem',
     docs: {
       description:
-        'Enforce canonical Title Case / sentence case for UI labels per DESIGN.md',
+        'Enforce canonical sentence case for UI labels per DESIGN.md',
       recommended: true,
     },
     messages: {
-      useTitleCase:
-        'UI label in {{contextLabel}} must use Title Case. Found "{{value}}". Expected "{{suggestion}}".',
       useSentenceCase:
         'UI copy in {{contextLabel}} must use sentence case. Found "{{value}}". Expected "{{suggestion}}".',
     },
@@ -121,6 +117,11 @@ module.exports = {
           ? context.getFilename()
           : '';
 
+    const relativePath = path
+      .relative(path.resolve(__dirname, '..'), filename)
+      .replaceAll('\\', '/');
+    runAllowances.set(context, { ...baseline[relativePath] });
+
     if (!isUiScopedFile(filename)) {
       return {};
     }
@@ -134,7 +135,7 @@ module.exports = {
         if (staticChildren.length === 0) return;
 
         if (
-          TITLE_CASE_COMPONENTS.has(componentName) ||
+          LABEL_COMPONENTS.has(componentName) ||
           HEADING_ELEMENTS.has(componentName)
         ) {
           for (const child of staticChildren) {
@@ -142,7 +143,6 @@ module.exports = {
               context,
               child.node,
               child.value,
-              'title',
               `<${componentName}>`
             );
           }
@@ -155,7 +155,6 @@ module.exports = {
               context,
               child.node,
               child.value,
-              'sentence',
               `<${componentName}>`
             );
           }
@@ -169,25 +168,13 @@ module.exports = {
         const stringValue = getStringFromJsxAttributeValue(node.value);
         if (stringValue == null) return;
 
-        if (TITLE_CASE_PROPS.has(propName)) {
-          reportCasingViolation(
-            context,
-            node,
-            stringValue,
-            'title',
-            `${propName} prop`
-          );
+        if (LABEL_PROPS.has(propName)) {
+          reportCasingViolation(context, node, stringValue, `${propName} prop`);
           return;
         }
 
         if (SENTENCE_CASE_PROPS.has(propName)) {
-          reportCasingViolation(
-            context,
-            node,
-            stringValue,
-            'sentence',
-            `${propName} prop`
-          );
+          reportCasingViolation(context, node, stringValue, `${propName} prop`);
         }
       },
 
@@ -195,7 +182,7 @@ module.exports = {
         if (node.key.type !== 'Identifier') return;
         const propName = node.key.name;
         if (
-          !TITLE_CASE_OBJECT_KEYS.has(propName) &&
+          !LABEL_OBJECT_KEYS.has(propName) &&
           !SENTENCE_CASE_OBJECT_KEYS.has(propName)
         ) {
           return;
@@ -208,12 +195,11 @@ module.exports = {
           return;
         }
 
-        if (TITLE_CASE_OBJECT_KEYS.has(propName)) {
+        if (LABEL_OBJECT_KEYS.has(propName)) {
           reportCasingViolation(
             context,
             node.value,
             node.value.value,
-            'title',
             `${propName} property`
           );
           return;
@@ -223,7 +209,6 @@ module.exports = {
           context,
           node.value,
           node.value.value,
-          'sentence',
           `${propName} property`
         );
       },
@@ -238,7 +223,6 @@ module.exports = {
           context,
           firstArg,
           firstArg.value,
-          'sentence',
           'toast message'
         );
       },

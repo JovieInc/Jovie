@@ -58,16 +58,16 @@ describe('OvieCeoOverview', () => {
     expect(screen.getByTestId('ovie-ceo-overview')).toBeInTheDocument();
     expect(screen.getAllByTestId(/^ovie-core-metric-/)).toHaveLength(3);
     expect(screen.getByText('Alive')).toBeInTheDocument();
-    expect(screen.getAllByText('Not Measured')).toHaveLength(2);
+    expect(screen.getAllByText('Not measured')).toHaveLength(2);
     expect(screen.getAllByText('Summer')).toHaveLength(3);
     expect(
       screen.getByRole('link', { name: /Inspect Stripe/i })
     ).toHaveAttribute('href', 'https://dashboard.stripe.com/');
     expect(
-      screen.getByRole('link', { name: /Inspect Customers/i })
+      screen.getByRole('link', { name: /Inspect customers/i })
     ).toHaveAttribute('href', '/app/ov/people');
     expect(
-      screen.getByRole('link', { name: /Inspect Releases/i })
+      screen.getByRole('link', { name: /Inspect releases/i })
     ).toHaveAttribute('href', '/app/ov/releases');
   });
 
@@ -119,7 +119,7 @@ describe('OvieCeoOverview', () => {
     );
 
     expect(screen.getByText('Alive')).toHaveClass('text-7xl');
-    for (const value of screen.getAllByText('Not Measured')) {
+    for (const value of screen.getAllByText('Not measured')) {
       expect(value).toHaveClass('text-4xl');
     }
   });

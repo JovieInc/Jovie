@@ -89,8 +89,8 @@ describe('mapSuggestedActionToInboxCard', () => {
 
     expect(card).toMatchObject({
       category: 'youtube_thumbnail',
-      typeLabel: 'YouTube Thumbnail',
-      primaryActionLabel: 'Approve Candidate',
+      typeLabel: 'YouTube thumbnail',
+      primaryActionLabel: 'Approve candidate',
       youtubeThumbnail: {
         channelId: 'UC-owned',
         youtubeVideoId: 'video-1',
@@ -146,7 +146,7 @@ describe('mapSuggestedActionToInboxCard', () => {
     expect(card).toMatchObject({
       id: 'brand-deal-1',
       signalType: 'brand_deal',
-      typeLabel: 'Brand Deal',
+      typeLabel: 'Brand deal',
       title: 'Example Brand creator-performance pilot',
       why: '$7.5k-$12.5k · Alex Buyer @ Example Brand · Backstage (t@timwhite.co) · verified · score 75.0 · 90-day organic usage, no exclusivity',
       primaryActionLabel: 'Approve buyer',
@@ -168,7 +168,7 @@ describe('mapSuggestedActionToInboxCard', () => {
     });
 
     expect(card.category).toBe('suggestion');
-    expect(card.typeLabel).toBe('Brand Deal');
+    expect(card.typeLabel).toBe('Brand deal');
     expect(card.primaryActionLabel).toBe('Approve buyer');
   });
 
@@ -187,7 +187,7 @@ describe('mapSuggestedActionToInboxCard', () => {
     expect(card).toMatchObject({
       id: 'action-1',
       signalType: 'new_event',
-      typeLabel: 'New Event',
+      typeLabel: 'New event',
       title: 'Detroit listeners up 340% — book a show',
       why: 'Promoter email matched your Detroit growth spike.',
       primaryActionLabel: 'Add to calendar',
@@ -229,7 +229,7 @@ describe('mapSuggestedActionToInboxCard', () => {
     });
 
     expect(card.signalType).toBe('new_song');
-    expect(card.typeLabel).toBe('New Song');
+    expect(card.typeLabel).toBe('New song');
   });
 
   it('falls back when payload title and rationale are missing', () => {
@@ -384,7 +384,7 @@ describe('tour-date classification in the mapper', () => {
     // category drives tour-date action labels; signalType drives the typed chip.
     expect(card.category).toBe('tour_date');
     expect(card.signalType).toBe('new_event');
-    expect(card.typeLabel).toBe('New Event');
+    expect(card.typeLabel).toBe('New event');
     expect(card.primaryActionLabel).toBe('Confirm date');
   });
 
@@ -399,7 +399,7 @@ describe('tour-date classification in the mapper', () => {
 
     expect(card.category).toBe('suggestion');
     expect(card.signalType).toBe('new_event');
-    expect(card.typeLabel).toBe('New Event');
+    expect(card.typeLabel).toBe('New event');
     expect(card.primaryActionLabel).toBe('Add to calendar');
   });
 });
@@ -459,8 +459,8 @@ describe('social reply drafts (JOV-5128)', () => {
 
     expect(card.category).toBe('social_reply');
     expect(card.signalType).toBe('fan_reply');
-    expect(card.typeLabel).toBe('Collab Request');
-    expect(card.primaryActionLabel).toBe('Approve Reply');
+    expect(card.typeLabel).toBe('Collab request');
+    expect(card.primaryActionLabel).toBe('Approve reply');
     expect(card.socialReply).toMatchObject({
       platform: 'instagram',
       authorLabel: '@promoter',
@@ -483,7 +483,7 @@ describe('social reply drafts (JOV-5128)', () => {
       createdAt: new Date('2026-10-01T08:00:00.000Z'),
     });
 
-    expect(card.typeLabel).toBe('Fan Reply');
+    expect(card.typeLabel).toBe('Fan reply');
     expect(card.socialReply?.executionState).toBe('ambiguous');
   });
 

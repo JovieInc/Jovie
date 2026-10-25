@@ -330,7 +330,7 @@ async function fillTaskSearch(page: Page, taskTitle: string): Promise<void> {
       await trigger.click();
     }
     const filterCurrentView = page.getByRole('button', {
-      name: 'Filter Current View',
+      name: 'Filter current view',
     });
     if (await filterCurrentView.isVisible().catch(() => false)) {
       await filterCurrentView.click();

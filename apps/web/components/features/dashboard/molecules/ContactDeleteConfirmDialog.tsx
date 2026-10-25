@@ -25,7 +25,7 @@ export function ContactDeleteConfirmDialog({
       onOpenChange={open => {
         if (!open) onCancel();
       }}
-      title='Delete Contact'
+      title='Delete contact'
       description={`Remove the "${deleteLabel}" contact from your profile? This action cannot be undone.`}
       confirmLabel='Delete'
       variant='destructive'

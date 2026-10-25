@@ -111,7 +111,7 @@ const mockUsePathname = vi.mocked(usePathname);
 const mockUseDesktopUpdateContext = vi.mocked(useDesktopUpdateContext);
 
 const originalLocation = window.location;
-const UPGRADE_CTA = `Get Verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
+const UPGRADE_CTA = `Get verified — ${FALLBACK_VERIFIED_PRICE_LABEL}`;
 
 describe('UserButton billing actions', () => {
   let fetchMock: Mock;
@@ -601,7 +601,7 @@ describe('UserButton billing actions', () => {
     await flushMicrotasks();
 
     await user.click(screen.getByText('Adele Adkins'));
-    await user.click(await screen.findByText('Install iOS Alpha'));
+    await user.click(await screen.findByText('Install iOS alpha'));
 
     expect(openMock).toHaveBeenCalledWith(
       APP_ROUTES.DOWNLOAD,
@@ -872,7 +872,7 @@ describe('UserButton billing actions', () => {
 
     expect(screen.getByText('Usage remaining')).toBeInTheDocument();
     expect(screen.getByText('73%')).toBeInTheDocument();
-    expect(screen.queryByText('Usage Stats')).not.toBeInTheDocument();
+    expect(screen.queryByText('Usage stats')).not.toBeInTheDocument();
   });
 
   it('shows the desktop update entry only when actionable and opens the modal from the menu', async () => {
@@ -1126,7 +1126,7 @@ describe('UserButton billing actions', () => {
     );
   });
 
-  it('uses distinct semantic icons for the Learn More menu items', async () => {
+  it('uses distinct semantic icons for the Learn more menu items', async () => {
     mockUseBillingStatusQuery.mockReturnValue({
       data: { isPro: false, plan: null, hasStripeCustomer: false },
       isLoading: false,
@@ -1137,27 +1137,27 @@ describe('UserButton billing actions', () => {
     render(<UserButton showUserInfo />);
 
     await user.click(screen.getByRole('button', { name: /Adele Adkins/i }));
-    await user.hover(screen.getByRole('menuitem', { name: 'Learn More' }));
+    await user.hover(screen.getByRole('menuitem', { name: 'Learn more' }));
 
     await waitFor(() => {
       expect(
-        screen.getByRole('menuitem', { name: 'Privacy Policy' })
+        screen.getByRole('menuitem', { name: 'Privacy policy' })
       ).toBeVisible();
     });
 
     expect(
       screen
-        .getByRole('menuitem', { name: 'Privacy Policy' })
+        .getByRole('menuitem', { name: 'Privacy policy' })
         .querySelector('svg')?.className.baseVal
     ).toContain('lucide-shield');
     expect(
       screen
-        .getByRole('menuitem', { name: 'Terms Of Service' })
+        .getByRole('menuitem', { name: 'Terms of service' })
         .querySelector('svg')?.className.baseVal
     ).toContain('lucide-file-check-corner');
     expect(
       screen
-        .getByRole('menuitem', { name: 'Cookie Policy' })
+        .getByRole('menuitem', { name: 'Cookie policy' })
         .querySelector('svg')?.className.baseVal
     ).toContain('lucide-cookie');
   });

@@ -24,7 +24,7 @@ export function PresenceLockAffordance({
       <PopoverTrigger asChild>
         <button
           type='button'
-          aria-label='Monitoring Restricted'
+          aria-label='Monitoring restricted'
           aria-expanded={open}
           aria-haspopup='dialog'
           data-testid='presence-lock'
@@ -66,7 +66,7 @@ export function PresenceLockAffordance({
         onOpenAutoFocus={event => event.preventDefault()}
       >
         <p className='text-xs font-medium text-primary-token'>
-          Monitoring Restricted
+          Monitoring restricted
         </p>
         <p className='mt-1 text-xs text-secondary-token'>{explanation}</p>
         <Link

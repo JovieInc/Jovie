@@ -310,7 +310,7 @@ describe('DashboardAudienceTable', () => {
       screen.getByTestId('dashboard-audience-empty-state')
     ).toBeInTheDocument();
     expect(screen.getByTestId('unified-table')).toBeInTheDocument();
-    expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
+    expect(screen.getByText('Grow your audience')).toBeInTheDocument();
     expect(capturedTableData).toEqual([]);
   });
 
@@ -321,7 +321,7 @@ describe('DashboardAudienceTable', () => {
     expect(
       screen.getByTestId('dashboard-audience-empty-state')
     ).toBeInTheDocument();
-    expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
+    expect(screen.getByText('Grow your audience')).toBeInTheDocument();
   });
 
   it('renders table when rows are provided', () => {
@@ -475,7 +475,7 @@ describe('DashboardAudienceTable', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Load More Members' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Load more members' }));
 
     expect(onLoadMore).toHaveBeenCalledTimes(1);
   });

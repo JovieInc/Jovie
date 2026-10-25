@@ -43,7 +43,7 @@ export const AUDIENCE_CSV_COLUMNS: CSVColumn<AudienceMember>[] = [
     },
   },
   {
-    header: 'Last Action',
+    header: 'Last action',
     accessor: 'latestActions',
     formatter: v => {
       const actions = v as { label: string }[] | null;
@@ -54,14 +54,14 @@ export const AUDIENCE_CSV_COLUMNS: CSVColumn<AudienceMember>[] = [
   },
   { header: 'Location', accessor: 'locationLabel' },
   { header: 'Type', accessor: 'type', formatter: v => capitalize(v) },
-  { header: 'Engagement Score', accessor: 'engagementScore' },
+  { header: 'Engagement score', accessor: 'engagementScore' },
   {
     header: 'Tags',
     accessor: 'tags',
     formatter: value => ((value as string[]) || []).join(', '),
   },
   {
-    header: 'Last Seen',
+    header: 'Last seen',
     accessor: 'lastSeenAt',
     formatter: v => (v as string) || '',
   },

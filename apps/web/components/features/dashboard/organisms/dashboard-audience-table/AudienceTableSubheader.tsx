@@ -141,5 +141,5 @@ const SUBSCRIBER_EXPORT_COLUMNS: CSVColumn<SubscriberExportRow>[] = [
   { header: 'Name', accessor: 'name' },
   { header: 'Email', accessor: 'email' },
   { header: 'Country', accessor: 'countryCode' },
-  { header: 'Consented At', accessor: 'consentedAt' },
+  { header: 'Consented at', accessor: 'consentedAt' },
 ];

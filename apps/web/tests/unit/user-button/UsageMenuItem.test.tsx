@@ -51,7 +51,7 @@ describe('UsageMenuItem', () => {
     await user.click(screen.getByRole('button', { name: /usage remaining/i }));
 
     const meter = screen.getByRole('progressbar', {
-      name: 'Weekly Messages remaining',
+      name: 'Weekly messages remaining',
     });
     expect(meter).toHaveAttribute('value', '1');
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
@@ -104,7 +104,7 @@ describe('UsageMenuItem', () => {
 
     await user.click(screen.getByRole('button', { name: /usage remaining/i }));
     expect(screen.getByText('Usage may be out of date')).toBeInTheDocument();
-    expect(screen.getByText('Last Known Weekly Messages')).toBeInTheDocument();
+    expect(screen.getByText('Last known weekly messages')).toBeInTheDocument();
     expect(screen.getAllByRole('progressbar')).toHaveLength(1);
   });
   it('does not claim a fresh balance after a failed refresh and exposes retry', async () => {
@@ -124,7 +124,7 @@ describe('UsageMenuItem', () => {
     expect(
       screen.queryByTestId('usage-meter-state-label')
     ).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Retry Usage' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Retry usage' }));
     expect(refetch).toHaveBeenCalledOnce();
   });
   it.each([
@@ -156,7 +156,7 @@ describe('UsageMenuItem', () => {
         screen.queryByRole('link', { name: /upgrade|plans/i })
       ).not.toBeInTheDocument();
       expect(
-        screen.getByText('Last Known Weekly Messages')
+        screen.getByText('Last known weekly messages')
       ).toBeInTheDocument();
     }
   );
@@ -183,7 +183,7 @@ describe('UsageMenuItem', () => {
       const user = userEvent.setup();
       const toggle = screen.getByRole('button', { name: /usage remaining/i });
       await user.click(toggle);
-      const retry = screen.getByRole('button', { name: 'Retry Usage' });
+      const retry = screen.getByRole('button', { name: 'Retry usage' });
       retry.focus();
       await user.keyboard('{Enter}{Enter}');
       expect(refetch).toHaveBeenCalledOnce();
@@ -208,14 +208,14 @@ describe('UsageMenuItem', () => {
       if (outcome === 'success') {
         expect(toggle).toHaveFocus();
         expect(
-          screen.queryByRole('button', { name: 'Retry Usage' })
+          screen.queryByRole('button', { name: 'Retry usage' })
         ).not.toBeInTheDocument();
       } else if (outcome === 'outside') {
         expect(outside).toHaveFocus();
       } else {
         expect(retry).toHaveFocus();
         expect(
-          screen.getByText('Last Known Weekly Messages')
+          screen.getByText('Last known weekly messages')
         ).toBeInTheDocument();
       }
     }
@@ -231,9 +231,9 @@ describe('UsageMenuItem', () => {
     await userEvent.click(
       screen.getByRole('button', { name: /usage remaining/i })
     );
-    const retry = screen.getByRole('button', { name: 'Retry Usage' });
+    const retry = screen.getByRole('button', { name: 'Retry usage' });
     await userEvent.click(retry);
     expect(retry).toHaveFocus();
-    expect(screen.getByText('Last Known Weekly Messages')).toBeInTheDocument();
+    expect(screen.getByText('Last known weekly messages')).toBeInTheDocument();
   });
 });

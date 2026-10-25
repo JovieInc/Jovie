@@ -99,7 +99,7 @@ export function getConnectionStatus(
     }
     if (row.status === 'needs_reauth') {
       return {
-        label: 'Reconnect Required',
+        label: 'Reconnect required',
         tone: 'warning',
         needsAttention: true,
         sortPriority: 0,
@@ -108,7 +108,7 @@ export function getConnectionStatus(
     }
     if (row.status === 'error') {
       return {
-        label: 'Needs Review',
+        label: 'Needs review',
         tone: 'error',
         needsAttention: true,
         sortPriority: 0,
@@ -116,7 +116,7 @@ export function getConnectionStatus(
       };
     }
     return {
-      label: 'Not Connected',
+      label: 'Not connected',
       tone: 'neutral',
       needsAttention: true,
       sortPriority: 0,
@@ -126,7 +126,7 @@ export function getConnectionStatus(
 
   if (row.qualificationStatus === 'conflicting') {
     return {
-      label: 'Needs Review',
+      label: 'Needs review',
       tone: 'error',
       needsAttention: true,
       sortPriority: 0,
@@ -135,7 +135,7 @@ export function getConnectionStatus(
   }
   if (row.qualificationStatus === 'suggested') {
     return {
-      label: 'Needs Qualification',
+      label: 'Needs qualification',
       tone: 'warning',
       needsAttention: true,
       sortPriority: 0,
@@ -144,7 +144,7 @@ export function getConnectionStatus(
   }
   if (row.qualificationStatus === 'rejected') {
     return {
-      label: 'Not You',
+      label: 'Not you',
       tone: 'neutral',
       needsAttention: false,
       sortPriority: 4,
@@ -154,7 +154,7 @@ export function getConnectionStatus(
   }
   if (row.monitoringState === 'locked') {
     return {
-      label: 'Limit Reached',
+      label: 'Limit reached',
       tone: 'warning',
       needsAttention: true,
       sortPriority: 1,
@@ -163,7 +163,7 @@ export function getConnectionStatus(
   }
   if (!providerAvailable) {
     return {
-      label: 'Search Unavailable',
+      label: 'Search unavailable',
       tone: 'neutral',
       needsAttention: false,
       sortPriority: 3,
@@ -200,7 +200,7 @@ export function getConnectionStatus(
   }
   if (row.rank === null) {
     return {
-      label: row.lastObservedAt ? 'Not Ranked' : 'Not Measured',
+      label: row.lastObservedAt ? 'Not ranked' : 'Not measured',
       tone: 'neutral',
       needsAttention: false,
       sortPriority: 3,

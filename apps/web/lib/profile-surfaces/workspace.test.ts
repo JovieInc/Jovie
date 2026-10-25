@@ -67,14 +67,14 @@ describe('connections workspace helpers', () => {
 
   it('does not claim healthy monitoring during an unavailable search provider', () => {
     expect(getConnectionStatus(surface(), false)).toMatchObject({
-      label: 'Search Unavailable',
+      label: 'Search unavailable',
       tone: 'neutral',
       needsAttention: false,
     });
     expect(
       getConnectionStatus(surface({ qualificationStatus: 'suggested' }), false)
         .label
-    ).toBe('Needs Qualification');
+    ).toBe('Needs qualification');
     expect(getConnectionStatus(connector(), false).label).toBe('Active');
   });
 
@@ -153,8 +153,8 @@ describe('connections workspace helpers', () => {
     expect(
       sortProfileWorkspaceRows([active, locked, conflicting]).map(row => row.id)
     ).toEqual(['conflicting', 'locked', 'spotify']);
-    expect(getConnectionStatus(conflicting).label).toBe('Needs Review');
-    expect(getConnectionStatus(locked).label).toBe('Limit Reached');
+    expect(getConnectionStatus(conflicting).label).toBe('Needs review');
+    expect(getConnectionStatus(locked).label).toBe('Limit reached');
   });
 
   it('retains rejected identities as non-actionable negative evidence', () => {
@@ -163,7 +163,7 @@ describe('connections workspace helpers', () => {
         surface({ qualificationStatus: 'rejected', monitoringState: 'active' })
       )
     ).toMatchObject({
-      label: 'Not You',
+      label: 'Not you',
       needsAttention: false,
       nextAction:
         'This identity was rejected and is retained as negative evidence.',
@@ -219,8 +219,8 @@ describe('connections workspace helpers', () => {
       expect(getConnectionPrimaryAction(row)).toBe('review');
       expect(getConnectionStatus(row).label).toBe(
         qualificationStatus === 'suggested'
-          ? 'Needs Qualification'
-          : 'Needs Review'
+          ? 'Needs qualification'
+          : 'Needs review'
       );
       expect(row.monitoringState).toBe('locked');
       expect(
@@ -337,7 +337,7 @@ describe('connections workspace helpers', () => {
       needsAttention: true,
     });
     expect(getConnectionStatus(pending)).toMatchObject({
-      label: 'Not Measured',
+      label: 'Not measured',
       needsAttention: false,
     });
   });

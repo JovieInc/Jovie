@@ -187,7 +187,7 @@ export function UsageMenuItem({
           {weeklyModel ? (
             <UsageMeter
               density='compact'
-              label={isStale ? 'Last Known Weekly Messages' : 'Weekly Messages'}
+              label={isStale ? 'Last known weekly messages' : 'Weekly messages'}
               showStatus={!isStale}
               model={weeklyModel}
               resetLabel={formatUsageResetLabel(weeklyModel.resetAt)}
@@ -217,7 +217,7 @@ export function UsageMenuItem({
                 aria-busy={retrying || chatUsage.isFetching}
                 onClick={retry}
               >
-                {retrying ? 'Retrying…' : 'Retry Usage'}
+                {retrying ? 'Retrying…' : 'Retry usage'}
               </Button>
             </div>
           )}

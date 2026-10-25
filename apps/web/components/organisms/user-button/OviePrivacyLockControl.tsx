@@ -190,7 +190,7 @@ export function OviePrivacyLockControl({
           size='sm'
           variant='ghost'
         >
-          Lock Ovie Now
+          Lock Ovie now
         </Button>
       ) : null}
     </div>

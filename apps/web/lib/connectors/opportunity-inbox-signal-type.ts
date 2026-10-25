@@ -106,7 +106,7 @@ export function classifyOpportunitySignalType(
 }
 
 export interface OpportunitySignalTypeMeta {
-  /** Title Case label rendered in the card meta row. */
+  /** Sentence case label rendered in the card meta row. */
   readonly label: string;
   /** Plural filter-chip label. */
   readonly filterLabel: string;
@@ -115,13 +115,13 @@ export interface OpportunitySignalTypeMeta {
 export const OPPORTUNITY_SIGNAL_TYPE_META: Readonly<
   Record<OpportunitySignalType, OpportunitySignalTypeMeta>
 > = {
-  new_song: { label: 'New Song', filterLabel: 'Songs' },
-  new_event: { label: 'New Event', filterLabel: 'Events' },
+  new_song: { label: 'New song', filterLabel: 'Songs' },
+  new_event: { label: 'New event', filterLabel: 'Events' },
   new_profile_match: {
-    label: 'Profile Match',
-    filterLabel: 'Profile Matches',
+    label: 'Profile match',
+    filterLabel: 'Profile matches',
   },
-  brand_deal: { label: 'Brand Deal', filterLabel: 'Brand Deals' },
-  fan_reply: { label: 'Fan Reply', filterLabel: 'Fan Replies' },
+  brand_deal: { label: 'Brand deal', filterLabel: 'Brand deals' },
+  fan_reply: { label: 'Fan reply', filterLabel: 'Fan replies' },
   other: { label: 'Suggestion', filterLabel: 'Other' },
 };

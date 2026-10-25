@@ -989,9 +989,9 @@ Quiet tool-call / streaming activity in the chat transcript is a first-class Sys
 | Native `alert()` / `confirm()` / `prompt()` | **NEVER** | Banned by `biome.json` `noRestrictedGlobals` and CI grep gate |
 
 **Copy rules (earn every word):**
-- **Title (Title Case):** name the action and its target. "Delete investor link?" not "Are you sure?"
+- **Title (sentence case):** name the action and its target. "Delete investor link?" not "Are you sure?"
 - **Description (Sentence case):** name the *external* consequence, not the internal record state. "Anyone with this URL will see a 404." not "This will be permanently removed."
-- **Confirm button (Title Case):** action verb. "Delete", "Dismiss all", "Cancel subscription" — never "OK" or "Yes"
+- **Confirm button (sentence case):** action verb. "Delete", "Dismiss all", "Cancel subscription" — never "OK" or "Yes"
 - **Cancel button:** keep the default "Cancel"
 - **Success toast:** terse confirmation, name the action and (where useful) the count. "Investor link deleted", "42 mismatches dismissed"
 
@@ -1068,42 +1068,30 @@ All full-screen takeover screens (offline, global error, root error, public erro
 
 ## Text Casing
 
+Decision: Tim White, 2026-10-23, JOV-8975 — sentence case replaces Title Case.
+
+All user-facing UI uses sentence case: buttons, page titles, headings, navigation,
+sidebar labels, empty states, notifications, badges, column headers, tooltips,
+aria-labels, descriptions, and other visible copy. Capitalize the first word;
+keep the remaining words lowercase except proper nouns and acronyms.
+
+Preserve names and abbreviations such as Jovie, Ovie, Spotify, Apple Music,
+YouTube, TikTok, Instagram, Stripe, Mac, macOS, iOS, EP, LP, ISRC, UPC,
+UPC/EAN, DSP, AI, URL, ID, PRO, BMI, and ASCAP. Code identifiers, file names,
+routes, CSS classes, i18n keys, analytics event names, and enum values do not change.
+
 | Context | Convention | Example |
 |---------|------------|---------|
-| Headings (H1-H4) | Title Case | "Grow Your Audience" |
-| Marketing display headlines | Sentence case | "Jovie runs your music career." |
-| Button labels | Title Case | "Copy Profile Link" |
-| Nav / tab labels | Title Case | "Dashboard", "Identified" |
-| Column headers | Title Case | "Last Action" |
-| Badge / tag labels | Title Case | "Returning", "High Intent" |
-| Body text / descriptions | Sentence case | "Share your profile link on social media." |
-| Tooltips | Sentence case | "High intent" |
-| Toast messages | Sentence case | "Member removed" |
-| Dynamic labels | Sentence case (first word capitalized) | "Mobile visitor from London" |
+| Headings | Sentence case | "Grow your audience" |
+| Buttons and aria-labels | Sentence case | "Copy profile link" |
+| Nav / tab labels | Sentence case | "Release settings" |
+| Column headers | Sentence case | "Last action" |
+| Badges and tooltips | Sentence case | "High intent" |
+| Body text and notifications | Sentence case | "Member removed" |
+| Proper nouns and acronyms | Preserve capitals | "Connect Apple Music", "Copy ISRC" |
 
-**Anti-patterns:**
-- Never ALL CAPS except abbreviations (LTV, SMS, UTM)
-- Never lowercase first word of a visible label or heading
-- Dynamic strings forming readable phrases must start with a capital letter
-
-**Marketing display exception (founder-directed 2026-07-21):** large Satoshi
-display headlines on marketing/public surfaces (homepage hero and section
-titles) use sentence case — it reads more editorial and premium at display
-sizes. App/UI headings (H1-H4 inside the product) stay Title Case. In JSX,
-mark intentional marketing sentence-case headlines with
-`{/* ui-casing-allow: marketing display headline */}`.
-
-**Recovery/disclosure exception (Tim, 2026-09-28):** error-recovery UI copy —
-titles, retry/dismiss/return actions, and disclosure toggles (a "Show/Hide
-details" `<summary>` or button) — uses sentence case, not the default Title
-Case for buttons and labels. This follows the shape of
-`RECOVERY_COPY` in `apps/web/components/features/feedback/recovery-contract.ts`
-("Something went wrong", "Try again", "Error details"): every consumer that
-composes or extends those labels (e.g. `` `Show ${RECOVERY_COPY.detailsLabel}` ``,
-a "Return to Jovie" fallback action) must keep the full rendered label in
-sentence case, not just the shared fragment. Mark instances the linter flags
-with `// ui-casing-allow: recovery action sentence case (Tim, 2026-09-28)` (or
-the JSX-comment form for a text child).
+Never use ALL CAPS except approved acronyms. Marketing display headlines and
+recovery/disclosure copy follow the same sentence case convention.
 
 **Utility:** Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data.
 

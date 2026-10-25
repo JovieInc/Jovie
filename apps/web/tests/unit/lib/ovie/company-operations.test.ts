@@ -75,12 +75,12 @@ describe('deriveOvieCompanyOverview', () => {
     const overview = deriveOvieCompanyOverview(buildMetrics(), NOW);
 
     expect(overview.metrics[1]).toMatchObject({
-      value: 'Not Measured',
+      value: 'Not measured',
       state: 'disconnected',
       observedAt: 'Not observed',
     });
     expect(overview.metrics[2]).toMatchObject({
-      value: 'Not Measured',
+      value: 'Not measured',
       state: 'disconnected',
     });
     expect(overview.metrics[2].detail).toContain(
@@ -136,7 +136,7 @@ describe('deriveOvieCompanyOverview', () => {
       state: 'unauthorized',
     };
     expect(deriveOvieCompanyOverview(metrics, NOW).metrics[1]).toMatchObject({
-      value: 'Not Measured',
+      value: 'Not measured',
       state: 'unauthorized',
     });
   });
@@ -266,7 +266,7 @@ describe('deriveOvieCompanyOverview', () => {
 
       const shipping = deriveOvieCompanyOverview(metrics, NOW).metrics[2];
       expect(shipping.state).toBe('disconnected');
-      expect(shipping.value).toBe('Not Measured');
+      expect(shipping.value).toBe('Not measured');
       expect(shipping.detail).toContain(testCase.expected);
     }
   );

@@ -202,7 +202,7 @@ function primaryOutcomeMetric(
       metrics.overview.activeSubscribers - weekAgo.activeSubscribers;
     return {
       id: 'primary-outcome',
-      label: 'Week Over Week',
+      label: 'Week over week',
       value: `${signedUsd(deltaUsd)} MRR${percent}`,
       detail: `${formatUsd(metrics.overview.mrrUsd)} MRR now vs ${formatUsd(weekAgo.mrrUsd)} 7 days ago, net of churn · ${metrics.overview.activeSubscribers} paying ${metrics.overview.activeSubscribers === 1 ? 'subscriber' : 'subscribers'} (${subscriberDelta < 0 ? '' : '+'}${subscriberDelta} WoW).`,
       state,
@@ -216,8 +216,8 @@ function primaryOutcomeMetric(
   }
   return {
     id: 'primary-outcome',
-    label: 'Week Over Week',
-    value: 'Not Measured',
+    label: 'Week over week',
+    value: 'Not measured',
     detail:
       'No authoritative weekly revenue snapshot or weekly active-company-user series is connected. Current MRR and current subscriber counts are not a week-over-week measurement.',
     state: state === 'fresh' || state === 'stale' ? 'disconnected' : state,
@@ -227,7 +227,7 @@ function primaryOutcomeMetric(
     freshnessDeadline: DEADLINE_NOT_DECLARED,
     owner: 'Summer',
     drillDownHref: APP_ROUTES.ADMIN_PEOPLE,
-    drillDownLabel: 'Inspect Customers',
+    drillDownLabel: 'Inspect customers',
   };
 }
 
@@ -237,13 +237,13 @@ function dogfoodReceiptsMetric(metrics: HudMetrics): CompanyCoreMetric {
   let exceptionDetail = '';
   if (executionExceptions > 0) {
     const itemLabel = executionExceptions === 1 ? 'item' : 'items';
-    exceptionDetail = ` ${executionExceptions} blocked or failed execution ${itemLabel} need attention in Operations Details.`;
+    exceptionDetail = ` ${executionExceptions} blocked or failed execution ${itemLabel} need attention in Operations details.`;
   }
 
   return {
     id: 'dogfood-receipts',
-    label: 'Verified Ships This Week',
-    value: 'Not Measured',
+    label: 'Verified ships this week',
+    value: 'Not measured',
     detail: `No authoritative weekly dogfood-receipt ledger is connected. Merges, green CI, and deploys do not count.${exceptionDetail}`,
     state: 'disconnected',
     authoritativeSource: 'Packaged dogfood and recurrence receipts',
@@ -251,7 +251,7 @@ function dogfoodReceiptsMetric(metrics: HudMetrics): CompanyCoreMetric {
     freshnessDeadline: DEADLINE_NOT_DECLARED,
     owner: 'Summer',
     drillDownHref: APP_ROUTES.ADMIN_RELEASES,
-    drillDownLabel: 'Inspect Releases',
+    drillDownLabel: 'Inspect releases',
   };
 }
 

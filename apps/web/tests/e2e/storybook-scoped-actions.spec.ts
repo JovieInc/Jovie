@@ -84,7 +84,7 @@ test.describe('scoped action input', () => {
       '/iframe.html?id=dashboard-opportunity-inbox-founder-review-stack--';
     await page.goto(`${base}no-visual&viewMode=story`, { waitUntil: 'commit' });
     const control = page.getByRole('button', {
-      name: 'Review Current Opportunity',
+      name: 'Review current opportunity',
     });
     await expect(control).toBeAttached({ timeout: 180_000 });
     await control.focus();

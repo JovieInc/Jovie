@@ -143,7 +143,7 @@ describe('HudCashMrrBand', () => {
     expect(screen.getByTestId('ovie-ceo-overview')).toBeInTheDocument();
     expect(screen.getByText('Company Now')).toBeInTheDocument();
     expect(screen.getByText('Alive')).toHaveClass('text-7xl');
-    for (const value of screen.getAllByText('Not Measured')) {
+    for (const value of screen.getAllByText('Not measured')) {
       expect(value).toHaveClass('text-4xl');
     }
   });

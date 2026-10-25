@@ -105,7 +105,7 @@ function useContactDetailHeaderParts({
     });
   }
   const overflowActions: DrawerHeaderAction[] = [
-    { id: 'delete', label: 'Delete Contact', icon: Trash2, onClick: onDelete },
+    { id: 'delete', label: 'Delete contact', icon: Trash2, onClick: onDelete },
   ];
 
   return {
@@ -385,10 +385,10 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
                 className='space-y-2 border-b border-subtle pb-3'
               >
                 <span className={CONTACT_SECTION_LABEL_CLASSNAME}>
-                  Contact Type
+                  Contact type
                 </span>
                 <Select value={contact.role} onValueChange={handleRoleChange}>
-                  <SelectTrigger aria-label='Contact Type'>
+                  <SelectTrigger aria-label='Contact type'>
                     <SelectValue>{roleLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
@@ -408,7 +408,7 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               </DrawerSection>
 
               <DrawerSection
-                title='Contact Info'
+                title='Contact info'
                 className='space-y-2 border-b border-subtle pb-3'
               >
                 <div className='space-y-1'>
@@ -442,18 +442,18 @@ export const ContactDetailSidebar = memo(function ContactDetailSidebar({
               {/* Preferred Channel */}
               {hasEmailAndPhone && (
                 <DrawerSection
-                  title='Preferred Contact'
+                  title='Preferred contact'
                   className='space-y-2 border-b border-subtle pb-3'
                 >
                   <div className='space-y-2'>
                     <span className={CONTACT_SECTION_LABEL_CLASSNAME}>
-                      Default Action
+                      Default action
                     </span>
                     <Select
                       value={contact.preferredChannel || ''}
                       onValueChange={handlePreferredChannelChange}
                     >
-                      <SelectTrigger aria-label='Preferred Contact Method'>
+                      <SelectTrigger aria-label='Preferred contact method'>
                         <SelectValue placeholder='Select preferred channel'>
                           {getPreferredChannelLabel(contact.preferredChannel)}
                         </SelectValue>

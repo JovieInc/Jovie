@@ -107,7 +107,7 @@ describe('AdminPlatformConnectionsPage', () => {
     expect(
       screen.getByTestId('admin-platform-connections')
     ).toBeInTheDocument();
-    expect(screen.getByText('Platform Connections')).toBeInTheDocument();
+    expect(screen.getByText('Platform connections')).toBeInTheDocument();
     expect(mockCaptureError).toHaveBeenCalledWith(
       'Admin platform connections failed to load optional settings',
       expect.any(Error),

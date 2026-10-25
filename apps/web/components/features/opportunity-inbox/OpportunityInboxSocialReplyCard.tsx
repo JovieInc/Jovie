@@ -23,7 +23,7 @@ const EXECUTION_STATE_LABELS: Readonly<Record<string, string>> = {
   sending: 'Sending',
   verified: 'Verified',
   blocked: 'Blocked',
-  ambiguous: 'Needs Review',
+  ambiguous: 'Needs review',
 };
 
 export function OpportunityInboxSocialReplyCard({

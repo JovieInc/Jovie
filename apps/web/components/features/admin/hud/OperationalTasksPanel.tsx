@@ -58,20 +58,20 @@ function workflowVisual(
     case 'merged':
     case 'production-verified':
       return {
-        label: state === 'merged' ? 'Merged' : 'Production Verified',
+        label: state === 'merged' ? 'Merged' : 'Production verified',
         className: 'text-accent-green',
         icon: CircleCheck,
       };
     case 'queued':
     case 'merge-queued':
       return {
-        label: state === 'queued' ? 'Queued' : 'Merge Queued',
+        label: state === 'queued' ? 'Queued' : 'Merge queued',
         className: 'text-accent-purple',
         icon: Clock3,
       };
     case 'in-review':
       return {
-        label: 'In Review',
+        label: 'In review',
         className: 'text-accent-orange',
         icon: GitPullRequest,
       };
@@ -83,11 +83,11 @@ function syncVisual(state: OperationalTaskFeed['syncState']) {
     case 'fresh':
       return { label: 'Fresh', tone: 'good' as const };
     case 'stale':
-      return { label: 'Stale Cache', tone: 'warning' as const };
+      return { label: 'Stale cache', tone: 'warning' as const };
     case 'syncing':
       return { label: 'Syncing', tone: 'neutral' as const };
     case 'failed':
-      return { label: 'Sync Failed', tone: 'bad' as const };
+      return { label: 'Sync failed', tone: 'bad' as const };
   }
 }
 
@@ -163,7 +163,7 @@ export function OperationalTasksPanelView({
     <>
       <Surface
         {...(presentation === 'section' ? { surface: 'details' as const } : {})}
-        aria-label='Operational Tasks'
+        aria-label='Operational tasks'
         className={presentation === 'section' ? 'overflow-hidden' : undefined}
         data-testid='ovie-operational-tasks'
       >
@@ -175,7 +175,7 @@ export function OperationalTasksPanelView({
         >
           <div className='min-w-0'>
             <h2 className='text-app font-semibold text-primary-token'>
-              Operational Tasks
+              Operational tasks
             </h2>
             <p className='truncate text-2xs text-tertiary-token'>
               Linear canonical · local reconciled cache ·{' '}

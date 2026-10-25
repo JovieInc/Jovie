@@ -50,7 +50,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
 
       {/* Avatar uploader (disabled by default) */}
       <FormField
-        label='Artist Name'
+        label='Artist name'
         error={formSubmitted ? validationErrors.name : undefined}
         helpText='Your name as it will appear on your profile'
         id='artist-name'
@@ -98,7 +98,7 @@ export function ProfileForm({ artist, onUpdate }: ProfileFormProps) {
         variant='primary'
         className='w-full'
       >
-        Update Profile
+        Update profile
       </Button>
 
       <FormStatus success={success ? 'Profile updated!' : undefined} />

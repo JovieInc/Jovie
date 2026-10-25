@@ -111,7 +111,7 @@ describe('presence inspector content (JOV-8106)', () => {
     const row = surface({ monitoringState: 'locked' });
     const model = derivePresenceInspector(row);
 
-    expect(model.status.label).toBe('Limit Reached');
+    expect(model.status.label).toBe('Limit reached');
     expect(model.primaryAction).toBe('upgrade');
     expect(model.signals.length).toBeGreaterThan(0);
     expect(model.needsIdentityDecision).toBe(false);

@@ -213,7 +213,7 @@ describe('ContactsTable', () => {
     expect(
       screen.getByTestId('contacts-toolbar-count-skeleton')
     ).toBeInTheDocument();
-    expect(screen.queryByText('No Contacts Yet')).not.toBeInTheDocument();
+    expect(screen.queryByText('No contacts yet')).not.toBeInTheDocument();
     // Loading and loaded rows share the 32px dense people-row geometry.
     expect(screen.getByTestId('contacts-unified-table')).toHaveAttribute(
       'data-row-mode',
@@ -221,7 +221,7 @@ describe('ContactsTable', () => {
     );
   });
 
-  it('keeps the same Add Contact action in the toolbar and empty state', () => {
+  it('keeps the same Add contact action in the toolbar and empty state', () => {
     const onAddContact = vi.fn();
 
     renderContactsTable({
@@ -234,7 +234,7 @@ describe('ContactsTable', () => {
     });
 
     expect(
-      screen.getByRole('heading', { name: 'No Contacts Yet' })
+      screen.getByRole('heading', { name: 'No contacts yet' })
     ).toBeVisible();
     expect(screen.getByTestId('contacts-toolbar-count')).toHaveTextContent(
       '0 contacts'
@@ -243,7 +243,7 @@ describe('ContactsTable', () => {
       screen.getByText('Add bookings, management, and press contacts.')
     ).toBeVisible();
     const emptyState = screen
-      .getByRole('heading', { name: 'No Contacts Yet' })
+      .getByRole('heading', { name: 'No contacts yet' })
       .closest('output');
     expect(emptyState).not.toBeNull();
     if (!emptyState) throw new TypeError('Expected canonical empty state');
@@ -251,7 +251,7 @@ describe('ContactsTable', () => {
     expect(emptyState.parentElement?.className).toContain('flex');
     expect(emptyState.querySelector('svg')).not.toBeNull();
     const addContactActions = screen.getAllByRole('button', {
-      name: 'Add Contact',
+      name: 'Add contact',
     });
     expect(addContactActions).toHaveLength(2);
     fireEvent.click(addContactActions[1]!);

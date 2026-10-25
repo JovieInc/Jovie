@@ -427,7 +427,7 @@ function HeaderGlobalSearch({
             variant='ghost'
             size='icon'
             onClick={onOpenFilters}
-            aria-label='Filter Current View'
+            aria-label='Filter current view'
             className='h-6 w-6 shrink-0'
           >
             <SlidersHorizontal className='h-3.5 w-3.5' aria-hidden='true' />
@@ -438,7 +438,7 @@ function HeaderGlobalSearch({
           variant='ghost'
           size='icon'
           onClick={onClose}
-          aria-label='Close Search'
+          aria-label='Close search'
           className='h-6 w-6 shrink-0'
         >
           <X className='h-3.5 w-3.5' aria-hidden='true' />
@@ -454,7 +454,7 @@ function HeaderGlobalSearch({
           // listbox with zero options (with a non-option status child) is
           // invalid ARIA.
           {...(groups.length > 0 || contextualSuggestions.length > 0
-            ? { role: 'listbox', 'aria-label': 'Search Results' }
+            ? { role: 'listbox', 'aria-label': 'Search results' }
             : {})}
           className='absolute inset-x-0 top-full z-50 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-subtle bg-surface-0 p-1.5 shadow-popover'
         >
@@ -508,7 +508,7 @@ function HeaderGlobalSearch({
           ))}
           {contextualSuggestions.length > 0 ? (
             <fieldset
-              aria-label='Current View'
+              aria-label='Current view'
               data-search-result-group='current-view'
               className='m-0 min-w-0 border-0 p-0'
             >

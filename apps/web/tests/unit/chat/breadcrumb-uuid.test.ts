@@ -3,8 +3,8 @@ import { getDemoBreadcrumbSegment } from '@/hooks/useAuthRouteConfig';
 import { getBreadcrumbLabel } from '@/lib/constants/breadcrumb-labels';
 
 describe('getBreadcrumbLabel', () => {
-  it('returns "New Chat" for the chat segment', () => {
-    expect(getBreadcrumbLabel('chat')).toBe('New Chat');
+  it('returns "New chat" for the chat segment', () => {
+    expect(getBreadcrumbLabel('chat')).toBe('New chat');
   });
 
   it('returns "Dashboard" for the dashboard segment', () => {
@@ -22,7 +22,7 @@ describe('getBreadcrumbLabel', () => {
   });
 
   it('returns the explicit title for the visibility audit', () => {
-    expect(getBreadcrumbLabel('visibility-audit')).toBe('Visibility Audit');
+    expect(getBreadcrumbLabel('visibility-audit')).toBe('Visibility audit');
   });
 
   it('converts unknown kebab-case to sentence case', () => {

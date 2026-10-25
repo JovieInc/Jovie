@@ -129,7 +129,7 @@ describe('subscriber export preparation', () => {
       })
     );
     expect(await readBlob(download.mock.calls[0][0])).toBe(
-      'Name,Email,Country,Consented At\n,consented@example.com,,2026-10-17T00:00:00.000Z'
+      'Name,Email,Country,Consented at\n,consented@example.com,,2026-10-17T00:00:00.000Z'
     );
   });
 

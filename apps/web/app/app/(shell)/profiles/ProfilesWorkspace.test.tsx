@@ -425,7 +425,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     const rail = render(
       <TooltipProvider>{panel as ReactElement}</TooltipProvider>
     );
-    await user.click(screen.getByRole('button', { name: 'Retry Source' }));
+    await user.click(screen.getByRole('button', { name: 'Retry source' }));
     expect(
       await within(screen.getByRole('table')).findByText('Observed Artist Name')
     ).toBeInTheDocument();
@@ -461,21 +461,21 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     renderWorkspace(data);
     await user.click(
-      screen.getByRole('button', { name: /Review Suggestions/ })
+      screen.getByRole('button', { name: /Review suggestions/ })
     );
-    expect(await screen.findByText("Couldn't Load Suggestions")).toBeVisible();
+    expect(await screen.findByText("Couldn't load suggestions")).toBeVisible();
     expect(
       screen.queryByText('Saved suggestions are still available. Try again.')
     ).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    await user.click(screen.getByRole('button', { name: 'Try Again' }));
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
     expect(
       await screen.findByRole('list', {
-        name: 'Suggested Connection Review Queue',
+        name: 'Suggested connection review queue',
       })
     ).toBeVisible();
     expect(
-      screen.queryByText("Couldn't Load Suggestions")
+      screen.queryByText("Couldn't load suggestions")
     ).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
@@ -527,7 +527,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       <TooltipProvider>{panel as ReactElement}</TooltipProvider>
     );
     expect(
-      screen.getByRole('link', { name: 'Inspect Source' })
+      screen.getByRole('link', { name: 'Inspect source' })
     ).toHaveAttribute('href', base.url);
     expect(
       screen.queryByRole('link', { name: 'Upgrade' })
@@ -631,10 +631,10 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       'min-h-75'
     );
     expect(
-      screen.getByRole('heading', { name: 'No Identity Selected' })
+      screen.getByRole('heading', { name: 'No identity selected' })
     ).toHaveClass('text-sm', 'font-semibold', 'text-primary-token');
     expect(
-      screen.getByRole('link', { name: 'Set Up Identity' })
+      screen.getByRole('link', { name: 'Set up identity' })
     ).toHaveAttribute('href', '/app/settings/profile');
   });
 
@@ -667,7 +667,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       })
     ).toHaveTextContent('Spotify');
     const status = within(spotifyRow as HTMLElement)
-      .getAllByText('Limit Reached')[0]
+      .getAllByText('Limit reached')[0]
       ?.closest('[tabindex="0"]');
     fireEvent.focus(status as HTMLElement);
     expect(
@@ -701,7 +701,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
     }
     expect(
-      screen.getByRole('button', { name: 'Add Profile Or Site' })
+      screen.getByRole('button', { name: 'Add profile or site' })
     ).toBeInTheDocument();
   });
 
@@ -741,7 +741,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     ).not.toBeInTheDocument();
     expect(
       within(signalList).getByTestId('presence-signal-finding')
-    ).toHaveTextContent('Needs Qualification');
+    ).toHaveTextContent('Needs qualification');
   });
 
   it('groups presence signals into separated blocker, finding, and state primitives', async () => {
@@ -755,7 +755,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     const dspSignals = screen.getByTestId('presence-signal-list');
     expect(
       within(dspSignals).getByTestId('presence-signal-finding')
-    ).toHaveTextContent('Limit Reached');
+    ).toHaveTextContent('Limit reached');
     expect(
       within(dspSignals).queryByTestId('presence-signal-blocker')
     ).not.toBeInTheDocument();
@@ -798,7 +798,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       )
     );
     await user.click(
-      screen.getByRole('button', { name: /Review Suggestions/ })
+      screen.getByRole('button', { name: /Review suggestions/ })
     );
 
     expect(
@@ -830,14 +830,14 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(
       within(screen.getByTestId('registered-header-actions')).getByRole(
         'button',
-        { name: 'Add Profile Or Site' }
+        { name: 'Add profile or site' }
       )
     );
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     expect(panel).not.toBeNull();
 
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
-    expect(await screen.findByText('Review Suggestions')).toBeInTheDocument();
+    expect(await screen.findByText('Review suggestions')).toBeInTheDocument();
     expect(
       screen.getByText('2 suggested profiles to review.')
     ).toBeInTheDocument();
@@ -852,7 +852,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     await userEvent
       .setup()
-      .click(screen.getByRole('button', { name: /Review Suggestions/ }));
+      .click(screen.getByRole('button', { name: /Review suggestions/ }));
 
     expect(
       await screen.findByText('Add canonical Alpha Artist profile')
@@ -878,7 +878,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     await user.click(
-      screen.getByRole('button', { name: /Review Suggestions/ })
+      screen.getByRole('button', { name: /Review suggestions/ })
     );
     expect(await screen.findByText('TikTok')).toBeInTheDocument();
 
@@ -932,7 +932,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     await user.click(
-      screen.getByRole('button', { name: /Review Suggestions/ })
+      screen.getByRole('button', { name: /Review suggestions/ })
     );
     expect(await screen.findByText('Alpha Artist')).toBeInTheDocument();
 
@@ -968,7 +968,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     await user.click(
-      screen.getByRole('button', { name: /Review Suggestions/ })
+      screen.getByRole('button', { name: /Review suggestions/ })
     );
     expect(await screen.findByText('TikTok')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add' }));
@@ -992,7 +992,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
     expect(await screen.findByText('TikTok')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Close Suggestions' })
+      screen.getByRole('button', { name: 'Close suggestions' })
     ).toHaveAttribute('aria-expanded', 'true');
     expect(navigationMock.replace).toHaveBeenCalledWith('/app/presence');
     expect(navigationMock.replace).not.toHaveBeenCalledWith(
@@ -1013,7 +1013,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     if (!instagram) throw new Error('Missing profile fixture');
     renderWorkspace({ ...data, providerAvailable: false, rows: [instagram] });
     for (const status of screen.getAllByLabelText(
-      'Monitoring Unknown: Search Unavailable'
+      'Monitoring unknown: search unavailable'
     ))
       expect(status).toHaveTextContent('Unknown');
     fireEvent.click(screen.getByRole('row', { name: /Instagram/ }));
@@ -1032,11 +1032,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     const details = screen.getByRole('button', { name: 'Monitoring details' });
     expect(details).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.queryByText(/Search Unavailable\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Search unavailable\./)).not.toBeInTheDocument();
     details.focus();
     await user.keyboard('{Enter}');
     expect(details).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText(/Search Unavailable\./)).toHaveTextContent(
+    expect(screen.getByText(/Search unavailable\./)).toHaveTextContent(
       'Search checks are unavailable'
     );
     expect(
@@ -1053,7 +1053,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     });
 
     await user.click(action);
-    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
+    await user.click(screen.getByRole('menuitem', { name: /View details/i }));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     expect(panel).not.toBeNull();
 
@@ -1075,7 +1075,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     );
     // JOV-6170: separated signal primitives replace the merged next-best-action.
     expect(screen.getByTestId('presence-signal-finding')).toHaveTextContent(
-      'Limit Reached'
+      'Limit reached'
     );
     expect(screen.getByText('Signals')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Upgrade' })).toHaveAttribute(
@@ -1091,7 +1091,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(
       screen.getByRole('button', { name: 'Actions for Spotify' })
     );
-    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
+    await user.click(screen.getByRole('menuitem', { name: /View details/i }));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
 
@@ -1125,7 +1125,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(
       screen.getByRole('button', { name: 'Actions for Instagram' })
     );
-    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
+    await user.click(screen.getByRole('menuitem', { name: /View details/i }));
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     expect(panel).not.toBeNull();
 
@@ -1151,7 +1151,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(action);
 
     expect(
-      screen.getByRole('menuitem', { name: /View Details/i })
+      screen.getByRole('menuitem', { name: /View details/i })
     ).toBeInTheDocument();
     expect(useRegisterRightPanel).not.toHaveBeenCalled();
 
@@ -1161,7 +1161,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.keyboard('{Enter}');
 
     expect(
-      screen.getByRole('menuitem', { name: /View Details/i })
+      screen.getByRole('menuitem', { name: /View details/i })
     ).toBeInTheDocument();
     expect(useRegisterRightPanel).not.toHaveBeenCalled();
   });
@@ -1191,13 +1191,13 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(
       screen.getByRole('button', { name: 'Actions for Spotify' })
     );
-    await user.click(screen.getByRole('menuitem', { name: /View Details/i }));
+    await user.click(screen.getByRole('menuitem', { name: /View details/i }));
     expect(
       vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
     ).not.toBeNull();
 
     await user.click(
-      screen.getByRole('button', { name: /Review Suggestions/ })
+      screen.getByRole('button', { name: /Review suggestions/ })
     );
     expect(
       vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0]
@@ -1209,14 +1209,14 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     await user.click(
-      screen.getByRole('button', { name: 'Add Profile Or Site' })
+      screen.getByRole('button', { name: 'Add profile or site' })
     );
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     expect(panel).not.toBeNull();
 
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
     expect(
-      await screen.findByRole('complementary', { name: 'Add Profile Or Site' })
+      await screen.findByRole('complementary', { name: 'Add profile or site' })
     ).toBeInTheDocument();
     expect(screen.queryByText(/Connect services/i)).not.toBeInTheDocument();
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
@@ -1224,11 +1224,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(
       screen.getByRole('button', { name: /Add public profile/i })
     );
-    const url = screen.getByRole('textbox', { name: 'Public Profile URL' });
+    const url = screen.getByRole('textbox', { name: 'Public profile URL' });
     await user.type(url, 'Instagram.com/tim/?utm_source=test');
     expect(screen.getByText(/instagram\.com\/tim/)).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Review Profile' })
+      screen.getByRole('button', { name: 'Review profile' })
     ).toBeEnabled();
   });
 
@@ -1237,7 +1237,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     await user.click(
-      screen.getByRole('button', { name: 'Add Profile Or Site' })
+      screen.getByRole('button', { name: 'Add profile or site' })
     );
     const panel = vi.mocked(useRegisterRightPanel).mock.calls.at(-1)?.[0];
     render(<TooltipProvider>{panel as ReactElement}</TooltipProvider>);
@@ -1245,11 +1245,11 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     await user.click(
       await screen.findByRole('button', { name: /Add public profile/i })
     );
-    const input = screen.getByRole('textbox', { name: 'Public Profile URL' });
+    const input = screen.getByRole('textbox', { name: 'Public profile URL' });
     await user.type(input, '@newhandle');
 
     expect(
-      screen.getByRole('listbox', { name: 'Suggested Profile Destinations' })
+      screen.getByRole('listbox', { name: 'Suggested profile destinations' })
     ).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /TikTok/i })).toHaveAttribute(
       'aria-selected',
@@ -1260,7 +1260,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(input).toHaveValue('https://youtube.com/@newhandle');
     expect(screen.getByText('Detected')).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Review Profile' })
+      screen.getByRole('button', { name: 'Review profile' })
     ).toBeEnabled();
 
     expect(screen.getByText('Preview only · not saved')).toBeInTheDocument();
@@ -1288,7 +1288,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     renderWorkspace(data);
 
     expect(
-      screen.getByRole('columnheader', { name: 'Search Rank' })
+      screen.getByRole('columnheader', { name: 'Search rank' })
     ).toHaveClass('max-lg:hidden');
     expect(screen.getByRole('columnheader', { name: 'Change' })).toHaveClass(
       'max-xl:hidden'
@@ -1350,7 +1350,7 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     // Status pill renders at the locked 32px minimum.
     const spotifyRow = rowAction.closest('tr');
     const status = within(spotifyRow as HTMLElement)
-      .getAllByText('Limit Reached')[0]
+      .getAllByText('Limit reached')[0]
       ?.closest('[tabindex="0"]');
     expect(status).toHaveClass('min-h-8');
 

@@ -77,7 +77,7 @@ describe('Contacts authenticated-surface evals', () => {
       />
     );
     expect(
-      screen.queryByRole('heading', { name: 'Delete Contact' })
+      screen.queryByRole('heading', { name: 'Delete contact' })
     ).not.toBeInTheDocument();
 
     rerender(
@@ -88,7 +88,7 @@ describe('Contacts authenticated-surface evals', () => {
       />
     );
     expect(
-      screen.getByRole('heading', { name: 'Delete Contact' })
+      screen.getByRole('heading', { name: 'Delete contact' })
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Delete' })).toHaveAttribute(
       'data-destructive',

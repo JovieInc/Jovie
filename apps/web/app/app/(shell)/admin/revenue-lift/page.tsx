@@ -8,7 +8,7 @@ import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { RevenueLiftDashboardView } from './RevenueLiftDashboardView';
 
 export const metadata: Metadata = {
-  title: 'Revenue Lift | Admin',
+  title: 'Revenue lift | Admin',
   description:
     'North star IRPAA + KPI tree from the canonical metrics layer (ops/VC).',
   robots: NOINDEX_ROBOTS,
@@ -32,7 +32,7 @@ export default async function AdminRevenueLiftPage() {
 
   return (
     <AdminPage
-      title='Revenue Lift'
+      title='Revenue lift'
       description='North star IRPAA and KPI tree from the canonical metrics layer. Internal ops / VC surface — every tile names its source.'
       testId='admin-revenue-lift-page'
       viewTestId='admin-revenue-lift-content'

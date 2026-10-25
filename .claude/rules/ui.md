@@ -346,7 +346,8 @@ Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 ### Text Casing Rules
 
 - All user-facing text must follow `DESIGN.md` casing rules.
-- **Title Case** for labels, headings, buttons, badges, column headers, nav items.
+- **Sentence case** for all user-facing UI, including labels, headings, buttons, badges, column headers, nav items, and aria-labels. Preserve proper nouns and acronyms (Jovie, Ovie, Apple Music, EP, ISRC, UPC, AI, URL, ID).
+- Decision: Tim White, 2026-10-23, JOV-8975 — sentence case replaces Title Case.
 - **Sentence case** for body text, descriptions, tooltips, toasts.
 - Never lowercase the first word of a visible label or heading.
 - Use `capitalizeFirst()` from `apps/web/lib/utils/string-utils.ts` for dynamic data from the database.
@@ -372,7 +373,7 @@ Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 
 - Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium.
 - Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment.
-- Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else.
+- Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal sentence case labels unless an existing canonical pattern explicitly calls for something else.
 - For marketing sections, the default composition, eyebrow rules, above-the-fold contract, AI-mockup bans, and fake-proof/founder-first bans are now owned normatively by the marketing registry (`apps/web/data/marketing/`) — see `docs/marketing/AGENT_GUIDE.md`. The rules below are retained only where they apply to non-marketing UI.
 - Do **NOT** wrap content in a Card when the parent surface (Sheet, Drawer, existing Card) already provides visual grouping; first solve hierarchy with spacing, alignment, type, and surface contrast.
 - Nested decorative carding around a phone, screenshot, or demo is banned by default. If the visual already lives inside a phone, drawer, or screenshot, do not wrap it in extra floating cards just to make it feel designed.

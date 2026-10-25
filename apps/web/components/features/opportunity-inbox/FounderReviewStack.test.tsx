@@ -122,7 +122,7 @@ describe('FounderReviewStack', () => {
 
     await user.tab();
     expect(
-      screen.getByRole('button', { name: 'Review Current Opportunity' })
+      screen.getByRole('button', { name: 'Review current opportunity' })
     ).toHaveFocus();
 
     await user.keyboard('{ArrowRight}');
@@ -147,7 +147,7 @@ describe('FounderReviewStack', () => {
     async input => {
       const { onApprove, onReject } = renderStack();
       const control = screen.getByRole('button', {
-        name: 'Review Current Opportunity',
+        name: 'Review current opportunity',
       });
       control.focus();
       fireEvent.keyDown(control, { key: 'ArrowRight', ...input });
@@ -162,7 +162,7 @@ describe('FounderReviewStack', () => {
   it('does not record a second decision while the active card is pending', async () => {
     const { onApprove, onReject } = renderStack({ pendingActionId: CARD.id });
     const control = screen.getByRole('button', {
-      name: 'Review Current Opportunity',
+      name: 'Review current opportunity',
     });
     expect(control).toBeDisabled();
     fireEvent.keyDown(control, { key: 'ArrowRight' });
@@ -179,10 +179,10 @@ describe('FounderReviewStack', () => {
       ...CARD,
       id: 'yt-card-1',
       sourceKind: 'youtube.thumbnail_candidate',
-      typeLabel: 'YouTube Thumbnail',
+      typeLabel: 'YouTube thumbnail',
       title: 'Review thumbnail for A song',
       why: 'YouTube API snapshot captured 2026-09-01T12:00:00.000Z.',
-      primaryActionLabel: 'Approve Candidate',
+      primaryActionLabel: 'Approve candidate',
       category: 'youtube_thumbnail' as const,
       youtubeThumbnail: {
         channelId: 'UC-owned',
@@ -211,7 +211,7 @@ describe('FounderReviewStack', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('1,250')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Approve Candidate' }));
+    await user.click(screen.getByRole('button', { name: 'Approve candidate' }));
     await user.click(screen.getByRole('button', { name: 'Reject' }));
 
     expect(onApprove).toHaveBeenCalledWith('yt-card-1');
@@ -224,9 +224,9 @@ describe('FounderReviewStack', () => {
       ...CARD,
       id: 'yt-card-2',
       sourceKind: 'youtube.thumbnail_candidate',
-      typeLabel: 'YouTube Thumbnail',
+      typeLabel: 'YouTube thumbnail',
       title: 'Review thumbnail for A song',
-      primaryActionLabel: 'Approve Candidate',
+      primaryActionLabel: 'Approve candidate',
       category: 'youtube_thumbnail' as const,
       youtubeThumbnail: {
         channelId: 'UC-owned',
@@ -250,7 +250,7 @@ describe('FounderReviewStack', () => {
 
     await user.tab();
     expect(
-      screen.getByRole('button', { name: 'Review Current Opportunity' })
+      screen.getByRole('button', { name: 'Review current opportunity' })
     ).toHaveFocus();
 
     await user.keyboard('{ArrowRight}');

@@ -16,7 +16,7 @@ interface HealthEntry {
   readonly tone: HudTone;
 }
 
-const GBRAIN_NO_SIGNAL_LABEL = 'No Signal';
+const GBRAIN_NO_SIGNAL_LABEL = 'No signal';
 
 function ledgerTone(quarantine: HudMetrics['testing']['quarantine']): HudTone {
   if (!quarantine.isValid) return 'bad';
@@ -81,7 +81,7 @@ export function HudSystemHealthStrip({
   return (
     <Surface
       {...(presentation === 'section' ? { surface: 'details' as const } : {})}
-      aria-label='System Health'
+      aria-label='System health'
       data-testid='hud-system-health-strip'
     >
       <div

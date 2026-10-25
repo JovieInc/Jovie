@@ -37,11 +37,11 @@ describe.each(['creator', 'company'])('shared %s evidence policy', target => {
     expect(
       evaluatePresenceChecks(checks([measured('pass'), unconfigured]), now)
         .label
-    ).toBe('Partially Measured');
+    ).toBe('Partially measured');
     expect(
       evaluatePresenceChecks(checks([measured('pass'), measured('warn')]), now)
         .label
-    ).toBe('Needs Attention');
+    ).toBe('Needs attention');
     expect(
       evaluatePresenceChecks(checks([measured('warn'), measured('fail')]), now)
         .tone

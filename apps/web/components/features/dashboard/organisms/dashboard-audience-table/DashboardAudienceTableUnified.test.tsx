@@ -121,9 +121,9 @@ describe('DashboardAudienceTableUnified', () => {
     expect(
       screen.getByRole('heading', { name: 'Audience', hidden: true })
     ).toBeInTheDocument();
-    expect(screen.getAllByText('Grow Your Audience').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Grow your audience').length).toBeGreaterThan(0);
     expect(
-      screen.getAllByRole('link', { name: 'Open Profile Settings' })[0]
+      screen.getAllByRole('link', { name: 'Open profile settings' })[0]
     ).toHaveAttribute('href', '/app/settings/profile');
     const headerLabels = screen
       .getAllByRole('columnheader')
@@ -135,7 +135,7 @@ describe('DashboardAudienceTableUnified', () => {
         'State',
         'Alerts',
         'Engagement',
-        'Last Seen',
+        'Last seen',
         'Action',
       ])
     );

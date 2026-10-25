@@ -142,7 +142,7 @@ describe('dashboard form validation consolidation', () => {
     expect(submitButton).toHaveAttribute('data-state', 'loading');
     expect(submitButton).toHaveAttribute('aria-busy', 'true');
     expect(submitButton).toBeDisabled();
-    expect(screen.getByText('Update Profile')).toBeInTheDocument();
+    expect(screen.getByText('Update profile')).toBeInTheDocument();
   });
 
   it('renders ProfileForm validation with the summary and reserved field feedback slots', () => {
@@ -164,7 +164,7 @@ describe('dashboard form validation consolidation', () => {
         .some(alert => /artist name is required/i.test(alert.textContent ?? ''))
     ).toBe(true);
     expect(
-      screen.getByRole('textbox', { name: /Artist Name/i })
+      screen.getByRole('textbox', { name: /Artist name/i })
     ).toHaveAttribute('aria-invalid', 'true');
     expect(
       container.querySelectorAll('[data-slot="field-feedback"]')

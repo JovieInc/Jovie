@@ -466,7 +466,7 @@ describe('CommandPalette', () => {
     render(withDashboard(<CommandPalette />));
     fireEvent.keyDown(globalThis, { key: 'k', metaKey: true });
     await screen.findByTestId('cmdk-main-plane');
-    expect(screen.getByText('Recent Chats')).toBeInTheDocument();
+    expect(screen.getByText('Recent chats')).toBeInTheDocument();
     expect(screen.getByText('Q1 release plan')).toBeInTheDocument();
     expect(screen.getByText('Conversation')).toBeInTheDocument();
     expect(screen.getByText('Active chat')).toBeVisible();
