@@ -11,7 +11,8 @@ export const RECONCILED = 'reconciled' as const;
 export type StripeReconciliationReason =
   | 'unknown_price_id'
   | 'merch_order_not_found'
-  | 'tip_unattributed';
+  | 'tip_unattributed'
+  | 'invoice_unattributed';
 
 export type StripeReconciliationContext = Readonly<
   Record<string, string | number | boolean | null | readonly string[]>
