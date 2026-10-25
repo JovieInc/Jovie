@@ -202,6 +202,7 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     const titleInput = drawer.locator('#release-title');
     await expect(titleInput).toBeVisible();
     await expect(titleInput).toBeEditable();
+    await titleInput.click();
     await expect(titleInput).toBeFocused();
     await titleInput.pressSequentially(releaseTitle, { delay: 25 });
     await expect(titleInput).toHaveValue(releaseTitle);
