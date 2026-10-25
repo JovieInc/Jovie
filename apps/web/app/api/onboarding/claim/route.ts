@@ -27,7 +27,11 @@ import {
   submitWaitlistAccessRequest,
   type WaitlistAccessRequestResult,
 } from '@/lib/waitlist/access-request';
-import { decideGoldenPathAdmissionForArtist } from '@/lib/waitlist/golden-path-admission.server';
+import { scoreAdmissionCandidate } from '@/lib/waitlist/admission-score';
+import {
+  decideGoldenPathAdmissionForArtist,
+  isGoldenPathAdmittedUser,
+} from '@/lib/waitlist/golden-path-admission.server';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
   isWaitlistApprovedStatus,
@@ -137,6 +141,20 @@ async function createWaitlistReceipt(params: {
     reach: state.artist?.followers ?? null,
   });
 
+  // Best leads first: the score and every input are stored on the entry. The
+  // catalog is not measurable before the identity is linked, so it is null.
+  const admissionScore = scoreAdmissionCandidate({
+    identityResolved: Boolean(state.artist?.id),
+    followers: state.artist?.followers ?? null,
+    popularity: state.artist?.popularity ?? null,
+    catalogReleases: null,
+    latestReleaseAt: null,
+    releaseStage:
+      state.interviewSignals.findLast(signal => signal.releaseStage)
+        ?.releaseStage ?? null,
+    chatTurns: params.messageRows.length,
+  });
+
   const email = normalizeEmail(emailRaw);
   const waitlistData = waitlistRequestSchema.parse({
     primaryGoal: null,
@@ -158,6 +176,7 @@ async function createWaitlistReceipt(params: {
     }),
     data: waitlistData,
     goldenPathAdmission,
+    admissionScore,
     source: 'onboarding_chat_claim',
   });
 }
@@ -190,6 +209,8 @@ interface ClaimHandoff {
   readonly profile: ClaimedProfilePayload | null;
   readonly waitlist: WaitlistAccessRequestResult | null;
   readonly waitlistIntakeRequired: boolean;
+  /** Admitted by the golden path, page private until ownership is proven. */
+  readonly proofPending?: boolean;
 }
 
 const EMPTY_CLAIM_HANDOFF: ClaimHandoff = {
@@ -207,15 +228,20 @@ async function resolveClaimHandoff(params: {
   readonly userAgent: string | null;
 }): Promise<ClaimHandoff> {
   if (!params.mustWaitlist) {
+    // A retry, a recovered response or an already-approved user must not
+    // publish what a golden-path admission left private.
+    const proofPending = await isGoldenPathAdmittedUser(params.appUserId);
     return {
       profile: await materializeClaimedOnboardingProfile({
         userId: params.appUserId,
         conversationId: params.conversationId,
         ipAddress: params.ipAddress,
         userAgent: params.userAgent,
+        ...(proofPending ? { visibility: 'unproven' as const } : {}),
       }),
       waitlist: null,
       waitlistIntakeRequired: false,
+      ...(proofPending ? { proofPending: true } : {}),
     };
   }
 
@@ -284,15 +310,20 @@ async function resolveClaimHandoff(params: {
     );
   }
 
+  // Golden-path admission is account access, not proof of ownership: the page
+  // stays private until the claim-verification review publishes it.
+  const proofPending = await isGoldenPathAdmittedUser(params.appUserId);
   return {
     profile: await materializeClaimedOnboardingProfile({
       userId: params.appUserId,
       conversationId: params.conversationId,
       ipAddress: params.ipAddress,
       userAgent: params.userAgent,
+      ...(proofPending ? { visibility: 'unproven' as const } : {}),
     }),
     waitlist: null,
     waitlistIntakeRequired: false,
+    ...(proofPending ? { proofPending: true } : {}),
   };
 }
 
@@ -307,6 +338,7 @@ function claimHandoffPayload(
     terminalKind !== null &&
     !handoff.waitlist &&
     !handoff.profileError &&
+    !handoff.proofPending &&
     Boolean(handoff.profile?.profileId);
   return {
     ...(handoff.profileError
@@ -319,6 +351,7 @@ function claimHandoffPayload(
     ...(handoff.waitlist ? { waitlist: handoff.waitlist } : {}),
     ...(handoff.waitlistIntakeRequired ? { waitlistIntakeRequired: true } : {}),
     ...profilePayload(handoff.profile),
+    ...(handoff.proofPending ? { proofPending: true } : {}),
     ...(readyForCheckout ? { readyForCheckout: true } : {}),
   };
 }

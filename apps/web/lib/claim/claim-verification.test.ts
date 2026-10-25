@@ -167,3 +167,22 @@ describe('operator decision transition', () => {
     expect(decideClaimVerificationRecord(rejected, input)).toBeNull();
   });
 });
+
+describe('proof-only requests (free admission, private page)', () => {
+  it('open for review immediately without a payment timestamp', () => {
+    const record = buildClaimVerificationRequest({
+      spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+      artistName: 'Mid Artist',
+      reach: 3_200,
+      paid: false,
+      proofOnly: true,
+      now,
+    });
+    expect(record.status).toBe('pending_verification');
+    expect(record.paidAt).toBeNull();
+  });
+
+  it('keeps the default: unpaid and not proof-only waits for payment', () => {
+    expect(request(false).status).toBe('awaiting_payment');
+  });
+});

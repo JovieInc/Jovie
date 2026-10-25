@@ -95,6 +95,8 @@ export async function requestClaimVerification(input: {
   readonly artistName: string | null;
   readonly reach: number;
   readonly paid: boolean;
+  /** Admission proof request: open for review now, private page, no payment. */
+  readonly proofOnly?: boolean;
   /** Consented journey id; records `pending-verification` when paid. */
   readonly acquisitionId?: string | null;
   readonly now?: Date;
@@ -142,6 +144,7 @@ export async function requestClaimVerification(input: {
       artistName: input.artistName,
       reach: input.reach,
       paid: input.paid,
+      proofOnly: input.proofOnly,
       now,
     }),
     acquisitionId: input.acquisitionId ?? null,

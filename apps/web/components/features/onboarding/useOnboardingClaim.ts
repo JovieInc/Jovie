@@ -9,6 +9,7 @@ import {
   markSignupFirstValuePending,
   trackFunnelStep,
 } from '@/lib/analytics/signup-funnel-client';
+import { claimStateHref } from '@/lib/claim/artist-offer-claim';
 import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
 
 /**
@@ -71,6 +72,8 @@ interface ClaimResponse {
    * may navigate off /start — bare `claimed`/`alreadyClaimed` may not.
    */
   readonly readyForCheckout?: boolean;
+  /** Admitted, page private until ownership is proven. */
+  readonly proofPending?: boolean;
 }
 
 const MAX_RETRIES = 3;
@@ -246,6 +249,13 @@ export function useOnboardingClaim(
         // the interview finished. Only a durable waitlist receipt or a
         // server-verified readyForCheckout may navigate off /start; anything
         // less stays in the conversation and retries after the next turn.
+        if (body.proofPending && body.profile?.profileId) {
+          markTriggerCompleted();
+          claimedRef.current = true;
+          setStatus('claimed');
+          router.replace(claimStateHref('proof_pending'));
+          return;
+        }
         if (body.waitlist?.entryId || body.readyForCheckout) {
           completeClaim();
           return;

@@ -409,4 +409,55 @@ describe('claim verification review', () => {
     expect(result).toEqual({ outcome: 'no_subscription' });
     expect(mocks.update).not.toHaveBeenCalled();
   });
+
+  describe('proof-only requests', () => {
+    const proofOnly = buildClaimVerificationRequest({
+      spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+      artistName: 'Mid Artist',
+      reach: 3_200,
+      paid: false,
+      proofOnly: true,
+      now: new Date('2026-10-21T08:00:00.000Z'),
+    });
+
+    it('can be rejected without a subscription and never refunds', async () => {
+      queueProfile(proofOnly, null);
+      const result = await decideClaimVerification({
+        profileId: PROFILE,
+        decision: 'reject',
+        decidedBy: 'tim@jov.ie',
+        now,
+      });
+      expect(result).toMatchObject({
+        outcome: 'decided',
+        record: { status: 'rejected' },
+      });
+      expect(mocks.refund).not.toHaveBeenCalled();
+    });
+
+    it('never refunds a proof-only request even if the account later has a subscription', async () => {
+      queueProfile(proofOnly, 'sub_other');
+      await decideClaimVerification({
+        profileId: PROFILE,
+        decision: 'reject',
+        decidedBy: 'tim@jov.ie',
+        now,
+      });
+      expect(mocks.refund).not.toHaveBeenCalled();
+    });
+
+    it('approval is what publishes the page', async () => {
+      queueProfile(proofOnly, null);
+      await decideClaimVerification({
+        profileId: PROFILE,
+        decision: 'approve',
+        decidedBy: 'tim@jov.ie',
+        now,
+      });
+      expect(mocks.state.updates[0]).toMatchObject({
+        spotifyId: '06HL4z0CvFAxyc27GXpf02',
+        isPublic: true,
+      });
+    });
+  });
 });

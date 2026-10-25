@@ -36,6 +36,9 @@ const {
   mockIsWaitlistGateEnabled: vi.fn(),
 }));
 
+const mockIsGoldenPathAdmittedUser = vi.hoisted(() =>
+  vi.fn().mockResolvedValue(false)
+);
 const mockDecideGoldenPathAdmission = vi.hoisted(() =>
   vi.fn().mockResolvedValue({
     admit: false,
@@ -44,6 +47,7 @@ const mockDecideGoldenPathAdmission = vi.hoisted(() =>
 );
 vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
   decideGoldenPathAdmissionForArtist: mockDecideGoldenPathAdmission,
+  isGoldenPathAdmittedUser: mockIsGoldenPathAdmittedUser,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -842,6 +846,87 @@ describe('POST /api/onboarding/claim — race, idempotency, failure paths', () =
     expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: 'conv_approved' })
     );
+  });
+
+  describe('golden-path admission keeps the page private until proof', () => {
+    beforeEach(() => {
+      mockIsGoldenPathAdmittedUser.mockResolvedValue(true);
+      mockMaterializeClaimedOnboardingProfile.mockResolvedValue({
+        profileId: 'profile-1',
+        handle: 'someartist',
+        status: 'created',
+      });
+    });
+
+    it('materializes unproven, reports proofPending and never unlocks checkout', async () => {
+      setupDbSelectForCandidates(
+        [{ id: 'conv_gp', createdAt: new Date('2026-05-01') }],
+        waitlistDecisionMessageRows()
+      );
+      mockSubmitWaitlistAccessRequest.mockResolvedValue({
+        entryId: 'entry-gp',
+        status: 'approved',
+        outcome: 'accepted',
+      });
+      setupUpdateForPrimary(1);
+      setupInsertAudit(true);
+
+      const res = await POST(makeRequest());
+      const body = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ visibility: 'unproven' })
+      );
+      expect(body.proofPending).toBe(true);
+      expect(body).not.toHaveProperty('readyForCheckout');
+    });
+
+    it('still materializes unproven on the already-approved retry path', async () => {
+      mockGetDbUser.mockResolvedValue({
+        id: '3a53ba3e-150c-4ab5-8e73-2d2499764e2c',
+        userStatus: 'waitlist_approved',
+      });
+      mockIsWaitlistGateEnabled.mockResolvedValue(true);
+      setupDbSelectForCandidates(
+        [{ id: 'conv_retry', createdAt: new Date('2026-05-01') }],
+        waitlistDecisionMessageRows()
+      );
+      setupUpdateForPrimary(1);
+      setupInsertAudit(true);
+
+      const res = await POST(makeRequest());
+      const body = await res.json();
+
+      expect(mockSubmitWaitlistAccessRequest).not.toHaveBeenCalled();
+      expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+        expect.objectContaining({ visibility: 'unproven' })
+      );
+      expect(body.proofPending).toBe(true);
+    });
+
+    it('leaves every other approved user on the public path', async () => {
+      mockIsGoldenPathAdmittedUser.mockResolvedValue(false);
+      setupDbSelectForCandidates(
+        [{ id: 'conv_other', createdAt: new Date('2026-05-01') }],
+        waitlistDecisionMessageRows()
+      );
+      mockSubmitWaitlistAccessRequest.mockResolvedValue({
+        entryId: 'entry-other',
+        status: 'approved',
+        outcome: 'already_accepted',
+      });
+      setupUpdateForPrimary(1);
+      setupInsertAudit(true);
+
+      const res = await POST(makeRequest());
+      const body = await res.json();
+
+      expect(mockMaterializeClaimedOnboardingProfile).toHaveBeenCalledWith(
+        expect.not.objectContaining({ visibility: 'unproven' })
+      );
+      expect(body).not.toHaveProperty('proofPending');
+    });
   });
 
   it('continues profile onboarding when the user already passed the waitlist gate', async () => {

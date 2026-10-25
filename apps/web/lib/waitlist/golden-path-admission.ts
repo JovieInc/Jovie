@@ -24,6 +24,7 @@ export type GoldenPathAdmissionReason =
   | 'hold_golden_path_not_green'
   | 'hold_capacity_full'
   | 'hold_auto_accept_disabled'
+  | 'hold_outranked'
   | 'hold_open_learnings';
 
 export interface GoldenPathAdmissionInput {

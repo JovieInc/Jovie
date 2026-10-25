@@ -170,7 +170,13 @@ export async function runWaitlistAutoAccept(
         isNotNull(waitlistEntries.spotifyUrl)
       )
     )
-    .orderBy(asc(waitlistEntries.waitlistedAt), asc(waitlistEntries.createdAt))
+    // Best leads first: highest admission score, then the longest waiting.
+    // Entries without a score sort last, in their old order.
+    .orderBy(
+      drizzleSql`coalesce((${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score')::numeric, -1) desc`,
+      asc(waitlistEntries.waitlistedAt),
+      asc(waitlistEntries.createdAt)
+    )
     .limit(limit);
 
   let approved = 0;

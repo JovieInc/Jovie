@@ -1,6 +1,10 @@
 import 'server-only';
 
+import { eq } from 'drizzle-orm';
 import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
+import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
 import {
   countOpenCohortLearnings,
@@ -106,4 +110,22 @@ export async function decideGoldenPathAdmissionForArtist(input: {
     return { admit: false, reason: context.holdReason };
   }
   return decision;
+}
+
+/**
+ * True when this user's waitlist entry was admitted by the golden path, which
+ * is account access, not proof of ownership. Read from the persisted decision
+ * (users.waitlist_entry_id -> status_reason), so a retried, recovered or
+ * already-approved claim treats the artist exactly as the first pass did.
+ */
+export async function isGoldenPathAdmittedUser(
+  appUserId: string
+): Promise<boolean> {
+  const [row] = await db
+    .select({ statusReason: waitlistEntries.statusReason })
+    .from(users)
+    .innerJoin(waitlistEntries, eq(waitlistEntries.id, users.waitlistEntryId))
+    .where(eq(users.id, appUserId))
+    .limit(1);
+  return row?.statusReason === 'qualified_golden_path_resolved_artist';
 }

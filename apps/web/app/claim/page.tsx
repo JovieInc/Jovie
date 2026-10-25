@@ -46,6 +46,14 @@ const STATE_COPY: Record<ClaimPageState, StateCopy> = {
       href: `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Artist profile verification')}`,
     },
   },
+  proof_pending: {
+    title: 'Your Page Is Saved And Private',
+    body: `We confirm a page belongs to the artist before it goes public. Email ${SUPPORT_EMAIL} from an address tied to the artist, or from the account you list on your Spotify profile, and we will publish it. Nothing is sent to anyone else.`,
+    action: {
+      label: 'Email Support',
+      href: `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent('Confirm my artist page')}`,
+    },
+  },
   already_subscribed: {
     title: `${PRO_CLAIM.displayName} Is Active`,
     body: 'Your subscription is active. Nothing more to pay.',

@@ -340,6 +340,9 @@ async function linkVerifiedArtist(input: {
       .set({
         spotifyId: next.spotifyArtistId,
         spotifyUrl: `https://open.spotify.com/artist/${next.spotifyArtistId}`,
+        // Proof is what publishes a free-admission page; a paid request was
+        // already public, so this is idempotent for it.
+        isPublic: true,
         settings: withClaimVerification(
           {
             ...base,
@@ -413,7 +416,13 @@ export async function decideClaimVerification(input: {
   if (snapshot.status !== 'pending_verification') {
     return { outcome: 'not_pending', record: snapshot };
   }
-  if (input.decision === 'reject' && !row.subscriptionId) {
+  // A paid request is refunded on reject and needs its subscription. A
+  // proof-only request (free admission, private page) has nothing to refund.
+  if (
+    input.decision === 'reject' &&
+    snapshot.paidAt !== null &&
+    !row.subscriptionId
+  ) {
     return { outcome: 'no_subscription' };
   }
 
@@ -436,7 +445,11 @@ export async function decideClaimVerification(input: {
   let releasedHandles: string[] = [];
   let refundId: string | null = null;
   try {
-    if (input.decision === 'reject' && row.subscriptionId) {
+    if (
+      input.decision === 'reject' &&
+      row.subscriptionId &&
+      current.paidAt !== null
+    ) {
       const refund = await refundFirstMonthAndCancel({
         subscriptionId: row.subscriptionId,
         // Per subscription: a profile re-requested and rejected again inside

@@ -19,6 +19,7 @@ let userRow: { id: string; userStatus: string } | null = null;
 const insertedEntries: Array<Record<string, unknown>> = [];
 const updatedRows: Array<Record<string, unknown>> = [];
 let waitlistInsertReturnRows: Array<{ id: string }> = [{ id: 'entry-new' }];
+let executeRows: Array<Record<string, unknown>> = [];
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: (...args: unknown[]) =>
@@ -70,7 +71,7 @@ vi.mock('@/lib/ingestion/session', () => ({
 }));
 
 function createTxMock() {
-  const execute = vi.fn().mockResolvedValue(undefined);
+  const execute = vi.fn(async () => executeRows);
 
   const select = vi.fn(() => ({
     from: vi.fn((table: unknown) => ({
@@ -181,6 +182,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     insertedEntries.length = 0;
     updatedRows.length = 0;
     waitlistInsertReturnRows = [{ id: 'entry-new' }];
+    executeRows = [];
     findLatestEntryByEmail.mockReset();
     findLatestEntryByEmail.mockReturnValue([]);
     getWaitlistSettings.mockReset();
@@ -341,6 +343,48 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
         })
       ).toBeTruthy();
       expect(releaseAutoAcceptSlot).not.toHaveBeenCalled();
+    });
+
+    it('holds an admit that pending entrants outrank, without reserving', async () => {
+      getWaitlistSettings.mockResolvedValue({
+        gateEnabled: true,
+        autoAcceptEnabled: true,
+        autoAcceptAfterDays: 1,
+        autoAcceptDailyLimit: 2,
+        autoAcceptedToday: 0,
+        autoAcceptResetsAt: new Date(Date.now() + 86_400_000),
+      });
+      executeRows = [{ score: '90' }, { score: '80' }];
+      const { submitWaitlistAccessRequest } = await import(
+        '@/lib/waitlist/access-request'
+      );
+      const { scoreAdmissionCandidate } = await import(
+        '@/lib/waitlist/admission-score'
+      );
+      const result = await submitWaitlistAccessRequest({
+        ...baseInput,
+        goldenPathAdmission: admit,
+        admissionScore: scoreAdmissionCandidate({
+          identityResolved: true,
+          followers: 800,
+          popularity: 5,
+          catalogReleases: null,
+          latestReleaseAt: null,
+          releaseStage: null,
+          chatTurns: 1,
+        }),
+      });
+
+      expect(result.status).toBe('waitlisted');
+      expect(tryReserveAutoAcceptSlot).not.toHaveBeenCalled();
+      expect(
+        updatedRows.find(row => {
+          const q = row.qualificationResult as
+            | { details?: { goldenPathHold?: string } }
+            | undefined;
+          return q?.details?.goldenPathHold === 'hold_outranked';
+        })
+      ).toBeTruthy();
     });
 
     it('never reserves capacity for a held decision', async () => {

@@ -91,12 +91,20 @@ export function buildClaimVerificationRequest(input: {
   readonly artistName: string | null;
   readonly reach: number;
   readonly paid: boolean;
+  /**
+   * Free-first admission: the page stays private and the request is open for
+   * review immediately, with no payment involved (paidAt stays null).
+   */
+  readonly proofOnly?: boolean;
   readonly now: Date;
 }): ClaimVerificationRecord {
   const at = input.now.toISOString();
   return {
     schema: CLAIM_VERIFICATION_SCHEMA,
-    status: input.paid ? 'pending_verification' : 'awaiting_payment',
+    status:
+      input.paid || input.proofOnly
+        ? 'pending_verification'
+        : 'awaiting_payment',
     spotifyArtistId: input.spotifyArtistId,
     artistName: input.artistName?.trim() || null,
     reach: {

@@ -19,6 +19,10 @@ import { logger } from '@/lib/utils/logger';
 import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
 import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
 import {
+  type AdmissionScore,
+  isOutrankedByQueue,
+} from '@/lib/waitlist/admission-score';
+import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
   type WaitlistApprovalResult,
@@ -82,6 +86,8 @@ export interface WaitlistAccessRequestInput {
    * golden path green). Capacity is reserved here, in the transaction.
    */
   readonly goldenPathAdmission?: GoldenPathAdmissionDecision;
+  /** Ranking score and its inputs, stored on the entry for every decision. */
+  readonly admissionScore?: AdmissionScore;
   /** Validated by the authenticated intake route for the exact canary email. */
   readonly syntheticRunId?: string;
 }
@@ -127,6 +133,7 @@ function buildEntryValues(params: {
   readonly email: string;
   readonly fullName: string;
   readonly source: string;
+  readonly admissionScore?: AdmissionScore;
 }) {
   const { data, email, fullName, source } = params;
   const { platform, normalizedUrl } = detectPlatformFromUrl(
@@ -152,7 +159,12 @@ function buildEntryValues(params: {
     selectedPlan: data.selectedPlan ?? null,
     source,
     canonical: true,
-    qualificationInputs: buildQualificationInputs(data),
+    qualificationInputs: {
+      ...buildQualificationInputs(data),
+      ...(params.admissionScore
+        ? { admissionScore: params.admissionScore }
+        : {}),
+    },
     updatedAt: new Date(),
     // Store a useful fallback in existing fields without inventing launch scoring.
     primarySocialFollowerCount: null,
@@ -264,6 +276,29 @@ async function tryApproveEntry(
   return approvalResult;
 }
 
+/** Scores of waitlisted entrants, best first, capped at `limit` rows. */
+async function listPendingScoresDesc(
+  tx: DbOrTransaction,
+  limit: number
+): Promise<number[]> {
+  if (limit <= 0) return [];
+  const result = await tx.execute(drizzleSql`
+    SELECT (qualification_inputs -> 'admissionScore' ->> 'score')::numeric AS score
+    FROM waitlist_entries
+    WHERE canonical = true
+      AND status = 'waitlisted'
+      AND qualification_inputs -> 'admissionScore' ->> 'score' IS NOT NULL
+    ORDER BY score DESC
+    LIMIT ${limit}
+  `);
+  const rows = Array.isArray(result)
+    ? result
+    : ((result as { rows?: unknown[] } | null | undefined)?.rows ?? []);
+  return (rows as { score: string | number }[])
+    .map(row => Number(row.score))
+    .filter(Number.isFinite);
+}
+
 async function decideAccess(params: {
   readonly tx: DbOrTransaction;
   readonly entryId: string;
@@ -273,6 +308,7 @@ async function decideAccess(params: {
   readonly data: WaitlistRequestPayload;
   readonly interviewResponses?: InterviewResponses;
   readonly goldenPathAdmission?: GoldenPathAdmissionDecision;
+  readonly admissionScore?: AdmissionScore;
 }): Promise<{
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
@@ -295,8 +331,26 @@ async function decideAccess(params: {
         responses: params.interviewResponses,
       })
     : null;
-  const goldenPathDecision =
+  let goldenPathDecision =
     mode === 'waitlist_enabled' ? params.goldenPathAdmission : undefined;
+  // Best leads first: with N slots left today, admit now only if fewer than N
+  // pending entrants outrank this one; the rest wait for the ranked drain.
+  if (goldenPathDecision?.admit && params.admissionScore) {
+    const remaining = Math.max(
+      0,
+      settings.autoAcceptDailyLimit - settings.autoAcceptedToday
+    );
+    const pending = await listPendingScoresDesc(params.tx, remaining);
+    if (
+      isOutrankedByQueue({
+        candidateScore: params.admissionScore.score,
+        pendingScoresDesc: pending,
+        remainingSlots: remaining,
+      })
+    ) {
+      goldenPathDecision = { admit: false, reason: 'hold_outranked' };
+    }
+  }
   let qualification = evaluateWaitlistQualification({
     email: params.email,
     payload: params.data,
@@ -505,6 +559,7 @@ export async function submitWaitlistAccessRequest(
           email: normalizedEmail,
           fullName: input.fullName,
           source: input.source ?? 'waitlist_form',
+          admissionScore: input.admissionScore,
         });
 
         if (existing && !isUnqualifiedSignupEntry(existing)) {
@@ -572,6 +627,7 @@ export async function submitWaitlistAccessRequest(
           data: input.data,
           interviewResponses: input.interviewResponses,
           goldenPathAdmission: input.goldenPathAdmission,
+          admissionScore: input.admissionScore,
         });
 
         const nextStatus = decision.qualification.status;
