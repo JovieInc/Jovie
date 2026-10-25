@@ -179,12 +179,13 @@ test('exceptions file is time-boxed and carries a reachability reason', () => {
   }
 });
 
-test('loop is wired: workflow runs sync + check on a backstop schedule, registry row has the SLA', () => {
+test('loop is wired: workflow runs sync + check on the lanes clock, registry row has the SLA', () => {
   const wf = readFileSync(
     path.join(ROOT, '.github/workflows/security-advisory-loop.yml'),
     'utf8'
   );
-  assert.match(wf, /schedule:/);
+  assert.match(wf, /clock_security_advisory_loop/);
+  assert.doesNotMatch(wf, /^\s*-\s*cron:/m, 'GitHub crons are frozen');
   assert.match(wf, /security-advisory-intake\.mjs --check/);
   assert.match(wf, /security-advisory-intake\.mjs\s*$/m);
   const rows = readFileSync(

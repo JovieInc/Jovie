@@ -1162,7 +1162,7 @@ nodes:
     allowedConsumers: []
     triggeringStateTransition:
       - push
-      - schedule
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:loop
     jobCount: 1
