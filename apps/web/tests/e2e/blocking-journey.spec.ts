@@ -177,10 +177,21 @@ test('signup -> onboarding -> profile/link -> smart link -> public profile -> ch
     // handlers changes only the DOM and is reverted on the next render. The
     // button is enabled only once the title reached React state, so retry the
     // fill until that is observable.
+    try {
     await expect(async () => {
       await drawer.getByLabel('Title', { exact: true }).fill(releaseTitle);
       await expect(createRelease).toBeEnabled({ timeout: 2_000 });
-    }).toPass({ timeout: 60_000 });
+    }).toPass({ timeout: 20_000 });
+    } catch (e) {
+      const info = await page.evaluate(() => ({
+        url: location.href,
+        drawers: document.querySelectorAll('[data-testid="add-release-sidebar"]').length,
+        inputs: [...document.querySelectorAll('#release-title')].map(i => ({ v: (i as HTMLInputElement).value, ro: (i as HTMLInputElement).readOnly, dis: (i as HTMLInputElement).disabled, keys: Object.keys(i).filter(k => k.startsWith('__react')) })),
+        html: document.querySelector('[data-testid="add-release-sidebar"]')?.outerHTML.slice(0, 2500),
+      }));
+      console.log('DIAG', JSON.stringify(info));
+      throw e;
+    }
     await drawer
       .getByRole('button', { name: 'Release Date', exact: true })
       .click();
