@@ -146,6 +146,7 @@ async function approveAdminUser() {
       SET
         user_status = 'active',
         is_admin = true,
+        admin_role = NULL,
         updated_at = NOW()
       WHERE id = $1
     `,

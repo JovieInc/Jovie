@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export default async function OperationsPage() {
-  await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess({ access: 'read' });
   const metrics = await getHudMetrics('admin');
 
   return (

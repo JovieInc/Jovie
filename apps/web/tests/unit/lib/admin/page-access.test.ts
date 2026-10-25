@@ -141,6 +141,24 @@ describe('getCurrentAdminPageAccess', () => {
       hasAdminRole: false,
       hasAdminReadRole: true,
     });
-    await expect(requireCurrentAdminPageAccess()).resolves.toBe('ro-user');
+    await expect(
+      requireCurrentAdminPageAccess({ access: 'read' })
+    ).resolves.toBe('ro-user');
+  });
+
+  it('keeps every page that does not opt in invisible to a read-only operator', async () => {
+    mockGetCachedAuth.mockResolvedValue({
+      userId: 'ro-user',
+      sessionId: 'ro-session',
+    });
+    mockIsAdmin.mockResolvedValue(false);
+    mockHasReadAccess.mockResolvedValue(true);
+
+    await expect(requireCurrentAdminPageAccess()).rejects.toThrow(
+      `NEXT_REDIRECT:${APP_ROUTES.DASHBOARD}`
+    );
+    await expect(
+      requireCurrentAdminPageAccess({ access: 'write' })
+    ).rejects.toThrow(`NEXT_REDIRECT:${APP_ROUTES.DASHBOARD}`);
   });
 });

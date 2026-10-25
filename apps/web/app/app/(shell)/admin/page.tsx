@@ -9,7 +9,7 @@ export { metadata } from './chat/page';
  * the shared composer. `/app/ov/chat` renders the same Home for deep links.
  */
 export default async function AdminHomePage() {
-  await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess({ access: 'read' });
   // Home is the default Ovie door, so it keeps the opt-in privacy lock the
   // /hud door enforced; Home data APIs enforce it again server-side.
   await assertOviePrivacyUnlocked();

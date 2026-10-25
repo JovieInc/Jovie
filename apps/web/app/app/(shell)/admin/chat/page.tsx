@@ -21,6 +21,6 @@ export const metadata: Metadata = {
  * the client from the existing shipping-state and inbox endpoints.
  */
 export default async function AdminChatPage() {
-  await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess({ access: 'read' });
   return <OvChatClient />;
 }

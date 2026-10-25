@@ -49,13 +49,24 @@ export const getCurrentAdminPageAccess = cache(
 );
 
 /**
- * Authoritative page-level read gate (full admins and read-only operators). Next may render layouts and pages in
+ * Authoritative page-level read gate. Full admins by default; read-only operators
+ * only on pages that pass `{ access: 'read' }`. Next may render layouts and pages in
  * parallel, so protected page/DAL work must await this before starting.
  */
-export async function requireCurrentAdminPageAccess(): Promise<string> {
+export async function requireCurrentAdminPageAccess(options?: {
+  /**
+   * 'write' (default) admits full admins only. 'read' also admits read-only
+   * operators and is reserved for the Ovie observation pages listed in
+   * admin-read-only-contract.test.ts. A page that does not opt in is invisible
+   * to a read-only operator even though the admin layout admits it.
+   */
+  access?: 'read' | 'write';
+}): Promise<string> {
   const access = await getCurrentAdminPageAccess();
+  const allowed =
+    options?.access === 'read' ? access.hasAdminReadRole : access.hasAdminRole;
 
-  if (!access.isAuthenticated || !access.userId || !access.hasAdminReadRole) {
+  if (!access.isAuthenticated || !access.userId || !allowed) {
     redirect(APP_ROUTES.DASHBOARD);
   }
 

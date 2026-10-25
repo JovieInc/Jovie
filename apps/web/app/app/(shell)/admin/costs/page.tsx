@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export const runtime = 'nodejs';
 
 export default async function AdminCostsPage() {
-  await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess({ access: 'read' });
 
   const [costsResult, refreshedResult] = await Promise.allSettled([
     getAdminCosts(),

@@ -17,6 +17,6 @@ export default async function AdminOpsPage({
 }: Readonly<{
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;
 }>) {
-  await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess({ access: 'read' });
   return HudPage({ searchParams });
 }

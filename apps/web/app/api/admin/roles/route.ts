@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { invalidateAdminCache, requireAdmin } from '@/lib/admin';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -8,6 +8,23 @@ import { users } from '@/lib/db/schema/auth';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
 import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';
+
+/**
+ * The caller's session id and the request's target id can be either the legacy
+ * Clerk id or users.id, so compare against every identity of the target.
+ */
+function isSameUser(
+  callerId: string | null | undefined,
+  targetUserId: string,
+  target: { id: string; clerkId?: string | null }
+): boolean {
+  if (!callerId) return false;
+  return (
+    callerId === targetUserId ||
+    callerId === target.id ||
+    (target.clerkId != null && callerId === target.clerkId)
+  );
+}
 
 /**
  * POST /api/admin/roles
@@ -43,6 +60,25 @@ export async function POST(request: Request) {
     // Update user's admin status
     const now = new Date();
     if (role === 'admin_read_only') {
+      // Demotion guards: an admin cannot demote themselves, and the last full
+      // admin cannot be demoted (either would lock everyone out of admin).
+      const { userId: callerId } = await getCachedAuth({ session: 'fresh' });
+      if (isSameUser(callerId, targetUserId, user)) {
+        return NextResponse.json(
+          { error: 'Cannot make your own account read-only' },
+          { status: 400 }
+        );
+      }
+      const [{ remaining }] = await db
+        .select({ remaining: drizzleSql<number>`count(*)::int` })
+        .from(users)
+        .where(and(eq(users.isAdmin, true), ne(users.id, user.id)));
+      if (remaining === 0) {
+        return NextResponse.json(
+          { error: 'Cannot demote the last full admin' },
+          { status: 409 }
+        );
+      }
       // Read-only operator: never an admin (isAdmin false also demotes a full
       // admin), no plan or billing change.
       await db
@@ -74,7 +110,7 @@ export async function POST(request: Request) {
     });
 
     logger.info(
-      `[admin/roles] Admin role granted to user ${targetUserId} by ${currentAdminId}`
+      `[admin/roles] ${role} granted to user ${targetUserId} by ${currentAdminId}`
     );
 
     return NextResponse.json({
@@ -128,18 +164,18 @@ export async function DELETE(request: Request) {
       session: 'fresh',
     });
 
-    // Prevent self-revocation
-    if (targetUserId === currentAdminId) {
-      return NextResponse.json(
-        { error: 'Cannot revoke your own admin privileges' },
-        { status: 400 }
-      );
-    }
-
     // Get user to verify they exist and get internal ID
     const user = await getUserByClerkId(db, targetUserId);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Prevent self-revocation (compared across both id forms of the target)
+    if (isSameUser(currentAdminId, targetUserId, user)) {
+      return NextResponse.json(
+        { error: 'Cannot revoke your own admin privileges' },
+        { status: 400 }
+      );
     }
 
     // Update user's admin status
@@ -158,7 +194,7 @@ export async function DELETE(request: Request) {
     invalidateAdminCache(targetUserId);
 
     logger.info(
-      `[admin/roles] Admin role revoked from user ${targetUserId} by ${currentAdminId}`
+      `[admin/roles] ${role} revoked from user ${targetUserId} by ${currentAdminId}`
     );
 
     return NextResponse.json({

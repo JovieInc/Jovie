@@ -17,7 +17,7 @@ export const metadata: Metadata = {
  * table refreshes as overnight workers land packets.
  */
 export default async function AdminCertificationsPage() {
-  await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess({ access: 'read' });
 
   return <OvieCertificationsWorkspace />;
 }

@@ -26,7 +26,7 @@ const evidenceGaps = [
 ] as const;
 
 export default async function ProductPage() {
-  await requireCurrentAdminPageAccess();
+  await requireCurrentAdminPageAccess({ access: 'read' });
   const capabilityEvidence = await loadCapabilityEvidence();
 
   return (
