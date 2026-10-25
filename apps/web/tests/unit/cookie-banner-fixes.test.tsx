@@ -94,6 +94,21 @@ describe('CookieBannerSection consent sync', () => {
     expect(phoneRule).toContain('bottom: var(--profile-bottom-nav-height);');
   });
 
+  it('anchors the tablet profile consent card above the dock, not over the avatar', () => {
+    const css = readFileSync(
+      resolve(process.cwd(), 'styles/design-system.css'),
+      'utf8'
+    );
+    const tabletRule =
+      /@media \(min-width: 768px\) and \(max-width: 1179px\)[\s\S]*?\.cookie-banner-card--above-public-profile-dock \{([^}]*)\}/.exec(
+        css
+      )?.[1];
+
+    expect(tabletRule).toContain('top: auto;');
+    expect(tabletRule).toContain('--cookie-banner-dock-clearance');
+    expect(tabletRule).not.toMatch(/top: var\(--page-pad\)/);
+  });
+
   it('calls setConsentState accepted on acceptAll', async () => {
     const { setConsentState } = await import('@/lib/tracking/consent');
     const mod = await import('@/components/organisms/CookieBannerSection');
