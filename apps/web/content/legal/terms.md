@@ -112,7 +112,7 @@ New accounts start with a 14-day Pro trial at no charge and no credit card requi
 
 ### Billing and Cancellation
 
-Paid subscriptions renew automatically at the end of each billing cycle. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period. You retain access to paid features until then.
+Paid subscriptions renew automatically at the end of each billing cycle. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period. You retain access to paid features until then. Payments are not refunded for a partial billing period: cancel anytime and keep Pro to the end of the paid month. No partial refunds.
 
 ## Disclaimers and Liability
 

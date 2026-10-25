@@ -3825,6 +3825,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/offer/route.ts",
+      "kind": "handler",
+      "route": "/api/offer",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/onboarding/claim/route.ts",
       "kind": "handler",
       "route": "/api/onboarding/claim",
