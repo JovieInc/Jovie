@@ -6,6 +6,7 @@
  * becomes now, zero, healthy, or blank.
  */
 
+import type { HeadroomReport } from '@/lib/ovie/home/github-headroom';
 import type { CapacityHorizon } from './capacity';
 
 export const SHIPPING_STATE_SCHEMA = 'ovie.shipping-state.v1' as const;
@@ -446,6 +447,8 @@ export type DeliveryLanes = {
    */
   readonly stageSummary?: StageSummary | null;
   readonly flow?: DeliveryFlow | null;
+  /** GitHub API headroom (`jovie-actions-quota-headroom/v1`); null until published. */
+  readonly githubHeadroom?: HeadroomReport | null;
   readonly publishedAt: string | null;
   /** The feed's own `at` is older than the lanes semantic window. */
   readonly stale: boolean;

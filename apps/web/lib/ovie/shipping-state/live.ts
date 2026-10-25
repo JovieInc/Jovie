@@ -1,3 +1,4 @@
+import { parseHeadroomReport } from '@/lib/ovie/home/github-headroom';
 import { parseCapacityHorizon } from './client';
 import {
   DELIVERY_MERGE_REPOS,
@@ -1007,6 +1008,7 @@ export function parseLanesStatus(
       ? parseStageSummary(payload.slo.stages)
       : null,
     flow: parseLaneFlow(payload),
+    githubHeadroom: parseHeadroomReport(payload.githubHeadroom),
     publishedAt,
     stale: false,
   };
