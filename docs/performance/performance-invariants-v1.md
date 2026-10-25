@@ -9,11 +9,11 @@ numbers — budgets live in the sources below and in the GBrain page, not here.
 
 | # | File | Owns | Enforcement today |
 |---|------|------|-------------------|
-| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; staged-build alias budgets block; the production alias exception is bounded below |
+| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; authenticated six-route and staged-build alias budgets block; the production alias exception is bounded below |
 | 2 | `apps/web/.lighthouserc.json` | Production Lighthouse for `/` and `/tim` | production-controller / postdeploy — perf assertions warn; only accessibility ≥ 0.9 errors |
 | 3 | `apps/web/.lighthouserc.{dashboard,onboarding,admin,chat,public-launch,pr}.json` | Per-surface Lighthouse thresholds (error level) | `ci.yml` `ci-lighthouse-*` jobs — `workflow_dispatch` only |
 | 4 | `apps/web/scripts/performance-interaction-manifest.ts` | Interaction latency / dropped frames (jank) classes | `perf:interactions` — manual |
-| 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/compare-chunks.ts` | Aspirational initial-JS gzip targets | Unwired; `bundle-baseline.json` is empty. Targets, never gates |
+| 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/compare-chunks.ts` | Initial-JS growth ratchet: fails closed when `bundle-baseline.json` is missing, malformed, or still the empty placeholder (JOV-8555) | Not invoked by any workflow yet (baseline capture + workflow wiring pending). Targets, never gates |
 
 Rows 1–4 define certified surfaces; row 5 numbers are citable targets only. Where two live
 sources disagree, the stricter number governs and the file is named in the audit report.
@@ -24,7 +24,11 @@ budgets. Marketing targets are tighter; unlisted routes use the default.
 Targets and measured baselines shrink; raises require an unexpired registry
 override for the exact key. Initial measurements (2026-10-23) allow at most 2%
 headroom. Lower baselines after reductions and delete them at the target.
-Profiles remain visible in server HTML before JavaScript. Row 5 stays unwired.
+Profiles remain visible in server HTML before JavaScript. Row 5 stays unwired: no
+workflow invokes compare-chunks, and the in-script growth ratchet now fails
+closed on an unwired baseline (JOV-8555), so the first wired run fails loudly
+until the baseline is captured with `pnpm --filter @jovie/web
+compare-chunks:snapshot` after a clean build.
 
 | Route | Measured KB | Baseline KB | Target KB |
 | --- | ---: | ---: | ---: |
@@ -38,6 +42,43 @@ Profiles remain visible in server HTML before JavaScript. Row 5 stays unwired.
 | `/demo/audience` | 847 | 863 | 800 |
 | `/demo` | 815 | 831 | 800 |
 | `/` | 650 | 663 | 640 |
+
+## Authenticated six-route graduation
+
+**Ship now (JOV-8557):** fail the existing authenticated six-route guard closed.
+The independent [graduation receipt](./authenticated-performance-graduation.json),
+measured at 2026-10-23T14:40:00Z, records 14 consecutive complete native PASS
+results. Each execution measured three samples for each of `creator-inbox-nav`,
+`creator-chat-nav`, `creator-library`, `creator-contacts`, `creator-calendar` and
+`creator-tasks`; the guard's PASS covers all manifest timing/resource budgets,
+including its existing same-route confirmation policy. No budget is raised.
+
+The hashed JSONL inventory enumerates all 145 controllers in the fixed
+2026-10-22T14:00:00Z–2026-10-23T14:40:00Z window. The latest 14 completed,
+executed measurement steps are selected by job completion time, regardless of
+controller conclusion. Skipped steps never qualify; partial or missing native
+authenticated results consume a nonqualifying slot. Each measurement records
+controller/attempt/job/step identities, native log SHA-256, all 18 primary samples,
+the native result and the matching checkout SHA, expected SHA and immutable
+deployment ID/URL. `headSha` is the controller source; `testedSha` is its checkout.
+
+This is production-release evidence against the exact staged production build
+before promotion. It is independent of `staging.jov.ie` and both public-profile
+alias windows below; canonical post-promotion production measurements cannot
+graduate this gate. Missing Better Auth credentials remain explicit skipped
+evidence under JOV-4452, never a passing authenticated measurement.
+
+**Re-evaluate when:** the existing guard reports a regression, or when its
+manifest/probe contract changes. The receipt names 2026-10-28T14:40:00Z as the
+next measurement review; that date does not expire blocking enforcement.
+
+**Then:** repair the measured regression and retain fail-closed enforcement.
+Refresh this receipt independently with the existing shared GitHub API client:
+
+```sh
+node scripts/lib/authenticated-performance-graduation.mjs \
+  2026-10-22T14:00:00Z 2026-10-23T14:40:00Z 2026-10-28T14:40:00Z
+```
 
 ## Public-profile alias graduation
 

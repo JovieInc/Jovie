@@ -284,6 +284,53 @@ describe('dead-man liveness', () => {
     expect(livenessDecisions(report)).toEqual([]);
   });
 
+  describe('promotion silence budget from the lanes feed (one source of truth)', () => {
+    const run = async feed => {
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': mainRef(MAIN),
+          [`/compare/${LIVE}...${MAIN}`]: {
+            ahead_by: 1,
+            commits: [{ commit: { committer: { date: iso(200) } } }],
+          },
+          ...(feed ? { 'lanes-status.json': feed } : {}),
+        }),
+      });
+      return rowFor(report, 'derived:jovie:production-promotion');
+    };
+    const limit = ageS => ({
+      deployHealth: { limits: { 'JovieInc/Jovie': { ageS } } },
+    });
+
+    it('uses the measured limit when it is inside the 1 to 24 hour bounds', async () => {
+      expect(await run(limit(9000))).toMatchObject({
+        status: 'stale',
+        budgetMinutes: 150,
+      });
+      expect(await run(limit(30_000))).toMatchObject({
+        status: 'fresh',
+        budgetMinutes: 500,
+      });
+    });
+
+    it('falls back to 246 minutes when the feed is missing, unreadable or out of bounds', async () => {
+      for (const feed of [
+        null,
+        limit(100),
+        limit(999_999),
+        { deployHealth: {} },
+      ]) {
+        expect(await run(feed)).toMatchObject({
+          status: 'fresh',
+          budgetMinutes: 246,
+        });
+      }
+    });
+  });
+
   it('keeps a recent unshipped commit inside the promotion silence budget', async () => {
     const { report } = await runLiveness({
       registry: only('derived:jovie:production-promotion'),
@@ -351,19 +398,19 @@ describe('dead-man liveness', () => {
           commits: [
             {
               sha: MAIN,
-              commit: { committer: { date: iso(141) } },
+              commit: { committer: { date: iso(300) } },
             },
           ],
         },
         'event=push': {
           total_count: 1,
-          workflow_runs: [{ created_at: iso(141), event: 'push' }],
+          workflow_runs: [{ created_at: iso(300), event: 'push' }],
         },
       }),
     });
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'stale',
-      ageMinutes: 141,
+      ageMinutes: 300,
     });
   });
 
@@ -422,7 +469,7 @@ describe('dead-man liveness', () => {
           commits: [
             {
               sha: MAIN,
-              commit: { committer: { date: iso(180) } },
+              commit: { committer: { date: iso(300) } },
             },
           ],
         },
@@ -430,7 +477,7 @@ describe('dead-man liveness', () => {
           String(url).includes('page=2')
             ? {
                 total_count: 101,
-                workflow_runs: [{ created_at: iso(130), event: 'push' }],
+                workflow_runs: [{ created_at: iso(280), event: 'push' }],
               }
             : {
                 total_count: 101,
@@ -440,7 +487,7 @@ describe('dead-man liveness', () => {
     });
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'stale',
-      ageMinutes: 130,
+      ageMinutes: 280,
     });
   });
 
@@ -482,7 +529,7 @@ describe('dead-man liveness', () => {
       }
     );
 
-    it.each([30, 180])(
+    it.each([30, 300])(
       'recovers an authenticated range 403 without hiding %i minutes of lag',
       async ageMinutes => {
         const requests = [];
@@ -516,10 +563,10 @@ describe('dead-man liveness', () => {
         expect(
           rowFor(report, 'derived:jovie:production-promotion')
         ).toMatchObject({
-          status: ageMinutes > 120 ? 'stale' : 'fresh',
+          status: ageMinutes > 246 ? 'stale' : 'fresh',
           reason:
-            ageMinutes > 120
-              ? 'silent-for-180m-over-120m'
+            ageMinutes > 246
+              ? 'silent-for-300m-over-246m'
               : '2-commits-unshipped',
           ageMinutes,
         });
@@ -529,7 +576,7 @@ describe('dead-man liveness', () => {
         );
         expect(requests[1].headers.get('authorization')).toBeNull();
         expect(requests.every(r => r.url.endsWith('?per_page=1'))).toBe(true);
-        expect(livenessDecisions(report).length).toBe(ageMinutes > 120 ? 1 : 0);
+        expect(livenessDecisions(report).length).toBe(ageMinutes > 246 ? 1 : 0);
       }
     );
     it('uses the public credential budget when main recovery exhausted the Actions budget', async () => {

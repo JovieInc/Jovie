@@ -7,6 +7,7 @@
  * Profiles that fail are quarantined (isPublic: false) and can be promoted
  * on re-ingest when quality improves.
  */
+import { hasScrapedTitleChrome } from '@/lib/profile/scraped-display-name';
 
 /**
  * Check if a display name would look embarrassing on a public profile page.
@@ -18,6 +19,7 @@
  * - The literal strings "undefined" or "null" (case-insensitive)
  * - Numeric-only (e.g., "4829173")
  * - Starting with "artist_" (unresolved Spotify artist ID prefix)
+ * - Carrying scraped page-title chrome (e.g., "Name | Instagram, Facebook")
  */
 export function isEmbarrassingDisplayName(name: string): boolean {
   const trimmed = name.trim();
@@ -34,6 +36,8 @@ export function isEmbarrassingDisplayName(name: string): boolean {
   if (/^\d+$/.test(trimmed)) return true;
 
   if (lower.startsWith('artist_')) return true;
+
+  if (hasScrapedTitleChrome(trimmed)) return true;
 
   return false;
 }

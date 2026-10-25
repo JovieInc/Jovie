@@ -80,10 +80,62 @@ class Isolated(unittest.TestCase):
         profile(codex.ACCOUNTS_ROOT, "beta")
         profile(codex.ACCOUNTS_ROOT, "openrouter", kind="apikey")
         (codex.ACCOUNTS_ROOT / "locks").mkdir()
+        # JOV-8763: the orchestration host may export CODEX_LANE_AUTH_MODE
+        # (subscription-pool). Inheriting it would route accounts()/state reads
+        # down the subscription-pool path instead of the fixtures above. Tests
+        # needing a mode (CurrentLoginTest, SubscriptionPoolTest) start their own
+        # patch after super().setUp(), and cleanup order restores theirs first.
+        self.host_env = patch.dict(os.environ)
+        self.host_env.start()
+        self.addCleanup(self.host_env.stop)
+        os.environ.pop("CODEX_LANE_AUTH_MODE", None)
 
     def tearDown(self):
         codex.ACCOUNTS_ROOT, codex.STATE = self.saved
         self.tmp.cleanup()
+
+
+class IsolatedSetUpHostModeTest(unittest.TestCase):
+    """JOV-8763: the orchestration host may export CODEX_LANE_AUTH_MODE=subscription-pool.
+
+    Isolated.setUp builds alpha/beta fixture accounts for the legacy ACCOUNTS_ROOT
+    scan. Inheriting the host's auth mode sends accounts() down the subscription-pool
+    path (profile validation, real CLI probes) instead, so the fixtures never decide
+    the result and tests pass or fail with the host's environment. The base setUp
+    must neutralize the inherited mode; tests that need a mode pin it themselves
+    (CurrentLoginTest, SubscriptionPoolTest).
+    """
+
+    def test_isolated_setUp_neutralizes_inherited_host_auth_mode(self):
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool"}):
+            case = AccountsTest("test_only_chatgpt_profiles_are_accounts")
+            case.setUp()
+            try:
+                self.assertIsNone(os.environ.get("CODEX_LANE_AUTH_MODE"))
+                self.assertFalse(codex.subscription_pool_mode())
+                self.assertEqual(codex.accounts(), ["alpha", "beta"])
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
+
+    def test_mode_pinned_by_a_subclass_restores_inherited_host_mode_on_cleanup(self):
+        class Pinned(Isolated):
+            def setUp(self):
+                super().setUp()
+                self.env = patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login"})
+                self.env.start()
+                self.addCleanup(self.env.stop)
+
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool"}):
+            case = Pinned()
+            case.setUp()
+            try:
+                self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "current-login")
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
 
 
 class AccountsTest(Isolated):
@@ -1208,12 +1260,12 @@ class SubscriptionPoolTest(Isolated):
     def test_invalid_configuration_fails_closed_without_discovery(self):
         invalid = ["", "[]", "{}", "null", "{bad"]
         for mutate in (lambda p: p.pop("current-login"),
-                       lambda p: p.update(third=p["lyb-pro"]),
+                       lambda p: p.update(third=p["lyb-pro"]),  # duplicate home and identity
                        lambda p: p.update({"current-login.1": p.pop("lyb-pro")}),
                        lambda p: p.update({"_ledger": p.pop("lyb-pro")}),
                        lambda p: p["lyb-pro"].update(home=p["current-login"]["home"]),
                        lambda p: p["lyb-pro"].update(emailSha256=p["current-login"]["emailSha256"]),
-                       lambda p: p["lyb-pro"].update(slots=2),
+                       lambda p: p["lyb-pro"].update(slots=0),
                        lambda p: p["lyb-pro"].update(slots=True),
                        lambda p: p["current-login"].update(slots=2),
                        lambda p: p["current-login"].update(home=p["lyb-pro"]["home"]),
@@ -1227,6 +1279,18 @@ class SubscriptionPoolTest(Isolated):
                 with self.subTest(raw=raw), patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": raw}):
                     with self.assertRaises(ValueError):
                         codex.accounts()
+
+    def test_pool_accepts_more_than_two_distinct_bound_accounts_with_measured_seats(self):
+        home = Path(self.tmp.name) / "third"; home.mkdir()
+        value = json.loads(json.dumps(self.profiles))
+        value["jovie-pro"] = {"home": str(home), "slots": 2, "emailSha256": "ab" * 32}
+        with patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(value)}):
+            self.assertEqual(sorted(codex.subscription_profiles()), ["current-login", "jovie-pro", "lyb-pro"])
+            self.assertEqual(codex.subscription_profiles()["jovie-pro"]["slots"], 2)
+            value["fourth-pro"] = {"home": str(home), "slots": 1, "emailSha256": "cd" * 32}
+            with patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(value)}):
+                with self.assertRaises(ValueError):
+                    codex.subscription_profiles()  # a home may be bound to one alias only
 
     def test_three_primary_plus_one_extra_preserve_existing_slot_paths(self):
         self.reconcile()

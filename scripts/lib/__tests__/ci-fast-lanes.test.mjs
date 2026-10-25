@@ -17,6 +17,7 @@ import {
   BIOME_TOOLCHAIN_FILES,
   biomeNeedsFullTree,
   CERTIFICATION_KERNEL_COMMAND,
+  DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND,
   earlierLaneFailed,
   escapeAnnotationMessage,
   escapeAnnotationProperty,
@@ -424,6 +425,24 @@ describe('runStructural screenshot contract discovery', () => {
     }
     vi.clearAllMocks();
   });
+
+  it.each(['mac', 'web'])(
+    'selects installed-identity coverage only for the Mac lane (%s)',
+    async lane => {
+      process.env.GITHUB_EVENT_NAME = 'pull_request';
+      process.env.CI_PRODUCT_LANES = lane;
+      process.env.CI_FAST_SKIP_STRUCTURAL = 'false';
+      const execute = vi.fn().mockReturnValue({ code: 0, output: 'ok\n' });
+      await runStructural({
+        execute,
+        changedFileList: ['scripts/desktop-installed-apps-audit.mjs'],
+      });
+      const commands = execute.mock.calls.map(([command]) => String(command));
+      expect(
+        commands.includes(DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND)
+      ).toBe(lane === 'mac');
+    }
+  );
 
   it.each([
     ['web', ['apps/web/lib/leads/constants.ts'], true],
@@ -2102,7 +2121,12 @@ describe('source-read guard selection', () => {
   it.each([
     [
       'pull_request',
-      ['web-source-read-tests', 'script-contracts', 'gate-weakening-detector'],
+      [
+        'web-source-read-tests',
+        'script-contracts',
+        'merged-with-base-invariants',
+        'gate-weakening-detector',
+      ],
     ],
     ['merge_group', []],
     ['push', []],
@@ -2209,6 +2233,13 @@ describe('source-read guard selection', () => {
       ...apiGuard(path),
       'web-source-read-tests',
       'script-contracts',
+      ...(/^(?:apps\/web\/components\/|packages\/ui\/)/u.test(path)
+        ? ['ui-story-coverage-allowlist']
+        : []),
+      'merged-with-base-invariants',
+      ...(/^scripts\/(?:lanes\/|tests\/test_)/u.test(path)
+        ? ['lanes-selftest-changed-tests']
+        : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
       'gate-weakening-detector',
     ]);
@@ -2276,6 +2307,7 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
+      'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
       'external-api-guard',
@@ -2289,6 +2321,7 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
+      'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
       'external-api-guard',
@@ -2360,6 +2393,26 @@ describe('source-read guard selection', () => {
         expect(
           readFileSync(
             join(REPO_ROOT, 'scripts/codex-cloud-setup.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'lanes-selftest-changed-tests') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain('LANES_SELFTEST=1');
+        expect(guard.command).toContain('python3 -m unittest');
+        continue;
+      }
+      if (guard.id === 'merged-with-base-invariants') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain('git worktree add');
+        expect(guard.command).toContain(
+          'scripts/invariants/design-surfaces.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/invariants/design-surfaces.test.mjs'),
             'utf8'
           )
         ).toContain("from 'node:test'");

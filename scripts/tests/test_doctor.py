@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+from datetime import datetime, timezone
 import os
 import subprocess
 import sys
@@ -278,9 +279,132 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(len(alerts), 1)
 
 
+def realistic_feed():
+    """Shaped like the 2026-10-25 live feed that hit 410,142 bytes: 737 overlap pairs (217 KB), 312
+    remediation fingerprints with long ask text (72 KB), 40 conditions (54 KB), per-PR attribution rows."""
+    pairs = [{"actionTaken": "flag", "files": [f"apps/web/components/area{n % 40}/File{n % 97}.tsx", "apps/web/data/shared.ts",
+                                              "apps/web/tests/unit/area/contract.test.ts", f"apps/web/lib/mod{n}.ts"],
+              "first": f"pr:#{22000 + n}", "firstPr": 22000 + n, "later": f"pr:#{23000 - n}", "laterPr": 23000 - n,
+              "observedAt": "2026-10-25T13:55:52.575644+00:00", "policyAction": "flag", "queueOwned": n % 3 == 0,
+              "regenerateFiles": []} for n in range(737)]
+    fingerprints = {f"remediation-fingerprint-{n}": {
+        "state": ("done", "exhausted", "claimed", "human")[n % 4], "issue": f"JOV-{7000 + n}", "cls": "fixable-by-agent",
+        "lane": None, "ask": "needs-human `ccf5eaaa-8705-49f0-b264-ec3558d678b7`: exhausted the lane ladder. " * 3,
+        "recurrence": ["2026-10-24T01:02:03Z"] * 6} for n in range(312)}
+    conditions = {f"condition-{n}": {"schema": "jovie.control-plane-liveness-condition/v1",
+                                    "idempotencyKey": "k" * 64, "condition": "c" * 900} for n in range(40)}
+    rows = [{"repository": "JovieInc/Jovie", "prNumber": n, "title": "fix(area): a typical pull request title (JOV-1)",
+             "headSha": "a" * 40, "mergeCommitSha": "b" * 40, "origin": {"method": "autonomous", "provider": "codex",
+                                                                        "evidence": ["x" * 60] * 4}} for n in range(560)]
+    return {"schema": "symphony-lanes-status/v1", "at": "2026-10-25T15:00:00Z", "host": "gem", "release": "r1",
+            "fileOverlap": {"mode": "flag", "pairs": pairs, "metrics": {"overlap_flags": 18810}},
+            "remediation": {"byFingerprint": fingerprints, "surfaced": [{"pr": n} for n in range(131)]},
+            "conditions": conditions,
+            "shippingAttribution": {"schema": "s", "projects": [{"channel": "Jovie", "mergeCount": 118,
+                                                                 "pullRequests": rows,
+                                                                 "missingOriginReceiptPullRequests": ["u" * 45] * 100}]},
+            "alerts": {"a": "x" * 200}}
+
+
+class PublicFeedSizeTest(unittest.TestCase):
+    def test_realistic_feed_stays_under_seventy_percent_of_the_cap_and_keeps_operational_identity(self):
+        feed = realistic_feed()
+        full = json.dumps(feed, indent=1)
+        self.assertGreater(len(full.encode()), doctor.PUBLIC_FEED_MAX_BYTES * 2, "fixture must reproduce the overflow")
+        out = doctor.public_status_projection(feed, full)
+        public = json.loads(out)
+        self.assertEqual(public["schema"], "symphony-lanes-status/v1")
+        self.assertLess(len(out.encode()), doctor.PUBLIC_FEED_MAX_BYTES * doctor.PUBLIC_FEED_WARN_RATIO)
+        overlap = public["fileOverlap"]
+        self.assertNotIn("pairs", overlap)
+        self.assertEqual(overlap["pairsSummary"]["count"], 737)
+        self.assertLessEqual(len(overlap["pairsSummary"]["topHotspots"]), doctor.PUBLIC_OVERLAP_TOP)
+        self.assertEqual(overlap["pairsSummary"]["topHotspots"][0]["file"], "apps/web/data/shared.ts")
+        self.assertEqual(overlap["pairsSummary"]["pairsRef"]["jsonPointer"], "/fileOverlap/pairs")
+        rows = public["remediation"]["byFingerprint"]
+        self.assertEqual(len(rows), 312)
+        self.assertEqual(set(rows["remediation-fingerprint-2"]), set(doctor.PUBLIC_REMEDIATION_FIELDS))
+        self.assertEqual(public["remediation"]["byFingerprintRef"]["recordCount"], 312)
+        self.assertEqual(len(public["remediation"]["surfaced"]), 131)  # ownership arrays stay whole
+        # Nothing is lost: the complete evidence is what the details file carries, byte for byte.
+        self.assertEqual(len(json.loads(full)["fileOverlap"]["pairs"]), 737)
+        self.assertEqual(public["publicProjection"]["fullEvidence"]["bytes"], len(full.encode()))
+
+    def test_conditions_keep_active_and_recent_resolutions_compactly_and_count_the_rest(self):
+        # Gem 2026-10-25: 33 of 52 receipts were resolved, kept forever, each with ~1.5 KB of review bindings.
+        now = 1_800_000_000.0
+        stamp = lambda age: datetime.fromtimestamp(now - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        review = {"outcome": "approved-template", "bindings": {"messageSha256": "f" * 64, "extra": "x" * 1200}}
+        def event(state, resolved_age=None, evidence="e" * 900):
+            row = {"schema": "s", "idempotencyKey": "gem:k:1", "condition": "k", "generation": 1, "state": state,
+                   "severity": "degraded", "owner": "doctor", "firstObservedAt": "2026-10-25T00:00:00Z",
+                   "source": {"producer": "p", "status": "degraded", "observedAt": "t", "freshnessSeconds": 0},
+                   "evidence": evidence, "writingReview": review, "writingDecision": {"d": "x" * 500},
+                   "summerEscalation": {"transport": "linear", "outcome": "requested"}}
+            if resolved_age is not None:
+                row["resolvedAt"] = stamp(resolved_age)
+            return row
+        public = {"conditions": {"live": event("active"), "fresh": event("resolved", 3600),
+                                 "old": event("resolved", 7 * 3600), "undated": event("resolved")}}
+        before = len(json.dumps(public))
+        doctor._compact_conditions(public, now)
+        self.assertEqual(sorted(public["conditions"]), ["fresh", "live"])
+        live = public["conditions"]["live"]
+        self.assertNotIn("writingReview", live)
+        self.assertNotIn("writingDecision", live)
+        self.assertEqual(live["evidence"], "e" * 900, "operational evidence is never trimmed")
+        self.assertEqual(live["summerEscalation"]["outcome"], "requested")
+        self.assertEqual(live["source"]["status"], "degraded")
+        summary = public["conditionsSummary"]
+        self.assertEqual((summary["total"], summary["resolvedOmitted"], summary["byState"]),
+                         (4, 2, {"active": 1, "resolved": 3}))
+        self.assertEqual(summary["ref"]["jsonPointer"], "/conditions")
+        self.assertLess(len(json.dumps(public)), before / 2)
+
+    def test_growth_rate_projects_time_to_cap_and_alerts_under_six_hours(self):
+        cap, now = 262144, 1_000_000.0
+        flat = doctor.feed_growth([[now - 3600, 100000], [now - 1800, 100000]], now, 100000)
+        self.assertEqual((flat["growthBytesPerHour"], flat["secondsToCap"]), (0, None))
+        self.assertIsNone(doctor.feed_growth([[now - 60, 1]], now, 2)["secondsToCap"], "too little history")
+        rising = doctor.feed_growth([[now - 3600, 145000], [now - 1800, 160000]], now, 175000)
+        self.assertEqual(rising["growthBytesPerHour"], 30000)
+        self.assertEqual(rising["secondsToCap"], round((cap - 175000) / (30000 / 3600)))
+        self.assertLess(rising["secondsToCap"], doctor.FEED_GROWTH_ALERT_S)
+        sizes = {"bytes": 175000, "maxBytes": cap, "ratio": 0.668, **rising}
+        alert = doctor.judge(obs(publicFeed=sizes))["public-feed-growth"]
+        self.assertIn("30000 bytes/h", alert)
+        slow = doctor.feed_growth([[now - 3600, 100000], [now - 1800, 100500]], now, 101000)
+        self.assertNotIn("public-feed-growth", doctor.judge(obs(publicFeed={"bytes": 101000, "maxBytes": cap, "ratio": 0.4, **slow})))
+        # The level alert wins when both apply; one alert, not two.
+        both = doctor.judge(obs(publicFeed={**sizes, "bytes": 190000, "ratio": 0.725}))
+        self.assertIn("public-feed-near-limit", both)
+        self.assertNotIn("public-feed-growth", both)
+
+    def test_section_sizes_are_measured_and_the_doctor_alerts_before_the_cap(self):
+        out = doctor.public_status_projection(realistic_feed(), json.dumps(realistic_feed(), indent=1))
+        sizes = doctor.feed_section_sizes(out)
+        self.assertEqual(sizes["bytes"], len(out.encode()))
+        self.assertLess(sizes["ratio"], doctor.PUBLIC_FEED_WARN_RATIO)
+        self.assertEqual(next(iter(sizes["sections"])), "conditions")
+        self.assertNotIn("public-feed-near-limit", doctor.judge(obs(publicFeed=sizes)))
+        near = {**sizes, "bytes": 190000, "ratio": 0.725}
+        alert = doctor.judge(obs(publicFeed=near))["public-feed-near-limit"]
+        self.assertIn("72%", alert)
+        self.assertIn("conditions", alert)
+        self.assertNotIn("public-feed-near-limit", doctor.judge(obs(publicFeed={})))
+
+
 class JudgeTest(unittest.TestCase):
     def test_healthy_host_raises_nothing(self):
         self.assertEqual(doctor.judge(obs()), {})
+
+    def test_install_lag_alerts_only_past_the_measured_threshold(self):
+        late = doctor.judge(obs(installLag={"behindS": doctor.INSTALL_LAG_ALERT_S + 60, "behindCommit": "dcfb270acb83",
+                                            "error": "AdmissionHeld: gate-admission-busy"}))
+        self.assertIn("gate-admission-busy", late["install-lag"])
+        self.assertIn("dcfb270a", late["install-lag"])
+        for lag in ({"behindS": 600}, {"behindS": 0}, {"behindS": None}, {}):
+            self.assertNotIn("install-lag", doctor.judge(obs(installLag=lag)))
 
     def test_failed_event_delivery_is_actionable_and_acknowledgement_clears_it(self):
         failed = obs(tick={'remediationEvents': {'deliveryFailed': 1, 'deliveryExhausted': 0, 'deliveryNextAt': 100}})
@@ -361,6 +485,32 @@ class JudgeTest(unittest.TestCase):
                                                     "preserved-target-needs-reconciliation": 17}))
         self.assertIn("40 PR repairs", alerts["repairs-without-work"])
         self.assertIn("target-state-unavailable 23", alerts["repairs-without-work"])
+
+    def test_refunded_no_work_repairs_are_counted_as_requeues_not_spend(self):
+        # Gem 2026-10-23: refunded infra stops never consumed an attempt, so the alert
+        # must say so instead of claiming the budget was burned.
+        alerts = doctor.judge(obs(noWorkRepairs24h={"target-state-unavailable": 10},
+                                  refundedNoWorkRepairs24h=7))
+        alert = alerts["repairs-without-work"]
+        self.assertIn("3 spent a fix attempt", alert)
+        self.assertIn("7 were refunded and requeued with backoff", alert)
+
+    def test_an_unclean_previous_tick_is_a_visible_alert_with_its_recovery(self):
+        alerts = doctor.judge(obs(tick={"at": "x", "error": None,
+                                        "uncleanPreviousRun": {"pid": 4242, "startedAt": 1.0},
+                                        "uncleanRecovery": {"refundedFixAttempts": ["6"]}}))
+        self.assertIn("lanes-tick-unclean", alerts)
+        self.assertIn("pid 4242", alerts["lanes-tick-unclean"])
+        self.assertIn("1 stranded fix-attempt charge", alerts["lanes-tick-unclean"])
+
+    def test_exhausted_only_delivery_failure_is_still_a_visible_alert(self):
+        # Terminal exhausted rows never retry: they must alert on their own, without a
+        # failed count, or a terminal failure would go silent.
+        alerts = doctor.judge(obs(tick={"remediationEvents": {"deliveryFailed": 0,
+                                                              "deliveryExhausted": 2,
+                                                              "deliveryNextAt": None}}))
+        self.assertIn("remediation-delivery", alerts)
+        self.assertIn("exhausted=2", alerts["remediation-delivery"])
 
     def test_disk_tiers_page_summer_only_below_critical(self):
         self.assertEqual(set(doctor.judge(obs(diskFreePct=7.0))), {"disk-low"})
@@ -459,6 +609,39 @@ class JudgeTest(unittest.TestCase):
                                            "unresolved": {"post-merge-without-merged-evidence": 40}}))
         self.assertIn("40 started JOV issues", loud["started-without-owner"])
 
+    def test_team_templated_receipts_use_the_newest_team_file_and_ignore_sidecars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            state = home / ".local/state/jovie-lanes"
+            (state / "refill").mkdir(parents=True)
+            (state / "decompose").mkdir()
+            now = time.time()
+            (state / "refill" / "JOV.json").write_text("{}")
+            (state / "refill" / "LYB.json").write_text("{}")
+            old = state / "refill" / "LYB.json"
+            os.utime(old, (now - 7200, now - 7200))
+            (state / "refill" / "JOV-rank.json").write_text("{}")  # sidecar, not a team receipt
+            stale_only = state / "decompose" / "LYB.json"
+            stale_only.write_text("{}")
+            os.utime(stale_only, (now - 7200, now - 7200))
+            (state / "decompose" / "seen.json").write_text("{}")  # lowercase: not a team
+            fresh_sidecar = state / "decompose" / "spawn-LYB.json"
+            fresh_sidecar.write_text("{}")
+            row = lambda name, minutes: {"id": f"gem:{name}", "status": "live", "host": "gem", "maxStalenessMinutes": minutes,
+                                         "receipt": {"kind": "host-local",
+                                                     "location": f"gem:~/.local/state/jovie-lanes/{name}/<TEAM>.json"}}
+            watch = doctor.automation_watch([row("refill", 15), row("decompose", 60)], "gem", now, home=home)
+            self.assertNotIn("gem:refill", watch["silent"], "JOV.json is fresh")
+            self.assertEqual(watch["silent"]["gem:decompose"]["ageS"] // 60, 120, "only a stale team receipt counts")
+            (state / "refill" / "JOV.json").unlink()
+            os.utime(state / "refill" / "JOV-rank.json", (now, now))
+            gone = doctor.automation_watch([row("refill", 15)], "gem", now, home=home)
+            self.assertIn("gem:refill", gone["silent"], "a sidecar cannot vouch for a team receipt")
+            for path in (state / "refill").iterdir():
+                path.unlink()
+            missing = doctor.automation_watch([row("refill", 15)], "gem", now, home=home)
+            self.assertIsNone(missing["silent"]["gem:refill"]["ageS"])
+
     def test_registered_host_local_automations_raise_automation_silent(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
@@ -491,6 +674,35 @@ class JudgeTest(unittest.TestCase):
             self.assertNotIn("automation-registry-unreadable",
                              doctor.judge(obs(automation={"known": False, "silent": {}, "skipped": True}, now=now)))
             self.assertNotIn("automation-registry-unreadable", doctor.judge(obs(now=now)))
+
+    def test_outcome_lane_stall_is_alerted_only_when_owed_receipts_age_out(self):
+        now = 1_800_000_000.0
+        old = doctor.epoch_iso(now - 30 * 3600)
+        fresh = doctor.epoch_iso(now - 3600)
+        capped = {"queued": 7, "status": "budget-exhausted", "at": now - 600, "oldestOwedAt": old,
+                  "spentToday": 30, "perDay": 30}
+        alert = doctor.judge(obs(outcomeQueue=capped, now=now))["outcome-lane-stalled"]
+        self.assertIn("7 Validating", alert)
+        self.assertIn("30/30", alert)
+        silent = {**capped, "status": "drained", "at": now - 3 * 3600}
+        self.assertIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue=silent, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "oldestOwedAt": fresh}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "status": "drained"}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(outcomeQueue={**capped, "queued": 0}, now=now)))
+        self.assertNotIn("outcome-lane-stalled", doctor.judge(obs(now=now)))
+
+    def test_outcome_queue_status_feeds_the_doctor_alert(self):
+        import outcome_lane
+        with tempfile.TemporaryDirectory() as raw:
+            state = Path(raw)
+            queue = [({"identifier": "JOV-1"}, {"at": "2026-10-23T00:00:00Z"}),
+                     ({"identifier": "JOV-2"}, {"at": "2026-10-22T00:00:00Z"})]
+            outcome_lane.write_queue(state, "budget-exhausted", queue, 1_792_800_000.0, 30)
+            row = json.loads((state / "outcome-queue.json").read_text())
+            self.assertEqual((row["queued"], row["oldestOwedAt"], row["status"]),
+                             (2, "2026-10-22T00:00:00Z", "budget-exhausted"))
+            alerts = doctor.judge(obs(outcomeQueue=row, now=1_792_800_000.0 + 60))
+            self.assertIn("outcome-lane-stalled", alerts)
 
     def test_the_watched_registry_is_the_one_merged_on_main(self):
         # The doctor must read the path the registry actually ships at (#22354: canon/).
@@ -879,6 +1091,97 @@ class ReconcileTest(unittest.TestCase):
         verify.assert_called_once_with(reviewed, "disk-low", "4% free", condition, "gem", tracker.title("disk-low"))
         self.assertEqual(state["conditions"]["disk-low"]["writingReview"], reviewed["review"])
         self.assertEqual(state["conditions"]["disk-low"]["writingDecision"], "approved-template")
+
+    def test_an_incident_opens_even_when_the_label_cannot_be_created_or_found(self):
+        issues, forbidden = [], []
+
+        class ForbiddenLabels:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]},
+                                                  "labels": {"nodes": [{"id": "symphony", "name": "symphony"}]}}]}}
+                if "issueLabels(" in query:
+                    return {"issueLabels": {"nodes": []}}
+                if "issueLabelCreate" in query:
+                    forbidden.append(variables)
+                    raise RuntimeError("linear: request rejected (403 FORBIDDEN)")
+                if "issueCreate" in query:
+                    issues.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-9", "identifier": "JOV-9"}}}
+                raise AssertionError(query)
+
+        self.assertEqual(doctor.Tracker(ForbiddenLabels(), "gem").open("production-deploy:lyb", "LYB deploys failing"), "iss-9")
+        self.assertEqual(len(forbidden), 1)
+        self.assertEqual(issues[0]["labelIds"], ["symphony"], "the incident keeps its symphony label and loses only the remediation one")
+
+    def test_a_failed_open_is_never_silent_and_keeps_when_it_started(self):
+        # 2026-10-25: production-deploy:lyb sat for ~50 min with no issue; Tracker.open swallowed the error.
+        class Down:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "t", "states": {"nodes": [{"id": "tr", "name": "Triage"}]},
+                                                  "labels": {"nodes": []}}]}}
+                if "issueLabels(" in query or "issueLabelCreate" in query:
+                    return {"issueLabels": {"nodes": []}}
+                raise RuntimeError("linear: 500")
+
+        tracker = doctor.Tracker(Down(), "gem")
+        self.assertIsNone(tracker.open("production-deploy:lyb", "x"))
+        self.assertTrue(tracker.last_error.startswith("create-failed:RuntimeError"))
+        first = doctor.reconcile({"production-deploy:lyb": "x"}, {}, tracker, 1000.0)
+        entry = first["issues"]["production-deploy:lyb"]
+        self.assertEqual((entry["id"], entry["since"]), (None, 1000.0))
+        self.assertIn("create-failed", entry["reason"])
+        second = doctor.reconcile({"production-deploy:lyb": "x"}, first, tracker, 1300.0)
+        self.assertEqual(second["issues"]["production-deploy:lyb"]["since"], 1000.0, "since survives retries")
+
+    def test_invariant_flags_only_alerts_without_an_issue_older_than_fifteen_minutes(self):
+        issues = {"a": {"id": "i1", "closedAt": None},
+                  "b": {"id": None, "closedAt": None, "reason": "create-failed:RuntimeError: 500", "since": 1000.0},
+                  "c": {"id": None, "closedAt": None, "since": 1000.0},
+                  "d": {"id": None, "closedAt": None, "reason": "r", "since": 1500.0}}
+        alerts = {"a": "", "b": "", "c": "", "d": "", "e": ""}
+        gaps = doctor.alert_issue_gaps(alerts, issues, 1000.0 + doctor.ALERT_ISSUE_GRACE_S + 1)
+        self.assertEqual(gaps, {"b": "create-failed:RuntimeError: 500", "c": "untracked"})
+        self.assertEqual(doctor.alert_issue_gaps(alerts, issues, 1000.0 + doctor.ALERT_ISSUE_GRACE_S - 1), {})
+        previous = {"issues": issues}
+        with mock.patch("time.time", return_value=1000.0 + doctor.ALERT_ISSUE_GRACE_S + 1):
+            raised = doctor.judge(obs(tick={"error": "boom"}), previous)
+        self.assertNotIn("alert-issue-missing", raised, "only alerts present this tick count")
+
+    def test_judge_raises_alert_issue_missing_for_a_standing_alert_without_an_issue(self):
+        previous = {"issues": {"tick-error": {"id": None, "closedAt": None, "reason": "create-failed:RuntimeError: 500", "since": 100.0}}}
+        with mock.patch("time.time", return_value=100.0 + doctor.ALERT_ISSUE_GRACE_S + 5):
+            alerts = doctor.judge(obs(tick={"error": "boom"}), previous)
+        self.assertIn("tick-error", alerts)
+        self.assertIn("tick-error (create-failed:RuntimeError: 500)", alerts["alert-issue-missing"])
+
+    def test_an_existing_label_beyond_the_first_fifty_is_found_by_name_and_not_recreated(self):
+        created, issues = [], []
+
+        class ManyLabels:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "team", "states": {"nodes": [{"id": "triage", "name": "Triage"}]},
+                                                  "labels": {"nodes": []}}]}}
+                if "issueLabels(" in query:
+                    return {"issueLabels": {"nodes": [{"id": "old-label", "name": variables["n"]}]}}
+                if "issueLabelCreate" in query:
+                    created.append(variables)
+                    return {}
+                if "issueCreate" in query:
+                    issues.append(variables["i"])
+                    return {"issueCreate": {"issue": {"id": "iss-8", "identifier": "JOV-8"}}}
+                raise AssertionError(query)
+
+        self.assertEqual(doctor.Tracker(ManyLabels(), "gem").open("production-deploy:lyb", "x"), "iss-8")
+        self.assertEqual((created, issues[0]["labelIds"]), ([], ["old-label"]))
 
     def test_alert_label_is_created_on_open_reopen_and_close(self):
         created = []
@@ -2683,3 +2986,99 @@ class ProviderPayloadCensusTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RedDispatchAlertTest(unittest.TestCase):
+    """JOV-8931: a relayed red check with no lane claim inside the grace window alerts."""
+
+    NOW = 1_000_000_000.0
+
+    def write_ledger(self, state, rows):
+        ledger = state / "runs/red-dispatch.jsonl"
+        ledger.parent.mkdir(parents=True, exist_ok=True)
+        with ledger.open("a") as handle:
+            for row in rows:
+                handle.write(json.dumps(row) + "\n")
+
+    def dispatched_row(self, *, pr=22868, sha="a" * 40, red_epoch=None):
+        return {"schema": "jovie-lane-red-dispatch/v1", "status": "dispatched", "pr": pr,
+                "sha": sha, "runId": 987654, "runAttempt": 2,
+                "redAt": "2026-10-23T18:27:30Z", "redAtEpoch": red_epoch,
+                "dispatchedAt": "2026-10-23T18:28:00Z", "claimAt": None,
+                "provider": "codex", "reason": None}
+
+    def test_summary_flags_dispatch_rows_past_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(red_epoch=self.NOW - 60),
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+            ])
+            summary = doctor.red_dispatch_summary(state, self.NOW)
+            self.assertEqual(summary["graceS"], 180)
+            self.assertEqual([row["pr"] for row in summary["unclaimed"]], [1])
+            self.assertEqual(summary["unclaimed"][0]["ageS"], 300)
+
+    def test_summary_clears_once_a_claim_row_lands(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [
+                self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300),
+                {"status": "claimed", "pr": 1, "sha": "b" * 40, "claimAt": "2026-10-23T18:30:00Z"},
+            ])
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_summary_tolerates_missing_or_corrupt_ledger(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW),
+                             {"graceS": 180, "unclaimed": []})
+            (state / "runs").mkdir(parents=True)
+            (state / "runs/red-dispatch.jsonl").write_text("not json\n")
+            self.assertEqual(doctor.red_dispatch_summary(state, self.NOW)["unclaimed"], [])
+
+    def test_judge_raises_the_alert_with_a_stable_key_per_pr(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(pr=1, sha="b" * 40, red_epoch=self.NOW - 300)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            alerts = doctor.judge(obs)
+            self.assertIn("red-dispatch-unclaimed:1", alerts)
+            self.assertIn("unclaimed 300s after red_at", alerts["red-dispatch-unclaimed:1"])
+
+    def test_judge_stays_quiet_inside_the_grace_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            self.write_ledger(state, [self.dispatched_row(red_epoch=self.NOW - 60)])
+            obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
+            self.assertFalse(doctor.judge(obs))
+
+
+class QuotaDeferredHeadsTests(unittest.TestCase):
+    def test_alert_names_the_heads_and_is_silent_at_zero(self):
+        deferred = {"value": 2, "heads": [{"number": 7, "ageMinutes": 90}, {"number": 8, "ageMinutes": 70}]}
+        alert = doctor.judge(obs(quotaDeferredHeads=deferred))["quota-deferred-heads"]
+        self.assertIn("2 open PR heads", alert)
+        self.assertIn("#7 90m", alert)
+        self.assertNotIn("quota-deferred-heads", doctor.judge(obs(quotaDeferredHeads={"value": 0, "heads": []})))
+        self.assertNotIn("quota-deferred-heads", doctor.judge(obs()))
+
+    def test_sampler_parses_exit_one_caches_and_keeps_a_stale_read_on_failure(self):
+        import tempfile
+        from types import SimpleNamespace
+        out = json.dumps({"metric": "quota_deferred_heads_older_than_1h", "value": 1,
+                          "heads": [{"number": 9, "ageMinutes": 80}]})
+        calls = []
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout=out, stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            signal, error = doctor.sample_quota_deferred_heads(Path(tmp), 1000.0, run)
+            self.assertEqual((signal["value"], error), (1, None))
+            again, _ = doctor.sample_quota_deferred_heads(Path(tmp), 1100.0, run)
+            self.assertEqual(len(calls), 1, "a fresh cache is not re-read")
+            self.assertEqual(again["value"], 1)
+            broken = lambda *a, **k: SimpleNamespace(returncode=2, stdout="", stderr="boom")
+            stale, error = doctor.sample_quota_deferred_heads(Path(tmp), 5000.0, broken)
+            self.assertEqual(stale["value"], 1)
+            self.assertIn("boom", error)

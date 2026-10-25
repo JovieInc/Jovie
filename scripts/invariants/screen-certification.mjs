@@ -283,6 +283,7 @@ web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.t
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
+web.app-loading|web|app-shell|apps/web/app/app/loading.tsx|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.app-shell|web|app-shell|apps/web/app/app/(shell)/layout.tsx|desktop,mobile
 web.money|web|screen.money|apps/web/app/app/money/page.tsx,apps/web/app/app/money/layout.tsx|desktop,mobile
@@ -295,6 +296,7 @@ web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobil
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
 web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
+web.smartlink-sounds|web|release-landing|apps/web/app/[username]/[slug]/sounds/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
 web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
 web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
@@ -346,10 +348,13 @@ web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.settings-data-privacy|web|screen.settings.data-privacy|apps/web/app/app/(shell)/settings/data-privacy/page.tsx|desktop,mobile
 web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
+web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
+web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
 web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx|desktop,mobile
 web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile

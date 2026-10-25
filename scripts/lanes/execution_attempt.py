@@ -65,7 +65,7 @@ def _status_pages(pages) -> list[dict]:
     if any(not isinstance(item, dict) for item in statuses): raise RuntimeError("execution-coordinator-history-malformed")
     return statuses
 def _trusted_creator(creator) -> bool:
-    return isinstance(creator, dict) and creator.get("login") == "jovie-bot[bot]" and creator.get("type") == "Bot"
+    return isinstance(creator, dict) and creator.get("login") in {"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]"} and creator.get("type") == "Bot"
 SUCCESS_TERMINAL = frozenset({"succeeded", "no_op_stale", "superseded"})
 LIVE_EVENTS = frozenset({"attempt_started", "boundary_admitted"})
 # A completion seal stays pending until the same reconcile operation appends its
@@ -134,10 +134,12 @@ def _github_rows(coordination: dict, ident: dict) -> tuple[list[dict], int | str
     pages = _gh(coordination, "GET", f"repos/{repository}/commits/{sha}/statuses?per_page=100")
     return _status_rows(_status_pages(pages), ident, coordination=coordination)
 RESERVATION_SCHEMA = "jovie-execution-reservation/v1"
-# Reader-first rollout: self-update must not activate incompatible writer links.
-# Enable only in a reviewed release after every participating reader/writer is
-# verified ready. This is deliberately not a JSON or environment override.
-IMMUTABLE_WRITER_ENABLED = False
+# Candidate-linked writer enablement (JOV-8293): the separately reviewed release
+# after the dual-format reader and every boundary_id caller landed and drained.
+# Legacy numeric chains stay readable, legacy common-source-SHA reservations are
+# never extended or reused, and an un-updated writer still refuses new receipts.
+# This is deliberately not a JSON or environment override.
+IMMUTABLE_WRITER_ENABLED = True
 def _append_ref(ident: dict, head) -> str:
     return f"refs/jovie-execution/{ident['identityDigest']}/append-{head if head is not None else 'root'}"
 def _without_status(row: dict) -> dict:

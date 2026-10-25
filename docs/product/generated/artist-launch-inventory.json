@@ -2441,6 +2441,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/summer-canary/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/summer-canary",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/sync-ai-crawler-analytics/route.ts",
       "kind": "handler",
       "route": "/api/cron/sync-ai-crawler-analytics",
@@ -2540,7 +2548,7 @@
       "source": "apps/web/app/api/dashboard/audience/subscribers/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/subscribers",
-      "methods": ["GET", "POST"],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3276,6 +3284,22 @@
       "source": "apps/web/app/api/internal/ovie/objections/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/objections",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/contributions/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/pipeline-bottleneck/contributions",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/pipeline-bottleneck",
       "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
@@ -4556,6 +4580,14 @@
       "source": "apps/web/app/api/v1/fleet/[operation]/route.ts",
       "kind": "handler",
       "route": "/api/v1/fleet/[operation]",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/v1/music/resolve/route.ts",
+      "kind": "handler",
+      "route": "/api/v1/music/resolve",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"

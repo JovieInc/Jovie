@@ -996,6 +996,66 @@ describe('ProfileCompactTemplate', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders Jovie footer branding on the free public profile (JOV-8777)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+      />
+    );
+
+    const branding = await screen.findByTestId('profile-jovie-branding');
+    expect(
+      within(branding).getByRole('link', { name: /Jovie home/i })
+    ).toHaveAttribute(
+      'href',
+      `/?utm_source=profile&utm_artist=${mockArtist.handle}`
+    );
+  });
+
+  it('hides Jovie footer branding inside embedded previews (JOV-8777)', async () => {
+    render(
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        embeddedPreview
+      />
+    );
+
+    expect(await screen.findByTestId('profile-compact-surface')).toBeVisible();
+    expect(
+      screen.queryByTestId('profile-jovie-branding')
+    ).not.toBeInTheDocument();
+  });
+
+  it('passes hideJovieBranding through to the desktop surface (JOV-8777)', async () => {
+    const restoreViewport = mockViewport('desktop');
+    try {
+      render(
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+
+      await waitFor(() => {
+        expect(mockProfileDesktopSurface).toHaveBeenCalled();
+      });
+      const desktopProps = mockProfileDesktopSurface.mock.calls.at(
+        -1
+      )?.[0] as Record<string, unknown>;
+      expect(desktopProps.hideJovieBranding).toBe(false);
+    } finally {
+      restoreViewport();
+    }
+  });
+
   it('renders the compact bottom navigation with four primary icon tabs', async () => {
     render(
       <ProfileCompactTemplate
@@ -1385,6 +1445,61 @@ describe('ProfileCompactTemplate', () => {
     pushStateSpy.mockRestore();
   });
 
+  it('keeps Home canonical after an Events deep link, remount, and browser history in Strict Mode', async () => {
+    window.history.replaceState(null, '', '/test-artist?mode=tour&source=qr');
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+    const profile = (
+      <React.StrictMode>
+        <ProfileCompactTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      </React.StrictMode>
+    );
+    const expectMode = (label: string, mode: string, search: string) => {
+      expect(window.location.search).toBe(search);
+      expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+        'data-mode',
+        mode
+      );
+      expect(
+        within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
+          name: label,
+        })
+      ).toHaveAttribute('aria-current', 'page');
+    };
+
+    try {
+      const view = render(profile);
+      await waitFor(() => expectMode('Events', 'tour', '?mode=tour&source=qr'));
+      expect(pushStateSpy).not.toHaveBeenCalled();
+
+      fireEvent.click(
+        within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
+          name: 'Home',
+        })
+      );
+      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
+      expect(pushStateSpy).toHaveBeenCalledTimes(1);
+
+      // Recreate the component from the canonical URL, as a reload would.
+      view.unmount();
+      render(profile);
+      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
+      expect(pushStateSpy).toHaveBeenCalledTimes(1);
+
+      act(() => window.history.back());
+      await waitFor(() => expectMode('Events', 'tour', '?mode=tour&source=qr'));
+      act(() => window.history.forward());
+      await waitFor(() => expectMode('Home', 'profile', '?source=qr'));
+      expect(pushStateSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      pushStateSpy.mockRestore();
+    }
+  });
+
   it('does not push a source-less URL before the source param hydrates', async () => {
     mockCanonicalProfileDSPs.mockReturnValue([{ platform: 'spotify' }]);
     window.history.replaceState(null, '', '/test-artist?source=qr');
@@ -1513,6 +1628,7 @@ describe('ProfileCompactTemplate', () => {
       );
     });
     expect(pushStateSpy).not.toHaveBeenCalled();
+    const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
 
     // A client Link (the about drawer's contact links) moves the URL to
     // contact mode; requestedMode is still 'about' until the shell's
@@ -1531,6 +1647,13 @@ describe('ProfileCompactTemplate', () => {
         socialLinks={[]}
         contacts={[]}
       />
+    );
+
+    // A fresh JSX element actually re-rendered the template; an identical
+    // element reference would bail out and prove nothing. The zero-write
+    // assertions below are only meaningful if the history effect re-ran.
+    expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+      rendersAfterLanding
     );
 
     await waitFor(() => {
@@ -1556,6 +1679,10 @@ describe('ProfileCompactTemplate', () => {
         contentPreferences: null,
       },
     }));
+    // The mode-sync rerender must also be real: capture the count before
+    // the flip so the assertion below proves this rerender re-ran the
+    // history effect too.
+    const rendersBeforeModeSync = mockUseProfileShell.mock.calls.length;
     view.rerender(
       <ProfileCompactTemplate
         mode='contact'
@@ -1563,6 +1690,9 @@ describe('ProfileCompactTemplate', () => {
         socialLinks={[]}
         contacts={[]}
       />
+    );
+    expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+      rendersBeforeModeSync
     );
     await waitFor(() => {
       expect(`${window.location.pathname}${window.location.search}`).toBe(
@@ -1630,6 +1760,7 @@ describe('ProfileCompactTemplate', () => {
     });
     pushStateSpy.mockClear();
     replaceStateSpy.mockClear();
+    const rendersAfterLanding = mockUseProfileShell.mock.calls.length;
     try {
       view.rerender(
         <ProfileCompactTemplate
@@ -1638,6 +1769,13 @@ describe('ProfileCompactTemplate', () => {
           socialLinks={[]}
           contacts={[]}
         />
+      );
+
+      // A fresh JSX element actually re-rendered the template; an identical
+      // element reference would bail out and prove nothing. The zero-write
+      // assertions below are only meaningful if the history effect re-ran.
+      expect(mockUseProfileShell.mock.calls.length).toBeGreaterThan(
+        rendersAfterLanding
       );
 
       await waitFor(() => {
