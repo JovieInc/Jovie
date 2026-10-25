@@ -2,7 +2,7 @@ name: M2 Revenue-Path Canary
 # clock-class: production-liveness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: GitHub-hosted production-liveness clock probes signed-out claim, $199 Pro checkout, and activation on prod without Stripe write credentials or session creation (the offer-truth step may hold the restricted read-only STRIPE_RO_KEY and the cron bearer for its own report); Slack and Linear secrets stay in the hosted job.
+# necessary-trust-boundary: GitHub-hosted production-liveness clock probes signed-out claim, $199 Pro checkout, and activation on prod without Stripe credentials or session creation; Slack and Linear secrets stay in the hosted job.
 # removal-trigger: Remove this hop when Production Controller or a first-party checkout monitor emits the same four-step receipt and files Linear plus Slack on red without a separate scheduled workflow.
 #
 # JOV-6439: daily and manually callable money-path probe.
@@ -114,57 +114,6 @@ jobs:
             exit 1
           fi
 
-      # Offer truth: production and Stripe (read-only restricted key) against the
-      # canonical offer. Mismatch fails the job and joins the M2 receipt; a check
-      # that could not run warns (3 strikes alert in the app); no STRIPE_RO_KEY
-      # leaves the Stripe-side checks "uncertified". The verdict is reported to
-      # the app, where a mismatch flips chat to fixed templates at once.
-      - name: Offer-truth live check
-        id: offer
-        if: ${{ always() }}
-        env:
-          OFFER_BASE_URL: ${{ inputs.base_url || 'https://jov.ie' }}
-          STRIPE_RO_KEY: ${{ secrets.STRIPE_RO_KEY }}
-          CRON_SECRET: ${{ secrets.CRON_SECRET }}
-          M2_CANARY_RECEIPT_PATH: ${{ runner.temp }}/m2-revenue-path-receipt.json
-          OFFER_RECEIPT: ${{ runner.temp }}/offer-truth-receipt.json
-        run: |
-          set +e
-          pnpm --filter=@jovie/web exec tsx scripts/offer-truth-live-check.ts \
-            --base-url "$OFFER_BASE_URL" --mode served --receipt "$OFFER_RECEIPT"
-          code=$?
-          set -e
-          if [ "$OFFER_BASE_URL" = "https://jov.ie" ] && [ -n "${CRON_SECRET:-}" ] && [ -f "$OFFER_RECEIPT" ]; then
-            node -e '
-              const fs = require("node:fs");
-              const r = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-              process.stdout.write(JSON.stringify({
-                verdict: r.verdict,
-                offerHash: r.offer && r.offer.hash,
-                failing: r.checks.filter(c => c.status === "fail" || c.status === "unavailable").map(c => c.id),
-              }));
-            ' "$OFFER_RECEIPT" | curl -sS --retry 2 -X POST \
-              -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
-              --data @- "$OFFER_BASE_URL/api/internal/offer-truth/report" || echo "::warning::offer-truth report not delivered"
-          fi
-          if [ "$code" -eq 1 ]; then
-            node -e '
-              const fs = require("node:fs");
-              const [receiptPath, offerPath] = process.argv.slice(1);
-              const o = JSON.parse(fs.readFileSync(offerPath, "utf8"));
-              let receipt = { steps: [] };
-              try { receipt = JSON.parse(fs.readFileSync(receiptPath, "utf8")); } catch {}
-              receipt.steps = [...(receipt.steps ?? []), {
-                name: "offer-truth",
-                ok: false,
-                detail: o.checks.filter(c => c.status === "fail").map(c => c.id + ": " + c.detail).join("; "),
-              }];
-              fs.writeFileSync(receiptPath, JSON.stringify(receipt));
-            ' "$M2_CANARY_RECEIPT_PATH" "$OFFER_RECEIPT"
-            exit 1
-          fi
-          if [ "$code" -ne 0 ]; then echo "::warning::offer-truth exit $code (2 unavailable, 3 uncertified)"; fi
-
       - name: Upload receipt
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -172,7 +121,6 @@ jobs:
           name: m2-revenue-path-receipt
           path: |
             ${{ runner.temp }}/m2-revenue-path-receipt.json
-            ${{ runner.temp }}/offer-truth-receipt.json
             ${{ runner.temp }}/canonical-profile-certificate
             ${{ runner.temp }}/canonical-profile-certificate.json
           if-no-files-found: warn

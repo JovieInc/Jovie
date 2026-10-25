@@ -11,9 +11,6 @@
 import { forbiddenShapeViolations } from './claims';
 import { contentHash } from './hash';
 import type { Offer } from './offer';
-import { wrongRecurringAmounts, wrongTrialDays } from './text-checks';
-
-export { wrongRecurringAmounts, wrongTrialDays } from './text-checks';
 
 export type CheckStatus =
   | 'pass'
@@ -137,6 +134,42 @@ export function jsonLdOffers(html: string): readonly Record<string, unknown>[] {
     }
   }
   return out;
+}
+
+const CADENCE =
+  /^\s*(?:\/\s?(?:mo|month|yr|year)\b|per\s+(?:month|year)\b|a\s+(?:month|year)\b|monthly|annually)/i;
+
+/** Dollar amounts stated with a billing cadence that are not the offer price (or free). */
+export function wrongRecurringAmounts(
+  text: string,
+  offer: Offer,
+  allow: readonly { readonly text: string }[] = []
+): readonly string[] {
+  const proUsd = offer.plans.pro.amountCents / 100;
+  const bad: string[] = [];
+  for (const m of text.matchAll(/\$\s?(\d[\d,]*(?:\.\d{1,2})?)/g)) {
+    const after = text.slice((m.index ?? 0) + m[0].length);
+    if (!CADENCE.test(after)) continue;
+    const usd = Number((m[1] ?? '').replace(/,/g, ''));
+    if (usd === 0 || usd === proUsd) continue;
+    const snippet = text
+      .slice(m.index ?? 0, (m.index ?? 0) + m[0].length + 16)
+      .trim();
+    if (allow.some(a => snippet.startsWith(a.text))) continue;
+    bad.push(snippet);
+  }
+  return bad;
+}
+
+/** "N-day" / "N day" trial lengths that differ from the offer. */
+export function wrongTrialDays(text: string, offer: Offer): readonly string[] {
+  const bad: string[] = [];
+  for (const m of text.matchAll(
+    /(\d+)[- ]day(?:s)?\s+(?:[A-Za-z]+\s+){0,3}?trial/gi
+  )) {
+    if (Number(m[1]) !== offer.trial.days) bad.push(m[0]);
+  }
+  return bad;
 }
 
 /* ------------------------------- the check ------------------------------ */

@@ -1,8 +1,7 @@
 import 'server-only';
 import { createGateway, gateway as defaultGateway } from '@ai-sdk/gateway';
 import * as ai from 'ai';
-import { isOfferGuardedFeature } from '@/lib/billing/offer/guard';
-import { getOfferGuardStrict } from '@/lib/billing/offer/kill-switch';
+
 import {
   assertGatewayImageModelAllowed,
   assertGatewayModelAllowed,
@@ -13,7 +12,6 @@ import {
   guardStructuredValue,
   isLeakGuardEnabled,
   type LeakGuardContext,
-  setOfferGuardStrictProvider,
   wrapStreamObjectResult,
   wrapStreamTextOptions,
   wrapStreamTextResult,
@@ -25,36 +23,10 @@ function getWrapped(): typeof ai {
   return ai;
 }
 
-// Offer kill switch: a failing live offer-truth check forces fixed templates.
-setOfferGuardStrictProvider(getOfferGuardStrict);
-
-/** Feature of a call: gateway `feature:` tag, else telemetry functionId. */
-function callFeature(options: unknown): string | undefined {
-  const o = (options ?? {}) as {
-    providerOptions?: { gateway?: { tags?: unknown } };
-    experimental_telemetry?: { functionId?: string };
-  };
-  const tags = o.providerOptions?.gateway?.tags;
-  const tagged = Array.isArray(tags)
-    ? tags.find(
-        (t): t is string => typeof t === 'string' && t.startsWith('feature:')
-      )
-    : undefined;
-  return (
-    tagged?.slice('feature:'.length) ?? o.experimental_telemetry?.functionId
-  );
-}
-
 function leakGuardContext(
-  source: LeakGuardContext['source'],
-  options?: unknown
+  source: LeakGuardContext['source']
 ): LeakGuardContext {
-  const feature = callFeature(options);
-  return {
-    source,
-    ...(feature ? { functionId: feature } : {}),
-    offerGuard: isOfferGuardedFeature(feature),
-  };
+  return { source };
 }
 
 function guardGenerateTextResult<
@@ -142,21 +114,17 @@ function tagFirstArg<ARGS extends readonly [unknown, ...unknown[]]>(
 }
 
 export const generateText: typeof ai.generateText = async (...args) => {
-  const tagged = tagFirstArg(args);
-  const result = await getWrapped().generateText(...tagged);
+  const result = await getWrapped().generateText(...tagFirstArg(args));
   if (!isLeakGuardEnabled()) {
     return result;
   }
 
-  return guardGenerateTextResult(
-    result,
-    leakGuardContext('generateText', tagged[0])
-  );
+  return guardGenerateTextResult(result, leakGuardContext('generateText'));
 };
 
 export const streamText: typeof ai.streamText = ((...args) => {
+  const context = leakGuardContext('streamText');
   const taggedArgs = tagFirstArg(args);
-  const context = leakGuardContext('streamText', taggedArgs[0]);
   const guardedArgs = isLeakGuardEnabled()
     ? ([
         wrapStreamTextOptions(taggedArgs[0], context),
@@ -173,22 +141,17 @@ export const streamText: typeof ai.streamText = ((...args) => {
 }) as typeof ai.streamText;
 
 export const generateObject: typeof ai.generateObject = async (...args) => {
-  const tagged = tagFirstArg(args);
-  const result = await getWrapped().generateObject(...tagged);
+  const result = await getWrapped().generateObject(...tagFirstArg(args));
   if (!isLeakGuardEnabled()) {
     return result;
   }
 
-  return guardGenerateObjectResult(
-    result,
-    leakGuardContext('generateObject', tagged[0])
-  );
+  return guardGenerateObjectResult(result, leakGuardContext('generateObject'));
 };
 
 export const streamObject: typeof ai.streamObject = (...args) => {
-  const tagged = tagFirstArg(args);
-  const context = leakGuardContext('streamObject', tagged[0]);
-  const result = getWrapped().streamObject(...tagged);
+  const context = leakGuardContext('streamObject');
+  const result = getWrapped().streamObject(...tagFirstArg(args));
 
   if (!isLeakGuardEnabled()) {
     return result;
