@@ -171,6 +171,30 @@ const deliveryLanesSchema = z.object({
     .unknown()
     .optional()
     .transform(value => parseHeadroomReport(value)),
+  deployHealth: z
+    .object({
+      observedAt: z.string().nullable(),
+      healthy: z.boolean(),
+      repos: z
+        .array(
+          z.object({
+            repo: z.string().min(1).max(96),
+            status: z.enum(['ok', 'failing', 'unknown']),
+            failedStreak: z.number().int().nonnegative(),
+            behindMain: z.number().int().nonnegative().nullable(),
+            oldestUnshippedAgeSeconds: z
+              .number()
+              .int()
+              .nonnegative()
+              .nullable(),
+            lastSuccessAt: z.string().nullable(),
+          })
+        )
+        .max(8),
+    })
+    .nullable()
+    .optional()
+    .default(null),
   stageSummary: z
     .object({
       at: z.string(),

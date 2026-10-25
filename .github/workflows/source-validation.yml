@@ -39,6 +39,18 @@ jobs:
           sparse-checkout: |
             .nvmrc
             packages/api-client
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+      # Edited-event jobs ran setup-node unprimed in all 8 jobs of a run
+      # (run 40176111773, 2026-10-25): one REST manifest call each.
+      - &quota-prime
+        name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
+        # A run step, not `uses:`: the client checkout path does not exist when
+        # workflow references are validated, so a local action there is rejected.
+        env:
+          NODE_VERSION_FILE: .source-validation-client/.nvmrc
+        run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
       - &quota-runtime
         name: Setup the quota client runtime
         if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
@@ -376,6 +388,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       # TruffleHog reads the object store directly and cannot use a partial
@@ -429,6 +442,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - &reused-checkout
@@ -474,6 +488,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -589,6 +604,7 @@ jobs:
         shard: ['1/4', '2/4', '3/4', '4/4']
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -664,6 +680,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout

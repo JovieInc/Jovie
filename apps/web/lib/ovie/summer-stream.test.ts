@@ -1,5 +1,9 @@
 import { readUIMessageStream, type UIMessage, type UIMessageChunk } from 'ai';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const captureErrorMock = vi.hoisted(() => vi.fn(async () => undefined));
+vi.mock('@/lib/error-tracking', () => ({ captureError: captureErrorMock }));
+
 import { encodeToolEvents } from '@/lib/chat/tool-events';
 import { MemoryOperatingStore } from './mcp/store';
 import { summerFailureText } from './summer-failure';
@@ -51,6 +55,24 @@ async function readTurn(
 }
 
 describe('Summer UI message stream', () => {
+  beforeEach(() => captureErrorMock.mockClear());
+
+  it('reports a failed founder turn to error tracking with its hop (no silent P0)', async () => {
+    await readTurn([
+      { type: 'state', state: 'unknown', hop: 'summer_deployment_unverified' },
+    ]);
+    expect(captureErrorMock).toHaveBeenCalledWith(
+      'Summer founder turn failed',
+      expect.objectContaining({
+        message: 'summer_turn_failed:summer_deployment_unverified',
+      }),
+      expect.objectContaining({
+        feature: 'ovie-summer',
+        hop: 'summer_deployment_unverified',
+      })
+    );
+  });
+
   it.each(['unknown', 'unavailable', 'failure'] as const)(
     'makes a textless Summer %s outcome visible without changing persistence',
     async state => {
