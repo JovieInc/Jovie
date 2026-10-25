@@ -5,15 +5,33 @@
  *   system1.mjs call   --task T [--key K] [--state-file F|-] [--image F]... [--shadow]
  *   system1.mjs label  --task T (--key K | --input-hash H) --label L [--source S] [--evidence E]
  *   system1.mjs seed   --task T --manifest M.json     call + label a known-answer set
+ *   system1.mjs label-outcomes [--task T] [--mirror F]...   join Linear outcomes onto calls
+ *   system1.mjs report [--json]
+ *   system1.mjs tune   (--task T | --all) [--apply] [--no-replay] [--no-routes]
+ *   system1.mjs weekly                                 report + tune --all --apply + receipt
+ *   system1.mjs rollback --task T
+ *   system1.mjs versions --task T
  */
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 
-import { loadRegistry, system1Call } from './lib/system1/router.mjs';
+import { buildReport } from './lib/system1/eval.mjs';
+import {
+  defaultMirrorPaths,
+  LABELERS,
+  labelOutcomes,
+  loadMirrorIssues,
+} from './lib/system1/labelers.mjs';
+import {
+  activeVersion,
+  loadRegistry,
+  system1Call,
+} from './lib/system1/router.mjs';
 import { createStore, LABEL_SCHEMA } from './lib/system1/store.mjs';
+import { rollback, tuneTask } from './lib/system1/tune.mjs';
 
 function parse(argv) {
-  const args = { _: [], image: [] };
+  const args = { _: [], image: [], mirror: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith('--')) {
@@ -21,9 +39,17 @@ function parse(argv) {
       continue;
     }
     const name = a.slice(2);
-    const flag = name === 'shadow';
+    const flag = [
+      'shadow',
+      'json',
+      'apply',
+      'all',
+      'no-replay',
+      'no-routes',
+    ].includes(name);
     const value = flag ? true : argv[++i];
     if (name === 'image') args.image.push(value);
+    else if (name === 'mirror') args.mirror.push(value);
     else args[name] = value;
   }
   return args;
@@ -114,7 +140,88 @@ export async function main(argv, deps = {}) {
     out(rows);
     return 0;
   }
-  process.stderr.write('usage: system1.mjs call|label|seed\n');
+  if (cmd === 'label-outcomes') {
+    const paths = args.mirror.length ? args.mirror : defaultMirrorPaths();
+    const issues = deps.issues ?? loadMirrorIssues(paths);
+    const tasks = args.task ? [args.task] : Object.keys(LABELERS);
+    out(tasks.map(task => labelOutcomes({ store, task, issues, now })));
+    return 0;
+  }
+  if (cmd === 'report') {
+    const report = buildReport(
+      registry,
+      store,
+      id => activeVersion(registry, id, store),
+      now
+    );
+    store.saveReport(report);
+    out(report);
+    return 0;
+  }
+  if (cmd === 'tune' || cmd === 'weekly') {
+    const ids =
+      args.all || cmd === 'weekly' ? Object.keys(registry.tasks) : [args.task];
+    const results = [];
+    let joined = [];
+    if (cmd === 'weekly') {
+      const issues = deps.issues ?? loadMirrorIssues(defaultMirrorPaths());
+      joined = Object.keys(LABELERS).map(task =>
+        labelOutcomes({ store, task, issues, now })
+      );
+    }
+    for (const task of ids) {
+      results.push(
+        await tuneTask({
+          registry,
+          store,
+          task,
+          apply: cmd === 'weekly' || Boolean(args.apply),
+          replay: !args['no-replay'],
+          tryRoutes: !args['no-routes'],
+          now,
+          deps: callDeps,
+          run: deps.run,
+        })
+      );
+    }
+    const report = buildReport(
+      registry,
+      store,
+      id => activeVersion(registry, id, store),
+      now
+    );
+    report.outcomeJoin = joined;
+    report.tuning = results.map(r => ({
+      task: r.task,
+      status: r.status,
+      promoted: r.promoted,
+      current: r.current,
+      heldout: r.heldout,
+      candidates: r.candidates.map(c => ({
+        kind: c.kind,
+        detail: c.detail,
+        gain: c.gain,
+        wins: c.wins,
+        losses: c.losses,
+        promote: c.promote,
+        guardrailFailures: c.guardrailFailures,
+      })),
+    }));
+    store.saveReport(report);
+    out(cmd === 'weekly' ? report : results);
+    return 0;
+  }
+  if (cmd === 'rollback') {
+    out(rollback(store, args.task, now));
+    return 0;
+  }
+  if (cmd === 'versions') {
+    out(store.versions(args.task) ?? { active: null, history: [] });
+    return 0;
+  }
+  process.stderr.write(
+    'usage: system1.mjs call|label|seed|report|tune|weekly|rollback|versions\n'
+  );
   return 2;
 }
 
