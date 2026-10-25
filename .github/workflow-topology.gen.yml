@@ -163,6 +163,7 @@ nodes:
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Merge Queue Green Enroll
+      - Mutation Diff
       - PR Conflict Handler
       - Rolling CI Dispatch
       - Staging Controller
@@ -715,8 +716,9 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:mutate
-    jobCount: 1
+      - workflow_run
+    terminalReceipt: job:sweep
+    jobCount: 2
   - name: Neon Ephemeral Branch Cleanup
     path: .github/workflows/neon-ephemeral-branch-cleanup.yml
     active: true
@@ -1543,6 +1545,9 @@ edges:
     type: workflow_run
   - from: PR Size Guard
     to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: CI
+    to: Mutation Diff
     type: workflow_run
   - from: Publish @jovie/cli to npm
     to: CLI Chaos

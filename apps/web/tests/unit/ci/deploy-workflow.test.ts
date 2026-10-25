@@ -1654,6 +1654,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(stageStep).toContain('bootstrap-cookie-jar');
     expect(stageStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
     expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(stageStep).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
     expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).not.toContain('STAGED_RESPONSE');
@@ -1818,6 +1819,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
 
     expect(publicSmoke).toContain('bootstrap-cookie-jar');
     expect(publicSmoke).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(publicSmoke).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(publicSmoke).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
     expect(publicSmoke).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
     expect(publicSmoke).not.toContain('x-vercel-protection-bypass');
@@ -4203,6 +4205,7 @@ describe('production promotion exact-artifact contract', () => {
       '[ "$production_deploy_target" != "production" ]'
     );
     expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).toContain('production_deployment_url_b64=');
     expect(stageStep).not.toContain(
