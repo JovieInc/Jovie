@@ -19,7 +19,7 @@ describe('ProductScreenshotFrame — dark-glass product frame (JOV-6247)', () =>
 
     const el = frame();
     expect(el).toHaveAttribute('data-variant', 'flat');
-    expect(el).not.toHaveClass('psf--dark-glass');
+    expect(el).not.toHaveClass('ds-glass');
   });
 
   it('keeps mobile web captures bezel-free while retaining desktop framing', () => {
@@ -65,7 +65,7 @@ describe('ProductScreenshotFrame — dark-glass product frame (JOV-6247)', () =>
 
     const el = frame();
     expect(el).toHaveAttribute('data-variant', 'dark-glass');
-    expect(el).toHaveClass('psf--dark-glass');
+    expect(el).toHaveClass('ds-glass');
   });
 
   it('keeps captured UI opaque and unmodified by the frame treatment', () => {
