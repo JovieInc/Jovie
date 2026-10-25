@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers';
+import { DisplayNotAuthorized } from '@/components/features/admin/hud/DisplayNotAuthorized';
 import { DisplayRetry } from '@/components/features/admin/hud/DisplayRetry';
 import { OvieDisplayHome } from '@/components/features/admin/hud/OvieDisplayHome';
 import { displayAccess } from '@/lib/ovie/display/server';
@@ -18,9 +19,5 @@ export default async function DisplayPage() {
   const access = await displayAccess(token);
   if (access === 'ok') return <OvieDisplayHome />;
   if (access === 'unavailable') return <DisplayRetry />;
-  return (
-    <main className='flex min-h-screen items-center justify-center bg-base text-secondary-token'>
-      This display is not authorized.
-    </main>
-  );
+  return <DisplayNotAuthorized />;
 }
