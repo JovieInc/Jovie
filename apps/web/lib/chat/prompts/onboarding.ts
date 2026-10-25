@@ -3,8 +3,7 @@ import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
   MAX_EARLY_ACCESS_TRUTH,
-  PRO_TRIAL_DURATION_DAYS,
-  PRO_TRIAL_TRUTH,
+  PRO_SELF_SERVE_TRUTH,
 } from '@/lib/billing/offer-truth';
 import { buildOnboardingPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
@@ -37,12 +36,17 @@ export function waitlistReceiptForEmail(
     : ONBOARDING_WAITLIST_RECEIPT;
 }
 
-// JOV-7135: every price and trial claim comes from offer truth, never a literal.
+// JOV-7135: every price claim comes from offer truth, never a literal.
+// Checkout is a plain Stripe subscription: it collects a card and bills at once
+// with no trial_period_days. The chat must never promise a trial or a no-card
+// start at checkout (asserted in onboarding.response-policy.test.ts and
+// lib/stripe/client.checkout-contract.test.ts).
 const PRO_PRICE_DISPLAY = formatPublicPriceDisplay(getPublicPriceClaim('pro'));
 
 export const ONBOARDING_PRICING_TRUTH = [
   `Free: ${FREE_PROFILE_TRUTH}`,
-  `${getPlanDisplayName('pro')}: ${PRO_PRICE_DISPLAY}. ${PRO_TRIAL_TRUTH}`,
+  `${getPlanDisplayName('pro')}: ${PRO_PRICE_DISPLAY}. Billed when you subscribe and renews monthly until cancelled. ${PRO_SELF_SERVE_TRUTH}`,
+  'Never mention a trial or a no-card start. Checkout is a paid subscription that collects a card and bills at once.',
   `Max: ${MAX_EARLY_ACCESS_TRUTH}`,
   'Quote only these facts. Never cite other prices, discounts, or comparisons.',
 ].join('\n');
@@ -54,7 +58,7 @@ export const ONBOARDING_CALIBRATION_EXAMPLES = {
     'This artist released music two weeks ago. A profile can put that release beside the links people need. What are you trying to improve?',
   softCommit: 'Want me to set this up?',
   waitlist: ONBOARDING_WAITLIST_RECEIPT,
-  checkoutCloser: `${getPlanDisplayName('pro')} is ${PRO_PRICE_DISPLAY} after a ${PRO_TRIAL_DURATION_DAYS}-day trial with no card; the free profile stays free. Want to start there?`,
+  checkoutCloser: `${getPlanDisplayName('pro')} is ${PRO_PRICE_DISPLAY}, billed when you subscribe and renewing until you cancel; the free profile stays free. Want to start there?`,
 } as const;
 
 /**

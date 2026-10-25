@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
+import {
+  ARTIST_VISIBILITY_OFFER,
+  formatPublicPriceDisplay,
+  formatUsdAmount,
+  getPublicPriceClaim,
+} from '@/lib/billing/offer-truth';
 import { lintVoice } from '@/lib/chat/voice-lint';
+import { PLAN_PRICES } from '@/lib/config/plan-prices';
 import {
   ONBOARDING_CALIBRATION_EXAMPLES,
+  ONBOARDING_PRICING_TRUTH,
   ONBOARDING_SYSTEM_PROMPT,
 } from './onboarding';
 import { resolveChatPromptRegistryEntry } from './registry';
@@ -110,9 +118,37 @@ describe('onboarding compact response policy', () => {
     expect(ONBOARDING_SYSTEM_PROMPT).toContain('without a CTA');
   });
 
+  it('never promises a trial or no-card start that checkout does not deliver', () => {
+    expect(ONBOARDING_SYSTEM_PROMPT).not.toMatch(
+      /14-day|no card|no credit card/i
+    );
+    expect(ONBOARDING_CALIBRATION_EXAMPLES.checkoutCloser).not.toMatch(
+      /trial|no card|free for/i
+    );
+    expect(ONBOARDING_SYSTEM_PROMPT).toContain(
+      'Never mention a trial or a no-card start'
+    );
+  });
+
+  it('quotes the same monthly price as billing config, offer truth and the checkout closer', () => {
+    const configured = formatUsdAmount(PLAN_PRICES.pro.monthly);
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(
+      PLAN_PRICES.pro.monthly
+    );
+    expect(formatPublicPriceDisplay(getPublicPriceClaim('pro'))).toBe(
+      `${configured}/mo`
+    );
+    expect(ONBOARDING_CALIBRATION_EXAMPLES.checkoutCloser).toContain(
+      `${configured}/mo`
+    );
+    expect(ONBOARDING_PRICING_TRUTH).toContain(`${configured}/mo`);
+    const quoted = ONBOARDING_SYSTEM_PROMPT.match(/\$\d[\d,.]*/g) ?? [];
+    expect(new Set(quoted)).toEqual(new Set([configured]));
+  });
+
   it('versions the changed onboarding prompt without changing its stable trace identity', () => {
     expect(resolveChatPromptRegistryEntry('onboarding')).toMatchObject({
-      version: 4,
+      version: 5,
       versionId: 'jovie-chat-onboarding-system:v1',
     });
     expect(resolveChatPromptRegistryEntry('app').version).toBe(1);
