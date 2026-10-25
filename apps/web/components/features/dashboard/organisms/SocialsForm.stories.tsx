@@ -64,17 +64,6 @@ const meta: Meta<typeof SocialsForm> = {
         { name: 'dark', value: '#1a1a1a' },
       ],
     },
-    a11y: {
-      config: {
-        rules: [
-          {
-            // We're mocking the database client, so we can ignore this warning
-            id: 'color-contrast',
-            enabled: true,
-          },
-        ],
-      },
-    },
   },
   tags: ['autodocs'],
   decorators: [

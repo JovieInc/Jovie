@@ -243,7 +243,7 @@
     },
     {
       "id": "ui-story-coverage-audit",
-      "name": "UI Story Coverage Audit (shadow)",
+      "name": "UI Story Coverage Audit",
       "tier": "risk-triggered-smoke",
       "mergeGate": false,
       "nextLocalCommand": "pnpm story-coverage:check && pnpm storybook:quality && pnpm component-ship-gate",
@@ -436,7 +436,11 @@
       "level": "high",
       "patterns": [
         "^\\.github/(workflows|actions|scripts|rulesets)/",
-        "^\\.github/ci-harness/"
+        "^\\.github/ci-harness/",
+        "^\\.github/[^/]+$",
+        "^canon/",
+        "^chromatic\\.config\\.json$",
+        "^codecov\\.yml$"
       ],
       "requiresSmoke": true,
       "requiresPreview": true,
@@ -571,6 +575,9 @@
         "^apps/web/app/\\[username\\]/",
         "^apps/web/components/features/profile/",
         "^apps/web/lib/images/",
+        "^apps/web/data/",
+        "^apps/web/styles/",
+        "^apps/web/screenshot-catalog/",
         "^packages/ui/"
       ],
       "requiresSmoke": false,

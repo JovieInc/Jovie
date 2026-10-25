@@ -14,6 +14,14 @@ const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
 });
 
+/** Short date pinned to UTC: "Dec 29, 2024" */
+const shortDateUTCFormatter = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
 /** Long date: "December 29, 2024" */
 const longDateFormatter = new Intl.DateTimeFormat('en-US', {
   month: 'long',
@@ -85,6 +93,17 @@ function createDateFormatter(
  * Used in: blog posts, release dates, admin tables
  */
 export const formatShortDate = createDateFormatter(shortDateFormatter);
+
+/**
+ * Format date as short format pinned to UTC: "Dec 29, 2024".
+ * Timezone-independent, so a server render and every client render produce
+ * identical bytes. Use for timestamp text that ships in server HTML when
+ * wall-clock-relative text (formatTimeAgo) can only be computed after
+ * hydration — rendering formatTimeAgo during SSR breaks hydration whenever
+ * the server clock and the client clock disagree, including pinned-clock
+ * screenshot captures.
+ */
+export const formatShortDateUTC = createDateFormatter(shortDateUTCFormatter);
 
 /**
  * Format date as long format: "December 29, 2024"

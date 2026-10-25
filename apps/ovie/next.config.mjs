@@ -55,6 +55,11 @@ export const nextConfig = {
       { source: '/', destination: '/app/ov', permanent: false },
       { source: '/app', destination: 'https://jov.ie/app', permanent: false },
       { source: '/hud-tv', destination: '/hud', permanent: false },
+      ...['/app/ov/needs-you', '/app/admin/needs-you'].map(source => ({
+        source,
+        destination: '/app/ov/inbox',
+        permanent: false,
+      })),
       ...['/support', '/legal/terms', '/legal/privacy'].map(source => ({
         source,
         destination: `https://jov.ie${source}`,

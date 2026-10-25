@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import {
+  cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -37,6 +39,40 @@ test('trusted source-read guards reject a deleted test on an old head and execut
   const git = (...args) =>
     execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
   try {
+    const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
+    mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
+    mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
+    const manifest = join(repo, 'apps/web/tests/node-environment-files.json');
+    writeFileSync(manifest, '["lib/merch/qa-gate.test.ts"]\n');
+    writeFileSync(retired, 'test fixture\n');
+    writeFileSync(
+      join(bin, 'pnpm'),
+      '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
+      { mode: 0o755 }
+    );
+    // This fixture has no launch, profile, art-direction, ICP-language, copy, or
+    // oasdiff inventory. Isolate those unrelated checkers, as pnpm above
+    // isolates the other guards, while checking its cwd. The older head
+    // deletes scripts/, so the real art-direction, ICP-language, and oasdiff
+    // runners are not on that checkout.
+    writeFileSync(
+      join(bin, 'node'),
+      `#!/bin/sh
+case "$*" in
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*)
+    [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
+    exit 0 ;;
+esac
+exec "$SOURCE_FIXTURE_NODE" "$@"
+`,
+      { mode: 0o755 }
+    );
+    git('init', '--quiet', '--initial-branch=source-head');
+    git('config', 'user.name', 'Source guard test');
+    git('config', 'user.email', 'source-guard@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'fork point before trusted source guards');
+    const fork = git('rev-parse', 'HEAD');
     const archive = execFileSync(
       '/usr/bin/git',
       ['archive', 'HEAD', 'scripts'],
@@ -50,40 +86,15 @@ test('trusted source-read guards reject a deleted test on an old head and execut
     for (const name of readdirSync(join(repo, 'scripts'))) {
       if (name.startsWith('codex-')) rmSync(join(repo, 'scripts', name));
     }
-    const retired = join(repo, 'apps/web/lib/merch/qa-gate.test.ts');
-    mkdirSync(join(repo, 'apps/web/lib/merch'), { recursive: true });
-    mkdirSync(join(repo, 'apps/web/tests'), { recursive: true });
-    const manifest = join(repo, 'apps/web/tests/node-environment-files.json');
-    writeFileSync(manifest, '["lib/merch/qa-gate.test.ts"]\n');
-    writeFileSync(retired, 'test fixture\n');
-    writeFileSync(
-      join(bin, 'pnpm'),
-      '#!/bin/sh\n[ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9\ncase "$*" in *node-environment-files.test.ts*) case "$(cat apps/web/tests/node-environment-files.json)" in *qa-gate.test.ts*) test -f apps/web/lib/merch/qa-gate.test.ts ;; *) exit 0 ;; esac ;; *) exit 0 ;; esac\n',
-      { mode: 0o755 }
-    );
-    // This fixture has no launch or profile inventory. Isolate those unrelated
-    // checker, as pnpm above isolates the other guards, while checking its cwd.
-    writeFileSync(
-      join(bin, 'node'),
-      `#!/bin/sh
-case "$*" in
-  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs)
-    [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
-    exit 0 ;;
-esac
-exec "$SOURCE_FIXTURE_NODE" "$@"
-`,
-      { mode: 0o755 }
-    );
-    git('init', '--quiet', '--initial-branch=source-head');
-    git('config', 'user.name', 'Source guard test');
-    git('config', 'user.email', 'source-guard@example.invalid');
     git('add', '.');
     git('commit', '--quiet', '-m', 'trusted source-read guards');
     git('branch', 'main');
     git('remote', 'add', 'origin', repo);
     git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
-    rmSync(join(repo, 'scripts'), { recursive: true });
+    // Checking the fork back out drops scripts/ that main added after the
+    // branch. Removing them from the trusted parent would be a pull-request
+    // deletion of the invariant suite and the gate detector.
+    git('checkout', '--detach', fork);
     rmSync(retired);
     git('add', '--all');
     git('commit', '--quiet', '-m', 'older head deletes a manifest-listed test');
@@ -105,12 +116,22 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     const rejected = invoke();
     assert.equal(rejected.status, 1, rejected.stdout + rejected.stderr);
     assert.match(rejected.stdout, /node-environment-files: exit 1/);
+    // The merge base is the fork, which has no scripts/. Files main added
+    // after that fork are absent from this head and are not deletions.
+    // Clearing the merch manifest removes the node-environment failure.
+    // The retired merch test is not an invariant test, so the detector passes.
+    // A deletion of a gate that existed at the fork is covered by
+    // gate-weakening-detector.test.mjs, not by restoring post-fork scripts.
     writeFileSync(manifest, '[]\n');
     git('add', '.');
     git('commit', '--quiet', '-m', 'remove the retired manifest entry');
-    const accepted = invoke();
-    assert.equal(accepted.status, 0, accepted.stdout + accepted.stderr);
-    assert.match(accepted.stdout, /node-environment-files: exit 0/);
+    const cleared = invoke();
+    assert.equal(cleared.status, 0, cleared.stdout + cleared.stderr);
+    assert.match(cleared.stdout, /node-environment-files: exit 0/);
+    assert.match(cleared.stdout, /gate-weakening-detector: PASS/);
+    assert.doesNotMatch(cleared.stdout, /gate-weakening-detector: FAIL/);
+    assert.doesNotMatch(cleared.stdout, /detector-deleted /);
+    assert.doesNotMatch(cleared.stdout, /invariant-test-deleted /);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -475,7 +496,7 @@ function fixture() {
     complete: true,
     pr: {
       number: 7,
-      title: 'fix(automation): preserve commissioning acceptance',
+      title: 'feat(automation): preserve commissioning acceptance',
       body: /** @type {string | null} */ ('Refs JOV-7300.'),
       state: 'open',
       draft: false,
@@ -1039,7 +1060,12 @@ function sourceValidationWorkflow() {
   return load(readFileSync('.github/workflows/source-validation.yml', 'utf8'));
 }
 
-function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
+function runProofReuse({
+  runs,
+  ghFails = false,
+  sha = 'a'.repeat(40),
+  quota = '5000',
+}) {
   const step = sourceValidationWorkflow().jobs.deterministic.steps.find(
     candidate => candidate.id === 'reuse'
   );
@@ -1047,22 +1073,35 @@ function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
   try {
     const bin = join(root, 'bin');
     mkdirSync(bin);
+    cpSync(
+      'packages/api-client',
+      join(root, '.source-validation-client/packages/api-client'),
+      { recursive: true }
+    );
+    writeFileSync(join(root, 'quota'), quota);
+    for (const [name, script] of Object.entries({
+      sleep: `printf '%s\\n' "$*" >> "${root}/sleep.log"`,
+    }))
+      writeFileSync(join(bin, name), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
     writeFileSync(
       join(root, 'runs.json'),
       JSON.stringify({ workflow_runs: runs })
     );
     writeFileSync(
       join(bin, 'gh'),
-      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${root}/gh.log"\n${ghFails ? 'exit 1' : `cat "${root}/runs.json"`}\n`,
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${root}/gh.log"\n${ghFails ? 'exit 1' : `case "$*" in *rate_limit*) cat "${root}/quota" ;; *) cat "${root}/runs.json" ;; esac`}\n`,
       { mode: 0o755 }
     );
     const output = join(root, 'output');
     writeFileSync(output, '');
     const result = spawnSync('bash', ['-c', step.run], {
+      cwd: root,
       encoding: 'utf8',
       env: {
         PATH: `${bin}:${process.env.PATH}`,
         GITHUB_OUTPUT: output,
+        GITHUB_STEP_SUMMARY: join(root, 'summary'),
+        JOVIE_API_STATE_DIR: join(root, 'state'),
         GH_TOKEN: 'test',
         HEAD_SHA: sha,
         HEAD_REF: 'agent/jov-1',
@@ -1079,6 +1118,13 @@ function runProofReuse({ runs, ghFails = false, sha = 'a'.repeat(40) }) {
       stderr: result.stderr,
       output: readFileSync(output, 'utf8'),
       ghLog,
+      budgeted: existsSync(join(root, 'state/api-ledger/github.json')),
+      sleeps: existsSync(join(root, 'sleep.log'))
+        ? readFileSync(join(root, 'sleep.log'), 'utf8')
+        : '',
+      summary: existsSync(join(root, 'summary'))
+        ? readFileSync(join(root, 'summary'), 'utf8')
+        : '',
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -1108,6 +1154,32 @@ test('a metadata-only edit reuses the newest green exact-head proof', () => {
     result.ghLog,
     /head_sha=a{40}&event=pull_request&status=completed/
   );
+});
+
+test('low quota uses shared admission and immediately runs full validation without a lookup', () => {
+  for (const quota of ['0', '10', '49']) {
+    const result = runProofReuse({ runs: [proofRun(400, 'success')], quota });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      result.budgeted,
+      true,
+      'preflight must record shared-client admission'
+    );
+    assert.equal(result.output, 'reuse=false\nproof_run=\n');
+    assert.equal(result.sleeps, '');
+    assert.doesNotMatch(result.ghLog, /actions\/workflows/);
+    assert.match(result.summary, /proof reuse skipped, full validation runs/);
+  }
+});
+
+test('healthy or unreadable quota never bypasses exact-head proof selection', () => {
+  for (const quota of ['50', '5000', 'unreadable', 'null', '10+bad']) {
+    const result = runProofReuse({ runs: [proofRun(400, 'failure')], quota });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.output, 'reuse=false\nproof_run=\n');
+    assert.equal(result.sleeps, '');
+    assert.match(result.ghLog, /actions\/workflows/);
+  }
 });
 
 test('a red, foreign, or unreadable predecessor runs the full source contract', () => {
@@ -1148,7 +1220,16 @@ test('a red, foreign, or unreadable predecessor runs the full source contract', 
 test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
   const workflow = sourceValidationWorkflow();
   const gate = "steps.reuse.outputs.reuse != 'true'";
-  const reuseStep = workflow.jobs.deterministic.steps[0];
+  const [client, runtime, reuseStep] = workflow.jobs.deterministic.steps;
+  assert.equal(client.with.ref, '${{ github.event.pull_request.base.sha }}');
+  assert.equal(client.with['persist-credentials'], false);
+  assert.match(client.with['sparse-checkout'], /packages\/api-client/);
+  assert.equal(
+    runtime.with['node-version-file'],
+    '.source-validation-client/.nvmrc'
+  );
+  assert.equal(client.if, reuseStep.if);
+  assert.equal(runtime.if, reuseStep.if);
   assert.equal(reuseStep.id, 'reuse');
   // Base retargets change the compared tree, so they never reuse a proof.
   assert.equal(
@@ -1156,7 +1237,9 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     "${{ github.event.action == 'edited' && !github.event.changes.base }}"
   );
   for (const job of ['security', 'migration', 'coverage', 'unit']) {
-    const [first, ...rest] = workflow.jobs[job].steps;
+    const [jobClient, jobRuntime, first, ...rest] = workflow.jobs[job].steps;
+    assert.deepEqual(jobClient, client, job);
+    assert.deepEqual(jobRuntime, runtime, job);
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
     // Coverage's route-budget build and the unit lanes narrow further to the
@@ -1179,6 +1262,13 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     'Measure actual installed source dependency graph',
     'Preserve exact source dependency evidence',
   ];
+  // Fleet evidence is a status read in `ready`, produced by the base-branch
+  // Fleet Rules Evidence workflow; it never depends on proof reuse.
+  assert.ok(
+    workflow.jobs.ready.steps.some(
+      step => step.name === 'Require fleet-rule evidence'
+    )
+  );
   const deterministic = workflow.jobs.deterministic.steps;
   for (const name of always) {
     const step = deterministic.find(candidate => candidate.name === name);
@@ -1213,7 +1303,7 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
   }
   assert.equal(
     workflow.jobs.ready.steps[0].run,
-    'test "$RESULTS" = \'success,success,success,success,success\''
+    'test "$RESULTS" = \'success,success,success,success,success,success\''
   );
 });
 
@@ -1422,4 +1512,111 @@ test('affected unit tests gate PR Ready and select only unit-affecting diffs (JO
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('UI-path axe gate blocks PR Ready and stays quiet for non-UI diffs', () => {
+  const workflow = sourceValidationWorkflow();
+  const job = workflow.jobs.a11y;
+  assert.equal(job.name, 'A11y (UI paths)');
+  assert.equal(job['continue-on-error'], undefined);
+  assert.equal(job.if, undefined);
+  assert.deepEqual(workflow.jobs.ready.needs, [
+    'deterministic',
+    'security',
+    'migration',
+    'coverage',
+    'unit',
+    'a11y',
+  ]);
+  const run = job.steps.find(
+    step => step.name === 'Run rendered WCAG 2.2 AA gate'
+  );
+  assert.match(run.run, /playwright\.a11y-gate\.config\.ts/);
+  assert.match(run.if, /steps\.scope\.outputs\.ui == 'true'/);
+  assert.equal(run['continue-on-error'], undefined);
+  assert.match(
+    workflow.jobs.deterministic.steps.find(
+      step => step.name === 'Run deterministic source contract'
+    ).run,
+    /node apps\/web\/scripts\/a11y-wcag-standard-check\.cjs/
+  );
+  const script = job.steps
+    .find(step => step.id === 'scope')
+    .run.replace(/\$\{\{\s*github\.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-a11y-scope-'));
+  const repo = join(root, 'repo');
+  mkdirSync(repo, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const write = path => {
+    mkdirSync(join(repo, path, '..'), { recursive: true });
+    writeFileSync(join(repo, path), `${path}\n`);
+  };
+  try {
+    git('init', '--quiet', '--initial-branch=main');
+    git('config', 'user.name', 'A11y scope test');
+    git('config', 'user.email', 'a11y-scope@example.invalid');
+    write('README.md');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'base');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    const scope = paths => {
+      git('checkout', '--quiet', '-B', 'head', 'origin/main');
+      for (const path of paths) write(path);
+      git('add', '.');
+      git('commit', '--quiet', '--allow-empty', '-m', 'head');
+      const output = join(root, `output-${Math.random()}`);
+      const result = spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          GITHUB_OUTPUT: output,
+        },
+      });
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return readFileSync(output, 'utf8');
+    };
+    assert.match(scope(['README.md']), /ui=false/);
+    assert.match(scope(['apps/web/lib/billing/plan.ts']), /ui=false/);
+    assert.match(scope(['apps/web/components/Button.tsx']), /ui=true/);
+    assert.match(scope(['docs/ACCESSIBILITY.md']), /ui=true/);
+    assert.match(
+      scope(['apps/web/lib/a11y-gates/wcag-standard.cjs']),
+      /ui=true/
+    );
+    assert.match(
+      scope(['apps/web/scripts/a11y-wcag-standard-check.cjs']),
+      /ui=true/
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('fleet metadata rules block native auto-merge admission until evidence is supplied', () => {
+  const input = fixture();
+  input.pr.title = 'fix(automation): repair gate';
+  const result = evaluateSourceAdmission(input);
+  assert.equal(result.allowed, false);
+  assert.ok(result.blockers.some(x => x.startsWith('red-before-green:')));
+  input.pr.body =
+    '## Red-before-green\nFailing command: `node --test scripts/fix.test.mjs`\nFailing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123';
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  input.files = [{ filename: 'apps/web/lib/auth/session.ts' }];
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.some(x =>
+      x.startsWith('locked-areas:')
+    )
+  );
+  input.pr.body += '\n## Locked areas\nGBrain: jovie-auth';
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  input.pr.body += '\n## Done receipt\nProduction verified.';
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.some(x =>
+      x.startsWith('done-receipt:')
+    )
+  );
 });

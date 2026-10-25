@@ -583,7 +583,7 @@ describe('merge_group workflow contract', () => {
     expect(remaining).toContain('apps/web/\\.storybook/');
     expect(remaining).toContain('apps/web/package\\.json$');
     expect(remaining).toContain('apps/web/scripts/');
-    expect(remaining).toContain('chromatic\\.config\\.json$');
+    expect(remaining).not.toContain('chromatic\\.config\\.json$');
     expect(remaining).toContain('package\\.json$');
     expect(remaining).toContain('shared-ui-visual-arbitrary');
     // Control-lane paths moved to data (JOV-6837).
@@ -3474,9 +3474,16 @@ ${selectedGateScript}`,
       .sort();
     expect(mergeGroupWorkflows).toEqual([
       'ci.yml',
+      'pr-fleet-rules.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',
     ]);
+    const fleet = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/pr-fleet-rules.yml'),
+      'utf8'
+    );
+    expect(fleet).not.toContain('secrets.');
+    expect(fleet).not.toMatch(/: write/);
     expect(getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-fork')).not.toContain(
       'secrets.'
     );

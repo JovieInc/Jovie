@@ -17,6 +17,7 @@ const member = {
   referrerHistory: [],
   utmParams: {},
   email: 'ada@example.com',
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
   purchaseCount: 0,
@@ -36,6 +37,10 @@ const meta = {
   args: {
     row: member as AudienceMember,
     open: true,
+    // `modal={false}`: a modal Radix menu `hideOthers`-ARIA-hides the story
+    // canvas around the portaled content, which fails axe aria-hidden-focus
+    // on the focusable trigger. Non-modal is visually identical for demos.
+    modal: false,
     onOpenChange: fn(),
   },
 } satisfies Meta<typeof AudienceRowActionsMenu>;

@@ -95,6 +95,12 @@ const result = await applyRemediationDecisionWithRetry(gated, {
   apiKey: env.LINEAR_API_KEY,
 });
 console.log(JSON.stringify({ ...result, previous: previous || null }));
+if (result.ok && result.action === 'hold') {
+  // Visible, never silent: an unresolved incident stays open while evidence is unknown.
+  console.log(
+    `::warning title=Remediation held::${gated.fingerprint || env.REMEDIATION_FINGERPRINT} not resolved: ${result.reason} (previous state: ${previous || 'none'}). Detail: ${env.REMEDIATION_DETAIL || 'n/a'}`
+  );
+}
 if (
   result.ok &&
   env.REMEDIATION_STATE_FILE &&

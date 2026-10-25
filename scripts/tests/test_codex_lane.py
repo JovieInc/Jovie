@@ -80,10 +80,62 @@ class Isolated(unittest.TestCase):
         profile(codex.ACCOUNTS_ROOT, "beta")
         profile(codex.ACCOUNTS_ROOT, "openrouter", kind="apikey")
         (codex.ACCOUNTS_ROOT / "locks").mkdir()
+        # JOV-8763: the orchestration host may export CODEX_LANE_AUTH_MODE
+        # (subscription-pool). Inheriting it would route accounts()/state reads
+        # down the subscription-pool path instead of the fixtures above. Tests
+        # needing a mode (CurrentLoginTest, SubscriptionPoolTest) start their own
+        # patch after super().setUp(), and cleanup order restores theirs first.
+        self.host_env = patch.dict(os.environ)
+        self.host_env.start()
+        self.addCleanup(self.host_env.stop)
+        os.environ.pop("CODEX_LANE_AUTH_MODE", None)
 
     def tearDown(self):
         codex.ACCOUNTS_ROOT, codex.STATE = self.saved
         self.tmp.cleanup()
+
+
+class IsolatedSetUpHostModeTest(unittest.TestCase):
+    """JOV-8763: the orchestration host may export CODEX_LANE_AUTH_MODE=subscription-pool.
+
+    Isolated.setUp builds alpha/beta fixture accounts for the legacy ACCOUNTS_ROOT
+    scan. Inheriting the host's auth mode sends accounts() down the subscription-pool
+    path (profile validation, real CLI probes) instead, so the fixtures never decide
+    the result and tests pass or fail with the host's environment. The base setUp
+    must neutralize the inherited mode; tests that need a mode pin it themselves
+    (CurrentLoginTest, SubscriptionPoolTest).
+    """
+
+    def test_isolated_setUp_neutralizes_inherited_host_auth_mode(self):
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool"}):
+            case = AccountsTest("test_only_chatgpt_profiles_are_accounts")
+            case.setUp()
+            try:
+                self.assertIsNone(os.environ.get("CODEX_LANE_AUTH_MODE"))
+                self.assertFalse(codex.subscription_pool_mode())
+                self.assertEqual(codex.accounts(), ["alpha", "beta"])
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
+
+    def test_mode_pinned_by_a_subclass_restores_inherited_host_mode_on_cleanup(self):
+        class Pinned(Isolated):
+            def setUp(self):
+                super().setUp()
+                self.env = patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "current-login"})
+                self.env.start()
+                self.addCleanup(self.env.stop)
+
+        with patch.dict(os.environ, {"CODEX_LANE_AUTH_MODE": "subscription-pool"}):
+            case = Pinned()
+            case.setUp()
+            try:
+                self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "current-login")
+            finally:
+                case.tearDown()
+                case.doCleanups()
+            self.assertEqual(os.environ.get("CODEX_LANE_AUTH_MODE"), "subscription-pool")
 
 
 class AccountsTest(Isolated):
@@ -122,8 +174,12 @@ class CurrentLoginTest(Isolated):
         super().setUp()
         self.root = Path(self.tmp.name)
         self.cli = self.root / "codex"
+        # Pin one slot. An ambient CODEX_LANE_LOGIN_SLOTS above 1 makes
+        # test_real_metadata_child_retains_lease_until_delayed_reap loop in
+        # reap_current_metadata. Collection also scrubs the host value.
         self.env = patch.dict(os.environ, {
             "CODEX_LANE_AUTH_MODE": "current-login", "CODEX_LANE_CLI": str(self.cli),
+            "CODEX_LANE_LOGIN_SLOTS": "1",
             "CODEX_HOME": str(self.root / "existing-login"), "OPENAI_API_KEY": "must-not-reach-child",
             "OPENAI_BASE_URL": "https://unavailable.invalid", "CODEX_API_KEY": "must-not-reach-child",
         })
@@ -294,7 +350,7 @@ class CurrentLoginTest(Isolated):
             self.assertTrue(codex.reconcile(1_000_000, 0)["reconciled"])
         calls.assert_called_once_with('current-login', [
             ('account/read', {'refreshToken': False}), ('account/rateLimits/read', None),
-            ('model/list', {'limit': 100, 'includeHidden': False})], lease_handle=ANY)
+            ('model/list', {'limit': 100, 'includeHidden': False})], timeout=codex.CURRENT_METADATA_TIMEOUT_S, lease_handle=ANY)
         value = codex.read_state()['current-login']['capacityLease']
         self.assertEqual(value['usableCapacityRemaining']['primary']['remainingPercent'], 50)
         self.assertEqual(value['compatibility']['models'], ['gpt-6.1-sol'])
@@ -1204,12 +1260,12 @@ class SubscriptionPoolTest(Isolated):
     def test_invalid_configuration_fails_closed_without_discovery(self):
         invalid = ["", "[]", "{}", "null", "{bad"]
         for mutate in (lambda p: p.pop("current-login"),
-                       lambda p: p.update(third=p["lyb-pro"]),
+                       lambda p: p.update(third=p["lyb-pro"]),  # duplicate home and identity
                        lambda p: p.update({"current-login.1": p.pop("lyb-pro")}),
                        lambda p: p.update({"_ledger": p.pop("lyb-pro")}),
                        lambda p: p["lyb-pro"].update(home=p["current-login"]["home"]),
                        lambda p: p["lyb-pro"].update(emailSha256=p["current-login"]["emailSha256"]),
-                       lambda p: p["lyb-pro"].update(slots=2),
+                       lambda p: p["lyb-pro"].update(slots=0),
                        lambda p: p["lyb-pro"].update(slots=True),
                        lambda p: p["current-login"].update(slots=2),
                        lambda p: p["current-login"].update(home=p["lyb-pro"]["home"]),
@@ -1223,6 +1279,18 @@ class SubscriptionPoolTest(Isolated):
                 with self.subTest(raw=raw), patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": raw}):
                     with self.assertRaises(ValueError):
                         codex.accounts()
+
+    def test_pool_accepts_more_than_two_distinct_bound_accounts_with_measured_seats(self):
+        home = Path(self.tmp.name) / "third"; home.mkdir()
+        value = json.loads(json.dumps(self.profiles))
+        value["jovie-pro"] = {"home": str(home), "slots": 2, "emailSha256": "ab" * 32}
+        with patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(value)}):
+            self.assertEqual(sorted(codex.subscription_profiles()), ["current-login", "jovie-pro", "lyb-pro"])
+            self.assertEqual(codex.subscription_profiles()["jovie-pro"]["slots"], 2)
+            value["fourth-pro"] = {"home": str(home), "slots": 1, "emailSha256": "cd" * 32}
+            with patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(value)}):
+                with self.assertRaises(ValueError):
+                    codex.subscription_profiles()  # a home may be bound to one alias only
 
     def test_three_primary_plus_one_extra_preserve_existing_slot_paths(self):
         self.reconcile()
@@ -1669,3 +1737,36 @@ class LaunchIdentityTest(Isolated):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+
+class CurrentMetadataRetryTest(unittest.TestCase):
+    def test_retries_timeouts_with_backoff_and_longer_budget(self):
+        budgets, sleeps = [], []
+        def fake(name, calls, timeout=15, *, lease_handle=None):
+            budgets.append(timeout)
+            if len(budgets) < 3:
+                raise TimeoutError("account/read: app-server response unavailable")
+            return [{"account": {}}, {"rateLimits": {}}, {"data": []}]
+        with patch.object(codex, "app_server_calls", fake):
+            snap = codex.current_subscription_snapshot("current-login", sleep=sleeps.append)
+        self.assertEqual(snap["models"], {"data": []})
+        self.assertEqual(budgets, [codex.CURRENT_METADATA_TIMEOUT_S] * 3)
+        self.assertGreater(codex.CURRENT_METADATA_TIMEOUT_S, 15)
+        self.assertEqual(sleeps, [2.0, 6.0])
+
+    def test_gives_up_after_bounded_attempts(self):
+        n = []
+        def fake(*a, **k):
+            n.append(1); raise TimeoutError("x")
+        with patch.object(codex, "app_server_calls", fake), self.assertRaises(TimeoutError):
+            codex.current_subscription_snapshot("current-login", sleep=lambda s: None)
+        self.assertEqual(len(n), codex.CURRENT_METADATA_ATTEMPTS)
+
+    def test_does_not_retry_non_timeouts(self):
+        n = []
+        def fake(*a, **k):
+            n.append(1); raise RuntimeError("account/read: app-server error")
+        with patch.object(codex, "app_server_calls", fake), self.assertRaises(RuntimeError):
+            codex.current_subscription_snapshot("current-login", sleep=lambda s: None)
+        self.assertEqual(n, [1])

@@ -118,7 +118,7 @@ describe('stage event contract', () => {
         { stage: 'merged', at: ago(10), sourceReceipt: 'r' },
         { stage: 'pr-open', at: ago(100), sourceReceipt: 'r' },
         { stage: 'queued', at: ago(5), sourceReceipt: 'r' },
-        { stage: 'verified', at: ago(1), sourceReceipt: 'r' },
+        { stage: 'closed', at: ago(1), sourceReceipt: 'r' },
       ],
       MANIFEST,
       { actor: 'codex' }
@@ -127,7 +127,7 @@ describe('stage event contract', () => {
       ['pr-open', 'advanced'],
       ['queued', 'advanced'],
       ['merged', 'advanced'],
-      ['verified', 'completed'],
+      ['closed', 'completed'],
     ]);
     // queued (5m ago) → merged (10m ago) is inverted: dwell clamps to zero.
     expect(events[1].exitedAt).toBe(events[1].enteredAt);
@@ -168,7 +168,7 @@ describe('stage timings', () => {
       dwell('gate-seat', 60, 120, 'a'),
       dwell('gate', 60, 1716, 'a'),
       event({
-        stage: 'verified',
+        stage: 'closed',
         entityId: 'a',
         enteredAt: ago(30),
         exitedAt: ago(30),
@@ -180,7 +180,7 @@ describe('stage timings', () => {
     expect(queued['24h']).toEqual({ n: 1, p50: 100, p95: 100 });
     expect(queued['7d']).toEqual({ n: 2, p50: 100, p95: 300 });
     expect(queued['28d']).toEqual({ n: 3, p50: 300, p95: 900 });
-    expect(t.entities.shipping.stages.verified).toMatchObject({
+    expect(t.entities.shipping.stages.closed).toMatchObject({
       terminal: true,
       '24h': { n: 1, p50: null, p95: null, failed: 0, failRate: 0 },
       regression: null,
@@ -200,6 +200,46 @@ describe('stage timings', () => {
         .length,
       stagesWithData: 4,
       events: 6,
+    });
+  });
+
+  it('times outcome receipts independently while closed remains terminal', () => {
+    const events = [
+      event({
+        stage: 'closed',
+        enteredAt: ago(60),
+        exitedAt: ago(60),
+        outcome: 'completed',
+      }),
+      ...['advanced', 'failed', 'abandoned'].map((outcome, index) => ({
+        ...dwell('outcome-receipt', 10, (index + 1) * 60, `JOV-${index + 1}`),
+        outcome,
+      })),
+    ];
+    const parsed = parseStageEventFeed(
+      events.map(e => JSON.stringify(e)).join('\n'),
+      MANIFEST
+    );
+    expect(parsed.rejected).toEqual([]);
+    const timings = computeStageTimings(parsed.events, MANIFEST, { now: NOW });
+    const receipts = timings.entities.shipping.stages['outcome-receipt'];
+    expect(receipts.terminal).toBeUndefined();
+    expect(receipts['24h']).toEqual({ n: 3, p50: 120, p95: 180 });
+    expect(
+      compactStageTimings(timings).entities.shipping.stages['outcome-receipt'][
+        '24h'
+      ]
+    ).toEqual([3, 120, 180]);
+    expect(timings.entities.shipping.stages.closed).toMatchObject({
+      terminal: true,
+      '24h': { n: 1, p50: null, p95: null, failed: 0, failRate: 0 },
+      regression: null,
+    });
+    expect(buildStageSummary(timings).slowestP95_7d).toContainEqual({
+      stage: 'shipping:outcome-receipt',
+      n: 3,
+      p50: 120,
+      p95: 180,
     });
   });
 
