@@ -22,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import capacity_metrics  # noqa: E402
+import capacity_watch  # noqa: E402
 import capacity_registry  # noqa: E402
 
 INTERVAL_S = 900
@@ -210,7 +211,7 @@ def read_metrics(state_dir: Path, registry: dict, now: float, merge_window=None)
 
 
 def tick(state_dir: Path, now: float | None = None, registry: dict | None = None, grok=read_grok,
-         force: bool = False, spawn=None) -> dict:
+         force: bool = False, spawn=None, agents=None) -> dict:
     if os.environ.get("LANES_SELFTEST") or os.environ.get("LANES_EXECUTION_BACKEND") == "local-test":
         return {"status": "selftest-skipped"}
     now = time.time() if now is None else now
@@ -231,6 +232,8 @@ def tick(state_dir: Path, now: float | None = None, registry: dict | None = None
         ledger = {}
     result = collect(registry, ledger if isinstance(ledger, dict) else {}, now, grok)
     result["metrics"] = metrics_overlay(Path(state_dir), registry, now, spawn)
+    result["watch"] = capacity_watch.read_watch(
+        registry, _iso(now), agents() if agents else capacity_watch.hyperagent_agent_names())
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(result, sort_keys=True))
     os.replace(temporary, path)
@@ -239,6 +242,12 @@ def tick(state_dir: Path, now: float | None = None, registry: dict | None = None
     temporary = windows.with_suffix(".tmp")
     temporary.write_text(json.dumps(quota_windows(registry, result, now), sort_keys=True))
     os.replace(temporary, windows)
+    # Resolved roles (planner, ...) for agents that cannot import the registry: state/roles.json.
+    roles = Path(state_dir) / "state" / "roles.json"
+    temporary = roles.with_suffix(".tmp")
+    temporary.write_text(json.dumps({"schema": "jovie.capacity-roles/v1", "generatedAt": _iso(now),
+                                      "roles": capacity_watch.resolve_roles(registry, result["watch"])}, sort_keys=True))
+    os.replace(temporary, roles)
     return {"status": "written", "accounts": sorted(result["accounts"])}
 
 

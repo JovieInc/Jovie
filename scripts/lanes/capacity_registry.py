@@ -205,3 +205,44 @@ def pace_adjust(registry: dict, state_dir: Path | None, lane: str, now: float) -
     if mode == "back-off-when-ahead" and mean > 0:
         return {"adjust": round(min(PACE_AHEAD_CAP, mean / 100), 3), "why": f"ahead-of-pace:{mean:.0f}pts", "deltas": deltas}
     return {"adjust": 0.0, "why": f"on-pace:{mean:.0f}pts", "deltas": deltas}
+
+
+def live_seats(registry: dict, state_dir: Path | None, provider_id: str | None, now: float) -> dict:
+    """{account_id: {usedPercent, elapsedPercent}} from routing-fresh LIVE readings (see live_deltas)."""
+    max_age = float((registry.get("thresholds") or {}).get("routingMaxAgeMinutes", 120)) * 60
+    live = read_live(state_dir).get("accounts") or {}
+    provider = next((p for p in registry.get("providers", []) if p.get("id") == provider_id), {})
+    out = {}
+    for account in provider.get("accounts", []):
+        quota = (live.get(f"{provider_id}/{account['id']}") or {}).get("quota")
+        if not quota or account.get("status", "active") != "active":
+            continue
+        observed, resets, window = _epoch(quota.get("observedAt")), _epoch(quota.get("resetsAt")), quota.get("windowMins")
+        used = quota.get("usedPercent")
+        if used is None and isinstance(quota.get("remainingPercent"), (int, float)):
+            used = 100 - quota["remainingPercent"]
+        if observed is None or now - observed > max_age or used is None or resets is None or not window or resets <= now:
+            continue
+        out[account["id"]] = {"usedPercent": used,
+                              "elapsedPercent": min(100.0, max(0.0, (now - (resets - window * 60)) / (window * 60) * 100))}
+    return out
+
+
+def resolve_role(registry: dict, role_id: str, watch_models: dict | None = None) -> dict | None:
+    """The model to use now for a role. A preferred candidate that is only being watched never wins until
+    a watch row confirms it (available: true); then the first available candidate; else None."""
+    role = (registry.get("roles") or {}).get(role_id)
+    if not role:
+        return None
+    watch_models = watch_models or {}
+    ranked = []
+    for c in role.get("candidates", []):
+        seen = watch_models.get(c["model"]) or {}
+        state = "available" if seen.get("available") is True else (c.get("availability") or {}).get("status", "unknown")
+        ranked.append({**c, "state": state, "evidence": seen or None})
+    chosen = next((c for c in ranked if c.get("preferred") and c["state"] == "available"), None) \
+        or next((c for c in ranked if c["state"] == "available"), None)
+    return {"role": role_id, "description": role.get("description"),
+            "chosen": {k: chosen[k] for k in ("model", "label", "pathId")} if chosen else None,
+            "candidates": [{"model": c["model"], "label": c.get("label"), "pathId": c.get("pathId"),
+                            "preferred": bool(c.get("preferred")), "state": c["state"], "evidence": c["evidence"]} for c in ranked]}

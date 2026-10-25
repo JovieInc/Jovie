@@ -28,6 +28,8 @@ def load(name, register=True):
 CR = load("capacity_registry")
 CL = load("capacity_live")
 CM = load("capacity_metrics")
+CP = load("capacity_pricing")
+CW = load("capacity_watch")
 HA = load("hyperagent_lane", register=False)
 NOW = datetime(2026, 10, 25, 2, 0, tzinfo=timezone.utc).timestamp()
 REGISTRY = json.loads((ROOT / "ops/registry/capacity.json").read_text())
@@ -235,6 +237,96 @@ class CostPerMerge(unittest.TestCase):
             self.assertEqual(len(CL.metrics_overlay(state, REGISTRY, NOW + CL.METRICS_INTERVAL_S + 1, spawned.append) and spawned), 2)
 
 
+VECTORS = json.loads((ROOT / "scripts/tests/fixtures/capacity-pricing-vectors.json").read_text())
+MODELS = json.loads((ROOT / "scripts/backlog-orchestrator/config/model-registry.json").read_text())
+LUNA_TASK = {"inputTokens": 1_000_000, "outputTokens": 100_000, "cachedTokens": 0}
+
+
+def with_quota(usd):
+    registry = json.loads(json.dumps(REGISTRY))
+    for row in registry["pricing"]["paths"]:
+        if row["accessPath"] == "subscription":
+            row["usableQuotaApiUsd"] = usd
+    return registry
+
+
+class AccessPathPricing(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.state = Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+        write_live(self.state, codex_rows(22, 16, 57))
+
+    def test_matches_the_shared_vectors_with_the_js_port(self):
+        self.assertAlmostEqual(CP.api_list_usd({"in": 0.2, "out": 1.2, "cached": None}, VECTORS["task"]), VECTORS["apiUsd"], places=9)
+        for seat in VECTORS["seats"]:
+            got = CP.subscription_marginal(VECTORS["apiUsd"], {"usedPercent": seat["usedPercent"], "elapsedPercent": seat["elapsedPercent"],
+                                                               "usableQuotaApiUsd": VECTORS["usableQuotaApiUsd"],
+                                                               "planWindowUsd": VECTORS["planWindowUsd"], "status": seat.get("status")})
+            self.assertAlmostEqual(got["usd"], seat["usd"], places=5, msg=seat["name"])
+            self.assertEqual((got["class"], got["routable"]), (seat["class"], seat["routable"]), seat["name"])
+
+    def test_the_same_luna_task_on_a_pro_seat_versus_the_api(self):
+        rows = CP.price_model(with_quota(400), MODELS, self.state, "gpt-5.6-luna", LUNA_TASK, NOW)
+        api = next(r for r in rows if r["accessPath"] == "api")
+        seats = {r["account"]: r for r in rows if r["accessPath"] == "subscription"}
+        self.assertAlmostEqual(api["usd"], 0.32, places=9)
+        self.assertEqual(set(seats), {"current-login", "jovie-pro", "lyb-pro"})
+        self.assertTrue(all(seat["usd"] < api["usd"] for seat in seats.values()))
+        self.assertLess(seats["jovie-pro"]["usd"], seats["current-login"]["usd"])
+        self.assertLess(seats["current-login"]["usd"], seats["lyb-pro"]["usd"])
+        self.assertEqual(seats["lyb-pro"]["class"], "ahead-of-pace")
+
+    def test_routing_prefers_the_subsidized_seat_with_headroom_and_the_api_when_seats_are_spent(self):
+        registry = with_quota(400)
+        self.assertEqual(CP.price_model(registry, MODELS, self.state, "gpt-5.6-luna", LUNA_TASK, NOW)[0]["accessPath"], "subscription")
+        write_live(self.state, codex_rows(100, 100, 100))
+        spent = CP.price_model(registry, MODELS, self.state, "gpt-5.6-luna", LUNA_TASK, NOW)
+        self.assertEqual(spent[0]["accessPath"], "api")
+        self.assertTrue(all(not r["routable"] for r in spent if r["accessPath"] == "subscription"))
+
+    def test_without_a_fresh_reading_or_measured_quota_a_seat_is_unknown_not_free_money(self):
+        write_live(self.state, {})
+        rows = CP.price_model(REGISTRY, MODELS, self.state, "gpt-5.6-luna", LUNA_TASK, NOW)
+        seat = next(r for r in rows if r["accessPath"] == "subscription")
+        self.assertIsNone(seat["usd"])
+        self.assertEqual(seat["class"], "unknown")
+
+    def test_the_same_model_on_two_paths_has_two_priced_rows(self):
+        glm = [r for r in CP.price_model(REGISTRY, MODELS, self.state, "glm-5.3", LUNA_TASK, NOW)]
+        self.assertEqual(sorted(r["accessPath"] for r in glm), ["api", "credits"])
+        self.assertLess(next(r for r in glm if r["accessPath"] == "credits")["usd"], next(r for r in glm if r["accessPath"] == "api")["usd"])
+
+
+class PlannerRole(unittest.TestCase):
+    def test_k3_is_the_planner_until_k31_pro_is_confirmed(self):
+        self.assertEqual(CR.resolve_role(REGISTRY, "planner")["chosen"]["model"], "moonshotai/kimi-k3")
+        watching = {"moonshotai/kimi-k3.1-pro": {"available": False}}
+        self.assertEqual(CR.resolve_role(REGISTRY, "planner", watching)["chosen"]["model"], "moonshotai/kimi-k3")
+        flipped = CR.resolve_role(REGISTRY, "planner", {"moonshotai/kimi-k3.1-pro": {"available": True}})
+        self.assertEqual(flipped["chosen"]["model"], "moonshotai/kimi-k3.1-pro")
+
+    def test_the_watcher_flips_on_a_hyperagent_agent_named_for_the_model(self):
+        none = CW.read_watch(REGISTRY, "t", ["GLM 5.3 Developer", "GLM 5.3 Flash Developer"])
+        self.assertFalse(none["models"]["moonshotai/kimi-k3.1-pro"]["available"])
+        hit = CW.read_watch(REGISTRY, "t", ["GLM 5.3 Developer", "Kimi K3.1 Pro Developer"])
+        self.assertTrue(hit["models"]["moonshotai/kimi-k3.1-pro"]["available"])
+        self.assertEqual(hit["models"]["moonshotai/kimi-k3.1-pro"]["agent"], "Kimi K3.1 Pro Developer")
+        self.assertFalse(CW.read_watch(REGISTRY, "t", None)["models"]["moonshotai/kimi-k3.1-pro"]["available"])  # unreadable is not available
+        self.assertEqual(CW.resolve_roles(REGISTRY, hit)["planner"]["chosen"]["model"], "moonshotai/kimi-k3.1-pro")
+
+    def test_the_tick_publishes_roles_for_agents_that_cannot_import_the_registry(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {}, clear=False):
+            for key in ("LANES_SELFTEST", "LANES_EXECUTION_BACKEND"):
+                os.environ.pop(key, None)
+            state = Path(tmp)
+            CL.tick(state, now=NOW, registry=REGISTRY, grok=lambda now: None, agents=lambda: ["Kimi K3.1 Pro Developer"])
+            roles = json.loads((state / "state" / "roles.json").read_text())
+            self.assertEqual(roles["roles"]["planner"]["chosen"]["model"], "moonshotai/kimi-k3.1-pro")
+            live = json.loads((state / "capacity-live.json").read_text())
+            self.assertTrue(live["watch"]["models"]["moonshotai/kimi-k3.1-pro"]["available"])
+
+
 class CoordinationRules(unittest.TestCase):
     def test_delegation_rule_for_non_lane_agents(self):
         rule = CR.delegation_rule(REGISTRY, "dots")
@@ -303,12 +395,12 @@ class LiveReads(unittest.TestCase):
             state = Path(tmp)
             (state / "codex-accounts.json").write_text(json.dumps({"lyb-pro": ledger_row("7f31f3ffca1c", 41, 1793382060)}))
             grok = lambda now: {"quota": {"usedPercent": 63, "observedAt": CL._iso(now)}}  # noqa: E731
-            first = CL.tick(state, now=NOW, registry=REGISTRY, grok=grok)
+            first = CL.tick(state, now=NOW, registry=REGISTRY, grok=grok, agents=lambda: [])
             self.assertEqual(first["status"], "written")
             live = json.loads((state / "capacity-live.json").read_text())
             self.assertEqual(sorted(live["accounts"]), ["openai-codex/lyb-pro", "xai-grok/supergrok-heavy"])
-            self.assertEqual(CL.tick(state, now=NOW + 60, registry=REGISTRY, grok=grok)["status"], "current")
-            self.assertEqual(CL.tick(state, now=NOW + CL.INTERVAL_S + 1, registry=REGISTRY, grok=grok)["status"], "written")
+            self.assertEqual(CL.tick(state, now=NOW + 60, registry=REGISTRY, grok=grok, agents=lambda: [])["status"], "current")
+            self.assertEqual(CL.tick(state, now=NOW + CL.INTERVAL_S + 1, registry=REGISTRY, grok=grok, agents=lambda: [])["status"], "written")
             self.assertEqual(CR.read_live(state)["accounts"]["xai-grok/supergrok-heavy"]["quota"]["usedPercent"], 63)
 
     def test_quota_windows_feed_the_coordination_burn_plan(self):
@@ -318,7 +410,7 @@ class LiveReads(unittest.TestCase):
             state = Path(tmp)
             (state / "codex-accounts.json").write_text(json.dumps({"lyb-pro": ledger_row("7f31f3ffca1c", 41, 1793382060, observed="2026-10-25T01:59:00Z")}))
             grok = lambda now: {"quota": {"usedPercent": 63, "resetsAt": "2026-10-26T21:01:00Z", "windowMins": 10080, "observedAt": CL._iso(now), "source": "grok"}}  # noqa: E731
-            CL.tick(state, now=NOW, registry=REGISTRY, grok=grok)
+            CL.tick(state, now=NOW, registry=REGISTRY, grok=grok, agents=lambda: [])
             data = json.loads((state / "state" / "quota-windows.json").read_text())
             by_agent = {w["agent"]: w for w in data["windows"]}
             self.assertEqual(set(by_agent), {"openai-codex:current-login", "openai-codex:jovie-pro", "openai-codex:lyb-pro", "xai-grok:supergrok-heavy"})
