@@ -3,6 +3,10 @@
 import { useEffect } from 'react';
 import { LISTEN_COOKIE } from '@/constants/app';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
+import {
+  localizeProviderUrl,
+  readVisitorCountryCookie,
+} from '@/lib/discography/storefront';
 import type { ProviderKey } from '@/lib/discography/types';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
 import {
@@ -138,7 +142,11 @@ export function PreferredDspRedirect({
     // Same attribution as an explicit provider tap on the rendered page.
     globalThis.location.replace(
       appendUTMParamsToUrl(
-        matchingLink.url,
+        localizeProviderUrl(
+          providerKey,
+          matchingLink.url,
+          readVisitorCountryCookie()
+        ),
         resolveSmartLinkOutboundUtmParams(searchParams)
       )
     );
