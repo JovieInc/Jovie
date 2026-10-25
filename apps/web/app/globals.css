@@ -16,6 +16,7 @@
 @import "tailwindcss";
 @import "../styles/design-system.css";
 @import "../styles/theme.css";
+@import "../styles/primitives/glass.css";
 @import "tw-animate-css";
 /* Shared theme tokens, custom utilities, and the dark variant live in
    styles/tailwind-foundation.css so the app-shell Tailwind context
