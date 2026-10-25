@@ -21,7 +21,7 @@ import { pathToFileURL } from 'node:url';
 
 const REPOSITORY = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const NOTICE =
-  /bucket=(github-token|jovie-bot) remaining=(\d+) limit=(\d+) used=(\d+) reset=(\d+) at=(\d+)/;
+  /bucket=(github-token|jovie-bot)(?: resource=(core|graphql|search))? remaining=(\d+) limit=(\d+) used=(\d+) reset=(\d+) at=(\d+)/;
 
 /** @param {string} message */
 export function parseQuotaNotice(message) {
@@ -29,11 +29,12 @@ export function parseQuotaNotice(message) {
   if (!match) return null;
   return {
     bucket: match[1],
-    remaining: Number(match[2]),
-    limit: Number(match[3]),
-    used: Number(match[4]),
-    reset: Number(match[5]),
-    at: Number(match[6]),
+    resource: match[2] ?? 'core',
+    remaining: Number(match[3]),
+    limit: Number(match[4]),
+    used: Number(match[5]),
+    reset: Number(match[6]),
+    at: Number(match[7]),
   };
 }
 
@@ -89,9 +90,13 @@ export function summarizeHeadroom(samples, windowSeconds = 3600) {
   for (const sample of samples) {
     if (!sample) continue;
     const windowStart = Math.floor(sample.at / windowSeconds) * windowSeconds;
-    const key = `${sample.bucket}@${windowStart}`;
+    const bucket =
+      sample.resource && sample.resource !== 'core'
+        ? `${sample.bucket}:${sample.resource}`
+        : sample.bucket;
+    const key = `${bucket}@${windowStart}`;
     const row = rows.get(key) ?? {
-      bucket: sample.bucket,
+      bucket,
       windowStart,
       limit: sample.limit,
       values: [],
@@ -143,27 +148,47 @@ function flag(argv, name, fallback) {
   return index >= 0 ? Number(argv[index + 1]) : fallback;
 }
 
+// Sources of `api-quota` notices: [workflow file, job name]. Enroll emits about
+// once a minute; PR Fleet Rules also samples every run (core, graphql, search),
+// so an hour without an enroll run still has samples.
+const SOURCES = [
+  ['merge-queue-green-enroll.yml', 'Enqueue green PRs'],
+  ['pr-fleet-rules.yml', 'PR Fleet Rules'],
+];
+
 function collectSamples(argv) {
   const hours = flag(argv, 'hours', 3);
   const maxSamples = flag(argv, 'max-samples', 60);
-  const since = new Date(Date.now() - hours * 3600_000).toISOString();
-  const runs = ghJson(
-    `repos/${REPOSITORY}/actions/workflows/merge-queue-green-enroll.yml/runs?created=>=${since}&status=success&per_page=100`
-  ).workflow_runs;
-  const stride = Math.max(1, Math.ceil(runs.length / maxSamples));
   const samples = [];
-  for (let index = 0; index < runs.length; index += stride) {
-    const jobs = ghJson(
-      `repos/${REPOSITORY}/actions/runs/${runs[index].id}/jobs?per_page=50`
-    ).jobs;
-    const enroll = jobs.find(job => job.name === 'Enqueue green PRs');
-    if (!enroll || enroll.conclusion !== 'success') continue;
-    const annotations = ghJson(
-      `repos/${REPOSITORY}/check-runs/${enroll.id}/annotations?per_page=50`
-    );
-    for (const annotation of annotations) {
-      if (annotation.title === 'api-quota')
-        samples.push(parseQuotaNotice(annotation.message));
+  const end = Date.now();
+  // One query per source and hour: a single newest-100 page never reached
+  // back to 09:00Z when the fleet ran hundreds of runs an hour.
+  for (const [workflow, jobName] of SOURCES) {
+    for (let hour = 0; hour < hours; hour++) {
+      const to = new Date(end - hour * 3600_000).toISOString();
+      const from = new Date(end - (hour + 1) * 3600_000).toISOString();
+      const runs = ghJson(
+        `repos/${REPOSITORY}/actions/workflows/${workflow}/runs?created=${from}..${to}&status=success&per_page=100`
+      ).workflow_runs;
+      const perHour = Math.max(
+        1,
+        Math.floor(maxSamples / hours / SOURCES.length)
+      );
+      const stride = Math.max(1, Math.ceil(runs.length / perHour));
+      for (let index = 0; index < runs.length; index += stride) {
+        const jobs = ghJson(
+          `repos/${REPOSITORY}/actions/runs/${runs[index].id}/jobs?per_page=50`
+        ).jobs;
+        const job = jobs.find(item => item.name === jobName);
+        if (!job || job.conclusion !== 'success') continue;
+        const annotations = ghJson(
+          `repos/${REPOSITORY}/check-runs/${job.id}/annotations?per_page=50`
+        );
+        for (const annotation of annotations) {
+          if (annotation.title === 'api-quota')
+            samples.push(parseQuotaNotice(annotation.message));
+        }
+      }
     }
   }
   return samples;

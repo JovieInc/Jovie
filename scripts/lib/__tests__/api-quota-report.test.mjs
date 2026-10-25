@@ -57,6 +57,7 @@ describe('api quota report', () => {
       )
     ).toEqual({
       bucket: 'github-token',
+      resource: 'core',
       remaining: 0,
       limit: 1000,
       used: 1000,
