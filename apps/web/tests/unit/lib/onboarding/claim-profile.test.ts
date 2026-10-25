@@ -33,6 +33,19 @@ const {
   mockDeriveClaimedOnboardingStateFromMessageRows: vi.fn(),
 }));
 
+const mockRecordArtistOfferStage = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: mockRecordArtistOfferStage,
+}));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === 'jv_acquisition_id'
+        ? { value: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f' }
+        : undefined,
+  }),
+}));
+
 vi.mock('@/lib/analytics/signup-funnel.server', () => ({
   recordFunnelStep: mockRecordFunnelStep,
 }));
@@ -458,6 +471,11 @@ describe('materializeClaimedOnboardingProfile', () => {
         step: 'claim_complete',
         cohort,
       });
+      // Golden-path "page claimed" is keyed to the consented journey cookie.
+      expect(mockRecordArtistOfferStage).toHaveBeenCalledWith(
+        '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+        'claimed'
+      );
     }
   );
 
