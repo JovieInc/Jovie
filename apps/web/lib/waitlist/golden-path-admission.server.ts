@@ -1,9 +1,14 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
+import {
+  isProofBlockingPublication,
+  readClaimVerification,
+} from '@/lib/claim/claim-verification';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
 import { captureError } from '@/lib/error-tracking';
 import {
@@ -113,14 +118,24 @@ export async function decideGoldenPathAdmissionForArtist(input: {
 }
 
 /**
- * True when this user's waitlist entry was admitted by the golden path, which
- * is account access, not proof of ownership. Read from the persisted decision
- * (users.waitlist_entry_id -> status_reason), so a retried, recovered or
- * already-approved claim treats the artist exactly as the first pass did.
+ * True while this user's page must stay private until ownership is proven.
+ * The durable source is the proof-only claim verification stored on the
+ * profile (it survives signup, redeem and admin status writes). Before any
+ * profile exists, the fresh admission decision on the waitlist entry decides.
+ * Once the operator verifies, this is false and the page may be public.
  */
 export async function isGoldenPathAdmittedUser(
   appUserId: string
 ): Promise<boolean> {
+  const [profile] = await db
+    .select({ settings: creatorProfiles.settings })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.userId, appUserId))
+    .orderBy(desc(creatorProfiles.createdAt))
+    .limit(1);
+  const record = readClaimVerification(profile?.settings);
+  if (record?.proofOnly) return record.status !== 'verified';
+
   const [row] = await db
     .select({ statusReason: waitlistEntries.statusReason })
     .from(users)
@@ -128,4 +143,15 @@ export async function isGoldenPathAdmittedUser(
     .where(eq(users.id, appUserId))
     .limit(1);
   return row?.statusReason === 'qualified_golden_path_resolved_artist';
+}
+
+/** Checkout is never offered while a free-admission page is unproven. */
+export async function hasProofPendingProfile(
+  appUserId: string
+): Promise<boolean> {
+  const rows = await db
+    .select({ settings: creatorProfiles.settings })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.userId, appUserId));
+  return rows.some(row => isProofBlockingPublication(row.settings));
 }

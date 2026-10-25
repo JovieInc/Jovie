@@ -100,6 +100,8 @@ export interface AccessDecision {
   readonly kind: AccessDecisionKind;
   /** Short rationale for logging + UI surfaces. Not user-facing copy. */
   readonly rationale: string;
+  /** Admitted, but the page stays private until ownership is proven. */
+  readonly proofRequired?: boolean;
   /** Why the golden path held this artist (controlled gate only). */
   readonly goldenPathHold?: GoldenPathAdmissionReason;
   /** 0-100 confidence; useful for retroactive analysis of where to tune thresholds. */
@@ -251,6 +253,7 @@ export function decideOnboardingAccess(
         kind: 'instant_access',
         rationale: `golden_path_${admission.reason}`,
         score: 80,
+        proofRequired: true,
       };
     }
     // Artists are admitted first; everyone else reserves their name (Tim

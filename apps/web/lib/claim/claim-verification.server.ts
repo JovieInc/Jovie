@@ -3,6 +3,7 @@ import 'server-only';
 import { desc, eq } from 'drizzle-orm';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
@@ -84,6 +85,27 @@ export async function getClaimVerificationReach(
   return requiresClaimVerification(followers) ? followers : null;
 }
 
+/** The operator matches the support email to the request by this address. */
+async function readRequesterEmail(profileId: string): Promise<string | null> {
+  try {
+    const [profile] = await db
+      .select({ userId: creatorProfiles.userId })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId))
+      .limit(1);
+    if (!profile?.userId) return null;
+    const [owner] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, profile.userId))
+      .limit(1);
+    return owner?.email ?? null;
+  } catch {
+    // The card is still filed without it; the operator can look it up.
+    return null;
+  }
+}
+
 /**
  * Store a verification request on the requester's own profile instead of
  * attaching the artist identity. Idempotent for the same artist: an existing
@@ -117,7 +139,19 @@ export async function requestClaimVerification(input: {
     const paid = input.paid
       ? markClaimVerificationPaid(existing, now, input.acquisitionId)
       : null;
-    if (!paid) return existing;
+    if (!paid) {
+      // A card that failed to file on the first pass must not leave an
+      // invisible request: filing is idempotent, so retry it while pending.
+      if (existing.status === 'pending_verification') {
+        await fileClaimVerificationCard({
+          profileId: input.profileId,
+          handle: row.handle,
+          record: existing,
+          requesterEmail: await readRequesterEmail(input.profileId),
+        });
+      }
+      return existing;
+    }
     await db
       .update(creatorProfiles)
       .set({
@@ -166,6 +200,7 @@ export async function requestClaimVerification(input: {
       profileId: input.profileId,
       handle: row.handle,
       record,
+      requesterEmail: await readRequesterEmail(input.profileId),
     });
   }
   return record;

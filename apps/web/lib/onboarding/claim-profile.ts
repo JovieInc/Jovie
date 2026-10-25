@@ -166,7 +166,8 @@ async function holdHighReachArtistForVerification(
   const reach = requiresClaimVerification(artist.followers)
     ? artist.followers
     : options.forceHold
-      ? (artist.followers ?? null)
+      ? // Unknown reach still holds the identity (fail closed).
+        (artist.followers ?? 0)
       : await getClaimVerificationReach(artist.id);
   if (reach === null) return { state, verification: null };
   return {

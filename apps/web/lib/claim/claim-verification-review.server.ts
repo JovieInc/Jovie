@@ -64,6 +64,8 @@ export async function fileClaimVerificationCard(input: {
   readonly profileId: string;
   readonly handle: string;
   readonly record: ClaimVerificationRecord;
+  /** Lets the operator match a support email to the request. */
+  readonly requesterEmail?: string | null;
 }): Promise<void> {
   const { record } = input;
   if (record.status !== 'pending_verification') return;
@@ -78,11 +80,18 @@ export async function fileClaimVerificationCard(input: {
     kind: 'decision',
     product: 'jov',
     title: `Verify artist claim: ${artist}`.slice(0, 120),
-    body: [
-      `@${input.handle} paid $12 and asked to link ${artist} (${record.reach.value.toLocaleString('en-US')} Spotify followers, threshold ${record.reach.threshold.toLocaleString('en-US')}).`,
-      `Requested ${record.requestedAt}, paid ${record.paidAt ?? 'unknown'}.`,
-      'Approve links the artist to their profile. Reject refunds the first month and cancels the subscription.',
-    ].join('\n'),
+    body: (record.proofOnly
+      ? [
+          `@${input.handle} was admitted free and asked to link ${artist} (${record.reach.value.toLocaleString('en-US')} Spotify followers). Their page is private until you approve.`,
+          `Account email: ${input.requesterEmail ?? 'unknown'}. Requested ${record.requestedAt}. Nothing was paid.`,
+          'Approve links the artist and publishes the page. Reject keeps the page private; there is nothing to refund.',
+        ]
+      : [
+          `@${input.handle} paid $12 and asked to link ${artist} (${record.reach.value.toLocaleString('en-US')} Spotify followers, threshold ${record.reach.threshold.toLocaleString('en-US')}).`,
+          `Requested ${record.requestedAt}, paid ${record.paidAt ?? 'unknown'}.`,
+          'Approve links the artist to their profile. Reject refunds the first month and cancels the subscription.',
+        ]
+    ).join('\n'),
     recommendation:
       'Approve only with ownership evidence (artist email domain, verified social, distributor account). Otherwise reject.',
     defaultIfSilent:

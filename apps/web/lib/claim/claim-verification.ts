@@ -73,6 +73,12 @@ export interface ClaimVerificationRecord {
   readonly decisionReason?: string | null;
   /** Stripe refund id for a rejected, refunded claim. */
   readonly refundId?: string | null;
+  /**
+   * Free admission: the page stays private until verified. Persisted on the
+   * profile so no mutable waitlist field can lose it; the database trigger
+   * `creator_profiles_proof_before_public` enforces it for every writer.
+   */
+  readonly proofOnly?: boolean;
 }
 
 /** High-reach artists are never claimed self-serve. Unknown reach is not high. */
@@ -114,7 +120,14 @@ export function buildClaimVerificationRequest(input: {
     },
     requestedAt: at,
     paidAt: input.paid ? at : null,
+    ...(input.proofOnly ? { proofOnly: true } : {}),
   };
+}
+
+/** True while a free-admission page is waiting for (or failed) proof. */
+export function isProofBlockingPublication(settings: unknown): boolean {
+  const record = readClaimVerification(settings);
+  return record?.proofOnly === true && record.status !== 'verified';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

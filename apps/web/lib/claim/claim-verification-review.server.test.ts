@@ -189,6 +189,28 @@ describe('claim verification review', () => {
     expect(body).toContain('2,400,000 Spotify followers');
   });
 
+  it('files an honest proof-only card with the requester email and no refund promise', async () => {
+    const proofOnly = buildClaimVerificationRequest({
+      spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+      artistName: 'Mid Artist',
+      reach: 3_200,
+      paid: false,
+      proofOnly: true,
+      now: new Date('2026-10-21T08:00:00.000Z'),
+    });
+    await fileClaimVerificationCard({
+      profileId: PROFILE,
+      handle: 'requester',
+      record: proofOnly,
+      requesterEmail: 'artist@example.com',
+    });
+    const body = mocks.submitCard.mock.calls.at(-1)?.[0]?.body as string;
+    expect(body).toContain('artist@example.com');
+    expect(body).toContain('private until you approve');
+    expect(body).not.toContain('paid $12');
+    expect(body).not.toContain('refunds');
+  });
+
   it('approve links the artist under the identity lock and records the stage', async () => {
     queueProfile(pending);
     const result = await decideClaimVerification({

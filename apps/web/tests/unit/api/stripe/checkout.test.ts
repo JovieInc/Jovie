@@ -22,6 +22,11 @@ vi.mock('@/lib/observability/revenue-spine', () => ({
   captureRevenueSpineFailure: mockRevenueFailure,
 }));
 
+const mockHasProofPendingProfile = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
+  hasProofPendingProfile: mockHasProofPendingProfile,
+}));
+
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockCreateCheckoutSession = vi.hoisted(() => vi.fn());
 const mockCreateBillingPortalSession = vi.hoisted(() => vi.fn());
@@ -94,6 +99,7 @@ import { POST } from '@/app/api/stripe/checkout/route';
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHasProofPendingProfile.mockResolvedValue(false);
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
     mockGetActivePriceIds.mockReturnValue(['price_123']);
@@ -183,6 +189,22 @@ describe('POST /api/stripe/checkout', () => {
 
     expect(response.status).toBe(401);
     expect(data.error).toBe('Unauthorized');
+  });
+
+  it('refuses checkout while a free-admission page is waiting for proof', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockHasProofPendingProfile.mockResolvedValue(true);
+
+    const response = await POST(
+      new NextRequest('http://localhost/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId: 'price_pro' }),
+      })
+    );
+
+    expect(response.status).toBe(403);
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
 
   it('returns 403 when max plan is disabled', async () => {

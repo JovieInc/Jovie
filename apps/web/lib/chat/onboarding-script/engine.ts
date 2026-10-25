@@ -358,8 +358,13 @@ function decisionTurn(
   // Terminal decision already made — point back at the card.
   if (existingDecisionKind && existingDecisionKind !== 'needs_more_info') {
     const events: FallbackToolEvent[] = [];
+    const proofRequired = (() => {
+      const next = findLatestToolOutput(uiMessages, 'propose_next_step');
+      return isRecord(next?.decision) && next.decision.proofRequired === true;
+    })();
     if (
       existingDecisionKind === 'instant_access' &&
+      !proofRequired &&
       !findLatestToolOutput(uiMessages, 'propose_checkout')
     ) {
       events.push({
@@ -419,6 +424,18 @@ function decisionTurn(
   const decision = decideAccess(state, parsedBand, {
     forceTurnCap: Boolean(parsedBand) || latestText.trim().length >= 8,
   });
+  if (decision.kind === 'instant_access' && decision.proofRequired) {
+    // Golden-path admission: account access, page private until ownership is
+    // proven. No checkout card and no checkout promise.
+    events.push(proposeNextStepEvent(decision));
+    const line = pick('golden_path_admitted');
+    return {
+      line,
+      text: renderLine(line, {}),
+      toolEvents: events,
+      guardedStep: 'waitlist_or_complete',
+    };
+  }
   if (decision.kind === 'instant_access') {
     events.push(proposeNextStepEvent(decision), {
       toolName: 'proposeCheckout',

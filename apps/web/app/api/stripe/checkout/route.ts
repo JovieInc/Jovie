@@ -54,6 +54,7 @@ import {
 } from '@/lib/stripe/retry';
 import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { logger } from '@/lib/utils/logger';
+import { hasProofPendingProfile } from '@/lib/waitlist/golden-path-admission.server';
 
 export const runtime = 'nodejs';
 
@@ -166,6 +167,12 @@ export async function POST(request: NextRequest) {
     const { userId } = await getCachedAuth({ session: 'fresh' });
     if (!userId) return jsonError('Unauthorized', 401);
     affectedUserId = userId;
+
+    // A free-admission page is private until ownership is proven; nobody pays
+    // for a page that is not live.
+    if (await hasProofPendingProfile(userId)) {
+      return jsonError('Your page is waiting for confirmation', 403);
+    }
 
     const parsedBody = await parseJsonBody<{
       humanConfirmed?: unknown;

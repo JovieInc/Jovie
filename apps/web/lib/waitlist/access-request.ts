@@ -279,7 +279,8 @@ async function tryApproveEntry(
 /** Scores of waitlisted entrants, best first, capped at `limit` rows. */
 async function listPendingScoresDesc(
   tx: DbOrTransaction,
-  limit: number
+  limit: number,
+  afterDays: number
 ): Promise<number[]> {
   if (limit <= 0) return [];
   const result = await tx.execute(drizzleSql`
@@ -287,6 +288,10 @@ async function listPendingScoresDesc(
     FROM waitlist_entries
     WHERE canonical = true
       AND status = 'waitlisted'
+      -- The same filter the ranked drain uses, so entrants it would not admit
+      -- today cannot crowd out someone who can be admitted now.
+      AND spotify_url IS NOT NULL
+      AND waitlisted_at <= now() - make_interval(days => ${afterDays}::int)
       AND qualification_inputs -> 'admissionScore' ->> 'score' IS NOT NULL
     ORDER BY score DESC
     LIMIT ${limit}
@@ -340,7 +345,11 @@ async function decideAccess(params: {
       0,
       settings.autoAcceptDailyLimit - settings.autoAcceptedToday
     );
-    const pending = await listPendingScoresDesc(params.tx, remaining);
+    const pending = await listPendingScoresDesc(
+      params.tx,
+      remaining,
+      Math.max(1, Math.trunc(settings.autoAcceptAfterDays))
+    );
     if (
       isOutrankedByQueue({
         candidateScore: params.admissionScore.score,

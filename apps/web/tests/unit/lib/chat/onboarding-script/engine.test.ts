@@ -374,6 +374,34 @@ describe('decideFallbackTurn', () => {
     );
   });
 
+  it('admits a resolved artist under the controlled gate with no checkout and the private-until-proof line', async () => {
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Handle locked.', [HANDLE_CONFIRMED, SOCIAL_ATTACHED]),
+      user('around 20k on instagram'),
+    ];
+    const state = createOnboardingTurnState({
+      sessionId: SESSION,
+      turnCount: messages.filter(m => m.role === 'user').length,
+      accessControlled: true,
+      goldenPathVerdict: 'ELIGIBLE',
+      messages,
+    });
+    const turn = await decideFallbackTurn({ uiMessages: messages, state });
+
+    expect(turn.line.stepId).toBe('golden_path_admitted');
+    expect(turn.text).toContain('private');
+    expect(turn.toolEvents.map(event => event.toolName)).not.toContain(
+      'proposeCheckout'
+    );
+    const next = turn.toolEvents.find(
+      event => event.output.action === 'propose_next_step'
+    );
+    expect(next?.output).toMatchObject({
+      decision: { kind: 'instant_access', proofRequired: true },
+    });
+  });
+
   it('waitlists only with meaningful signal after turn cap', async () => {
     const lowSignal = {
       ...CONFIRMED_OUTPUT,

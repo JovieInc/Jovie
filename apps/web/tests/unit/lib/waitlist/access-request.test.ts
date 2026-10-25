@@ -20,6 +20,7 @@ const insertedEntries: Array<Record<string, unknown>> = [];
 const updatedRows: Array<Record<string, unknown>> = [];
 let waitlistInsertReturnRows: Array<{ id: string }> = [{ id: 'entry-new' }];
 let executeRows: Array<Record<string, unknown>> = [];
+const executedSql: string[] = [];
 
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: (...args: unknown[]) =>
@@ -71,7 +72,14 @@ vi.mock('@/lib/ingestion/session', () => ({
 }));
 
 function createTxMock() {
-  const execute = vi.fn(async () => executeRows);
+  const execute = vi.fn(async (query?: unknown) => {
+    executedSql.push(
+      JSON.stringify(
+        (query as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? []
+      )
+    );
+    return executeRows;
+  });
 
   const select = vi.fn(() => ({
     from: vi.fn((table: unknown) => ({
@@ -183,6 +191,7 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
     updatedRows.length = 0;
     waitlistInsertReturnRows = [{ id: 'entry-new' }];
     executeRows = [];
+    executedSql.length = 0;
     findLatestEntryByEmail.mockReset();
     findLatestEntryByEmail.mockReturnValue([]);
     getWaitlistSettings.mockReset();
@@ -385,6 +394,10 @@ describe('submitWaitlistAccessRequest', { timeout: 20_000 }, () => {
           return q?.details?.goldenPathHold === 'hold_outranked';
         })
       ).toBeTruthy();
+      // The pending read uses the drain's filter, so entrants it would not
+      // admit today cannot crowd out someone who can be admitted now.
+      expect(executedSql.join(' ')).toContain('spotify_url IS NOT NULL');
+      expect(executedSql.join(' ')).toContain('waitlisted_at <=');
     });
 
     it('never reserves capacity for a held decision', async () => {
