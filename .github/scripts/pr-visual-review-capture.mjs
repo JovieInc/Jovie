@@ -249,14 +249,13 @@ async function assertFullscreenGeometry(page) {
   if (geometry.overflowX) problems.push('horizontal overflow');
   if (!frame || !canvas) problems.push('HUD frame missing');
   else {
-    // The scaled canvas fills its region; drift moves it at most 10 scaled px,
-    // inside its 16 scaled px padding.
-    const slack = Math.ceil(10 * Math.max(1, geometry.scale)) + 1;
+    // The scaled canvas is exactly its region (drift lives on an inner wrapper,
+    // within the canvas padding).
     if (
       Math.abs(canvas.w - frame.w) > 1 ||
       Math.abs(canvas.h - frame.h) > 1 ||
-      Math.abs(canvas.x - frame.x) > slack ||
-      Math.abs(canvas.y - frame.y) > slack
+      Math.abs(canvas.x - frame.x) > 1 ||
+      Math.abs(canvas.y - frame.y) > 1
     )
       problems.push(
         `canvas ${JSON.stringify(canvas)} does not fill its region ${JSON.stringify(frame)}`

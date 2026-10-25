@@ -1,6 +1,12 @@
 'use client';
 
-import { type ReactNode, useEffect, useRef, useState } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import {
   type FullscreenFeedStatus,
   fullscreenDrift,
@@ -97,24 +103,36 @@ export function OvieFullscreenFrame({
   return (
     <div
       ref={regionRef}
-      className='relative h-full min-h-0 w-full overflow-hidden text-primary-token'
+      // Below lg the home slot is content-sized, so there is no fixed region to
+      // scale into: the canvas stays in flow at 1x. From lg it is scaled.
+      className='relative w-full text-primary-token lg:h-full lg:min-h-0 lg:overflow-hidden'
       data-testid='ovie-fullscreen'
       data-feed-level={status.level}
     >
       <div
-        className='absolute left-0 top-0 origin-top-left p-4 [&_.truncate]:overflow-visible [&_.truncate]:whitespace-normal [&_.truncate]:text-clip [&_[class*=line-clamp]]:line-clamp-none'
+        // The scale is applied at once (no transition: a mid-transition canvas
+        // is neither the old size nor the new). Drift is the inner wrapper.
+        className='lg:absolute lg:left-0 lg:top-0 lg:origin-top-left lg:[height:var(--fs-h)] lg:[transform:var(--fs-scale)] lg:[width:var(--fs-w)]'
         data-testid='ovie-fullscreen-canvas'
-        style={{
-          // Nothing truncates in Full Screen (shared organisms use .truncate
-          // and line-clamp, so release them here instead of forking them).
-          boxSizing: 'border-box',
-          width: `${100 / scale}%`,
-          height: `${100 / scale}%`,
-          transform: `scale(${scale}) translate(${drift.x}px, ${drift.y}px)`,
-          transition: 'transform var(--ds-motion-cinematic-duration) linear',
-        }}
+        style={
+          {
+            '--fs-w': `${100 / scale}%`,
+            '--fs-h': `${100 / scale}%`,
+            '--fs-scale': `scale(${scale})`,
+          } as CSSProperties
+        }
       >
-        {children}
+        <div
+          className='h-full w-full p-4 [&_.truncate]:overflow-visible [&_.truncate]:whitespace-normal [&_.truncate]:text-clip [&_[class*=line-clamp]]:line-clamp-none'
+          style={{
+            // Nothing truncates in Full Screen (shared organisms use .truncate
+            // and line-clamp, so release them here instead of forking them).
+            transform: `translate(${drift.x}px, ${drift.y}px)`,
+            transition: 'transform var(--ds-motion-cinematic-duration) linear',
+          }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
