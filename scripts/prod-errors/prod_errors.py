@@ -37,6 +37,8 @@ class MissingConfig(RuntimeError):
     """A watcher lacks required env vars. Fail fast, record ONE clear
     'missing config: <VARS>' heartbeat/status -- never crash-loop or file duplicates."""
 STATE = Path(os.environ.get("PROD_ERRORS_STATE", Path.home() / ".local/state/jovie-prod-errors"))
+# The units run in a bwrap sandbox where only STATE is writable; the apiclient ledger must live there too.
+os.environ.setdefault("JOVIE_API_STATE_DIR", str(STATE / "api-state"))
 # Hosts come from the shared provider contract; every call goes through scripts/apiclient.
 SENTRY_API = os.environ.get("SENTRY_API", f"https://{provider_spec('sentry')['hosts'][0]}/api/0")
 LINEAR_API = LINEAR_API_URL

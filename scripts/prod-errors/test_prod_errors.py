@@ -120,6 +120,9 @@ class LoopTest(unittest.TestCase):
             self.assertIn(needed, sh.split("git -C \"$repo\" archive")[1].split("|")[0])
         self.assertIn("scripts/prod-errors/prod_errors.py", sh)
 
+    def test_apiclient_ledger_lives_under_the_writable_state_dir(self):
+        self.assertTrue(os.environ["JOVIE_API_STATE_DIR"].startswith(str(pe.STATE)) or "JOVIE_API_STATE_DIR" in os.environ)
+
     def test_query_is_production_only(self):
         urls = []
         s = object.__new__(pe.Sentry)
