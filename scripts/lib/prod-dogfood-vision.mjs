@@ -14,14 +14,9 @@ import { createHash } from 'node:crypto';
  * and typesafe-ai/jev only (Tim STRICT 2026-09-17), so claude-haiku, gemini and
  * gpt-4o-mini are denied there.
  *
- * Panel 2026-10-25: 26 production screenshots (6 known-bad: the take-me-over
- * 404, the seaside-heights "Coming soon" placeholder and the /compare
- * not-found page, each at phone and desktop; 20 known-good profile, release,
- * home, pricing, sign-in and LogYourBody pages).
- *   clef-flash   (Workers AI, credits)  acc 0.96  6/6 bad caught, 1 FP  $0.000087/verdict  2.2s
- *   clef         (Workers AI, credits)  acc 0.92  4/6 bad caught, 0 FP  $0.000231/verdict  1.7s
- *   glm-5.3-flash (Gateway, allowlisted) acc 0.96  6/6 bad caught, 1 FP  $0.000224/verdict  4.7s
- *   glm-5.3      (Gateway, allowlisted) acc 0.88  5/6 bad caught, 2 FP  $0.001895/verdict  4.9s
+ * Panel 2026-10-25 (26 real screenshots, 6 known-bad incl. the seaside-heights Coming soon
+ * page): clef-flash acc 0.96, 6/6 bad, $0.000087/verdict; glm-5.3-flash 0.96, 6/6, $0.000224;
+ * clef 0.92, 4/6; glm-5.3 0.88, 5/6, $0.0019.
  * clef-flash wins on accuracy and price, and its one false positive scored 0.63
  * against the 0.65 gate below (a 26-image panel: treat the threshold as
  * provisional). Without a Workers AI token the run falls back to glm-5.3-flash.
