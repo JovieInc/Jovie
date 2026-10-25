@@ -10,6 +10,8 @@
  * canon/CAPACITY.md (generated, drift-checked by the unit test).
  */
 
+import { listPrices, priceTask } from './capacity-pricing.mjs';
+
 export const SCHEMA = 'jovie.capacity-registry/v1';
 export const USAGE_MODELS = [
   'uncapped-own-model',
@@ -33,7 +35,10 @@ const parseTime = value => {
 };
 
 /** Structural errors only; an empty array means the registry is sound. */
-export function validateRegistry(registry, { agentIds, spendIds } = {}) {
+export function validateRegistry(
+  registry,
+  { agentIds, spendIds, modelIds } = {}
+) {
   const errors = [];
   if (!isObject(registry) || registry.schema !== SCHEMA) {
     return [`schema must be ${SCHEMA}`];
@@ -47,6 +52,42 @@ export function validateRegistry(registry, { agentIds, spendIds } = {}) {
     errors.push('thresholds.liveMaxAgeHours and manualMaxAgeDays are required');
   }
   const policies = isObject(registry.policies) ? registry.policies : {};
+  const pathIds = new Set();
+  for (const row of registry.pricing?.paths ?? []) {
+    const where = `pricing path ${row?.id ?? '?'}`;
+    if (!row?.id || pathIds.has(row.id))
+      errors.push(`${where}: id missing or duplicated`);
+    pathIds.add(row?.id);
+    if (!['api', 'credits', 'subscription'].includes(row?.accessPath)) {
+      errors.push(`${where}: accessPath ${row?.accessPath} unknown`);
+    }
+    if (
+      row?.modelRegistryId &&
+      modelIds &&
+      !modelIds.includes(row.modelRegistryId)
+    ) {
+      errors.push(
+        `${where}: modelRegistryId ${row.modelRegistryId} not in the model registry`
+      );
+    }
+    if (row?.accessPath === 'subscription' && !row.provider)
+      errors.push(`${where}: subscription path needs a provider`);
+    const owner = registry.providers?.find(p => p.id === row?.provider);
+    if (row?.provider && !owner)
+      errors.push(`${where}: provider ${row.provider} not in providers`);
+    for (const a of row?.accounts ?? []) {
+      if (owner && !owner.accounts?.some(x => x.id === a))
+        errors.push(`${where}: account ${a} not on ${row.provider}`);
+    }
+  }
+  for (const [roleId, role] of Object.entries(registry.roles ?? {})) {
+    for (const c of role.candidates ?? []) {
+      if (!pathIds.has(c.pathId))
+        errors.push(
+          `role ${roleId}: candidate ${c.model} pathId ${c.pathId} not in pricing.paths`
+        );
+    }
+  }
   if (!Array.isArray(registry.providers) || registry.providers.length === 0) {
     errors.push('providers must be a non-empty array');
     return errors;
@@ -255,7 +296,7 @@ function priceView(plan, now) {
  */
 export function evaluateRegistry(
   registry,
-  { now = Date.now(), live = {}, spend } = {}
+  { now = Date.now(), live = {}, spend, models } = {}
 ) {
   const spendById = new Map((spend?.providers ?? []).map(p => [p.id, p]));
   /** Credits may name a spend.json row as their base; a newer own reading wins. */
@@ -361,6 +402,13 @@ export function evaluateRegistry(
       monthlyUsd: providers.reduce((s, p) => s + p.monthlyUsd, 0),
       stale: providers.filter(p => p.freshness !== 'fresh').map(p => p.id),
     },
+    paths: pathRows(registry, models),
+    roles: Object.fromEntries(
+      Object.keys(registry.roles ?? {}).map(id => [
+        id,
+        resolveRole(registry, id, live.watch?.models ?? {}),
+      ])
+    ),
     metricsMeta: live.metrics
       ? {
           windowDays: live.metrics.windowDays ?? null,
@@ -443,6 +491,35 @@ export function renderCanon(view, registry) {
       `- **${p.label}** (${p.policy.id}): ${p.policy.rule}${p.policy.delegation ? ` Delegation: ${p.policy.delegation}` : ''}`
     );
   }
+  if (view.paths?.length) {
+    lines.push(
+      '',
+      '## Cost by access path',
+      '',
+      registry.pricing.rule,
+      '',
+      '| Model | Path | Where | List $/MTok in / out | Note |',
+      '|---|---|---|---|---|'
+    );
+    for (const row of view.paths) {
+      const list = row.list
+        ? `${row.list.inUsdPerMTok} / ${row.list.outUsdPerMTok}`
+        : 'not listed';
+      lines.push(
+        `| ${row.model} | ${row.accessPath} | ${row.provider ?? 'direct'}${row.accounts.length ? ` (${row.accounts.join(', ')})` : ''} | ${list} | ${row.note ?? ''} |`
+      );
+    }
+  }
+  const roleIds = Object.keys(view.roles ?? {});
+  if (roleIds.length) {
+    lines.push('', '## Roles', '');
+    for (const id of roleIds) {
+      const r = view.roles[id];
+      lines.push(
+        `- **${id}**: ${r.description} Now: ${r.chosen ? `${r.chosen.label} (${r.chosen.model}) via ${r.chosen.pathId}` : 'no available model'}. Candidates: ${r.candidates.map(c => `${c.label} ${c.state}${c.preferred ? ' (preferred)' : ''}`).join('; ')}.`
+      );
+    }
+  }
   lines.push(
     '',
     '## Routing order for non-lane agents',
@@ -504,3 +581,111 @@ export function capacityAlerts(view) {
   }
   return alerts;
 }
+
+/**
+ * Resolve a role (for example `planner`) to the model to use now: the first preferred candidate
+ * whose availability is confirmed (registry status, or a live watch row `watch[model].available`),
+ * else the first candidate that is available, else null. A preferred candidate that is only being
+ * watched never wins until the watcher confirms it.
+ */
+export function resolveRole(registry, roleId, watch = {}) {
+  const role = registry.roles?.[roleId];
+  if (!role) return null;
+  const state = c => {
+    const seen = watch[c.model];
+    if (seen?.available === true) return 'available';
+    return c.availability?.status ?? 'unknown';
+  };
+  const ranked = role.candidates.map(c => ({ ...c, state: state(c) }));
+  const chosen =
+    ranked.find(c => c.preferred && c.state === 'available') ??
+    ranked.find(c => c.state === 'available') ??
+    null;
+  return {
+    role: roleId,
+    description: role.description,
+    chosen: chosen && {
+      model: chosen.model,
+      label: chosen.label,
+      pathId: chosen.pathId,
+    },
+    candidates: ranked.map(c => ({
+      model: c.model,
+      label: c.label,
+      pathId: c.pathId,
+      preferred: Boolean(c.preferred),
+      state: c.state,
+      evidence: watch[c.model] ?? null,
+    })),
+  };
+}
+
+/** Pricing rows joined to list prices, with the same model on every path side by side. */
+export function pathRows(registry, modelRegistry) {
+  const prices = modelRegistry ? listPrices(modelRegistry) : {};
+  return (registry.pricing?.paths ?? []).map(row => ({
+    id: row.id,
+    model: row.model,
+    accessPath: row.accessPath,
+    provider: row.provider ?? null,
+    accounts: row.accounts ?? [],
+    funding: row.funding ?? null,
+    list: prices[row.modelRegistryId] ?? null,
+    usableQuotaApiUsd: row.usableQuotaApiUsd ?? null,
+    note: row.usableQuotaNote ?? row.priceWhenAvailable ?? null,
+  }));
+}
+
+/**
+ * Price one task on every path of a model, using each subscription account's live pace as the seat.
+ * Returns the priced rows (one per account for subscription paths) cheapest routable first.
+ */
+export function priceModel(
+  registry,
+  modelRegistry,
+  view,
+  model,
+  task,
+  options = {}
+) {
+  const prices = listPrices(modelRegistry);
+  const out = [];
+  for (const row of registry.pricing.paths.filter(r => r.model === model)) {
+    if (row.accessPath !== 'subscription') {
+      out.push({
+        ...priceTask(row, prices, task),
+        account: row.accounts?.[0] ?? null,
+      });
+      continue;
+    }
+    const provider = view.providers.find(p => p.id === row.provider);
+    for (const id of row.accounts ?? []) {
+      const account = provider?.accounts.find(a => a.id === id);
+      const quota = account?.quota;
+      const windowUsd =
+        ((account?.plan?.effectiveUsdMonthly ?? 0) * 7) / 30.4375;
+      out.push({
+        ...priceTask(
+          row,
+          prices,
+          task,
+          {
+            usedPercent: quota?.usedPercent ?? null,
+            elapsedPercent: quota?.elapsedPercent ?? null,
+            usableQuotaApiUsd: row.usableQuotaApiUsd ?? null,
+            planWindowUsd: windowUsd,
+            status: account?.status,
+          },
+          {
+            floorFraction: registry.pricing.subscriptionFloorFraction,
+            band: registry.pricing.paceBandPercent,
+          }
+        ),
+        account: id,
+      });
+    }
+  }
+  return rankPathsExport(out);
+}
+
+import { rankPaths as rankPathsExport } from './capacity-pricing.mjs';
