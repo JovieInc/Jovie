@@ -6,6 +6,52 @@ import {
   resolveCanonicalPlanId,
 } from '@/lib/entitlements/registry';
 
+/**
+ * Features a checkout may return the buyer to (JOV-9035). Exact-match
+ * allowlist: an unlisted `from` never reaches the Stripe return URL, so the
+ * param can never smuggle an arbitrary redirect into the success state.
+ */
+export const CHECKOUT_RETURN_FEATURE_ROUTES: readonly string[] = [
+  APP_ROUTES.DASHBOARD,
+  APP_ROUTES.CHAT,
+  APP_ROUTES.PRESENCE,
+  APP_ROUTES.RELEASES,
+  APP_ROUTES.DASHBOARD_LIBRARY,
+  APP_ROUTES.DASHBOARD_AUDIENCE,
+  APP_ROUTES.DASHBOARD_CONTACTS,
+  APP_ROUTES.DASHBOARD_TASKS,
+  APP_ROUTES.DASHBOARD_TOUR_DATES,
+  APP_ROUTES.DASHBOARD_RELEASE_PLAN,
+].sort() as readonly string[];
+
+export function resolveCheckoutReturnFeature(
+  from: string | null | undefined
+): string | null {
+  if (typeof from !== 'string' || from === '') return null;
+  return CHECKOUT_RETURN_FEATURE_ROUTES.includes(from) ? from : null;
+}
+
+/** Acknowledgement hold before the success moment navigates (JOV-9035). */
+export const CHECKOUT_SUCCESS_HOLD_MS = 600;
+
+/** Arrival marker that lands focus on the destination feature's main h1. */
+export const CHECKOUT_SUCCESS_FOCUS_PARAM = 'focus';
+export const CHECKOUT_SUCCESS_FOCUS_VALUE = 'heading';
+
+export function withHeadingFocusParam(route: string): string {
+  const separator = route.includes('?') ? '&' : '?';
+  return `${route}${separator}${CHECKOUT_SUCCESS_FOCUS_PARAM}=${CHECKOUT_SUCCESS_FOCUS_VALUE}`;
+}
+
+/**
+ * The single checkout acknowledgement message (JOV-9035). The plan name is
+ * the canonical display name ("Artist Presence" for pro), so the message
+ * reads "Payment complete. Artist Presence is active." for a pro upgrade.
+ */
+export function getCheckoutSuccessAnnouncement(displayName: string): string {
+  return `Payment complete. ${displayName} is active.`;
+}
+
 export type PaidPlanId = Exclude<PlanId, 'free'>;
 export type CheckoutSuccessView =
   | { readonly kind: 'pending'; readonly reason: 'session' | 'billing' }
@@ -129,26 +175,32 @@ export function isArtistVisibilityPlan(plan: PaidPlanId): boolean {
   return plan === 'pro' || plan === 'trial';
 }
 
-export function getPaidSuccessPrimaryHref(input: {
+export interface PaidSuccessDestinationInput {
   readonly plan: PaidPlanId;
   readonly isOnboardingUpgrade: boolean;
   /** Paid before claiming a link: claim or create it next. */
   readonly needsProfile?: boolean;
-}): string {
+  /** Feature route that triggered the upgrade (JOV-9035), if allowlisted. */
+  readonly fromFeature?: string | null;
+}
+
+export function getPaidSuccessPrimaryHref(
+  input: PaidSuccessDestinationInput
+): string {
   if (input.isOnboardingUpgrade) return APP_ROUTES.DASHBOARD;
   if (input.needsProfile) return APP_ROUTES.START;
+  if (input.fromFeature) return input.fromFeature;
   return isArtistVisibilityPlan(input.plan)
     ? APP_ROUTES.PRESENCE
     : APP_ROUTES.CHAT;
 }
 
-export function getPaidSuccessPrimaryLabel(input: {
-  readonly plan: PaidPlanId;
-  readonly isOnboardingUpgrade: boolean;
-  readonly needsProfile?: boolean;
-}): string {
+export function getPaidSuccessPrimaryLabel(
+  input: PaidSuccessDestinationInput
+): string {
   if (input.isOnboardingUpgrade) return 'Explore your dashboard';
   if (input.needsProfile) return 'Claim your link';
+  if (input.fromFeature) return 'Open your unlocked feature';
   return isArtistVisibilityPlan(input.plan)
     ? 'Open Artist Visibility'
     : 'Go to chat';

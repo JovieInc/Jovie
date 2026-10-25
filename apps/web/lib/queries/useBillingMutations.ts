@@ -21,6 +21,8 @@ import { handleMutationError } from './mutation-utils';
 export interface CheckoutInput {
   priceId: string;
   source?: 'youtube_thumbnails';
+  /** Allowlisted feature route the buyer returns to (JOV-9035). */
+  from?: string | null;
 }
 
 /**
@@ -52,6 +54,7 @@ async function createCheckoutSession(
     body: JSON.stringify({
       priceId: input.priceId,
       source: input.source,
+      from: input.from ?? undefined,
       humanConfirmed: true,
     }),
   });

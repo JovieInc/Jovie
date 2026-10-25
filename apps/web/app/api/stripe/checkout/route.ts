@@ -5,6 +5,7 @@
 
 import * as Sentry from '@sentry/nextjs';
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveCheckoutReturnFeature } from '@/app/billing/success/checkout-success-state';
 import { APP_ROUTES } from '@/constants/routes';
 import { agentCheckoutCorrelation } from '@/lib/acquisition/agent-checkout-correlation';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
@@ -183,6 +184,7 @@ export async function POST(request: NextRequest) {
       offer_version?: unknown;
       firstTouch?: unknown;
       first_touch?: unknown;
+      from?: unknown;
     }>(request, {
       route: '/api/stripe/checkout',
       headers: NO_STORE_HEADERS,
@@ -194,6 +196,7 @@ export async function POST(request: NextRequest) {
       referralCode: rawReferralCode,
       returnTo: rawReturnTo,
       source: rawSource,
+      from: rawFrom,
     } = parsedBody.data;
 
     const envelope = await openFirstTouchEnvelope(
@@ -297,6 +300,14 @@ export async function POST(request: NextRequest) {
       ? `&plan_id=${encodeURIComponent(selectedPlan)}`
       : '';
 
+    // JOV-9035: a checkout triggered from an app feature returns to that
+    // feature (validated against the exact-match allowlist — never an
+    // arbitrary URL) instead of stranding the buyer on the billing surface.
+    const fromFeature = resolveCheckoutReturnFeature(rawFrom);
+    const fromSuffix = fromFeature
+      ? `&from=${encodeURIComponent(fromFeature)}`
+      : '';
+
     let successUrl: string;
     let cancelUrl: string;
     if (isClaimFlow) {
@@ -309,7 +320,7 @@ export async function POST(request: NextRequest) {
       successUrl = `${baseUrl}/billing/youtube-thumbnails/success?session_id={CHECKOUT_SESSION_ID}`;
       cancelUrl = `${baseUrl}/billing/youtube-thumbnails?checkout=cancel`;
     } else {
-      successUrl = `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}${planIdSuffix}`;
+      successUrl = `${baseUrl}/billing/success?session_id={CHECKOUT_SESSION_ID}${planIdSuffix}${fromSuffix}`;
       cancelUrl = `${baseUrl}/billing/cancel`;
     }
 

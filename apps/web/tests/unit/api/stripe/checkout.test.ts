@@ -597,6 +597,55 @@ describe('POST /api/stripe/checkout', () => {
     );
   });
 
+  it('returns the buyer to the feature that triggered the upgrade (JOV-9035)', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_from_feature',
+      url: 'https://checkout.stripe.com/pay/cs_from_feature',
+    });
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        priceId: 'price_123',
+        from: '/app/chat',
+      }),
+    });
+
+    expect((await POST(request)).status).toBe(200);
+    const [call] = mockCreateCheckoutSession.mock.calls.at(-1) ?? [];
+    expect(call.successUrl).toMatch(
+      /\/billing\/success\?session_id=\{CHECKOUT_SESSION_ID\}/
+    );
+    expect(call.successUrl).toMatch(/from=%2Fapp%2Fchat$/);
+    expect(call.successUrl).not.toMatch(/\/billing$/);
+  });
+
+  it('drops an unallowlisted from instead of embedding it in the return url', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_from_invalid',
+      url: 'https://checkout.stripe.com/pay/cs_from_invalid',
+    });
+
+    const request = new NextRequest('http://localhost/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        priceId: 'price_123',
+        from: 'https://evil.example/steal',
+      }),
+    });
+
+    expect((await POST(request)).status).toBe(200);
+    const [call] = mockCreateCheckoutSession.mock.calls.at(-1) ?? [];
+    expect(call.successUrl).toMatch(
+      /\/billing\/success\?session_id=\{CHECKOUT_SESSION_ID\}/
+    );
+    expect(call.successUrl).not.toContain('from=');
+  });
+
   it('retries transient Stripe errors and preserves idempotency key', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
 
