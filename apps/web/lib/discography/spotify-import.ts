@@ -190,6 +190,12 @@ export interface SpotifyImportOptions {
   maxTracksPerRelease?: number;
   /** Market for availability. Defaults to 'US' */
   market?: string;
+  /**
+   * Also import `appears_on` albums on which the artist is a credited album
+   * artist (co-primary, e.g. "ONE&TWO & Tim White"). Off by default; remixer
+   * or compilation appearances where the artist is not an album artist stay out.
+   */
+  includeCoPrimaryAppearsOn?: boolean;
   /** Discover cross-platform links after import. Defaults to 'background' */
   discoverLinks?: boolean | 'sync' | 'background';
 }
@@ -251,6 +257,28 @@ async function reconcileCollaboratorProfilesBestEffort(
       { source: 'spotify_import', creatorProfileId }
     );
   }
+}
+
+/**
+ * `appears_on` albums where the artist is a credited album artist. Best effort:
+ * an incomplete provider response adds nothing rather than failing the import.
+ */
+async function fetchCoPrimaryAppearsOnAlbums(
+  spotifyArtistId: string,
+  market: string,
+  alreadyHave: ReadonlySet<string>
+): Promise<SpotifyAlbum[]> {
+  const appearsOn = await getSpotifyArtistAlbums(spotifyArtistId, {
+    includeGroups: ['appears_on'],
+    market,
+  });
+  if (!appearsOn.complete) return [];
+  return appearsOn.albums.filter(
+    album =>
+      !alreadyHave.has(album.id) &&
+      album.album_type !== 'compilation' &&
+      album.artists.some(artist => artist.id === spotifyArtistId)
+  );
 }
 
 /**
@@ -421,7 +449,8 @@ export async function importReleasesFromSpotify(
           includeGroups,
           market,
         });
-        const { albums: spotifyAlbums, total: spotifyTotal } = artistCatalog;
+        const { total: spotifyTotal } = artistCatalog;
+        let spotifyAlbums = artistCatalog.albums;
         result.total = Math.min(spotifyTotal, maxReleasesPerImport);
 
         if (!artistCatalog.complete || spotifyAlbums.length !== spotifyTotal) {
@@ -429,6 +458,17 @@ export async function importReleasesFromSpotify(
             `Spotify artist catalog is incomplete (${spotifyAlbums.length} of ${spotifyTotal} albums observed): ${artistCatalog.issue ?? 'pagination did not account for every album'}. No releases were imported.`
           );
           return result;
+        }
+
+        if (options.includeCoPrimaryAppearsOn) {
+          spotifyAlbums = [
+            ...spotifyAlbums,
+            ...(await fetchCoPrimaryAppearsOnAlbums(
+              spotifyArtistId,
+              market,
+              new Set(spotifyAlbums.map(a => a.id))
+            )),
+          ];
         }
 
         if (spotifyAlbums.length === 0) {

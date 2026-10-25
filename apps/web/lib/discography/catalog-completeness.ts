@@ -23,6 +23,78 @@ import { syncReleasesFromSpotify } from './spotify-import';
 
 export const CATALOG_COMPLETENESS_STATE_KEY = 'catalogCompleteness';
 
+/**
+ * Rollout flags. Comma-separated handles, or `*` for every artist. Default is
+ * Tim's own profile only; widening is a product-behavior change (public by
+ * default for undecided imports, co-primary appears_on imports).
+ */
+export const DEFAULT_ROLLOUT_HANDLES = 'tim';
+
+export function isRolledOut(flag: string | undefined, handle: string): boolean {
+  const value = (flag ?? DEFAULT_ROLLOUT_HANDLES).trim().toLowerCase();
+  if (value === '*') return true;
+  return value
+    .split(',')
+    .map(h => h.trim())
+    .filter(Boolean)
+    .includes(handle.toLowerCase());
+}
+
+export interface HiddenRelease {
+  readonly slug: string;
+  readonly title: string;
+  /** Which public-eligibility conditions this release fails. */
+  readonly failed: readonly string[];
+}
+
+/** Why each existing release is not public, one entry per failed condition. */
+export async function diagnoseHiddenReleases(
+  creatorProfileId: string
+): Promise<HiddenRelease[]> {
+  const result = await db.execute<{
+    slug: string;
+    title: string;
+    status: string;
+    release_date: Date | null;
+    reveal_date: Date | null;
+    has_artwork: boolean;
+    has_link: boolean;
+    approval: string | null;
+    visibility: string | null;
+  }>(drizzleSql`
+    SELECT r.slug, r.title, r.status, r.release_date, r.reveal_date,
+      NULLIF(BTRIM(r.artwork_url), '') IS NOT NULL AS has_artwork,
+      EXISTS (SELECT 1 FROM provider_links l WHERE l.release_id = r.id
+        AND l.owner_type = 'release' AND NULLIF(BTRIM(l.url), '') IS NOT NULL) AS has_link,
+      a.approval_status::text AS approval, a.profile_visibility::text AS visibility
+    FROM discog_releases r
+    LEFT JOIN library_asset_approval_statuses a
+      ON a.asset_id = r.id::text AND a.creator_profile_id = r.creator_profile_id
+    WHERE r.creator_profile_id = ${creatorProfileId} AND r.deleted_at IS NULL
+  `);
+  const now = Date.now();
+  const hidden: HiddenRelease[] = [];
+  for (const r of result.rows) {
+    const failed: string[] = [];
+    if (r.status === 'draft') failed.push('status_draft');
+    if (!r.release_date) failed.push('no_release_date');
+    else if (
+      new Date(r.release_date).getTime() > now &&
+      !(r.reveal_date && new Date(r.reveal_date).getTime() <= now)
+    )
+      failed.push('future_release_date');
+    if (!r.has_artwork) failed.push('no_artwork');
+    if (!r.has_link) failed.push('no_provider_link');
+    if (r.approval === null) failed.push('no_approval_row');
+    else if (r.approval !== 'approved') failed.push(`approval_${r.approval}`);
+    if (r.approval !== null && r.visibility !== 'visible')
+      failed.push(`visibility_${r.visibility}`);
+    if (failed.length > 0)
+      hidden.push({ slug: r.slug, title: r.title, failed });
+  }
+  return hidden;
+}
+
 export interface CatalogCompletenessProfileReport {
   readonly handle: string;
   readonly publicBefore: number;
@@ -31,6 +103,10 @@ export interface CatalogCompletenessProfileReport {
   readonly imported: number;
   readonly importFailed: number;
   readonly spotifyTotal: number;
+  /** Releases not public before this run, and the conditions each failed. */
+  readonly hiddenBefore: readonly HiddenRelease[];
+  readonly published: boolean;
+  readonly appearsOn: boolean;
   readonly error?: string;
 }
 
@@ -96,14 +172,27 @@ export async function runCatalogCompletenessForProfile(profile: {
     imported: 0,
     importFailed: 0,
     spotifyTotal: 0,
+    hiddenBefore: [] as HiddenRelease[],
+    published: false,
+    appearsOn: false,
   };
   try {
     const publicBefore = await countPublicReleases(profile.id);
-    const approvalsPublished = await publishUndecidedIngestedReleases(
-      profile.id
+    const hiddenBefore = await diagnoseHiddenReleases(profile.id);
+    const published = isRolledOut(
+      process.env.CATALOG_PUBLISH_UNDECIDED_HANDLES,
+      profile.username
     );
+    const appearsOn = isRolledOut(
+      process.env.CATALOG_APPEARS_ON_HANDLES,
+      profile.username
+    );
+    const approvalsPublished = published
+      ? await publishUndecidedIngestedReleases(profile.id)
+      : 0;
     const sync = await syncReleasesFromSpotify(profile.id, {
       includeTracks: true,
+      includeCoPrimaryAppearsOn: appearsOn,
     });
     const publicAfter = await countPublicReleases(profile.id);
     return {
@@ -114,6 +203,9 @@ export async function runCatalogCompletenessForProfile(profile: {
       imported: sync.imported,
       importFailed: sync.failed,
       spotifyTotal: sync.total,
+      hiddenBefore,
+      published,
+      appearsOn,
     };
   } catch (error) {
     await captureError('Catalog completeness failed for profile', error, {
