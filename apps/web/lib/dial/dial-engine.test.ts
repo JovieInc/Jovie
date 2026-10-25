@@ -522,3 +522,62 @@ describe('DialEngine wheel idle detection', () => {
     expect(ctx.engine.currentPosition).toBeCloseTo(10.4, 9);
   });
 });
+
+describe('DialEngine programmatic fling', () => {
+  it('coasts to the requested item, ticking each one on the way', () => {
+    const ctx = setup(12, 0);
+    ctx.engine.flingTo(8);
+    expect(ctx.engine.currentState).toBe('release');
+    expect(ctx.engine.targetIndex).toBe(8);
+    ctx.clock.advance(6000);
+    expect(ctx.engine.currentPosition).toBe(8);
+    expect(ctx.rests).toEqual([8]);
+    expect(ctx.ticks.at(-1)).toBe(8);
+    expect(ctx.ticks.length).toBeGreaterThan(3);
+  });
+  it('flings back toward the start and lands on it', () => {
+    const ctx = setup(12, 8);
+    ctx.engine.flingTo(0);
+    ctx.clock.advance(6000);
+    expect(ctx.engine.currentPosition).toBe(0);
+    expect(ctx.rests).toEqual([0]);
+  });
+  it('clamps an out-of-range target', () => {
+    const ctx = setup(12, 0);
+    ctx.engine.flingTo(99);
+    ctx.clock.advance(6000);
+    expect(ctx.engine.currentPosition).toBe(11);
+  });
+  it('fling with an explicit velocity uses the projected end', () => {
+    const ctx = setup(100, 10);
+    ctx.engine.fling(0.02);
+    expect(ctx.engine.targetIndex).toBe(Math.round(10 + 0.02 * 499));
+  });
+  it('is ignored while a pointer holds the dial and can be interrupted by a grab', () => {
+    const ctx = setup(12, 0);
+    ctx.engine.grab();
+    ctx.engine.fling(0.05);
+    expect(ctx.engine.currentState).toBe('drag');
+    ctx.engine.release();
+    ctx.engine.flingTo(6);
+    ctx.clock.advance(300);
+    const caught = ctx.engine.currentPosition;
+    ctx.engine.grab();
+    ctx.clock.advance(1000);
+    expect(ctx.engine.currentPosition).toBe(caught);
+  });
+  it('snaps instantly under reduced motion', () => {
+    const ctx = setup(12, 0, true);
+    ctx.engine.flingTo(5);
+    expect(ctx.engine.currentPosition).toBe(5);
+    expect(ctx.clock.queued).toBe(0);
+  });
+  it('restarts a fling in flight from where it is', () => {
+    const ctx = setup(12, 0);
+    ctx.engine.flingTo(10);
+    ctx.clock.advance(200);
+    ctx.engine.flingTo(0);
+    ctx.clock.advance(6000);
+    expect(ctx.engine.currentPosition).toBe(0);
+  });
+});

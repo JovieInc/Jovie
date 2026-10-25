@@ -143,6 +143,26 @@ export class DialEngine {
     this.startCurve(createRelease(this.position, 0, target), time);
   }
 
+  /**
+   * Programmatic throw (reveal choreography): coast from the current position
+   * at `velocity` items/ms and snap to the projected item, as a finger would.
+   * Ignored while a pointer holds the dial.
+   */
+  fling(velocity: number, time: number = this.options.scheduler.now()): void {
+    if (this.state === 'drag') return;
+    this.stopLoop();
+    this.wheelAt = null;
+    this.state = 'idle';
+    this.settle(velocity, time);
+  }
+
+  /** Throw that coasts exactly to `index` (rounded and clamped). */
+  flingTo(index: number, time: number = this.options.scheduler.now()): void {
+    const target = clamp(Math.round(index), 0, this.maxIndex);
+    const reach = DECELERATION_RATE / (1 - DECELERATION_RATE);
+    this.fling((target - this.position) / reach, time);
+  }
+
   /** Continuous input (trackpad): `delta` items since the last event. */
   wheel(delta: number, time: number = this.options.scheduler.now()): void {
     if (this.state !== 'drag' || this.wheelAt === null) {

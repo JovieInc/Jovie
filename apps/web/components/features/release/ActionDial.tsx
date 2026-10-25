@@ -43,6 +43,13 @@ interface ActionDialProps {
   readonly hint?: string;
   readonly className?: string;
   readonly disabled?: boolean;
+  /**
+   * Marketing demo: no outbound link, no activation callback (so no click
+   * tracking), and Stream Now only shows a quiet "demo" note. Unless
+   * `reveal: false`, one short fling plays when the dial first scrolls into
+   * view (not under reduced motion); any touch, wheel or key stops it.
+   */
+  readonly demo?: boolean | { readonly reveal?: boolean };
 }
 
 const TAP_SLOP_PX = 6;
@@ -50,6 +57,9 @@ const PAGE_STEP = 5;
 const MIN_HAPTIC_GAP_MS = 24;
 const MIN_PULSE_GAP_MS = 90;
 const TYPEAHEAD_RESET_MS = 700;
+const REVEAL_DELAY_MS = 450;
+const REVEAL_DISTANCE = 7;
+const DEMO_NOTE_MS = 2200;
 const NO_HAPTIC = Symbol('no-haptic');
 export const DIAL_HINT_SEEN_KEY = 'jovie:dial-hint-seen';
 
@@ -107,7 +117,10 @@ export function ActionDial({
   hint = 'Swipe to switch. Your choice is remembered.',
   className,
   disabled = false,
+  demo = false,
 }: Readonly<ActionDialProps>) {
+  const isDemo = demo !== false;
+  const revealEnabled = isDemo && (demo === true || demo.reveal !== false);
   const count = options.length;
   const selectedIndex = Math.max(
     0,
@@ -124,6 +137,10 @@ export function ActionDial({
   const hintId = `${uid}-hint`;
   const hintGlyphRef = useRef<HTMLSpanElement | null>(null);
   const usedRef = useRef(false);
+  const [demoNote, setDemoNote] = useState(false);
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const revealStageRef = useRef<'idle' | 'out' | 'back' | 'done'>('idle');
+  const demoNoteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const rootRef = useRef<HTMLFieldSetElement | null>(null);
   const listboxRef = useRef<HTMLDivElement | null>(null);
@@ -151,6 +168,20 @@ export function ActionDial({
     usedRef.current = true;
     setShowHint(false);
     writeHintSeen();
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (demoNoteTimerRef.current) clearTimeout(demoNoteTimerRef.current);
+    },
+    []
+  );
+
+  /** A touch, wheel or key hands the dial to the user for good. */
+  const cancelReveal = useCallback(() => {
+    revealStageRef.current = 'done';
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = null;
   }, []);
 
   useEffect(() => {
@@ -234,7 +265,10 @@ export function ActionDial({
         setActiveIndex(index);
         if (suppressHapticRef.current === NO_HAPTIC) return;
         const now = performance.now();
-        if (now - lastHapticRef.current >= MIN_HAPTIC_GAP_MS) {
+        // The scripted reveal is not a user gesture: no haptic for it.
+        const scripted =
+          revealStageRef.current === 'out' || revealStageRef.current === 'back';
+        if (!scripted && now - lastHapticRef.current >= MIN_HAPTIC_GAP_MS) {
           lastHapticRef.current = now;
           // Selection tick per item (vibrate on Android; native engine in the iOS app).
           live.current.selectionHaptic();
@@ -245,6 +279,14 @@ export function ActionDial({
       },
       onRest: index => {
         setRestIndex(index);
+        if (revealStageRef.current === 'out') {
+          revealStageRef.current = 'back';
+          revealTimerRef.current = setTimeout(() => {
+            engineRef.current?.flingTo(0);
+          }, 420);
+        } else if (revealStageRef.current === 'back') {
+          revealStageRef.current = 'done';
+        }
         const option = live.current.options[index];
         if (option && option.id !== live.current.selectedId) {
           live.current.onSelect(option.id);
@@ -275,6 +317,34 @@ export function ActionDial({
     setRestIndex(selectedIndex);
   }, [selectedIndex]);
 
+  // Demo reveal: one short fling when first scrolled into view, then back to
+  // the first service. Any user input cancels it (see cancelReveal).
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!revealEnabled || !root || count < 3 || reducedMotion) return;
+    if (revealStageRef.current !== 'idle') return;
+    if (typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        observer.disconnect();
+        revealTimerRef.current = setTimeout(() => {
+          const engine = engineRef.current;
+          if (!engine || engine.currentState !== 'idle') return;
+          if (revealStageRef.current !== 'idle') return;
+          revealStageRef.current = 'out';
+          engine.flingTo(Math.min(count - 1, REVEAL_DISTANCE));
+        }, REVEAL_DELAY_MS);
+      },
+      { threshold: 0.6 }
+    );
+    observer.observe(root);
+    return () => {
+      observer.disconnect();
+      if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    };
+  }, [revealEnabled, count, reducedMotion]);
+
   // Non-passive so the wheel can claim the scroll, only while the dial can move.
   useEffect(() => {
     const root = rootRef.current;
@@ -290,6 +360,7 @@ export function ActionDial({
       const atEnd = position >= count - 1 && delta > 0;
       if ((atStart || atEnd) && engine.currentState === 'idle') return;
       event.preventDefault();
+      cancelReveal();
       markUsed();
       if (isWheelNotch(event)) {
         engine.moveTo(engine.targetIndex + Math.sign(delta));
@@ -299,13 +370,14 @@ export function ActionDial({
     };
     root.addEventListener('wheel', onWheel, { passive: false });
     return () => root.removeEventListener('wheel', onWheel);
-  }, [count, markUsed]);
+  }, [count, markUsed, cancelReveal]);
 
   const onPointerDown = useCallback(
     (event: ReactPointerEvent<HTMLFieldSetElement>) => {
       const engine = engineRef.current;
       if (!engine || gestureRef.current) return;
       if (event.pointerType === 'mouse' && event.button !== 0) return;
+      cancelReveal();
       const caught = engine.currentState === 'release';
       suppressClickRef.current = false;
       gestureRef.current = {
@@ -316,7 +388,7 @@ export function ActionDial({
       };
       engine.grab(event.timeStamp);
     },
-    []
+    [cancelReveal]
   );
 
   const onPointerMove = useCallback(
@@ -364,6 +436,7 @@ export function ActionDial({
   const handleKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     const engine = engineRef.current;
     if (!engine || event.altKey || event.ctrlKey || event.metaKey) return;
+    cancelReveal();
     switch (event.key) {
       case 'ArrowDown':
         moveBy(1);
@@ -454,6 +527,15 @@ export function ActionDial({
     );
 
   const handleActivate = () => {
+    if (isDemo) {
+      setDemoNote(true);
+      if (demoNoteTimerRef.current) clearTimeout(demoNoteTimerRef.current);
+      demoNoteTimerRef.current = setTimeout(
+        () => setDemoNote(false),
+        DEMO_NOTE_MS
+      );
+      return;
+    }
     const chosen = options[activeIndexRef.current] ?? active;
     onActivate?.(chosen.id);
   };
@@ -549,11 +631,11 @@ export function ActionDial({
           <SmartLinkProviderButton
             label={actionLabel}
             icon={actionIcon}
-            href={active.href}
+            href={isDemo ? undefined : active.href}
             providerKey={active.id}
             primary
             disabled={disabled}
-            ariaLabel={`${actionLabel} with ${active.label}`}
+            ariaLabel={`${actionLabel} with ${active.label}${isDemo ? ' (demo, no link)' : ''}`}
             className='w-full'
             onClick={event => {
               if (suppressClickRef.current) {
@@ -577,16 +659,27 @@ export function ActionDial({
       ) : null}
       {count > 1 ? (
         <div
-          className='mt-1 flex h-5 items-center justify-center'
+          className='relative mt-1 flex h-5 items-center justify-center'
           aria-hidden='true'
           data-testid='action-dial-hint'
           data-visible={showHint}
         >
+          {isDemo ? (
+            <span
+              className={cn(
+                'absolute text-xs text-primary-token transition-opacity duration-normal motion-reduce:transition-none',
+                demoNote ? 'opacity-100' : 'opacity-0'
+              )}
+              role='status'
+            >
+              {demoNote ? 'This is a demo. No link opens.' : ''}
+            </span>
+          ) : null}
           <span
             ref={hintGlyphRef}
             className={cn(
               'text-tertiary-token transition-opacity duration-normal motion-reduce:transition-none',
-              showHint ? 'opacity-100' : 'opacity-0'
+              showHint && !demoNote ? 'opacity-100' : 'opacity-0'
             )}
           >
             <svg
