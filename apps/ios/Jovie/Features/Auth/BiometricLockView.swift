@@ -1,4 +1,5 @@
 import Foundation
+import JovieKit
 import LocalAuthentication
 import SwiftUI
 
