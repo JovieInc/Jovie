@@ -54,7 +54,10 @@ const mocks = vi.hoisted(() => {
       })
     );
 
+  const afterTasks: Promise<unknown>[] = [];
+
   return {
+    afterTasks,
     selectMock,
     selectLimitMock,
     sourceLink,
@@ -63,6 +66,13 @@ const mocks = vi.hoisted(() => {
     recordAudienceEvent: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+vi.mock('@/lib/next/schedule-after', () => ({
+  scheduleAfter: (task: () => unknown) => {
+    mocks.afterTasks.push(Promise.resolve().then(task));
+    return true;
+  },
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -133,6 +143,12 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn().mockResolvedValue(undefined),
 }));
 
+async function callRoute(...args: Parameters<typeof GET>) {
+  const response = await GET(...args);
+  await Promise.all(mocks.afterTasks.splice(0));
+  return response;
+}
+
 describe('GET /s/[code]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -146,9 +162,12 @@ describe('GET /s/[code]', () => {
       reason: 'known_crawler',
     });
 
-    const response = await GET(new NextRequest('http://localhost/s/abc123'), {
-      params: Promise.resolve({ code: 'abc123' }),
-    });
+    const response = await callRoute(
+      new NextRequest('http://localhost/s/abc123'),
+      {
+        params: Promise.resolve({ code: 'abc123' }),
+      }
+    );
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(
@@ -178,9 +197,12 @@ describe('GET /s/[code]', () => {
         userAgent,
       });
 
-      const response = await GET(new NextRequest('http://localhost/s/abc123'), {
-        params: Promise.resolve({ code: 'abc123' }),
-      });
+      const response = await callRoute(
+        new NextRequest('http://localhost/s/abc123'),
+        {
+          params: Promise.resolve({ code: 'abc123' }),
+        }
+      );
 
       expect(response.status).toBe(302);
       expect(recordAnonymousBotMetric).not.toHaveBeenCalled();
@@ -201,12 +223,35 @@ describe('GET /s/[code]', () => {
       userAgent: 'facebookexternalhit/1.1',
     });
 
+    const response = await callRoute(
+      new NextRequest('http://localhost/s/abc123'),
+      {
+        params: Promise.resolve({ code: 'abc123' }),
+      }
+    );
+
+    expect(response.status).toBe(302);
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
+
+  it('flushes the 302 before analytics finish (redirect latency budget)', async () => {
+    let releaseAnalytics: () => void = () => undefined;
+    mocks.withSystemIngestionSession.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          releaseAnalytics = resolve;
+        })
+    );
+
     const response = await GET(new NextRequest('http://localhost/s/abc123'), {
       params: Promise.resolve({ code: 'abc123' }),
     });
 
+    // The route resolved while the analytics transaction is still pending.
     expect(response.status).toBe(302);
     expect(recordAudienceEvent).not.toHaveBeenCalled();
+    releaseAnalytics();
+    await Promise.all(mocks.afterTasks.splice(0));
   });
 
   it('treats partial consent cookies as malformed through the shared parser', async () => {
@@ -216,7 +261,7 @@ describe('GET /s/[code]', () => {
       },
     });
 
-    const response = await GET(request, {
+    const response = await callRoute(request, {
       params: Promise.resolve({ code: 'abc123' }),
     });
 
@@ -239,7 +284,7 @@ describe('GET /s/[code]', () => {
 
     const request = new NextRequest('http://localhost/s/abc123');
 
-    const response = await GET(request, {
+    const response = await callRoute(request, {
       params: Promise.resolve({ code: 'abc123' }),
     });
 
@@ -265,7 +310,7 @@ describe('GET /s/[code]', () => {
         },
       });
 
-      const response = await GET(request, {
+      const response = await callRoute(request, {
         params: Promise.resolve({ code: 'abc123' }),
       });
 
@@ -286,7 +331,7 @@ describe('GET /s/[code]', () => {
       },
     });
 
-    const response = await GET(request, {
+    const response = await callRoute(request, {
       params: Promise.resolve({ code: 'abc123' }),
     });
 
