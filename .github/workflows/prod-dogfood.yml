@@ -140,6 +140,9 @@ jobs:
         id: run
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          # Cheapest passing vision provider wins (see prod-dogfood-vision.mjs): Workers AI
+          # credits when the token exists, else the allowlisted Gateway model.
+          CLOUDFLARE_WORKERS_AI_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_AI_TOKEN }}
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           DOGFOOD_VISION: ${{ steps.vision-seen.outputs.cache-hit == 'true' && '0' || '1' }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
