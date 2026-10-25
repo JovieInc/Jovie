@@ -324,6 +324,7 @@ export {
   type ReleaseArtist,
   recordingArtists,
   releaseArtists,
+  releaseIdentityDecisions,
   type SmartLinkTarget,
   selectArtistSchema,
   selectContentSlugRedirectSchema,

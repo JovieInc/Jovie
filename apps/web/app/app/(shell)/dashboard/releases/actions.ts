@@ -23,6 +23,7 @@ import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { normalizeEditableIsrc } from '@/lib/discography/editable-isrc';
+import { recordIdentityDecision } from '@/lib/discography/identity-review';
 import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
@@ -949,6 +950,42 @@ export async function rescanAppleMusicLinks(): Promise<{
 /**
  * Sync releases from Spotify
  */
+/**
+ * Commit the artist's "Is this you?" answer for a release. Accept publishes,
+ * Reject hides and is never re-imported or re-asked. The client delays this
+ * call by a few seconds so the artist can undo before anything is written.
+ */
+export async function commitReleaseIdentityDecision(params: {
+  releaseId: string;
+  decision: 'accepted' | 'rejected';
+}): Promise<{ ok: boolean }> {
+  noStore();
+  if (params.decision !== 'accepted' && params.decision !== 'rejected') {
+    throw new TypeError('Invalid decision');
+  }
+  const { userId } = await getCachedAuth();
+  if (!userId) {
+    throw new Error('Unauthorized');
+  }
+  const profile = await requireProfile();
+  const result = await recordIdentityDecision({
+    creatorProfileId: profile.id,
+    releaseId: params.releaseId,
+    decision: params.decision,
+    decidedBy: userId,
+    ownerSpotifyId: profile.spotifyId,
+  });
+  if (!result.ok) return result;
+
+  invalidateReleaseCaches(userId, profile.id);
+  await trackServerEvent('release_identity_decision', {
+    profileId: profile.id,
+    releaseId: params.releaseId,
+    decision: params.decision,
+  });
+  return result;
+}
+
 export async function syncFromSpotify(): Promise<{
   success: boolean;
   message: string;

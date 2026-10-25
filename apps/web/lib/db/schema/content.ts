@@ -3,6 +3,7 @@ import {
   boolean,
   check,
   decimal,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -662,6 +663,46 @@ export const selectDiscogRecordingSchema = createSelectSchema(discogRecordings);
 
 export type DiscogRecording = typeof discogRecordings.$inferSelect;
 export type NewDiscogRecording = typeof discogRecordings.$inferInsert;
+
+/**
+ * "Is this you?" decisions for provider-ingested releases the importer was not
+ * confident about. Keyed by provider album id so a rejected release is never
+ * re-imported or re-asked, even if its row is re-created. The decision is the
+ * measurement behind the confidence threshold (accept/reject rate by reason).
+ */
+export const releaseIdentityDecisions = pgTable(
+  'release_identity_decisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    creatorProfileId: uuid('creator_profile_id').notNull(),
+    providerAlbumId: text('provider_album_id').notNull(),
+    releaseId: uuid('release_id'),
+    /** 'accepted' | 'rejected' */
+    decision: text('decision').notNull(),
+    /** Why the importer was unsure (publication-eligibility reason code). */
+    reason: text('reason').notNull(),
+    decidedBy: text('decided_by'),
+    decidedAt: timestamp('decided_at').defaultNow().notNull(),
+  },
+  table => ({
+    // Explicit name: the generated one exceeds Postgres' 63-byte limit.
+    creatorProfileFk: foreignKey({
+      name: 'release_identity_decisions_profile_fk',
+      columns: [table.creatorProfileId],
+      foreignColumns: [creatorProfiles.id],
+    }).onDelete('cascade'),
+    creatorAlbumUnique: uniqueIndex(
+      'release_identity_decisions_creator_album_unique'
+    ).on(table.creatorProfileId, table.providerAlbumId),
+    decisionValid: check(
+      'release_identity_decisions_decision_valid',
+      drizzleSql`decision IN ('accepted', 'rejected')`
+    ),
+  })
+);
+
+export type ReleaseIdentityDecision =
+  typeof releaseIdentityDecisions.$inferSelect;
 
 // Release track schemas & types
 export const insertDiscogReleaseTrackSchema =

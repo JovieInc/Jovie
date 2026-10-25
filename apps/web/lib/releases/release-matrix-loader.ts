@@ -1,5 +1,6 @@
 'use server';
 
+import { eq } from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { cache } from 'react';
@@ -8,7 +9,10 @@ import { APP_ROUTES } from '@/constants/routes';
 import { buildAppShellSignInUrl } from '@/lib/auth/build-app-shell-signin-url';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { CACHE_TTL, createReleasesTag } from '@/lib/cache/tags';
+import { db } from '@/lib/db';
 import { getWeeklyReleaseClickCounts } from '@/lib/db/queries/analytics';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { loadPendingIdentityReviews } from '@/lib/discography/identity-review';
 import type { ReleaseWithProviders } from '@/lib/discography/queries';
 import {
   getReleaseForProfileById,
@@ -72,24 +76,43 @@ function releaseCacheKeys(userId: string, profileId: string) {
 interface CachedReleaseMatrix {
   readonly releases: ReleaseWithProviders[];
   readonly weeklyClickCounts: Array<[string, number]>;
+  /** releaseId -> "Is this you?" prompt data (unsure provider matches). */
+  readonly identityReviews: Array<
+    [string, { reason: string; provenance: string }]
+  >;
+}
+
+async function loadIdentityReviews(profileId: string) {
+  const [owner] = await db
+    .select({ spotifyId: creatorProfiles.spotifyId })
+    .from(creatorProfiles)
+    .where(eq(creatorProfiles.id, profileId))
+    .limit(1);
+  return loadPendingIdentityReviews(profileId, owner?.spotifyId ?? null);
 }
 
 async function fetchReleaseMatrixCore(
   profileId: string,
   lifecycle: 'active' | 'archived' = 'active'
 ): Promise<CachedReleaseMatrix> {
-  const [releases, weeklyClickCounts] = await Promise.all([
+  const [releases, weeklyClickCounts, identityReviews] = await Promise.all([
     getReleasesFromDb(profileId, { includeDrafts: true, lifecycle }),
     // Weekly metric degrades gracefully: a failed aggregate never blocks the
     // releases list — rows just render the "—" placeholder.
     getWeeklyReleaseClickCounts(profileId).catch(
       () => new Map<string, number>()
     ),
+    // Review prompts degrade to none: a failed lookup (e.g. migration drift)
+    // never blocks the releases list.
+    lifecycle === 'active'
+      ? loadIdentityReviews(profileId).catch(() => new Map())
+      : Promise.resolve(new Map()),
   ]);
 
   return {
     releases,
     weeklyClickCounts: Array.from(weeklyClickCounts.entries()),
+    identityReviews: Array.from(identityReviews.entries()),
   };
 }
 
@@ -100,6 +123,7 @@ function mapReleaseMatrix(
 ): ReleaseViewModel[] {
   const providerLabels = buildProviderLabels();
   const weeklyClickCounts = new Map(cached.weeklyClickCounts);
+  const identityReviews = new Map(cached.identityReviews ?? []);
 
   return cached.releases.map(release => {
     const viewModel = mapReleaseToViewModel(
@@ -109,6 +133,13 @@ function mapReleaseMatrix(
       profileHandle
     );
     viewModel.weeklyStreams = weeklyClickCounts.get(viewModel.id) ?? null;
+    const review = identityReviews.get(viewModel.id);
+    if (review) {
+      viewModel.identityReview = {
+        reason: review.reason,
+        provenance: review.provenance,
+      };
+    }
     return viewModel;
   });
 }

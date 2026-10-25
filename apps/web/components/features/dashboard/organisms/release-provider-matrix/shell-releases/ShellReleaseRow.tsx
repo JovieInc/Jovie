@@ -45,6 +45,7 @@ import { dropDateMeta } from '@/lib/format-drop-date';
 import { formatStreams } from '@/lib/format-streams';
 import { prefetchReleaseTracks } from '@/lib/queries';
 import { cn } from '@/lib/utils';
+import { IdentityReviewRow } from './IdentityReviewRow';
 import { releaseStatusToShell, releaseToDspItems } from './release-adapters';
 
 export type ShellRowLockReason = 'scheduled' | 'cap' | null;
@@ -306,7 +307,7 @@ const WeeklyStreamsCell = memo(function WeeklyStreamsCell({
  * target; inner interactive elements stop propagation so they don't
  * double-fire selection — the standard pattern across shell-v1.
  */
-export const ShellReleaseRow = memo(function ShellReleaseRow({
+const ShellStandardReleaseRow = memo(function ShellStandardReleaseRow({
   release,
   isSelected,
   onSelect,
@@ -506,5 +507,44 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
         </div>
       ) : null}
     </ShellListRowFrame>
+  );
+});
+
+/**
+ * Release row. An unsure provider match (`identityReview`) renders the
+ * "Is this you?" row instead of going public; once the artist accepts, the
+ * normal row takes over, and a rejected release disappears.
+ */
+export const ShellReleaseRow = memo(function ShellReleaseRow(
+  props: ComponentPropsWithoutRef<typeof ShellStandardReleaseRow>
+) {
+  const [accepted, setAccepted] = useState(false);
+  const { release, ...rest } = props;
+
+  if (release.identityReview && !accepted) {
+    const {
+      isSelected: _isSelected,
+      onSelect: _onSelect,
+      actionMenuItems: _actionMenuItems,
+      smartLinkLockReason: _smartLinkLockReason,
+      syncStatus: _syncStatus,
+      ...host
+    } = rest;
+    return (
+      <IdentityReviewRow
+        {...host}
+        release={release}
+        typeLabel={RELEASE_TYPE_BADGE_LABEL[release.releaseType] ?? 'Single'}
+        onDecided={decision => {
+          if (decision === 'accepted') setAccepted(true);
+        }}
+      />
+    );
+  }
+  return (
+    <ShellStandardReleaseRow
+      release={{ ...release, identityReview: null }}
+      {...rest}
+    />
   );
 });
