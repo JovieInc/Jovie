@@ -191,6 +191,7 @@ function isAllowedDocsUrl(
 }
 
 export function isAllowedPublicProfilePath(pathname: string): boolean {
+  if (!hasSafePathname(pathname)) return false;
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length === 0 || segments.length > 4) return false;
 

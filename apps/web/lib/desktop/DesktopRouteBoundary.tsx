@@ -1,16 +1,27 @@
 'use client';
 
-import { Button } from '@jovie/ui';
 import { usePathname } from 'next/navigation';
-import { type ReactNode, useEffect, useRef } from 'react';
+import {
+  lazy,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { toast } from '@/components/feedback';
-import { isProfileRoute } from '@/lib/sentry/route-detector';
 import routes from '../../../desktop/src/application-routes.json';
+import { isAllowedPublicProfilePath } from '../../../desktop/src/navigation';
 import {
   getElectronAPI,
   recoverApplicationDocument,
   useIsElectronRuntime,
 } from './electron-bridge';
+
+// The denial action is desktop-only; its styling must not inflate every web route.
+const RecoveryButton = lazy(() =>
+  import('@jovie/ui/atoms/button').then(module => ({ default: module.Button }))
+);
 
 /** Same application/auth allowlist as Electron; encoded separators fail closed. */
 export function isSupportedDesktopPath(pathname: string): boolean {
@@ -41,8 +52,10 @@ export function DesktopRouteBoundary({
   const lastSupported = useRef(fallback);
   const api = getElectronAPI();
   const isElectron = useIsElectronRuntime();
-  const legacyProfilePreview =
-    !api?.navigationBoundaryVersion && isProfileRoute(pathname);
+  const [legacyProfilePreview] = useState(
+    () =>
+      !api?.navigationBoundaryVersion && isAllowedPublicProfilePath(pathname)
+  );
   const isMainShell =
     isElectron &&
     api?.windowRole !== 'profile-preview' &&
@@ -126,9 +139,13 @@ export function DesktopRouteBoundary({
   return (
     <div role='status'>
       <p>This page opens in your browser.</p>
-      <Button onClick={() => recoverApplicationDocument(lastSupported.current)}>
-        Return to app
-      </Button>
+      <Suspense fallback={null}>
+        <RecoveryButton
+          onClick={() => recoverApplicationDocument(lastSupported.current)}
+        >
+          Return to app
+        </RecoveryButton>
+      </Suspense>
     </div>
   );
 }

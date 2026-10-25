@@ -35,15 +35,48 @@ import {
 beforeEach(() => {
   vi.clearAllMocks();
   route.path = '/app/chat';
+  api.current.navigationBoundaryVersion = 1;
   api.current.windowRole = 'main';
   api.current.routeNavigation.mockResolvedValue({ ok: true });
   document.documentElement.dataset.desktopRuntime = 'electron';
 });
 afterEach(() => {
   cleanup();
+  globalThis.history.replaceState({}, '', '/');
   document.documentElement.removeAttribute('data-desktop-runtime');
 });
 describe('desktop hosted route recovery', () => {
+  it.each([
+    '/blog',
+    '/download',
+    '/changelog',
+    '/install',
+    '/pwa',
+    '/developers',
+    '/pricing',
+  ])(
+    'recovers public route %s in an older shell without a boundary version',
+    path => {
+      Reflect.deleteProperty(api.current, 'navigationBoundaryVersion');
+      route.path = path;
+      globalThis.history.replaceState({}, '', path);
+      const open = vi.spyOn(globalThis, 'open').mockImplementation(() => null);
+      render(
+        <DesktopRouteBoundary>
+          <div>public skeleton</div>
+        </DesktopRouteBoundary>
+      );
+      expect(screen.queryByText('public skeleton')).toBeNull();
+      expect(replace).toHaveBeenCalledWith('/app/chat');
+      expect(open).toHaveBeenCalledWith(
+        location.href,
+        '_blank',
+        'noopener,noreferrer'
+      );
+      open.mockRestore();
+    }
+  );
+
   it.each([
     '/blog',
     '/changelog',
@@ -54,7 +87,7 @@ describe('desktop hosted route recovery', () => {
     '/api/private',
     '/app%2fchat',
     '/app/%00',
-  ])('never renders unsupported route %s or its skeleton', path => {
+  ])('never renders unsupported route %s or its skeleton', async path => {
     route.path = path;
     render(
       <DesktopRouteBoundary>
@@ -62,8 +95,42 @@ describe('desktop hosted route recovery', () => {
       </DesktopRouteBoundary>
     );
     expect(screen.queryByText('public skeleton')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Return to app' })).toBeVisible();
+    expect(
+      await screen.findByRole('button', { name: 'Return to app' })
+    ).toBeVisible();
     expect(replace).toHaveBeenCalledWith('/app/chat');
+  });
+  it('does not turn an older main shell into a preview after a profile history escape', () => {
+    Reflect.deleteProperty(api.current, 'navigationBoundaryVersion');
+    globalThis.history.replaceState({}, '', '/app/chat?thread=1#latest');
+    const open = vi.spyOn(globalThis, 'open').mockImplementation(() => null);
+    const { rerender } = render(
+      <DesktopRouteBoundary>
+        <div>product</div>
+      </DesktopRouteBoundary>
+    );
+    route.path = '/timwhite';
+    globalThis.history.replaceState({}, '', '/timwhite');
+    rerender(
+      <DesktopRouteBoundary>
+        <div>profile escape</div>
+      </DesktopRouteBoundary>
+    );
+    expect(screen.queryByText('profile escape')).toBeNull();
+    expect(replace).toHaveBeenCalledWith('/app/chat?thread=1#latest');
+    open.mockRestore();
+  });
+
+  it('preserves an older isolated preview identified at the initial document route', () => {
+    Reflect.deleteProperty(api.current, 'navigationBoundaryVersion');
+    route.path = '/timwhite';
+    render(
+      <DesktopRouteBoundary>
+        <div>Profile preview</div>
+      </DesktopRouteBoundary>
+    );
+    expect(screen.getByText('Profile preview')).toBeVisible();
+    expect(replace).not.toHaveBeenCalled();
   });
   it.each([
     '/app/chat',

@@ -72,6 +72,11 @@ test('public profile paths accept artist handles and reject reserved segments', 
   expect(isAllowedPublicProfilePath('/artist/bad seg')).toBe(false);
 });
 
+test('standalone profile path validation rejects ambiguous separators', () => {
+  expect(isAllowedPublicProfilePath('/artist//ep')).toBe(false);
+  expect(isAllowedPublicProfilePath('//artist/ep')).toBe(false);
+});
+
 test('public profile urls require the app origin and a safe profile path', () => {
   expect(
     isAllowedPublicProfileUrl(url('https://jov.ie/artist'), production)
