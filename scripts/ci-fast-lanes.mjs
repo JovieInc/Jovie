@@ -113,6 +113,40 @@ export const COPY_GATE_COMMAND =
 export const MERGE_GROUP_GUARDS_COMMAND =
   'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts';
 
+/**
+ * Cheap static scans (measured 0.5-10s each on 2026-10-25, ~30s together) that
+ * the structural lane runs in merge groups. They also run on every PR, merged
+ * with base, by the 'merged-with-base-invariants' source guard, so a PR that is
+ * green alone but trips a scan once combined fails before enqueue. A new bare
+ * pnpm/node scan added to the structural lane must be listed here or in
+ * STRUCTURAL_STATIC_SCAN_EXEMPT (scripts/lib/__tests__/ci-structural-inventory.test.mjs).
+ */
+export const PR_CHEAP_SCAN_COMMANDS = Object.freeze([
+  'pnpm next:proxy-guard',
+  'pnpm tailwind:check',
+  'pnpm --filter=@jovie/web run lint:no-native-dialogs',
+  'pnpm --filter=@jovie/web run lint:seo',
+  'pnpm --filter=@jovie/web run lint:contrast-ratchet',
+  'pnpm design:shared-ui-visual-arbitrary:check',
+  'pnpm design:overlay-layers:check',
+  'pnpm component-ship-gate',
+  'pnpm screen-registration-gate',
+  'pnpm ci:harness:check',
+  'pnpm ci:incident-contract:validate',
+  'pnpm ci:branching-guard:validate',
+  'pnpm ci:merge-queue:check',
+  'pnpm ci:typecheck-gate-guard',
+  'pnpm doc:freshness:check',
+  'node .github/scripts/quarantine-ledger.mjs validate',
+]);
+
+/** Static-looking structural commands that deliberately stay merge-group-only. */
+export const STRUCTURAL_STATIC_SCAN_EXEMPT = Object.freeze({
+  'pnpm invariants:check':
+    'run on the PR merged with base by merged-with-base-invariants (~88s)',
+  'pnpm ci:control:test': 'control-plane suite, ~40s; merge-group only',
+});
+
 export const SOURCE_GUARDS = Object.freeze([
   Object.freeze({
     id: 'artist-launch-contract',
@@ -329,7 +363,7 @@ export const SOURCE_GUARDS = Object.freeze([
     // invariants on the PR merged with the current base in a
     // throwaway worktree. A textual merge conflict is left to its own gates.
     id: 'merged-with-base-invariants',
-    command: `bash -c ${shellQuote('set -euo pipefail; t="$(mktemp -d)"; root="$PWD"; git worktree add -q --detach "$t" HEAD; for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done; trap \'git worktree remove --force "$t"\' EXIT; cd "$t"; git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true; git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }; node scripts/invariants/design-surfaces.mjs; if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi; pnpm invariants:check')}`,
+    command: `bash -c ${shellQuote('set -euo pipefail; t="$(mktemp -d)"; root="$PWD"; git worktree add -q --detach "$t" HEAD; for nm in node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules; do [ -d "$root/$nm" ] && mkdir -p "$t/$(dirname "$nm")" && ln -s "$root/$nm" "$t/$nm"; done; trap \'git worktree remove --force "$t"\' EXIT; cd "$t"; git fetch -q --no-tags origin "${GITHUB_BASE_REF:-main}" || true; git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/${GITHUB_BASE_REF:-main}" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }; node scripts/invariants/design-surfaces.mjs; if [ -f scripts/invariants/stack-pattern-ratchet.mjs ]; then node scripts/invariants/stack-pattern-ratchet.mjs; fi; ' + PR_CHEAP_SCAN_COMMANDS.join('; ') + '; pnpm invariants:check')}`,
     inputs: /./u,
     prOnly: true,
   }),
@@ -977,6 +1011,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/typecheck-performance.test.mjs',
   'scripts/lib/__tests__/ui-story-coverage-policy.test.mjs',
   'scripts/lib/__tests__/ci-fast-pr-structural-guards.test.mjs',
+  'scripts/lib/__tests__/ci-structural-inventory.test.mjs',
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
   'scripts/lib/__tests__/visual-snapshot-compare.test.mjs',
