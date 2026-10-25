@@ -3,13 +3,9 @@
 // a user (Playwright request context + browser), emits SHA-bound dogfood
 // receipts and a certification roll-up, and files deduped Linear issues for
 // every defect it finds; issues close themselves when the check passes again.
-//
-//   node scripts/prod-dogfood.mjs --out out/dogfood            # run + file
-//   node scripts/prod-dogfood.mjs --out out/dogfood --no-file  # dry run
-//   node scripts/prod-dogfood.mjs --metrics-only               # weekly Tim-found vs agent-found
-//
-// Read-only on production: GET requests and page loads of Tim's public
-// profile and public marketing/auth surfaces. No credentials, no writes.
+// Flags: --out DIR, --no-file (dry run), --metrics-only, --auth-checks FILE, --ingest URL.
+// Read-only on production: GETs and page loads of public surfaces; authenticated
+// journeys come from the separate Playwright spec.
 import {
   appendFileSync,
   existsSync,
