@@ -27,6 +27,7 @@ def load(name, register=True):
 
 CR = load("capacity_registry")
 CL = load("capacity_live")
+CM = load("capacity_metrics")
 HA = load("hyperagent_lane", register=False)
 NOW = datetime(2026, 10, 25, 2, 0, tzinfo=timezone.utc).timestamp()
 REGISTRY = json.loads((ROOT / "ops/registry/capacity.json").read_text())
@@ -186,6 +187,52 @@ class PaceRouting(unittest.TestCase):
             self.assertEqual(CX.pick(state, NOW, names, deltas={})[0], "lyb-pro")  # plain LRU
             self.assertEqual(CX.pick(state, NOW, names, deltas={"lyb-pro": 38, "jovie-pro": -3, "current-login": 3})[0], "jovie-pro")
             self.assertEqual(CX.pick(state, NOW, names, deltas={"lyb-pro": 38, "jovie-pro": 30, "current-login": -25})[0], "current-login")
+
+
+def lane_row(provider, pr, category, started="2026-10-24T10:00:00Z", repository="JovieInc/Jovie"):
+    return {"provider": provider, "pr": str(pr), "repository": repository, "startedAt": started,
+            "attribution": {"category": category}}
+
+
+class CostPerMerge(unittest.TestCase):
+    def test_cost_per_created_merge_uses_receipts_and_the_merge_window(self):
+        rows = [lane_row("grok", 1, "autonomous-created"), lane_row("grok", 2, "autonomous-created"),
+                lane_row("grok", 3, "autonomous-remediation"), lane_row("codex", 4, "autonomous-created"),
+                lane_row("grok", 5, "autonomous-created", started="2026-10-01T00:00:00Z"),  # outside the window
+                lane_row("grok", 6, "autonomous-created", repository="JovieInc/LogYourBody")]
+        merged = {"JovieInc/Jovie#1", "JovieInc/Jovie#3", "JovieInc/Jovie#4", "JovieInc/Jovie#5"}
+        out = CM.compute(REGISTRY, rows, merged, {"providers": []}, NOW)
+        grok = out["xai-grok"]
+        self.assertEqual((grok["prsCreated"], grok["mergedCreated"], grok["mergedRepaired"]), (2, 1, 1))
+        self.assertEqual(grok["costUsd"], round(99 / 30.4375 * 7, 2))
+        self.assertEqual(grok["costPerMergedUsd"], grok["costUsd"])
+        self.assertEqual(out["openai-codex"]["costUsd"], round(600 / 30.4375 * 7, 2))  # lapsed account excluded
+        self.assertEqual(out["openai-codex"]["costBasis"], "amortized-plan")
+
+    def test_no_merges_means_no_ratio_not_zero_and_credits_use_the_recorded_burn(self):
+        spend = {"providers": [{"id": "hyperagent-credits", "burnPerDayUsd": {"value": 47.6}}]}
+        out = CM.compute(REGISTRY, [lane_row("hyperagent", 9, "autonomous-created")], set(), spend, NOW)
+        hyper = out["hyperagent"]
+        self.assertIsNone(hyper["costPerMergedUsd"])
+        self.assertEqual((hyper["costUsd"], hyper["costBasis"]), (333.2, "credit-burn-estimate"))
+
+    def test_an_incomplete_merge_window_is_reported_not_counted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            incomplete = lambda *a, **k: {"complete": False, "reason": "max_pages_reached", "prs": []}  # noqa: E731
+            self.assertEqual(CL.read_metrics(Path(tmp), REGISTRY, NOW, incomplete), {"incomplete": "max_pages_reached"})
+            complete = lambda *a, **k: {"complete": True, "prs": [{"number": 1}, {"number": 2}]}  # noqa: E731
+            result = CL.read_metrics(Path(tmp), REGISTRY, NOW, complete)
+            self.assertEqual(result["mergedInWindow"], 2)
+
+    def test_the_tick_never_waits_for_the_merge_window(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            spawned = []
+            self.assertEqual(CL.metrics_overlay(state, REGISTRY, NOW, spawned.append), {})
+            self.assertEqual(spawned, [state])
+            self.assertEqual(CL.metrics_overlay(state, REGISTRY, NOW + 60, spawned.append).get("startedAt"), CL._iso(NOW))
+            self.assertEqual(len(spawned), 1)  # attempt recorded: no respawn every tick
+            self.assertEqual(len(CL.metrics_overlay(state, REGISTRY, NOW + CL.METRICS_INTERVAL_S + 1, spawned.append) and spawned), 2)
 
 
 class CoordinationRules(unittest.TestCase):
