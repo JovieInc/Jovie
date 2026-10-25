@@ -17,8 +17,12 @@ describe('MarketingSurfaceCard', () => {
 
     expect(screen.getByTestId('card')).toHaveClass(
       'marketing-rounded-frame',
-      'border'
+      'border',
+      'ds-glass'
     );
+    expect(
+      screen.getByTestId('card').querySelector('[aria-hidden="true"]')
+    ).toBeNull();
     expect(screen.getByText('Profile')).toBeVisible();
     expect(screen.getByText('Ready')).toBeVisible();
     expect(screen.getByText('Share one link')).toBeVisible();
@@ -38,7 +42,7 @@ describe('MarketingSurfaceCard', () => {
       'marketing-rounded-frame',
       'w-full'
     );
-    expect(screen.getByTestId('card')).not.toHaveClass('border');
+    expect(screen.getByTestId('card')).not.toHaveClass('border', 'ds-glass');
     expect(
       screen.getByRole('img', { name: 'Profile preview' }).parentElement
     ).toBe(screen.getByTestId('card'));
