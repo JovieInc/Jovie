@@ -280,6 +280,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // select the identical files with complementary -k expressions so every
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/prod-errors/test_prod_errors.py',
       'scripts/tests/test_gh_retry.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',

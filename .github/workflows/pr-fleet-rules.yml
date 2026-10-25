@@ -21,9 +21,17 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
+      # Every workflow spends one repo-wide GITHUB_TOKEN bucket (~1,000 REST
+      # calls/hour). New unbudgeted spend fails here; grandfathered sites only
+      # shrink (scripts/lib/workflow-token-budget.ratchet.json).
+      - name: Workflow GITHUB_TOKEN budget
+        run: node scripts/workflow-token-budget-guard.mjs && node --test scripts/workflow-token-budget-guard.test.mjs
       - name: Test fleet policy with coverage
         run: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-fleet-rules.mjs --test-coverage-lines=95 --test-coverage-functions=100 --test-coverage-branches=90 scripts/pr-fleet-rules.test.mjs
       # One evidence read prints the blast-radius warnings and enforces the
