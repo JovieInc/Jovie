@@ -76,6 +76,10 @@ CLOCKS = (
     # applies unless client_payload.apply is false; the bot token cannot send workflow_dispatch.
     Clock("staleBranchSweep", "stale-branch-sweep.yml", "clock_stale_branch_sweep", 7 * 86400,
           "stale-branch-sweep-clock.json", github_cron=False),
+    # Closed-loop health (fleet/closed-loop-gaps.md gap 7): Resend bounce/complaint/latency + SPF/DKIM/DMARC.
+    Clock("loopHealthEmailDeliverability", "loop-health-email-deliverability.yml",
+          "clock_loop_health_email_deliverability", 6 * 3600,
+          "loop-health-email-deliverability-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 

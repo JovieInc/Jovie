@@ -1,0 +1,72 @@
+name: Loop Health Email Deliverability
+# No clock here (JOV-INV-042 freezes GitHub crons): the Gem lanes clock fires
+# repository_dispatch clock_loop_health_email_deliverability every 6 hours.
+# Measures Resend bounce, complaint and sign-in delivery latency plus the
+# SPF, DKIM, DMARC and BIMI DNS of the sending domains, then files or resolves
+# one fingerprinted Linear issue (scripts/loop-health.mjs). A breach is the
+# loop working and exits 0; only an unreadable signal fails the job so the
+# registry dead-man row goes red.
+
+on:
+  repository_dispatch:
+    types: [clock_loop_health_email_deliverability]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: loop-health-email-deliverability
+  cancel-in-progress: false
+
+jobs:
+  measure:
+    name: Measure email deliverability
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout trusted loop definitions
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/loop-health.mjs
+            scripts/lib
+            scripts/loops
+          sparse-checkout-cone-mode: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+
+      - name: Resolve CRON_SECRET
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "::error::CRON_SECRET missing from GitHub secrets"
+            exit 1
+          fi
+
+      - name: Measure, evaluate and file or resolve
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          node scripts/loop-health.mjs --loop email-deliverability \
+            --receipt "$RUNNER_TEMP/loop-health-email-deliverability.json" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload loop receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: loop-health-email-deliverability
+          path: ${{ runner.temp }}/loop-health-email-deliverability.json
+          if-no-files-found: warn
+          retention-days: 30
