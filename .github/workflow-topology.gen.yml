@@ -419,6 +419,18 @@ nodes:
       - workflow_run
     terminalReceipt: job:assess
     jobCount: 2
+  - name: Fleet Rules Evidence
+    path: .github/workflows/fleet-rules-evidence.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_run
+    terminalReceipt: job:rerun
+    jobCount: 2
   - name: Fork PR Gate
     path: .github/workflows/fork-pr-gate.yml
     active: true
@@ -1259,6 +1271,7 @@ nodes:
     allowedConsumers:
       - Auto-Ready Agent Drafts
       - Dependabot Pin Sync
+      - Fleet Rules Evidence
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Review (shadow)
@@ -1463,6 +1476,9 @@ edges:
     type: workflow_run
   - from: CI
     to: Fleet Gate Refresh
+    type: workflow_run
+  - from: Source Validation
+    to: Fleet Rules Evidence
     type: workflow_run
   - from: iOS CI
     to: Mac Lane Route
