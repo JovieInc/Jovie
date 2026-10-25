@@ -2237,6 +2237,9 @@ describe('source-read guard selection', () => {
         ? ['ui-story-coverage-allowlist']
         : []),
       'merged-with-base-invariants',
+      ...(/^scripts\/(?:lanes\/|tests\/test_)/u.test(path)
+        ? ['lanes-selftest-changed-tests']
+        : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
       'gate-weakening-detector',
     ]);
@@ -2393,6 +2396,12 @@ describe('source-read guard selection', () => {
             'utf8'
           )
         ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'lanes-selftest-changed-tests') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain('LANES_SELFTEST=1');
+        expect(guard.command).toContain('python3 -m unittest');
         continue;
       }
       if (guard.id === 'merged-with-base-invariants') {
