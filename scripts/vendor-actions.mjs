@@ -53,9 +53,9 @@ export function loadManifest(repoRoot) {
   );
 }
 
-/** Most common SHA each `owner/repo` is pinned to across workflows and actions. */
+/** Every SHA each `owner/repo` is pinned to across workflows and actions. */
 export function workflowPins(repoRoot) {
-  const counts = new Map();
+  const pins = new Map();
   const scan = dir => {
     for (const path of listFiles(resolve(repoRoot, dir))) {
       if (!/\.ya?ml$/.test(path) || path.includes(`${VENDOR_ROOT}/`)) continue;
@@ -63,20 +63,14 @@ export function workflowPins(repoRoot) {
       for (const match of text.matchAll(
         /uses:\s+([\w.-]+\/[\w.-]+)(?:\/[\w./-]+)?@([0-9a-f]{40})/g
       )) {
-        const key = `${match[1]}@${match[2]}`;
-        counts.set(key, (counts.get(key) ?? 0) + 1);
+        if (!pins.has(match[1])) pins.set(match[1], new Set());
+        pins.get(match[1]).add(match[2]);
       }
     }
   };
   scan('.github/workflows');
   scan('.github/actions');
-  const best = new Map();
-  for (const [key, count] of counts) {
-    const [repo, sha] = key.split('@');
-    if (!best.has(repo) || best.get(repo).count < count)
-      best.set(repo, { sha, count });
-  }
-  return new Map([...best].map(([repo, value]) => [repo, value.sha]));
+  return pins;
 }
 
 /** @returns {string[]} problems; empty when the vendored trees are intact. */
@@ -100,11 +94,11 @@ export function checkVendored(repoRoot) {
       if (actual !== hash)
         problems.push(`${action.dir}/${file}: hash mismatch`);
     }
-    const pinned = pins.get(action.repo);
-    if (pinned && pinned !== action.sha) {
-      problems.push(
-        `${action.dir}: vendored ${action.repo}@${action.sha} but workflows pin @${pinned}; run node scripts/vendor-actions.mjs --refresh ${action.dir}`
-      );
+    for (const pinned of pins.get(action.repo) ?? []) {
+      if (pinned !== action.sha)
+        problems.push(
+          `${action.dir}: vendored ${action.repo}@${action.sha} but workflows pin @${pinned}; align workflow pins and run node scripts/vendor-actions.mjs --refresh ${action.dir}`
+        );
     }
   }
   for (const path of listFiles(resolve(repoRoot, VENDOR_ROOT))) {
@@ -119,8 +113,12 @@ function refresh(repoRoot, dir, shaOverride) {
   const manifest = loadManifest(repoRoot);
   const action = manifest.actions.find(item => item.dir === dir);
   if (!action) throw new Error(`unknown vendored action ${dir}`);
-  const sha =
-    shaOverride ?? workflowPins(repoRoot).get(action.repo) ?? action.sha;
+  const pins = workflowPins(repoRoot).get(action.repo);
+  if (!shaOverride && pins && pins.size > 1)
+    throw new Error(
+      `${action.repo}: conflicting workflow pins; align them or select --sha explicitly`
+    );
+  const sha = shaOverride ?? pins?.values().next().value ?? action.sha;
   const work = mkdtempSync(join(tmpdir(), 'vendor-action-'));
   try {
     execFileSync('git', ['init', '-q', work]);

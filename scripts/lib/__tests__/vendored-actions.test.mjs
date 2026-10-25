@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import {
   appendFileSync,
   cpSync,
@@ -34,7 +35,7 @@ describe('vendored actions (JOV-8754)', () => {
     expect(checkVendored(repoRoot)).toEqual([]);
     const pins = workflowPins(repoRoot);
     for (const action of loadManifest(repoRoot).actions)
-      expect(pins.get(action.repo), action.repo).toBe(action.sha);
+      expect(pins.get(action.repo), action.repo).toEqual(new Set([action.sha]));
   });
 
   it('serve the setup-node-pnpm composite with no remote nested pnpm or cache action', () => {
@@ -66,11 +67,7 @@ describe('vendored actions (JOV-8754)', () => {
       const bumped = `${'a'.repeat(40)}`;
       writeFileSync(
         workflow,
-        Array.from(
-          { length: 50 },
-          (_, index) =>
-            `# ${index}\n      - uses: actions/cache/restore@${bumped}\n`
-        ).join('')
+        `steps:\n  - uses: actions/cache/restore@${bumped}\n`
       );
       const problems = checkVendored(root);
       expect(problems).toContain(
@@ -86,6 +83,42 @@ describe('vendored actions (JOV-8754)', () => {
           )
         )
       ).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('flags a single conflicting workflow pin even while most pins match', () => {
+    const root = sandbox();
+    try {
+      const bumped = 'a'.repeat(40);
+      writeFileSync(
+        join(root, '.github/workflows/zz-single-bump.yml'),
+        `steps:\n  - uses: actions/cache/restore@${bumped}\n`
+      );
+      expect(
+        checkVendored(root).some(problem =>
+          problem.includes(`but workflows pin @${bumped}`)
+        )
+      ).toBe(true);
+      const checked = spawnSync(
+        process.execPath,
+        [resolve(repoRoot, 'scripts/vendor-actions.mjs'), '--check'],
+        { cwd: root, encoding: 'utf8' }
+      );
+      expect(checked.status).toBe(1);
+      expect(checked.stderr).toContain(`but workflows pin @${bumped}`);
+      const refreshed = spawnSync(
+        process.execPath,
+        [
+          resolve(repoRoot, 'scripts/vendor-actions.mjs'),
+          '--refresh',
+          'actions-cache',
+        ],
+        { cwd: root, encoding: 'utf8', env: { ...process.env, PATH: '' } }
+      );
+      expect(refreshed.status).toBe(1);
+      expect(refreshed.stderr).toContain('conflicting workflow pins');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
