@@ -162,6 +162,26 @@ describe('HypotheticalDilutionPreview', () => {
     );
   });
 
+  it.each([
+    'Valuation (USD)',
+    'Committed, Unissued Cash (USD)',
+    'Proposed Cash (USD)',
+  ])('explains oversized monetary text in %s', field => {
+    openPreview();
+    loadExample();
+    for (const value of ['9007199254740992', '9'.repeat(400)]) {
+      change(field, value);
+      expect(screen.getByLabelText(field)).toHaveAttribute(
+        'aria-invalid',
+        'true'
+      );
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Maximum is $1 trillion.'
+      );
+      expect(screen.queryByText('57.6%')).toBeNull();
+    }
+  });
+
   it('clears inputs and assumptions while retaining the open disclosure', () => {
     const { container, unmount } = openPreview();
     loadExample();

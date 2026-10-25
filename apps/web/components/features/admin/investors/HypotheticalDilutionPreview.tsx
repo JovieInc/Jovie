@@ -24,6 +24,7 @@ import { formatAmount } from '@/lib/utils/format-number';
 // Limit UI inputs to $1T each: even their sum retains cent precision in the
 // shared currency formatter's number / 100 conversion. Pure math has its own limit.
 const MAX_UI_MONEY_MINOR = 100_000_000_000_000;
+const MONEY_TEXT_PATTERN = /^\d+(?:\.\d{1,2})?$/;
 const EMPTY = { ownership: '', valuation: '', committed: '', proposed: '' };
 // Entirely synthetic. Never replace with company financing terms or CRM values.
 const SYNTHETIC = {
@@ -49,7 +50,7 @@ type Success = Extract<HypotheticalPricedRoundResult, { ok: true }>;
 
 function parseMoney(value: string): number | null {
   const text = value.trim();
-  if (!/^\d+(?:\.\d{1,2})?$/.test(text)) return null;
+  if (!MONEY_TEXT_PATTERN.test(text)) return null;
   const [whole, fraction = ''] = text.split('.');
   const minor = Number(whole) * 100 + Number(fraction.padEnd(2, '0'));
   return Number.isSafeInteger(minor) ? minor : null;
@@ -72,12 +73,13 @@ function evaluate(fields: Fields, valuationBasis: ValuationBasis) {
     committed: committed !== null ? '' : 'Enter an amount or zero.',
     proposed: proposed !== null ? '' : 'Enter an amount or zero.',
   };
-  for (const [field, amount] of [
-    ['valuation', valuation],
-    ['committed', committed],
-    ['proposed', proposed],
-  ] as const) {
-    if (amount !== null && amount > MAX_UI_MONEY_MINOR) {
+  for (const field of ['valuation', 'committed', 'proposed'] as const) {
+    const text = fields[field].trim();
+    // Classify over-limit text even when converting it to minor units is unsafe.
+    if (
+      MONEY_TEXT_PATTERN.test(text) &&
+      Number(text) > MAX_UI_MONEY_MINOR / 100
+    ) {
       errors[field] = 'Maximum is $1 trillion.';
     }
   }
