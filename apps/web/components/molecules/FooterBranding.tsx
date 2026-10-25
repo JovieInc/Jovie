@@ -59,11 +59,11 @@ function renderLogoMark(
  * box back to layout so the visible mark and its spacing do not move.
  */
 const LOGO_HIT_AREA_CLASS =
-  'inline-flex min-h-11 min-w-11 items-center justify-center -mx-3 -my-2.25';
+  'inline-flex min-h-11 min-w-11 items-center justify-center -mx-3 -my-2';
 
 function getLogoLinkClass(mark: string, isLinear: boolean): string {
   if (mark === 'text') {
-    return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3.5 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
+    return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
   }
   if (isLinear) {
     return cn(
