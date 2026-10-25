@@ -373,6 +373,125 @@ function ValueCard({
   );
 }
 
+const ACCESS_PATH_LABEL: Record<string, string> = {
+  api: 'API',
+  credits: 'Given credits',
+  subscription: 'Subscription seat',
+};
+
+function seatNote(
+  view: CapacityView,
+  provider: string | null,
+  account: string
+): string {
+  const quota = view.providers
+    .find(p => p.id === provider)
+    ?.accounts.find(a => a.id === account)?.quota;
+  if (!quota) return `${account}: no reading`;
+  const copy =
+    quota.verdict === 'under-burning'
+      ? 'behind pace: nearly free'
+      : quota.verdict === 'on-pace'
+        ? 'on pace: plan share'
+        : quota.verdict === 'over-burning'
+          ? 'ahead of pace: rising toward API'
+          : 'no pace';
+  return `${account}: ${copy}`;
+}
+
+function PathsCard({ view }: Readonly<{ view: CapacityView }>) {
+  if (view.paths.length === 0) return null;
+  const models = [...new Set(view.paths.map(p => p.model))];
+  return (
+    <ContentSurfaceCard surface='details' data-testid='capacity-paths'>
+      <div className='space-y-3 p-4'>
+        <p className='text-xs font-caption text-tertiary-token'>
+          Cost by access path: the same model is a separate row per path
+        </p>
+        <div className='overflow-x-auto'>
+          <table className='w-full text-left text-app'>
+            <thead className='text-2xs text-tertiary-token'>
+              <tr>
+                <th className='py-1 pr-3 font-normal'>Model</th>
+                <th className='py-1 pr-3 font-normal'>Path</th>
+                <th className='py-1 pr-3 font-normal'>List $/MTok in / out</th>
+                <th className='py-1 font-normal'>Marginal now</th>
+              </tr>
+            </thead>
+            <tbody>
+              {models.flatMap(model =>
+                view.paths
+                  .filter(p => p.model === model)
+                  .map(row => (
+                    <tr
+                      key={row.id}
+                      className='border-t border-subtle align-top'
+                    >
+                      <td className='py-1.5 pr-3 text-primary-token'>
+                        {row.model}
+                      </td>
+                      <td className='py-1.5 pr-3 text-secondary-token'>
+                        {ACCESS_PATH_LABEL[row.accessPath] ?? row.accessPath}
+                        {row.provider ? ` (${row.provider})` : ''}
+                      </td>
+                      <td className='py-1.5 pr-3 tabular-nums text-secondary-token'>
+                        {row.list
+                          ? `${row.list.inUsdPerMTok} / ${row.list.outUsdPerMTok}`
+                          : 'not listed'}
+                      </td>
+                      <td className='py-1.5 text-secondary-token'>
+                        {row.accessPath === 'subscription'
+                          ? row.accounts
+                              .map(a => seatNote(view, row.provider, a))
+                              .join('; ')
+                          : row.accessPath === 'credits'
+                            ? 'list price, paid from given credits'
+                            : 'list price, cash'}
+                      </td>
+                    </tr>
+                  ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <p className='text-2xs text-tertiary-token'>
+          A subscription seat costs about a tenth of its plan share while behind
+          pace and rises to the API price as it nears exhaustion; dollars appear
+          once the usable quota is measured.
+        </p>
+      </div>
+    </ContentSurfaceCard>
+  );
+}
+
+function RolesCard({ view }: Readonly<{ view: CapacityView }>) {
+  const roles = Object.values(view.roles).filter(r => r !== null);
+  if (roles.length === 0) return null;
+  return (
+    <ContentSurfaceCard surface='details' data-testid='capacity-roles'>
+      <div className='space-y-2 p-4'>
+        <p className='text-xs font-caption text-tertiary-token'>Roles</p>
+        {roles.map(role => (
+          <div key={role.role}>
+            <p className='text-app text-primary-token'>
+              {role.role}:{' '}
+              {role.chosen ? `${role.chosen.label} now` : 'no available model'}
+            </p>
+            <p className='text-2xs text-tertiary-token'>
+              {role.candidates
+                .map(
+                  c =>
+                    `${c.label} ${c.state}${c.preferred ? ' (preferred)' : ''}`
+                )
+                .join(' · ')}
+            </p>
+          </div>
+        ))}
+      </div>
+    </ContentSurfaceCard>
+  );
+}
+
 function AlertBanner({
   alerts,
 }: Readonly<{ alerts: readonly CapacityAlert[] }>) {
@@ -556,6 +675,8 @@ export function CapacityBoard({
         <ProviderScreen provider={selected} now={now} meta={view.metricsMeta} />
       ) : null}
 
+      <PathsCard view={view} />
+      <RolesCard view={view} />
       <ContentSurfaceCard surface='details'>
         <div className='space-y-2 p-4'>
           <p className='text-xs font-caption text-tertiary-token'>

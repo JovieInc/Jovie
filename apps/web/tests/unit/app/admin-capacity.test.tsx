@@ -10,6 +10,7 @@ import {
 } from '@/components/features/admin/capacity/capacity-format';
 import ops from '../../../../../ops/registry/capacity.json';
 import spend from '../../../../../ops/registry/spend.json';
+import models from '../../../../../scripts/backlog-orchestrator/config/model-registry.json';
 import {
   evaluateRegistry,
   routingOrder,
@@ -32,7 +33,7 @@ vi.mock('next/link', () => ({
 }));
 
 const NOW = Date.parse('2026-10-25T02:00:00Z');
-const view = evaluateRegistry(ops, { now: NOW, spend });
+const view = evaluateRegistry(ops, { now: NOW, spend, models });
 
 function board(selectedId: string | null) {
   return render(
@@ -92,7 +93,12 @@ const liveMetrics = {
 };
 
 function boardWith(selectedId: string, live: object | null) {
-  const v = evaluateRegistry(ops, { now: NOW, spend, live: live ?? {} });
+  const v = evaluateRegistry(ops, {
+    now: NOW,
+    spend,
+    models,
+    live: live ?? {},
+  });
   return render(
     <CapacityBoard
       view={v}
@@ -141,6 +147,38 @@ describe('value and alerts', () => {
     expect(screen.getByTestId('capacity-value').textContent).toMatch(
       /Merge window unreadable \(max_pages_reached\)/
     );
+  });
+});
+
+describe('access paths and roles', () => {
+  it('shows the same model as separate rows per access path with list prices', () => {
+    board('openai-codex');
+    const paths = screen.getByTestId('capacity-paths');
+    const rows = within(paths)
+      .getAllByRole('row')
+      .filter(r => r.textContent?.includes('glm-5.3'));
+    expect(rows).toHaveLength(2);
+    expect(rows[0].textContent).toMatch(
+      /Given credits \(hyperagent\).*0\.3 \/ 1\.2/
+    );
+    expect(rows[1].textContent).toMatch(
+      /API \(vercel-ai-gateway\).*0\.5625 \/ 1\.8326/
+    );
+    const luna = within(paths)
+      .getAllByRole('row')
+      .filter(r => r.textContent?.includes('gpt-5.6-luna'));
+    const text = luna.map(r => r.textContent).join(' ');
+    expect(text).toMatch(/API.*0\.2 \/ 1\.2.*list price, cash/);
+    expect(text).toMatch(
+      /Subscription seat \(openai-codex\).*lyb-pro: ahead of pace: rising toward API/
+    );
+  });
+
+  it('states the planner: Kimi K3 now with K3.1 Pro preferred and watched', () => {
+    board('openai-codex');
+    const roles = screen.getByTestId('capacity-roles');
+    expect(roles.textContent).toMatch(/planner: Kimi K3 now/);
+    expect(roles.textContent).toMatch(/Kimi K3\.1 Pro watching \(preferred\)/);
   });
 });
 

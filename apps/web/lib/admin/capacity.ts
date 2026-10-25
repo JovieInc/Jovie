@@ -3,6 +3,7 @@ import 'server-only';
 import { readFile } from 'node:fs/promises';
 import ops from '../../../../ops/registry/capacity.json';
 import spend from '../../../../ops/registry/spend.json';
+import models from '../../../../scripts/backlog-orchestrator/config/model-registry.json';
 import {
   type CapacityView,
   evaluateRegistry,
@@ -39,7 +40,7 @@ export async function getAdminCapacity(
   now = Date.now()
 ): Promise<AdminCapacity> {
   const live = await readLiveOverlay();
-  const view = evaluateRegistry(ops, { now, live: live ?? {}, spend });
+  const view = evaluateRegistry(ops, { now, live: live ?? {}, spend, models });
   return {
     view,
     order: routingOrder(view),
