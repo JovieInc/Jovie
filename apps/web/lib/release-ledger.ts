@@ -186,11 +186,12 @@ export function isNoise(entry: LedgerEntry): boolean {
 }
 
 const THEME_PHRASE: Record<LedgerTheme, string> = {
-  reliability: 'steadier day-to-day reliability',
+  reliability: 'fewer rough edges',
   speed: 'faster pages and actions',
   security: 'tighter security',
-  quality: 'polish and quality',
-  tooling: 'safer releases',
+  quality: 'extra polish',
+  // Never shown: summarizeUnderTheHood skips tooling.
+  tooling: '',
 };
 
 export interface UnderTheHood {
