@@ -1,4 +1,4 @@
-import { and, sql as drizzleSql, eq, or } from 'drizzle-orm';
+import { and, sql as drizzleSql, eq, inArray, or } from 'drizzle-orm';
 import { createFingerprint } from '@/app/api/audience/lib/audience-utils';
 import { AUDIENCE_IDENTIFIED_COOKIE, BASE_URL } from '@/constants/app';
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
@@ -1442,3 +1442,45 @@ export const updateContentPreferencesDomain = async (
 };
 
 export const AUDIENCE_COOKIE_NAME = AUDIENCE_IDENTIFIED_COOKIE;
+
+/**
+ * Every subscription row (including revoked and unsubscribed) for the given
+ * normalized identifiers, so share consent can be resolved per person.
+ * Used by lib/audience/share-gate.server.ts.
+ */
+export async function selectShareConsentRows(
+  tx: Pick<typeof db, 'select'>,
+  creatorProfileId: string,
+  emails: readonly string[],
+  phones: readonly string[]
+) {
+  const match = [
+    emails.length
+      ? inArray(
+          drizzleSql<string>`lower(trim(${notificationSubscriptions.email}))`,
+          [...emails]
+        )
+      : undefined,
+    phones.length
+      ? inArray(drizzleSql<string>`trim(${notificationSubscriptions.phone})`, [
+          ...phones,
+        ])
+      : undefined,
+  ].filter((c): c is NonNullable<typeof c> => c !== undefined);
+
+  return tx
+    .select({
+      email: notificationSubscriptions.email,
+      phone: notificationSubscriptions.phone,
+      optInAt: notificationSubscriptions.artistEmailOptInAt,
+      optOutAt: notificationSubscriptions.artistEmailOptOutAt,
+      unsubscribedAt: notificationSubscriptions.unsubscribedAt,
+    })
+    .from(notificationSubscriptions)
+    .where(
+      and(
+        eq(notificationSubscriptions.creatorProfileId, creatorProfileId),
+        or(...match)
+      )
+    );
+}

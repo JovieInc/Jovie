@@ -22,10 +22,11 @@ class FakeSentry:
 
 class FakeLinear:
     def __init__(self):
-        self.created, self.comments, self.states, self.n = [], [], [], 0
+        self.created, self.comments, self.states, self.n, self.closed = [], [], [], 0, set()
 
-    def find_by_label(self, name):
-        return next((c["id"] for c in self.created if name in c["labels"]), None)
+    def find_by_label(self, name, open_only=False):
+        return next((c["id"] for c in self.created if name in c["labels"]
+                     and not (open_only and c["id"] in self.closed)), None)
 
     def create(self, title, body, labels, priority):
         self.n += 1
@@ -78,8 +79,72 @@ class LoopTest(unittest.TestCase):
         self.assertIn("boom", self.l.created[0]["body"])
 
     def test_non_golden_below_threshold_ignored(self):
-        r = pe.handle_issue(self.issue(title="Timeout in cron", culprit="jobs/x"), self.ledger, self.s, self.l, [], self.t, self.dir)
+        r = pe.handle_issue(self.issue(title="Timeout in cron", culprit="jobs/x", userCount=0, count=1), self.ledger, self.s, self.l, [], self.t, self.dir)
         self.assertEqual(r, "below-threshold")
+
+    def test_sentry_linked_linear_issue_is_adopted_not_duplicated(self):
+        iss = self.issue(title="Timeout in cron", culprit="jobs/x", userCount=2,
+                         annotations=[{"url": "https://linear.app/jovie/issue/JOV-8864/x", "displayName": "JOV#8864"}])
+        r = pe.handle_issue(iss, self.ledger, self.s, self.l, [], self.t, self.dir)
+        self.assertEqual(r, "opened")
+        self.assertEqual(self.l.created, [])
+        self.assertEqual(self.ledger["101"]["linear"], "JOV-8864")
+        self.assertTrue(self.ledger["101"]["adopted"])
+        self.assertEqual(self.l.comments[0][0], "JOV-8864")
+
+    def test_unlinked_same_title_issues_roll_up_into_one_linear_issue(self):
+        class S(FakeSentry):
+            def top_issues(self_):
+                return [self.issue(id=str(n), title="App Hanging", culprit="x", userCount=0, count=2,
+                                   project={"slug": "ios"}) for n in (1, 2, 3)]
+        with mock.patch.object(pe, "gh_json", return_value=[]):
+            pe.sweep(S(), self.l, self.dir)
+        self.assertEqual(len(self.l.created), 1)
+        led = json.loads((self.dir / "ledger.json").read_text())
+        self.assertEqual({e["linear"] for e in led.values()}, {"JOV-1"})
+
+    def test_metrics_p50_regression_and_trend(self):
+        t = self.t
+        led = {"a": {"sentryId": "a", "firstSeen": t - 7200, "closedAt": t, "reopens": 1, "linear": "JOV-1"},
+               "b": {"sentryId": "b", "firstSeen": t - 3600, "closedAt": t, "linear": "JOV-2"}}
+        m = pe.record_metrics(led, [self.issue(userCount=4)], t, self.dir)
+        self.assertEqual(m["usersAffected24h"], 4)
+        self.assertEqual(m["regressionRate"], 0.5)
+        self.assertEqual(m["firstSeenToFixHours"]["p50"], 2.0)
+        self.assertEqual(len((self.dir / "sentry-loop-metrics.jsonl").read_text().splitlines()), 1)
+
+    def test_blocked_pr_with_open_bot_threads_files_one_issue_then_dedupes(self):
+        graph = {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": [
+            {"id": "T1", "isResolved": False, "isOutdated": False, "path": "a.ts", "line": 3,
+             "comments": {"nodes": [{"author": {"login": "sentry"}, "body": "**Bug:** x"}]}},
+            {"id": "T2", "isResolved": True, "isOutdated": False, "path": "b.ts", "line": 1,
+             "comments": {"nodes": [{"author": {"login": "sentry"}, "body": "old"}]}}]}}}}}
+        def gh(args):
+            return [{"number": 9, "title": "t", "mergeStateStatus": "BLOCKED"}] if args[0] == "pr" else graph
+        with mock.patch.object(pe, "gh_json", side_effect=gh):
+            self.assertEqual(pe.bot_threads(self.l, self.dir), {"threads-filed": 1})
+            self.assertEqual(pe.bot_threads(self.l, self.dir), {"threads-filed": 0})
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("resolveReviewThread", self.l.created[0]["body"])
+        self.assertIn("T1", self.l.created[0]["body"])
+        self.assertNotIn("old", self.l.created[0]["body"])
+
+    def test_repeat_episode_after_closed_alert_files_a_new_issue(self):
+        # JOV-9007: dedupe against CLOSED issues silently swallowed a recurring identical incident.
+        pe.alert("dead-man", "watchers unhealthy: ci-main is erroring", False, self.l, self.dir)
+        pe.alert("dead-man", "watchers unhealthy: ci-main is erroring", False, self.l, self.dir)
+        self.assertEqual(len(self.l.created), 1)  # same open episode still dedupes
+        self.l.closed.add("JOV-1")  # recovered, issue completed
+        pe.alert("dead-man", "watchers unhealthy: ci-main is erroring", False, self.l, self.dir)
+        self.assertEqual(len(self.l.created), 2)
+
+    def test_query_is_production_only(self):
+        urls = []
+        s = object.__new__(pe.Sentry)
+        s.org = "o"
+        s._call = lambda m, u, b=None: urls.append(u) or []
+        pe.Sentry.top_issues(s)
+        self.assertIn("environment%3Aproduction", urls[0])
 
     def test_stripe_price_is_human_gate_with_siren_and_hold(self):
         pe.handle_issue(self.issue(id="7", title="StripeInvalidRequestError: No such price", culprit="api/checkout"),
