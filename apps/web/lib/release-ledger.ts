@@ -134,6 +134,18 @@ function pickArea(scope: string, subject: string): LedgerArea {
   return 'other';
 }
 
+/**
+ * Theme is derived, never stored, so a rule change re-reads old receipts.
+ * Work in internal areas, and maintenance anywhere, is invisible to customers.
+ */
+export function themeFor(kind: LedgerKind, area: LedgerArea): LedgerTheme {
+  if (kind === 'security') return 'security';
+  if (kind === 'maintenance' || INTERNAL_AREAS.has(area)) return 'tooling';
+  if (kind === 'perf') return 'speed';
+  if (kind === 'fix') return 'reliability';
+  return 'quality';
+}
+
 export function classifyLedgerEntry(input: LedgerInput): LedgerEntry {
   const raw = input.title.trim();
   const parsed = TITLE_RE.exec(raw);
@@ -154,14 +166,7 @@ export function classifyLedgerEntry(input: LedgerInput): LedgerEntry {
   else if (type === 'feat' || type === 'feature') kind = 'feature';
   else kind = 'maintenance';
 
-  let theme: LedgerTheme;
-  if (kind === 'security') theme = 'security';
-  else if (kind === 'perf') theme = 'speed';
-  else if (kind === 'fix') theme = 'reliability';
-  else if (kind === 'feature') theme = 'quality';
-  else if (type === 'test' || type === 'tests' || type === 'refactor')
-    theme = 'quality';
-  else theme = 'tooling';
+  const theme = themeFor(kind, area);
 
   return { ...input, kind, area, theme, opsSummary: subject };
 }
@@ -209,6 +214,7 @@ export function summarizeUnderTheHood(
   for (const entry of entries) {
     if (entry.storyId) continue;
     if (isEmbargoed(entry, now)) continue;
+    if (entry.theme === 'tooling') continue;
     themes[entry.theme] = (themes[entry.theme] ?? 0) + 1;
     total += 1;
   }
@@ -303,7 +309,6 @@ export interface ReceiptRow {
   readonly n: number;
   readonly k: LedgerKind;
   readonly a: LedgerArea;
-  readonly t: LedgerTheme;
   readonly s?: string;
   readonly e?: string;
 }
@@ -315,7 +320,7 @@ export function fromReceiptRow(row: ReceiptRow): LedgerEntry {
     title: '',
     kind: row.k,
     area: row.a,
-    theme: row.t,
+    theme: themeFor(row.k, row.a),
     opsSummary: '',
     storyId: row.s ?? null,
     embargoUntil: row.e ?? null,
@@ -328,7 +333,6 @@ export function toReceiptRow(entry: LedgerEntry): ReceiptRow {
     n: entry.number,
     k: entry.kind,
     a: entry.area,
-    t: entry.theme,
     ...(entry.storyId ? { s: entry.storyId } : {}),
     ...(entry.embargoUntil ? { e: entry.embargoUntil } : {}),
   };

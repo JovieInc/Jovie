@@ -187,25 +187,24 @@ describe('customer publication integrity', () => {
   });
 
   it('consolidates non-story merges into one under-the-hood line and never counts embargoed security', () => {
-    const row = (n: number, k: string, a: string, t: string, extra = {}) => ({
+    const row = (n: number, k: string, a: string, extra = {}) => ({
       n,
       k,
       a,
-      t,
       ...extra,
     });
     const receipt = {
       ...publication(),
       ledger: [
-        row(1, 'feature', 'app', 'quality', { s: 'artist-news' }),
-        row(2, 'perf', 'app', 'speed'),
-        row(3, 'maintenance', 'delivery', 'tooling'),
-        row(4, 'security', 'app', 'security'),
+        row(1, 'feature', 'app', { s: 'artist-news' }),
+        row(2, 'perf', 'app'),
+        row(3, 'maintenance', 'delivery'),
+        row(4, 'security', 'app'),
       ],
     };
     const [entry] = projectCustomerChangelog(parseChangelog(markdown(receipt)));
     expect(entry.underTheHood).toBe(
-      'Under the hood: Faster pages and actions and safer releases.'
+      'Under the hood: Faster pages and actions.'
     );
     expect(entry.underTheHood).not.toMatch(/secur/i);
     const [legacy] = projectCustomerChangelog(

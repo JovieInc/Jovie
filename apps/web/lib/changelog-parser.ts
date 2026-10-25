@@ -30,7 +30,6 @@ import {
   fromReceiptRow,
   LEDGER_AREAS,
   LEDGER_KINDS,
-  LEDGER_THEMES,
   summarizeUnderTheHood,
 } from './release-ledger';
 
@@ -531,7 +530,6 @@ const PublicationReceiptSchema = z.object({
         n: z.number().int(),
         k: z.enum(LEDGER_KINDS),
         a: z.enum(LEDGER_AREAS),
-        t: z.enum(LEDGER_THEMES),
         s: z.string().optional(),
         e: z.string().optional(),
       })

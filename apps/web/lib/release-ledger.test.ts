@@ -114,14 +114,24 @@ describe('noise consolidation', () => {
       'chore(ci): tweak',
       'perf(web): faster',
       'fix(web): crash',
-      'test(web): cover',
+      'feat(web): new thing behind a flag',
+      'fix(lanes): internal fix',
     ].map((title, i) => classifyLedgerEntry(pr(i + 1, title)));
     const summary = summarizeUnderTheHood(entries, NOW);
-    expect(summary.total).toBe(5);
+    expect(summary.total).toBe(3);
     expect(summary.line.startsWith('Under the hood: ')).toBe(true);
     expect(summary.line.match(/,/g)?.length ?? 0).toBeLessThanOrEqual(1);
     expect(summary.line.endsWith('.')).toBe(true);
     expect(summary.line).not.toMatch(/#\d|JOV|\d{2,}/);
+  });
+  it('never mentions tooling or internal-only work', () => {
+    const entries = [
+      'chore(ci): tweak',
+      'fix(lanes): hold',
+      'feat(ovie): page',
+    ].map((title, i) => classifyLedgerEntry(pr(i + 1, title)));
+    const summary = summarizeUnderTheHood(entries, NOW);
+    expect(summary).toMatchObject({ total: 0, line: '' });
   });
   it('is empty when every merge became a story', () => {
     const entries = [
