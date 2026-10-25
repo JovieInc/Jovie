@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 import { toast } from '@/components/feedback';
 import { ChatOpsDataCard } from '@/components/jovie/components/ChatOpsDataCard';
@@ -28,6 +29,7 @@ import {
 import { inboxDecisionRequest, type OvieInbox } from '@/lib/ovie/inbox';
 import { FREQUENT_CACHE } from '@/lib/queries/cache-strategies';
 import { OvieCompanyHome } from './OvieCompanyHome';
+import { OvieWallFrame } from './OvieWallFrame';
 import { useCanvasHistory } from './useCanvasHistory';
 import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 import { useOvieCompanyQueries } from './useOvieCompanyQueries';
@@ -72,6 +74,7 @@ export interface OvieHomeCanvasProps {
 
 export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
   const queryClient = useQueryClient();
+  const wall = useSearchParams()?.get('wall') === '1';
   const shipping = useHudShippingStateQuery(null);
   const { metrics, funnel } = useOvieCompanyQueries();
   const inbox = useQuery<OvieInbox>({
@@ -323,8 +326,9 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     </div>
   ) : undefined;
 
-  return (
+  const body = (
     <OvieCompanyHome
+      wall={wall}
       tiles={tiles}
       since={since}
       copy={OVIE_HOME_COPY}
@@ -349,5 +353,19 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       onRetryAsks={() => void inbox.refetch()}
       onRetryLoop={() => void shipping.refetch()}
     />
+  );
+  if (!wall) return body;
+  // Poll intervals match each query above; the frame judges staleness from them.
+  return (
+    <OvieWallFrame
+      feeds={[
+        { id: 'shipping', updatedAtMs: shipping.dataUpdatedAt, pollMs: 6_000 },
+        { id: 'decisions', updatedAtMs: inbox.dataUpdatedAt, pollMs: 30_000 },
+        { id: 'revenue', updatedAtMs: metrics.dataUpdatedAt, pollMs: 30_000 },
+        { id: 'funnel', updatedAtMs: funnel.dataUpdatedAt, pollMs: 60_000 },
+      ]}
+    >
+      {body}
+    </OvieWallFrame>
   );
 }

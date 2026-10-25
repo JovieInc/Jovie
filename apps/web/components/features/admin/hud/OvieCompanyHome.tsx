@@ -24,6 +24,7 @@ import type { LastLookedSummary } from '@/lib/ovie/home/since-last-looked';
 export function OvieCompanyHome({
   tiles,
   since,
+  wall = false,
   copy,
   asks,
   asksStatus,
@@ -44,6 +45,7 @@ export function OvieCompanyHome({
 }: Readonly<{
   readonly tiles: readonly CompanyTile[] | null;
   readonly since: LastLookedSummary | null;
+  readonly wall?: boolean;
   readonly copy: HomeLoopCopy;
   readonly asks: readonly HomeLoopAsk[];
   readonly asksStatus: HomeLoopSectionStatus;
@@ -70,7 +72,7 @@ export function OvieCompanyHome({
       className='@container flex w-full flex-col gap-3 lg:h-full lg:min-h-0'
       data-testid='ovie-company-home'
     >
-      <OvieCompanyHud tiles={tiles} since={since} />
+      <OvieCompanyHud tiles={tiles} since={since} wall={wall} />
       {answer ? (
         <div className='max-h-1/2 shrink-0 overflow-y-auto'>{answer}</div>
       ) : null}

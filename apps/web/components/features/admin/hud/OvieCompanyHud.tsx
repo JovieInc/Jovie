@@ -26,6 +26,45 @@ const SLOTS = ['a', 'b', 'c', 'd', 'e', 'f'] as const;
 const TILE_FRAME =
   'flex h-24 min-w-0 flex-col justify-between gap-1 rounded-lg bg-surface-1 px-3 py-2 text-left';
 
+/** Room-distance tile: nothing hides behind a click or a hover. */
+function WallTile({ tile }: Readonly<{ tile: CompanyTile }>) {
+  return (
+    <div
+      className='flex min-w-0 flex-col gap-2 rounded-lg border border-subtle bg-surface-1 px-4 py-3'
+      data-testid={`ovie-tile-${tile.id}`}
+      data-tone={tile.tone}
+      data-measured={tile.measured}
+    >
+      <span className='flex items-center justify-between gap-2'>
+        <span className='truncate text-sm font-medium text-secondary-token'>
+          {tile.label}
+        </span>
+        <span
+          role='img'
+          aria-label={TONE_LABEL[tile.tone]}
+          className={cn('size-3 shrink-0 rounded-full', TONE_DOT[tile.tone])}
+        />
+      </span>
+      <span
+        className={cn(
+          'font-semibold tabular-nums leading-tight',
+          tile.measured
+            ? 'text-5xl text-primary-token'
+            : 'text-2xl text-tertiary-token'
+        )}
+      >
+        {tile.value}
+      </span>
+      <span className='text-base text-secondary-token'>{tile.line}</span>
+      {tile.details.slice(0, 2).map(line => (
+        <span key={line} className='text-sm text-tertiary-token'>
+          {line}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function SinceLine({ since }: Readonly<{ since: LastLookedSummary }>) {
   return (
     <p
@@ -47,10 +86,13 @@ function SinceLine({ since }: Readonly<{ since: LastLookedSummary }>) {
 export function OvieCompanyHud({
   tiles,
   since,
+  wall = false,
 }: Readonly<{
   /** `null` while the sources load. */
   readonly tiles: readonly CompanyTile[] | null;
   readonly since: LastLookedSummary | null;
+  /** Wall mode: read-only, larger type, details always visible, no hover. */
+  readonly wall?: boolean;
 }>) {
   const [openId, setOpenId] = useState<CompanyTile['id'] | null>(null);
   const panelId = useId();
@@ -77,6 +119,7 @@ export function OvieCompanyHud({
               </div>
             ))
           : tiles.map(tile => {
+              if (wall) return <WallTile key={tile.id} tile={tile} />;
               const expanded = tile.id === openId;
               return (
                 <button
