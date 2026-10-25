@@ -14,6 +14,8 @@ import { ARTIST_MCP_OWNER_TOOLS } from '@/lib/mcp/artist-oauth-discovery';
 const hoisted = vi.hoisted(() => ({
   getCachedAuth: vi.fn(),
   getProfileByUsername: vi.fn(),
+  getActiveLinksForProfile: vi.fn(),
+  getMerchMvpEnabled: vi.fn(),
   getReleasesForProfileLite: vi.fn(),
   getLiveMerchCardsForProfile: vi.fn(),
   getUpcomingTourDatesForProfile: vi.fn(),
@@ -39,8 +41,16 @@ vi.mock('@/lib/rate-limit', async () => {
   };
 });
 
+vi.mock('@/lib/flags/profile-variant', () => ({
+  getMerchMvpEnabled: hoisted.getMerchMvpEnabled,
+}));
+
 vi.mock('@/lib/services/profile', () => ({
   getProfileByUsername: hoisted.getProfileByUsername,
+}));
+
+vi.mock('@/lib/services/social-links/queries', () => ({
+  getActiveLinksForProfile: hoisted.getActiveLinksForProfile,
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -112,6 +122,7 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    hoisted.getMerchMvpEnabled.mockResolvedValue(true);
     hoisted.rateLimit.mockResolvedValue({
       success: true,
       limit: 100,
@@ -119,6 +130,7 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
       reset: new Date(Date.now() + 60_000),
     });
     hoisted.getProfileByUsername.mockResolvedValue(FAKE_PROFILE);
+    hoisted.getActiveLinksForProfile.mockResolvedValue([]);
     hoisted.getReleasesForProfileLite.mockResolvedValue([]);
     hoisted.getLiveMerchCardsForProfile.mockResolvedValue([]);
     hoisted.getUpcomingTourDatesForProfile.mockResolvedValue([]);
@@ -897,11 +909,97 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
     }
   );
 
+  it('returns exact published item destinations and canonical claim status to anonymous readers', async () => {
+    hoisted.getProfileByUsername.mockResolvedValue({
+      ...FAKE_PROFILE,
+      username: 'Artist1',
+      usernameNormalized: 'artist1',
+      isClaimed: false,
+      isVerified: false,
+      claimToken: 'private-token',
+    });
+    hoisted.getReleasesForProfileLite.mockResolvedValue([
+      {
+        id: 'rel-1',
+        title: 'Song',
+        slug: 'song-2025',
+        releaseType: 'single',
+        releaseDate: new Date('2025-01-02T00:00:00Z'),
+      },
+      { id: 'rel-2', title: 'Song', slug: 'song-2', releaseType: 'single' },
+      { id: 'unsupported', title: 'Unsupported', slug: null },
+    ]);
+    hoisted.getLiveMerchCardsForProfile.mockResolvedValue([
+      { id: '00000000-0000-4000-8000-000000000002', title: 'Tee' },
+    ]);
+    const { POST } = await import('./route');
+    const read = async (resource: string) => {
+      const res = await POST(
+        makeRequest({
+          jsonrpc: '2.0',
+          id: resource,
+          method: 'resources/read',
+          params: { uri: `artist://artist1/${resource}` },
+        }),
+        { params: Promise.resolve({ username: 'ARTIST1' }) }
+      );
+      return JSON.parse((await res.json()).result.contents[0].text);
+    };
+    expect(await read('bio')).toMatchObject({
+      username: 'artist1',
+      profileUrl: 'https://jov.ie/artist1',
+      isClaimed: false,
+      isVerified: false,
+    });
+    expect(await read('releases')).toEqual([
+      {
+        id: 'rel-1',
+        title: 'Song',
+        type: 'single',
+        releaseDate: '2025-01-02',
+        artworkUrl: null,
+        url: 'https://jov.ie/artist1/song-2025',
+      },
+      {
+        id: 'rel-2',
+        title: 'Song',
+        type: 'single',
+        releaseDate: null,
+        artworkUrl: null,
+        url: 'https://jov.ie/artist1/song-2',
+      },
+    ]);
+    expect(await read('merch')).toEqual([
+      expect.objectContaining({
+        url: 'https://jov.ie/artist1/merch/00000000-0000-4000-8000-000000000002',
+      }),
+    ]);
+    const res = await POST(
+      makeRequest({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: {
+          name: 'add_to_cart',
+          arguments: { itemId: '00000000-0000-4000-8000-000000000002' },
+        },
+      }),
+      { params: Promise.resolve({ username: 'artist1' }) }
+    );
+    expect(
+      JSON.parse((await res.json()).result.content[0].text).checkoutUrl
+    ).toBe('https://jov.ie/artist1/merch/00000000-0000-4000-8000-000000000002');
+    hoisted.getMerchMvpEnabled.mockResolvedValue(false);
+    expect(await read('merch')).toEqual([]);
+    expect(JSON.stringify(await read('bio'))).not.toContain('private-token');
+  });
+
   it('keeps public profile resources and tools anonymous', async () => {
     hoisted.getReleasesForProfileLite.mockResolvedValue([
       {
         id: 'rel-1',
         title: 'Song',
+        slug: 'song',
         releaseType: 'single',
         releaseDate: null,
         artworkUrl: null,
@@ -921,7 +1019,7 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
     ]);
     hoisted.getLiveMerchCardsForProfile.mockResolvedValue([
       {
-        id: 'item-1',
+        id: '00000000-0000-4000-8000-000000000002',
         title: 'Tee',
         description: 'Cotton',
         productType: 'shirt',
@@ -957,8 +1055,14 @@ describe('POST /api/mcp/[username] — JSON-RPC id echo', () => {
 
     const tools = [
       { name: 'get_ticket_link', arguments: { eventId: 'evt-1' } },
-      { name: 'check_merch_availability', arguments: { itemId: 'item-1' } },
-      { name: 'add_to_cart', arguments: { itemId: 'item-1' } },
+      {
+        name: 'check_merch_availability',
+        arguments: { itemId: '00000000-0000-4000-8000-000000000002' },
+      },
+      {
+        name: 'add_to_cart',
+        arguments: { itemId: '00000000-0000-4000-8000-000000000002' },
+      },
       { name: 'list_videos', arguments: {} },
     ];
     for (const params of tools) {

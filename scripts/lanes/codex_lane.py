@@ -71,15 +71,21 @@ def subscription_pool_mode() -> bool:
 
 
 def subscription_profiles() -> dict:
-    """Explicit, identity-bound two-account configuration; never discover credentials."""
+    """Explicit, identity-bound multi-account configuration; never discover credentials.
+
+    Tim 2026-10-24: no arbitrary caps. The pool was fixed at exactly two accounts with one seat on the
+    second, so a third paid subscription could not be added. An account is bound to its home AND its
+    verified email hash. A seat count is a host-side bound (a seat is one local codex exec on this
+    machine, so it cannot exceed the CPU count); the provider limit is the account's usage window,
+    which the capacity ledger measures per account."""
     if not subscription_pool_mode():
         return {}
     try:
         profiles = json.loads(os.environ.get("CODEX_LANE_SUBSCRIPTION_PROFILES", ""))
     except (ValueError, TypeError):
         raise ValueError("subscription profiles malformed") from None
-    if not isinstance(profiles, dict) or len(profiles) != 2 or CURRENT_LOGIN not in profiles:
-        raise ValueError("subscription pool requires current-login and one additional profile")
+    if not isinstance(profiles, dict) or len(profiles) < 2 or CURRENT_LOGIN not in profiles:
+        raise ValueError("subscription pool requires current-login and at least one additional profile")
     primary_limit = os.cpu_count()
     if type(primary_limit) is not int or primary_limit <= 0:
         raise ValueError("subscription compute capacity unavailable")
@@ -96,7 +102,7 @@ def subscription_profiles() -> dict:
         home = str(Path(home).resolve())
         if not Path(home).is_dir():
             raise ValueError("subscription home unavailable")
-        if type(slots) is not int or not 1 <= slots <= (primary_limit if name == CURRENT_LOGIN else 1):
+        if type(slots) is not int or not 1 <= slots <= primary_limit:
             raise ValueError("subscription slot limit invalid")
         if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
             raise ValueError("subscription identity binding invalid")
