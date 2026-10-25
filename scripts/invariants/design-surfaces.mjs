@@ -487,6 +487,17 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   Notifications: ['ARTIST_NOTIFICATIONS'],
   'Instant Merch': ['INSTANT_MERCH'],
   'YouTube Thumbnails': ['YOUTUBE_THUMBNAILS'],
+  // JOV-8925: locked homepage footer labels behind LOCKED_MARKETING_FOOTER_COLUMNS
+  // and the expanded legal band in MARKETING_LEGAL_LINKS.
+  Payments: ['PAY'],
+  Updates: ['ARTIST_NOTIFICATIONS'],
+  'Your Jovie profile': ['ARTIST_PROFILES'],
+  'Smart links': ['SMART_LINKS'],
+  'Contact capture': ['ARTIST_PROFILES'],
+  Audience: ['ARTIST_PROFILES'],
+  Automation: ['LAUNCH'],
+  Cookies: ['LEGAL_COOKIES'],
+  DMCA: ['LEGAL_DMCA'],
   CLI: ['CLI'],
   Developers: ['DEVELOPERS'],
   'Jovie Card': ['CARD'],
