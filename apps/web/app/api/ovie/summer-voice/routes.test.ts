@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   gate: vi.fn(),
   createSession: vi.fn(),
   ask: vi.fn(),
+  configured: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
@@ -15,10 +16,12 @@ vi.mock('@/lib/ovie/summer-founder-gate', () => ({
 vi.mock('@/lib/ovie/summer-voice', () => ({
   createSummerVoiceSession: mocks.createSession,
   askSummerForVoice: mocks.ask,
+  isSummerVoiceConfigured: mocks.configured,
 }));
 
 import { POST as ask } from './ask/route';
 import { POST as session } from './session/route';
+import { GET as status } from './status/route';
 
 const denied = () =>
   NextResponse.json({ error: 'founder_required' }, { status: 403 });
@@ -79,5 +82,16 @@ describe('summer voice routes', () => {
     expect((await ask(post({ question: 'q' }))).status).toBe(503);
     mocks.gate.mockResolvedValueOnce(denied());
     expect((await ask(post({ question: 'q' }))).status).toBe(403);
+  });
+
+  it('status: reports the flag to the founder only', async () => {
+    mocks.gate.mockResolvedValueOnce({ principalHash: 'p' });
+    mocks.configured.mockReturnValue(false);
+    expect(await (await status()).json()).toEqual({ enabled: false });
+    mocks.gate.mockResolvedValueOnce({ principalHash: 'p' });
+    mocks.configured.mockReturnValue(true);
+    expect(await (await status()).json()).toEqual({ enabled: true });
+    mocks.gate.mockResolvedValueOnce(denied());
+    expect((await status()).status).toBe(403);
   });
 });

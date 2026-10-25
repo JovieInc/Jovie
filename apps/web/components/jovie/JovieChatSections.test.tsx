@@ -414,6 +414,10 @@ describe('ChatComposerSurface one-chrome-layer wiring', () => {
   });
 });
 
+vi.mock('@/components/features/admin/summer-voice/SummerVoiceControl', () => ({
+  SummerVoiceControl: () => <div data-testid='summer-voice-control' />,
+}));
+
 describe('ChatComposerSurface Summer voice entry', () => {
   it('shows the voice control only in ov chat mode', () => {
     renderComposerSurface({ chatMode: 'ov' });

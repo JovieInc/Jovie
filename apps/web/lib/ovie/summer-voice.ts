@@ -55,6 +55,13 @@ export type SummerVoiceSession =
       readonly code: 'voice_not_configured' | 'voice_provider_unavailable';
     };
 
+/** The feature flag: voice exists for the UI only once the agent is configured. */
+export function isSummerVoiceConfigured(): boolean {
+  return Boolean(
+    env.ELEVENLABS_API_KEY?.trim() && env.ELEVENLABS_SUMMER_AGENT_ID?.trim()
+  );
+}
+
 export async function createSummerVoiceSession(): Promise<SummerVoiceSession> {
   const apiKey = env.ELEVENLABS_API_KEY?.trim();
   const agentId = env.ELEVENLABS_SUMMER_AGENT_ID?.trim();

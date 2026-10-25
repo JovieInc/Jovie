@@ -1,6 +1,7 @@
 'use client';
 
 import { Mic, Square } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { type SummerVoiceState, useSummerVoice } from './useSummerVoice';
 
 const ERROR_COPY: Record<string, string> = {
@@ -70,8 +71,25 @@ export function SummerVoiceControlView({
   );
 }
 
+/** Renders nothing until the server says voice is configured (the feature flag). */
 export function SummerVoiceControl() {
+  const [enabled, setEnabled] = useState(false);
   const { state, start, stop } = useSummerVoice();
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/ovie/summer-voice/status', { cache: 'no-store' })
+      .then(response => (response.ok ? response.json() : null))
+      .then((body: { enabled?: boolean } | null) => {
+        if (!cancelled) setEnabled(body?.enabled === true);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!enabled) return null;
   return (
     <SummerVoiceControlView
       state={state}
