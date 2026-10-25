@@ -1,6 +1,7 @@
 name: Ovie Summer Canary
-run-name: Ovie Summer Canary (${{ github.event.schedule || github.event_name }})
-# Hourly stateless probe of Summer's fast chat path from production. It writes
+run-name: Ovie Summer Canary (${{ github.event_name }})
+# No cron here (JOV-INV-042 freezes GitHub crons): the Gem lanes clock fires
+# repository_dispatch clock_summer_canary hourly. Stateless probe of Summer's fast chat path from production. It writes
 # nothing to the founder's Summer history. Variable-gated: set the repo variable
 # E2E_PROD_SUMMER_CANARY=true once summer-config's fast chat endpoint is deployed.
 # clock-class: production-liveness
@@ -13,8 +14,8 @@ permissions:
   contents: read
 
 on:
-  schedule:
-    - cron: '7 * * * *'
+  repository_dispatch:
+    types: [clock_summer_canary]
   workflow_dispatch:
 
 concurrency:
