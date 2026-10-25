@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { FleetVerdictPanel } from '@/components/features/admin/hud/FleetVerdictPanel';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
@@ -20,6 +21,7 @@ export default async function OperationsPage() {
       description='Autonomous company outcomes and exceptions. Active remediation stays attached to the work.'
       testId='founder-operations-page'
     >
+      <FleetVerdictPanel />
       <HudSystemHealthStrip metrics={metrics} presentation='page' />
       <OperationalTasksPanel presentation='page' />
       <nav aria-label='Related Operations'>
