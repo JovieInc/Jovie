@@ -210,9 +210,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('rejects stale product names, versions, destinations, locales, and disabled-feature screenshot claims', () => {
     const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.presence');
-    const current = readProductReferenceOwner().getProductProjection({
-      PROFILES_WORKSPACE: true,
-    });
+    const current = readProductReferenceOwner().getProductProjection({});
     const proof = { ...validExternalProof(screen), productReferences: current };
     const errors = candidate =>
       evaluateScreenProof(candidate, { screen, headSha: HEAD }).filter(
@@ -236,12 +234,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       },
       snapshot => {
         snapshot.features[0].destination = '/app/profiles';
-      },
-      snapshot => {
-        snapshot.flags.PROFILES_WORKSPACE = false;
-      },
-      snapshot => {
-        delete snapshot.flags.PROFILES_WORKSPACE;
       },
       snapshot => {
         snapshot.features = [];
