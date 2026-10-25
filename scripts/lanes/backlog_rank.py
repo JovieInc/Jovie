@@ -116,6 +116,20 @@ def order(rows: list[dict], now: float) -> list[dict]:
                                          row.get("identifier") or ""))
 
 
+def plan_sort_orders(ranked: list[dict], current: dict[str, float], others_min: float, step: float = 1.0) -> dict[str, float]:
+    """New Linear sortOrder values (lower = higher in the list) that put `ranked` in score order
+    above every other Backlog row. Empty when the list is already in that shape, so a settled
+    Backlog costs no writes and the values never drift downward."""
+    ids = [row["id"] for row in ranked]
+    if not ids or any(i not in current for i in ids):
+        return {}
+    values = [current[i] for i in ids]
+    if values == sorted(values) and len(set(values)) == len(values) and values[-1] < others_min:
+        return {}
+    count = len(ids)
+    return {i: round(others_min - (count - n) * step, 6) for n, i in enumerate(ids)}
+
+
 def with_factory_floor(ordered: list[dict], take: int, factory_share: float | None, floor: float) -> list[dict]:
     """The first `take` rows, but when the fleet's measured factory share is under `floor` the best
     factory row goes first. Share unknown (None) leaves the order alone: never guess a deficit."""

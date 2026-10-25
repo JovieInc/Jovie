@@ -14,7 +14,10 @@ outbox like every other lane write (readback, retry, never overwrites a remote d
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -196,13 +199,128 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
     return receipt
 
 
-def _factory_share(state: Path) -> float | None:
-    """Measured factory share of recent issue runs, written by the doctor; None when never measured."""
+RANK_TOP = 40            # promotable rows kept in score order at the top of the Backlog list
+RANK_EVERY_S = 1800      # one sortOrder read per team per half hour at most
+RANK_WRITES_PER_TICK = 10
+
+
+WAKE_SCHEMA = "jovie-backlog-wake/v1"
+WAKE_REASONS = frozenset({"issue-created", "issue-updated", "outcome-gap", "sentry-spike", "tim-comment", "capacity-change"})
+
+
+def write_wake(state: Path, team: str, reason: str, now: float | None = None) -> Path:
+    """Event producer contract: drop a wake file; the jovie-lanes-wake.path unit (PathChanged on state/wake)
+    runs `fix-now`, which drains it into an immediate sync + refill + rank for that team. Atomic,
+    one file per team and reason, so a burst of events costs one pass."""
+    now = time.time() if now is None else now
+    if reason not in WAKE_REASONS:
+        raise ValueError(f"unknown wake reason {reason}")
+    path = Path(state) / "wake" / f"backlog-{team}-{reason}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps({"schema": WAKE_SCHEMA, "team": team, "reason": reason, "at": now}))
+    temporary.replace(path)
+    return path
+
+
+def drain_wakes(state: Path, teams: set[str], now: float | None = None, limit: int = 8) -> list[dict]:
+    """Valid backlog wake files, consumed. Oversized, malformed or unknown-team files are dropped."""
+    now = time.time() if now is None else now
+    found = []
+    for path in sorted((Path(state) / "wake").glob("backlog-*.json"))[:limit]:
+        try:
+            data = json.loads(path.read_text()) if path.stat().st_size <= 1024 else None
+        except (OSError, ValueError):
+            data = None
+        path.unlink(missing_ok=True)
+        if isinstance(data, dict) and data.get("schema") == WAKE_SCHEMA and data.get("team") in teams \
+                and data.get("reason") in WAKE_REASONS and isinstance(data.get("at"), (int, float)):
+            found.append({"team": data["team"], "reason": data["reason"], "at": data["at"], "handledAt": now})
+    try:  # wake -> handled latency per event, for p50/p95
+        with open(Path(state) / "backlog-wakes.jsonl", "a") as handle:
+            for row in found:
+                handle.write(json.dumps(row) + "\n")
+    except OSError:
+        pass
+    return found
+
+
+def rank_pass(lane, host, binding, linear, now: float | None = None, force: bool = False) -> dict:
+    """Write the score order into Linear's manual Backlog order (sortOrder, lower = higher: Linear gives
+    newer issues lower values and lists them first). Reads ids and sortOrder only, writes through
+    the outbox with readback, at most RANK_WRITES_PER_TICK per tick; a settled order writes nothing."""
+    now = time.time() if now is None else now
+    state = Path(host.state)
+    path = state / "refill" / f"{binding.key}-rank.json"
     try:
-        value = json.loads((Path(state) / "factory-share.json").read_text()).get("share")
-        return float(value) if value is not None else None
+        previous = json.loads(path.read_text())
+    except (OSError, ValueError):
+        previous = {}
+    pending = previous.get("pending") or {}
+    receipt = {"at": now, "team": binding.key, "written": 0}
+    if not pending and not force and now - float(previous.get("readAt") or 0) < RANK_EVERY_S:
+        return {**previous, "skipped": "throttled"}
+    mirror = lane.linear_sync.read_mirror(state, binding.key)
+    if now - float(mirror.get("syncedAt") or 0) > 900:
+        return {**receipt, "held": "mirror-stale"}
+    if not pending:
+        current, after = {}, None
+        for _ in range(10):
+            page = (linear.gql(lane.linear_sync.BACKLOG_ORDER_QUERY, {"team": binding.key, "after": after}) or {}).get("issues") or {}
+            for node in page.get("nodes") or []:
+                current[node["id"]] = float(node["sortOrder"])
+            if not (page.get("pageInfo") or {}).get("hasNextPage"):
+                break
+            after = page["pageInfo"]["endCursor"]
+        rows = [row for row in (mirror.get("issues") or {}).values() if row.get("state") == "Backlog" and row["id"] in current]
+        open_ids = {row["identifier"] for row in (mirror.get("issues") or {}).values()}
+        ready = [row for row in rows if skip_reason(row, open_ids, frozenset(label.lower() for label in binding.excluded)) is None]
+        top = backlog_rank.order(ready, now)[:RANK_TOP]
+        top_ids = {row["id"] for row in top}
+        others = [value for key, value in current.items() if key not in top_ids]
+        pending = backlog_rank.plan_sort_orders(top, current, min(others) if others else 0.0)
+        receipt.update(readAt=now, backlog=len(rows), top=len(top))
+    outbox = lane.linear_sync.Outboxed(state, linear)
+    for issue_id in list(pending)[:RANK_WRITES_PER_TICK]:
+        outbox.rank(issue_id, pending.pop(issue_id))
+        receipt["written"] += 1
+    receipt["pending"] = pending
+    receipt["readAt"] = receipt.get("readAt") or previous.get("readAt")
+    _write(path, receipt)
+    return receipt
+
+
+FLEET_LEDGER = Path(__file__).resolve().parent / "fleet_ledger.py"
+SHARE_TTL_S = 3600
+
+
+def _factory_share(state: Path, now: float | None = None) -> float | None:
+    """Factory share of recent issue runs, read from `fleet_ledger.py metrics` (one definition, not two),
+    cached an hour. None when the ledger is absent, unreadable or has classified nothing: an unknown
+    share never triggers the floor."""
+    now = time.time() if now is None else now
+    cache = Path(state) / "factory-share.json"
+    try:
+        saved = json.loads(cache.read_text())
+        if now - float(saved.get("at") or 0) < SHARE_TTL_S:
+            return saved.get("share")
     except (OSError, ValueError, TypeError, AttributeError):
-        return None
+        pass
+    share = None
+    if FLEET_LEDGER.exists():
+        try:
+            out = subprocess.run([sys.executable, str(FLEET_LEDGER), "metrics", "--days", "7"], capture_output=True,
+                                 text=True, timeout=60, env={**os.environ, "LANES_STATE": str(state)})
+            factory = json.loads(out.stdout)["factory"]
+            if int(factory.get("factory", 0)) + int(factory.get("product", 0)) > 0:
+                share = float(factory["share"])
+        except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+            share = None
+    try:
+        cache.write_text(json.dumps({"at": now, "share": share}))
+    except OSError:
+        pass
+    return share
 
 
 def _log(state: Path, row: dict) -> None:

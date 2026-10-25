@@ -136,5 +136,92 @@ class RefillGuardTests(unittest.TestCase):
         self.assertNotIn("alarm", receipt)
 
 
+class RankWriteTests(unittest.TestCase):
+    def test_plan_puts_ranked_rows_above_everything_and_settles(self):
+        ranked = [{"id": "a"}, {"id": "b"}, {"id": "c"}]
+        plan = br.plan_sort_orders(ranked, {"a": -5.0, "b": -9.0, "c": -1.0}, others_min=-4.0)
+        self.assertEqual(plan, {"a": -7.0, "b": -6.0, "c": -5.0})
+        self.assertLess(max(plan.values()), -4.0)
+        self.assertEqual(br.plan_sort_orders(ranked, plan, -4.0), {})  # settled: no writes, no drift
+        self.assertEqual(br.plan_sort_orders(ranked, {"a": 1.0}, 0.0), {})  # unknown order: never guess
+
+    def test_rank_pass_reads_once_writes_through_outbox_in_batches(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        rows = [row(n, priority=1 + n % 3) for n in range(1, 16)]
+        path = ls.mirror_path(state, "JOV"); path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"schema": ls.MIRROR, "syncedAt": NOW, "issues": {r["id"]: r for r in rows}}))
+        calls = []
+
+        class Client:
+            def gql(self, query, variables):
+                calls.append(query)
+                return {"issues": {"pageInfo": {"hasNextPage": False},
+                                   "nodes": [{"id": r["id"], "identifier": r["identifier"], "sortOrder": -float(i)} for i, r in enumerate(rows)]}}
+        lane = SimpleNamespace(linear_sync=ls)
+        host = SimpleNamespace(state=state)
+        binding = SimpleNamespace(key="JOV", excluded=())
+        first = refill.rank_pass(lane, host, binding, Client(), now=NOW + 1)
+        self.assertEqual((first["written"], len(first["pending"])), (10, 5))
+        self.assertEqual(len(calls), 1)
+        second = refill.rank_pass(lane, host, binding, Client(), now=NOW + 2)  # drains the rest, no second read
+        self.assertEqual((second["written"], len(second["pending"])), (5, 0))
+        self.assertEqual(len(calls), 1)
+        entries = [e for e in json.loads((state / "linear" / "outbox.json").read_text())["entries"] if e["op"] == "rank"]
+        self.assertEqual(len(entries), 15)
+        values = {e["issueId"]: e["value"] for e in entries}
+        best = br.order(rows, NOW + 1)
+        self.assertEqual(sorted(values, key=values.get), [r["id"] for r in best])
+        throttled = refill.rank_pass(lane, host, binding, Client(), now=NOW + 3)
+        self.assertEqual(throttled.get("skipped"), "throttled")
+
+    def test_outbox_label_and_rank_ops_are_idempotent(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        for _ in range(2):
+            ls.enqueue(state, "label", "id1", body="agent-ready")
+            ls.enqueue(state, "rank", "id1", target="-3.5")
+        ls.enqueue(state, "rank", "id1", target="-4.5")
+        entries = json.loads((state / "linear" / "outbox.json").read_text())["entries"]
+        self.assertEqual(sorted((e["op"], e.get("value") or e.get("body")) for e in entries),
+                         [("label", "agent-ready"), ("rank", -4.5)])
+
+
+class FactoryShareTests(unittest.TestCase):
+    def test_share_comes_from_the_ledger_once_an_hour_and_unknown_is_none(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        fake = state / "fleet_ledger.py"
+        fake.write_text("import json;print(json.dumps({'factory':{'factory':1,'product':9,'share':0.1}}))")
+        old = refill.FLEET_LEDGER
+        refill.FLEET_LEDGER = fake
+        self.addCleanup(setattr, refill, "FLEET_LEDGER", old)
+        self.assertEqual(refill._factory_share(state, now=100.0), 0.1)
+        fake.write_text("raise SystemExit(1)")
+        self.assertEqual(refill._factory_share(state, now=200.0), 0.1)   # cached
+        self.assertIsNone(refill._factory_share(state, now=100.0 + refill.SHARE_TTL_S + 1))
+        fake.write_text("import json;print(json.dumps({'factory':{'factory':0,'product':0,'share':0.0}}))")
+        self.assertIsNone(refill._factory_share(state, now=100000.0))   # nothing classified: unknown
+
+
+class WakeTests(unittest.TestCase):
+    def test_wake_files_are_validated_deduped_and_consumed(self):
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        refill.write_wake(state, "JOV", "tim-comment", now=10.0)
+        refill.write_wake(state, "JOV", "tim-comment", now=11.0)          # same team+reason: one file
+        refill.write_wake(state, "LYB", "sentry-spike", now=12.0)
+        (state / "wake" / "backlog-XXX-issue-created.json").write_text(json.dumps(
+            {"schema": refill.WAKE_SCHEMA, "team": "XXX", "reason": "issue-created", "at": 1}))
+        (state / "wake" / "backlog-bad.json").write_text("{not json")
+        (state / "wake" / "red-5-abc-1.json").write_text("{}")             # not ours: untouched
+        got = refill.drain_wakes(state, {"JOV", "LYB"}, now=20.0)
+        self.assertEqual(sorted((w["team"], w["reason"]) for w in got), [("JOV", "tim-comment"), ("LYB", "sentry-spike")])
+        self.assertEqual({p.name for p in (state / "wake").iterdir()}, {"red-5-abc-1.json"})
+        self.assertEqual(len((state / "backlog-wakes.jsonl").read_text().splitlines()), 2)
+        with self.assertRaises(ValueError):
+            refill.write_wake(state, "JOV", "because")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -52,6 +52,11 @@ ISSUE_QUERY = 'query($id:String!){issue(id:$id){' + ROW + ' team{states{nodes{id
 MOVE_MUTATION = ('mutation($id:String!,$s:String!){issueUpdate(id:$id,input:{stateId:$s}){success issue{'
                  + ROW + '}}}')
 COMMENT_MUTATION = 'mutation($id:String!,$b:String!){commentCreate(input:{issueId:$id,body:$b}){success}}'
+RANK_MUTATION = ('mutation($id:String!,$o:Float!){issueUpdate(id:$id,input:{sortOrder:$o}){success issue{id sortOrder}}}')
+LABELS_QUERY = ('query($id:String!){issue(id:$id){labels(first:50){nodes{id name}} team{labels(first:250){nodes{id name}}}}}')
+LABEL_MUTATION = ('mutation($id:String!,$l:[String!]!){issueUpdate(id:$id,input:{labelIds:$l}){success issue{id}}}')
+BACKLOG_ORDER_QUERY = ('query($team:String!,$after:String){issues(first:100,after:$after,filter:{team:{key:{eq:$team}},'
+                       'state:{type:{eq:"backlog"}}}){pageInfo{hasNextPage endCursor} nodes{id identifier sortOrder}}}')
 COMMENTS_QUERY = 'query($id:String!){issue(id:$id){comments(first:20){nodes{body}}}}'
 
 
@@ -291,6 +296,10 @@ def enqueue(state: Path, op: str, issue_id: str, *, target: str | None = None, b
     if op == "move":
         require_owner(state, issue_id, target, owner)
         key = f"move:{issue_id}:{target}"
+    elif op == "rank":
+        key = f"rank:{issue_id}:{target}"
+    elif op == "label":
+        key = f"label:{issue_id}:{body}"
     elif op == "comment":
         key = "comment:" + hashlib.sha256(f"{issue_id}\0{body}".encode()).hexdigest()[:24]
     else:
@@ -299,10 +308,11 @@ def enqueue(state: Path, op: str, issue_id: str, *, target: str | None = None, b
         entries = data.setdefault("entries", [])
         if any(entry.get("key") == key for entry in entries):
             return key
-        if op == "move":
-            entries[:] = [entry for entry in entries if not (entry.get("op") == "move" and entry.get("issueId") == issue_id)]
+        if op in ("move", "rank"):  # the newest intent replaces a pending one
+            entries[:] = [entry for entry in entries if not (entry.get("op") == op and entry.get("issueId") == issue_id)]
         entries.append({"key": key, "op": op, "issueId": issue_id, "enqueuedAt": time.time(), "attempts": 0,
-                        **({"target": target} if op == "move" else {"body": body})})
+                        **({"target": target} if op == "move" else {"value": float(target)} if op == "rank"
+                           else {"body": body})})
     return key
 
 
@@ -367,6 +377,31 @@ def _deliver_comment(state: Path, linear, entry: dict) -> str:
     return "commented"
 
 
+def _deliver_rank(state: Path, linear, entry: dict) -> str:
+    result = (linear.gql(RANK_MUTATION, {"id": entry["issueId"], "o": entry["value"]}) or {}).get("issueUpdate") or {}
+    after = result.get("issue") if isinstance(result.get("issue"), dict) else {}
+    if result.get("success") is not True or abs(float(after.get("sortOrder", "nan")) - entry["value"]) > 1e-6:
+        raise RuntimeError("rank not confirmed by readback")
+    return "ranked"
+
+
+def _deliver_label(state: Path, linear, entry: dict) -> str:
+    issue = (linear.gql(LABELS_QUERY, {"id": entry["issueId"]}) or {}).get("issue")
+    if not isinstance(issue, dict):
+        return "remote-missing"
+    have = {node["id"] for node in (issue.get("labels") or {}).get("nodes") or []}
+    wanted = next((node["id"] for node in ((issue.get("team") or {}).get("labels") or {}).get("nodes") or []
+                   if node.get("name") == entry["body"]), None)
+    if not wanted:
+        raise ValueError(f"no label {entry['body']}")
+    if wanted in have:
+        return "already"
+    result = (linear.gql(LABEL_MUTATION, {"id": entry["issueId"], "l": sorted(have | {wanted})}) or {}).get("issueUpdate") or {}
+    if result.get("success") is not True:
+        raise RuntimeError("label not confirmed")
+    return "labelled"
+
+
 def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT) -> dict:
     entries = list(_read(_outbox_path(state), OUTBOX).get("entries") or [])
     delivered, outcome = [], "drained"
@@ -375,7 +410,8 @@ def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT) ->
             outcome = "budget-held"
             break
         try:
-            result = (_deliver_move if entry["op"] == "move" else _deliver_comment)(state, linear, entry)
+            result = {"move": _deliver_move, "rank": _deliver_rank, "label": _deliver_label}.get(entry["op"], _deliver_comment)(
+                state, linear, entry)
         except transient:
             outcome = "rate-limited"  # never an attempt: the entry waits for the reset
             break
@@ -476,3 +512,9 @@ class Outboxed:
 
     def comment(self, issue_id: str, body: str) -> None:
         enqueue(self._state, "comment", issue_id, body=body)
+
+    def rank(self, issue_id: str, sort_order: float) -> None:
+        enqueue(self._state, "rank", issue_id, target=str(sort_order))
+
+    def label(self, issue_id: str, name: str) -> None:
+        enqueue(self._state, "label", issue_id, body=name)
