@@ -18,6 +18,7 @@ import { PROOF_CLAIM_FUNNEL_EVENTS } from '@/lib/acquisition/proof-claim-funnel'
 import { track } from '@/lib/analytics';
 import { AUTH_SURFACE, FORM_LAYOUT } from '@/lib/auth/constants';
 import { clearPlanIntent, type PlanIntentTier } from '@/lib/auth/plan-intent';
+import { buildCheckoutTerms } from '@/lib/billing/checkout-terms';
 import { getEntitlements } from '@/lib/entitlements/registry';
 import { normalizeOnboardingReturnTo } from '@/lib/onboarding/return-to';
 import type { ClaimTimeFinding } from '@/lib/proof/claim-time-proof';
@@ -38,6 +39,8 @@ interface OnboardingCheckoutClientProps {
   readonly isDefaultUpsell: boolean;
   /** Computed claim-time proof; empty hides the card (JOV-7794). */
   readonly proofFindings?: readonly ClaimTimeFinding[];
+  /** ISO first-charge instant when a mid-trial upgrade defers billing. */
+  readonly firstChargeAt?: string | null;
 }
 
 // formatPrice replaced by formatAmount per @jovie/no-ad-hoc-currency rule
@@ -248,6 +251,7 @@ export function OnboardingCheckoutClient({
   spotifyFollowers,
   isDefaultUpsell,
   proofFindings = [],
+  firstChargeAt = null,
 }: OnboardingCheckoutClientProps) {
   const searchParams = useSearchParams();
   // Pre-compute savings to determine annual default
@@ -258,6 +262,8 @@ export function OnboardingCheckoutClient({
   const [isAnnual, setIsAnnual] = useState(annualSavingsPercent > 25);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Unchecked by default: no billing without an affirmative opt-in.
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const planMarketing = getEntitlements(plan).marketing;
 
@@ -267,6 +273,11 @@ export function OnboardingCheckoutClient({
     isAnnual && annualAmount !== null ? annualAmount : monthlyAmount;
   const interval = isAnnual ? 'year' : 'month';
   const returnTo = normalizeOnboardingReturnTo(searchParams.get('returnTo'));
+  const terms = buildCheckoutTerms({
+    amountCents: currentAmount,
+    interval,
+    firstChargeAt: firstChargeAt ? new Date(firstChargeAt) : null,
+  });
 
   useEffect(() => {
     track('onboarding_checkout_shown', {
@@ -285,6 +296,7 @@ export function OnboardingCheckoutClient({
   }, [plan, spotifyFollowers, hasAnnualOption, isDefaultUpsell]);
 
   const handleCheckout = useCallback(async () => {
+    if (!termsAccepted) return;
     setIsLoading(true);
     setError(null);
 
@@ -311,6 +323,9 @@ export function OnboardingCheckoutClient({
           humanConfirmed: true,
           returnTo,
           source: 'onboarding',
+          termsAccepted: true,
+          termsVersion: terms.version,
+          expectedFirstChargeAt: firstChargeAt,
         }),
       });
 
@@ -333,7 +348,17 @@ export function OnboardingCheckoutClient({
       );
       setIsLoading(false);
     }
-  }, [plan, profileId, currentPriceId, interval, isDefaultUpsell, returnTo]);
+  }, [
+    plan,
+    profileId,
+    currentPriceId,
+    interval,
+    isDefaultUpsell,
+    returnTo,
+    termsAccepted,
+    terms.version,
+    firstChargeAt,
+  ]);
 
   const handleSkip = useCallback(() => {
     track('onboarding_checkout_skipped', {
@@ -427,10 +452,36 @@ export function OnboardingCheckoutClient({
           </ContentSurfaceCard>
         ) : null}
 
+        {/* Billing terms + explicit consent, shown at the charge point */}
+        <div className='mb-4 space-y-2' data-testid='checkout-terms'>
+          <p className='text-xs text-secondary-token'>{terms.timing}</p>
+          <p className='text-xs text-secondary-token'>{terms.cancel}</p>
+          <label className='flex cursor-pointer items-start gap-2.5 text-app text-primary-token'>
+            <input
+              type='checkbox'
+              className='mt-0.5 h-4 w-4 shrink-0'
+              checked={termsAccepted}
+              onChange={event => setTermsAccepted(event.target.checked)}
+              disabled={isLoading}
+            />
+            <span>
+              {terms.consentLabel}{' '}
+              <a
+                href='/legal/terms'
+                target='_blank'
+                rel='noopener noreferrer'
+                className='underline underline-offset-2'
+              >
+                Terms
+              </a>
+            </span>
+          </label>
+        </div>
+
         {/* CTA */}
         <Button
           onClick={handleCheckout}
-          disabled={isLoading}
+          disabled={isLoading || !termsAccepted}
           variant='primary'
           size='xl'
           className='w-full'
