@@ -149,7 +149,8 @@ LANE_TESTS = ["scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_li
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
               "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py",
-              "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py"]
+              "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
+              "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
 RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
