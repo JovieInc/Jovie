@@ -68,7 +68,9 @@ describe('CTA label weight lock (JOV-5317)', () => {
   });
 
   it('keeps the shared iOS ActionButton label at 510, not 400 or 590', () => {
-    const source = readRepo('apps/ios/Jovie/DesignSystem/JovieTheme.swift');
+    const source = readRepo(
+      'apps/ios/Packages/JovieKit/Sources/JovieKit/JovieTheme.swift'
+    );
 
     expect(source).toMatch(/static let actionLabelWeight: CGFloat = 510/);
     expect(source).toContain(
