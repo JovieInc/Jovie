@@ -854,6 +854,33 @@ MusicFetch.
 alert `escalation-surfaced` for the lanes repair owner (never a human by default); PRs
 that merged or closed drop out once the reconcile pass has a complete open-PR view.
 
+## Fleet work ledger (`fleet_ledger.py`)
+
+One read-only view of every claim (lanes run leases, repo-binding issue locks, the claim ledger and
+external-agent claims in `fleet-claims/`), each with a verdict: `live`, `starting`, `stranded`
+(active, no live lease for 3 h) or `expired` (external claim silent past its ttl). Non-lane agents
+(Lola, Hyperagent threads, Summer) take work with `fleet_ledger.py claim JOV-1 --agent lola --ttl 1800`,
+renew with `heartbeat`, and drop it with `release`; anyone checking `external_active` ignores an
+expired claim. `metrics` reports duplicate overlapping runs, overnight (00-08 UTC) vs day
+throughput and the factory share of issue runs (floor 20 %). `ownership.reconcile` also releases
+repo-binding claims whose binding issue lock is no longer held.
+
+Also in the same module and companions:
+
+- Lanes skip any issue under an unexpired external claim (`held_back_issues`); the doctor raises
+  `stranded-claims` and records one `fleet-ready.jsonl` row per pass, so `metrics` reports
+  `idleWhileReady` (allowed seat free while work waited) and `throttledMin` (autoscaler cut seats).
+- `fleet_ledger.py gates`: human-gated issues must carry `Default:` and `Deadline:` lines; they park
+  (lanes skip them), come due, or are `unbounded` (a gate that can block forever).
+- `fleet_ledger.py burn` reads `quota-windows.json` and ranks capped agents by how far behind their
+  reset window they are, so quota is spent before it resets.
+- `factory_intake.py`: `state/factory-signals/*.json` (`jovie-factory-signal/v1`: fingerprint, problem,
+  acceptance, metric) become Todo issues labelled `factory`, `ws:symphony-throughput` and
+  `factory-fp:<fp>` on each doctor pass (max 3, deduped by the label). Done means the metric moved.
+- `codex_delegate.py --agent dots -- codex exec ...`: agents that delegate to Codex take a
+  `slots/codex.N` seat under the lanes' admission lock and cap (exit 75 if none) and are logged per
+  agent in `runs/delegations.jsonl`.
+
 ## Tests
 
 ```sh
