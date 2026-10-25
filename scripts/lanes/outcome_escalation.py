@@ -15,17 +15,28 @@ without the required steps, and each item left unverifiable is routed as a capab
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
+import time
+import urllib.request
 from pathlib import Path
 
 STEPS = ("tools", "telemetry", "agent-help", "adversarial")
 PROBE_TIMEOUT_S = 120
 VISION_TIMEOUT_S = 600
-HELP_MARKER = "<!-- outcome-help-request:v1 -->"
+HELP_MARKER = "<!-- outcome-help-request:v1"
 GAP_MARKER = "<!-- outcome-capability-gap:v1 -->"
 GAP_FILE = "outcome-gaps.json"
+GATEWAY_URL = "https://ai-gateway.vercel.sh/v1/chat/completions"
+GATEWAY_ENV = Path(os.environ.get("AI_GATEWAY_LANE_ENV", Path.home() / ".config/jovie-lanes/ai-gateway.env"))
+# Measured 2026-10-25 on 12 real and seeded verdict items (supported / contradicted / insufficient):
+# openai/gpt-6.1-sol 9/12 correct at $0.0013 per correct verdict, 3.2s; zai/glm-5.3 7/12 at $0.0073, 13.8s.
+# A different family from the codex verifier. LANES_OUTCOME_ADVERSARIAL_MODEL=off disables it.
+DEFAULT_ADVERSARIAL_MODEL = "openai/gpt-6.1-sol"
+REPLY_PRICE = {"openai/gpt-6.1-sol": (2e-6, 1e-5), "zai/glm-5.3": (1.2e-6, 4e-6)}
+VERDICTS = ("supported", "contradicted", "insufficient")
 URL_RE = re.compile(r"https://[A-Za-z0-9.-]*jov\.ie[^\s)\"'<>]*")
 
 # capability -> (owner, what to build)
@@ -118,7 +129,7 @@ def vision_read(shot: str | None, out_dir: Path, run, env: dict, codex_cmd: list
         return None
 
 
-def request_agent_help(linear, issue: dict, item: dict, urls: list[str], mesh_send=None) -> dict:
+def request_agent_help(linear, issue: dict, item: dict, urls: list[str], mesh_send=None, corr: str = "") -> dict:
     """Ask an agent that has the capability. Mesh when the host holds credentials, else a Linear comment."""
     question = (f"Outcome verifier for {issue['identifier']} could not observe: \"{item['criterion']}\". "
                 f"Blocked by: {str(item.get('evidence') or '')[:240]}. Please open {', '.join(urls) or 'the production build'} "
@@ -132,35 +143,95 @@ def request_agent_help(linear, issue: dict, item: dict, urls: list[str], mesh_se
     else:
         mesh_note = "mesh unavailable on this host (no credentials)"
     try:
-        linear.comment(issue["id"], f"{HELP_MARKER}\nHelp requested from an agent with the capability (Summer, Instinct or the "
-                       f"golden-path owner):\n\n> {question}\n\nReply on this issue; the next outcome verification reads it.\n({mesh_note})")
-        return {"channel": "linear-comment", "delivered": True, "ref": "issue-comment", "note": mesh_note}
+        linear.comment(issue["id"], f"<!-- outcome-help-request:v1 corr={corr} -->\nHelp requested from an agent with the capability "
+                       f"(Summer, Instinct or the golden-path owner):\n\n> {question}\n\nReply to this comment, or quote `corr:{corr}` "
+                       f"in a new one. The next outcome verification re-evaluates the item from your reply.\n({mesh_note})")
+        return {"channel": "linear-comment", "delivered": True, "ref": corr, "note": mesh_note}
     except Exception as error:  # noqa: BLE001
         return {"channel": "none", "delivered": False, "note": f"{mesh_note}; linear failed: {type(error).__name__}"}
 
 
-def adversarial_review(item: dict, run, env: dict, codex_cmd: list[str], out_dir: Path) -> dict:
-    """A different model reviews a judgement item. Needs LANES_OUTCOME_ADVERSARIAL_MODEL."""
-    model = os.environ.get("LANES_OUTCOME_ADVERSARIAL_MODEL", "").strip()
-    if not model:
-        return {"ran": False, "result": "unavailable: no second-model reviewer configured (LANES_OUTCOME_ADVERSARIAL_MODEL)"}
-    answer = Path(out_dir) / "adversarial.txt"
-    prompt = Path(out_dir) / "adversarial.prompt.md"
-    answer.unlink(missing_ok=True)
-    prompt.write_text("You are an adversarial reviewer from a different model than the verifier. Judge this acceptance item "
-                      f"strictly from the evidence given.\nItem: {item['criterion']}\nEvidence: {item.get('evidence')}\n"
-                      f"Write to {answer} one line: VERDICT pass|fail|inconclusive, then one sentence of reasoning.")
+def gateway_key() -> str | None:
+    key = os.environ.get("AI_GATEWAY_API_KEY", "").strip()
+    if key:
+        return key
     try:
-        run([*codex_cmd, "--prompt-file", str(prompt), "--cwd", str(out_dir), "--model", model, "--reasoning-effort", "high"],
-            capture_output=True, text=True, timeout=VISION_TIMEOUT_S, env=env)
-        text = answer.read_text()[:300].strip()
-        return {"ran": bool(text), "result": text or "no answer written"}
-    except (OSError, Exception) as error:  # noqa: BLE001
-        return {"ran": False, "result": f"failed: {type(error).__name__}"}
+        for line in GATEWAY_ENV.read_text().splitlines():
+            name, _, value = line.partition("=")
+            if name.strip() in ("AI_GATEWAY_API_KEY", "export AI_GATEWAY_API_KEY") and value.strip():
+                return value.strip().strip("'\"")
+    except OSError:
+        pass
+    return None
+
+
+def adversarial_model() -> str | None:
+    model = os.environ.get("LANES_OUTCOME_ADVERSARIAL_MODEL", DEFAULT_ADVERSARIAL_MODEL).strip()
+    return None if model.lower() in ("", "off", "0", "false") else model
+
+
+def gateway_judge(question: str, model: str, urlopen=urllib.request.urlopen, timeout: int = 90) -> dict:
+    """One strict three-way verdict from a model of another family through the AI Gateway."""
+    key = gateway_key()
+    if not key:
+        return {"ran": False, "result": f"unavailable: no AI Gateway key on this host ({GATEWAY_ENV})"}
+    prompt = ("You are an adversarial reviewer from a different model family than the verifier. Answer with JSON only: "
+              '{"verdict":"supported"|"contradicted"|"insufficient","reason":"<one sentence>"}. supported = the evidence directly '
+              "proves the criterion; contradicted = it shows the criterion is false; insufficient = it establishes neither.\n" + question)
+    body = json.dumps({"model": model, "messages": [{"role": "user", "content": prompt}], "temperature": 0,
+                       "max_tokens": 2000}).encode()
+    request = urllib.request.Request(GATEWAY_URL, body, {"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            data = json.load(response)
+        text = data["choices"][0]["message"]["content"]
+        parsed = json.loads(text[text.index("{"):text.rindex("}") + 1])
+        verdict = parsed.get("verdict")
+        if verdict not in VERDICTS:
+            raise ValueError("verdict outside the contract")
+    except Exception as error:  # noqa: BLE001 - the attempt and its failure are the record
+        return {"ran": False, "result": f"{model} failed: {type(error).__name__}: {str(error)[:80]}"}
+    usage = data.get("usage") or {}
+    price = REPLY_PRICE.get(model, (0, 0))
+    cost = usage.get("prompt_tokens", 0) * price[0] + usage.get("completion_tokens", 0) * price[1]
+    return {"ran": True, "verdict": verdict, "costUsd": round(cost, 5),
+            "result": f"{model}: {verdict} - {str(parsed.get('reason') or '')[:160]} (${cost:.4f})"}
+
+
+def adversarial_review(item: dict, run=None, env=None, codex_cmd=None, out_dir=None, urlopen=urllib.request.urlopen) -> dict:
+    """A different-family model reviews a judgement item from the recorded evidence."""
+    model = adversarial_model()
+    if model is None:
+        return {"ran": False, "result": "disabled (LANES_OUTCOME_ADVERSARIAL_MODEL=off)"}
+    return gateway_judge(f"Criterion: {item['criterion']}\nEvidence: {item.get('evidence')}", model, urlopen=urlopen)
+
+
+def correlation_id(issue_id: str, item: dict, sha: str = "") -> str:
+    return "oh-" + hashlib.sha1(f"{issue_id}|{item['criterion']}|{sha}".encode()).hexdigest()[:10]
+
+
+def find_help(comments: list[dict], corr: str) -> dict | None:
+    """The help request carrying `corr` and the replies to it (child comments or comments quoting `corr:<id>`)."""
+    nodes = sorted(comments or [], key=lambda c: c.get("createdAt") or "")
+    request = next((c for c in nodes if HELP_MARKER in (c.get("body") or "") and f"corr={corr}" in (c.get("body") or "")), None)
+    if request is None:
+        return None
+    replies = [c for c in nodes if c is not request and (c.get("createdAt") or "") >= (request.get("createdAt") or "")
+               and HELP_MARKER not in (c.get("body") or "") and GAP_MARKER not in (c.get("body") or "")
+               and ((c.get("parent") or {}).get("id") == request.get("id") or f"corr:{corr}" in (c.get("body") or ""))]
+    return {"request": request, "replies": replies}
+
+
+def evaluate_reply(item: dict, reply_text: str, urlopen=urllib.request.urlopen) -> dict:
+    """Re-evaluate an item from an agent's reply (strict: a reply that only asserts is insufficient)."""
+    model = adversarial_model() or DEFAULT_ADVERSARIAL_MODEL
+    return gateway_judge(f"Criterion: {item['criterion']}\nWhy the verifier could not observe it: {item.get('evidence')}\n"
+                         f"Another agent that has the capability replied: {reply_text[:1500]}\n"
+                         "Judge the criterion from the reply only if it reports concrete observed state.", model, urlopen=urlopen)
 
 
 def escalate(items: list[dict], *, tree: Path, out_dir: Path, run, env: dict, codex_cmd: list[str], linear, issue: dict,
-             mesh_send=None) -> list[dict]:
+             mesh_send=None, sha: str = "", urlopen=urllib.request.urlopen) -> list[dict]:
     """Attach `attempts` to every unverifiable item (the model supplies its telemetry attempt). May flip an item
     the probe shows to be observable to `fail` ("observable but not observed")."""
     result = []
@@ -194,11 +265,32 @@ def escalate(items: list[dict], *, tree: Path, out_dir: Path, run, env: dict, co
             item["attempts"] = attempts
             result.append(item)
             continue
-        help_ = request_agent_help(linear, issue, item, urls, mesh_send)
-        attempts.append({"step": "agent-help", "result": f"{help_['channel']} delivered={help_['delivered']} {help_.get('note', '')}".strip()})
+        corr = correlation_id(issue["id"], item, sha)
+        item["helpCorr"] = corr
+        found = find_help((issue.get("comments") or {}).get("nodes") or [], corr)
+        if found and found["replies"]:
+            # The loop closes without the mesh: an earlier help request got a reply, so re-evaluate from it.
+            reply = found["replies"][-1]
+            who = (reply.get("user") or {}).get("name") or "an agent"
+            verdict = evaluate_reply(item, reply.get("body") or "", urlopen=urlopen)
+            attempts.append({"step": "agent-help", "result": f"reply from {who} to {corr}: {verdict['result']}"})
+            if verdict.get("verdict") == "supported":
+                item["status"] = "pass"
+                item["evidence"] = f"observed by {who} at the lane's request ({corr}): {(reply.get('body') or '')[:360]}"
+            elif verdict.get("verdict") == "contradicted":
+                item["status"] = "fail"
+                item["evidence"] = f"contradicted by {who}'s observation ({corr}): {(reply.get('body') or '')[:360]}"
+        elif found:
+            attempts.append({"step": "agent-help", "result": f"requested {found['request'].get('createdAt')} ({corr}); no reply yet, not re-posted"})
+        else:
+            help_ = request_agent_help(linear, issue, item, urls, mesh_send, corr=corr)
+            attempts.append({"step": "agent-help", "result": f"{help_['channel']} delivered={help_['delivered']} corr={corr} {help_.get('note', '')}".strip()})
         if item.get("kind") == "judgement" or item.get("capability") == "taste":
-            review = adversarial_review(item, run, env, codex_cmd, out_dir)
+            review = adversarial_review(item, urlopen=urlopen)
             attempts.append({"step": "adversarial", "result": review["result"]})
+            if review.get("verdict") == "contradicted" and item["status"] == "unverifiable":
+                item["status"] = "fail"
+                item["evidence"] = "contradicted by the adversarial reviewer: " + review["result"]
         item["attempts"] = attempts
         result.append(item)
     return result
@@ -217,10 +309,11 @@ def gap_for(issue: str, item: dict) -> dict:
     capability = item.get("capability") if item.get("capability") in CAPABILITIES else "other"
     owner, build = CAPABILITIES[capability]
     return {"issue": issue, "criterion": item["criterion"][:200], "capability": capability, "owner": owner, "build": build,
+            "evidence": str(item.get("evidence") or "")[:300], "helpCorr": item.get("helpCorr"),
             "attempts": [f"{a['step']}: {a['result'][:120]}" for a in item.get("attempts") or []]}
 
 
-def route_gaps(state: Path, linear, issue: dict, items: list[dict], now: float) -> list[dict]:
+def route_gaps(state: Path, linear, issue: dict, items: list[dict], now: float, sha: str = "", episode: str | None = None) -> list[dict]:
     """Record each unverifiable item as a capability gap (state ledger + one comment) so it gets built."""
     gaps = [gap_for(issue["identifier"], item) for item in items if item.get("status") == "unverifiable"]
     if not gaps:
@@ -231,7 +324,7 @@ def route_gaps(state: Path, linear, issue: dict, items: list[dict], now: float) 
         book = book if isinstance(book, dict) else {}
     except (OSError, ValueError):
         book = {}
-    book[issue["identifier"]] = {"at": now, "gaps": gaps}
+    book[issue["identifier"]] = {"at": now, "sha": sha, "episode": episode, "gaps": gaps}
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(book, sort_keys=True))
     os.replace(tmp, path)
@@ -244,3 +337,57 @@ def route_gaps(state: Path, linear, issue: dict, items: list[dict], now: float) 
     except Exception:  # noqa: BLE001 - the ledger entry stands
         pass
     return gaps
+
+
+HELP_ISSUE_QUERY = ("query($id:String!){issue(id:$id){id identifier state{name} "
+                    "comments(last:50){nodes{id body createdAt parent{id} user{name}}}}}")
+RESOLUTION_MARKER = "<!-- outcome-help-resolution:v1 -->"
+
+
+def read_gaps(state: Path) -> dict:
+    try:
+        data = json.loads((Path(state) / GAP_FILE).read_text())
+        return data if isinstance(data, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def followup_replies(state: Path, linear, now: float, limit: int = 15, urlopen=urllib.request.urlopen) -> list[dict]:
+    """Close help loops between verifications: for each gap with an open help request, read the issue's
+    comments, and when a reply arrived re-evaluate the item. Supported or contradicted resolves the gap
+    (comment + ledger). Returns the resolutions so the caller can act on a contradiction."""
+    book = read_gaps(state)
+    resolved, checked = [], 0
+    for ident, record in sorted(book.items()):
+        for gap in record.get("gaps") or []:
+            if not gap.get("helpCorr") or gap.get("resolved") or checked >= limit:
+                continue
+            checked += 1
+            row = linear.gql(HELP_ISSUE_QUERY, {"id": ident}).get("issue")
+            if not row:
+                continue
+            found = find_help((row.get("comments") or {}).get("nodes") or [], gap["helpCorr"])
+            if not found or not found["replies"]:
+                continue
+            reply = found["replies"][-1]
+            if reply.get("id") and reply["id"] == gap.get("lastReplyId"):
+                continue  # already judged insufficient
+            who = (reply.get("user") or {}).get("name") or "an agent"
+            verdict = evaluate_reply({"criterion": gap["criterion"], "evidence": gap.get("evidence")}, reply.get("body") or "",
+                                     urlopen=urlopen)
+            gap["lastReplyId"] = reply.get("id")
+            if verdict.get("verdict") in ("supported", "contradicted"):
+                gap["resolved"] = {"at": now, "verdict": verdict["verdict"], "by": who, "result": verdict["result"]}
+                try:
+                    linear.comment(row["id"], f"{RESOLUTION_MARKER}\nCapability gap resolved from {who}'s reply to {gap['helpCorr']}: "
+                                   f"**{verdict['verdict']}** for \"{gap['criterion']}\". {verdict['result']}")
+                except Exception:  # noqa: BLE001 - the ledger entry stands
+                    pass
+                resolved.append({"issue": ident, "gap": gap, "state": (row.get("state") or {}).get("name"),
+                                 "sha": record.get("sha"), "episode": record.get("episode"), "verdict": verdict["verdict"],
+                                 "issueId": row["id"]})
+    if checked:
+        tmp = (Path(state) / GAP_FILE).with_suffix(".tmp")
+        tmp.write_text(json.dumps(book, sort_keys=True))
+        os.replace(tmp, Path(state) / GAP_FILE)
+    return resolved
