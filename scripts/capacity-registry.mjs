@@ -42,7 +42,7 @@ export function buildCanon({ registry, spend }) {
     now: Date.parse(registry.updatedAt),
     spend,
   });
-  return `${renderCanon(view, registry)}\n`;
+  return renderCanon(view, registry);
 }
 
 export function check(inputs = loadAll(), canonPath = CANON_PATH) {

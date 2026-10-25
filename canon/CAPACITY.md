@@ -43,4 +43,3 @@ Plan spend at the snapshot: $715.67/mo across active accounts.
 7. cloudflare-credits
 8. hyperagent
 9. vercel-ai-gateway
-
