@@ -88,10 +88,9 @@ describe('SmartLinkPoweredByFooter', () => {
     const { rerender } = render(<SmartLinkPoweredByFooter />);
     const link = screen.getByRole('link', { name: 'Report' });
     expect(link).toHaveAttribute('href', '/report?type=smart_link');
-    expect(screen.getByRole('link', { name: /Powered by/i })).toHaveAttribute(
-      'href',
-      '/'
-    );
+    expect(
+      screen.getByRole('link', { name: /Made with Jovie/i })
+    ).toHaveAttribute('href', '/');
 
     rerender(<SmartLinkPoweredByFooter reportTarget='/tim/never-say-a-word' />);
     expect(link).toHaveAttribute(
@@ -100,14 +99,25 @@ describe('SmartLinkPoweredByFooter', () => {
     );
   });
 
-  it('gives every footer link a 44px hit container and keeps the separator outside the Report link', () => {
+  it('gives every footer link a 44px hit container and has brand-first hierarchy with no separators', () => {
     render(<SmartLinkPoweredByFooter />);
     for (const link of screen.getAllByRole('link')) {
       expect(link.className).toContain('before:h-11');
       expect(link.className).toContain('before:min-w-11');
     }
+    const brand = screen.getByRole('link', { name: /Made with Jovie/i });
+    const report = screen.getByRole('link', { name: 'Report' });
+    expect(brand.className).toContain('text-sm');
+    expect(report.className).toContain('text-xs');
+    expect(
+      screen.getByRole('contentinfo').textContent?.includes('\u00b7')
+    ).toBe(false);
     expect(screen.getByRole('link', { name: 'Report' }).textContent).toBe(
       'Report'
+    );
+    expect(screen.getByRole('link', { name: 'Privacy' })).toHaveAttribute(
+      'href',
+      '/legal/privacy'
     );
   });
 

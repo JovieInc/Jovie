@@ -30,8 +30,7 @@ describe('SmartLinkShell', () => {
         artworkUrl='/art.jpg'
         artworkAlt='Never Say A Word artwork'
         showMenuButton={false}
-        heroTreatment='below'
-        heroOverlay={<h1>Never Say A Word</h1>}
+        heroMeta={<h1>Never Say A Word</h1>}
       >
         Listen
       </SmartLinkShell>

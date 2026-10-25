@@ -8,6 +8,7 @@
  * vignettes, and top bar into a single reusable component.
  */
 
+import { IconButton } from '@jovie/ui';
 import { ChevronLeft } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -29,8 +30,12 @@ import { cn } from '@/lib/utils';
 export const SMART_LINK_MENU_ITEM_CLASS =
   'flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-sm font-[470] text-white/88 transition-colors duration-subtle active:bg-white/[0.06]';
 export const SMART_LINK_MENU_ICON_CLASS = 'h-4 w-4 text-white/40';
+// Title and artist render below clean square art, never over it ("no text on
+// text", DESIGN.md). 24/32 title, 14/20 artist, 4px between.
 export const SMART_LINK_HERO_TITLE_CLASS =
-  'text-2xl font-semibold leading-[1.08] tracking-tight text-(--color-text-tooltip) [text-shadow:0_1px_12px_rgba(0,0,0,0.4)]';
+  'text-2xl font-semibold leading-8 tracking-tight text-(--color-text-tooltip)';
+export const SMART_LINK_HERO_ARTIST_CLASS =
+  'mt-1 block text-sm font-book leading-5 text-muted-foreground transition-colors duration-subtle hover:text-foreground';
 
 /** Hook for the share action used across all smart link pages */
 export function useSmartLinkShare(
@@ -57,13 +62,11 @@ type SmartLinkShellBaseProps = {
   readonly artworkUrl: string | null;
   readonly artworkAlt?: string;
   readonly children: React.ReactNode;
-  /** Content overlaid at the bottom of the hero artwork (title, artist, play button) */
-  readonly heroOverlay?: React.ReactNode;
+  /** Title, artist and meta rendered in normal flow below the square art. */
+  readonly heroMeta?: React.ReactNode;
   readonly showBrandMark?: boolean;
   readonly returnHref?: string | null;
   readonly returnLabel?: string;
-  /** Exploration only: how square cover art is framed in the hero. */
-  readonly heroTreatment?: 'current' | 'square' | 'blurred' | 'below';
   /** Wraps the artwork image (e.g., for context menu). Must render a relative h-full w-full container. */
   readonly artworkWrapper?: (img: React.ReactNode) => React.ReactNode;
 };
@@ -77,9 +80,6 @@ type SmartLinkShellProps =
       readonly showMenuButton: false;
       readonly onMenuOpen?: () => void;
     });
-
-const SMART_LINK_ICON_BUTTON_CLASSES =
-  "relative before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] flex h-8 w-8 items-center justify-center rounded-full border border-white/[0.08] bg-black/25 text-white/70 backdrop-blur-2xl transition-colors duration-subtle hover:bg-black/40";
 
 function ArtworkFallback() {
   return (
@@ -104,15 +104,15 @@ function SmartLinkHeaderRightSlot({
 }): ReactNode {
   if (showMenuButton && onMenuOpen) {
     return (
-      <button
-        type='button'
+      <IconButton
+        variant='secondary'
+        size='md'
         onClick={onMenuOpen}
-        className={SMART_LINK_ICON_BUTTON_CLASSES}
-        aria-label='Menu'
+        ariaLabel='Menu'
         aria-haspopup='dialog'
       >
         <Mark size={17} className='h-4 w-4' />
-      </button>
+      </IconButton>
     );
   }
 
@@ -134,14 +134,13 @@ export function SmartLinkShell({
   artworkUrl,
   artworkAlt = 'Artwork',
   children,
-  heroOverlay,
+  heroMeta,
   onMenuOpen,
   showBrandMark = true,
   showMenuButton = true,
   returnHref,
   returnLabel = 'Back',
   artworkWrapper,
-  heroTreatment = 'current',
 }: SmartLinkShellProps) {
   const artworkImage = artworkUrl ? (
     <Image
@@ -159,55 +158,23 @@ export function SmartLinkShell({
   return (
     <PublicSurfaceShell ambientMediaUrl={artworkUrl}>
       <PublicSurfaceStage>
-        {/* Hero */}
-        <header
-          className={cn(
-            'relative w-full shrink-0',
-            heroTreatment === 'below' && 'pb-1',
-            heroTreatment === 'square' && 'aspect-square',
-            (heroTreatment === 'current' || heroTreatment === 'blurred') &&
-              'aspect-[4/3] md:aspect-square'
-          )}
-          data-hero-treatment={heroTreatment}
-        >
-          {heroTreatment === 'blurred' && artworkUrl ? (
-            <div
-              className='absolute inset-0 overflow-hidden'
-              aria-hidden='true'
-            >
-              <Image
-                src={artworkUrl}
-                alt=''
-                fill
-                sizes='(max-width: 767px) 100vw, 430px'
-                className='scale-125 object-cover opacity-70 blur-2xl'
-              />
-            </div>
-          ) : null}
-          {heroTreatment !== 'below' && (
-            <>
-              <div className='absolute inset-0'>
-                {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
-              </div>
-
-              {/* Vignettes */}
-              <div className='pointer-events-none absolute inset-x-0 top-0 h-[36%] bg-[linear-gradient(to_bottom,rgba(0,0,0,0.45)_0%,rgba(0,0,0,0.15)_55%,transparent_100%)]' />
-              <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[55%] bg-[linear-gradient(to_top,var(--profile-stage-bg,rgba(8,9,10,1))_0%,rgba(5,6,8,0.75)_45%,transparent_100%)]' />
-            </>
-          )}
-
+        {/* Hero: clean square art, then title and artist in flow. No text,
+            gradient or scrim ever sits on the art (DESIGN.md rule 8). */}
+        <header className='relative w-full shrink-0 pb-1'>
           <PublicSurfaceHeader
             className='px-5 pt-[max(env(safe-area-inset-top),20px)]'
             leftSlot={
               returnHref ? (
-                <Link
-                  href={returnHref}
-                  className={SMART_LINK_ICON_BUTTON_CLASSES}
-                  aria-label={returnLabel}
-                  data-testid='smart-link-back'
+                <IconButton
+                  asChild
+                  variant='secondary'
+                  size='md'
+                  ariaLabel={returnLabel}
                 >
-                  <ChevronLeft className='h-4 w-4' />
-                </Link>
+                  <Link href={returnHref} data-testid='smart-link-back'>
+                    <ChevronLeft className='h-4 w-4' />
+                  </Link>
+                </IconButton>
               ) : null
             }
             rightSlot={SmartLinkHeaderRightSlot({
@@ -217,23 +184,19 @@ export function SmartLinkShell({
             })}
           />
 
-          {heroTreatment === 'below' && (
-            // "No text on text": clean square art, no overlay or gradient on
-            // it. Title and artist render below in normal flow, aligned to
-            // the art edges (DESIGN.md, Do not fuck with art).
-            <div className='relative px-5 pt-4'>
-              <ArtworkFrame
-                size='hero'
-                className='aspect-square w-full'
-                data-testid='smart-link-artwork'
-              >
-                {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
-              </ArtworkFrame>
-            </div>
-          )}
+          <div className='relative px-5 pt-4'>
+            <ArtworkFrame
+              size='hero'
+              className='aspect-square w-full'
+              data-testid='smart-link-artwork'
+            >
+              {artworkWrapper ? artworkWrapper(artworkImage) : artworkImage}
+            </ArtworkFrame>
+          </div>
 
-          {/* Hero overlay */}
-          {heroOverlay}
+          {heroMeta ? (
+            <div className='relative z-10 px-5 pt-6'>{heroMeta}</div>
+          ) : null}
         </header>
 
         {/* Content */}
