@@ -167,10 +167,15 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   // A lane_runner.py edit alone does not pull in test_lane_runner.py (867 tests, ~90s); edit that test to run it.
   'tests=""',
   'for m in $(printf "%s\\n" $cand | sort -u); do if [ -f "$m" ] && grep -q "\\"$m\\"" scripts/lanes/lane_runner.py; then tests="$tests $m"; fi; done',
-  '[ -n "${tests// /}" ] || { echo "no changed release self-test lanes tests"; exit 0; }',
+  // Any scripts/lanes/*.py edit also runs the atomic-state ratchet and UpdateTest, which stage the
+  // lanes tree the way the release self-test does (#23232: a truncating state write in a new module).
+  'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
+  'extra=""',
+  'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
+  '[ -n "${tests// /}$extra" ] || { echo "no changed release self-test lanes tests"; exit 0; }',
   'mkdir -p "$t/state/home"',
-  'echo "release self-test env (LANES_SELFTEST=1) on:$tests"',
-  'LANES_SELFTEST=1 LANES_STATE="$t/state" HOME="$t/state/home" python3 -m unittest -q $tests',
+  'echo "release self-test env (LANES_SELFTEST=1) on:$tests $extra"',
+  'LANES_SELFTEST=1 LANES_STATE="$t/state" HOME="$t/state/home" python3 -m unittest -q $tests $extra',
 ].join('; ');
 
 export const SOURCE_GUARDS = Object.freeze([
@@ -876,6 +881,10 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/merge-queue-green-enroll.test.mjs',
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
+  'scripts/lib/__tests__/fleet-rules-lane-evidence.test.mjs',
+  'scripts/lib/__tests__/fleet-rules-verdict-retry.test.mjs',
+  'scripts/lib/__tests__/pr-ready-evidence-pick.test.mjs',
+  'scripts/lib/__tests__/quota-deferred-heads.test.mjs',
   'scripts/hold-contract.test.mjs',
   'scripts/invariants/art-direction/surface-media.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',

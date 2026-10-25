@@ -55,6 +55,18 @@ describe('lanes release self-test env at PR time', () => {
     expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).not.toContain('pytest');
   });
 
+  it('also runs the atomic-state ratchet and UpdateTest for any scripts/lanes edit', () => {
+    expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).toContain(
+      'scripts/tests/test_lanes_atomic_state.py'
+    );
+    expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).toContain(
+      'scripts.tests.test_lane_runner.UpdateTest'
+    );
+    expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).toContain(
+      'python3 -m unittest -q $tests $extra'
+    );
+  });
+
   function run(testBody, { listed = true } = {}) {
     const dir = mkdtempSync(join(tmpdir(), 'lanes-selftest-guard-'));
     try {
