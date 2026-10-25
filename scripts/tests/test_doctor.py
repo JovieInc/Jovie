@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib.util
 import hashlib
 import json
+from datetime import datetime, timezone
 import os
 import subprocess
 import sys
@@ -329,6 +330,56 @@ class PublicFeedSizeTest(unittest.TestCase):
         self.assertEqual(len(json.loads(full)["fileOverlap"]["pairs"]), 737)
         self.assertEqual(public["publicProjection"]["fullEvidence"]["bytes"], len(full.encode()))
 
+    def test_conditions_keep_active_and_recent_resolutions_compactly_and_count_the_rest(self):
+        # Gem 2026-10-25: 33 of 52 receipts were resolved, kept forever, each with ~1.5 KB of review bindings.
+        now = 1_800_000_000.0
+        stamp = lambda age: datetime.fromtimestamp(now - age, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        review = {"outcome": "approved-template", "bindings": {"messageSha256": "f" * 64, "extra": "x" * 1200}}
+        def event(state, resolved_age=None, evidence="e" * 900):
+            row = {"schema": "s", "idempotencyKey": "gem:k:1", "condition": "k", "generation": 1, "state": state,
+                   "severity": "degraded", "owner": "doctor", "firstObservedAt": "2026-10-25T00:00:00Z",
+                   "source": {"producer": "p", "status": "degraded", "observedAt": "t", "freshnessSeconds": 0},
+                   "evidence": evidence, "writingReview": review, "writingDecision": {"d": "x" * 500},
+                   "summerEscalation": {"transport": "linear", "outcome": "requested"}}
+            if resolved_age is not None:
+                row["resolvedAt"] = stamp(resolved_age)
+            return row
+        public = {"conditions": {"live": event("active"), "fresh": event("resolved", 3600),
+                                 "old": event("resolved", 7 * 3600), "undated": event("resolved")}}
+        before = len(json.dumps(public))
+        doctor._compact_conditions(public, now)
+        self.assertEqual(sorted(public["conditions"]), ["fresh", "live"])
+        live = public["conditions"]["live"]
+        self.assertNotIn("writingReview", live)
+        self.assertNotIn("writingDecision", live)
+        self.assertEqual(live["evidence"], "e" * 900, "operational evidence is never trimmed")
+        self.assertEqual(live["summerEscalation"]["outcome"], "requested")
+        self.assertEqual(live["source"]["status"], "degraded")
+        summary = public["conditionsSummary"]
+        self.assertEqual((summary["total"], summary["resolvedOmitted"], summary["byState"]),
+                         (4, 2, {"active": 1, "resolved": 3}))
+        self.assertEqual(summary["ref"]["jsonPointer"], "/conditions")
+        self.assertLess(len(json.dumps(public)), before / 2)
+
+    def test_growth_rate_projects_time_to_cap_and_alerts_under_six_hours(self):
+        cap, now = 262144, 1_000_000.0
+        flat = doctor.feed_growth([[now - 3600, 100000], [now - 1800, 100000]], now, 100000)
+        self.assertEqual((flat["growthBytesPerHour"], flat["secondsToCap"]), (0, None))
+        self.assertIsNone(doctor.feed_growth([[now - 60, 1]], now, 2)["secondsToCap"], "too little history")
+        rising = doctor.feed_growth([[now - 3600, 145000], [now - 1800, 160000]], now, 175000)
+        self.assertEqual(rising["growthBytesPerHour"], 30000)
+        self.assertEqual(rising["secondsToCap"], round((cap - 175000) / (30000 / 3600)))
+        self.assertLess(rising["secondsToCap"], doctor.FEED_GROWTH_ALERT_S)
+        sizes = {"bytes": 175000, "maxBytes": cap, "ratio": 0.668, **rising}
+        alert = doctor.judge(obs(publicFeed=sizes))["public-feed-growth"]
+        self.assertIn("30000 bytes/h", alert)
+        slow = doctor.feed_growth([[now - 3600, 100000], [now - 1800, 100500]], now, 101000)
+        self.assertNotIn("public-feed-growth", doctor.judge(obs(publicFeed={"bytes": 101000, "maxBytes": cap, "ratio": 0.4, **slow})))
+        # The level alert wins when both apply; one alert, not two.
+        both = doctor.judge(obs(publicFeed={**sizes, "bytes": 190000, "ratio": 0.725}))
+        self.assertIn("public-feed-near-limit", both)
+        self.assertNotIn("public-feed-growth", both)
+
     def test_section_sizes_are_measured_and_the_doctor_alerts_before_the_cap(self):
         out = doctor.public_status_projection(realistic_feed(), json.dumps(realistic_feed(), indent=1))
         sizes = doctor.feed_section_sizes(out)
@@ -557,6 +608,39 @@ class JudgeTest(unittest.TestCase):
                                            "oldestOwnerlessS": 7200,
                                            "unresolved": {"post-merge-without-merged-evidence": 40}}))
         self.assertIn("40 started JOV issues", loud["started-without-owner"])
+
+    def test_team_templated_receipts_use_the_newest_team_file_and_ignore_sidecars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            state = home / ".local/state/jovie-lanes"
+            (state / "refill").mkdir(parents=True)
+            (state / "decompose").mkdir()
+            now = time.time()
+            (state / "refill" / "JOV.json").write_text("{}")
+            (state / "refill" / "LYB.json").write_text("{}")
+            old = state / "refill" / "LYB.json"
+            os.utime(old, (now - 7200, now - 7200))
+            (state / "refill" / "JOV-rank.json").write_text("{}")  # sidecar, not a team receipt
+            stale_only = state / "decompose" / "LYB.json"
+            stale_only.write_text("{}")
+            os.utime(stale_only, (now - 7200, now - 7200))
+            (state / "decompose" / "seen.json").write_text("{}")  # lowercase: not a team
+            fresh_sidecar = state / "decompose" / "spawn-LYB.json"
+            fresh_sidecar.write_text("{}")
+            row = lambda name, minutes: {"id": f"gem:{name}", "status": "live", "host": "gem", "maxStalenessMinutes": minutes,
+                                         "receipt": {"kind": "host-local",
+                                                     "location": f"gem:~/.local/state/jovie-lanes/{name}/<TEAM>.json"}}
+            watch = doctor.automation_watch([row("refill", 15), row("decompose", 60)], "gem", now, home=home)
+            self.assertNotIn("gem:refill", watch["silent"], "JOV.json is fresh")
+            self.assertEqual(watch["silent"]["gem:decompose"]["ageS"] // 60, 120, "only a stale team receipt counts")
+            (state / "refill" / "JOV.json").unlink()
+            os.utime(state / "refill" / "JOV-rank.json", (now, now))
+            gone = doctor.automation_watch([row("refill", 15)], "gem", now, home=home)
+            self.assertIn("gem:refill", gone["silent"], "a sidecar cannot vouch for a team receipt")
+            for path in (state / "refill").iterdir():
+                path.unlink()
+            missing = doctor.automation_watch([row("refill", 15)], "gem", now, home=home)
+            self.assertIsNone(missing["silent"]["gem:refill"]["ageS"])
 
     def test_registered_host_local_automations_raise_automation_silent(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -1031,6 +1115,50 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(doctor.Tracker(ForbiddenLabels(), "gem").open("production-deploy:lyb", "LYB deploys failing"), "iss-9")
         self.assertEqual(len(forbidden), 1)
         self.assertEqual(issues[0]["labelIds"], ["symphony"], "the incident keeps its symphony label and loses only the remediation one")
+
+    def test_a_failed_open_is_never_silent_and_keeps_when_it_started(self):
+        # 2026-10-25: production-deploy:lyb sat for ~50 min with no issue; Tracker.open swallowed the error.
+        class Down:
+            def gql(self, query, variables):
+                if "title:{eq:$t}" in query:
+                    return {"issues": {"nodes": []}}
+                if "teams(filter" in query:
+                    return {"teams": {"nodes": [{"id": "t", "states": {"nodes": [{"id": "tr", "name": "Triage"}]},
+                                                  "labels": {"nodes": []}}]}}
+                if "issueLabels(" in query or "issueLabelCreate" in query:
+                    return {"issueLabels": {"nodes": []}}
+                raise RuntimeError("linear: 500")
+
+        tracker = doctor.Tracker(Down(), "gem")
+        self.assertIsNone(tracker.open("production-deploy:lyb", "x"))
+        self.assertTrue(tracker.last_error.startswith("create-failed:RuntimeError"))
+        first = doctor.reconcile({"production-deploy:lyb": "x"}, {}, tracker, 1000.0)
+        entry = first["issues"]["production-deploy:lyb"]
+        self.assertEqual((entry["id"], entry["since"]), (None, 1000.0))
+        self.assertIn("create-failed", entry["reason"])
+        second = doctor.reconcile({"production-deploy:lyb": "x"}, first, tracker, 1300.0)
+        self.assertEqual(second["issues"]["production-deploy:lyb"]["since"], 1000.0, "since survives retries")
+
+    def test_invariant_flags_only_alerts_without_an_issue_older_than_fifteen_minutes(self):
+        issues = {"a": {"id": "i1", "closedAt": None},
+                  "b": {"id": None, "closedAt": None, "reason": "create-failed:RuntimeError: 500", "since": 1000.0},
+                  "c": {"id": None, "closedAt": None, "since": 1000.0},
+                  "d": {"id": None, "closedAt": None, "reason": "r", "since": 1500.0}}
+        alerts = {"a": "", "b": "", "c": "", "d": "", "e": ""}
+        gaps = doctor.alert_issue_gaps(alerts, issues, 1000.0 + doctor.ALERT_ISSUE_GRACE_S + 1)
+        self.assertEqual(gaps, {"b": "create-failed:RuntimeError: 500", "c": "untracked"})
+        self.assertEqual(doctor.alert_issue_gaps(alerts, issues, 1000.0 + doctor.ALERT_ISSUE_GRACE_S - 1), {})
+        previous = {"issues": issues}
+        with mock.patch("time.time", return_value=1000.0 + doctor.ALERT_ISSUE_GRACE_S + 1):
+            raised = doctor.judge(obs(tick={"error": "boom"}), previous)
+        self.assertNotIn("alert-issue-missing", raised, "only alerts present this tick count")
+
+    def test_judge_raises_alert_issue_missing_for_a_standing_alert_without_an_issue(self):
+        previous = {"issues": {"tick-error": {"id": None, "closedAt": None, "reason": "create-failed:RuntimeError: 500", "since": 100.0}}}
+        with mock.patch("time.time", return_value=100.0 + doctor.ALERT_ISSUE_GRACE_S + 5):
+            alerts = doctor.judge(obs(tick={"error": "boom"}), previous)
+        self.assertIn("tick-error", alerts)
+        self.assertIn("tick-error (create-failed:RuntimeError: 500)", alerts["alert-issue-missing"])
 
     def test_an_existing_label_beyond_the_first_fifty_is_found_by_name_and_not_recreated(self):
         created, issues = [], []
@@ -2924,3 +3052,33 @@ class RedDispatchAlertTest(unittest.TestCase):
             self.write_ledger(state, [self.dispatched_row(red_epoch=self.NOW - 60)])
             obs = {"now": self.NOW, "redDispatch": doctor.red_dispatch_summary(state, self.NOW)}
             self.assertFalse(doctor.judge(obs))
+
+
+class QuotaDeferredHeadsTests(unittest.TestCase):
+    def test_alert_names_the_heads_and_is_silent_at_zero(self):
+        deferred = {"value": 2, "heads": [{"number": 7, "ageMinutes": 90}, {"number": 8, "ageMinutes": 70}]}
+        alert = doctor.judge(obs(quotaDeferredHeads=deferred))["quota-deferred-heads"]
+        self.assertIn("2 open PR heads", alert)
+        self.assertIn("#7 90m", alert)
+        self.assertNotIn("quota-deferred-heads", doctor.judge(obs(quotaDeferredHeads={"value": 0, "heads": []})))
+        self.assertNotIn("quota-deferred-heads", doctor.judge(obs()))
+
+    def test_sampler_parses_exit_one_caches_and_keeps_a_stale_read_on_failure(self):
+        import tempfile
+        from types import SimpleNamespace
+        out = json.dumps({"metric": "quota_deferred_heads_older_than_1h", "value": 1,
+                          "heads": [{"number": 9, "ageMinutes": 80}]})
+        calls = []
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=1, stdout=out, stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            signal, error = doctor.sample_quota_deferred_heads(Path(tmp), 1000.0, run)
+            self.assertEqual((signal["value"], error), (1, None))
+            again, _ = doctor.sample_quota_deferred_heads(Path(tmp), 1100.0, run)
+            self.assertEqual(len(calls), 1, "a fresh cache is not re-read")
+            self.assertEqual(again["value"], 1)
+            broken = lambda *a, **k: SimpleNamespace(returncode=2, stdout="", stderr="boom")
+            stale, error = doctor.sample_quota_deferred_heads(Path(tmp), 5000.0, broken)
+            self.assertEqual(stale["value"], 1)
+            self.assertIn("boom", error)
