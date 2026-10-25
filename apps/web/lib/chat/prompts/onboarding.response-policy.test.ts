@@ -4,6 +4,8 @@ import {
   formatPublicPriceDisplay,
   formatUsdAmount,
   getPublicPriceClaim,
+  PRO_TRIAL_DURATION_DAYS,
+  PRO_TRIAL_TRUTH,
 } from '@/lib/billing/offer-truth';
 import { lintVoice } from '@/lib/chat/voice-lint';
 import { PLAN_PRICES } from '@/lib/config/plan-prices';
@@ -118,16 +120,25 @@ describe('onboarding compact response policy', () => {
     expect(ONBOARDING_SYSTEM_PROMPT).toContain('without a CTA');
   });
 
-  it('never promises a trial or no-card start that checkout does not deliver', () => {
-    expect(ONBOARDING_SYSTEM_PROMPT).not.toMatch(
-      /14-day|no card|no credit card/i
-    );
-    expect(ONBOARDING_CALIBRATION_EXAMPLES.checkoutCloser).not.toMatch(
-      /trial|no card|free for/i
-    );
+  it('describes the free trial and the paid upgrade as two different things', () => {
+    // The trial is an entitlement with no card that ends into Free; upgrading
+    // is a card-taking subscription. The chat must never join them into an
+    // automatic charge after the trial.
+    expect(ONBOARDING_SYSTEM_PROMPT).toContain(PRO_TRIAL_TRUTH);
     expect(ONBOARDING_SYSTEM_PROMPT).toContain(
-      'Never mention a trial or a no-card start'
+      'Never say the trial turns into an automatic charge'
     );
+    const closer = ONBOARDING_CALIBRATION_EXAMPLES.checkoutCloser;
+    expect(closer).toContain(
+      `${PRO_TRIAL_DURATION_DAYS} days free and no card`
+    );
+    expect(closer).toContain('unless you upgrade');
+    expect(closer).toContain('Upgrading takes a card');
+    for (const text of [closer, ONBOARDING_PRICING_TRUTH]) {
+      expect(text).not.toMatch(
+        /after (the|a|your) (\d+-day )?trial,? (you|we)['’]?(ll| will)? (be )?charge|automatically (charged|billed)|then (you['’]re|you are) charged/i
+      );
+    }
   });
 
   it('quotes the same monthly price as billing config, offer truth and the checkout closer', () => {
