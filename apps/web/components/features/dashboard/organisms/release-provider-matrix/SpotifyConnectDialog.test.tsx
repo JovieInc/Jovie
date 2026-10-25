@@ -147,6 +147,18 @@ describe('SpotifyConnectDialog', () => {
     await expectNoA11yViolations(container);
   }, 15_000);
 
+  it('keeps the artist search at the 24px target-size floor', async () => {
+    const { container } = renderDialog();
+
+    const input = await getFocusedCombobox();
+    // The canonical Input atom carries the hit-target floor (h-11 / sm:h-8);
+    // min-h-6 keeps the raw input at or above the 24px floor in every mode.
+    expect(input).toHaveClass('min-h-6');
+    expect(input).toHaveClass('sm:h-8');
+    expect(input).toBeEnabled();
+    await expectNoA11yViolations(container);
+  }, 15_000);
+
   it('renders a resolving skeleton while the connection state is unknown', async () => {
     const { container } = renderDialog({ connected: undefined });
 
