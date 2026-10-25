@@ -143,6 +143,11 @@ describe('eval', () => {
     });
     expect(rep.tasks.t.trend[0]).toMatchObject({ week: '2026-10-19', n: 4 });
     expect(rep.tasks.t.costUsd7d).toBeGreaterThan(0);
+    expect(rep.tasks.t.qualityByVersion.v1.n).toBe(4);
+    // a version with no labeled outcomes yet is not judged against guardrails
+    expect(
+      guardrailFailures({ n: 0, precision: null }, { minPrecision: 0.9 })
+    ).toEqual([]);
   });
 });
 

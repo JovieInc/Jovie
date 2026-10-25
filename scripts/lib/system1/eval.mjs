@@ -123,6 +123,7 @@ export function score(items, taskDef, predict) {
 /** Guardrails are absolute floors/ceilings on the candidate. Returns the failed names. */
 export function guardrailFailures(metrics, guardrails = {}) {
   const failed = [];
+  if (!metrics.n) return failed; // no labeled outcomes yet: nothing to judge
   const lt = (value, min) => value === null || value < min;
   const gt = (value, max) => value !== null && value > max;
   if (
@@ -254,6 +255,12 @@ export function buildReport(registry, store, activeOf, now = Date.now) {
       heldout: heldout.length,
       quality: pick(quality),
       quality7d: pick(q7),
+      qualityByVersion: Object.fromEntries(
+        [...new Set(items.flatMap(i => Object.keys(i.byVersion)))]
+          .sort()
+          .map(v => [v, pick(score(items, def, loggedPredictor(v)))])
+          .filter(([, m]) => m.n > 0)
+      ),
       guardrailFailures: guardrailFailures(quality, def.guardrails),
       trend: weeklyTrend(items, def),
     };
