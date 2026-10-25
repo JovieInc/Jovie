@@ -1,0 +1,49 @@
+{
+  "schema": "jovie-authenticated-performance-graduation/v1",
+  "repository": "JovieInc/Jovie",
+  "surface": "production-release-exact-staged-build",
+  "measuredAt": "2026-10-23T14:40:00Z",
+  "routeIds": [
+    "creator-calendar",
+    "creator-chat-nav",
+    "creator-contacts",
+    "creator-inbox-nav",
+    "creator-library",
+    "creator-tasks"
+  ],
+  "selection": {
+    "workflowPath": ".github/workflows/production-controller.yml",
+    "job": "Production Release / Promote to Production",
+    "step": "Prove canonical navigation budgets on exact staged build",
+    "since": "2026-10-22T14:00:00Z",
+    "cutoff": "2026-10-23T14:40:00Z",
+    "enumeratedControllers": 145,
+    "windowSize": 14,
+    "eligibility": "latest completed executed measurement steps regardless of controller conclusion; missing/partial authenticated results are nonqualifying; skipped steps never qualify",
+    "order": "measurement job completedAt descending, controllerRunId descending"
+  },
+  "policy": {
+    "requiredConsecutiveRuns": 14,
+    "samplesPerRoute": 3,
+    "budgetAuthority": "apps/web/scripts/performance-route-manifest.ts",
+    "nextReviewAt": "2026-10-28T14:40:00Z",
+    "trackingIssue": "JOV-8557"
+  },
+  "evidence": {
+    "inventory": "generated/authenticated-performance-controller-inventory.jsonl",
+    "inventorySha256": "a7441a3631ef913241e6f76719cc1bb75fe1d588dfb0721216b608b8cff96969",
+    "measurements": "generated/authenticated-performance-measurements.jsonl",
+    "measurementsSha256": "5071bf552b5314b08af4f001b9b4d4e52c035789bf5fcfe4c4f22de4a2b7c872"
+  },
+  "window": {
+    "selectedJobIds": [
+      120434250174, 120419730434, 120404016763, 120380539381, 120359282478,
+      120347375639, 120333167891, 120317391792, 120309576157, 120300100415,
+      120288939704, 120281939386, 120275403033, 120268571552
+    ],
+    "qualifyingRunsInWindow": 14,
+    "consecutiveQualifyingRuns": 14,
+    "graduated": true,
+    "decision": "block"
+  }
+}

@@ -208,7 +208,7 @@ test('3: premise evidence records assumption and an executed falsifying command/
   ])
     assert.equal(hasPremiseEvidence(body), false);
   // Execute the real Python prompt renderer without importing its worker runtime.
-  const code = `import ast, pathlib\np=ast.parse(pathlib.Path('scripts/lanes/lane_runner.py').read_text())\nf=next(n for n in p.body if isinstance(n,ast.FunctionDef) and n.name=='render_fix_prompt')\nns={'PLANNING_CONTRACT': [], 'REPO_SLUG':'JovieInc/Jovie'}\nexec(compile(ast.Module(body=[f],type_ignores=[]),'prompt','exec'),ns)\nprint(ns['render_fix_prompt']({'number':1,'headRefName':'fix/test'},'same check failed twice'))`;
+  const code = `import ast, pathlib\np=ast.parse(pathlib.Path('scripts/lanes/lane_runner.py').read_text())\nf=next(n for n in p.body if isinstance(n,ast.FunctionDef) and n.name=='render_fix_prompt')\nns={'PLANNING_CONTRACT': [], 'NO_HISTORY_REWRITE': [], 'REPO_SLUG':'JovieInc/Jovie'}\nexec(compile(ast.Module(body=[f],type_ignores=[]),'prompt','exec'),ns)\nprint(ns['render_fix_prompt']({'number':1,'headRefName':'fix/test'},'same check failed twice'))`;
   const result = spawnSync('python3', ['-c', code], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /same check fails twice in a row/i);
