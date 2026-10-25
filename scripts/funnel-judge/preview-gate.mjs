@@ -12,8 +12,8 @@
 // secret, scorer error); the lane holds the PR on any non-zero exit.
 
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdtempSync, readFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
@@ -32,10 +32,34 @@ export function funnelPaths(paths) {
   );
 }
 
-/** The preview URL the readiness step printed in its env block. */
+/** A preview host GitHub's log mask replaced with asterisks cannot be opened. */
+export function usablePreviewUrl(value) {
+  try {
+    const url = new URL(String(value ?? '').trim());
+    return (
+      url.protocol === 'https:' &&
+      url.hostname.endsWith('.vercel.app') &&
+      !url.hostname.includes('*')
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The preview URL the readiness step printed. Prefer the base64 line: GitHub
+ * masks secret substrings in the plain `DEPLOYMENT_URL` env dump, which
+ * punches asterisks into the hostname.
+ */
 export function parseDeploymentUrl(log) {
-  const match = /DEPLOYMENT_URL:\s*(https:\/\/[^\s"']+)/.exec(log);
-  return match ? match[1] : null;
+  const text = String(log ?? '');
+  const encoded = /DEPLOYMENT_URL_B64:\s*([A-Za-z0-9+/=]+)/.exec(text);
+  if (encoded) {
+    const decoded = Buffer.from(encoded[1], 'base64').toString('utf8').trim();
+    if (usablePreviewUrl(decoded)) return decoded;
+  }
+  const match = /DEPLOYMENT_URL:\s*(https:\/\/[^\s"']+)/.exec(text);
+  return match && usablePreviewUrl(match[1]) ? match[1] : null;
 }
 
 /** 30s, 45s, 60s ... capped at 120s: never more than one call per 30s. */
@@ -46,18 +70,20 @@ export function backoffMs(attempt) {
 export const POLL_CAP_MS = 15 * 60_000;
 const PREVIEW_JOB = 'Preview Deploy (manual)';
 
+function plainGhOutput(text) {
+  return String(text ?? '').replace(/\u001B\[[0-9;]*m/g, '');
+}
+
 function ghJson(args, gh) {
   const result = gh(['api', ...args]);
   if (result.status !== 0) {
     throw new Error(
       `gh api ${args[0]} failed: ${
-        String(result.stderr ?? '')
-          .trim()
-          .split('\n')[0]
+        plainGhOutput(result.stderr).trim().split('\n')[0]
       }`
     );
   }
-  return JSON.parse(String(result.stdout || 'null'));
+  return JSON.parse(plainGhOutput(result.stdout).trim() || 'null');
 }
 
 /**
@@ -161,26 +187,124 @@ export async function previewUrlFor(input) {
   }
 }
 
-/** The bypass secret for protected previews, from Doppler at call time. */
-function readBypassSecret() {
-  if (process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
-    return process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const BYPASS_SECRET = 'VERCEL_AUTOMATION_BYPASS_SECRET';
+const DOPPLER_PROJECT = 'jovie-web';
+const DOPPLER_CONFIG = 'dev';
+
+function unquote(value) {
+  const text = String(value ?? '').trim();
+  if (
+    (text.startsWith('"') && text.endsWith('"')) ||
+    (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    return text.slice(1, -1);
   }
-  const result = spawnSync(
-    'doppler',
-    [
-      'secrets',
-      'get',
-      'VERCEL_AUTOMATION_BYPASS_SECRET',
-      '--plain',
-      '--project',
-      'jovie-web',
-      '--config',
-      'dev',
-    ],
-    { encoding: 'utf8', timeout: 15_000 }
-  );
-  return result.status === 0 ? String(result.stdout).trim() || null : null;
+  return text;
+}
+
+/**
+ * Directories whose saved Doppler CLI login is `jovie-web` / `dev`.
+ * Lane worktrees live outside the checkout the token was scoped to, so
+ * `doppler` from the worktree has no token unless `--scope` points here.
+ */
+export function parseDopplerScopes(
+  text,
+  { project = DOPPLER_PROJECT, config = DOPPLER_CONFIG } = {}
+) {
+  const scopes = [];
+  let section = null;
+  let scopeIndent = null;
+  let currentPath = null;
+  let current = null;
+  const flush = () => {
+    if (
+      section === 'scoped' &&
+      currentPath &&
+      current?.project === project &&
+      current?.config === config
+    ) {
+      scopes.push(currentPath);
+    }
+    currentPath = null;
+    current = null;
+  };
+  for (const line of String(text ?? '').split(/\r?\n/)) {
+    if (!line.trim() || line.trimStart().startsWith('#')) continue;
+    const indent = line.length - line.trimStart().length;
+    const body = line.trim();
+    if (indent === 0) {
+      flush();
+      section = /^([A-Za-z0-9_-]+):/.exec(body)?.[1] ?? null;
+      scopeIndent = null;
+      continue;
+    }
+    if (section !== 'scoped') continue;
+    if (scopeIndent === null) scopeIndent = indent;
+    if (indent === scopeIndent && body.endsWith(':')) {
+      flush();
+      currentPath = unquote(body.slice(0, -1).trim());
+      current = {};
+      continue;
+    }
+    if (!current || indent <= scopeIndent) continue;
+    const projectField = /^enclave\.project:\s*(.+)$/.exec(body);
+    const configField = /^enclave\.config:\s*(.+)$/.exec(body);
+    if (projectField) current.project = unquote(projectField[1]);
+    if (configField) current.config = unquote(configField[1]);
+  }
+  flush();
+  return scopes;
+}
+
+function loadDopplerDevScopes(env = process.env) {
+  try {
+    const dir = env.DOPPLER_CONFIG_DIR || join(homedir(), '.doppler');
+    return parseDopplerScopes(readFileSync(join(dir, '.doppler.yaml'), 'utf8'));
+  } catch {
+    return [];
+  }
+}
+
+function dopplerBypassValue(spawn, scope) {
+  const args = [
+    'secrets',
+    'get',
+    BYPASS_SECRET,
+    '--plain',
+    '--project',
+    DOPPLER_PROJECT,
+    '--config',
+    DOPPLER_CONFIG,
+  ];
+  if (scope) args.push('--scope', scope);
+  let result;
+  try {
+    result = spawn('doppler', args, { encoding: 'utf8', timeout: 15_000 });
+  } catch {
+    return null;
+  }
+  if (result?.status !== 0) return null;
+  return String(result.stdout ?? '').trim() || null;
+}
+
+/** The bypass secret for protected previews, from the env or Doppler. */
+export function readBypassSecret({
+  env = process.env,
+  spawn = spawnSync,
+  scopes,
+} = {}) {
+  const fromEnv = String(env[BYPASS_SECRET] ?? '').trim();
+  if (fromEnv) return fromEnv;
+  const cwdValue = dopplerBypassValue(spawn);
+  if (cwdValue) return cwdValue;
+  const seen = new Set([process.cwd()]);
+  for (const scope of scopes ?? loadDopplerDevScopes(env)) {
+    if (!scope || seen.has(scope)) continue;
+    seen.add(scope);
+    const value = dopplerBypassValue(spawn, scope);
+    if (value) return value;
+  }
+  return null;
 }
 
 function fail(code, reason) {
@@ -228,7 +352,12 @@ export async function main(argv = process.argv.slice(2)) {
     ref: values.ref,
     pr: Number(values.pr),
     workId: values['work-id'],
-    gh: args => spawnSync('gh', args, { encoding: 'utf8', timeout: 60_000 }),
+    gh: args =>
+      spawnSync('gh', args, {
+        encoding: 'utf8',
+        timeout: 60_000,
+        env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1' },
+      }),
     sleep: ms => new Promise(done => setTimeout(done, ms)),
     now: () => Date.now(),
   });
