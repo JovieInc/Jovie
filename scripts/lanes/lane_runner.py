@@ -7211,7 +7211,12 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
-                prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                excerpt = failure_excerpt(pr)
+                try:
+                    pr_events.ensure_red_before_green(pr, excerpt)
+                except (OSError, subprocess.SubprocessError, ValueError):
+                    pass  # evidence is best effort; the repair itself must still run
+                prompt = render_fix_prompt(pr, excerpt)
                 if preserved:
                     prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
                               "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)

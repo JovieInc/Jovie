@@ -19,6 +19,7 @@ import json
 import math
 import os
 import re
+import tempfile
 import subprocess
 import sys
 import time
@@ -906,6 +907,80 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
             return None
         kinds.add(kind)
     return sorted(kinds)[0]
+
+
+RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
+RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
+ANY_HEADING = re.compile(r"^#{1,6}\s")
+JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
+
+
+def red_section_complete(body: str) -> bool:
+    """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
+    lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
+    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
+    if start is None:
+        return False
+    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    section = "\n".join(lines[start + 1:end])
+    command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
+    run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
+    fence = re.search(r"```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```",
+                      section, re.I)
+    text = command.group(1).replace("`", "").strip() if command else ""
+    return len(text) > 2 and text.lower() not in {"todo", "tbd", "n/a", "none"} and bool(fence or run_url)
+
+
+def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
+    """A `## Red-before-green` section built from the PR's own red check: the failing run URL and
+    the failed jobs' error lines the fixer is shown. Fleet Rules treats lane-fix-red as a repair
+    label, so every red lane PR needs this evidence; agents forget it (45 of 138 Fleet Rules
+    failures on 2026-10-25) and the lane already has it. None when no red check names a run."""
+    for check in pr.get("statusCheckRollup") or []:
+        if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
+            continue
+        found = JOB_URL.match(check.get("detailsUrl") or "")
+        if not found:
+            continue
+        run_url = found.group(1)
+        lines = [f"FAIL {check.get('name') or 'check'} (red at head {str(pr.get('headRefOid') or '')[:9]})"]
+        for line in (excerpt or "").splitlines()[:25]:
+            line = line.rstrip()
+            if line.strip() and not line.startswith("```"):
+                lines.append(" " + line if ANY_HEADING.match(line) else line)
+        return "\n".join([
+            "## Red-before-green", "",
+            f"Failing command: `gh run view {run_url.rsplit('/', 1)[-1]} --repo {REPO} --log-failed`",
+            f"Failing run (before fix): {run_url}", "",
+            "```text", *lines, "```", "", RED_BLOCK_MARKER])
+    return None
+
+
+def with_red_section(body: str, block: str) -> str:
+    """Replace an empty/placeholder Red-before-green section with the block, or append one."""
+    lines = (body or "").split("\n")
+    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
+    if start is None:
+        return (body or "").rstrip("\n") + "\n\n" + block + "\n"
+    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
+
+
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=run) -> bool:
+    """Write the evidence block into the PR body when its section is missing or incomplete."""
+    block = red_before_green_block(pr, excerpt)
+    if not block or not isinstance(pr.get("number"), int):
+        return False
+    viewed = sh(["gh", "pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
+    if viewed.returncode != 0 or red_section_complete(viewed.stdout or ""):
+        return False
+    updated = with_red_section(viewed.stdout or "", block)
+    with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
+        path = Path(tmp) / "body.md"
+        path.write_text(updated)
+        if RED_BLOCK_MARKER not in path.read_text():
+            return False
+        return sh(["gh", "pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
 
 
 HOLD_DEQUEUE = "dequeued-by-hand"
