@@ -2,7 +2,7 @@ import 'server-only';
 
 import { desc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
-import { discogReleases } from '@/lib/db/schema/content';
+import { discogRecordings, discogReleases } from '@/lib/db/schema/content';
 import { getCanvasStatusFromMetadata } from '@/lib/services/canvas/service';
 import { toISOStringOrNull } from '@/lib/utils/date';
 import type { ReleaseContext } from './types';
@@ -35,4 +35,28 @@ export async function fetchReleasesForChat(
     releaseDate: toISOStringOrNull(release.releaseDate),
     canvasStatus: getCanvasStatusFromMetadata(release.metadata),
   }));
+}
+
+export const CATALOG_TRACK_TITLE_LIMIT = 2000;
+
+/**
+ * Recording titles for the grounding guard. Returns null when the list may be
+ * truncated or unreadable, so the guard skips the title rule rather than
+ * falsely rejecting a real song.
+ */
+export async function fetchCatalogTrackTitlesForChat(
+  profileId: string
+): Promise<string[] | null> {
+  try {
+    const rows = await db
+      .select({ title: discogRecordings.title })
+      .from(discogRecordings)
+      .where(eq(discogRecordings.creatorProfileId, profileId))
+      .limit(CATALOG_TRACK_TITLE_LIMIT);
+    return rows.length >= CATALOG_TRACK_TITLE_LIMIT
+      ? null
+      : rows.map(row => row.title);
+  } catch {
+    return null;
+  }
 }
