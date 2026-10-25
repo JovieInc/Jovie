@@ -17,6 +17,7 @@ import {
   evaluateLocal,
   githubRequest,
   hasPremiseEvidence,
+  isInertPath,
   isLockedArea,
   localFiles,
   main,
@@ -1006,4 +1007,44 @@ test('local: --local prints the rule failures and exits non-zero without any API
 test('local: default git reads the real repository without throwing', () => {
   const files = localFiles({ base: 'HEAD', cwd: process.cwd() });
   assert.deepEqual(files, []);
+});
+
+test('no-executable exemption: inert-only diffs with the statement pass; any code file voids it; the body alone is not trusted', () => {
+  const stated =
+    '## Red-before-green\nFailing command: none (no executable change)\n\n## Blast radius\nWhat could break: nothing runs.\nProof: docs only.';
+  const fix = body => pr({ title: 'fix(docs): typo', body });
+  const errorsFor = (paths, body = stated) =>
+    check(
+      fix(body),
+      paths.map(path => file(path))
+    ).errors.filter(error => error.startsWith('red-before-green'));
+  assert.deepEqual(
+    errorsFor([
+      'docs/guide.md',
+      'README.md',
+      'canon/automation-registry.jsonl',
+      'config/registry/x.json',
+    ]),
+    []
+  );
+  for (const code of [
+    'apps/web/lib/x.ts',
+    'scripts/x.mjs',
+    'docs/tool.ts',
+    '.github/workflows/ci.yml',
+    'apps/web/lib/x.test.ts',
+    'docs/run.sh',
+    'CLAUDE.md',
+    'apps/web/notes.md',
+  ])
+    assert.equal(errorsFor(['docs/guide.md', code]).length, 1, code);
+  assert.equal(
+    errorsFor(
+      ['docs/guide.md'],
+      '## Blast radius\nWhat could break: nothing.\nProof: docs.'
+    ).length,
+    1
+  );
+  assert.equal(errorsFor([]).length, 1);
+  assert.equal(isInertPath('docs/a.md'), true);
 });

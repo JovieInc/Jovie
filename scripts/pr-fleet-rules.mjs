@@ -151,6 +151,17 @@ export function onlyWeakensAssertions(files) {
   return weakened;
 }
 
+// No-executable-behavior exemption for Red-before-green. The file list is verified here, never trusted from the body:
+// every changed path must be documentation or inert data by extension AND location, so one code, test, workflow or
+// script file anywhere in the diff voids it.
+const INERT_EXTENSION = /\.(?:md|mdx|txt|json|jsonl)$/;
+const INERT_LOCATION = /^(?:docs\/|canon\/|config\/registry\/)/;
+export const isInertPath = path =>
+  (INERT_LOCATION.test(path) && INERT_EXTENSION.test(path)) ||
+  (/^[^/]+\.md$/.test(path) && !/^(?:AGENTS|CLAUDE)\.md$/.test(path));
+export const NO_EXECUTABLE_STATEMENT =
+  /^\s*(?:-\s*)?Failing command:\s*`?none \(no executable change\)`?\s*$/im;
+
 export function evaluateFleetRules({
   pr,
   files,
@@ -189,7 +200,11 @@ export function evaluateFleetRules({
         )
       ));
   const red = section(body, 'Red-before-green');
-  if (repair && !exempt) {
+  const noExecutable =
+    paths.length > 0 &&
+    paths.every(isInertPath) &&
+    NO_EXECUTABLE_STATEMENT.test(red);
+  if (repair && !exempt && !noExecutable) {
     const command = field(red, 'Failing command').replace(/`/g, '');
     const output =
       /```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```/i.test(
