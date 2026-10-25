@@ -1,0 +1,8 @@
+[Unit]
+Description=Jovie System-1 weekly tuning (Mondays)
+[Timer]
+OnCalendar=Mon *-*-* 06:20:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+[Install]
+WantedBy=timers.target
