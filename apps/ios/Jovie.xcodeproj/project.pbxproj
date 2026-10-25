@@ -38,7 +38,6 @@
 		5F4F3551CC9F4C09A2520AEB /* AppShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C2C97BF3A0B42C58A62529F /* AppShellView.swift */; };
 		61A81E78D0B448B6A68F45AD /* MobileAuthReturn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EBA07D5CBE04B0BBF053706 /* MobileAuthReturn.swift */; };
 		6853DA69F7459FE14462F48F /* Jovie-logo.png in Resources */ = {isa = PBXBuildFile; fileRef = 969C5D08D3E71A2D9824375A /* Jovie-logo.png */; };
-		6E62396A29D88F275920CA48 /* JovieTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */; };
 		70003B11B0FA1692B2017553 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6FDEFEB6D7C1D0251FDA1E61 /* Foundation.framework */; };
 		71B98E46403E1759256C61A5 /* IntentNavigationStoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5615484B29C6B6E26EE5E92B /* IntentNavigationStoreTests.swift */; };
 		74E75D0A3C816805F65FA48A /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E33DCDBD6A55190F563B419C /* DashboardView.swift */; };
@@ -283,7 +282,6 @@
 		B4D156B3220339CAB0DBE1DD /* SplashView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SplashView.swift; sourceTree = "<group>"; };
 		B53DAA4BCC9D40A3A2C1552B /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		B83A77F0A36DF3E6D5C77C2F /* MobileMeResponseTests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MobileMeResponseTests.swift; sourceTree = "<group>"; };
-		D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = JovieTheme.swift; sourceTree = "<group>"; };
 		D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Configuration.local.plist; sourceTree = "<group>"; };
 		DD30F57584F71E958D8C0514 /* LaunchMode.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LaunchMode.swift; sourceTree = "<group>"; };
 		E33DCDBD6A55190F563B419C /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -496,15 +494,6 @@
 			path = AppShell;
 			sourceTree = "<group>";
 		};
-		4A21A051CA70F90309561576 /* DesignSystem */ = {
-			isa = PBXGroup;
-			children = (
-				D03E6B0F83EC74031D75DCFB /* JovieTheme.swift */,
-			);
-			name = DesignSystem;
-			path = DesignSystem;
-			sourceTree = "<group>";
-		};
 		4D030230C47160EF0AAE5086 /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
@@ -602,7 +591,6 @@
 			children = (
 				CD1E4E5554DA1BC0E409C363 /* App */,
 				83A70DCC42A2C4A23FF9A69D /* Core */,
-				4A21A051CA70F90309561576 /* DesignSystem */,
 				38A521B77CFB8C49A552F2BF /* Features */,
 				05F2C63DC64DD882C7F220C8 /* Resources */,
 				D24EEA621BFC0D5C4F57065C /* Configuration.local.plist */,
@@ -930,7 +918,6 @@
 				A0J0V26350000000000000002 /* MobileAuthFinalization.swift in Sources */,
 				ADC14533827EFD888D1ED50F /* QRCodeRenderer.swift in Sources */,
 				A13F86A7D4F0C7F83D2BB000 /* ScreenBrightnessManager.swift in Sources */,
-				6E62396A29D88F275920CA48 /* JovieTheme.swift in Sources */,
 				A0A344000000000000000002 /* AppShellIntentNavigation.swift in Sources */,
 				A0J0V36330000000000000002 /* AppShellLeftDrawer.swift in Sources */,
 				A0J0V3632A00000000000002 /* AppShellTabBar.swift in Sources */,
