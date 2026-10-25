@@ -163,6 +163,52 @@ describe('GET /s/[code]', () => {
     expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Mobile/21F90 Instagram 340.0.0.20.100',
+    'WhatsApp/2.24.19 iOS/18.0',
+    'Mozilla/5.0 [FBAN/FBIOS;FBAV/480.0]',
+  ])(
+    'records Meta in-app browser fans as real visitors: %s',
+    async userAgent => {
+      vi.mocked(detectBot).mockReturnValueOnce({
+        isBot: true,
+        isMeta: true,
+        reason: 'Meta crawler detected',
+        shouldBlock: false,
+        userAgent,
+      });
+
+      const response = await GET(new NextRequest('http://localhost/s/abc123'), {
+        params: Promise.resolve({ code: 'abc123' }),
+      });
+
+      expect(response.status).toBe(302);
+      expect(recordAnonymousBotMetric).not.toHaveBeenCalled();
+      expect(publicClickLimiter.limit).toHaveBeenCalled();
+      expect(recordAudienceEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ eventType: 'source_scanned' })
+      );
+    }
+  );
+
+  it('still skips analytics for the Facebook link-preview crawler', async () => {
+    vi.mocked(detectBot).mockReturnValueOnce({
+      isBot: true,
+      isMeta: true,
+      reason: 'Meta crawler detected',
+      shouldBlock: false,
+      userAgent: 'facebookexternalhit/1.1',
+    });
+
+    const response = await GET(new NextRequest('http://localhost/s/abc123'), {
+      params: Promise.resolve({ code: 'abc123' }),
+    });
+
+    expect(response.status).toBe(302);
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
+
   it('treats partial consent cookies as malformed through the shared parser', async () => {
     const request = new NextRequest('http://localhost/s/abc123', {
       headers: {

@@ -4,6 +4,7 @@ import {
   createFingerprint,
   mergeAudienceTags,
 } from '@/app/api/audience/lib/audience-utils';
+import { isSmartLinkCrawler } from '@/lib/analytics/smart-link-admission';
 import { recordAudienceEvent } from '@/lib/audience/record-audience-event';
 import { appendSourceUtmParams } from '@/lib/audience/source-links';
 import {
@@ -195,7 +196,11 @@ export async function GET(
     const clientIP = extractClientIP(request.headers);
     const userAgent = request.headers.get('user-agent');
     const botDetection = detectBot(request, '/s/[code]');
-    if (botDetection.isBot) {
+    // Instagram/WhatsApp/Facebook in-app browsers carry Meta product tokens the
+    // shared detector flags as bots; those are real fans, not crawlers, so only
+    // genuine crawlers skip analytics (same admission rule as /r/[slug]).
+    const isCrawler = isSmartLinkCrawler(botDetection);
+    if (isCrawler) {
       recordAnonymousBotMetric(botDetection, 'redirect');
       return NextResponse.redirect(destinationUrl, { status: 302 });
     }
@@ -236,7 +241,7 @@ export async function GET(
         const audienceMemberId = await resolveAudienceMemberId(tx, {
           creatorProfileId: sourceLink.creatorProfileId,
           fingerprint: createFingerprint(clientIP, userAgent),
-          isBot: botDetection.isBot,
+          isBot: isCrawler,
           userAgent,
           geoCity,
           geoCountry,
