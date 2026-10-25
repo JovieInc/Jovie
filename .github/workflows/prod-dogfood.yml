@@ -165,6 +165,8 @@ jobs:
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           DOGFOOD_VISION: ${{ steps.vision-seen.outputs.cache-hit == 'true' && '0' || '1' }}
           REMEDIATION_TRIGGERS_DISABLED: ${{ vars.REMEDIATION_TRIGGERS_DISABLED }}
+          # A missing key or a failing filer is an error here (exit 3), never a silent skip.
+          DOGFOOD_REQUIRE_FILING: '1'
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           # Exit 2 means defects were found and filed; that is a successful
@@ -202,3 +204,18 @@ jobs:
         with:
           path: .dogfood-vision-seen
           key: dogfood-vision-${{ needs.gate.outputs.sha }}
+
+      # Loud failure: exit 3 (filer broke) or a runner crash fails the job, which the
+      # scheduled-workflow remediation intake files; also page the alerts channel.
+      - name: Alarm when the dogfood filer or runner fails
+        if: ${{ failure() }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          echo "::error title=prod-dogfood::filer or runner failed, exit ${{ steps.run.outputs.code }}"
+          if [ -n "${SLACK_WEBHOOK_URL:-}" ]; then
+            curl -sS --max-time 20 -X POST -H "content-type: application/json" \
+              --data "{\"text\":\"prod-dogfood failed (filer or runner). The production dogfood agent is not filing defects: $RUN_URL\"}" \
+              "$SLACK_WEBHOOK_URL" || true
+          fi
