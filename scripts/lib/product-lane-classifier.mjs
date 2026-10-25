@@ -5,6 +5,27 @@ import { isDeepStrictEqual } from 'node:util';
 
 export const PRODUCT_LANES = ['ios', 'mac', 'web'];
 
+/**
+ * Rules whose only Mac-lane effect is the node checks (`@jovie/desktop`
+ * typecheck and test). A change selected for Mac solely by these runs the Mac
+ * lane on ubuntu; anything else keeps macOS for swift and package:staging.
+ */
+export const MAC_NODE_ONLY_RULES = Object.freeze(
+  new Set(['mac-desktop-node-input'])
+);
+
+/**
+ * @param {{ classifications?: Array<{ rule?: string, affectedProducts?: string[] }> }} receipt
+ * @returns {boolean} true when the Mac lane needs a macOS runner
+ */
+export function macNativeRequired(receipt) {
+  return (receipt.classifications ?? []).some(
+    item =>
+      (item.affectedProducts ?? []).includes('mac') &&
+      !MAC_NODE_ONLY_RULES.has(item.rule ?? '')
+  );
+}
+
 const GATE_RECEIPTS = {
   ios: {
     tests:
@@ -155,10 +176,22 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^apps\/ios\/Jovie\/Resources\/Assets\.xcassets\/AppIcon\.appiconset\/Contents\.json$/,
   ],
   [
+    // Web files the packaged app is built from (prepare-icons runs the brand
+    // generator): the Mac lane must package, so it needs macOS.
     'mac-consumed-web-input',
     'web',
     ['mac', 'web'],
-    /^(?:packages\/ui\/brand\/(geometry\.gen|jovie-o-geometry)\.ts$|apps\/web\/(scripts\/generate-brand-assets\.ts|lib\/brand\/tokens\.ts|lib\/design\/generated\/design-tokens\.ts|styles\/(design-system|system-b-app)\.css|data\/marketing\/routeManifest\.ts|constants\/routes\.ts|app\/desktop-auth\/DesktopAuthClient\.tsx|components\/organisms\/(DesktopTitlebar|CmdKPalette|CommandPalette|user-button\/UserButton)\.tsx|components\/features\/(workspace-lock\/WorkspaceLockScreen\.tsx|dashboard\/dashboard-nav\/config\.ts))$)/,
+    /^(?:packages\/ui\/brand\/(geometry\.gen|jovie-o-geometry)\.ts$|apps\/web\/(scripts\/generate-brand-assets\.ts|lib\/brand\/tokens\.ts|lib\/design\/generated\/design-tokens\.ts)$)/,
+  ],
+  [
+    // Web files only read by `@jovie/desktop` node tests (dogfood inventory,
+    // url-disposition, system-b-tokens). They need the Mac lane's node checks,
+    // not Swift or electron-builder, so they do not require a macOS runner
+    // (MAC_NODE_ONLY_RULES). Hosted macOS is one small org-wide pool.
+    'mac-desktop-node-input',
+    'web',
+    ['mac', 'web'],
+    /^apps\/web\/(?:styles\/(design-system|system-b-app)\.css|data\/marketing\/routeManifest\.ts|constants\/routes\.ts|app\/desktop-auth\/DesktopAuthClient\.tsx|components\/organisms\/(DesktopTitlebar|CmdKPalette|CommandPalette|user-button\/UserButton)\.tsx|components\/features\/(workspace-lock\/WorkspaceLockScreen\.tsx|dashboard\/dashboard-nav\/config\.ts))$/,
   ],
   [
     'ios-product',
@@ -1107,6 +1140,7 @@ export function runProductLaneClassifier(
     const outputs = [
       `run_web=${selected.has('web')}`,
       `run_macos=${selected.has('mac')}`,
+      `run_macos_native=${selected.has('mac') && macNativeRequired(receipt)}`,
       `run_ios=${selected.has('ios')}`,
       `run_operations=${selected.has('operations')}`,
       `run_cross_product=${selected.has('cross-product')}`,
