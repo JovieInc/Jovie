@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
   createTestSelector,
+  escapeGlobPath,
   HIGH_RISK_PREFIXES,
   readExecutedTests,
   readModuleSource,
@@ -162,7 +163,7 @@ for (const source of toRun) {
     );
     const run = spawnSync(
       join(webRoot, 'node_modules/.bin/stryker'),
-      ['run', 'stryker.diff.config.mjs', '--mutate', source],
+      ['run', 'stryker.diff.config.mjs', '--mutate', escapeGlobPath(source)],
       {
         cwd: webRoot,
         stdio: 'inherit',
