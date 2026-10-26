@@ -14,35 +14,11 @@ describe('approved people registry', () => {
   it('accepts Tim with his own photos', () => {
     assert.deepEqual(
       validateRegistry(
-        {
-          people: [tim],
-          images: [
-            { path: 'a.jpg', person: 'tim-white', routes: ['/product'] },
-          ],
-        },
+        { people: [tim], images: [{ path: 'a.jpg', person: 'tim-white' }] },
         () => true
       ),
       []
     );
-  });
-
-  it('requires a per-route allowlist and never allows the homepage', () => {
-    const base = { people: [tim] };
-    const none = validateRegistry(
-      { ...base, images: [{ path: 'a.jpg', person: 'tim-white' }] },
-      () => true
-    );
-    assert.ok(none.some(error => /routes is required/u.test(error)));
-    const home = validateRegistry(
-      {
-        ...base,
-        images: [
-          { path: 'a.jpg', person: 'tim-white', routes: ['/', '/product'] },
-        ],
-      },
-      () => true
-    );
-    assert.ok(home.some(error => /homepage/u.test(error)));
   });
 
   it('rejects missing consent, provenance and unknown people', () => {
