@@ -301,7 +301,7 @@ export const SOURCE_GUARDS = Object.freeze([
     // anti-slop list that drifted from the registry (Tim, 2026-10-26).
     id: 'anti-slop',
     command:
-      'node scripts/anti-slop/run.mjs validate && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs',
+      'node scripts/anti-slop/run.mjs validate && node scripts/anti-slop/brand-name.mjs && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs scripts/anti-slop/brand-name.test.mjs',
     inputs:
       /^(?:docs\/|scripts\/(?:anti-slop\/|invariants\/|design-frontend-skill-check|ci-fast-lanes\.mjs$)|packages\/copy\/|\.github\/workflows\/source-validation\.yml$|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|package\.json$|CLAUDE\.md$|AGENTS\.md$)/u,
     prOnly: false,

@@ -1,0 +1,10 @@
+{
+  "note": "Verbatim or historical text that must keep its original spelling. Prefer fixing the text.",
+  "exceptions": [
+    {
+      "file": "canon/PRODUCT.md",
+      "match": "jovie",
+      "reason": "Tim's verbatim quote (EVENT 2026-10-20), frozen historical record"
+    }
+  ]
+}

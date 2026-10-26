@@ -8,7 +8,7 @@ const meta = {
     layout: 'centered',
   },
   args: {
-    value: 'tim@jovie.com',
+    value: 'tim@jov.ie',
     label: 'Email',
   },
 } satisfies Meta<typeof CopyableField>;

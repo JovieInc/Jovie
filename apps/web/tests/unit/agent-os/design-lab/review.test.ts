@@ -73,18 +73,18 @@ describe('reviewDesignProposal', () => {
       proposalId: baseProposal.id,
       decision: 'yes',
       notes: null,
-      reviewer: 'tim@jovie.com',
+      reviewer: 'tim@jov.ie',
     });
 
     expect(triggerDesignLabDispatch).toHaveBeenCalledWith({
       proposal: baseProposal,
       amendmentNotes: null,
-      requestedBy: 'tim@jovie.com',
+      requestedBy: 'tim@jov.ie',
     });
     expect(appendDesignTasteMemoryEntry).toHaveBeenCalledWith(
       expect.objectContaining({
         decision: 'accepted',
-        reviewer: 'tim@jovie.com',
+        reviewer: 'tim@jov.ie',
       })
     );
     expect(updateDesignLabLinearIssueStatus).toHaveBeenCalledWith(
@@ -111,7 +111,7 @@ describe('reviewDesignProposal', () => {
       proposalId: baseProposal.id,
       decision: 'no',
       notes: 'Too loud for our restrained aesthetic.',
-      reviewer: 'tim@jovie.com',
+      reviewer: 'tim@jov.ie',
     });
 
     expect(triggerDesignLabDispatch).not.toHaveBeenCalled();
@@ -145,13 +145,13 @@ describe('reviewDesignProposal', () => {
       proposalId: baseProposal.id,
       decision: 'yes-with-notes',
       notes: 'Keep the underline but reduce accent saturation.',
-      reviewer: 'tim@jovie.com',
+      reviewer: 'tim@jov.ie',
     });
 
     expect(triggerDesignLabDispatch).toHaveBeenCalledWith({
       proposal: baseProposal,
       amendmentNotes: 'Keep the underline but reduce accent saturation.',
-      requestedBy: 'tim@jovie.com',
+      requestedBy: 'tim@jov.ie',
     });
     expect(saveDesignProposal).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -178,7 +178,7 @@ describe('reviewDesignProposal', () => {
         proposalId: baseProposal.id,
         decision: 'yes',
         notes: null,
-        reviewer: 'tim@jovie.com',
+        reviewer: 'tim@jov.ie',
       })
     ).rejects.toThrow('Design proposal has already been reviewed.');
   });
