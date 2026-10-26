@@ -121,6 +121,54 @@ export function summarizeHeadroom(samples, windowSeconds = 3600) {
     );
 }
 
+/**
+ * Buckets projected to run dry before their hourly window resets, from this
+ * window's samples: consumption rate = remaining drop over elapsed time, so
+ * time-to-empty = remaining / rate. Needs `minSamples` readings spanning at least
+ * `minSpanSeconds`; a flat or refilling bucket never alerts.
+ *
+ * @param {{ at: number, bucket: string, remaining: number, limit?: number }[]} samples
+ * @param {number} nowSeconds
+ * @param {{ windowSeconds?: number, minSamples?: number, minSpanSeconds?: number }} [options]
+ */
+export function projectDrain(samples, nowSeconds, options = {}) {
+  const {
+    windowSeconds = 3600,
+    minSamples = 3,
+    minSpanSeconds = 120,
+  } = options;
+  const windowStart = Math.floor(nowSeconds / windowSeconds) * windowSeconds;
+  const resetAt = windowStart + windowSeconds;
+  const byBucket = new Map();
+  for (const sample of samples) {
+    if (!sample || sample.at < windowStart || sample.at > nowSeconds) continue;
+    const list = byBucket.get(sample.bucket) ?? [];
+    list.push(sample);
+    byBucket.set(sample.bucket, list);
+  }
+  const alerts = [];
+  for (const [bucket, list] of byBucket) {
+    list.sort((a, b) => a.at - b.at);
+    const first = list[0];
+    const last = list[list.length - 1];
+    const span = last.at - first.at;
+    if (list.length < minSamples || span < minSpanSeconds) continue;
+    const rate = (first.remaining - last.remaining) / span;
+    if (!(rate > 0)) continue;
+    const emptyAt = last.at + last.remaining / rate;
+    if (emptyAt >= resetAt) continue;
+    alerts.push({
+      bucket,
+      remaining: last.remaining,
+      ratePerMinute: Math.round(rate * 60),
+      emptyAt: new Date(emptyAt * 1000).toISOString(),
+      resetAt: new Date(resetAt * 1000).toISOString(),
+      minutesEarly: Math.round((resetAt - emptyAt) / 60),
+    });
+  }
+  return alerts.sort((a, b) => a.bucket.localeCompare(b.bucket));
+}
+
 /** Seconds a job ran, or null when it never started or finished. */
 export function jobSeconds(job) {
   const started = Date.parse(job?.started_at);
@@ -198,6 +246,25 @@ function quota(argv) {
   if (rows.length === 0) console.log('no api-quota samples in window');
 }
 
+function drain(argv) {
+  const samples = collectSamples(argv);
+  const now = Math.floor(Date.now() / 1000);
+  const alerts = projectDrain(samples, now);
+  if (argv.includes('--json'))
+    console.log(
+      JSON.stringify({
+        schema: 'jovie-actions-quota-drain/v1',
+        generatedAt: new Date(now * 1000).toISOString(),
+        alerts,
+      })
+    );
+  for (const alert of alerts)
+    console.log(
+      `::warning title=GitHub ${alert.bucket} bucket projected to drain::${alert.bucket} has ${alert.remaining} left at ~${alert.ratePerMinute}/min; empty at ${alert.emptyAt}, ${alert.minutesEarly} min before the ${alert.resetAt} reset.`
+    );
+  if (alerts.length) process.exitCode = 3;
+}
+
 function admission(argv) {
   const count = flag(argv, 'runs', 40);
   const runs = ghJson(
@@ -222,9 +289,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   if (command === 'quota') quota(rest);
   else if (command === 'headroom') headroom(rest);
   else if (command === 'admission') admission(rest);
+  else if (command === 'drain') drain(rest);
   else {
     console.error(
-      'usage: api-quota-report.mjs quota|headroom|admission [--hours N] [--runs N]'
+      'usage: api-quota-report.mjs quota|headroom|drain|admission [--hours N] [--runs N]'
     );
     process.exit(2);
   }

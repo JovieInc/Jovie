@@ -1034,12 +1034,30 @@ def reverify_auth_bank(state: dict, now: float) -> dict:
     return read_state()
 
 
-def pick(state: dict, now: float, names: list[str] | None = None):
-    """Least-recently-used available account that nobody else has leased right now."""
+def pace_deltas(now: float) -> dict:
+    """{account: used-minus-elapsed points} from the capacity registry's live overlay; {} when unread."""
+    try:
+        import capacity_registry
+        return capacity_registry.live_deltas(capacity_registry.load(), STATE.parent, "openai-codex", now)
+    except Exception:
+        return {}
+
+
+def pick(state: dict, now: float, names: list[str] | None = None, deltas: dict | None = None):
+    """Available account that nobody else has leased right now: accounts behind their weekly pace
+    first, ahead-of-pace accounts last (they will run dry before reset), least-recently-used within
+    each group. Without a fresh live reading every account is level and this is plain LRU."""
     state = reverify_auth_bank(state, now)
     names = accounts() if names is None else names
+    deltas = pace_deltas(now) if deltas is None else deltas
+    band = 10.0
+
+    def group(n: str) -> int:
+        d = deltas.get(n)
+        return 0 if d is None else (-1 if d < -band else 1 if d > band else 0)
+
     order = sorted((n for n in names if available(n, state, now)),
-                   key=lambda n: float(state.get(n, {}).get("lastUsed") or 0))
+                   key=lambda n: (group(n), float(state.get(n, {}).get("lastUsed") or 0)))
     for name in order:
         handle = lease(name)
         if handle is not None:
