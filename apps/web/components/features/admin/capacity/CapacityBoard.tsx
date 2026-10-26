@@ -417,52 +417,38 @@ function PathsCard({ view }: Readonly<{ view: CapacityView }>) {
         <p className='text-xs font-caption text-tertiary-token'>
           Cost by access path: the same model is a separate row per path
         </p>
-        <div className='overflow-x-auto'>
-          <table className='w-full text-left text-app'>
-            <thead className='text-2xs text-tertiary-token'>
-              <tr>
-                <th className='py-1 pr-3 font-normal'>Model</th>
-                <th className='py-1 pr-3 font-normal'>Path</th>
-                <th className='py-1 pr-3 font-normal'>List $/MTok in / out</th>
-                <th className='py-1 font-normal'>Marginal now</th>
-              </tr>
-            </thead>
-            <tbody>
-              {models.flatMap(model =>
-                view.paths
-                  .filter(p => p.model === model)
-                  .map(row => (
-                    <tr
-                      key={row.id}
-                      className='border-t border-subtle align-top'
-                    >
-                      <td className='py-1.5 pr-3 text-primary-token'>
-                        {row.model}
-                      </td>
-                      <td className='py-1.5 pr-3 text-secondary-token'>
-                        {ACCESS_PATH_LABEL[row.accessPath] ?? row.accessPath}
-                        {row.provider ? ` (${row.provider})` : ''}
-                      </td>
-                      <td className='py-1.5 pr-3 tabular-nums text-secondary-token'>
-                        {row.list
-                          ? `${row.list.inUsdPerMTok} / ${row.list.outUsdPerMTok}`
-                          : 'not listed'}
-                      </td>
-                      <td className='py-1.5 text-secondary-token'>
-                        {row.accessPath === 'subscription'
-                          ? row.accounts
-                              .map(a => seatNote(view, row.provider, a))
-                              .join('; ')
-                          : row.accessPath === 'credits'
-                            ? 'list price, paid from given credits'
-                            : 'list price, cash'}
-                      </td>
-                    </tr>
-                  ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <ul className='divide-y divide-subtle text-app'>
+          {models.flatMap(model =>
+            view.paths
+              .filter(p => p.model === model)
+              .map(row => (
+                <li
+                  key={row.id}
+                  className='grid gap-x-3 gap-y-0.5 py-2 sm:grid-cols-[1.2fr_1fr_1fr_2fr]'
+                >
+                  <span className='text-primary-token'>{row.model}</span>
+                  <span className='text-secondary-token'>
+                    {ACCESS_PATH_LABEL[row.accessPath] ?? row.accessPath}
+                    {row.provider ? ` (${row.provider})` : ''}
+                  </span>
+                  <span className='tabular-nums text-secondary-token'>
+                    {row.list
+                      ? `${row.list.inUsdPerMTok} / ${row.list.outUsdPerMTok} per MTok`
+                      : 'not listed'}
+                  </span>
+                  <span className='text-secondary-token'>
+                    {row.accessPath === 'subscription'
+                      ? row.accounts
+                          .map(a => seatNote(view, row.provider, a))
+                          .join('; ')
+                      : row.accessPath === 'credits'
+                        ? 'list price, paid from given credits'
+                        : 'list price, cash'}
+                  </span>
+                </li>
+              ))
+          )}
+        </ul>
         <p className='text-2xs text-tertiary-token'>
           A subscription seat costs about a tenth of its plan share while behind
           pace and rises to the API price as it nears exhaustion; dollars appear

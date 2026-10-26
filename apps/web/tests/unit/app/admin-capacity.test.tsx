@@ -155,7 +155,7 @@ describe('access paths and roles', () => {
     board('openai-codex');
     const paths = screen.getByTestId('capacity-paths');
     const rows = within(paths)
-      .getAllByRole('row')
+      .getAllByRole('listitem')
       .filter(r => r.textContent?.includes('glm-5.3'));
     expect(rows).toHaveLength(2);
     expect(rows[0].textContent).toMatch(
@@ -165,7 +165,7 @@ describe('access paths and roles', () => {
       /API \(vercel-ai-gateway\).*0\.5625 \/ 1\.8326/
     );
     const luna = within(paths)
-      .getAllByRole('row')
+      .getAllByRole('listitem')
       .filter(r => r.textContent?.includes('gpt-5.6-luna'));
     const text = luna.map(r => r.textContent).join(' ');
     expect(text).toMatch(/API.*0\.2 \/ 1\.2.*list price, cash/);
