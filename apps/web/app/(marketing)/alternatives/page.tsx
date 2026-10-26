@@ -4,12 +4,14 @@ import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAlternative, getAlternativeSlugs } from '@/content/alternatives';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
+import { documentTitle } from '@/lib/seo/document-title';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
-  title: `Alternatives — ${APP_NAME}`,
+  title: documentTitle(`Alternatives — ${APP_NAME}`),
   description:
     'Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.',
   alternates: {
@@ -21,6 +23,11 @@ export const metadata: Metadata = {
       'Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.',
     url: `${BASE_URL}${APP_ROUTES.ALTERNATIVES}`,
     type: 'website',
+    images: [marketingOgImage('alternatives')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('alternatives').url],
   },
 };
 
@@ -49,7 +56,8 @@ export default function AlternativesIndexPage() {
       <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Alternatives</p>
         <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'>
-          Alternatives For Musicians
+          {/* ui-casing-allow: sentence-case headings per marketing plan phase 1 */}
+          Alternatives for artists
         </h1>
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
           Jovie is a musician-first alternative to generic link-in-bio tools.

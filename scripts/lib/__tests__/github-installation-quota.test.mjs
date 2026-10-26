@@ -11,13 +11,17 @@ import {
   softFailCommand,
 } from '../github-installation-quota.mjs';
 import {
+  isScorecardGraphqlTransient,
+  MAX_SCORECARD_GRAPHQL_ATTEMPTS,
   MAX_SCORECARD_RESTARTS,
   parseGoDurationSeconds,
   planPoisonedScorecardRetry,
   planScorecardBuckets,
+  planScorecardGraphqlRetry,
   runScorecardContainer,
   scorecardContainerEnv,
   scorecardDockerArgs,
+  scorecardGraphqlBackoffSeconds,
   scorecardKillArgs,
   scorecardWaitFromLine,
   superviseScorecardRun,
@@ -206,6 +210,15 @@ describe('workflow wiring', () => {
     );
     expect(security).not.toContain('uses: ossf/scorecard-action');
     expect(security).toContain('timeout-minutes: 50');
+    const scorecardJob = security.slice(
+      security.indexOf('\n  scorecard:'),
+      security.indexOf('\n  commit-signature-check:')
+    );
+    expect(scorecardJob).toContain(
+      'scripts/lib/scorecard-credential-guard.mjs'
+    );
+    expect(scorecardJob).not.toContain('continue-on-error');
+    expect(scorecardJob).not.toContain('ossf/scorecard-action@v');
   });
 });
 
@@ -548,5 +561,255 @@ describe('scorecard credential guard', () => {
     expect(kills[0].join(' ')).toContain('kill --signal KILL');
     expect(kills[0].join(' ')).not.toContain(token);
     expect(kills[0].join(' ')).toContain('jovie-scorecard-38976277555');
+  });
+});
+
+describe('scorecard GraphQL transient retry', () => {
+  const nowSeconds = 1_700_000_000;
+  // Run 39813671687 / job on be44a038, and the same sentence on 7509def6.
+  const incident =
+    'scorecard had an error: internal error: ListCommits:error during graphqlHandler.setup: internal error: githubv4.Query: Something went wrong while executing your query on 2026-10-22T16:24:06Z. Please include `8C41:29D669:C5F97:283791:6ADA38A1` when reporting this issue.';
+
+  it('classifies only the GraphQL fault and a nearby 5xx', () => {
+    expect(isScorecardGraphqlTransient(incident)).toBe(true);
+    expect(
+      isScorecardGraphqlTransient(
+        'scorecard had an error: githubv4.Query: non-200 OK status code: 502 Bad Gateway body: ""'
+      )
+    ).toBe(true);
+    expect(
+      isScorecardGraphqlTransient(
+        'internal error: graphqlHandler.setup: HTTP 503 Service Unavailable'
+      )
+    ).toBe(true);
+    expect(
+      isScorecardGraphqlTransient(
+        'githubv4.Query: GitHub API 500 for /graphql: 500 Internal Server Error'
+      )
+    ).toBe(true);
+    expect(
+      isScorecardGraphqlTransient(
+        'scorecard had an error: 504 Gateway Timeout while executing the query'
+      )
+    ).toBe(true);
+
+    expect(isScorecardGraphqlTransient('')).toBe(false);
+    expect(
+      isScorecardGraphqlTransient(
+        'level=info msg="Rate limit exceeded. Waiting 31m15s to retry..."'
+      )
+    ).toBe(false);
+    expect(
+      isScorecardGraphqlTransient(
+        'scorecard had an error: internal error: ListCommits: 401 Bad credentials'
+      )
+    ).toBe(false);
+    expect(
+      isScorecardGraphqlTransient(
+        'scorecard had an error: internal error: probe CI-Tests failed'
+      )
+    ).toBe(false);
+    expect(
+      isScorecardGraphqlTransient('Resource not accessible by integration')
+    ).toBe(false);
+    expect(
+      isScorecardGraphqlTransient('Something went wrong with the pinned image')
+    ).toBe(false);
+    expect(isScorecardGraphqlTransient('HTTP 404')).toBe(false);
+    expect(isScorecardGraphqlTransient('HTTP 429')).toBe(false);
+    expect(isScorecardGraphqlTransient('HTTP 502')).toBe(false);
+    expect(
+      isScorecardGraphqlTransient(
+        'dial tcp 140.82.112.3:443: connect: connection refused'
+      )
+    ).toBe(false);
+    expect(scorecardGraphqlBackoffSeconds(1)).toBe(15);
+    expect(scorecardGraphqlBackoffSeconds(2)).toBe(30);
+    expect(MAX_SCORECARD_GRAPHQL_ATTEMPTS).toBe(3);
+  });
+
+  it('retries the transient twice, then keeps a clean Scorecard result', async () => {
+    const waits = [];
+    const removed = [];
+    const attempts = [];
+    const code = await superviseScorecardRun({
+      now: () => nowSeconds * 1000,
+      startedAt: nowSeconds * 1000,
+      sleep: async ms => {
+        waits.push(ms);
+      },
+      removeResults: async () => {
+        removed.push(true);
+      },
+      runAttempt: async attempt => {
+        attempts.push(attempt);
+        if (attempt < 3) return { poisoned: false, code: 1, output: incident };
+        return { poisoned: false, code: 0, output: '' };
+      },
+    });
+    const first = planScorecardGraphqlRetry({
+      nowSeconds,
+      elapsedSeconds: 0,
+      backoffSeconds: 15,
+    });
+    const second = planScorecardGraphqlRetry({
+      nowSeconds,
+      elapsedSeconds: first.waitSeconds,
+      backoffSeconds: 30,
+    });
+    expect(code).toBe(0);
+    expect(attempts).toEqual([1, 2, 3]);
+    expect(removed).toEqual([true, true]);
+    expect(waits).toEqual([
+      first.waitSeconds * 1000,
+      second.waitSeconds * 1000,
+    ]);
+    expect(first.action).toBe('wait');
+    expect(second.action).toBe('wait');
+  });
+
+  it('fails a non-GraphQL Scorecard error on the first exit', async () => {
+    const waits = [];
+    const attempts = [];
+    const code = await superviseScorecardRun({
+      now: () => nowSeconds * 1000,
+      startedAt: nowSeconds * 1000,
+      sleep: async ms => {
+        waits.push(ms);
+      },
+      runAttempt: async attempt => {
+        attempts.push(attempt);
+        return {
+          poisoned: false,
+          code: 1,
+          output:
+            'scorecard had an error: internal error: probe CI-Tests failed',
+        };
+      },
+    });
+    expect(code).toBe(1);
+    expect(attempts).toEqual([1]);
+    expect(waits).toEqual([]);
+  });
+
+  it('stops after three GraphQL faults instead of skipping the scan', async () => {
+    const logs = [];
+    const attempts = [];
+    const code = await superviseScorecardRun({
+      now: () => nowSeconds * 1000,
+      startedAt: nowSeconds * 1000,
+      log: message => logs.push(message),
+      sleep: async () => {},
+      runAttempt: async attempt => {
+        attempts.push(attempt);
+        return { poisoned: false, code: 1, output: incident };
+      },
+    });
+    expect(code).toBe(1);
+    expect(attempts).toEqual([1, 2, 3]);
+    expect(logs.join('\n')).toContain(
+      `on all ${MAX_SCORECARD_GRAPHQL_ATTEMPTS} attempts`
+    );
+    expect(logs.join('\n')).not.toContain('continue-on-error');
+  });
+
+  it('refuses a GraphQL retry that would pass the token lifetime', async () => {
+    const elapsed =
+      INSTALLATION_TOKEN_LIFETIME_SECONDS - SCORECARD_TOKEN_MARGIN_SECONDS;
+    const logs = [];
+    const waits = [];
+    const code = await superviseScorecardRun({
+      now: () => nowSeconds * 1000,
+      startedAt: (nowSeconds - elapsed) * 1000,
+      log: message => logs.push(message),
+      sleep: async ms => {
+        waits.push(ms);
+      },
+      runAttempt: async () => ({ poisoned: false, code: 1, output: incident }),
+    });
+    const plan = planScorecardGraphqlRetry({
+      nowSeconds,
+      elapsedSeconds: elapsed,
+      backoffSeconds: 15,
+    });
+    expect(plan.action).toBe('fail');
+    expect(code).toBe(1);
+    expect(waits).toEqual([]);
+    expect(logs.join('\n')).toContain('token lifetime');
+    expect(logs.join('\n')).toContain('401');
+  });
+
+  it('keeps the GraphQL fault in the container log for the classifier', async () => {
+    const outcome = await runScorecardContainer({
+      env: {
+        GH_TOKEN: 'ghs_example_token_value',
+        GITHUB_WORKSPACE: '/runner/work/Jovie/Jovie',
+        GITHUB_EVENT_PATH: '/runner/work/_temp/_github_workflow/event.json',
+        GITHUB_RUN_ID: '39813671687',
+        RUNNER_TEMP: '/tmp/scorecard-guard-graphql',
+        PATH: '/usr/bin',
+      },
+      attempt: 1,
+      run: async () => ({ code: 0, stdout: '', stderr: '' }),
+      spawnChild: () => {
+        /** @type {Map<string, Array<(...args: unknown[]) => void>>} */
+        const listeners = new Map();
+        const stream = () => {
+          /** @type {Map<string, Array<(...args: unknown[]) => void>>} */
+          const streamListeners = new Map();
+          return {
+            /**
+             * @param {string} event
+             * @param {(...args: unknown[]) => void} listener
+             */
+            on(event, listener) {
+              const list = streamListeners.get(event) ?? [];
+              list.push(listener);
+              streamListeners.set(event, list);
+            },
+            /**
+             * @param {string} event
+             * @param {unknown[]} args
+             */
+            emit(event, ...args) {
+              for (const listener of streamListeners.get(event) ?? []) {
+                listener(...args);
+              }
+            },
+          };
+        };
+        const stderr = stream();
+        const child = {
+          stdout: stream(),
+          stderr,
+          /**
+           * @param {string} event
+           * @param {(...args: unknown[]) => void} listener
+           */
+          on(event, listener) {
+            const list = listeners.get(event) ?? [];
+            list.push(listener);
+            listeners.set(event, list);
+          },
+          /**
+           * @param {string} event
+           * @param {unknown[]} args
+           */
+          emit(event, ...args) {
+            for (const listener of listeners.get(event) ?? []) {
+              listener(...args);
+            }
+          },
+        };
+        setImmediate(() => {
+          stderr.emit('data', Buffer.from(`${incident}\n`));
+          setImmediate(() => child.emit('close', 1));
+        });
+        return child;
+      },
+    });
+    expect(outcome).toMatchObject({ poisoned: false, code: 1 });
+    expect(isScorecardGraphqlTransient(outcome.output)).toBe(true);
+    expect(outcome.output).not.toContain('ghs_example_token_value');
   });
 });

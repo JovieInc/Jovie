@@ -14,6 +14,8 @@ interface RailToggleButtonProps {
   readonly pinned?: boolean;
   /** In-content controls opt out so a floating preview cannot cover them. */
   readonly previewTrigger?: boolean;
+  /** Overrides the mirrored rail art, e.g. the flyout peek shows a pin. */
+  readonly iconOverride?: IconName;
   readonly openLabel: string;
   readonly closedLabel: string;
   readonly onToggle: () => void;
@@ -35,6 +37,7 @@ export function RailToggleButton({
   open,
   pinned,
   previewTrigger = true,
+  iconOverride,
   openLabel,
   closedLabel,
   onToggle,
@@ -46,7 +49,7 @@ export function RailToggleButton({
   iconTestId,
 }: RailToggleButtonProps) {
   const label = open ? openLabel : closedLabel;
-  const iconName: IconName = railIconName(side, open);
+  const iconName: IconName = iconOverride ?? railIconName(side, open);
 
   const button = (
     <IconButton
@@ -76,7 +79,11 @@ export function RailToggleButton({
   );
 
   return (
-    <TooltipShortcut label={label} shortcut={shortcut} side='bottom'>
+    <TooltipShortcut
+      label={label}
+      shortcut={shortcut}
+      side={side === 'left' ? 'right' : 'bottom'}
+    >
       {button}
     </TooltipShortcut>
   );

@@ -202,7 +202,7 @@ export function SoundsLandingPage({
         </div>
 
         <div className='shrink-0 pb-[max(env(safe-area-inset-bottom),8px)]'>
-          <SmartLinkPoweredByFooter />
+          <SmartLinkPoweredByFooter reportTarget={smartLinkPath} />
         </div>
       </div>
       {/* Menu drawer */}

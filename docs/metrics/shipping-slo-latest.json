@@ -1,28 +1,191 @@
 {
-  "at": "2026-10-17T11:34:48.988Z",
+  "at": "2026-10-25T12:52:43.709Z",
   "ciP95Seconds": {
-    "pull_request": null,
-    "merge_group": 1549
+    "pull_request": 787,
+    "merge_group": 2085
   },
-  "queueWaitP95Seconds": null,
-  "queueEjectionRate": null,
+  "queueWaitP95Seconds": 6235,
+  "queueEjectionRate": 0.7,
   "leadTimeP95Seconds": {
     "devin": null,
-    "codex": 20324,
-    "other": 9549
+    "codex": 460712,
+    "other": 70656
   },
   "remediationP95Seconds": {
-    "prRedToGreen": null,
+    "prRedToGreen": 4275,
     "mainRedToGreen": null,
     "productionPromoteHold": null
   },
-  "productionLagP95Seconds": null,
+  "productionLagP95Seconds": 17980,
   "throughput": {
-    "mergesPerDay": 42.857142857142854,
-    "verifiedPerDay": null,
-    "wowGrowth": null,
-    "growthTrend": "unknown"
+    "mergesPerDay": 96.71428571428571,
+    "verifiedPerDay": 96.57142857142857,
+    "wowGrowth": -0.23329558323895805,
+    "growthTrend": "decelerating"
   },
-  "regressions": ["ci_walltime.merge_group.p95"],
-  "flatStall": false
+  "regressions": [
+    "ci_walltime.merge_group.p95",
+    "merge_queue.wait.p95",
+    "merge_queue.ejection_rate",
+    "lead_time.codex.p95",
+    "production_lag.merged_to_verified.p95"
+  ],
+  "flatStall": false,
+  "stages": {
+    "schema": "jovie-stage-summary/v1",
+    "at": "2026-10-25T12:52:43.709Z",
+    "coverage": {
+      "stagesTotal": 54,
+      "stagesWithData": 37,
+      "events": 38607
+    },
+    "regressions": [
+      "shipping:admitted.p95",
+      "shipping:worker-start.p95",
+      "shipping:pr-open.p95",
+      "shipping:gate-seat.p95",
+      "shipping:gate.p95",
+      "shipping:queued.p95",
+      "shipping:verified.p95",
+      "shipping:pr-open->merged.p95",
+      "shipping:verified->closed.p95",
+      "shipping:merged->closed.p95",
+      "remediation:repair-start.p95",
+      "remediation:red->green.p95",
+      "release:staging.p95",
+      "release:canary.p95",
+      "release:staging->verified.p95",
+      "ios-release:merge.p95",
+      "ios-release:merge->testflight.p95"
+    ],
+    "slowestP95_7d": [
+      {
+        "stage": "shipping:issue",
+        "p50": 25131.622,
+        "p95": 1778110.715,
+        "n": 156
+      },
+      {
+        "stage": "shipping:verified",
+        "p50": 338655.188,
+        "p95": 1759858.947,
+        "n": 126
+      },
+      {
+        "stage": "shipping:eligible",
+        "p50": 9485.902,
+        "p95": 1467934.443,
+        "n": 76
+      },
+      {
+        "stage": "shipping:outcome-receipt",
+        "p50": 665125,
+        "p95": 1247922,
+        "n": 90
+      },
+      {
+        "stage": "shipping:admitted",
+        "p50": 0,
+        "p95": 1118448.962,
+        "n": 165
+      }
+    ],
+    "endToEnd7d": {
+      "shipping:issue->verified": {
+        "p50": 221187.257,
+        "p95": 2418210.571,
+        "n": 206
+      },
+      "shipping:pr-open->merged": {
+        "p50": 6735,
+        "p95": 314236,
+        "n": 677
+      },
+      "shipping:merged->verified": {
+        "p50": 4506,
+        "p95": 17980,
+        "n": 672
+      },
+      "shipping:verified->closed": {
+        "p50": 338655.188,
+        "p95": 1759858.947,
+        "n": 126
+      },
+      "shipping:merged->closed": {
+        "p50": 343124.188,
+        "p95": 1763238.947,
+        "n": 126
+      },
+      "remediation:red->green": {
+        "p50": 6568,
+        "p95": 199463,
+        "n": 250
+      },
+      "release:staging->verified": {
+        "p50": 2592,
+        "p95": 4903,
+        "n": 158
+      },
+      "release-replay:blocked->replayed": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      },
+      "ios-release:merge->testflight": {
+        "p50": 2142,
+        "p95": 11753,
+        "n": 15
+      },
+      "ios-release:merge->released": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      },
+      "revenue-funnel:signup->paid": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      },
+      "revenue-funnel:visit->paid": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      },
+      "automation-run:started->finished": {
+        "p50": 35,
+        "p95": 434,
+        "n": 334
+      },
+      "linear-intake:triage->classified": {
+        "p50": 59.57,
+        "p95": 174205.854,
+        "n": 172
+      },
+      "summer-turn:event->outcome": {
+        "p50": 37,
+        "p95": 125,
+        "n": 331
+      },
+      "summer-turn:model-turn->outcome": {
+        "p50": 37,
+        "p95": 125,
+        "n": 353
+      },
+      "taste-decision:waiting->decided": {
+        "p50": 53038,
+        "p95": 53038,
+        "n": 1
+      },
+      "claim-dogfood:wait->journey": {
+        "p50": 354,
+        "p95": 570,
+        "n": 14
+      },
+      "market-signal:published->delivered": {
+        "p50": null,
+        "p95": null,
+        "n": 0
+      }
+    }
+  }
 }

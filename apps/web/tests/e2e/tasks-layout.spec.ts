@@ -360,7 +360,7 @@ async function selectTaskMetaOption(
   triggerName: string,
   optionName: string
 ): Promise<void> {
-  await page.getByLabel(triggerName).click();
+  await page.getByRole('button', { name: triggerName }).click();
   await page.getByRole('menuitem', { name: optionName }).click();
 }
 
@@ -555,7 +555,9 @@ test.describe('Tasks layout', () => {
       await assertTasksBoardLayout(page, testInfo, viewport);
     });
 
-    test(`keeps the list fallback contained at ${viewport.name}`, async ({
+    // JOV-8792: the "Filter Tasks" surface this flow drives has no renderer
+    // since search moved to the command palette.
+    test.fixme(`keeps the list fallback contained at ${viewport.name}`, async ({
       page,
     }, testInfo) => {
       await assertTasksLayout(page, testInfo, viewport);
@@ -615,6 +617,10 @@ test.describe('Tasks layout', () => {
     });
   }
 
+  // Rapid same-task edits are serialized per task in useTaskMutations (each
+  // write is stamped with the version the previous write committed), so the
+  // burst no longer depends on browser event ordering. Firefox runs this
+  // like every other browser — see JOV-8793.
   test('persists board item edits after rapid title and metadata changes', async ({
     page,
   }, testInfo) => {
@@ -659,6 +665,9 @@ test.describe('Tasks layout', () => {
       timeout: 30_000,
     });
     await ensureBoardViewMode(page);
+    // The board defaults to Assigned To Me. The persisted card is assigned to
+    // Jovie, so the same visibility checks run after that filter is selected.
+    await page.getByRole('tab', { name: /Assigned To Jovie/ }).click();
 
     const movedCard = page
       .getByTestId('tasks-board-column-in_progress')

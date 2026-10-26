@@ -34,17 +34,20 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
     alt,
     className,
     priority,
+    sizes,
     src,
   }: {
     readonly alt: string;
     readonly className?: string;
     readonly priority?: boolean;
+    readonly sizes?: string;
     readonly src: string;
   }) =>
     React.createElement('img', {
       alt,
       className,
       'data-priority': priority ? 'true' : 'false',
+      'data-sizes': sizes,
       src,
     }),
 }));
@@ -408,6 +411,33 @@ describe('ProfilePacCard landscape states', () => {
     });
   });
 
+  it.each([
+    ['an upcoming release', '2999-01-01', 'Coming soon'],
+    ['a released release', '2020-01-01', 'Listen'],
+    ['a release with no date', null, 'Listen'],
+  ])(
+    'labels the degraded listen action for %s as %s',
+    (_name, releaseDate, label) => {
+      render(
+        <ProfilePacCard
+          artist={pacArtist}
+          release={{
+            title: 'Release',
+            slug: 'release',
+            artworkUrl: '/release.jpg',
+            previewUrl: null,
+            releaseDate,
+          }}
+          assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+          layout='profile-landscape'
+          captureEnabled={false}
+        />
+      );
+
+      expect(screen.getByRole('link', { name: label })).toBeInTheDocument();
+    }
+  );
+
   it('never prompts, submits, or emits capture events when capture is disabled', async () => {
     render(
       <ProfilePacCard
@@ -721,6 +751,32 @@ describe('ProfilePacCard landscape states', () => {
     );
   });
 
+  it('requests a desktop-sized artwork source while phones keep the 104px request', () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        release={{
+          title: 'Release',
+          slug: 'release',
+          artworkUrl: '/release.jpg',
+          previewUrl: null,
+          releaseDate: '2020-01-01',
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        presentation='featured'
+        renderMode='preview'
+        captureEnabled={false}
+      />
+    );
+
+    const art = screen.getByTestId('profile-pac-featured-art');
+    expect(art.querySelector('img')).toHaveAttribute(
+      'data-sizes',
+      '(min-width: 1024px) 400px, 104px'
+    );
+  });
+
   it('renders the featured mode card with the rotating accent and a neutral Listen now CTA', () => {
     mockUseTrackAudioPlayer.mockReturnValue({
       playbackState: {
@@ -768,6 +824,25 @@ describe('ProfilePacCard landscape states', () => {
     // Neutral CTA face, not the glass slot.
     expect(listen.firstElementChild).toHaveClass('h-7', 'rounded-full');
     expect(listen.className).not.toContain('profile-glass-pill');
+  });
+
+  it('leaves the featured byline empty when there is no release', () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        presentation='featured'
+        renderMode='preview'
+        captureEnabled={false}
+      />
+    );
+
+    expect(
+      screen.getByRole('heading', { name: 'Tim White' })
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Tim White')).toHaveLength(1);
+    expect(screen.queryByText('Tim White / Tim White')).toBeNull();
   });
 
   it('keeps the featured capture form stacked and hides the art while prompting', async () => {

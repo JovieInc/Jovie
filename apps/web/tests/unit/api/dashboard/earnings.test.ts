@@ -1,8 +1,19 @@
+import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const APP_USER_ID = '11111111-1111-4111-8111-111111111111';
+
 const hoisted = vi.hoisted(() => ({
+  sharedKeys: {
+    emails: new Map<string, 'shared' | 'revoked'>(),
+    phones: new Map(),
+  },
   withDbSessionTxMock: vi.fn(),
   captureErrorMock: vi.fn(),
+}));
+
+vi.mock('@/lib/audience/share-gate.server', () => ({
+  loadSharedContactKeys: vi.fn(async () => hoisted.sharedKeys),
 }));
 
 vi.mock('@/lib/auth/session', () => ({
@@ -34,7 +45,7 @@ vi.mock('drizzle-orm', () => ({
   count: vi.fn(),
   desc: vi.fn(),
   sql: vi.fn(),
-  eq: vi.fn(),
+  eq: vi.fn((column: unknown, value: unknown) => ({ column, value })),
   sum: vi.fn(),
 }));
 
@@ -49,6 +60,7 @@ vi.mock('@/lib/http/headers', () => ({
 describe('GET /api/dashboard/earnings', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    hoisted.sharedKeys.emails.clear();
   });
 
   it('returns earnings data for valid user', async () => {
@@ -119,7 +131,7 @@ describe('GET /api/dashboard/earnings', () => {
           };
         });
 
-        return callback(mockTx, 'clerk_123');
+        return callback(mockTx, APP_USER_ID);
       }
     );
 
@@ -131,6 +143,15 @@ describe('GET /api/dashboard/earnings', () => {
     expect(body.stats.totalRevenueCents).toBe(5000);
     expect(body.stats.totalTips).toBe(10);
     expect(body.tippers).toHaveLength(1);
+    // Not shared with the artist: anonymized row, amount only.
+    expect(body.tippers[0]).toMatchObject({
+      amountCents: 500,
+      tipperName: null,
+      contactEmail: null,
+    });
+    expect(JSON.stringify(body)).not.toContain('fan@test.com');
+    expect(eq).toHaveBeenCalledWith('id', APP_USER_ID);
+    expect(eq).not.toHaveBeenCalledWith('clerkId', expect.anything());
   });
 
   it('returns 401 when auth fails', async () => {

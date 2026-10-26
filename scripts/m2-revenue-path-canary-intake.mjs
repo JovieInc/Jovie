@@ -53,7 +53,7 @@ export async function fileM2RevenuePathLinearIssue({
 - Source branch/session: m2-revenue-path-canary.yml
 
 ## Follow-up
-Daily M2 revenue-path canary (signed-out → claim → $199 Pro checkout → activation) is red. This is not generic uptime.
+Daily M2 revenue-path canary (signed-out → claim → $12 Pro checkout → activation) is red. This is not generic uptime.
 
 ## Why it matters
 A broken money path can look green on the health gate while checkout or activation is dark.

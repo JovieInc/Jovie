@@ -23,6 +23,14 @@ const COMPOSER_TEXTAREA = '[aria-label="Chat Message Input"]';
 const RAIL_TOGGLE = '[data-testid="artist-profile-rail-toggle"]';
 const RIGHT_RAIL = '[data-testid="app-shell-right-rail"]';
 const APP_SHELL_FRAME = '[data-app-shell-frame="true"]';
+const PROFILE_RAIL = '[data-testid="profile-contact-sidebar"]';
+/**
+ * The chat preview panel is disabled under E2E unless the URL carries
+ * `?panel=profile` (ChatPageClient.tsx `enablePreviewPanel`), which also
+ * auto-opens the rail. Each test closes it first so the toggle flows below
+ * exercise a real open.
+ */
+const CHAT_WITH_PROFILE_PANEL = '/app/chat?panel=profile';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -38,7 +46,7 @@ test.describe('right-rail × composer interaction', () => {
     test.setTimeout(120_000);
 
     await setTestAuthBypassSession(page, 'creator-ready');
-    await gotoAuthenticatedChatRoute(page);
+    await gotoAuthenticatedChatRoute(page, { path: CHAT_WITH_PROFILE_PANEL });
 
     // Wait for the app shell to be fully rendered
     await expect(page.locator(APP_SHELL_FRAME)).toBeVisible({
@@ -49,6 +57,11 @@ test.describe('right-rail × composer interaction', () => {
     await expect(page.locator(COMPOSER_TEXTAREA)).toBeVisible({
       timeout: 20_000,
     });
+
+    // `?panel=profile` auto-opens the rail; start every test from closed.
+    await expect(page.locator(PROFILE_RAIL)).toBeVisible({ timeout: 15_000 });
+    await page.locator(RAIL_TOGGLE).click();
+    await expect(page.locator(PROFILE_RAIL)).toBeHidden({ timeout: 15_000 });
   });
 
   test('A: composer textarea remains focusable after opening profile rail', async ({
@@ -93,11 +106,15 @@ test.describe('right-rail × composer interaction', () => {
     expect(initiallyFocused).toBe(true);
 
     // Open the rail while composer has focus
+    // A pointer click would move focus to the toggle button itself (browser
+    // default), which is not the rail stealing focus. Dispatch the click event
+    // so only the rail's own open lifecycle can move focus.
     await expect(page.locator(RAIL_TOGGLE)).toBeVisible({ timeout: 10_000 });
-    await page.locator(RAIL_TOGGLE).click();
+    await page.locator(RAIL_TOGGLE).dispatchEvent('click');
 
     // Wait for the rail to be open
     await expect(page.locator(RIGHT_RAIL)).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator(PROFILE_RAIL)).toBeVisible({ timeout: 10_000 });
 
     // Composer should STILL have focus (rail opening must not steal it)
     const stillFocused = await page.evaluate(
@@ -211,29 +228,9 @@ test.describe('right-rail × composer interaction', () => {
     await expect(textarea).toHaveValue('rapid toggles completed');
   });
 
-  test('F: profile-menu dialog transition releases the composer', async ({
-    page,
-  }) => {
-    await page.locator(RAIL_TOGGLE).click();
-    await expect(page.locator(RIGHT_RAIL)).toBeVisible({ timeout: 10_000 });
-
-    await page.getByRole('button', { name: 'Profile Actions' }).click();
-    await page.getByRole('menuitem', { name: 'UTM Builder' }).click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 10_000 });
-
-    await page.keyboard.press('Escape');
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 10_000 });
-
-    const pointerEvents = await page.evaluate(
-      () => getComputedStyle(document.body).pointerEvents
-    );
-    expect(pointerEvents).not.toBe('none');
-
-    const textarea = page.locator(COMPOSER_TEXTAREA);
-    await textarea.click();
-    await textarea.fill('composer remains available after UTM dialog');
-    await expect(textarea).toHaveValue(
-      'composer remains available after UTM dialog'
-    );
-  });
+  // F (profile-menu → UTM Builder dialog) was retired: the chat rail renders
+  // ProfileContactSidebar read-only and neither `Profile Actions` nor
+  // UtmBuilderDialog has a production importer, so the path is unreachable.
+  // Dialog/overlay recovery is covered by chat-composer-right-rail.spec.ts
+  // (tests 3 and 5).
 });

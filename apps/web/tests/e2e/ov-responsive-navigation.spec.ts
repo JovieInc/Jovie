@@ -30,6 +30,17 @@ async function enterPersona(
   await expect(page.locator('#main-content')).toBeVisible({ timeout: 60_000 });
 }
 
+/** Business and Tools stay collapsed until the viewer opens them (Tim 2026-10-21). */
+async function expandOperatorTools(navigation: Locator) {
+  for (const name of ['Business', 'Tools']) {
+    const group = navigation.getByRole('button', { name, exact: true });
+    if ((await group.count()) === 0) continue;
+    if ((await group.getAttribute('aria-expanded')) !== 'true') {
+      await group.click();
+    }
+  }
+}
+
 async function visibleHrefSet(navigation: Locator) {
   return navigation.locator('a[href]').evaluateAll(links =>
     links
@@ -181,7 +192,7 @@ test.describe('OV responsive navigation exclusivity', () => {
       );
 
       for (const destination of [
-        { label: 'OV', href: APP_ROUTES.ADMIN_CHAT },
+        { label: 'OV', href: APP_ROUTES.OV },
         { label: 'Jovie', href: APP_ROUTES.DASHBOARD },
       ]) {
         // An RSC fetch or changed URL alone does not prove the old server
@@ -229,6 +240,7 @@ test.describe('OV responsive navigation exclusivity', () => {
         if (destination.label === 'OV') {
           await expect(operatorNavigation).toBeVisible();
           await expect(customerNavigation).toHaveCount(0);
+          await expandOperatorTools(operatorNavigation);
           expect(new Set(await visibleHrefSet(operatorNavigation))).toEqual(
             new Set(ADMIN_NAV_REGISTRY.map(item => item.href))
           );
@@ -260,8 +272,8 @@ test.describe('OV responsive navigation exclusivity', () => {
       test.setTimeout(180_000);
       await page.setViewportSize(viewport);
       await enterPersona(page, 'admin', APP_ROUTES.OV);
-      // /app/ov rewrites to /app/admin, which redirects to the HUD.
-      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.HUD}/?$`));
+      // /app/ov is Ovie Home (founder decision 2026-10-20).
+      await expect(page).toHaveURL(new RegExp(`${APP_ROUTES.OV}/?$`));
 
       const mobileNavigation = page.getByRole('navigation', {
         name: 'OV Mobile Navigation',
@@ -337,6 +349,7 @@ test.describe('OV responsive navigation exclusivity', () => {
           page.getByRole('navigation', { name: 'Dashboard Navigation' })
         ).toHaveCount(0);
 
+        await expandOperatorTools(desktopNavigation);
         const operatorLinks = desktopNavigation.getByRole('link');
         await expect(operatorLinks).toHaveCount(ADMIN_NAV_REGISTRY.length);
         for (const item of ADMIN_NAV_REGISTRY) {

@@ -100,7 +100,6 @@ describe('half-built product surfaces stay dark', () => {
         category.features.map(feature => feature.name)
       ),
       ...mdxSources('../docs/app'),
-      source('components/features/home/NewFeaturesSection.tsx'),
       source('content/pages/solutions/artists.ts'),
       source('data/artistNotificationsCopy.ts'),
     ].join('\n');

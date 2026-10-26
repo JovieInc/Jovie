@@ -11,7 +11,7 @@ import { join, resolve } from 'node:path';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
-// Every repo workflow shares one GITHUB_TOKEN REST bucket (1,000 calls/h per
+// Every repo workflow shares one GITHUB_TOKEN REST bucket (5,000 calls/h per
 // repo), and merge-group rebuilds multiply each call. This ledger is the
 // complete list of ci.yml steps that receive the token, with the REST calls
 // each one spends in a green merge group. A new token-bearing step fails here

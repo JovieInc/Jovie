@@ -33,6 +33,7 @@ import { env } from '@/lib/env-server';
 import { captureCriticalError, captureWarning } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { stripe } from '@/lib/stripe/client';
+import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { isActiveSubscription } from '@/lib/stripe/webhooks/utils';
 import { logger } from '@/lib/utils/logger';
 
@@ -77,6 +78,7 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
     processed: 0,
     blocked: [],
     failed: [],
+    needsReconciliation: [],
   };
   let result: ReconciliationResult | undefined;
   let failure: unknown;
@@ -89,6 +91,10 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
       ),
       ...webhookReplay.failed.map(
         issue => `Webhook ${issue.stripeEventId} failed: ${issue.reason}`
+      ),
+      ...webhookReplay.needsReconciliation.map(
+        issue =>
+          `Webhook ${issue.stripeEventId} needs reconciliation: ${issue.reason}`
       )
     );
 
@@ -101,7 +107,8 @@ export async function runReconciliation(): Promise<ReconciliationResult> {
       success:
         stats.errors === 0 &&
         webhookReplay.blocked.length === 0 &&
-        webhookReplay.failed.length === 0,
+        webhookReplay.failed.length === 0 &&
+        webhookReplay.needsReconciliation.length === 0,
       stats,
       errors,
       duration,
@@ -316,7 +323,7 @@ async function reconcileProUsersWithoutSubscription(
     })
     .from(users)
     .where(
-      drizzleSql`${users.isPro} = true AND ${users.stripeSubscriptionId} IS NULL`
+      drizzleSql`${users.isPro} = true AND ${users.stripeSubscriptionId} IS NULL AND ${users.isAdmin} = false`
     )
     .limit(50);
 
@@ -414,35 +421,19 @@ async function repairProUserWithoutSubscription(user: {
     }
   }
 
-  // No active subscription found - they shouldn't be Pro
-  await db
-    .update(users)
-    .set({
-      isPro: false,
-      stripeSubscriptionId: null,
-      billingUpdatedAt: new Date(),
-      billingVersion: drizzleSql`${users.billingVersion} + 1`,
-    })
-    .where(eq(users.id, user.id));
-  try {
-    await withSystemIngestionSession(tx =>
-      tx.insert(billingAuditLog).values({
-        userId: user.id,
-        eventType: 'reconciliation_fix',
-        previousState: { stripeSubscriptionId: null },
-        newState: { isPro: false },
-        source: 'reconciliation',
-        metadata: {
-          reason: 'no_active_subscription',
-        },
-      })
-    );
-  } catch (auditError) {
-    await captureCriticalError(
-      'Billing audit log insert failed after user update',
-      auditError,
-      { userId: user.id, eventType: 'reconciliation_fix' }
-    );
+  // No active subscription found - they shouldn't be Pro. Same writer as the
+  // webhook: resets plan, bumps the billing version and writes the audit row
+  // in one transaction (the old direct update left plan='pro', isPro=false).
+  const result = await updateUserBillingStatus({
+    clerkUserId: user.id,
+    isPro: false,
+    stripeSubscriptionId: null,
+    eventType: 'reconciliation_fix',
+    source: 'reconciliation',
+    metadata: { reason: 'no_active_subscription' },
+  });
+  if (!result.success) {
+    throw new Error(result.error ?? 'Failed to downgrade Pro user');
   }
 
   return { mismatches: 1, fixed: 1 };

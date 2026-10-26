@@ -49,47 +49,59 @@ function bodyRows(container: HTMLElement) {
   return container.querySelectorAll('tbody tr[data-index]');
 }
 
+// jsdom has no layout. TanStack virtual-core <= 3.19.4 measured the scroll
+// element with offsetWidth/offsetHeight; 3.19.6 (react-virtual 3.14.21) reads
+// clientWidth/clientHeight. Stub both so the viewport is known whichever the
+// library reads; otherwise it sees a 0px viewport, yields no rows, and the body
+// falls back to all 10k (#22280 merge group, 2026-10-20).
+const LAYOUT_PROPS = [
+  'offsetHeight',
+  'offsetWidth',
+  'clientHeight',
+  'clientWidth',
+] as const;
+
 describe('UnifiedTable perf budget (10k rows)', () => {
-  const originalOffsetHeight = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    'offsetHeight'
-  );
-  const originalOffsetWidth = Object.getOwnPropertyDescriptor(
-    HTMLElement.prototype,
-    'offsetWidth'
+  // Own descriptors only: clientHeight/clientWidth live on Element.prototype,
+  // so the stub is deleted afterwards rather than copied onto HTMLElement.
+  const originals = LAYOUT_PROPS.map(
+    prop =>
+      [
+        prop,
+        Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop),
+      ] as const
   );
 
   beforeAll(() => {
-    // jsdom has no layout: rows measure at the dense height, everything else
-    // (the scroll container) at the viewport height.
-    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-      configurable: true,
-      get(this: HTMLElement) {
-        return this.tagName === 'TR' ? ROW_PX : VIEWPORT_PX;
-      },
-    });
-    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
-      configurable: true,
-      get: () => 1024,
-    });
+    // Rows measure at the dense height, everything else (the scroll
+    // container) at the viewport height.
+    for (const prop of ['offsetHeight', 'clientHeight'] as const) {
+      Object.defineProperty(HTMLElement.prototype, prop, {
+        configurable: true,
+        get(this: HTMLElement) {
+          return this.tagName === 'TR' ? ROW_PX : VIEWPORT_PX;
+        },
+      });
+    }
+    for (const prop of ['offsetWidth', 'clientWidth'] as const) {
+      Object.defineProperty(HTMLElement.prototype, prop, {
+        configurable: true,
+        get: () => 1024,
+      });
+    }
     HTMLElement.prototype.scrollIntoView = vi.fn();
     window.matchMedia = vi.fn().mockReturnValue({ matches: true });
   });
 
   afterAll(() => {
-    if (originalOffsetHeight) {
-      Object.defineProperty(
-        HTMLElement.prototype,
-        'offsetHeight',
-        originalOffsetHeight
-      );
-    }
-    if (originalOffsetWidth) {
-      Object.defineProperty(
-        HTMLElement.prototype,
-        'offsetWidth',
-        originalOffsetWidth
-      );
+    for (const [prop, descriptor] of originals) {
+      if (descriptor) {
+        Object.defineProperty(HTMLElement.prototype, prop, descriptor);
+      } else {
+        delete (HTMLElement.prototype as unknown as Record<string, unknown>)[
+          prop
+        ];
+      }
     }
   });
 

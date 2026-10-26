@@ -203,11 +203,20 @@ describe('supply chain provenance guardrails', () => {
     expect(signatureJob).toContain(
       "if: github.event_name == 'push' && github.ref == 'refs/heads/main'"
     );
-    expect(verifyStep).toContain(
-      'gh api "repos/${REPO}/commits/${COMMIT_SHA}"'
-    );
+    // The read is routed through the shared gh-api-hold.sh wrapper so a
+    // transient GitHub API outage (installation rate-limit 403, 429, 5xx)
+    // degrades to a visible warning instead of turning main red. The audit
+    // verdicts stay intact: verified=true prints success, verified=false
+    // emits the Unsigned commit warning, and non-transient errors still fail.
+    expect(verifyStep).toContain('.github/scripts/gh-api-hold.sh');
+    expect(verifyStep).toContain('api "repos/${REPO}/commits/${COMMIT_SHA}"');
+    expect(verifyStep).toContain('GH_API_HOLD_BUDGET_SECONDS');
     expect(verifyStep).toContain('.commit.verification.verified');
     expect(verifyStep).toContain('::warning title=Unsigned commit::');
+    expect(verifyStep).toContain(
+      '::warning title=Signature verification unavailable::'
+    );
+    expect(verifyStep).toContain('GITHUB_STEP_SUMMARY');
   });
 
   it('keeps commit signing audit-only until an explicit live cutover', () => {

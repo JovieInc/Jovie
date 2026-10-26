@@ -65,6 +65,10 @@ class SweepTest(unittest.TestCase):
         git(self.repo, "push", "-q", "origin", "HEAD:main")
         self.roots = [self.base / "wts"]
         self.now = time.time() + 2 * DAY  # every reflog entry reads two days idle
+        # Hermetic: the real scanners are exercised by SnapshotScanTest; here every snapshot is clean.
+        self.scan = patch.object(sweeper, "scan_snapshot", return_value=None)
+        self.scan.start()
+        self.addCleanup(self.scan.stop)
 
     def worktree(self, name, *, root=None):
         path = (root or self.roots[0]) / name
@@ -76,8 +80,20 @@ class SweepTest(unittest.TestCase):
         kw.setdefault("now", self.now)
         return sweeper.sweep([self.repo], self.roots, [self.base / "never"], date="20261003", **kw)
 
-    def remote_branches(self):
-        return git(self.remote, "for-each-ref", "--format=%(refname:short)", "refs/heads/backup").split()
+    def remote_snapshots(self):
+        """Sweep snapshots on the remote; a sweep never creates a branch (refs/heads/*), since
+        branch pushes started Actions and Vercel builds (77 queued on 2026-10-20)."""
+        heads = git(self.remote, "for-each-ref", "--format=%(refname)", "refs/heads/").split()
+        self.assertEqual([ref for ref in heads if ref != "refs/heads/main"], [], "sweep created a branch")
+        return git(self.remote, "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/").split()
+
+    def backup_ref(self, name):
+        matches = [branch for branch in self.remote_snapshots()
+                   if branch.startswith(f"refs/jovie-preserved/sweep/mac/{name}-20261003-")]
+        self.assertEqual(len(matches), 1)
+        branch = matches[0]
+        self.assertTrue(branch.endswith("-" + git(self.remote, "rev-parse", branch)))
+        return branch
 
     def test_existing_drain_starts_no_cleanup_commands(self):
         state = self.base / "state"
@@ -114,7 +130,7 @@ class SweepTest(unittest.TestCase):
         self.assertTrue(report["drained"])
         self.assertFalse(first.exists())
         self.assertTrue(second.exists())
-        self.assertEqual(git(self.remote, "show", "backup/mac/first-20261003:a.txt"),
+        self.assertEqual(git(self.remote, "show", f"{self.backup_ref('first')}:a.txt"),
                          "keep this edit")
         self.assertEqual(len(report["removed"]), 1)
         self.assertFalse(any("prune" in args for args in commands))
@@ -139,7 +155,7 @@ class SweepTest(unittest.TestCase):
         report = self.sweep()
         self.assertFalse(path.exists())
         self.assertEqual(report["removed"], [{"path": str(path), "reason": "idle"}])
-        self.assertEqual(self.remote_branches(), [])
+        self.assertEqual(self.remote_snapshots(), [])
 
     def test_dirty_and_unpushed_work_is_backed_up_before_removal(self):
         path = self.worktree("dirty")
@@ -159,11 +175,77 @@ class SweepTest(unittest.TestCase):
         provenance.write_text("retain provenance\n")
         report = self.sweep(now=time.time() + 2 * DAY)
         self.assertFalse(path.exists())
-        self.assertEqual(report["backups"], ["backup/mac/dirty-20261003"])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/dirty-20261003").split()
+        branch = self.backup_ref("dirty")
+        self.assertEqual(report["backups"], [branch])
+        files = git(self.remote, "ls-tree", "-r", "--name-only", branch).split()
         self.assertEqual(sorted(files), [".symphony/package-cache/network-trace", "a.txt", "b.txt", "new.txt"],
                          "private cache bytes never reach the backup; source and provenance do")
-        self.assertEqual(git(self.remote, "show", "backup/mac/dirty-20261003:a.txt"), "edited")
+        self.assertEqual(git(self.remote, "show", f"{branch}:a.txt"), "edited")
+
+    def test_same_named_checkouts_keep_both_remote_snapshots(self):
+        paths = []
+        for name in ("first", "second"):
+            path = self.roots[0] / name / "shared-name"
+            git(self.repo, "worktree", "add", "-q", "-b", name, str(path), "origin/main")
+            (path / "a.txt").write_text(f"{name} unsaved work\n")
+            paths.append(path)
+        report = self.sweep()
+        self.assertTrue(all(not path.exists() for path in paths))
+        branches = self.remote_snapshots()
+        self.assertEqual(len(branches), 2, "each deleted checkout needs its own surviving snapshot")
+        self.assertEqual(set(report["backups"]), set(branches))
+        self.assertEqual({git(self.remote, "show", f"{branch}:a.txt") for branch in branches},
+                         {"first unsaved work", "second unsaved work"})
+
+    def test_backup_ref_cannot_be_advanced_even_to_a_descendant(self):
+        path = self.worktree("occupied-ref")
+        initial = git(path, "rev-parse", "HEAD")
+        (path / "a.txt").write_text("unpushed work\n")
+        git(path, "commit", "-qam", "local only")
+        head = git(path, "rev-parse", "HEAD")
+        branch = f"refs/jovie-preserved/sweep/mac/occupied-ref-20261003-{head}"
+        git(self.remote, "update-ref", branch, initial)
+        report = self.sweep()
+        self.assertTrue(path.exists(), "a conflicting immutable ref leaves the checkout in place")
+        self.assertEqual(git(self.remote, "rev-parse", branch), initial)
+        self.assertEqual(report["backups"], [])
+        self.assertEqual(report["stripped"], [str(path)])
+
+    def test_long_checkout_name_still_gets_a_recoverable_backup(self):
+        path = self.worktree("long-" + "x" * 210)
+        (path / "a.txt").write_text("long checkout unsaved work\n")
+        report = self.sweep()
+        self.assertFalse(path.exists())
+        self.assertEqual(len(report["backups"]), 1)
+        branch = report["backups"][0]
+        self.assertLess(len(branch.rsplit("/", 1)[-1]) + len(".lock"), 255)
+        self.assertEqual(git(self.remote, "show", f"{branch}:a.txt"), "long checkout unsaved work")
+
+    def test_identical_snapshot_backup_can_be_retried(self):
+        path = self.worktree("retry")
+        (path / "a.txt").write_text("unpushed work\n")
+        git(path, "commit", "-qam", "local only")
+        info = sweeper.inspect(path, no_processes)
+        first = sweeper.backup(path, info, no_processes, "sweep/mac", "20261003")
+        self.assertIsNotNone(first)
+        self.assertEqual(sweeper.backup(path, info, no_processes, "sweep/mac", "20261003"), first)
+        self.assertEqual(self.remote_snapshots(), [first])
+        self.assertEqual(git(self.remote, "show", f"{first}:a.txt"), "unpushed work")
+
+    def test_backup_push_hook_rejection_keeps_unsaved_work(self):
+        path = self.worktree("hook-rejected")
+        (path / "a.txt").write_text("must survive rejected backup\n")
+        hooks = self.base / "hooks"
+        hooks.mkdir()
+        hook = hooks / "pre-push"
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+        git(self.repo, "config", "core.hooksPath", str(hooks))
+        report = self.sweep()
+        self.assertTrue(path.exists(), "a rejected backup never authorizes deletion")
+        self.assertEqual((path / "a.txt").read_text(), "must survive rejected backup\n")
+        self.assertEqual(self.remote_snapshots(), [])
+        self.assertEqual(report["stripped"], [str(path)])
 
     def test_failed_backup_keeps_checkout_and_strips_build_output(self):
         path = self.worktree("unsaved")
@@ -283,9 +365,9 @@ class SweepTest(unittest.TestCase):
         self.assertFalse(closed.exists())
         self.assertFalse(expired.exists())
         self.assertEqual(sorted(r["reason"] for r in report["removed"]), ["preserved-expired", "preserved-pr-closed"])
-        self.assertEqual(sorted(self.remote_branches()),
-                         ["backup/mac/closed-repair-20261003", "backup/mac/expired-repair-20261003"])
-        files = git(self.remote, "ls-tree", "-r", "--name-only", "backup/mac/closed-repair-20261003").split()
+        self.assertEqual(sorted(self.remote_snapshots()),
+                         [self.backup_ref("closed-repair"), self.backup_ref("expired-repair")])
+        files = git(self.remote, "ls-tree", "-r", "--name-only", self.backup_ref("closed-repair")).split()
         self.assertNotIn(sweeper.PRESERVED_REPAIR, files)
 
 
@@ -305,7 +387,89 @@ class SweepTest(unittest.TestCase):
         self.assertEqual([row["reason"] for row in report["removed"]], ["preserved-clean"])
         self.assertTrue(work.exists(), "real uncommitted work stays preserved until its TTL")
         self.assertTrue(repair.exists(), "a cancelled repair's marker is not a cleanup marker")
-        self.assertEqual(self.remote_branches(), [], "a clean checkout needs no backup branch")
+        self.assertEqual(self.remote_snapshots(), [], "a clean checkout needs no backup branch")
+
+class SnapshotScanTest(unittest.TestCase):
+    """refs/jovie-preserved/* is public: a snapshot pushes only when both scanners prove it clean."""
+
+    def fake_run(self, *, truffle=0, leaks=0, base="b" * 40, raise_on=None):
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(list(args))
+            if raise_on and raise_on in args[0]:
+                raise subprocess.TimeoutExpired(args, 1)
+            if args[0] == "git" and "merge-base" in args:
+                return subprocess.CompletedProcess(args, 0 if base else 1, stdout=(base or "") + "\n", stderr="")
+            if args[0] == "git":
+                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+            code = truffle if "trufflehog" in args[0] else leaks
+            return subprocess.CompletedProcess(args, code, stdout="", stderr="")
+        return run, calls
+
+    def scan(self, **kw):
+        run, calls = self.fake_run(**kw)
+        with patch.object(sweeper, "scanner", side_effect=lambda name: f"/opt/{name}"):
+            return sweeper.scan_snapshot(Path("/w"), run, "origin", "a" * 40), calls
+
+    def test_clean_findings_errors_and_unknown_base(self):
+        self.assertEqual(self.scan()[0], None)
+        self.assertEqual(self.scan(truffle=sweeper.TRUFFLEHOG_FINDINGS)[0], "secret-finding:trufflehog")
+        self.assertEqual(self.scan(leaks=1)[0], "secret-finding:gitleaks")
+        self.assertTrue(self.scan(truffle=2)[0].startswith("scan-failed"))
+        self.assertEqual(self.scan(raise_on="gitleaks")[0], "scan-failed:TimeoutExpired")
+        self.assertEqual(self.scan(base=None)[0], "scan-base-unknown")
+        self.assertEqual(self.scan(base="a" * 40)[0], None)  # nothing new beyond the remote
+
+    def test_scan_covers_base_to_snapshot_by_commit_sha(self):
+        _, calls = self.scan(truffle=sweeper.TRUFFLEHOG_FINDINGS)
+        truffle = next(call for call in calls if "trufflehog" in call[0])
+        self.assertIn("--fail", truffle)
+        self.assertEqual(truffle[truffle.index("--since-commit") + 1], "b" * 40)
+        # A full ref path makes trufflehog scan nothing and exit 0; the SHA is scanned.
+        self.assertEqual(truffle[truffle.index("--branch") + 1], "a" * 40)
+        leaks = next(call for call in calls if "gitleaks" in call[0])
+        self.assertIn(f"{'b' * 40}..{'a' * 40}", leaks)
+        self.assertFalse(any("update-ref" in call for call in calls))
+
+    def test_missing_scanner_holds(self):
+        run, calls = self.fake_run()
+        with patch.object(sweeper, "scanner", return_value=None):
+            self.assertEqual(sweeper.scan_snapshot(Path("/w"), run, "origin", "a" * 40), "scan-unavailable")
+        self.assertEqual(calls, [])
+
+
+class SnapshotHoldTest(SweepTest):
+    """A held snapshot never pushes and keeps the checkout exactly as it is."""
+
+    def test_secret_finding_keeps_checkout_unstripped_and_unpushed(self):
+        path = self.worktree("leaky")
+        (path / "a.txt").write_text("edit with a secret\n")
+        (path / "node_modules").mkdir()
+        self.scan.stop()
+        with patch.object(sweeper, "scan_snapshot", return_value="secret-finding:trufflehog"):
+            report = self.sweep()
+        self.scan.start()
+        self.assertTrue((path / "a.txt").exists() and (path / "node_modules").exists())
+        self.assertEqual(report["secretHeld"], [{"name": "leaky", "path": str(path),
+                                                 "reason": "secret-finding:trufflehog"}])
+        self.assertEqual(self.remote_snapshots(), [])
+        self.assertEqual(report["removed"], [])
+
+    def test_outputs_and_archives_never_enter_a_snapshot(self):
+        path = self.worktree("bulky")
+        (path / "a.txt").write_text("real edit\n")
+        (path / "outputs/sidebar-review").mkdir(parents=True)
+        (path / "outputs/sidebar-review/build.bin").write_text("x")
+        (path / "src.tar.gz").write_bytes(b"\x1f\x8b")
+        (path / "nested").mkdir()
+        (path / "nested/bundle.zip").write_bytes(b"PK")
+        self.sweep()
+        [ref] = self.remote_snapshots()
+        files = git(self.remote, "ls-tree", "-r", "--name-only", ref).split()
+        self.assertIn("a.txt", files)
+        self.assertFalse([name for name in files if name.startswith("outputs/") or name.endswith((".tar.gz", ".zip"))])
+
 
 class ScopeTest(unittest.TestCase):
     def test_glob_roots_match_only_direct_children(self):
@@ -409,7 +573,9 @@ class HostWiringTest(unittest.TestCase):
             self.assertEqual(sweeper.default_repos(home, lanes_repo), [lanes_repo, home / "Jovie"])
             roots, never = sweeper.default_roots(home, home / "state"), sweeper.default_never(home)
             for path in (home / ".codex/worktrees/a1/Jovie", home / "conductor/workspaces/x/y",
-                         home / "state/worktrees/run", home / "jovie-wt-fix"):
+                         home / "state/worktrees/run", home / "jovie-wt-fix",
+                         # Binding (LYB) run checkouts were never swept; 347 were reclaimed by hand.
+                         home / "state/bindings/LYB/worktrees/20261020T000000Z-LYB-1-codex-abc123"):
                 self.assertTrue(sweeper.in_scope(path, roots, never), path)
             for path in (home / ".cache/pnpm", home / "Library/pnpm/store", home / "Jovie"):
                 self.assertFalse(sweeper.in_scope(path, roots, never), path)
@@ -419,18 +585,210 @@ class HostWiringTest(unittest.TestCase):
             state = Path(tmp) / "state"
             state.mkdir()
             (state / "worktree-sweep.json").write_text(json.dumps({"startedAt": 5.0}))
-            report = {"removed": [], "backups": ["backup/mac/x-1"], "stripped": [], "kept": 3, "errors": []}
+            report = {"removed": [], "backups": ["refs/jovie-preserved/sweep/mac/x-1"], "stripped": [], "kept": 3, "errors": []}
             with patch.object(sweeper, "sweep", return_value=report) as run_sweep, \
+                    patch.object(sweeper, "sweep_standalone", return_value={"removed": []}), \
+                    patch.object(sweeper, "daily_report", return_value="not-due"), \
                     patch.object(sweeper, "default_repos", return_value=[]):
                 self.assertEqual(sweeper.main(["--state", str(state), "--repo", tmp]), 0)
                 run_sweep.assert_called_once()
                 saved = json.loads((state / "worktree-sweep.json").read_text())
-                self.assertEqual((saved["startedAt"], saved["backups"]), (5.0, ["backup/mac/x-1"]))
+                self.assertEqual((saved["startedAt"], saved["backups"]), (5.0, ["refs/jovie-preserved/sweep/mac/x-1"]))
                 import fcntl
                 with open(state / "disk-cleanup.lock", "a") as held:
                     fcntl.flock(held, fcntl.LOCK_EX)
                     self.assertEqual(sweeper.main(["--state", str(state), "--repo", tmp]), 0)
                 run_sweep.assert_called_once()  # a held cleanup lock skips the run
+
+
+class StandaloneAndHeadroomTest(unittest.TestCase):
+    """Standalone clones, volume headroom and the daily report (gem disk incident, 2026-10-24)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name).resolve()
+        self.home = self.base / "home"
+        self.state = self.base / "state"
+        self.home.mkdir()
+        self.state.mkdir()
+        self.remote = self.base / "remote.git"
+        git(self.base, "init", "-q", "--bare", "-b", "main", str(self.remote))
+        seed = self.base / "seed"
+        git(self.base, "clone", "-q", str(self.remote), str(seed))
+        (seed / "a.txt").write_text("a\n")
+        git(seed, "add", ".")
+        git(seed, "commit", "-qm", "init")
+        git(seed, "push", "-q", "origin", "HEAD:main")
+        self.now = time.time() + 10 * DAY
+
+    def clone(self, rel):
+        path = self.home / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        git(self.base, "clone", "-q", str(self.remote), str(path))
+        return path
+
+    def sweep(self, **kw):
+        return sweeper.sweep_standalone(self.home, self.state, [], [self.base / "never"], run=no_processes,
+                                        now=self.now, **kw)
+
+    def test_clean_published_idle_clone_is_removed_and_logged_first(self):
+        path = self.clone("grok-ship-workspaces/JOV/JOV-1")
+        seen = []
+
+        def remove(target):
+            seen.append((self.state / "disk-reclaim.jsonl").read_text())
+            sweeper.shutil.rmtree(target)
+
+        report = self.sweep(remove=remove)
+        self.assertFalse(path.exists())
+        self.assertEqual(report["removed"], [str(path)])
+        self.assertIn(str(path), seen[0])
+        self.assertGreater(report["freedKiB"], 0)
+
+    def test_each_failed_check_keeps_the_clone(self):
+        dirty = self.clone("grok-wt/dirty")
+        (dirty / "scratch.txt").write_text("untracked work\n")
+        unpushed = self.clone("grok-wt/unpushed")
+        (unpushed / "b.txt").write_text("b\n")
+        git(unpushed, "add", ".")
+        git(unpushed, "commit", "-qm", "local only")
+        stash = self.clone("grok-wt/stash")
+        (stash / "a.txt").write_text("changed\n")
+        git(stash, "stash", "push", "-q")
+        linked = self.clone("grok-wt/linked")
+        git(linked, "worktree", "add", "-q", "-b", "side", str(self.base / "side"), "origin/main")
+        kept = self.clone("grok-wt/marked")
+        (kept / sweeper.KEEP_MARKER).write_text("")
+        referenced = self.clone("grok-wt/ref-me")
+        (self.state / "bindings.json").write_text('{"wt": "ref-me"}')
+        busy = self.clone("grok-wt/busy")
+        report = sweeper.sweep_standalone(
+            self.home, self.state, [], [], now=self.now,
+            run=lambda args, **kw: SimpleNamespace(returncode=0, stdout=f"{busy}\n", stderr="")
+            if args[0] == "ps" else no_processes(args, **kw))
+        for path in (dirty, unpushed, stash, linked, kept, referenced, busy):
+            self.assertTrue(path.exists(), path)
+        self.assertEqual(report["removed"], [])
+        self.assertEqual(set(report["kept"]), {"dirty", "1-unpublished", "stash", "linked-worktrees",
+                                              "keep-marker", "state-referenced", "busy"})
+
+    def test_recent_clone_and_unreadable_process_inventory_keep_everything(self):
+        path = self.clone("wt-fresh")
+        self.assertEqual(self.sweep(idle_s=30 * DAY)["kept"], {"recent": 1})
+        broken = sweeper.sweep_standalone(self.home, self.state, [], [], now=self.now, run=lambda *a, **k: (_ for _ in ()).throw(OSError("no ps")))
+        self.assertEqual(broken["errors"], ["process-state-unavailable"])
+        self.assertTrue(path.exists())
+
+    def test_stale_remote_refs_are_fetched_before_judging(self):
+        path = self.clone("codex-worktrees/stale")
+        git(path, "checkout", "-q", "-b", "feature")
+        (path / "f.txt").write_text("f\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "feature")
+        git(path, "push", "-q", "origin", "feature")
+        git(path, "update-ref", "-d", "refs/remotes/origin/feature")  # the clone forgot it was pushed
+        self.assertEqual(self.sweep()["removed"], [str(path)])
+
+    def test_dangling_remote_ref_does_not_block_a_published_clone(self):
+        path = self.clone("codex-worktrees/dangling")
+        (path / ".git/refs/remotes/origin").mkdir(parents=True, exist_ok=True)
+        (path / ".git/refs/remotes/origin/ghost").write_text("1" * 40 + "\n")
+        self.assertIsNone(sweeper.unpublished(path, no_processes))
+
+    def test_squash_merged_branch_counts_as_published(self):
+        path = self.clone("grok-wt/squashed")
+        git(path, "checkout", "-q", "-b", "feature")
+        (path / "f.txt").write_text("f\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "feature")
+        other = self.base / "squasher"
+        git(self.base, "clone", "-q", str(self.remote), str(other))
+        (other / "f.txt").write_text("f\n")  # same change, different commit: a squash merge
+        git(other, "add", ".")
+        git(other, "commit", "-qm", "squash of feature")
+        git(other, "push", "-q", "origin", "HEAD:main")
+        git(path, "checkout", "-q", "main")
+        git(path, "fetch", "-q", "origin")
+        self.assertIsNone(sweeper.unpublished(path, no_processes))
+
+    def test_unlanded_branch_stays_unpublished(self):
+        path = self.clone("grok-wt/open")
+        git(path, "checkout", "-q", "-b", "feature")
+        (path / "g.txt").write_text("g\n")
+        git(path, "add", ".")
+        git(path, "commit", "-qm", "unlanded")
+        self.assertEqual(sweeper.unpublished(path, no_processes), "1-unpublished")
+
+    def test_run_checkout_needs_a_receipt_and_only_the_checkout_goes(self):
+        run = self.state / "runs/owner-x"
+        git(self.base, "clone", "-q", str(self.remote), str(run / "checkout"))
+        (run / "receipt.json").write_text("{}")
+        (self.state / "runs/owner-y").mkdir(parents=True)
+        git(self.base, "clone", "-q", str(self.remote), str(self.state / "runs/owner-y/checkout"))
+        report = self.sweep()
+        self.assertEqual(report["removed"], [str(run / "checkout")])
+        self.assertTrue((run / "receipt.json").exists())
+        self.assertEqual(report["kept"], {"no-receipt": 1})
+
+    def test_candidates_skip_linked_worktrees_and_known_repos(self):
+        repo = self.clone("codex-worktrees/primary")
+        git(repo, "worktree", "add", "-q", "-b", "wt", str(self.home / "codex-worktrees/linked"), "origin/main")
+        names = [p.name for p in sweeper.standalone_candidates(self.home, self.state, [repo])]
+        self.assertEqual(names, [])
+
+    def test_default_roots_cover_the_ship_and_fleet_roots(self):
+        roots = {str(r) for r in sweeper.default_roots(self.home, self.state)}
+        for rel in ("codex-worktrees", "grok-wt", "grok-ship-workspaces", "codex-ship-workspaces", "wt-*"):
+            self.assertIn(str(self.home / rel), roots)
+
+    def test_headroom_levels_and_alarm_events_on_change(self):
+        usage = {Path("/a"): (100, 0, 20), Path("/b"): (100, 0, 25), Path("/c"): (100, 0, 10), Path("/d"): (100, 0, 60)}
+        current = sweeper.headroom(list(usage), usage=lambda p: usage[p])
+        self.assertEqual([v["level"] for v in current["volumes"]], ["warn", "warn", "crit", "ok"])
+        self.assertEqual([a["mount"] for a in current["alarms"]], ["/a", "/b", "/c"])
+        sweeper.publish_headroom(self.state, current, self.now)
+        events = (self.state / "host-alarms.jsonl").read_text().splitlines()
+        self.assertEqual(len(events), 3)
+        sweeper.publish_headroom(self.state, current, self.now + 1)
+        self.assertEqual(len((self.state / "host-alarms.jsonl").read_text().splitlines()), 3)  # no repeat
+        usage[Path("/c")] = (100, 0, 90)
+        sweeper.publish_headroom(self.state, sweeper.headroom(list(usage), usage=lambda p: usage[p]), self.now + 2)
+        self.assertEqual(len((self.state / "host-alarms.jsonl").read_text().splitlines()), 4)  # recovered
+        self.assertEqual(sweeper.headroom([Path("/missing-volume")], usage=lambda p: (_ for _ in ()).throw(OSError()))["volumes"], [])
+
+    def test_volumes_lists_root_srv_mounts_and_state_volume(self):
+        found = sweeper.volumes(self.home, self.state, mounts=[Path("/srv/worktrees")])
+        self.assertIn(Path("/"), found)
+        self.assertIn(Path("/srv/worktrees"), found)
+
+    def test_daily_report_names_top_growers_and_runs_once_a_day(self):
+        grow = self.base / "grow"
+        grow.mkdir()
+        (grow / "blob").write_bytes(b"x" * 4096)
+        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now, targets=[grow]), "written")
+        (grow / "blob2").write_bytes(b"x" * 8 * 2**20)
+        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now + 60, targets=[grow]), "not-due")
+        self.assertEqual(sweeper.daily_report(self.home, self.state, self.now + DAY + 1, targets=[grow]), "written")
+        report = json.loads((self.state / "disk-report.json").read_text())
+        self.assertEqual(report["topGrowers"][0]["path"], str(grow))
+        self.assertGreater(report["topGrowers"][0]["deltaGiB"], 0)
+        self.assertTrue(report["volumes"])
+
+    def test_report_targets_only_lists_existing_paths(self):
+        (self.state / "runs").mkdir()
+        self.assertIn(self.state / "runs", sweeper.report_targets(self.home, self.state))
+
+    def test_linked_worktree_with_keep_marker_is_never_retired(self):
+        repo = self.base / "primary"
+        git(self.base, "clone", "-q", str(self.remote), str(repo))
+        wt = self.home / "codex-worktrees/base-wt"
+        git(repo, "worktree", "add", "-q", "-b", "base-wt", str(wt), "origin/main")
+        (wt / sweeper.KEEP_MARKER).write_text("")
+        report = sweeper.sweep([repo], [self.home / "codex-worktrees"], [], run=no_processes, now=self.now,
+                               prefix="sweep/mac", date="20261003")
+        self.assertTrue(wt.exists())
+        self.assertEqual(report["removed"], [])
 
 
 if __name__ == "__main__":

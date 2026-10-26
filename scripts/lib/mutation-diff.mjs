@@ -66,15 +66,22 @@ const ALIASES = Object.freeze([
  * Pick the changed files this lane mutates.
  * @param {string[]} changedPaths repo-relative paths
  * @param {(path: string) => string | null} [readModule] apps/web-relative reader
+ * @param {{ prefixes?: readonly string[] | null }} [options] `prefixes: null`
+ *   widens selection from the high-risk prefixes to every apps/web source
+ *   (the rolling sweep; see scripts/mutation-sweep.mjs).
  * @returns {string[]} apps/web-relative source paths
  */
-export function selectHighRiskSources(changedPaths, readModule) {
+export function selectHighRiskSources(
+  changedPaths,
+  readModule,
+  { prefixes = HIGH_RISK_PREFIXES } = {}
+) {
   const selected = new Set();
   for (const path of changedPaths) {
     if (!path.startsWith(`${WEB_ROOT}/`)) continue;
     const webPath = path.slice(WEB_ROOT.length + 1);
     if (!SOURCE_EXTENSION.test(webPath) || NON_SOURCE.test(webPath)) continue;
-    if (HIGH_RISK_PREFIXES.some(prefix => webPath.startsWith(prefix))) {
+    if (!prefixes || prefixes.some(prefix => webPath.startsWith(prefix))) {
       const contents = readModule?.(webPath);
       if (typeof contents === 'string' && !hasRuntimeSource(webPath, contents))
         continue;
@@ -471,7 +478,7 @@ export function readTestSources(webRoot) {
  *   targetExecution?: ReturnType<typeof readTargetExecution> }} FileResult
  */
 
-/** @param {Mutant[]} mutants */
+/** @param {{ status: string }[]} mutants */
 export function scoreMutants(mutants) {
   /** @type {Record<string, number>} */
   const counts = {};
@@ -492,7 +499,9 @@ export function scoreMutants(mutants) {
 /**
  * Markdown summary: one row per file, then the first survivors per file.
  * @param {{ sources: string[], results: FileResult[], untested: string[], skipped: string[],
- *   errors?: { file: string, reason: string }[], lowScore: number, survivorsPerFile?: number }} input
+ *   errors?: { file: string, reason: string }[], lowScore: number, survivorsPerFile?: number,
+ *   floors?: Record<string, { floor?: number }>,
+ *   floorFailures?: { file: string, score: number | null, floor: number, valid?: number }[] }} input
  */
 export function renderSummary({
   sources,
@@ -502,8 +511,10 @@ export function renderSummary({
   lowScore,
   errors = [],
   survivorsPerFile = 10,
+  floors = {},
+  floorFailures = [],
 }) {
-  const lines = ['## Mutation diff (advisory)', ''];
+  const lines = ['## Mutation diff', ''];
   if (sources.length === 0) {
     lines.push('Skipped: no applicable changed high-risk source files.');
     return `${lines.join('\n')}\n`;
@@ -514,9 +525,9 @@ export function renderSummary({
   );
   if (results.length > 0) {
     lines.push(
-      '| File | Score | Detected | Survived | Test files | Passed tests | Target statements / functions |'
+      '| File | Score | Detected | Survived | Test files | Passed tests | Target statements / functions | Floor |'
     );
-    lines.push('|---|---:|---:|---:|---:|---:|---:|');
+    lines.push('|---|---:|---:|---:|---:|---:|---:|---:|');
     for (const result of results) {
       const { detected, undetected, score } = scoreMutants(result.mutants);
       const flag = score !== null && score < lowScore ? ' (low)' : '';
@@ -525,8 +536,19 @@ export function renderSummary({
       const executed = target
         ? `${target.executedStatements}/${target.totalStatements} / ${target.executedFunctions}/${target.totalFunctions}`
         : 'n/a';
+      const floor = floors[result.file]?.floor;
+      const floorCell = typeof floor === 'number' ? `${floor}%` : 'n/a';
       lines.push(
-        `| \`${result.file}\` | ${shown} | ${detected} | ${undetected} | ${result.tests.length} | ${result.executedTests ?? 'n/a'} | ${executed} |`
+        `| \`${result.file}\` | ${shown} | ${detected} | ${undetected} | ${result.tests.length} | ${result.executedTests ?? 'n/a'} | ${executed} | ${floorCell} |`
+      );
+    }
+  }
+  if (floorFailures.length > 0) {
+    lines.push('', '### Score floor regressions', '');
+    for (const failure of floorFailures) {
+      const shown = failure.score === null ? 'n/a' : `${failure.score}%`;
+      lines.push(
+        `- \`${failure.file}\`: ${shown} is below floor ${failure.floor}%`
       );
     }
   }

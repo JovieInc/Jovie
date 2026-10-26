@@ -40,6 +40,14 @@ jobs:
       eligible: ${{ steps.source.outputs.eligible }}
       staging_artifact_id: ${{ steps.source.outputs.staging_artifact_id }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -47,9 +55,9 @@ jobs:
           sparse-checkout-cone-mode: false
           persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
-        with: {node-version: 24.21.0}
+        with: {node-version: 24.22.1}
       - id: source
-        env: {GH_TOKEN: "${{ github.token }}"}
+        env: {GH_TOKEN: "${{ steps.read-token.outputs.token }}"}
         run: node .github/scripts/staging-release-source.mjs
   # Event-driven supersession, with no wait: main itself is the
   # release-lineage event log. This generation proceeds the moment its exact
@@ -72,11 +80,22 @@ jobs:
     if: ${{ needs.release-source.outputs.eligible == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read lets the lineage gate read queued successors' staging
+    # completion artifacts so it never yields to a generation that cannot ship.
     permissions:
+      actions: read
       contents: read
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -88,7 +107,7 @@ jobs:
       - name: Evaluate event-driven supersession
         id: coalesce
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           # Starvation bound for the forward-only lineage gate: once main has
@@ -108,7 +127,7 @@ jobs:
           set -euo pipefail
           {
             echo "is_current=false"
-            echo "decision=superseded"
+            echo "decision=error"
             echo "replacement_sha=none"
             echo "wait_seconds=0"
             echo "time_saved_seconds=0"
@@ -172,8 +191,21 @@ jobs:
             # behind this one, even past PRODUCTION_STARVATION_SECONDS —
             # a still-queued generation costs seconds to yield, so a stale
             # backlog drains to the newest queued generation (JOV-7149).
-            gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
-              bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+            # No production mutation has started. The gate still fails closed
+            # when ancestry stays unreadable (JOV-7674), including at this
+            # pre-mutation boundary. Unknown lineage cannot prove that a
+            # replacement generation can supersede this one.
+            gate_log="$RUNNER_TEMP/lineage-gate-before-evaluation.txt"
+            set +e
+            CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
+              bash .github/scripts/release-lineage-gate.sh >"$gate_log"
+            gate_status=$?
+            set -e
+            gate_decision="$(tail -n 1 "$gate_log" 2>/dev/null || true)"
+            if [ "$gate_status" -ne 0 ]; then
+              echo "::error::Release lineage gate failed before evaluation (exit=${gate_status})."
+              exit "$gate_status"
+            fi
             if [ "$gate_decision" != "decision=proceed" ]; then
               record_receipt "superseded" "newer main landed before evaluation" "$current_main_sha" 0 "yield the production lease to controller generation $current_main_sha"
               exit 0
@@ -288,6 +320,8 @@ jobs:
       deployed_sha: ${{ steps.authorize.outputs.deployed_sha }}
       web_evidence_sha: ${{ steps.authorize.outputs.web_evidence_sha }}
       lane_receipt_artifact_id: ${{ steps.authorize.outputs.lane_receipt_artifact_id }}
+      # Successful job outputs survive failed-jobs-only retries.
+      lane_range_artifact_name: production-lane-range-${{ steps.authorize.outputs.expected_sha }}-${{ github.run_attempt }}
       staging_verified: ${{ steps.authorize.outputs.staging_verified }}
       release_lane: ${{ steps.authorize.outputs.release_lane }}
       release_policy_version: ${{ steps.authorize.outputs.release_policy_version }}
@@ -295,6 +329,14 @@ jobs:
       release_certification_required: ${{ steps.authorize.outputs.release_certification_required }}
       release_requires_smoke: ${{ steps.authorize.outputs.release_requires_smoke }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
@@ -358,7 +400,7 @@ jobs:
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           EXACT_STAGING_ARTIFACT_ID: ${{ needs.release-source.outputs.staging_artifact_id }}
@@ -373,6 +415,10 @@ jobs:
           TRIGGER_HEAD_REPOSITORY: ${{ fromJSON(needs.release-source.outputs.ci).head_repository.full_name }}
           PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         shell: bash
+        # Keep this run script free of ${{ }}: GitHub evaluates an interpolated
+        # script as one format() expression capped at ~21,000 chars, and crossing
+        # it fails the workflow with zero jobs (JOV-8706). Pass inputs via env;
+        # the runner already exports GITHUB_RUN_ID and GITHUB_RUN_ATTEMPT.
         run: |
           set -euo pipefail
           {
@@ -427,11 +473,13 @@ jobs:
             echo "::error::Could not resolve exact current main while authorizing production."
             exit 1
           }
-          if [ "$current_main_sha" != "$EXPECTED_SHA" ] &&
-            [ "$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" IN_FLIGHT=true \
-              bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
-            echo "::notice::Controller generation $EXPECTED_SHA yielded to $current_main_sha before production authorization."
-            exit 0
+          if [ "$current_main_sha" != "$EXPECTED_SHA" ]; then
+            gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before production authorization" IN_FLIGHT=true \
+              bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+            if [ "$gate_decision" != "decision=proceed" ]; then
+              echo "::notice::Controller generation $EXPECTED_SHA yielded to $current_main_sha before production authorization."
+              exit 0
+            fi
           fi
           echo "is_current=true" >> "$GITHUB_OUTPUT"
 
@@ -452,8 +500,8 @@ jobs:
             --sha "$EXPECTED_SHA" \
             --repo "$REPOSITORY" \
             --controller-workflow-id "$controller_workflow_id" \
-            --actor-run-id "${{ github.run_id }}" \
-            --actor-attempt "${{ github.run_attempt }}")"
+            --actor-run-id "${GITHUB_RUN_ID}" \
+            --actor-attempt "${GITHUB_RUN_ATTEMPT}")"
           jq -e '
             type == "object" and
             (.state | IN("none", "pending", "recovery_available", "verified", "manual")) and
@@ -479,8 +527,8 @@ jobs:
               exit 0
               ;;
             recovery_available)
-              if [ "${{ github.run_attempt }}" != "2" ] ||
-                [ "$(jq -r '.controllerRun // 0' <<<"$marker_state_json")" != "${{ github.run_id }}" ] ||
+              if [ "${GITHUB_RUN_ATTEMPT}" != "2" ] ||
+                [ "$(jq -r '.controllerRun // 0' <<<"$marker_state_json")" != "${GITHUB_RUN_ID}" ] ||
                 [ "$marker_reason" != "current_recovery_attempt_requires_lease" ]; then
                 echo "::error::Only the exact full controller attempt 2 may consume an interrupted-marker recovery."
                 exit 1
@@ -489,7 +537,7 @@ jobs:
               echo "marker_recovery=true" >> "$GITHUB_OUTPUT"
               ;;
             none)
-              if [ "${{ github.run_attempt }}" != "1" ]; then
+              if [ "${GITHUB_RUN_ATTEMPT}" != "1" ]; then
                 echo "::error::A controller rerun without durable marker evidence cannot authorize production."
                 exit 1
               fi
@@ -768,12 +816,14 @@ jobs:
               echo "::error::Could not resolve exact main at the production authorization boundary."
               exit 1
             }
-            if [ "$final_main_sha" != "$EXPECTED_SHA" ] &&
-              [ "$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" IN_FLIGHT=true \
-                bash .github/scripts/release-lineage-gate.sh | tail -n 1)" != "decision=proceed" ]; then
-              echo "::notice::Controller generation $EXPECTED_SHA yielded to $final_main_sha at authorization."
-              echo "is_current=false" >> "$GITHUB_OUTPUT"
-              exit 0
+            if [ "$final_main_sha" != "$EXPECTED_SHA" ]; then
+              gate_decision="$(CURRENT_MAIN_SHA="$final_main_sha" BOUNDARY="at authorization" IN_FLIGHT=true \
+                bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+              if [ "$gate_decision" != "decision=proceed" ]; then
+                echo "::notice::Controller generation $EXPECTED_SHA yielded to $final_main_sha at authorization."
+                echo "is_current=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
             fi
 
             {
@@ -885,6 +935,7 @@ jobs:
           EXPECTED_VERCEL_ENVIRONMENT=production \
           VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" \
           VERCEL_VERIFY_PUBLIC_SURFACES=true \
+          VERCEL_VERIFY_LINKED_RELEASES=tim \
           VERCEL_PROBE_TIMEOUT_MS=180000 \
             node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar
 
@@ -1130,6 +1181,14 @@ jobs:
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1137,12 +1196,12 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: ${{ needs.authorize-production.outputs.authorized == 'true' }}
         with:
-          name: production-lane-range-${{ needs.authorize-production.outputs.expected_sha }}-${{ github.run_attempt }}
+          name: ${{ needs.authorize-production.outputs.lane_range_artifact_name }}
           path: ${{ runner.temp }}/release-lineage
       - name: Resolve current main before final verification
         id: current
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
           RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
@@ -1184,7 +1243,7 @@ jobs:
         if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.release_lane != 'not_applicable' && needs.authorize-production.outputs.release_unattended_allowed == 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
           PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
@@ -1289,7 +1348,7 @@ jobs:
         id: finalize
         if: ${{ always() && needs.production-release.outputs.superseded_before_promotion != 'true' && (steps.current.outputs.is_current == 'true' || steps.verify.outputs.canonical_verified == 'true') }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
           AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
@@ -1529,6 +1588,9 @@ jobs:
           ref: main
           fetch-depth: 0
           persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc

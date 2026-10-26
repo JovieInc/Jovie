@@ -16,6 +16,7 @@ from contextlib import ExitStack
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 
 import qualification_guard as guard
+ROOT = Path(__file__).resolve().parents[2]
 from qualification_guard import CheckoutHeld, SafetyPolicy, checked_checkout
 
 
@@ -102,6 +103,30 @@ class GuardContractTest(unittest.TestCase):
         head = self.commit("synthetic fixture revert after safety floor")
         with self.assertRaisesRegex(CheckoutHeld, "fixture-not-reviewed"):
             self.check(head)
+
+    def test_every_reviewed_fixture_version_passes_and_others_hold(self):
+        # 2026-10-20: a merged fixture change (#22301) broke a single pinned hash, and every
+        # lane draft's gate deferred as fixture-not-reviewed. Reviewed versions are a set.
+        newer = b"# synthetic reviewed successor; never executed\n"
+        self.fixture.write_bytes(newer)
+        head = self.commit("synthetic reviewed fixture change on main")
+        with self.assertRaisesRegex(CheckoutHeld, "fixture-not-reviewed"):
+            self.check(head)
+        both = replace(self.policy, fixture_sha256=(self.policy.fixture_sha256,
+                                                    hashlib.sha256(newer).hexdigest()))
+        self.assertEqual(self.check(head, policy=both)["fixtureSha256"], hashlib.sha256(newer).hexdigest())
+        for broken in ((), ("not-a-hash",), None):
+            with self.assertRaisesRegex(CheckoutHeld, "invalid-fixture-policy"):
+                self.check(head, policy=replace(self.policy, fixture_sha256=broken))
+
+    def test_the_repo_fixture_is_a_reviewed_version(self):
+        # A PR that changes the fixture must add its hash to REVIEWED_FIXTURE_SHA256 in the
+        # same change, or every lane draft cut from the merged main stops qualifying.
+        fixture = ROOT / guard.DEFAULT_POLICY.fixture_path
+        self.assertIn(hashlib.sha256(fixture.read_bytes()).hexdigest(), guard.REVIEWED_FIXTURE_SHA256,
+                      f"{guard.DEFAULT_POLICY.fixture_path} changed: add its sha256 to REVIEWED_FIXTURE_SHA256")
+        self.assertNotIn("84f761baca2d994ae865dcfa5ecc3461d896fdcd74125b431dd54429219d8751",
+                         guard.REVIEWED_FIXTURE_SHA256, "pre-floor fixture versions stay unreviewed")
 
     def test_missing_safety_object_holds(self):
         with self.assertRaises(CheckoutHeld):

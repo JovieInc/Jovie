@@ -20,6 +20,10 @@ SPEC.loader.exec_module(lane)
 remediation = lane.remediation
 
 PROVIDERS = json.loads((ROOT / "scripts/lanes/providers.json").read_text())
+# Quota numbers (softRuns, windowS) live in ops/registry/capacity.json, not providers.json.
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
+import capacity_registry  # noqa: E402
+capacity_registry.apply_limits(PROVIDERS, capacity_registry.load(ROOT / "ops/registry/capacity.json"))
 POLICY = json.loads((ROOT / "scripts/lanes/routing.json").read_text())
 
 
@@ -208,10 +212,19 @@ class AvailabilityTest(unittest.TestCase):
             "a": {"available": False}, "b": {"available": True}}})})
         with patch.object(lane, "codex_lane_module", return_value=fake):
             self.assertEqual(lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)["pressure"], 0.5)
-        fake.status = staticmethod(lambda now: {"accounts": {"a": {"available": False}}})
+        fake.status = staticmethod(lambda now: {"accounts": {"a": {"available": False,
+                                                                  "exhaustedUntil": "2026-10-20T17:00:00Z"}}})
         with patch.object(lane, "codex_lane_module", return_value=fake):
             self.assertEqual(lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)["why"],
                              "all-accounts-banked")
+        # Gem 2026-10-20: stale identity evidence, not a bank, made both accounts unavailable.
+        fake.status = staticmethod(lambda now: {"accounts": {
+            "a": {"available": False, "exhaustedUntil": None}, "b": {"available": False,
+                                                                  "exhaustedUntil": "2026-10-20T17:00:00Z"}}})
+        with patch.object(lane, "codex_lane_module", return_value=fake):
+            verdict = lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)
+        self.assertFalse(verdict["ok"])
+        self.assertEqual(verdict["why"], "all-accounts-unavailable (1 banked, 1 without fresh capacity evidence)")
         with patch.object(lane, "codex_lane_module", side_effect=OSError):
             self.assertEqual(lane.quota_pressure(self.host, "codex", PROVIDERS["codex"], 0)["why"], "accounts unread")
 

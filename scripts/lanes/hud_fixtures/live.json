@@ -1,0 +1,608 @@
+{
+  "_now": "2026-10-20T18:29:30+00:00",
+  "_source": "Gem hud.py --json capture 2026-10-20T18:29Z, trimmed to the fields the HUD reads (10 of 25 merges)",
+  "local": {
+    "host": "gem",
+    "release": "fe27f07",
+    "releaseMatchesHud": true,
+    "hudDir": "/release/scripts/lanes",
+    "providers": { "codex": {}, "grok": {} },
+    "slots": { "codex": 3, "grok": 1 },
+    "baseSlots": { "codex": 3, "grok": 1 },
+    "slotEvidence": "fresh-dispatcher",
+    "autoscaleMode": "apply",
+    "workers": [
+      {
+        "pid": 411367,
+        "provider": "codex",
+        "run": {
+          "provider": "codex",
+          "kind": "fix",
+          "target": "PR21774",
+          "startedAt": "2026-10-20T18:26:25+00:00",
+          "phase": "agent"
+        }
+      },
+      { "pid": 450327, "provider": "codex", "run": null },
+      { "pid": 450328, "provider": "codex", "run": null },
+      { "pid": 450541, "provider": "grok", "run": null }
+    ],
+    "ledger24h": {
+      "recovery-handoff": 108,
+      "revisit-failed": 46,
+      "failed": 15,
+      "fix-no-change": 15,
+      "sync-failed": 14,
+      "fix-pushed": 12
+    },
+    "runs24h": 251,
+    "receipts24h": [],
+    "attributionReceipts": [],
+    "lastLanding": "2026-10-20T18:01:43Z",
+    "held": {
+      "21903": {
+        "sha": "f1674cead0a5b46cead0bcd43d2cae11212fcdca",
+        "reason": "fix-exhausted"
+      },
+      "22138": {
+        "sha": "a9a776312571a46f0ad71dcab2a8b0eb3857ba04",
+        "reason": "gate-check-failed"
+      },
+      "21774": {
+        "sha": "f324eee5367d25ea43aa78fa27eb70d6b3e20af1",
+        "reason": "fix-exhausted"
+      }
+    },
+    "heldError": null,
+    "failures": {},
+    "gateTimeouts": {},
+    "requeue": {},
+    "cooldowns": {},
+    "codex": {
+      "accounts": {
+        "alpha": {
+          "available": true,
+          "leased": false,
+          "resetsInS": 0,
+          "remainingPercent": 83,
+          "naturalResetInS": 0,
+          "bankedResetCount": 1,
+          "capacityLease": {
+            "sources": { "capacity": { "observedAt": "2026-10-07T18:08:23Z" } }
+          }
+        },
+        "beta": {
+          "available": true,
+          "leased": false,
+          "resetsInS": 0,
+          "remainingPercent": 99,
+          "naturalResetInS": 0,
+          "bankedResetCount": 0,
+          "capacityLease": {
+            "sources": { "capacity": { "observedAt": "2026-10-07T16:06:02Z" } }
+          }
+        }
+      },
+      "available": ["alpha", "beta"],
+      "count": 5
+    },
+    "doctor": {
+      "at": "2026-10-20T18:27:49Z",
+      "observed": {
+        "capacityByProvider": {
+          "codex": {
+            "slots": 3,
+            "running": 3,
+            "base": 3,
+            "leaseAgesComplete": true,
+            "oldestLeaseAge": 121.36061239242554
+          },
+          "grok": {
+            "slots": 1,
+            "running": 1,
+            "base": 1,
+            "leaseAgesComplete": true,
+            "oldestLeaseAge": 58.36061239242554
+          }
+        },
+        "poolByProvider": { "codex": 1, "grok": 0 },
+        "candidatePoolByProvider": { "codex": 27, "grok": 27 },
+        "eligiblePoolByProvider": { "codex": 1, "grok": 0 },
+        "newIssueBudgetByProvider": {
+          "codex": {
+            "allowed": true,
+            "reason": "within-budget",
+            "used": null,
+            "cap": null
+          },
+          "grok": {
+            "allowed": true,
+            "reason": "within-budget",
+            "used": null,
+            "cap": null
+          }
+        },
+        "rejectedByProvider": {
+          "codex": {
+            "sensitive-text": 17,
+            "hotspot-held": 7,
+            "route-held:standard": 1,
+            "in-flight-pr": 1
+          },
+          "grok": {
+            "sensitive-text": 17,
+            "hotspot-held": 7,
+            "route-held:standard": 2,
+            "in-flight-pr": 1
+          }
+        }
+      },
+      "capacity": {
+        "schema": "jovie.capacity-horizon/v1",
+        "generatedAt": "2026-10-20T18:27:49Z",
+        "leases": [
+          {
+            "alias": "lyb-pro",
+            "usableRemaining": 98,
+            "bankedCount": 1,
+            "mode": "normal",
+            "event": { "label": "natural reset", "at": "2026-10-27T06:52:38Z" },
+            "forecast": {
+              "completionP50At": null,
+              "sustainablePercentPerHour": null,
+              "projectedUnused": null
+            },
+            "route": { "selectedJob": "JOV-4670" },
+            "freshness": {
+              "observedAt": "2026-10-20T17:35:24Z",
+              "status": "fresh",
+              "confidence": "unknown"
+            }
+          },
+          {
+            "alias": "current-login",
+            "usableRemaining": 99,
+            "bankedCount": 1,
+            "mode": "normal",
+            "event": { "label": "natural reset", "at": "2026-10-27T08:57:13Z" },
+            "forecast": {
+              "completionP50At": null,
+              "sustainablePercentPerHour": null,
+              "projectedUnused": null
+            },
+            "route": { "selectedJob": "JOV-7559" },
+            "freshness": {
+              "observedAt": "2026-10-20T18:07:41Z",
+              "status": "fresh",
+              "confidence": "unknown"
+            }
+          }
+        ],
+        "incidents": [],
+        "topBlocker": "drain evidence stale or missing"
+      },
+      "alerts": {
+        "remediation-delivery": "remediation action lacks authoritative acknowledgement; failed=41, exhausted=4, next retry=179149...",
+        "failed-runs": "15 harness-failed runs in 24h; read runs/ledger.jsonl reasons",
+        "repairs-without-work": "109 PR repairs in 24h spent a fix attempt before any agent work (preserved-target-needs-reconcili...",
+        "escalation-needs-human": "needs a human decision: #20117 needs-human-decision, #20549 needs-human-decision, #20251 needs-re..."
+      }
+    },
+    "feed": {
+      "schema": "symphony-lanes-status/v1",
+      "at": "2026-10-20T18:28:28Z",
+      "host": "gem",
+      "release": "fe27f07",
+      "running": 4,
+      "idle": 0,
+      "linear": { "outbox": { "depth": 1, "oldestAgeS": -18, "dead": 0 } },
+      "admission": {
+        "pool": 1,
+        "candidatePool": 27,
+        "eligiblePool": 1,
+        "rejectedByProvider": {
+          "codex": {
+            "sensitive-text": 17,
+            "hotspot-held": 7,
+            "route-held:standard": 1,
+            "in-flight-pr": 1
+          },
+          "grok": {
+            "sensitive-text": 17,
+            "hotspot-held": 7,
+            "route-held:standard": 2,
+            "in-flight-pr": 1
+          }
+        }
+      },
+      "delivery": { "state": "eligible-work", "staleAfterSeconds": 7200 },
+      "mergeThroughput": {
+        "schema": "symphony-merge-throughput/v1",
+        "observedAt": 1792520869.3606124,
+        "windowHours": 1,
+        "queueDepth": 3,
+        "queueWaitP50Minutes": 11.4,
+        "mergedPerHour": 5,
+        "openedPerHour": 11,
+        "ejectionRate": 0.2
+      },
+      "slo": {
+        "ciP95Seconds": { "pull_request": null, "merge_group": 1012 },
+        "leadTimeP95Seconds": { "codex": 37836, "other": 9940 }
+      },
+      "throughput": {
+        "providers": {
+          "codex": {
+            "idleReason": "fully-utilized",
+            "idleSlots": 0,
+            "issueToMergeSecondsP50": 1495.0
+          },
+          "grok": {
+            "idleReason": "fully-utilized",
+            "idleSlots": 0,
+            "issueToMergeSecondsP50": null
+          }
+        }
+      },
+      "prs": {
+        "open": 36,
+        "drafts": 27,
+        "inQueue": 4,
+        "dirty": 2,
+        "red": 11,
+        "cleanNotQueued": 2,
+        "exhausted": 2,
+        "staleLaneDrafts": 0,
+        "staleOtherDrafts": 0,
+        "staleAgentDrafts": 2
+      },
+      "held_by_reason": { "fix-exhausted": 3, "gate-check-failed": 2 },
+      "oldest_prs": [
+        {
+          "pr": 21725,
+          "draft": true,
+          "ageH": 142.0,
+          "idleH": 9.2,
+          "head": "codex/jov-8345-desktop-freshness-identity",
+          "headSha": "92c2edd4df89f2a2473404d35921bd65ac618d9d",
+          "state": "hold:fix-exhausted",
+          "reason": "fix-exhausted",
+          "next": "preserve work and diagnosis; re-entry requires a fenced material-change receipt"
+        }
+      ],
+      "escalation": { "escalating": 34, "ladder_exhausted": 24 },
+      "remediation": { "eventsOpen": 129, "eventsExhausted": 112 },
+      "conditions": {
+        "remediation-delivery": {
+          "condition": "remediation-delivery",
+          "state": "active",
+          "severity": "degraded",
+          "owner": "symphony-lanes-doctor",
+          "firstObservedAt": "2026-10-08T10:57:32Z",
+          "evidence": "remediation action lacks authoritative acknowledgement; failed=41, exhausted=4, next retry=179149...",
+          "nextAction": "wake-summer-via-linear-or-independent-status-feed",
+          "summerEscalation": { "transport": "linear", "outcome": "requested" }
+        },
+        "failed-runs": {
+          "condition": "failed-runs",
+          "state": "active",
+          "severity": "degraded",
+          "owner": "symphony-lanes-doctor",
+          "firstObservedAt": "2026-10-19T12:16:18Z",
+          "evidence": "15 harness-failed runs in 24h; read runs/ledger.jsonl reasons",
+          "nextAction": "wake-summer-via-linear-or-independent-status-feed",
+          "summerEscalation": { "transport": "linear", "outcome": "pending" }
+        },
+        "repairs-without-work": {
+          "condition": "repairs-without-work",
+          "state": "active",
+          "severity": "degraded",
+          "owner": "symphony-lanes-doctor",
+          "firstObservedAt": "2026-10-11T20:40:57Z",
+          "evidence": "109 PR repairs in 24h spent a fix attempt before any agent work (preserved-target-needs-reconcili...",
+          "nextAction": "wake-summer-via-linear-or-independent-status-feed",
+          "summerEscalation": { "transport": "linear", "outcome": "requested" }
+        },
+        "escalation-needs-human": {
+          "condition": "escalation-needs-human",
+          "state": "active",
+          "severity": "degraded",
+          "owner": "symphony-lanes-doctor",
+          "firstObservedAt": "2026-10-11T18:31:22Z",
+          "evidence": "needs a human decision: #20117 needs-human-decision, #20549 needs-human-decision, #20251 needs-re...",
+          "nextAction": "wake-summer-via-linear-or-independent-status-feed",
+          "summerEscalation": { "transport": "linear", "outcome": "requested" }
+        }
+      }
+    },
+    "tick": { "at": "2026-10-20T18:25:31Z", "error": null, "quotaBlocked": {} },
+    "gateSeats": 2
+  },
+  "linear": {
+    "ok": true,
+    "pool": { "agent-ready": 15, "devin": 1, "codex": 1 },
+    "poolTotal": 26,
+    "active": {},
+    "triage": 11,
+    "mirrorAgeS": 134,
+    "outbox": 1,
+    "fetchedAt": "2026-10-20T18:26:49.088162+00:00"
+  },
+  "github": {
+    "ok": true,
+    "errors": {},
+    "readAt": {
+      "open": "2026-10-20T18:28:48.512113+00:00",
+      "merged": "2026-10-20T18:26:53.425870+00:00",
+      "queue": "2026-10-20T18:28:59.139686+00:00",
+      "rate": "2026-10-20T18:29:00.351822+00:00"
+    },
+    "open": [
+      {
+        "number": 21748,
+        "title": "fix(auth): honor provider branding and isolate auth targets (JOV-6226)",
+        "lane": "codex",
+        "issue": "JOV-6226",
+        "draft": true,
+        "merge": "DIRTY",
+        "headRefOid": "d3a1c08cc4c8971434c04be2ce9bad783a6e6284"
+      },
+      {
+        "number": 21774,
+        "title": "feat(marketing): unify public reading shells (JOV-5763)",
+        "lane": "codex",
+        "issue": "JOV-5763",
+        "draft": true,
+        "merge": "DIRTY",
+        "headRefOid": "f324eee5367d25ea43aa78fa27eb70d6b3e20af1"
+      },
+      {
+        "number": 21946,
+        "title": "fix(ui): restore aa contrast for primary destructive buttons (JOV-8384)",
+        "lane": "codex",
+        "issue": "JOV-8384",
+        "draft": false,
+        "merge": "CLEAN",
+        "headRefOid": "5f01d883f4309eab438afe80a325a57bbdb9be02"
+      },
+      {
+        "number": 22138,
+        "title": "fix(onboarding): follow active cards and cover states (JOV-8535)",
+        "lane": "grok",
+        "issue": "JOV-8535",
+        "draft": true,
+        "merge": "CLEAN",
+        "headRefOid": "a9a776312571a46f0ad71dcab2a8b0eb3857ba04"
+      },
+      {
+        "number": 21826,
+        "title": "fix(ci): preserve production release evidence across retries (JOV-8237)",
+        "lane": "codex",
+        "issue": "JOV-8237",
+        "draft": false,
+        "merge": "DIRTY",
+        "headRefOid": "8237cb774d8248a31176e9a7767439e5a843a2cb"
+      },
+      {
+        "number": 21824,
+        "title": "feat(marketing): lock youtube artist mvp homepage (JOV-5885)",
+        "lane": "codex",
+        "issue": "JOV-5885",
+        "draft": true,
+        "merge": "CLEAN",
+        "headRefOid": "8d5844c33347668e9a2b2ab2e85249b8f09851be"
+      },
+      {
+        "number": 22011,
+        "title": "feat(marketing): bind approved media recipes to sources (JOV-6246) [controlled-proof]",
+        "lane": "codex",
+        "issue": "JOV-6246",
+        "draft": true,
+        "merge": "CLEAN",
+        "headRefOid": "e905668569e57589cd0a45df8c8139caf87b703c"
+      },
+      {
+        "number": 21903,
+        "title": "feat(agents): attest observed routes and reject opaque controlled runs (JOV-8119)",
+        "lane": "codex",
+        "issue": "JOV-8119",
+        "draft": true,
+        "merge": "BLOCKED",
+        "headRefOid": "f1674cead0a5b46cead0bcd43d2cae11212fcdca"
+      }
+    ],
+    "queue": {
+      "depth": 3,
+      "entries": [
+        {
+          "number": 22306,
+          "state": "AWAITING_CHECKS",
+          "enqueuedAt": "2026-10-20T18:16:13Z"
+        },
+        {
+          "number": 22309,
+          "state": "AWAITING_CHECKS",
+          "enqueuedAt": "2026-10-20T18:16:28Z"
+        },
+        {
+          "number": 22305,
+          "state": "AWAITING_CHECKS",
+          "enqueuedAt": "2026-10-20T18:21:48Z"
+        }
+      ]
+    },
+    "rate": {
+      "core": 4773,
+      "graphql": 4526,
+      "resetAt": "2026-10-20T19:16:27Z"
+    },
+    "promotion": {
+      "firstPass": { "rate": 0.65 },
+      "reenqueueMinutes": { "p75": 0.7, "pending": 2 },
+      "openToFirstEnqueueMinutes": { "p75": 54.3 },
+      "occupancy": { "cleanNotQueued": 2 },
+      "intake": {
+        "opensPerHour": 1.5,
+        "mergesPerHour": 2.1,
+        "keysWithMultipleOpenPrs": 0
+      },
+      "queueEntriesPerMerge": 1.3
+    },
+    "fetchedAt": "2026-10-20T18:29:02.735857+00:00",
+    "merged24h": [
+      {
+        "number": 22307,
+        "title": "fix(ci): set up Playwright when proof reuse still runs browser guards",
+        "mergedAt": "2026-10-20T18:23:46Z",
+        "headRefOid": "da41655fb10d3da8ff8e5bb0732945def9b0bb51",
+        "mergeCommit": { "oid": "661de44cb6db131ecd4891116ffaa77c9bcb9220" }
+      },
+      {
+        "number": 22304,
+        "title": "fix(connectors): preserve Google OAuth ownership and return recovery",
+        "mergedAt": "2026-10-20T18:19:39Z",
+        "headRefOid": "9c9a36cfe0b9fa5303dccfaf1cba1f99c6d98273",
+        "mergeCommit": { "oid": "52d41f5bb9502603847dce161410e93697c2e5e3" }
+      },
+      {
+        "number": 22253,
+        "title": "fix(lanes): keep the public status feed within its reader limit",
+        "mergedAt": "2026-10-20T18:04:31Z",
+        "headRefOid": "fe0ef6b2887af65ca10563795cf10d6b3f72f3a4",
+        "mergeCommit": { "oid": "972234c2cb3eea28a2af4763f101837ebaabadb4" }
+      },
+      {
+        "number": 21869,
+        "title": "feat(playbooks): bind growth preparation to launch evidence (JOV-7811)",
+        "mergedAt": "2026-10-20T17:53:34Z",
+        "headRefOid": "cad4ee4065f33d382cbe111f85dc1040f42aa188",
+        "mergeCommit": { "oid": "c9b767a24265ad33f407c1ff18ca4020a5442052" }
+      },
+      {
+        "number": 22301,
+        "title": "fix(lanes): stop Gem lane cleanup from leaking checkouts",
+        "mergedAt": "2026-10-20T17:41:39Z",
+        "headRefOid": "e398fafcb71ece8c5a64c7a60f381d467386e725",
+        "mergeCommit": { "oid": "0fa7c7a7f1aaf362ed8c9beca8693b43eb76a5ce" }
+      },
+      {
+        "number": 21834,
+        "title": "feat(observability): add revenue-spine failure fingerprints (JOV-8249)",
+        "mergedAt": "2026-10-20T17:24:16Z",
+        "headRefOid": "0285b20999ddb72ac4efc9a3fdb2b0a66723fae9",
+        "mergeCommit": { "oid": "0e207c768696f9dab87368eb384ead4344fe838b" }
+      },
+      {
+        "number": 21956,
+        "title": "feat(evals): add held-out revision quality replay (JOV-8414)",
+        "mergedAt": "2026-10-20T16:48:18Z",
+        "headRefOid": "2ecd637c6272b063beaace78ba0a402ae9b9742b",
+        "mergeCommit": { "oid": "20a2da2b14c064b9f771cc53a069f9662198260d" }
+      },
+      {
+        "number": 22166,
+        "title": "ci: catalog the workflow writes the enqueue check skips",
+        "mergedAt": "2026-10-19T20:41:06Z",
+        "headRefOid": "e418f59568242b7d6bc6b4225d472683f5004ecc",
+        "mergeCommit": { "oid": "48dce1933e84d14d0f0288965935a546ceaa4d4c" }
+      },
+      {
+        "number": 22290,
+        "title": "fix(ovie): preserve Home snapshot freshness (JOV-8348)",
+        "mergedAt": "2026-10-19T20:06:18Z",
+        "headRefOid": "9a44465dd09cecd04202e239dd7bd320e76aab6e",
+        "mergeCommit": { "oid": "7ca2a55f458804f8d6ae6c4f9a1d36c943b4f660" }
+      },
+      {
+        "number": 22292,
+        "title": "fix(ci): restore merge queue victim enrollment (JOV-7747)",
+        "mergedAt": "2026-10-19T20:01:35Z",
+        "headRefOid": "b4dab1837ddbcce9619a770cfd6ae2a64c5c350b",
+        "mergeCommit": { "oid": "9ed10b30cbbd4287e0566269ae8c7d1d4fda8c34" }
+      }
+    ]
+  },
+  "production": {
+    "readAt": "2026-10-20T18:29:02+00:00",
+    "error": null,
+    "deployed": {
+      "661de44cb6db131ecd4891116ffaa77c9bcb9220": false,
+      "52d41f5bb9502603847dce161410e93697c2e5e3": false,
+      "972234c2cb3eea28a2af4763f101837ebaabadb4": false,
+      "c9b767a24265ad33f407c1ff18ca4020a5442052": false,
+      "0fa7c7a7f1aaf362ed8c9beca8693b43eb76a5ce": false,
+      "0e207c768696f9dab87368eb384ead4344fe838b": false,
+      "20a2da2b14c064b9f771cc53a069f9662198260d": false,
+      "48dce1933e84d14d0f0288965935a546ceaa4d4c": true,
+      "7ca2a55f458804f8d6ae6c4f9a1d36c943b4f660": true,
+      "9ed10b30cbbd4287e0566269ae8c7d1d4fda8c34": true
+    },
+    "buildId": "060037d",
+    "mainSha": "661de44cb6db131ecd4891116ffaa77c9bcb9220",
+    "prodSha": "060037d721042d332cbd006bf8a38e8f3bf877eb",
+    "marker": {
+      "status": "verified",
+      "at": "2026-10-20T13:15:52Z",
+      "checkedAt": 1792520942.7842758,
+      "error": null
+    },
+    "behind": 18
+  },
+  "system": {
+    "load1": 1.1,
+    "cores": 16,
+    "diskFreePct": 19.9,
+    "memAvailPct": 90
+  },
+  "derived": {
+    "attributions": {
+      "22307": {
+        "confidence": "inferred",
+        "category": "inferred:founder-operated-unknown-provider"
+      },
+      "22304": {
+        "confidence": "inferred",
+        "category": "inferred:founder-operated-unknown-provider"
+      },
+      "22253": {
+        "confidence": "inferred",
+        "category": "inferred:founder-operated-unknown-provider"
+      },
+      "21869": { "confidence": "inferred", "category": "inferred:symphony" },
+      "22301": {
+        "confidence": "inferred",
+        "category": "inferred:founder-operated-unknown-provider"
+      },
+      "21834": { "confidence": "inferred", "category": "inferred:symphony" },
+      "21956": { "confidence": "inferred", "category": "inferred:symphony" },
+      "22166": {
+        "confidence": "inferred",
+        "category": "inferred:founder-operated-unknown-provider"
+      },
+      "22290": { "confidence": "verified", "category": "unknown" },
+      "22292": { "confidence": "verified", "category": "autonomous-created" }
+    },
+    "throughput": {
+      "providers": {
+        "codex": {
+          "eligibleWorkOffered": 12,
+          "workerStarts": 7,
+          "productiveRuns": 2,
+          "prsCreated": 2,
+          "firstPassGreenRate": 0.5,
+          "remediationRuns": 65,
+          "landedOutput": 1
+        },
+        "grok": {
+          "eligibleWorkOffered": 0,
+          "workerStarts": 0,
+          "productiveRuns": 0,
+          "prsCreated": 0,
+          "firstPassGreenRate": null,
+          "remediationRuns": 74,
+          "landedOutput": 0
+        }
+      }
+    }
+  }
+}

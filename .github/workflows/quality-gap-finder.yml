@@ -26,6 +26,7 @@ on:
       - 'scripts/quality-gap-finder.mjs'
       - 'apps/web/app/**'
       - 'apps/web/components/**'
+      - 'apps/web/data/detection-coverage-registry.json'
       - 'apps/web/lib/**'
       - 'apps/web/scripts/performance-route-manifest.ts'
       - '.github/workflows/quality-gap-finder.yml'
@@ -56,6 +57,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with:

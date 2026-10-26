@@ -3,6 +3,7 @@ import {
   index,
   jsonb,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   uniqueIndex,
@@ -34,6 +35,8 @@ export interface AcquisitionFirstTouch {
   runId?: string;
   candidateId?: string;
   offerVersion?: string;
+  /** Probe traffic (automation UA or synthetic header); excluded from funnels. */
+  synthetic?: boolean;
 }
 
 /** Consent-scoped, first-party acquisition identity. No IP or fingerprint data. */
@@ -67,6 +70,35 @@ export const acquisitionJourneys = pgTable(
     ),
   })
 );
+
+/**
+ * First occurrence of each recorded artist-offer funnel stage per consented
+ * journey (stage contract: lib/acquisition/artist-offer-funnel.ts). `visit`
+ * and `sign-in` are derived from `acquisition_journeys.captured_at` and
+ * `linked_at`, so only explicitly emitted stages are stored here. Rows are
+ * consent-scoped with their journey and disappear with it.
+ */
+export const acquisitionJourneyStages = pgTable(
+  'acquisition_journey_stages',
+  {
+    acquisitionId: uuid('acquisition_id')
+      .notNull()
+      .references(() => acquisitionJourneys.id, { onDelete: 'cascade' }),
+    stage: text('stage').notNull(),
+    occurredAt: timestamp('occurred_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    pk: primaryKey({ columns: [table.acquisitionId, table.stage] }),
+    stageOccurredAtIdx: index(
+      'acquisition_journey_stages_stage_occurred_at_idx'
+    ).on(table.stage, table.occurredAt),
+  })
+);
+
+export type AcquisitionJourneyStage =
+  typeof acquisitionJourneyStages.$inferSelect;
 
 export const insertAcquisitionJourneySchema =
   createInsertSchema(acquisitionJourneys);

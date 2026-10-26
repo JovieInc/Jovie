@@ -485,9 +485,9 @@ work even when they are internal or generated.
    density, accessibility constraints, and verification path.
 3. Use the official design system when one exists. In Jovie, `DESIGN.md`,
    `docs/design-system/*`, tokens, and existing components outrank generic advice.
-4. Anti-slop is mandatory. Reject generic SaaS card grids, centered everything,
-   decorative blobs, uniform oversized radii, purple-blue gradient defaults,
-   icon-in-circle feature grids, and copy that could describe any product.
+4. Anti-slop is mandatory. The canonical list is ASR-020 (plus ASR-021, ASR-023,
+   ASR-024, ASR-025, ASR-026) in `docs/design-system/anti-slop-rules.json`; cite
+   ids, do not copy the text. `node scripts/anti-slop/run.mjs list` prints them.
 5. Platform literacy matters. Web, iOS, macOS/Ovie, and ops tools share principles
    but not chrome, density, interaction conventions, or motion budgets.
 6. State coverage is design coverage. Include loading, empty, error, disabled,
@@ -496,6 +496,20 @@ work even when they are internal or generated.
    labels, and decorative elements before adding new visual treatment.
 8. Evidence closes the loop. Design work is not done without screenshots, mockups,
    component evidence, or an explicit non-UI rationale.
+9. General pages stay generic. Homepage, pricing, about, brand, and other
+   general marketing copy do not name a customer segment (music, artist,
+   musician, DJ, producer, label, founder, investor, fan, author, or a
+   creator-type niche). “Creator” is the generic word. Audience routes such as
+   `solutions/[audience]` may use segment language. The locked headline is
+   “Be found. Be understood.” MKT-D16 and
+   `scripts/invariants/icp-language/check.mjs` enforce this. The baseline only
+   shrinks.
+
+### Taste Rule: Copy Is the Message, Never the Brief
+
+Reject AI instructions, editing rules, and unfinished text in every user-visible string, including metadata, accessibility labels, emails, errors, empty states, and demos. Use the copy system.
+Run `node scripts/invariants/copy-leak/check.mjs` before review: it blocks PR Ready and merge groups. Fix real leaks; its baseline only shrinks.
+Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 
 ### Logo asset normalization
 
@@ -542,8 +556,7 @@ Before declaring design work complete, report pass/fail for:
   without implementation or screenshot evidence.
 - Iconography: Lucide for UI icons where available; Jovie brand remains O-only;
   no invented brand marks.
-- Anti-slop: no generic gradients, nested cards, decorative blobs, repetitive
-  feature grids, or template copy.
+- Anti-slop: every ASR rule in scope passes (ASR-020 and the rules it links).
 - Evidence: screenshots, mockups, test output, or component/file evidence included
   in the PR or final handoff.
 - Forms, overflow, media, l10n, browser, and a11y gaps: load

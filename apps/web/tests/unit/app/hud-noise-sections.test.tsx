@@ -19,6 +19,9 @@ vi.mock('@/components/features/admin/hud/FounderFunnelBand', () => ({
 vi.mock('@/components/features/admin/hud/FounderMorningWalkCard', () => ({
   FounderMorningWalkCard: stub('FounderMorningWalkCard'),
 }));
+vi.mock('@/components/features/admin/hud/HudDetectionCoveragePanel', () => ({
+  HudDetectionCoveragePanel: stub('HudDetectionCoveragePanel'),
+}));
 vi.mock('@/components/features/admin/hud/HudDrilldownSearch', () => ({
   HudDrilldownSearch: stub('HudDrilldownSearch'),
 }));
@@ -49,6 +52,7 @@ describe('HUD noise-section lazy boundaries', () => {
       'AgentOsRunsPanel',
       'FounderFunnelBand',
       'FounderMorningWalkCard',
+      'HudDetectionCoveragePanel',
       'HudDrilldownSearch',
       'HudEnvExceptionsPanel',
       'HudGithubBudgetPanel',
@@ -86,6 +90,7 @@ describe('HUD noise-section lazy boundaries', () => {
       '@/components/features/admin/agent-os',
       '@/components/features/admin/hud/FounderFunnelBand',
       '@/components/features/admin/hud/FounderMorningWalkCard',
+      '@/components/features/admin/hud/HudDetectionCoveragePanel',
       '@/components/features/admin/hud/HudDrilldownSearch',
       '@/components/features/admin/hud/HudEnvExceptionsPanel',
       '@/components/features/admin/hud/HudKpiSubgrid',

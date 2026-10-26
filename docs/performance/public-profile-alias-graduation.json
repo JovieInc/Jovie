@@ -1,270 +1,59 @@
 {
-  "schema": "jovie-public-profile-alias-graduation/v1",
-  "surface": "production-canonical-alias",
-  "measuredAt": "2026-10-14T15:21:25Z",
+  "schema": "jovie-public-profile-alias-graduation/v2",
+  "repository": "JovieInc/Jovie",
+  "measuredAt": "2026-10-21T01:06:00Z",
   "selection": {
-    "workflow": "Production Controller",
     "workflowPath": ".github/workflows/production-controller.yml",
-    "job": "Production Release / Production public-profile alias usable-result gate",
-    "eligibility": "completed controller executions where the production canonical-alias job ran",
-    "order": "newest-first",
-    "windowSize": 14
+    "since": "2026-10-14T00:00:00Z",
+    "cutoff": "2026-10-21T01:06:00Z",
+    "enumeratedControllers": 472,
+    "windowSize": 14,
+    "eligibility": "completed controllers and completed measurement steps by cutoff, regardless of controller conclusion; partial measurements consume a nonqualifying slot",
+    "order": "measurement job completedAt descending, controllerRunId descending"
   },
   "policy": {
-    "metric": "usable-alias-result",
+    "metric": "usable-alias-result-max",
     "samplesPerRoute": 5,
     "p95Estimator": "nearest-rank",
     "thresholdMs": 1500,
-    "qualifyingRun": "every selected route has nearest-rank p95 at or below thresholdMs",
     "requiredConsecutiveRuns": 14,
-    "currentEnforcement": "warn",
-    "nextReviewAt": "2026-10-21T15:21:25Z",
-    "trackingIssue": "JOV-8338"
+    "nextReviewAt": "2026-10-28T01:06:00Z",
+    "trackingIssue": "JOV-8737"
   },
-  "result": {
-    "qualifyingRunsInWindow": 12,
-    "consecutiveQualifyingRuns": 1,
-    "graduated": false,
-    "decision": "warn"
+  "evidence": {
+    "inventory": "generated/public-profile-alias-controller-inventory.jsonl",
+    "inventorySha256": "c88a6c9b5e175a85a954353bef59c882617fe68bd59d2b80af0b005bcd551225",
+    "measurements": "generated/public-profile-alias-measurements.jsonl",
+    "measurementsSha256": "9f0dc67e6163af7c9167900c5685bec632e452bc566887d73044a8408b55fe7e"
   },
-  "runs": [
-    {
-      "controllerRunId": 38585277795,
-      "jobId": 115933705814,
-      "headSha": "6437c7a3b5a7a9d168a76f755286ef9c2c873fb6",
-      "completedAt": "2026-10-14T15:21:25Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38585277795/job/115933705814",
-      "routeP95Ms": {
-        "public-profile-listen": 1247.6,
-        "public-profile-music": 1202.2,
-        "public-profile-releases": 898.3,
-        "public-profile-subscribe": 781.6,
-        "public-profile-tip": 1193.5,
-        "public-profile-tour": 870.3
-      },
-      "observedP95Ms": 1247.6,
-      "qualifies": true
+  "windows": {
+    "production": {
+      "surface": "production-canonical-alias",
+      "job": "Production Release / Production public-profile alias usable-result gate",
+      "step": "Gate canonical public-profile aliases on usable results",
+      "selectedJobIds": [
+        118967921541, 118961489234, 118938706279, 118919264353, 118886253492,
+        118871438580, 118852106606, 118836788534, 118821642453, 118810523687,
+        118646436408, 118564755986, 118303461117, 118285399006
+      ],
+      "qualifyingRunsInWindow": 11,
+      "consecutiveQualifyingRuns": 0,
+      "graduated": false,
+      "decision": "warn"
     },
-    {
-      "controllerRunId": 38582527200,
-      "jobId": 115921767630,
-      "headSha": "e995831a933efc259c5b892d3175b9dae83db62a",
-      "completedAt": "2026-10-14T14:58:03Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38582527200/job/115921767630",
-      "routeP95Ms": {
-        "public-profile-listen": 1507.5,
-        "public-profile-music": 897.4,
-        "public-profile-releases": 1299.9,
-        "public-profile-subscribe": 816.9,
-        "public-profile-tip": 1325.0,
-        "public-profile-tour": 905.2
-      },
-      "observedP95Ms": 1507.5,
-      "qualifies": false
-    },
-    {
-      "controllerRunId": 38572973908,
-      "jobId": 115889329763,
-      "headSha": "d59de3eab3bd72fde8cae265ef7d6426d73ee184",
-      "completedAt": "2026-10-14T13:50:52Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38572973908/job/115889329763",
-      "routeP95Ms": {
-        "public-profile-listen": 1205.4,
-        "public-profile-music": 802.7,
-        "public-profile-releases": 890.0,
-        "public-profile-subscribe": 1135.0,
-        "public-profile-tip": 760.0,
-        "public-profile-tour": 728.2
-      },
-      "observedP95Ms": 1205.4,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38564340241,
-      "jobId": 115860642818,
-      "headSha": "887ea1bf56e9dffcf85dda41d208fdc9ed95310f",
-      "completedAt": "2026-10-14T12:54:23Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38564340241/job/115860642818",
-      "routeP95Ms": {
-        "public-profile-listen": 1223.9,
-        "public-profile-music": 1036.7,
-        "public-profile-releases": 1019.9,
-        "public-profile-subscribe": 713.2,
-        "public-profile-tip": 1072.2,
-        "public-profile-tour": 825.9
-      },
-      "observedP95Ms": 1223.9,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38552406025,
-      "jobId": 115821124109,
-      "headSha": "14ec6f0ccc853e9a1f81ad58c03af6536e63add1",
-      "completedAt": "2026-10-14T11:17:43Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38552406025/job/115821124109",
-      "routeP95Ms": {
-        "public-profile-listen": 1329.0,
-        "public-profile-music": 854.4,
-        "public-profile-releases": 776.8,
-        "public-profile-subscribe": 976.9,
-        "public-profile-tip": 1163.9,
-        "public-profile-tour": 732.2
-      },
-      "observedP95Ms": 1329.0,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38549972405,
-      "jobId": 115814706460,
-      "headSha": "4b1167b3c3aa548327417ae8c8f84f4c8c10981a",
-      "completedAt": "2026-10-14T10:56:38Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38549972405/job/115814706460",
-      "routeP95Ms": {
-        "public-profile-listen": 1149.9,
-        "public-profile-music": 1218.7,
-        "public-profile-releases": 729.3,
-        "public-profile-subscribe": 1062.8,
-        "public-profile-tip": 969.3,
-        "public-profile-tour": 599.7
-      },
-      "observedP95Ms": 1218.7,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38538856536,
-      "jobId": 115773878754,
-      "headSha": "7b78b2b9f39cecc7ede83b77d728c1f164964c1e",
-      "completedAt": "2026-10-14T09:13:58Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38538856536/job/115773878754",
-      "routeP95Ms": {
-        "public-profile-listen": 1177.5,
-        "public-profile-music": 910.9,
-        "public-profile-releases": 1130.1,
-        "public-profile-subscribe": 709.6,
-        "public-profile-tip": 829.6,
-        "public-profile-tour": 771.1
-      },
-      "observedP95Ms": 1177.5,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38535963851,
-      "jobId": 115764084304,
-      "headSha": "7f4139a1b650e5dea4eb71ed57bd3d7ebfb6d2a2",
-      "completedAt": "2026-10-14T08:53:30Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38535963851/job/115764084304",
-      "routeP95Ms": {
-        "public-profile-listen": 1307.1,
-        "public-profile-music": 687.1,
-        "public-profile-releases": 827.2,
-        "public-profile-subscribe": 823.7,
-        "public-profile-tip": 844.6,
-        "public-profile-tour": 721.1
-      },
-      "observedP95Ms": 1307.1,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38533378866,
-      "jobId": 115755913212,
-      "headSha": "3810df8dc9983888fa564956ed20ab075c15b0be",
-      "completedAt": "2026-10-14T08:28:22Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38533378866/job/115755913212",
-      "routeP95Ms": {
-        "public-profile-listen": 1376.1,
-        "public-profile-music": 1155.2,
-        "public-profile-releases": 720.4,
-        "public-profile-subscribe": 653.7,
-        "public-profile-tip": 654.4,
-        "public-profile-tour": 697.0
-      },
-      "observedP95Ms": 1376.1,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38525945407,
-      "jobId": 115729800186,
-      "headSha": "3e3e4e48a40bf9151ef0995d737a6a2671246830",
-      "completedAt": "2026-10-14T07:17:13Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38525945407/job/115729800186",
-      "routeP95Ms": {
-        "public-profile-listen": 1060.3,
-        "public-profile-music": 1028.9,
-        "public-profile-releases": 895.0,
-        "public-profile-subscribe": 668.4,
-        "public-profile-tip": 715.6,
-        "public-profile-tour": 873.2
-      },
-      "observedP95Ms": 1060.3,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38521758164,
-      "jobId": 115718159826,
-      "headSha": "74988153ec60f4e0bfffd8e7bda848b013cad661",
-      "completedAt": "2026-10-14T06:45:24Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38521758164/job/115718159826",
-      "routeP95Ms": {
-        "public-profile-listen": 2041.1,
-        "public-profile-music": 726.3,
-        "public-profile-releases": 956.9,
-        "public-profile-subscribe": 797.4,
-        "public-profile-tip": 1096.0,
-        "public-profile-tour": 939.8
-      },
-      "observedP95Ms": 2041.1,
-      "qualifies": false
-    },
-    {
-      "controllerRunId": 38516717860,
-      "jobId": 115700887656,
-      "headSha": "f01b1345aada8ffa00f129bbfca1a7e98854402b",
-      "completedAt": "2026-10-14T05:43:13Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38516717860/job/115700887656",
-      "routeP95Ms": {
-        "public-profile-listen": 1151.8,
-        "public-profile-music": 1031.2,
-        "public-profile-releases": 944.7,
-        "public-profile-subscribe": 836.3,
-        "public-profile-tip": 710.1,
-        "public-profile-tour": 699.9
-      },
-      "observedP95Ms": 1151.8,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38504965606,
-      "jobId": 115663810339,
-      "headSha": "ce624f44b2f44e560eba649d0b0dccfd05aaffad",
-      "completedAt": "2026-10-14T03:31:09Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38504965606/job/115663810339",
-      "routeP95Ms": {
-        "public-profile-listen": 1096.3,
-        "public-profile-music": 874.2,
-        "public-profile-releases": 1253.0,
-        "public-profile-subscribe": 899.6,
-        "public-profile-tip": 1255.9,
-        "public-profile-tour": 785.8
-      },
-      "observedP95Ms": 1255.9,
-      "qualifies": true
-    },
-    {
-      "controllerRunId": 38496901156,
-      "jobId": 115640775982,
-      "headSha": "497fa3d26938ba429f31413350fa6e1f0fe89573",
-      "completedAt": "2026-10-14T02:08:25Z",
-      "jobUrl": "https://github.com/JovieInc/Jovie/actions/runs/38496901156/job/115640775982",
-      "routeP95Ms": {
-        "public-profile-listen": 778.0,
-        "public-profile-music": 766.7,
-        "public-profile-releases": 857.2,
-        "public-profile-subscribe": 1244.6,
-        "public-profile-tip": 893.9,
-        "public-profile-tour": 782.3
-      },
-      "observedP95Ms": 1244.6,
-      "qualifies": true
+    "staging": {
+      "surface": "staging-exact-build",
+      "job": "Production Release / Promote to Production",
+      "step": "Prove canonical navigation budgets on exact staged build",
+      "selectedJobIds": [
+        118830683801, 118816089991, 118805394245, 118280569621, 118224005862,
+        118002200697, 117991453943, 117537609961, 117500086265, 117331991578,
+        117311489498, 117290131952, 117261762987, 117254950876
+      ],
+      "qualifyingRunsInWindow": 14,
+      "consecutiveQualifyingRuns": 14,
+      "graduated": true,
+      "decision": "block"
     }
-  ]
+  }
 }

@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "direction": "lock_up",
+  "note": "Per-file mutation score floors for billing, auth, and Stripe. Each floor is one point under the measured score from the cited Mutation Diff run, so that run passes. Floors only move up. Files without an entry stay advisory until a run is recorded. This workflow is not a merge-queue required check.",
+  "files": {
+    "app/api/billing/health/route.ts": {
+      "measured": 44.6,
+      "floor": 43.6,
+      "valid": 305,
+      "runId": 39691992741,
+      "sha": "e84979745ae3625b1240841a42e65467cb9cce25"
+    },
+    "app/api/stripe/webhooks/route.ts": {
+      "measured": 68.9,
+      "floor": 67.9,
+      "valid": 193,
+      "runId": 39691992741,
+      "sha": "e84979745ae3625b1240841a42e65467cb9cce25"
+    },
+    "app/api/webhooks/stripe-merch/route.ts": {
+      "measured": 39.4,
+      "floor": 38.4,
+      "valid": 104,
+      "runId": 39691992741,
+      "sha": "e84979745ae3625b1240841a42e65467cb9cce25"
+    },
+    "app/api/webhooks/stripe-tips/route.ts": {
+      "measured": 58.4,
+      "floor": 57.4,
+      "valid": 166,
+      "runId": 39691992741,
+      "sha": "e84979745ae3625b1240841a42e65467cb9cce25"
+    },
+    "lib/auth/proxy-request-handler.ts": {
+      "measured": 68.4,
+      "floor": 67.4,
+      "valid": 187,
+      "runId": 39862439698,
+      "sha": "7d066b4da85245306ca2f702d12faaa8cc794a43"
+    },
+    "lib/billing/webhook-replay.ts": {
+      "measured": 69.1,
+      "floor": 68.1,
+      "valid": 136,
+      "runId": 39691992741,
+      "sha": "e84979745ae3625b1240841a42e65467cb9cce25"
+    },
+    "lib/claim/redirect-origin.ts": {
+      "measured": 47.1,
+      "floor": 46.1,
+      "valid": 87,
+      "runId": 39873145330,
+      "sha": "3c0691a23ea5fe132d406050b65f2cdfeaa20144"
+    },
+    "lib/stripe/dunning.ts": {
+      "measured": 12.6,
+      "floor": 11.6,
+      "valid": 135,
+      "runId": 39889081061,
+      "sha": "814306a8c832b4f8940251465a522df90d7ebde1"
+    },
+    "lib/stripe/startup-validation.ts": {
+      "measured": 90.5,
+      "floor": 89.5,
+      "valid": 63,
+      "runId": 39814455991,
+      "sha": "a87826a9cdde691aa3b2b5049af3da3d37befc82"
+    },
+    "lib/stripe/test-price-contract.ts": {
+      "measured": 83.9,
+      "floor": 82.9,
+      "valid": 118,
+      "runId": 39814455991,
+      "sha": "a87826a9cdde691aa3b2b5049af3da3d37befc82"
+    },
+    "lib/stripe/webhooks/base-handler.ts": {
+      "measured": 55.7,
+      "floor": 54.7,
+      "valid": 88,
+      "runId": 39691992741,
+      "sha": "e84979745ae3625b1240841a42e65467cb9cce25"
+    },
+    "lib/stripe/webhooks/handlers/payment-handler.ts": {
+      "measured": 77.1,
+      "floor": 76.1,
+      "valid": 218,
+      "runId": 39689355537,
+      "sha": "675c917543c4286bf8f324b21b2dc37adfb3a023"
+    },
+    "proxy.ts": {
+      "measured": 56.7,
+      "floor": 55.7,
+      "valid": 150,
+      "runId": 39873145330,
+      "sha": "3c0691a23ea5fe132d406050b65f2cdfeaa20144"
+    }
+  }
+}

@@ -36,6 +36,8 @@ jobs:
       affected_targets: ${{ steps.probe.outputs.affected_targets }}
       incident_classes: ${{ steps.probe.outputs.incident_classes }}
       incident_key: ${{ steps.probe.outputs.incident_key }}
+      unknown_targets: ${{ steps.probe.outputs.unknown_targets }}
+      unknown_reasons: ${{ steps.probe.outputs.unknown_reasons }}
       requires_agent_ingress: ${{ steps.probe.outputs.requires_agent_ingress }}
     steps:
       - name: Checkout policy source
@@ -57,6 +59,7 @@ jobs:
         # production SHA against main; it reaches GitHub only, never jov.ie.
         env:
           GH_TOKEN: ${{ github.token }}
+          PRODUCTION_LIMITS_FEED_URL: ${{ vars.PRODUCTION_LIMITS_FEED_URL }}
         run: >-
           node .github/scripts/production-continuity.mjs
           --output "$RUNNER_TEMP/production-continuity.json"
@@ -77,7 +80,12 @@ jobs:
           STATUS: ${{ steps.probe.outputs.status }}
           AFFECTED_TARGETS: ${{ steps.probe.outputs.affected_targets }}
           INCIDENT_CLASSES: ${{ steps.probe.outputs.incident_classes }}
+          UNKNOWN_TARGETS: ${{ steps.probe.outputs.unknown_targets }}
+          UNKNOWN_REASONS: ${{ steps.probe.outputs.unknown_reasons }}
         run: |
+          if [ "$STATUS" = "unknown" ] || [ -n "$UNKNOWN_TARGETS" ]; then
+            echo "::warning title=Production continuity evidence unknown::Unreadable evidence for $UNKNOWN_TARGETS ($UNKNOWN_REASONS). Not healthy; an open incident is not resolved."
+          fi
           {
             echo "### Production Continuity Guard"
             echo
@@ -86,6 +94,11 @@ jobs:
             echo "| Status | $STATUS |"
             echo "| Affected targets | ${AFFECTED_TARGETS:-none} |"
             echo "| Incident classes | ${INCIDENT_CLASSES:-none} |"
+            echo "| Unknown targets | ${UNKNOWN_TARGETS:-none} (${UNKNOWN_REASONS:-none}) |"
+            # Release lag stays visible while it is still inside the stale bound.
+            jq -r '.targets[] | select(.id == "jovie-production-freshness")
+              | "| Production freshness | live \(.liveSha // "unknown" | .[0:7]) vs main \(.mainSha // "unknown" | .[0:7]): \(.unshippedCommits) unshipped, oldest \(.unshippedAgeSeconds)s (\(.reason)) |"' \
+              "$RUNNER_TEMP/production-continuity.json" || true
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Complete independent scheduler check-in
@@ -212,6 +225,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Map the observe verdict to a remediation conclusion
+        id: verdict
+        env:
+          OBSERVE_RESULT: ${{ needs.observe.result }}
+          OBSERVE_STATUS: ${{ needs.observe.outputs.status }}
+        run: node .github/scripts/production-continuity.mjs --remediation-conclusion
       - name: File or resolve production-monitor-continuity
         env:
           GH_TOKEN: ${{ github.token }}
@@ -220,8 +239,9 @@ jobs:
           REMEDIATION_MODE: monitor
           REMEDIATION_FINGERPRINT: production-monitor-continuity
           REMEDIATION_SOURCE: production-continuity.yml
-          REMEDIATION_CONCLUSION: ${{ (needs.observe.result != 'success' || needs.observe.outputs.status == 'unhealthy') && 'failure' || 'success' }}
-          REMEDIATION_DETAIL: ${{ needs.observe.outputs.incident_key }} ${{ needs.observe.outputs.incident_classes }}
+          # Only an observed `healthy` rollup is success; see remediationConclusion().
+          REMEDIATION_CONCLUSION: ${{ steps.verdict.outputs.conclusion }}
+          REMEDIATION_DETAIL: ${{ needs.observe.outputs.incident_key }} ${{ needs.observe.outputs.incident_classes }} ${{ needs.observe.outputs.unknown_targets }} ${{ needs.observe.outputs.unknown_reasons }}
           REMEDIATION_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           REMEDIATION_GATE_STEADY_GREEN: '1'
           REMEDIATION_FAIL_OPEN: '1'

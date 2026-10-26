@@ -47,6 +47,32 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
       'apps/web/tests/unit/marketing/MarketingTerminalCta.test.tsx',
     ],
   ],
+  // Homepage copy modules live under data/, outside the component/app import
+  // graph. Bind each one to the unit tests that import it.
+  [
+    'apps/web/data/homepageFrontDoorCta.ts',
+    [
+      'apps/web/components/features/waitlist/WaitlistPublicLanding.test.tsx',
+      'apps/web/data/canonicalPublicShellOptimization.test.ts',
+      'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
+      'apps/web/tests/unit/marketing/marketing-cta-intents.test.ts',
+      'apps/web/tests/unit/marketing/marketing-header-cta-consistency.test.ts',
+    ],
+  ],
+  [
+    'apps/web/data/homepageV2Copy.ts',
+    ['apps/web/tests/unit/marketing/feature-tile-accent-uniqueness.test.ts'],
+  ],
+  [
+    'apps/web/data/marketingCtaIntents.ts',
+    [
+      'apps/web/app/(marketing)/product/ProductLanding.test.tsx',
+      'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
+      'apps/web/tests/unit/marketing/marketing-bounded-revenue-path.test.ts',
+      'apps/web/tests/unit/marketing/marketing-cta-intents.test.ts',
+      'apps/web/tests/unit/marketing/marketing-header-cta-consistency.test.ts',
+    ],
+  ],
   [
     'apps/web/lib/leads/qualification-decision.ts',
     ['apps/web/tests/lib/leads/qualification-decision.test.ts'],
@@ -159,21 +185,14 @@ const VERCEL_CONGESTION_CONTROL_PYTHON_TESTS = [
 // otherwise sails through affected-test selection and only fails on the
 // merge-group full suite (PR #15566 looped enroll→group-red 3× on 2026-08-06).
 const HOMEPAGE_SYSTEM_B_STYLE_GUARD_TESTS = [
-  'apps/web/tests/unit/home/bento-feature-grid-system-b-style-guard.test.tsx',
-  'apps/web/tests/unit/home/claim-handle-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/dead-home-actions-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/home-profile-showcase-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-artist-outcomes-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-closed-loop-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-command-center-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-faq-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-footer-cta-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-grid-spine-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-hero-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-pricing-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-product-statement-system-b-style-guard.test.ts',
   'apps/web/tests/unit/home/mounted-home-trust-strip-system-b-style-guard.test.ts',
-  'apps/web/tests/unit/home/mounted-home-workspace-system-b-style-guard.test.ts',
 ];
 const HOMEPAGE_SYSTEM_B_GUARD_EXACT_INPUTS = new Set([
   'apps/web/components/marketing/ClientFaqAccordion.tsx',
@@ -1121,6 +1140,11 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
 }
 
 const LANE_PYTHON_COVERAGE_INPUTS = new Set([
+  'scripts/hyperagent/hyperagent.py',
+  'scripts/hyperagent/install.py',
+  'scripts/hyperagent/models.json',
+  'scripts/lanes/reason.json',
+  'scripts/tests/test_hyperagent_cli.py',
   ...[
     'backlog_admission',
     'backlog_writer_guard',
@@ -2070,6 +2094,8 @@ function planAffectedTests(
     files.some(
       file => file.startsWith('.github/') || file.startsWith('scripts/')
     ) && !isExactProductionReleaseContract;
+  const hasCompleteAffectedTestSelectorPair =
+    affectedTestSelectorInputCount === AFFECTED_TEST_SELECTOR_MANIFEST.size;
   const hasManifestInputBeyondDirectTests = manifest =>
     files.some(
       file =>
@@ -2219,7 +2245,8 @@ function planAffectedTests(
     ...(isExactScannerLoadRepairPrimary || isExactScannerLoadRepairWithSelector
       ? SCANNER_LOAD_REPAIR_SCRIPT_TESTS
       : []),
-    ...(isExactAffectedTestSelector ||
+    ...(hasCompleteAffectedTestSelectorPair ||
+    isExactAffectedTestSelector ||
     (isBoundedAudienceReleaseDenial && affectedTestSelectorInputCount > 0) ||
     (isExactAuthenticatedA11yRepair && affectedTestSelectorInputCount > 0) ||
     isExactPrSizeGuardWithSelector ||
@@ -2486,6 +2513,32 @@ function planAffectedTests(
   const uncoveredSourceFiles = relatedFiles.filter(
     file => !isCoveredSource(file)
   );
+  // The complete selector pair may accompany an already-covered product
+  // change. It still fails closed for a partial pair, an exact control-lane
+  // member, or a manifest hit that is not one of the two selector files.
+  const selectorPairAccompaniesCoveredProduct =
+    hasCompleteAffectedTestSelectorPair &&
+    relatedFiles.length > 0 &&
+    uncoveredSourceFiles.length === 0 &&
+    !files.some(
+      file =>
+        !AFFECTED_TEST_SELECTOR_MANIFEST.has(file) &&
+        (SERVICE_CENSUS_QUALIFICATION_MANIFEST.has(file) ||
+          DEPENDENCY_GATE_QUALIFICATION_MANIFEST.has(file) ||
+          CODEX_CAPACITY_QUALIFICATION_MANIFEST.has(file))
+    );
+  const selectorPairIsTheOnlyManifestHit = manifest => {
+    if (!selectorPairAccompaniesCoveredProduct) return false;
+    const triggering = files.filter(
+      file =>
+        manifest.has(file) &&
+        (hasUnsupportedAutomationPeer || !directlyRunnableTestFiles.has(file))
+    );
+    return (
+      triggering.length > 0 &&
+      triggering.every(file => AFFECTED_TEST_SELECTOR_MANIFEST.has(file))
+    );
+  };
   const hasUncoveredSource =
     uncoveredSourceFiles.length > 0 ||
     (mergeQueueControllerInputCount > 0 &&
@@ -2501,15 +2554,28 @@ function planAffectedTests(
     hasStandalonePrerequisiteGlobal ||
     hasUnknownPrerequisiteTrainPeer ||
     hasIncompleteVercelCongestionControl ||
-    hasIncompleteAffectedTestSelector ||
-    hasIncompletePrSizeGuard ||
-    hasIncompletePerformanceProfilerRepair ||
-    hasIncompleteScannerLoadRepair ||
-    hasIncompleteMobileOverflowNavigationRace ||
-    hasIncompleteRunnerIoPressure ||
-    hasIncompleteRunnerPrerequisiteContract ||
-    hasIncompleteLayoutGuardContract ||
-    hasIncompleteNeonAttemptArtifactRepair;
+    (hasIncompleteAffectedTestSelector &&
+      !selectorPairIsTheOnlyManifestHit(AFFECTED_TEST_SELECTOR_MANIFEST)) ||
+    (hasIncompletePrSizeGuard &&
+      !selectorPairIsTheOnlyManifestHit(PR_SIZE_GUARD_MANIFEST)) ||
+    (hasIncompletePerformanceProfilerRepair &&
+      !selectorPairIsTheOnlyManifestHit(PERFORMANCE_PROFILER_REPAIR_ANCHORS)) ||
+    (hasIncompleteScannerLoadRepair &&
+      !selectorPairIsTheOnlyManifestHit(SCANNER_LOAD_REPAIR_MANIFEST)) ||
+    (hasIncompleteMobileOverflowNavigationRace &&
+      !selectorPairIsTheOnlyManifestHit(
+        MOBILE_OVERFLOW_NAVIGATION_RACE_MANIFEST
+      )) ||
+    (hasIncompleteRunnerIoPressure &&
+      !selectorPairIsTheOnlyManifestHit(RUNNER_IO_PRESSURE_MANIFEST)) ||
+    (hasIncompleteRunnerPrerequisiteContract &&
+      !selectorPairIsTheOnlyManifestHit(
+        RUNNER_PREREQUISITE_CONTRACT_MANIFEST
+      )) ||
+    (hasIncompleteLayoutGuardContract &&
+      !selectorPairIsTheOnlyManifestHit(LAYOUT_GUARD_CONTRACT_MANIFEST)) ||
+    (hasIncompleteNeonAttemptArtifactRepair &&
+      !selectorPairIsTheOnlyManifestHit(NEON_ATTEMPT_ARTIFACT_MANIFEST));
   const hasSelectedTests =
     selectedTests.length > 0 ||
     rootVitestTests.length > 0 ||

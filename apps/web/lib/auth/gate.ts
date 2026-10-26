@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/nextjs';
 import { eq } from 'drizzle-orm';
 import { cache } from 'react';
 import { getRequestSession } from '@/lib/auth/request-session';
+import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import { db } from '@/lib/db';
 import {
   getDeepErrorMessage,
@@ -14,6 +15,7 @@ import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 import { captureCriticalError, captureError } from '@/lib/error-tracking';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { normalizeEmail } from '@/lib/utils/email';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import {
@@ -147,6 +149,7 @@ interface AuthGateRecord {
   profileIsPublic: boolean | null;
   profileAvatarUrl: string | null;
   profileOnboardingCompletedAt: Date | null;
+  profileSettings?: unknown;
 }
 
 interface AuthGateDbUser {
@@ -167,6 +170,7 @@ interface AuthGateProfile {
   avatarUrl: string | null;
   isPublic: boolean | null;
   onboardingCompletedAt: Date | null;
+  proofPending?: boolean;
   isClaimed: true;
 }
 
@@ -607,6 +611,7 @@ async function loadAuthGateRecord(
         profileIsPublic: creatorProfiles.isPublic,
         profileAvatarUrl: creatorProfiles.avatarUrl,
         profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+        profileSettings: creatorProfiles.settings,
       })
       .from(users)
       .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
@@ -664,6 +669,9 @@ function toAuthGateProfile(
     avatarUrl: dbResult.profileAvatarUrl,
     isPublic: dbResult.profileIsPublic,
     onboardingCompletedAt: dbResult.profileOnboardingCompletedAt,
+    ...(isProofBlockingPublication(dbResult.profileSettings)
+      ? { proofPending: true }
+      : {}),
     isClaimed: true, // joined via activeProfileId = claimed
   };
 }
@@ -729,7 +737,15 @@ async function resolveUserStateInternal(
   const [waitlistGateEnabled, lookupResult] = await Promise.all([
     readWaitlistGateEnabledForAuthGate(),
     loadAuthGateRecord(clerkUserId, email),
-  ]);
+  ]).catch(error => {
+    captureRevenueSpineFailure({
+      stage: 'returning_access',
+      severity: 'blocked',
+      userId: knownClerkUserId,
+      error,
+    });
+    throw error;
+  });
   if (lookupResult && 'state' in lookupResult) {
     return lookupResult;
   }
