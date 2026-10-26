@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { cookies } from 'next/headers';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { requiresClaimVerification } from '@/lib/claim/claim-verification';
@@ -41,6 +43,7 @@ import {
   SpotifyProfileIdentityConflictError,
 } from '@/lib/profile/spotify-profile-identity';
 import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import {
   type AccountMetricCohort,
   getAccountMetricCohort,
@@ -641,7 +644,21 @@ async function materializeProfile({
       step: 'claim_complete',
       cohort: claimCohort,
     });
+    await recordClaimedStage();
   }
 
   return { profileId, handle, status };
+}
+
+/** Journey-keyed golden-path stage. Never throws; no consent cookie, no row. */
+async function recordClaimedStage(): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    await recordArtistOfferStage(
+      cookieStore.get(ACQUISITION_COOKIE_NAME)?.value,
+      'claimed'
+    );
+  } catch {
+    // Measurement only: a request without a cookie store records nothing.
+  }
 }
