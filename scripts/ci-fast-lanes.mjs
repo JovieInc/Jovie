@@ -162,7 +162,9 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/$B" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
   'files="$(git diff --name-only --diff-filter=d "origin/$B" HEAD -- scripts/lanes scripts/tests)"',
   'cand=""',
-  'for f in $files; do case "$f" in scripts/tests/test_*.py) cand="$cand $f";; scripts/lanes/lane_runner.py) ;; scripts/lanes/*.py) cand="$cand scripts/tests/test_$(basename "$f" .py).py";; esac; done',
+  // The qualification guard pins the sha256 of scripts/tests/test_disk_guard.py; editing that fixture without
+  // adding its hash ejected seven merge groups and six bystanders (#23280, 2026-10-25), so run its pinning test.
+  'for f in $files; do case "$f" in scripts/tests/test_disk_guard.py) cand="$cand $f scripts/tests/test_qualification_guard.py";; scripts/tests/test_*.py) cand="$cand $f";; scripts/lanes/lane_runner.py) ;; scripts/lanes/*.py) cand="$cand scripts/tests/test_$(basename "$f" .py).py";; esac; done',
   // The release self-test runs only LANE_TESTS (lane_runner.py), with unittest and no conftest.
   // A lane_runner.py edit alone does not pull in test_lane_runner.py (867 tests, ~90s); edit that test to run it.
   'tests=""',
