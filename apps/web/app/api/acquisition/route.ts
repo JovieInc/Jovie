@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         capturedAt: new Date(capturedAt),
         appUserId,
       }),
-    { actorId: appUserId ?? acquisitionId, system: true }
+    { actorId: appUserId ?? acquisitionId, system: true, retry: 'never' }
   );
 
   const funnelStage = stageForFunnelPath(parsed.data.currentPath);
