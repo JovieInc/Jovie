@@ -160,8 +160,24 @@ jobs:
           git fetch --no-tags origin "${{ github.base_ref }}"
           trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
           guard_root="$(mktemp -d "$RUNNER_TEMP/source-read-guard.XXXXXX")"
-          trap 'rm -rf "$guard_root"' EXIT
+          merging=false
+          # Restore the PR head checkout for every later step, however this one ends.
+          trap '[ "$merging" != true ] || git reset --hard --quiet "$EXPECTED_HEAD"; rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
+          # Guard code and the guard list come from the trusted base (above); the
+          # files they read must be the ones this PR would land: base plus head.
+          # Run against the head alone, a PR behind the base fails every guard
+          # that reads a file the base added after the PR branched (#23313,
+          # #23336: domain-write-guard ENOENT on write-registry.json). The merge
+          # is uncommitted, so HEAD and the changed-file list stay the PR's. A
+          # dirty tree (a local run) is never reset: it keeps the head-only run.
+          clean=true
+          git diff --quiet HEAD 2>/dev/null || clean=false
+          [ "$clean" = true ] || echo "::notice::working tree has local changes; source guards run on the head alone"
+          [ "$clean" != true ] || merging=true
+          merge_ok=true
+          [ "$merging" != true ] || git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1 || merge_ok=false
+          [ "$merge_ok" = true ] || { conflicts="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"; echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base} in: ${conflicts:-unknown files}. Resolve the conflict (lane-fix-conflict); source guards judge the merged tree and cannot run on a conflicted one."; echo "merge conflict with ${GITHUB_BASE_REF:-base}: ${conflicts:-unknown files}"; exit 1; }
           export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
           node --input-type=module -e '
             import { spawnSync } from "node:child_process";
