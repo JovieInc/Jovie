@@ -638,8 +638,8 @@ describe('rolling CI dispatch CLI and workflow', () => {
       'hosted-commit',
       'FX_MAX_AGENT_STEPS',
       'fx ask --json --no-save',
-      "GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jovie.com'",
-      "GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jovie.com'",
+      "GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jov.ie'",
+      "GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jov.ie'",
       'startup_failure',
       "node-version: '24'",
     ]) {

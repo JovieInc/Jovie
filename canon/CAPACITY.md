@@ -13,7 +13,7 @@ Plan spend at the snapshot: $715.67/mo across active accounts.
 | Instinct | instinct | uncapped-own-model | Own model, no usage cap n/a | instinct active | uncapped-own-model |
 | Muse | muse | capped-quota | Capped quota (plan not recorded) n/a | muse active | burn-before-reset |
 | Anthropic (Opus, Sonnet, Haiku) | lane-claude, claude-code-session | subscription-pool | Claude subscriptions n/a | claude-subscriptions active | preserve-frontier |
-| Vercel AI Gateway | summer, github-actions | pay-per-token | Prepaid credits (AI_GATEWAY_API_KEY, team jovie) n/a | team-jovie-credits $12.06 (read 2026-10-25) | pay-as-you-go |
+| Vercel AI Gateway | summer, github-actions | pay-per-token | Prepaid credits (AI_GATEWAY_API_KEY, team `jovie`) n/a | team-jovie-credits $12.06 (read 2026-10-25) | pay-as-you-go |
 | Cloudflare Startup credits | summer | credits | Startup Program credits (given, not bought) $0 | startup-program $10,000, expires 2027-06-09 (read 2026-10-20) | spend-credits-before-expiry |
 | Devin (free SWE-2) | lane-devin, devin-mesh | free | Free (swe-2-medium) $0 | free disabled | unavailable |
 | Kimi | lane-kimi | capped-quota | Kimi plan $200 | kimi-plan unverified | unavailable |

@@ -1,6 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { compareToBaseline, distance, scanText } from './brand-name.mjs';
+import {
+  compareToBaseline,
+  distance,
+  scanText,
+  stripCommitScopes,
+} from './brand-name.mjs';
 
 const kinds = (text, file = 'a.md') =>
   scanText(text, { file }).map(h => `${h.kind}:${h.text}`);
@@ -79,4 +84,16 @@ test('baseline ratchet: new hits fail, baselined hits pass', () => {
   assert.deepEqual(compareToBaseline(hits, { 'a.md\tmisspelling': 2 }), []);
   assert.equal(compareToBaseline(hits, { 'a.md\tmisspelling': 1 }).length, 1);
   assert.equal(compareToBaseline(hits, {}).length, 1);
+});
+
+test('commit scopes are identifiers; PR and commit text is still checked', () => {
+  assert.equal(stripCommitScopes('chore(jovie): fix Jovy'), 'chore: fix Jovy');
+  assert.deepEqual(
+    kinds(stripCommitScopes('feat(jovie): welcome to Jovy'), 'm.md'),
+    ['misspelling:Jovy']
+  );
+});
+
+test('the repo itself has no brand hits and needs no baseline', () => {
+  assert.deepEqual(scanText('Jovie at jov.ie', { file: 'a.md' }), []);
 });
