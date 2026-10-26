@@ -56,7 +56,7 @@ test.describe('Artist Notifications Landing', () => {
     ).toBeVisible();
     await expect(
       page.getByRole('heading', {
-        name: /notify every listener automatically\./i,
+        name: /notify listeners for you\./i,
       })
     ).toBeVisible();
     await expect(

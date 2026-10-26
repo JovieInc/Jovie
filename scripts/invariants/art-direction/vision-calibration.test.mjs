@@ -6,6 +6,7 @@ import {
   MIN_NEGATIVES,
   MIN_POSITIVES,
   measure,
+  tasteJudgeLabels,
   verdict,
   wilsonLower,
 } from './vision-calibration.mjs';
@@ -70,4 +71,18 @@ test('a large, accurate sample earns promotion; a precise-but-leaky one does not
 test('wilsonLower is conservative for small n', () => {
   assert.ok(wilsonLower(3, 3) < 0.5);
   assert.ok(wilsonLower(90, 100) < 0.9);
+});
+
+test('taste labels from Tim verdicts feed calibration and wait for a judge run', () => {
+  const labels = tasteJudgeLabels(process.cwd());
+  assert.ok(
+    labels.some(
+      l =>
+        l.key === 'release-hero-blurred' &&
+        l.judge === 'text_on_busy' &&
+        l.truth === 'defect'
+    )
+  );
+  const { judges } = checkCalibration(process.cwd(), readVisionConfig());
+  assert.ok(judges.text_on_busy.unmatched >= 2);
 });

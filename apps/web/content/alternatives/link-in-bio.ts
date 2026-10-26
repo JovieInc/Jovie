@@ -27,7 +27,7 @@ export const linkInBioAlternative: AlternativeData = {
       claimIds: ['jovie.contact-collection', 'jovie.capability-access'],
     },
     {
-      text: 'Eligible artists can add audience notifications, advanced analytics, and a release-planning workspace.',
+      text: 'Eligible accounts can add audience notifications, advanced analytics, and a release-planning workspace.',
       claimIds: [
         'jovie.fan-notifications',
         'jovie.analytics',
@@ -57,7 +57,7 @@ export const linkInBioAlternative: AlternativeData = {
     {
       title: 'Access-aware workspace',
       description:
-        'Audience notifications, advanced analytics, and release planning are available to enrolled artists rather than promised to every account.',
+        'Audience notifications, advanced analytics, and release planning are available to enrolled accounts rather than promised to every account.',
       claimIds: [
         'jovie.fan-notifications',
         'jovie.analytics',

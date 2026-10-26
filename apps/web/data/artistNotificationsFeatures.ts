@@ -16,7 +16,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
       screenshotSrc: getMarketingExportImage('tim-white-profile-listen-mobile')
         .publicUrl,
       screenshotAlt:
-        'Jovie artist profile showing the latest release at the top of the page.',
+        'Jovie profile showing the latest release at the top of the page.',
       screenshotWidth: 660,
       screenshotHeight: 1368,
       objectPosition: '50% 0%',
@@ -55,7 +55,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
         'tim-white-profile-subscribe-mobile'
       ).publicUrl,
       screenshotAlt:
-        'Jovie artist profile showing the subscribe surface for audience capture.',
+        'Jovie profile showing the subscribe surface for audience capture.',
       screenshotWidth: 660,
       screenshotHeight: 1368,
       objectPosition: '50% 0%',
@@ -82,7 +82,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
     {
       id: 'one-profile-same-destination',
       title: 'One profile, same destination',
-      body: 'The same artist profile can stay in bio, stories, QR, and posts while notifications route listeners back to the right place.',
+      body: 'The same profile can stay in bio, stories, QR, and posts while notifications route listeners back to the right place.',
       size: 'large',
       accent: 'teal',
       kicker: 'Unified routing',
