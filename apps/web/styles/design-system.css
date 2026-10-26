@@ -870,13 +870,15 @@
 
 @media (min-width: 768px) and (max-width: 1179px) {
   /* At tablet and narrow-desktop widths, the centered profile still uses its
-     lower region for the PAC and dock. Keep consent above the card instead. */
+     lower region for the PAC and dock. The avatar sits at the card top, so
+     anchor consent directly above the dock (published by CookieBannerSection)
+     and never over the identity. */
   .cookie-banner-card--above-public-profile-dock {
-    top: var(--page-pad);
-    bottom: auto;
+    top: auto;
+    bottom: var(--cookie-banner-dock-clearance, var(--page-pad));
     left: 50%;
     right: auto !important;
-    width: 254px !important;
+    width: min(358px, calc(100vw - 32px)) !important;
     max-width: none;
     transform: translateX(-50%);
   }

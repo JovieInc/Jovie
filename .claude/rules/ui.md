@@ -370,6 +370,8 @@ Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 
 ### No AI-Slop Product UI
 
+The machine-readable rule list is `docs/design-system/anti-slop-rules.json` (ASR ids; `node scripts/anti-slop/run.mjs list`). Run `node scripts/anti-slop/run.mjs check --files <paths>` before showing UI. Agent-first default for app and admin: ASR-031. Redundant chrome: ASR-035. Eyebrows: ASR-022.
+
 - Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium.
 - Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment.
 - Do **NOT** use all-caps labels, eyebrow text, or section headers as a default styling move; use normal Title Case labels unless an existing canonical pattern explicitly calls for something else.
