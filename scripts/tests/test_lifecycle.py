@@ -327,5 +327,27 @@ class OperatorLifecycleTest(unittest.TestCase):
             self.assertEqual(current.resolve(), self.repo / "scripts/lanes")
 
 
+class HeartbeatTest(unittest.TestCase):
+    def test_beat_touches_the_file_at_most_every_interval_and_is_inert_without_one(self):
+        spec = importlib.util.spec_from_file_location("heartbeat_lifecycle", SOURCE)
+        lifecycle = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lifecycle)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tick-heartbeat"
+            lifecycle.HEARTBEAT, lifecycle._last_beat = None, 0.0
+            lifecycle.beat(1000.0)
+            self.assertFalse(path.exists())
+            lifecycle.HEARTBEAT = path
+            try:
+                lifecycle.beat(1000.0)
+                self.assertEqual(int(path.stat().st_mtime), 1000)
+                lifecycle.beat(1005.0)
+                self.assertEqual(int(path.stat().st_mtime), 1000, "rate limited")
+                lifecycle.beat(1000.0 + lifecycle.HEARTBEAT_EVERY_S + 1)
+                self.assertEqual(int(path.stat().st_mtime), 1016)
+            finally:
+                lifecycle.HEARTBEAT, lifecycle._last_beat = None, 0.0
+
+
 if __name__ == "__main__":
     unittest.main()

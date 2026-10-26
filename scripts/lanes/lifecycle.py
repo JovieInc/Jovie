@@ -105,6 +105,29 @@ def active():
     return _active is not None
 
 
+# The dispatch tick sets this to its heartbeat file: every subprocess it starts proves it is alive and working,
+# so the watchdog tells a long tick from a hung one by progress, not by wall time (2026-10-26: a 30-minute tick
+# was restarted at the 22-minute grace on every cycle and never reached its doctor pass).
+HEARTBEAT = None
+HEARTBEAT_EVERY_S = 15.0
+_last_beat = 0.0
+
+
+def beat(now: float | None = None) -> None:
+    global _last_beat
+    if HEARTBEAT is None:
+        return
+    now = time.time() if now is None else now
+    if now - _last_beat < HEARTBEAT_EVERY_S:
+        return
+    _last_beat = now
+    try:
+        with open(HEARTBEAT, "a"):
+            os.utime(HEARTBEAT, (now, now))
+    except OSError:
+        pass  # liveness evidence is best effort; the tick itself never fails on it
+
+
 def run(args, **kwargs):
     """Retain ownership in a tracked helper across controller death.
 
@@ -112,6 +135,7 @@ def run(args, **kwargs):
     The helper reports a drained outcome on a dedicated pipe; a cleanup failure
     retains the shared lock and never produces an outcome eligible for retry.
     """
+    beat()
     if not active():
         return subprocess.run(args, **kwargs)
     timeout = kwargs.pop("timeout", None)

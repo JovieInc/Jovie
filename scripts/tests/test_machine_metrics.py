@@ -53,6 +53,26 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(len(block["topRecurring"]), 3)
 
 
+class DailyReadingTest(unittest.TestCase):
+    def test_one_row_per_utc_day_is_appended_without_anyone_asking(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            record = {"machineMergeShare": 0.25, "machineMade": 2, "merged": 8}
+            first = mm.daily_row(state, [], record, {}, NOW)
+            second = mm.daily_row(state, [], record, {}, NOW + 3600)
+            lines = (state / mm.DAILY_FILE).read_text().splitlines()
+            self.assertEqual(len(lines), 1)
+            self.assertEqual(first["date"], second["date"])
+            self.assertEqual(first["machineMergeShare"], 0.25)
+            nxt = mm.daily_row(state, [], record, {}, NOW + 86400)
+            self.assertNotEqual(nxt["date"], first["date"])
+            self.assertEqual(len((state / mm.DAILY_FILE).read_text().splitlines()), 2)
+
+    def test_the_public_block_carries_the_latest_daily_row(self):
+        block = mm.public_block({"at": "x", "daily": {"date": "2026-10-25", "fixRedLlmRuns": 40}})
+        self.assertEqual(block["daily"]["fixRedLlmRuns"], 40)
+
+
 class RefreshTest(unittest.TestCase):
     def test_refresh_writes_both_files_marks_built_machines_and_respects_freshness(self):
         with tempfile.TemporaryDirectory() as tmp:
