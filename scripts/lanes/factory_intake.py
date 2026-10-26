@@ -104,9 +104,17 @@ def body(row: dict) -> str:
     return f"{text}{units}\n\n<!-- factory-evidence:{digest} -->"
 
 
+EXTRA_LABELS = frozenset({"machine-gap"})
+
+
+def extra_labels(row: dict) -> list[str]:
+    """Optional routing labels a signal may carry; only known ones, so a signal cannot mint labels."""
+    return [name for name in row.get("extraLabels") or [] if name in EXTRA_LABELS]
+
+
 def plan(signals: list[dict]) -> list[dict]:
     return [{"fingerprint": row["fingerprint"], "title": str(row["title"]).strip()[:200], "description": body(row),
-             "labels": [FACTORY_LABEL, WORKSTREAM_LABEL, label(row["fingerprint"])],
+             "labels": [FACTORY_LABEL, WORKSTREAM_LABEL, *extra_labels(row), label(row["fingerprint"])],
              "legacyEvidence": "evidence" not in row, "observedAt": row.get("_observedAt"),
              "receiptKeys": receipt_keys(row), "receiptHistory": receipt_history(row)} for row in signals]
 
