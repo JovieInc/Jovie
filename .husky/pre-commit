@@ -1,4 +1,9 @@
 #!/usr/bin/env sh
+# Host-wide heavy-task semaphore (scripts/heavy-task.sh): lint-staged, eslint and the proxy guard of many
+# concurrent agent commits took a shared host to load 43. Re-run this hook once under a slot; hosted CI skips it.
+if [ -z "${HEAVY_TASK_HELD:-}" ] && [ -z "${CI:-}" ] && [ -f scripts/heavy-task.sh ]; then
+  exec bash scripts/heavy-task.sh sh "$0" "$@"
+fi
 set -e  # Required: ensures check-conflict-markers.sh failure actually blocks commits
 # Universal gate ladder (JOV-3210): conflict → secrets → proxy → lint.
 # Source of truth: scripts/gate-ladder/ladder.json (`pnpm gate-ladder:validate`).

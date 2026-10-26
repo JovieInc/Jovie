@@ -30,11 +30,11 @@ MODE="${1:-lint}"
 
 run_lint() {
   # Mirrors root `pnpm run pre-push` — fast, deterministic checks only (no tests).
-  pnpm run pre-push
+  bash scripts/heavy-task.sh pnpm run pre-push
 }
 
 run_test() {
-  pnpm --filter=@jovie/web run test:fast
+  bash scripts/heavy-task.sh pnpm --filter=@jovie/web run test:fast
 }
 
 run_affected() {
@@ -43,13 +43,13 @@ run_affected() {
   run_lint
   # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
   echo "[pre-push-gate] running component-ship-gate"
-  pnpm component-ship-gate
+  bash scripts/heavy-task.sh pnpm component-ship-gate
   # One pass over every changed-file step Source Validation runs, listing all
   # failures (derived from the workflow, so it cannot drift). JOVIE_PREFLIGHT=0
   # skips it; JOVIE_SKIP_PRE_PUSH_GATE is the only other escape hatch.
   echo "[pre-push-gate] running preflight"
   node scripts/preflight.mjs --hook
-  bash scripts/automation-verify.sh affected
+  bash scripts/heavy-task.sh bash scripts/automation-verify.sh affected
 }
 
 run_publication() {

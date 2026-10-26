@@ -7,6 +7,13 @@ import { worktreeMetadata } from './scripts/playwright-worktree';
 import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
+// Lanes and agents never run Playwright locally: hosted CI does (scripts/deny-lane-heavy.mjs).
+if (process.env.LANES_NO_LOCAL_BUILD === '1') {
+  throw new Error(
+    'playwright is skipped on lane hosts: CI runs it on hosted runners. Do not retry; let CI report.'
+  );
+}
+
 const vercelAutomation = vercelAutomationHeaders();
 
 // Smoke test optimization: faster timeouts for quick feedback

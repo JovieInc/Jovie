@@ -1,10 +1,13 @@
 import { execFileSync, spawnSync } from 'node:child_process';
+import { denyLaneHeavy } from './deny-lane-heavy.mjs';
 
 const rawArgs = process.argv.slice(2);
 const leadingSeparatorRemoved =
   rawArgs[0] === '--' ? rawArgs.slice(1) : rawArgs;
 const [task, ...taskArgs] = leadingSeparatorRemoved;
 const args = [task, ...(taskArgs[0] === '--' ? taskArgs.slice(1) : taskArgs)];
+
+if (task === 'build' || task === 'e2e') denyLaneHeavy(`turbo ${task}`);
 
 if (!task) {
   console.error('Usage: node scripts/turbo-local.mjs <turbo-task> [...args]');
