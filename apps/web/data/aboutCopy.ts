@@ -1,4 +1,5 @@
 import { SUPPORT_EMAIL } from '@/constants/domains';
+import { APP_ROUTES } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 
 /**
@@ -61,6 +62,15 @@ export const ABOUT_COPY = {
     email: ABOUT_FACTS.supportEmail,
     supportPath: ABOUT_FACTS.supportPath,
     supportLabel: `jov.ie${ABOUT_FACTS.supportPath}`,
+  },
+  related: {
+    id: 'related',
+    label: 'Related',
+    links: [
+      { label: 'Product', href: APP_ROUTES.PRODUCT },
+      { label: 'Pricing', href: APP_ROUTES.PRICING },
+      { label: 'Changelog', href: APP_ROUTES.CHANGELOG },
+    ],
   },
   questionsLabel: 'Questions',
 } as const;

@@ -30,11 +30,12 @@ describe('AboutPageContent', () => {
     const headings = Array.from(container.querySelectorAll('h2')).map(h =>
       h.textContent?.trim()
     );
-    expect(headings.slice(0, 5)).toEqual([
+    expect(headings.slice(0, 6)).toEqual([
       'What Jovie is',
       'Why it exists',
       'Who makes it',
       'Contact',
+      'Related',
       'Questions',
     ]);
     expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
@@ -62,6 +63,20 @@ describe('AboutPageContent', () => {
     expect(
       screen.getByRole('link', { name: ABOUT_COPY.contact.supportLabel })
     ).toHaveAttribute('href', '/support');
+  });
+
+  it('links three to five related pages from the body for the GEO sibling-link check', () => {
+    render(<AboutPageContent />);
+    const hrefs = ABOUT_COPY.related.links.map(link => link.href);
+    expect(hrefs).toEqual(['/product', '/pricing', '/changelog']);
+    for (const link of ABOUT_COPY.related.links) {
+      expect(screen.getByRole('link', { name: link.label })).toHaveAttribute(
+        'href',
+        link.href
+      );
+    }
+    expect(hrefs.length + 1).toBeGreaterThanOrEqual(3);
+    expect(hrefs.length + 1).toBeLessThanOrEqual(5);
   });
 
   it('shows every question and answer as visible text for answer engines', () => {

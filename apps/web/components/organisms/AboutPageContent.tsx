@@ -68,6 +68,24 @@ export function AboutPageContent() {
               </Link>
             </p>
           </div>
+          <div className={ROW_CLASS}>
+            <h2 className={LABEL_CLASS}>{ABOUT_COPY.related.label}</h2>
+            <ul
+              className={`${BODY_CLASS} flex flex-wrap gap-x-8 gap-y-2 text-base text-secondary-token`}
+            >
+              {ABOUT_COPY.related.links.map(link => (
+                <li key={link.href}>
+                  <Link
+                    href={link.href}
+                    prefetch={false}
+                    className='text-primary-token underline underline-offset-4'
+                  >
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </section>
         <section
           data-testid='marketing-section-faq'
