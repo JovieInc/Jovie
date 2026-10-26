@@ -21,6 +21,13 @@ const {
   mockRecordFeaturedSlotEvent: vi.fn(async () => true),
 }));
 
+vi.mock('next/server', async importOriginal => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: (task: () => unknown) => {
+    void task();
+  },
+}));
+
 vi.mock('next/headers', () => ({
   cookies: vi.fn(async () => ({
     get: mockCookiesGet,

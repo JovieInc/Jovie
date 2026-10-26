@@ -9,6 +9,11 @@ import {
   parseFeaturedExtras,
 } from './metrics';
 
+function isForeignKeyViolation(error: unknown): boolean {
+  const code = error as { code?: string; cause?: { code?: string } } | null;
+  return code?.code === '23503' || code?.cause?.code === '23503';
+}
+
 /**
  * Count one featured impression or tap. Counts only, no identifiers.
  * Measurement must never break the beacon path: it never throws.
@@ -41,7 +46,9 @@ export async function recordFeaturedSlotEvent(input: {
     `);
     return true;
   } catch (error) {
-    // Unknown profile (foreign key) or a transient DB error: drop the count.
+    // Unknown profile id (foreign key violation) is expected from forged
+    // beacons: drop it quietly. Anything else is a real fault.
+    if (isForeignKeyViolation(error)) return false;
     await captureError('featured slot counter write failed', error, {
       route: '/api/profile/pac-event',
     }).catch(() => undefined);
