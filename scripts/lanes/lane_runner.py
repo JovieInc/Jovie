@@ -61,7 +61,8 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
-import machine_gap  # noqa: E402  (abstraction gate: build the machine on the 3rd repeat or a costly task)
+import machine_gap  # noqa: E402
+import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
@@ -135,7 +136,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -534,7 +535,9 @@ class Host:
     def base_slots(self, provider: str, default: int) -> int:
         if provider == 'devin' and not devin_free_policy.admission_open(self.agent_timeout):
             return 0
-        return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+        configured = int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+        # Pay-per-use lanes earn slots by measured merged PRs per dollar (slot_yield); everything else is as configured.
+        return slot_yield.ceiling(self.state, provider, configured)[0]
 
     def slots(self, provider: str, default: int) -> int:
         return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))

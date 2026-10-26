@@ -1909,6 +1909,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "escalation": obs.get("escalation") or remediation.empty_escalation(),
             "remediation": obs.get("remediation") or remediation.empty_remediation(),
             "autoscale": _autoscale_block(host),
+            "machine": _machine_block(host),
             # Real-limit record (jovie.capacity-limit): which measured limit holds lanes back.
             "capacityLimit": _capacity_limit_block(host)}
 
@@ -1917,6 +1918,28 @@ def _capacity_limit_block(host) -> dict | None:
     try:
         import capacity_limit
         return capacity_limit.read_record(host.state)
+    except Exception:  # the feed never fails on an optional record
+        return None
+
+
+def _machine_block(host) -> dict | None:
+    """Machine metrics (machine-made share of merges, 3+ repeat fingerprints, cost per merged PR by class, days
+    from 3rd repeat to machine) plus any lane whose slots the merged-per-dollar gate is holding down. Small fields
+    only: the public feed has a byte cap."""
+    state = getattr(host, "state", None)
+    if state is None:
+        return None
+    try:
+        import machine_metrics
+        import slot_yield
+        block = machine_metrics.public_block(machine_metrics.refresh(state))
+        gated = {}
+        for lane_name in ("hyperagent", "claude", "devin", "kimi"):
+            slots, why = slot_yield.ceiling(state, lane_name, 10)
+            if why.get("gated"):
+                gated[lane_name] = {"slots": slots, "mergedPerUsd": why.get("mergedPerUsd"), "referencePerUsd": why.get("referencePerUsd")}
+        block["slotGate"] = gated
+        return block
     except Exception:  # the feed never fails on an optional record
         return None
 
