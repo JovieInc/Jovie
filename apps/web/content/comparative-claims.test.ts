@@ -60,7 +60,7 @@ describe('comparative claims registry', () => {
       expect(text.length).toBeLessThan(120);
     }
     expect(renderComparativeClaim(COMPARATIVE_CLAIMS[0])).toBe(
-      'Main content appears 7x faster than on Linktree.'
+      'Main content appears 6x faster than on Linktree.'
     );
   });
 
