@@ -20,6 +20,11 @@
     "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
   },
   {
+    "file": ".claude/rules/domain-writes.md",
+    "paths": ["apps/web/**"],
+    "bodySha256": "95d9db99d51c78dd7d07d0836f4692415ef8c2180896e9ed820fae44c99601c4"
+  },
+  {
     "file": ".claude/rules/environment.md",
     "paths": [
       "package.json",
@@ -135,7 +140,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "58152f4ec8c78b5f966f72df3eba353992a1d6bfd2f853220634c3406a59e90b"
+    "bodySha256": "7dee862a9ed0c472a84092c02648891b2cb8790fcbbf26e894ea5997e5799ad7"
   },
   {
     "file": ".claude/rules/security.md",
@@ -177,6 +182,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "4fb1c3b50414a6a0ebaf685ded81166aae40b945f7a18adcfd61e6ca889172b9"
+    "bodySha256": "09c791e90bb8d3b89d72a2d24ae7c7fd6edb1097c2f2f204f4372006f549911c"
   }
 ]
