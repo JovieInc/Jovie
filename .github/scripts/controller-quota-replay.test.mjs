@@ -614,3 +614,38 @@ describe('io defaults', () => {
     assert.ok(Date.now() - started >= 5);
   });
 });
+
+describe('production controller lease reads', () => {
+  // 2026-10-25 00:59Z: "Cross-prove exact successful push CI" held the
+  // production-mutation lease 17 minutes waiting for the repo-wide GITHUB_TOKEN
+  // bucket to reset. Lease-path reads use the Jovie Bot installation's own
+  // budget (read-only), falling back to github.token so they never read less.
+  const workflow = readFileSync(
+    new URL('../workflows/production-controller.yml', import.meta.url),
+    'utf8'
+  );
+  const jobBlock = name => {
+    const start = workflow.indexOf(`\n  ${name}:\n`);
+    const rest = workflow.slice(start + 1);
+    const next = rest.slice(1).search(/\n  [a-z][a-z0-9-]*:\n/);
+    return next < 0 ? rest : rest.slice(0, next + 1);
+  };
+  for (const job of [
+    'release-source',
+    'coalesce-production',
+    'authorize-production',
+  ]) {
+    it(`${job} reads on the read-only Jovie Bot token with a github.token fallback`, () => {
+      const block = jobBlock(job);
+      for (const needle of [
+        'id: read-token',
+        'continue-on-error: true',
+        'permission-actions: read',
+        'permission-contents: read',
+        'steps.read-token.outputs.token || github.token',
+      ])
+        assert.ok(block.includes(needle), `${job}: ${needle}`);
+      assert.doesNotMatch(block, /permission-[a-z-]+: write/);
+    });
+  }
+});
