@@ -131,7 +131,7 @@ describe('triggerDesignLabDispatch artifact lifecycle', () => {
     const result = await triggerDesignLabDispatch({
       amendmentNotes: 'Keep the underline but reduce accent saturation.',
       proposal,
-      requestedBy: 'tim@jovie.com',
+      requestedBy: 'tim@jov.ie',
     });
 
     expect(result.triggered).toBe(true);
@@ -270,7 +270,7 @@ describe('buildDesignHtmlDispatchPrompt', () => {
       linearIssueUrl: 'https://linear.app/jovie/issue/JOV-1939',
       tasteMemoryExcerpt: 'Reject loud accent squares on chrome.',
       requestedAt: '2026-07-31T00:00:00.000Z',
-      requestedBy: 'tim@jovie.com',
+      requestedBy: 'tim@jov.ie',
     });
 
     expect(prompt).toContain('Surface ID: dashboard-sidebar');
