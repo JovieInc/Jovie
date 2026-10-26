@@ -16,7 +16,7 @@ function landingCard(id: (typeof LANDING_CARDS)[number]['id']) {
 }
 
 export const HOMEPAGE_FAN_STATES_COPY = {
-  headline: 'Each visit gets the right next step.',
+  headline: 'Your profile leads with one clear thing.',
   galleryLabel: 'Profile states',
   states: [
     {

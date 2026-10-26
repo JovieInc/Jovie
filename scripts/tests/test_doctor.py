@@ -120,6 +120,22 @@ class FactoryStayUpWatchdogTest(unittest.TestCase):
             self.assertEqual(result["reasons"], ["factory-tick-in-progress"])
             recovery.assert_not_called()
 
+    def assess_tick(self, age_s, heartbeat):
+        obs = factory_observation(tickEpoch=300, tickAgeSeconds=700, runningWorkers=0,
+                                  service={"active": True, "ageSeconds": age_s, "manager": "systemd"},
+                                  heartbeatAgeSeconds=heartbeat)
+        return factory_watchdog.assess(obs)["reasons"]
+
+    def test_a_long_tick_that_keeps_working_is_not_restarted_but_a_silent_one_is(self):
+        # 2026-10-26: a 30-minute dispatch tick was restarted at the 22-minute grace on every cycle and never
+        # reached its doctor pass; the feed, the HUD and the dead-man went stale for over an hour.
+        beyond_grace = factory_watchdog.ACTIVE_TICK_GRACE_S + 600
+        self.assertEqual(self.assess_tick(beyond_grace, 20), ["factory-tick-in-progress"])
+        self.assertEqual(self.assess_tick(beyond_grace, None), ["factory-down"])
+        self.assertEqual(self.assess_tick(beyond_grace, factory_watchdog.HEARTBEAT_ALIVE_S + 60), ["factory-down"])
+        self.assertEqual(self.assess_tick(factory_watchdog.TICK_HARD_CAP_S + 60, 5), ["factory-down"],
+                         "a tick that never finishes is bounded even while it beats")
+
     def test_stale_factory_recovers_only_after_a_new_writing_observation(self):
         with tempfile.TemporaryDirectory() as tmp:
             state = Path(tmp)
@@ -2751,6 +2767,26 @@ class DeliveryTest(unittest.TestCase):
 
 
 class RunTest(unittest.TestCase):
+    def test_factory_adapter_and_intake_failures_do_not_abort_doctor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "factory-signals").mkdir()
+            (state / "factory-signals/pending.json").write_text(json.dumps({
+                "schema": "jovie-factory-signal/v1", "fingerprint": "pending", "title": "Repair",
+                "problem": "Evidence", "acceptance": ["Reproduce and repair"], "metric": {"name": "failures", "target": 0}}))
+            class Down:
+                def gql(self, query, variables):
+                    raise RuntimeError("fixture Linear down")
+            tracker = FakeTracker()
+            tracker.linear = Down()
+            with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
+                    mock.patch.object(doctor, "observe", return_value=obs()), \
+                    mock.patch.object(doctor.factory_signals, "sentinel_signals", side_effect=ValueError("bad adapter")):
+                result = doctor.run(SimpleNamespace(state=state), SimpleNamespace(HOST="test"), None, tracker)
+            self.assertIn("fixture Linear down", result["factoryIntake"]["error"])
+            self.assertEqual(json.loads((state / "doctor.json").read_text())["factoryIntake"], result["factoryIntake"])
+            self.assertTrue((state / "factory-signals/pending.json").exists())
+
     def test_legacy_admission_alarm_survives_unknown_inventory_and_restart(self):
         for timer in (None, 998000):
             with self.subTest(timer=timer), tempfile.TemporaryDirectory() as tmp:
