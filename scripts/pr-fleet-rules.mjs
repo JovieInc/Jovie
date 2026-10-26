@@ -155,7 +155,7 @@ export function evaluateFleetRules({
   pr,
   files,
   repository = 'JovieInc/Jovie',
-  readFile,
+  readFile = undefined,
 }) {
   const errors = [],
     warnings = [];
