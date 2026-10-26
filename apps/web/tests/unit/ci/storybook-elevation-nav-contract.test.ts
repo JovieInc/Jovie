@@ -17,7 +17,7 @@ const SPEC = readFileSync(
 
 type NavLike = { name: string; href: string; requiredFlag?: string };
 
-const navItems = Object.values(navigationConfig).filter(
+const navItems = (Object.values(navigationConfig) as unknown[]).filter(
   (value): value is NavLike =>
     typeof value === 'object' &&
     value !== null &&
