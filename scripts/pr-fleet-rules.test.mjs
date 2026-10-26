@@ -930,3 +930,29 @@ test('missing test patches and placeholder decision references cannot bypass blo
     []
   );
 });
+
+test('pricing changes require a passing pricing-model link', () => {
+  const priced = [file('apps/web/lib/config/plan-prices.ts')];
+  const good = JSON.stringify({
+    bar: { best_y3_arr_usd: 30e6, best_y3_growth_min: 2 },
+    assumptions: [{ name: 'a' }],
+    chosen: 'D',
+    options: {
+      D: {
+        arr: { worst: [1, 2, 3], base: [1, 2, 3], best: [8e6, 49e6, 188e6] },
+      },
+    },
+  });
+  const withLink = pr({
+    body: proof + '\npricing-model: docs/pricing-models/x.json',
+  });
+  assert.match(
+    evaluateFleetRules({ pr: pr(), files: priced }).errors.join('\n'),
+    /pricing-model:/
+  );
+  assert.deepEqual(
+    evaluateFleetRules({ pr: withLink, files: priced, readFile: () => good })
+      .errors,
+    []
+  );
+});

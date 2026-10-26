@@ -1,0 +1,75 @@
+{
+  "decision": "2026-10-26 usage-led hybrid ladder",
+  "chosen": "D hybrid: tier ladder with included credits + metered usage/outcomes (recommended)",
+  "bar": {
+    "best_y3_arr_usd": 30000000,
+    "best_y3_growth_min": 2.0,
+    "implies": "$100M+ ARR by year 5"
+  },
+  "assumptions": [
+    {
+      "name": "new signups/yr (Y1,Y2,Y3) worst/base/best",
+      "value": "20k,60k,150k / 100k,400k,1.2M / 300k,1.5M,5M",
+      "source": "assumption; creator-economy scale unverified; biggest swing factor"
+    },
+    {
+      "name": "free to paid conversion D",
+      "value": "3% / 4.5% / 7.5%",
+      "source": "assumption"
+    },
+    {
+      "name": "starting ARPU/yr D",
+      "value": "$330",
+      "source": "assumption: tier mix plus included-credit commit and outcome fees"
+    },
+    {
+      "name": "NRR per cohort-year D",
+      "value": "0.95 / 1.10 / 1.30",
+      "source": "assumption; usage-priced infra (Exa, ElevenLabs credit tiers) 2026, third-party"
+    },
+    {
+      "name": "enterprise accounts at Y3 / ACV D",
+      "value": "4,35,150 at $20k",
+      "source": "assumption: managers, labels, agencies, brands"
+    }
+  ],
+  "options": {
+    "A flat music tier ($12, Linkfire-style)": {
+      "arr": {
+        "worst": [22280, 76528, 201149],
+        "base": [149600, 675040, 2186736],
+        "best": [643200, 3590040, 13196538]
+      },
+      "best_y3_growth": 3.68,
+      "clears_bar": false
+    },
+    "B seat ladder Free/Pro20/Max60/Ultra200 + $5 outcome": {
+      "arr": {
+        "worst": [267000, 1031250, 2905388],
+        "base": [2225000, 10825000, 36425000],
+        "best": [10600000, 63059047, 239762000]
+      },
+      "best_y3_growth": 3.8,
+      "clears_bar": true
+    },
+    "C usage/credit ladder (Exa-style), generous free": {
+      "arr": {
+        "worst": [122000, 380800, 942720],
+        "base": [1120000, 4565904, 14284200],
+        "best": [5780000, 28924864, 105268800]
+      },
+      "best_y3_growth": 3.64,
+      "clears_bar": true
+    },
+    "D hybrid: tier ladder with included credits + metered usage/outcomes (recommended)": {
+      "arr": {
+        "worst": [224667, 835433, 2307995],
+        "base": [1718333, 8062944, 26920850],
+        "best": [8425000, 49057851, 188460750]
+      },
+      "best_y3_growth": 3.84,
+      "clears_bar": true
+    }
+  },
+  "model_script": "scratchpad/pricing-bundle/model.py (inputs reproduced in assumptions above)"
+}

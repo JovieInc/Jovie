@@ -2,6 +2,7 @@
 // One policy for PR feedback, native admission, and durable delivery receipts.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { evaluatePricingModel } from './lib/pricing-model-gate.mjs';
 
 const RUN_URL =
   /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/actions\/runs\/([1-9]\d*)(?:\/attempts\/[1-9]\d*)?$/;
@@ -154,6 +155,7 @@ export function evaluateFleetRules({
   pr,
   files,
   repository = 'JovieInc/Jovie',
+  readFile = path => readFileSync(path, 'utf8'),
 }) {
   const errors = [],
     warnings = [];
@@ -242,6 +244,7 @@ export function evaluateFleetRules({
     errors.push(
       `locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for ${[...new Set(locked)].join(', ')}.`
     );
+  errors.push(...evaluatePricingModel({ paths, body, readFile }));
   return { errors, warnings };
 }
 
