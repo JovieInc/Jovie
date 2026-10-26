@@ -937,7 +937,7 @@
       }
     },
     {
-      "id": "ASR-039",
+      "id": "ASR-042",
       "title": "Founder face never dominates",
       "statement": "The homepage never shows Tim's face. Product pages (artist profile examples) may show it, without dominating the frame; marketing must not read as an ad for the founder. Allowed faces and routes come from the approved-people registry's per-route allowlist.",
       "rationale": "A large founder portrait makes a product page feel like an ad for a person.",
