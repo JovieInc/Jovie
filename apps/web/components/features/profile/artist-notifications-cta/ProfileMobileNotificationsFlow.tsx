@@ -64,6 +64,8 @@ interface ProfileMobileNotificationsFlowProps {
   readonly artistEmailOptIn?: boolean;
   readonly artistEmailReady?: boolean;
   readonly showArtistEmailSection?: boolean;
+  /** Content types this artist has. Defaults to new music only. */
+  readonly availableContent?: readonly PromisedContent[];
   readonly onClose: () => void;
   readonly onBack: () => void;
   readonly onChannelChange: (channel: 'email' | 'sms') => void;
@@ -86,11 +88,44 @@ interface ProfileMobileNotificationsFlowProps {
   readonly onPreferencesSubmit: () => void;
 }
 
-const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
+/**
+ * Consent wording (audience permission model). Jovie is the sender and sends
+ * only verified events. Sharing with the artist is a separate, optional
+ * choice made after subscribing, never implied here.
+ */
+export const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
   email:
-    'By submitting, you agree to receive email updates from this artist and Jovie. Unsubscribe anytime.',
-  sms: 'By submitting, you agree to receive text updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.',
+    'By continuing, you agree to get emails from Jovie about this artist. Unsubscribe anytime.',
+  sms: 'By continuing, you agree to get texts from Jovie about this artist. Reply STOP to opt out. Message and data rates may apply.',
 };
+
+type PromisedContent = Extract<
+  NotificationContentType,
+  'newMusic' | 'tourDates' | 'merch'
+>;
+
+const PROMISE_LABEL: Record<PromisedContent, string> = {
+  newMusic: 'new music',
+  tourDates: 'shows',
+  merch: 'merch',
+};
+
+/** Promise only the content types this artist actually has. */
+export function describeUpdatePromise(
+  artistName: string,
+  available: readonly PromisedContent[]
+): { readonly title: string; readonly body: string } {
+  const types = available.length > 0 ? available : (['newMusic'] as const);
+  if (types.length === 1 && types[0] === 'newMusic') {
+    return { title: 'Get New Music', body: `New music from ${artistName}.` };
+  }
+  const labels = types.map(type => PROMISE_LABEL[type]);
+  const list =
+    labels.length > 1
+      ? `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`
+      : labels[0];
+  return { title: 'Get Updates', body: `${artistName}: ${list}.` };
+}
 
 const PREFERENCE_META: Record<
   Extract<NotificationContentType, 'newMusic' | 'tourDates' | 'merch'>,
@@ -113,7 +148,7 @@ const PREFERENCE_META: Record<
   },
 };
 
-const JOVIE_ALERT_KEYS = ['newMusic', 'tourDates', 'merch'] as const;
+const DEFAULT_AVAILABLE_CONTENT = ['newMusic'] as const;
 
 function formatCountdown(endTime: number) {
   const remainingMs = endTime - Date.now();
@@ -384,6 +419,7 @@ export function ProfileMobileNotificationsFlow({
   canGoBackFromPreferences = false,
   artistEmailOptIn = false,
   showArtistEmailSection = false,
+  availableContent = DEFAULT_AVAILABLE_CONTENT,
   onClose,
   onBack,
   onChannelChange,
@@ -495,6 +531,8 @@ export function ProfileMobileNotificationsFlow({
     return null;
   }
 
+  const updatePromise = describeUpdatePromise(artistName, availableContent);
+
   const screen = (() => {
     if (step === 'email') {
       const isSms = channel === 'sms';
@@ -502,8 +540,8 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           compact
-          title='Get Updates'
-          body={`${artistName}: music, shows, merch.`}
+          title={updatePromise.title}
+          body={updatePromise.body}
           footer={
             <div className='min-h-27 space-y-3'>
               {error ? (
@@ -728,7 +766,7 @@ export function ProfileMobileNotificationsFlow({
                 Sent from Jovie
               </p>
 
-              {(JOVIE_ALERT_KEYS as readonly NotificationContentType[]).map(
+              {(availableContent as readonly NotificationContentType[]).map(
                 key => {
                   const meta =
                     PREFERENCE_META[key as keyof typeof PREFERENCE_META];
@@ -764,7 +802,7 @@ export function ProfileMobileNotificationsFlow({
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
                   <p className='text-app font-semibold tracking-tight text-white/42'>
-                    Sent by {artistName}
+                    Optional
                   </p>
 
                   <div className='flex items-center justify-between gap-4 py-2'>
@@ -774,7 +812,11 @@ export function ProfileMobileNotificationsFlow({
                       </span>
                       <div>
                         <p className='text-mid font-medium tracking-[-0.015em] text-white/88'>
-                          Artist Emails
+                          Share My Email With {artistName}
+                        </p>
+                        <p className='text-xs leading-4 text-white/42'>
+                          Lets {artistName} email you directly. Off unless you
+                          turn it on.
                         </p>
                       </div>
                     </div>
@@ -783,7 +825,7 @@ export function ProfileMobileNotificationsFlow({
                       onCheckedChange={checked =>
                         onArtistEmailToggle?.(checked)
                       }
-                      aria-label='Artist Emails'
+                      aria-label={`Share my email with ${artistName}`}
                     />
                   </div>
                 </div>

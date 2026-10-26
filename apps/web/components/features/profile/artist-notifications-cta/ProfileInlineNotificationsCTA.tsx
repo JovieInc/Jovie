@@ -44,6 +44,8 @@ type FlowOrigin = 'manage' | 'subscribe';
 
 export interface ProfileInlineNotificationsCTAProps {
   readonly artist: Artist;
+  /** Content types this artist has. Defaults to new music only. */
+  readonly availableContent?: ReadonlyArray<'newMusic' | 'tourDates' | 'merch'>;
   readonly onManageNotifications?: () => void;
   readonly onRegisterReveal?: (reveal: () => void) => void;
   readonly variant?: 'default' | 'hero' | 'button' | 'link';
@@ -163,6 +165,7 @@ function getTriggerClassName(
 
 export function ProfileInlineNotificationsCTA({
   artist,
+  availableContent,
   onManageNotifications,
   onRegisterReveal,
   variant = 'default',
@@ -905,6 +908,7 @@ export function ProfileInlineNotificationsCTA({
         artistEmailOptIn={artistEmailOptIn}
         artistEmailReady={artistEmailReady}
         showArtistEmailSection={showArtistEmailSection}
+        availableContent={availableContent}
         onClose={handleClose}
         onBack={handleBack}
         onChannelChange={handleChannelChange}

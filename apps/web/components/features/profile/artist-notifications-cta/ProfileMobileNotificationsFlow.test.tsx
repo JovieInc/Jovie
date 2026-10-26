@@ -93,7 +93,7 @@ describe('ProfileMobileNotificationsFlow', () => {
   });
 
   it('labels the event preference with the generalized Events copy', () => {
-    renderFlow();
+    renderFlow({ availableContent: ['newMusic', 'tourDates', 'merch'] });
 
     expect(screen.getAllByText('Events').length).toBeGreaterThan(0);
     expect(screen.queryByText('Shows')).toBeNull();
@@ -110,5 +110,13 @@ describe('ProfileMobileNotificationsFlow', () => {
 
     expect(source).not.toMatch(/\bred-\d/);
     expect(source).toContain('text-error');
+  });
+
+  it('shows only the preference toggles for content the artist has', () => {
+    renderFlow();
+
+    expect(screen.getAllByText('New Music').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Events')).toBeNull();
+    expect(screen.queryByText('Merch')).toBeNull();
   });
 });
