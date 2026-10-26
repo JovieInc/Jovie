@@ -344,6 +344,7 @@ describe('social link compare-and-swap routes', () => {
     expect(mocks.selections[0]).toEqual({
       id: expect.anything(),
       internalUserId: expect.anything(),
+      usernameNormalized: expect.anything(),
     });
     expect(mocks.selections[0]).not.toHaveProperty('clerkId');
     expect(mocks.profileLeftJoin).not.toHaveBeenCalled();
@@ -609,6 +610,8 @@ describe('social link compare-and-swap routes', () => {
       version: 2,
     });
     expect(mocks.syncPrimaryMusicUrls).toHaveBeenCalledTimes(1);
-    expect(mocks.invalidateSocialLinksCache).not.toHaveBeenCalled();
+    // Only the committed newer add refreshes the public profile; the rejected
+    // older delete does not.
+    expect(mocks.invalidateSocialLinksCache).toHaveBeenCalledTimes(1);
   });
 });
