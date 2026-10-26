@@ -49,6 +49,17 @@ describe('ProfileIdentityHeader', () => {
     expect(portrait?.closest('.h-20.w-20')).not.toBeNull();
   });
 
+  it('asks for a 2x source for the 160px desktop portrait while phones keep 80px', () => {
+    renderHeader();
+    const portrait = screen
+      .getByTestId('profile-identity-header')
+      .querySelector('img');
+    expect(portrait).toHaveAttribute(
+      'sizes',
+      '(min-width: 1024px) 320px, 80px'
+    );
+  });
+
   it('shows the verified state as a glyph with a tooltip, never the word', () => {
     renderHeader({ isVerified: true });
 
