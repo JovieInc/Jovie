@@ -2130,6 +2130,223 @@ class _GistApiFake:
 
 
 class PublishTest(unittest.TestCase):
+    def raw_readback_fixture(self, names=("lanes-status.json", "lanes-status-details.json")):
+        """Synthetic immutable Gist snapshots and bounded curl transfers, with no network."""
+        fixture = SimpleNamespace(gets=0, raw_calls=[], revision="d" * 40, mutation=None,
+                                  response=lambda name, content: content, code="200", exit_code=0,
+                                  raw_error=None, url=lambda name, url: url, size=lambda size: size,
+                                  curl_version="curl 8.4.0 synthetic", version_exit=0)
+        def run(args, **kwargs):
+            if args[0] == "curl":
+                if "--version" in args:
+                    return SimpleNamespace(returncode=fixture.version_exit, stdout=fixture.curl_version)
+                url = args[args.index("--url") + 1]
+                name = url.rsplit("/", 1)[1]
+                fixture.raw_calls.append((list(args), kwargs))
+                if fixture.raw_error:
+                    raise fixture.raw_error
+                content = self.api.files[name].encode("utf-8")
+                Path(args[args.index("--output") + 1]).write_bytes(fixture.response(name, content))
+                if fixture.mutation:
+                    fixture.mutation()
+                return SimpleNamespace(returncode=fixture.exit_code, stdout=fixture.code)
+            result = self.api(args, **kwargs)
+            if "--method" in args and args[args.index("--method") + 1] == "GET":
+                fixture.gets += 1
+                stored = json.loads(result.stdout)
+                stored.update(owner={"login": "fixture-owner"}, history=[{"version": fixture.revision}])
+                for name in names:
+                    row = stored["files"][name]
+                    raw = f"https://gist.githubusercontent.com/fixture-owner/abc123/raw/{fixture.revision}/{name}"
+                    row.update(content=row["content"][:7], truncated=True,
+                               raw_url=fixture.url(name, raw), size=fixture.size(row["size"]))
+                result.stdout = json.dumps(stored)
+            return result
+        patch = mock.patch.object(doctor.lifecycle, "run", run)
+        patch.start()
+        self.addCleanup(patch.stop)
+        env = mock.patch.dict(os.environ, {"LANES_STATE": str(self.state)})
+        env.start()
+        self.addCleanup(env.stop)
+        return fixture
+
+    def test_truncated_status_and_details_verify_exact_immutable_raw_bytes(self):
+        fixture = self.raw_readback_fixture()
+        feed = self.feed(0)
+        feed["conditions"]["source-unknown"]["evidence"] = "界" * 100_000
+        self.assertEqual(doctor.publish_status(self.host, self.lane, feed), "https://gist.example/abc123")
+        self.assertEqual((fixture.gets, len(fixture.raw_calls)), (2, 2))
+        receipt = json.loads(self.record.read_text())
+        for name, key in (("lanes-status.json", "publicFeedSha256"),
+                          ("lanes-status-details.json", "fullEvidenceSha256")):
+            self.assertEqual(receipt[key], hashlib.sha256(self.api.files[name].encode()).hexdigest())
+        self.assertLessEqual(len(self.api.files["lanes-status.json"].encode()), doctor.PUBLIC_FEED_MAX_BYTES)
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), feed)
+        for args, options in fixture.raw_calls:
+            name = args[-1].rsplit("/", 1)[1]
+            self.assertEqual(args[:2], ["curl", "--disable"])
+            self.assertEqual(args[args.index("--proto") + 1], "=https")
+            self.assertEqual(args[args.index("--max-redirs") + 1], "0")
+            self.assertEqual(int(args[args.index("--max-filesize") + 1]), len(self.api.files[name].encode()))
+            self.assertEqual(float(args[args.index("--max-time") + 1]), options["timeout"])
+            self.assertTrue(0 < options["timeout"] <= 60)
+            self.assertNotIn("--location", args)
+            self.assertNotIn("--insecure", args)
+            self.assertNotIn("--header", args)
+
+    def test_truncated_raw_readback_refuses_untrusted_origins_and_file_identities(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        original = self.record.read_bytes()
+        urls = [
+            "http://gist.githubusercontent.com/fixture-owner/abc123/raw/" + "d" * 40 + "/lanes-status-details.json",
+            "https://gist.githubusercontent.com.evil.invalid/fixture-owner/abc123/raw/" + "d" * 40 + "/lanes-status-details.json",
+            "https://fixture-user@gist.githubusercontent.com/fixture-owner/abc123/raw/" + "d" * 40 + "/lanes-status-details.json",
+            "https://127.0.0.1/fixture-owner/abc123/raw/" + "d" * 40 + "/lanes-status-details.json",
+        ]
+        for replace in (lambda u: u.replace("fixture-owner", "wrong-owner"),
+                        lambda u: u.replace("abc123", "def456"),
+                        lambda u: u.replace("d" * 40, "HEAD"),
+                        lambda u: u.replace("/lanes-status-details.json", "/lanes-status.json"),
+                        lambda u: u + "?redirect=other", lambda u: u + "#fragment",
+                        lambda u: u.replace("/raw/", "/raw/../raw/"),
+                        lambda u: u.replace(".com/", ".com:443/")):
+            urls.append(replace("https://gist.githubusercontent.com/fixture-owner/abc123/raw/" +
+                                "d" * 40 + "/lanes-status-details.json"))
+        for url in urls:
+            with self.subTest(url=url):
+                fixture.url = lambda name, raw, url=url: url
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual(self.record.read_bytes(), original)
+        self.assertEqual(fixture.raw_calls, [], "reject before any raw network operation")
+
+    def test_truncated_raw_readback_refuses_wrong_bytes_lengths_and_http_results(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        original = self.record.read_bytes()
+        for response, code, exit_code in (
+                (lambda n, b: b[:-1], "200", 0),
+                (lambda n, b: b + b"x", "200", 0),
+                (lambda n, b: b"x" + b[1:], "200", 0),
+                (lambda n, b: b, "206", 0),
+                (lambda n, b: b, "302", 0),
+                (lambda n, b: b, "404", 0),
+                (lambda n, b: b, "200", 63)):
+            with self.subTest(code=code, exit_code=exit_code, response=response):
+                fixture.response, fixture.code, fixture.exit_code = response, code, exit_code
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual(self.record.read_bytes(), original)
+
+    def test_truncated_raw_readback_requires_exact_api_byte_size_before_fetching(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        for size in (None, True, 0, "123", 123.0, -1):
+            with self.subTest(size=size):
+                fixture.size = lambda _, size=size: size
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(fixture.raw_calls, [])
+        self.assertNotIn("verifiedAt", json.loads(self.record.read_text()))
+
+    def test_truncated_raw_readback_requires_a_curl_with_streaming_size_limits(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        original = self.record.read_bytes()
+        for version, exit_code in (("curl 8.3.0 synthetic", 0), ("curl 7.88.1 synthetic", 0),
+                                   ("unknown", 0), ("curl 8.4.0 synthetic", 1)):
+            with self.subTest(version=version, exit_code=exit_code):
+                fixture.curl_version, fixture.version_exit = version, exit_code
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual(self.record.read_bytes(), original)
+        self.assertEqual(fixture.raw_calls, [], "an unsupported curl must never download raw content")
+
+    def test_truncated_raw_readback_accounts_for_http_failures_in_the_shared_client(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        fixture.code = "429"
+        with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        ledger = json.loads((self.state / "api-ledger/github.json").read_text())
+        credential = ledger["credentials"]["anonymous-gist-raw"]
+        self.assertEqual(credential["breaker"]["state"], "open")
+        usage = next(iter(credential["usage"].values()))["report"]
+        self.assertEqual((usage["attempts"], usage["errors"], usage["rateLimited"]), (1, 1, 1))
+        self.assertNotIn("verifiedAt", json.loads(self.record.read_text()))
+
+    def test_truncated_raw_readback_preserves_previous_receipt_on_timeout(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        previous = {"url": "https://gist.example/abc123", "id": "abc123", "verifiedAt": "previous",
+                    "fullEvidenceSha256": "previous-full", "publicFeedSha256": "previous-public"}
+        self.record.write_text(json.dumps(previous))
+        for error in (subprocess.TimeoutExpired("synthetic-curl", 0.1), OSError("synthetic TLS refusal")):
+            with self.subTest(error=type(error).__name__):
+                fixture.raw_error = error
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual(json.loads(self.record.read_text()), previous)
+
+    def test_truncated_raw_readback_uses_remaining_overall_deadline(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        clock = [100.0]
+        after_write = self.api.after_write
+        self.api.after_write = lambda: (after_write(), clock.__setitem__(0, 159.0))
+        with mock.patch.object(doctor.time, "monotonic", side_effect=lambda: clock[0]):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(fixture.raw_calls[0][1]["timeout"], 1)
+        fixture.raw_calls.clear()
+        self.api.after_write = lambda: clock.__setitem__(0, clock[0] + 59)
+        fixture.mutation = lambda: clock.__setitem__(0, clock[0] + 2)
+        with mock.patch.object(doctor.time, "monotonic", side_effect=lambda: clock[0]):
+            with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                doctor.publish_status(self.host, self.lane, self.feed(0))
+
+    def test_truncated_raw_readback_cannot_certify_a_concurrent_gist_generation(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        fixture.mutation = lambda: setattr(fixture, "revision", "e" * 40)
+        original = self.record.read_bytes()
+        with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+            doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(fixture.gets, 2)
+        self.assertEqual(self.record.read_bytes(), original)
+
+    def test_truncated_raw_readback_cannot_overwrite_a_concurrent_local_generation(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        for filename in ("status-gist.json", "lanes-status.json", "lanes-status-publish.json"):
+            with self.subTest(filename=filename):
+                original = self.record.read_bytes()
+                fixture.mutation = lambda filename=filename: (self.state / filename).write_text("concurrent")
+                with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                    doctor.publish_status(self.host, self.lane, self.feed(0))
+                self.assertEqual((self.state / filename).read_text(), "concurrent")
+                if filename == "status-gist.json":
+                    self.record.write_bytes(original)
+                self.assertNotIn("verifiedAt", json.loads(self.record.read_text()))
+
+    def test_truncated_raw_readback_serializes_publishers_through_the_final_receipt(self):
+        fixture = self.raw_readback_fixture(("lanes-status-details.json",))
+        def concurrent_publish():
+            writes = self.api.write_count
+            with self.assertRaisesRegex(RuntimeError, "status-gist-publish-in-progress"):
+                doctor.publish_status(self.host, self.lane, {"at": "other-generation"})
+            self.assertEqual(self.api.write_count, writes)
+        fixture.mutation = concurrent_publish
+        doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(json.loads(self.api.files["lanes-status-details.json"]), self.feed(0))
+        self.assertIn("verifiedAt", json.loads(self.record.read_text()))
+        fixture.mutation = None
+        doctor.publish_status(self.host, self.lane, self.feed(0))  # lock released after success
+
+    def test_truncated_raw_readback_rechecks_generation_after_building_the_receipt(self):
+        self.raw_readback_fixture(("lanes-status-details.json",))
+        calls = [0]
+        def timestamp():
+            calls[0] += 1
+            if calls[0] == 2:
+                self.record.write_text("concurrent-final-receipt")
+            return "synthetic-at"
+        with mock.patch.object(doctor, "now_iso", side_effect=timestamp):
+            with self.assertRaisesRegex(RuntimeError, "status-gist-readback-unconfirmed"):
+                doctor.publish_status(self.host, self.lane, self.feed(0))
+        self.assertEqual(self.record.read_text(), "concurrent-final-receipt")
+
     def setUp(self):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
