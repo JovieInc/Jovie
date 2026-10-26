@@ -345,48 +345,50 @@ function InlineCaptureField({
   onSubmit: () => void;
 }>) {
   return (
-    <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1.5'>
-      <div className='flex min-h-13 items-center gap-1'>
-        {channel === 'sms' ? (
-          <CountrySelector
-            country={country}
-            isOpen={isCountryOpen}
-            onOpenChange={onCountryOpenChange}
-            onSelect={onCountrySelect}
+    <div className='space-y-3'>
+      <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1'>
+        <div className='flex min-h-14 items-center gap-1'>
+          {channel === 'sms' ? (
+            <CountrySelector
+              country={country}
+              isOpen={isCountryOpen}
+              onOpenChange={onCountryOpenChange}
+              onSelect={onCountrySelect}
+            />
+          ) : (
+            <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/46'>
+              <Mail className='size-4.5' />
+            </span>
+          )}
+          <input
+            data-testid='mobile-email-input'
+            type={channel === 'sms' ? 'tel' : 'email'}
+            inputMode={channel === 'sms' ? 'tel' : 'email'}
+            autoComplete={channel === 'sms' ? 'tel' : 'email'}
+            value={value}
+            placeholder={placeholder}
+            onChange={event => onValueChange(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                onSubmit();
+              }
+            }}
+            disabled={isSubmitting}
+            aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
+            className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
           />
-        ) : (
-          <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/46'>
-            <Mail className='size-4.5' />
-          </span>
-        )}
-        <input
-          data-testid='mobile-email-input'
-          type={channel === 'sms' ? 'tel' : 'email'}
-          inputMode={channel === 'sms' ? 'tel' : 'email'}
-          autoComplete={channel === 'sms' ? 'tel' : 'email'}
-          value={value}
-          placeholder={placeholder}
-          onChange={event => onValueChange(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              onSubmit();
-            }
-          }}
-          disabled={isSubmitting}
-          aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
-          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
-        />
-        <button
-          type='button'
-          onClick={onSubmit}
-          disabled={isSubmitting}
-          className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
-          aria-label='Submit'
-        >
-          <Send className='size-4' />
-        </button>
+        </div>
       </div>
+      <button
+        type='button'
+        onClick={onSubmit}
+        disabled={isSubmitting}
+        className='inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
+      >
+        <Send className='size-4' aria-hidden='true' />
+        Submit
+      </button>
     </div>
   );
 }
@@ -544,7 +546,7 @@ export function ProfileMobileNotificationsFlow({
           title={updatePromise.title}
           body={updatePromise.body}
           footer={
-            <div className='min-h-27 space-y-3'>
+            <div className='space-y-2'>
               {error ? (
                 <p className='text-sm text-error' role='alert'>
                   {error}
@@ -569,7 +571,7 @@ export function ProfileMobileNotificationsFlow({
                   type='button'
                   onClick={() => onChannelChange(isSms ? 'email' : 'sms')}
                   disabled={isSubmitting}
-                  className='inline-flex h-11 items-center gap-1.5 rounded-full px-1 text-xs font-semibold text-white/62 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
+                  className='inline-flex h-11 items-center gap-1.5 rounded-full text-xs font-semibold text-white/62 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
                 >
                   {isSms ? (
                     <Mail className='size-3.5' />
@@ -583,7 +585,7 @@ export function ProfileMobileNotificationsFlow({
                     type='button'
                     onClick={onDismissCapture}
                     disabled={isSubmitting}
-                    className='inline-flex h-11 items-center rounded-full px-1 text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
+                    className='inline-flex h-11 items-center rounded-full text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
                   >
                     Not Now
                   </button>
