@@ -60,7 +60,7 @@ describe('primary marketing navigation contract', () => {
   it('keeps the top-level marketing nav labels exact and ordered', () => {
     // Canonical Pen header (2026-09-26): Customers flyout, Product, Pricing.
     expect(MARKETING_NAV_LINKS).toEqual([
-      { href: '/product', label: 'Product' },
+      { href: '/artist-profiles', label: 'Product' },
       { href: '/pricing', label: 'Pricing' },
     ]);
   });
@@ -79,7 +79,7 @@ describe('primary marketing navigation contract', () => {
       id: 'customers',
       label: 'Customers',
       heading: 'Customers',
-      links: [{ href: '/solutions/artists', label: 'Artists' }],
+      links: [{ href: '/artist-profiles', label: 'Artists' }],
     });
     const destinations = MARKETING_CUSTOMERS_FLYOUT.links.map(
       link => link.href
@@ -88,7 +88,6 @@ describe('primary marketing navigation contract', () => {
     expect(MARKETING_TOOLS_FLYOUT_LINKS.map(link => link.label)).toEqual([
       'Music Smart Links',
       'Audience notifications',
-      'Instant Merch',
       'CLI',
     ]);
   });
