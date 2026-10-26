@@ -16,6 +16,8 @@ import os
 import re
 from datetime import datetime, timezone
 
+import machine_gap
+
 SCHEMA = "jovie.remediation-event/v1"
 CLASSES = (
     "ready",
@@ -1612,6 +1614,12 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
         row["cls"] = classified["cls"]
         row["subtype"] = classified.get("subtype")
         row["dossier"] = event_dossier(classified, canonical.get("title") or "", canonical.get("identifier") or "")
+        # A recurring event is a machine-builder task: the third occurrence in 14 days stops fixing the instance.
+        recent = sum(1 for item in (history if escalation_enabled() else []) if now - (iso_epoch(item.get("updatedAt")) or 0) < 14 * 86400)
+        row["recurrence14d"] = recent
+        row["machineBuilder"] = recent + 1 >= 3
+        if row["machineBuilder"]:
+            row["dossier"] = machine_gap.builder_dossier(fingerprint, recent + 1) + "\n" + row["dossier"]
         if classified["subtype"] == "musicfetch-cutover":
             row["route"] = MUSICFETCH_CUTOVER
         if classified["cls"] == "human-only":
