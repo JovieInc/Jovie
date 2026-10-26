@@ -124,6 +124,9 @@ import { generateSubscriptionManagementToken } from '@/lib/notifications/managem
 const mockedDb = db as unknown as {
   limit: ReturnType<typeof vi.fn>;
   execute: ReturnType<typeof vi.fn>;
+  insert: ReturnType<typeof vi.fn>;
+  values: ReturnType<typeof vi.fn>;
+  onConflictDoUpdate: ReturnType<typeof vi.fn>;
 };
 
 describe('notifications/domain', () => {
@@ -258,14 +261,12 @@ describe('notifications/domain', () => {
           pendingConfirmation: true,
           requiresOtp: false,
         });
-        const inserted = vi.mocked(db.values).mock.calls.at(-1)?.[0] as Record<
+        const inserted = mockedDb.values.mock.calls.at(-1)?.[0] as Record<
           string,
           unknown
         >;
         expect(inserted.confirmedAt).toBeNull();
-        const conflict = vi
-          .mocked(db.onConflictDoUpdate)
-          .mock.calls.at(-1)?.[0] as {
+        const conflict = mockedDb.onConflictDoUpdate.mock.calls.at(-1)?.[0] as {
           set: Record<string, unknown>;
         };
         expect(conflict.set).not.toHaveProperty('confirmedAt');
@@ -285,8 +286,8 @@ describe('notifications/domain', () => {
           reason: 'stopped',
         });
         mockArtist();
-        vi.mocked(db.values).mockClear();
-        vi.mocked(db.insert).mockClear();
+        mockedDb.values.mockClear();
+        mockedDb.insert.mockClear();
 
         const result = await subscribeToNotificationsDomain(smsPayload);
 
@@ -296,8 +297,8 @@ describe('notifications/domain', () => {
           success: true,
           pendingConfirmation: true,
         });
-        expect(db.insert).not.toHaveBeenCalled();
-        expect(db.values).not.toHaveBeenCalled();
+        expect(mockedDb.insert).not.toHaveBeenCalled();
+        expect(mockedDb.values).not.toHaveBeenCalled();
       });
     });
 
