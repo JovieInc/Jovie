@@ -11078,6 +11078,56 @@ time.sleep(30)
             self.assertEqual(json.loads(output)["held"], "fleet-observer-detached-child", errors)
             self.assert_gone(handles)
 
+class DoctorFreshnessTest(unittest.TestCase):
+    def host(self, tmp):
+        return lane.Host(state=Path(tmp), repo=Path(tmp))
+
+    def test_a_stale_doctor_gets_a_detached_pass_a_fresh_one_does_not(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = self.host(tmp)
+            now = time.time()
+            (host.state / "doctor.json").write_text(json.dumps({"at": lane.now_iso()}))
+            with patch.object(lane.subprocess, "Popen") as popen:
+                self.assertFalse(lane.spawn_doctor_if_stale(host, now))
+                popen.assert_not_called()
+                self.assertTrue(lane.spawn_doctor_if_stale(host, now + lane.DOCTOR_REFRESH_S + 5))
+                self.assertEqual(popen.call_args.args[0][-1], "doctor")
+                self.assertTrue(popen.call_args.kwargs["start_new_session"])
+            (host.state / "doctor.json").unlink()
+            with patch.object(lane.subprocess, "Popen") as popen:
+                self.assertFalse(lane.spawn_doctor_if_stale(host, now), "no report yet: the end-of-tick pass writes it")
+                popen.assert_not_called()
+
+    def test_a_second_concurrent_doctor_pass_exits_without_running(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = self.host(tmp)
+            holder = lane.Locked(host.state / "locks" / "doctor-run.lock", blocking=False)
+            try:
+                with patch.object(lane.doctor, "run") as run:
+                    self.assertEqual(lane.run_doctor(host), 0)
+                    run.assert_not_called()
+            finally:
+                holder.release()
+            with patch.object(lane.doctor, "run") as run, patch.object(lane, "codex_lane_module", return_value=None):
+                self.assertEqual(lane.run_doctor(host), 0)
+                run.assert_called_once()
+
+    def test_dispatch_arms_the_heartbeat_and_starts_the_doctor_before_the_slow_work(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            host = self.host(tmp)
+            order = []
+            lane.lifecycle._last_beat = 0.0
+            with patch.object(lane, "spawn_doctor_if_stale", side_effect=lambda *_: order.append("doctor")), \
+                    patch.object(lane, "_begin_tick_intent", return_value=None), \
+                    patch.object(lane, "_dispatch", side_effect=lambda *_: order.append("dispatch") or 0), \
+                    patch.object(lane, "_clear_tick_intent"):
+                try:
+                    self.assertEqual(lane.dispatch(host), 0)
+                    self.assertEqual(order, ["doctor", "dispatch"])
+                    self.assertTrue((host.state / "tick-heartbeat").exists())
+                finally:
+                    lane.lifecycle.HEARTBEAT = None
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -14225,7 +14275,7 @@ class RepositoryBindingTest(unittest.TestCase):
                                      "conclusion": "SUCCESS" if green else "FAILURE"}], **fields}
         return lane.bindings.pr_row(self.node(pr), ["CI Summary"])
 
-    def claim(self, issues, prs, run_receipt=None, states=None, reserved=False):
+    def claim(self, issues, prs, run_receipt=None, states=None, reserved=False, **work_kwargs):
         linear = FakeLinear([])
         linear.key = "lin_test"
         self.mirror(issues)
@@ -14253,7 +14303,8 @@ class RepositoryBindingTest(unittest.TestCase):
                 patch.object(lane, "in_flight_issues") as jovie_in_flight:
             entry = lane.bindings.reserve if reserved else lane.bindings.work
             verdict = entry(lane, self.host, "codex", {"cmd": ["true"], "model": "m"},
-                            bindings=[dataclasses.replace(self.binding, reserved_seats=1) if reserved else self.binding])
+                            bindings=[dataclasses.replace(self.binding, reserved_seats=1) if reserved else self.binding],
+                            **work_kwargs)
         jovie_budget.assert_not_called()
         jovie_in_flight.assert_not_called()
         status = json.loads((self.host.state / "bindings.json").read_text())["LYB"]
@@ -14270,6 +14321,38 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertEqual(status["refusals"], {"LYB-152": "LYB:excluded-label:hold"})
         self.assertEqual((status["pool"], status["eligible"]), (2, 1))
         self.assertEqual(lane.linear_sync.claim_status(self.host.state, "id-LYB-7"), "active")
+
+    def test_new_lyb_work_yields_to_pending_jovie_repair_but_lyb_repair_does_not(self):
+        # 2026-10-25: the binding pass ran first, so LYB intake took every seat for 6h while
+        # 119 red Jovie PRs waited. The checked-in LYB binding opts in.
+        self.assertTrue(self.binding.yield_to_jovie_repair)
+        verdict, _, run, status = self.claim([self.lyb("LYB-7", labels=())], [], jovie_repair_pending=True)
+        self.assertIsNone(verdict)
+        run.assert_not_called()
+        self.assertEqual(status["outcome"], "no-repair")
+        red = {"number": 44, "headRefName": "codex/lyb-11-20261011t000000", "headRefOid": "b" * 40, "title": "t",
+               "mergeStateStatus": "BLOCKED", "statusCheckRollup": [{"name": "iOS", "conclusion": "FAILURE"}]}
+        verdict, _, run, _ = self.claim([self.lyb("LYB-7", labels=())], [red], run_receipt={"verdict": "pushed"},
+                                        jovie_repair_pending=True)
+        self.assertEqual(run.call_args.kwargs["pr"]["number"], 44)
+        verdict, _, run, _ = self.claim([self.lyb("LYB-7", labels=())], [], jovie_repair_pending=False)
+        self.assertEqual(verdict, "pr-opened")
+
+    def test_jovie_repair_pending_is_false_only_for_a_fresh_zero_record(self):
+        write = lambda row: (self.host.state / "maintenance-demand.json").write_text(json.dumps({"lanes": {"codex": row}}))
+        self.assertTrue(lane.jovie_repair_pending(self.host, 1000.0))  # no record
+        write({"observedAt": 990.0, "pending": 0})
+        self.assertFalse(lane.jovie_repair_pending(self.host, 1000.0))
+        write({"observedAt": 990.0, "pending": 3})
+        self.assertTrue(lane.jovie_repair_pending(self.host, 1000.0))
+        write({"observedAt": 990.0, "pending": None})
+        self.assertTrue(lane.jovie_repair_pending(self.host, 1000.0))
+        write({"observedAt": 1.0, "pending": 0})  # stale: the Jovie path has not run
+        self.assertTrue(lane.jovie_repair_pending(self.host, 1000.0))
+        # A lane that never repairs Jovie PRs cannot prove Jovie has none.
+        (self.host.state / "maintenance-demand.json").write_text(json.dumps(
+            {"lanes": {"hyperagent": {"observedAt": 990.0, "pending": 0}}}))
+        self.assertTrue(lane.jovie_repair_pending(self.host, 1000.0))
 
     def test_lyb_epic_is_decomposed_in_its_own_repo_and_settles_its_own_state(self):
         epic = self.lyb("LYB-60", labels=("type:epic",))

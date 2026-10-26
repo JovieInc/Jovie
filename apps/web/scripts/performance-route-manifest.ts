@@ -2100,6 +2100,11 @@ const ACCOUNT_BILLING_ROUTES = [
 
 const ONBOARDING_ROUTES = [
   {
+    // Entry route. First/largest paint is NOT budgeted here: the unthrottled,
+    // warm Playwright run passed LCP at 1.3s while Lighthouse mobile measured
+    // 8.4s on production (2026-10-25). LCP is gated by the throttled-mobile
+    // Lighthouse check (performance-entry-budgets.json); this entry keeps the
+    // layout, interaction, TTFB and size budgets and the screenshot plumbing.
     id: 'onboarding',
     group: 'onboarding',
     surface: 'onboarding',
@@ -2115,8 +2120,6 @@ const ONBOARDING_ROUTES = [
       ],
     },
     timings: [
-      { metric: 'first-contentful-paint', budget: 900 },
-      { metric: 'largest-contentful-paint', budget: 1300 },
       { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1000 },

@@ -366,7 +366,9 @@ describe('public-profile alias graduation policy', () => {
         stubCommand(
           fixture.bin,
           'pnpm',
-          '#!/bin/sh\nprintf "%s\\n" "$@" > "$ALIAS_GUARD_ARGUMENTS"\nexit "$ALIAS_GUARD_EXIT"\n'
+          // Record every invocation (the script runs other pnpm commands around the guard) and
+          // fail only the performance-budgets guard, so the assertions read that guard's own arguments.
+          '#!/bin/sh\nprintf "%s\\n" "$@" >> "$ALIAS_GUARD_ARGUMENTS"\nprintf -- "--invocation-end--\\n" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
         );
         const result = runScript(script, fixture, {
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
@@ -386,7 +388,18 @@ describe('public-profile alias graduation policy', () => {
             failure_subtype: 'exact_build_performance_failed',
           });
         else expect(outputs.performance_status).toBe('warn');
-        const args = readFileSync(join(fixture.root, 'arguments'), 'utf8');
+        const calls = readFileSync(join(fixture.root, 'arguments'), 'utf8')
+          .split('--invocation-end--\n')
+          .filter(Boolean);
+        const guardCalls = calls.filter(call =>
+          call.includes('performance-budgets-guard')
+        );
+        expect(guardCalls.length).toBeGreaterThan(0);
+        // The public-profile alias guard is the one carrying the alias routes.
+        const args =
+          guardCalls.find(call =>
+            call.includes('--route-id\n' + ALIAS_ROUTES[0])
+          ) ?? guardCalls.at(-1);
         expect(args).toContain(
           `--base-url\n${staging ? DEPLOYMENT_URL : 'https://jov.ie'}`
         );

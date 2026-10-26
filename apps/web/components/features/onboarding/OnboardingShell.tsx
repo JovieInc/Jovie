@@ -133,7 +133,15 @@ export function OnboardingShell({
     });
   }, []);
 
+  const [conversationStarted, setConversationStarted] = useState(false);
+  // "Start Over" means nothing before there is a conversation to discard.
+  const hasConversation =
+    conversationStarted ||
+    initialMessages.length > 0 ||
+    conversationId !== null;
+
   const handleConversationActivity = useCallback(() => {
+    setConversationStarted(true);
     setClaimTrigger(current => current + 1);
   }, []);
 
@@ -251,14 +259,14 @@ export function OnboardingShell({
               className='relative flex min-h-0 min-w-0 flex-1 flex-col'
               data-onboarding-session={sessionLabel}
             >
-              {onRestart || onLogout || !isSignedIn ? (
+              {(onRestart && hasConversation) || onLogout || !isSignedIn ? (
                 <OnboardingIdentityConflict
                   visible={claimStatus === 'identity-conflict'}
                   isSignedIn={isSignedIn}
                   onLogout={onLogout}
                   disabled={actionPending || controlsDisabled}
                 >
-                  {onRestart ? (
+                  {onRestart && hasConversation ? (
                     <Button
                       variant='ghost'
                       size='sm'

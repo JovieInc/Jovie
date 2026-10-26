@@ -16,6 +16,8 @@ import os
 import re
 from datetime import datetime, timezone
 
+import machine_gap
+
 SCHEMA = "jovie.remediation-event/v1"
 CLASSES = (
     "ready",
@@ -682,9 +684,12 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
     candidates = []
     for row in qualified:
         seen = availability(row["lane"], row) or {}
-        pressure = max(0.0, float(seen.get("pressure") or 0.0))
+        pace = float(seen.get("paceAdjust") or 0.0)
+        # Quota pressure is never negative; the registry's pace adjustment may discount a lane that is
+        # behind pace on use-or-lose quota (floor: a tenth of its cost), never below that.
+        pressure = max(-0.9, max(0.0, float(seen.get("pressure") or 0.0)) + pace)
         candidates.append({**row, "available": bool(seen.get("ok")), "why": seen.get("why") or "ok",
-                           "pressure": round(pressure, 3),
+                           "pressure": round(pressure, 3), "paceAdjust": round(pace, 3),
                            "effectiveCost": round(row["cost"] * (1 + pressure), 3)})
     candidates.sort(key=lambda row: (row["effectiveCost"], row["tier"], row["index"], row["order"]))
     chosen = next((row for row in candidates if row["available"]), None)
@@ -705,9 +710,9 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
             "reasons": need["reasons"], "notes": notes,
             "chosen": None if chosen is None else {key: chosen[key] for key in
                                                    ("lane", "model", "alias", "capability", "costClass",
-                                                    "cost", "pressure", "effectiveCost")},
+                                                    "cost", "pressure", "paceAdjust", "effectiveCost")},
             "candidates": [{key: row[key] for key in ("lane", "model", "capability", "cost", "pressure",
-                                                      "effectiveCost", "available", "why")}
+                                                      "effectiveCost", "paceAdjust", "available", "why")}
                            for row in candidates],
             "rationale": rationale}
 
@@ -1612,6 +1617,12 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
         row["cls"] = classified["cls"]
         row["subtype"] = classified.get("subtype")
         row["dossier"] = event_dossier(classified, canonical.get("title") or "", canonical.get("identifier") or "")
+        # A recurring event is a machine-builder task: the third occurrence in 14 days stops fixing the instance.
+        recent = sum(1 for item in (history if escalation_enabled() else []) if now - (iso_epoch(item.get("updatedAt")) or 0) < 14 * 86400)
+        row["recurrence14d"] = recent
+        row["machineBuilder"] = recent + 1 >= 3
+        if row["machineBuilder"]:
+            row["dossier"] = machine_gap.builder_dossier(fingerprint, recent + 1) + "\n" + row["dossier"]
         if classified["subtype"] == "musicfetch-cutover":
             row["route"] = MUSICFETCH_CUTOVER
         if classified["cls"] == "human-only":
