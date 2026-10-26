@@ -19,6 +19,18 @@ export type ClaimLayoutShiftEntry = {
   sources: ClaimLayoutShiftSource[];
 };
 
+type GuidanceLayoutShiftRect = { y: number; h: number; w: number };
+
+type GuidanceLayoutShiftEntry = {
+  value: number;
+  startTime: number;
+  sources?: {
+    node: string | null;
+    previous: GuidanceLayoutShiftRect | null;
+    current: GuidanceLayoutShiftRect | null;
+  }[];
+};
+
 declare global {
   interface Window {
     __claimLayout?: { supported: boolean; total: number | null };
@@ -32,7 +44,7 @@ declare global {
       unguidedFirst: boolean;
       first: number[] | null;
       guided: number[] | null;
-      entries?: ClaimLayoutShiftEntry[];
+      entries?: GuidanceLayoutShiftEntry[];
       /** Diagnostic: rect heights/tops of the layout chain at both samples. */
       firstDetail?: Record<string, string>;
       guidedDetail?: Record<string, string>;
@@ -44,7 +56,7 @@ export function installDelayedGuidanceLayoutProbe(fontSize: number): void {
   const supported =
     typeof PerformanceObserver === 'function' &&
     PerformanceObserver.supportedEntryTypes.includes('layout-shift');
-  const metric = {
+  const metric: NonNullable<Window['__claimInitialLayout']> = {
     supported,
     total: supported ? 0 : (null as number | null),
     unguidedFirst: false,
@@ -90,7 +102,7 @@ export function installDelayedGuidanceLayoutProbe(fontSize: number): void {
             value: shift.value,
             startTime: shift.startTime,
             sources: node,
-          } as never);
+          });
         }
       }
     }).observe({ type: 'layout-shift', buffered: true });

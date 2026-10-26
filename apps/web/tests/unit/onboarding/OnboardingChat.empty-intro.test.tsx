@@ -273,6 +273,7 @@ describe('OnboardingChat empty intro', () => {
     render(
       <OnboardingChat
         starterHandoff={{ kind: 'prompt', prompt: 'Claim my page' }}
+        turnstileToken={null}
         turnstileHasSiteKey={false}
         turnstilePanel={<span hidden />}
       />
