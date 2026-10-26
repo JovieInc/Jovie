@@ -458,11 +458,11 @@ export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/compare/linktree':
     '515e0a4c0437680b5b264fb2b3829a8b9486eb1371d3a20112811396911e4cd7',
   '/compare/linkfire':
-    '0b2d66dc78d69d39852ecd247f4e7b28c8243ea471cd65b56b7e6ded91d421d5',
+    '0974d7e2ab63e31a3048640fc074e08dd686994eaf18f25ed3d336338e0177b1',
   '/alternatives/linktree':
-    'c679a7b4cf862784e81151d5df2472f0c81530328e44beec1e4bd85f390ce286',
+    '142452c97cc161ef4356c8473c55d5dbdb40c1e875e82c9c0895ab39d729777a',
   '/alternatives/link-in-bio':
-    '67847983a3ac9762697e6b3d9f5a33733c2157e2799b17565f729fba41393e22',
+    'c37310308b9660cf66823717e73cb0d93a421d50e6108d933329c655c3bb923f',
   '/llms.txt':
     '2bc4a4c5e14ec0e63d188d161392bb104d807118a74cedad5b03dc3144aa2bc1',
   '/llms-full.txt':

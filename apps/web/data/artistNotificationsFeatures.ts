@@ -6,7 +6,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
     {
       id: 'new-music-first',
       title: 'New music first',
-      body: 'Keep the latest release at the front of the return path so fans have one clean next action.',
+      body: 'Keep the latest release at the front of the return path so listeners have one clean next action.',
       size: 'large',
       accent: 'blue',
       kicker: 'Release moment',
@@ -24,7 +24,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
     {
       id: 'nearby-show-timing',
       title: 'Nearby show timing',
-      body: 'Put the right date in front of the right fans while ticket intent is still warm.',
+      body: 'Put the right date in front of the right listeners while ticket intent is still warm.',
       size: 'large',
       accent: 'orange',
       kicker: 'Tour timing',
@@ -34,7 +34,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
       screenshotSrc: getMarketingExportImage('artist-spec-geo-insights-desktop')
         .publicUrl,
       screenshotAlt:
-        'Jovie geo insights showing cities where fan attention is building.',
+        'Jovie geo insights showing cities where listener attention is building.',
       screenshotWidth: 344,
       screenshotHeight: 540,
       objectPosition: '50% 0%',
@@ -42,7 +42,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
     {
       id: 'capture-once',
       title: 'Capture once',
-      body: 'A stream, QR scan, or profile visit can become a fan Jovie can reach again.',
+      body: 'A stream, QR scan, or profile visit can become a listener Jovie can reach again.',
       size: 'small',
       // Distinct from the activate-creators tile in the homepage v2 power
       // grid: each rendered feature's accent must be unique.
@@ -55,7 +55,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
         'tim-white-profile-subscribe-mobile'
       ).publicUrl,
       screenshotAlt:
-        'Jovie artist profile showing the subscribe surface for fan capture.',
+        'Jovie artist profile showing the subscribe surface for audience capture.',
       screenshotWidth: 660,
       screenshotHeight: 1368,
       objectPosition: '50% 0%',
@@ -82,7 +82,7 @@ export const ARTIST_NOTIFICATIONS_SPEC_TILES: readonly MarketingFeatureTile[] =
     {
       id: 'one-profile-same-destination',
       title: 'One profile, same destination',
-      body: 'The same artist profile can stay in bio, stories, QR, and posts while notifications route fans back to the right place.',
+      body: 'The same artist profile can stay in bio, stories, QR, and posts while notifications route listeners back to the right place.',
       size: 'large',
       accent: 'teal',
       kicker: 'Unified routing',

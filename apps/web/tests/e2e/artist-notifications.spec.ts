@@ -72,7 +72,7 @@ test.describe('Artist Notifications Landing', () => {
     ).toBeVisible();
     await expect(page.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
-      '/signup?plan=pro'
+      '/start'
     );
     await expect(page.getByText('Owned audience')).toHaveCount(0);
     await expect(page.getByText('Automatic reactivation')).toHaveCount(0);

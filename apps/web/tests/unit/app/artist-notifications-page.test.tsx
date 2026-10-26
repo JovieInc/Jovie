@@ -58,12 +58,12 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       heroSection.getByRole('heading', {
-        name: segmentedAccessibleName('Reach Every Fan.', 'On Autopilot.'),
+        name: segmentedAccessibleName('Reach your audience.', 'On autopilot.'),
       })
     ).toBeInTheDocument();
     expect(
-      heroSection.getByRole('link', { name: 'Start Artist Presence Trial' })
-    ).toHaveAttribute('href', '/signup?plan=pro');
+      heroSection.getByRole('link', { name: 'Claim your page' })
+    ).toHaveAttribute('href', '/start');
     expect(heroSection.queryByText('Capture once')).not.toBeInTheDocument();
 
     // No brand has granted permission for this page (JOV-7795).
@@ -165,7 +165,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(screen.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
-      '/signup?plan=pro'
+      '/start'
     );
 
     for (const bannedCopy of [

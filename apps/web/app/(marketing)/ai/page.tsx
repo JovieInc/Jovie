@@ -13,6 +13,8 @@ export const revalidate = false;
 
 export const metadata: Metadata = {
   title: documentTitle('Jovie AI Operating System'),
+  description:
+    'How a Jovie profile decides what to lead with: your latest release or show.',
   robots: NOINDEX_ROBOTS,
   twitter: {
     site: COMPANY_IDENTITY.xHandle,
@@ -48,9 +50,8 @@ export default function AiPage() {
               The AI operating system behind every Jovie profile
             </h1>
             <p className='max-w-2xl text-lg leading-8 text-secondary-token'>
-              Jovie turns a creator profile into an always-on decision loop:
-              identify the visitor, read context, choose the next best action,
-              and learn from the result. This public page covers the operating
+              Jovie turns a creator profile into a page that leads with the
+              latest release or show. This public page covers the operating
               model without exposing the private investor portal.
             </p>
             <div className='flex flex-wrap gap-3'>

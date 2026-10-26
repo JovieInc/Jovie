@@ -38,7 +38,7 @@
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageFanStatesCopy.ts",
-      "copy": "Each visit gets the right next step.",
+      "copy": "Your profile leads with your latest release or show.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",

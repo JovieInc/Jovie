@@ -37,7 +37,27 @@ const BANNED_NAME_RULES = [
   { id: 'haruki', pattern: /\bHaruki\b/giu },
 ] as const;
 
+/**
+ * Banned marketing terms (phase 1, 2026-10-25). Same shrink-only baseline as
+ * the phrase rules: existing hits are grandfathered, new ones fail.
+ * - "fan": we say audience or listener (editorial blog posts are exempt).
+ * - white-label / remove branding: branding stays on every profile.
+ * - revolutionary / all-in-one: filler claims with no evidence.
+ */
 const PHRASE_RULES = [
+  {
+    id: 'banned-fan',
+    pattern: /(?<![-_#/])\bfans?\b(?![-_])/giu,
+    skipPath: /\/content\/blog\//u,
+  },
+  { id: 'white-label', pattern: /\bwhite[\s-]?label(?:ed|ing)?\b/giu },
+  {
+    id: 'remove-branding',
+    pattern:
+      /\bremov(?:e|es|ing|al)\s+(?:of\s+)?(?:the\s+)?(?:jovie\s+)?branding\b/giu,
+  },
+  { id: 'revolutionary', pattern: /\brevolutionary\b/giu },
+  { id: 'all-in-one', pattern: /\ball[\s-]in[\s-]one\b/giu },
   { id: 'link-in-bio', pattern: /\blink[\s-]in[\s-]bio\b/giu },
   {
     id: 'niche-music',
@@ -236,11 +256,16 @@ function excerptAround(source: string, index: number, length: number): string {
 function collectPatternHits(
   file: string,
   source: string,
-  rules: readonly { readonly id: string; readonly pattern: RegExp }[],
+  rules: readonly {
+    readonly id: string;
+    readonly pattern: RegExp;
+    readonly skipPath?: RegExp;
+  }[],
   useExcerpt: boolean
 ): CorrectionHit[] {
   const hits: CorrectionHit[] = [];
   for (const rule of rules) {
+    if (rule.skipPath?.test(file)) continue;
     const pattern = new RegExp(rule.pattern.source, rule.pattern.flags);
     for (const match of source.matchAll(pattern)) {
       const text = useExcerpt

@@ -23,11 +23,11 @@ describe('ArtistNotificationsHero', () => {
     const hero = ARTIST_NOTIFICATIONS_COPY.hero;
     const view = render(<ArtistNotificationsHero hero={hero} />);
     const trial = screen.getByRole('link', { name: hero.primaryCtaLabel });
-    expect(trial).toHaveAttribute('href', '/signup?plan=pro');
+    expect(trial).toHaveAttribute('href', '/start');
     expect(trial).toHaveAttribute('data-test-prefetch', 'false');
     fireEvent.focus(trial);
     fireEvent.mouseEnter(trial);
-    expect(trial).toHaveAttribute('href', '/signup?plan=pro');
+    expect(trial).toHaveAttribute('href', '/start');
     expect(trial).toHaveAttribute('data-test-prefetch', 'false');
 
     view.rerender(
@@ -51,7 +51,7 @@ describe('ArtistNotificationsHero', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: segmentedAccessibleName('Reach Every Fan.', 'On Autopilot.'),
+        name: segmentedAccessibleName('Reach your audience.', 'On autopilot.'),
       })
     ).not.toHaveClass('line-clamp-2');
     expect(

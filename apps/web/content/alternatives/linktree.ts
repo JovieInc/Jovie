@@ -23,7 +23,7 @@ export const linktreeAlternative: AlternativeData = {
       claimIds: ['jovie.contact-collection', 'linktree.contact-collection'],
     },
     {
-      text: 'Both products support subscriber updates. Jovie fan notifications are available to enrolled artists.',
+      text: 'Both products support subscriber updates. Jovie audience notifications are available to enrolled artists.',
       claimIds: ['jovie.fan-notifications', 'linktree.notifications'],
     },
     {
@@ -41,7 +41,7 @@ export const linktreeAlternative: AlternativeData = {
     {
       title: 'Release smart links',
       description:
-        'Publish release links that remember a fan’s streaming-platform choice.',
+        'Publish release links that remember a listener’s streaming-platform choice.',
       claimIds: ['jovie.smart-links'],
     },
     {
@@ -53,7 +53,7 @@ export const linktreeAlternative: AlternativeData = {
     {
       title: 'Enrolled artist workflows',
       description:
-        'Eligible artists can use fan notifications, advanced analytics, and release-planning tools.',
+        'Eligible artists can use audience notifications, advanced analytics, and release-planning tools.',
       claimIds: [
         'jovie.fan-notifications',
         'jovie.analytics',
