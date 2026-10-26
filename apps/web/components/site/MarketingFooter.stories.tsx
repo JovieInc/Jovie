@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Adjacent component coverage for the canonical shell.footer story. The central Marketing/Shells catalog owns the registry identity.',
+          'Adjacent component coverage for the canonical shell.footer story. The central Marketing/Shells catalog owns the registry identity. Footer links point at launched pages only; unlisted and redirected routes are omitted.',
       },
     },
   },
