@@ -46,3 +46,13 @@ captures were also visually inspected. They retain the five groups and existing
 theme/locale primitives within the same footer. This repair adds no UI or
 interaction. These are local browser observations, separate from hosted CI,
 deployment and production certification.
+
+## Lossless encoding repair
+
+On 2026-10-26, the 320px PNG's IDAT stream was recompressed with zlib level 9
+to remove an accidental brand-scanner match in compressed bytes. The PNG shrank
+from 401,422 to 376,612 bytes. Decoded scanlines and all non-IDAT chunks remain
+byte-identical; their scanline SHA-256 is
+`ae6f41e1a960e888970e1d8312dc9940b22ad79ee2e589dc466e019a5068c5b9`.
+Chunk CRCs and the unchanged brand scanner pass. This changes file encoding only;
+it does not renew the browser observation, source certification or design approval.
