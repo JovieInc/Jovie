@@ -63,6 +63,7 @@ test('audience routes are exempt and general routes are scanned', () => {
   );
   const files = collectScanFiles(REPO_ROOT, config);
   for (const file of [
+    'apps/web/app/(home)/page.tsx',
     'apps/web/app/(marketing)/pricing/layout.tsx',
     'apps/web/data/companyIdentity.ts',
   ]) {
@@ -111,23 +112,6 @@ test('the recorded homepage and general-page baseline matches the tree', () => {
   assert.deepEqual(result.failures, []);
   assert.equal(result.count, result.ids.length);
   assert.ok(result.count > 0);
-});
-
-test('the artist-first homepage is exempt; general routes stay scanned (Tim, 2026-10-25)', () => {
-  for (const file of [
-    'apps/web/app/(home)/page.tsx',
-    'apps/web/components/homepage/HomeHero.tsx',
-  ]) {
-    assert.equal(isExemptPath(file, config), true, file);
-  }
-  const entry = config.audienceAllowlist.find(
-    item => item.path === 'apps/web/app/(home)/'
-  );
-  assert.match(entry.reason, /2026-10-25/);
-  assert.equal(
-    isExemptPath('apps/web/app/(marketing)/pricing/page.tsx', config),
-    false
-  );
 });
 
 test('allowed product phrases are not audience terms; the rest of the line is', () => {
