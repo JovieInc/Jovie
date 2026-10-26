@@ -264,8 +264,9 @@ the single hue and forbid secondary hues. Orange as a scene or cue color, and
 a literal triad, stay forbidden. The orange, red, and green rotation above
 does not apply to these marketing images or section accents. The prose
 frontend skill is not in this repo (`~/.codex/skills/frontend-skill`); this
-contract is the in-repo copy. Blocking checks are the companion PRs from
-agent bc-385e97f8.
+contract is the in-repo copy. Blocking source checks are
+`scripts/invariants/art-direction/accent.mjs` and `hue.mjs`; they ratchet
+source violations without certifying generated pixels or prompt compliance.
 
 ### Do not fuck with art (founder-locked 2026-08-13)
 
@@ -296,6 +297,14 @@ Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
   uses `.marketing-type-display` / `-section` / `-lede`.
 - Marketing plan prices render only through `MarketingOfferSummary` or
   `getPublicPriceClaim` from offer truth; never type a price into copy.
+- Marketing images and cards use a radius token. The wide cinematic corner
+  is `.marketing-rounded-frame` (`--system-b-radius-panel` / `--radius-3xl`).
+  Exempt only the full-bleed hero start (it rounds as it zooms out), logos,
+  icons, SVG marks, and already-round avatars. See MKT-D17.
+- Marketing and public pages have one boxed width (`.public-container`, via
+  `MarketingContainer` or `Container`) and one full-bleed override (`bleed`).
+  Header, hero, sections and footer share it. No other page `max-w-*`, no
+  container padding of your own. See MKT-D18.
 
 ### No Duplicate Page Titles (Breadcrumb + Toolbar)
 
@@ -328,6 +337,12 @@ absent.
 - Dedicated audience routes may use that language. The allowlist is `scripts/invariants/icp-language/config.json`.
 - The headline “Be found. Be understood.” is locked.
 - `scripts/invariants/icp-language/check.mjs` is a blocking PR Ready check. Existing hits are a shrink-only baseline. See MKT-D16 in `docs/marketing/DESIGN_INVARIANTS.md`.
+
+### Copy Is the Message, Never the Brief
+
+Reject AI instructions, editing rules, and unfinished text in every user-visible string, including metadata, accessibility labels, emails, errors, empty states, and demos. Use the copy system.
+Run `node scripts/invariants/copy-leak/check.mjs` before review: it blocks PR Ready and merge groups. Fix real leaks; its baseline only shrinks.
+Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 
 ### No Emoji in UI — Use Icons
 

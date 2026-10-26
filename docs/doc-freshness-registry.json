@@ -196,8 +196,8 @@
     },
     ".claude/rules/macos.md": {
       "owner": "@itstimwhite",
-      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified.",
-      "documentSha256": "3e478342371997f9537a7194222b21221735e6ea564eee3651fb3dd9319945f9",
+      "claim": "Current Mac owners and planned Swift-native direction follow the stack receipt and accepted ADR; no native parity is certified. New surfaces default to SwiftUI, Electron stays maintenance-only, and the production ultrawide Ovie surface stays under a perpetual design loop.",
+      "documentSha256": "81e758d169e66a1235c43e67ca33e634d9bbdb711a8abcd8d013f50aff91abe7",
       "sources": [
         {
           "path": "docs/macos/swift-control-invariants.md",
@@ -260,8 +260,8 @@
     },
     ".claude/rules/security.md": {
       "owner": "@itstimwhite",
-      "claim": "CSP provider domains are consumed by the existing CSP implementation.",
-      "documentSha256": "192c9a31384046b11edfe63e9cf94e6fd0dd4d788770ac65774b7275a204dace",
+      "claim": "CSP provider domains are consumed by the existing CSP implementation. Every capability, quota, rate, or resource carries a documented, server-enforced, single-setting abuse limit.",
+      "documentSha256": "6dc09197a4bfec7315d92811565eff8f3b71079cca303470cd64e321fbd6897a",
       "sources": [
         {
           "path": "apps/web/lib/security/content-security-policy.ts",
@@ -310,7 +310,7 @@
     ".claude/rules/ui.md": {
       "owner": "@itstimwhite",
       "claim": "Operational UI policy inherits the design authority chain. Canonical founder identity, Tailwind utility registration, signup intent and visible opening proof follow their lesson contracts.",
-      "documentSha256": "a4cf01d634e41c4c6e4ebe40e34227bf4b29854eb50c6bb5ed20623fc1cb73f3",
+      "documentSha256": "bd46feef8b79cef56b7db3f337765f3947161a06ba0740d37d4f66ace6f4c2af",
       "sources": [
         {
           "path": "DESIGN.md",
@@ -400,7 +400,7 @@
     "DESIGN.md": {
       "owner": "@itstimwhite",
       "claim": "Operational design authority derives from company design canon.",
-      "documentSha256": "69ede1800bda674b78acb92ac7053b06855675674bcf0300f1dba21e323accb6",
+      "documentSha256": "eb6d051d8be2ccbf0b3869c8743cbffad04c3848cea8d1845f83f16c40e24298",
       "sources": [
         {
           "path": "canon/DESIGN.md",

@@ -385,13 +385,62 @@ async function readMainSha(client, repo, headers, apiUrl, readGitTip) {
   }
 }
 
+/** Read only the oldest missing commit; retry transients through the shared client. */
+async function readUnshippedRange(url, { client, fetchImpl, token }) {
+  const read = async (reader, authToken, maxAttempts) => {
+    try {
+      const response = await reader.request({
+        url,
+        headers: {
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache',
+          ...githubHeaders(authToken),
+        },
+        priority: 'report',
+        conditional: false,
+        maxAttempts,
+        maxWaitMs: TIMEOUT_MS,
+        timeoutMs: TIMEOUT_MS,
+      });
+      if (response.status !== 200)
+        return {
+          ok: false,
+          reason: `http-${response.status}`,
+          publicRecovery: response.status === 403,
+        };
+      return { ok: true, body: response.json() };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: error?.status
+          ? `http-${error.status}`
+          : (error?.failure ?? error?.kind ?? 'unreadable'),
+        publicRecovery:
+          error?.status === 403 || ['shed', 'budget'].includes(error?.kind),
+      };
+    }
+  };
+  const authenticated = await read(client, token, 2);
+  if (authenticated.ok || !token || !authenticated.publicRecovery)
+    return authenticated;
+  // Jovie is public. A denied/exhausted Actions credential must not hide an
+  // otherwise readable range. The public read has its own shared budget and
+  // one attempt; it carries no token and still requires a real comparison.
+  const publicClient = createApiClient({
+    provider: 'github',
+    credential: hashCredential('github', ''),
+    fetch: fetchImpl,
+  });
+  return read(publicClient, '', 1);
+}
+
 /**
  * Production promotion heartbeat, independent of the continuity guard's own
  * verdict: production carrying main is a fresh proof; otherwise the proof is
  * as old as the oldest missing commit has been on main. Unreadable is unknown
  * (red), never healthy.
  */
-export async function observeProductionFreshness(
+async function observeProductionFreshnessProof(
   receipt,
   { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API, lsRemote }
 ) {
@@ -419,12 +468,18 @@ export async function observeProductionFreshness(
   const now = new Date(nowMs).toISOString();
   if (live === main)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
-  const compare = await readJson(
+  const compareUrl = `${apiUrl}/repos/${receipt.repo}/compare/${live}...${main}?per_page=1`;
+  const compare = await readUnshippedRange(compareUrl, {
+    client,
     fetchImpl,
-    `${apiUrl}/repos/${receipt.repo}/compare/${live}...${main}`,
-    headers
-  );
-  if (!compare.ok) return { ok: false, reason: 'unshipped-range-unreadable' };
+    token,
+  });
+  if (!compare.ok)
+    return {
+      ok: false,
+      reason: `unshipped-range-${compare.reason}`,
+      url: compareUrl,
+    };
   if (Number(compare.body?.ahead_by) === 0)
     return { ok: true, lastProofAt: now, reason: 'production-current' };
   const oldestCommit = compare.body?.commits?.[0];
@@ -444,6 +499,30 @@ export async function observeProductionFreshness(
     lastProofAt: landedAt,
     reason: `${compare.body.ahead_by}-commits-unshipped`,
   };
+}
+
+const FEED_BUDGET_MIN_MINUTES = 60;
+const FEED_BUDGET_MAX_MINUTES = 24 * 60;
+
+/**
+ * Production promotion heartbeat with ONE source of truth for its silence budget: the measured p95 of normal
+ * merge-to-production lag, recomputed weekly by the lanes doctor and published in the lanes feed
+ * (`deployHealth.limits[repo].ageS`). Bounded to 1 to 24 hours; an unreadable or out-of-bounds feed falls back to
+ * the receipt's own `fallbackBudgetMinutes` (246, the p95 measured 2026-10-25), never a separate static budget.
+ */
+export async function observeProductionFreshness(receipt, context) {
+  const proof = await observeProductionFreshnessProof(receipt, context);
+  if (!proof.ok || !receipt.limitsUrl) return proof;
+  const feed = await readJson(context.fetchImpl, receipt.limitsUrl);
+  const ageS = feed.ok
+    ? feed.body?.deployHealth?.limits?.[receipt.repo]?.ageS
+    : undefined;
+  const minutes = Number.isFinite(ageS) ? Math.ceil(ageS / 60) : NaN;
+  const budgetMinutes =
+    minutes >= FEED_BUDGET_MIN_MINUTES && minutes <= FEED_BUDGET_MAX_MINUTES
+      ? minutes
+      : receipt.fallbackBudgetMinutes;
+  return { ...proof, budgetMinutes };
 }
 
 /**
@@ -920,13 +999,19 @@ export async function main({
   if (env.GITHUB_STEP_SUMMARY)
     appendFileSync(env.GITHUB_STEP_SUMMARY, summary(report));
 
-  const state = { ...previous };
-  for (const row of report.results) {
-    if (row.critical)
-      state[livenessFingerprint(row.id)] =
-        row.status === 'fresh' ? 'green' : 'red';
-  }
+  // Alert state only moves when the decisions are actually applied
+  // (JOV-8843). A diagnostic run (no --file) or a disabled-intake run
+  // (REMEDIATION_INTAKE_DISABLED=1) observes and reports but must preserve
+  // the persisted state: otherwise a run that never filed could still flip a
+  // fingerprint green, silently dropping a red->green resolution the next
+  // filing run would have delivered (an open alert stuck unresolved).
   if (args.file && env.REMEDIATION_INTAKE_DISABLED !== '1') {
+    const state = { ...previous };
+    for (const row of report.results) {
+      if (row.critical)
+        state[livenessFingerprint(row.id)] =
+          row.status === 'fresh' ? 'green' : 'red';
+    }
     const { applyRemediationDecisionWithRetry } = await import(
       './lib/remediation-signal.mjs'
     );
@@ -946,9 +1031,9 @@ export async function main({
         state[decision.fingerprint] =
           previous[decision.fingerprint] ?? 'unknown';
     }
+    if (args.previous)
+      writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
-  if (args.previous)
-    writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   process.stdout.write(
     `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id) })}\n`
   );

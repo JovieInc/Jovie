@@ -401,3 +401,60 @@ describe('EmailCodeAuthForm pre-hydration guard', () => {
     );
   });
 });
+
+describe('EmailCodeAuthForm page alignment', () => {
+  async function reachCodeStepWithAlign(align: 'left' | 'center') {
+    sendVerificationOtp.mockResolvedValueOnce({
+      data: { success: true },
+      error: null,
+    });
+    render(
+      <EmailCodeAuthForm mode='sign-in' redirectUrl='/app' align={align} />
+    );
+    fireEvent.change(screen.getByLabelText(/email/i), {
+      target: { value: 'artist@example.com' },
+    });
+    fireEvent.submit(
+      screen.getByLabelText(/email/i).closest('form') as HTMLFormElement
+    );
+    await waitFor(() =>
+      expect(
+        document.querySelector('[data-auth-email-code-step="code"]')
+      ).toBeTruthy()
+    );
+    return document.querySelector('[data-auth-email-code-step="code"]');
+  }
+
+  it('left-aligns the code step on full-page shells', async () => {
+    const step = await reachCodeStepWithAlign('left');
+    const intro = step?.querySelector('p');
+    expect(intro?.className).toContain('text-left');
+    expect(intro?.className).not.toContain('text-center');
+  });
+
+  it('keeps overlay captures centered by default', async () => {
+    const step = await reachCodeStepWithAlign('center');
+    const intro = step?.querySelector('p');
+    expect(intro?.className).toContain('text-center');
+    expect(intro?.className).not.toContain('text-left');
+  });
+
+  it('renders the code step digit boxes on the 32px hero scale (glm/auth-focal-polish)', async () => {
+    await reachCodeStepWithAlign('left');
+    const firstDigit = screen.getByLabelText('Digit 1 of 6');
+    const shell = firstDigit.closest('div');
+    expect(shell?.className).toMatch(/\bh-8\b/);
+    expect(shell?.className).toMatch(/\bw-7\b/);
+    expect(shell?.className).not.toMatch(/\bh-12\b/);
+  });
+});
+
+describe('Pen sign-in polish (glm/auth-focal-polish)', () => {
+  it('renders the email CTA on the approved auth pill geometry with no restyled Button sizes', () => {
+    render(<EmailCodeAuthForm mode='sign-in' redirectUrl='/start' />);
+    const cta = screen.getByRole('button', { name: 'Send sign-in code' });
+    expect(cta).toHaveClass('w-full');
+    expect(cta.className).not.toMatch(/\bh-8\b/);
+    expect(cta.className).not.toMatch(/\bmin-h-8\b/);
+  });
+});

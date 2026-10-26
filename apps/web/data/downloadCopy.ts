@@ -21,14 +21,14 @@ export const DOWNLOAD_COPY = {
   platforms: {
     mac: {
       label: 'Mac',
-      title: 'Mac workspace',
+      title: 'Mac Workspace',
       body: 'Open Jovie from your Dock, keep your release workflow out of browser noise, and stay current with automatic updates.',
       action: 'Download for Mac',
       releasesAction: 'View releases',
     },
     iphone: {
       label: 'iPhone',
-      title: 'iPhone app',
+      title: 'iPhone App',
       body: 'The Mac app is the public download. The iPhone app is not available on this page.',
       status: 'Not a public download',
     },
@@ -37,15 +37,15 @@ export const DOWNLOAD_COPY = {
   workflowTitle: 'Everything In Jovie, Closer.',
   features: [
     {
-      title: 'One workspace',
+      title: 'One Workspace',
       body: 'Releases, links, audience data, and campaigns stay connected to the same Jovie account you use on the web.',
     },
     {
-      title: 'Signed releases',
+      title: 'Signed Releases',
       body: 'The Mac build is Developer ID signed, Apple notarized, and distributed from the latest GitHub release.',
     },
     {
-      title: 'Daily updates',
+      title: 'Daily Updates',
       body: 'The app updates in the background when you quit, so the next open is the latest version.',
     },
     {

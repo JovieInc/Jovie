@@ -17,7 +17,7 @@
 /* ---------- Power-feature tile shell ---------- */
 
 .ap-spec-wall__tile-card {
-  border-radius: 1.25rem;
+  border-radius: var(--radius-2xl);
 }
 
 .ap-spec-wall__tile-hairline {
@@ -92,7 +92,7 @@
 /* The tile card border is the only frame; no inner hairline (ui.md nested
    decorative carding). */
 .ap-spec-wall__shot {
-  border-radius: 0.85rem;
+  border-radius: var(--radius-xl);
   background: var(--color-bg-base);
 }
 

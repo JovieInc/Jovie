@@ -178,7 +178,7 @@ interface ReleasesListContentProps {
   readonly onSelect: (release: ReleaseViewModel) => void;
   readonly onClearFilters: () => void;
   /** Ref forwarded to the listbox element for keyboard-nav focus scoping. */
-  readonly listboxRef?: RefObject<HTMLDivElement | null>;
+  readonly listboxRef?: RefObject<HTMLUListElement | null>;
 }
 
 function ReleasesListContent({
@@ -205,9 +205,12 @@ function ReleasesListContent({
     return (
       <div className='py-12 grid place-items-center text-center'>
         <div className='max-w-sm'>
-          <div className='text-app font-caption text-primary-token'>
-            Connect Spotify to get started
-          </div>
+          {/* Real heading: the e2e state resolution and axe gates resolve the
+              disconnected state by its 'Connect Spotify' heading, matching
+              the h3 the connected empty state already renders. */}
+          <h3 className='text-app font-caption text-primary-token text-balance'>
+            Connect Spotify To Get Started
+          </h3>
           <p className='mt-1 text-xs text-tertiary-token leading-normal'>
             Sync your catalog from Spotify or add a release manually to start
             generating smart links.
@@ -305,9 +308,16 @@ function ReleasesListContent({
   }
 
   return (
-    <div
+    <ul
       ref={listboxRef}
-      role='listbox'
+      // Native `ul` (implicit role=list) + native `li` rows: each row owns
+      // real interactive controls, which an ARIA `option` cannot contain
+      // (axe nested-interactive). Every row IS the li host: axe's `list`
+      // rule requires ul children to carry listitem semantics (suppressed
+      // wrappers are rejected like a div), and no wrapper element keeps
+      // the listitem role set singular for the shell's keyboard navigation
+      // and role queries. The Radix context-menu trigger's global
+      // aria-haspopup on the row's implicit listitem is legal aria.
       aria-label='Releases'
       className='py-1.5 space-y-px px-2'
     >
@@ -316,23 +326,23 @@ function ReleasesListContent({
           key={r.id}
           items={contextMenuItemsByReleaseId.get(r.id)}
         >
-          {/* Plain wrapper: Radix ContextMenu.Trigger asChild needs a host
-              element that accepts the injected ref/onContextMenu props. */}
-          <div data-shell-release-row-context-target>
-            <ShellReleaseRow
-              release={r}
-              isSelected={r.id === selectedReleaseId}
-              onSelect={() => onSelect(r)}
-              actionMenuItems={actionMenusByReleaseId.get(r.id)}
-              smartLinkLockReason={
-                isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
-              }
-              syncStatus={getSyncStatus(r.id)}
-            />
-          </div>
+          {/* The row IS the li host: Radix ContextMenu.Trigger asChild
+              injects its ref/onContextMenu/global aria onto the row's own
+              host element (React 19 passes refs through function-component
+              props), so the ul's direct children are exactly the rows. */}
+          <ShellReleaseRow
+            release={r}
+            isSelected={r.id === selectedReleaseId}
+            onSelect={() => onSelect(r)}
+            actionMenuItems={actionMenusByReleaseId.get(r.id)}
+            smartLinkLockReason={
+              isSmartLinkLocked(r.id) ? getSmartLinkLockReason(r.id) : null
+            }
+            syncStatus={getSyncStatus(r.id)}
+          />
         </TableContextMenu>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -569,7 +579,7 @@ export function ShellReleasesView({
   );
 
   /** Ref for the listbox container — used to scope J/K nav to the releases list. */
-  const listboxRef = useRef<HTMLDivElement>(null);
+  const listboxRef = useRef<HTMLUListElement>(null);
 
   useAmbientListSelection({
     enabled: visibleReleases.length > 0,

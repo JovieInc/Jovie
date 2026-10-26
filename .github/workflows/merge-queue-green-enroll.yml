@@ -116,8 +116,13 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -135,8 +140,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-actions: read
           permission-contents: write
           permission-pull-requests: write
@@ -216,8 +221,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
@@ -828,8 +833,13 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -839,8 +849,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
 
@@ -886,8 +896,13 @@ jobs:
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -927,8 +942,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
 
@@ -1007,8 +1022,13 @@ jobs:
             scripts/merge-group-victim-rearm.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -1018,8 +1038,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-actions: read
           # enqueuePullRequest needs the same contents grant as the enroll job.
           permission-contents: write

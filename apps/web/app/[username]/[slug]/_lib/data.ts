@@ -5,7 +5,15 @@
  * Used by both the main smart link page and the /sounds page.
  */
 
-import { and, sql as drizzleSql, eq, isNotNull, isNull } from 'drizzle-orm';
+import {
+  and,
+  sql as drizzleSql,
+  eq,
+  gt,
+  isNotNull,
+  isNull,
+  or,
+} from 'drizzle-orm';
 import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { sanitizeCacheTags } from '@/lib/cache/tags';
@@ -264,6 +272,14 @@ function attachCanonicalCredits(
         skippedFeaturedNames: reconciled.mismatch.skippedFeaturedNames,
       }
     );
+  }
+
+  if (reconciled.idConflicts && reconciled.idConflicts.length > 0) {
+    logger.info('Release credit provider id conflict collapsed by name', {
+      entityType: context.entityType,
+      entityId: context.entityId,
+      conflicts: reconciled.idConflicts,
+    });
   }
 
   const primaryArtists = toSmartLinkPrimaryEntries(reconciled.primaryArtists);
@@ -878,9 +894,12 @@ function rehydrateContent(
 }
 
 /**
- * Soft presence check for an entity that exists but is not public-eligible yet.
- * Used to convert 404s into alerts opt-in (JOV-3682). Does not leak draft
- * status beyond title + existence; deleted rows still resolve to null.
+ * Soft presence check for a genuinely upcoming release: a non-deleted row that
+ * is not public-eligible yet AND has a future release or reveal date. Used to
+ * convert 404s into alerts opt-in (JOV-3682). Orphans (drafts, past-dated rows
+ * that never became eligible, stale duplicates) resolve to null so the route
+ * returns a real 404 instead of a misleading "Coming soon" page. Does not leak
+ * draft status beyond title + existence; deleted rows resolve to null.
  */
 export async function getUnpublishedReleasePresence(
   creatorProfileId: string,
@@ -898,7 +917,11 @@ export async function getUnpublishedReleasePresence(
         and(
           eq(discogReleases.creatorProfileId, creatorProfileId),
           eq(discogReleases.slug, slug),
-          isNull(discogReleases.deletedAt)
+          isNull(discogReleases.deletedAt),
+          or(
+            gt(discogReleases.releaseDate, drizzleSql`NOW()`),
+            gt(discogReleases.revealDate, drizzleSql`NOW()`)
+          )
         )
       )
       .limit(1);

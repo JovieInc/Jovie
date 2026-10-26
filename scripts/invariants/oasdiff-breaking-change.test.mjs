@@ -1,5 +1,13 @@
 import assert from 'node:assert/strict';
-import { existsSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
@@ -14,6 +22,7 @@ import {
   readApiBreakingMarker,
   renderBaseSpec,
   renderSpecAt,
+  runOasdiff,
   SPEC_SOURCE_RE,
   specSourcesChanged,
 } from './oasdiff-breaking-change.mjs';
@@ -285,6 +294,36 @@ test('guard-file changes trigger the HEAD self-check path', () => {
   assert.equal(result.code, 0);
   assert.equal(seenBaseRef, 'HEAD');
   assert.match(emitted.join('\n'), /self-check/);
+});
+
+test('githubactions breaking invocation does not pass --color', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-args-'));
+  const bin = join(dir, 'oasdiff');
+  const argsFile = join(dir, 'args');
+  writeFileSync(
+    bin,
+    `#!/usr/bin/env node
+import { writeFileSync } from 'node:fs';
+writeFileSync(${JSON.stringify(argsFile)}, process.argv.slice(2).join('\\n'));
+`
+  );
+  chmodSync(bin, 0o755);
+  try {
+    const result = runOasdiff(bin, 'base.json', 'revision.json');
+    assert.equal(result.code, 0);
+    assert.equal(result.stderr, '');
+    assert.deepEqual(readFileSync(argsFile, 'utf8').split('\n'), [
+      'breaking',
+      'base.json',
+      'revision.json',
+      '-f',
+      'githubactions',
+      '--fail-on',
+      'ERR',
+    ]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('the pinned oasdiff release is exact and sha-verified', () => {

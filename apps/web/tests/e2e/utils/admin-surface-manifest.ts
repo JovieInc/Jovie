@@ -61,6 +61,15 @@ function getRedirectName(path: string): string {
 
 const renderSurfaces = [
   {
+    id: 'inbox',
+    name: 'Admin Inbox',
+    path: APP_ROUTES.ADMIN_INBOX,
+    rootTestId: 'founder-inbox-page',
+    snapshotSlug: 'admin-inbox',
+    utilityRoot: false,
+    includeInFastHealth: true,
+  },
+  {
     id: 'home',
     name: 'Admin Home',
     path: APP_ROUTES.ADMIN_NOW,
@@ -88,8 +97,26 @@ const renderSurfaces = [
     includeInFastHealth: true,
   },
   {
+    id: 'shipping',
+    name: 'Admin Shipping',
+    path: APP_ROUTES.ADMIN_SHIPPING,
+    rootTestId: 'ovie-shipping-page',
+    snapshotSlug: 'admin-shipping',
+    utilityRoot: false,
+    includeInFastHealth: false,
+  },
+  {
+    id: 'costs',
+    name: 'Admin Capacity',
+    path: APP_ROUTES.ADMIN_COSTS,
+    rootTestId: 'admin-costs-page',
+    snapshotSlug: 'admin-costs',
+    utilityRoot: false,
+    includeInFastHealth: false,
+  },
+  {
     id: 'operations',
-    name: 'Admin Operations',
+    name: 'Admin Fleet',
     path: APP_ROUTES.ADMIN_OPERATIONS,
     rootTestId: 'founder-operations-page',
     snapshotSlug: 'admin-operations',

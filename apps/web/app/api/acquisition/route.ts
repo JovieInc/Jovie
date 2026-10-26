@@ -14,6 +14,9 @@ import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 
 export const runtime = 'nodejs';
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const captureSchema = z.object({
   action: z.literal('capture').optional(),
   acquisitionId: z.string().uuid(),
@@ -78,7 +81,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ recorded: true, linked: false });
   }
 
+  // `getCachedAuth().userId` is the app `users.id` UUID, not the Better Auth
+  // id. Matching it against `users.better_auth_user_id` linked 0 of 28,156
+  // production journeys in 30 days, so the sign-in stage always read 0.
   const { userId: authUserId } = await getCachedAuth();
+  const appUserId =
+    typeof authUserId === 'string' && UUID_PATTERN.test(authUserId)
+      ? authUserId
+      : null;
   // Agent fields never come from a request body or unsigned query parameters.
   const acquisitionId = signed?.id ?? parsed.data.acquisitionId;
   const capturedAt = signed
@@ -91,7 +101,7 @@ export async function POST(request: NextRequest) {
   await db.execute(drizzleSql`
     WITH app_user AS (
       SELECT id FROM users
-      WHERE better_auth_user_id = ${authUserId ?? ''}
+      WHERE id = ${appUserId}::uuid
       LIMIT 1
     ), upserted AS (
       INSERT INTO acquisition_journeys (
@@ -138,7 +148,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     recorded: true,
-    linked: Boolean(authUserId),
+    linked: appUserId !== null,
     acquisitionId,
   });
 }

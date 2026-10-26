@@ -35,14 +35,13 @@ function renderStep(
 }
 
 describe('OnboardingHandleStep keyboard focus', () => {
-  it('uses the field frame for input focus and keeps submit reachable by keyboard', async () => {
+  it('gives the input its own ring focus and keeps submit reachable by keyboard', async () => {
     const { onSubmit } = renderStep();
     const user = userEvent.setup();
     await user.tab();
     const input = screen.getByRole('textbox', { name: 'Claim Your Handle' });
     expect(input).toHaveFocus();
-    expect(input.closest('.focus-field-inset')).not.toBeNull();
-    expect(input).not.toHaveClass('focus-ring-themed');
+    expect(input).toHaveClass('focus-ring-themed');
 
     await user.tab();
     const submit = screen.getByTestId('onboarding-handle-submit');
@@ -62,7 +61,7 @@ describe('OnboardingHandleStep keyboard focus', () => {
     const input = screen.getByRole('textbox', { name: 'Claim Your Handle' });
     expect(input).toHaveFocus();
     expect(input).toHaveAttribute('aria-invalid', 'true');
-    expect(input.closest('.focus-field-inset')).not.toBeNull();
+    expect(input).toHaveClass('focus-ring-themed');
     expect(screen.getByTestId('handle-unavailable')).toHaveTextContent(
       'That handle is unavailable'
     );

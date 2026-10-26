@@ -46,7 +46,6 @@ vi.mock('@/components/shell/RuntimeUpdateProvider', () => ({
 const mutateMock = vi.fn();
 const refreshMock = vi.fn();
 const mutateAsyncMock = vi.fn().mockResolvedValue({ ok: true });
-let inboxHomeEnabled = false;
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/app',
@@ -56,10 +55,6 @@ vi.mock('next/navigation', () => ({
     prefetch: vi.fn(),
     refresh: refreshMock,
   }),
-}));
-
-vi.mock('@/lib/flags/client', () => ({
-  useAppFlag: () => inboxHomeEnabled,
 }));
 
 vi.mock('@/lib/founder-review/client', () => ({
@@ -197,7 +192,7 @@ const pendingTourDate = {
 describe('OpportunityInboxPageClient', () => {
   afterEach(() => {
     runtimeState.update = null;
-    inboxHomeEnabled = false;
+
     mutateMock.mockReset();
     mutateAsyncMock.mockReset();
     mutateAsyncMock.mockResolvedValue({ ok: true });
@@ -366,7 +361,6 @@ describe('OpportunityInboxPageClient', () => {
   });
 
   it('keeps unavailable creator inboxes distinct from a healthy empty state', () => {
-    inboxHomeEnabled = true;
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -447,7 +441,70 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.getByTestId('opportunity-inbox-content')).toHaveClass(
       'system-b-opportunity-inbox-page'
     );
-    expect(screen.getByRole('textbox', { name: 'Notes' })).toBeVisible();
+    expect(screen.getByRole('toolbar', { name: 'Inbox View' })).toHaveClass(
+      'justify-center'
+    );
+    expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add Notes' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
+  it('discloses empty notes by keyboard and restores focus on Escape', async () => {
+    const user = userEvent.setup();
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          availability: HEALTHY_AVAILABILITY,
+          emptyActionCards: [],
+        }}
+      />
+    );
+    const addNotes = screen.getByRole('button', { name: 'Add Notes' });
+    addNotes.focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Hide Notes' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    const field = screen.getByRole('textbox', { name: 'Notes' });
+    expect(field).toBeVisible();
+    await user.click(field);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add Notes' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Add Notes' }));
+    await user.click(screen.getByRole('button', { name: 'Hide Notes' }));
+    expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
+  });
+
+  it('keeps entered notes visible through view switches and allows hiding after clearing', async () => {
+    const user = userEvent.setup();
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          availability: HEALTHY_AVAILABILITY,
+          emptyActionCards: [],
+        }}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Add Notes' }));
+    const field = screen.getByRole('textbox', { name: 'Notes' });
+    await user.type(field, 'Review this tomorrow');
+    expect(screen.queryByRole('button', { name: 'Hide Notes' })).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(field).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Done For You' }));
+    expect(field).toHaveValue('Review this tomorrow');
+    expect(field).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Needs You' }));
+    expect(field).toHaveValue('Review this tomorrow');
+    await user.clear(field);
+    await user.click(screen.getByRole('button', { name: 'Hide Notes' }));
+    expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
   });
 
   it('renders the inbox feed when cards are present', () => {
@@ -474,7 +531,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    expect(screen.getByTestId('opportunity-inbox-feed')).toBeInTheDocument();
+    expect(screen.getByTestId('opportunity-card-stack')).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Inbox' })).toBeNull();
     expect(
       screen.queryByText('Pending opportunities, ready to accept or dismiss.')
@@ -799,7 +856,7 @@ describe('OpportunityInboxPageClient', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Plan Opportunity/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Review pitch' }));
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
@@ -807,7 +864,6 @@ describe('OpportunityInboxPageClient', () => {
 
   it('returns focus to the active filter after clearing its stack', async () => {
     const user = userEvent.setup();
-    inboxHomeEnabled = true;
 
     render(
       <OpportunityInboxPageClient
@@ -866,7 +922,6 @@ describe('OpportunityInboxPageClient', () => {
           apply: vi.fn(),
         };
       const user = userEvent.setup();
-      inboxHomeEnabled = true;
 
       render(
         <OpportunityInboxPageClient
@@ -909,7 +964,7 @@ describe('OpportunityInboxPageClient', () => {
 
   it('returns focus to recovery after completing the last report next step', async () => {
     const user = userEvent.setup();
-    inboxHomeEnabled = true;
+
     mutateMock.mockImplementation((_id, options) => {
       options?.onSuccess?.();
     });
@@ -962,7 +1017,7 @@ describe('OpportunityInboxPageClient', () => {
 
   it('does not restore stack focus after a failed report next step', async () => {
     const user = userEvent.setup();
-    inboxHomeEnabled = true;
+
     mutateMock.mockImplementation((_id, options) => {
       options?.onError?.();
     });
@@ -1018,7 +1073,7 @@ describe('OpportunityInboxPageClient', () => {
     'does not restore stack focus after a failed %s action',
     async key => {
       const user = userEvent.setup();
-      inboxHomeEnabled = true;
+
       mutateMock.mockImplementation((_id, options) => {
         options?.onError?.();
       });
@@ -1066,7 +1121,7 @@ describe('OpportunityInboxPageClient', () => {
 
   it('returns focus to a queue item restored after an asynchronous failure', async () => {
     const user = userEvent.setup();
-    inboxHomeEnabled = true;
+
     let rejectAction: (() => void) | undefined;
     mutateMock.mockImplementationOnce((_id, options) => {
       rejectAction = () => options?.onError?.(new Error('decision failed'));
@@ -1219,8 +1274,7 @@ describe('OpportunityInboxPageClient', () => {
 });
 
 describe('creator-only empty home', () => {
-  it('never offers founder capture when Inbox Home is enabled', () => {
-    inboxHomeEnabled = true;
+  it('never offers founder capture in the supported creator inbox', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{

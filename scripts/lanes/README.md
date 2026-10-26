@@ -49,7 +49,7 @@ The harness, not the model, owns:
 | Disabled-lane drafts: adopted for bounded repair; provider state, issue completion and exhausted attempts never authorize closing unlabelled work | `pr_events.retire_orphan()`, `return_to_pool()` |
 | Held and failed records carry `reason` + `next_action`; the status feed publishes `held_by_reason` | `pr_events.held_reason()`, `doctor.status_feed()` |
 | Garbage collection of crashed worktrees | `prune_worktrees()` |
-| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `refs/jovie-preserved/sweep/<host>/<name>-<date>` first (a non-branch ref: no Actions or Vercel build), else only build output is stripped. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
+| Worktree retirement (JOV-7704): the tick spawns one sweep per hour (10 min under 15% free, and even when disk admission fails) over lanes, Codex, Conductor, Claude-scratch and `jovie-wt-*` checkouts. A checkout retires when its PR closed (1h grace) or after 12h idle; preserved repairs expire on PR close or after 3 days. Live-process paths are never touched; dirty or unpushed work is pushed to `refs/jovie-preserved/sweep/<host>/<name>-<date>-<snapshot>` first (a non-branch ref: no Actions or Vercel build); existing backup refs are immutable and push hooks run. A snapshot that is not proven secret-free is not published and the checkout stays untouched. A failed backup keeps the checkout and strips only build output. Primary clones, bare mirrors, `~/.cache` and the pnpm store are out of scope | `worktree_sweep.py`, `dispatch()` |
 | Disk admission on the tick and before installs: critical (at or below 5%) or unknown free space blocks work. Only a worker holding a slot may sweep under 15%, under one host-wide cleanup lock; cleanup preserves the shared pnpm store, unrelated checkouts and cancelled repair source. The same sweep also removes transient `_work` output of runners with no `Runner.Worker` running, retires idle Symphony workspaces on a low filesystem (never through a mount; dirty or unpushed work is pushed to a backup branch first, else only build output goes) and lane logs idle 14 days | `disk_guard.py`, `dispatch()`, `worker()` |
 | Adaptive slots (default on, every tick, measured limits only; kill switch `SYMPHONY_AUTOSCALE=0`) | `autoscale.decide()`, `dispatch()` |
 | Drain-safe self-update from `origin/main` after the release's own tests pass | `update()` |
@@ -63,20 +63,25 @@ The harness, not the model, owns:
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
-Execution receipts retain `jovie-execution-attempt/v1`. The default production and CLI
-writer still emits legacy numeric status chains; self-update cannot activate the new
-wire format. `IMMUTABLE_WRITER_ENABLED` is checked in as false, with no environment or
-caller override. The upgraded reader also validates candidate-linked receipts, while
-a disabled writer refuses to extend them. Enabling the writer requires a separately
-reviewed source change after every participating reader and writer is drained, updated
-and verified ready; JOV-8293 remains open for that activation and runtime outcome.
+Execution receipts retain `jovie-execution-attempt/v1`. The production and CLI writer
+now emits the candidate-linked immutable wire format (JOV-8293 enablement), with no
+environment or caller override; the dual reader still validates legacy numeric
+chains, while an un-updated writer refuses to extend candidate-linked reservations.
 Enabled recovery reserves an existing `failed_unknown` disposition before projecting
 an unknown boundary, so helper crashes and repeated retries remain held. Boundary IDs
 bind existing dispatch, handoff, repair and adoption phases within the original fence;
 duplicate or changed-cost reuse is held, and distinct intended phases charge normally.
 Legacy common-source-SHA reservations have no owner proof and remain held for
-authoritative reconciliation. Source merge is preparatory and does not repair or
-certify the running coordinator.
+authoritative reconciliation. Source merge is preparatory; the exact installed
+runtime generation still needs its own interrupted-reservation outcome receipts.
+
+PR repair selection captures one qualified bulk inventory outside the global claim lock,
+using the existing per-key cache lock. Current local preservation and attempt state,
+fresh selected-head/foreign-owner checks and atomic charging remain inside. Unknown or
+expired initial repair evidence defers before new-issue fallback; remote-only lanes retain
+their original path. New-issue and sweep reads, brief effects and selected-owner latency
+remain separate lock/continuity work under JOV-8371; this source change does not attest an
+installed release or measured live throughput recovery.
 
 Event-driven: a worker that finishes re-execs the current release and pulls the next
 issue. The minute timer only restarts idle lanes and applies updates; it never signals a
@@ -544,6 +549,12 @@ does not retain a removed runtime directory.
 Per-host knobs: `LANES_SLOTS_<PROVIDER>`, `LANES_LINEAR_ENV`, `LANES_AGENT_TIMEOUT_S`,
 `LANES_GATE_TIMEOUT_S`, `LANES_GATE_SLOTS`. A host-specific GitHub token in
 `~/.config/jovie-lanes/github.env` (`GH_TOKEN=...`) gives that host its own API budget.
+Delivery retries are bounded by one knob, `LANES_EVENT_DELIVERY_MAX_ATTEMPTS` (default 3,
+hard-capped at 10): every remediation delivery either gains an authoritative readback or ends
+as a reported `exhausted` row — never silent, never unbounded. A tick that dies mid-run leaves
+a `tick-in-flight.json` marker; the next tick reports `uncleanPreviousRun` and refunds the
+fix-attempt charges stranded with no verdict (and infra-class no-work stops — unreadable
+target, failed checkout — requeue with the capped handoff backoff instead of re-claiming).
 With the Jovie Bot key, every `gh` call (workers, doctor, reconcile, agents) passes the shim's
 shared budget guard: below `JOVIE_GITHUB_FLOOR` (600) GraphQL points, read-only polling exits 75
 until GitHub's reset while writes still go through; the budget is re-read at most once a minute.
@@ -839,6 +850,33 @@ MusicFetch.
 (state, issue, class, lane, and the exact ask). A surfaced PR that is still open raises
 alert `escalation-surfaced` for the lanes repair owner (never a human by default); PRs
 that merged or closed drop out once the reconcile pass has a complete open-PR view.
+
+## Fleet work ledger (`fleet_ledger.py`)
+
+One read-only view of every claim (lanes run leases, repo-binding issue locks, the claim ledger and
+external-agent claims in `fleet-claims/`), each with a verdict: `live`, `starting`, `stranded`
+(active, no live lease for 3 h) or `expired` (external claim silent past its ttl). Non-lane agents
+(Lola, Hyperagent threads, Summer) take work with `fleet_ledger.py claim JOV-1 --agent lola --ttl 1800`,
+renew with `heartbeat`, and drop it with `release`; anyone checking `external_active` ignores an
+expired claim. `metrics` reports duplicate overlapping runs, overnight (00-08 UTC) vs day
+throughput and the factory share of issue runs (floor 20 %). `ownership.reconcile` also releases
+repo-binding claims whose binding issue lock is no longer held.
+
+Also in the same module and companions:
+
+- Lanes skip any issue under an unexpired external claim (`held_back_issues`); the doctor raises
+  `stranded-claims` and records one `fleet-ready.jsonl` row per pass, so `metrics` reports
+  `idleWhileReady` (allowed seat free while work waited) and `throttledMin` (autoscaler cut seats).
+- `fleet_ledger.py gates`: human-gated issues must carry `Default:` and `Deadline:` lines; they park
+  (lanes skip them), come due, or are `unbounded` (a gate that can block forever).
+- `fleet_ledger.py burn` reads `quota-windows.json` and ranks capped agents by how far behind their
+  reset window they are, so quota is spent before it resets.
+- `factory_intake.py`: `state/factory-signals/*.json` (`jovie-factory-signal/v1`: fingerprint, problem,
+  acceptance, metric) become Todo issues labelled `factory`, `ws:symphony-throughput` and
+  `factory-fp:<fp>` on each doctor pass (max 3, deduped by the label). Done means the metric moved.
+- `codex_delegate.py --agent dots -- codex exec ...`: agents that delegate to Codex take a
+  `slots/codex.N` seat under the lanes' admission lock and cap (exit 75 if none) and are logged per
+  agent in `runs/delegations.jsonl`.
 
 ## Tests
 

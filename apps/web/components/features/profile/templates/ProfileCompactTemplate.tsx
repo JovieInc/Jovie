@@ -363,6 +363,10 @@ export function ProfileCompactTemplate({
   const initialLocationModeAlignedRef = useRef(false);
   const suppressNextHistorySyncRef = useRef(true);
   const arrivalHistoryLengthRef = useRef<number | null>(null);
+  // The pathname this document mounted on. Render fixtures mount this
+  // template on their own pathname; user-initiated mode activation from
+  // there stays sanctioned.
+  const mountedPathnameRef = useRef<string | null>(null);
   const profileHistoryDepthRef = useRef(0);
   // The mode this document landed with. Filled in by the effect below, before
   // the history effect, while the landing URL is still intact. Next's history
@@ -391,6 +395,7 @@ export function ProfileCompactTemplate({
 
   useEffect(() => {
     arrivalHistoryLengthRef.current = globalThis.history.length;
+    mountedPathnameRef.current = globalThis.location.pathname;
     profileHistoryDepthRef.current = readPublicProfileHistoryDepth(
       globalThis.history.state
     );
@@ -638,14 +643,14 @@ export function ProfileCompactTemplate({
 
   const syncRequestedModeFromLocation = useCallback(
     (fallbackMode = mode) => {
-      setRequestedMode(currentMode => {
-        const nextMode = getInitialModeFromLocation(fallbackMode, true);
-        if (currentMode !== nextMode) {
-          suppressNextHistorySyncRef.current = true;
-          initialLocationModeAlignedRef.current = false;
-        }
-        return nextMode;
-      });
+      const nextMode = getInitialModeFromLocation(fallbackMode, true);
+      // React may replay a state updater after the alignment effect commits.
+      // Keep history guards outside that replay using the committed mode.
+      if (lastSyncedModeRef.current !== nextMode) {
+        suppressNextHistorySyncRef.current = true;
+        initialLocationModeAlignedRef.current = false;
+      }
+      setRequestedMode(nextMode);
     },
     [mode]
   );
@@ -801,6 +806,20 @@ export function ProfileCompactTemplate({
         ? getProfileModeHref(artist.handle, 'profile', searchSuffix)
         : getProfileModeHref(artist.handle, activeMode, searchSuffix);
     if (currentHref === href) {
+      return;
+    }
+
+    // Durable ownership: once the document's pathname has left both this
+    // profile's root path and the pathname this template mounted on, the
+    // URL belongs to a navigation away from the surface. The in-flight
+    // guard below only defers the first run after such a move; later
+    // mode/drawer settling would still write the profile URL back over the
+    // navigation target (the open-drawer claim funnel case). The profile's
+    // own root path and the mount pathname (render fixtures) stay ours.
+    if (
+      globalThis.location.pathname !== `/${artist.handle}` &&
+      globalThis.location.pathname !== mountedPathnameRef.current
+    ) {
       return;
     }
 
@@ -1096,7 +1115,7 @@ export function ProfileCompactTemplate({
                 viewerCountryCode={resolvedViewerCountryCode}
                 visitorAssignmentResolved={visitorAssignmentResolved}
                 merchCards={merchCards}
-                hideJovieBranding={hideJovieBranding}
+                hideJovieBranding={hideJovieBranding || embeddedPreview}
                 hideMoreMenu={hideMoreMenu}
                 allowFanCapture={allowFanCapture}
                 allowSignedInEscape={!embeddedPreview}
@@ -1179,6 +1198,7 @@ export function ProfileCompactTemplate({
                   setRequestedMode(nextMode);
                 }}
                 onAlertsModalClose={() => setRequestedMode('profile')}
+                hideJovieBranding={hideJovieBranding || embeddedPreview}
                 onDrawerOpenChange={handleDrawerOpenChange}
                 onDrawerViewChange={handleDrawerViewChange}
                 onOpenMenu={() => openDrawerMode('menu')}

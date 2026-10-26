@@ -94,6 +94,31 @@ describe('OvieLauncherRail', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('names launcher buttons from their visible content (WCAG 2.5.3)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: async () => INVENTORY })
+    );
+    render(<OvieLauncherRail />);
+    await waitFor(() => {
+      expect(screen.getByTestId('ovie-launcher-gbrain')).toBeEnabled();
+    });
+
+    // The accessible name must contain the visible text: label and status
+    // are both visible spans, so the content is the name (same convention
+    // as the compact rail). No overriding aria-label on the buttons.
+    // Join-agnostic: the name comes from adjacent label + status spans,
+    // so accept either "Symphony Unavailable" or "SymphonyUnavailable".
+    for (const [id, name] of [
+      ['symphony', /symphony\s*unavailable/i],
+      ['gbrain', /gbrain\s*ready/i],
+    ] as const) {
+      const button = screen.getByTestId(`ovie-launcher-${id}`);
+      expect(button).not.toHaveAttribute('aria-label');
+      expect(button).toHaveAccessibleName(name);
+    }
+  });
+
   it('compact renders only ready primary destinations and no chrome', async () => {
     vi.stubGlobal(
       'fetch',

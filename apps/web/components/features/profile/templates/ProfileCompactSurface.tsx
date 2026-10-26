@@ -13,6 +13,9 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { ShareLinkButton } from '@/components/features/share/ShareLinkButton';
+import { FooterBranding } from '@/components/molecules/FooterBranding';
+import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type {
   ProfileMode,
@@ -345,6 +348,7 @@ export function ProfileCompactSurface({
   dataTestId,
   hideBackButton = false,
   allowSignedInEscape = false,
+  hideJovieBranding = false,
   hideMoreMenu = false,
   headerSocialLinksOverride,
   renderInteractiveOverlays = true,
@@ -703,7 +707,23 @@ export function ProfileCompactSurface({
             {hideMoreMenu ? (
               <div className='h-11 w-11 shrink-0' aria-hidden='true' />
             ) : (
-              <div className='pointer-events-auto'>
+              <div className='pointer-events-auto flex items-center gap-2'>
+                <ShareLinkButton
+                  title={artist.name}
+                  getUrl={() => `${BASE_URL}/${artist.handle}`}
+                  ariaLabel={`Share ${artist.name}'s profile`}
+                  testId='profile-header-share'
+                  onShare={result => {
+                    track('profile_share_click', {
+                      artist_id: artist.id,
+                      profile_id: artist.id,
+                      profile_slug: artist.handle,
+                      handle: artist.handle,
+                      source: 'header',
+                      result,
+                    });
+                  }}
+                />
                 <CircleIconButton
                   onClick={onOpenMenu}
                   size='lg'
@@ -863,6 +883,22 @@ export function ProfileCompactSurface({
                 modeCardAccents={modeCardAccents}
               />
             )}
+            {!hideJovieBranding && renderMode !== 'preview' ? (
+              /* JOV-8777: free public profiles carry the Jovie mark so the
+                 free tier has real branding for the paid removal upgrade to
+                 take away. Opt-outs (previews, demos) pass hideJovieBranding. */
+              <div
+                className='flex justify-center pb-4 pt-2'
+                data-testid='profile-jovie-branding'
+              >
+                <FooterBranding
+                  artistHandle={artist.handle}
+                  variant='linear'
+                  showCTA={false}
+                  size='sm'
+                />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -882,6 +918,7 @@ export function ProfileCompactSurface({
                   <ProofClaimCtaLink
                     href={proofClaimCta.href}
                     label={proofClaimCta.label}
+                    ariaLabel={`jov.ie/you ${proofClaimCta.label}`}
                     testId='profile-proof-claim-bar-cta'
                     className='flex h-11 w-full items-center justify-between rounded-full border border-(--profile-dock-border) bg-(--profile-dock-solid-bg) px-4 text-sm font-medium text-white/88 transition-colors duration-subtle hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70'
                   >

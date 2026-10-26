@@ -38,6 +38,12 @@ describe('HeaderSearchSurfaceFromContext', () => {
 
     expect(screen.getByText('Search')).toBeVisible();
     expect(screen.queryByText('Search chats')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Search Jovie' })).toHaveClass(
+      'h-(--app-shell-sidebar-row-height)',
+      'px-(--app-shell-sidebar-inset)',
+      'gap-x-(--app-shell-sidebar-icon-gap)',
+      'grid-cols-(--app-shell-sidebar-nav-grid)'
+    );
   });
 
   it('opens and closes the existing shared search from the compact icon by keyboard', async () => {
