@@ -180,7 +180,7 @@ describe('outbound claim link, composed', () => {
     const selectable = await db()
       .select({ id: leads.id })
       .from(leads)
-      .where(outreachApprovedWhere);
+      .where(outreachApprovedWhere());
     expect(selectable.map(row => row.id)).toContain(lead.id);
 
     // Follow the exact link the email carries.

@@ -69,7 +69,7 @@ function getPendingEmailWhereClause(now = new Date()) {
   return and(
     or(eq(leads.outreachRoute, 'email'), eq(leads.outreachRoute, 'both')),
     eq(leads.outreachStatus, 'pending'),
-    outreachApprovedWhere,
+    outreachApprovedWhere(),
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),

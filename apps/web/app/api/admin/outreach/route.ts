@@ -92,7 +92,7 @@ function getPendingEmailWhereClause(
   return and(
     getOutreachRouteWhereClause('email'),
     eq(leads.outreachStatus, 'pending'),
-    outreachApprovedWhere,
+    outreachApprovedWhere(),
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),

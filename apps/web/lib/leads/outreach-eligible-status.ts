@@ -1,4 +1,4 @@
-import { and, inArray, isNotNull } from 'drizzle-orm';
+import { and, eq, isNotNull, or } from 'drizzle-orm';
 import { leads } from '@/lib/db/schema/leads';
 
 /**
@@ -6,8 +6,11 @@ import { leads } from '@/lib/db/schema/leads';
  * has since been ingested. Ingestion advances `status` to `ingested` after
  * approval, so selecting `status = 'approved'` alone made every ingested lead
  * unreachable. `approvedAt` proves the lead passed the approval step.
+ * A function, so the predicate is built where it is used.
  */
-export const outreachApprovedWhere = and(
-  inArray(leads.status, ['approved', 'ingested']),
-  isNotNull(leads.approvedAt)
-);
+export function outreachApprovedWhere() {
+  return and(
+    or(eq(leads.status, 'approved'), eq(leads.status, 'ingested')),
+    isNotNull(leads.approvedAt)
+  );
+}
