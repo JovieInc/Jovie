@@ -8,7 +8,6 @@ import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 export const metadata: Metadata = { title: 'Capacity | Ovie' };
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 interface CapacityPageProps {
   readonly searchParams?: Promise<
