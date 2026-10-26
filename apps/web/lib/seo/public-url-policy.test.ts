@@ -53,19 +53,40 @@ describe('public URL policy (GSC recovery)', () => {
     });
   });
 
-  it('leaves /product Design Ready and does not reserve /product or /you', () => {
+  it('redirects /product to / and still does not reserve /product or /you', () => {
     expect(getPublicUrlPolicyEntry('/product')).toMatchObject({
-      action: 'shipping',
-      owner: 'web',
+      action: 'redirect',
+      destination: APP_ROUTES.HOME,
+      status: 308,
     });
-    expect(getPublicUrlPolicyEntry('/product')).not.toHaveProperty(
-      'destination'
-    );
     expect(isReservedUsername('product')).toBe(false);
     expect(isReservedUsername('you')).toBe(false);
     expect(getGoneReservedHandles()).toEqual(['music', 'shows']);
     for (const handle of getGoneReservedHandles()) {
       expect(isReservedUsername(handle)).toBe(true);
+    }
+  });
+
+  it('308s the phase-1 IA duplicates to the page that owns their job', () => {
+    const expected: Record<string, string> = {
+      '/new': '/',
+      '/product': '/',
+      '/solutions/artists': '/artist-profiles',
+      '/launch': '/smart-links',
+      '/product/link-analytics': '/smart-links',
+      '/product/utm-links': '/smart-links',
+      '/product/dsp-links': '/smart-links',
+      '/product/isrc': '/smart-links',
+      '/product/pre-save': '/smart-links',
+      '/product/release-scheduling': '/artist-profiles',
+      '/product/command-palette': '/',
+    };
+    for (const [path, destination] of Object.entries(expected)) {
+      expect(getPublicUrlPolicyEntry(path), path).toMatchObject({
+        action: 'redirect',
+        destination,
+        status: 308,
+      });
     }
   });
 
@@ -80,7 +101,7 @@ describe('public URL policy (GSC recovery)', () => {
         '/shows',
       ])
     );
-    expect(excluded).not.toContain('/product');
+    expect(excluded).toContain('/product');
     expect(excluded).not.toContain('/you');
     expect(excluded).not.toContain(APP_ROUTES.LEGAL_PRIVACY);
   });

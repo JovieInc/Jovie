@@ -33,25 +33,25 @@ export const ABOUT_COPY = {
   features: [
     {
       title: 'Living Profile',
-      href: APP_ROUTES.PRODUCT,
+      href: APP_ROUTES.ARTIST_PROFILES,
       description:
         'Your work, links, and story in one place people can actually find.',
     },
     {
       title: 'Relationships',
-      href: APP_ROUTES.PRODUCT,
+      href: APP_ROUTES.ARTIST_PROFILES,
       description:
         'Give each person a clear way to follow, subscribe, listen, buy, book, or reach out.',
     },
     {
       title: 'Audience',
-      href: APP_ROUTES.PRODUCT,
+      href: APP_ROUTES.ARTIST_PROFILES,
       description:
         'See who is paying attention, what brought them, and what they may want next.',
     },
     {
       title: 'Adaptive',
-      href: APP_ROUTES.PRODUCT,
+      href: APP_ROUTES.ARTIST_PROFILES,
       description:
         'Jovie adapts to your work without reducing you to a category.',
     },
@@ -60,13 +60,6 @@ export const ABOUT_COPY = {
       href: APP_ROUTES.ARTIST_PROFILES,
       description:
         'Smart links, release notifications, and catalog tools when the work is music.',
-    },
-    {
-      title: 'Payments',
-      href: APP_ROUTES.PAY,
-      description:
-        // ui-casing-allow: feature list copy with brand name
-        'Let people tip you directly through your profile or a QR code, with payments handled by Stripe.',
     },
   ],
 } as const;

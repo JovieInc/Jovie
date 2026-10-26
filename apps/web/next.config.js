@@ -583,9 +583,47 @@ const nextConfig = {
       // not found").
       {
         source: '/solutions',
-        destination: '/solutions/artists',
+        destination: '/artist-profiles',
         permanent: true,
       },
+      // Marketing IA consolidation (phase 1, 2026-10-25). Each duplicate or
+      // thin page 308s to the page that now owns its job. Keep in step with
+      // PUBLIC_URL_POLICY (lib/seo/public-url-policy.ts); a test compares both.
+      {
+        source: '/solutions/artists',
+        destination: '/artist-profiles',
+        permanent: true,
+      },
+      { source: '/new', destination: '/', permanent: true },
+      { source: '/product', destination: '/', permanent: true },
+      { source: '/launch', destination: '/smart-links', permanent: true },
+      {
+        source: '/product/link-analytics',
+        destination: '/smart-links',
+        permanent: true,
+      },
+      {
+        source: '/product/utm-links',
+        destination: '/smart-links',
+        permanent: true,
+      },
+      {
+        source: '/product/dsp-links',
+        destination: '/smart-links',
+        permanent: true,
+      },
+      { source: '/product/isrc', destination: '/smart-links', permanent: true },
+      {
+        source: '/product/pre-save',
+        destination: '/smart-links',
+        permanent: true,
+      },
+      {
+        source: '/product/release-scheduling',
+        destination: '/artist-profiles',
+        permanent: true,
+      },
+      { source: '/product/command-palette', destination: '/', permanent: true },
       {
         source: '/engagement-engine',
         destination: '/artist-notifications',

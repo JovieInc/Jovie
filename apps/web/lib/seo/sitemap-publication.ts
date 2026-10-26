@@ -220,6 +220,11 @@ export function collectSitemapInventoryViolations(
     if (getSitemapExcludedPublicPaths().includes(path)) {
       violations.push(`non-indexable public url: ${path}`);
     }
+    // Capability gate: a path bound to a capability that is not generally
+    // available (or not public) must never be listed, whatever generator emitted it.
+    if (!isIndexableCapabilityPath(path)) {
+      violations.push(`non-GA capability url: ${path}`);
+    }
     if (AUTH_PRIVATE_PATHS.has(path) || isRenderFixturePathname(path)) {
       violations.push(`private or fixture url included: ${path}`);
     }

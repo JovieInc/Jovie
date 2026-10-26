@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { YOUTUBE_THUMBNAILS_COPY } from '@/data/youtubeThumbnailsCopy';
+import { robotsForRoute } from '@/lib/marketing/route-publication-policy';
 import { YoutubeThumbnailsLanding } from './YoutubeThumbnailsLanding';
 import './youtube-thumbnails.css';
 
@@ -11,6 +12,7 @@ const PAGE_URL = `${BASE_URL}${APP_ROUTES.YOUTUBE_THUMBNAILS}`;
 const PAGE_TITLE = `${YOUTUBE_THUMBNAILS_COPY.seo.title} | ${APP_NAME}`;
 
 export const metadata: Metadata = {
+  robots: robotsForRoute('/youtube-thumbnails'),
   title: YOUTUBE_THUMBNAILS_COPY.seo.title,
   description: YOUTUBE_THUMBNAILS_COPY.seo.description,
   metadataBase: new URL(BASE_URL),

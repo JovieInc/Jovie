@@ -52,11 +52,10 @@ describe('about footer refresh copy', () => {
     expect(PUBLIC_COMMERCIAL_FOOTER_LINKS.length).toBeGreaterThanOrEqual(4);
     expect(PUBLIC_COMMERCIAL_FOOTER_LINKS.length).toBeLessThanOrEqual(6);
     expect(PUBLIC_COMMERCIAL_FOOTER_LINKS.map(link => link.href)).toEqual([
-      '/product',
       '/pricing',
       '/artist-profiles',
       '/smart-links',
-      '/card',
+      '/artist-notifications',
     ]);
 
     for (const link of PUBLIC_COMMERCIAL_FOOTER_LINKS) {

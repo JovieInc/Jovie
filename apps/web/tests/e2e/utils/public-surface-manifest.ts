@@ -292,8 +292,9 @@ const MARKETING_SURFACES = [
   {
     id: 'marketing-launch',
     family: 'marketing',
-    expectedState: 'ok',
+    expectedState: 'redirect',
     path: APP_ROUTES.LAUNCH,
+    expectedRedirects: [/^\/smart-links$/],
     readySelectors: ['h1', 'main'],
     mainSelector: 'main',
     minMainTextLength: 120,

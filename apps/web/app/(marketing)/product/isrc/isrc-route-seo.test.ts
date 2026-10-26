@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import {
   getPublicProfileCandidate,
@@ -11,28 +10,22 @@ import {
 } from '@/lib/seo/sitemap-publication';
 
 describe('/product/isrc marketing route', () => {
-  it('ships as a published commercial sitemap hub', () => {
-    expect(APP_ROUTES.PRODUCT_ISRC).toBe('/product/isrc');
-    expect(getExactPublishedMarketingPaths()).toContain('/product/isrc');
-    expect(getPublishedCommercialHubPaths()).toContain('/product/isrc');
+  it('is redirected out of the sitemap (phase 1 IA)', () => {
+    expect(getExactPublishedMarketingPaths()).not.toContain('/product/isrc');
+    expect(getPublishedCommercialHubPaths()).not.toContain('/product/isrc');
 
     const route = MARKETING_ROUTE_MANIFEST.find(
       entry => entry.url === '/product/isrc'
     );
     expect(route).toMatchObject({
-      status: 'active',
-      recipeId: 'feature',
-      glob: '(marketing)/product/isrc/page.tsx',
+      status: 'deprecated',
+      aliasOf: '/smart-links',
+      noindex: true,
     });
-    expect(route?.noindex).toBeUndefined();
-    expect(route?.aliasOf).toBeUndefined();
     expect(route?.healthCheck).toMatchObject({
       path: '/product/isrc',
-      expected: 'page',
-    });
-    expect(route?.productEvidence).toMatchObject({
-      kind: 'interactive-mockup',
-      testId: 'isrc-editor',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
     });
   });
 

@@ -40,12 +40,13 @@ describe('public marketing navigation', () => {
     expect(labels).not.toContain('Pitch');
   });
 
-  it('links the AI public brief from the Resources footer', () => {
+  it('keeps the unlisted AI brief out of the Resources footer', () => {
     const resources = MARKETING_FOOTER_COLUMNS.find(
       column => column.title === 'Resources'
     );
 
-    expect(resources?.links).toContainEqual({
+    // /ai is unlisted (phase 1): reachable by URL, not linked.
+    expect(resources?.links).not.toContainEqual({
       href: '/ai',
       label: 'AI Operating System',
     });
@@ -67,11 +68,9 @@ describe('public marketing navigation', () => {
       'Artist Profiles',
       'Music Smart Links',
       'Notifications',
-      'Pay',
       'Audience capture',
       'Audience reactivation',
       'Product Demo',
-      'Release System',
     ]);
     expect(MARKETING_TOOLS_FLYOUT_LINKS[0]).toMatchObject({
       label: 'Music Smart Links',
@@ -87,21 +86,18 @@ describe('public marketing navigation', () => {
       getMarketingFooterColumns(true).some(column => column.title === 'Music')
     ).toBe(false);
     expect(customers?.links.map(link => link.label)).toEqual([
-      'Artists',
       'Artist Profiles',
       'Smart Links',
       'Notifications',
-      'Pay',
       'Audience Capture',
       'Audience Reactivation',
       'Product Demo',
-      'Release System',
     ]);
     expect(customers?.links[0]).toMatchObject({
-      href: '/solutions/artists',
-      label: 'Artists',
+      href: '/artist-profiles',
+      label: 'Artist Profiles',
     });
-    expect(customers?.links[2]?.href).toBe('/smart-links');
+    expect(customers?.links[1]?.href).toBe('/smart-links');
     expect(
       customers?.links.find(link => link.label === 'Audience Capture')?.href
     ).toBe('/artist-profiles#capture-every-fan');
@@ -130,12 +126,12 @@ describe('public marketing navigation', () => {
     ).toBe(false);
   });
 
-  it('links the engineering publication from the footer', () => {
+  it('keeps the empty engineering index out of the footer', () => {
     const hrefs = MARKETING_FOOTER_COLUMNS.flatMap(column =>
       column.links.map(link => link.href)
     );
 
-    expect(hrefs).toContain('/engineering');
+    expect(hrefs).not.toContain('/engineering');
     expect(hrefs).not.toContain('/engineering/preview');
   });
 });

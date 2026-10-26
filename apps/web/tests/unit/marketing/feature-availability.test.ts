@@ -89,9 +89,10 @@ describe('feature availability contract — distinct decisions', () => {
       access: 'interest_capture',
       accessLabel: 'Planned — join the list.',
     });
-    // Published and indexable while the feature itself is unavailable.
+    // Published while the feature itself is unavailable, but never indexable:
+    // phase 1 (2026-10-25) indexes generally available capabilities only.
     expect(isPublicationPermitted(demandValidation)).toBe(true);
-    expect(isCapabilityIndexable(demandValidation)).toBe(true);
+    expect(isCapabilityIndexable(demandValidation)).toBe(false);
     expect(isFeatureUsable(demandValidation)).toBe(false);
     expect(isCapabilityPurchasable(demandValidation)).toBe(false);
     expect(describeFeatureAccess(demandValidation)).toBe(
@@ -99,11 +100,24 @@ describe('feature availability contract — distinct decisions', () => {
     );
   });
 
-  it('unlisted publication is renderable but not indexable', () => {
+  it('unlisted publication is renderable but neither indexable nor navigable', () => {
     const r = record({ publication: 'unlisted' });
     expect(isPublicationPermitted(r)).toBe(true);
     expect(isCapabilityIndexable(r)).toBe(false);
-    expect(isCapabilityNavigable(r)).toBe(true);
+    expect(isCapabilityNavigable(r)).toBe(false);
+  });
+
+  it('only generally available public capabilities are indexable', () => {
+    for (const maturity of [
+      'proposed',
+      'limited_testing',
+      'public_beta',
+    ] as const) {
+      expect(isCapabilityIndexable(record({ maturity }))).toBe(false);
+    }
+    expect(
+      isCapabilityIndexable(record({ maturity: 'general_availability' }))
+    ).toBe(true);
   });
 
   it('internal_only never surfaces publicly', () => {
@@ -173,13 +187,14 @@ describe('route publication policy — real registry', () => {
     }
   });
 
-  it('/card is a published demand-validation page with access disabled', () => {
+  it('/card is a renderable demand-validation page, unlisted until the pass ships', () => {
     const policy = resolveMarketingRoutePolicy({
       url: '/card',
       status: 'active',
     });
     expect(policy.publishable).toBe(true);
-    expect(policy.indexable).toBe(true);
+    expect(policy.indexable).toBe(false);
+    expect(policy.navigable).toBe(false);
     expect(policy.interestCaptureOnly).toBe(true);
     expect(policy.purchasable).toBe(false);
     expect(policy.accessLabel).toContain('planned');
@@ -187,14 +202,14 @@ describe('route publication policy — real registry', () => {
     expect(policy.contentRevision).toBe('2026-09-19');
   });
 
-  it('/voice is unlisted: renderable and navigable, not indexable', () => {
+  it('/voice is unlisted: renderable, not navigable, not indexable', () => {
     const policy = resolveMarketingRoutePolicy({
       url: '/voice',
       status: 'active',
     });
     expect(policy.publishable).toBe(true);
     expect(policy.indexable).toBe(false);
-    expect(policy.navigable).toBe(true);
+    expect(policy.navigable).toBe(false);
   });
 
   it('manifest noindex stays authoritative for unbound routes', () => {
@@ -259,11 +274,15 @@ describe('route publication policy — real registry', () => {
   it('capability index gate composes with sitemap rules', () => {
     expect(
       isSitemapIndexableMarketingRoute({ url: '/card', status: 'active' })
+    ).toBe(false);
+    expect(
+      isSitemapIndexableMarketingRoute({ url: '/cli', status: 'active' })
     ).toBe(true);
     expect(
       isSitemapIndexableMarketingRoute({ url: '/voice', status: 'active' })
     ).toBe(false);
-    expect(isIndexableCapabilityPath('/card')).toBe(true);
+    expect(isIndexableCapabilityPath('/card')).toBe(false);
+    expect(isIndexableCapabilityPath('/cli')).toBe(true);
     expect(isIndexableCapabilityPath('/voice')).toBe(false);
   });
 });

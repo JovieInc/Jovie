@@ -55,18 +55,11 @@ export const BOUNDED_MARKETING_REVENUE_PATH: readonly BoundedRevenuePathStop[] =
         'Discovery landing; canonical homepage per route manifest and marketing (home) group.',
     },
     {
-      url: APP_ROUTES.PRODUCT,
+      url: APP_ROUTES.ARTIST_PROFILES,
       role: 'understanding',
-      pageGlobs: ['(marketing)/product/page.tsx'],
+      pageGlobs: ['(marketing)/artist-profiles/page.tsx'],
       evidence:
-        'MARKETING_NAV_LINKS header link "Product" (Pen canonical header).',
-    },
-    {
-      url: APP_ROUTES.SOLUTIONS_ARTISTS,
-      role: 'understanding',
-      pageGlobs: ['(marketing)/solutions/[audience]/page.tsx'],
-      evidence:
-        'MARKETING_CUSTOMERS_FLYOUT "Artists" — the only audience routed from header navigation.',
+        'MARKETING_NAV_LINKS header link "Product" and the Customers flyout "Artists" (phase 1: /product and /solutions/artists 308 here).',
     },
     {
       url: APP_ROUTES.PRICING,

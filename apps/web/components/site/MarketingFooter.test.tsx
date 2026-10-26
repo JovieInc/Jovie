@@ -77,10 +77,9 @@ describe('MarketingFooter', () => {
     expect(
       screen.queryByText('Music', { selector: 'p.mf-eyebrow' })
     ).toBeNull();
-    expect(screen.getByRole('link', { name: 'Artists' })).toHaveAttribute(
-      'href',
-      '/solutions/artists'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Artist Profiles' })
+    ).toHaveAttribute('href', '/artist-profiles');
     expect(screen.getByRole('link', { name: 'Smart Links' })).toHaveAttribute(
       'href',
       '/smart-links'
@@ -105,7 +104,7 @@ describe('MarketingFooter', () => {
     expect(footerColumnTitle('Connect')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/product'
+      '/artist-profiles'
     );
   });
 
@@ -287,15 +286,12 @@ describe('MarketingFooter', () => {
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
   });
 
-  it('links to the canonical Card route without duplicating its terminal CTA', () => {
+  it('does not link the unlisted Card route and keeps the terminal CTA off it', () => {
     mockUsePathname.mockReturnValue('/card');
 
     render(<MarketingFooter />);
 
-    expect(screen.getByRole('link', { name: 'Jovie Card' })).toHaveAttribute(
-      'href',
-      '/card'
-    );
+    expect(screen.queryByRole('link', { name: 'Jovie Card' })).toBeNull();
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();

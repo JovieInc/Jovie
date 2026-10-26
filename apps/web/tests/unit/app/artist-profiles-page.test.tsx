@@ -362,13 +362,13 @@ describe('ArtistProfilesPage', () => {
     ).toBeInTheDocument();
     expect(
       screen.getAllByTestId('artist-profile-related-feature')
-    ).toHaveLength(4);
+    ).toHaveLength(3);
     expect(
       screen.getByRole('link', { name: /See audience notifications/i })
     ).toHaveAttribute('href', '/artist-notifications');
     expect(
-      screen.getByRole('link', { name: /See Instant Merch/i })
-    ).toHaveAttribute('href', '/instant-merch');
+      screen.queryByRole('link', { name: /See Instant Merch/i })
+    ).toBeNull();
     expect(ARTIST_PROFILE_COPY.faq.items).toHaveLength(4);
     expect(
       screen.getByRole('heading', { name: 'The profile in action.' })

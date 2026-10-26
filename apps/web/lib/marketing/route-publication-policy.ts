@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import {
   describeFeatureAccess,
   type FeatureCapabilityRecord,
@@ -12,6 +13,7 @@ import {
   getMarketingPageContractForPathname,
   type MarketingPageContract,
 } from '@/data/marketing/pageContracts';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import type { SitemapManifestRoute } from '@/lib/seo/sitemap-publication';
 
 /**
@@ -135,4 +137,15 @@ export function isIndexableRoute(
   entry: Pick<SitemapManifestRoute, 'url' | 'status' | 'noindex' | 'aliasOf'>
 ): boolean {
   return resolveMarketingRoutePolicy(entry).indexable;
+}
+
+/**
+ * Robots metadata derived from the capability registry, so flipping a
+ * capability's publication back to 'public' (and GA) is the only switch needed
+ * to bring an unlisted page back into search.
+ */
+export function robotsForRoute(url: string): NonNullable<Metadata['robots']> {
+  return resolveMarketingRoutePolicy({ url, status: 'active' }).indexable
+    ? { index: true, follow: true }
+    : NOINDEX_ROBOTS;
 }

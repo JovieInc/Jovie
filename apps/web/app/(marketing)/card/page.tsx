@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { JOVIE_CARD_COPY } from '@/data/jovieCardCopy';
+import { robotsForRoute } from '@/lib/marketing/route-publication-policy';
 import { documentTitle } from '@/lib/seo/document-title';
 import { JovieCardLanding } from './JovieCardLanding';
 
@@ -11,6 +12,7 @@ const PAGE_URL = `${BASE_URL}${APP_ROUTES.CARD}`;
 const PAGE_TITLE = `${JOVIE_CARD_COPY.seo.title} | ${APP_NAME}`;
 
 export const metadata: Metadata = {
+  robots: robotsForRoute('/card'),
   title: documentTitle(JOVIE_CARD_COPY.seo.title),
   description: JOVIE_CARD_COPY.seo.description,
   metadataBase: new URL(BASE_URL),

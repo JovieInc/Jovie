@@ -286,13 +286,6 @@ test.describe('Content Gate — Public Pages', () => {
         minLength: 150,
       },
       {
-        path: APP_ROUTES.LAUNCH,
-        name: 'Launch',
-        expectedUrl: /\/launch$/,
-        readyText: /your entire music career/i,
-        minLength: 250,
-      },
-      {
         path: APP_ROUTES.LAUNCH_PRICING,
         name: 'Legacy launch pricing redirect',
         expectedUrl: /\/pricing$/,

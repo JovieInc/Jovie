@@ -176,24 +176,44 @@ describe('marketing route health contract', () => {
     const redirects = MARKETING_ROUTE_HEALTH_TARGETS.filter(
       target => target.expected === 'redirect'
     );
-    expect(redirects).toEqual([
-      {
-        glob: '(marketing)/new/page.tsx',
-        path: '/new',
-        expected: 'redirect',
-        allowedFinalPaths: ['/'],
-        allowsAuthShell: false,
-        requiresSharedChrome: true,
-      },
-      {
-        glob: '(marketing)/artist-profile/page.tsx',
-        path: '/artist-profile',
-        expected: 'redirect',
-        allowedFinalPaths: ['/artist-profiles'],
-        allowsAuthShell: false,
-        requiresSharedChrome: false,
-      },
-    ]);
+    expect(redirects).toEqual(
+      expect.arrayContaining([
+        {
+          glob: '(marketing)/new/page.tsx',
+          path: '/new',
+          expected: 'redirect',
+          allowedFinalPaths: ['/'],
+          allowsAuthShell: false,
+          requiresSharedChrome: true,
+        },
+        {
+          glob: '(marketing)/artist-profile/page.tsx',
+          path: '/artist-profile',
+          expected: 'redirect',
+          allowedFinalPaths: ['/artist-profiles'],
+          allowsAuthShell: false,
+          requiresSharedChrome: false,
+        },
+      ])
+    );
+    // Phase 1 IA (2026-10-25): the duplicates 308 to the page that owns the job.
+    expect(
+      Object.fromEntries(
+        redirects.map(target => [target.path, target.allowedFinalPaths])
+      )
+    ).toEqual({
+      '/new': ['/'],
+      '/artist-profile': ['/artist-profiles'],
+      '/product': ['/'],
+      '/product/command-palette': ['/'],
+      '/product/link-analytics': ['/smart-links'],
+      '/product/utm-links': ['/smart-links'],
+      '/product/dsp-links': ['/smart-links'],
+      '/product/isrc': ['/smart-links'],
+      '/product/pre-save': ['/smart-links'],
+      '/product/release-scheduling': ['/artist-profiles'],
+      '/launch': ['/smart-links'],
+    });
 
     expect(
       MARKETING_ROUTE_HEALTH_TARGETS.find(

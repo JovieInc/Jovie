@@ -30,12 +30,11 @@ describe('AboutPageContent', () => {
   it('lets readers inspect product details and the founder without JavaScript actions', () => {
     render(<AboutPageContent />);
     for (const [name, href] of [
-      ['Living Profile', '/product'],
-      ['Relationships', '/product'],
-      ['Audience', '/product'],
-      ['Adaptive', '/product'],
+      ['Living Profile', '/artist-profiles'],
+      ['Relationships', '/artist-profiles'],
+      ['Audience', '/artist-profiles'],
+      ['Adaptive', '/artist-profiles'],
       ['For Artists', '/artist-profiles'],
-      ['Payments', '/pay'],
       ['Tim White, Founder', '/tim/about'],
     ]) {
       expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
@@ -95,7 +94,6 @@ describe('AboutPageContent', () => {
       'Audience',
       'Adaptive',
       'For Artists',
-      'Payments',
     ]) {
       expect(
         screen.getByRole('heading', { level: 3, name: feature })

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import {
   getPublicProfileCandidate,
@@ -11,12 +10,11 @@ import {
 } from '@/lib/seo/sitemap-publication';
 
 describe('/product/link-analytics marketing route', () => {
-  it('ships as a published commercial sitemap hub', () => {
-    expect(APP_ROUTES.PRODUCT_LINK_ANALYTICS).toBe('/product/link-analytics');
-    expect(getExactPublishedMarketingPaths()).toContain(
+  it('is redirected out of the sitemap (phase 1 IA)', () => {
+    expect(getExactPublishedMarketingPaths()).not.toContain(
       '/product/link-analytics'
     );
-    expect(getPublishedCommercialHubPaths()).toContain(
+    expect(getPublishedCommercialHubPaths()).not.toContain(
       '/product/link-analytics'
     );
 
@@ -24,19 +22,14 @@ describe('/product/link-analytics marketing route', () => {
       entry => entry.url === '/product/link-analytics'
     );
     expect(route).toMatchObject({
-      status: 'active',
-      recipeId: 'feature',
-      glob: '(marketing)/product/link-analytics/page.tsx',
+      status: 'deprecated',
+      aliasOf: '/smart-links',
+      noindex: true,
     });
-    expect(route?.noindex).toBeUndefined();
-    expect(route?.aliasOf).toBeUndefined();
     expect(route?.healthCheck).toMatchObject({
       path: '/product/link-analytics',
-      expected: 'page',
-    });
-    expect(route?.productEvidence).toMatchObject({
-      kind: 'interactive-mockup',
-      testId: 'release-smart-link-analytics',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
     });
   });
 

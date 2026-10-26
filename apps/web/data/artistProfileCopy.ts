@@ -1084,13 +1084,6 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
         href: APP_ROUTES.ARTIST_NOTIFICATIONS,
         ctaLabel: 'See audience notifications',
       },
-      {
-        id: 'instant-merch',
-        title: 'Instant Merch',
-        body: 'Create merch in Jovie and publish approved products back to the artist profile with dedicated, indexable product pages.',
-        href: APP_ROUTES.INSTANT_MERCH,
-        ctaLabel: 'See Instant Merch',
-      },
     ],
   },
   howItWorks: {
