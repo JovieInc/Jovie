@@ -379,15 +379,20 @@ def verify(host, lane, linear, issue: dict, ask: dict, run=lifecycle.run) -> dic
             # (a fail would route it to Rework), retried on the next day's drain.
             return {"result": "verifier-failed", "returncode": done.returncode, "runId": run_id,
                     "durationS": round(time.time() - started)}
-        if isinstance(verdict, dict) and isinstance(verdict.get("items"), list):
+        decision = judge(verdict, issue["identifier"], ask["sha"])
+        gaps = []
+        # Empty, malformed, wrong-target, or truncated verdicts cannot supersede prior gaps.
+        if decision["reason"] in ("items-not-verified", "all-items-verified", "verified-with-residual", "too-little-verified"):
+            complete = len(decision["items"]) == len(verdict["items"])
             work = host.state / "runs" / f"{run_id}.escalation"
             codex_cmd = [sys.executable, str(HERE / "codex_lane.py"), "run"]
             verdict["items"] = esc.escalate(
                 [i for i in verdict["items"] if isinstance(i, dict)], tree=tree, out_dir=work, run=run, env=env,
                 codex_cmd=codex_cmd, linear=linear, issue=issue, mesh_send=getattr(host, "mesh_send", None), sha=ask["sha"])
-        decision = judge(verdict, issue["identifier"], ask["sha"])
-        gaps = esc.route_gaps(host.state, linear, issue, decision["items"], time.time(), sha=ask["sha"],
-                              episode=ask["manifest"].get("receiptNotBefore"))
+            decision = judge(verdict, issue["identifier"], ask["sha"])
+            if complete:
+                gaps = esc.route_gaps(host.state, linear, issue, decision["items"], time.time(), sha=ask["sha"],
+                                      episode=ask["manifest"].get("receiptNotBefore"))
         authorization = app_authorization(host.state)
         if authorization is None:
             return {"result": "linear-app-unavailable", "decision": decision["status"], "runId": run_id}
@@ -442,6 +447,9 @@ def help_followups(host, linear, now: float, run=lifecycle.run) -> list[dict]:
     out = []
     try:
         for res in esc.followup_replies(host.state, linear, now):
+            if res.get("error"):
+                out.append(res)
+                continue
             out.append({"issue": res["issue"], "verdict": res["verdict"]})
             if res["verdict"] == "contradicted" and res["state"] == "Validating" and res.get("sha"):
                 authorization = app_authorization(host.state)

@@ -340,20 +340,24 @@ def gap_for(issue: str, item: dict) -> dict:
 
 
 def route_gaps(state: Path, linear, issue: dict, items: list[dict], now: float, sha: str = "", episode: str | None = None) -> list[dict]:
-    """Record each unverifiable item as a capability gap (state ledger + one comment) so it gets built."""
-    gaps = [gap_for(issue["identifier"], item) for item in items if item.get("status") == "unverifiable"]
-    if not gaps:
+    """Replace gaps from a complete judged verification; no gaps retires older help correlations."""
+    if not items:
         return []
+    gaps = [gap_for(issue["identifier"], item) for item in items if item.get("status") == "unverifiable"]
     path = Path(state) / GAP_FILE
     try:
         book = json.loads(path.read_text())
         book = book if isinstance(book, dict) else {}
     except (OSError, ValueError):
         book = {}
+    if not gaps and issue["identifier"] not in book:
+        return []
     book[issue["identifier"]] = {"at": now, "sha": sha, "episode": episode, "gaps": gaps}
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(book, sort_keys=True))
     os.replace(tmp, path)
+    if not gaps:
+        return []
     lines = [GAP_MARKER, f"Outcome verification left {len(gaps)} item(s) unverifiable after escalation. Each is a missing capability, not a pass:"]
     for gap in gaps:
         lines.append(f"- {gap['criterion']}: needs {gap['capability']} ({gap['build']}); owner {gap['owner']}. Tried: "
@@ -381,7 +385,8 @@ def read_gaps(state: Path) -> dict:
 def followup_replies(state: Path, linear, now: float, limit: int = 15, urlopen=None) -> list[dict]:
     """Close help loops between verifications: for each gap with an open help request, read the issue's
     comments, and when a reply arrived re-evaluate the item. Supported or contradicted resolves the gap
-    (comment + ledger). Returns the resolutions so the caller can act on a contradiction."""
+    (comment + ledger). Returns resolutions and per-issue query errors so the caller can act on
+    contradictions even when another issue cannot be read."""
     book = read_gaps(state)
     resolved, checked = [], 0
     for ident, record in sorted(book.items()):
@@ -389,7 +394,11 @@ def followup_replies(state: Path, linear, now: float, limit: int = 15, urlopen=N
             if not gap.get("helpCorr") or gap.get("resolved") or checked >= limit:
                 continue
             checked += 1
-            row = linear.gql(HELP_ISSUE_QUERY, {"id": ident}).get("issue")
+            try:
+                row = linear.gql(HELP_ISSUE_QUERY, {"id": ident}).get("issue")
+            except (OSError, ValueError, RuntimeError, KeyError) as error:
+                resolved.append({"issue": ident, "error": type(error).__name__})
+                continue  # leave this gap retryable while returning other resolutions
             if not row:
                 continue
             found = find_help((row.get("comments") or {}).get("nodes") or [], gap["helpCorr"])

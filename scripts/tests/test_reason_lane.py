@@ -1391,11 +1391,116 @@ class OutcomeLaneTest(unittest.TestCase):
             self.assertIn(needle, text)
         self.assertIn("NOT installed (boom)", outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}}, "NOT installed (boom)"))
 
-    def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None):
+    def test_complete_verification_retires_old_gaps_before_later_correlated_replies(self):
+        esc = outcome.esc
+        episode = "2026-10-20T00:00:00Z"
+        old = self.outcome_probe_fixture(helpCorr="oh-0123456789")
+        book = {"JOV-7771": {"at": 1, "sha": SHA, "episode": episode, "gaps": [esc.gap_for("JOV-7771", old)]},
+                "JOV-7772": {"sha": SHA, "episode": episode, "gaps": [{"criterion": "Other issue", "helpCorr": None}]}}
+        for status in ("pass", "fail"):
+            with self.subTest(status=status):
+                verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [
+                    {"criterion": old["criterion"], "status": status, "evidence": "Current device observation establishes this result"}]}
+                result, calls, comments, state = self.drain(verdict, seed_gaps=book,
+                                                            manifest_extra={"receiptNotBefore": episode})
+                self.assertEqual((result["done"][0]["result"], result["done"][0]["decision"]), ("recorded", status))
+                receipt = next(a for a, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a)))
+                self.assertEqual(receipt[receipt.index("--status") + 1], status, "a fresh true failure is still recorded")
+                stored = esc.read_gaps(state)
+                self.assertEqual(stored["JOV-7771"]["gaps"], [])
+                self.assertEqual((stored["JOV-7771"]["sha"], stored["JOV-7771"]["episode"]), (SHA, episode))
+                self.assertEqual(stored["JOV-7772"], book["JOV-7772"])
+                self.assertFalse(any(esc.GAP_MARKER in body for _, body in comments), "retiring gaps needs no gap comment")
+                queries = []
+                linear = SimpleNamespace(gql=lambda q, v: queries.append(v) or {"issue": {
+                    "id": "uuid-7771", "state": {"name": "Validating"}, "comments": {"nodes": self.help_thread(
+                        old["helpCorr"], "Earlier device observation contradicted the criterion")}}})
+                with patch.object(esc, "evaluate_reply") as evaluate, patch.object(outcome, "record_receipt") as write:
+                    self.assertEqual(outcome.help_followups(SimpleNamespace(state=state), linear, time.time()), [])
+                self.assertFalse(queries)
+                evaluate.assert_not_called()
+                write.assert_not_called()
+
+    def test_empty_malformed_and_partial_verdicts_do_not_supersede_existing_gaps(self):
+        esc = outcome.esc
+        old = self.outcome_probe_fixture(helpCorr="oh-0123456789")
+        book = {"JOV-7771": {"at": 1, "sha": SHA, "episode": None, "gaps": [esc.gap_for("JOV-7771", old)]}}
+        proved = {"criterion": "Current build responds", "status": "pass", "evidence": "GET version returned the bound build"}
+        unknown = self.outcome_probe_fixture(criterion="A different unknown", evidence="Authentication unavailable")
+        base = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [proved]}
+        cases = [None, {}, {**base, "sha": "0" * 40}, {**base, "items": []},
+                 {**base, "items": [proved, None]}, {**base, "items": [proved, {}]},
+                 {**base, "items": [unknown, {}]}]
+        cases += [{**base, "items": [proved] * 40 + [tail]} for tail in (None, {}, unknown)]
+        for verdict in cases:
+            with self.subTest(verdict=verdict):
+                _, _, _, state = self.drain(verdict, seed_gaps=book)
+                self.assertEqual(esc.read_gaps(state), book)
+        result, _, _, state = self.drain({**base, "items": [unknown] + [proved] * 39 + [None]}, seed_gaps=book)
+        self.assertEqual(result["done"][0]["decision"], "pass", "existing escalation and first-40 judgment stay unchanged")
+        self.assertEqual(esc.read_gaps(state), book, "a truncated judgment is not a complete gap replacement")
+        # An empty direct call also cannot erase a previously recorded observation gap.
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / esc.GAP_FILE).write_text(json.dumps(book))
+            esc.route_gaps(state, SimpleNamespace(), {"id": "uuid-7771", "identifier": "JOV-7771"}, [], 2, sha=SHA)
+            self.assertEqual(esc.read_gaps(state), book)
+
+    def test_followup_query_failure_preserves_other_progress_and_delivers_true_failure_receipt(self):
+        esc = outcome.esc
+        corr, episode = "oh-0123456789", "2026-10-20T00:00:00Z"
+        for error_type in (RuntimeError, OSError, ValueError, KeyError):
+            with self.subTest(error_type=error_type.__name__), tempfile.TemporaryDirectory() as tmp:
+                state = Path(tmp)
+                book = {ident: {"sha": SHA, "episode": episode, "gaps": [{"criterion": ident,
+                        "evidence": "Authentication unavailable", "helpCorr": corr}]} for ident in ("JOV-0001", "JOV-0002", "JOV-0003")}
+                (state / esc.GAP_FILE).write_text(json.dumps(book))
+                queries, comments, failing = [], [], [True]
+                thread = self.help_thread(corr, "A direct authenticated observation of this criterion")
+
+                class Linear:
+                    def gql(self, query, variables):
+                        ident = variables["id"]
+                        queries.append(ident)
+                        if ident == "JOV-0002" and failing[0]:
+                            raise error_type("fixture query failure")
+                        return {"issue": {"id": ident, "state": {"name": "Validating"}, "comments": {"nodes": thread}}}
+                    def comment(self, ident, body):
+                        comments.append((ident, body))
+
+                host = SimpleNamespace(state=state, repo=state / "repo")
+                def evaluate(item, reply, **kwargs):
+                    return {"verdict": "supported" if item["criterion"] == "JOV-0003" else "contradicted",
+                            "result": "Concrete observation for " + item["criterion"]}
+                with patch.object(esc, "evaluate_reply", side_effect=evaluate) as judged, \
+                        patch.object(outcome, "app_authorization", return_value="Bearer fixture"), \
+                        patch.object(outcome, "checkout", return_value=state / "tree"), \
+                        patch.object(outcome, "drop_checkout"), patch.object(outcome, "record_receipt", return_value=True) as write:
+                    result = outcome.help_followups(host, Linear(), 2)
+                    self.assertEqual(result, [{"issue": "JOV-0001", "verdict": "contradicted"},
+                        {"issue": "JOV-0002", "error": error_type.__name__}, {"issue": "JOV-0003", "verdict": "supported"}])
+                    stored = esc.read_gaps(state)
+                    self.assertEqual(stored["JOV-0001"]["gaps"][0]["resolved"]["verdict"], "contradicted")
+                    self.assertEqual(stored["JOV-0002"], book["JOV-0002"], "failed queries remain retryable")
+                    self.assertEqual(stored["JOV-0003"]["gaps"][0]["resolved"]["verdict"], "supported")
+                    write.assert_called_once()
+                    self.assertEqual(write.call_args.args[1:3], ("JOV-0001", SHA))
+                    self.assertEqual(write.call_args.args[3]["status"], "fail")
+                    self.assertEqual(write.call_args.args[5], {"receiptNotBefore": episode})
+                    self.assertEqual(outcome.help_followups(host, Linear(), 3), [{"issue": "JOV-0002", "error": error_type.__name__}])
+                    self.assertEqual((judged.call_count, write.call_count, len(comments)), (2, 1, 2), "no replay of completed effects")
+                    failing[0] = False
+                    self.assertEqual(outcome.help_followups(host, Linear(), 4), [{"issue": "JOV-0002", "verdict": "contradicted"}])
+                    self.assertEqual(write.call_count, 2, "the recovered query's contradiction reaches the receipt writer")
+                    self.assertEqual(queries, ["JOV-0001", "JOV-0002", "JOV-0003", "JOV-0002", "JOV-0002"])
+
+    def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None, seed_gaps=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         state = Path(tmp.name)
         calls, comments = [], []
+        if seed_gaps is not None:
+            (state / outcome.esc.GAP_FILE).write_text(json.dumps(seed_gaps))
 
         class Locked:
             def __init__(self, path, blocking=False):
