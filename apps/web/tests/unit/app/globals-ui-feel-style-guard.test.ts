@@ -97,3 +97,27 @@ describe('public root stylesheet isolation', () => {
     expect(notFoundSource).not.toContain('ArtistProfileLandingPage.css');
   });
 });
+
+describe('electron compact-window desktop shell (JOV-8942)', () => {
+  const source = readGlobals();
+
+  it('hides the mobile bottom surface in the desktop runtime at every width', () => {
+    expect(source).toMatch(
+      /html\[data-desktop-runtime="electron"\][\s\S]{0,200}?\[data-testid="app-shell-mobile-bottom-surface"\][\s\S]{0,40}?\{[\s\S]{0,80}?display:\s*none;/
+    );
+  });
+
+  it('keeps the desktop frame chrome in the compact range', () => {
+    const compact = source.match(
+      /@media \(max-width: 1023px\)[\s\S]{0,2000}?html\[data-desktop-runtime="electron"\][\s\S]{0,200}?#main-content[\s\S]{0,400}?\}/
+    );
+    expect(compact).not.toBeNull();
+    const block = compact?.[0] ?? '';
+    expect(block).toContain('gap: var(--app-shell-gap)');
+    expect(block).toContain('padding: var(--app-shell-gap)');
+    expect(block).toContain('display: flex');
+    expect(block).toContain('border-radius: var(--app-shell-radius)');
+    expect(block).toContain('box-shadow: var(--app-shell-sidebar-shadow)');
+    expect(block).toContain('box-shadow: var(--app-shell-shadow)');
+  });
+});

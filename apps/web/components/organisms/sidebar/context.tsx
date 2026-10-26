@@ -12,6 +12,7 @@ import {
   SIDEBAR_KEYBOARD_SHORTCUT,
   useSidebarKeyboardShortcut,
 } from '@/hooks/useSidebarKeyboardShortcut';
+import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { cn } from '@/lib/utils';
 
 export {
@@ -40,7 +41,12 @@ export const SidebarProvider = React.forwardRef<
     },
     ref
   ) => {
-    const isMobile = useBreakpointDown('lg');
+    const isNarrowViewport = useBreakpointDown('lg');
+    const isElectron = useIsElectronRuntime();
+    // JOV-8942: a desktop window never adopts the mobile shell. The Electron
+    // runtime keeps the inline rail mounted at compact widths instead of
+    // swapping it for the mobile sheet + bottom tab bar.
+    const isMobile = isNarrowViewport && !isElectron;
     const [openMobile, setOpenMobile] = React.useState(false);
     const { open, setOpen } = useSidebarCookieState({
       defaultOpen,
@@ -55,6 +61,39 @@ export const SidebarProvider = React.forwardRef<
     React.useEffect(() => {
       if (!isMobile) setOpenMobile(false);
     }, [isMobile]);
+
+    // JOV-8942: in the desktop runtime, entering the compact range collapses
+    // the inline rail to the icon rail. Widening restores the pin the window
+    // had before shrinking — unless the user changed the rail while compact,
+    // which is their live intent and never overridden.
+    const wasCompactDesktopRef = React.useRef(false);
+    const restoreOpenRef = React.useRef(false);
+    React.useEffect(() => {
+      if (!isElectron) {
+        wasCompactDesktopRef.current = false;
+        restoreOpenRef.current = false;
+        return;
+      }
+      if (!isNarrowViewport) {
+        if (wasCompactDesktopRef.current) {
+          wasCompactDesktopRef.current = false;
+          if (restoreOpenRef.current) {
+            restoreOpenRef.current = false;
+            setOpen(true);
+          }
+        }
+        return;
+      }
+      if (!wasCompactDesktopRef.current) {
+        wasCompactDesktopRef.current = true;
+        restoreOpenRef.current = open;
+        if (open) setOpen(false);
+        return;
+      }
+      // Already compact and collapsed by us: a rail the user (re)opened
+      // while compact must not be forced back closed on widen.
+      if (open) restoreOpenRef.current = false;
+    }, [isElectron, isNarrowViewport, open, setOpen]);
 
     // Helper to toggle the sidebar.
     const toggleSidebar = React.useCallback(() => {
