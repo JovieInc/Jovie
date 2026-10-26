@@ -686,9 +686,9 @@
     {
       "source": "apps/web/app/app/(shell)/admin/capacity/page.tsx",
       "from": null,
-      "to": "holdout",
+      "to": "migrating",
       "at": "2026-10-26T02:17:00Z",
-      "evidence": "PR #23313 introduces the admin agent plans page; source registration only, not rendered certification."
+      "evidence": "PR #23313 introduces the admin agent plans page inside the admin shell migration (JOV-8098); source registration only."
     }
   ]
 }
