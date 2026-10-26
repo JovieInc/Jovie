@@ -998,8 +998,8 @@ export function ProfilePacCard({
                     src={artImageUrl}
                     alt={artImageAlt}
                     fill
-                    priority={artPriority}
-                    loading={artPriority ? undefined : 'eager'}
+                    priority
+                    fetchPriority='high'
                     sizes='104px'
                     className={
                       isReleaseArtwork
