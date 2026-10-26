@@ -23,6 +23,7 @@ from pathlib import Path
 import pathlib as _pl, sys as _sys  # noqa: E402
 _sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
 from atomic_state import atomic_write_text  # noqa: E402
+import factory_intake  # noqa: E402  (shared receipt identity and legacy episode formatting)
 
 SCHEMA = "jovie-factory-signal/v1"
 RECUR_DAYS = 3
@@ -182,15 +183,27 @@ def write(state: Path, signals: list[dict]) -> dict:
     written, kept = [], []
     for signal in signals:
         path = directory / f"{signal['fingerprint']}.json"
+        previous = {}
         try:
             previous = json.loads(path.read_text())
-            unchanged = isinstance(previous, dict) and {k: v for k, v in previous.items() if k != "_observedAt"} == signal
+            unchanged = isinstance(previous, dict) and {k: v for k, v in previous.items()
+                                                       if k not in {"_observedAt", "_receiptHistory"}} == signal
         except (OSError, ValueError):
             unchanged = False
         (kept if unchanged else written).append(signal["fingerprint"])
         if not unchanged:
             # Persist observation time with the evidence so copying/restoring a signal is not a new observation.
             content = {**signal, "_observedAt": datetime.now(timezone.utc).isoformat()}
+            previous = previous if isinstance(previous, dict) else {}
+            history = factory_intake.receipt_history(previous)
+            if "_receiptHistory" not in previous and factory_intake.receipt_keys(previous) and \
+                    factory_intake.validate(previous) is None:
+                # Retain the one pre-upgrade receipt set before refreshing an old signal.
+                # It binds an opaque legacy digest/body to the observations it covered.
+                description = factory_intake.body(previous)
+                history[factory_intake.EVIDENCE.search(description)[1]] = description
+            if factory_intake.receipt_keys(signal) or history:
+                content["_receiptHistory"] = history
             atomic_write_text(path, json.dumps(content, indent=1))
     return {"written": written, "alreadyPresent": kept}
 

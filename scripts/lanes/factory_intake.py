@@ -76,6 +76,14 @@ def label(fingerprint: str) -> str:
     return f"factory-fp:{fingerprint}"
 
 
+def receipt_keys(row: dict) -> list[str]:
+    evidence = row.get("evidence")
+    receipts = evidence.get("receipts") if isinstance(evidence, dict) else None
+    if not isinstance(receipts, list) or not all(isinstance(path, str) and path for path in receipts):
+        return []
+    return sorted({"receipt:" + hashlib.sha256(path.encode()).hexdigest() for path in receipts})
+
+
 def body(row: dict) -> str:
     metric = row["metric"]
     lines = ["## Goal", str(row["problem"]).strip(), "", "## Definition of done",
@@ -91,13 +99,16 @@ def body(row: dict) -> str:
     evidence = {"fingerprint": row["fingerprint"], "source": row.get("source"),
                 "evidence": row.get("evidence", text)}
     digest = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
-    return f"{text}\n\n<!-- factory-evidence:{digest} -->"
+    keys = receipt_keys(row)
+    units = f"\n\n<!-- factory-receipts:{json.dumps(keys)} -->" if keys else ""
+    return f"{text}{units}\n\n<!-- factory-evidence:{digest} -->"
 
 
 def plan(signals: list[dict]) -> list[dict]:
     return [{"fingerprint": row["fingerprint"], "title": str(row["title"]).strip()[:200], "description": body(row),
              "labels": [FACTORY_LABEL, WORKSTREAM_LABEL, label(row["fingerprint"])],
-             "legacyEvidence": "evidence" not in row, "observedAt": row.get("_observedAt")} for row in signals]
+             "legacyEvidence": "evidence" not in row, "observedAt": row.get("_observedAt"),
+             "receiptKeys": receipt_keys(row), "receiptHistory": receipt_history(row)} for row in signals]
 
 
 EXISTING = ('query($l:String!){issues(first:1,filter:{team:{key:{eq:"JOV"}},labels:{name:{eq:$l}},'
@@ -106,6 +117,30 @@ HISTORY = ('query($l:String!,$after:String){issues(first:50,after:$after,include
            'labels:{name:{eq:$l}},state:{type:{in:["completed","canceled"]}}})'
            '{nodes{id identifier description completedAt canceledAt} pageInfo{hasNextPage endCursor}}}')
 EVIDENCE = re.compile(r"\n\n<!-- factory-evidence:([a-f0-9]{64}) -->\s*$")
+RECEIPTS = re.compile(r"\n\n<!-- factory-receipts:(\[[^\n]*\]) -->(?=\n\n<!-- factory-evidence:[a-f0-9]{64} -->\s*$)")
+
+
+def covered_receipts(description: str | None) -> set[str]:
+    marker = RECEIPTS.search(description or "")
+    try:
+        keys = json.loads(marker[1]) if marker else []
+        if isinstance(keys, list) and all(isinstance(key, str) and re.fullmatch(r"receipt:[a-f0-9]{64}", key) for key in keys):
+            return set(keys)
+    except ValueError:
+        pass
+    return set()
+
+
+def receipt_history(row: dict) -> dict[str, str]:
+    history = row.get("_receiptHistory")
+    if not isinstance(history, dict):
+        return {}
+    out = {}
+    for digest, description in history.items():
+        marker = EVIDENCE.search(description) if isinstance(description, str) else None
+        if marker and marker[1] == digest and covered_receipts(description):
+            out[digest] = description
+    return out
 
 
 def same_evidence(description: str | None, proposed: str, legacy: bool = False) -> bool:
@@ -115,7 +150,8 @@ def same_evidence(description: str | None, proposed: str, legacy: bool = False) 
     if old and not legacy:
         return False
     # Old issues/signals had no explicit evidence. Only their exact body proves a replay.
-    return EVIDENCE.sub("", description or "").strip() == EVIDENCE.sub("", proposed).strip()
+    return EVIDENCE.sub("", RECEIPTS.sub("", description or "")).strip() == \
+        EVIDENCE.sub("", RECEIPTS.sub("", proposed)).strip()
 
 
 def observed_before_completion(issue: dict, observed_at: str | None) -> bool:
@@ -131,10 +167,17 @@ def observed_before_completion(issue: dict, observed_at: str | None) -> bool:
 
 def terminal_episode(linear, fp_label: str, item: dict) -> dict | None:
     after, cursors = None, set()
+    keys = set(item.get("receiptKeys") or [])
     while True:
         page = linear.gql(HISTORY, {"l": fp_label, "after": after})["issues"]
         for issue in page["nodes"]:
-            if same_evidence(issue.get("description"), item["description"], item.get("legacyEvidence", False)) or \
+            description = issue.get("description")
+            same = same_evidence(description, item["description"], item.get("legacyEvidence", False))
+            if keys and not EVIDENCE.search(description or ""):
+                same = False  # a legacy aggregate summary cannot identify explicit new receipts
+            historical = any(keys <= covered_receipts(previous) and same_evidence(description, previous)
+                             for previous in (item.get("receiptHistory") or {}).values()) if keys else False
+            if same or historical or (keys and keys <= covered_receipts(description)) or \
                     observed_before_completion(issue, item.get("observedAt")):
                 return issue
         if not page["pageInfo"]["hasNextPage"]:
@@ -157,10 +200,16 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
 
     def remember(item, digest, issue):
         episodes = covered.setdefault(item["fingerprint"], {})
-        if episodes.get(digest) != issue:
-            episodes[digest] = issue
-            if save is not None:
-                save(covered)
+        changed = episodes.get(digest) != issue
+        episodes[digest] = issue
+        # Keep each observation's first covering issue. Retention/read-loss changes a
+        # set digest but cannot create a new receipt, including across later episodes.
+        for key in item.get("receiptKeys") or []:
+            if key not in episodes:
+                episodes[key] = issue
+                changed = True
+        if changed and save is not None:
+            save(covered)
 
     team = linear.gql(TEAM, {})["teams"]["nodes"][0]
     todo = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Todo")
@@ -172,7 +221,20 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
         marker = EVIDENCE.search(item["description"])
         digest = marker[1] if marker else hashlib.sha256(item["description"].encode()).hexdigest()
         found = linear.gql(EXISTING, {"l": fp_label})["issues"]["nodes"]
-        receipt = covered.get(item["fingerprint"], {}).get(digest)
+        episodes = covered.setdefault(item["fingerprint"], {})
+        migrated = False
+        for old_digest, description in (item.get("receiptHistory") or {}).items():
+            if old_digest in episodes:
+                for key in covered_receipts(description):
+                    if key not in episodes:
+                        episodes[key] = episodes[old_digest]
+                        migrated = True
+        if migrated and save is not None:
+            save(covered)
+        keys = item.get("receiptKeys") or []
+        receipt = episodes.get(digest)
+        if not receipt and keys and all(key in episodes for key in keys):
+            receipt = episodes[keys[0]]
         prior = found[0] if found else ({"identifier": receipt} if receipt else
                                        terminal_episode(linear, fp_label, item))
         if prior:

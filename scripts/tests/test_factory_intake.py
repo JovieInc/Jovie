@@ -223,5 +223,111 @@ class FactoryIntakeTest(unittest.TestCase):
         self.assertEqual(fi.apply(linear, fi.plan([signal()]))[0]["action"], "exists")
         self.assertEqual(len(linear.created), 1)
 
+
+    def test_covered_cheap_fixer_receipt_loss_never_replays_but_a_new_receipt_qualifies(self):
+        for loss in ("deleted", "malformed"):
+            for terminal in ("completed", "canceled"):
+                with self.subTest(loss=loss, terminal=terminal), tempfile.TemporaryDirectory() as tmp:
+                    root, linear = Path(tmp), EpisodeLinear()
+                    receipts = root / "cheap-fixer"
+                    receipts.mkdir()
+                    row = {"schema": "jovie-cheap-fixer-receipt/v1", "failureClass": "lint",
+                           "outcome": "handoff-model-failed", "classMatch": "x"}
+                    for i in range(6):
+                        (receipts / f"receipt-{i}.json").write_text(json.dumps(row))
+                    def scan():
+                        signals = fs.cheap_fixer_signals(receipts)
+                        fs.write(root, signals)
+                        return fi.run_pass(root, linear)["results"][0]
+                    first = scan()
+                    self.assertEqual(first["action"], "filed")
+                    linear.issues[-1]["state"] = terminal
+                    lost = receipts / "receipt-0.json"
+                    if loss == "deleted":
+                        lost.unlink()
+                    else:
+                        lost.write_text("{")
+                    self.assertEqual(scan()["action"], "exists", "loss of one covered receipt is not an observation")
+                    self.assertEqual(len(linear.created), 1)
+                    # Reordering the same five receipt identities is not a fresh episode either.
+                    retained = fs.cheap_fixer_signals(receipts)[0]
+                    retained["evidence"]["receipts"].reverse()
+                    fs.write(root, [retained])
+                    self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "exists")
+                    # Five covered receipts plus one genuinely new receipt are actionable.
+                    (receipts / "new-receipt.json").write_text(json.dumps(row))
+                    self.assertEqual(scan()["action"], "filed")
+                    self.assertEqual(len(linear.created), 2)
+                    # Covered units remain covered across another completion and loss.
+                    linear.issues[-1]["state"] = terminal
+                    (receipts / "receipt-1.json").unlink()
+                    self.assertEqual(scan()["action"], "exists")
+                    self.assertEqual(len(linear.created), 2)
+
+    def test_receipt_coverage_bootstraps_legacy_digest_state_and_survives_state_loss(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, linear = Path(tmp), EpisodeLinear()
+            original = signal(evidence={"receipts": ["a", "b", "c", "d", "e", "f"]})
+            fs.write(root, [original])
+            fi.run_pass(root, linear)
+            path = root / "factory-intake.json"
+            # The old format has only opaque episode digests, all with string issue values.
+            covered = json.loads(path.read_text())
+            for episodes in covered.values():
+                for key in list(episodes):
+                    if key.startswith("receipt:"):
+                        del episodes[key]
+            path.write_text(json.dumps(covered))
+            self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "exists")
+            linear.issues[-1]["state"] = "completed"
+            subset = {**original, "evidence": {"receipts": ["b", "c", "d", "e", "f"]}}
+            fs.write(root, [subset])
+            self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "exists")
+            # The terminal issue's receipt evidence also protects recovery without a local map.
+            path.unlink()
+            self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "exists")
+            self.assertEqual(len(linear.created), 1)
+
+
+    def test_first_scan_after_legacy_upgrade_can_already_be_a_receipt_subset(self):
+        for state_format in ("digest-only", "missing"):
+            for old_body in ("digest", "plain"):
+                with self.subTest(state_format=state_format, old_body=old_body), tempfile.TemporaryDirectory() as tmp:
+                    root, linear = Path(tmp), EpisodeLinear()
+                    receipts = root / "cheap-fixer"
+                    receipts.mkdir()
+                    row = {"schema": "jovie-cheap-fixer-receipt/v1", "failureClass": "lint",
+                           "outcome": "handoff-model-failed", "classMatch": "x"}
+                    for i in range(6):
+                        (receipts / f"{i}.json").write_text(json.dumps(row))
+                    fs.write(root, fs.cheap_fixer_signals(receipts))
+                    fi.run_pass(root, linear)
+                    linear.issues[0]["state"] = "completed"
+                    linear.issues[0]["description"] = fi.RECEIPTS.sub("", linear.issues[0]["description"])
+                    if old_body == "plain":
+                        linear.issues[0]["description"] = fi.EVIDENCE.sub("", linear.issues[0]["description"])
+                    path = root / "factory-intake.json"
+                    if state_format == "missing":
+                        path.unlink()
+                    else:
+                        covered = json.loads(path.read_text())
+                        for episodes in covered.values():
+                            for key in list(episodes):
+                                if key.startswith("receipt:"):
+                                    del episodes[key]
+                        path.write_text(json.dumps(covered))
+                    # Simulate the existing pre-upgrade signal before its first refresh.
+                    signal_path = next((root / "factory-signals").glob("*.json"))
+                    previous = json.loads(signal_path.read_text())
+                    previous.pop("_receiptHistory", None)
+                    signal_path.write_text(json.dumps(previous))
+                    (receipts / "0.json").unlink()
+                    fs.write(root, fs.cheap_fixer_signals(receipts))
+                    self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "exists")
+                    self.assertEqual(len(linear.created), 1)
+                    (receipts / "new.json").write_text(json.dumps(row))
+                    fs.write(root, fs.cheap_fixer_signals(receipts))
+                    self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "filed")
+
 if __name__ == "__main__":
     unittest.main()
