@@ -16,7 +16,7 @@ Goal: one cohesive product that is recognizably the same, and finished to Linear
 - Consistency: one master per concept, variants as instances, one name per noun (IA map in `docs/design-system/` canonical IA when merged).
 
 ## Taste and blocking rules (unchanged, enforced elsewhere)
-Anti-slop list, copy is the message never the brief (`node scripts/invariants/copy-leak/check.mjs`), general pages stay generic (ICP-language check), logo normalization (`pnpm design:logo-assets:check`), Lucide for UI icons, Jovie mark is the O only. Full text lives in `/design-canonical`; do not copy it into other docs.
+Anti-slop list (ASR-020; all rule ids and status: `node scripts/anti-slop/run.mjs list`), copy is the message never the brief (ASR-017) (`node scripts/invariants/copy-leak/check.mjs`), general pages stay generic (ICP-language check), logo normalization (`pnpm design:logo-assets:check`), Lucide for UI icons, Jovie mark is the O only. Full text lives in `/design-canonical`; do not copy it into other docs.
 
 ## Taste labels
 Every time Tim approves or rejects a frame or page (chat, approvals artifact, Pen, design review), capture it so the judges can calibrate: `node scripts/invariants/art-direction/taste-labels.mjs add --id <slug> --surface <text> --verdict approve|reject --words "<his words>" --rules ASR-nnn --image <file> --judge <criterion>=defect|ok`. Data lives in `docs/design-system/taste-labels/`. A judge may block only after enough labels clear the floors (see vision-calibration).
