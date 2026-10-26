@@ -8,6 +8,7 @@ import {
 } from '@/lib/claim/claim-verification';
 import { generateProofCode } from '@/lib/claim/proof-code';
 import type { DbOrTransaction } from '@/lib/db';
+import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -235,6 +236,24 @@ export async function approveWaitlistEntryInTx(
     clerkId: user.clerkId,
     ...(proofRequest ? { proofRequest } : {}),
   };
+}
+
+/**
+ * Records the acquisition journey on a waitlist entry's qualification inputs.
+ * First write wins, so a later submit never rewrites the journey.
+ */
+export async function stampWaitlistAcquisitionId(
+  entryId: string,
+  acquisitionId: string
+): Promise<void> {
+  await db.execute(drizzleSql`
+    UPDATE waitlist_entries
+    SET qualification_inputs =
+      COALESCE(qualification_inputs, '{}'::jsonb)
+      || jsonb_build_object('acquisitionId', ${acquisitionId}::text)
+    WHERE id = ${entryId}::uuid
+      AND NOT (COALESCE(qualification_inputs, '{}'::jsonb) ? 'acquisitionId')
+  `);
 }
 
 export async function finalizeWaitlistApproval(result: WaitlistApprovalResult) {

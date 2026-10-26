@@ -30,18 +30,26 @@ const text = value =>
 
 export function section(body, heading) {
   const lines = stripComments(body).split('\n');
+  // A "# ..." line inside a code fence (shell comment, markdown in a log) is
+  // not a heading, so it must not start or end a section.
+  let fenced = false;
+  const isHeading = lines.map(line => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      return false;
+    }
+    return !fenced && /^#{1,6}\s/.test(line);
+  });
   const start = lines.findIndex(
-    line =>
-      /^#{1,6}\s/.test(line) &&
+    (line, index) =>
+      isHeading[index] &&
       line
         .replace(/^#+\s*/, '')
         .trim()
         .toLowerCase() === heading.toLowerCase()
   );
   if (start < 0) return '';
-  const end = lines.findIndex(
-    (line, index) => index > start && /^#{1,6}\s/.test(line)
-  );
+  const end = isHeading.findIndex((is, index) => index > start && is);
   return lines.slice(start + 1, end < 0 ? undefined : end).join('\n');
 }
 function field(body, label) {

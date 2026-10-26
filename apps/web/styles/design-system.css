@@ -265,6 +265,18 @@
   --ds-motion-cinematic-duration: 420ms;
   --ds-motion-cinematic-easing: cubic-bezier(0.22, 1, 0.36, 1);
 
+  /* Marketing motion language (guides/motion.md). Names only; the curves and
+     durations are the cinematic tokens above. presets.ts mirrors these and a
+     test pins the two together. */
+  --motion-scroll-hero-range: 100svh;
+  --motion-hero-zoom-from: 1.94;
+  --motion-parallax-tilt: 6deg;
+  --motion-parallax-pointer-max: 1.5deg;
+  --motion-takeover-lift: -32px;
+  --motion-takeover-settle: 24px;
+  --motion-field-fps: 30;
+  --motion-field-grain: 0.03;
+
   /* Core Theme Inputs */
   --theme-base-hue: 282;
   /* Neutral foundation hue — Linear March 2026 refresh (shifted from 272→282) */
@@ -3349,6 +3361,14 @@
   :root {
     --ds-motion-subtle-duration: 0ms;
     --ds-motion-cinematic-duration: 0ms;
+    /* Rest state: no zoom (from == rest frame scale 1248/1348), flat shell,
+       no pointer tilt, no takeover travel, no field frames. */
+    --motion-hero-zoom-from: 0.9258;
+    --motion-parallax-tilt: 0deg;
+    --motion-parallax-pointer-max: 0deg;
+    --motion-takeover-lift: 0px;
+    --motion-takeover-settle: 0px;
+    --motion-field-fps: 0;
     --duration-instant: 0ms;
     --duration-fast: 0ms;
     --duration-normal: 0ms;

@@ -19,6 +19,7 @@ const READ_JOBS = {
   'release-source': 'source',
   'coalesce-production': 'coalesce',
   'authorize-production': 'authorize',
+  'production-verified': 'current',
 };
 
 for (const [job, stepId] of Object.entries(READ_JOBS)) {
@@ -39,5 +40,19 @@ for (const [job, stepId] of Object.entries(READ_JOBS)) {
     assert.doesNotMatch(text, /GITHUB_TOKEN/);
     const reader = steps.find(s => s.id === stepId);
     assert.equal(reader.env.GH_TOKEN, '${{ steps.read-token.outputs.token }}');
+    for (const s of steps.filter(st => st.env?.GH_TOKEN)) {
+      assert.equal(s.env.GH_TOKEN, '${{ steps.read-token.outputs.token }}');
+    }
   });
 }
+
+// The marker-heal job dispatches a workflow (actions: write), which no App token here is
+// granted; that single rare write stays on github.token on purpose.
+test('heal-interrupted-marker is the only controller job still on github.token', () => {
+  const holders = Object.entries(wf.jobs)
+    .filter(([, job]) =>
+      JSON.stringify(job.steps ?? []).includes('github.token')
+    )
+    .map(([name]) => name);
+  assert.deepEqual(holders, ['heal-interrupted-marker']);
+});

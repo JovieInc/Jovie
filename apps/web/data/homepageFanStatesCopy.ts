@@ -21,22 +21,16 @@ export const HOMEPAGE_FAN_STATES_COPY = {
   states: [
     {
       id: 'listen',
-      scenarioId: 'tim-white-profile-listen-mobile',
-      alt: "Tim White's Jovie profile showing his music catalog.",
       title: landingCard('straight-to-listen').title,
       body: landingCard('straight-to-listen').description,
     },
     {
       id: 'show-up',
-      scenarioId: 'tim-white-profile-tour-mobile',
-      alt: "Tim White's Jovie profile showing upcoming shows with ticket links.",
       title: landingCard('local-dates-first').title,
       body: landingCard('local-dates-first').description,
     },
     {
       id: 'stay-close',
-      scenarioId: 'tim-white-profile-subscribe-mobile',
-      alt: "Tim White's Jovie profile asking a listener to get updates by email.",
       title: landingCard('capture-the-fan').title,
       body: landingCard('capture-the-fan').description,
     },
