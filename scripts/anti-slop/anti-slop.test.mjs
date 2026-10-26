@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
@@ -53,6 +53,30 @@ const repo = () => {
 test('the real registry validates and has no unregistered prose copies', () => {
   const { errors } = runValidate();
   assert.deepEqual(errors, []);
+});
+
+test('rule ids are unique across the registry, counted in the raw file so parallel PRs cannot collide', () => {
+  const raw = readFileSync(join(process.cwd(), REGISTRY_PATH), 'utf8');
+  const ids = [...raw.matchAll(/"id":\s*"(ASR-\d{3})"/gu)].map(m => m[1]);
+  const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
+  assert.deepEqual(
+    dupes,
+    [],
+    `duplicate rule ids: ${[...new Set(dupes)].join(', ')}. The PR that merges second takes the next free id.`
+  );
+  assert.equal(new Set(ids).size, loadRegistry().rules.length);
+});
+
+test('deliberate red: two rules with one id fail validation, naming the id', () => {
+  const root = repo();
+  const reg = base();
+  reg.rules.push({
+    ...reg.rules[0],
+    title: 'Second rule claiming the same id',
+  });
+  assert.ok(
+    validateRegistry(reg, root).errors.some(e => e === 'ASR-001: duplicate id')
+  );
 });
 
 test('every rule carries a dated source', () => {

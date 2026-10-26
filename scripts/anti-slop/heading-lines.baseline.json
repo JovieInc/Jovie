@@ -1,0 +1,28 @@
+{
+  "note": "Headings that wrap to 3+ lines on public marketing routes at 2026-10-26 (measured on jov.ie). Shrink only: fixing one needs a copy or layout decision from Tim; delete its entry when fixed. New violations fail.",
+  "violations": [
+    "/artist-profiles@390:h2:Your music stays together. The right action leads.",
+    "/card@390:h1:Your Jovie profile. Ready for the real world.",
+    "/card@390:h2:An introduction. Not a list of usernames",
+    "/card@390:h2:Show your card. They open your profile",
+    "/instant-merch@1440:h1:Make the drop before the moment passes.",
+    "/instant-merch@390:h1:Make the drop before the moment passes.",
+    "/instant-merch@390:h3:Never Say A Word \u2014 lyric tee",
+    "/launch@1440:h2:Paste one Spotify link. Get smart links, fan notifications, and a link-in-bio th",
+    "/launch@1440:h3:jov.ie/tim/contact",
+    "/launch@1440:h3:jov.ie/tim/listen",
+    "/launch@1440:h3:jov.ie/tim/pay",
+    "/launch@1440:h3:jov.ie/tim/tour",
+    "/launch@390:h2:A link-in-bio built to convert, not just display.",
+    "/launch@390:h2:More creators than ever. More noise than ever.",
+    "/launch@390:h2:One profile. Purpose-built routes for every job.",
+    "/launch@390:h2:Paste one Spotify link. Get smart links, fan notifications, and a link-in-bio th",
+    "/launch@390:h2:Your music deserves better than a stack of links.",
+    "/launch@390:h3:jov.ie/tim/contact",
+    "/launch@390:h3:jov.ie/tim/listen",
+    "/launch@390:h3:jov.ie/tim/pay",
+    "/launch@390:h3:jov.ie/tim/tour",
+    "/pay@390:h2:Payments are just the beginning.",
+    "/solutions/artists@390:h2:Your music stays together. The right action leads."
+  ]
+}

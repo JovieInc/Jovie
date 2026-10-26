@@ -3,13 +3,14 @@
  * One entry point for the anti-slop guardrails.
  *   node scripts/anti-slop/run.mjs validate            registry integrity, wiring, prose drift (CI)
  *   node scripts/anti-slop/run.mjs list [--scope s]    rules, with status
- *   node scripts/anti-slop/run.mjs check --files a b   run the static rules over files before showing them
+ *   node scripts/anti-slop/run.mjs check [--render] --files a b   run the static rules over files before showing them (--render adds the 1440/390 heading line check)
  *   node scripts/anti-slop/run.mjs legacy --write      rewrite legacy-copies.json (shrink only)
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scanTypeScale } from '../invariants/art-direction/type-scale.mjs';
 import {
   checkDrift,
   findUnregisteredCopies,
@@ -57,7 +58,7 @@ export function runMatchers(reg, files, root = REPO_ROOT) {
   return findings;
 }
 
-function main(argv) {
+async function main(argv) {
   const [cmd = 'validate', ...rest] = argv;
   if (cmd === 'validate') {
     const { errors, summary, copies } = runValidate();
@@ -89,6 +90,27 @@ function main(argv) {
     }
     const reg = loadRegistry();
     const findings = runMatchers(reg, files);
+    for (const file of files) {
+      if (/\.(?:html?|css|tsx|jsx)$/u.test(file)) {
+        for (const hit of scanTypeScale(readFileSync(file, 'utf8'), file))
+          findings.push({
+            id: 'ASR-025',
+            severity: 'block',
+            file,
+            line: hit.line,
+            text: `${hit.px}px: ${hit.text}`,
+          });
+      }
+    }
+    if (rest.includes('--render')) {
+      const { checkTargets } = await import('./heading-lines.mjs');
+      const rendered = await checkTargets(
+        files.filter(f => /\.html?$/u.test(f))
+      );
+      for (const failure of rendered.failures)
+        process.stderr.write(`${failure}\n`);
+      if (rendered.failures.length) return 1;
+    }
     const fs = spawnSync(
       process.execPath,
       [
@@ -120,4 +142,4 @@ function main(argv) {
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1])
-  process.exitCode = main(process.argv.slice(2));
+  process.exitCode = await main(process.argv.slice(2));

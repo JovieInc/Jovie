@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { expect, test } from '@playwright/test';
 
 /**
@@ -497,6 +500,104 @@ test.describe('JOV-2081: Viewport matrix — /sign-in', () => {
       ).toBeVisible({ timeout: 15_000 });
 
       await assertPrimaryCtaVisible(page, viewport);
+    });
+  }
+});
+
+// ==========================================================================
+// ASR-037: headings wrap to at most 2 lines at 1440 and 390 (Tim, 2026-10-26)
+// ==========================================================================
+const HEADING_LINE_ROUTES = [
+  '/',
+  '/pricing',
+  '/artist-profiles',
+  '/artist-notifications',
+  '/download',
+  '/pay',
+  '/instant-merch',
+  '/youtube-thumbnails',
+  '/product',
+  '/card',
+  '/smart-links',
+  '/launch',
+  '/about',
+  '/support',
+  '/developers',
+  '/cli',
+  '/compare',
+  '/alternatives',
+  '/integrations',
+  '/solutions/artists',
+] as const;
+
+// Shrink-only baseline: headings that need a copy or layout decision to fix.
+const HEADING_LINE_BASELINE = new Set<string>(
+  (
+    JSON.parse(
+      readFileSync(
+        join(
+          process.cwd(),
+          '../../scripts/anti-slop/heading-lines.baseline.json'
+        ),
+        'utf8'
+      )
+    ) as { violations: string[] }
+  ).violations
+);
+
+// Playwright loads this spec through require(), which cannot take the ESM
+// helper statically; import it inside the test.
+test.describe('marketing heading line cap', () => {
+  for (const route of HEADING_LINE_ROUTES) {
+    test(`${route}: headings wrap to the line cap or fewer at every viewport`, async ({
+      page,
+    }) => {
+      const {
+        VIEWPORTS: HEADING_LINE_VIEWPORTS,
+        MAX_LINES: HEADING_MAX_LINES,
+        measureHeadings,
+      } = await import(
+        pathToFileURL(
+          resolve(__dirname, '../../../../scripts/anti-slop/heading-lines.mjs')
+        ).href
+      );
+      await blockAnalytics(page);
+      for (const viewport of HEADING_LINE_VIEWPORTS) {
+        await page.setViewportSize(viewport);
+        await page.goto(route, {
+          waitUntil: 'domcontentloaded',
+          timeout: 60_000,
+        });
+        await page.evaluate('document.fonts && document.fonts.ready');
+        await page.waitForTimeout(400);
+        const tooLong = (
+          (await measureHeadings(page)) as Array<{
+            tag: string;
+            text: string;
+            lines: number;
+          }>
+        ).filter(heading => heading.lines > HEADING_MAX_LINES);
+        const key = (heading: { tag: string; text: string }) =>
+          `${route}@${viewport.width}:${heading.tag}:${heading.text}`;
+        const fresh = tooLong.filter(
+          heading => !HEADING_LINE_BASELINE.has(key(heading))
+        );
+        const fixed = [...HEADING_LINE_BASELINE].filter(
+          entry =>
+            entry.startsWith(`${route}@${viewport.width}:`) &&
+            !tooLong.some(heading => key(heading) === entry)
+        );
+        for (const entry of fixed) {
+          test.info().annotations.push({
+            type: 'heading-baseline-stale',
+            description: `fixed, delete from heading-lines.baseline.json: ${entry}`,
+          });
+        }
+        expect(
+          fresh.map(h => `<${h.tag}> ${h.lines} lines: "${h.text}"`),
+          `ASR-037 ${route} @${viewport.width}`
+        ).toEqual([]);
+      }
     });
   }
 });
