@@ -115,11 +115,38 @@ function argValue(argv: readonly string[], name: string): string | undefined {
   return index >= 0 ? argv[index + 1] : undefined;
 }
 
+interface LighthouseAudit {
+  readonly numericValue?: number;
+  readonly details?: {
+    readonly items?: readonly {
+      readonly items?: readonly {
+        readonly node?: {
+          readonly snippet?: string;
+          readonly nodeLabel?: string;
+        };
+      }[];
+    }[];
+  };
+}
+
+/**
+ * Short label for the LCP element so a failing budget names what to fix (the
+ * 2026-10-26 failures needed a manual trace to learn it was a cookie card and a
+ * Suspense-hidden heading).
+ */
+export function describeLcpElement(audit: LighthouseAudit | undefined): string {
+  const node = audit?.details?.items?.[0]?.items?.[0]?.node;
+  const snippet = node?.snippet?.replace(/\s+/g, ' ').slice(0, 90);
+  if (!snippet) return 'unknown element';
+  const label = node?.nodeLabel?.replace(/\s+/g, ' ').slice(0, 40);
+  return label ? `${snippet} "${label}"` : snippet;
+}
+
 function runLighthouse(
   url: string,
   headersFile: string | null,
   outFile: string
-): { lcp: number; cls: number } {
+): { lcp: number; cls: number; element: string } {
   const require = createRequire(import.meta.url);
   const lhciDir = path.dirname(require.resolve('@lhci/cli/package.json'));
   const cli = require.resolve('lighthouse/cli/index.js', { paths: [lhciDir] });
@@ -140,14 +167,20 @@ function runLighthouse(
   });
   if (run.status !== 0) throw new Error(`lighthouse failed for ${url}`);
   const report = JSON.parse(readFileSync(outFile, 'utf8')) as {
-    audits: Record<string, { numericValue?: number }>;
+    audits: Record<string, LighthouseAudit>;
   };
   const lcp = report.audits['largest-contentful-paint']?.numericValue;
   const cls = report.audits['cumulative-layout-shift']?.numericValue;
   if (typeof lcp !== 'number' || typeof cls !== 'number') {
     throw new Error(`lighthouse produced no LCP/CLS for ${url}`);
   }
-  return { lcp, cls };
+  return {
+    lcp,
+    cls,
+    element: describeLcpElement(
+      report.audits['largest-contentful-paint-element']
+    ),
+  };
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
@@ -200,7 +233,7 @@ export async function main(argv: readonly string[]): Promise<number> {
         lcpSamples.push(sample.lcp);
         clsSamples.push(sample.cls);
         console.log(
-          `  ${budget.id} sample ${run + 1}/${runs}: LCP ${Math.round(sample.lcp)}ms CLS ${sample.cls.toFixed(3)}`
+          `  ${budget.id} sample ${run + 1}/${runs}: LCP ${Math.round(sample.lcp)}ms CLS ${sample.cls.toFixed(3)} element ${sample.element}`
         );
       }
       verdicts.push(
