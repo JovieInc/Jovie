@@ -243,3 +243,29 @@ export function routingOrder(
   view: CapacityView
 ): readonly { id: string; rank: number; freshness: Freshness }[];
 export function renderCanon(view: CapacityView, registry: unknown): string;
+
+export interface LaneRoutingView {
+  readonly providers: readonly {
+    readonly id: string;
+    readonly accounts: readonly {
+      readonly quota?: { readonly verdict?: string } | null;
+    }[];
+    readonly metrics?: { readonly costPerMergedUsd?: number | null } | null;
+    readonly limits?: { readonly laneSlots?: { readonly value?: number } };
+    readonly offGem?: { readonly status?: string };
+  }[];
+}
+
+export function laneRoutingOrder(
+  view: LaneRoutingView,
+  context?: {
+    gemLoaded?: boolean;
+    launchCritical?: boolean;
+    needsModelCodexLacks?: boolean;
+  }
+): {
+  order: ('openai-codex' | 'hyperagent')[];
+  reasons: string[];
+  hyperagentSlots: number | null;
+  codexWhere: 'gem' | 'gem-throttled' | 'codex-cloud';
+};
