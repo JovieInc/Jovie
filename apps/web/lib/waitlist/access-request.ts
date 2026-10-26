@@ -56,6 +56,7 @@ import {
   isStatusUpgrade,
   type UserLifecycleStatus,
 } from '@/lib/waitlist/status-precedence';
+import { recordWaitlistJoin } from './acquisition-stages';
 
 const WAITLIST_LOCK_PREFIX = 'waitlist:';
 
@@ -90,6 +91,8 @@ export interface WaitlistAccessRequestInput {
   readonly admissionScore?: AdmissionScore;
   /** Validated by the authenticated intake route for the exact canary email. */
   readonly syntheticRunId?: string;
+  /** Consented acquisition journey id (cookie) for loop attribution. */
+  readonly acquisitionId?: string | null;
 }
 
 export interface WaitlistAccessRequestResult {
@@ -746,6 +749,15 @@ export async function submitWaitlistAccessRequest(
   ) {
     notifySlackWaitlist(input.fullName, normalizedEmail).catch(error => {
       logger.warn('[waitlist] Slack notification failed', error);
+    });
+  }
+
+  if (!suppressCanaryCommunications) {
+    await recordWaitlistJoin({
+      entryId: result.entryId,
+      acquisitionId: input.acquisitionId,
+      admitted:
+        result.outcome === 'accepted' || result.outcome === 'already_accepted',
     });
   }
 
