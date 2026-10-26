@@ -38,7 +38,7 @@
       "step": "homepage",
       "route": "/",
       "source": "apps/web/data/homepageFanStatesCopy.ts",
-      "copy": "Your profile leads with your latest release or show.",
+      "copy": "Your profile leads with one clear thing.",
       "nature": "capability",
       "evidenceClass": null,
       "status": "admissible",

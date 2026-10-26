@@ -13,8 +13,7 @@ export const revalidate = false;
 
 export const metadata: Metadata = {
   title: documentTitle('Jovie AI Operating System'),
-  description:
-    'How a Jovie profile decides what to lead with: your latest release or show.',
+  description: 'How a Jovie profile decides what to lead with.',
   robots: NOINDEX_ROBOTS,
   twitter: {
     site: COMPANY_IDENTITY.xHandle,

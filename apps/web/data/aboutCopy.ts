@@ -41,7 +41,7 @@ export const ABOUT_COPY = {
       title: 'Relationships',
       href: APP_ROUTES.PRODUCT,
       description:
-        'Lead with your latest release or show, with clear ways to follow, subscribe, listen, or reach out.',
+        'Give each person a clear way to follow, subscribe, listen, buy, book, or reach out.',
     },
     {
       title: 'Audience',
