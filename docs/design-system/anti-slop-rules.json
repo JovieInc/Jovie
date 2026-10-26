@@ -869,9 +869,13 @@
             "file": "scripts/ci-fast-lanes.mjs",
             "token": "id: 'anti-slop'",
             "commandIncludes": "brand-name.mjs"
+          },
+          {
+            "file": ".github/workflows/source-validation.yml",
+            "token": "scripts/anti-slop/brand-name.mjs"
           }
         ],
-        "coverageNote": "Whole-repo scan against a shrinking per-file baseline on every PR (code, copy, docs, HTML). PR bodies and commit messages are checked by `brand-name.mjs --text-file` and `run.mjs check`, not yet wired to a PR-body CI step. Pen files are encrypted: scan their HTML/CSS export with --files."
+        "coverageNote": "Whole-repo scan (zero baseline; one frozen verbatim quote excepted) on every PR, plus the PR title, body and commit messages in Source Validation using the trusted base copy. Pen files are encrypted: scan their HTML/CSS export with run.mjs check --files."
       }
     }
   ],

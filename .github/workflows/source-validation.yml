@@ -228,6 +228,30 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts/design-frontend-skill-check.mjs | tar -x -C "$guard_root"
           node "$guard_root/scripts/design-frontend-skill-check.mjs" --diff-base "$trusted_ref"
+      # ASR-036: the brand is spelled Jovie (domain jov.ie) in the PR title, body
+      # and every commit message. Runs the trusted base copy; skips until that
+      # copy exists on the base branch.
+      - name: Check brand spelling in PR text and commit messages
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$BASE_BRANCH"
+          trusted_ref="$(git rev-parse --verify "refs/remotes/origin/$BASE_BRANCH^{commit}")"
+          if ! git cat-file -e "$trusted_ref:scripts/anti-slop/brand-name.mjs" 2>/dev/null; then
+            echo "brand-name guard not on $BASE_BRANCH yet; skipping"
+            exit 0
+          fi
+          guard_root="$(mktemp -d "$RUNNER_TEMP/brand-guard.XXXXXX")"
+          trap 'rm -rf "$guard_root"' EXIT
+          git archive "$trusted_ref" scripts/anti-slop | tar -x -C "$guard_root"
+          message_file="$(mktemp "$RUNNER_TEMP/brand-text.XXXXXX")"
+          { printf '%s\n\n%s\n\n' "$PR_TITLE" "$PR_BODY"; git log --format=%B "$trusted_ref..$HEAD_SHA"; } > "$message_file"
+          node "$guard_root/scripts/anti-slop/brand-name.mjs" --text-file "$message_file"
       # The merge group's Path Changes job runs this trusted classifier and
       # fails PR Ready on any path no lane rule maps, ejecting the whole group.
       # Run the same classifier here so the PR fails before enqueue instead.

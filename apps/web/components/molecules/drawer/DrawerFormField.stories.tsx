@@ -17,7 +17,7 @@ const meta = {
       <input
         id='profile-url'
         className='h-8 w-full rounded-md border border-subtle bg-surface-0 px-2 text-sm text-primary-token'
-        defaultValue='jovie.com/tim'
+        defaultValue='jov.ie/tim'
       />
     ),
   },

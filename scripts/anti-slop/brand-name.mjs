@@ -14,6 +14,10 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { REPO_ROOT } from './lib.mjs';
 
+/** Frozen verbatim or historical text. Each entry needs a reason. */
+export const EXCEPTIONS = JSON.parse(
+  readFileSync(new URL('./brand-name.exceptions.json', import.meta.url), 'utf8')
+).exceptions;
 export const BASELINE = 'scripts/anti-slop/brand-name.baseline.json';
 const EXPLICIT =
   /(?<![\w@/.-])(?:Jovy|Jovee|Jovei|Jovvie|Jovies|J0vie|Jovey|Jouvie|Jovvy|Jovye)(?![\w@/-])/giu;
@@ -48,7 +52,7 @@ const JOVI_OK =
   /\b(?:Summer Jovi|Jovi Technology|Jovi (?:coach|agent|health|AI|chat|memory|works)|(?:through|ask|ask|with|from|to) Jovi\b.*\b(?:agent|coach|health|memory)|AI Agent)\b|\b(?:agent|coach|health|memory)\b.*\bJovi\b/iu;
 const PROSE = /\.(?:md|mdx|txt|html|htm)$/iu;
 const SKIP_PATH =
-  /(?:^|\/)(?:pnpm-lock\.yaml|CHANGELOG\.md|node_modules\/|\.git\/)|\.(?:png|jpe?g|webp|avif|svg|ico|pen|xcodeproj|pbxproj|lock|woff2?)$|brand-name\.(?:mjs|test\.mjs|baseline\.json)$|anti-slop-rules\.json$/iu;
+  /(?:^|\/)(?:pnpm-lock\.yaml|CHANGELOG\.md|node_modules\/|\.git\/)|\.(?:png|jpe?g|webp|avif|svg|ico|pen|xcodeproj|pbxproj|lock|woff2?)$|brand-name\.(?:mjs|test\.mjs|baseline\.json|exceptions\.json)$|(?:^|\/)__snapshots__\/|anti-slop-rules\.json$/iu;
 const BINARY_LIKE =
   /\.(?:png|jpe?g|gif|webp|avif|pdf|zip|mp4|mov|woff2?|ttf|otf|icns|ico)$/iu;
 
@@ -85,7 +89,9 @@ export function scanLine(line, { prose = false } = {}) {
   for (const m of text.matchAll(EXPLICIT))
     found.push({ kind: 'misspelling', text: m[0] });
   if (!DOMAIN_OK_CONTEXT.test(line))
-    for (const m of line.matchAll(DOMAIN))
+    for (const m of line
+      .replace(/https?:\/\/\S+/gu, u => ' '.repeat(u.length))
+      .matchAll(DOMAIN))
       found.push({ kind: 'domain', text: m[0] });
   for (const m of text.matchAll(WORD)) {
     const word = m[0];
@@ -120,8 +126,17 @@ export function scanLine(line, { prose = false } = {}) {
   return found;
 }
 
-export function scanText(text, { file = '', prose = PROSE.test(file) } = {}) {
+/** Conventional-commit scopes like chore(jovie): are identifiers, not prose. */
+export function stripCommitScopes(text) {
+  return text.replace(/^(\w+)\([^)\n]*\)(!?:)/gmu, '$1$2');
+}
+
+export function scanText(
+  text,
+  { file = '', prose = PROSE.test(file), exceptions = EXCEPTIONS } = {}
+) {
   const hits = [];
+  const excused = exceptions.filter(e => e.file === file && e.reason);
   let fenced = false;
   text.split('\n').forEach((line, index) => {
     if (prose && /^\s*(?:```|~~~)/u.test(line)) {
@@ -129,6 +144,8 @@ export function scanText(text, { file = '', prose = PROSE.test(file) } = {}) {
       return;
     }
     if (fenced) return;
+    if (/^\s*name:\s*\S+\s*$/u.test(line)) return; // yaml identifier
+    if (excused.some(e => line.includes(e.match))) return;
     for (const hit of scanLine(line, { prose }))
       hits.push({
         file,
@@ -224,10 +241,13 @@ export function compareToBaseline(hits, baseline) {
 function main(argv) {
   const arg = name => argv[argv.indexOf(name) + 1];
   if (argv.includes('--text-file')) {
-    const hits = scanText(readFileSync(arg('--text-file'), 'utf8'), {
-      file: 'message.md',
-      prose: true,
-    });
+    const hits = scanText(
+      stripCommitScopes(readFileSync(arg('--text-file'), 'utf8')),
+      {
+        file: 'message.md',
+        prose: true,
+      }
+    );
     for (const h of hits)
       process.stderr.write(
         `ASR-036 ${h.kind} "${h.text}" line ${h.line}: ${h.context}\n`
