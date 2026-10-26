@@ -31,10 +31,10 @@ describe('AboutPageContent', () => {
     render(<AboutPageContent />);
     for (const [name, href] of [
       ['Living Profile', '/artist-profiles'],
-      ['Relationships', '/artist-profiles'],
+      ['Relationships', '/artist-notifications'],
       ['Audience', '/artist-profiles'],
       ['Adaptive', '/artist-profiles'],
-      ['For Artists', '/artist-profiles'],
+      ['For Artists', '/smart-links'],
       ['Tim White, Founder', '/tim/about'],
     ]) {
       expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);

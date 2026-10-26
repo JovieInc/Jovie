@@ -39,7 +39,7 @@ export const ABOUT_COPY = {
     },
     {
       title: 'Relationships',
-      href: APP_ROUTES.ARTIST_PROFILES,
+      href: APP_ROUTES.ARTIST_NOTIFICATIONS,
       description:
         'Give each person a clear way to follow, subscribe, listen, buy, book, or reach out.',
     },
@@ -57,7 +57,7 @@ export const ABOUT_COPY = {
     },
     {
       title: 'For Artists',
-      href: APP_ROUTES.ARTIST_PROFILES,
+      href: APP_ROUTES.SMART_LINKS,
       description:
         'Smart links, release notifications, and catalog tools when the work is music.',
     },

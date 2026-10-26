@@ -23,6 +23,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
+import { getPublishedEngineeringStories } from '@/lib/engineering-publication';
 import {
   certifySweep,
   compareToBaseline,
@@ -149,7 +150,12 @@ async function main() {
       `No build output at ${appDir}. Run \`pnpm --filter web build\` or pass --base-url.`
     );
   }
-  const targets = sweepTargets();
+  const publishedEngineeringStories = await getPublishedEngineeringStories()
+    .then(stories => stories.length)
+    .catch(() => undefined);
+  const targets = sweepTargets(undefined, undefined, {
+    publishedEngineeringStories,
+  });
   const pages = await Promise.all(
     targets.map(target =>
       baseUrl ? fetchPage(baseUrl, target) : readBuildPage(appDir, target)

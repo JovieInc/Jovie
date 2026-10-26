@@ -26,11 +26,7 @@
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
-    "/card": [
-      "agentic:structured-data",
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links"
-    ],
+    "/card": ["agentic:structured-data"],
     "/changelog": [
       "agentic:structured-data",
       "copy:copy-lint",
@@ -64,18 +60,8 @@
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
-    "/instant-merch": [
-      "agentic:structured-data",
-      "copy:copy-lint",
-      "geo:geo-direct-answer",
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links"
-    ],
-    "/pay": [
-      "agentic:structured-data",
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links"
-    ],
+    "/instant-merch": ["agentic:structured-data", "copy:copy-lint"],
+    "/pay": ["agentic:structured-data"],
     "/pricing": ["geo:geo-sibling-links"],
     "/smart-links": [
       "agentic:structured-data",
@@ -88,11 +74,6 @@
     "/voice": ["agentic:structured-data", "copy:copy-lint"],
     "/waitlist": ["technical:html-source"],
     "/waitlist/invite": ["technical:html-source"],
-    "/youtube-thumbnails": [
-      "agentic:structured-data",
-      "geo:geo-jsonld-type",
-      "geo:geo-orphan",
-      "geo:geo-sibling-links"
-    ]
+    "/youtube-thumbnails": ["agentic:structured-data"]
   }
 }
