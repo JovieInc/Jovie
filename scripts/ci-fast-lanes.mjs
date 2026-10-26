@@ -126,6 +126,7 @@ export const PR_CHEAP_SCAN_COMMANDS = Object.freeze([
   'pnpm tailwind:check',
   'pnpm --filter=@jovie/web run lint:no-native-dialogs',
   'pnpm --filter=@jovie/web run lint:seo',
+  'pnpm --filter=@jovie/web run lint:marketing-glass',
   'pnpm --filter=@jovie/web run lint:contrast-ratchet',
   'pnpm design:shared-ui-visual-arbitrary:check',
   'pnpm design:overlay-layers:check',
@@ -225,6 +226,16 @@ export const SOURCE_GUARDS = Object.freeze([
       'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs',
     inputs:
       /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/automation-liveness\.mjs|scripts\/lib\/(?:automation-registry\.mjs|__tests__\/automation-(?:registry|liveness)\.test\.mjs))/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    // Growth loop registry + experiment ledger (Tim 2026-10-26): malformed
+    // entries, outbound/paid loops without Tim approval and duplicate sources fail.
+    id: 'growth-registry',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/growth-registry.test.mjs',
+    inputs:
+      /^(?:canon\/growth-(?:loops|experiments)\.jsonl|scripts\/lib\/(?:growth-registry\.mjs|__tests__\/growth-registry\.test\.mjs))$/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -349,6 +360,17 @@ export const SOURCE_GUARDS = Object.freeze([
     command: `node ${shellQuote(fileURLToPath(new URL('./external-api-guard.mjs', import.meta.url)))}`,
     inputs:
       /(?:\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$|^packages\/api-client\/providers\.json$|^scripts\/lib\/external-api-guard\.)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    // Direct writes to core tables live only in registered domain functions
+    // (.claude/rules/domain-writes.md). A new second path, or a social-link
+    // writer without cache invalidation, fails here; grandfathered sites only
+    // shrink. Its contract test runs with SCRIPT_CONTRACT_VITEST_TESTS.
+    id: 'domain-write-guard',
+    command: `node ${shellQuote(fileURLToPath(new URL('./domain-write-guard.mjs', import.meta.url)))}`,
+    inputs:
+      /^(?:apps\/web\/(?:app|lib|components)\/.+\.(?:ts|tsx|mts)$|apps\/web\/lib\/domain\/write-registry\.json$|scripts\/(?:lib\/)?domain-write-guard\.|scripts\/lib\/domain-write-guard\.ratchet\.gen\.json$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -689,7 +711,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
     ' '
   )
 );
@@ -1091,6 +1113,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/external-api-guard.test.mjs',
+  'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =

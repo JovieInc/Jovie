@@ -136,7 +136,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -9072,17 +9072,69 @@ def recover_unclean_tick(host: Host) -> dict:
     return {"schema": "jovie.unclean-tick-recovery/v1", "refundedFixAttempts": sorted(refunded)}
 
 
+DOCTOR_REFRESH_S = 5 * 60
+
+
+def spawn_doctor_if_stale(host: Host, now: float | None = None) -> bool:
+    """Start a detached doctor pass when the last one is older than DOCTOR_REFRESH_S. The doctor used to run only
+    at the very end of a dispatch tick, so a slow tick left the feed, the HUD and the dead-man stale."""
+    now = time.time() if now is None else now
+    try:
+        at = datetime.fromisoformat(str(json.loads((host.state / "doctor.json").read_text())["at"]).replace("Z", "+00:00")).timestamp()
+    except (OSError, ValueError, KeyError, TypeError):
+        return False  # no doctor report at all (fresh host, fixture): the end-of-tick pass writes the first one
+    if now - at < DOCTOR_REFRESH_S:
+        return False
+    try:
+        with open(host.state / "doctor-spawn.log", "ab") as out:
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "doctor"], stdin=subprocess.DEVNULL,
+                             stdout=out, stderr=out, start_new_session=True, cwd=str(host.repo))
+        return True
+    except OSError:
+        return False
+
+
+def run_doctor(host: Host) -> int:
+    """One doctor pass; a second concurrent pass exits at once (doctor-run.lock)."""
+    lock = Locked(host.state / "locks" / "doctor-run.lock", blocking=False)
+    try:
+        if not lock.held:
+            return 0
+        doctor.run(host, sys.modules[__name__], codex_lane_module())
+        return 0
+    finally:
+        lock.release()
+
+
 def dispatch(host: Host) -> int:
+    lifecycle.HEARTBEAT = host.state / "tick-heartbeat"
+    lifecycle.beat()
+    try:
+        spawn_doctor_if_stale(host)
+    except Exception:  # a doctor that cannot start never blocks dispatch
+        pass
     unclean_previous = None
     try:
         unclean_previous = _begin_tick_intent(host)
     except Exception:
         unclean_previous = {"unavailable": True}  # a failed marker write must not skip the tick
+    started = time.monotonic()
     try:
         result = _dispatch(host, unclean_previous)
     finally:
         _clear_tick_intent(host)
+        record_tick_duration(host, time.monotonic() - started)
     return result
+
+
+def record_tick_duration(host: Host, seconds: float) -> None:
+    """One row per dispatch tick: the number to drive down (it was 25-60 minutes on 2026-10-26; target under 5)."""
+    try:
+        with open(host.state / "runs" / "tick-durations.jsonl", "a") as out:
+            out.write(json.dumps({"at": now_iso(), "dispatchS": round(seconds, 1), "release": read_marker(host),
+                                  "topCommands": lifecycle.top_stats()}) + "\n")
+    except OSError:
+        pass
 
 
 def _dispatch(host: Host, unclean_previous: dict | None) -> int:
@@ -9277,7 +9329,7 @@ def finish_dispatch(host: Host, tick: dict) -> int:
         tick["capacityLive"] = {"status": "error", "error": type(error).__name__}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
-        doctor.run(host, sys.modules[__name__], codex_lane_module())
+        run_doctor(host)
     except Exception as error:  # never let the doctor take dispatch down
         update_json(host.state / "tick.json", lambda data: data.update(doctorError=f"{type(error).__name__}: {error}"[:200]))
     return 1 if tick["error"] or tick.get("admissionDenied") else 0
@@ -9571,6 +9623,8 @@ def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
     Only the `current` symlink moves; running workers finish on their release. The outcome is
     written to update.json so a refused release is an alert, not a traceback in a journal."""
+    lifecycle.HEARTBEAT = host.state / "tick-heartbeat"  # the self-test is minutes long; its keepalive proves progress
+    lifecycle.beat()
     # Single flight: two updaters take the gate-admission lock and the seats from each other, so each
     # reads gate-admission-busy (3 concurrent `lane_runner update` at 17:07Z 2026-10-25, one of them a
     # manual retry loop, kept #23268 from installing). A second caller exits without touching update.json.
@@ -10513,6 +10567,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
+    sub.add_parser("doctor", help="one doctor pass (the dispatch tick starts one when the last is stale)")
     sub.add_parser("fix-now", help="drain the relay's red wake files immediately (JOV-8931)")
     sub.add_parser("update")
     prove = sub.add_parser("prove-staging", help="prove a staged release tree with this tree's own installer")
@@ -10596,6 +10651,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
         return worker(host, args.provider)
     if args.command == "fix-now":
         return fix_now(host)
+    if args.command == "doctor":
+        return run_doctor(host)
     return dispatch(host)
 
 

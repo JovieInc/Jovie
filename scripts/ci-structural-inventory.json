@@ -1,6 +1,6 @@
 {
   "measuredAt": "2026-10-25",
-  "source": "merge-group CI 40188929222 structural command timings",
+  "source": "merge-group CI 40188929222 structural command timings; marketing-glass: local isolated-worktree pnpm measurement, Node 24.22.1/pnpm 9.15.9, 2026-10-26",
   "thresholdSeconds": 60,
   "commands": [
     {
@@ -286,6 +286,12 @@
       "kind": "pr-cheap-scan"
     },
     {
+      "key": "pnpm --filter=@jovie/web run lint:marketing-glass",
+      "part": "webParts",
+      "seconds": 0.4,
+      "kind": "pr-cheap-scan"
+    },
+    {
       "key": "pnpm --filter=@jovie/web run lint:contrast-ratchet",
       "part": "webParts",
       "seconds": 1.3,
@@ -306,7 +312,7 @@
     {
       "key": "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/chat/mobile-chat-certification.test.ts",
       "part": "webParts",
-      "seconds": 5.0,
+      "seconds": 5,
       "kind": "suite"
     },
     {

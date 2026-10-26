@@ -70,7 +70,7 @@ function AuthShellInner({
   // removes it after hydration without replacing the shell or losing drafts.
   const sidebarTrigger =
     isMobile || isElectron ? null : !sidebarPinned ? (
-      <SidebarCollapseButton />
+      <SidebarCollapseButton previewTrigger={false} />
     ) : null;
 
   const isInSettings = section === 'settings';
