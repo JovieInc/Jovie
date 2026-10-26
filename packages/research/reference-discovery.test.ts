@@ -105,6 +105,11 @@ describe('bounded scoped discovery', () => {
       { approvalReceipt: null },
       { maxCalls: 0 },
       { maxUsd: 0 },
+      { calls: -1 },
+      { calls: Number.NaN },
+      { reservedUsd: -1 },
+      { reservedUsd: Number.NaN },
+      { revision: -1 },
       { source: 'other' },
       { scope: { ...scope, tenantId: 'other' } },
     ]) {

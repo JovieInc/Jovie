@@ -113,6 +113,15 @@ export async function runReferenceDiscoveryPage(input: {
     throw new Error('Discovery scope mismatch.');
   if (job.source !== adapter.name)
     throw new Error('Discovery source mismatch.');
+  if (
+    !Number.isInteger(job.calls) ||
+    job.calls < 0 ||
+    !Number.isFinite(job.reservedUsd) ||
+    job.reservedUsd < 0 ||
+    !Number.isInteger(job.revision) ||
+    job.revision < 0
+  )
+    throw new Error('Invalid persisted discovery counters.');
   validateWindow(job.window);
   if (!adapter.supportsWindow(job.window))
     throw new Error('Source does not support this date window.');
