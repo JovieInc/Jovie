@@ -116,6 +116,13 @@ let resizeObserverTarget: Element | null = null;
 
 vi.mock('@/components/organisms/table', () => ({
   AudienceMobileCard: () => null,
+  TableEmptyState: ({
+    heading,
+    testId,
+  }: {
+    heading?: string;
+    testId?: string;
+  }) => <div data-testid={testId}>{heading}</div>,
   UnifiedTable: ({
     data,
     columnVisibility,
@@ -198,6 +205,7 @@ function generateMockAudienceMembers(count: number): AudienceMember[] {
     referrerHistory: [{ url: 'https://example.com' }],
     utmParams: {},
     email: i % 3 === 0 ? `user${i + 1}@example.com` : null,
+    emailVisibleToArtist: true,
     phone: i % 3 === 1 ? `+1555000${String(i).padStart(4, '0')}` : null,
     spotifyConnected: i % 5 === 0,
     purchaseCount: Math.floor(Math.random() * 10),
@@ -301,7 +309,9 @@ describe('DashboardAudienceTable', () => {
     expect(
       screen.getByTestId('dashboard-audience-empty-state')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('unified-table')).toBeInTheDocument();
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
+    expect(capturedTableData).toEqual([]);
   });
 
   it('shows unified empty state with correct testId in subscribers mode', () => {

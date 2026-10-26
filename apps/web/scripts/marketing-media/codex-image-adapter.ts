@@ -13,10 +13,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type {
-  ImageGenerationAdapter,
-  ImageGenerationOutcome,
-  ImageGenerationRequest,
+import {
+  type ImageGenerationAdapter,
+  type ImageGenerationOutcome,
+  type ImageGenerationRequest,
+  marketingImagePrompt,
 } from './image-adapter';
 
 /** Generations one factory run may spend on the subscription. */
@@ -124,9 +125,7 @@ export function promptFor(request: ImageGenerationRequest): string {
     'Generate exactly one image with your built-in image_gen tool.',
     'Never use the imagegen CLI fallback, scripts/image_gen.py or any API key.',
     'Do not read or write any files. Reply with only the word done.',
-    `Aspect ratio about ${request.width}:${request.height}. No text, logos, watermarks or UI.`,
-    `Art direction: ${request.brief}`,
-    `Subject: ${request.prompt}`,
+    marketingImagePrompt(request),
   ].join('\n');
 }
 

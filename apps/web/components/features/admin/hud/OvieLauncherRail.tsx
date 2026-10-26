@@ -41,7 +41,10 @@ function LaunchControl({
       variant='secondary'
       size='sm'
       disabled={disabled}
-      aria-label={`${control.label}, ${STATUS_LABEL[control.status]}`}
+      // Named from content: the visible label + status spans are the
+      // accessible name (WCAG 2.5.3 Label in Name). An overriding
+      // aria-label failed axe 4.14 label-content-name-mismatch on the
+      // /hud?fs=1 capture once the truncated label text rendered visibly.
       title={`${control.label}. ${control.why}`}
       data-testid={`ovie-launcher-${control.id}`}
       data-group={control.group}

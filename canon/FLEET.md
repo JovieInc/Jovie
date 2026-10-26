@@ -3,7 +3,7 @@
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
 Owner: Tim White
-Last updated: 2026-10-10
+Last updated: 2026-10-20
 Source: founder interviews, 2026-08-17, 2026-09-04 and 2026-10-10
 
 The fleet exists to make Jovie default alive. It does not exist to file issues, keep agents busy, or maximize merges.
@@ -122,6 +122,17 @@ No enforcement path may count its own activity as progress or use a handoff rece
 
 Tim does not open Linear in the morning. Tim does not enroll PRs.
 
+### Taste never blocks: default plus deadline
+
+**EVENT:** Tim White, 2026-10-20 — "don't let taste block things forever." Every
+taste or decision ask that reaches Tim carries a recommended default and a
+deadline (48 hours unless the asker sets one, at most 14 days). If Tim is silent
+at the deadline, the default is recorded as the decision and ships; Tim's
+post-ship feedback revises it afterwards. Spend and outbound asks may only
+default to *no action*. An ask filed without a declared default defaults to *no
+action* too, so silence never acts on an undeclared default. The contract lives
+in [`docs/operations/DECISION_DEFAULT_CONTRACT.md`](../docs/operations/DECISION_DEFAULT_CONTRACT.md).
+
 ---
 
 ## Anti-goals
@@ -138,6 +149,7 @@ Tim does not open Linear in the morning. Tim does not enroll PRs.
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-20 | EVENT: every founder ask carries a default and a deadline; the default ships on silence, post-ship feedback revises it. | Tim White |
 | 2026-10-10 | Required a predeclared runnable exit check for every repo job; Done needs exact destination proof, not a CLI/HTTP/PR activity receipt. | Tim White |
 | 2026-09-21 | Deleted the ownerless-recovery-sweep workflow (chronic infra red on the jovie-fixed runner; ownerless-recovery role folded into the event-driven production controller). | Tim White |
 | 2026-09-04 | Made commitment closure explicit: destination-bound proof, accountable blockers, reconcile-before-duplicate, and independent missed-event recovery. | Tim White |

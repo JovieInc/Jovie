@@ -27,6 +27,7 @@ export const VERCEL_TOKEN_MISSING_WARNING =
 
 const MODES = new Set([
   'all',
+  'credentials',
   'domains',
   'drafts',
   'exhausted',
@@ -473,6 +474,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<any[]>} [options.loadSummerPulls]
  * @param {() => Promise<any>} [options.loadDeployments]
  * @param {() => Promise<any[]>} [options.loadDomains]
+ * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -486,6 +488,7 @@ export async function runRemediationSweep({
   loadSummerPulls,
   loadDeployments,
   loadDomains,
+  loadCredentials,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -550,6 +553,18 @@ export async function runRemediationSweep({
     for (const record of records) {
       const plan = planDomainExpiry(record, nowMs);
       if (plan) plans.push(plan);
+    }
+  }
+  if (includesMode(mode, 'credentials')) {
+    // Credentials and spend registry (ops/registry/): expiry 7d/1d, runway
+    // under 14 days, 50/80/100% of a cap, unowned or unconsumed secrets.
+    // Summer was down 2026-10-18..20 when an unwatched grant expired.
+    if (!loadCredentials) {
+      warnings.push('Credentials registry loader not wired; not judged');
+    } else {
+      const credentials = await loadCredentials();
+      warnings.push(...(credentials.warnings ?? []));
+      plans.push(...credentials.plans);
     }
   }
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });

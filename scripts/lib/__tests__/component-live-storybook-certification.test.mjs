@@ -45,7 +45,9 @@ import {
   readStorybookBuildResources,
   reapStaleStorybookVitestLeases,
   requireStorybookBuildMemory,
+  STORYBOOK_BUILD_ADMISSION_BYTES,
   STORYBOOK_BUILD_RSS_LIMIT_BYTES,
+  STORYBOOK_HOST_RESERVE_BYTES,
   STORYBOOK_VITEST_OWNER_ARG,
   spawnProcessGroup,
   storybookBuildEnvironment,
@@ -110,18 +112,67 @@ describe('live Storybook owned build resource bounds', () => {
     expect(() =>
       requireStorybookBuildMemory(() => ({
         ...healthy,
-        availableBytes: 25 * GiB,
+        availableBytes: 4 * GiB,
       }))
     ).toThrow('insufficient-owned-build-headroom');
     expect(() =>
       requireStorybookBuildMemory(() => ({
         ...healthy,
-        availableBytes: 5 * GiB,
+        availableBytes: GiB,
       }))
     ).toThrow('host-memory-reserve');
     expect(() => requireStorybookBuildMemory(() => ({}))).toThrow(
       'resource-measurement-unavailable'
     );
+  });
+
+  // PR #21946 (2026-10-20): a loaded 16 GiB ubuntu-latest merge-group runner
+  // was held because admission demanded 30% of total plus the whole 8 GiB
+  // runaway cap (12.8 GiB free). The measured live-cert build peaks near
+  // 1.35 GiB, so the runner must admit it while still keeping a host reserve.
+  it('admits the bounded build on a loaded 16 GiB hosted runner', () => {
+    const runner = { totalBytes: 16 * GiB, rssBytes: 0 };
+    expect(
+      requireStorybookBuildMemory(() => ({
+        ...runner,
+        availableBytes: 7 * GiB,
+      }))
+    ).toEqual({
+      availableBytes: 7 * GiB,
+      requiredBytes:
+        STORYBOOK_HOST_RESERVE_BYTES + STORYBOOK_BUILD_ADMISSION_BYTES,
+    });
+    expect(
+      STORYBOOK_HOST_RESERVE_BYTES + STORYBOOK_BUILD_ADMISSION_BYTES
+    ).toBeLessThanOrEqual(5 * GiB);
+    // The admission budget stays above the measured peak; the runaway cap
+    // stays the watchdog bound.
+    expect(STORYBOOK_BUILD_ADMISSION_BYTES).toBeGreaterThan(1.35 * GiB);
+    expect(STORYBOOK_BUILD_RSS_LIMIT_BYTES).toBeGreaterThan(
+      STORYBOOK_BUILD_ADMISSION_BYTES
+    );
+    expect(() =>
+      requireStorybookBuildMemory(() => ({
+        ...runner,
+        availableBytes: 4 * GiB,
+      }))
+    ).toThrow(
+      /insufficient-owned-build-headroom; availableBytes=\d+; requiredBytes=\d+/
+    );
+    expect(
+      storybookBuildResourceDisposition({
+        ...runner,
+        availableBytes: 3 * GiB,
+        rssBytes: 2 * GiB,
+      }).ok
+    ).toBe(true);
+    expect(
+      storybookBuildResourceDisposition({
+        ...runner,
+        availableBytes: STORYBOOK_HOST_RESERVE_BYTES - 1,
+        rssBytes: 2 * GiB,
+      }).reason
+    ).toBe('host-memory-reserve');
   });
 
   it('uses Linux available memory, and refuses missing or unreadable census', () => {
@@ -464,7 +515,7 @@ describe('live Storybook owned build resource bounds', () => {
     expect(
       storybookBuildResourceDisposition({
         ...healthy,
-        availableBytes: 19 * GiB,
+        availableBytes: STORYBOOK_HOST_RESERVE_BYTES - 1,
       }).reason
     ).toBe('host-memory-reserve');
     for (const sample of [

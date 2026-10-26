@@ -19,8 +19,10 @@ const hoisted = vi.hoisted(() => {
   const refreshFeaturedPlaylistFallbackCandidateMock = vi
     .fn()
     .mockResolvedValue(undefined);
+  const getClaimVerificationReachMock = vi.fn().mockResolvedValue(null);
 
   return {
+    getClaimVerificationReachMock,
     andMock,
     eqMock,
     getCachedAuthMock,
@@ -92,6 +94,10 @@ vi.mock('@/lib/db/schema/profiles', () => ({
   },
 }));
 
+vi.mock('@/lib/claim/claim-verification.server', () => ({
+  getClaimVerificationReach: hoisted.getClaimVerificationReachMock,
+}));
+
 vi.mock('@/lib/dsp-enrichment/enrichment-status', () => ({
   setAllEnrichmentStatuses: hoisted.setAllEnrichmentStatusesMock,
 }));
@@ -148,6 +154,7 @@ describe('enrichProfileFromDsp app-user identity', () => {
     hoisted.getCachedAuthMock.mockResolvedValue({
       userId: 'app-user-uuid',
     });
+    hoisted.getClaimVerificationReachMock.mockResolvedValue(null);
     hoisted.limitMock.mockResolvedValue([
       {
         appleMusicId: null,
@@ -173,6 +180,32 @@ describe('enrichProfileFromDsp app-user identity', () => {
         youtubeUrl: null,
       },
     ]);
+  });
+
+  it('never copies an unlinked high-reach artist onto the profile', async () => {
+    hoisted.getClaimVerificationReachMock.mockResolvedValue(3_000_000);
+    const { enrichProfileFromDsp } = await import(
+      '@/app/onboarding/actions/enrich-profile'
+    );
+
+    await expect(
+      enrichProfileFromDsp(
+        'famous-artist-id',
+        'https://open.spotify.com/artist/famous-artist-id'
+      )
+    ).resolves.toEqual({
+      name: 'Artist Name',
+      imageUrl: 'https://cdn.example.com/avatar.avif',
+      bio: null,
+      genres: [],
+      followers: null,
+    });
+    expect(hoisted.getClaimVerificationReachMock).toHaveBeenCalledWith(
+      'famous-artist-id'
+    );
+    expect(hoisted.setAllEnrichmentStatusesMock).not.toHaveBeenCalled();
+    expect(hoisted.updateMock).not.toHaveBeenCalled();
+    expect(hoisted.getSpotifyArtistProfileMock).not.toHaveBeenCalled();
   });
 
   it('loads the claimed profile by users.id instead of legacy clerk_id', async () => {

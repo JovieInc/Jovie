@@ -52,7 +52,7 @@ export default async function HudPage({
     if (adminAccess.hasAdminRole) await assertOviePrivacyUnlocked();
     if (!adminAccess.isAuthenticated) unauthorized();
     if (!adminAccess.hasAdminRole) forbidden();
-    if (requestedKiosk) redirect(APP_ROUTES.HUD);
+    if (requestedKiosk) redirect(APP_ROUTES.ADMIN_OPS);
   }
 
   const [metrics, funnel] = await Promise.all([

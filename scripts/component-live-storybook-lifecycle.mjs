@@ -26,7 +26,22 @@ export const STORYBOOK_READY_TIMEOUT_MS = 8 * 60 * 1000;
 export const STORYBOOK_POLL_MS = 250;
 export const STORYBOOK_VITEST_OWNER_ARG = '--jovie-storybook-vitest-owner=';
 export const STORYBOOK_VITEST_RUN_TIMEOUT_MS = 12 * 60 * 1000;
+// Runaway guard: a resolver recursion once grew this build past ~60 GiB
+// (#20988). The watchdog kills the owned group above this RSS.
 export const STORYBOOK_BUILD_RSS_LIMIT_BYTES = 8 * 1024 ** 3;
+// Absolute host headroom the watchdog keeps free while the build runs. It was
+// 30% of total memory, sized on a 64 GiB agent host; on a 16 GiB hosted runner
+// that is 4.8 GiB the runner never needs, and admission added the whole 8 GiB
+// runaway cap on top (12.8 GiB free). A loaded ubuntu-latest merge-group
+// runner never has that, so every canonical Button/Badge/Card change failed
+// deterministically in the queue (PR #21946, 2026-10-20 runs 39459127357 and
+// 39463382258).
+export const STORYBOOK_HOST_RESERVE_BYTES = 2 * 1024 ** 3;
+// Admission budget for the live-cert build itself. Measured 2026-10-20: the
+// JOVIE_LIVE_STORYBOOK_CERT build (canonical stories only, no addons,
+// --max-old-space-size=4096) peaked at 1.35 GiB process-group RSS. Admit with
+// about 2x that; the watchdog above still bounds a runaway at the RSS cap.
+export const STORYBOOK_BUILD_ADMISSION_BYTES = 3 * 1024 ** 3;
 const STORYBOOK_BUILD_OWNERS = new WeakMap();
 const STORYBOOK_BUILD_REPLACED = new WeakSet();
 // A leader that has exited but whose exit Node has not yet dispatched is
@@ -57,7 +72,10 @@ export function storybookBuildResourceDisposition(sample) {
     sample.rssBytes < 0
   )
     return { ok: false, reason: 'resource-measurement-unavailable' };
-  const reserveBytes = Math.ceil(sample.totalBytes * 0.3);
+  const reserveBytes = Math.min(
+    STORYBOOK_HOST_RESERVE_BYTES,
+    Math.ceil(sample.totalBytes * 0.3)
+  );
   if (sample.rssBytes > STORYBOOK_BUILD_RSS_LIMIT_BYTES)
     return { ok: false, reason: 'owned-build-rss-limit', reserveBytes };
   if (sample.availableBytes < reserveBytes)
@@ -89,14 +107,13 @@ export function storybookHostMemory({
 export function requireStorybookBuildMemory(memory = storybookHostMemory) {
   const sample = { ...memory(), rssBytes: 0 };
   const disposition = storybookBuildResourceDisposition(sample);
-  if (
-    !disposition.ok ||
-    sample.availableBytes <
-      disposition.reserveBytes + STORYBOOK_BUILD_RSS_LIMIT_BYTES
-  )
+  const requiredBytes =
+    (disposition.reserveBytes ?? 0) + STORYBOOK_BUILD_ADMISSION_BYTES;
+  if (!disposition.ok || sample.availableBytes < requiredBytes)
     throw new Error(
-      `Storybook build resource admission held: ${disposition.reason ?? 'insufficient-owned-build-headroom'}`
+      `Storybook build resource admission held: ${disposition.reason ?? 'insufficient-owned-build-headroom'}; availableBytes=${sample.availableBytes}; requiredBytes=${requiredBytes}; totalBytes=${sample.totalBytes}`
     );
+  return { availableBytes: sample.availableBytes, requiredBytes };
 }
 
 /**

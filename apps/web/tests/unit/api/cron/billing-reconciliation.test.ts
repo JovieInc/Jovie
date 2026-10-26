@@ -39,6 +39,7 @@ vi.mock('@/lib/db/schema/auth', () => ({
     id: 'id',
     clerkId: 'clerkId',
     isPro: 'isPro',
+    isAdmin: 'isAdmin',
     stripeSubscriptionId: 'stripeSubscriptionId',
     stripeCustomerId: 'stripeCustomerId',
     billingUpdatedAt: 'billingUpdatedAt',
@@ -85,6 +86,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
       processed: 0,
       blocked: [],
       failed: [],
+      needsReconciliation: [],
     });
   });
 
@@ -163,6 +165,7 @@ describe('GET /api/cron/billing-reconciliation', () => {
             processed: 0,
             blocked: [],
             failed: [],
+            needsReconciliation: [],
           },
         }),
       })
@@ -239,6 +242,64 @@ describe('GET /api/cron/billing-reconciliation', () => {
     );
     expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
     expect(mockCaptureWarning).not.toHaveBeenCalled();
+  });
+
+  it('downgrades a Pro user with no active subscription through the shared writer, resetting the plan', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    mockUpdateUserBillingStatus.mockResolvedValue({ success: true });
+    mockStripeList.mockResolvedValueOnce({
+      data: [{ id: 'sub_old', customer: 'cus_9', status: 'canceled' }],
+      has_more: false,
+    });
+    const empty = () => ({
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([]),
+          }),
+          limit: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    });
+    mockDbSelect
+      .mockReturnValueOnce(empty())
+      .mockReturnValueOnce({
+        from: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue([
+              {
+                id: 'user_9',
+                clerkId: 'clerk_9',
+                isPro: true,
+                stripeCustomerId: 'cus_9',
+              },
+            ]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce(empty());
+
+    const { GET } = await import('@/app/api/cron/billing-reconciliation/route');
+    const response = await GET(
+      new Request('http://localhost/api/cron/billing-reconciliation', {
+        headers: { Authorization: 'Bearer test-secret' },
+      })
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockUpdateUserBillingStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        clerkUserId: 'user_9',
+        isPro: false,
+        stripeSubscriptionId: null,
+        source: 'reconciliation',
+        metadata: { reason: 'no_active_subscription' },
+      })
+    );
+    // No direct users.update that would leave plan='pro', isPro=false.
+    expect(mockDbUpdateSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ isPro: false })
+    );
   });
 
   it('continues second-pass repairs when one user repair fails', async () => {

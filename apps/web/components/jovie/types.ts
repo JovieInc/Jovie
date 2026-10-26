@@ -4,8 +4,8 @@ import {
   type ToolUIPart,
   type UIMessage,
 } from 'ai';
+import type { ReactNode } from 'react';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
-import type { OvieHomeBriefing } from '@/lib/ovie/home-briefing';
 import type { ChatInsightSummary } from '@/types/insights';
 import {
   CHAT_STARTER_ACTION_ORDER,
@@ -29,6 +29,21 @@ export interface ArtistContext {
     readonly totalReceivedCents: number;
     readonly monthReceivedCents: number;
   };
+}
+
+/** What a living Home canvas needs from the shared chat. */
+export interface HomeCanvasState {
+  readonly messages: readonly MessageLike[];
+  /** A turn is being submitted or streamed. */
+  readonly isStreaming: boolean;
+  readonly onOpenTranscript: () => void;
+}
+
+/** The subset of a chat message a canvas reads; parts are untyped tool data. */
+export interface MessageLike {
+  readonly id: string;
+  readonly role: string;
+  readonly parts: readonly unknown[];
 }
 
 export interface JovieChatProps {
@@ -67,8 +82,19 @@ export interface JovieChatProps {
    * Omitted = customer (artist) mode, byte-identical to previous behavior.
    */
   readonly chatMode?: 'ov';
-  /** Ranked founder briefing shown before the first Ovie message. */
-  readonly ovieHomeBriefing?: OvieHomeBriefing;
+  /**
+   * Living Home canvas shown above the docked composer before the first
+   * message. Persona-neutral: Ovie passes the company loop; Jovie may pass
+   * the creator loop (founder decision 2026-10-20, one mirrored shell).
+   */
+  readonly homeCanvas?: ReactNode | ((state: HomeCanvasState) => ReactNode);
+  /**
+   * `empty-state` (default): the canvas shows until the first message, then
+   * the transcript takes over. `living`: the canvas stays the main surface
+   * and renders each turn's generated UI in place; the transcript opens on
+   * request (founder decision 2026-10-20, Q3).
+   */
+  readonly homeCanvasMode?: 'empty-state' | 'living';
   /** Whether profile setup is complete, used to suppress setup quick actions. */
   readonly isProfileComplete?: boolean;
   /**

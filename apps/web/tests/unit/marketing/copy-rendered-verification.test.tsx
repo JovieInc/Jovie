@@ -101,7 +101,7 @@ function pricingRenderedSurface(): RenderedCopySurface {
   const proClaim = getPublicPriceClaim('pro');
   const { container } = render(
     <PricingRecipeBody
-      requestAccessCopy={`Artist Presence is ${proClaim.priceLabel}/month with limited access. Request access.`}
+      requestAccessCopy={`${proClaim.displayName} is ${proClaim.priceLabel}/month. Claim your profile.`}
       plans={
         <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
       }

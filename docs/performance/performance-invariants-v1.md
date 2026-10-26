@@ -9,15 +9,76 @@ numbers — budgets live in the sources below and in the GBrain page, not here.
 
 | # | File | Owns | Enforcement today |
 |---|------|------|-------------------|
-| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; public-profile alias staging and production exceptions are bounded below |
+| 1 | `apps/web/scripts/performance-route-manifest.ts` | Route budgets (FCP/LCP/CLS/TTFB, `interactive-shell-ready`, `warm-shell-response`, `skeleton-to-content`, `usable-alias-result`) and resource budgets in transferSize KB | `performance-budgets-guard.ts` in `production-release.yml`; authenticated six-route and staged-build alias budgets block; the production alias exception is bounded below |
 | 2 | `apps/web/.lighthouserc.json` | Production Lighthouse for `/` and `/tim` | production-controller / postdeploy — perf assertions warn; only accessibility ≥ 0.9 errors |
 | 3 | `apps/web/.lighthouserc.{dashboard,onboarding,admin,chat,public-launch,pr}.json` | Per-surface Lighthouse thresholds (error level) | `ci.yml` `ci-lighthouse-*` jobs — `workflow_dispatch` only |
 | 4 | `apps/web/scripts/performance-interaction-manifest.ts` | Interaction latency / dropped frames (jank) classes | `perf:interactions` — manual |
-| 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/compare-chunks.ts` | Aspirational initial-JS gzip targets | Unwired; `bundle-baseline.json` is empty. Targets, never gates |
+| 5 | `docs/performance/route-budgets.json`, `apps/web/scripts/compare-chunks.ts` | Initial-JS growth ratchet: fails closed when `bundle-baseline.json` is missing, malformed, or still the empty placeholder (JOV-8555) | Not invoked by any workflow yet (baseline capture + workflow wiring pending). Targets, never gates |
 
 Rows 1–4 define certified surfaces; row 5 numbers are citable targets only. Where two live
 sources disagree, the stricter number governs and the file is named in the audit report.
 The only current row 1 advisory exceptions are bounded by the graduation policy below.
+
+`apps/web/scripts/route-js-budget.mjs` blocks finished builds on per-route gzip
+budgets. Marketing targets are tighter; unlisted routes use the default.
+Targets and measured baselines shrink; raises require an unexpired registry
+override for the exact key. Initial measurements (2026-10-23) allow at most 2%
+headroom. Lower baselines after reductions and delete them at the target.
+Profiles remain visible in server HTML before JavaScript. Row 5 stays unwired: no
+workflow invokes compare-chunks, and the in-script growth ratchet now fails
+closed on an unwired baseline (JOV-8555), so the first wired run fails loudly
+until the baseline is captured with `pnpm --filter @jovie/web
+compare-chunks:snapshot` after a clean build.
+
+| Route | Measured KB | Baseline KB | Target KB |
+| --- | ---: | ---: | ---: |
+| `/demo/showcase/[surface]` | 1284 | 1309 | 800 |
+| `/start` | 1223 | 1247 | 800 |
+| `/demo/founder-video` | 1157 | 1180 | 800 |
+| `/exp/shell-v1` | 947 | 965 | 800 |
+| `/[username]` | 883 | 900 | 800 |
+| `/[username]/profile-mode-render/[profileMode]/[marker]` | 883 | 900 | 800 |
+| `/exp/page-builder` | 881 | 898 | 800 |
+| `/demo/audience` | 847 | 863 | 800 |
+| `/demo` | 815 | 831 | 800 |
+| `/` | 650 | 663 | 640 |
+
+## Authenticated six-route graduation
+
+**Ship now (JOV-8557):** fail the existing authenticated six-route guard closed.
+The independent [graduation receipt](./authenticated-performance-graduation.json),
+measured at 2026-10-23T14:40:00Z, records 14 consecutive complete native PASS
+results. Each execution measured three samples for each of `creator-inbox-nav`,
+`creator-chat-nav`, `creator-library`, `creator-contacts`, `creator-calendar` and
+`creator-tasks`; the guard's PASS covers all manifest timing/resource budgets,
+including its existing same-route confirmation policy. No budget is raised.
+
+The hashed JSONL inventory enumerates all 145 controllers in the fixed
+2026-10-22T14:00:00Z–2026-10-23T14:40:00Z window. The latest 14 completed,
+executed measurement steps are selected by job completion time, regardless of
+controller conclusion. Skipped steps never qualify; partial or missing native
+authenticated results consume a nonqualifying slot. Each measurement records
+controller/attempt/job/step identities, native log SHA-256, all 18 primary samples,
+the native result and the matching checkout SHA, expected SHA and immutable
+deployment ID/URL. `headSha` is the controller source; `testedSha` is its checkout.
+
+This is production-release evidence against the exact staged production build
+before promotion. It is independent of `staging.jov.ie` and both public-profile
+alias windows below; canonical post-promotion production measurements cannot
+graduate this gate. Missing Better Auth credentials remain explicit skipped
+evidence under JOV-4452, never a passing authenticated measurement.
+
+**Re-evaluate when:** the existing guard reports a regression, or when its
+manifest/probe contract changes. The receipt names 2026-10-28T14:40:00Z as the
+next measurement review; that date does not expire blocking enforcement.
+
+**Then:** repair the measured regression and retain fail-closed enforcement.
+Refresh this receipt independently with the existing shared GitHub API client:
+
+```sh
+node scripts/lib/authenticated-performance-graduation.mjs \
+  2026-10-22T14:00:00Z 2026-10-23T14:40:00Z 2026-10-28T14:40:00Z
+```
 
 ## Public-profile alias graduation
 
@@ -28,17 +89,39 @@ Controller executions where that job ran can enter its window. Neither surface c
 other surface's streak.
 
 **Ship now:** production remains warning-only. The dated
-[`jovie-public-profile-alias-graduation/v1`](./public-profile-alias-graduation.json) receipt
-records 12 qualifying runs in the latest 14-run window and a current consecutive streak of
-1/14. With five samples per route, nearest-rank p95 is the maximum sample; every selected
-route must be at or below 1500 ms for a run to qualify.
+[`jovie-public-profile-alias-graduation/v2`](./public-profile-alias-graduation.json) receipt,
+measured at 2026-10-21T01:06:00Z, records 11 qualifying production runs in the latest
+14-run window and a current consecutive streak of 0/14. The three maxima over budget
+are 1626.2, 2083.1 and 2431.6 ms. Staging independently qualifies at 14/14, so its
+exact-build alias budget now fails closed when that measurement step runs. With five
+samples per route, nearest-rank p95 is the maximum sample; every selected route must
+be at or below 1500 ms for a run to qualify.
 
 **Re-evaluate when:** production reaches 14 consecutive eligible executions, and no later
-than 2026-10-21 under JOV-8338. Staging must present its own equivalent 14-run receipt before
-its policy changes.
+than 2026-10-28T01:06:00Z under JOV-8737. Staging's independent graduation is recorded
+under JOV-8338; production evidence never changes staging's decision.
 
 **Then:** make the qualifying surface's budget gate blocking. If a surface still does not
 qualify, refresh its dated measurement and set another bounded review date.
+
+The receipt references generated JSONL with all 472 controller jobsets in the fixed
+October 14–21 interval and 28 selected measurements (840 raw samples). Each measurement
+records exact controller/attempt/job/step identities, native log SHA-256, samples and
+matching native maxima. `headSha` identifies the controller workflow source;
+`testedSha` identifies its actual checkout. Staging also records the immutable
+deployment ID/URL and matching expected SHA. Failed controllers remain eligible;
+partial measurements consume a nonqualifying slot. Missing provider pages or logs
+abort collection instead of silently skipping an execution.
+
+Refresh manually with authenticated `gh`, explicit UTC boundaries, and the owning issue:
+
+```sh
+node scripts/lib/public-profile-alias-graduation.mjs \
+  2026-10-14T00:00:00Z 2026-10-21T01:06:00Z 2026-10-28T01:06:00Z JOV-8737
+```
+
+This regenerates the receipt and its two evidence files; review the resulting
+decisions and update the existing workflow enforcement in the same change.
 
 ## Rules binding repo edits
 
@@ -76,3 +159,49 @@ Route-response-latency budgets in this file are **not** a substitute for keeping
 path free of blocking I/O. The thread-blocking gate is `JOV-INV-031`
 ([latency-sensitive-execution-v1](./latency-sensitive-execution-v1.md)). That gate invents
 no numbers here and does not claim that async metadata changes crawler/bot wait.
+
+## Sibling check class: surface media
+
+Canvas, WebGL, and video on marketing pages are not a second Lighthouse budget
+and do not add a row here. `scripts/invariants/art-direction/surface-media.mjs`
+allows them only inside a named scope that keeps a non-WebGL fallback and
+`prefers-reduced-motion`. Scopes are registered in
+`docs/design-system/motion-effects.json` (ASR-039), which also carries each
+effect's gzip, frame-rate and offscreen-pause budget. The homepage hero
+(`apps/web/components/homepage/hero-light/`) is that approved scope and ships
+with no feature flag. The ambient field stays in scope because it already
+keeps a CSS poster and declines WebGL under reduced motion. Every other hit
+is on that check's shrink-only baseline.
+
+
+## Homepage hero WebGL exception
+
+The rules above are unchanged. This section does not add a row 1–3 budget.
+
+`night-dj-harmony-v1` still reads: Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.
+
+approved by Tim, scoped to the flagged hero prototype only. Dated 2026-10-22 8:47 PM PT.
+
+The exception applies only to the homepage hero decorative layer. It does not apply
+to any other surface. The hero ships enabled. There is no feature flag. There is no
+video. The canvas is `aria-hidden` and `pointer-events: none`, and it loads after
+idle. No WebGL support, reduced motion, save-data, low-power, and context loss keep
+the CSS poster, with no layout shift. The glass bar stays on CSS tokens
+(`backdrop-filter` via `--blur-header`).
+
+<!-- hero-light-webgl-exception/v1
+{
+  "schema": "hero-light-webgl-exception/v1",
+  "status": "approved",
+  "approval": "approved by Tim, scoped to the flagged hero prototype only",
+  "approvedAt": "2026-10-22 8:47 PM PT",
+  "approver": "Tim",
+  "rule": "Glow and glass stay CSS tokens. No canvas, WebGL, or video on a surface.",
+  "invariant": "night-dj-harmony-v1",
+  "sibling": "performance-invariants-v1",
+  "amendsInvariant": false,
+  "surface": "homepage hero decorative layer",
+  "otherSurfaces": false,
+  "module": "apps/web/components/homepage/hero-light/hero-light-gl.ts"
+}
+-->

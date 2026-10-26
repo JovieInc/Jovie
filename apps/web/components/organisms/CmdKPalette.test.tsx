@@ -154,6 +154,33 @@ function MainPlaneReopenHarness() {
 }
 
 describe('CmdKPalette', () => {
+  it('constrains dialog search to the compact presentation column', () => {
+    render(<CmdKPalette profileId='profile-1' open onOpenChange={vi.fn()} />);
+
+    const column = screen.getByTestId('shared-command-palette');
+    expect(column).toHaveClass('w-full', 'max-w-2xl');
+    expect(column).not.toHaveClass('max-w-3xl');
+    expect(column).toContainElement(
+      screen.getByRole('combobox', { name: 'Command Palette Search' })
+    );
+    expect(column).toContainElement(
+      screen.getByRole('listbox', { name: 'Command Palette Results' })
+    );
+  });
+
+  it('keeps main-plane results full width without a dialog column', () => {
+    render(<MainPlaneHarness />);
+
+    const plane = screen.getByTestId('cmdk-main-plane');
+    expect(plane).toHaveClass('w-full');
+    expect(plane).not.toHaveClass('max-w-2xl');
+    expect(plane).not.toHaveClass('max-w-3xl');
+    expect(screen.queryByTestId('shared-command-palette')).toBeNull();
+    expect(plane).toContainElement(
+      screen.getByRole('listbox', { name: 'Command Palette Results' })
+    );
+  });
+
   it('opens Contacts exactly once when its result is clicked', async () => {
     const onOpenChange = vi.fn();
     pushMock.mockClear();
@@ -299,7 +326,7 @@ describe('CmdKPalette', () => {
       expect(rows[1]).toHaveAttribute('aria-selected', 'true');
       expect(input).toHaveFocus();
       fireEvent.keyDown(input, { key: 'Enter' });
-      expect(pushMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.LIBRARY);
+      expect(pushMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.PRESENCE);
     }
   );
 
@@ -310,7 +337,7 @@ describe('CmdKPalette', () => {
     expect(rows[0]).toHaveAttribute('aria-selected', 'true');
     rows[1].focus();
     fireEvent.keyDown(rows[1], { key: 'Enter' });
-    expect(pushMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.LIBRARY);
+    expect(pushMock).toHaveBeenCalledExactlyOnceWith(APP_ROUTES.PRESENCE);
   });
 
   it('keeps an empty search open when navigation or commit has no result', () => {
@@ -354,23 +381,24 @@ describe('CmdKPalette', () => {
     expect(input).toHaveFocus();
   });
 
-  it('keeps Identity gated when workspace discoverability flags are hydrated', () => {
+  it('keeps Identity reachable with a stale rollout flag in the hydrated snapshot', () => {
     pushMock.mockClear();
-    const view = (enabled: boolean) => (
-      <AppFlagProvider
-        initialFlags={{ ...APP_FLAG_DEFAULTS, PROFILES_WORKSPACE: enabled }}
-      >
-        <MainPlaneHarness />
-      </AppFlagProvider>
-    );
+    const view = (enabled: boolean) => {
+      const staleFlags = { ...APP_FLAG_DEFAULTS, PROFILES_WORKSPACE: enabled };
+      return (
+        <AppFlagProvider initialFlags={staleFlags}>
+          <MainPlaneHarness />
+        </AppFlagProvider>
+      );
+    };
     const { rerender } = render(view(false));
     const input = screen.getByRole('combobox', {
       name: 'Command Palette Search',
     });
     fireEvent.change(input, { target: { value: 'Identity' } });
     expect(
-      screen.queryByRole('option', { name: /^Identity/ })
-    ).not.toBeInTheDocument();
+      screen.getByRole('option', { name: /^Identity/ })
+    ).toBeInTheDocument();
     rerender(view(true));
     expect(
       screen.getByRole('option', { name: /^Identity/ })
@@ -384,8 +412,8 @@ describe('CmdKPalette', () => {
     fireEvent.change(input, { target: { value: 'Identity' } });
     rerender(view(false));
     expect(
-      screen.queryByRole('option', { name: /^Identity/ })
-    ).not.toBeInTheDocument();
+      screen.getByRole('option', { name: /^Identity/ })
+    ).toBeInTheDocument();
   });
 
   it('updates workspace doors from the hydrated flag provider', () => {
@@ -489,7 +517,7 @@ describe('CmdKPalette', () => {
     const input = screen.getByRole('combobox', {
       name: 'Command Palette Search',
     });
-    // Go To follows the sidebar: Home leads (Identity is flag-gated off here).
+    // Go To follows the sidebar: Home, Identity, then Work.
     const home = screen.getByRole('option', {
       name: segmentedAccessibleName('Home', 'Open your Jovie home.', '⌘1'),
     });
@@ -502,8 +530,8 @@ describe('CmdKPalette', () => {
     expect(
       screen.getByRole('option', {
         name: segmentedAccessibleName(
-          PRODUCT_ONTOLOGY.work.label,
-          PRODUCT_ONTOLOGY.work.definition,
+          PRODUCT_ONTOLOGY.identity.label,
+          PRODUCT_ONTOLOGY.identity.definition,
           '⌘2'
         ),
       })

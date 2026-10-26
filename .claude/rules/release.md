@@ -404,7 +404,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Stage | Exact responsibility |
 | --- | --- |
-| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
+| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, unit tests the exact diff can affect (`--changed` against the merge base, aggregated into `PR Ready`), diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
 | Native merge queue | Re-run deterministic gates plus exact-head coverage on the exact `merge_group` head, then require only path-selected Web unit/build, Mac test/package, iOS Xcode, shared-contract integration, and model-free semantic evidence. |
 | Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
 | Direct/admin main | Fail closed through path/risk/fast/secret/migration plus every product lane selected by the exact push diff; skipped selected lanes and executed unselected lanes are invalid. |
@@ -447,7 +447,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Ovie Typecheck (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck` |
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
-| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test` |
 | `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |

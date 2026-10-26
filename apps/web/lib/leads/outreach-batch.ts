@@ -13,7 +13,6 @@ import {
   ne,
   or,
 } from 'drizzle-orm';
-import { getAppUrl } from '@/constants/domains';
 import { db } from '@/lib/db';
 import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { contactEvidenceReviews } from '@/lib/db/schema/contacts';
@@ -25,6 +24,7 @@ import {
   isInstantlyOutboundEnabled,
   isOutreachQuietHours,
 } from '@/lib/leads/outbound-gates';
+import { outreachApprovedWhere } from '@/lib/leads/outreach-eligible-status';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   evaluateOutboundSend,
@@ -34,6 +34,7 @@ import {
   type BlockedEffectReceipt,
   denyAudienceEffect,
 } from '@/lib/outbound/audience-effect-policy';
+import { getOutboundClaimUrl } from '@/lib/outbound/claim-url';
 import {
   outboundTargetFromLead,
   readOutboundLedger,
@@ -68,7 +69,7 @@ function getPendingEmailWhereClause(now = new Date()) {
   return and(
     or(eq(leads.outreachRoute, 'email'), eq(leads.outreachRoute, 'both')),
     eq(leads.outreachStatus, 'pending'),
-    eq(leads.status, 'approved'),
+    outreachApprovedWhere(),
     eq(leads.emailInvalid, false),
     isNotNull(leads.contactEmail),
     isNotNull(leads.claimToken),
@@ -432,7 +433,7 @@ export async function processOutreachBatch(
       const instantlyLeadId = await pushLeadToInstantly({
         email: lead.contactEmail,
         firstName: lead.displayName ?? lead.linktreeHandle,
-        claimLink: getAppUrl(`/claim/${lead.claimToken}`),
+        claimLink: getOutboundClaimUrl(lead.claimToken),
         artistName: lead.displayName ?? lead.linktreeHandle,
         priorityScore: lead.priorityScore ?? 0,
         approvedCopy: permission.copy,

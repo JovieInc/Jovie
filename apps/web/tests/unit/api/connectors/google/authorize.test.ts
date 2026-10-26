@@ -189,6 +189,42 @@ describe('GET /api/connectors/google/authorize', () => {
     expect(decoded.returnTo).toBe('/app/custom');
   });
 
+  it.each([
+    'https://evil.example/steal',
+    '//evil.example',
+    '/%5Cevil.example',
+    'javascript:alert(1)',
+  ])('signs Settings instead of an unsafe returnTo (%s)', async unsafe => {
+    const { GET } = await import('@/app/api/connectors/google/authorize/route');
+    const response = await GET(
+      new Request(
+        `http://localhost/api/connectors/google/authorize?${new URLSearchParams({ returnTo: unsafe }).toString()}`
+      )
+    );
+
+    const url = new URL(response.headers.get('location') as string);
+    expect(url.origin).toBe('https://accounts.google.com');
+    const decoded = verifyGoogleOAuthState(
+      url.searchParams.get('state') as string
+    );
+    expect(decoded.returnTo).toBe(APP_ROUTES.SETTINGS_CONNECTORS);
+  });
+
+  it('keeps existing query context on a safe returnTo', async () => {
+    const { GET } = await import('@/app/api/connectors/google/authorize/route');
+    const response = await GET(
+      new Request(
+        `http://localhost/api/connectors/google/authorize?${new URLSearchParams({ returnTo: '/app/ov/integrations?tab=google' }).toString()}`
+      )
+    );
+
+    const url = new URL(response.headers.get('location') as string);
+    const decoded = verifyGoogleOAuthState(
+      url.searchParams.get('state') as string
+    );
+    expect(decoded.returnTo).toBe('/app/ov/integrations?tab=google');
+  });
+
   it('uses GOOGLE_OAUTH_REDIRECT_URI_BASE when configured instead of request origin', async () => {
     hoisted.mockEnv.GOOGLE_OAUTH_REDIRECT_URI_BASE =
       'https://redirect.example.com/api/connectors/google';

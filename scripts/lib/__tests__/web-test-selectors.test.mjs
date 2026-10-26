@@ -107,6 +107,12 @@ describe('authoritative web unit selector', () => {
     expect(
       isAuthoritativeUnitTest('apps/web/tests/e2e/smoke-public.spec.ts')
     ).toBe(false);
+    expect(
+      isAuthoritativeUnitTest('apps/web/tests/a11y/rendered-gate.spec.ts')
+    ).toBe(false);
+    expect(read('apps/web/vitest.config.fast.mts')).toContain(
+      "'tests/a11y/**'"
+    );
     expect(buildAuthoritativeTestCommand(selected)[1]).toBe(
       'pnpm --filter=@jovie/ui run test -- atoms/skeleton.test.tsx'
     );

@@ -448,8 +448,14 @@ function HeaderGlobalSearch({
       {hasQuery ? (
         <div
           id={listboxId}
-          role='listbox'
-          aria-label='Search Results'
+          // Only claim `role=\"listbox\"` when at least one `option` is
+          // present (axe aria-required-children): the loading / error /
+          // no-results states render a single `role=\"status\"` row, and a
+          // listbox with zero options (with a non-option status child) is
+          // invalid ARIA.
+          {...(groups.length > 0 || contextualSuggestions.length > 0
+            ? { role: 'listbox', 'aria-label': 'Search Results' }
+            : {})}
           className='absolute inset-x-0 top-full z-50 mt-1.5 max-h-80 overflow-y-auto rounded-xl border border-subtle bg-surface-0 p-1.5 shadow-popover'
         >
           {indexedGroups.map(({ group, startIndex }) => (

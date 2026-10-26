@@ -11,24 +11,28 @@ Hermes and Trigger.dev are retired. Eve is Summer's approved durable target,
 but the Summer identity is unavailable until exact deployment and conversation
 receipts prove it. Ovie must not fall back to a local executor.
 
-## Canonical Ops contract (JOV-5256)
+## Ovie Home and the Ops contract (JOV-5959, JOV-5256)
 
-Packaged-app M1 consumes this exact contract. Do not add a second dashboard,
-shell, or Overview/HUD/TV product.
+EVENT: founder decision 2026-10-20 (`canon/PRODUCT.md`, "Jovie and Ovie
+mirror one shell"). Ovie Home at `/app/ov` is the default door: the shared
+composer with the living company-loop canvas above it. Both packaged doors
+open it. The full Ops dashboard stays one product, now at `/app/ov/ops`.
+Do not add a second dashboard, shell, or Overview/HUD/TV product.
 
 | Field | Value |
 |---|---|
-| Product name | Ops |
-| Route | `/hud` (`APP_ROUTES.HUD`) |
+| Home | `/app/ov` (`APP_ROUTES.OV`); `/app/ov/chat` renders the same Home |
+| Ops product name | Ops |
+| Ops route | `/app/ov/ops` (`APP_ROUTES.ADMIN_OPS`) |
 | Component | `HudDashboardClient` |
 | Module | `apps/web/lib/ovie/ops-entrypoint.ts` |
-| Packaged default | `/hud` (zero extra clicks; no `/app/chat` fallback) |
+| Packaged default | `/app/ov` (zero extra clicks; no `/app/chat` fallback) |
 
 Presentation modes of the same component and metrics contract:
 
 | Mode | Input | Density | Presentation |
 |---|---|---|---|
-| Shell | `/hud` | `shell` | `shell` |
+| Shell | `/app/ov/ops` | `shell` | `shell` |
 | Fullscreen | `/hud?fs=1` | `kiosk` | `shell` |
 | Kiosk | `/hud?kiosk=<token>` | `kiosk` | `token` |
 | Packaged Mac Ovie (JOV-5298) | `/hud?ovie=mac` | `shell` | `mac` (`OvieMacHud`) |
@@ -37,8 +41,8 @@ Compatibility aliases, never independent screens:
 
 | Old URL | Now |
 |---|---|
-| `/app/ov` | Redirects to `/hud` |
-| `/app/ov/ops` | Redirects to `/hud` (`?mode=kiosk` → `/hud?fs=1`) |
+| `/hud` | Redirects to Home at `/app/ov` (kiosk tokens and `?fs=1` keep the isolated Ops presentation) |
+| `/hud?ovie=mac` | Redirects to Home at `/app/ov` |
 | `/hud-tv` | Redirects to `/hud` (keeps `?kiosk=`, otherwise `?fs=1`) |
 
 Scan-first need band: Needs Tim, survival (cash/MRR), customer bottleneck,
@@ -49,9 +53,10 @@ walk capture, dispatch, and developer controls stay in disclosure.
 
 | Surface | Role |
 |---|---|
-| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. Packaged Ovie menu opens `/hud?ovie=mac`. |
-| `/hud` | One Ops screen. Fullscreen `?fs=1`. Unattended TV `?kiosk=TOKEN`. |
-| `/app/ov/chat` | Entitled operator door. Must not fall through to artist Jovie chat or self-identify as Ovie. |
+| Packaged Mac/iOS door | Talk + ops presentation. Conversational authority is Summer, after Eve intake. Both packaged doors open Home at `/app/ov`. |
+| `/app/ov` | Ovie Home: composer plus the living company-loop canvas. |
+| `/app/ov/ops` | One Ops screen. Fullscreen `/hud?fs=1`. Unattended TV `/hud?kiosk=TOKEN`. |
+| `/app/ov/chat` | Same Home; entitled operator door. Must not fall through to artist Jovie chat or self-identify as Ovie. |
 
 ## Ubuntu operational truth (JOV-5248)
 

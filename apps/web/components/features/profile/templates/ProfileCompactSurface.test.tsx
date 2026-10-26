@@ -1,6 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import type { DynamicOptions } from 'next/dist/shared/lib/app-dynamic';
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -315,10 +322,38 @@ describe('ProfileCompactSurface', () => {
       'href',
       '/start'
     );
+    // WCAG 2.5.3 / axe label-content-name-mismatch: the accessible name
+    // starts with the visible "jov.ie/you" text.
+    expect(
+      screen
+        .getByTestId('profile-proof-claim-bar-cta')
+        .getAttribute('aria-label')
+    ).toBe('jov.ie/you Claim yours');
     // Rides inside the dock, directly above the nav, so it moves with it.
     expect(bar.nextElementSibling).toBe(
       screen.getByTestId('profile-bottom-nav')
     );
+  });
+
+  it('puts a 44pt share control in the header next to the menu', async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: share,
+    });
+    renderSurface();
+
+    const button = screen.getByTestId('profile-header-share');
+    expect(button).toHaveAccessibleName(/^Share .+'s profile$/);
+    expect(button).toHaveClass('h-11', 'w-11');
+    fireEvent.click(button);
+    await waitFor(() => expect(share).toHaveBeenCalledTimes(1));
+    expect(share.mock.calls[0][0].url).toMatch(/\/[^/]+$/);
+
+    Object.defineProperty(navigator, 'share', {
+      configurable: true,
+      value: undefined,
+    });
   });
 
   it('omits the claim bar on regular profiles', () => {
@@ -327,10 +362,42 @@ describe('ProfileCompactSurface', () => {
     expect(screen.queryByTestId('profile-proof-claim-bar')).toBeNull();
   });
 
+  it('renders Jovie footer branding on the free public profile (JOV-8777)', () => {
+    renderSurface();
+
+    const branding = screen.getByTestId('profile-jovie-branding');
+    const link = within(branding).getByRole('link', { name: /Jovie home/i });
+    expect(link).toHaveAttribute(
+      'href',
+      `/?utm_source=profile&utm_artist=${artist.handle}`
+    );
+  });
+
+  it('omits Jovie footer branding when hideJovieBranding is set (JOV-8777)', () => {
+    renderSurface({ hideJovieBranding: true });
+
+    expect(screen.queryByTestId('profile-jovie-branding')).toBeNull();
+  });
+
   it('hides the bottom tab bar in static previews so it cannot cover clipped content (JOV-7192)', () => {
     renderSurface({ renderMode: 'preview', presentation: 'embedded' });
 
     expect(screen.queryByTestId('profile-bottom-nav')).toBeNull();
+    expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+      'data-render-mode',
+      'preview'
+    );
+  });
+
+  it('exposes the interactive render mode so md+ embedded chrome still reserves the dock', () => {
+    // From md up the live profile passes presentation="embedded" and still
+    // renders the dock; the dock-reservation CSS keys off data-render-mode.
+    renderSurface({ presentation: 'embedded' });
+
+    const surface = screen.getByTestId('profile-compact-surface');
+    expect(surface).toHaveAttribute('data-presentation', 'embedded');
+    expect(surface).toHaveAttribute('data-render-mode', 'interactive');
+    expect(screen.getByTestId('profile-bottom-nav')).toBeTruthy();
   });
 
   it('uses pearlQuiet top chrome without IconButton restyle classes', () => {

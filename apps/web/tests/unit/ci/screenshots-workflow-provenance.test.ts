@@ -213,12 +213,24 @@ describe('Product Screenshots provenance', () => {
         mkdirSync(bin);
         writeFileSync(
           join(bin, 'node'),
-          `#!/bin/sh\nprintf '%s\\n' "$@" > "${root}/emit-args"\n`,
+          `#!/bin/sh
+if [ "$1" = scripts/invariants/screen-proof-emit.mjs ]; then
+  printf '%s\\n' "$@" > "${root}/emit-args"
+else
+  exec "${process.execPath}" "$@"
+fi
+`,
           { mode: 0o755 }
         );
-        const run = (jobs: unknown[]) =>
-          runWithRealGh({
-            script: String(proof.bind?.run),
+        // Exercise the real resolver and gh transport without waiting out
+        // the production read-after-write budget for terminal fixtures.
+        writeFileSync(join(bin, 'sleep'), '#!/bin/sh\nexit 0\n', {
+          mode: 0o755,
+        });
+        const run = (payloads: unknown[][], status = 200) => {
+          let reads = 0;
+          return runWithRealGh({
+            script: `cd '${repoRoot}'\n${String(proof.bind?.run)}`,
             env: {
               // Caller PATH overrides the harness default, so the resolved
               // real gh dir must lead any host gh shims still on PATH.
@@ -229,23 +241,51 @@ describe('Product Screenshots provenance', () => {
               GITHUB_SHA: 'a'.repeat(40),
               GITHUB_SERVER_URL: 'https://github.com',
               GITHUB_WORKSPACE: root,
+              JOVIE_API_STATE_DIR: root,
             },
             route: path =>
               path ===
               'repos/JovieInc/Jovie/actions/runs/900/attempts/2/jobs?per_page=100'
-                ? { body: { jobs } }
+                ? {
+                    status,
+                    body: {
+                      jobs: payloads[Math.min(reads++, payloads.length - 1)],
+                    },
+                  }
                 : null,
           });
+        };
 
-        const missing = await run([{ id: 5, name: 'Certify Screenshots' }]);
+        const missing = await run([[{ id: 5, name: 'Certify Screenshots' }]]);
         expect(missing.code, proof.label).toBe(1);
         expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
 
+        const unknown = await run([[{ id: 7, name: 'unknown-job' }]]);
+        expect(unknown.code, proof.label).toBe(1);
+        expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
+
+        const ambiguous = await run([
+          [
+            { id: 77, name: String(generate.name) },
+            { id: 78, name: String(generate.name) },
+          ],
+        ]);
+        expect(ambiguous.code, proof.label).toBe(1);
+        expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
+
+        const denied = await run([[]], 403);
+        expect(denied.code, proof.label).toBe(1);
+        expect(existsSync(join(root, 'emit-args')), proof.label).toBe(false);
+
         const bound = await run([
-          { id: 5, name: 'Certify Screenshots' },
-          { id: 77, name: String(generate.name) },
+          [{ id: 7, name: 'unknown-job' }],
+          [
+            { id: 5, name: 'Certify Screenshots' },
+            { id: 77, name: String(generate.name) },
+          ],
         ]);
         expect(bound.code, `${proof.label}: ${bound.stderr}`).toBe(0);
+        expect(bound.requests, proof.label).toHaveLength(2);
         const args = readFileSync(join(root, 'emit-args'), 'utf8').split('\n');
         expect(args).toEqual(
           expect.arrayContaining([
@@ -257,7 +297,7 @@ describe('Product Screenshots provenance', () => {
         );
       }
     },
-    // Two real gh runs per discovered screen.
+    // Real gh requests cover missing, placeholder, ambiguous and resolved rows.
     60_000
   );
 

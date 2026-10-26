@@ -29,6 +29,7 @@
         "apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx",
         "apps/web/app/app/(shell)/admin/algorithm-health/page.tsx",
         "apps/web/app/app/(shell)/admin/campaigns/page.tsx",
+        "apps/web/app/app/(shell)/admin/capacity/page.tsx",
         "apps/web/app/app/(shell)/admin/certifications/page.tsx",
         "apps/web/app/app/(shell)/admin/chat-playground/page.tsx",
         "apps/web/app/app/(shell)/admin/chat/page.tsx",
@@ -52,7 +53,6 @@
         "apps/web/app/app/(shell)/admin/lists/[id]/page.tsx",
         "apps/web/app/app/(shell)/admin/lists/page.tsx",
         "apps/web/app/app/(shell)/admin/lists/views/[viewId]/page.tsx",
-        "apps/web/app/app/(shell)/admin/needs-you/page.tsx",
         "apps/web/app/app/(shell)/admin/operations/page.tsx",
         "apps/web/app/app/(shell)/admin/ops/page.tsx",
         "apps/web/app/app/(shell)/admin/outbound/page.tsx",
@@ -142,6 +142,31 @@
         "apps/web/app/billing/youtube-thumbnails/page.tsx",
         "apps/web/app/billing/youtube-thumbnails/success/page.tsx"
       ]
+    },
+    {
+      "id": "claim",
+      "area": "activation",
+      "importance": {
+        "acquisition": 3,
+        "revenue": 3,
+        "usage": 3
+      },
+      "status": "holdout",
+      "owner": "@itstimwhite",
+      "issue": "JOV-8392",
+      "expectedOwners": [
+        "apps/web/components/molecules/ContentSectionHeader.tsx",
+        "apps/web/components/molecules/ContentSurfaceCard.tsx",
+        "apps/web/components/organisms/StandaloneProductPage.tsx"
+      ],
+      "divergence": "The claim entry reuses the standalone product shell; search and checkout-return states await screen certification.",
+      "remainingScope": "Certify claim search, loading, empty, unavailable, claimed, verification, subscribed and canceled-checkout states on desktop and mobile.",
+      "evidence": {
+        "kind": "source-audit",
+        "at": "2026-10-20T22:14:00Z",
+        "ref": "334dc8c4413326cad5832ed2b0e74780da7e3467:apps/web/app/claim/page.tsx"
+      },
+      "sources": ["apps/web/app/claim/page.tsx"]
     },
     {
       "id": "home",
@@ -267,7 +292,14 @@
         "apps/web/app/(marketing)/integrations/page.tsx",
         "apps/web/app/(marketing)/launch/page.tsx",
         "apps/web/app/(marketing)/pay/page.tsx",
+        "apps/web/app/(marketing)/product/command-palette/page.tsx",
+        "apps/web/app/(marketing)/product/dsp-links/page.tsx",
+        "apps/web/app/(marketing)/product/isrc/page.tsx",
+        "apps/web/app/(marketing)/product/link-analytics/page.tsx",
         "apps/web/app/(marketing)/product/page.tsx",
+        "apps/web/app/(marketing)/product/pre-save/page.tsx",
+        "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
+        "apps/web/app/(marketing)/product/utm-links/page.tsx",
         "apps/web/app/(marketing)/smart-links/page.tsx",
         "apps/web/app/(marketing)/solutions/[audience]/page.tsx",
         "apps/web/app/(marketing)/support/page.tsx",
@@ -357,9 +389,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-15T16:40:00Z",
-        "ref": "docs/screenshots/jov-8097/README.md",
-        "sourceDigest": "6b67c9b31ac0494fd8e98afbfea6cc4ba5b57c102f4e01ed38ec04ac04d96d49"
+        "at": "2026-10-23T22:18:41.922Z",
+        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements.",
+        "sourceDigest": "8e04962d231d816b3936aaef2002e05d3d28994daa8a970035b91ce66eca8536"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
@@ -594,6 +626,69 @@
       "to": "canonical",
       "at": "2026-10-15T04:43:44Z",
       "evidence": "docs/screenshots/jov-8097/README.md"
+    },
+    {
+      "source": "apps/web/app/claim/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-20T22:14:00Z",
+      "evidence": "PR #22382 introduces the artist claim entry using StandaloneProductPage; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/isrc/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T10:00:00Z",
+      "evidence": "PR #22783 introduces the /product/isrc marketing page; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/utm-links/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T10:00:00Z",
+      "evidence": "PR #22777 introduces the /product/utm-links marketing page; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/dsp-links/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T11:10:00Z",
+      "evidence": "PR #22789 introduces the /product/dsp-links marketing page; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/link-analytics/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T13:20:00Z",
+      "evidence": "Source registration for the link analytics product page. Not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T16:05:01Z",
+      "evidence": "PR #22801 re-registers the release scheduling product page after merging main. Original branch observation: 2026-10-23T12:00:00Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/pre-save/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T17:06:39Z",
+      "evidence": "PR #22823 re-registers the pre-save product page after merging main. Original branch observation: 2026-10-23T14:00:00Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/product/command-palette/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-23T18:26:27.418Z",
+      "evidence": "PR #22804 re-registers the command palette product page after merging main including pre-save. Original branch observation: 2026-10-23T12:30:00Z; previous repair registration: 2026-10-23T16:58:51Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/capacity/page.tsx",
+      "from": null,
+      "to": "migrating",
+      "at": "2026-10-26T02:17:00Z",
+      "evidence": "PR #23313 introduces the admin agent plans page inside the admin shell migration (JOV-8098); source registration only."
     }
   ]
 }

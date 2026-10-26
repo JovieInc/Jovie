@@ -61,7 +61,6 @@ export function VoiceDemoVisual({ className }: Readonly<VoiceDemoVisualProps>) {
         onClick={toggleDemo}
         className='focus-ring-themed mt-5 inline-flex items-center gap-2 rounded-full border border-subtle bg-panel px-5 py-2 text-sm font-medium text-primary-token transition-colors hover:bg-surface-1'
         data-testid='voice-demo-play-btn'
-        aria-label={isPlaying ? 'Stop voice sample' : 'Play voice sample demo'}
       >
         {isPlaying ? (
           <>

@@ -4,6 +4,11 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
 import {
+  HomepageArtistHero,
+  HomepageFanStates,
+  HomepageOfferClose,
+} from '@/components/homepage/HomepageArtistProfile';
+import {
   FaqSection,
   MarketingContainer,
   MarketingHero,
@@ -11,7 +16,6 @@ import {
 } from '@/components/marketing';
 import { ArtistNotificationsLanding } from '@/components/marketing/artist-notifications/ArtistNotificationsLanding';
 import { ArtistProfileLandingRoute } from '@/components/marketing/artist-profile/ArtistProfileLandingRoute';
-import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import { MarketingFinalCTA } from '@/components/site/MarketingFinalCTA';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { APP_ROUTES } from '@/constants/routes';
@@ -75,14 +79,16 @@ export const homepage: Story = {
     docs: {
       description: {
         story:
-          'Proven recipe `homepage` — reference route `/new` via HomepageV2Route.',
+          'Proven recipe `homepage` — reference route `/`: the artist-profile hero, three real profile states, then the free offer with the same claim.',
       },
     },
   },
   render: () => (
     <RecipeChrome recipeId='homepage'>
       <PublicPageShell>
-        <HomepageV2Route />
+        <HomepageArtistHero />
+        <HomepageFanStates />
+        <HomepageOfferClose />
       </PublicPageShell>
     </RecipeChrome>
   ),
@@ -426,7 +432,7 @@ export const seo: Story = {
           <MarketingHero
             headingId='seo-hero-heading'
             headline='About Jovie'
-            subtitle='Jovie is one product for presence, relationships, and growth — for artists, founders, authors, creators, and independent experts.'
+            subtitle='Jovie is one product for presence, relationships, and growth — for any creator.'
             primaryCta={{ label: 'Get started', href: APP_ROUTES.SIGNUP }}
             logos={false}
             align='left'

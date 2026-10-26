@@ -160,37 +160,52 @@ export function DesktopTitlebar() {
         !sidebarOpen && !isMobile ? 'icon' : undefined
       }
       data-testid='electron-titlebar-row'
-      data-electron-drag-region='true'
-      style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+      data-electron-no-drag='true'
+      style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
     >
       {isDesktop ? (
         <div
           data-testid='electron-titlebar-sidebar-cell'
-          className='flex w-full min-w-0 items-center gap-1.5 px-2.5'
+          data-electron-no-drag='true'
+          className='flex w-full min-w-0 items-center gap-(--app-shell-sidebar-icon-gap)'
+          style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
         >
           <div
             data-testid='electron-traffic-light-safe-area'
-            className='w-(--electron-traffic-light-safe-width) shrink-0'
+            data-electron-drag-region='true'
+            className='w-(--electron-traffic-light-safe-width) shrink-0 self-stretch'
+            style={{ WebkitAppRegion: 'drag' } as CSSProperties}
             aria-hidden='true'
           />
           {/* Single canonical sidebar toggle for Electron: the same rail
               control primitive the header uses in the browser. Buttons are
-              no-drag via the Electron drag-region CSS. */}
-          <RailToggleButton
-            side='left'
-            controlsId='shell-left-rail'
-            open={sidebarToggleOpen}
-            pinned={isMobile ? sidebarCtx?.openMobile : sidebarCtx?.open}
-            openLabel={
-              sidebarCtx?.isPreview ? 'Pin sidebar' : 'Collapse sidebar'
-            }
-            closedLabel='Expand sidebar'
-            onToggle={() => toggleSidebar?.()}
-            disabled={!toggleSidebar}
-            shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
-            dataTestId='electron-sidebar-toggle'
-            iconTestId='electron-sidebar-toggle-icon'
-          />
+              no-drag via the Electron drag-region CSS.
+              While the sidebar context has not mounted (streaming shell
+              skeleton, provider-less hosts) the canonical control has no
+              toggle to call. Render placeholder chrome instead of a disabled
+              button: a disabled canonical control is unfocusable and inert,
+              so it must not exist under the canonical test id. */}
+          {toggleSidebar ? (
+            <RailToggleButton
+              side='left'
+              controlsId='shell-left-rail'
+              open={sidebarToggleOpen}
+              pinned={isMobile ? sidebarCtx?.openMobile : sidebarCtx?.open}
+              openLabel={
+                sidebarCtx?.isPreview ? 'Pin sidebar' : 'Collapse sidebar'
+              }
+              closedLabel='Expand sidebar'
+              onToggle={toggleSidebar}
+              shortcut={SIDEBAR_KEYBOARD_SHORTCUT_BARE}
+              dataTestId='electron-sidebar-toggle'
+              iconTestId='electron-sidebar-toggle-icon'
+            />
+          ) : (
+            <div
+              aria-hidden='true'
+              className='skeleton h-7 w-7 shrink-0 rounded-full'
+            />
+          )}
           <div
             data-testid='electron-nav-pill'
             className='flex shrink-0 items-center gap-0.5'
@@ -229,6 +244,13 @@ export function DesktopTitlebar() {
               <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
             </button>
           </div>
+          <div
+            data-testid='electron-titlebar-drag-strip'
+            data-electron-drag-region='true'
+            className='h-full min-w-0 flex-1 self-stretch'
+            style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+            aria-hidden='true'
+          />
         </div>
       ) : null}
     </div>

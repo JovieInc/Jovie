@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/lib/queries';
 import {
+  resetQueuedTaskUpdatesForTests,
   useMoveTaskMutation,
   useUpdateTaskMutation,
 } from '@/lib/queries/useTaskMutations';
@@ -13,6 +14,7 @@ import type {
   TaskStats,
   TaskStatus,
   TaskView,
+  UpdateTaskInput,
 } from '@/lib/tasks/types';
 
 const mockUpdateTask = vi.hoisted(() => vi.fn());
@@ -111,6 +113,7 @@ describe('useTaskMutations', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetQueuedTaskUpdatesForTests();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -121,6 +124,132 @@ describe('useTaskMutations', () => {
           retry: false,
         },
       },
+    });
+  });
+
+  it('commits overlapping edits with the version each write advances', async () => {
+    let version = 4;
+    const seen: Array<number | undefined> = [];
+    mockUpdateTask.mockImplementation(
+      async (_taskId: string, data: UpdateTaskInput) => {
+        seen.push(data.expectedMutationVersion);
+        if (data.expectedMutationVersion !== version) {
+          throw new Error('Task changed in another session');
+        }
+        version += 1;
+        return createTask({
+          mutationVersion: version,
+          ...(data.priority === undefined ? {} : { priority: data.priority }),
+          ...(data.status === undefined ? {} : { status: data.status }),
+          ...(data.assigneeKind === undefined
+            ? {}
+            : { assigneeKind: data.assigneeKind }),
+          ...(data.title === undefined ? {} : { title: data.title }),
+        });
+      }
+    );
+
+    const { result } = renderHook(() => useUpdateTaskMutation(), { wrapper });
+
+    await act(async () => {
+      await Promise.all([
+        result.current.mutateAsync({
+          taskId: 'task-1',
+          data: { priority: 'urgent', expectedMutationVersion: 4 },
+        }),
+        result.current.mutateAsync({
+          taskId: 'task-1',
+          data: { assigneeKind: 'jovie', expectedMutationVersion: 4 },
+        }),
+        result.current.mutateAsync({
+          taskId: 'task-1',
+          data: {
+            title: 'Layout QA task fixture 1',
+            status: 'in_progress',
+            expectedMutationVersion: 4,
+          },
+        }),
+      ]);
+    });
+
+    expect(seen).toEqual([4, 5, 6]);
+    expect(version).toBe(7);
+  });
+
+  it('commits the debounced title save that lands after a metadata burst settles', async () => {
+    // JOV-8793 burst shape: title/status/priority/assignee edits on one board
+    // item each capture the same expected version while the previous write is
+    // still in flight, and the title editor's debounced save is scheduled
+    // later still. The server must see a strictly increasing version chain
+    // (no repeated version, no 'Task changed in another session') and the
+    // committed row must retain every field, not just the last write.
+    let version = 4;
+    const seen: Array<number | undefined> = [];
+    // TaskView fields are readonly; track the committed patch in a mutable
+    // draft and hand copies to the fixture helper.
+    const committed = {
+      title: 'Layout QA task fixture',
+      status: 'backlog' as TaskStatus,
+      priority: 'medium' as TaskView['priority'],
+      assigneeKind: 'human' as TaskView['assigneeKind'],
+    };
+    mockUpdateTask.mockImplementation(
+      async (_taskId: string, data: UpdateTaskInput) => {
+        seen.push(data.expectedMutationVersion);
+        if (data.expectedMutationVersion !== version) {
+          throw new Error('Task changed in another session');
+        }
+        version += 1;
+        if (data.title !== undefined) committed.title = data.title;
+        if (data.status !== undefined) committed.status = data.status;
+        if (data.priority !== undefined) committed.priority = data.priority;
+        if (data.assigneeKind !== undefined) {
+          committed.assigneeKind = data.assigneeKind;
+        }
+        return createTask({ ...committed, mutationVersion: version });
+      }
+    );
+
+    const { result } = renderHook(() => useUpdateTaskMutation(), { wrapper });
+
+    // Metadata writes capture the pre-burst version (4) at schedule time.
+    // They run back to back through the queue while the caller is still
+    // holding the same capture.
+    const priorityWrite = result.current.mutateAsync({
+      taskId: 'task-1',
+      data: { priority: 'urgent', expectedMutationVersion: 4 },
+    });
+    const assigneeWrite = result.current.mutateAsync({
+      taskId: 'task-1',
+      data: { assigneeKind: 'jovie', expectedMutationVersion: 4 },
+    });
+    const statusWrite = result.current.mutateAsync({
+      taskId: 'task-1',
+      data: { status: 'in_progress', expectedMutationVersion: 4 },
+    });
+    await act(async () => {
+      await Promise.all([priorityWrite, assigneeWrite, statusWrite]);
+    });
+
+    // The queue has now drained and settled (test isolation deletes the
+    // remembered version). The debounced title save fires afterwards carrying
+    // the version the acknowledged writes committed — it must still land.
+    await act(async () => {
+      await result.current.mutateAsync({
+        taskId: 'task-1',
+        data: {
+          title: 'Layout QA task fixture 2',
+          expectedMutationVersion: 7,
+        },
+      });
+    });
+
+    expect(seen).toEqual([4, 5, 6, 7]);
+    expect(committed).toEqual({
+      title: 'Layout QA task fixture 2',
+      status: 'in_progress',
+      priority: 'urgent',
+      assigneeKind: 'jovie',
     });
   });
 

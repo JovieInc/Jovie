@@ -97,7 +97,8 @@ export default defineConfig({
       headless: true,
       instances: [{ browser: 'chromium' }],
     },
-    setupFiles: ['./.storybook/vitest.setup.ts'],
+    // addon-vitest provisions project and addon preview annotations together.
+    // Manual project-only setup suppresses addon hooks, including a11y scans.
     // Retry once in CI to handle transient Vite browser-mode module serving failures
     // (Storybook's internal React 18 compat chunk occasionally fails to load)
     retry: process.env.CI ? 3 : 0,

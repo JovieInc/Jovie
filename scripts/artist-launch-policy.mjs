@@ -110,7 +110,9 @@ export const SURFACES = [
     entity: 'profile-claim',
     routes: [
       '/[username]/claim',
+      '/claim',
       '/claim/[token]',
+      '/claim/start',
       '/onboarding',
       '/api/onboarding/claim',
     ],

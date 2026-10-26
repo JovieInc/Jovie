@@ -140,10 +140,12 @@ export function OnboardingTurnstile({
     publicEnv.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
     testMode
   );
-  const hasStaticBypass =
-    process.env.NODE_ENV === 'development' ||
-    publicEnv.NEXT_PUBLIC_E2E_MODE === '1' ||
-    publicEnv.NEXT_PUBLIC_AUTH_MOCK === '1';
+  // E2E and auth-mock builds are not a static bypass: every runtime that sets
+  // them also renders `data-e2e-mode="1"` on <html> (root layout), so the
+  // runtime marker below covers them, and a controlled-verification spec can
+  // opt out by clearing it (start-entry-continuity, JOV-7771). Build-time
+  // flags made that opt-out unreachable.
+  const hasStaticBypass = process.env.NODE_ENV === 'development';
   const shouldBypassTurnstile =
     hasStaticBypass || localAutomationBypass === true;
   const isRuntimeBypassPending =

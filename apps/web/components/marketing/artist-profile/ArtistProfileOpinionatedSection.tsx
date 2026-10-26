@@ -41,7 +41,7 @@ export function ArtistProfileOpinionatedSection({
     caption ??
     (preview
       ? undefined
-      : 'A Jovie artist profile leads fans to the current release with one Listen action.');
+      : 'A Jovie artist profile leads listeners to the current release with one Listen action.');
 
   return (
     <ArtistProfileSectionShell
@@ -74,7 +74,7 @@ export function ArtistProfileOpinionatedSection({
           </div>
 
           <figure
-            className='ap-opinionated__visual relative'
+            className='ap-opinionated__visual marketing-rounded-frame relative'
             data-testid='artist-profile-opinionated-profile'
           >
             {accessibleCaption ? (

@@ -28,14 +28,31 @@ def _file_locked(path: Path, fn):
                 ledger.writelines(json.dumps(row, sort_keys=True) + "\n" for row in additions)
                 ledger.flush(); os.fsync(ledger.fileno())
         return result
+GET_TIMEOUT_S = 90
+
+
 def _gh(coordination: dict, method: str, endpoint: str, body=None):
     token = os.environ.get(coordination.get("tokenEnv", "GH_TOKEN")) or os.environ.get("GITHUB_TOKEN")
     # No token in the environment means `gh` authenticates itself (the lanes' Jovie Bot shim mints
     # one per call); requiring GH_TOKEN here crashed every fix run once the shim landed.
     args = ["gh", "api", "-X", method, endpoint]
     args += ["--paginate", "--slurp"] if method == "GET" else ["--input", "-"]
-    ran = lifecycle.run(args, input=None if body is None else json.dumps(body), capture_output=True, text=True,
-                         env={**os.environ, "GH_TOKEN": token} if token else None, timeout=30)
+    env = {**os.environ, "GH_TOKEN": token} if token else None
+    if method == "GET":
+        # Paginated status-history reads grow with the ledger: a flat 30 s timed out 14 claims
+        # in 24h (2026-10-21), each failing a run before any agent work. Reads are idempotent:
+        # 90 s, one retry. Writes keep 30 s and are never replayed.
+        for attempt in (1, 2):
+            try:
+                ran = lifecycle.run(args, input=None, capture_output=True, text=True, env=env,
+                                    timeout=GET_TIMEOUT_S)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt == 2:
+                    raise
+    else:
+        ran = lifecycle.run(args, input=json.dumps(body) if body is not None else None, capture_output=True,
+                            text=True, env=env, timeout=30)
     if ran.returncode:
         if body and body.get("ref") and "422" in ran.stderr: return None
         raise RuntimeError(f"execution-coordinator-http-{ran.returncode}")
@@ -48,7 +65,7 @@ def _status_pages(pages) -> list[dict]:
     if any(not isinstance(item, dict) for item in statuses): raise RuntimeError("execution-coordinator-history-malformed")
     return statuses
 def _trusted_creator(creator) -> bool:
-    return isinstance(creator, dict) and creator.get("login") == "jovie-bot[bot]" and creator.get("type") == "Bot"
+    return isinstance(creator, dict) and creator.get("login") in {"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]"} and creator.get("type") == "Bot"
 SUCCESS_TERMINAL = frozenset({"succeeded", "no_op_stale", "superseded"})
 LIVE_EVENTS = frozenset({"attempt_started", "boundary_admitted"})
 # A completion seal stays pending until the same reconcile operation appends its
@@ -117,10 +134,12 @@ def _github_rows(coordination: dict, ident: dict) -> tuple[list[dict], int | str
     pages = _gh(coordination, "GET", f"repos/{repository}/commits/{sha}/statuses?per_page=100")
     return _status_rows(_status_pages(pages), ident, coordination=coordination)
 RESERVATION_SCHEMA = "jovie-execution-reservation/v1"
-# Reader-first rollout: self-update must not activate incompatible writer links.
-# Enable only in a reviewed release after every participating reader/writer is
-# verified ready. This is deliberately not a JSON or environment override.
-IMMUTABLE_WRITER_ENABLED = False
+# Candidate-linked writer enablement (JOV-8293): the separately reviewed release
+# after the dual-format reader and every boundary_id caller landed and drained.
+# Legacy numeric chains stay readable, legacy common-source-SHA reservations are
+# never extended or reused, and an un-updated writer still refuses new receipts.
+# This is deliberately not a JSON or environment override.
+IMMUTABLE_WRITER_ENABLED = True
 def _append_ref(ident: dict, head) -> str:
     return f"refs/jovie-execution/{ident['identityDigest']}/append-{head if head is not None else 'root'}"
 def _without_status(row: dict) -> dict:

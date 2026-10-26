@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { getSeamSideOffset, SEAM_GAP, Tooltip } from './Tooltip';
 
 function mockRect(el: HTMLElement, rect: Partial<DOMRect>) {
@@ -120,4 +120,40 @@ describe('Tooltip (shell)', () => {
       'Ask Jovie about my audience trends and engagement over the last quarter'
     );
   });
+});
+
+it('touch activates once without a stuck hint, then restores mouse and keyboard hints', async () => {
+  const activate = vi.fn();
+  render(
+    <Tooltip label='Action hint'>
+      <button type='button' onClick={activate}>
+        Action
+      </button>
+    </Tooltip>
+  );
+  const trigger = screen.getByRole('button', { name: 'Action' });
+  fireEvent.focus(trigger);
+  expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+  const touch = new Event('pointerdown', { bubbles: true });
+  Object.defineProperty(touch, 'pointerType', { value: 'touch' });
+  fireEvent(trigger, touch);
+  fireEvent.pointerUp(trigger);
+  fireEvent.click(trigger);
+  expect(activate).toHaveBeenCalledTimes(1);
+  expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+  fireEvent.blur(trigger);
+  fireEvent.focus(trigger);
+  expect(screen.queryByTestId('tooltip-content')).not.toBeInTheDocument();
+  fireEvent.keyDown(document.body, { key: 'Tab' });
+  fireEvent.blur(trigger);
+  fireEvent.focus(trigger);
+  expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
+  fireEvent(trigger, touch);
+  fireEvent.pointerUp(trigger);
+  fireEvent.blur(trigger);
+  const mouse = new Event('pointerover', { bubbles: true });
+  Object.defineProperty(mouse, 'pointerType', { value: 'mouse' });
+  fireEvent(trigger, mouse);
+  fireEvent.focus(trigger);
+  expect(screen.getByTestId('tooltip-content')).toBeInTheDocument();
 });

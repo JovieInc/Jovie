@@ -177,6 +177,12 @@ vi.mock('@/lib/utm', () => ({
     return url.includes('?') ? `${url}&${qs}` : `${url}?${qs}`;
   },
   extractUTMParams: () => ({}),
+  SMART_LINK_DEFAULT_UTM_PARAMS: { utm_source: 'jovie' },
+  // No visit UTMs in jsdom, so the shared rule falls back to the defaults.
+  resolveSmartLinkOutboundUtmParams: (
+    _searchParams: URLSearchParams,
+    defaults: Record<string, string> = { utm_source: 'jovie' }
+  ) => ({ ...defaults }),
 }));
 
 // ---------------------------------------------------------------------------
@@ -241,7 +247,7 @@ describe('@critical ReleaseLandingPage', () => {
     expect(buttons[0].getAttribute('data-href')).toBe(
       'https://open.spotify.com/track/1?utm_source=jovie'
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Select Apple Music' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Apple Music' }));
     await waitFor(() =>
       expect(screen.getByTestId('provider-button')).toHaveAttribute(
         'data-href',
@@ -260,7 +266,7 @@ describe('@critical ReleaseLandingPage', () => {
       screen.getByRole('group', { name: 'Choose a streaming service' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Select Apple Music' })
+      screen.getByRole('option', { name: 'Apple Music' })
     ).toBeInTheDocument();
   });
 

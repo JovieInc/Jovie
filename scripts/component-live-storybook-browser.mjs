@@ -141,7 +141,7 @@ function ownerSelector(owner) {
  * @param {{ register: (child: import('node:child_process').ChildProcess) => import('node:child_process').ChildProcess, signal: AbortSignal }} ctx
  */
 async function buildStorybook(outputDir, ctx) {
-  requireStorybookBuildMemory();
+  const admission = requireStorybookBuildMemory();
   const child = ctx.register(
     spawnProcessGroup(
       'pnpm',
@@ -163,6 +163,7 @@ async function buildStorybook(outputDir, ctx) {
     )
   );
   const output = { stdout: '', stderr: '' };
+  let peakRssBytes = () => 0;
   child.stdout?.on('data', chunk => {
     output.stdout += chunk;
   });
@@ -171,6 +172,7 @@ async function buildStorybook(outputDir, ctx) {
   });
   const code = await new Promise((resolveExit, reject) => {
     const resources = watchStorybookBuildResources(child, reject);
+    peakRssBytes = () => resources.peakRssBytes();
     const onAbort = () => {
       resources.stop();
       killProcessGroup(child, 'SIGKILL');
@@ -196,6 +198,10 @@ async function buildStorybook(outputDir, ctx) {
       `Storybook build failed closed (${code}): ${(output.stderr || output.stdout || '').slice(0, 4000)}`
     );
   }
+  // Measurement evidence for the admission budget (stderr keeps stdout JSON clean).
+  console.error(
+    `[live-storybook] build peakRssBytes=${peakRssBytes()} availableBytes=${admission.availableBytes} requiredBytes=${admission.requiredBytes}`
+  );
 }
 
 function resolveAxePath() {

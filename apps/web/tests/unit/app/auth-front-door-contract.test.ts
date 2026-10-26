@@ -11,19 +11,22 @@ import { MARKETING_PRICING_PLANS } from '@/data/marketingPricingPlans';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 
 describe('auth front-door contract', () => {
-  it('keeps waitlist-on homepage CTAs in request-access mode', () => {
+  it('keeps waitlist-on front-door CTAs on the claim label, routed to signup', () => {
     const contract = getHomepageFrontDoorCtaContract(true);
 
     expect(PUBLIC_WAITLIST_URL).toBe(APP_ROUTES.SIGNUP);
     expect(contract.primary).toEqual({
-      label: 'Request access',
+      label: 'Claim your profile',
       href: APP_ROUTES.SIGNUP,
     });
     expect(contract.primary.href).not.toBe(APP_ROUTES.WAITLIST);
     expect(contract.secondary).toBeNull();
     expect(contract.fallbackSupport).toBe(
-      'Limited prelaunch access. We will email when you are in.'
+      'Free to start. Reserve your name now.'
     );
+    // Retired with the self-serve offer (EVENT: Tim, 2026-10-20).
+    expect(contract.primary.label).not.toMatch(/request access/i);
+    expect(contract.fallbackSupport).not.toMatch(/limited/i);
   });
 
   it('keeps waitlist-off homepage CTAs in open-signup mode', () => {
@@ -40,7 +43,7 @@ describe('auth front-door contract', () => {
     expect(contract.fallbackSupport).toBe('Free forever. No credit card.');
   });
 
-  it('keeps free acquisition on signup, claims on the qualify chat, and Pro on request-access routing', () => {
+  it('keeps free acquisition on signup, claims on the qualify chat, and Pro on the self-serve claim checkout', () => {
     expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).toBe(APP_ROUTES.SIGNUP);
     // Claims enter the /start qualify chat (Tim 2026-09-28, JOV-3379).
     expect(MARKETING_CTA_INTENTS.claimProfile.href).toBe(APP_ROUTES.START);
@@ -49,7 +52,7 @@ describe('auth front-door contract', () => {
     ).toBe(`${APP_ROUTES.SIGNUP}?plan=free`);
     expect(
       MARKETING_PRICING_PLANS.find(plan => plan.id === 'pro')?.ctaHref
-    ).toBe(APP_ROUTES.WAITLIST);
+    ).toBe(`${APP_ROUTES.CLAIM}?plan=pro`);
     expect(HOMEPAGE_FRONT_DOOR_CTA.primary.href).not.toContain('/waitlist');
     expect(MARKETING_CTA_INTENTS.claimProfile.href).not.toContain('/waitlist');
   });

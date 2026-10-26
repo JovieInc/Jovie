@@ -1,6 +1,10 @@
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { formatUsd } from '@/lib/admin/format';
-import { formatSourceFreshness, isSourceStale } from '@/lib/hud/source-trust';
+import {
+  formatObservedAt,
+  formatSourceFreshness,
+  isSourceStale,
+} from '@/lib/hud/source-trust';
 import type { RevenueLiftDashboardData } from '@/lib/metrics/revenue-lift-dashboard';
 import { formatAmount } from '@/lib/utils/format-number';
 
@@ -25,6 +29,10 @@ function SourceLine({
           : stale
             ? `Stale · updated ${formatSourceFreshness(source.fetchedAtIso)}`
             : `Updated ${formatSourceFreshness(source.fetchedAtIso)}`}
+      {' · '}
+      <time dateTime={source.fetchedAtIso}>
+        Observed {formatObservedAt(source.fetchedAtIso)}
+      </time>
       <span className='block truncate' title={source.source}>
         Source: {source.source}
       </span>
@@ -94,10 +102,17 @@ export function RevenueLiftDashboardView({
             Incremental Revenue Per Active Artist (IRPAA)
           </h2>
           <p className='mt-3 min-h-10 text-4xl font-semibold tracking-tight text-primary-token'>
-            {irpaa ? formatAmount(irpaa.irpaaCents) : '—'}
+            {irpaa
+              ? formatAmount(irpaa.irpaaCents)
+              : data.irpaaSource.state === 'no_data'
+                ? 'No data'
+                : '—'}
           </p>
           <p className='mt-1 min-h-5 text-sm text-secondary-token'>
-            {deltaLabel ?? 'Prior-window comparison unavailable'}
+            {deltaLabel ??
+              (irpaa
+                ? 'No prior-window baseline'
+                : 'Prior-window comparison unavailable')}
             {irpaa
               ? ` · ${irpaa.activeArtists} active artists · ${irpaa.runCount} automation runs`
               : null}
@@ -440,9 +455,12 @@ export function RevenueLiftDashboardView({
       </section>
 
       <p className='text-2xs text-tertiary-token'>
-        Generated {formatSourceFreshness(data.generatedAtIso)}. Verified money,
-        attributed engagement, and causal lift stay separate. Proxy weights stay
-        on the blended IRPAA composite; see
+        Observed{' '}
+        <time dateTime={data.generatedAtIso}>
+          {formatObservedAt(data.generatedAtIso)}
+        </time>
+        . Verified money, attributed engagement, and causal lift stay separate.
+        Proxy weights stay on the blended IRPAA composite; see
         docs/product/creator-outcomes-measurement-contract.md.
       </p>
     </div>
