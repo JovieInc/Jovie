@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/EmptyState.test.tsx
+
 import { Button, type ButtonProps, Kbd } from '@jovie/ui';
 import Link from 'next/link';
 import React from 'react';
@@ -253,6 +255,55 @@ export function EmptyState({
     );
   };
 
+  const content = (
+    <>
+      {icon && (
+        <div className={cn('mb-3', styles.iconWrapper)} aria-hidden='true'>
+          {icon}
+        </div>
+      )}
+
+      <h3
+        id={headingId}
+        className={cn(
+          'mb-1 text-app font-caption',
+          styles.heading,
+          isWorkspacePresentation &&
+            'mb-2 text-sm font-semibold tracking-tight text-primary-token'
+        )}
+      >
+        {heading}
+      </h3>
+
+      {description && (
+        <p
+          id={descriptionId}
+          className={cn(
+            'mb-5 max-w-sm text-app leading-[1.45]',
+            styles.descriptionClassName,
+            isWorkspacePresentation &&
+              cn('max-w-md text-xs text-secondary-token', !hasActions && 'mb-0')
+          )}
+        >
+          {description}
+        </p>
+      )}
+
+      {hasActions && (
+        <div
+          className={cn(
+            'flex max-w-full flex-col gap-2 sm:flex-row sm:gap-3',
+            isWorkspacePresentation ? 'items-start' : 'items-center'
+          )}
+        >
+          {actionSlot}
+          {renderPrimaryAction()}
+          {renderSecondaryAction()}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <output
       aria-labelledby={headingId}
@@ -266,47 +317,15 @@ export function EmptyState({
         className
       )}
     >
-      {icon && (
-        <div className={cn('mb-3', styles.iconWrapper)} aria-hidden='true'>
-          {icon}
-        </div>
-      )}
-
-      <h3
-        id={headingId}
-        className={cn(
-          'mb-1 text-app font-caption',
-          styles.heading,
-          isWorkspacePresentation &&
-            'mb-2 text-2xl font-semibold tracking-tight text-primary-token'
-        )}
-      >
-        {heading}
-      </h3>
-
-      {description && (
-        <p
-          id={descriptionId}
-          className={cn(
-            'mb-5 max-w-sm text-app leading-[1.45]',
-            styles.descriptionClassName,
-            isWorkspacePresentation &&
-              cn(
-                'max-w-md text-base leading-6 text-secondary-token',
-                !hasActions && 'mb-0'
-              )
-          )}
+      {isWorkspacePresentation ? (
+        <div
+          data-empty-state-card=''
+          className='w-full max-w-md rounded-md border border-subtle bg-surface-0 p-6 text-left'
         >
-          {description}
-        </p>
-      )}
-
-      {hasActions && (
-        <div className='flex max-w-full flex-col items-center gap-2 sm:flex-row sm:gap-3'>
-          {actionSlot}
-          {renderPrimaryAction()}
-          {renderSecondaryAction()}
+          {content}
         </div>
+      ) : (
+        content
       )}
     </output>
   );

@@ -1,5 +1,7 @@
 'use client';
 
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
+
 // ---------------------------------------------------------------------------
 // DESIGN RULE — NO AI-SLOP GRADIENTS ON UI CHROME
 // ---------------------------------------------------------------------------
@@ -1468,7 +1470,7 @@ const TRACKS: Track[] = [
   {
     id: 'untitled-demo-04',
     releaseId: null,
-    title: 'Untitled Demo 04',
+    title: COPY_FALLBACKS.demo,
     artist: 'Tim White',
     album: '—',
     type: 'Single',

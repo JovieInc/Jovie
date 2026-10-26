@@ -78,6 +78,7 @@ describe('ActionDial', () => {
     const dial = screen.getByRole('group', {
       name: 'Choose a streaming service',
     });
+    expect(dial.querySelector('div')).toHaveClass('h-53', 'min-h-53');
     dispatchTouchPointer(dial, 'pointerdown', 120);
     dispatchTouchPointer(dial, 'pointermove', 154);
     expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
@@ -225,14 +226,140 @@ describe('ActionDial', () => {
     });
   });
 
+  it.each([103, 120])(
+    'returns a partial row drag ending at %i without selecting the tapped row',
+    endY => {
+      vi.useFakeTimers();
+      const onSelect = vi.fn();
+      render(<Fixture onSelect={onSelect} />);
+      const row = screen.getByRole('button', { name: 'Select Apple Music' });
+      dispatchTouchPointer(row, 'pointerdown', 120);
+      dispatchTouchPointer(row, 'pointermove', 103);
+      dispatchTouchPointer(row, 'pointermove', endY);
+      dispatchTouchPointer(row, 'pointerup', endY);
+      expect(screen.getByTestId('action-dial-icon-spotify')).not.toHaveClass(
+        'transition-none'
+      );
+      expect(screen.getByTestId('action-dial-icon-apple')).not.toHaveClass(
+        'transition-none'
+      );
+      fireEvent.click(row);
+      act(() => vi.advanceTimersByTime(180));
+
+      expect(onSelect).not.toHaveBeenCalled();
+      expect(
+        screen.getByRole('link', { name: 'Stream Now with Spotify' })
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
+        transform: 'translateY(0%)',
+      });
+    }
+  );
+
+  it('returns a reversed two-provider row drag on its incoming side', () => {
+    vi.useFakeTimers();
+    const onSelect = vi.fn();
+    render(
+      <ActionDial
+        options={OPTIONS.slice(0, 2)}
+        selectedId='spotify'
+        onSelect={onSelect}
+        actionLabel='Stream Now'
+        groupLabel='Choose a streaming service'
+      />
+    );
+    const row = screen.getByRole('button', { name: 'Select Apple Music' });
+    dispatchTouchPointer(row, 'pointerdown', 120);
+    dispatchTouchPointer(row, 'pointermove', 137);
+    expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
+      transform: 'translateY(-75%)',
+    });
+    // A release can return to the origin without delivering another move.
+    dispatchTouchPointer(row, 'pointerup', 120);
+    expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
+      transform: 'translateY(-100%)',
+    });
+    fireEvent.click(row);
+    act(() => vi.advanceTimersByTime(180));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('link', { name: 'Stream Now with Spotify' })
+    ).toBeInTheDocument();
+  });
+
+  it('rebases the hidden third icon without sweeping it through the CTA', () => {
+    render(<Fixture />);
+    const dial = screen.getByTestId('action-dial');
+    dispatchTouchPointer(dial, 'pointerdown', 120);
+    dispatchTouchPointer(dial, 'pointermove', 86);
+    dispatchTouchPointer(dial, 'pointerup', 86);
+
+    expect(screen.getByTestId('action-dial-icon-deezer')).toHaveClass(
+      'transition-none'
+    );
+    expect(screen.getByTestId('action-dial-icon-spotify')).not.toHaveClass(
+      'transition-none'
+    );
+    expect(screen.getByTestId('action-dial-icon-apple')).not.toHaveClass(
+      'transition-none'
+    );
+  });
+
+  it('returns a canceled row drag without persisting a new provider', () => {
+    vi.useFakeTimers();
+    const onSelect = vi.fn();
+    render(<Fixture onSelect={onSelect} />);
+    const row = screen.getByRole('button', { name: 'Select Apple Music' });
+    dispatchTouchPointer(row, 'pointerdown', 120);
+    dispatchTouchPointer(row, 'pointermove', 86);
+    dispatchTouchPointer(row, 'pointercancel', 86);
+    act(() => vi.advanceTimersByTime(180));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
+      transform: 'translateY(0%)',
+    });
+  });
+
+  it('keeps the final provider when a reverse swipe interrupts settling', () => {
+    vi.useFakeTimers();
+    const onSelect = vi.fn();
+    render(<Fixture onSelect={onSelect} />);
+    const dial = screen.getByTestId('action-dial');
+    dispatchTouchPointer(dial, 'pointerdown', 120);
+    dispatchTouchPointer(dial, 'pointermove', 86);
+    dispatchTouchPointer(dial, 'pointerup', 86);
+    act(() => vi.advanceTimersByTime(30));
+    dispatchTouchPointer(dial, 'pointerdown', 120);
+    dispatchTouchPointer(dial, 'pointermove', 154);
+    dispatchTouchPointer(dial, 'pointerup', 154);
+    act(() => vi.advanceTimersByTime(180));
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
+      transform: 'translateY(0%)',
+    });
+    expect(
+      screen.getByRole('link', { name: 'Stream Now with Spotify' })
+    ).toBeInTheDocument();
+  });
+
   it('keeps reduced-motion icon changes discrete', () => {
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
-    render(<Fixture />);
+    const onSelect = vi.fn();
+    render(<Fixture onSelect={onSelect} />);
 
     expect(
       screen.queryByTestId('action-dial-icon-track')
     ).not.toBeInTheDocument();
     expect(screen.getByText('Spotify icon')).toBeInTheDocument();
+    const dial = screen.getByTestId('action-dial');
+    dispatchTouchPointer(dial, 'pointerdown', 120);
+    dispatchTouchPointer(dial, 'pointermove', 86);
+    expect(screen.getByText('Spotify icon')).toBeInTheDocument();
+    expect(onSelect).not.toHaveBeenCalled();
+    dispatchTouchPointer(dial, 'pointerup', 86);
+    expect(onSelect).toHaveBeenCalledExactlyOnceWith('apple');
+    expect(screen.getByText('Apple icon')).toBeInTheDocument();
   });
 
   it('keeps server markup compatible with reduced-motion hydration', () => {
@@ -280,7 +407,7 @@ describe('ActionDial', () => {
     expect(action).toBeDisabled();
     expect(action.className).toContain('top-3');
     expect(action.className).not.toContain('top-20');
-    expect(action.parentElement?.className).toContain('h-19');
+    expect(action.parentElement).toHaveClass('h-19', 'min-h-19');
     expect(action.parentElement?.className).not.toContain('h-53');
   });
 

@@ -23,6 +23,7 @@ export const LEGACY_PROFILE_ALIAS_SLUGS = [
   'tour',
   'shows',
   'events',
+  'contact',
 ] as const;
 
 const SAFE_SEGMENT = /^[a-zA-Z0-9._-]+$/;

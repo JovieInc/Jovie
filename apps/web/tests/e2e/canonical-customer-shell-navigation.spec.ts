@@ -98,6 +98,32 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
     { width: 768, height: 1024 },
   ]) {
     await page.setViewportSize(viewport);
+    // The ?panel=profile deep link leaves the profile rail open. Below lg
+    // it presents as a modal sheet whose focus boundary marks the shell
+    // inert + aria-hidden, so landmark role queries cannot resolve while
+    // it is up. Dismiss the sheet (a chat rail stays closed until its next
+    // explicit action, JOV-7150) and assert the nav contract on the
+    // exposed shell.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#shell-artist-profile-rail')).toHaveAttribute(
+      'data-rail-phase',
+      'closed'
+    );
+    // Durable receipt for the dismissal leg: the drawer's observed lifecycle
+    // right after Escape. When the phase never reaches `closed`, the
+    // received value in the matrix artifacts was the missing diagnostic.
+    const dismissedRail = await page.evaluate(() => {
+      const element = document.querySelector('#shell-artist-profile-rail');
+      return {
+        present: element !== null,
+        railPhase: element?.getAttribute('data-rail-phase') ?? null,
+        ariaModal: element?.getAttribute('aria-modal') ?? null,
+        ariaHidden: element?.getAttribute('aria-hidden') ?? null,
+      };
+    });
+    process.stdout.write(
+      `${JSON.stringify({ name: 'mobile-rail-after-escape', viewport, observed: dismissedRail })}\n`
+    );
     const tabs = page.getByRole('navigation', { name: 'Dashboard Tabs' });
     await expect(tabs).toBeVisible();
     await expect(
@@ -144,7 +170,13 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
 
     await page.keyboard.press('Escape');
     await expect(more).toHaveAttribute('aria-expanded', 'false');
-    expect(await tabs.boundingBox()).toEqual(before);
+    const tabsAfterCollapse = await tabs.boundingBox();
+    // Receipt for the exact-box stability contract: both snapshots travel
+    // with the run so a mismatch names the axis and the delta directly.
+    process.stdout.write(
+      `${JSON.stringify({ name: 'mobile-tabs-box', viewport, before, after: tabsAfterCollapse })}\n`
+    );
+    expect(tabsAfterCollapse).toEqual(before);
     await expectNoHorizontalOverflow(page);
     await page.screenshot({
       path: testInfo.outputPath(
@@ -178,7 +210,14 @@ test('mobile navigation and canonical sidebar are stable at 375, 768, and 1440',
 
   const navBeforeFilter = await desktopNav.boundingBox();
   await desktopNav.getByRole('link', { name: 'New Chat' }).focus();
-  expect(await desktopNav.boundingBox()).toEqual(navBeforeFilter);
+  const navAfterFilter = await desktopNav.boundingBox();
+  // Receipt for the focus-stability contract: both snapshots travel with the
+  // run so a shift names its axis and magnitude (the focus-induced sub-pixel
+  // movement was previously only visible as an opaque toEqual mismatch).
+  process.stdout.write(
+    `${JSON.stringify({ name: 'desktop-nav-box', before: navBeforeFilter, after: navAfterFilter })}\n`
+  );
+  expect(navAfterFilter).toEqual(navBeforeFilter);
   await expectNoHorizontalOverflow(page);
   await page.screenshot({
     path: testInfo.outputPath('canonical-customer-shell-1440x900.png'),

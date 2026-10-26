@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 import { HOMEPAGE_PROFILE_PREVIEW_TOUR_DATES } from '../../components/features/home/homepage-profile-preview-fixture';
 import {
   startOfProfileSurfaceLocalDay,
@@ -13,6 +14,7 @@ import {
   expectedPublicProfileLayout,
   PROFILE_DESKTOP_SURFACE_SHIPPED,
 } from './utils/profile-desktop-surface';
+import { certifyProfileModeHistory } from './utils/profile-mode-history';
 import { auditPublicProfileLayout } from './utils/public-profile-layout-invariant';
 import {
   installPublicRouteMocks,
@@ -25,6 +27,18 @@ const PHONE_COLUMN_ONLY =
   'Exercises the default mobile-first desktop column; the build ships the desktop surface';
 
 const diagnostics = new WeakMap<object, () => Promise<void>>();
+
+for (const viewport of [
+  { width: 390, height: 844 },
+  { width: 1440, height: 900 },
+]) {
+  test(`profile mode history survives Home refresh at ${viewport.width}px`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await certifyProfileModeHistory(page, testInfo, 'unfazed');
+  });
+}
 
 test.beforeEach(({ page }) => {
   diagnostics.set(page, observeProfileAdmissionFailure(page));
@@ -1074,7 +1088,7 @@ test.describe('public profile browser admission', () => {
     await captureStill(page, testInfo, 'profile-admission-mobile.png', true);
     const accessibility = await new AxeBuilder({ page })
       .include('[data-testid="marketing-render-surface"]')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
     expect(accessibility.violations).toEqual([]);
 

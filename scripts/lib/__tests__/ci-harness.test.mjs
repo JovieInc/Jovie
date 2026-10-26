@@ -118,7 +118,7 @@ describe('ci-harness manifest', () => {
     const nonGates = (manifest.jobs ?? []).filter(job => !job.mergeGate);
     expect(nonGates.map(job => job.name)).toEqual([
       'Component Ship Gate (via ci-fast structural)',
-      'UI Story Coverage Audit (shadow)',
+      'UI Story Coverage Audit',
       'Lighthouse (public routes manual)',
       'Lighthouse (admin manual)',
       'Lighthouse (chat manual)',

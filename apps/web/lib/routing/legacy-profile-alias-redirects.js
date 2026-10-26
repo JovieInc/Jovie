@@ -30,6 +30,7 @@ const LEGACY_PROFILE_MODE_ALIAS_MODES = [
   ['tour', 'tour'],
   ['shows', 'tour'],
   ['events', 'tour'],
+  ['contact', 'contact'],
 ];
 
 function legacyProfileAliasUsernamePattern() {

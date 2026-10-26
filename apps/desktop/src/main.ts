@@ -121,6 +121,7 @@ import {
   summarizeUnhandledRejection,
 } from './main-liveness';
 import { installNightlyUpdateLaunchAgent } from './nightly-update-launch-agent';
+import { buildNativeHelpMenu } from './native-help-menu';
 import { DesktopNavigationCoordinator } from './navigation-coordinator';
 import { createStartupMaintenanceGate } from './startup-maintenance';
 import {
@@ -265,7 +266,9 @@ const printBuildIdentityOnStart = process.argv.includes(
   DESKTOP_BUILD_IDENTITY_PRINT_FLAG
 );
 const MACOS_TRAFFIC_LIGHT_X = 20;
-const MACOS_TRAFFIC_LIGHT_Y = 17;
+// JOV-8974: the titlebar band sits one app-shell gap (8px) below the window
+// top, so the native lights ride down with the band (was 17 flush-top).
+const MACOS_TRAFFIC_LIGHT_Y = 25;
 const MACOS_TRAFFIC_LIGHT_POSITION = {
   x: MACOS_TRAFFIC_LIGHT_X,
   y: MACOS_TRAFFIC_LIGHT_Y,
@@ -319,9 +322,6 @@ const CLIENT_NAVIGATION_CHANNEL = 'desktop-client-navigation';
 const CLIENT_NAVIGATION_READY_CHANNEL = 'desktop-client-navigation-ready';
 const LAUNCH_OPERATOR_CONTROL_CHANNEL = 'launch-operator-control';
 const GET_BUILD_IDENTITY_CHANNEL = 'get-build-identity';
-type UpdateChannel =
-  | typeof UPDATE_AVAILABLE_CHANNEL
-  | typeof UPDATE_DOWNLOADED_CHANNEL;
 
 interface NavState {
   canGoBack: boolean;
@@ -1508,12 +1508,13 @@ function buildDesktopShellHtml(input: {
       .shell { position: relative; display: grid; width: min(420px, calc(100vw - 48px)); gap: 16px; padding: 32px 24px; text-align: center; justify-items: center; }
       .mark { width: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; height: ${SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx}px; color: var(--system-b-mark-cream); }
       .copy { position: relative; display: grid; gap: 8px; justify-items: center; }
-      h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+      h1 { margin: 0; font-size: 17px; font-weight: 650; letter-spacing: -0.01em; text-wrap: balance; }
       p { margin: 0; max-width: 34ch; color: var(--system-b-text-secondary); font-size: 13px; line-height: 1.55; }
       .actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
       a { display: inline-flex; height: 34px; align-items: center; justify-content: center; border-radius: var(--system-b-radius-pill); padding: 0 13px; color: var(--system-b-text-primary); font-size: 12px; font-weight: 590; text-decoration: none; }
       .primary { background: var(--system-b-primary-bg); color: var(--system-b-primary-fg); }
       .secondary { color: var(--system-b-text-secondary); }
+      a:focus-visible { outline: 2px solid var(--system-b-text-primary); outline-offset: 3px; }
       ${DESKTOP_BUILD_IDENTITY_SHELL_CSS}
     </style>
   </head>
@@ -1583,6 +1584,7 @@ function buildDesktopBootSplashHtml(): string {
   const markCream = SYSTEM_B_DESKTOP_TOKENS.markCream;
   const cornerMarkPx = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkSizePx;
   const cornerMarkOpacity = SYSTEM_B_DESKTOP_TOKENS.macCornerMarkOpacity;
+  const settledMarkPx = SYSTEM_B_DESKTOP_TOKENS.splashMarkSizePx;
   const wordmarkDataUrl = desktopBootSplashWordmarkDataUrl;
   return `<!doctype html>
 <html lang="en">
@@ -1604,6 +1606,21 @@ function buildDesktopBootSplashHtml(): string {
       .suffix { font-size: min(38px, 1.7vw); line-height: 1.15; font-weight: 400; letter-spacing: -.8px; }
       .progress { width: min(120px, 5.36vw); height: 2px; overflow: hidden; background: rgba(255,255,255,.2); }
       .progress::before { content: ""; display: block; width: min(44px, 1.96vw); height: 2px; background: var(--mac-ion); }
+      /* splash-b-everywhere-v1: the wordmark appears, then settles down to just the O. Opacity/scale only, so nothing shifts layout. */
+      .stage { display: grid; place-items: center; }
+      .stage > * { grid-area: 1 / 1; }
+      .settled-mark { width: ${settledMarkPx}px; height: ${settledMarkPx}px; color: var(--mac-cream); opacity: 0; animation: splash-o-settle 360ms ease-out 1100ms forwards; }
+      .lockup, .fallback-mark { opacity: 0; animation: splash-wordmark-appear 320ms ease-out forwards, splash-wordmark-settle 360ms ease-in 1100ms forwards; }
+      .progress { animation: splash-progress-out 240ms ease-out 1100ms forwards; }
+      @keyframes splash-wordmark-appear { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes splash-wordmark-settle { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.4); } }
+      @keyframes splash-o-settle { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+      @keyframes splash-progress-out { to { opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) {
+        .lockup, .fallback-mark, .settled-mark, .progress { animation: none; }
+        .lockup, .fallback-mark, .progress { opacity: 0; }
+        .settled-mark { opacity: 1; }
+      }
     </style>
   </head>
   <body>
@@ -1612,7 +1629,7 @@ function buildDesktopBootSplashHtml(): string {
         <path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/>
       </svg>
       <div class="lockup-area" aria-hidden="true">
-        ${wordmarkDataUrl ? `<div class="lockup"><img class="wordmark" src="${wordmarkDataUrl}" alt="" /><span class="suffix">for Mac</span></div>` : `<svg class="fallback-mark" viewBox="0 0 353.68 347.97" aria-hidden="true"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg>`}
+        <div class="stage">${wordmarkDataUrl ? `<div class="lockup"><img class="wordmark" src="${wordmarkDataUrl}" alt="" /><span class="suffix">for Mac</span></div>` : `<svg class="fallback-mark" viewBox="0 0 353.68 347.97" aria-hidden="true"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg>`}<svg class="settled-mark" viewBox="0 0 353.68 347.97" aria-hidden="true" data-splash-settled="o"><path fill="currentColor" d="${JOVIE_MARK_SVG_PATH}"/></svg></div>
         <div class="progress"></div>
       </div>
     </main>
@@ -2518,6 +2535,7 @@ function createWindow(initialUrl = APP_ENTRY_URL): BrowserWindow {
   });
 
   mainWindow = win;
+  configureSidebarShortcut(win);
   const navigationContentsId = win.webContents.id;
   win.webContents.on('render-process-gone', () => {
     desktopNavigation.setReady(navigationContentsId, false);
@@ -2951,6 +2969,19 @@ function buildUpdateMenuItem(): MenuItemConstructorOptions {
   };
 }
 
+// Keep Cmd/Ctrl+B in the renderer so editors, dialogs, IME, and repeats
+// retain the existing shortcut policy. Pointer activation uses the menu IPC.
+function configureSidebarShortcut(win: BrowserWindow): void {
+  win.webContents.on('before-input-event', (_event, input) => {
+    win.webContents.setIgnoreMenuShortcuts(
+      input.key.toLowerCase() === 'b' &&
+        (input.meta || input.control) &&
+        !input.alt &&
+        !input.shift
+    );
+  });
+}
+
 function buildViewMenu(): MenuItemConstructorOptions[] {
   const viewMenu: MenuItemConstructorOptions[] = [];
 
@@ -2964,6 +2995,15 @@ function buildViewMenu(): MenuItemConstructorOptions[] {
   }
 
   viewMenu.push(
+    {
+      label: 'Toggle Sidebar',
+      accelerator: 'CommandOrControl+B',
+      click: () => {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        mainWindow.webContents.send('shell:toggle-sidebar');
+      },
+    },
+    { type: 'separator' },
     { role: 'resetZoom' },
     { role: 'zoomIn' },
     { role: 'zoomOut' },
@@ -2980,6 +3020,12 @@ function buildApplicationMenu(): Menu {
     { role: 'editMenu' },
     { label: 'View', submenu: viewMenu },
     { role: 'windowMenu' },
+    buildNativeHelpMenu({
+      identity: desktopBuildIdentity,
+      platform: process.platform,
+      architecture: process.arch,
+      openExternal: openExternalUrl,
+    }),
   ];
 
   if (process.platform === 'darwin') {
@@ -2995,7 +3041,7 @@ function buildApplicationMenu(): Menu {
           buildUpdateMenuItem(),
           { type: 'separator' },
           {
-            label: 'Preferences...',
+            label: 'Preferences…',
             accelerator: 'Command+,',
             click: openPreferences,
           },
@@ -3035,7 +3081,7 @@ function buildApplicationMenu(): Menu {
           },
         },
         {
-          label: 'Preferences...',
+          label: 'Preferences…',
           accelerator: 'Ctrl+,',
           click: openPreferences,
         },

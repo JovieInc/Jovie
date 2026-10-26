@@ -620,7 +620,7 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: ['[data-testid="profile-intent-page-body"]'],
+      content: ['[data-testid="profile-mode-drawer-contact"]'],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 2800 },

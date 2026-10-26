@@ -111,7 +111,7 @@ jobs:
           set -euo pipefail
           {
             echo "is_current=false"
-            echo "decision=superseded"
+            echo "decision=error"
             echo "replacement_sha=none"
             echo "wait_seconds=0"
             echo "time_saved_seconds=0"
@@ -175,8 +175,21 @@ jobs:
             # behind this one, even past PRODUCTION_STARVATION_SECONDS —
             # a still-queued generation costs seconds to yield, so a stale
             # backlog drains to the newest queued generation (JOV-7149).
-            gate_decision="$(CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
-              bash .github/scripts/release-lineage-gate.sh | tail -n 1)"
+            # No production mutation has started. The gate still fails closed
+            # when ancestry stays unreadable (JOV-7674), including at this
+            # pre-mutation boundary. Unknown lineage cannot prove that a
+            # replacement generation can supersede this one.
+            gate_log="$RUNNER_TEMP/lineage-gate-before-evaluation.txt"
+            set +e
+            CURRENT_MAIN_SHA="$current_main_sha" BOUNDARY="before evaluation" \
+              bash .github/scripts/release-lineage-gate.sh >"$gate_log"
+            gate_status=$?
+            set -e
+            gate_decision="$(tail -n 1 "$gate_log" 2>/dev/null || true)"
+            if [ "$gate_status" -ne 0 ]; then
+              echo "::error::Release lineage gate failed before evaluation (exit=${gate_status})."
+              exit "$gate_status"
+            fi
             if [ "$gate_decision" != "decision=proceed" ]; then
               record_receipt "superseded" "newer main landed before evaluation" "$current_main_sha" 0 "yield the production lease to controller generation $current_main_sha"
               exit 0
@@ -291,6 +304,8 @@ jobs:
       deployed_sha: ${{ steps.authorize.outputs.deployed_sha }}
       web_evidence_sha: ${{ steps.authorize.outputs.web_evidence_sha }}
       lane_receipt_artifact_id: ${{ steps.authorize.outputs.lane_receipt_artifact_id }}
+      # Successful job outputs survive failed-jobs-only retries.
+      lane_range_artifact_name: production-lane-range-${{ steps.authorize.outputs.expected_sha }}-${{ github.run_attempt }}
       staging_verified: ${{ steps.authorize.outputs.staging_verified }}
       release_lane: ${{ steps.authorize.outputs.release_lane }}
       release_policy_version: ${{ steps.authorize.outputs.release_policy_version }}
@@ -1148,7 +1163,7 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: ${{ needs.authorize-production.outputs.authorized == 'true' }}
         with:
-          name: production-lane-range-${{ needs.authorize-production.outputs.expected_sha }}-${{ github.run_attempt }}
+          name: ${{ needs.authorize-production.outputs.lane_range_artifact_name }}
           path: ${{ runner.temp }}/release-lineage
       - name: Resolve current main before final verification
         id: current
