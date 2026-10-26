@@ -39,6 +39,18 @@ jobs:
           sparse-checkout: |
             .nvmrc
             packages/api-client
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+      # Edited-event jobs ran setup-node unprimed in all 8 jobs of a run
+      # (run 40176111773, 2026-10-25): one REST manifest call each.
+      - &quota-prime
+        name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
+        # A run step, not `uses:`: the client checkout path does not exist when
+        # workflow references are validated, so a local action there is rejected.
+        env:
+          NODE_VERSION_FILE: .source-validation-client/.nvmrc
+        run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
       - &quota-runtime
         name: Setup the quota client runtime
         if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
@@ -234,6 +246,28 @@ jobs:
           # The classifier only runs when invoked as its own entry point; a
           # missing receipt means it never ran, which must not read as a pass.
           test -s "$lane_dir/receipt.json"
+      # actionlint also runs in the merge group (ci-fast), but a workflow edit
+      # that fails it there ejects the whole group (#23060: an unquoted
+      # run-name with " #" was read as a YAML comment). Lint at PR time so
+      # the author sees it before enqueue. Same checksum-pinned toolchain.
+      - name: Lint changed workflows and actions (actionlint)
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          SHELLCHECK_OPTS: >-
+            --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "$BASE_BRANCH"
+          base_sha="$(git merge-base "origin/$BASE_BRANCH" HEAD)"
+          if [ -z "$(git diff --name-only "$base_sha" HEAD -- .github/workflows .github/actions)" ]; then
+            echo "No workflow or action changes; actionlint not applicable."
+            exit 0
+          fi
+          bash .github/scripts/run-actionlint.sh
       # Read-only restore of the web tsc incremental state that
       # tsc-cache-warm.yml writes on main. A pull_request can read that
       # default-branch cache; merge_group already restores it in ci-fast.
@@ -354,6 +388,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       # TruffleHog reads the object store directly and cannot use a partial
@@ -407,6 +442,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - &reused-checkout
@@ -452,6 +488,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -567,6 +604,7 @@ jobs:
         shard: ['1/4', '2/4', '3/4', '4/4']
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -642,6 +680,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -721,7 +760,12 @@ jobs:
             .nvmrc
             packages/api-client
             .github/workflows/fleet-rules-evidence.yml
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ (always() && github.event_name == 'pull_request') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ always() && github.event_name == 'pull_request' }}
         with:
@@ -748,7 +792,7 @@ jobs:
           fi
           floor="$(date -u -d "$EVENT_UPDATED_AT" +%s)"
           runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
-          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10))] | sort_by(.created_at) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
           IFS=$'\t' read -r status conclusion url <<<"$row"
           case "$status/$conclusion" in
             completed/success) echo "Fleet rules passed: $url" ;;
