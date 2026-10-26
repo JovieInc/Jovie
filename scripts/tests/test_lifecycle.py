@@ -349,5 +349,29 @@ class HeartbeatTest(unittest.TestCase):
                 lifecycle.HEARTBEAT, lifecycle._last_beat = None, 0.0
 
 
+    def test_a_bounded_child_keeps_the_heartbeat_alive_while_it_runs(self):
+        import time
+        spec = importlib.util.spec_from_file_location("keepalive_lifecycle", SOURCE)
+        lifecycle = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(lifecycle)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "tick-heartbeat"
+            lifecycle.HEARTBEAT, lifecycle.HEARTBEAT_EVERY_S = path, 0.05
+            seen = []
+            def slow(args, **kwargs):
+                time.sleep(0.4)
+                seen.append(path.stat().st_mtime)
+                return "done"
+            lifecycle._run = slow
+            started = time.time()
+            self.assertEqual(lifecycle.run(["x"], timeout=60), "done")
+            self.assertGreater(seen[0], started + 0.1, "beat while the child was still running")
+            # an unbounded child gets no keepalive thread
+            before = path.stat().st_mtime
+            lifecycle._run = lambda a, **k: time.sleep(0.3) or "x"
+            lifecycle.run(["x"])
+            self.assertEqual(path.stat().st_mtime, before)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -11095,7 +11095,8 @@ class DoctorFreshnessTest(unittest.TestCase):
                 self.assertTrue(popen.call_args.kwargs["start_new_session"])
             (host.state / "doctor.json").unlink()
             with patch.object(lane.subprocess, "Popen") as popen:
-                self.assertTrue(lane.spawn_doctor_if_stale(host, now), "no doctor.json counts as stale")
+                self.assertFalse(lane.spawn_doctor_if_stale(host, now), "no report yet: the end-of-tick pass writes it")
+                popen.assert_not_called()
 
     def test_a_second_concurrent_doctor_pass_exits_without_running(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -11115,6 +11116,7 @@ class DoctorFreshnessTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             host = self.host(tmp)
             order = []
+            lane.lifecycle._last_beat = 0.0
             with patch.object(lane, "spawn_doctor_if_stale", side_effect=lambda *_: order.append("doctor")), \
                     patch.object(lane, "_begin_tick_intent", return_value=None), \
                     patch.object(lane, "_dispatch", side_effect=lambda *_: order.append("dispatch") or 0), \

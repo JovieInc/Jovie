@@ -9082,7 +9082,7 @@ def spawn_doctor_if_stale(host: Host, now: float | None = None) -> bool:
     try:
         at = datetime.fromisoformat(str(json.loads((host.state / "doctor.json").read_text())["at"]).replace("Z", "+00:00")).timestamp()
     except (OSError, ValueError, KeyError, TypeError):
-        at = 0.0
+        return False  # no doctor report at all (fresh host, fixture): the end-of-tick pass writes the first one
     if now - at < DOCTOR_REFRESH_S:
         return False
     try:
@@ -9118,11 +9118,22 @@ def dispatch(host: Host) -> int:
         unclean_previous = _begin_tick_intent(host)
     except Exception:
         unclean_previous = {"unavailable": True}  # a failed marker write must not skip the tick
+    started = time.monotonic()
     try:
         result = _dispatch(host, unclean_previous)
     finally:
         _clear_tick_intent(host)
+        record_tick_duration(host, time.monotonic() - started)
     return result
+
+
+def record_tick_duration(host: Host, seconds: float) -> None:
+    """One row per dispatch tick: the number to drive down (it was 25-60 minutes on 2026-10-26; target under 5)."""
+    try:
+        with open(host.state / "runs" / "tick-durations.jsonl", "a") as out:
+            out.write(json.dumps({"at": now_iso(), "dispatchS": round(seconds, 1), "release": read_marker(host)}) + "\n")
+    except OSError:
+        pass
 
 
 def _dispatch(host: Host, unclean_previous: dict | None) -> int:
@@ -9611,6 +9622,8 @@ def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
     Only the `current` symlink moves; running workers finish on their release. The outcome is
     written to update.json so a refused release is an alert, not a traceback in a journal."""
+    lifecycle.HEARTBEAT = host.state / "tick-heartbeat"  # the self-test is minutes long; its keepalive proves progress
+    lifecycle.beat()
     # Single flight: two updaters take the gate-admission lock and the seats from each other, so each
     # reads gate-admission-busy (3 concurrent `lane_runner update` at 17:07Z 2026-10-25, one of them a
     # manual retry loop, kept #23268 from installing). A second caller exits without touching update.json.

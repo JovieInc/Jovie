@@ -16,6 +16,7 @@ from pathlib import Path
 import stat
 import subprocess
 import sys
+import threading
 import time
 
 PROTOCOL = "jovie-lane-lifecycle/v1"
@@ -113,12 +114,12 @@ HEARTBEAT_EVERY_S = 15.0
 _last_beat = 0.0
 
 
-def beat(now: float | None = None) -> None:
+def beat(now: float | None = None, force: bool = False) -> None:
     global _last_beat
     if HEARTBEAT is None:
         return
     now = time.time() if now is None else now
-    if now - _last_beat < HEARTBEAT_EVERY_S:
+    if not force and now - _last_beat < HEARTBEAT_EVERY_S:
         return
     _last_beat = now
     try:
@@ -128,7 +129,28 @@ def beat(now: float | None = None) -> None:
         pass  # liveness evidence is best effort; the tick itself never fails on it
 
 
+def _keepalive(timeout):
+    """Beat while one bounded child runs (a release self-test is minutes long). Bounded by the child's own
+    timeout, so a hung child still ends and the beat with it; an unbounded child gets no keepalive."""
+    if HEARTBEAT is None or timeout is None or timeout == float("inf"):
+        return lambda: None
+    stop = threading.Event()
+    def loop():
+        while not stop.wait(HEARTBEAT_EVERY_S):
+            beat(time.time(), force=True)
+    threading.Thread(target=loop, daemon=True).start()
+    return stop.set
+
+
 def run(args, **kwargs):
+    stop = _keepalive(kwargs.get("timeout"))
+    try:
+        return _run(args, **kwargs)
+    finally:
+        stop()
+
+
+def _run(args, **kwargs):
     """Retain ownership in a tracked helper across controller death.
 
     Preserve subprocess.run's stdin, stdout, stderr and exit/timeout contract.
