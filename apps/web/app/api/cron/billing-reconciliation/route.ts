@@ -323,7 +323,7 @@ async function reconcileProUsersWithoutSubscription(
     })
     .from(users)
     .where(
-      drizzleSql`${users.isPro} = true AND ${users.stripeSubscriptionId} IS NULL`
+      drizzleSql`${users.isPro} = true AND ${users.stripeSubscriptionId} IS NULL AND ${users.isAdmin} = false`
     )
     .limit(50);
 

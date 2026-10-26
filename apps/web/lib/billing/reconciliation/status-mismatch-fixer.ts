@@ -5,6 +5,7 @@
  */
 
 import type Stripe from 'stripe';
+import { captureCriticalError } from '@/lib/error-tracking';
 import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import {
   resolvePlanFromPriceIds,
@@ -64,6 +65,18 @@ export async function fixStatusMismatch(
   const priceIds = subscriptionPriceIds(subscription);
   const resolved = resolvePlanFromPriceIds(priceIds);
   if (!resolved) {
+    // A paying customer stays Free until someone maps the price: alert, like
+    // the webhook path does, instead of only counting a batch error.
+    await captureCriticalError(
+      'Reconciliation cannot map subscription price to a plan',
+      new Error('unknown_price_id'),
+      {
+        userId: user.id,
+        subscriptionId: subscription.id,
+        priceIds,
+        route: '/api/cron/billing-reconciliation',
+      }
+    );
     return {
       success: false,
       error: `unknown_price_id: ${priceIds.join(',') || 'none'}`,

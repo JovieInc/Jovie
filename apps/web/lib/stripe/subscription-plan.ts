@@ -21,10 +21,11 @@ export function subscriptionPriceIds(subscription: {
  */
 export function resolvePlanFromPriceIds(
   priceIds: readonly string[]
-): { priceId: string; plan: PlanType } | null {
+): { priceId: string; plan: Exclude<PlanType, 'free'> } | null {
   for (const priceId of priceIds) {
     const plan = getPlanFromPriceId(priceId);
-    if (plan) return { priceId, plan };
+    // A price that maps to 'free' grants nothing: treat it as unmappable.
+    if (plan && plan !== 'free') return { priceId, plan };
   }
   return null;
 }

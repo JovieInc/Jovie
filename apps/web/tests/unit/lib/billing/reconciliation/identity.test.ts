@@ -4,6 +4,7 @@ const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/stripe/customer-sync', () => ({
   updateUserBillingStatus: mockUpdateUserBillingStatus,
 }));
+vi.mock('@/lib/error-tracking', () => ({ captureCriticalError: vi.fn() }));
 vi.mock('@/lib/stripe/config', () => ({
   getPlanFromPriceId: (id: string) => (id === 'price_pro' ? 'pro' : null),
 }));

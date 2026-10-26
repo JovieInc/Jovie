@@ -41,16 +41,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Update user's admin status
-    const now = new Date();
-    await db
-      .update(users)
-      .set({ isAdmin: true, updatedAt: now })
-      .where(eq(users.id, user.id));
-
-    // Admins get Max through the shared billing writer: it bumps billingVersion
-    // and writes the audit row, so a concurrent webhook cannot silently
-    // overwrite the grant.
+    // Grant Max first, through the shared billing writer (billingVersion bump
+    // and audit row in one transaction). Only then set the admin flag, so a
+    // failed billing write never leaves a half-applied grant.
     const billing = await updateUserBillingStatus({
       clerkUserId: user.id,
       isPro: true,
@@ -65,6 +58,12 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    const now = new Date();
+    await db
+      .update(users)
+      .set({ isAdmin: true, updatedAt: now })
+      .where(eq(users.id, user.id));
 
     const updatedUser = { id: user.id, clerkId: user.clerkId };
 

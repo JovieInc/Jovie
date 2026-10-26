@@ -1,10 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
 
 const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
+const mockCaptureCritical = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/stripe/config', () => ({
   getPlanFromPriceId: (id: string) =>
     ({ price_pro: 'pro', price_max: 'max' })[id] ?? null,
+}));
+
+vi.mock('@/lib/error-tracking', () => ({
+  captureCriticalError: mockCaptureCritical,
 }));
 
 vi.mock('@/lib/stripe/customer-sync', () => ({
@@ -108,6 +113,7 @@ describe('status-mismatch-fixer', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('unknown_price_id');
+    expect(mockCaptureCritical).toHaveBeenCalled();
     expect(mockUpdateUserBillingStatus).not.toHaveBeenCalled();
   });
 

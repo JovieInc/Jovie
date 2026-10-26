@@ -216,8 +216,8 @@ interface UpdateBillingStatusBase {
  */
 export type UpdateBillingStatusOptions = UpdateBillingStatusBase &
   (
-    | { isPro: true; plan: string } // 'pro' | 'max'
-    | { isPro: false; plan?: string } // defaults to 'free'
+    | { isPro: true; plan: 'pro' | 'max' }
+    | { isPro: false; plan?: 'free' } // defaults to 'free'
   );
 
 /**

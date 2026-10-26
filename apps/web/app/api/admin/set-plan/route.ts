@@ -37,8 +37,8 @@ export async function POST(req: Request) {
   const { plan } = parsed.data;
   const isPro = plan !== 'free';
 
-  // Same writer as the webhook: bumps billingVersion (so a concurrent webhook
-  // conflicts instead of overwriting) and writes the audit row.
+  // Same writer as the webhook: bumps billingVersion and writes the audit row
+  // in one transaction.
   const audit = {
     clerkUserId: userId,
     eventType: 'admin_override',
@@ -46,7 +46,9 @@ export async function POST(req: Request) {
     metadata: { reason: 'dev_toolbar_set_plan', plan },
   } as const;
   const result = await updateUserBillingStatus(
-    isPro ? { ...audit, isPro, plan } : { ...audit, isPro, plan: 'free' }
+    plan === 'free'
+      ? { ...audit, isPro: false, plan }
+      : { ...audit, isPro: true, plan }
   );
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 500 });
