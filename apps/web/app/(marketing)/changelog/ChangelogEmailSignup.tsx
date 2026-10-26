@@ -83,6 +83,10 @@ export function ChangelogEmailSignup({
   const inputRef = useRef<HTMLInputElement>(null);
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
+  // Turnstile is third-party script weight and a CSP probe: load it only once
+  // the visitor shows intent to submit this form, never on page load.
+  const [turnstileArmed, setTurnstileArmed] = useState(false);
+  const armTurnstile = useCallback(() => setTurnstileArmed(true), []);
   const [turnstileFailed, setTurnstileFailed] = useState(false);
   const [turnstileRetryable, setTurnstileRetryable] = useState(false);
 
@@ -351,6 +355,9 @@ export function ChangelogEmailSignup({
       <div className='mt-4 grid'>
         <form
           onSubmit={handleSubmit}
+          onFocusCapture={armTurnstile}
+          onPointerEnter={armTurnstile}
+          onTouchStart={armTurnstile}
           data-testid='changelog-subscribe-form'
           aria-hidden={settled || undefined}
           inert={settled}
@@ -407,7 +414,8 @@ export function ChangelogEmailSignup({
               {copy.buttonLabel}
             </Button>
           </div>
-          {status === 'subscribed' ? null : (
+          {status === 'subscribed' ||
+          (turnstileRequired && !turnstileArmed) ? null : (
             <InvisibleTurnstile
               onToken={setTurnstileToken}
               onStateChange={handleTurnstileStateChange}
