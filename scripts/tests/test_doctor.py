@@ -518,6 +518,18 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(set(alerts), {"disk-critical"})
         self.assertIn("Summer", alerts["disk-critical"])
 
+    def test_disk_hold_below_growth_floor_alarms_after_thirty_minutes_naming_consumers(self):
+        # 2026-10-25: 13.2% free held codex at 1 seat for hours with no alarm (floor is 15%).
+        top = [{"path": "/home/x/codex-worktrees", "gib": 210.5}]
+        held = obs(diskFreePct=13.2, diskTop=top)
+        self.assertNotIn("disk-capacity-held", doctor.judge(held))
+        self.assertNotIn("disk-capacity-held", doctor.judge(
+            held, {"diskHeldSince": held["now"] - doctor.DISK_HELD_S + 1}))
+        alerts = doctor.judge(held, {"diskHeldSince": held["now"] - doctor.DISK_HELD_S})
+        self.assertIn("/home/x/codex-worktrees 210.5 GiB", alerts["disk-capacity-held"])
+        self.assertNotIn("disk-capacity-held", doctor.judge(
+            obs(diskFreePct=16.0), {"diskHeldSince": held["now"] - 9999}))
+
     def test_pool_empty_needs_thirty_sustained_minutes(self):
         self.assertEqual(doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0}), {})
         alerts = doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0 - 1801})
@@ -3081,4 +3093,38 @@ class QuotaDeferredHeadsTests(unittest.TestCase):
             broken = lambda *a, **k: SimpleNamespace(returncode=2, stdout="", stderr="boom")
             stale, error = doctor.sample_quota_deferred_heads(Path(tmp), 5000.0, broken)
             self.assertEqual(stale["value"], 1)
+            self.assertIn("boom", error)
+
+
+class QuotaDrainTests(unittest.TestCase):
+    ALERT = {"bucket": "github-token", "remaining": 3000, "ratePerMinute": 200,
+             "emptyAt": "2026-10-26T01:00:00.000Z", "resetAt": "2026-10-26T01:35:00.000Z", "minutesEarly": 35}
+
+    def test_alert_names_the_bucket_and_is_silent_without_a_projection(self):
+        alert = doctor.judge(obs(quotaDrain={"alerts": [self.ALERT]}))["quota-drain"]
+        self.assertIn("github-token has 3000 left at ~200/min", alert)
+        self.assertIn("35 min before its reset", alert)
+        self.assertNotIn("quota-drain", doctor.judge(obs(quotaDrain={"alerts": []})))
+        self.assertNotIn("quota-drain", doctor.judge(obs()))
+
+    def test_sampler_parses_exit_three_caches_and_keeps_a_stale_read_on_failure(self):
+        import tempfile
+        from types import SimpleNamespace
+        report = {"schema": "jovie-actions-quota-drain/v1", "generatedAt": "x", "alerts": [self.ALERT]}
+        out = "::notice::ignored\n".replace("::notice::ignored\n", "") + json.dumps(report) + "\n::warning title=x::y\n"
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            return SimpleNamespace(returncode=3, stdout=out, stderr="")
+        with tempfile.TemporaryDirectory() as tmp:
+            signal, error = doctor.sample_quota_drain(Path(tmp), 1000.0, run)
+            self.assertEqual((len(signal["alerts"]), error), (1, None))
+            self.assertEqual(calls[0][2:], ["drain", "--json", "--hours", "1"])
+            again, _ = doctor.sample_quota_drain(Path(tmp), 1100.0, run)
+            self.assertEqual(len(calls), 1, "a fresh cache is not re-read")
+            self.assertEqual(again["alerts"][0]["bucket"], "github-token")
+            broken = lambda *a, **k: SimpleNamespace(returncode=2, stdout="", stderr="boom")
+            stale, error = doctor.sample_quota_drain(Path(tmp), 5000.0, broken)
+            self.assertEqual(len(stale["alerts"]), 1)
             self.assertIn("boom", error)

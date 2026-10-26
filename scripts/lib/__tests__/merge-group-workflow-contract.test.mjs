@@ -1072,9 +1072,30 @@ describe('merge_group workflow contract', () => {
       'uses: ./.github/workflows/mac-lane-route.yml'
     );
     expect(macos).toContain(
-      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || (inputs.native && 'macos-15' || 'ubuntu-latest') }}`
     );
     expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
+    // Node-only web inputs run the Mac lane's node checks on ubuntu; swift
+    // and the MenuMonitor artifact stay macOS-only.
+    expect(macosCaller).toContain(
+      "native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}"
+    );
+    expect(CI_WORKFLOW).toContain(
+      "run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}"
+    );
+    expect(macosRoute).toContain('inputs.native');
+    for (const step of [
+      'Swift test and build (macOS only)',
+      'Verify exact Mac artifact set',
+    ]) {
+      const at = MACOS_CI_WORKFLOW.indexOf(`name: ${step}`);
+      expect(at, step).toBeGreaterThan(-1);
+      expect(MACOS_CI_WORKFLOW.slice(at, at + 160), step).toContain(
+        'inputs.native'
+      );
+    }
+    expect(macos).toContain('pnpm --filter @jovie/desktop run typecheck');
+    expect(macos).toContain('pnpm --filter @jovie/desktop run test');
     expect(macos).not.toContain('runs-on: macos-26');
     expect(CI_WORKFLOW).not.toContain('mac_runner_class');
     expect(CI_WORKFLOW).not.toContain('mac-runner-heartbeat.yml');
@@ -1101,6 +1122,9 @@ describe('merge_group workflow contract', () => {
     );
     expect(macos).not.toContain('desktop-staging');
     expect(macos).not.toContain('package:staging');
+    expect(macos).not.toContain(
+      'echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"'
+    );
     expect(unitTests).toContain(
       "run_full_ci == 'true' && matrix.shard == 'packages/ui'\n        run: pnpm turbo test --filter=@jovie/ui"
     );

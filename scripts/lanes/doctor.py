@@ -73,6 +73,12 @@ NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable"
 NO_WORK_REPAIR_ALERT = 6
 DISK_MIN_PCT = 10
 DISK_CRIT_PCT = 5
+# Autoscale blocks growth (capacity held below base, blocker "disk-low") at or below
+# autoscale.DISK_INCREASE_MIN free. Held that long with no alarm let merges collapse unseen
+# on 2026-10-25, so a sustained hold raises its own incident naming the top consumers.
+DISK_HELD_S = 30 * 60
+DISK_TOP_REFRESH_S = 10 * 60
+DISK_TOP_BUDGET_S = 45
 GITHUB_MIN_REMAINING = gh_app_token.FLOOR
 # An open PR older than this is a governor signal (JOV-7079): the cockpit names it and its
 # disposition instead of letting it age silently.
@@ -82,6 +88,8 @@ MERGE_THROUGHPUT_CACHE_S = 10 * 60
 PROMOTION_SCRIPT = Path(__file__).resolve().parents[1] / "promotion-loss-metrics.mjs"
 QUOTA_DEFERRED_SCRIPT = Path(__file__).resolve().parents[1] / "quota-deferred-heads.mjs"
 QUOTA_DEFERRED_REFRESH_S = 15 * 60  # about 100 REST reads per refresh; the lanes clock calls often
+QUOTA_DRAIN_SCRIPT = Path(__file__).resolve().parents[1] / "lib" / "api-quota-report.mjs"
+QUOTA_DRAIN_REFRESH_S = 15 * 60  # about 40 REST reads per refresh (one Enroll job list per run)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OPS_REPORT_SCRIPT = Path(__file__).resolve().with_name("ops-report.mjs")
 
@@ -486,6 +494,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     quota_deferred, quota_deferred_error = None, None
     if not os.environ.get("LANES_SELFTEST"):
         quota_deferred, quota_deferred_error = sample_quota_deferred_heads(state, now)
+    quota_drain, quota_drain_error = None, None
+    if not os.environ.get("LANES_SELFTEST"):
+        quota_drain, quota_drain_error = sample_quota_drain(state, now)
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
@@ -565,6 +576,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
         "quotaDeferredHeads": quota_deferred, "quotaDeferredHeadsError": quota_deferred_error,
+        "quotaDrain": quota_drain, "quotaDrainError": quota_drain_error,
         "redDispatch": red_dispatch_summary(state, now),
         "failedByReason": failed_by_reason(failures),
         "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
@@ -706,6 +718,35 @@ def sample_quota_deferred_heads(state: Path, now: float, run=lifecycle.run) -> t
         return (cached if cached.get("schema") else None), f"{type(error).__name__}: {error}"[:200]
 
 
+def sample_quota_drain(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
+    """Buckets of the repo's GitHub installation projected to run dry before their hourly reset,
+    from `api-quota-report.mjs drain --json` (exit 3 when there are any, so 0 and 3 both parse).
+    Refreshed at most every QUOTA_DRAIN_REFRESH_S; a failed read keeps the last good signal."""
+    path = Path(state) / "quota-drain.json"
+    cached = read_json(path, {})
+    observed = cached.get("observedAt")
+    if isinstance(observed, (int, float)) and not isinstance(observed, bool) \
+            and 0 <= now - observed < QUOTA_DRAIN_REFRESH_S:
+        return cached, None
+    try:
+        result = run(["node", str(QUOTA_DRAIN_SCRIPT), "drain", "--json", "--hours", "1"],
+                     capture_output=True, text=True, timeout=240)
+        if result.returncode not in (0, 3):
+            raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+        line = next((row for row in (result.stdout or "").splitlines() if row.startswith("{")), "")
+        report = json.loads(line)
+        if report.get("schema") != "jovie-actions-quota-drain/v1" or not isinstance(report.get("alerts"), list):
+            raise ValueError("quota drain output missing the schema")
+        signal = {"schema": "jovie-quota-drain/v1", "observedAt": now, "alerts": report["alerts"][:8]}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached if cached.get("schema") else None), f"{type(error).__name__}: {error}"[:200]
+
+
 def failed_by_reason(failures: dict) -> dict[str, int]:
     """Issues whose last lane run failed, by reason code (records before reason codes: `legacy`)."""
     counts: dict[str, int] = {}
@@ -835,6 +876,30 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
     vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
     return bool(pool and account_ready and vacant
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
+
+
+def disk_held(obs: dict) -> bool:
+    free = obs.get("diskFreePct")
+    return free is not None and free <= autoscale.DISK_INCREASE_MIN
+
+
+def top_disk_consumers(state: Path, budget_s: float = DISK_TOP_BUDGET_S, run=subprocess.run) -> list[dict]:
+    """Largest of the usual suspects, measured with a shared time budget (du over a full
+    worktree tree can take minutes on a loaded host; whatever finishes is reported)."""
+    home = Path.home()
+    roots = [state / "worktrees", state / "runs", home / "codex-worktrees", home / "grok-wt", home / "gem-workspace",
+             home / ".cache", home / ".npm", home / "symphony-elixir-workspaces", Path("/tmp")]
+    deadline, rows = time.monotonic() + budget_s, []
+    for root in roots:
+        left = deadline - time.monotonic()
+        if left <= 1 or not root.exists():
+            continue
+        try:
+            out = run(["du", "-xsk", str(root)], capture_output=True, text=True, timeout=left).stdout.split()
+            rows.append({"path": str(root), "gib": round(int(out[0]) / 1048576, 1)})
+        except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+            continue
+    return sorted(rows, key=lambda row: -row["gib"])[:5]
 
 
 def provider_idle_since(obs: dict, previous: dict) -> dict[str, float]:
@@ -1178,6 +1243,13 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
     elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
+    held_since = (previous or {}).get("diskHeldSince")
+    if disk_held(obs) and isinstance(held_since, (int, float)) and obs["now"] - held_since >= DISK_HELD_S:
+        top = obs.get("diskTop") or (previous or {}).get("diskTop") or []
+        named = ", ".join(f"{row['path']} {row['gib']} GiB" for row in top) or "consumers not yet measured"
+        alerts["disk-capacity-held"] = (
+            f"root disk {obs['diskFreePct']}% free (growth floor {autoscale.DISK_INCREASE_MIN}%) for "
+            f"{int((obs['now'] - held_since) // 60)}m: lane capacity is held below base. Top consumers: {named}")
     if github_reads_held:
         alerts["github-quota"] = (f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; read-only polling "
                                   f"held below the {GITHUB_MIN_REMAINING}-point floor to preserve writes")
@@ -1228,6 +1300,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         listed = ", ".join(f"#{row.get('number')} {row.get('ageMinutes')}m" for row in (deferred.get("heads") or [])[:8])
         alerts["quota-deferred-heads"] = (f"{deferred['value']} open PR heads sit on a quota-deferred Fleet Rules "
                                           f"verdict past 1h (never a verdict; the re-run loop is broken): {listed}")
+    drain = (obs.get("quotaDrain") or {}).get("alerts") or []
+    if drain:
+        listed = "; ".join(f"{row.get('bucket')} has {row.get('remaining')} left at ~{row.get('ratePerMinute')}/min, empty "
+                           f"{row.get('minutesEarly')} min before its reset ({row.get('emptyAt')})" for row in drain[:4])
+        alerts["quota-drain"] = (f"GitHub API budget is projected to run dry before it resets: {listed}. Pause bulk reruns "
+                                 f"and bulk gh work until the reset.")
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -1247,9 +1325,11 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "hud-stale": "restart-hud-service",
         "orphan-prs": "reconcile-pr-ownership",
         "quota-deferred-heads": "rerun-quota-deferred-fleet-evidence",
+        "quota-drain": "pause-bulk-reruns-and-bulk-api-work-until-the-reset",
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
+        "disk-capacity-held": "reclaim-top-disk-consumers-then-restore-lane-seats",
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
         "remediation-delivery": "repair-and-read-back-existing-event-delivery",
     }
@@ -1909,6 +1989,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "escalation": obs.get("escalation") or remediation.empty_escalation(),
             "remediation": obs.get("remediation") or remediation.empty_remediation(),
             "autoscale": _autoscale_block(host),
+            "machine": _machine_block(host),
             # Real-limit record (jovie.capacity-limit): which measured limit holds lanes back.
             "capacityLimit": _capacity_limit_block(host)}
 
@@ -1917,6 +1998,28 @@ def _capacity_limit_block(host) -> dict | None:
     try:
         import capacity_limit
         return capacity_limit.read_record(host.state)
+    except Exception:  # the feed never fails on an optional record
+        return None
+
+
+def _machine_block(host) -> dict | None:
+    """Machine metrics (machine-made share of merges, 3+ repeat fingerprints, cost per merged PR by class, days
+    from 3rd repeat to machine) plus any lane whose slots the merged-per-dollar gate is holding down. Small fields
+    only: the public feed has a byte cap."""
+    state = getattr(host, "state", None)
+    if state is None:
+        return None
+    try:
+        import machine_metrics
+        import slot_yield
+        block = machine_metrics.public_block(machine_metrics.refresh(state))
+        gated = {}
+        for lane_name in ("hyperagent", "claude", "devin", "kimi"):
+            slots, why = slot_yield.ceiling(state, lane_name, 10)
+            if why.get("gated"):
+                gated[lane_name] = {"slots": slots, "mergedPerUsd": why.get("mergedPerUsd"), "referencePerUsd": why.get("referencePerUsd")}
+        block["slotGate"] = gated
+        return block
     except Exception:  # the feed never fails on an optional record
         return None
 
@@ -2261,6 +2364,15 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["admissionRepairSince"] = previous.get("admissionRepairSince") or obs["now"]
     elif repair_holds is not None or not (previous.get("alerts") or {}).get("admission-repair-needed"):
         previous["admissionRepairSince"] = None
+    if disk_held(obs):
+        previous["diskHeldSince"] = previous.get("diskHeldSince") or obs["now"]
+        top_at = previous.get("diskTopAt")
+        if obs["now"] - previous["diskHeldSince"] >= DISK_HELD_S and not os.environ.get("LANES_SELFTEST") \
+                and not (isinstance(top_at, (int, float)) and obs["now"] - top_at < DISK_TOP_REFRESH_S):
+            previous["diskTop"], previous["diskTopAt"] = top_disk_consumers(host.state), obs["now"]
+    else:
+        previous["diskHeldSince"] = previous["diskTop"] = previous["diskTopAt"] = None
+    obs["diskTop"] = previous.get("diskTop")
     previous["providerIdleSince"] = provider_idle_since(obs, previous)
     previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
     obs["delivery"] = delivery_evidence(obs, previous)
@@ -2284,6 +2396,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         result["factoryIntake"] = factory_intake.run_pass(host.state, tracker.linear)
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["admissionRepairSince"] = previous.get("admissionRepairSince")
+    for key in ("diskHeldSince", "diskTop", "diskTopAt"):
+        result[key] = previous.get(key)
     result["deliveryDemandSince"] = previous.get("deliveryDemandSince")
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]
