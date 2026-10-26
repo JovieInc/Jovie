@@ -88,7 +88,7 @@ describe('jobAttemptRow', () => {
       job,
       collectedAt: '2026-10-23T20:05:00Z',
     });
-    expect(row.anomalous_earlier_start).toBeTrue();
+    expect(row.anomalous_earlier_start).toBe(true);
     expect(row.started_at).toBe('2026-10-23T19:58:00Z');
     expect(row.started_at_normalized).toBe('2026-10-23T20:00:00Z');
   });
@@ -99,7 +99,7 @@ describe('jobAttemptRow', () => {
       job: BASE_JOB,
       collectedAt: '2026-10-23T19:12:30Z',
     });
-    expect(row.anomalous_earlier_start).toBeFalse();
+    expect(row.anomalous_earlier_start).toBe(false);
     expect(row.started_at_normalized).toBe('2026-10-23T19:01:00Z');
   });
 
@@ -184,7 +184,7 @@ describe('collectRunRows', () => {
       collectedAt: '2026-10-23T19:12:30Z',
     });
     expect(result.rows.length).toBe(2);
-    expect(result.truncated).toBeFalse();
+    expect(result.truncated).toBe(false);
     expect(result.rows[0].job_id).toBe(90001);
     expect(result.rows[1].job_name).toBe('Unit Tests (5/10)');
     expect(calls[0]).toContain('/actions/runs/5001/jobs');
@@ -202,7 +202,7 @@ describe('collectRunRows', () => {
       fetchJson,
       collectedAt: '2026-10-23T19:12:30Z',
     });
-    expect(result.truncated).toBeTrue();
+    expect(result.truncated).toBe(true);
     expect(result.rows.length).toBe(CAPS.maxRowsPerRunEvent);
   });
 
@@ -218,7 +218,7 @@ describe('collectRunRows', () => {
       collectedAt: '2026-10-23T19:12:30Z',
     });
     expect(pages).toBe(CAPS.maxJobPages);
-    expect(result.truncated).toBeTrue();
+    expect(result.truncated).toBe(true);
   });
 
   it('adds one queue_event row with depth for merge_group runs', async () => {
@@ -250,7 +250,7 @@ describe('collectRunRows', () => {
     expect(queueRows.length).toBe(1);
     expect(queueRows[0].queue_depth).toBe(3);
     expect(queueRows[0].merged_at).toBe('2026-10-23T19:15:00Z');
-    expect(seen.some(p => p.includes('status=queued'))).toBeTrue();
+    expect(seen.some(p => p.includes('status=queued'))).toBe(true);
   });
 
   it('does not emit queue_event rows for pull_request runs', async () => {
