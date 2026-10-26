@@ -73,7 +73,7 @@ describe('ArtistNotificationsPage', () => {
     ).not.toBeInTheDocument();
 
     expect(
-      screen.getByRole('heading', { name: 'Capture every fan.' })
+      screen.getByRole('heading', { name: 'Capture every listener.' })
     ).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -86,7 +86,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       reactivationSection.getByRole('heading', {
-        name: 'Notify every fan automatically.',
+        name: 'Notify every listener automatically.',
       })
     ).toBeInTheDocument();
     expect(

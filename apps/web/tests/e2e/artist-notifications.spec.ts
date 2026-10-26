@@ -36,7 +36,7 @@ test.describe('Artist Notifications Landing', () => {
   test('hero renders with the new promise and Pro CTA', async ({ page }) => {
     await expect(
       page.getByRole('heading', {
-        name: /reach every fan\.\s*on autopilot\./i,
+        name: /reach your audience\.\s*on autopilot\./i,
       })
     ).toBeVisible();
     await expect(
@@ -52,23 +52,27 @@ test.describe('Artist Notifications Landing', () => {
       page.getByText('Trusted by artists and teams releasing on')
     ).toHaveCount(0);
     await expect(
-      page.getByRole('heading', { name: /capture every fan\./i })
+      page.getByRole('heading', { name: /capture every listener\./i })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: /notify every fan automatically\./i })
+      page.getByRole('heading', {
+        name: /notify every listener automatically\./i,
+      })
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: /bring fans back when it matters\./i })
+      page.getByRole('heading', {
+        name: /bring listeners back when it matters\./i,
+      })
     ).toBeVisible();
     await expect(
       page.getByRole('heading', { name: /new music first/i })
     ).toBeVisible();
     await expect(
-      page.getByText('How does Jovie bring fans back?')
+      page.getByText('How does Jovie bring listeners back?')
     ).toBeVisible();
     await expect(page.getByTestId('final-cta-headline')).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: /ready to amplify\?/i })
+      page.getByRole('heading', { name: /ready to reach your audience\?/i })
     ).toBeVisible();
     await expect(page.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
@@ -87,7 +91,7 @@ test.describe('Artist Notifications Landing', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: /reach every fan\.\s*on autopilot\./i,
+        name: /reach your audience\.\s*on autopilot\./i,
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
