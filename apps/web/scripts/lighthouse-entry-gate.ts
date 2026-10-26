@@ -8,6 +8,15 @@
  * fails when any route is over its budget. It replaces the unthrottled
  * `/start` budget; do not keep both.
  *
+ * Warm-up policy: the exact staged deployment is seconds old when this gate
+ * runs, so its very first loads pay serverless cold-start, edge-cache misses
+ * and runner first-load stalls that a visitor on the live alias almost never
+ * pays. One discarded Lighthouse load per route (default 1, `--warmups N`,
+ * 0 disables) runs before the timed samples, mirroring
+ * `discardSharedAliasContextWarmups` in performance-budgets-guard.ts: pay the
+ * cold first-load once, then measure. Warm-up samples are logged but never
+ * counted; only the timed samples can pass or fail a route.
+ *
  * Budgets live in `performance-entry-budgets.json`. Ratchet `lcpMs` down when
  * the measured median is comfortably under it; never loosen it.
  */
@@ -150,11 +159,46 @@ function runLighthouse(
   return { lcp, cls };
 }
 
+function warmupOutputPath(
+  work: string,
+  budgetId: string,
+  warmup: number
+): string {
+  return path.join(work, `${budgetId}-warmup-${warmup}.json`);
+}
+
+/**
+ * A discarded Lighthouse load: pays the fresh deployment's cold-start before
+ * the timed samples. Its result is logged for diagnosis and never counted —
+ * only a timed sample can pass or fail a route. A warm-up that fails is
+ * tolerated: if the origin is truly broken the timed runs still fail closed.
+ */
+function tryWarmupLoad(
+  url: string,
+  headersFile: string | null,
+  outFile: string
+): { lcp: number; cls: number } | null {
+  try {
+    return runLighthouse(url, headersFile, outFile);
+  } catch (error) {
+    console.log(
+      `  warmup load failed and was discarded: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+}
+
 export async function main(argv: readonly string[]): Promise<number> {
   const baseUrl = argValue(argv, '--base-url');
   if (!baseUrl) throw new Error('--base-url is required');
   const handle = argValue(argv, '--handle') ?? 'tim';
   const runs = Number(argValue(argv, '--runs') ?? '3');
+  const warmups = Number(argValue(argv, '--warmups') ?? '1');
+  if (!Number.isInteger(warmups) || warmups < 0) {
+    throw new Error('--warmups must be a non-negative integer');
+  }
   const only = argv.flatMap((value, index) =>
     value === '--route-id' ? [argv[index + 1]] : []
   );
@@ -191,6 +235,19 @@ export async function main(argv: readonly string[]): Promise<number> {
       ).toString();
       const lcpSamples: number[] = [];
       const clsSamples: number[] = [];
+      for (let warmup = 0; warmup < warmups; warmup += 1) {
+        const discarded = tryWarmupLoad(
+          url,
+          headersFile,
+          warmupOutputPath(work, budget.id, warmup)
+        );
+        console.log(
+          `  ${budget.id} warmup ${warmup + 1}/${warmups}: discarded` +
+            (discarded
+              ? ` (LCP ${Math.round(discarded.lcp)}ms CLS ${discarded.cls.toFixed(3)})`
+              : '')
+        );
+      }
       for (let run = 0; run < runs; run++) {
         const sample = runLighthouse(
           url,
