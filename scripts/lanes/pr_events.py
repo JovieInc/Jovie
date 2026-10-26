@@ -37,6 +37,8 @@ import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner im
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
 LANE_FIX_RED = PREFIX + "red"
+# The only writer that enqueues green PRs (.github/workflows/merge-queue-green-enroll.yml).
+GREEN_ENROLL_WORKFLOW = "merge-queue-green-enroll.yml"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
 TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
@@ -485,6 +487,23 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     deleted = sh(["gh", "api", "-X", "DELETE",
                   f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
     return deleted.returncode == 0
+
+
+def wake_green_enroll(number: int, sh=run) -> bool:
+    """Dispatch Merge Queue Green Enroll for this exact PR (JOV-8788).
+
+    Label writes stay on GITHUB_TOKEN so a relay label never fans out into
+    label-triggered runs, which also means the DELETE that clears lane-fix-red
+    wakes nothing: with an already required-green, unchanged head no later
+    check completion comes either (#22417 sat green and unqueued 33 minutes
+    until an unrelated main push sweep). workflow_dispatch is the recursion-guard
+    exception, the relay job's actions: write grant pays for it, and green
+    enroll's own blocked recheck already uses the same hop. The enroll run
+    re-reads eligibility itself, so a hold, freeze or newer head stays safe.
+    """
+    dispatched = sh(["gh", "workflow", "run", GREEN_ENROLL_WORKFLOW,
+                     "--repo", REPO, "--ref", "main", "-f", f"pr_number={number}"])
+    return dispatched.returncode == 0
 
 
 # The dispatch tick re-read the same stuck PRs' claim comments every pass (~84 reads an hour on
@@ -1059,6 +1078,13 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             pr["labels"] = [label for label in (pr.get("labels") or [])
                             if (label.get("name") if isinstance(label, dict) else str(label)).lower()
                             != LANE_FIX_RED]
+            # The relay's GITHUB_TOKEN DELETE wakes nothing (recursion guard),
+            # and a final check completion has already fired its own enroll wake
+            # before this deletion, so hand the now-eligible head straight to the
+            # enroll controller. A draft is promoted by auto-ready instead.
+            if not pr.get("isDraft"):
+                cleared.append((number, "enroll-wake" if wake_green_enroll(number, sh)
+                                else "enroll-wake-failed"))
         if terminal_signal(pr) or not in_scope(pr, kind, disabled):
             continue
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
@@ -2709,6 +2735,10 @@ def main(argv: list[str] | None = None) -> int:
     for number, kind in added:
         if kind == "cleared-red":
             print(f"#{number} cleared lane-fix-red")
+        elif kind == "enroll-wake":
+            print(f"#{number} enroll wake dispatched")
+        elif kind == "enroll-wake-failed":
+            print(f"#{number} enroll wake dispatch failed", file=sys.stderr)
         else:
             print(f"#{number} {PREFIX}{kind}")
     print(f"labeled={len(added)}")
