@@ -142,12 +142,35 @@ def _keepalive(timeout):
     return stop.set
 
 
+# Wall seconds and call counts per command label, for the tick-durations row: which command the tick spends its
+# time in (2026-10-26: a 25-60 minute tick, cause unmeasured).
+STATS: dict = {}
+
+
+def label_of(args) -> str:
+    try:
+        words = [Path(str(a)).name if i == 0 else str(a) for i, a in enumerate(args)][:3]
+    except (TypeError, ValueError):
+        return "?"
+    return " ".join(words)[:48]
+
+
 def run(args, **kwargs):
     stop = _keepalive(kwargs.get("timeout"))
+    started = time.monotonic()
     try:
         return _run(args, **kwargs)
     finally:
         stop()
+        if HEARTBEAT is not None:
+            row = STATS.setdefault(label_of(args), [0, 0.0])
+            row[0] += 1
+            row[1] += time.monotonic() - started
+
+
+def top_stats(limit: int = 8) -> list:
+    return [[name, calls, round(seconds, 1)] for name, (calls, seconds) in
+            sorted(STATS.items(), key=lambda item: -item[1][1])[:limit]]
 
 
 def _run(args, **kwargs):

@@ -366,6 +366,10 @@ class HeartbeatTest(unittest.TestCase):
             started = time.time()
             self.assertEqual(lifecycle.run(["x"], timeout=60), "done")
             self.assertGreater(seen[0], started + 0.1, "beat while the child was still running")
+            top = lifecycle.top_stats()
+            self.assertEqual(top[0][0], 'x')
+            self.assertEqual(top[0][1], 1)
+            self.assertGreaterEqual(top[0][2], 0.3)
             # an unbounded child gets no keepalive thread
             before = path.stat().st_mtime
             lifecycle._run = lambda a, **k: time.sleep(0.3) or "x"

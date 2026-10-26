@@ -9131,7 +9131,8 @@ def record_tick_duration(host: Host, seconds: float) -> None:
     """One row per dispatch tick: the number to drive down (it was 25-60 minutes on 2026-10-26; target under 5)."""
     try:
         with open(host.state / "runs" / "tick-durations.jsonl", "a") as out:
-            out.write(json.dumps({"at": now_iso(), "dispatchS": round(seconds, 1), "release": read_marker(host)}) + "\n")
+            out.write(json.dumps({"at": now_iso(), "dispatchS": round(seconds, 1), "release": read_marker(host),
+                                  "topCommands": lifecycle.top_stats()}) + "\n")
     except OSError:
         pass
 
