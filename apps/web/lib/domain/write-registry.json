@@ -86,7 +86,11 @@
       "id": "waitlist.admission",
       "entity": "waitlist/admission",
       "module": "apps/web/lib/waitlist/approval.ts",
-      "exports": ["approveWaitlistEntryInTx", "disapproveWaitlistEntryInTx"],
+      "exports": [
+        "approveWaitlistEntryInTx",
+        "disapproveWaitlistEntryInTx",
+        "stampWaitlistAcquisitionId"
+      ],
       "tables": ["waitlistEntries", "creatorProfiles"]
     },
     {
