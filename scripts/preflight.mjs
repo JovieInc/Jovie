@@ -143,7 +143,7 @@ const SET_E = /^set\s+-[a-z]*e[a-z]*\b/;
 const TYPECHECK = /^(\s*)(pnpm\b[^\n]*\btypecheck[^\n]*)$/gm;
 
 /** Statement-level adjustments that keep one failure from hiding the rest. */
-export function prepareStatement(statement, { flockPath } = {}) {
+export function prepareStatement(statement, { flockPath = '' } = {}) {
   let text = statement;
   // `set -e` would end the process at the first red statement.
   if (SET_E.test(text.trim())) return 'set -uo pipefail';
