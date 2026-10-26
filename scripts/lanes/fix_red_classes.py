@@ -23,13 +23,14 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
+import migration_renumber
 import remediation
 from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, AGENT = "rerun", "sync-main", "wire-ci-fast", "agent"
-DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST})
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, AGENT = "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "agent"
+DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -47,6 +48,7 @@ BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?#
 SIGNATURES = (
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
+    ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, AGENT),
     ("pr-body", BODY_TEXT, AGENT),

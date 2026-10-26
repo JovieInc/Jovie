@@ -61,6 +61,7 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
@@ -136,7 +137,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -6536,6 +6537,66 @@ def claim_infra_rerun(host: Host, pr: dict) -> bool:
     return bool(taken)
 
 
+OPEN_MIGRATIONS_QUERY = ('query($endCursor:String){repository(owner:"JovieInc",name:"Jovie"){pullRequests(states:OPEN,first:100,'
+                         'after:$endCursor){pageInfo{hasNextPage endCursor}nodes{number files(first:100){nodes{path}}}}}}')
+
+
+def open_pr_migrations(exclude: int) -> dict | None:
+    """{PR number: migration numbers it adds} for every other open PR; None when GitHub cannot be read."""
+    result = gh_call(["api", "graphql", "--paginate", "-f", f"query={OPEN_MIGRATIONS_QUERY}", "--jq",
+                      ".data.repository.pullRequests.nodes[]|{n:.number,f:[.files.nodes[].path]}"])
+    if result.returncode != 0:
+        return None
+    out = {}
+    for line in (result.stdout or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            return None
+        numbers = migration_renumber._numbers(row.get("f") or [])
+        if numbers and row.get("n") != exclude:
+            out[int(row["n"])] = numbers
+    return out
+
+
+def renumber_migrations_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a migration number collision: renumber to the next free number, rebuild the journal and
+    snapshots, merge main and push. Returns a finished-agent stand-in, or None (worktree restored) when it does not apply."""
+    git = lambda *args, **kw: sh(["git", *args], cwd=worktree, log=log, timeout=900, **kw)
+    def restore() -> None:
+        git("merge", "--abort")
+        git("reset", "--hard", f"origin/{pr['headRefName']}")
+        git("clean", "-fdq", "--", migration_renumber.MIG_DIR)
+    others = open_pr_migrations(pr["number"])
+    if others is None:
+        return None
+    def read(*args):
+        done = sh(["git", *args], cwd=worktree, timeout=300)
+        if done.returncode:
+            raise OSError(f"git {args[0]} failed")
+        return done.stdout or ""
+    try:
+        changed = migration_renumber.renumber(worktree, read, "origin/main", pr["number"], others)
+        if not changed:
+            return None
+        git("add", "-A", "--", migration_renumber.MIG_DIR)
+        if git("commit", "-q", "-m", "fix(db): renumber migration to the next free number").returncode:
+            raise OSError("commit failed")
+        if git("merge", "--no-edit", "origin/main").returncode:
+            conflicted = (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split()
+            if conflicted != [f"{migration_renumber.META}/_journal.json"] \
+                    or git("checkout", "--ours", "--", conflicted[0]).returncode or git("add", conflicted[0]).returncode \
+                    or git("commit", "-q", "--no-edit").returncode:
+                raise OSError("merge conflict outside the journal")
+        if git("push", "-q", "origin", f"HEAD:{pr['headRefName']}").returncode:
+            raise OSError("push failed")
+    except (migration_renumber.Unmergeable, OSError, ValueError, KeyError, subprocess.SubprocessError):
+        restore()
+        return None
+    receipt.update(resolution="renumbered-migrations", renumbered=changed[:12])
+    return types.SimpleNamespace(returncode=0)
+
+
 def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
     finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
@@ -7514,7 +7575,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
-                agent = wire_ci_fast_fix(host, pr, route, worktree, log, receipt) if route and route["action"] == fix_red_classes.WIRE_CI_FAST else None
+                fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
+                         fix_red_classes.RENUMBER: renumber_migrations_fix}.get((route or {}).get("action"))
+                agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),
