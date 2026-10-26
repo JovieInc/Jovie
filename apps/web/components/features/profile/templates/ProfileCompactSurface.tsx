@@ -13,7 +13,9 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { ShareLinkButton } from '@/components/features/share/ShareLinkButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
+import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type {
   ProfileMode,
@@ -705,7 +707,23 @@ export function ProfileCompactSurface({
             {hideMoreMenu ? (
               <div className='h-11 w-11 shrink-0' aria-hidden='true' />
             ) : (
-              <div className='pointer-events-auto'>
+              <div className='pointer-events-auto flex items-center gap-2'>
+                <ShareLinkButton
+                  title={artist.name}
+                  getUrl={() => `${BASE_URL}/${artist.handle}`}
+                  ariaLabel={`Share ${artist.name}'s profile`}
+                  testId='profile-header-share'
+                  onShare={result => {
+                    track('profile_share_click', {
+                      artist_id: artist.id,
+                      profile_id: artist.id,
+                      profile_slug: artist.handle,
+                      handle: artist.handle,
+                      source: 'header',
+                      result,
+                    });
+                  }}
+                />
                 <CircleIconButton
                   onClick={onOpenMenu}
                   size='lg'
