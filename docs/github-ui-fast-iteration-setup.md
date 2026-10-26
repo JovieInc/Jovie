@@ -78,7 +78,7 @@ Recommended cleanup:
 
 Recommended environment configuration:
 
-### Preview – `jovie`
+### Preview – jovie
 
 1. Go to `Settings` -> `Environments` -> `Preview – jovie`.
 2. Leave required reviewers disabled.
@@ -86,7 +86,7 @@ Recommended environment configuration:
 4. Allow admin bypass.
 5. Do not restrict deployment branches unless you specifically want to lock preview to PR workflows only.
 
-### Production – `jovie`
+### Production – jovie
 
 1. Go to `Settings` -> `Environments` -> `Production – jovie`.
 2. Keep required reviewers disabled.

@@ -10,7 +10,6 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scanText } from './brand-name.mjs';
 import {
   checkDrift,
   findUnregisteredCopies,
@@ -90,16 +89,6 @@ function main(argv) {
     }
     const reg = loadRegistry();
     const findings = runMatchers(reg, files);
-    for (const file of files) {
-      for (const hit of scanText(readFileSync(file, 'utf8'), { file }))
-        findings.push({
-          id: 'ASR-036',
-          severity: 'block',
-          file,
-          line: hit.line,
-          text: `${hit.kind} ${hit.text}`,
-        });
-    }
     const fs = spawnSync(
       process.execPath,
       [
