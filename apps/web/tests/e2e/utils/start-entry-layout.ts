@@ -32,6 +32,7 @@ declare global {
       unguidedFirst: boolean;
       first: number[] | null;
       guided: number[] | null;
+      entries?: ClaimLayoutShiftEntry[];
       /** Diagnostic: rect heights/tops of the layout chain at both samples. */
       firstDetail?: Record<string, string>;
       guidedDetail?: Record<string, string>;
@@ -64,6 +65,32 @@ export function installDelayedGuidanceLayoutProbe(fontSize: number): void {
           metric.total = Number.NaN;
         } else if (!shift.hadRecentInput) {
           metric.total = (metric.total ?? 0) + shift.value;
+          const node = (
+            shift as unknown as {
+              sources?: Array<{
+                node?: Node | null;
+                previousRect?: DOMRectReadOnly;
+                currentRect?: DOMRectReadOnly;
+              }>;
+            }
+          ).sources?.map(source => {
+            const el = source.node instanceof Element ? source.node : null;
+            const box = (rect?: DOMRectReadOnly) =>
+              rect ? { y: rect.y, h: rect.height, w: rect.width } : null;
+            return {
+              node: el
+                ? (el.getAttribute('data-testid') ??
+                  `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)}`)
+                : null,
+              previous: box(source.previousRect),
+              current: box(source.currentRect),
+            };
+          });
+          (metric.entries ??= []).push({
+            value: shift.value,
+            startTime: shift.startTime,
+            sources: node,
+          } as never);
         }
       }
     }).observe({ type: 'layout-shift', buffered: true });
