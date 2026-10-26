@@ -115,7 +115,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:liveness
-    jobCount: 1
+    jobCount: 2
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
