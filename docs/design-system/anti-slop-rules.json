@@ -877,6 +877,52 @@
         "check": "vision:hierarchy",
         "evidence": []
       }
+    },
+    {
+      "id": "ASR-037",
+      "title": "Headings wrap to at most 2 lines",
+      "statement": "At 1440 and at 390, a heading (h1 to h3, display and heading text roles) wraps to at most 2 lines. Three lines is a violation.",
+      "rationale": "Long wrapped headings read as noise, not Apple-short copy.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "Tim: 3 lines is a violation. 2 max for headings."
+      },
+      "scope": ["marketing", "app", "artifact", "pen"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "shadow",
+        "check": "scripts/anti-slop/heading-lines.mjs",
+        "evidence": ["scripts/anti-slop/heading-lines.mjs"],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'anti-slop'",
+            "commandIncludes": "heading-lines.test.mjs"
+          }
+        ],
+        "coverageNote": "Measured in a real browser (content height / line-height) at 1440 and 390. `run.mjs check --render --files page.html` covers Pen HTML exports and founder artifacts; visual-capture passes call measureHeadings(page). Shadow until the dogfood and visual-capture passes call it on live pages; the unit tests and a real-browser deliberate red run in CI."
+      }
+    },
+    {
+      "id": "ASR-038",
+      "title": "One idea per product shot",
+      "statement": "A marketing product shot shows one idea. A full form with legal and SMS rows as a marketing visual is noisy; crop to the one state that makes the point.",
+      "rationale": "Product visuals carry one message; dense forms read as clutter.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "Tim: a full form with legal and SMS rows as a marketing visual is noisy"
+      },
+      "scope": ["marketing", "artifact", "pen"],
+      "severity": "warn",
+      "enforcement": {
+        "kind": "human+vision",
+        "status": "planned",
+        "check": "vision:hierarchy and a new one_idea question; human review until labeled",
+        "evidence": []
+      }
     }
   ],
   "judges": [
