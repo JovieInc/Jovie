@@ -168,7 +168,6 @@ jobs:
       - name: Generate Ovie Home capture fixture
         id: ovie_fixture
         if: steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success'
-        continue-on-error: true
         env:
           OVIE_HOME_FIXTURE_OUT: ${{ github.workspace }}/pr-visual-artifacts/ovie-home-fixture.json
         run: |

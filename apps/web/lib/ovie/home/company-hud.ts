@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { computeRatePercent } from '@/lib/analytics/metrics';
 import type { DeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import type { HudMetrics } from '@/types/hud';
 import type { FleetVerdict } from './fleet-verdict';
@@ -126,7 +127,7 @@ function aliveTile(overview: CompanyInputs['overview']): CompanyTile {
 
 /** Week-over-week growth, or null when there is no baseline to divide by. */
 export function weeklyGrowthPct(now: number, weekAgo: number): number | null {
-  return weekAgo > 0 ? ((now - weekAgo) / weekAgo) * 100 : null;
+  return weekAgo > 0 ? computeRatePercent(now - weekAgo, weekAgo) : null;
 }
 
 function revenueTile(overview: CompanyInputs['overview']): CompanyTile {
@@ -272,7 +273,7 @@ function shippingTile(
     last7.state !== 'not-measured' &&
     prior7.state !== 'not-measured' &&
     prior7.value > 0
-      ? `${last7.value >= prior7.value ? '+' : ''}${Math.round(((last7.value - prior7.value) / prior7.value) * 100)}% vs prior 7d`
+      ? `${last7.value >= prior7.value ? '+' : ''}${computeRatePercent(last7.value - prior7.value, prior7.value, 0)}% vs prior 7d`
       : null;
   const verified =
     verifiedToday === null ? '' : ` · ${verifiedToday} verified in production`;

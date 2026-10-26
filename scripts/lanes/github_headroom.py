@@ -18,6 +18,8 @@ import sys
 import time
 from pathlib import Path
 
+import atomic_state
+
 SCHEMA = "jovie-actions-quota-headroom/v1"
 CACHE_FILE = "github-headroom.json"
 LOCK_FILE = "github-headroom.lock"
@@ -54,7 +56,7 @@ def read_block(state: Path, repo: Path, now: float | None = None, spawn=subproce
     if _fresh(lock, LOCK_TTL_S, now):
         return report
     try:
-        lock.write_text(str(int(now)))
+        atomic_state.atomic_write_text(lock, str(int(now)))
         spawn([sys.executable, str(Path(__file__).resolve()), "refresh", str(state), str(repo)],
               stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
               start_new_session=True)
