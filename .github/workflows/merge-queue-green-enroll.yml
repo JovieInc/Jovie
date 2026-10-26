@@ -993,6 +993,18 @@ jobs:
                 { id: pr.id }
               );
               core.notice(`DEQUEUED #${number}: labeled ${context.payload.label.name} while queued`);
+              // The queue timeline records only "manual" for this removal, so say why on the PR
+              // (24h to 2026-10-26: 14 bot dequeues with no recorded reason). The marker is
+              // machine-readable; scripts/queue-dequeue.mjs writes the same shape for agents.
+              const record = { code: 'hold', by: 'merge-queue-green-enroll/dequeue-held', label: context.payload.label.name, labeledBy: context.payload.sender?.login ?? null };
+              try {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: number,
+                  body: `Dequeued from the merge queue (hold): \`${context.payload.label.name}\` was added by @${context.payload.sender?.login ?? 'unknown'} while it was queued. Remove the label to re-enroll once CLEAN.\n<!-- queue-dequeue ${JSON.stringify(record)} -->`,
+                });
+              } catch (commentError) {
+                core.warning(`could not record the dequeue reason on #${number}: ${commentError.message}`);
+              }
             } catch (error) {
               // A denied dequeue leaves today's behaviour: its merge group fails the gate.
               core.warning(`dequeue of held #${number} failed: ${error.message}`);
