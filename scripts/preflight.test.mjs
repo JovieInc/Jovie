@@ -64,6 +64,7 @@ test('splitStatements keeps multi-line quotes together and drops comments', () =
 test('set -e is neutralised and || exit is contained', () => {
   assert.equal(prepareStatement('set -euo pipefail'), 'set -uo pipefail');
   assert.match(prepareStatement('test 1 -eq 2 || exit 7'), /^\( test/);
+  assert.match(prepareStatement('if x; then\n exit 0\nfi'), /^\( if/);
 });
 
 test('substitute reports expressions with no local value', () => {
@@ -90,6 +91,18 @@ test('a step added to the workflow appears in the derived plan and runs', async 
   const { out } = await runPlan(workflow(added));
   assert.match(out, /== Brand new gate/);
   assert.match(out, /FAIL \(9\)/);
+});
+
+test('every step is either planned to run or skipped with a written reason', () => {
+  const steps = deriveSteps(
+    readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8')
+  );
+  for (const step of steps) {
+    assert.ok(
+      step.skip ? step.skip.length > 3 : step.run.trim().length > 0,
+      `${step.name}: neither runnable nor skipped with a reason`
+    );
+  }
 });
 
 test('the real Source Validation workflow yields the gates workers keep missing', () => {

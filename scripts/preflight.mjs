@@ -88,7 +88,7 @@ function skipReasonFromCondition(condition) {
  * Returns [{ name, run, env, skip }] for every step of the job in order.
  */
 export function deriveSteps(workflowText, jobId = JOB_ID) {
-  const doc = yamlLoad(workflowText);
+  const doc = /** @type {any} */ (yamlLoad(workflowText));
   const job = doc?.jobs?.[jobId];
   if (!job || !Array.isArray(job.steps))
     throw new Error(`workflow has no job "${jobId}" with steps`);
@@ -147,8 +147,8 @@ export function prepareStatement(statement, { flockPath } = {}) {
   let text = statement;
   // `set -e` would end the process at the first red statement.
   if (SET_E.test(text.trim())) return 'set -uo pipefail';
-  // `... || exit N` would end the process; contain it in a subshell.
-  if (/\|\|\s*exit\b/.test(text)) text = `( ${text}\n)`;
+  // `exit` would end the process; contain it in a subshell.
+  if (/\bexit\b/.test(text)) text = `( ${text}\n)`;
   // Typechecks share gem's CPU: serialize them under the host lock.
   if (flockPath) text = text.replace(TYPECHECK, `$1flock ${flockPath} $2`);
   return text;
@@ -170,7 +170,7 @@ export function buildProgram(statements, envVars, opts = {}) {
 }
 
 const PLUMBING =
-  /^(?:test\s|\[\[?\s|git\s|set\s|export\s|[A-Za-z_][A-Za-z0-9_]*=|trap\s|cat\s|wait\b|echo\s|mkdir\s|\(\s*$)/;
+  /^(?:test\s|\[\[?\s|git\s|set\s|export\s|[A-Za-z_][A-Za-z0-9_]*=(?:"[^"]*"|\S*)$|trap\s|cat\s|wait\b|echo\s|mkdir\s|\(\s*$)/;
 
 export function labelFor(statement) {
   const first = statement
@@ -180,10 +180,11 @@ export function labelFor(statement) {
   return flat.length > 110 ? `${flat.slice(0, 107)}...` : flat;
 }
 
-function runProgram(program, cwd, onResult) {
+function runProgram(program, cwd, env, onResult) {
   return new Promise(resolve => {
     const child = spawn('bash', ['-c', program], {
       cwd,
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     let buffer = '';
@@ -297,13 +298,27 @@ export async function main({
   }
   const workflowFile = path.resolve(cwd, args.workflow ?? WORKFLOW_PATH);
   const steps = deriveSteps(readFileSync(workflowFile, 'utf8'));
+  // Gates refuse the ambient Node when it violates engines (gem ships 22).
+  const pinned = spawnSync('bash', ['scripts/hooks/resolve-repo-node.sh'], {
+    cwd,
+    encoding: 'utf8',
+  });
+  const pinnedBin = pinned.status === 0 ? pinned.stdout.trim() : '';
+  const procEnv = pinnedBin
+    ? { ...env, PATH: `${pinnedBin}:${env.PATH}` }
+    : env;
+  if (!procEnv.GH_TOKEN && !procEnv.GITHUB_TOKEN) {
+    const tok = spawnSync('gh', ['auth', 'token'], { encoding: 'utf8' });
+    if (tok.status === 0 && tok.stdout.trim())
+      procEnv.GH_TOKEN = tok.stdout.trim();
+  }
   const runnerTemp = mkdtempSync(path.join(tmpdir(), 'preflight-'));
   const headSha = git(['rev-parse', 'HEAD']);
   const values = expressionValues({
     base: args.base,
     headSha,
     runnerTemp,
-    env,
+    env: procEnv,
   });
   const flockPath = (() => {
     if (
@@ -362,7 +377,7 @@ export async function main({
     );
     const seen = new Set();
     const t0 = Date.now();
-    await runProgram(program, cwd, ({ index, code, output }) => {
+    await runProgram(program, cwd, procEnv, ({ index, code, output }) => {
       seen.add(index);
       const label = labelFor(statements[index]);
       if (code !== 0) {
@@ -406,8 +421,14 @@ export async function main({
   if (failures.length === 0) log(`  all clear (${passed} statements passed)`);
   for (const failure of failures) {
     log(`\n[ ] ${failure.step}: ${failure.label} (exit ${failure.code})`);
-    for (const line of failure.output.filter(Boolean).slice(-15))
-      log(`      ${line}`);
+    const lines = failure.output.filter(Boolean);
+    const loud = lines.filter(line =>
+      /\b(?:fail|error|violation|missing|not registered)\b|✗|×|TS\d{4}/i.test(
+        line
+      )
+    );
+    for (const line of (loud.length ? loud : lines).slice(-15))
+      log(`      ${line.slice(0, 240)}`);
   }
   if (failures.length)
     log(`\n${failures.length} item(s) to fix before pushing.`);
