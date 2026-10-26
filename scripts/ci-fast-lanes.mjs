@@ -2151,6 +2151,7 @@ export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/agent/pen-live-canvas-persist.test.mjs',
   'scripts/agent/pen-cold-readback.test.mjs',
   'scripts/agent/pen-par/pen-par.test.mjs',
+  'scripts/agent/pen-instance-drift.test.mjs',
   'scripts/skill-governance-guard.test.mjs',
   'scripts/skill-catalog.test.mjs',
   'scripts/agent-web-contract.test.mjs',
