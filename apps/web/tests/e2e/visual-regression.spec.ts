@@ -1,11 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { expect, test } from '@playwright/test';
-import {
-  VIEWPORTS as HEADING_LINE_VIEWPORTS,
-  MAX_LINES as HEADING_MAX_LINES,
-  measureHeadings,
-} from '../../../../scripts/anti-slop/heading-lines.mjs';
 
 /**
  * Visual regression tests for the 5 highest-churn surfaces.
@@ -549,13 +545,24 @@ const HEADING_LINE_BASELINE = new Set<string>(
   ).violations
 );
 
+// Playwright loads this spec through require(), which cannot take the ESM
+// helper statically; import it inside the test.
 test.describe('marketing heading line cap', () => {
-  for (const viewport of HEADING_LINE_VIEWPORTS) {
-    for (const route of HEADING_LINE_ROUTES) {
-      test(`${route} at ${viewport.width}: headings wrap to ${HEADING_MAX_LINES} lines or fewer`, async ({
-        page,
-      }) => {
-        await blockAnalytics(page);
+  for (const route of HEADING_LINE_ROUTES) {
+    test(`${route}: headings wrap to the line cap or fewer at every viewport`, async ({
+      page,
+    }) => {
+      const {
+        VIEWPORTS: HEADING_LINE_VIEWPORTS,
+        MAX_LINES: HEADING_MAX_LINES,
+        measureHeadings,
+      } = await import(
+        pathToFileURL(
+          resolve(__dirname, '../../../../scripts/anti-slop/heading-lines.mjs')
+        ).href
+      );
+      await blockAnalytics(page);
+      for (const viewport of HEADING_LINE_VIEWPORTS) {
         await page.setViewportSize(viewport);
         await page.goto(route, {
           waitUntil: 'domcontentloaded',
@@ -563,9 +570,13 @@ test.describe('marketing heading line cap', () => {
         });
         await page.evaluate('document.fonts && document.fonts.ready');
         await page.waitForTimeout(400);
-        const tooLong = (await measureHeadings(page)).filter(
-          heading => heading.lines > HEADING_MAX_LINES
-        );
+        const tooLong = (
+          (await measureHeadings(page)) as Array<{
+            tag: string;
+            text: string;
+            lines: number;
+          }>
+        ).filter(heading => heading.lines > HEADING_MAX_LINES);
         const key = (heading: { tag: string; text: string }) =>
           `${route}@${viewport.width}:${heading.tag}:${heading.text}`;
         const fresh = tooLong.filter(
@@ -586,7 +597,7 @@ test.describe('marketing heading line cap', () => {
           fresh.map(h => `<${h.tag}> ${h.lines} lines: "${h.text}"`),
           `ASR-037 ${route} @${viewport.width}`
         ).toEqual([]);
-      });
-    }
+      }
+    });
   }
 });
