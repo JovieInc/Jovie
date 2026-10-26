@@ -5,6 +5,7 @@ import { revalidateTag } from 'next/cache';
 import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { canSetUpPublicProfile } from '@/lib/auth/profile-setup-eligibility';
 import { setupDbSession } from '@/lib/auth/session';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
@@ -162,13 +163,19 @@ export async function createAdditionalProfile(input: {
     await setupDbSession(appUserId);
 
     const [user] = await db
-      .select({ id: users.id })
+      .select({ id: users.id, userStatus: users.userStatus })
       .from(users)
       .where(appUserIdFilter(appUserId))
       .limit(1);
 
     if (!user) {
       return { success: false, error: 'User not found' };
+    }
+    if (!canSetUpPublicProfile(user.userStatus)) {
+      return {
+        success: false,
+        error: 'This account cannot create a profile yet',
+      };
     }
 
     const existingProfiles = await db

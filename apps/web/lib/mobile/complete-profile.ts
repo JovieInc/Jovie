@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { desc, eq } from 'drizzle-orm';
+import { canSetUpPublicProfile } from '@/lib/auth/profile-setup-eligibility';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
@@ -95,11 +96,7 @@ export async function completeMobileProfile(
           'Your account could not be loaded.'
         );
       }
-      if (
-        user.userStatus === 'banned' ||
-        user.userStatus === 'suspended' ||
-        user.userStatus === 'waitlist_pending'
-      ) {
+      if (!canSetUpPublicProfile(user.userStatus)) {
         throw new MobileProfileCompletionError(
           'forbidden',
           'This account cannot complete profile setup.'
