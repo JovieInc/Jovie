@@ -918,6 +918,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
   'scripts/automation-liveness-gate.test.mjs',
+  'scripts/lib/__tests__/self-hosted-jobs.test.mjs',
   'scripts/lib/__tests__/lane-fix-relay-wakes.test.mjs',
   'scripts/lib/__tests__/fleet-rules-evidence-concurrency.test.mjs',
   'scripts/lib/__tests__/fleet-rules-lane-evidence.test.mjs',
