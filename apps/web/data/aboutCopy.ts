@@ -17,9 +17,12 @@ export const ABOUT_FACTS = {
   /**
    * Verified identity links only (checked 2026-10-26). The GitHub organization
    * exists and links back to jov.ie. The founder channel is linked from the
-   * live jov.ie/tim profile. The X handle stays out until it can be verified.
+   * live jov.ie/tim profile. The X handle is the canonical one from companyIdentity.
    */
-  organizationSameAs: ['https://github.com/JovieInc'],
+  organizationSameAs: [
+    'https://github.com/JovieInc',
+    `https://x.com/${COMPANY_IDENTITY.xHandle.replace(/^@/, '')}`,
+  ],
   founderSameAs: ['https://www.youtube.com/@timwhite'],
 } as const;
 

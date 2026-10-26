@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ABOUT_COPY, ABOUT_FACTS, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -77,7 +78,10 @@ describe('/about structured data', () => {
     for (const url of org.sameAs as string[]) {
       expect(url).toMatch(/^https:\/\//);
     }
-    expect(JSON.stringify(org.sameAs)).not.toContain('x.com');
+    expect(org.sameAs).toContain(
+      `https://x.com/${COMPANY_IDENTITY.xHandle.replace(/^@/, '')}`
+    );
+    expect(COMPANY_IDENTITY.xHandle).toBe('@meetjovie');
     expect(JSON.stringify(org.sameAs)).not.toContain('linkedin');
   });
 
