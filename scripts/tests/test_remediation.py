@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# The release self-test uses unittest without pytest's conftest path setup.
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
 os.environ.setdefault("LANES_EXECUTION_BACKEND", "local-test")
 
 
