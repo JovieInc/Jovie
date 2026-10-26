@@ -1,16 +1,35 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
   checkSurface,
+  effectViolations,
   HERO_SCOPE_PREFIX,
+  loadEffects,
+  registryProblems,
+  scopeIdFor,
   scopeViolations,
   surfaceViolations,
 } from './surface-media.mjs';
 
+const HAS_TS = (() => {
+  try {
+    createRequire(import.meta.url)('typescript');
+    return true;
+  } catch {
+    return false;
+  }
+})();
 const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = join(HERE, '../../..');
+const MOTION = 'apps/web/components/marketing/motion/';
+const MATTE = `${MOTION}matte-field-gl.ts`;
+const ZOOM = `${MOTION}hero-shell-zoom.ts`;
+const read = file => readFileSync(join(REPO, file), 'utf8');
+const entry = file => ({ file, source: read(file) });
 
 describe('surface media', () => {
   it('records unscoped canvas, WebGL, and video', () => {
@@ -73,5 +92,103 @@ describe('surface media', () => {
       'video:apps/web/app/(marketing)/solutions/[audience]/sections.tsx',
       'video:apps/web/components/marketing/changelog/CustomerChangelogArchive.tsx',
     ]);
+  });
+
+  it('reads its scopes from the motion-effects registry (ASR-039)', () => {
+    const registry = loadEffects();
+    assert.deepEqual(registryProblems(registry), []);
+    assert.deepEqual(
+      registry.effects.map(effect => effect.id),
+      [
+        'homepage-hero',
+        'marketing-ambient-field',
+        'marketing-matte-motion',
+        'homepage-shell-hero',
+      ]
+    );
+    assert.equal(scopeIdFor(MATTE), 'marketing-matte-motion');
+    assert.equal(scopeIdFor(ZOOM), 'marketing-matte-motion');
+    assert.equal(
+      scopeIdFor(`${HERO_SCOPE_PREFIX}anything.css`),
+      'homepage-hero'
+    );
+    assert.equal(scopeIdFor('apps/web/components/marketing/Other.tsx'), null);
+  });
+
+  it('passes every registered effect as shipped', () => {
+    const files = loadEffects()
+      .effects.flatMap(effect => effect.files)
+      .filter(file => !file.endsWith('/'));
+    assert.deepEqual(effectViolations(files.map(entry)), []);
+  });
+
+  it('fails an effect whose file drops prefers-reduced-motion (deliberate red)', () => {
+    const stripped = {
+      file: MATTE,
+      source: read(MATTE).replaceAll('prefers-reduced-motion', 'always-on'),
+    };
+    assert.deepEqual(effectViolations([stripped, entry(ZOOM)]), [
+      `scope:marketing-matte-motion:missing-reduced-motion-in:${MATTE}`,
+    ]);
+  });
+
+  it('fails a GL file with no offscreen pause or no frame cap', () => {
+    const gl = read(MATTE)
+      .replace(/IntersectionObserver|visibilitychange/g, 'x')
+      .replace(/fpsCap|FRAME_INTERVAL|1000\s*\/\s*\d+/g, 'y');
+    const out = effectViolations([{ file: MATTE, source: gl }, entry(ZOOM)]);
+    assert.ok(
+      out.includes(
+        `scope:marketing-matte-motion:missing-offscreen-pause:${MATTE}`
+      )
+    );
+    assert.ok(
+      out.includes(`scope:marketing-matte-motion:missing-fps-cap:${MATTE}`)
+    );
+  });
+
+  it('fails an effect over its transpiled gzip budget', {
+    skip: !HAS_TS,
+  }, () => {
+    const registry = structuredClone(loadEffects());
+    const effect = registry.effects.find(
+      e => e.id === 'marketing-matte-motion'
+    );
+    effect.budget.gzipBytes = 100;
+    effect.budget.perFileGzipBytes[ZOOM] = 100;
+    const out = effectViolations([entry(MATTE), entry(ZOOM)], registry);
+    assert.ok(
+      out.some(f =>
+        f.startsWith(`scope:marketing-matte-motion:over-budget:${ZOOM}:`)
+      )
+    );
+    assert.ok(
+      out.some(f =>
+        /^scope:marketing-matte-motion:over-budget:\d+>100$/.test(f)
+      )
+    );
+  });
+
+  it('rejects a malformed registry', () => {
+    assert.deepEqual(registryProblems({ schema: 'nope' }), [
+      'registry:schema must be jovie.motion-effects/v1',
+    ]);
+    const bad = {
+      schema: 'jovie.motion-effects/v1',
+      effects: [
+        { id: 'x', files: [], fallback: '(', reducedMotion: {}, budget: {} },
+      ],
+    };
+    const problems = registryProblems(bad);
+    for (const p of [
+      'files',
+      'fallback-not-a-regex',
+      'reduced-motion-marker',
+      'budget-gzipBytes',
+      'budget-pausesOffscreen',
+      'budget-fpsCap',
+    ]) {
+      assert.ok(problems.includes(`registry:x:${p}`), p);
+    }
   });
 });

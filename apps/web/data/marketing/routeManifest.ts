@@ -298,19 +298,20 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     recipeId: 'homepage',
     renderedSections: [
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        'apps/web/components/homepage/shell-hero/HomepageShellHeroFrame.tsx',
         'hero',
-        'split-claim-card'
+        'centered-none'
       ),
       // The unsupported adoption strip is intentionally omitted until it has
-      // an attributable permission or adoption receipt.
+      // an attributable permission or adoption receipt (the hero logo slot
+      // renders only with a grant; LOGO_PERMISSIONS is empty).
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        'apps/web/components/homepage/shell-hero/HomepageWhatsNew.tsx',
         'product-gallery',
-        'profile-grid'
+        'release-rail'
       ),
       approvedVariantBinding(
-        'apps/web/components/homepage/HomepageArtistProfile.tsx',
+        'apps/web/components/homepage/shell-hero/HomepageClaimClose.tsx',
         'cta',
         'final-single-claim'
       ),
@@ -318,9 +319,9 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     bindingEvidence: {
       status: 'verified',
       source:
-        'EVENT 2026-10-20 artist-profile homepage (HomepageArtistProfile.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
+        'Generic homepage shell hero (shell-hero/HomepageShellHero.tsx); homepage-contract render test; marketing-route-health observer on the reviewed head',
       notes:
-        'One source owner for hero, product gallery, and the offer close. Deployment, visual certification, and Tim Taste remain separate receipts.',
+        "Hero and claim close have their own owners; the What's-new preview is a changelog projection, not a recipe section. Deployment, visual certification, and Tim Taste remain separate receipts.",
     },
     status: 'active',
     specVersion: '1.4.0',

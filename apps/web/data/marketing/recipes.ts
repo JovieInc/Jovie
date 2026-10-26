@@ -16,7 +16,6 @@
  */
 
 import { HOMEPAGE_COPY } from '../homepageCopy';
-import { HOMEPAGE_FAN_STATES_COPY } from '../homepageFanStatesCopy';
 import type { MarketingAudience, MarketingSectionId } from './sections';
 
 export type RecipeId =
@@ -164,36 +163,37 @@ export interface MarketingRecipe {
 
 export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
   // ── homepage (proven — reference: /) ─────────────────────────────────────
-  // EVENT 2026-10-20 (Tim): the homepage sells the artist profile. Company
-  // metadata and structured data stay general; the page body does not.
+  // Generic homepage (Tim 2026-10-22, MKT-D16): the artist-profile story
+  // lives on /artist-profiles. Locked headline, the app shell as a product
+  // shot, then one claim close.
   {
     id: 'homepage',
     label: 'Homepage',
     status: 'proven',
     referenceRoute: '/', // /new is a retired redirect, not a rendered reference
     audience: 'general',
-    // Claim + live profile, three real fan states, then the free offer with
-    // the same claim. Prices and plan terms come from offer truth only.
+    // Locked headline over the app shell, the latest product updates, then
+    // the one real claim form.
     sectionOrder: ['hero', 'product-gallery', 'cta'],
     arc: [
       {
         beat: 'promise',
-        feeling: HOMEPAGE_COPY.hero.headline,
+        feeling: HOMEPAGE_COPY.shell.headline,
         section: 'hero',
       },
       {
         beat: 'proof',
-        feeling: HOMEPAGE_FAN_STATES_COPY.headline,
+        feeling: HOMEPAGE_COPY.shell.whatsNew.heading,
         section: 'product-gallery',
       },
       {
         beat: 'action',
-        feeling: HOMEPAGE_COPY.offer.headline,
+        feeling: HOMEPAGE_COPY.shell.claim.heading,
         section: 'cta',
       },
     ],
     hierarchy: {
-      oneBigIdea: HOMEPAGE_COPY.hero.subhead,
+      oneBigIdea: HOMEPAGE_COPY.shell.support,
       seeFirst: 'hero',
       second: 'product-gallery',
       third: 'cta',
@@ -203,13 +203,13 @@ export const MARKETING_RECIPES: readonly MarketingRecipe[] = [
         maxHeroWeightProofElements: 1,
       },
       aboveTheFoldContract: {
-        desktop: ['hero'], // headline + claim + the live profile capture
+        desktop: ['hero'], // headline + support line + the app shell
         mobile: ['hero'],
       },
     },
     ctaCadence: {
       strategy: 'sparse',
-      primaryLabel: HOMEPAGE_COPY.hero.claim.action,
+      primaryLabel: HOMEPAGE_COPY.shell.claim.action,
       cadence: 'hero-and-close',
     },
     fallbacks: [

@@ -1,0 +1,328 @@
+/*
+ * Homepage shell hero (generic, 2026-10-26).
+ *
+ * Rest frame first: a stack of headline, support line, the app shell as a
+ * matte product shot, then an optional logo slot. That stack is what renders
+ * with no JS, under prefers-reduced-motion, and below 1024px.
+ *
+ * Wide screens with motion allowed pin the hero for one viewport of scroll
+ * while hero-shell-zoom.ts writes --hero-zoom-* variables. Only transform and
+ * opacity move. The pinned layout is selected by media queries alone, so
+ * hydration never changes layout (CLS 0). Design coordinates are the 1440px
+ * frame from the motion study, scaled by --k.
+ */
+
+/* Rest values. hero-shell-zoom.ts overwrites them inline while pinned. */
+.shell-hero {
+  --hero-zoom-scale: 0.92582;
+  --hero-zoom-x: 96px;
+  --hero-zoom-y: 384px;
+  --hero-zoom-headline-y: 144px;
+  --hero-zoom-headline-o: 1;
+  --hero-zoom-edge-o: 1;
+  --hero-zoom-logos-o: 1;
+  --hero-zoom-logos-y: 0px;
+  position: relative;
+  /* The dock bleeds the hero under the fixed header; clear it. */
+  padding-block: var(--space-24) var(--space-12);
+}
+
+.shell-hero__stage {
+  /* container-width-allow: scaled 1440px design stage, not a page container */
+  width: min(100% - (var(--ds-public-gutter) * 2), 1248px);
+  margin-inline: auto;
+}
+
+.shell-hero__design {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.shell-hero__head {
+  text-align: center;
+}
+
+.shell-hero__headline {
+  font-family: var(--font-display);
+  font-size: clamp(2.375rem, 4.45vw, 4rem);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: -0.03em;
+  line-height: 1.06;
+  color: var(--color-text-primary-token);
+  text-wrap: balance;
+}
+
+.shell-hero__beat {
+  display: block;
+}
+
+.shell-hero__support {
+  max-width: 34rem;
+  margin: var(--space-6) auto 0;
+  font-size: var(--ds-marketing-lede-size);
+  letter-spacing: var(--ds-marketing-lede-tracking);
+  line-height: var(--ds-marketing-lede-leading);
+  color: var(--color-text-secondary-token);
+  text-wrap: pretty;
+}
+
+.shell-hero__shell {
+  position: relative;
+  width: 100%;
+  margin: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-base);
+  box-shadow: var(--shadow-xl);
+}
+
+.shell-hero__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 2696 / 1920;
+}
+
+/* The hairline frame. Fades in with the zoom; full at rest. */
+.shell-hero__edge {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px var(--color-border-subtle);
+  opacity: var(--hero-zoom-edge-o);
+  pointer-events: none;
+}
+
+/* Empty when LOGO_PERMISSIONS holds no grant for "/": takes no space. */
+.shell-hero__logos {
+  width: 100%;
+}
+.shell-hero__logos:empty {
+  display: none;
+}
+
+.shell-hero__logo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-8) var(--space-12);
+  margin: 0;
+  padding: var(--space-6) 0 0;
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-secondary-token);
+  list-style: none;
+}
+
+/* ── Wide: design-coordinate stage ───────────────────────────────────── */
+@media (min-width: 1024px) {
+  .shell-hero {
+    padding-block: 0;
+  }
+
+  .shell-hero__sticky {
+    container-type: inline-size;
+    overflow: clip;
+  }
+
+  .shell-hero__stage {
+    --design-h: 1456;
+    --k: tan(atan2(min(100cqw, 1440px), 1440px));
+    position: relative;
+    /* container-width-allow: scaled 1440px design stage, not a page container */
+    width: min(100cqw, 1440px);
+    height: calc(var(--design-h) * 1px * var(--k));
+  }
+
+  /* No logo grants: do not reserve the empty slot's space. */
+  .shell-hero:has(.shell-hero__logos:empty) .shell-hero__stage {
+    --design-h: 1368;
+  }
+
+  .shell-hero__design {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* container-width-allow: scaled 1440px design stage, not a page container */
+    width: 1440px;
+    height: calc(var(--design-h) * 1px);
+    transform: scale(var(--k));
+    transform-origin: 0 0;
+  }
+
+  .shell-hero__head {
+    position: absolute;
+    z-index: 2;
+    top: 0;
+    right: 0;
+    left: 0;
+    transform: translate3d(0, var(--hero-zoom-headline-y), 0);
+    opacity: var(--hero-zoom-headline-o);
+  }
+
+  .shell-hero__headline {
+    font-size: 4rem;
+  }
+
+  .shell-hero__support {
+    max-width: 560px;
+    font-size: 1.125rem;
+  }
+
+  .shell-hero__shell {
+    position: absolute;
+    top: 0;
+    left: 0;
+    /* container-width-allow: scaled 1440px design stage, not a page container */
+    width: 1348px;
+    height: 960px;
+    transform: translate3d(var(--hero-zoom-x), var(--hero-zoom-y), 0)
+      scale(var(--hero-zoom-scale));
+    transform-origin: 0 0;
+  }
+
+  .shell-hero__logos {
+    position: absolute;
+    top: 1320px;
+    right: 96px;
+    left: 96px;
+    width: auto;
+    opacity: var(--hero-zoom-logos-o);
+    transform: translate3d(0, var(--hero-zoom-logos-y), 0);
+  }
+}
+
+/* ── Wide + motion + scripting: pinned for one viewport of scroll ─────── */
+@media (min-width: 1024px) and (scripting: enabled) and (
+    prefers-reduced-motion: no-preference
+  ) {
+  .shell-hero {
+    /* First frame (p = 0): shell at 1.94x with the claim form under the eye. */
+    --hero-zoom-scale: 1.94;
+    --hero-zoom-x: -447.88px;
+    --hero-zoom-y: -291.8px;
+    --hero-zoom-headline-y: 132px;
+    --hero-zoom-edge-o: 0;
+    --hero-zoom-logos-o: 0;
+    --hero-zoom-logos-y: 8px;
+  }
+
+  .shell-hero__sticky {
+    position: sticky;
+    top: 0;
+  }
+
+  /* The pin range: one viewport of scroll (--motion-scroll-hero-range). */
+  .shell-hero::after {
+    display: block;
+    height: var(--motion-scroll-hero-range);
+    content: "";
+  }
+
+  .shell-hero__head,
+  .shell-hero__shell,
+  .shell-hero__logos {
+    will-change: transform, opacity;
+  }
+}
+
+/* ── Sections below the hero ─────────────────────────────────────────── */
+.shell-matte {
+  position: relative;
+  isolation: isolate;
+}
+
+/* Static poster: the field at rest. Tonal vignette over the base, plus a
+   fixed grain. This is also the reduced-motion and no-WebGL state. */
+.shell-matte__field {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  background-color: var(--color-bg-base);
+  background-image:
+    radial-gradient(
+      ellipse 90% 60% at 50% 40%,
+      color-mix(in oklab, var(--color-bg-base) 88%, white),
+      var(--color-bg-base) 70%
+    ),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.03'/%3E%3C/svg%3E");
+}
+
+.shell-matte__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity var(--duration-cinematic) var(--ease-out);
+}
+
+.shell-matte[data-live="true"] .shell-matte__canvas {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell-matte__canvas {
+    display: none;
+  }
+}
+
+.shell-section {
+  padding-block: var(--space-16);
+}
+
+.shell-whats-new__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shell-whats-new__link {
+  display: grid;
+  grid-template-columns: minmax(0, 9rem) minmax(0, 1fr);
+  gap: var(--space-6);
+  padding-block: var(--space-4);
+  border-top: 1px solid var(--color-border-subtle);
+  color: var(--color-text-primary-token);
+  text-decoration: none;
+}
+
+.shell-whats-new__date {
+  font-size: var(--text-sm);
+  color: var(--color-text-tertiary-token);
+}
+
+.shell-whats-new__all {
+  display: inline-block;
+  margin-top: var(--space-6);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary-token);
+}
+
+.shell-claim__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  gap: var(--space-6);
+  text-align: center;
+}
+
+.shell-claim__form {
+  width: min(28rem, 100%);
+  margin-top: var(--space-2);
+  text-align: left;
+}
+
+@media (max-width: 640px) {
+  .shell-whats-new__link {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-1);
+  }
+}

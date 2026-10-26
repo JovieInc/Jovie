@@ -171,7 +171,7 @@ describe('correction pyramid guards', () => {
     expect(hero).toContain('copy.headline');
     expect(hero).toContain('HOMEPAGE_COPY');
     expect(hero).not.toContain(`>${LOCKED_HOMEPAGE_H1}<`);
-    expect(page).toContain('HomepageArtistHero');
+    expect(page).toContain('HomepageShellHero');
   });
 
   it('tightens a warn baseline only when every live key is already known', () => {

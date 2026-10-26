@@ -1,5 +1,6 @@
-// Homepage page contract (EVENT 2026-10-20, Tim: the homepage sells the
-// artist profile). One table-driven contract replaces the per-component
+// Homepage page contract (generic homepage, Tim 2026-10-22 and 2026-10-26:
+// locked headline, app shell product shot, claim close; the artist-profile
+// story lives on /artist-profiles). One table-driven contract replaces the per-component
 // homepage locks: it renders the real `/` page module and checks the route
 // manifest, copy truth sources, the one primary action, product imagery, and
 // tokenized styles. Changing the page means changing its typed records, not
@@ -10,12 +11,8 @@ import { render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing';
 import { getMarketingRecipe } from '@/data/marketing/recipes';
-import {
-  formatPublicPriceDisplay,
-  getPublicPriceClaim,
-} from '@/lib/billing/offer-truth';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
-import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { getEndUserPerfRouteById } from '@/scripts/performance-route-manifest';
 
 const gate = vi.hoisted(() => ({ WAITLIST_ENABLED: true }));
@@ -33,6 +30,23 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
   };
 });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
+// The async changelog read is covered by HomepageWhatsNew.test.tsx; the page
+// contract renders the same section from three fixed entries.
+vi.mock('@/components/homepage/shell-hero/HomepageWhatsNew', async () => {
+  const actual = await vi.importActual<
+    typeof import('@/components/homepage/shell-hero/HomepageWhatsNew')
+  >('@/components/homepage/shell-hero/HomepageWhatsNew');
+  const entries = ['a', 'b', 'c'].map((id, index) => ({
+    id,
+    title: `Update ${id}`,
+    date: `2026-10-0${index + 1}`,
+  }));
+  return {
+    ...actual,
+    HomepageWhatsNew: () =>
+      actual.HomepageWhatsNewSection({ entries: entries as never }),
+  };
+});
 vi.mock('next/navigation', async importOriginal => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ push: vi.fn() }),
@@ -58,19 +72,15 @@ async function renderHomePage() {
 }
 
 async function loadCopy() {
-  const [{ HOMEPAGE_COPY }, { HOMEPAGE_FAN_STATES_COPY }] = await Promise.all([
-    import('@/data/homepageCopy'),
-    import('@/data/homepageFanStatesCopy'),
-  ]);
-  return { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY };
+  const { HOMEPAGE_COPY } = await import('@/data/homepageCopy');
+  return { HOMEPAGE_COPY };
 }
 
 const HOMEPAGE_SOURCES = [
   'data/homepageCopy.ts',
-  'data/homepageFanStatesCopy.ts',
-  'components/homepage/HomepageArtistProfile.tsx',
-  'components/marketing/MarketingOfferSummary.tsx',
-  'components/marketing/MarketingPhoneStateGallery.tsx',
+  'components/homepage/shell-hero/HomepageShellHero.tsx',
+  'components/homepage/shell-hero/HomepageClaimClose.tsx',
+  'components/homepage/shell-hero/HomepageWhatsNew.tsx',
 ] as const;
 
 const HOMEPAGE_STYLES = [
@@ -119,27 +129,41 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     );
   });
 
-  it('mounts the hero light and keeps the canvas off until WebGL can run', async () => {
+  it('keeps the canvas off until WebGL can run and mounts no hero light', async () => {
     const { container } = await renderHomePage();
     expect(
       container.querySelector('[data-testid="homepage-hero-light"]')
+    ).toBeNull();
+    expect(container.querySelector('[data-hero-zoom]')).not.toBeNull();
+    expect(container.querySelector('canvas')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="homepage-matte-section"] canvas')
     ).not.toBeNull();
-    expect(container.querySelector('.homepage-hero-canvas')).not.toBeNull();
-    expect(container.querySelector('canvas')).toBeNull();
+    // The matte field is below the hero, never under it.
+    expect(
+      container.querySelector('[data-hero-zoom] canvas'),
+      'one moving idea per frame'
+    ).toBeNull();
   });
 
   it('renders one h1 from the copy module and no stray headings', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
+    const { HOMEPAGE_COPY } = await loadCopy();
+    const { COMPANY_IDENTITY } = await import('@/data/companyIdentity');
     await renderHomePage();
 
     const h1s = screen.getAllByRole('heading', { level: 1 });
     expect(h1s).toHaveLength(1);
-    expect(h1s[0]).toHaveTextContent(HOMEPAGE_COPY.hero.headline);
+    expect(HOMEPAGE_COPY.shell.headline).toBe(
+      COMPANY_IDENTITY.homepageHeadline
+    );
+    expect(h1s[0].textContent?.replaceAll(/\s+/g, ' ').trim()).toBe(
+      COMPANY_IDENTITY.homepageHeadline
+    );
     expect(
       screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)
     ).toEqual([
-      HOMEPAGE_FAN_STATES_COPY.headline,
-      HOMEPAGE_COPY.offer.headline,
+      HOMEPAGE_COPY.shell.whatsNew.heading,
+      HOMEPAGE_COPY.shell.claim.heading,
     ]);
   });
 
@@ -148,26 +172,17 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     async waitlist => {
       gate.WAITLIST_ENABLED = waitlist;
       const { HOMEPAGE_COPY } = await loadCopy();
-      const { MARKETING_CTA_INTENTS } = await import(
-        '@/data/marketingCtaIntents'
-      );
       const { container } = await renderHomePage();
 
       const forms = [...container.querySelectorAll('form')];
-      expect(forms).toHaveLength(2); // hero + terminal CTA, same action
-      for (const form of forms) {
-        expect(form).toHaveAttribute('action', '/start');
-        expect(
-          within(form).getByRole('button', {
-            name: HOMEPAGE_COPY.hero.claim.action,
-          })
-        ).toHaveAttribute('type', 'submit');
-      }
+      expect(forms).toHaveLength(1); // the claim close; the hero shot is an image
+      expect(forms[0]).toHaveAttribute('action', '/start');
+      expect(
+        within(forms[0]).getByRole('button', {
+          name: HOMEPAGE_COPY.shell.claim.action,
+        })
+      ).toHaveAttribute('type', 'submit');
       expect(screen.queryByText('Request access')).toBeNull();
-      expect(screen.getByText(HOMEPAGE_COPY.hero.supportNote)).toBeVisible();
-      expect(HOMEPAGE_COPY.hero.supportNote).toBe(
-        MARKETING_CTA_INTENTS.claimProfile.support
-      );
     }
   );
 
@@ -180,22 +195,14 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('states prices only through offer truth', async () => {
-    const { HOMEPAGE_COPY } = await loadCopy();
-    await renderHomePage();
-    const summary = screen.getByTestId('homepage-offer-summary');
-    const claim = getPublicPriceClaim(HOMEPAGE_COPY.offer.plan);
-
-    expect(summary).toHaveAttribute('data-offer-plan', claim.plan);
-    expect(summary).toHaveTextContent(formatPublicPriceDisplay(claim));
-    expect(summary).toHaveTextContent(claim.badge);
-    // No source file on the page may type a price, plan name, or trial.
+  it('types no price, plan, or trial on the page sources', () => {
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), path).not.toMatch(
         /\$\s?\d|\d+\s?\/\s?mo\b|\bper month\b/i
       );
       expect(read(path), path).not.toMatch(/\b\d+-day\b/i);
     }
+    expect(getPublicPriceClaim('free').plan).toBe('free');
   });
 
   it('backs every free inclusion with a free entitlement row', async () => {
@@ -213,39 +220,35 @@ describe('homepage contract', { timeout: 60_000 }, () => {
     }
   });
 
-  it('shows real product states from the screenshot registry only', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
+  it('shows the template app shell as the only hero image, with alt text', async () => {
     const { container } = await renderHomePage();
-    const scenarios = [
-      HOMEPAGE_COPY.hero.profile.scenarioId,
-      ...HOMEPAGE_FAN_STATES_COPY.states.map(state => state.scenarioId),
-    ];
-    const expected = scenarios.map(id => getMarketingExportImage(id).publicUrl);
-    const images = [...container.querySelectorAll('main img, section img')];
+    const images = [...container.querySelectorAll('img')];
 
-    expect(images.map(image => image.getAttribute('src'))).toEqual(expected);
-    // The hero capture is the LCP image; nothing below the fold is priority.
-    expect(
-      images.map(image => image.getAttribute('data-priority') === 'true')
-    ).toEqual([true, false, false, false]);
-    for (const image of images) {
-      expect(image.getAttribute('alt')?.length).toBeGreaterThan(20);
-    }
+    expect(images).toHaveLength(1);
+    expect(images[0].getAttribute('alt')).toBe(
+      'Example: the Jovie app with a claimed jov.ie/you profile'
+    );
+    expect(images[0].getAttribute('src')).toBe(
+      '/assets/marketing/app-shell-template.webp'
+    );
     for (const path of HOMEPAGE_SOURCES) {
       expect(read(path), path).not.toContain('/product-screenshots/');
     }
   });
 
   it('keeps copy in data and free of em dashes and stock promotion', async () => {
-    const { HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY } = await loadCopy();
-    const lines = JSON.stringify([HOMEPAGE_COPY, HOMEPAGE_FAN_STATES_COPY]);
+    const { HOMEPAGE_COPY } = await loadCopy();
+    const lines = JSON.stringify(HOMEPAGE_COPY.shell);
     expect(lines).not.toContain('—');
     expect(lines).not.toMatch(
       /\b(seamless|unlock|elevate|world-class|all-in-one|supercharge)\b/i
     );
-    const component = read('components/homepage/HomepageArtistProfile.tsx');
     // Rendered text comes from props/copy, not JSX literals.
-    expect(component).not.toMatch(/>\s*[A-Z][a-z]+(?: [a-z]+){2,}[.!]?\s*</);
+    for (const path of HOMEPAGE_SOURCES.slice(1)) {
+      expect(read(path), path).not.toMatch(
+        />\s*[A-Z][a-z]+(?: [a-z]+){2,}[.!]?\s*</
+      );
+    }
   });
 
   it('reconciles homepage fragment anchors with the ids the page renders', async () => {

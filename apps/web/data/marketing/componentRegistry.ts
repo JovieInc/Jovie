@@ -288,9 +288,10 @@ const SECTION_RESOLUTIONS = {
         rootBinding: "sectionVariant='centered-none'",
       },
       {
-        variantId: 'split-claim-card',
-        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='split-claim-card'",
+        variantId: 'centered-none',
+        componentPath:
+          'apps/web/components/homepage/shell-hero/HomepageShellHeroFrame.tsx',
+        rootBinding: "data-marketing-variant='centered-none'",
       },
       {
         variantId: 'left-none',
@@ -535,8 +536,9 @@ const SECTION_RESOLUTIONS = {
       },
       {
         variantId: 'final-single-claim',
-        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='final-single-claim'",
+        componentPath:
+          'apps/web/components/homepage/shell-hero/HomepageClaimClose.tsx',
+        rootBinding: "data-marketing-variant='final-single-claim'",
       },
       {
         variantId: 'included-single',
@@ -574,9 +576,10 @@ const SECTION_RESOLUTIONS = {
         rootBinding: "sectionVariant='profile-grid'",
       },
       {
-        variantId: 'profile-grid',
-        componentPath: 'apps/web/components/homepage/HomepageArtistProfile.tsx',
-        rootBinding: "sectionVariant='profile-grid'",
+        variantId: 'release-rail',
+        componentPath:
+          'apps/web/components/homepage/shell-hero/HomepageWhatsNew.tsx',
+        rootBinding: "data-marketing-variant='release-rail'",
       },
       {
         variantId: 'release-rail',
@@ -727,11 +730,11 @@ const RECIPE_RESOLUTIONS = {
     resolvedSource: 'apps/web/app/(home)/page.tsx',
     exportName: 'HomePage',
     // oPZHQ remains the legacy HomepageV2Route contract. Do not transfer its
-    // native identity to the artist-profile homepage without owner proof.
+    // native identity to the generic shell-hero homepage without owner proof.
     penRootId: null,
     penRootIds: [],
     penIdentityReason:
-      'The artist-profile / assembly (EVENT 2026-10-20) has no verified native mapping. The legacy HomepageV2Route contract is not its Pen owner; native reference resolution remains with the existing certification owner.',
+      'The generic shell-hero / assembly (2026-10-26) has no verified native mapping. The legacy HomepageV2Route contract is not its Pen owner; native reference resolution remains with the existing certification owner.',
     rootProofs: [
       {
         source: 'apps/web/app/(home)/page.tsx',
@@ -741,7 +744,7 @@ const RECIPE_RESOLUTIONS = {
       },
       {
         source: 'apps/web/app/(home)/page.tsx',
-        binding: '<HomepageFanStates />',
+        binding: '<HomepageWhatsNew />',
         occurrences: 1,
         kind: 'source',
       },
