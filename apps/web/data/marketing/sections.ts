@@ -489,7 +489,7 @@ export const MARKETING_SECTIONS: readonly MarketingSection[] = [
         media: 'none',
         alignment: 'centered',
         chooseWhen:
-          'recipe=seo OR recipe=blog-landing (interior hero) OR no asset available',
+          'recipe=seo OR recipe=blog-landing (interior hero) OR no asset available OR recipe=homepage (locked headline and one support line, centered; the app shell product shot is page media below the copy, Tim 2026-10-26)',
         exemplar: { route: '/about', section: 'hero' },
         status: 'active',
       },

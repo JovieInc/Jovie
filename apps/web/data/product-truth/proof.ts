@@ -11,6 +11,10 @@ import {
   type EvidenceClass,
   type ProofGeneratorId,
 } from './evidence';
+import {
+  LOGO_RELATIONSHIPS,
+  type LogoRelationship,
+} from './logo-relationships';
 
 export const PROOF_KINDS = [
   'logo',
@@ -46,9 +50,7 @@ export interface LogoPermissionRecord {
   readonly scope: string;
 }
 
-export const LOGO_RELATIONSHIPS = ['customer', 'integration', 'press'] as const;
-
-export type LogoRelationship = (typeof LOGO_RELATIONSHIPS)[number];
+export { LOGO_RELATIONSHIPS, type LogoRelationship };
 
 export interface LogoProof extends ProofBase {
   readonly kind: 'logo';

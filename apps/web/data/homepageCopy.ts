@@ -1,4 +1,5 @@
 import { APP_ROUTES } from '@/constants/routes';
+import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
 
 /**
@@ -21,6 +22,31 @@ import { MARKETING_CTA_INTENTS } from '@/data/marketingCtaIntents';
  */
 
 export const HOMEPAGE_COPY = {
+  /**
+   * The page the homepage renders (generic, 2026-10-26): locked headline,
+   * support line, shell product shot, What's-new preview, claim close. No
+   * segment language; the artist-profile story lives on /artist-profiles.
+   */
+  shell: {
+    headline: COMPANY_IDENTITY.homepageHeadline,
+    // The claim-audited identity line. Web research on a person is profile
+    // monitoring, which is internal-only until certified (claim-audit.test.ts
+    // keeps it out of public copy).
+    support: COMPANY_IDENTITY.seoDescription,
+    shellAlt: 'Example: the Jovie app with a claimed jov.ie/you profile',
+    logoRowLabel: 'Customers',
+    whatsNew: {
+      heading: "What's new",
+      allLabel: 'See all updates',
+    },
+    claim: {
+      heading: 'Claim your name.',
+      subhead: 'Free to claim. No website required.',
+      domain: 'jov.ie/',
+      placeholder: 'you',
+      action: 'Claim',
+    },
+  },
   seo: {
     // General enough for the company-identity invariant: no artist-only
     // definition in metadata. The description stays on COMPANY_IDENTITY.

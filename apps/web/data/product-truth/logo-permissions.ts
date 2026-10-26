@@ -1,5 +1,8 @@
 import { LOGO_ASSET_REGISTRY } from '@/data/design/logoAssets';
-import { LOGO_RELATIONSHIPS, type LogoRelationship } from './proof';
+import {
+  LOGO_RELATIONSHIPS,
+  type LogoRelationship,
+} from './logo-relationships';
 
 /**
  * Brand-logo permission registry (JOV-7795).

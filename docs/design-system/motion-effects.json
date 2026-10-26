@@ -13,7 +13,11 @@
           "apps/web/components/homepage/hero-light/HomepageHeroLight.tsx"
         ]
       },
-      "budget": { "gzipBytes": 7168, "fpsCap": null, "pausesOffscreen": true }
+      "budget": {
+        "gzipBytes": 7168,
+        "fpsCap": null,
+        "pausesOffscreen": true
+      }
     },
     {
       "id": "marketing-ambient-field",
@@ -29,7 +33,11 @@
           "apps/web/components/marketing/motion/MarketingAmbientField.tsx"
         ]
       },
-      "budget": { "gzipBytes": 5120, "fpsCap": 30, "pausesOffscreen": true }
+      "budget": {
+        "gzipBytes": 5120,
+        "fpsCap": 30,
+        "pausesOffscreen": true
+      }
     },
     {
       "id": "marketing-matte-motion",
@@ -51,6 +59,32 @@
         "perFileGzipBytes": {
           "apps/web/components/marketing/motion/matte-field-gl.ts": 2048,
           "apps/web/components/marketing/motion/hero-shell-zoom.ts": 1536
+        },
+        "fpsCap": 30,
+        "pausesOffscreen": true
+      }
+    },
+    {
+      "id": "homepage-shell-hero",
+      "summary": "Homepage `/`: pinned hero with the scroll-linked shell zoom (CSS transforms), and the matte field behind the sections below it (CSS poster first, WebGL2 after idle).",
+      "files": [
+        "apps/web/components/homepage/shell-hero/HomepageShellHeroFrame.tsx",
+        "apps/web/components/homepage/shell-hero/HomepageMatteSection.tsx",
+        "apps/web/components/homepage/shell-hero/HomepageShellHero.css"
+      ],
+      "fallback": "poster|rest frame|shouldRunMatteField",
+      "reducedMotion": {
+        "marker": "prefers-reduced-motion",
+        "requiredIn": [
+          "apps/web/components/homepage/shell-hero/HomepageMatteSection.tsx",
+          "apps/web/components/homepage/shell-hero/HomepageShellHero.css"
+        ]
+      },
+      "budget": {
+        "gzipBytes": 1536,
+        "perFileGzipBytes": {
+          "apps/web/components/homepage/shell-hero/HomepageMatteSection.tsx": 1024,
+          "apps/web/components/homepage/shell-hero/HomepageShellHeroFrame.tsx": 512
         },
         "fpsCap": 30,
         "pausesOffscreen": true

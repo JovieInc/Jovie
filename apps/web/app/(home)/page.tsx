@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import { SignupFunnelBeacon } from '@/components/features/tracking/SignupFunnelBeacon';
-import {
-  HomepageArtistHero,
-  HomepageFanStates,
-  HomepageOfferClose,
-} from '@/components/homepage/HomepageArtistProfile';
+import { HomepageClaimClose } from '@/components/homepage/shell-hero/HomepageClaimClose';
+import { HomepageMatteSection } from '@/components/homepage/shell-hero/HomepageMatteSection';
+import { HomepageShellHero } from '@/components/homepage/shell-hero/HomepageShellHero';
+import { HomepageWhatsNew } from '@/components/homepage/shell-hero/HomepageWhatsNew';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
@@ -176,19 +175,22 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
 }
 
 /**
- * The homepage sells the artist profile (EVENT 2026-10-20, Tim): the claim
- * and the live profile, three real fan states, then the free offer and the
- * same claim. The ORGANIZATION schema and page metadata keep the general
- * company identity; the WebSite and SoftwareApplication schemas speak with
- * the approved artist-profile launch (JOV-8565).
+ * The homepage is generic (Tim, 2026-10-22; MKT-D16): the locked headline,
+ * the app shell as a product shot that zooms out on scroll, then the matte
+ * field behind the What's-new preview and the claim close. The artist-profile
+ * story lives on /artist-profiles. The ORGANIZATION schema and page metadata
+ * keep the general company identity; the WebSite and SoftwareApplication
+ * schemas speak with the approved launch copy (JOV-8565).
  */
 export default function HomePage() {
   return (
     <HomePageShell>
       <HomepageQueryProvider>
-        <HomepageArtistHero headingId='home-hero-heading' />
-        <HomepageFanStates />
-        <HomepageOfferClose />
+        <HomepageShellHero headingId='home-hero-heading' />
+        <HomepageMatteSection>
+          <HomepageWhatsNew />
+          <HomepageClaimClose />
+        </HomepageMatteSection>
       </HomepageQueryProvider>
     </HomePageShell>
   );
