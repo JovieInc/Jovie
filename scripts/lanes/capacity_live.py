@@ -24,6 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import capacity_metrics  # noqa: E402
 import capacity_watch  # noqa: E402
 import capacity_registry  # noqa: E402
+from atomic_state import atomic_write_text  # noqa: E402
 
 INTERVAL_S = 900
 GROK_BIN = Path.home() / ".local/bin/grok"
@@ -170,7 +171,7 @@ def metrics_overlay(state_dir: Path, registry: dict, now: float, spawn=None) -> 
     if now - stamp >= METRICS_INTERVAL_S:
         # Record the attempt first: a failing refresh retries next interval, never every tick.
         try:
-            path.write_text(json.dumps({**current, "startedAt": _iso(now)}))
+            atomic_write_text(path, json.dumps({**current, "startedAt": _iso(now)}))
             (spawn or spawn_metrics)(state_dir)
         except OSError:
             pass
