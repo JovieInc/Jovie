@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { canSetUpPublicProfile } from '@/lib/auth/profile-setup-eligibility';
+import { canSetUpPublicProfile } from '@/lib/profile/profile-setup-eligibility';
 
 describe('canSetUpPublicProfile', () => {
   it.each(['banned', 'suspended', 'waitlist_pending'])('blocks %s', status => {

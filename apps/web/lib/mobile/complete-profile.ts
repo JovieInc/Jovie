@@ -1,13 +1,13 @@
 import 'server-only';
 
 import { desc, eq } from 'drizzle-orm';
-import { canSetUpPublicProfile } from '@/lib/auth/profile-setup-eligibility';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { invalidateProfileCache } from '@/lib/cache/profile';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
+import { canSetUpPublicProfile } from '@/lib/profile/profile-setup-eligibility';
 import { isContentClean } from '@/lib/validation/content-filter';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 import { markWaitlistSignedUpInTx } from '@/lib/waitlist/signup';

@@ -5,7 +5,6 @@ import { revalidateTag } from 'next/cache';
 import { attachFirstTouchReceipt } from '@/lib/acquisition/activation-receipt';
 import { appUserIdFilter } from '@/lib/auth/app-user-id';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { canSetUpPublicProfile } from '@/lib/auth/profile-setup-eligibility';
 import { setupDbSession } from '@/lib/auth/session';
 import { CACHE_TAGS } from '@/lib/cache/tags';
 import { db } from '@/lib/db';
@@ -13,6 +12,7 @@ import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
+import { canSetUpPublicProfile } from '@/lib/profile/profile-setup-eligibility';
 import { isReservedPublicProfileIdentity } from '@/lib/profile/public-profile-identity-policy';
 
 const UUID_RE =
