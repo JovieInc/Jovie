@@ -62,6 +62,7 @@ import {
   buildPublicProfileMetadata,
   PROFILE_ERROR_METADATA,
 } from '@/lib/profile/metadata';
+import type { ProfileVariantSeed } from '@/lib/profile/one-right-thing/variant';
 import { opaqueInternalProfileRedirectPath } from '@/lib/profile/opaque-internal-profile-handle';
 import { resolveOpaqueInternalProfileUsername } from '@/lib/profile/opaque-internal-profile-handle.server';
 import { schedulePublicCollaboratorProfileReconciliation } from '@/lib/profile/public-collaborator-reconciliation';
@@ -109,11 +110,14 @@ interface Props {
     readonly username: string;
     /** Private rewrite-only input; public requests never populate this. */
     readonly __profileMode?: ProfileMode;
+    /** Private rewrite-only input: request signals decoded from the variant key. */
+    readonly __featuredSeed?: ProfileVariantSeed;
   }>;
 }
 
 interface ArtistPageContentProps {
   readonly initialMode: ProfileMode;
+  readonly featuredSeed: ProfileVariantSeed | null;
   readonly username: string;
   readonly profileResult: PublicProfileLoaderResult;
 }
@@ -260,6 +264,7 @@ async function getPublicReleaseCollaborators(
 
 async function ArtistPageContent({
   initialMode,
+  featuredSeed,
   username,
   profileResult,
 }: Readonly<ArtistPageContentProps>) {
@@ -353,6 +358,10 @@ async function ArtistPageContent({
   // Generate a short-lived HMAC token so the client can authenticate its visit
   // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
   // Falls back to undefined gracefully if the secret is not configured.
+  // The featured pick is evaluated at this instant on the server and on the
+  // client, so hydration reproduces it exactly even if a boundary passes
+  // inside the ISR cache window.
+  const featuredRenderedAt = new Date().toISOString();
   const visitTrackingToken =
     getClientTrackingToken(profile.id).token ?? undefined;
 
@@ -558,6 +567,8 @@ async function ArtistPageContent({
         releases={releases}
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
+        featuredSeed={featuredSeed}
+        featuredRenderedAt={featuredRenderedAt}
       />
       <ProfileAeoContent
         content={aeoContent}
@@ -590,7 +601,11 @@ async function ArtistPageContent({
 
 export default async function ArtistPage({ params }: Readonly<Props>) {
   assertLiveProfileRoute();
-  const { username, __profileMode: initialMode = 'profile' } = await params;
+  const {
+    username,
+    __profileMode: initialMode = 'profile',
+    __featuredSeed: featuredSeed = null,
+  } = await params;
   assertValidProfileUsername(username);
 
   if (username.toLowerCase() === 'unfazed') {
@@ -618,6 +633,7 @@ export default async function ArtistPage({ params }: Readonly<Props>) {
     <Suspense fallback={<ProfileLoading />}>
       <ArtistPageContent
         initialMode={initialMode}
+        featuredSeed={featuredSeed}
         username={username}
         profileResult={profileResult}
       />

@@ -47,6 +47,8 @@ import {
 } from '@/lib/profile/capture-dismissal-client';
 import { PROFILE_CARD_FOOTER_ANCHOR_CLASSNAME } from '@/lib/profile/composition';
 import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
+import type { FeaturedDecision } from '@/lib/profile/one-right-thing/engine';
+import { featuredEventExtras } from '@/lib/profile/one-right-thing/event-extras';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PacState as PacEventState } from '@/lib/tracking/pac-events-shared';
 import { cn } from '@/lib/utils';
@@ -161,6 +163,12 @@ interface ProfilePacCardProps {
   readonly presentation?: 'rail' | 'featured';
   /** Rotating background accent for the featured presentation. */
   readonly accent?: ProfileCardAccentAssignment;
+  /**
+   * The one-right-thing engine's pick for this visitor. Leads the card for
+   * cold visitors, and its kind and reason code ride on the card's data
+   * attributes and every PAC event.
+   */
+  readonly featured?: FeaturedDecision | null;
 }
 
 interface CaptureCopy {
@@ -250,6 +258,7 @@ function PrimaryPill({
         className={className}
         onClick={onClick}
         aria-label={ariaLabel}
+        data-featured-cta=''
       >
         {content}
       </Link>
@@ -265,6 +274,7 @@ function PrimaryPill({
         className={className}
         onClick={onClick}
         aria-label={ariaLabel}
+        data-featured-cta=''
       >
         {content}
       </a>
@@ -278,6 +288,7 @@ function PrimaryPill({
       disabled={disabled}
       className={className}
       aria-label={ariaLabel}
+      data-featured-cta=''
     >
       {content}
     </button>
@@ -319,6 +330,7 @@ export function ProfilePacCard({
   artPriority = false,
   presentation = 'rail',
   accent = FEATURED_FALLBACK_ACCENT,
+  featured = null,
 }: Readonly<ProfilePacCardProps>) {
   const isFeatured = presentation === 'featured';
   const pillShape = isFeatured ? 'card' : 'compact';
@@ -329,12 +341,18 @@ export function ProfilePacCard({
 
   const [captureSuppressed, setCaptureSuppressed] = useState(false);
 
+  const featuredExtras = useMemo(
+    () => featuredEventExtras(featured),
+    [featured]
+  );
+
   const ctx = useMemo<PacContext>(
     () => ({
       tier: isSubscribed ? 'captured' : 'cold',
       captureEnabled,
       s2Slot: assignment.s2Slot,
       captureSuppressed,
+      lead: featured?.kind ?? null,
       inventory: {
         hasListen: Boolean(release || hasPlayableDestinations),
         hasPreview: Boolean(previewUrl && pacTrackId),
@@ -348,6 +366,7 @@ export function ProfilePacCard({
       assignment.s2Slot,
       captureEnabled,
       captureSuppressed,
+      featured?.kind,
       hasTip,
       hasPlayableDestinations,
       isSubscribed,
@@ -383,6 +402,7 @@ export function ProfilePacCard({
     assignment,
     state: eventState,
     enabled: isInteractive,
+    baseExtras: featuredExtras,
   });
   const playTrackerRef = useRef(createPlayTracker());
   useEffect(() => {
@@ -913,6 +933,18 @@ export function ProfilePacCard({
   const isReleaseArtwork =
     state.kind !== 'merch' && Boolean(release?.artworkUrl);
 
+  // featured_tap: the card's primary actions carry data-featured-cta, so one
+  // capture handler counts taps for every item kind without per-state wiring.
+  const handleFeaturedTap = useCallback(
+    (event: MouseEvent<HTMLElement>) => {
+      // Capture-form buttons (stage s1) are not the featured item.
+      if (!featured || state.stage === 's1') return;
+      const target = event.target as Element | null;
+      if (target?.closest?.('[data-featured-cta]')) emit('featured_tap');
+    },
+    [emit, featured, state.stage]
+  );
+
   // Exposure ref on the outer card (callback ref).
   const sectionRef = useCallback(
     (node: HTMLElement | null) => {
@@ -932,6 +964,9 @@ export function ProfilePacCard({
         data-degraded={state.degraded ? 'true' : undefined}
         data-dismiss-affordance={assignment.dismissAffordance}
         data-presentation='featured'
+        data-featured-kind={featured?.kind}
+        data-featured-reason={featured?.reason}
+        onClickCapture={handleFeaturedTap}
       >
         <ProfileModeCard
           accent={accent}
@@ -963,8 +998,8 @@ export function ProfilePacCard({
                     src={artImageUrl}
                     alt={artImageAlt}
                     fill
-                    priority={artPriority}
-                    loading={artPriority ? undefined : 'eager'}
+                    priority
+                    fetchPriority='high'
                     sizes='104px'
                     className={
                       isReleaseArtwork
@@ -1007,6 +1042,9 @@ export function ProfilePacCard({
       data-stage={state.stage}
       data-degraded={state.degraded ? 'true' : undefined}
       data-dismiss-affordance={assignment.dismissAffordance}
+      data-featured-kind={featured?.kind}
+      data-featured-reason={featured?.reason}
+      onClickCapture={handleFeaturedTap}
       data-layout={layout}
       className={cn(
         'relative flex h-full w-full min-w-0 overflow-hidden rounded-(--profile-inner-radius) border border-(--profile-pearl-border) bg-(--profile-pearl-bg) shadow-(--profile-pearl-shadow) backdrop-blur-2xl',

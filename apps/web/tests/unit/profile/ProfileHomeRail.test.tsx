@@ -237,7 +237,7 @@ describe('ProfileHomeRail', () => {
     expect(screen.queryByRole('link', { name: 'Listen' })).toBeNull();
   });
 
-  it('eager-loads latest-release artwork even when it is not the hero LCP', () => {
+  it('prioritizes the featured cover artwork even when the hero is not the LCP', () => {
     render(
       <ProfileHomeRail
         artist={makeArtist()}
@@ -253,7 +253,10 @@ describe('ProfileHomeRail', () => {
     const artwork = screen.getByRole('img', {
       name: 'The Deep End artwork',
     });
-    expect(artwork).toHaveAttribute('loading', 'eager');
+    // The per-visitor featured cover is the card's LCP element: it is fetched
+    // at high priority (never lazy) regardless of the pacArtPriority hint.
+    expect(artwork).toHaveAttribute('fetchpriority', 'high');
+    expect(artwork).not.toHaveAttribute('loading', 'lazy');
   });
 
   it('renders tip-only inventory as a support PAC instead of a blank Listen card', () => {

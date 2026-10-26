@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
@@ -17,6 +17,13 @@ import {
 } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
+import { pickOneRightThing } from '@/lib/profile/one-right-thing/engine';
+import { featuredEventExtras } from '@/lib/profile/one-right-thing/event-extras';
+import { useReturningMarker } from '@/lib/profile/one-right-thing/use-returning-marker';
+import {
+  type ProfileVariantSeed,
+  signalsFromVariantSeed,
+} from '@/lib/profile/one-right-thing/variant';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
@@ -44,6 +51,13 @@ interface ProfileHomeRailProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  /**
+   * Request signals decoded from the ISR variant. The pick is decided on the
+   * server from these, so hydration reproduces it exactly (no swap).
+   */
+  readonly featuredSeed?: ProfileVariantSeed | null;
+  /** ISO time of the server render; the pick is evaluated at this instant. */
+  readonly featuredRenderedAt?: string;
   readonly releases?: readonly PublicRelease[];
   readonly hasTip?: boolean;
   /**
@@ -95,6 +109,8 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   viewerLocation,
   resolveNearbyTour = true,
   merchCards = [],
+  featuredSeed = null,
+  featuredRenderedAt,
   releases = [],
   hasTip = false,
   pacArtPriority = false,
@@ -102,11 +118,8 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
 }: Readonly<ProfileHomeRailProps>) {
   // PAC instrumentation (spec §8): pac_exposure fires when the card is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
-  const { exposureRef } = usePacEvents({
-    profileId: artist.id,
-    assignment: profilePacAssignment,
-    enabled: renderMode !== 'preview',
-  });
+  const isInteractiveRender = renderMode === 'interactive';
+  useReturningMarker(isInteractiveRender, artist.handle);
   // Re-evaluate visibility at the release boundary so the card's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
   // page was served from a stale ISR cache.
@@ -186,6 +199,62 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       hasPlayableDestinations
   );
 
+  // One right thing: a deterministic, explainable pick for this visitor. The
+  // first render uses neutral signals (identical for everyone, ISR-safe); it
+  // can only change after hydration. Previews and fixtures never personalize.
+  // Fixed for the page's lifetime: never advances, so the card cannot swap.
+  const [decisionNow] = useState(() =>
+    featuredRenderedAt ? new Date(featuredRenderedAt) : new Date()
+  );
+  const featuredDecision = useMemo(() => {
+    if (!isInteractiveRender || !hasPacSubject) return null;
+    return pickOneRightThing({
+      signals: signalsFromVariantSeed(featuredSeed, decisionNow),
+      inventory: {
+        release: pacRelease
+          ? {
+              slug: pacRelease.slug,
+              releaseDate: pacRelease.releaseDate ?? null,
+              isUpcoming: isPacReleaseUpcoming(pacRelease, decisionNow),
+            }
+          : null,
+        shows: tourDates.map(show => ({
+          id: show.id,
+          startDate: show.startDate,
+          country: show.country,
+          ticketUrl: show.ticketUrl,
+        })),
+        hasMerch: Boolean(merchCards[0]),
+        hasTip,
+        hasListen: hasPlayableDestinations,
+      },
+      // No artist-facing control for pinning exists yet.
+      artistPriority: null,
+    });
+  }, [
+    hasPacSubject,
+    hasPlayableDestinations,
+    hasTip,
+    isInteractiveRender,
+    merchCards,
+    decisionNow,
+    pacRelease,
+    tourDates,
+    featuredSeed,
+  ]);
+  const featuredShow =
+    featuredDecision?.kind === 'show'
+      ? (upcomingTourDates.find(show => show.id === featuredDecision.refId) ??
+        pacNextShow)
+      : pacNextShow;
+
+  const { exposureRef } = usePacEvents({
+    profileId: artist.id,
+    assignment: profilePacAssignment,
+    enabled: renderMode !== 'preview',
+    baseExtras: featuredEventExtras(featuredDecision),
+  });
+
   // Pen parity (Tim, 2026-09-26/28): the featured editorial card is the only
   // card surface under the identity header — it replaces the highlights
   // carousel in place rather than stacking above it.
@@ -201,7 +270,8 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
           artist={artist}
           release={pacRelease}
           merchCard={merchCards[0] ?? null}
-          nextShow={pacNextShow}
+          nextShow={featuredShow}
+          featured={featuredDecision}
           hasTip={hasTip}
           assignment={profilePacAssignment}
           isSubscribed={isSubscribed}

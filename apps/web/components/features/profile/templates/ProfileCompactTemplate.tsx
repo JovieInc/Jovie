@@ -47,6 +47,7 @@ import type { PublicMerchCard } from '@/lib/merch/types';
 import { PROFILE_DESKTOP_SURFACE_ENABLED } from '@/lib/profile/desktop-surface-flag';
 import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import type { ProfileVariantSeed } from '@/lib/profile/one-right-thing/variant';
 import {
   buildProfileAccentCssVars,
   readProfileAccentTheme,
@@ -105,6 +106,9 @@ interface ProfileCompactTemplateProps {
   readonly releases?: readonly PublicRelease[];
   readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  readonly featuredSeed?: ProfileVariantSeed | null;
+  /** ISO time of the server render; the pick is evaluated at this instant. */
+  readonly featuredRenderedAt?: string;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly visualVariant?: 'default';
@@ -280,6 +284,8 @@ export function ProfileCompactTemplate({
   releases,
   catalogLoadFailed = false,
   merchCards = [],
+  featuredSeed = null,
+  featuredRenderedAt,
   hideJovieBranding = false,
   hideMoreMenu = false,
   visualVariant = 'default',
@@ -1115,6 +1121,8 @@ export function ProfileCompactTemplate({
                 viewerCountryCode={resolvedViewerCountryCode}
                 visitorAssignmentResolved={visitorAssignmentResolved}
                 merchCards={merchCards}
+                featuredSeed={featuredSeed}
+                featuredRenderedAt={featuredRenderedAt}
                 hideJovieBranding={hideJovieBranding || embeddedPreview}
                 hideMoreMenu={hideMoreMenu}
                 allowFanCapture={allowFanCapture}

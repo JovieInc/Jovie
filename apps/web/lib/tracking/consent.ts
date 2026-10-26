@@ -8,6 +8,8 @@ import { parseConsentCookieValue } from '@/lib/cookies/consent-state';
  * Respects Global Privacy Control (GPC) and Do Not Track (DNT) signals.
  */
 
+import { clearReturningMarker } from '@/lib/profile/one-right-thing/returning-cookie';
+
 export type ConsentState =
   | 'undecided'
   | 'accepted'
@@ -106,11 +108,18 @@ export function getConsentState(): ConsentState {
   return 'undecided';
 }
 
+/** First path segment, the profile handle when on a profile page. */
+function profileHandleFromLocation(): string | undefined {
+  return globalThis.location?.pathname.split('/')[1] || undefined;
+}
+
 /**
  * Set consent state in storage and cookie
  */
 export function setConsentState(state: 'accepted' | 'rejected'): void {
   if (typeof window === 'undefined') return;
+  // Withdrawal must stop edge personalization immediately.
+  if (state === 'rejected') clearReturningMarker(profileHandleFromLocation());
 
   // Store in localStorage (guard against null in restricted contexts)
   try {
@@ -298,5 +307,6 @@ export function clearConsentState(): void {
     // localStorage may be unavailable
   }
   document.cookie = `${CONSENT_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  clearReturningMarker(profileHandleFromLocation());
   clearAcquisitionId();
 }

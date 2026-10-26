@@ -58,6 +58,7 @@ import {
   resolveProfileModeCardAccents,
 } from '@/lib/profile/mode-card-accent';
 import { CONTENT_SAFE_AREA_BOTTOM_PADDING } from '@/lib/profile/nav-constants';
+import type { ProfileVariantSeed } from '@/lib/profile/one-right-thing/variant';
 import { shouldShowColdVisitorTabBar } from '@/lib/profile/pac-tab-bar-experiment';
 import {
   getPermittedPublicProfileActions,
@@ -219,6 +220,9 @@ interface ProfileCompactSurfaceProps {
   readonly releases?: readonly PublicRelease[];
   readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  readonly featuredSeed?: ProfileVariantSeed | null;
+  /** ISO time of the server render; the pick is evaluated at this instant. */
+  readonly featuredRenderedAt?: string;
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
   readonly activeMode?: ProfileMode;
@@ -323,6 +327,8 @@ export function ProfileCompactSurface({
   releases = [],
   catalogLoadFailed = false,
   merchCards = [],
+  featuredSeed = null,
+  featuredRenderedAt,
   drawerOpen,
   drawerView,
   activeMode = 'profile',
@@ -845,6 +851,8 @@ export function ProfileCompactSurface({
                 viewerLocation={viewerLocation}
                 resolveNearbyTour={resolveNearbyTour}
                 merchCards={merchCards}
+                featuredSeed={featuredSeed}
+                featuredRenderedAt={featuredRenderedAt}
                 releases={releases}
                 hasTip={hasTip}
                 pacArtPriority={!resolvedHeroImageUrl}

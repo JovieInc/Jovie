@@ -73,7 +73,10 @@ function redirectSignedOutElectronAppShell(req: NextRequest): NextResponse {
   return response;
 }
 
-const PRIVATE_PROFILE_ALIAS_MARKER = '__profile-mode-alias';
+const PRIVATE_PROFILE_ALIAS_MARKERS: readonly string[] = [
+  '__profile-mode-alias',
+  '__profile-variant',
+];
 const MAX_PROFILE_ALIAS_SEGMENT_LENGTH = 2048;
 const MAX_PROFILE_ALIAS_DECODE_PASSES = 4;
 
@@ -98,7 +101,9 @@ function isReservedProfileAliasMarkerPath(pathname: string): boolean {
       }
 
       if (
-        nextDecodedSegment.split('/').includes(PRIVATE_PROFILE_ALIAS_MARKER)
+        nextDecodedSegment
+          .split('/')
+          .some(part => PRIVATE_PROFILE_ALIAS_MARKERS.includes(part))
       ) {
         return true;
       }

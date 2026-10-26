@@ -34,7 +34,7 @@ export type InAppBrowser =
   | 'spotify'
   | 'other';
 
-export type VisitorDevice = 'ios' | 'android' | 'desktop';
+export type VisitorDevice = 'ios' | 'android' | 'desktop' | 'unknown';
 
 export interface VisitorSignals {
   readonly source: VisitorSource;

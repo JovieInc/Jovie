@@ -57,7 +57,7 @@ describe('PAC event schema (spec §8)', () => {
     mockGetConsentState.mockReturnValue('undecided');
   });
 
-  it('defines 11 client events + the server back-join event', () => {
+  it('defines 12 client events + the server back-join event', () => {
     expect(PAC_CLIENT_EVENTS).toEqual([
       'pac_exposure',
       'pac_play_start',
@@ -70,6 +70,7 @@ describe('PAC event schema (spec §8)', () => {
       'capture_dismiss',
       'capture_channel_toggle',
       'pac_secondary_click',
+      'featured_tap',
     ]);
     expect(PAC_SERVER_EVENTS).toEqual(['pac_s2_convert']);
   });

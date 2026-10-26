@@ -11,7 +11,7 @@ import { countPersonalizingRules, ONE_RIGHT_THING_CLAIM_GATE } from './engine';
  * live public profile and at least `minLiveRules` rules personalize. Flip
  * `ONE_RIGHT_THING_LIVE_ON_PROFILE` in the PR that wires the engine in.
  */
-export const ONE_RIGHT_THING_LIVE_ON_PROFILE = false;
+export const ONE_RIGHT_THING_LIVE_ON_PROFILE = true;
 
 const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const SCAN_DIRS = [

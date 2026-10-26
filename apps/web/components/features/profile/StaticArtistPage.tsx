@@ -11,6 +11,7 @@ import type { ProfilePacAssignment } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ConfirmedFeaturedPlaylistFallback } from '@/lib/profile/featured-playlist-fallback';
+import type { ProfileVariantSeed } from '@/lib/profile/one-right-thing/variant';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { AvatarSize } from '@/lib/utils/avatar-sizes';
 import type { PublicContact } from '@/types/contacts';
@@ -55,6 +56,10 @@ export interface StaticArtistPageProps {
   readonly releases?: readonly PublicRelease[];
   readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  /** Request signals from the ISR variant; null renders the neutral pick. */
+  readonly featuredSeed?: ProfileVariantSeed | null;
+  /** ISO time of the server render; the pick is evaluated at this instant. */
+  readonly featuredRenderedAt?: string;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly showClaimFooter?: boolean;
@@ -98,6 +103,8 @@ export function StaticArtistPage({
   releases,
   catalogLoadFailed = false,
   merchCards,
+  featuredSeed,
+  featuredRenderedAt,
   hideJovieBranding = false,
   hideMoreMenu = false,
   showClaimFooter = false,
@@ -169,6 +176,8 @@ export function StaticArtistPage({
       releases={releases}
       catalogLoadFailed={catalogLoadFailed}
       merchCards={viewModel.merchCards}
+      featuredSeed={featuredSeed}
+      featuredRenderedAt={featuredRenderedAt}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
       showClaimFooter={showClaimFooter}

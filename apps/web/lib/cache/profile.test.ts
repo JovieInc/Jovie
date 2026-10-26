@@ -61,4 +61,31 @@ describe('invalidateProfileCache discovery outputs (JOV-6260)', () => {
     });
     expect(revalidatePath).toHaveBeenCalledWith('/oldartist', 'layout');
   });
+
+  it('invalidates every one-right-thing ISR variant of the profile page', async () => {
+    const { invalidateProfileCache, invalidateSocialLinksCache } = await import(
+      './profile'
+    );
+    await invalidateProfileCache('variantartist');
+
+    const variantPaths = revalidatePath.mock.calls
+      .map(call => call[0] as string)
+      .filter(path => path.includes('/profile-variant-render/'));
+    expect(variantPaths).toHaveLength(56);
+    expect(new Set(variantPaths).size).toBe(56);
+    expect(variantPaths).toContain(
+      '/variantartist/profile-variant-render/dn-DE/__profile-variant'
+    );
+    expect(variantPaths).toContain(
+      '/variantartist/profile-variant-render/or-xx/__profile-variant'
+    );
+
+    revalidatePath.mockClear();
+    await invalidateSocialLinksCache('id', 'variantartist');
+    expect(
+      revalidatePath.mock.calls.filter(call =>
+        String(call[0]).includes('/profile-variant-render/')
+      )
+    ).toHaveLength(56);
+  });
 });

@@ -39,6 +39,7 @@ These cookies remember choices you make on Jovie.
 |------------|---------|----------|
 | `jovie_dsp` | Stores your preferred music service for profile listen links | 1 year |
 | `jv_pref_spotify` | Stores whether Spotify was selected as the preferred music service | 1 year |
+| `jv_returning` | Set on an artist's page only after you accept cookies. Marks that this browser has visited that page so the next visit can lead with a show or release. Removed if you withdraw consent. | 90 days |
 
 ### Analytics Cookies
 

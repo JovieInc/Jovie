@@ -63,6 +63,11 @@ export interface UsePacEventsOptions {
   readonly state?: PacState;
   /** Disable for preview/non-interactive renders. */
   readonly enabled?: boolean;
+  /**
+   * Extras merged into every event, e.g. the featured item kind and reason
+   * code (`featuredEventExtras`). Event-specific extras win on key clashes.
+   */
+  readonly baseExtras?: PacEventExtras;
 }
 
 export interface PacEventsApi {
@@ -85,8 +90,14 @@ export function usePacEvents({
   assignment,
   state = 'idle',
   enabled = true,
+  baseExtras,
 }: UsePacEventsOptions): PacEventsApi {
   const variantId = useMemo(() => buildPacVariantId(assignment), [assignment]);
+
+  const baseExtrasRef = useRef(baseExtras);
+  useEffect(() => {
+    baseExtrasRef.current = baseExtras;
+  }, [baseExtras]);
 
   const stateRef = useRef<PacState>(state);
   const isVisibleRef = useRef(false);
@@ -95,11 +106,14 @@ export function usePacEvents({
     // When the PAC state machine advances while already ≥50% visible,
     // re-emit exposure for the new state (once-per-state dedup still applies).
     if (enabled && isVisibleRef.current) {
-      trackPacExposure({
-        profileId,
-        variantId,
-        pacState: state,
-      });
+      trackPacExposure(
+        {
+          profileId,
+          variantId,
+          pacState: state,
+        },
+        baseExtrasRef.current
+      );
     }
   }, [enabled, profileId, state, variantId]);
 
@@ -117,7 +131,9 @@ export function usePacEvents({
           variantId,
           pacState: stateOverride ?? stateRef.current,
         },
-        extras
+        baseExtrasRef.current || extras
+          ? { ...baseExtrasRef.current, ...extras }
+          : undefined
       );
     },
     [enabled, profileId, variantId]
@@ -141,11 +157,14 @@ export function usePacEvents({
             isVisibleRef.current = visible;
             if (visible) {
               // Once-per-state-per-session dedup lives in trackPacExposure.
-              trackPacExposure({
-                profileId,
-                variantId,
-                pacState: stateRef.current,
-              });
+              trackPacExposure(
+                {
+                  profileId,
+                  variantId,
+                  pacState: stateRef.current,
+                },
+                baseExtrasRef.current
+              );
             }
           }
         },
