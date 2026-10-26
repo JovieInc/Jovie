@@ -75,11 +75,11 @@ export function HomepageWhatsNewSection({
                   {formatCustomerChangelogDate(entry.date)}
                 </span>
                 <span className='shell-whats-new__title'>{entry.title}</span>
-                {/* Ends the entry as a sentence in the extracted page text, so
-                    neighbouring titles never read as one "from X to Y" frame
-                    (copy lint, formulaic-range). */}
-                <span className='sr-only'>.</span>
               </Link>
+              {/* Ends the entry as a sentence in the extracted page text, so
+                  neighbouring titles never read as one "from X to Y" frame
+                  (copy lint, formulaic-range). */}
+              <span className='sr-only'>.</span>
             </li>
           ))}
         </ol>
