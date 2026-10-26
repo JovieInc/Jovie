@@ -13,8 +13,8 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { CircleIconButton } from '@/components/atoms/CircleIconButton';
+import { ShareLinkButton } from '@/components/features/share/ShareLinkButton';
 import { FooterBranding } from '@/components/molecules/FooterBranding';
-import { ShareLinkButton } from '@/components/molecules/ShareLinkButton';
 import { BASE_URL } from '@/constants/app';
 import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
 import type {

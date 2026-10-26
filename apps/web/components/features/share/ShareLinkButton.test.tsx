@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ShareLinkButton } from '@/components/molecules/ShareLinkButton';
+import { ShareLinkButton } from '@/components/features/share/ShareLinkButton';
 
 function setShare(value: unknown) {
   Object.defineProperty(navigator, 'share', { configurable: true, value });
