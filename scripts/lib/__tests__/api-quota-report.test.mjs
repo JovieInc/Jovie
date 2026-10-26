@@ -5,10 +5,12 @@ import { describe, expect, it } from 'vitest';
 import {
   jobSeconds,
   parseQuotaNotice,
+  parseTallyNotice,
   percentile,
   projectDrain,
   summarizeHeadroom,
   summarizeQuota,
+  summarizeTally,
 } from '../api-quota-report.mjs';
 
 describe('api quota report', () => {
@@ -214,5 +216,47 @@ describe('projectDrain', () => {
       hour + 600
     );
     expect(alerts.map(alert => alert.bucket)).toEqual(['github-token']);
+  });
+});
+
+describe('gh call tally', () => {
+  const notice = (workflow, job, calls, githubToken) =>
+    parseTallyNotice(
+      `workflow=${workflow} job=${job} calls=${calls} github_token=${githubToken} other=${calls - githubToken} top=pr view:2,api graphql:1`
+    );
+
+  it('parses the job notice, including workflow names with spaces', () => {
+    expect(notice('Lane Fix Relay', 'relay', 5, 3)).toEqual({
+      workflow: 'Lane Fix Relay',
+      job: 'relay',
+      calls: 5,
+      githubToken: 3,
+      other: 2,
+      top: 'pr view:2,api graphql:1',
+    });
+    expect(parseTallyNotice('bucket=github-token remaining=1')).toBeNull();
+  });
+
+  it('sums github.token calls per workflow and job and ranks the top caller', () => {
+    const rows = summarizeTally(
+      [
+        notice('Lane Fix Relay', 'relay', 6, 4),
+        notice('Lane Fix Relay', 'relay', 4, 2),
+        notice('Fleet Rules Evidence', 'evidence', 2, 1),
+        null,
+      ],
+      2
+    );
+    expect(rows.map(row => row.key)).toEqual([
+      'Lane Fix Relay / relay',
+      'Fleet Rules Evidence / evidence',
+    ]);
+    expect(rows[0]).toMatchObject({
+      runs: 2,
+      calls: 10,
+      githubToken: 6,
+      githubTokenPerRun: 3,
+      githubTokenPerHour: 3,
+    });
   });
 });

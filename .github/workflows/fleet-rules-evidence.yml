@@ -53,6 +53,25 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Count gh calls (start)
+        shell: bash
+        env:
+          GITHUB_TOKEN_FOR_TALLY: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # One line per gh invocation, tagged with a hash of the token it ran with, so the
+          # job can report how many calls spent github.token. Reported by the last step.
+          d="$RUNNER_TEMP/gh-tally-bin"; mkdir -p "$d"
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'printf "%s\t%s %s\n" "$(printf %s "${GH_TOKEN:-${GITHUB_TOKEN:-}}" | sha256sum | cut -c1-8)" "${1:-}" "${2:-}" >> "$GH_CALL_TALLY_FILE" 2>/dev/null || true' \
+            'exec "$GH_CALL_TALLY_REAL" "$@"' > "$d/gh"
+          chmod +x "$d/gh"
+          echo "$d" >> "$GITHUB_PATH"
+          {
+            echo "GH_CALL_TALLY_FILE=$RUNNER_TEMP/gh-calls.tsv"
+            echo "GH_CALL_TALLY_REAL=$(command -v gh)"
+            echo "GH_CALL_TALLY_GITHUB_HASH=$(printf %s "$GITHUB_TOKEN_FOR_TALLY" | sha256sum | cut -c1-8)"
+          } >> "$GITHUB_ENV"
       - name: Mint CI App read token for fleet evidence
         id: fleet-token
         continue-on-error: true
@@ -91,6 +110,19 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: bash .github/scripts/fleet-rules-verdict.sh
+      - name: Report gh call tally
+        if: always()
+        shell: bash
+        run: |
+          f="${GH_CALL_TALLY_FILE:-}"
+          if [ -z "$f" ] || [ ! -s "$f" ]; then
+            echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=0 github_token=0 other=0 top="
+            exit 0
+          fi
+          total="$(wc -l < "$f" | tr -d ' ')"
+          gt="$(awk -F'\t' -v h="${GH_CALL_TALLY_GITHUB_HASH:-}" '$1==h' "$f" | wc -l | tr -d ' ')"
+          top="$(cut -f2 "$f" | sort | uniq -c | sort -rn | head -4 | awk '{c=$1; $1=""; sub(/^ /,""); printf "%s:%s,", $0, c}')"
+          echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=$total github_token=$gt other=$((total-gt)) top=${top%,}"
 
   rerun:
     name: Re-run Source Validation after a verdict
@@ -101,6 +133,25 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Count gh calls (start)
+        shell: bash
+        env:
+          GITHUB_TOKEN_FOR_TALLY: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # One line per gh invocation, tagged with a hash of the token it ran with, so the
+          # job can report how many calls spent github.token. Reported by the last step.
+          d="$RUNNER_TEMP/gh-tally-bin"; mkdir -p "$d"
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'printf "%s\t%s %s\n" "$(printf %s "${GH_TOKEN:-${GITHUB_TOKEN:-}}" | sha256sum | cut -c1-8)" "${1:-}" "${2:-}" >> "$GH_CALL_TALLY_FILE" 2>/dev/null || true' \
+            'exec "$GH_CALL_TALLY_REAL" "$@"' > "$d/gh"
+          chmod +x "$d/gh"
+          echo "$d" >> "$GITHUB_PATH"
+          {
+            echo "GH_CALL_TALLY_FILE=$RUNNER_TEMP/gh-calls.tsv"
+            echo "GH_CALL_TALLY_REAL=$(command -v gh)"
+            echo "GH_CALL_TALLY_GITHUB_HASH=$(printf %s "$GITHUB_TOKEN_FOR_TALLY" | sha256sum | cut -c1-8)"
+          } >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -163,3 +214,16 @@ jobs:
           else
             echo "Fleet evidence for $HEAD_SHA is $concl (attempt ${attempt:-0}); nothing to re-run."
           fi
+      - name: Report gh call tally
+        if: always()
+        shell: bash
+        run: |
+          f="${GH_CALL_TALLY_FILE:-}"
+          if [ -z "$f" ] || [ ! -s "$f" ]; then
+            echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=0 github_token=0 other=0 top="
+            exit 0
+          fi
+          total="$(wc -l < "$f" | tr -d ' ')"
+          gt="$(awk -F'\t' -v h="${GH_CALL_TALLY_GITHUB_HASH:-}" '$1==h' "$f" | wc -l | tr -d ' ')"
+          top="$(cut -f2 "$f" | sort | uniq -c | sort -rn | head -4 | awk '{c=$1; $1=""; sub(/^ /,""); printf "%s:%s,", $0, c}')"
+          echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=$total github_token=$gt other=$((total-gt)) top=${top%,}"

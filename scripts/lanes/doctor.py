@@ -738,6 +738,18 @@ def sample_quota_drain(state: Path, now: float, run=lifecycle.run) -> tuple[dict
         if report.get("schema") != "jovie-actions-quota-drain/v1" or not isinstance(report.get("alerts"), list):
             raise ValueError("quota drain output missing the schema")
         signal = {"schema": "jovie-quota-drain/v1", "observedAt": now, "alerts": report["alerts"][:8]}
+        if report["alerts"]:
+            # Name the top github.token callers only while a bucket is draining (one extra read pass).
+            try:
+                tallied = run(["node", str(QUOTA_DRAIN_SCRIPT), "tally", "--json", "--hours", "1"],
+                              capture_output=True, text=True, timeout=240)
+                line = next((row for row in (tallied.stdout or "").splitlines() if row.startswith("{")), "")
+                rows = json.loads(line).get("rows") if tallied.returncode == 0 and line else None
+                if isinstance(rows, list):
+                    signal["topCallers"] = [{"key": row.get("key"), "githubTokenPerHour": row.get("githubTokenPerHour"),
+                                             "githubTokenPerRun": row.get("githubTokenPerRun")} for row in rows[:5]]
+            except (OSError, ValueError, subprocess.SubprocessError):
+                pass  # the callers are context for the alert, never a reason to drop it
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
@@ -1304,8 +1316,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
     if drain:
         listed = "; ".join(f"{row.get('bucket')} has {row.get('remaining')} left at ~{row.get('ratePerMinute')}/min, empty "
                            f"{row.get('minutesEarly')} min before its reset ({row.get('emptyAt')})" for row in drain[:4])
+        callers = ", ".join(f"{row.get('key')} ~{row.get('githubTokenPerHour')}/h"
+                            for row in ((obs.get("quotaDrain") or {}).get("topCallers") or [])[:3])
         alerts["quota-drain"] = (f"GitHub API budget is projected to run dry before it resets: {listed}. Pause bulk reruns "
-                                 f"and bulk gh work until the reset.")
+                                 f"and bulk gh work until the reset."
+                                 + (f" Top github.token callers: {callers}." if callers else ""))
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
