@@ -63,7 +63,7 @@ export function shouldMountGoogleAnalytics(params: {
 }
 
 export function isCookieBannerRequiredFromClient(): boolean {
-  if (globalThis.document === undefined) return false;
+  if (globalThis.document === undefined) return true;
 
   return isCookieBannerRequiredFromCookieString(globalThis.document.cookie);
 }
@@ -161,7 +161,7 @@ gtag('consent', 'default', {
     return;
   }
   var bannerRequired = !document.cookie.split(';').some(function (cookie) {
-    return cookie.trim().indexOf('${COOKIE_BANNER_REQUIRED_COOKIE}=0') === 0;
+    return cookie.trim() === '${COOKIE_BANNER_REQUIRED_COOKIE}=0';
   });
   var storedConsent = null;
   try {

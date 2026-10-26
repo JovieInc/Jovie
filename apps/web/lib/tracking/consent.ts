@@ -186,10 +186,15 @@ export function isAnalyticsAllowed(): boolean {
       return !isConsentRequiredForCurrentVisitor();
     }
 
+    if (isConsentRequiredForCurrentVisitor()) {
+      // Consent-required regions need an affirmative, well-formed choice.
+      return parseConsentCookieValue(raw)?.analytics === true;
+    }
+
     const parsed = JSON.parse(raw);
     return parsed?.analytics !== false;
   } catch {
-    return true;
+    return !isConsentRequiredForCurrentVisitor();
   }
 }
 

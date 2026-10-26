@@ -27,7 +27,12 @@ const CASES = [
     visible: false,
   },
   { name: 'JP', headers: { 'x-vercel-ip-country': 'JP' }, visible: false },
-  { name: 'missing geo (fail closed)', headers: {}, visible: true },
+  {
+    name: 'missing geo (fail closed)',
+    // Overrides the suite-wide default US/TX geo with an empty signal.
+    headers: { 'x-vercel-ip-country': '', 'x-vercel-ip-country-region': '' },
+    visible: true,
+  },
   {
     name: 'unknown XX (fail closed)',
     headers: { 'x-vercel-ip-country': 'XX' },

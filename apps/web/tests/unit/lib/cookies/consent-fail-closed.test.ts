@@ -5,7 +5,7 @@ import {
   isCookieBannerRequiredFromCookieString,
   resolveCookieBannerRequirement,
 } from '@/lib/cookies/consent-regions';
-import { isMarketingAllowed } from '@/lib/tracking/consent';
+import { isAnalyticsAllowed, isMarketingAllowed } from '@/lib/tracking/consent';
 
 describe('consent geo fail-closed', () => {
   it.each([
@@ -71,5 +71,23 @@ describe('absent required flag blocks non-essential tracking', () => {
   it('allows marketing only when the proxy marked a non-required region', () => {
     document.cookie = 'jv_cc_required=0; path=/';
     expect(isMarketingAllowed()).toBe(true);
+  });
+
+  it.each(['not-json', '{}', '{"marketing":true}'])(
+    'blocks analytics in a required region for unusable jv_cc %j',
+    raw => {
+      document.cookie = 'jv_cc_required=1; path=/';
+      localStorage.setItem('jv_cc', raw);
+      expect(isAnalyticsAllowed()).toBe(false);
+    }
+  );
+
+  it('keeps analytics allowed for a valid opt-in in a required region', () => {
+    document.cookie = 'jv_cc_required=1; path=/';
+    localStorage.setItem(
+      'jv_cc',
+      JSON.stringify({ essential: true, analytics: true, marketing: false })
+    );
+    expect(isAnalyticsAllowed()).toBe(true);
   });
 });
