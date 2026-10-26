@@ -60,6 +60,7 @@ jobs:
         with:
           app-id: ${{ vars.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-actions: read
           permission-contents: read
           permission-pull-requests: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -101,6 +102,14 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Mint CI App read token for the re-run lookups
+        id: fleet-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-actions: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -121,7 +130,9 @@ jobs:
           node-version-file: .nvmrc
       - name: Re-run PR Ready when a passing verdict exists for this exact head
         env:
+          # Reads run on the CI App installation token, the POSTs (actions:write) on github.token.
           GH_TOKEN: ${{ github.token }}
+          GH_READ_TOKEN: ${{ steps.fleet-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
@@ -133,6 +144,11 @@ jobs:
           # job budget (75s of the 2 minute timeout; the gate-weakening detector
           # forbids raising it) holds with no API calls and retries once. A longer
           # wait or a second deferral still fails, never a pass.
+          # Reads never fall back to github.token: no App token means the hop cannot look up.
+          ghr() {
+            if [ -z "${GH_READ_TOKEN:-}" ]; then echo "::error::No CI App read token for the re-run lookups." >&2; return 75; fi
+            GH_TOKEN="$GH_READ_TOKEN" ghx "$@"
+          }
           ghx() {
             local err rc until_ts wait_s
             err="$(mktemp)"
@@ -147,7 +163,7 @@ jobs:
               sleep "$wait_s"
             done
           }
-          latest="$(ghx api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&status=completed&per_page=10" \
+          latest="$(ghr api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&status=completed&per_page=10" \
             --jq '[.workflow_runs[]] | sort_by([.created_at, .id]) | last | "\(.id // "")\t\(.conclusion // "missing")\t\(.run_attempt // 0)"')"
           IFS=$'\t' read -r ev_id concl attempt <<<"$latest"
           if [ "$concl" = success ]; then
