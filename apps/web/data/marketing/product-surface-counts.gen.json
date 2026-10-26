@@ -89,16 +89,9 @@
     },
     "visibleByDefault": {
       "skill": 6,
-      "nav": 14,
-      "total": 20
+      "nav": 15,
+      "total": 21
     },
-    "flagGatedNavigation": [
-      {
-        "id": "go-presence",
-        "requiredFlag": "PROFILES_WORKSPACE",
-        "visibleByDefault": false
-      }
-    ],
     "discoverabilityGatedNavigation": [
       {
         "id": "go-youtube",
