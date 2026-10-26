@@ -24,7 +24,7 @@ export const COMPARATIVE_BENCHMARK = {
   runs: 5,
   /** Shown next to every claim. Must stay a complete, neutral description. */
   method:
-    'Tim White’s own page on each service, loaded in headless Chromium with Lighthouse 13 mobile emulation (slow 4G, 4x CPU slowdown, 390 px wide), five alternating runs per page, median reported. Linktree’s page is a free-plan page with the default consent banner. Network counts come from the same runs; zoom and markup checks read each page’s HTML. Results vary by page, device and day.',
+    'Tim White’s own page on each service, loaded in headless Chromium with Lighthouse 13 mobile emulation (slow 4G, 4x CPU slowdown, 390 px wide), five alternating runs per page, median reported. Two independent measurements (2026-10-26 00:36Z and 01:03Z) agreed; the lower margin of the two is published. Linktree’s page is a free-plan page with the default consent banner. Network counts come from the same runs; zoom and markup checks read each page’s HTML. Results vary by page, device and day.',
   methodSource:
     'https://github.com/JovieInc/Jovie/blob/main/scripts/benchmarks/vs-linktree.mjs',
 } as const;
@@ -72,7 +72,7 @@ export const COMPARATIVE_CLAIMS = [
     metric: 'lcp-ms',
     direction: 'lower-is-better',
     wording: 'Main content appears {x}x faster than on Linktree.',
-    baseline: { jovie: 1851, competitor: 13117 },
+    baseline: { jovie: 1857, competitor: 12362 },
     spread: { jovie: [1722, 2580], competitor: [11601, 15295] },
     minMargin: 3,
     robustness: 'robust',
@@ -81,8 +81,8 @@ export const COMPARATIVE_CLAIMS = [
     id: 'benchmark.vs-linktree.fcp',
     metric: 'fcp-ms',
     direction: 'lower-is-better',
-    wording: 'First paint is {x}x faster than Linktree.',
-    baseline: { jovie: 1681, competitor: 3729 },
+    wording: 'First paint is {pct}% faster than Linktree.',
+    baseline: { jovie: 1610, competitor: 2828 },
     spread: { jovie: [1572, 1701], competitor: [2551, 6832] },
     minMargin: 1.5,
     robustness: 'robust',
@@ -102,7 +102,7 @@ export const COMPARATIVE_CLAIMS = [
     metric: 'total-bytes',
     direction: 'lower-is-better',
     wording: '{pct}% lighter than Linktree.',
-    baseline: { jovie: 1228776, competitor: 2138947 },
+    baseline: { jovie: 1228847, competitor: 2138728 },
     spread: { jovie: [1228644, 1229124], competitor: [2138600, 2139101] },
     minMargin: 1.3,
     robustness: 'robust',
@@ -135,7 +135,7 @@ export const COMPARATIVE_CLAIMS = [
     direction: 'higher-is-better',
     wording:
       'Lighthouse mobile performance score of {jv}, against {cp} for Linktree.',
-    baseline: { jovie: 88, competitor: 33 },
+    baseline: { jovie: 90, competitor: 39 },
     spread: { jovie: [81, 93], competitor: [30, 43] },
     minMargin: 1.5,
     robustness: 'robust',
@@ -159,7 +159,7 @@ export const COMPARATIVE_CLAIMS = [
     baseline: { jovie: 1, competitor: 0 },
     spread: { jovie: [1, 1], competitor: [0, 0] },
     minMargin: 1.01,
-    robustness: 'fragile',
+    robustness: 'robust',
   },
 ] as const satisfies readonly ComparativeClaim[];
 

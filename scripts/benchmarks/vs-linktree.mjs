@@ -37,10 +37,13 @@ function arg(name, fallback) {
 function lighthouseOnce(url, dir, index) {
   const out = join(dir, `lh-${index}.json`);
   const result = spawnSync(
-    'npx',
+    'npm',
     [
+      'exec',
       '--yes',
-      LIGHTHOUSE,
+      `--package=${LIGHTHOUSE}`,
+      '--',
+      'lighthouse',
       url,
       '--quiet',
       '--output=json',
@@ -49,7 +52,7 @@ function lighthouseOnce(url, dir, index) {
       '--form-factor=mobile',
       '--chrome-flags=--headless=new --no-sandbox --disable-gpu',
     ],
-    { encoding: 'utf8', timeout: 180_000 }
+    { encoding: 'utf8', timeout: 180_000, cwd: dir }
   );
   if (result.status !== 0) {
     throw new Error(
