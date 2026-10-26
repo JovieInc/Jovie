@@ -24,7 +24,7 @@ QUERY = '''query($q:String!){
   search(query:$q,type:ISSUE,first:100){
     issueCount
     nodes{... on PullRequest{number title url author{login} mergedBy{login} headRefName headRefOid
-      mergeCommit{oid} baseRefName createdAt updatedAt mergedAt}}
+      mergeCommit{oid} baseRefName createdAt updatedAt mergedAt body}}
   }
 }'''
 
