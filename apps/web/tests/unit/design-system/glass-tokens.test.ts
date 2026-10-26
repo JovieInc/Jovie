@@ -87,9 +87,9 @@ const backdrops: Record<string, Rgb> = {
 describe('glass tokens', () => {
   it('expose one semantic name per role, in OKLCH, for both themes', () => {
     expect(css).toContain(
-      '--color-surface-glass: var(--noir-ion-glass-surface);'
+      '--color-glass-surface: var(--noir-ion-glass-surface);'
     );
-    expect(css).toContain('--color-edge-glass: var(--noir-ion-glass-edge);');
+    expect(css).toContain('--color-glass-edge: var(--noir-ion-glass-edge);');
     expect(css).toContain('--glass-blur: var(--noir-ion-glass-blur);');
     for (const block of [lightBlock, darkBlock]) {
       expect(anchor(block, '--noir-ion-glass-surface')).toMatch(/^oklch\(/);

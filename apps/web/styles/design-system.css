@@ -1192,8 +1192,8 @@
   --noir-ion-glass-surface: oklch(97.69% 0.0075 249 / 0.88);
   --noir-ion-glass-edge: oklch(18.13% 0.0069 258.4 / 0.1);
   --noir-ion-glass-blur: 8px;
-  --color-surface-glass: var(--noir-ion-glass-surface);
-  --color-edge-glass: var(--noir-ion-glass-edge);
+  --color-glass-surface: var(--noir-ion-glass-surface);
+  --color-glass-edge: var(--noir-ion-glass-edge);
   --glass-blur: var(--noir-ion-glass-blur);
   --noir-ion-ion: #11afff;
   --noir-ion-ion-solid: #11afff;
