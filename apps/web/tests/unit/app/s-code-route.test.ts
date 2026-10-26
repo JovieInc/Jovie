@@ -167,6 +167,7 @@ describe('GET /s/[code]', () => {
     const request = new NextRequest('http://localhost/s/abc123', {
       headers: {
         Cookie: 'jv_cc={"marketing":false}',
+        'x-vercel-ip-country': 'JP',
       },
     });
 
@@ -191,7 +192,9 @@ describe('GET /s/[code]', () => {
   it('classifies Wallet profile pass scans separately from short links', async () => {
     mocks.sourceLink.sourceType = 'wallet_pass';
 
-    const request = new NextRequest('http://localhost/s/abc123');
+    const request = new NextRequest('http://localhost/s/abc123', {
+      headers: { 'x-vercel-ip-country': 'JP' },
+    });
 
     const response = await GET(request, {
       params: Promise.resolve({ code: 'abc123' }),
@@ -205,6 +208,15 @@ describe('GET /s/[code]', () => {
         sourceKind: 'wallet_pass',
       })
     );
+  });
+
+  it('skips audience recording when the geo signal is missing (fail closed)', async () => {
+    const request = new NextRequest('http://localhost/s/abc123');
+    const response = await GET(request, {
+      params: Promise.resolve({ code: 'abc123' }),
+    });
+    expect(response.status).toBe(302);
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
 
   it.each([

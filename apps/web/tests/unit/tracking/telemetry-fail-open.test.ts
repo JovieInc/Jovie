@@ -155,6 +155,8 @@ describe('fail-open consent paths (JOV-6585)', () => {
   });
 
   it('treats a denied localStorage write as degradation, not failure (JOV-848)', () => {
+    // Known non-consent region; an absent flag fails closed.
+    document.cookie = 'jv_cc_required=0; path=/';
     const originalSetItem = globalThis.localStorage.setItem;
     globalThis.localStorage.setItem = vi.fn(() => {
       throw new DOMException('QuotaExceededError', 'QuotaExceededError');
