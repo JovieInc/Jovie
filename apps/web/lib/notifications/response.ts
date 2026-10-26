@@ -79,6 +79,27 @@ export const buildSubscribeSuccessResponse = (
 });
 
 /**
+ * SMS subscribes are never confirmed by the form post. The row (if any) stays
+ * pending until the phone holder texts back a valid join code, so the response
+ * is pending without an email OTP step.
+ */
+export const buildSmsPendingSubscribeResponse = (
+  audienceIdentified: boolean,
+  durationMs: number
+): NotificationSubscribeDomainResponse => ({
+  status: 200,
+  audienceIdentified,
+  body: {
+    success: true,
+    message: 'Confirm by text message to finish subscribing',
+    emailDispatched: false,
+    durationMs,
+    pendingConfirmation: true,
+    requiresOtp: false,
+  },
+});
+
+/**
  * Build a successful unsubscribe response
  */
 export const buildUnsubscribeSuccessResponse = (

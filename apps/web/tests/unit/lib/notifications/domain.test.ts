@@ -70,6 +70,16 @@ vi.mock('@/lib/notifications/service', () => ({
   sendNotification: vi.fn().mockResolvedValue({ delivered: [] }),
 }));
 
+vi.mock('@/lib/notifications/sms-suppression', () => ({
+  isPhoneSmsSuppressed: vi
+    .fn()
+    .mockResolvedValue({ suppressed: false, reason: null }),
+}));
+
+vi.mock('@/lib/analytics/signup-funnel.server', () => ({
+  recordFunnelStep: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/notifications/suppression', () => ({
   isEmailSuppressed: vi.fn().mockResolvedValue({ suppressed: false }),
 }));
@@ -201,6 +211,89 @@ describe('notifications/domain', () => {
           }),
         })
       );
+    });
+
+    describe('SMS double opt-in and STOP (compliance)', () => {
+      const artistId = '123e4567-e89b-12d3-a456-426614174000';
+      const smsPayload = {
+        artist_id: artistId,
+        phone: '+15551234567',
+        channel: 'sms',
+        country_code: 'US',
+        source: 'alerts-landing',
+      };
+
+      const mockArtist = () =>
+        vi
+          .mocked(mockedDb.limit)
+          .mockResolvedValueOnce([
+            {
+              id: artistId,
+              displayName: 'Test Artist',
+              username: 'testartist',
+              creatorIsPro: true,
+              creatorClerkId: null,
+              settings: null,
+            },
+          ])
+          .mockResolvedValueOnce([]);
+
+      it('records a pending row and never confirms from the form post', async () => {
+        const { fireSubscribeCAPIEvent } = await import(
+          '@/lib/tracking/fire-subscribe-event'
+        );
+        const { recordFunnelStep } = await import(
+          '@/lib/analytics/signup-funnel.server'
+        );
+        mockArtist();
+
+        const result = await subscribeToNotificationsDomain(smsPayload);
+
+        expect(result.status).toBe(200);
+        expect(result.body).toMatchObject({
+          success: true,
+          pendingConfirmation: true,
+          requiresOtp: false,
+        });
+        const inserted = vi.mocked(db.values).mock.calls.at(-1)?.[0] as Record<
+          string,
+          unknown
+        >;
+        expect(inserted.confirmedAt).toBeNull();
+        const conflict = vi
+          .mocked(db.onConflictDoUpdate)
+          .mock.calls.at(-1)?.[0] as {
+          set: Record<string, unknown>;
+        };
+        expect(conflict.set).not.toHaveProperty('confirmedAt');
+        expect(conflict.set).not.toHaveProperty('unsubscribedAt');
+        expect(fireSubscribeCAPIEvent).not.toHaveBeenCalled();
+        expect(recordFunnelStep).not.toHaveBeenCalled();
+      });
+
+      it('does not re-subscribe a STOP or blocked number without a fresh opt-in', async () => {
+        const { isPhoneSmsSuppressed } = await import(
+          '@/lib/notifications/sms-suppression'
+        );
+        vi.mocked(isPhoneSmsSuppressed).mockResolvedValueOnce({
+          suppressed: true,
+          reason: 'stopped',
+        });
+        mockArtist();
+        vi.mocked(db.values).mockClear();
+        vi.mocked(db.insert).mockClear();
+
+        const result = await subscribeToNotificationsDomain(smsPayload);
+
+        // Same answer as a pending subscribe, so suppression state is not leaked.
+        expect(result.status).toBe(200);
+        expect(result.body).toMatchObject({
+          success: true,
+          pendingConfirmation: true,
+        });
+        expect(db.insert).not.toHaveBeenCalled();
+        expect(db.values).not.toHaveBeenCalled();
+      });
     });
 
     it('keeps the subscribe success path when audience enrichment fails', async () => {
