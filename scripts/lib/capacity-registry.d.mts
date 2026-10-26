@@ -247,7 +247,9 @@ export function renderCanon(view: CapacityView, registry: unknown): string;
 export interface LaneRoutingView {
   readonly providers: readonly {
     readonly id: string;
-    readonly accounts: readonly { readonly quota?: { readonly verdict?: string } | null }[];
+    readonly accounts: readonly {
+      readonly quota?: { readonly verdict?: string } | null;
+    }[];
     readonly metrics?: { readonly costPerMergedUsd?: number | null } | null;
     readonly limits?: { readonly laneSlots?: { readonly value?: number } };
     readonly offGem?: { readonly status?: string };
