@@ -8569,6 +8569,20 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         temporary.unlink(missing_ok=True)
 
 
+def jovie_repair_pending(host: Host, now: float | None = None) -> bool:
+    """True unless a fresh maintenance-demand record from any local lane proves Jovie has no
+    repairable PR. Unknown or stale counts as pending so the Jovie path gets a turn and
+    refreshes the record (a record only goes stale when other work starves the Jovie path)."""
+    now = time.time() if now is None else now
+    lanes = read_json(host.state / "maintenance-demand.json").get("lanes")
+    for row in (lanes.values() if isinstance(lanes, dict) else ()):
+        at, pending = (row or {}).get("observedAt"), (row or {}).get("pending")
+        if type(at) in (int, float) and 0 <= now - at <= MAINTENANCE_DEMAND_MAX_AGE_S \
+                and type(pending) is int and pending == 0:
+            return False
+    return True
+
+
 def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, maintenance_only=False) -> int:
     """Release ownership on every exceptional exit, including notification failures."""
     try:
@@ -8584,7 +8598,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Extra repository bindings (LYB) share this seat. Jovie-only holds below never block them,
     # and a binding fault never blocks the Jovie path. No configured binding = no reads at all.
     try:
-        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only)
+        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only,
+                              jovie_repair_pending=jovie_repair_pending(host))
     except Exception as error:
         bound = None
         print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
