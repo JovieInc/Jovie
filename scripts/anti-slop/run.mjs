@@ -8,7 +8,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanTypeScale } from '../invariants/art-direction/type-scale.mjs';
 import { scanText } from './brand-name.mjs';
@@ -42,7 +42,7 @@ export function runMatchers(reg, files, root = REPO_ROOT) {
       const fileRe = matcher.files ? new RegExp(matcher.files, 'u') : null;
       for (const file of files) {
         if (fileRe && !fileRe.test(file)) continue;
-        const lines = readFileSync(join(root, file), 'utf8').split('\n');
+        const lines = readFileSync(resolve(root, file), 'utf8').split('\n');
         lines.forEach((line, index) => {
           if (re.test(line))
             findings.push({

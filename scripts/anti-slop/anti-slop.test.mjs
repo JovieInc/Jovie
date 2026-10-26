@@ -134,6 +134,17 @@ test('registry matchers flag lines in any file type', () => {
   assert.equal(findings[0].line, 2);
 });
 
+test('matchers accept absolute paths (agents pass artifact paths from anywhere)', () => {
+  const root = repo();
+  put(root, 'abs.html', 'bad word');
+  const reg = base();
+  reg.rules[0].enforcement.matchers = [{ pattern: 'bad word' }];
+  assert.equal(
+    runMatchers(reg, [join(root, 'abs.html')], '/some/other/root').length,
+    1
+  );
+});
+
 test('registry path constant points at the committed file', () => {
   assert.equal(REGISTRY_PATH, 'docs/design-system/anti-slop-rules.json');
 });
