@@ -13,7 +13,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { loadavg, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   allowsPinchZoom,
@@ -166,6 +166,7 @@ async function main() {
       schema: 'jovie-vs-linktree-receipt/v1',
       measuredAt: new Date().toISOString(),
       runs,
+      hostLoad1m: Number(loadavg()[0].toFixed(1)),
       method: COMPARATIVE_BENCHMARK.method,
       evaluations,
     };

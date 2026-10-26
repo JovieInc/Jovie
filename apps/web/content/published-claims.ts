@@ -458,7 +458,7 @@ export function validatePublishedClaimReceipts(
  */
 export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/compare/linktree':
-    '27b42542c78e6f39a6c55c2264fdfbfa15524cb4c3ebd47715c19eba4c292780',
+    '68678dfb4d944bbaa546e6e870a04f060a4059e962cd5178dce7138e9acd7091',
   '/compare/linkfire':
     '0b2d66dc78d69d39852ecd247f4e7b28c8243ea471cd65b56b7e6ded91d421d5',
   '/alternatives/linktree':
