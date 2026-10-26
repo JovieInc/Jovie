@@ -29,6 +29,7 @@
         "apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx",
         "apps/web/app/app/(shell)/admin/algorithm-health/page.tsx",
         "apps/web/app/app/(shell)/admin/campaigns/page.tsx",
+        "apps/web/app/app/(shell)/admin/capacity/page.tsx",
         "apps/web/app/app/(shell)/admin/certifications/page.tsx",
         "apps/web/app/app/(shell)/admin/chat-playground/page.tsx",
         "apps/web/app/app/(shell)/admin/chat/page.tsx",
@@ -681,6 +682,13 @@
       "to": "holdout",
       "at": "2026-10-23T18:26:27.418Z",
       "evidence": "PR #22804 re-registers the command palette product page after merging main including pre-save. Original branch observation: 2026-10-23T12:30:00Z; previous repair registration: 2026-10-23T16:58:51Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/capacity/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-26T02:17:00Z",
+      "evidence": "PR #23313 introduces the admin agent plans page; source registration only, not rendered certification."
     }
   ]
 }
