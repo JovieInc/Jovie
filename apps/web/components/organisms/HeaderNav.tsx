@@ -583,6 +583,7 @@ export function HeaderNav({
                   onMouseEnter={() => openFlyout(menu.id)}
                   onPointerEnter={() => openFlyout(menu.id)}
                   onFocus={() => openFlyout(menu.id)}
+                  onClick={() => openFlyout(menu.id)}
                 >
                   {menu.label}
                   <ChevronDown aria-hidden='true' size={13} strokeWidth={1.8} />

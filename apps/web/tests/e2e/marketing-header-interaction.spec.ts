@@ -109,6 +109,46 @@ async function assertTargets(page: Page) {
   return targets;
 }
 
+test('marketing flyout reopens with Enter and Space after Escape returns focus', async ({
+  page,
+}) => {
+  for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+    await page.emulateMedia({ reducedMotion });
+    await openHeader(page, 1440);
+    const header = page.getByTestId('header-nav');
+    const before = await header.boundingBox();
+    const trigger = page.getByRole('button', {
+      name: 'Customers',
+      exact: true,
+    });
+    const artists = page
+      .locator('#marketing-header-flyout-customers')
+      .getByRole('link', { name: /^Artists/ });
+    await trigger.focus();
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+
+    for (const key of ['Enter', 'Space']) {
+      for (const focusPanel of [false, true]) {
+        if (focusPanel) {
+          await expect(artists).toBeVisible();
+          await artists.focus();
+          await expect(artists).toBeFocused();
+        }
+        await page.keyboard.press('Escape');
+        await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+        await expect(trigger).toBeFocused();
+        await page.keyboard.press(key);
+        await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+        await expect(artists).toHaveAttribute('href', '/solutions/artists');
+        expect(await header.boundingBox()).toEqual(before);
+      }
+    }
+    await page.keyboard.press('Escape');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(await header.boundingBox()).toEqual(before);
+  }
+});
+
 test('marketing header targets activate their own action and feedback follows rapid reversal', async ({
   page,
 }) => {

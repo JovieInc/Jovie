@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HeaderNav } from '@/components/organisms/HeaderNav';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
+import { MARKETING_CUSTOMERS_FLYOUT } from '@/data/marketingNavigation';
 
 // Mock Clerk (MobileNav uses useAuthSafe which wraps Clerk hooks)
 vi.mock('@clerk/nextjs', () => ({
@@ -119,6 +121,61 @@ describe('HeaderNav flyout interactions', () => {
 
     fireEvent.keyDown(document, { key: 'Escape' });
 
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+  });
+
+  it.each([
+    { key: 'Enter', sequence: '{Enter}', from: 'trigger' },
+    { key: 'Space', sequence: ' ', from: 'trigger' },
+    { key: 'Enter', sequence: '{Enter}', from: 'panel' },
+    { key: 'Space', sequence: ' ', from: 'panel' },
+  ])(
+    'reopens with $key after Escape from the $from',
+    async ({ sequence, from }) => {
+      const user = userEvent.setup();
+      render(
+        <HeaderNav
+          authMode='public-static'
+          presentation='marketing-glass'
+          flyoutMenus={[MARKETING_CUSTOMERS_FLYOUT]}
+        />
+      );
+      const trigger = screen.getByRole('button', { name: /Customers/ });
+      act(() => trigger.focus());
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      if (from === 'panel') {
+        act(() => screen.getByRole('link', { name: /^Artists/ }).focus());
+      }
+
+      await user.keyboard('{Escape}');
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(trigger).toHaveFocus();
+
+      await user.keyboard(sequence);
+      expect(trigger).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('link', { name: /^Artists/ })).toHaveAttribute(
+        'href',
+        '/solutions/artists'
+      );
+    }
+  );
+
+  it('keeps a focus-opened flyout open when its trigger is activated', async () => {
+    const user = userEvent.setup();
+    render(
+      <HeaderNav
+        authMode='public-static'
+        presentation='marketing-glass'
+        flyoutMenus={[MARKETING_CUSTOMERS_FLYOUT]}
+      />
+    );
+    const trigger = screen.getByRole('button', { name: /Customers/ });
+    await user.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Enter}');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Escape}');
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(trigger).toHaveFocus();
   });
