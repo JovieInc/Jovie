@@ -37,7 +37,6 @@ const LEGACY_PERSONALIZATION_PHRASES: ReadonlyArray<readonly [string, string]> =
     ['app/(marketing)/ai/page.tsx', 'next best action'],
     ['app/(marketing)/launch/page.tsx', 'right listening destination'],
     ['app/(marketing)/smart-links/page.tsx', 'where each visitor listens'],
-    ['data/aboutCopy.ts', 'next step that fits'],
     ['data/artistProfileCopy.ts', 'adapts to every fan'],
   ];
 
