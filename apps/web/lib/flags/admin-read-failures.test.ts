@@ -43,6 +43,39 @@ describe('Admin flag source truth', () => {
     expect(await getFeatureFlagAuditEvents()).toEqual([]);
     expect((await getFeatureFlagAdminRows()).length).toBeGreaterThan(0);
   });
+  it.each(['DESIGN_V1', 'INBOX_HOME', 'PROFILES_WORKSPACE'])(
+    'hides retired %s controls while retaining their audit history',
+    async flagKey => {
+      mocks.rows.mockResolvedValueOnce([
+        { flagKey, dev: true, staging: true, prod: false },
+      ]);
+      const controls = await getFeatureFlagAdminRows();
+      expect(controls.map(row => row.flagKey)).not.toContain(flagKey);
+
+      mocks.rows.mockResolvedValueOnce([
+        {
+          id: 'retired-audit-1',
+          flagKey,
+          envTier: 'prod',
+          action: 'disable',
+          actor: 'admin',
+          previousValue: true,
+          newValue: false,
+          reason: 'incident stop',
+          createdAt: new Date('2026-10-02T10:00:00Z'),
+        },
+      ]);
+      expect(await getFeatureFlagAuditEvents()).toContainEqual(
+        expect.objectContaining({
+          flagKey,
+          previousEffective: true,
+          newEffective: false,
+          reason: 'incident stop',
+          canRollback: false,
+        })
+      );
+    }
+  );
   it('retains explicit overrides and revision-relevant audit values on a successful read', async () => {
     const { APP_FLAG_DEFAULTS } = await import('./contracts');
     const flagKey = Object.keys(APP_FLAG_DEFAULTS)[0];

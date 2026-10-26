@@ -14299,6 +14299,10 @@ class RepositoryBindingTest(unittest.TestCase):
         self.assertTrue(lane.jovie_repair_pending(self.host, 1000.0))
         write({"observedAt": 1.0, "pending": 0})  # stale: the Jovie path has not run
         self.assertTrue(lane.jovie_repair_pending(self.host, 1000.0))
+        # A lane that never repairs Jovie PRs cannot prove Jovie has none.
+        (self.host.state / "maintenance-demand.json").write_text(json.dumps(
+            {"lanes": {"hyperagent": {"observedAt": 990.0, "pending": 0}}}))
+        self.assertTrue(lane.jovie_repair_pending(self.host, 1000.0))
 
     def test_lyb_epic_is_decomposed_in_its_own_repo_and_settles_its_own_state(self):
         epic = self.lyb("LYB-60", labels=("type:epic",))

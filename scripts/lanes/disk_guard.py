@@ -303,6 +303,9 @@ def reclaimable(host, roots=None) -> bool:
     whole) or one on a filesystem above LOW_PCT free never frees the state disk. Counting them
     held "disk-reclamation-pending" with nothing reclaimable for hours on 2026-10-25."""
     mounts = False  # read lazily: most hosts have no candidate at all
+    # This feeds a deletion decision: an unreadable mount table proves nothing is safe to
+    # reclaim, so it counts nothing (fail closed). A workspace merely located under a mount
+    # point is fine: free_pct(child) already measures that child's own filesystem.
     for root in retired_workspace_roots() if roots is None else roots:
         try:
             if not root.is_dir() or root.is_symlink():
@@ -314,10 +317,11 @@ def reclaimable(host, roots=None) -> bool:
                 if pct is not None and pct > LOW_PCT:
                     continue
                 mounts = mount_points() if mounts is False else mounts
-                if mounts is not None:
-                    resolved = child.resolve()
-                    if any(mount == resolved or resolved in mount.parents for mount in mounts):
-                        continue
+                if mounts is None:
+                    return False
+                resolved = child.resolve()
+                if any(mount == resolved or resolved in mount.parents for mount in mounts):
+                    continue
                 return True
         except OSError:
             continue
