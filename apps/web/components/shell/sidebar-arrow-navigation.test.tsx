@@ -37,10 +37,10 @@ describe('moveSidebarNavFocus', () => {
       moveSidebarNavFocus(root, {
         key: 'ArrowDown',
         target: a,
-      } as KeyboardEvent)
+      })
     ).toBe(true);
     expect(document.activeElement).toBe(b);
-    moveSidebarNavFocus(root, { key: 'End', target: b } as KeyboardEvent);
+    moveSidebarNavFocus(root, { key: 'End', target: b });
     expect(document.activeElement).toBe(c);
   });
   it('leaves text fields and modified keys alone', () => {
@@ -49,20 +49,20 @@ describe('moveSidebarNavFocus', () => {
       moveSidebarNavFocus(root, {
         key: 'ArrowDown',
         target: input,
-      } as KeyboardEvent)
+      })
     ).toBe(false);
     expect(
       moveSidebarNavFocus(root, {
         key: 'ArrowDown',
         target: a,
         metaKey: true,
-      } as KeyboardEvent)
+      })
     ).toBe(false);
   });
   it('skips rows hidden from assistive tech', () => {
     const { root, a, b } = setup();
     b.setAttribute('aria-hidden', 'true');
-    moveSidebarNavFocus(root, { key: 'ArrowDown', target: a } as KeyboardEvent);
+    moveSidebarNavFocus(root, { key: 'ArrowDown', target: a });
     expect(document.activeElement?.textContent).toBe('C');
   });
 });

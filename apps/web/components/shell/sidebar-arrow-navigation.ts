@@ -25,30 +25,53 @@ export function nextSidebarNavIndex(
   }
 }
 
-const NAV_ROW_SELECTOR =
-  'nav a[href], nav button:not([disabled]), [role="menuitem"]:not([aria-disabled="true"])';
+const NAV_ROW_SELECTOR = 'nav a, nav button';
+
+type NavKeyEvent = {
+  readonly key: string;
+  readonly target: EventTarget | null;
+  readonly altKey?: boolean;
+  readonly metaKey?: boolean;
+  readonly ctrlKey?: boolean;
+};
+
+function hasAncestor(
+  element: HTMLElement,
+  test: (node: HTMLElement) => boolean
+) {
+  for (let node: HTMLElement | null = element; node; node = node.parentElement)
+    if (test(node)) return true;
+  return false;
+}
+
+const isHiddenFromNav = (node: HTMLElement) =>
+  node.hidden || node.inert || node.getAttribute('aria-hidden') === 'true';
+
+const ownsArrows = (node: HTMLElement) =>
+  node.isContentEditable ||
+  node.tagName === 'INPUT' ||
+  node.tagName === 'TEXTAREA' ||
+  node.tagName === 'SELECT' ||
+  node.getAttribute('role') === 'menu';
+
+const isNavRow = (row: HTMLElement) =>
+  (row instanceof HTMLButtonElement
+    ? !row.disabled
+    : row.hasAttribute('href')) && !hasAncestor(row, isHiddenFromNav);
 
 /** Move focus within the sidebar nav rows; returns true when it handled the key. */
 export function moveSidebarNavFocus(
   root: HTMLElement,
-  event: Pick<
-    KeyboardEvent,
-    'key' | 'target' | 'altKey' | 'metaKey' | 'ctrlKey'
-  >
+  event: NavKeyEvent
 ): boolean {
   if (event.altKey || event.metaKey || event.ctrlKey) return false;
   const target = event.target;
   if (!(target instanceof HTMLElement)) return false;
   // Text fields and open menus own their arrows.
-  if (
-    target.closest(
-      'input, textarea, select, [contenteditable="true"], [role="menu"]'
-    )
-  )
-    return false;
+  if (hasAncestor(target, ownsArrows)) return false;
   const rows = Array.from(
     root.querySelectorAll<HTMLElement>(NAV_ROW_SELECTOR)
-  ).filter(row => !row.closest('[hidden], [inert], [aria-hidden="true"]'));
+  ).filter(isNavRow);
   const current = rows.findIndex(row => row === target || row.contains(target));
   if (current < 0) return false;
   const next = nextSidebarNavIndex(rows.length, current, event.key);
