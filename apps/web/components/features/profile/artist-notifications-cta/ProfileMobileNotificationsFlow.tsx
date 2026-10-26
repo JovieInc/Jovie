@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { APP_ROUTES } from '@/constants/routes';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
 import {
   type CountryOption,
@@ -64,6 +65,8 @@ interface ProfileMobileNotificationsFlowProps {
   readonly artistEmailOptIn?: boolean;
   readonly artistEmailReady?: boolean;
   readonly showArtistEmailSection?: boolean;
+  /** Content types this artist has. Defaults to new music only. */
+  readonly availableContent?: readonly PromisedContent[];
   readonly onClose: () => void;
   readonly onBack: () => void;
   readonly onChannelChange: (channel: 'email' | 'sms') => void;
@@ -86,11 +89,44 @@ interface ProfileMobileNotificationsFlowProps {
   readonly onPreferencesSubmit: () => void;
 }
 
-const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
+/**
+ * Consent wording (audience permission model). Jovie is the sender and sends
+ * only verified events. Sharing with the artist is a separate, optional
+ * choice made after subscribing, never implied here.
+ */
+export const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
   email:
-    'By submitting, you agree to receive email updates from this artist and Jovie. Unsubscribe anytime.',
-  sms: 'By submitting, you agree to receive text updates from this artist and Jovie. Reply STOP to opt out. Message and data rates may apply.',
+    'By continuing, you agree to get emails from Jovie about this artist. Unsubscribe anytime.',
+  sms: 'By continuing, you agree to get recurring automated texts from Jovie about this artist at this number. Consent is not a condition of purchase. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to cancel.',
 };
+
+type PromisedContent = Extract<
+  NotificationContentType,
+  'newMusic' | 'tourDates' | 'merch'
+>;
+
+const PROMISE_LABEL: Record<PromisedContent, string> = {
+  newMusic: 'new music',
+  tourDates: 'shows',
+  merch: 'merch',
+};
+
+/** Promise only the content types this artist actually has. */
+export function describeUpdatePromise(
+  artistName: string,
+  available: readonly PromisedContent[]
+): { readonly title: string; readonly body: string } {
+  const types = available.length > 0 ? available : (['newMusic'] as const);
+  if (types.length === 1 && types[0] === 'newMusic') {
+    return { title: 'Get New Music', body: `New music from ${artistName}.` };
+  }
+  const labels = types.map(type => PROMISE_LABEL[type]);
+  const list =
+    labels.length > 1
+      ? `${labels.slice(0, -1).join(', ')} and ${labels.at(-1)}`
+      : labels[0];
+  return { title: 'Get Updates', body: `${artistName}: ${list}.` };
+}
 
 const PREFERENCE_META: Record<
   Extract<NotificationContentType, 'newMusic' | 'tourDates' | 'merch'>,
@@ -113,7 +149,7 @@ const PREFERENCE_META: Record<
   },
 };
 
-const JOVIE_ALERT_KEYS = ['newMusic', 'tourDates', 'merch'] as const;
+const DEFAULT_AVAILABLE_CONTENT = ['newMusic'] as const;
 
 function formatCountdown(endTime: number) {
   const remainingMs = endTime - Date.now();
@@ -309,48 +345,50 @@ function InlineCaptureField({
   onSubmit: () => void;
 }>) {
   return (
-    <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1.5'>
-      <div className='flex min-h-13 items-center gap-1'>
-        {channel === 'sms' ? (
-          <CountrySelector
-            country={country}
-            isOpen={isCountryOpen}
-            onOpenChange={onCountryOpenChange}
-            onSelect={onCountrySelect}
+    <div className='space-y-3'>
+      <div className='rounded-(--profile-action-radius) border border-white/10 bg-white/[0.035] p-1'>
+        <div className='flex min-h-14 items-center gap-1'>
+          {channel === 'sms' ? (
+            <CountrySelector
+              country={country}
+              isOpen={isCountryOpen}
+              onOpenChange={onCountryOpenChange}
+              onSelect={onCountrySelect}
+            />
+          ) : (
+            <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/46'>
+              <Mail className='size-4.5' />
+            </span>
+          )}
+          <input
+            data-testid='mobile-email-input'
+            type={channel === 'sms' ? 'tel' : 'email'}
+            inputMode={channel === 'sms' ? 'tel' : 'email'}
+            autoComplete={channel === 'sms' ? 'tel' : 'email'}
+            value={value}
+            placeholder={placeholder}
+            onChange={event => onValueChange(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                onSubmit();
+              }
+            }}
+            disabled={isSubmitting}
+            aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
+            className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
           />
-        ) : (
-          <span className='flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-white/46'>
-            <Mail className='size-4.5' />
-          </span>
-        )}
-        <input
-          data-testid='mobile-email-input'
-          type={channel === 'sms' ? 'tel' : 'email'}
-          inputMode={channel === 'sms' ? 'tel' : 'email'}
-          autoComplete={channel === 'sms' ? 'tel' : 'email'}
-          value={value}
-          placeholder={placeholder}
-          onChange={event => onValueChange(event.target.value)}
-          onKeyDown={event => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              onSubmit();
-            }
-          }}
-          disabled={isSubmitting}
-          aria-label={channel === 'sms' ? 'Phone Number' : 'Email Address'}
-          className='h-11 min-w-0 flex-1 bg-transparent px-1 text-base font-medium tracking-[-0.005em] dark:text-white placeholder:text-(--profile-aeo-muted) focus:outline-none disabled:cursor-not-allowed disabled:opacity-60'
-        />
-        <button
-          type='button'
-          onClick={onSubmit}
-          disabled={isSubmitting}
-          className='inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
-          aria-label='Submit'
-        >
-          <Send className='size-4' />
-        </button>
+        </div>
       </div>
+      <button
+        type='button'
+        onClick={onSubmit}
+        disabled={isSubmitting}
+        className='inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white text-sm font-semibold text-black transition-opacity duration-subtle hover:opacity-92 disabled:cursor-not-allowed disabled:opacity-55 dark:bg-white dark:text-black'
+      >
+        <Send className='size-4' aria-hidden='true' />
+        Submit
+      </button>
     </div>
   );
 }
@@ -384,6 +422,7 @@ export function ProfileMobileNotificationsFlow({
   canGoBackFromPreferences = false,
   artistEmailOptIn = false,
   showArtistEmailSection = false,
+  availableContent = DEFAULT_AVAILABLE_CONTENT,
   onClose,
   onBack,
   onChannelChange,
@@ -495,6 +534,8 @@ export function ProfileMobileNotificationsFlow({
     return null;
   }
 
+  const updatePromise = describeUpdatePromise(artistName, availableContent);
+
   const screen = (() => {
     if (step === 'email') {
       const isSms = channel === 'sms';
@@ -502,24 +543,35 @@ export function ProfileMobileNotificationsFlow({
       return (
         <ScreenShell
           compact
-          title='Get Updates'
-          body={`${artistName}: music, shows, merch.`}
+          title={updatePromise.title}
+          body={updatePromise.body}
           footer={
-            <div className='min-h-27 space-y-3'>
+            <div className='space-y-2'>
               {error ? (
                 <p className='text-sm text-error' role='alert'>
                   {error}
                 </p>
               ) : null}
               <p className='text-xs leading-4 text-tertiary-token'>
-                {CAPTURE_CONSENT_COPY[isSms ? 'sms' : 'email']}
+                {CAPTURE_CONSENT_COPY[isSms ? 'sms' : 'email']}{' '}
+                {isSms ? (
+                  <>
+                    <a className='underline' href={APP_ROUTES.LEGAL_TERMS}>
+                      Terms
+                    </a>
+                    {' · '}
+                  </>
+                ) : null}
+                <a className='underline' href={APP_ROUTES.LEGAL_PRIVACY}>
+                  Privacy
+                </a>
               </p>
               <div className='flex items-center justify-between gap-3'>
                 <button
                   type='button'
                   onClick={() => onChannelChange(isSms ? 'email' : 'sms')}
                   disabled={isSubmitting}
-                  className='inline-flex h-11 items-center gap-1.5 rounded-full px-1 text-xs font-semibold text-white/62 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
+                  className='inline-flex h-11 items-center gap-1.5 rounded-full text-xs font-semibold text-white/62 transition-colors duration-subtle hover:text-white disabled:cursor-not-allowed disabled:opacity-50'
                 >
                   {isSms ? (
                     <Mail className='size-3.5' />
@@ -533,7 +585,7 @@ export function ProfileMobileNotificationsFlow({
                     type='button'
                     onClick={onDismissCapture}
                     disabled={isSubmitting}
-                    className='inline-flex h-11 items-center rounded-full px-1 text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
+                    className='inline-flex h-11 items-center rounded-full text-xs font-semibold text-white/48 transition-colors duration-subtle hover:text-white/70 disabled:cursor-not-allowed disabled:opacity-50'
                   >
                     Not Now
                   </button>
@@ -710,12 +762,19 @@ export function ProfileMobileNotificationsFlow({
           title='Alerts'
           footer={
             canEditPreferences ? (
-              <PrimaryButton
-                onClick={onPreferencesSubmit}
-                disabled={isPreferencesSaving}
-              >
-                Save & Finish
-              </PrimaryButton>
+              <div className='space-y-3'>
+                {error ? (
+                  <p className='text-sm text-error' role='alert'>
+                    {error}
+                  </p>
+                ) : null}
+                <PrimaryButton
+                  onClick={onPreferencesSubmit}
+                  disabled={isPreferencesSaving}
+                >
+                  Save & Finish
+                </PrimaryButton>
+              </div>
             ) : null
           }
         >
@@ -728,7 +787,7 @@ export function ProfileMobileNotificationsFlow({
                 Sent from Jovie
               </p>
 
-              {(JOVIE_ALERT_KEYS as readonly NotificationContentType[]).map(
+              {(availableContent as readonly NotificationContentType[]).map(
                 key => {
                   const meta =
                     PREFERENCE_META[key as keyof typeof PREFERENCE_META];
@@ -764,7 +823,7 @@ export function ProfileMobileNotificationsFlow({
                 <div className='h-px bg-white/8' />
                 <div className='space-y-3'>
                   <p className='text-app font-semibold tracking-tight text-white/42'>
-                    Sent by {artistName}
+                    Optional
                   </p>
 
                   <div className='flex items-center justify-between gap-4 py-2'>
@@ -774,7 +833,12 @@ export function ProfileMobileNotificationsFlow({
                       </span>
                       <div>
                         <p className='text-mid font-medium tracking-[-0.015em] text-white/88'>
-                          Artist Emails
+                          Share My Email With {artistName}
+                        </p>
+                        <p className='text-xs leading-4 text-white/42'>
+                          They can see it, email you directly, and use it in
+                          their own tools, including ads. Off unless you turn it
+                          on. You can turn it off anytime.
                         </p>
                       </div>
                     </div>
@@ -783,7 +847,7 @@ export function ProfileMobileNotificationsFlow({
                       onCheckedChange={checked =>
                         onArtistEmailToggle?.(checked)
                       }
-                      aria-label='Artist Emails'
+                      aria-label={`Share my email with ${artistName}`}
                     />
                   </div>
                 </div>

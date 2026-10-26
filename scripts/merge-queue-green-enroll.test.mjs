@@ -1019,6 +1019,27 @@ test('does not remove lane-fix-red and does not enroll while the label remains',
   }
 });
 
+test('a skip behind a blocking label names the label, not the CLEAN merge state', async () => {
+  const labeled = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: 'lane-fix-red' }],
+  };
+  const result = await fixture({
+    roster: [{ ...candidate(1), labels: [] }],
+    readCurrentSnapshot: () => ({ ...current(1), labels: labeled }),
+  });
+  assert.deepEqual(result.mutations, []);
+  const stale = await fixture({
+    roster: [candidate(1)],
+    readCurrentSnapshot: () => ({ ...current(1), headRefOid: 'b'.repeat(40) }),
+  });
+  assert.deepEqual(stale.mutations, []);
+  assert.ok(script.includes('blocking-label:'));
+  assert.ok(script.includes('head-moved:'));
+  assert.ok(script.includes('merge-state-not-admissible:'));
+  assert.ok(!script.includes('`mergeStateStatus=${pr.mergeStateStatus}`'));
+});
+
 test('enrolls a required-green head once lane-fix-red is gone', async () => {
   const result = await fixture({
     roster: [{ ...candidate(1), labels: [] }],
@@ -1940,8 +1961,20 @@ async function dequeueFixture({
   const warnings = [];
   /** @type {string[]} */
   const notices = [];
+  /** @type {{ issue_number: number, body: string }[]} */
+  const comments = [];
   await runDequeue(
     {
+      rest: {
+        issues: {
+          createComment: async (
+            /** @type {{ issue_number: number, body: string }} */ args
+          ) => {
+            comments.push(args);
+            return {};
+          },
+        },
+      },
       graphql: async (
         /** @type {string} */ query,
         /** @type {Record<string, unknown>} */ variables
@@ -1967,14 +2000,17 @@ async function dequeueFixture({
         return { repository: { pullRequest: currentPR } };
       },
     },
-    { repo: { owner: 'JovieInc', repo: 'Jovie' }, payload },
+    {
+      repo: { owner: 'JovieInc', repo: 'Jovie' },
+      payload: { sender: { login: 'some-agent' }, ...payload },
+    },
     {
       info() {},
       notice: (/** @type {string} */ message) => notices.push(message),
       warning: (/** @type {string} */ message) => warnings.push(message),
     }
   );
-  return { reads, mutations, warnings, notices };
+  return { reads, mutations, warnings, notices, comments };
 }
 
 for (const label of [
@@ -1998,6 +2034,14 @@ for (const label of [
     assert.deepEqual(result.notices, [
       `DEQUEUED #7: labeled ${label} while queued`,
     ]);
+    // The queue timeline only says "manual"; the reason is recorded on the PR.
+    assert.equal(result.comments.length, 1);
+    assert.equal(result.comments[0].issue_number, 7);
+    assert.match(
+      result.comments[0].body,
+      new RegExp(`\\\`${label}\\\` was added by @some-agent`)
+    );
+    assert.match(result.comments[0].body, /<!-- queue-dequeue \{"code":"hold"/);
   });
 }
 
@@ -2351,7 +2395,7 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
     step => step.name === 'Enqueue green PRs'
   ).with.script;
   for (const decision of [
-    "receipt(pr, 'skip', `mergeStateStatus=",
+    "receipt(pr, 'skip', why)",
     "receipt(pr, 'skip', 'blocked-recheck-exhausted')",
     "receipt(pr, 'recheck', `blocked-recheck=",
     "receipt(pr, 'held', failure.reason)",

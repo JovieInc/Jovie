@@ -43,13 +43,13 @@ export const ARTIST_PROFILE_SECTION_ORDER: readonly ArtistProfileSectionOrderEnt
     },
     {
       id: 'outcomes',
-      label: 'Fan Outcomes',
+      label: 'Audience outcomes',
       testId: 'artist-profile-section-outcomes',
       screenshotScenarioId: 'artist-profile-outcomes-section-desktop',
     },
     {
       id: 'capture',
-      label: 'Capture Every Fan',
+      label: 'Capture every listener',
       testId: 'artist-profile-section-capture',
       screenshotScenarioId: 'artist-profile-capture-section-desktop',
     },
