@@ -109,8 +109,6 @@
   --color-accent-gray-subtle: rgb(127 127 133 / 0.18);
   --color-accent-blue: #11afff;
   --color-accent-blue-subtle: rgba(17, 175, 255, 0.12);
-  --color-accent-purple: #a982ff;
-  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
   --color-accent-pink: #ff48d2;
   --color-accent-pink-subtle: rgba(255, 72, 210, 0.12);
   --color-accent-red: #ff677d;
@@ -140,7 +138,14 @@
   --system-b-app-frame-seam: var(--color-border-subtle);
   --system-b-app-content-surface: var(--color-bg-elevated);
   --system-b-entity-chip-release-accent: var(--color-accent);
-  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
   --system-b-entity-chip-track-accent: var(--color-accent-blue);
   --system-b-entity-chip-event-accent: var(--color-accent-orange);
+}
+
+/* Keep the secondary accent role separate from the surface theme bridge. */
+.system-b-marketing.dark,
+:root.dark .system-b-marketing {
+  --color-accent-purple: #a982ff;
+  --color-accent-purple-subtle: rgba(169, 130, 255, 0.12);
+  --system-b-entity-chip-artist-accent: var(--color-accent-purple);
 }
