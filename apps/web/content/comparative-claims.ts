@@ -83,7 +83,7 @@ export const COMPARATIVE_CLAIMS = [
     direction: 'lower-is-better',
     wording: 'First paint is faster than Linktree.',
     baseline: { jovie: 1567, competitor: 2426 },
-    spread: { jovie: [1572, 1701], competitor: [2551, 6832] },
+    spread: { jovie: [1567, 1701], competitor: [2426, 6832] },
     minMargin: 1.3,
     robustness: 'robust',
   },
