@@ -89,6 +89,27 @@ export function evaluateEntryRoute(
   };
 }
 
+function escapeCommandData(value: string): string {
+  return value
+    .replaceAll('%', '%25')
+    .replaceAll('\r', '%0D')
+    .replaceAll('\n', '%0A');
+}
+
+/**
+ * GitHub Actions error annotation for a failed route. Step logs need an
+ * authenticated API call, but annotations show on the run page, so this is
+ * how anyone can see which entry route broke the release gate.
+ */
+export function formatFailureAnnotation(verdict: EntryRouteVerdict): string {
+  const title = escapeCommandData(`Entry-route LCP gate: ${verdict.id}`)
+    .replaceAll(':', '%3A')
+    .replaceAll(',', '%2C');
+  return `::error title=${title}::${escapeCommandData(
+    `${verdict.id} (${verdict.url}): ${verdict.failures.join('; ')}`
+  )}`;
+}
+
 export function parseBudgets(raw: unknown): EntryRouteBudget[] {
   if (!Array.isArray(raw) || raw.length === 0) {
     throw new TypeError('entry budgets must be a non-empty array');
@@ -220,6 +241,9 @@ export async function main(argv: readonly string[]): Promise<number> {
       `${verdict.pass ? 'PASS' : 'FAIL'} ${verdict.id}: LCP ${Math.round(verdict.lcpMedianMs)}ms / ${verdict.lcpBudgetMs}ms, CLS ${verdict.clsMedian.toFixed(3)} / ${verdict.clsBudget}`
     );
     for (const failure of verdict.failures) console.log(`  ${failure}`);
+    if (!verdict.pass && process.env.GITHUB_ACTIONS === 'true') {
+      console.log(formatFailureAnnotation(verdict));
+    }
   }
   return verdicts.every(verdict => verdict.pass) ? 0 : 1;
 }
