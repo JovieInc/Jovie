@@ -954,6 +954,67 @@
         "check": "approved-people registry per-route allowlist (marketing worker, PR #23329 follow-up) + vision judge for dominance",
         "evidence": []
       }
+    },
+    {
+      "id": "ASR-040",
+      "title": "Pen structural edits are guarded",
+      "statement": "Before any Pen move, delete, replace, insert or reparent on a component that has instances, the edit must be property-only, or it is refused; the .pen file is snapshotted first.",
+      "rationale": "Moving slot nodes in App Shell JwsdW (76 instances) silently dropped every instance's slot overrides (JOV-9246).",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "JOV-9246; Pen incident, Library worker recovered from a saved copy"
+      },
+      "scope": ["pen"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/agent/pen-structural-guard.mjs",
+        "evidence": [
+          "scripts/agent/pen-structural-guard.mjs",
+          "scripts/agent/pen-structural-guard.test.mjs"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'anti-slop'",
+            "commandIncludes": "pen-structural-guard.test.mjs"
+          }
+        ],
+        "coverageNote": "The CLI classifies an execute script and the instance count (from --instances or a census); agents run it before a structural Pencil execute (documented in pen-operations.md). It is not yet a PreToolUse hook on mcp__pencil__execute because the hook cannot know instance counts without a census."
+      }
+    },
+    {
+      "id": "ASR-041",
+      "title": "Review frames carry a role",
+      "statement": "Vision review input names a frame role, final or transition-keyframe. Transition keyframes get the motion rubric (legible at every step, no headline collision, consistent anchors), never the page-composition rubric. There is no default role.",
+      "rationale": "Clef failed a 50%-zoom transition keyframe as a finished page at 0.26.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "lead: Clef judged a 50% zoom keyframe as a finished page"
+      },
+      "scope": ["marketing", "artifact", "pen"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static+vision",
+        "status": "enforced",
+        "visionStatus": "shadow",
+        "check": "scripts/invariants/art-direction/frame-roles.mjs",
+        "evidence": [
+          "scripts/invariants/art-direction/frame-roles.mjs",
+          "scripts/invariants/art-direction/frame-roles.test.mjs"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ],
+        "coverageNote": "The review request builder refuses a missing role; callers (ad-review, dogfood vision panel) must build requests through reviewRequest()."
+      }
     }
   ],
   "judges": [
