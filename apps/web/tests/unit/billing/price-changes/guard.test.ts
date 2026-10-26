@@ -153,3 +153,16 @@ describe('price-change guard', () => {
     expect(run({ headRecords: [annual] }).join()).toMatch(/only monthly/);
   });
 });
+
+describe('price-change guard: new keys', () => {
+  it('RED: a new legacy/config key (existing-plan source) is not exempt', () => {
+    const violations = evaluatePriceChangeGuard({
+      baseLive: BASE,
+      headLive: { ...BASE, 'config:proMonthly': 1500 },
+      baseRecords: [],
+      headRecords: [],
+      today: '2026-12-01',
+    });
+    expect(violations.join()).toMatch(/new non-offer price key/);
+  });
+});

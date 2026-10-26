@@ -42,6 +42,24 @@ export function assertApplyAllowed(): void {
   }
 }
 
+/** The record's old amount/interval must be what subscribers really pay. */
+async function assertOldPriceContract(
+  change: ScheduledPriceChange,
+  priceId: string
+): Promise<void> {
+  const price = await stripe.prices.retrieve(priceId);
+  if (
+    price.currency !== change.currency ||
+    price.unit_amount !== change.oldAmountCents ||
+    price.recurring?.interval !== change.interval ||
+    price.recurring.interval_count !== 1
+  ) {
+    throw new Error(
+      `Stripe price ${priceId} does not match the old price of scheduled change ${change.id}`
+    );
+  }
+}
+
 async function assertNewPriceContract(
   change: ScheduledPriceChange,
   priceId: string
@@ -67,6 +85,7 @@ async function assertNewPriceContract(
 export const stripePriceChangePort: StripePort = {
   async listAffected(change) {
     const oldPriceId = priceIdFromEnv(change.oldStripePriceEnvKey);
+    await assertOldPriceContract(change, oldPriceId);
     const found: AffectedSubscription[] = [];
     for await (const subscription of stripe.subscriptions.list({
       price: oldPriceId,
@@ -103,6 +122,10 @@ export const stripePriceChangePort: StripePort = {
       throw new ScheduleOwnedError(subscription.subscriptionId);
     }
     const newPriceId = priceIdFromEnv(change.newStripePriceEnvKey);
+    await assertOldPriceContract(
+      change,
+      priceIdFromEnv(change.oldStripePriceEnvKey)
+    );
     await assertNewPriceContract(change, newPriceId);
     // Update only the item on the old price, by id; other items are untouched.
     // No proration: the new price first bills at the next renewal.

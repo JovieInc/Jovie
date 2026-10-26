@@ -29,7 +29,11 @@ export const resendMailPort: MailPort = {
       html: message.html,
       idempotencyKey: message.idempotencyKey,
     });
-    if (result.status === 'sent' && result.detail) {
+    if (
+      result.status === 'sent' &&
+      result.detail &&
+      result.detail !== 'resend'
+    ) {
       return { status: 'sent', messageId: result.detail };
     }
     return {

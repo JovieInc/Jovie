@@ -43,6 +43,7 @@ New prices for new plans need no record. Price decreases need no record.
 ## Not built yet
 
 - Annual price changes (a notice window aligned to the renewal date).
+- Nothing calls `recordFallbackNotice` yet: a permanent bounce holds the change until a person documents an alternate-channel notice.
 - An in-app banner as the alternate channel for permanent bounces; today
   `recordFallbackNotice` documents one made by a person.
 - Notice copy is a draft (`price-change-notice.ts`); Tim owns the wording.

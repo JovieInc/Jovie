@@ -62,6 +62,15 @@ export function evaluatePriceChangeGuard(input: GuardInput): string[] {
   }
 
   // New records must give the full notice window from today.
+  // Only offer prices can be new without a record; a new legacy/config key
+  // would be an existing-subscriber price appearing from nowhere.
+  for (const key of Object.keys(headLive)) {
+    if (baseLive[key] === undefined && !key.startsWith('offer:')) {
+      violations.push(
+        `${key}: new non-offer price key needs review (existing-plan price source)`
+      );
+    }
+  }
   for (const head of headRecords) {
     if (baseById.has(head.id)) continue;
     violations.push(...validateRecordShape(head));
