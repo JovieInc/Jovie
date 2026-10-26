@@ -3,7 +3,7 @@
   "mode": "warn",
   "issue": "JOV-8606",
   "tighten": "auto",
-  "count": 31,
+  "count": 30,
   "violations": [
     "apps/web/app/(marketing)/alternatives/page.tsx :: link-in-bio :: Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links.",
     "apps/web/app/(marketing)/alternatives/page.tsx :: link-in-bio :: Find a musician-first alternative to generic link-in-bio tools, with smart links and release workflows instead of a list of links. #2",
@@ -31,7 +31,6 @@
     "apps/web/content/alternatives/link-in-bio.ts :: link-in-bio :: Do I need a separate link-in-bio tool if I use Jovie?",
     "apps/web/content/blog/the-myspace-problem.md :: link-in-bio :: Link-in-bio tools treat the page as a canvas. Unlimited links. Unlimited fonts. Unlimited colors. Every page looks different. Two Linktrees feel like two",
     "apps/web/content/comparisons/linktree.ts :: link-in-bio :: Link-in-bio profile",
-    "apps/web/data/aboutCopy.ts :: niche-music :: without reducing you to a category. For musicians, Jovie routes listeners to the right streaming platform, turns profile visits into relationships, surfaces",
     "apps/web/data/artistProfileCopy.ts :: link-in-bio :: link in bio for musicians",
     "apps/web/data/artistProfileCopy.ts :: link-in-bio :: music link in bio",
     "apps/web/data/artistProfileCopy.ts :: link-in-bio :: Stop designing your link-in-bio.",

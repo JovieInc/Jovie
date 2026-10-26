@@ -51,7 +51,7 @@ export default function AiPage() {
             <p className='max-w-2xl text-lg leading-8 text-secondary-token'>
               Jovie turns a creator profile into a page that leads with the
               latest release or show. This public page covers the operating
-              model without exposing the private investor portal.
+              model without exposing private material.
             </p>
             <div className='flex flex-wrap gap-3'>
               <Button asChild variant='primary'>

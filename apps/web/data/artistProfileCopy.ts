@@ -494,7 +494,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
           'tim-white-profile-subscribe-mobile'
         ).publicUrl,
         screenshotAlt:
-          'Jovie artist profile inviting listeners to get release updates.',
+          'Jovie profile inviting listeners to get release updates.',
         screenshotWidth: 660,
         screenshotHeight: 1368,
       },
@@ -772,7 +772,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   },
   opinionated: {
     headline: 'Stop designing your link-in-bio.',
-    body: 'Jovie leads with the next action a listener needs. You get a clear path without redesigning the page. Make music. Jovie turns attention into action.',
+    body: 'Jovie leads with the next action a listener needs. You get a clear path without redesigning the page. Jovie turns attention into action.',
     principle: 'One profile. Built to convert.',
   },
   outcomeDuo: {
@@ -872,7 +872,7 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
     thanksCard: {
       textAnchor: 'top',
       title: 'Say thanks',
-      body: 'One clean thank-you can feel personal and send the listener straight back to the music.',
+      body: 'One clean thank-you can feel personal and send the listener straight back to what you released.',
       appName: 'Jovie',
       sender: 'Jovie for Tim White',
       visualSide: 'right',
@@ -1002,14 +1002,14 @@ export const ARTIST_PROFILE_COPY: ArtistProfileLandingCopy = {
   reactivation: {
     headline: 'Notify them automatically.',
     subhead:
-      'When new music drops or a nearby show is coming up, Jovie brings the right listeners back.',
+      'When a new release drops or a nearby show is coming up, Jovie brings the right listeners back.',
     workflow: {
       columns: ['Trigger', 'Audience', 'Message', 'Destination'],
       rows: [
         {
           id: 'release',
           trigger: 'New music',
-          audience: 'Listeners who asked for music',
+          audience: 'Listeners who asked for updates',
           message: 'New release alert',
           destination: 'Latest release page',
         },
