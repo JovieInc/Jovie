@@ -45,7 +45,9 @@ function hasAncestor(
 }
 
 const isHiddenFromNav = (node: HTMLElement) =>
-  node.hidden || node.inert || node.getAttribute('aria-hidden') === 'true';
+  Boolean(node.hidden) ||
+  node.hasAttribute('inert') ||
+  node.getAttribute('aria-hidden') === 'true';
 
 const ownsArrows = (node: HTMLElement) =>
   node.isContentEditable ||
