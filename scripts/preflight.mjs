@@ -22,6 +22,9 @@
  *   --hook       pre-push mode: honour JOVIE_PREFLIGHT=0 and skip when HEAD has
  *                no commits ahead of the base
  *
+ * The changelog guard needs a token: export GH_TOKEN (your gh login token) to
+ * run it locally; without one that step is listed as skipped.
+ *
  * Each run appends one JSONL line (red statement labels, duration) to
  * ~/.local/state/jovie-lanes/preflight.jsonl; JOVIE_PREFLIGHT_LEDGER=off
  * disables it. That ledger is the measurement for CI rounds avoided.
@@ -307,11 +310,6 @@ export async function main({
   const procEnv = pinnedBin
     ? { ...env, PATH: `${pinnedBin}:${env.PATH}` }
     : env;
-  if (!procEnv.GH_TOKEN && !procEnv.GITHUB_TOKEN) {
-    const tok = spawnSync('gh', ['auth', 'token'], { encoding: 'utf8' });
-    if (tok.status === 0 && tok.stdout.trim())
-      procEnv.GH_TOKEN = tok.stdout.trim();
-  }
   const runnerTemp = mkdtempSync(path.join(tmpdir(), 'preflight-'));
   const headSha = git(['rev-parse', 'HEAD']);
   const values = expressionValues({

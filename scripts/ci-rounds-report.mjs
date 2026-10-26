@@ -8,7 +8,7 @@
  * Usage: node scripts/ci-rounds-report.mjs [--prs 25] [--json]
  *
  * Cost: 1 GraphQL call, through the enforced client
- * layer (packages/api-client). Check `gh api rate_limit` first for bulk use.
+ * layer (packages/api-client). Check the GitHub core rate limit first for bulk use.
  */
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
