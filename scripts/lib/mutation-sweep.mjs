@@ -373,6 +373,40 @@ export function moduleKey(sourceBlob, testBlobs) {
 }
 
 /**
+ * Per-file timeout sized from what this host actually did, not a constant.
+ * Basis: the module's own last scored duration, else the median scored
+ * duration, else the ceiling. Scaled by run-queue pressure per core (work at
+ * nice 19 only gets the idle share, so wall time stretches with load), doubled
+ * for headroom, and clamped to [floorMs, ceilMs].
+ * @param {{ previousMs?: number | null, medianMs?: number | null, load: number,
+ *   cores: number, floorMs: number, ceilMs: number }} input
+ */
+export function fileTimeoutMs({
+  previousMs,
+  medianMs,
+  load,
+  cores,
+  floorMs,
+  ceilMs,
+}) {
+  const base = previousMs || medianMs;
+  if (!base) return ceilMs;
+  const pressure = Math.max(1, load / Math.max(1, cores));
+  return Math.round(Math.min(ceilMs, Math.max(floorMs, base * pressure * 2)));
+}
+
+/** Median duration of modules that finished scoring, or null. */
+export function medianScoredMs(
+  /** @type {ReturnType<typeof emptyState>} */ state
+) {
+  const xs = Object.values(state.modules)
+    .filter(m => m.status === 'scored' && m.durationMs > 0)
+    .map(m => m.durationMs)
+    .sort((a, b) => a - b);
+  return xs.length === 0 ? null : xs[Math.floor(xs.length / 2)];
+}
+
+/**
  * Ratchet verdict: a module regresses when its fresh score is under the
  * committed floor (baseline) or, with no floor, under the previous recorded
  * score by more than `slack` points while measured on enough mutants.
@@ -431,4 +465,53 @@ export function proposeBaselineEntries(state, baseline, source) {
     };
   }
   return out;
+}
+
+/**
+ * Floor raises for modules that already have a floor: a fresh score at least
+ * MIN_RATCHET_VALID strong whose measured-1 beats the committed floor
+ * (lock_up: floors only move up). Same entry shape as proposeBaselineEntries.
+ * @param {ReturnType<typeof emptyState>} state
+ * @param {{ files: Record<string, { floor: number }> }} baseline
+ * @param {{ runId: number, sha: string }} source
+ */
+export function raiseBaselineEntries(state, baseline, source) {
+  /** @type {Record<string, { measured: number, floor: number, valid: number, runId: number, sha: string }>} */
+  const out = {};
+  for (const [file, entry] of Object.entries(state.modules)) {
+    const current = baseline.files[file];
+    if (!current) continue;
+    if (entry.status !== 'scored' || entry.score === null) continue;
+    if (entry.valid < MIN_RATCHET_VALID) continue;
+    const floor = Math.round((entry.score - 1) * 10) / 10;
+    if (!(floor > current.floor)) continue;
+    out[file] = {
+      measured: entry.score,
+      floor,
+      valid: entry.valid,
+      runId: source.runId,
+      sha: entry.sha ?? source.sha,
+    };
+  }
+  return out;
+}
+
+/**
+ * Merge floor additions/raises into a baseline object without mutating it.
+ * Never lowers a floor.
+ * @param {{ files: Record<string, { floor: number }> } & Record<string, unknown>} baseline
+ * @param {Record<string, { floor: number }>} proposal
+ */
+export function mergeFloorProposal(baseline, proposal) {
+  const files = { ...baseline.files };
+  /** @type {string[]} */ const changed = [];
+  for (const [file, entry] of Object.entries(proposal)) {
+    if (files[file] && !(entry.floor > files[file].floor)) continue;
+    files[file] = entry;
+    changed.push(file);
+  }
+  const sorted = Object.fromEntries(
+    Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+  );
+  return { baseline: { ...baseline, files: sorted }, changed };
 }

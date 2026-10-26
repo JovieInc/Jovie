@@ -13,17 +13,21 @@ describe('Mutation Diff spare-compute contract', () => {
     const runsOn = [...workflow.matchAll(/^\s+runs-on:\s*(.+)$/gmu)].map(
       match => match[1].trim()
     );
-    expect(runsOn).toHaveLength(2);
+    expect(runsOn).toHaveLength(3);
     for (const value of runsOn) {
       expect(value).toBe('[self-hosted, Linux, X64, jovie-fixed]');
     }
     expect(workflow).not.toMatch(/ubuntu-/u);
   });
 
-  it('confines its one secret to the issue-filing step and never runs on pull requests', () => {
+  it('confines secrets to the filing step and the floor-pr job, and never runs on pull requests', () => {
     const secrets = workflow.match(/\$\{\{\s*secrets\.[A-Z_]+/gu) ?? [];
-    expect(secrets).toHaveLength(1);
+    expect(secrets).toHaveLength(2);
     expect(secrets[0]).toMatch(/LINEAR_API_KEY/u);
+    expect(secrets[1]).toMatch(/AGENTS_APP_PRIVATE_KEY/u);
+    const floorJob = workflow.slice(workflow.indexOf('\n  floor-pr:'));
+    expect(floorJob).not.toMatch(/mutation-sweep\.mjs|stryker|vitest|pnpm/iu);
+    expect(floorJob).toContain('scripts/mutation-open-floor-pr.mjs');
     const step = workflow
       .split('- name: File survivor issues')[1]
       .split(/\n {6}- name:/u)[0];
@@ -48,5 +52,16 @@ describe('Mutation Diff spare-compute contract', () => {
     expect(sweep).toContain('group: mutation-sweep');
     expect(sweep).toContain('cancel-in-progress: false');
     expect(sweep).toContain('scripts/mutation-sweep-preflight.mjs');
+  });
+
+  it('shares idle CPU at the lowest priority instead of gating on a load constant', () => {
+    const sweep = workflow.slice(workflow.indexOf('\n  sweep:'));
+    expect(sweep).toMatch(/nice -n 19 ionice -c3/u);
+    expect(sweep).toMatch(/CPUWeight=1/u);
+    const preflight = readFileSync(
+      resolve(REPO_ROOT, 'scripts/mutation-sweep-preflight.mjs'),
+      'utf8'
+    );
+    expect(preflight).not.toMatch(/loadavg|MAX_LOAD/u);
   });
 });
