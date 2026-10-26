@@ -204,7 +204,7 @@ To fix a violation:
 
 ## Color System
 
-Read [color system](docs/design-system/DETAILS.md#color-system) before edits.
+Read [the color system reference](docs/design-system/DETAILS.md#color-system) when changing this area.
 
 Mint = success. Orange = warning. Red = danger. Use semantic tokens, not these names as raw CSS values.
 
