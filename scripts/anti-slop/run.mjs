@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { scanTypeScale } from '../invariants/art-direction/type-scale.mjs';
 import { scanText } from './brand-name.mjs';
 import {
   checkDrift,
@@ -91,6 +92,16 @@ function main(argv) {
     const reg = loadRegistry();
     const findings = runMatchers(reg, files);
     for (const file of files) {
+      if (/\.(?:html?|css|tsx|jsx)$/u.test(file)) {
+        for (const hit of scanTypeScale(readFileSync(file, 'utf8'), file))
+          findings.push({
+            id: 'ASR-025',
+            severity: 'block',
+            file,
+            line: hit.line,
+            text: `${hit.px}px: ${hit.text}`,
+          });
+      }
       for (const hit of scanText(readFileSync(file, 'utf8'), { file }))
         findings.push({
           id: 'ASR-036',

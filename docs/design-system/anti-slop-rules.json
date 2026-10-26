@@ -587,9 +587,32 @@
       "severity": "block",
       "enforcement": {
         "kind": "static+vision",
-        "status": "planned",
-        "check": "banned imagery tags in asset sidecars (PR2) + vision:cliche",
-        "evidence": []
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/imagery-tags.mjs (sidecars) + runner matcher on artifact HTML + vision:cliche",
+        "evidence": ["scripts/invariants/art-direction/imagery-tags.mjs"],
+        "visionStatus": "shadow",
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ],
+        "matchers": [
+          {
+            "pattern": "\\b(?:microphones?|headphones?|dj decks?|turntables?|vinyl|guitars?|concert crowd|on stage)\\b",
+            "flags": "iu",
+            "files": "\\.html?$",
+            "fixtures": {
+              "fail": [
+                "<img alt='a DJ decks closeup'>",
+                "<p>crowd at a concert crowd</p>"
+              ],
+              "pass": ["<p>abstract ion plate</p>"]
+            }
+          }
+        ],
+        "coverageNote": "Sidecars under apps/web/public and artifact HTML via run.mjs check. Undeclared imagery in PNG/Pen is the advisory cliche judge."
       }
     },
     {
@@ -625,9 +648,20 @@
       "severity": "block",
       "enforcement": {
         "kind": "static",
-        "status": "planned",
-        "check": "type-scale cap (PR2)",
-        "evidence": []
+        "status": "enforced",
+        "check": "scripts/invariants/art-direction/type-scale.mjs",
+        "evidence": [
+          "scripts/invariants/art-direction/type-scale.mjs",
+          "scripts/invariants/art-direction/type-scale.exceptions.json"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
+          }
+        ],
+        "coverageNote": "Cap 80px on marketing css/tsx. Artifact HTML via run.mjs check. Tracking and weight not checked."
       }
     },
     {
