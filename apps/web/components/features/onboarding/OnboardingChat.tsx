@@ -797,6 +797,8 @@ export function OnboardingChat({
   const wasAwaitingTurnstileRetryRef = useRef(false);
   const wasSecurityCheckRecoveryRef = useRef(false);
   const pendingVerifiedSubmitRef = useRef(false);
+  const starterBannerWrapRef = useRef<HTMLDivElement>(null);
+  const lastStarterBannerHeightRef = useRef(0);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
   >(null);
@@ -1164,14 +1166,10 @@ export function OnboardingChat({
     shouldReserveStarterVerification &&
     turnstileHasSiteKey &&
     (turnstileStatus === 'loading' || turnstileStatus === 'interactive');
-  // Latch: once the reserved instruction line has painted, its height must
-  // survive its withdrawal (the site key can also vanish under the automation
-  // bypass, so the spacer cannot key off turnstileHasSiteKey).
-  const [starterInstructionWasSized, setStarterInstructionWasSized] =
-    useState(false);
-  if (sizeStarterInstruction && !starterInstructionWasSized) {
-    setStarterInstructionWasSized(true);
-  }
+  useLayoutEffect(() => {
+    const height = starterBannerWrapRef.current?.offsetHeight ?? 0;
+    if (height > 0) lastStarterBannerHeightRef.current = height;
+  });
   const flowStatus = shouldShowTurnstileBanner ? (
     <OnboardingFlowStatus
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
@@ -1188,11 +1186,15 @@ export function OnboardingChat({
   const isSecurityCheckRecovery = chatError?.errorCode === 'TURNSTILE_REQUIRED';
   // Withdrawing the starter banner (token usable, automation bypass, first
   // send) used to collapse the bottom-anchored composer box ~24px after first
-  // paint. Hold the same height with an inert spacer until the first message
-  // renders and the empty-state composer is replaced.
+  // paint. The banner height is measured while it is mounted (ghost line,
+  // sized provider mount or guidance: whichever it contains), and an inert
+  // spacer of that height holds the space until the first message renders and
+  // the empty-state composer is replaced.
+  // eslint-disable-next-line react-hooks/refs -- last measured height, written in a layout effect and only read when the banner withdraws.
+  const heldBannerHeight = lastStarterBannerHeightRef.current;
   const holdsStarterBannerSpace =
-    starterInstructionWasSized &&
-    !sizeStarterInstruction &&
+    !flowStatus &&
+    heldBannerHeight > 0 &&
     hasInitialStarterPrompt &&
     messages.length === 0 &&
     chatError === null &&
@@ -1231,12 +1233,15 @@ export function OnboardingChat({
   const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
-      {isSecurityCheckRecovery ? null : flowStatus}
+      {isSecurityCheckRecovery || !flowStatus ? null : (
+        <div ref={starterBannerWrapRef}>{flowStatus}</div>
+      )}
       {holdsStarterBannerSpace ? (
         <div
           aria-hidden='true'
-          className='h-6 pointer-events-none'
+          className='pointer-events-none'
           data-testid='onboarding-starter-banner-space'
+          style={{ height: heldBannerHeight }}
         />
       ) : null}
       {isSecurityCheckRecovery ? (

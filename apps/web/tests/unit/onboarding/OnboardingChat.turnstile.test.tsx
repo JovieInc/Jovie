@@ -461,6 +461,11 @@ describe('OnboardingChat Turnstile gating', () => {
   );
 
   it('holds the starter banner height with an inert spacer after sizing is withdrawn', () => {
+    // jsdom has no layout: report the banner's painted height so the hold
+    // has something to keep.
+    const heightSpy = vi
+      .spyOn(HTMLElement.prototype, 'offsetHeight', 'get')
+      .mockReturnValue(24);
     const props = {
       starterHandoff: { kind: 'prompt' as const, prompt: 'Claim my page' },
       turnstileHasSiteKey: true,
@@ -488,7 +493,8 @@ describe('OnboardingChat Turnstile gating', () => {
     ).toBeNull();
     const spacer = screen.getByTestId('onboarding-starter-banner-space');
     expect(spacer).toHaveAttribute('aria-hidden', 'true');
-    expect(spacer.className).toContain('h-6');
+    expect(spacer).toHaveStyle({ height: '24px' });
+    heightSpy.mockRestore();
   });
 
   it('withdraws starter sizing when the configured key disappears', () => {
