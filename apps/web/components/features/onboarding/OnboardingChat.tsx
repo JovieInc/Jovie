@@ -1149,12 +1149,9 @@ export function OnboardingChat({
     hasInitialStarterPrompt &&
     messages.length === 0 &&
     !hasSentFirst &&
-    chatError === null;
-  // The reserve is decided only by state the server render already knows
-  // (starter prompt, no messages). Withdrawing it when the token turns usable
-  // or the automation bypass resolves collapsed the composer box ~22px after
-  // first paint, a real layout shift since the server-seeded /start chat
-  // (#23270) paints before those client signals exist.
+    chatError === null &&
+    !isTurnstileTokenUsable(turnstileToken, turnstileStatus) &&
+    localAutomationBypass !== true;
   const shouldShowTurnstileBanner =
     Boolean(turnstilePanel) &&
     (turnstilePanelVisible ||
@@ -1170,9 +1167,7 @@ export function OnboardingChat({
       sizeStarterInstruction={
         shouldReserveStarterVerification &&
         turnstileHasSiteKey &&
-        (turnstileStatus === 'loading' ||
-          turnstileStatus === 'interactive' ||
-          turnstileStatus === 'verified')
+        (turnstileStatus === 'loading' || turnstileStatus === 'interactive')
       }
     />
   ) : null;
