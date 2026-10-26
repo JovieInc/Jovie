@@ -42,6 +42,7 @@ const set = (mutate = {}) => [
   { ...good('auth'), ...(mutate.auth ?? {}) },
   { ...good('billing'), ...(mutate.billing ?? {}) },
 ];
+/** @param {unknown} [r] Deliberately includes malformed range fixtures. */
 const run = (evidence, r = range({ billing: true }), extra = {}) =>
   evaluatePromotion({ range: r, evidence, now: NOW, ...extra });
 
@@ -96,7 +97,7 @@ describe('current evidence cannot be replaced by an older green receipt', () => 
       }),
     ];
     expect(run(evidence).decision).toBe('blocked');
-    expect(run(evidence.toReversed()).decision).toBe('blocked');
+    expect(run([...evidence].reverse()).decision).toBe('blocked');
   });
   it('accepts a later successful recovery, not a newer unrelated candidate', () => {
     expect(
