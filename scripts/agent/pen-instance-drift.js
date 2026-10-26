@@ -1,4 +1,3 @@
-// biome-ignore-all lint/correctness/noUndeclaredVariables: Pen execute() injects Get, Print, Replace, Insert, Move and Delete; __penDrift is the snapshot global.
 /* pen-instance-drift v1: run inside the Pen MCP `execute` tool.
  * After editing a reusable master, lists every instance that does not show
  * the master's current values, and why:
