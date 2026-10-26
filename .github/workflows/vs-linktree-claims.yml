@@ -35,10 +35,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
+
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 24
+          node-version-file: .nvmrc
 
       - name: Re-measure claims
         env:
