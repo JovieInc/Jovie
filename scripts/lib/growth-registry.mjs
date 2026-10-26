@@ -200,7 +200,12 @@ export function validateExperiments(ledger, loops) {
   return errors;
 }
 
-/** The tracked link for a loop. `content` tells variants of one loop apart. */
+/**
+ * The tracked link for a loop. `content` tells variants of one loop apart.
+ * @param {{ utmSource: string, utmMedium: string, id: string }} loop
+ * @param {string} url
+ * @param {{ content?: string }} [options]
+ */
 export function trackedLink(loop, url, { content } = {}) {
   const u = new URL(url);
   u.searchParams.set('utm_source', loop.utmSource);
