@@ -39,6 +39,7 @@ PREFIX = "lane-fix-"
 LANE_FIX_RED = PREFIX + "red"
 # The only writer that enqueues green PRs (.github/workflows/merge-queue-green-enroll.yml).
 GREEN_ENROLL_WORKFLOW = "merge-queue-green-enroll.yml"
+GH_BIN = "gh"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
 TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
@@ -501,8 +502,17 @@ def wake_green_enroll(number: int, sh=run) -> bool:
     enroll's own blocked recheck already uses the same hop. The enroll run
     re-reads eligibility itself, so a hold, freeze or newer head stays safe.
     """
-    dispatched = sh(["gh", "workflow", "run", GREEN_ENROLL_WORKFLOW,
-                     "--repo", REPO, "--ref", "main", "-f", f"pr_number={number}"])
+    args = ["workflow", "run", GREEN_ENROLL_WORKFLOW,
+            "--repo", REPO, "--ref", "main", "-f", f"pr_number={number}"]
+    # Production goes through the budgeted client layer (external-api-guard ratchet);
+    # an injected shell (tests) sees the full command line.
+    if sh is run:
+        try:
+            dispatched = api_gh(args)
+        except ImportError:  # sparse relay checkout without the client layer: plain gh still wakes
+            dispatched = sh([GH_BIN, *args])
+    else:
+        dispatched = sh([GH_BIN, *args])
     return dispatched.returncode == 0
 
 
