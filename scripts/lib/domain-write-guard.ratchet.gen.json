@@ -38,9 +38,6 @@
     "apps/web/app/api/canvas/generate/route.ts": {
       "discogReleases": 1
     },
-    "apps/web/app/api/chat/confirm-edit/route.ts": {
-      "creatorProfiles": 1
-    },
     "apps/web/app/api/chat/confirm-link/route.ts": {
       "socialLinks": 2
     },
@@ -143,7 +140,7 @@
       "creatorProfiles": 1
     },
     "apps/web/app/app/(shell)/dashboard/releases/actions.ts": {
-      "discogReleases": 4,
+      "discogReleases": 3,
       "discogRecordings": 1,
       "discogTracks": 1,
       "creatorProfiles": 5
