@@ -34,6 +34,34 @@ export function loadRegistry(root = REPO_ROOT) {
   return JSON.parse(readFileSync(join(root, REGISTRY_PATH), 'utf8'));
 }
 
+/**
+ * A wiring entry is proven only by what runs: a ci-fast lane whose command
+ * names the check (commandIncludes), or a non-comment line of the file. A
+ * bare token in a comment or an unrelated lane does not count.
+ */
+export function wiringProblem(wire, root) {
+  const file = join(root, wire.file);
+  if (!existsSync(file)) return `${wire.file} missing`;
+  const text = readFileSync(file, 'utf8');
+  if (wire.commandIncludes) {
+    const start = text.indexOf(wire.token);
+    if (start < 0) return `${wire.file} lacks ${JSON.stringify(wire.token)}`;
+    const end = text.indexOf('Object.freeze(', start);
+    const block = text.slice(start, end < 0 ? undefined : end);
+    return block.includes(wire.commandIncludes)
+      ? null
+      : `lane ${wire.token} does not run ${JSON.stringify(wire.commandIncludes)}`;
+  }
+  const live = text
+    .split('\n')
+    .some(
+      line => line.includes(wire.token) && !/^\s*(?:#|\/\/|\*)/u.test(line)
+    );
+  return live
+    ? null
+    : `${wire.file} has no live line with ${JSON.stringify(wire.token)}`;
+}
+
 export function validateRegistry(reg, root = REPO_ROOT) {
   const errors = [];
   const ids = new Set();
@@ -83,15 +111,39 @@ export function validateRegistry(reg, root = REPO_ROOT) {
         errors.push(`${at}: evidence missing: ${path}`);
     }
     for (const wire of enf.wiredIn ?? []) {
-      const file = join(root, wire.file);
-      if (
-        !existsSync(file) ||
-        !readFileSync(file, 'utf8').includes(wire.token)
-      ) {
-        errors.push(
-          `${at}: not wired: ${wire.file} lacks ${JSON.stringify(wire.token)}`
-        );
+      const problem = wiringProblem(wire, root);
+      if (problem) errors.push(`${at}: not wired: ${problem}`);
+    }
+    for (const matcher of enf.matchers ?? []) {
+      try {
+        if (/g/u.test(matcher.flags ?? ''))
+          errors.push(`${at}: matcher flags must not include g`);
+        const re = new RegExp(matcher.pattern, matcher.flags ?? 'iu');
+        const fixtures = matcher.fixtures ?? {};
+        if (!fixtures.fail?.length || !fixtures.pass?.length)
+          errors.push(`${at}: matcher needs fixtures.fail and fixtures.pass`);
+        for (const line of fixtures.fail ?? [])
+          if (!re.test(line))
+            errors.push(
+              `${at}: matcher misses its own fail fixture ${JSON.stringify(line)}`
+            );
+        for (const line of fixtures.pass ?? [])
+          if (re.test(line))
+            errors.push(
+              `${at}: matcher flags its own pass fixture ${JSON.stringify(line)}`
+            );
+      } catch (error) {
+        errors.push(`${at}: matcher does not compile: ${error.message}`);
       }
+    }
+    if (
+      enf.status === 'enforced' &&
+      enf.kind.includes('vision') &&
+      !['shadow', 'blocking'].includes(enf.visionStatus)
+    ) {
+      errors.push(
+        `${at}: enforced rule with a vision part needs visionStatus shadow|blocking`
+      );
     }
   }
   for (const judge of reg.judges ?? []) {
@@ -99,6 +151,12 @@ export function validateRegistry(reg, root = REPO_ROOT) {
       errors.push(`judge ${judge.id}: unknown rule ${judge.rule}`);
   }
   return { errors, ids };
+}
+
+/** Vendored changelogs and SKILL.md files generated from a sibling .tmpl are not authored prose. */
+function isGenerated(root, rel) {
+  if (rel.endsWith('/CHANGELOG.md')) return true;
+  return rel.endsWith('/SKILL.md') && existsSync(join(root, `${rel}.tmpl`));
 }
 
 function trackedProseFiles(root) {
@@ -111,7 +169,7 @@ function trackedProseFiles(root) {
       for (const name of readdirSync(abs)) {
         if (name !== 'node_modules' && name !== '.git') walk(`${rel}/${name}`);
       }
-    } else if (/\.(?:md|mdx|tmpl|txt)$/u.test(rel)) {
+    } else if (/\.(?:md|mdx|tmpl|txt)$/u.test(rel) && !isGenerated(root, rel)) {
       out.push(rel);
     }
   };
@@ -150,6 +208,13 @@ export function checkDrift(reg, root = REPO_ROOT) {
     for (const cited of text.match(/\bASR-\d{3}\b/gu) ?? []) {
       if (!ids.has(cited))
         errors.push(`mirror ${mirror.path}: cites unknown ${cited}`);
+    }
+  }
+  for (const file of trackedProseFiles(root)) {
+    for (const cited of new Set(
+      readFileSync(join(root, file), 'utf8').match(/\bASR-\d{3}\b/gu) ?? []
+    )) {
+      if (!ids.has(cited)) errors.push(`${file}: cites unknown ${cited}`);
     }
   }
   const legacy = JSON.parse(readFileSync(join(root, LEGACY_PATH), 'utf8'));

@@ -267,7 +267,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'art-direction'"
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
           }
         ]
       }
@@ -292,7 +293,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'art-direction'"
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
           }
         ]
       }
@@ -317,7 +319,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'art-direction'"
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
           }
         ]
       }
@@ -342,10 +345,12 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'art-direction'"
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
           }
         ],
-        "coverageNote": "Static part only trusts the declared sidecar kind; vision part is shadow."
+        "coverageNote": "Static part only trusts the declared sidecar kind; vision part is shadow.",
+        "visionStatus": "shadow"
       }
     },
     {
@@ -368,7 +373,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'art-direction'"
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
           }
         ]
       }
@@ -393,7 +399,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'marketing-container-width'"
+            "token": "id: 'marketing-container-width'",
+            "commandIncludes": "container-width.test.mjs"
           }
         ]
       }
@@ -418,7 +425,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'art-direction'"
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
           }
         ]
       }
@@ -443,7 +451,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'copy-leak'"
+            "token": "id: 'copy-leak'",
+            "commandIncludes": "copy-leak/check.mjs"
           }
         ]
       }
@@ -468,7 +477,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'icp-language'"
+            "token": "id: 'icp-language'",
+            "commandIncludes": "icp-language/check.mjs"
           }
         ]
       }
@@ -492,8 +502,8 @@
         "evidence": ["packages/copy/rules.ts", "packages/copy/lint.test.ts"],
         "wiredIn": [
           {
-            "file": "packages/copy/lint.test.ts",
-            "token": "slop"
+            "file": "package.json",
+            "token": "copy:check"
           }
         ],
         "coverageNote": "Runs on registered writing surfaces only (scripts/invariants/writing-surfaces-registry.json); PR bodies and founder HTML are not covered."
@@ -519,7 +529,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'art-direction'"
+            "token": "id: 'art-direction'",
+            "commandIncludes": "art-direction/run.mjs"
           }
         ]
       }
@@ -696,7 +707,7 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "native-spacing-scale"
+            "token": "native-spacing-scale-ratchet.test.ts"
           }
         ],
         "coverageNote": "Native spacing only; no rendered bounding-box check yet."
@@ -725,7 +736,8 @@
         "wiredIn": [
           {
             "file": "scripts/ci-fast-lanes.mjs",
-            "token": "pen-token-parity"
+            "token": "id: 'pen-token-parity'",
+            "commandIncludes": "pen-token-parity"
           }
         ],
         "coverageNote": "Token parity and stills only; instance-override drift (#23326) not detected."
@@ -830,6 +842,36 @@
         "status": "planned",
         "check": "vision:hierarchy",
         "evidence": []
+      }
+    },
+    {
+      "id": "ASR-036",
+      "title": "Spell the brand right",
+      "statement": "The brand is Jovie and the domain is jov.ie. Flag Jovy, Jovee, Jovei, Jovvie, Jovies, J0vie, near-misses (edit distance 1-2 on Jo-v words), jovie.com or jovie.io, and wrong casing in prose. Jovi is allowed only where it names the agent (Summer Jovi, Jovi coach, Jovi Technology Inc). jovie.com in copy is correct only when it disambiguates the unrelated childcare company.",
+      "rationale": "A misspelled brand name is the cheapest credibility loss.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "Tim: we need a gate for misspelling Jovie"
+      },
+      "scope": ["marketing", "app", "copy", "artifact"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static",
+        "status": "enforced",
+        "check": "scripts/anti-slop/brand-name.mjs",
+        "evidence": [
+          "scripts/anti-slop/brand-name.mjs",
+          "scripts/anti-slop/brand-name.baseline.json"
+        ],
+        "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'anti-slop'",
+            "commandIncludes": "brand-name.mjs"
+          }
+        ],
+        "coverageNote": "Whole-repo scan against a shrinking per-file baseline on every PR (code, copy, docs, HTML). PR bodies and commit messages are checked by `brand-name.mjs --text-file` and `run.mjs check`, not yet wired to a PR-body CI step. Pen files are encrypted: scan their HTML/CSS export with --files."
       }
     }
   ],

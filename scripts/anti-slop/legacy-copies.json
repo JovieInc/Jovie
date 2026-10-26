@@ -1,14 +1,8 @@
 {
   "note": "Prose copies of the anti-slop list that predate the registry (2026-10-26). Shrink only: cite an ASR id in the file and drop it from this list.",
   "files": [
-    ".agents/skills/gstack/CHANGELOG.md",
-    ".agents/skills/gstack/design-consultation/SKILL.md",
-    ".agents/skills/gstack/design-html/SKILL.md",
     ".agents/skills/gstack/design-html/SKILL.md.tmpl",
-    ".agents/skills/gstack/design-review/SKILL.md",
-    ".agents/skills/gstack/plan-design-review/SKILL.md",
     ".agents/skills/gstack/plan-design-review/SKILL.md.tmpl",
-    ".agents/skills/gstack/ship/SKILL.md",
     ".claude/skills/design-html/SKILL.md",
     ".claude/skills/design-review/SKILL.md",
     ".claude/skills/plan-design-review/SKILL.md",
