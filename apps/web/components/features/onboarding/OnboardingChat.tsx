@@ -1171,7 +1171,6 @@ export function OnboardingChat({
       }
     />
   ) : null;
-
   const userTurnCount = messages.filter(
     message => message.role === 'user'
   ).length;
@@ -1179,6 +1178,17 @@ export function OnboardingChat({
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
   const isSecurityCheckRecovery = chatError?.errorCode === 'TURNSTILE_REQUIRED';
+  // Withdrawing the starter banner (token usable, automation bypass, first
+  // send) used to collapse the bottom-anchored composer box ~24px after first
+  // paint. Hold the same height with an inert spacer until the first message
+  // renders and the empty-state composer is replaced.
+  const holdsStarterBannerSpace =
+    !flowStatus &&
+    hasInitialStarterPrompt &&
+    turnstileHasSiteKey === true &&
+    messages.length === 0 &&
+    chatError === null &&
+    !isSecurityCheckRecovery;
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -1214,6 +1224,13 @@ export function OnboardingChat({
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
       {isSecurityCheckRecovery ? null : flowStatus}
+      {holdsStarterBannerSpace ? (
+        <div
+          aria-hidden='true'
+          className='h-6 pointer-events-none'
+          data-testid='onboarding-starter-banner-space'
+        />
+      ) : null}
       {isSecurityCheckRecovery ? (
         <OnboardingSecurityCheckRecovery
           status={turnstileStatus}

@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import type { ElementType, ReactNode } from 'react';
@@ -704,7 +705,12 @@ describe('Onboarding screen performance budgets', () => {
     );
 
     await screen.findByRole('heading', { name: 'Your release preview' });
-    expect(screen.getByRole('button', { name: /^Continue$/i })).toBeEnabled();
+    // Continue stays disabled until the discovery snapshot resolves (readiness
+    // pending by design); the heading paints first, so wait for that state
+    // instead of racing the mocked fetch under CPU contention.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^Continue$/i })).toBeEnabled()
+    );
     expect(
       screen.getByText(
         'Your first releases have not landed yet. This is taking longer than usual.'
