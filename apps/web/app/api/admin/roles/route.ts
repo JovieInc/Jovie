@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';
 
@@ -44,14 +45,26 @@ export async function POST(request: Request) {
     const now = new Date();
     await db
       .update(users)
-      .set({
-        isAdmin: true,
-        isPro: true,
-        plan: 'max',
-        billingUpdatedAt: now,
-        updatedAt: now,
-      })
+      .set({ isAdmin: true, updatedAt: now })
       .where(eq(users.id, user.id));
+
+    // Admins get Max through the shared billing writer: it bumps billingVersion
+    // and writes the audit row, so a concurrent webhook cannot silently
+    // overwrite the grant.
+    const billing = await updateUserBillingStatus({
+      clerkUserId: user.id,
+      isPro: true,
+      plan: 'max',
+      eventType: 'admin_override',
+      source: 'manual',
+      metadata: { reason: 'admin_role_granted', targetUserId },
+    });
+    if (!billing.success) {
+      return NextResponse.json(
+        { error: billing.error ?? 'Failed to grant admin plan' },
+        { status: 500 }
+      );
+    }
 
     const updatedUser = { id: user.id, clerkId: user.clerkId };
 

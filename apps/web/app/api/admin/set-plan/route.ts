@@ -6,13 +6,11 @@
  * Used by the AdminPlanToggle dev bar component.
  */
 
-import { eq } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireAdmin } from '@/lib/admin/middleware';
 import { getCachedAuth } from '@/lib/auth/cached';
-import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
+import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 
 const RequestSchema = z.object({
   plan: z.enum(['free', 'pro', 'max']),
@@ -39,14 +37,20 @@ export async function POST(req: Request) {
   const { plan } = parsed.data;
   const isPro = plan !== 'free';
 
-  await db
-    .update(users)
-    .set({
-      plan,
-      isPro,
-      billingUpdatedAt: new Date(),
-    })
-    .where(eq(users.id, userId));
+  // Same writer as the webhook: bumps billingVersion (so a concurrent webhook
+  // conflicts instead of overwriting) and writes the audit row.
+  const audit = {
+    clerkUserId: userId,
+    eventType: 'admin_override',
+    source: 'manual',
+    metadata: { reason: 'dev_toolbar_set_plan', plan },
+  } as const;
+  const result = await updateUserBillingStatus(
+    isPro ? { ...audit, isPro, plan } : { ...audit, isPro, plan: 'free' }
+  );
+  if (!result.success) {
+    return NextResponse.json({ error: result.error }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true, plan, isPro });
 }

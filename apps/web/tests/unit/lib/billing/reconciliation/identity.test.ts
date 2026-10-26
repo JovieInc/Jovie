@@ -4,10 +4,14 @@ const mockUpdateUserBillingStatus = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/stripe/customer-sync', () => ({
   updateUserBillingStatus: mockUpdateUserBillingStatus,
 }));
+vi.mock('@/lib/stripe/config', () => ({
+  getPlanFromPriceId: (id: string) => (id === 'price_pro' ? 'pro' : null),
+}));
 const subscription = {
   id: 'sub_1',
   customer: 'cus_1',
   status: 'active',
+  items: { data: [{ price: { id: 'price_pro' } }] },
 } as never;
 describe('billing reconciliation identity', () => {
   beforeEach(() => {
