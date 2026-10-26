@@ -269,6 +269,17 @@ describe('OnboardingChat empty intro', () => {
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('holds no banner space when no starter banner ever painted', () => {
+    render(
+      <OnboardingChat
+        starterHandoff={{ kind: 'prompt', prompt: 'Claim my page' }}
+        turnstileHasSiteKey={false}
+        turnstilePanel={<span hidden />}
+      />
+    );
+    expect(screen.queryByTestId('onboarding-starter-banner-space')).toBeNull();
+  });
+
   it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {
     render(
       <OnboardingChat

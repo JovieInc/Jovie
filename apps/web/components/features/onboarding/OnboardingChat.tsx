@@ -798,7 +798,7 @@ export function OnboardingChat({
   const wasSecurityCheckRecoveryRef = useRef(false);
   const pendingVerifiedSubmitRef = useRef(false);
   const starterBannerWrapRef = useRef<HTMLDivElement>(null);
-  const lastStarterBannerHeightRef = useRef(0);
+  const [heldBannerHeight, setHeldBannerHeight] = useState(0);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
   >(null);
@@ -1166,10 +1166,6 @@ export function OnboardingChat({
     shouldReserveStarterVerification &&
     turnstileHasSiteKey &&
     (turnstileStatus === 'loading' || turnstileStatus === 'interactive');
-  useLayoutEffect(() => {
-    const height = starterBannerWrapRef.current?.offsetHeight ?? 0;
-    if (height > 0) lastStarterBannerHeightRef.current = height;
-  });
   const flowStatus = shouldShowTurnstileBanner ? (
     <OnboardingFlowStatus
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
@@ -1177,6 +1173,23 @@ export function OnboardingChat({
       sizeStarterInstruction={sizeStarterInstruction}
     />
   ) : null;
+  const starterBannerMounted =
+    Boolean(flowStatus) && chatError?.errorCode !== 'TURNSTILE_REQUIRED';
+  useLayoutEffect(() => {
+    const element = starterBannerWrapRef.current;
+    if (!element) return;
+    // Measured before paint and on every size change while mounted, so the
+    // spacer always matches the banner it replaces.
+    const measure = () => {
+      const height = element.offsetHeight;
+      if (height > 0) setHeldBannerHeight(height);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [starterBannerMounted]);
   const userTurnCount = messages.filter(
     message => message.role === 'user'
   ).length;
@@ -1190,8 +1203,6 @@ export function OnboardingChat({
   // sized provider mount or guidance: whichever it contains), and an inert
   // spacer of that height holds the space until the first message renders and
   // the empty-state composer is replaced.
-  // eslint-disable-next-line react-hooks/refs -- last measured height, written in a layout effect and only read when the banner withdraws.
-  const heldBannerHeight = lastStarterBannerHeightRef.current;
   const holdsStarterBannerSpace =
     !flowStatus &&
     heldBannerHeight > 0 &&

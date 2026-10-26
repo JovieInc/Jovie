@@ -23,6 +23,8 @@ declare global {
   interface Window {
     __claimLayout?: { supported: boolean; total: number | null };
     __claimLayoutEntries?: ClaimLayoutShiftEntry[];
+    /** Diagnostic: composer child heights, one entry per change, first 4s. */
+    __claimComposerFrames?: string[];
     __armClaimLayout?: () => void;
     __claimInitialLayout?: {
       supported: boolean;
@@ -174,6 +176,33 @@ export function installReplyLayoutProbe(): void {
     since = performance.now();
     recompute();
   };
+
+  const frames: string[] = [];
+  window.__claimComposerFrames = frames;
+  let lastSignature = '';
+  const sampleComposer = () => {
+    const composer = document.querySelector(
+      '[data-testid="chat-empty-state-centered-composer"]'
+    );
+    if (composer) {
+      const describe = (el: Element) => {
+        const box = el.getBoundingClientRect();
+        const tag = el.getAttribute('data-testid') ?? el.tagName.toLowerCase();
+        return `${tag}:${box.height.toFixed(0)}`;
+      };
+      const kids = [...composer.children].flatMap(child => [
+        describe(child),
+        ...[...child.children].map(grand => `  ${describe(grand)}`),
+      ]);
+      const signature = `${composer.getBoundingClientRect().height.toFixed(0)} [${kids.join(' | ')}]`;
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        frames.push(`${Math.round(performance.now())}ms ${signature}`);
+      }
+    }
+    if (performance.now() < 4000) requestAnimationFrame(sampleComposer);
+  };
+  requestAnimationFrame(sampleComposer);
 
   if (!supported) return;
 

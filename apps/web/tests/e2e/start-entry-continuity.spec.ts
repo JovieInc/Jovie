@@ -18,6 +18,7 @@ function expectZeroLayoutShift(
         supported: boolean;
         total: number | null;
         entries?: readonly unknown[];
+        composerFrames?: readonly string[];
       }
     | undefined,
   testInfo: TestInfo
@@ -29,7 +30,7 @@ function expectZeroLayoutShift(
     if (metric!.entries) {
       expect(
         metric!.total,
-        `layout-shift entries ${JSON.stringify(metric!.entries)}`
+        `layout-shift entries ${JSON.stringify(metric!.entries)} composerFrames ${JSON.stringify(metric!.composerFrames)}`
       ).toBe(0);
     } else {
       expect(metric!.total).toBe(0);
@@ -52,6 +53,7 @@ async function readReplyLayout(page: Page) {
       supported: metric.supported,
       total: metric.total,
       entries: window.__claimLayoutEntries ?? [],
+      composerFrames: window.__claimComposerFrames ?? [],
     };
   });
 }
