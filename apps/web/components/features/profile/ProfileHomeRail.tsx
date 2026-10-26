@@ -19,7 +19,11 @@ import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
 import { pickOneRightThing } from '@/lib/profile/one-right-thing/engine';
 import { featuredEventExtras } from '@/lib/profile/one-right-thing/event-extras';
-import { useVisitorSignals } from '@/lib/profile/one-right-thing/use-visitor-signals';
+import { useReturningMarker } from '@/lib/profile/one-right-thing/use-returning-marker';
+import {
+  type ProfileVariantSeed,
+  signalsFromVariantSeed,
+} from '@/lib/profile/one-right-thing/variant';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
@@ -47,6 +51,11 @@ interface ProfileHomeRailProps {
   readonly viewerLocation?: UserLocation | null;
   readonly resolveNearbyTour?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
+  /**
+   * Request signals decoded from the ISR variant. The pick is decided on the
+   * server from these, so hydration reproduces it exactly (no swap).
+   */
+  readonly featuredSeed?: ProfileVariantSeed | null;
   readonly releases?: readonly PublicRelease[];
   readonly hasTip?: boolean;
   /**
@@ -98,6 +107,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   viewerLocation,
   resolveNearbyTour = true,
   merchCards = [],
+  featuredSeed = null,
   releases = [],
   hasTip = false,
   pacArtPriority = false,
@@ -106,7 +116,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   // PAC instrumentation (spec §8): pac_exposure fires when the card is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
   const isInteractiveRender = renderMode === 'interactive';
-  const visitorSignals = useVisitorSignals(isInteractiveRender);
+  useReturningMarker(isInteractiveRender);
   // Re-evaluate visibility at the release boundary so the card's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
   // page was served from a stale ISR cache.
@@ -192,7 +202,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   const featuredDecision = useMemo(() => {
     if (!isInteractiveRender || !hasPacSubject) return null;
     return pickOneRightThing({
-      signals: visitorSignals,
+      signals: signalsFromVariantSeed(featuredSeed, now),
       inventory: {
         release: pacRelease
           ? {
@@ -223,7 +233,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     now,
     pacRelease,
     upcomingTourDates,
-    visitorSignals,
+    featuredSeed,
   ]);
   const featuredShow =
     featuredDecision?.kind === 'show'

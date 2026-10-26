@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
+const {
+  buildProfileVariantRewrites,
+} = require('./lib/routing/profile-variant-rewrites');
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
@@ -713,6 +716,10 @@ const nextConfig = {
           destination:
             '/:username/profile-mode-render/:profileMode/__profile-mode-alias',
         },
+        // One-right-thing: bounded ISR variants keyed on request signals so
+        // the first HTML already carries the visitor's featured item. After
+        // the ?mode= rewrite, which keeps precedence.
+        ...buildProfileVariantRewrites(),
         {
           source: '/app/ov/:path*',
           destination: '/app/admin/:path*',

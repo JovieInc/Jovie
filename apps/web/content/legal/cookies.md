@@ -19,6 +19,7 @@ These cookies are required for basic site functionality and cannot be disabled.
 | `jv_cc` | Stores your cookie consent preferences | 1 year |
 | `jv_cc_required` | Stores whether your region requires Jovie to show cookie consent controls | 30 days |
 | `jv_country` | Stores country code for region-appropriate consent and profile localization | 30 days |
+| `jv_returning` | Set only after you accept cookies; lets the next visit lead with something you have not seen | 90 days |
 | `better-auth.` | Authentication, session management, and account security | Session |
 | `__Secure-better-auth.` | Secure authentication session cookies on HTTPS origins | Session |
 | `__Host-better-auth.` | Host-scoped authentication session cookies on HTTPS origins | Session |

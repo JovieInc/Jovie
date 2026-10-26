@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   classifyVisitorSource,
-  detectDevice,
-  detectInAppBrowser,
   neutralVisitorSignals,
-  normalizeCountry,
-  resolveVisitorSignals,
 } from './visitor-signals';
 
 describe('classifyVisitorSource', () => {
@@ -62,69 +58,16 @@ describe('classifyVisitorSource', () => {
   });
 });
 
-describe('device and in-app detection', () => {
-  it('detects in-app browsers by product token', () => {
-    expect(detectInAppBrowser('Mozilla/5.0 (iPhone) Instagram 330.0')).toBe(
-      'instagram'
-    );
-    expect(detectInAppBrowser('Mozilla/5.0 [FBAN/FBIOS;FBAV/400]')).toBe(
-      'facebook'
-    );
-    expect(detectInAppBrowser('Mozilla/5.0 (iPhone) Spotify/9.0.40')).toBe(
-      'spotify'
-    );
-    expect(detectInAppBrowser('Mozilla/5.0 (Macintosh) Safari/605')).toBeNull();
-    expect(detectInAppBrowser(undefined)).toBeNull();
-  });
-
-  it('detects device class', () => {
-    expect(detectDevice('Mozilla/5.0 (iPhone; CPU iPhone OS 17)')).toBe('ios');
-    expect(detectDevice('Mozilla/5.0 (Linux; Android 14)')).toBe('android');
-    expect(detectDevice('Mozilla/5.0 (Macintosh)')).toBe('desktop');
-  });
-});
-
-describe('country and consent', () => {
-  it('only accepts two letter codes', () => {
-    expect(normalizeCountry('de')).toBe('DE');
-    expect(normalizeCountry('XX')).toBeNull();
-    expect(normalizeCountry('T1')).toBeNull();
-    expect(normalizeCountry('USA')).toBeNull();
-    expect(normalizeCountry(null)).toBeNull();
-  });
-
-  it('never reports returning without consent to read the marker', () => {
-    const base = {
-      referrer: null,
-      search: '',
-      userAgent: 'x',
-      countryCookie: 'US',
-      returningMarkerPresent: true,
-      now: new Date('2026-10-25T00:00:00Z'),
-    };
+describe('neutralVisitorSignals', () => {
+  it('carries no per-visitor input', () => {
     expect(
-      resolveVisitorSignals({ ...base, returningMarkerAllowed: false })
-        .returning
-    ).toBeNull();
-    expect(
-      resolveVisitorSignals({ ...base, returningMarkerAllowed: true }).returning
-    ).toBe(true);
-    expect(
-      resolveVisitorSignals({
-        ...base,
-        returningMarkerAllowed: true,
-        returningMarkerPresent: false,
-      }).returning
-    ).toBe(false);
-  });
-
-  it('neutral signals carry no per-visitor input', () => {
-    const n = neutralVisitorSignals(new Date('2026-10-25T00:00:00Z'));
-    expect(n).toMatchObject({
+      neutralVisitorSignals(new Date('2026-10-25T00:00:00Z'))
+    ).toMatchObject({
       source: { channel: 'direct', name: null },
       inApp: null,
       country: null,
       returning: null,
+      device: 'unknown',
     });
   });
 });

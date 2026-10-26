@@ -1,24 +1,16 @@
 /**
- * Visitor signal resolvers for the one-right-thing engine.
+ * Source classification for the one-right-thing engine, plus the neutral
+ * signals used when a render has no variant seed.
  *
- * Everything here reads only what a browser already sends with the request or
- * what the edge stamped in the essential `jv_country` cookie: the referrer,
- * the user agent, `utm_source`, the country. None of it needs non-essential
- * cookies. The one stored signal, "returning visitor", is read only when the
- * caller says consent allows it, and is `null` (unknown) otherwise.
+ * Per-visitor signals reach a render through the edge variant key (see
+ * `variant.ts`), never through client code after hydration. This module's
+ * classifier is the reference the edge DSP patterns are tested against.
  *
- * Coverage caveat: referrers are stripped by many apps and in-app browsers,
- * and the Spotify webview user agent is matched on its product token only.
+ * Coverage caveat: referrers are stripped by many apps and in-app browsers.
  * `direct` therefore means "no usable source", not "typed the URL".
  */
 
-import type {
-  InAppBrowser,
-  VisitorChannel,
-  VisitorDevice,
-  VisitorSignals,
-  VisitorSource,
-} from './engine';
+import type { VisitorChannel, VisitorSignals, VisitorSource } from './engine';
 
 const DSP_NAMES = new Set([
   'spotify',
@@ -122,68 +114,13 @@ export function classifyVisitorSource(input: {
   return { channel: 'other', name: null };
 }
 
-export function detectInAppBrowser(
-  userAgent: string | null | undefined
-): InAppBrowser | null {
-  const ua = userAgent ?? '';
-  if (/\bInstagram\b/u.test(ua)) return 'instagram';
-  if (/\bFBAN\b|\bFBAV\b|\bFB_IAB\b/u.test(ua)) return 'facebook';
-  if (/musical_ly|\bBytedance\b|\bTikTok\b/iu.test(ua)) return 'tiktok';
-  if (/\bSpotify\b/u.test(ua)) return 'spotify';
-  if (/\bLine\/|\bSnapchat\b|\bTwitter for\b/u.test(ua)) return 'other';
-  return null;
-}
-
-export function detectDevice(
-  userAgent: string | null | undefined
-): VisitorDevice {
-  const ua = userAgent ?? '';
-  if (/iPhone|iPad|iPod/u.test(ua)) return 'ios';
-  if (/Android/u.test(ua)) return 'android';
-  return 'desktop';
-}
-
-/** Accepts only a two letter code; anything else is unknown. */
-export function normalizeCountry(
-  value: string | null | undefined
-): string | null {
-  const code = (value ?? '').trim().toUpperCase();
-  if (!/^[A-Z]{2}$/u.test(code) || code === 'XX' || code === 'T1') return null;
-  return code;
-}
-
-export interface RawVisitorEnvironment {
-  readonly referrer: string | null | undefined;
-  readonly search: string | null | undefined;
-  readonly ownHost?: string | null;
-  readonly userAgent: string | null | undefined;
-  readonly countryCookie: string | null | undefined;
-  /** True only when consent allows reading the returning-visitor marker. */
-  readonly returningMarkerAllowed: boolean;
-  readonly returningMarkerPresent: boolean;
-  readonly now: Date;
-}
-
-export function resolveVisitorSignals(
-  env: RawVisitorEnvironment
-): VisitorSignals {
-  return {
-    source: classifyVisitorSource(env),
-    inApp: detectInAppBrowser(env.userAgent),
-    country: normalizeCountry(env.countryCookie),
-    device: detectDevice(env.userAgent),
-    returning: env.returningMarkerAllowed ? env.returningMarkerPresent : null,
-    now: env.now,
-  };
-}
-
 /** The signals every first (server-equivalent) render uses: no per-visitor input. */
 export function neutralVisitorSignals(now: Date): VisitorSignals {
   return {
     source: { channel: 'direct', name: null },
     inApp: null,
     country: null,
-    device: 'desktop',
+    device: 'unknown',
     returning: null,
     now,
   };
