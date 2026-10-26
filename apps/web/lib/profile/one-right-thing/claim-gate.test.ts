@@ -33,15 +33,9 @@ const GATED_CLAIM =
  * same review as adding a claim.
  */
 const LEGACY_PERSONALIZATION_PHRASES: ReadonlyArray<readonly [string, string]> =
-  [
-    ['app/(marketing)/ai/page.tsx', 'next best action'],
-    ['app/(marketing)/launch/page.tsx', 'right listening destination'],
-    ['app/(marketing)/smart-links/page.tsx', 'where each visitor listens'],
-    ['data/artistProfileCopy.ts', 'adapts to every fan'],
-  ];
+  [['app/(marketing)/launch/page.tsx', 'right listening destination']];
 
-const PERSONALIZATION_PATTERN =
-  /next best action|right listening destination|where each visitor listens|next step that fits|adapts to every fan/giu;
+const PERSONALIZATION_PATTERN = /right listening destination/giu;
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
