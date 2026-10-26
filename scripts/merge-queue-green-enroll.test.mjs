@@ -1019,6 +1019,27 @@ test('does not remove lane-fix-red and does not enroll while the label remains',
   }
 });
 
+test('a skip behind a blocking label names the label, not the CLEAN merge state', async () => {
+  const labeled = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: 'lane-fix-red' }],
+  };
+  const result = await fixture({
+    roster: [{ ...candidate(1), labels: [] }],
+    readCurrentSnapshot: () => ({ ...current(1), labels: labeled }),
+  });
+  assert.deepEqual(result.mutations, []);
+  const stale = await fixture({
+    roster: [candidate(1)],
+    readCurrentSnapshot: () => ({ ...current(1), headRefOid: 'b'.repeat(40) }),
+  });
+  assert.deepEqual(stale.mutations, []);
+  assert.ok(script.includes('blocking-label:'));
+  assert.ok(script.includes('head-moved:'));
+  assert.ok(script.includes('merge-state-not-admissible:'));
+  assert.ok(!script.includes('`mergeStateStatus=${pr.mergeStateStatus}`'));
+});
+
 test('enrolls a required-green head once lane-fix-red is gone', async () => {
   const result = await fixture({
     roster: [{ ...candidate(1), labels: [] }],
@@ -2374,7 +2395,7 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
     step => step.name === 'Enqueue green PRs'
   ).with.script;
   for (const decision of [
-    "receipt(pr, 'skip', `mergeStateStatus=",
+    "receipt(pr, 'skip', why)",
     "receipt(pr, 'skip', 'blocked-recheck-exhausted')",
     "receipt(pr, 'recheck', `blocked-recheck=",
     "receipt(pr, 'held', failure.reason)",
