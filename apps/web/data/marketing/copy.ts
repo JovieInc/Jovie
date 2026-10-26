@@ -2132,188 +2132,207 @@ export function auditMarketingCopyPeerGroups(
   options: MarketingCopyPeerShadowOptions = {}
 ): readonly MarketingCopyPeerShadowReceipt[] {
   const groups = brief.peerGroups ?? [];
-  return groups
-    .filter(
-      group =>
-        !options.changedMemberRefs ||
-        (
-          MARKETING_COPY_PEN_PEER_GROUPS.find(peer => peer.ref === group.ref)
-            ?.members ?? group.members
-        ).some(member => options.changedMemberRefs?.includes(member.ref))
-    )
-    .map(group => {
-      const captures = snapshots.filter(
-        snapshot => snapshot.groupRef === group.ref
-      );
-      const captured = captures[0];
-      // The versioned Pen fixture owns membership, never a writer exemption.
-      const baseline = MARKETING_COPY_PEN_PEER_GROUPS.find(
-        peer => peer.ref === group.ref && peer.version === group.version
-      );
-      const expectedRefs = baseline?.members.map(member => member.ref) ?? [];
-      const declaredRefs = group.members.map(member => member.ref);
-      const actualRefs = captured?.members.map(member => member.ref) ?? [];
-      const complete =
-        groups.filter(peer => peer.ref === group.ref).length === 1 &&
-        captures.length === 1 &&
-        captured?.groupVersion === group.version &&
-        expectedRefs.length > 0 &&
-        declaredRefs.length === expectedRefs.length &&
-        findDuplicates(declaredRefs).length === 0 &&
-        expectedRefs.every(ref => declaredRefs.includes(ref)) &&
-        (captured?.members.every(member => member.value.trim()) ?? false) &&
-        expectedRefs.every(ref => ref.trim()) &&
-        findDuplicates(expectedRefs).length === 0 &&
-        findDuplicates(actualRefs).length === 0 &&
-        actualRefs.length === expectedRefs.length &&
-        expectedRefs.every(ref => actualRefs.includes(ref));
-      const checks: MarketingCopyPeerCheck[] = [];
-      const add = (
-        check: MarketingCopyPeerCheck['check'],
-        status: MarketingCopyPeerCheck['status'],
-        rationale: string,
-        evidence: readonly string[],
-        uncertainty: readonly string[] = [],
-        memberRef?: string
-      ) =>
-        checks.push({
-          check,
-          memberRef,
-          status,
-          verdict:
-            status === 'pass'
-              ? 'clean'
-              : status === 'violation'
-                ? 'violation'
-                : 'insufficient-evidence',
-          rationale,
-          evidence,
-          uncertainty,
-        });
-      add(
-        'membership',
-        complete ? 'pass' : 'violation',
-        complete
-          ? 'Every declared peer occurs exactly once in the versioned fixture snapshot.'
-          : 'Coverage failure: missing, duplicate, unexpected or wrong-version fixture membership.',
-        [
-          ...expectedRefs.map(ref => `expected:${ref}`),
-          ...actualRefs.map(ref => `observed:${ref}`),
-        ]
-      );
-      const declared = group.members.filter(
-        member =>
-          member.role &&
-          member.canonicalLabel !== undefined &&
-          member.conventionRef?.trim()
-      );
-      if (declared.length === 0) {
+  const refsFor = (group: MarketingCopyPeerGroup) =>
+    new Set(
+      [
+        ...(MARKETING_COPY_PEN_PEER_GROUPS.find(peer => peer.ref === group.ref)
+          ?.members ?? []),
+        ...group.members,
+        ...snapshots
+          .filter(snapshot => snapshot.groupRef === group.ref)
+          .flatMap(snapshot => snapshot.members),
+      ].map(member => member.ref)
+    );
+  const unknownChange =
+    options.changedMemberRefs?.some(
+      ref => !groups.some(group => refsFor(group).has(ref))
+    ) ?? false;
+  return Object.freeze(
+    groups
+      .filter(
+        group =>
+          !options.changedMemberRefs ||
+          unknownChange ||
+          options.changedMemberRefs.some(ref => refsFor(group).has(ref))
+      )
+      .map(group => {
+        const captures = snapshots.filter(
+          snapshot => snapshot.groupRef === group.ref
+        );
+        const captured = captures[0];
+        const baseline = MARKETING_COPY_PEN_PEER_GROUPS.find(
+          peer => peer.ref === group.ref && peer.version === group.version
+        );
+        const expectedRefs = baseline?.members.map(member => member.ref) ?? [];
+        const declaredRefs = group.members.map(member => member.ref);
+        const actualRefs = captured?.members.map(member => member.ref) ?? [];
+        const complete =
+          !unknownChange &&
+          groups.filter(peer => peer.ref === group.ref).length === 1 &&
+          captures.length === 1 &&
+          captured?.groupVersion === group.version &&
+          expectedRefs.length > 0 &&
+          declaredRefs.length === expectedRefs.length &&
+          findDuplicates(declaredRefs).length === 0 &&
+          expectedRefs.every(ref => declaredRefs.includes(ref)) &&
+          (captured?.members.every(member => member.value.trim()) ?? false) &&
+          findDuplicates(actualRefs).length === 0 &&
+          actualRefs.length === expectedRefs.length &&
+          expectedRefs.every(ref => actualRefs.includes(ref));
+        const checks: MarketingCopyPeerCheck[] = [];
+        const add = (
+          check: MarketingCopyPeerCheck['check'],
+          status: MarketingCopyPeerCheck['status'],
+          rationale: string,
+          evidence: readonly string[],
+          uncertainty: readonly string[] = [],
+          memberRef?: string
+        ) =>
+          checks.push(
+            Object.freeze({
+              check,
+              memberRef,
+              status,
+              verdict:
+                status === 'pass'
+                  ? 'clean'
+                  : status === 'violation'
+                    ? 'violation'
+                    : 'insufficient-evidence',
+              rationale,
+              evidence: Object.freeze([...evidence]),
+              uncertainty: Object.freeze([...uncertainty]),
+            })
+          );
         add(
-          'canonical-label',
+          'membership',
+          complete ? 'pass' : 'violation',
+          complete
+            ? 'Every declared peer occurs exactly once in the versioned fixture snapshot.'
+            : 'Coverage failure: missing, duplicate, unexpected or wrong-version fixture membership.',
+          [
+            ...expectedRefs.map(ref => `expected:${ref}`),
+            ...actualRefs.map(ref => `observed:${ref}`),
+          ],
+          unknownChange
+            ? [
+                'Unattributed changed reference; all covered groups require extraction review.',
+              ]
+            : []
+        );
+        const declared = group.members.filter(
+          member =>
+            member.role &&
+            member.canonicalLabel !== undefined &&
+            member.conventionRef?.trim()
+        );
+        if (declared.length === 0) {
+          add(
+            'canonical-label',
+            'unreviewed',
+            'No canonical-label convention and role were declared.',
+            [],
+            [
+              'Labels alone establish neither a shared role nor a canonical action.',
+            ]
+          );
+        }
+        for (const member of declared) {
+          const observed = captured?.members.find(
+            peer => peer.ref === member.ref
+          );
+          const supported =
+            complete && group.locale === 'en' && Boolean(observed);
+          add(
+            'canonical-label',
+            supported
+              ? peerLabel(observed?.value ?? '') ===
+                peerLabel(member.canonicalLabel ?? '')
+                ? 'pass'
+                : 'violation'
+              : 'unreviewed',
+            supported
+              ? 'Compare the explicitly declared label, preserving case and punctuation.'
+              : 'Incomplete fixture coverage or unsupported locale; label comparison abstained.',
+            [
+              member.conventionRef ?? '',
+              `expected:${member.canonicalLabel}`,
+              `observed:${observed?.value ?? '(missing)'}`,
+            ],
+            supported
+              ? []
+              : ['No inference for unsupported extraction or locale.'],
+            member.ref
+          );
+        }
+        add(
+          'grammar',
           'unreviewed',
-          'No canonical-label convention and role were declared.',
+          'Free-prose grammar and actor/relationship entailment require review.',
           [],
           [
-            'Labels alone establish neither a shared role nor a canonical action.',
+            `relationship:${group.relationship}`,
+            `actor:${group.actor ?? 'ambiguous'}`,
+            `semantic-review:${options.semanticReview ?? 'not-run'}`,
+            `locale:${group.locale}`,
           ]
         );
-      }
-      for (const member of declared) {
-        const observed = captured?.members.find(
-          peer => peer.ref === member.ref
-        );
-        const supported =
-          complete && group.locale === 'en' && Boolean(observed);
         add(
-          'canonical-label',
-          supported
-            ? peerLabel(observed?.value ?? '') ===
-              peerLabel(member.canonicalLabel ?? '')
-              ? 'pass'
-              : 'violation'
-            : 'unreviewed',
-          supported
-            ? 'Compare the explicitly declared label, preserving case and punctuation.'
-            : 'Incomplete fixture coverage or unsupported locale; label comparison abstained.',
-          [
-            member.conventionRef ?? '',
-            `expected:${member.canonicalLabel}`,
-            `observed:${observed?.value ?? '(missing)'}`,
-          ],
-          supported
-            ? []
-            : ['No inference for unsupported extraction or locale.'],
-          member.ref
+          'claim-support',
+          'unreviewed',
+          'Fixture labels do not verify claim entailment; absent or expired support is not proof of falsity.',
+          options.claimEvidence?.references ?? [],
+          [`evidence:${options.claimEvidence?.freshness ?? 'missing'}`]
         );
-      }
-      add(
-        'grammar',
-        'unreviewed',
-        'Free-prose grammar and actor/relationship entailment require review.',
-        [],
-        [
-          `relationship:${group.relationship}`,
-          `actor:${group.actor ?? 'ambiguous'}`,
-          `semantic-review:${options.semanticReview ?? 'not-run'}`,
-          `locale:${group.locale}`,
-        ]
-      );
-      add(
-        'claim-support',
-        'unreviewed',
-        'Fixture labels do not verify claim entailment; absent or expired support is not proof of falsity.',
-        options.claimEvidence?.references ?? [],
-        [`evidence:${options.claimEvidence?.freshness ?? 'missing'}`]
-      );
-      const action = options.actionEvidence;
-      const held = Boolean(
-        action?.holdReferences.length &&
-          group.members.some(member => member.actionId === action.actionId)
-      );
-      add(
-        'audience-delivery',
-        held ? 'violation' : 'unreviewed',
-        held
-          ? 'The supplied audience-delivery hold outranks enrollment and consent.'
-          : 'No verified action binding or delivery authority is established by these labels.',
-        action?.holdReferences ?? [],
-        ['Fixture assumptions cannot grant audience-delivery authority.']
-      );
-      add(
-        'rendered-production',
-        'unreviewed',
-        'Fixture evaluation cannot establish rendered-production coverage.',
-        [group.provenance.libraryFileId, group.provenance.labelSource],
-        [
-          `binding:${group.binding.status}`,
-          `publication:${group.publication}`,
-          `labels-visible-in-image:${group.provenance.labelsVisibleInImage}`,
-        ]
-      );
-      const exactInput = JSON.stringify({
-        schemaVersion: MARKETING_COPY_PEER_SPEC_VERSION,
-        group,
-        captures,
-        options,
-      });
-      return {
-        schemaVersion: MARKETING_COPY_PEER_SPEC_VERSION,
-        mode: 'shadow',
-        scope: 'fixture',
-        blocking: false,
-        groupRef: group.ref,
-        groupVersion: group.version,
-        memberRefs: expectedRefs,
-        provenance: group.provenance,
-        binding: group.binding,
-        coverage: {
-          fixture: complete ? 'complete' : 'failure',
-          renderedProduction: 'unreviewed',
-        },
-        checks,
-        inputDigest: bytesToHex(sha256(new TextEncoder().encode(exactInput))),
-      };
-    });
+        const action = options.actionEvidence;
+        const held = Boolean(
+          action?.holdReferences.length &&
+            group.members.some(member => member.actionId === action.actionId)
+        );
+        add(
+          'audience-delivery',
+          held ? 'violation' : 'unreviewed',
+          held
+            ? 'The supplied audience-delivery hold outranks enrollment and consent.'
+            : 'No verified action binding or delivery authority is established by these labels.',
+          action?.holdReferences ?? [],
+          ['Fixture assumptions cannot grant audience-delivery authority.']
+        );
+        add(
+          'rendered-production',
+          'unreviewed',
+          'Fixture evaluation cannot establish rendered-production coverage.',
+          [group.provenance.libraryFileId, group.provenance.labelSource],
+          [
+            `binding:${group.binding.status}`,
+            `publication:${group.publication}`,
+          ]
+        );
+        const exactInput = JSON.stringify({
+          schemaVersion: MARKETING_COPY_PEER_SPEC_VERSION,
+          group,
+          captures,
+          options,
+        });
+        return Object.freeze({
+          schemaVersion: MARKETING_COPY_PEER_SPEC_VERSION,
+          mode: 'shadow',
+          scope: 'fixture',
+          blocking: false,
+          groupRef: group.ref,
+          groupVersion: group.version,
+          memberRefs: Object.freeze(expectedRefs),
+          provenance: Object.freeze({ ...group.provenance }),
+          binding: Object.freeze({ ...group.binding }),
+          coverage: Object.freeze({
+            fixture: complete ? 'complete' : 'failure',
+            renderedProduction: 'unreviewed',
+          }),
+          checks: Object.freeze(checks),
+          inputDigest: bytesToHex(sha256(new TextEncoder().encode(exactInput))),
+        });
+      })
+  );
 }
 
 const PEN_PEER_REVIEW = {
@@ -2359,17 +2378,16 @@ export const MARKETING_COPY_PEN_PEER_GROUPS: readonly MarketingCopyPeerGroup[] =
     {
       ...PEN_PEER_CONTEXT,
       ref: 'pen.product.workflow-labels',
+      version: '2026-10-26.2',
       provenance: {
         ...PEN_PEER_REVIEW,
-        libraryFileId: 'libfile_d8ff0e5e79ac8191a3063cd3ce75e232',
-        fileName: 'jovie-product-mobile-section-checkpoint-2.png',
+        libraryFileId: 'libfile_5a49825571ac8191a057c5208976a3f1',
+        fileName: 'hKsFs.png',
         sha256:
-          '7112293d8f6647126b390b4d2f838a7b212e7e2a9117b8acb31e9954d702d11b',
-        region:
-          'Anatomy section; workflow row is absent from this supplied capture',
-        labelSource:
-          'reviewed Page block 6a6bfc56-9562-4f4f-824e-60f5090e5628; user-approved fixture scope',
-        labelsVisibleInImage: false,
+          '3a6dc4c5fa3064e336a6433c3f765f592b5b57c98ae4ec1e0cb846cc9c135257',
+        region: 'Workflow row: 01 Public profile / 02 Notify / 03 Get paid',
+        labelSource: 'image pixels (original full product capture)',
+        labelsVisibleInImage: true,
       },
       members: [
         { ref: 'product.workflow.profile', value: 'Public profile' },
@@ -2378,3 +2396,12 @@ export const MARKETING_COPY_PEN_PEER_GROUPS: readonly MarketingCopyPeerGroup[] =
       ],
     },
   ];
+
+for (const group of MARKETING_COPY_PEN_PEER_GROUPS) {
+  group.members.forEach(member => Object.freeze(member));
+  Object.freeze(group.members);
+  Object.freeze(group.provenance);
+  Object.freeze(group.binding);
+  Object.freeze(group);
+}
+Object.freeze(MARKETING_COPY_PEN_PEER_GROUPS);

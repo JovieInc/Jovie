@@ -230,6 +230,10 @@ const peerAudit = (
   snapshots = peerSnapshots(groups),
   options: MarketingCopyPeerShadowOptions = {}
 ) => auditMarketingCopyPeerGroups({ peerGroups: groups }, snapshots, options);
+const peerCheck = (
+  receipt: ReturnType<typeof peerAudit>[number],
+  name: string
+) => receipt.checks.find(check => check.check === name);
 const conventionGroup = (label = 'Get updates'): MarketingCopyPeerGroup => ({
   ...penGroups[0],
   relationship: 'equivalent-peers',
@@ -255,13 +259,15 @@ describe('fixture-only peer-group shadow pilot', () => {
       ['Get updates', 'Get paid', 'Read by agents'],
       ['Public profile', 'Notify', 'Get paid'],
     ]);
-    expect(
-      new Set(
-        penGroups.flatMap(group => group.members.map(member => member.ref))
-      ).size
-    ).toBe(6);
+    const refs = penGroups.flatMap(group =>
+      group.members.map(member => member.ref)
+    );
+    expect(new Set(refs).size).toBe(6);
+    expect(penGroups.map(group => group.version)).toEqual([
+      '2026-10-26.1',
+      '2026-10-26.2',
+    ]);
     for (const group of penGroups) {
-      expect(group.version).toBe('2026-10-26.1');
       expect(group.binding.status).toBe('UNBOUND');
       expect(group.publication).toBe('unknown');
       expect(group.actor).toBeNull();
@@ -269,7 +275,7 @@ describe('fixture-only peer-group shadow pilot', () => {
     }
     expect(
       penGroups.map(group => group.provenance.labelsVisibleInImage)
-    ).toEqual([true, false]);
+    ).toEqual([true, true]);
   });
 
   it.each(penGroups)('abstains on the original ambiguous $ref', group => {
@@ -281,9 +287,7 @@ describe('fixture-only peer-group shadow pilot', () => {
     expect(
       receipt.checks.filter(check => check.status === 'violation')
     ).toEqual([]);
-    expect(
-      receipt.checks.find(check => check.check === 'grammar')
-    ).toMatchObject({
+    expect(peerCheck(receipt, 'grammar')).toMatchObject({
       status: 'unreviewed',
       verdict: 'insufficient-evidence',
     });
@@ -298,9 +302,7 @@ describe('fixture-only peer-group shadow pilot', () => {
     'loads all peers when one member of $ref changes or is deleted',
     group => {
       const snapshots = peerSnapshots();
-      const target = snapshots.find(
-        snapshot => snapshot.groupRef === group.ref
-      )!;
+      const target = snapshots[penGroups.indexOf(group)];
       const changed = group.members[0].ref;
       const options = { changedMemberRefs: [changed] };
       expect(
@@ -324,87 +326,94 @@ describe('fixture-only peer-group shadow pilot', () => {
     'missing-snapshot',
     'duplicate-snapshot',
     'fake-exemption',
-  ])('reports %s extraction as coverage failure', fault => {
-    const [snapshot] = peerSnapshots([penGroups[0]]);
-    let snapshots = [snapshot];
-    if (fault === 'omitted' || fault === 'fake-exemption')
-      snapshot.members = snapshot.members.slice(1);
-    if (fault === 'duplicate')
-      snapshot.members = [
-        snapshot.members[0],
-        snapshot.members[0],
-        snapshot.members[2],
-      ];
-    if (fault === 'unexpected')
-      snapshot.members = [
-        ...snapshot.members,
-        { ref: 'invented', value: 'Exempt' },
-      ];
-    if (fault === 'wrong-version') snapshot.groupVersion = 'invented';
-    if (fault === 'missing-snapshot') snapshots = [];
-    if (fault === 'duplicate-snapshot') snapshots = [snapshot, snapshot];
-    if (fault === 'fake-exemption')
-      Object.assign(snapshot, {
-        writerExemptions: [
-          {
-            memberRef: penGroups[0].members[0].ref,
-            approvedBy: 'writer',
-            reason: 'skip',
-          },
-        ],
+    'removed-contract-peer',
+    'unknown-group',
+    'unregistered-version',
+    'empty-extraction',
+  ])(
+    'reports %s as coverage failure without writer-defined membership',
+    fault => {
+      let group = penGroups[0];
+      if (fault === 'removed-contract-peer')
+        group = { ...group, members: group.members.slice(1) };
+      if (fault === 'unknown-group')
+        group = { ...group, ref: 'writer:invented-group' };
+      if (fault === 'unregistered-version')
+        group = { ...group, version: 'writer:invented-version' };
+      const [snapshot] = peerSnapshots([group]);
+      let snapshots = [snapshot];
+      if (fault === 'omitted' || fault === 'fake-exemption')
+        snapshot.members = snapshot.members.slice(1);
+      if (fault === 'duplicate')
+        snapshot.members = [
+          snapshot.members[0],
+          snapshot.members[0],
+          snapshot.members[2],
+        ];
+      if (fault === 'unexpected')
+        snapshot.members.push({ ref: 'invented', value: 'Exempt' });
+      if (fault === 'wrong-version') snapshot.groupVersion = 'invented';
+      if (fault === 'missing-snapshot') snapshots = [];
+      if (fault === 'duplicate-snapshot') snapshots = [snapshot, snapshot];
+      if (fault === 'empty-extraction') snapshot.members[0].value = '  ';
+      if (fault === 'fake-exemption')
+        Object.assign(snapshot, {
+          writerExemptions: [
+            {
+              memberRef: group.members[0].ref,
+              approvedBy: 'writer',
+              reason: 'skip',
+            },
+          ],
+        });
+      const options =
+        fault === 'removed-contract-peer'
+          ? { changedMemberRefs: [penGroups[0].members[0].ref] }
+          : {};
+      const receipts = peerAudit([group], snapshots, options);
+      expect(receipts).toHaveLength(1);
+      expect(receipts[0].coverage.fixture).toBe('failure');
+      expect(receipts[0].checks[0]).toMatchObject({
+        check: 'membership',
+        status: 'violation',
       });
-    const [receipt] = peerAudit([penGroups[0]], snapshots);
-    expect(receipt.coverage.fixture).toBe('failure');
-    expect(receipt.checks[0]).toMatchObject({
-      check: 'membership',
-      status: 'violation',
-    });
-    expect(receipt.blocking).toBe(false);
-  });
+      expect(receipts[0].blocking).toBe(false);
+    }
+  );
 
   it.each([
-    ['Get updates', 'Get Updates', 'violation'],
-    ["You're ready", 'You’re ready', 'violation'],
-    ["You're ready", 'Youre ready', 'violation'],
-    ['Get updates', ' \nGet\t updates  ', 'pass'],
+    ['Get updates', 'Get Updates', 'violation', 'declared'],
+    ["You're ready", 'You’re ready', 'violation', 'declared'],
+    ["You're ready", 'Youre ready', 'violation', 'declared'],
+    ['Get updates', ' \nGet\t updates  ', 'pass', 'declared'],
+    ['Get updates', 'Get Updates', 'unreviewed', 'undeclared'],
+    ['Get updates', 'Get Updates', 'unreviewed', 'partial'],
   ] as const)(
-    'compares declared %s to %s without erasing protected distinctions',
-    (canonical, value, status) => {
-      const group = conventionGroup(canonical);
+    'compares %s to %s only under a covered declaration',
+    (canonical, value, status, mode) => {
+      const declared = conventionGroup(canonical);
+      const group =
+        mode === 'undeclared'
+          ? {
+              ...declared,
+              members: declared.members.map(member => ({
+                ...member,
+                role: undefined,
+              })),
+            }
+          : declared;
       const snapshots = peerSnapshots([group]);
       const original = peerAudit([group], snapshots)[0];
       snapshots[0].members = snapshots[0].members.map((member, i) =>
         i ? member : { ...member, value }
       );
+      if (mode === 'partial')
+        snapshots[0].members = snapshots[0].members.slice(1);
       const [receipt] = peerAudit([group], snapshots);
-      expect(
-        receipt.checks.find(check => check.check === 'canonical-label')?.status
-      ).toBe(status);
+      expect(peerCheck(receipt, 'canonical-label')?.status).toBe(status);
       expect(receipt.inputDigest).not.toBe(original.inputDigest);
     }
   );
-
-  it('does not compare an undeclared role or incomplete extraction', () => {
-    const group = conventionGroup();
-    const incomplete = peerSnapshots([group]).map(snapshot => ({
-      ...snapshot,
-      members: snapshot.members.slice(1),
-    }));
-    expect(
-      peerAudit([group], incomplete)[0].checks.find(
-        check => check.check === 'canonical-label'
-      )?.status
-    ).toBe('unreviewed');
-    const undeclared = {
-      ...group,
-      members: group.members.map(member => ({ ...member, role: undefined })),
-    };
-    expect(
-      peerAudit([undeclared])[0].checks.find(
-        check => check.check === 'canonical-label'
-      )?.status
-    ).toBe('unreviewed');
-  });
 
   it.each([
     [
@@ -432,9 +441,7 @@ describe('fixture-only peer-group shadow pilot', () => {
       })),
     };
     const [receipt] = peerAudit([group]);
-    expect(
-      receipt.checks.find(check => check.check === 'grammar')?.status
-    ).toBe('unreviewed');
+    expect(peerCheck(receipt, 'grammar')?.status).toBe('unreviewed');
     expect(receipt.checks.some(check => check.status === 'violation')).toBe(
       false
     );
@@ -450,9 +457,7 @@ describe('fixture-only peer-group shadow pilot', () => {
             freshness === 'missing' ? [] : ['fixture:evidence-observation'],
         },
       });
-      expect(
-        receipt.checks.find(check => check.check === 'claim-support')
-      ).toMatchObject({
+      expect(peerCheck(receipt, 'claim-support')).toMatchObject({
         status: 'unreviewed',
         verdict: 'insufficient-evidence',
         uncertainty: [`evidence:${freshness}`],
@@ -482,9 +487,9 @@ describe('fixture-only peer-group shadow pilot', () => {
           holdReferences: ['JOV-8772', 'JOV-8029', 'JOV-8031'],
         },
       });
-      expect(
-        receipt.checks.find(check => check.check === 'audience-delivery')
-      ).toMatchObject({ status: 'violation' });
+      expect(peerCheck(receipt, 'audience-delivery')).toMatchObject({
+        status: 'violation',
+      });
       expect(receipt.blocking).toBe(false);
     }
   );
@@ -518,57 +523,85 @@ describe('fixture-only peer-group shadow pilot', () => {
       });
       expect(receipt.blocking).toBe(false);
       if (scenario === 'unsupported-locale')
-        expect(
-          receipt.checks.find(check => check.check === 'canonical-label')
-            ?.status
-        ).toBe('unreviewed');
+        expect(peerCheck(receipt, 'canonical-label')?.status).toBe(
+          'unreviewed'
+        );
       for (const headline of [
         'One profile for every fan',
         'Concise premium adaptive.',
       ]) {
         const candidate = draft(headline);
         const annotated = { ...brief, peerGroups: [group] };
-        expect(auditMarketingCopyPage(annotated, candidate)).toEqual(
-          auditMarketingCopyPage(brief, candidate)
-        );
-        expect(
-          auditMarketingCopySemantics(annotated, candidate, {
+        const gate = (target: MarketingCopyPageBrief) => ({
+          structural: auditMarketingCopyPage(target, candidate),
+          semantic: auditMarketingCopySemantics(target, candidate, {
             enforcement: 'delta',
-          })
-        ).toEqual(
-          auditMarketingCopySemantics(brief, candidate, {
-            enforcement: 'delta',
-          })
-        );
-        expect(createMarketingCopyReviewDigest(annotated, candidate)).toBe(
-          createMarketingCopyReviewDigest(brief, candidate)
-        );
+          }),
+          digest: createMarketingCopyReviewDigest(target, candidate),
+        });
+        expect(gate(annotated)).toEqual(gate(brief));
       }
     }
   );
 });
 
-it.each([
-  'removed-contract-peer',
-  'unknown-group',
-  'unregistered-version',
-  'empty-extraction',
-])('cannot certify %s by changing writer-supplied membership', fault => {
-  let group = penGroups[0];
-  if (fault === 'removed-contract-peer')
-    group = { ...group, members: group.members.slice(1) };
-  if (fault === 'unknown-group')
-    group = { ...group, ref: 'writer:invented-group' };
-  if (fault === 'unregistered-version')
-    group = { ...group, version: 'writer:invented-version' };
-  const snapshots = peerSnapshots([group]);
-  if (fault === 'empty-extraction') snapshots[0].members[0].value = '  ';
-  const options =
-    fault === 'removed-contract-peer'
-      ? { changedMemberRefs: [penGroups[0].members[0].ref] }
-      : {};
-  const receipts = peerAudit([group], snapshots, options);
-  expect(receipts).toHaveLength(1);
-  expect(receipts[0].coverage.fixture).toBe('failure');
-  expect(receipts[0].blocking).toBe(false);
+describe('peer contract integrity', () => {
+  it('loads a group when the changed peer was added outside its canonical membership', () => {
+    for (const extracted of [true, false]) {
+      const group = penGroups[0];
+      const snapshots = peerSnapshots([group]);
+      const extra = {
+        ref: 'home.action-cards.extra',
+        value: 'Unexpected fourth peer',
+      };
+      if (extracted) snapshots[0].members.push(extra);
+      const receipts = peerAudit([group], snapshots, {
+        changedMemberRefs: [extra.ref],
+      });
+      expect(receipts).toHaveLength(1);
+      expect(receipts[0].memberRefs).toHaveLength(3);
+      expect(receipts[0].coverage.fixture).toBe('failure');
+    }
+  });
+
+  it('prevents a shallow clone from redefining the canonical denominator at runtime', () => {
+    const canonical = penGroups[0];
+    const original = [...canonical.members];
+    try {
+      Reflect.apply(Array.prototype.pop, { ...canonical }.members, []);
+    } catch {
+      /* A frozen input rejects mutation. */
+    }
+    const afterLength = canonical.members.length;
+    if (afterLength < original.length)
+      Reflect.apply(Array.prototype.push, canonical.members, [original[2]]);
+    expect(afterLength).toBe(3);
+    const shortened = { ...canonical, members: original.slice(0, 2) };
+    expect(peerAudit([shortened])[0].coverage.fixture).toBe('failure');
+  });
+
+  it('keeps the evaluated receipt immutable after caller-owned evidence changes', () => {
+    const group = structuredClone(penGroups[0]);
+    const references = ['fixture:evidence'];
+    const [receipt] = peerAudit([group], peerSnapshots([group]), {
+      claimEvidence: { freshness: 'expired', references },
+      actionEvidence: {
+        actionId: 'fixture:action',
+        holdReferences: references,
+        enrolled: null,
+        consent: null,
+      },
+    });
+    const evaluated = JSON.stringify(receipt);
+    Object.assign(group.provenance, { fileName: 'caller-mutated.png' });
+    Object.assign(group.binding, {
+      status: 'BOUND',
+      sourceRef: 'caller:mutated',
+    });
+    references.push('caller:evidence');
+    expect(JSON.stringify(receipt)).toBe(evaluated);
+    expect(() =>
+      Reflect.apply(Array.prototype.push, receipt.memberRefs, ['caller:extra'])
+    ).toThrow(TypeError);
+  });
 });
