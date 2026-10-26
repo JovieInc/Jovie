@@ -304,11 +304,24 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     let chatPosts = 0;
     await page.route('**/api/chat', async route => {
       if (route.request().method() === 'POST') chatPosts++;
+      // The first real send mints the signed onboarding cookie. A server-seeded
+      // fresh /start (#23270) treats a cookieless reload as a new visitor and
+      // resends the starter, so keep the server's Set-Cookie on the fixture
+      // reply: the reload below must look like production, where the cookie
+      // exists after the first send.
+      const serverCookie =
+        route.request().method() === 'POST'
+          ? await route
+              .fetch()
+              .then(response => response.headers()['set-cookie'])
+              .catch(() => undefined)
+          : undefined;
       await replyReady;
       await route.fulfill({
         headers: {
           'content-type': 'text/event-stream',
           'x-vercel-ai-ui-message-stream': 'v1',
+          ...(serverCookie ? { 'set-cookie': serverCookie } : {}),
         },
         body: 'data: {"type":"start","messageId":"reply"}\n\ndata: {"type":"text-start","id":"reply-text"}\n\ndata: {"type":"text-delta","id":"reply-text","delta":"Your draft is saved."}\n\ndata: {"type":"text-end","id":"reply-text"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n',
       });
