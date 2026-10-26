@@ -35,9 +35,9 @@ test.describe('Onboarding Flow', () => {
   });
 
   test('anonymous handle claim redirects to signup', async ({ page }) => {
-    // The homepage currently uses RedesignedHero with a "Get started" CTA
-    // that links to /signup. The ClaimHandleForm is behind a feature flag
-    // and may not be rendered. Check for either form.
+    // The homepage hero claim form (ProductClaimHandleForm) is the primary
+    // conversion control and renders by default; keep this guard for any
+    // hero variant that hides it.
     const handleInput = page.getByLabel(
       /choose your handle|claim your handle/i
     );
@@ -78,7 +78,7 @@ test.describe('Onboarding Flow', () => {
     await handleInput.fill(handle);
 
     const submitButton = page
-      .locator('form:has(#handle-input) button[type="submit"]')
+      .locator('form:has(#homepage-claim-handle) button[type="submit"]')
       .first();
     await expect(submitButton).toBeVisible();
 
