@@ -259,14 +259,14 @@ export function ProfileDrawerShell({
     <Drawer.Root open={open} onOpenChange={onOpenChange}>
       <Drawer.Portal>
         <Drawer.Overlay
-          className={`fixed inset-0 ${PROFILE_Z.DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`}
+          className={`fixed inset-0 ${PROFILE_Z.MODAL_DRAWER_BACKDROP} bg-black/60 backdrop-blur-sm`}
           onClick={handleDismiss}
           data-modal-backdrop
           tabIndex={-1}
           data-testid='profile-drawer-overlay'
         />
         <div
-          className={`fixed inset-x-0 bottom-0 ${PROFILE_Z.DRAWER_CONTENT} flex justify-center`}
+          className={`fixed inset-x-0 bottom-0 ${PROFILE_Z.MODAL_DRAWER_CONTENT} flex justify-center`}
         >
           <Drawer.Content
             ref={attachModalRef}

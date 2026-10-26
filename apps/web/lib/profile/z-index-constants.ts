@@ -13,7 +13,9 @@
  *   4. Embedded preview modal       — `z-30`   (centered modal over preview iframe)
  *   5. Drawer backdrop              — `z-40`   (full-screen blurred backdrop)
  *   6. Drawer content + QR overlay  — `z-50`   (top-level standalone affordances)
- *   7. Full-screen mobile flow      — `z-[140]` (subscribe takeover above drawers)
+ *   7. Cookie banner                — `z-[60]`  (non-modal consent card)
+ *   8. Modal drawer backdrop/content — `z-[65]`/`z-[70]` (above the banner)
+ *   9. Full-screen mobile flow      — `z-[140]` (subscribe takeover above drawers)
  *
  * Tailwind v4 scans this file for class strings, so importing a value here is
  * equivalent (for JIT class generation) to writing the literal in the JSX.
@@ -30,6 +32,12 @@ export const PROFILE_Z = {
   DRAWER_BACKDROP: 'z-40',
   /** Drawer content and top-level affordances (e.g. QR overlay). */
   DRAWER_CONTENT: 'z-50',
+  /** Public-profile cookie consent card (fixed, bottom-right). */
+  COOKIE_BANNER: 'z-[60]',
+  /** Modal profile drawer backdrop: above the cookie banner. */
+  MODAL_DRAWER_BACKDROP: 'z-[65]',
+  /** Modal profile drawer content: above the cookie banner and its backdrop. */
+  MODAL_DRAWER_CONTENT: 'z-[70]',
   /**
    * Full-screen takeover that must sit above every drawer/overlay
    * (e.g. mobile notifications signup flow). Uses an arbitrary value

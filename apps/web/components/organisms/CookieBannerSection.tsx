@@ -13,6 +13,7 @@ import {
 } from '@/lib/cookies/banner-visibility';
 import { saveConsent } from '@/lib/cookies/consent';
 import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { PROFILE_Z } from '@/lib/profile/z-index-constants';
 import { setConsentState } from '@/lib/tracking/consent';
 
 const CONSENT_SAVE_ERROR =
@@ -344,7 +345,7 @@ export function CookieBannerSection({
           ref={bannerRef}
           aria-label='Cookie Consent'
           data-testid='cookie-banner'
-          className={`cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 ${
+          className={`cookie-banner-card fixed bottom-4 right-4 ${PROFILE_Z.COOKIE_BANNER} w-[calc(100vw-2rem)] max-w-85 ${
             shouldClearProfileDock
               ? 'cookie-banner-card--above-public-profile-dock'
               : 'sm:max-w-95'
