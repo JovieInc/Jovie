@@ -135,12 +135,19 @@ from `SOURCE_GUARDS` or mark it advisory.
 ## Preflight before every push
 
 Run `pnpm preflight` before every push (workers: every push, no exceptions; the
-pre-push gate also runs it, so do not bypass hooks). It derives its plan from
-the `deterministic` job of `.github/workflows/source-validation.yml`, runs each
-statement on its own, and lists all failures in one pass: typecheck of affected
-packages, `lint:eslint:changed`, screen registry, census, nav and manifest
-registrations, component-ship-gate, ratchets and baselines. Add
-`--body-file <path> --title <title>` to lint the PR body (changelog marker,
-Red-before-green, Blast radius, Locked areas). `pnpm preflight --list` prints the
-plan. `pnpm ci:rounds` reports CI rounds (Source Validation head commits) per
-merged PR as p50/p95; the goal is to drive the p50 toward 1.
+pre-push gate also runs it, so do not bypass hooks). It is deliberately light
+(target under 5 minutes): hosted CI runners are free and parallel, the shared
+dev host is not. It derives its plan from the `deterministic` job of
+`.github/workflows/source-validation.yml`, merges `origin/main` first, runs each
+statement on its own, overlaps independent steps within measured RAM and load,
+and lists all failures in one pass: `lint:eslint:changed`, screen registry,
+census, nav and manifest registrations, DS ratchets and shrink-only baselines,
+`component-ship-gate` (test-not-touched), and the diff-selected source guards.
+Add `--body-file <path> --title <title>` to lint the PR body (changelog marker,
+Red-before-green, Blast radius, Locked areas).
+
+Excluded on purpose, each printed as `EXCLUDED: <command> (reason)`: full
+typecheck of any package, builds, full coverage and control suites, Storybook.
+Hosted CI runs them; do not run them locally to "be safe". `pnpm preflight
+--list` prints the plan. `pnpm ci:rounds` reports CI rounds (Source Validation
+head commits) per merged PR as p50/p95; the goal is to drive the p50 toward 1.
