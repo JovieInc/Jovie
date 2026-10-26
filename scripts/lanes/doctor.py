@@ -82,6 +82,8 @@ MERGE_THROUGHPUT_CACHE_S = 10 * 60
 PROMOTION_SCRIPT = Path(__file__).resolve().parents[1] / "promotion-loss-metrics.mjs"
 QUOTA_DEFERRED_SCRIPT = Path(__file__).resolve().parents[1] / "quota-deferred-heads.mjs"
 QUOTA_DEFERRED_REFRESH_S = 15 * 60  # about 100 REST reads per refresh; the lanes clock calls often
+QUOTA_DRAIN_SCRIPT = Path(__file__).resolve().parents[1] / "lib" / "api-quota-report.mjs"
+QUOTA_DRAIN_REFRESH_S = 15 * 60  # about 40 REST reads per refresh (one Enroll job list per run)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OPS_REPORT_SCRIPT = Path(__file__).resolve().with_name("ops-report.mjs")
 
@@ -486,6 +488,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
     quota_deferred, quota_deferred_error = None, None
     if not os.environ.get("LANES_SELFTEST"):
         quota_deferred, quota_deferred_error = sample_quota_deferred_heads(state, now)
+    quota_drain, quota_drain_error = None, None
+    if not os.environ.get("LANES_SELFTEST"):
+        quota_drain, quota_drain_error = sample_quota_drain(state, now)
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
@@ -565,6 +570,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
         "quotaDeferredHeads": quota_deferred, "quotaDeferredHeadsError": quota_deferred_error,
+        "quotaDrain": quota_drain, "quotaDrainError": quota_drain_error,
         "redDispatch": red_dispatch_summary(state, now),
         "failedByReason": failed_by_reason(failures),
         "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
@@ -697,6 +703,35 @@ def sample_quota_deferred_heads(state: Path, now: float, run=lifecycle.run) -> t
             raise ValueError("quota-deferred-heads output missing the metric")
         signal = {"schema": "jovie-quota-deferred-heads/v1", "observedAt": now,
                   "value": metric["value"], "heads": (metric.get("heads") or [])[:20]}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached if cached.get("schema") else None), f"{type(error).__name__}: {error}"[:200]
+
+
+def sample_quota_drain(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
+    """Buckets of the repo's GitHub installation projected to run dry before their hourly reset,
+    from `api-quota-report.mjs drain --json` (exit 3 when there are any, so 0 and 3 both parse).
+    Refreshed at most every QUOTA_DRAIN_REFRESH_S; a failed read keeps the last good signal."""
+    path = Path(state) / "quota-drain.json"
+    cached = read_json(path, {})
+    observed = cached.get("observedAt")
+    if isinstance(observed, (int, float)) and not isinstance(observed, bool) \
+            and 0 <= now - observed < QUOTA_DRAIN_REFRESH_S:
+        return cached, None
+    try:
+        result = run(["node", str(QUOTA_DRAIN_SCRIPT), "drain", "--json", "--hours", "1"],
+                     capture_output=True, text=True, timeout=240)
+        if result.returncode not in (0, 3):
+            raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+        line = next((row for row in (result.stdout or "").splitlines() if row.startswith("{")), "")
+        report = json.loads(line)
+        if report.get("schema") != "jovie-actions-quota-drain/v1" or not isinstance(report.get("alerts"), list):
+            raise ValueError("quota drain output missing the schema")
+        signal = {"schema": "jovie-quota-drain/v1", "observedAt": now, "alerts": report["alerts"][:8]}
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
@@ -1228,6 +1263,12 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
         listed = ", ".join(f"#{row.get('number')} {row.get('ageMinutes')}m" for row in (deferred.get("heads") or [])[:8])
         alerts["quota-deferred-heads"] = (f"{deferred['value']} open PR heads sit on a quota-deferred Fleet Rules "
                                           f"verdict past 1h (never a verdict; the re-run loop is broken): {listed}")
+    drain = (obs.get("quotaDrain") or {}).get("alerts") or []
+    if drain:
+        listed = "; ".join(f"{row.get('bucket')} has {row.get('remaining')} left at ~{row.get('ratePerMinute')}/min, empty "
+                           f"{row.get('minutesEarly')} min before its reset ({row.get('emptyAt')})" for row in drain[:4])
+        alerts["quota-drain"] = (f"GitHub API budget is projected to run dry before it resets: {listed}. Pause bulk reruns "
+                                 f"and bulk gh work until the reset.")
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -1247,6 +1288,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "hud-stale": "restart-hud-service",
         "orphan-prs": "reconcile-pr-ownership",
         "quota-deferred-heads": "rerun-quota-deferred-fleet-evidence",
+        "quota-drain": "pause-bulk-reruns-and-bulk-api-work-until-the-reset",
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
