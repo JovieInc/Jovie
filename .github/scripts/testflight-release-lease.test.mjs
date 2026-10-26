@@ -10,6 +10,7 @@ import {
   storedZip,
 } from '../../scripts/lib/real-gh-harness.mjs';
 import {
+  annotationSink,
   command,
   comparisonReady,
   evidenceFailureKind,
@@ -17,6 +18,10 @@ import {
   readEvidence,
   validateLease,
 } from './testflight-release-lease.mjs';
+
+// Mocked rate-limit refusals print `::error::` lines; swallow them so the runner's
+// log parser never turns a fixture into an annotation (2026-10-25).
+annotationSink.emit = () => {};
 
 const SOURCE = 'a'.repeat(40);
 const CONTROLLER_HEAD = 'b'.repeat(40);

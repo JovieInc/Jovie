@@ -6,6 +6,7 @@ import {
   jobSeconds,
   parseQuotaNotice,
   percentile,
+  projectDrain,
   summarizeHeadroom,
   summarizeQuota,
 } from '../api-quota-report.mjs';
@@ -148,5 +149,70 @@ describe('api quota report', () => {
     expect(names.indexOf('Sample API quota')).toBeLessThan(
       names.indexOf('Enqueue green PRs')
     );
+  });
+});
+
+describe('projectDrain', () => {
+  const hour = 1_800_000_000 - (1_800_000_000 % 3600);
+  const sample = (minute, remaining, bucket = 'github-token') => ({
+    at: hour + minute * 60,
+    bucket,
+    remaining,
+    limit: 5000,
+  });
+
+  it('alerts when the bucket is projected empty before the window resets', () => {
+    const alerts = projectDrain(
+      [sample(0, 5000), sample(5, 4000), sample(10, 3000)],
+      hour + 10 * 60
+    );
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]).toMatchObject({
+      bucket: 'github-token',
+      remaining: 3000,
+      ratePerMinute: 200,
+    });
+    // 3000 left at 200/min is empty 15 min from now, 35 min before the reset.
+    expect(alerts[0].minutesEarly).toBe(35);
+  });
+
+  it('stays quiet when the bucket outlasts the window, is flat, or has too little data', () => {
+    expect(
+      projectDrain(
+        [sample(0, 5000), sample(5, 4900), sample(10, 4800)],
+        hour + 600
+      )
+    ).toEqual([]);
+    expect(
+      projectDrain(
+        [sample(0, 3000), sample(5, 3000), sample(10, 3000)],
+        hour + 600
+      )
+    ).toEqual([]);
+    expect(
+      projectDrain([sample(0, 5000), sample(10, 100)], hour + 600)
+    ).toEqual([]);
+    expect(
+      projectDrain(
+        [sample(0, 5000), sample(0.5, 4000), sample(1, 3000)],
+        hour + 60
+      )
+    ).toEqual([]);
+  });
+
+  it('ignores samples from earlier windows and judges each bucket on its own', () => {
+    const alerts = projectDrain(
+      [
+        { at: hour - 60, bucket: 'github-token', remaining: 1, limit: 5000 },
+        sample(0, 5000, 'jovie-bot'),
+        sample(5, 4990, 'jovie-bot'),
+        sample(10, 4980, 'jovie-bot'),
+        sample(0, 5000),
+        sample(5, 2500),
+        sample(10, 0),
+      ],
+      hour + 600
+    );
+    expect(alerts.map(alert => alert.bucket)).toEqual(['github-token']);
   });
 });
