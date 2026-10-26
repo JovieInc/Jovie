@@ -114,6 +114,7 @@
     {"id": "workflow:staging-controller", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/staging-controller.yml"},
     {"id": "workflow:stale-branch-sweep", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/stale-branch-sweep.yml", "note": "Fired weekly by the lanes clock (repository_dispatch clock_stale_branch_sweep); registry entry github:jovie:stale-branch-sweep."},
     {"id": "workflow:ovie-summer-canary", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/ovie-summer-canary.yml", "note": "Fired hourly by the lanes clock (repository_dispatch clock_summer_canary); registry entry lanes-clock:summer-canary."},
+    {"id": "workflow:vs-linktree-claims", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/vs-linktree-claims.yml", "note": "Fired weekly by the lanes clock (repository_dispatch clock_vs_linktree_claims); registry entry lanes-clock:vs-linktree-claims."},
     {"id": "workflow:summer-eve-pin", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/summer-eve-pin.yml"},
     {"id": "workflow:synthetic-monitoring", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/synthetic-monitoring.yml"},
     {"id": "workflow:test-coverage-audit", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/test-coverage-audit.yml"},

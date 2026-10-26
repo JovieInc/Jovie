@@ -607,6 +607,7 @@
       "runner-autoscaler-canary.yml": "runner health probe, not a delivery stage",
       "m2-revenue-path-canary.yml": "synthetic revenue probe; gap tracked in the stage gap audit",
       "ovie-summer-canary.yml": "synthetic Summer fast-chat probe, not a delivery stage",
+      "vs-linktree-claims.yml": "weekly claim re-measure of public pages, not a delivery stage",
       "production-controller-health.yml": "controller liveness monitor; measures the controller, not a stage",
       "postdeploy-probes.yml": "manual re-run of production probes; production-controller.yml owns the stage",
       "desktop-release.yml": "desktop app release; gap tracked in the stage gap audit",

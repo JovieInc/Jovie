@@ -251,7 +251,7 @@ class CadenceClocksTest(unittest.TestCase):
                         self.assertIn("'repository_dispatch'", condition)
 
     def test_stale_workflows_are_dispatched_once_on_their_own_intervals(self):
-        self.age = {"stale-branch-sweep.yml": 8 * 86400}
+        self.age = {"stale-branch-sweep.yml": 8 * 86400, "vs-linktree-claims.yml": 8 * 86400}
         result = clock.tick(self.path, "gem", self.api, NOW)
         self.assertEqual(result["status"], "dispatch-requested")
         self.assertEqual(set(result["clocks"]), {c.name for c in clock.CLOCKS[1:]})

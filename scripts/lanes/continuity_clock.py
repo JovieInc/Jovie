@@ -79,6 +79,9 @@ CLOCKS = (
     # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).
     Clock("summerCanary", "ovie-summer-canary.yml", "clock_summer_canary", 3600,
           "summer-canary-clock.json", github_cron=False),
+    # Weekly re-measure of the published jov.ie vs Linktree claims; flags any that stopped being true.
+    Clock("vsLinktreeClaims", "vs-linktree-claims.yml", "clock_vs_linktree_claims", 7 * 86400,
+          "vs-linktree-claims-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 
