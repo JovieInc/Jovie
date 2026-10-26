@@ -1428,10 +1428,13 @@ def breaker_streak(runs: list, now: float) -> int:
     return streak
 
 
-def pr_breaker_open(host, number: int, now: float) -> bool:
+def pr_breaker_open(host, number: int, now: float, head: str | None = None) -> bool:
+    """Open after BREAKER_STREAK unproductive runs, or for the exact head a fingerprint breaker tripped on."""
     try:
-        data = json.loads((host.state / "pr-breaker.json").read_text())
-        return breaker_streak((data.get(str(number)) or {}).get("runs") or [], now) >= BREAKER_STREAK
+        entry = json.loads((host.state / "pr-breaker.json").read_text()).get(str(number)) or {}
+        if head and entry.get("fpOpenHead") == head:
+            return True
+        return breaker_streak(entry.get("runs") or [], now) >= BREAKER_STREAK
     except (OSError, ValueError, AttributeError, TypeError):
         return False
 
@@ -1699,7 +1702,7 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
         if (left := owner_settling(pr, record, now)) is not None:
             lane.note_owner_settle(host, pr, left, now)
             continue  # The writer is still pushing; the head's checks restart on every push.
-        if pr_breaker_open(host, pr["number"], now):
+        if pr_breaker_open(host, pr["number"], now, pr.get("headRefOid")):
             continue  # 3 unproductive runs in 24h across heads: one factory signal is filed instead
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \

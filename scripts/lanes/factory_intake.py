@@ -78,9 +78,17 @@ def body(row: dict) -> str:
     return "\n".join(lines)
 
 
+EXTRA_LABELS = frozenset({"machine-gap"})
+
+
+def extra_labels(row: dict) -> list[str]:
+    """Optional routing labels a signal may carry; only known ones, so a signal cannot mint labels."""
+    return [name for name in row.get("extraLabels") or [] if name in EXTRA_LABELS]
+
+
 def plan(signals: list[dict]) -> list[dict]:
     return [{"fingerprint": row["fingerprint"], "title": str(row["title"]).strip()[:200], "description": body(row),
-             "labels": [FACTORY_LABEL, WORKSTREAM_LABEL, label(row["fingerprint"])]} for row in signals]
+             "labels": [FACTORY_LABEL, WORKSTREAM_LABEL, *extra_labels(row), label(row["fingerprint"])]} for row in signals]
 
 
 EXISTING = ('query($l:String!){issues(first:1,filter:{team:{key:{eq:"JOV"}},labels:{name:{eq:$l}},'
