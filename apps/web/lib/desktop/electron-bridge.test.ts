@@ -20,6 +20,7 @@ import {
   __testing,
   isDesktopEnvironment,
   notifyDesktopComposerReadiness,
+  observeDesktopFullScreen,
   observeDesktopVisualActivity,
   reportDesktopWorkState,
   useDesktopBuildIdentity,
@@ -141,6 +142,65 @@ describe('electron-bridge — defensive guards', () => {
       dispose();
     }
     expect(callback).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it('omits the full-screen subscription on old and partial bridges', () => {
+    const callback = vi.fn();
+    const subscribe = vi.fn();
+    for (const api of [
+      {},
+      { onFullScreenChanged: subscribe },
+      { getFullScreenState: vi.fn() },
+    ]) {
+      setElectronAPI(api);
+      observeDesktopFullScreen(callback)();
+    }
+    expect(subscribe).not.toHaveBeenCalled();
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it('keeps a newer full-screen event over a delayed initial snapshot', async () => {
+    let resolveSnapshot: ((isFullScreen: boolean) => void) | undefined;
+    let listener: ((isFullScreen: boolean) => void) | undefined;
+    const unsubscribe = vi.fn();
+    setElectronAPI({
+      getFullScreenState: () =>
+        new Promise<boolean>(resolve => {
+          resolveSnapshot = resolve;
+        }),
+      onFullScreenChanged: (callback: (isFullScreen: boolean) => void) => {
+        listener = callback;
+        return unsubscribe;
+      },
+    });
+    const callback = vi.fn();
+    const dispose = observeDesktopFullScreen(callback);
+    listener?.(false);
+    resolveSnapshot?.(true);
+    await Promise.resolve();
+    expect(callback).toHaveBeenCalledExactlyOnceWith(false);
+    dispose();
+    listener?.(true);
+    expect(callback).toHaveBeenCalledOnce();
+    expect(unsubscribe).toHaveBeenCalledOnce();
+  });
+
+  it('reads the initial native full-screen state and tolerates rejected snapshots', async () => {
+    const callback = vi.fn();
+    for (const snapshot of [
+      Promise.resolve(true),
+      Promise.reject(new Error('old shell')),
+    ]) {
+      setElectronAPI({
+        getFullScreenState: () => snapshot,
+        onFullScreenChanged: () => () => undefined,
+      });
+      const dispose = observeDesktopFullScreen(callback);
+      await Promise.resolve();
+      await Promise.resolve();
+      dispose();
+    }
+    expect(callback).toHaveBeenCalledExactlyOnceWith(true);
   });
   it('isDesktopEnvironment returns false in pure browser context', () => {
     expect(isDesktopEnvironment()).toBe(false);
