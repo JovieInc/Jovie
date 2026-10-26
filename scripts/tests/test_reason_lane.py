@@ -1076,11 +1076,11 @@ class OutcomeLaneTest(unittest.TestCase):
         self.assertEqual((gaps[0]["capability"], gaps[0]["owner"]), ("signed-in-browser", "golden-path (authqaprod fixture)"))
         self.assertIn(esc.GAP_MARKER, comments[-1])
         self.assertIn("JOV-7771", json.loads((state / esc.GAP_FILE).read_text()))
-        # A page that loads fine for the lane's browser was observable: the shrug becomes a failure.
+        # Reachability alone does not prove this criterion in either direction.
         probe.update(finalUrl="https://jov.ie/app/tasks", text="Tasks due today 3")
         flipped = esc.escalate([item], tree=tree, out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
-        self.assertEqual(flipped[0]["status"], "fail")
-        self.assertIn("observable but not observed", flipped[0]["evidence"])
+        self.assertEqual(flipped[0]["status"], "unverifiable")
+        self.assertEqual(flipped[0]["evidence"], item["evidence"])
         # Judgement items also ask a second model; without one configured the gap is recorded as such.
         with patch.object(esc, "gateway_key", return_value=None):
             judgement = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
@@ -1089,6 +1089,99 @@ class OutcomeLaneTest(unittest.TestCase):
             unconfigured = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
                                         out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
         self.assertIn("no AI Gateway key", {a["step"]: a["result"] for a in unconfigured[0]["attempts"]}["adversarial"])
+
+    def outcome_probe_fixture(self, **changes):
+        item = {"criterion": "Mac disk health stays below the pressure threshold", "status": "unverifiable",
+                "kind": "observable", "capability": "device",
+                "evidence": "Device observation unavailable; build binding only: https://jov.ie/api/version",
+                "attempts": [{"step": "telemetry", "result": "Needs a device observation, not public build metadata"}]}
+        return {**item, **changes}
+
+    def escalate_with_public_probe(self, items, issue=None, **kwargs):
+        esc = outcome.esc
+        probe = {"url": "https://jov.ie/api/version", "ok": True, "status": 200,
+                 "finalUrl": "https://jov.ie/api/version", "text": '{"buildId":"abc1234"}'}
+        with patch.object(esc, "browser_probe", return_value=probe), patch.object(esc, "request_agent_help", return_value={
+                "channel": "none", "delivered": False, "note": "fixture has no authenticated agent"}):
+            return esc.escalate(items, tree=ROOT, out_dir=Path("unused"), run=None, env={}, codex_cmd=[], linear=None,
+                                issue=issue or {"id": "u1", "identifier": "JOV-7771"}, sha=SHA, **kwargs)
+
+    def test_unrelated_successful_probe_preserves_each_criterion_and_its_evidence(self):
+        for criterion, capability in (("Mac disk pressure stays below threshold", "device"),
+                                      ("Installed protocol rollout is complete", "process-record"),
+                                      ("Authenticated chat replies stream", "signed-in-browser")):
+            with self.subTest(criterion=criterion):
+                item = self.outcome_probe_fixture(criterion=criterion, capability=capability)
+                original = json.loads(json.dumps(item))
+                row, = self.escalate_with_public_probe([item])
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertEqual(item, original, "escalation must not mutate the verifier's original evidence")
+                self.assertEqual(outcome.esc.missing_steps(row), [])
+                self.assertIn("https://jov.ie/api/version -> 200", row["attempts"][1]["result"])
+                self.assertEqual(outcome.esc.gap_for("JOV-7771", row)["capability"], capability)
+
+    def test_relevant_help_evidence_still_decides_despite_an_unrelated_successful_probe(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Task due chips render", capability="signed-in-browser")
+        corr = esc.correlation_id("u1", item, SHA)
+        for verdict, status, observation in (("contradicted", "fail", "Signed in on the verified build: due chips are missing"),
+                                              ("supported", "pass", "Signed in on the verified build: 3 due chips are visible"),
+                                              ("insufficient", "unverifiable", "I have not opened this build")):
+            with self.subTest(verdict=verdict), patch.object(esc, "evaluate_reply", return_value={
+                    "ran": True, "verdict": verdict, "result": observation}) as evaluate:
+                issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr, observation)}}
+                row, = self.escalate_with_public_probe([item], issue)
+                self.assertEqual(row["status"], status)
+                evaluate.assert_called_once()
+                self.assertEqual(evaluate.call_args.args[0]["criterion"], item["criterion"])
+                self.assertEqual(evaluate.call_args.args[1], observation)
+                self.assertIn(observation if verdict != "insufficient" else item["evidence"], row["evidence"])
+
+    def test_mixed_criteria_retain_true_failures_passes_and_residuals(self):
+        passed = {"criterion": "Build contains the binding merge", "status": "pass", "evidence": "git merge-base confirmed the binding SHA"}
+        failed = {"criterion": "Chat streams a reply", "status": "fail", "evidence": "Authenticated observation: stream closes with HTTP 500"}
+        unknown = self.outcome_probe_fixture()
+        rows = self.escalate_with_public_probe([passed, failed, unknown])
+        self.assertEqual(rows[:2], [passed, failed])
+        self.assertEqual([r["status"] for r in rows], ["pass", "fail", "unverifiable"])
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": rows}
+        self.assertEqual(outcome.judge(verdict, "JOV-7771", SHA)["status"], "fail", "a real contradiction still fails")
+        verdict["items"] = self.escalate_with_public_probe([passed, {**passed, "criterion": "Tests pass"}, unknown])
+        decision = outcome.judge(verdict, "JOV-7771", SHA)
+        self.assertEqual((decision["status"], decision["reason"]), ("pass", "verified-with-residual"))
+        self.assertEqual(decision["items"][-1]["status"], "unverifiable", "the aggregate policy never turns the unknown into a pass")
+
+    def test_unavailable_authentication_is_unknown_even_when_another_probe_loads(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Authenticated chat replies stream", capability="signed-in-browser",
+                                          urls=["https://jov.ie/app/chat"],
+                                          evidence="No authenticated fixture; build binding only: https://jov.ie/api/version")
+        for final_url, text, status in (("https://jov.ie/signin", "Log in to Jovie", 200),
+                                        ("https://jov.ie/app/chat", "Unauthorized", 401),
+                                        ("https://jov.ie/app/chat", "Public application shell", 200)):
+            with self.subTest(final_url=final_url, status=status):
+                def probe(tree, url, *args):
+                    return {"ok": True, "status": status if url.endswith("/chat") else 200,
+                            "finalUrl": final_url if url.endswith("/chat") else url, "text": text}
+                with patch.object(esc, "browser_probe", side_effect=probe), patch.object(esc, "request_agent_help", return_value={
+                        "channel": "none", "delivered": False, "note": "authentication unavailable"}):
+                    row, = esc.escalate([item], tree=ROOT, out_dir=Path("unused"), run=None, env={}, codex_cmd=[], linear=None,
+                                        issue={"id": "u1", "identifier": "JOV-7771"}, sha=SHA)
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertEqual(esc.missing_steps(row), [])
+
+    def test_stale_help_evidence_for_another_build_cannot_decide_a_current_unknown(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Installed protocol rollout is complete", capability="process-record")
+        stale_corr = esc.correlation_id("u1", item, "0" * 40)
+        issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(
+            stale_corr, "Previous build: protocol installed and verified")}}
+        with patch.object(esc, "evaluate_reply") as evaluate:
+            row, = self.escalate_with_public_probe([item], issue)
+        evaluate.assert_not_called()
+        self.assertNotEqual(row["helpCorr"], stale_corr)
+        self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+        self.assertEqual(esc.missing_steps(row), [])
 
     def gateway(self, verdict, reason="because", prompt_tokens=1000, completion_tokens=100, calls=None):
         def urlopen(request, timeout=0):
