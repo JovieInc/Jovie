@@ -60,6 +60,56 @@ export function snapshotFile(
   return target;
 }
 
+/**
+ * The node ids a structural script acts on: the first literal argument of
+ * I/M/D/R/C (the node, or the parent for I) and the second of M/C (the new
+ * parent). Path ids like "kh2z3/dTGMn" contribute every segment. A component
+ * id that only appears as a ref in an inserted instance is not a target.
+ */
+export function targetsOf(script) {
+  const targets = new Set();
+  const call =
+    /(?:^|[^\w.$])([IMDRC])\s*\(\s*(['"`])([^'"`]+)\2(?:\s*,\s*(['"`])([^'"`]+)\4)?/gmu;
+  for (const m of script.replace(/\/\/.*$/gmu, '').matchAll(call)) {
+    const ids = [m[3]];
+    if ((m[1] === 'M' || m[1] === 'C') && m[5]) ids.push(m[5]);
+    for (const id of ids)
+      for (const part of id.split('/')) if (part) targets.add(part);
+  }
+  return [...targets];
+}
+
+/** Decide using a census { components, instances, owners }. */
+export function decideWithCensus({ script, census, file, snapshotDir, now }) {
+  const verdict = classifyOps(script);
+  if (verdict.propertyOnly)
+    return { allowed: true, reason: 'property-only edit', snapshot: null };
+  const hits = [];
+  for (const id of targetsOf(script)) {
+    const owner =
+      census.owners?.[id] ??
+      (census.components?.[id] !== undefined ? id : null);
+    const n = owner ? Number(census.instances?.[owner] ?? 0) : 0;
+    if (n > 0) hits.push({ id, owner, instances: n });
+  }
+  if (hits.length) {
+    const first = hits[0];
+    return {
+      allowed: false,
+      reason: `refused: structural Pen edit touches ${first.id} inside component ${first.owner}, which has ${first.instances} instance(s); this can silently drop instance overrides (JOV-9246). Make it property-only, or copy the component, edit the copy and re-point instances deliberately.`,
+      snapshot: null,
+      hits,
+    };
+  }
+  const snapshot =
+    file && existsSync(file) ? snapshotFile(file, snapshotDir, now) : null;
+  return {
+    allowed: true,
+    reason: 'structural edit touching no component with instances',
+    snapshot,
+  };
+}
+
 /** Decide whether an edit may run. `instances` is the instance count of the edited component. */
 export function decide({ script, instances, file, snapshotDir, now }) {
   const verdict = classifyOps(script);

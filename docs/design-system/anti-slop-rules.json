@@ -973,16 +973,24 @@
         "check": "scripts/agent/pen-structural-guard.mjs",
         "evidence": [
           "scripts/agent/pen-structural-guard.mjs",
-          "scripts/agent/pen-structural-guard.test.mjs"
+          "scripts/agent/pen-structural-guard.test.mjs",
+          "scripts/agent/pen-guard-hook.mjs",
+          "scripts/agent/pen-census.mjs",
+          "scripts/agent/pen-guard-install.sh"
         ],
         "wiredIn": [
+          {
+            "file": "scripts/ci-fast-lanes.mjs",
+            "token": "id: 'anti-slop'",
+            "commandIncludes": "pen-guard-hook.test.mjs"
+          },
           {
             "file": "scripts/ci-fast-lanes.mjs",
             "token": "id: 'anti-slop'",
             "commandIncludes": "pen-structural-guard.test.mjs"
           }
         ],
-        "coverageNote": "The CLI classifies an execute script and the instance count (from --instances or a census); agents run it before a structural Pencil execute (documented in pen-operations.md). It is not yet a PreToolUse hook on mcp__pencil__execute because the hook cannot know instance counts without a census."
+        "coverageNote": "A Claude Code PreToolUse hook on mcp__pencil__execute (installed by scripts/agent/pen-guard-install.sh) blocks structural ops (M, D, R, C, I) whose target id sits inside a component the instance census says has instances; it snapshots the .pen file before allowing other structural edits. The census is rebuilt by a launchd agent every 10 minutes from the saved .pen files that changed (headless pen CLI). No census for the file: warn, not block. Literal ids only: a script that computes ids at run time is not resolved. Installed on the Mac that runs Pencil; other hosts must run the installer."
       }
     },
     {
