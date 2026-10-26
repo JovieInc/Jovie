@@ -530,6 +530,26 @@ class JudgeTest(unittest.TestCase):
         self.assertNotIn("disk-capacity-held", doctor.judge(
             obs(diskFreePct=16.0), {"diskHeldSince": held["now"] - 9999}))
 
+    def test_top_disk_consumers_runs_du_with_a_budget_and_ranks_the_largest(self):
+        import tempfile
+        sizes = {}
+
+        def fake_du(cmd, **kwargs):
+            if cmd[2] not in sizes:
+                raise OSError("du unavailable")
+            return type("R", (), {"stdout": f"{sizes[cmd[2]]}\t{cmd[2]}\n"})()
+        with tempfile.TemporaryDirectory() as tmp:
+            home, state = Path(tmp) / "home", Path(tmp) / "state"
+            for name in ("codex-worktrees", ".cache", "grok-wt"):
+                (home / name).mkdir(parents=True)
+            (state / "runs").mkdir(parents=True)
+            sizes.update({str(home / "codex-worktrees"): 3 * 1048576, str(home / ".cache"): 1048576,
+                          str(state / "runs"): 2 * 1048576})  # grok-wt: du raises, so it is skipped
+            with mock.patch.dict(os.environ, {"HOME": str(home)}):
+                top = doctor.top_disk_consumers(state, budget_s=30, run=fake_du)
+        self.assertEqual([(Path(row["path"]).name, row["gib"]) for row in top],
+                         [("codex-worktrees", 3.0), ("runs", 2.0), (".cache", 1.0)])
+
     def test_pool_empty_needs_thirty_sustained_minutes(self):
         self.assertEqual(doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0}), {})
         alerts = doctor.judge(obs(pool=0, busy=0), {"poolEmptySince": 1_000_000.0 - 1801})
