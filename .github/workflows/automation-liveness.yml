@@ -48,6 +48,16 @@ jobs:
     outputs:
       due: ${{ steps.due.outputs.due }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          sparse-checkout: |
+            packages/api-client
+            .nvmrc
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
       - id: due
         env:
           GH_TOKEN: ${{ github.token }}
@@ -57,10 +67,10 @@ jobs:
           if [ "$EVENT" = workflow_dispatch ]; then echo "due=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           now=$(date -u +%s)
           due=true
-          for id in $(gh run list --repo "$GITHUB_REPOSITORY" --workflow automation-liveness.yml --limit 6 \
+          for id in $(node packages/api-client/cli.ts gh --priority poll -- run list --repo "$GITHUB_REPOSITORY" --workflow automation-liveness.yml --limit 6 \
               --json databaseId --jq '.[].databaseId' 2>/dev/null); do
             [ "$id" = "$GITHUB_RUN_ID" ] && continue
-            at=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+            at=$(node packages/api-client/cli.ts gh --priority poll -- api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
               --jq '.jobs[] | select(.name == "Check automation heartbeats" and .conclusion == "success") | .completed_at' 2>/dev/null | head -1)
             if [ -n "$at" ]; then
               age=$(( now - $(date -u -d "$at" +%s) ))
