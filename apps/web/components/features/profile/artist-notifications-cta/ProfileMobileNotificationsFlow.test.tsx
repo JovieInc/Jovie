@@ -119,4 +119,15 @@ describe('ProfileMobileNotificationsFlow', () => {
     expect(screen.queryByText('Events')).toBeNull();
     expect(screen.queryByText('Merch')).toBeNull();
   });
+
+  it('shows a save error on the preferences step instead of looking saved', () => {
+    renderFlow({ error: 'We could not save your choices. Try again.' });
+    expect(screen.getByRole('alert').textContent).toMatch(/could not save/);
+  });
+
+  it('describes what the artist toggle really shares', () => {
+    renderFlow({ showArtistEmailSection: true });
+    expect(screen.getByText(/including ads/)).toBeTruthy();
+    expect(screen.getByText(/Off unless you turn it on/)).toBeTruthy();
+  });
 });

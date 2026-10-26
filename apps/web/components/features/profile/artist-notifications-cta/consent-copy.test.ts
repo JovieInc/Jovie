@@ -16,13 +16,23 @@ describe('Get Updates consent wording', () => {
       expect(copy).not.toMatch(/(artist|them) and Jovie/i);
       expect(copy).not.toMatch(/from this artist/i);
       expect(copy).not.toMatch(/fan/i);
-      expect(copy.length).toBeLessThanOrEqual(140);
+      expect(copy.length).toBeLessThanOrEqual(channel === 'sms' ? 260 : 140);
     });
   }
 
-  it('keeps unsubscribe and STOP language', () => {
+  it('keeps unsubscribe language and the standard text-message elements', () => {
     expect(CAPTURE_CONSENT_COPY.email).toMatch(/Unsubscribe anytime/);
-    expect(CAPTURE_CONSENT_COPY.sms).toMatch(/Reply STOP/);
+    const sms = CAPTURE_CONSENT_COPY.sms;
+    for (const required of [
+      /recurring automated texts/i,
+      /not a condition of purchase/i,
+      /Msg frequency varies/i,
+      /Msg & data rates may apply/i,
+      /HELP/,
+      /STOP/,
+    ]) {
+      expect(sms).toMatch(required);
+    }
   });
 });
 

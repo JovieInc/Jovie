@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { APP_ROUTES } from '@/constants/routes';
 import { OtpInput } from '@/features/auth/atoms/otp-input';
 import {
   type CountryOption,
@@ -96,7 +97,7 @@ interface ProfileMobileNotificationsFlowProps {
 export const CAPTURE_CONSENT_COPY: Record<'email' | 'sms', string> = {
   email:
     'By continuing, you agree to get emails from Jovie about this artist. Unsubscribe anytime.',
-  sms: 'By continuing, you agree to get texts from Jovie about this artist. Reply STOP to opt out. Message and data rates may apply.',
+  sms: 'By continuing, you agree to get recurring automated texts from Jovie about this artist at this number. Consent is not a condition of purchase. Msg frequency varies. Msg & data rates may apply. Reply HELP for help, STOP to cancel.',
 };
 
 type PromisedContent = Extract<
@@ -550,7 +551,18 @@ export function ProfileMobileNotificationsFlow({
                 </p>
               ) : null}
               <p className='text-xs leading-4 text-tertiary-token'>
-                {CAPTURE_CONSENT_COPY[isSms ? 'sms' : 'email']}
+                {CAPTURE_CONSENT_COPY[isSms ? 'sms' : 'email']}{' '}
+                {isSms ? (
+                  <>
+                    <a className='underline' href={APP_ROUTES.LEGAL_TERMS}>
+                      Terms
+                    </a>
+                    {' · '}
+                  </>
+                ) : null}
+                <a className='underline' href={APP_ROUTES.LEGAL_PRIVACY}>
+                  Privacy
+                </a>
               </p>
               <div className='flex items-center justify-between gap-3'>
                 <button
@@ -748,12 +760,19 @@ export function ProfileMobileNotificationsFlow({
           title='Alerts'
           footer={
             canEditPreferences ? (
-              <PrimaryButton
-                onClick={onPreferencesSubmit}
-                disabled={isPreferencesSaving}
-              >
-                Save & Finish
-              </PrimaryButton>
+              <div className='space-y-3'>
+                {error ? (
+                  <p className='text-sm text-error' role='alert'>
+                    {error}
+                  </p>
+                ) : null}
+                <PrimaryButton
+                  onClick={onPreferencesSubmit}
+                  disabled={isPreferencesSaving}
+                >
+                  Save & Finish
+                </PrimaryButton>
+              </div>
             ) : null
           }
         >
@@ -815,8 +834,9 @@ export function ProfileMobileNotificationsFlow({
                           Share My Email With {artistName}
                         </p>
                         <p className='text-xs leading-4 text-white/42'>
-                          Lets {artistName} email you directly. Off unless you
-                          turn it on.
+                          They can see it, email you directly, and use it in
+                          their own tools, including ads. Off unless you turn it
+                          on. You can turn it off anytime.
                         </p>
                       </div>
                     </div>

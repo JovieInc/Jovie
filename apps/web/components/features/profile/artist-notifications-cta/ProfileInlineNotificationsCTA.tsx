@@ -771,6 +771,8 @@ export function ProfileInlineNotificationsCTA({
     [canEditPreferences]
   );
 
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+
   const handlePreferencesSubmit = useCallback(async () => {
     if (!canEditPreferences) {
       setFlowOrigin('subscribe');
@@ -796,9 +798,12 @@ export function ProfileInlineNotificationsCTA({
             showArtistEmailSection && email ? artistEmailOptIn : undefined,
         });
       } catch {
-        // Keep the flow moving. Status will reconcile on the next fetch.
+        // A failed save must not look saved (turning sharing off especially).
+        setPrefsError('We could not save your choices. Try again.');
+        return;
       }
     }
+    setPrefsError(null);
 
     const selectedAlertToggles = Object.entries(alertPrefs)
       .filter(([, enabled]) => enabled)
@@ -809,7 +814,10 @@ export function ProfileInlineNotificationsCTA({
       source: resolvedSource,
       alert_opt_in_variant: experimentVariant,
       selected_alert_toggles: selectedAlertToggles,
-      artist_email_opt_in: artistEmailOptIn,
+      artist_email_opt_in:
+        showArtistEmailSection && Boolean(activeEmail)
+          ? artistEmailOptIn
+          : false,
       signup_completion_result: 'success',
     });
 
@@ -890,7 +898,7 @@ export function ProfileInlineNotificationsCTA({
         otpCode={otpCode}
         nameInput={nameInput}
         birthdayInput={birthdayInput}
-        error={error}
+        error={error ?? prefsError}
         isSubmitting={isSubmitting}
         isNameSaving={nameMutation.isPending}
         isBirthdaySaving={birthdayMutation.isPending}
