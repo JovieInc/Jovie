@@ -20,13 +20,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@opentelemetry/api": "1.9.1",
+    "@opentelemetry/api": "1.10.0",
     "@vercel/blob": "2.8.2",
-    "ai": "7.0.144",
-    "braintrust": "3.37.2",
+    "ai": "7.0.153",
+    "braintrust": "3.39.0",
     "eve": "0.72.1",
     "just-bash": "3.6.0",
-    "microsandbox": "0.7.8",
+    "microsandbox": "0.7.11",
     "zod": "4.6.7"
   },
   "devDependencies": {
