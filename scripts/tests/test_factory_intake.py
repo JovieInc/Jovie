@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest import mock
 
 LANES = Path(__file__).resolve().parents[1] / "lanes"
 sys.path.insert(0, str(LANES))
@@ -199,6 +200,28 @@ class FactoryIntakeTest(unittest.TestCase):
                 self.assertIn("error", fi.run_pass(root, linear))
                 self.assertEqual(linear.created, [])
                 self.assertTrue((root / "factory-signals/run-waste.json").exists())
+
+
+    def test_open_period_receipt_write_failure_does_not_replay_after_completion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, linear = Path(tmp), EpisodeLinear()
+            fs.write(root, [signal(problem="first", evidence={"days": ["2026-10-21", "2026-10-22", "2026-10-23"]})])
+            fi.run_pass(root, linear)
+            fs.write(root, [signal(problem="updated while open", evidence={"days": ["2026-10-22", "2026-10-23", "2026-10-24"]})])
+            with mock.patch.object(fi, "atomic_write_text", side_effect=OSError("fixture disk full")):
+                self.assertIn("error", fi.run_pass(root, linear))
+            linear.issues[0].update(state="completed", completedAt=datetime.now(timezone.utc).isoformat())
+            self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "exists")
+            self.assertEqual(len(linear.created), 1)
+            fs.write(root, [signal(problem="observed after completion", evidence={"days": ["2026-10-23", "2026-10-24", "2026-10-25"]})])
+            self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "filed")
+
+    def test_old_format_signal_rollback_keeps_the_same_rendered_evidence_covered(self):
+        linear = EpisodeLinear()
+        fi.apply(linear, fi.plan([signal(evidence={"days": ["a", "b", "c"]})]))
+        linear.issues[-1]["state"] = "completed"
+        self.assertEqual(fi.apply(linear, fi.plan([signal()]))[0]["action"], "exists")
+        self.assertEqual(len(linear.created), 1)
 
 if __name__ == "__main__":
     unittest.main()

@@ -182,14 +182,16 @@ def write(state: Path, signals: list[dict]) -> dict:
     written, kept = [], []
     for signal in signals:
         path = directory / f"{signal['fingerprint']}.json"
-        content = json.dumps(signal, indent=1)
         try:
-            unchanged = json.loads(path.read_text()) == signal
+            previous = json.loads(path.read_text())
+            unchanged = isinstance(previous, dict) and {k: v for k, v in previous.items() if k != "_observedAt"} == signal
         except (OSError, ValueError):
             unchanged = False
         (kept if unchanged else written).append(signal["fingerprint"])
         if not unchanged:
-            atomic_write_text(path, content)
+            # Persist observation time with the evidence so copying/restoring a signal is not a new observation.
+            content = {**signal, "_observedAt": datetime.now(timezone.utc).isoformat()}
+            atomic_write_text(path, json.dumps(content, indent=1))
     return {"written": written, "alreadyPresent": kept}
 
 

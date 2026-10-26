@@ -102,13 +102,17 @@ class FactorySignalsTest(unittest.TestCase):
     def test_write_is_idempotent(self):
         signal = {"fingerprint": "a-b"}
         self.assertEqual(fs.write(self.root, [signal])["written"], ["a-b"])
+        first = (self.root / "factory-signals/a-b.json").read_text()
         self.assertEqual(fs.write(self.root, [signal]), {"written": [], "alreadyPresent": ["a-b"]})
+        self.assertEqual((self.root / "factory-signals/a-b.json").read_text(), first, "replay preserves observation time")
 
     def test_write_refreshes_new_evidence_without_deleting_other_pending_signals(self):
         fs.write(self.root, [{"fingerprint": "a-b", "problem": "old"}, {"fingerprint": "pending"}])
         newer = {"fingerprint": "a-b", "problem": "new"}
         fs.write(self.root, [newer])
-        self.assertEqual(json.loads((self.root / "factory-signals/a-b.json").read_text()), newer)
+        saved = json.loads((self.root / "factory-signals/a-b.json").read_text())
+        self.assertIsNotNone(datetime.fromisoformat(saved.pop("_observedAt")).tzinfo)
+        self.assertEqual(saved, newer)
         self.assertTrue((self.root / "factory-signals/pending.json").exists())
 
 

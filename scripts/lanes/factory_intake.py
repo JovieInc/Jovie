@@ -27,6 +27,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from datetime import datetime, timezone
 
 from atomic_state import atomic_write_text
 
@@ -42,11 +43,16 @@ def read_signals(directory: Path) -> tuple[list[dict], list[str]]:
     for path in sorted(directory.glob("*.json")):
         try:
             row = json.loads(path.read_text())
+            observed_at = datetime.fromtimestamp(path.stat().st_mtime, timezone.utc).isoformat()
         except (OSError, ValueError):
             bad.append(f"{path.name}: unreadable")
             continue
         problem = validate(row)
-        (bad.append(f"{path.name}: {problem}") if problem else good.append(row))
+        if problem:
+            bad.append(f"{path.name}: {problem}")
+        else:
+            # A retained file is an observation, not a fresh episode on every doctor pass.
+            good.append({**row, "_observedAt": row.get("_observedAt") or observed_at})
     return good, bad
 
 
@@ -90,31 +96,46 @@ def body(row: dict) -> str:
 
 def plan(signals: list[dict]) -> list[dict]:
     return [{"fingerprint": row["fingerprint"], "title": str(row["title"]).strip()[:200], "description": body(row),
-             "labels": [FACTORY_LABEL, WORKSTREAM_LABEL, label(row["fingerprint"])]} for row in signals]
+             "labels": [FACTORY_LABEL, WORKSTREAM_LABEL, label(row["fingerprint"])],
+             "legacyEvidence": "evidence" not in row, "observedAt": row.get("_observedAt")} for row in signals]
 
 
 EXISTING = ('query($l:String!){issues(first:1,filter:{team:{key:{eq:"JOV"}},labels:{name:{eq:$l}},'
             'state:{type:{nin:["completed","canceled"]}}}){nodes{id identifier}}}')
 HISTORY = ('query($l:String!,$after:String){issues(first:50,after:$after,includeArchived:true,filter:{team:{key:{eq:"JOV"}},'
            'labels:{name:{eq:$l}},state:{type:{in:["completed","canceled"]}}})'
-           '{nodes{id identifier description} pageInfo{hasNextPage endCursor}}}')
+           '{nodes{id identifier description completedAt canceledAt} pageInfo{hasNextPage endCursor}}}')
 EVIDENCE = re.compile(r"\n\n<!-- factory-evidence:([a-f0-9]{64}) -->\s*$")
 
 
-def same_evidence(description: str | None, proposed: str) -> bool:
+def same_evidence(description: str | None, proposed: str, legacy: bool = False) -> bool:
     old, new = EVIDENCE.search(description or ""), EVIDENCE.search(proposed)
-    if old:
-        return bool(new and old[1] == new[1])
-    # Old issues had no episode marker. Exact legacy body equality proves a replay.
-    return (description or "").strip() == EVIDENCE.sub("", proposed).strip()
+    if old and new and old[1] == new[1]:
+        return True
+    if old and not legacy:
+        return False
+    # Old issues/signals had no explicit evidence. Only their exact body proves a replay.
+    return EVIDENCE.sub("", description or "").strip() == EVIDENCE.sub("", proposed).strip()
 
 
-def terminal_episode(linear, fp_label: str, description: str) -> dict | None:
+def observed_before_completion(issue: dict, observed_at: str | None) -> bool:
+    # Recovery if a local receipt write failed while work was open: the terminal issue
+    # covers observations made before it closed. A later observation remains eligible.
+    try:
+        observed = datetime.fromisoformat((observed_at or "").replace("Z", "+00:00"))
+        closed = datetime.fromisoformat((issue.get("completedAt") or issue.get("canceledAt") or "").replace("Z", "+00:00"))
+        return observed.tzinfo is not None and closed.tzinfo is not None and observed <= closed <= datetime.now(timezone.utc)
+    except (TypeError, ValueError):
+        return False
+
+
+def terminal_episode(linear, fp_label: str, item: dict) -> dict | None:
     after, cursors = None, set()
     while True:
         page = linear.gql(HISTORY, {"l": fp_label, "after": after})["issues"]
         for issue in page["nodes"]:
-            if same_evidence(issue.get("description"), description):
+            if same_evidence(issue.get("description"), item["description"], item.get("legacyEvidence", False)) or \
+                    observed_before_completion(issue, item.get("observedAt")):
                 return issue
         if not page["pageInfo"]["hasNextPage"]:
             return None
@@ -153,7 +174,7 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None,
         found = linear.gql(EXISTING, {"l": fp_label})["issues"]["nodes"]
         receipt = covered.get(item["fingerprint"], {}).get(digest)
         prior = found[0] if found else ({"identifier": receipt} if receipt else
-                                       terminal_episode(linear, fp_label, item["description"]))
+                                       terminal_episode(linear, fp_label, item))
         if prior:
             # New observations while unresolved belong to that work, even after it closes.
             remember(item, digest, prior["identifier"])
