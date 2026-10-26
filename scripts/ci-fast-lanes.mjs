@@ -296,6 +296,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Anti-slop registry (docs/design-system/anti-slop-rules.json): schema,
+    // evidence and wiring of every enforced rule, and prose copies of the
+    // anti-slop list that drifted from the registry (Tim, 2026-10-26).
+    id: 'anti-slop',
+    command:
+      'node scripts/anti-slop/run.mjs validate && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs',
+    inputs:
+      /^(?:docs\/design-system\/anti-slop-rules\.json$|scripts\/anti-slop\/|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|CLAUDE\.md$|AGENTS\.md$|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Marketing images and cards use a radius token. Zero exceptions.
     id: 'marketing-rounded-media',
     command: 'node --test scripts/invariants/art-direction/rounded.test.mjs',
