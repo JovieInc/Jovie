@@ -7,6 +7,7 @@
  *
  *   node pen-census.mjs --workspace "$HOME/Documents/Jovie/Jovie Marketing Workspace"
  *   node pen-census.mjs path/to/design.pen [...]
+ *   --max-age-days N   skip files not saved in the last N days (keeps the first pass small)
  */
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -100,6 +101,11 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
         .filter(f => f.endsWith('.pen'))
         .map(f => join(args[w + 1], f))
     );
+  const maxAge = args.indexOf('--max-age-days');
+  if (maxAge >= 0) {
+    const cutoff = Date.now() - Number(args[maxAge + 1]) * 86_400_000;
+    files = files.filter(f => statSync(f).mtimeMs >= cutoff);
+  }
   for (const file of files) {
     try {
       process.stdout.write(`${JSON.stringify(censusOne(file))}\n`);

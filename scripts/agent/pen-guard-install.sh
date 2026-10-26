@@ -35,7 +35,7 @@ cat > "$PLIST" <<PLISTEOF
 <plist version="1.0"><dict>
 <key>Label</key><string>ie.jov.pen-census</string>
 <key>ProgramArguments</key><array>
-<string>$NODE_BIN</string><string>$HOOKS/pen-census.mjs</string><string>--workspace</string><string>$WORKSPACE</string>
+<string>$NODE_BIN</string><string>$HOOKS/pen-census.mjs</string><string>--max-age-days</string><string>14</string><string>--workspace</string><string>$WORKSPACE</string>
 </array>
 <key>EnvironmentVariables</key><dict><key>PATH</key><string>$(dirname "$NODE_BIN"):/usr/bin:/bin</string></dict>
 <key>StartInterval</key><integer>600</integer>
