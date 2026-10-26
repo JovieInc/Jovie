@@ -8,8 +8,11 @@ import {
   openFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
 import { toReceiptFirstTouch } from '@/lib/acquisition/first-touch-receipt';
+import { upsertAndLinkJourney } from '@/lib/acquisition/journey-link';
+import { isSyntheticTraffic } from '@/lib/acquisition/synthetic-traffic';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
+import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 
 export const runtime = 'nodejs';
@@ -94,52 +97,23 @@ export async function POST(request: NextRequest) {
   const capturedAt = signed
     ? new Date(signed.iat).toISOString()
     : parsed.data.capturedAt;
-  const firstTouchJson = JSON.stringify(
-    signed ? toReceiptFirstTouch(signed) : parsed.data.firstTouch
-  );
+  const firstTouchJson = JSON.stringify({
+    ...(signed ? toReceiptFirstTouch(signed) : parsed.data.firstTouch),
+    ...(isSyntheticTraffic(request.headers) ? { synthetic: true } : {}),
+  });
 
-  await db.execute(drizzleSql`
-    WITH app_user AS (
-      SELECT id FROM users
-      WHERE id = ${appUserId}::uuid
-      LIMIT 1
-    ), upserted AS (
-      INSERT INTO acquisition_journeys (
-        id, first_touch, consent_state, captured_at, updated_at
-      ) VALUES (
-        ${acquisitionId}::uuid,
-        ${firstTouchJson}::jsonb,
-        'analytics_allowed',
-        ${new Date(capturedAt)},
-        now()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        first_touch = CASE
-          WHEN acquisition_journeys.first_touch = '{}'::jsonb
-            THEN EXCLUDED.first_touch
-          ELSE acquisition_journeys.first_touch
-        END,
-        updated_at = now()
-      RETURNING id
-    ), claimed AS (
-      UPDATE acquisition_journeys AS journey
-      SET user_id = app_user.id, linked_at = now(), updated_at = now()
-      FROM app_user, upserted
-      WHERE journey.id = upserted.id
-        AND (journey.user_id IS NULL OR journey.user_id = app_user.id)
-        AND NOT EXISTS (
-          SELECT 1 FROM acquisition_journeys existing
-          WHERE existing.user_id = app_user.id
-            AND existing.id <> journey.id
-        )
-      RETURNING journey.id, journey.user_id
-    )
-    UPDATE pixel_events AS pe
-    SET user_id = claimed.user_id
-    FROM claimed
-    WHERE pe.acquisition_id = claimed.id
-      AND pe.user_id IS NULL
-  `);
+  // One transaction: the upsert and the user link must both commit (they are
+  // separate statements; see lib/acquisition/journey-link.ts).
+  await runAtomicDbOperation(
+    tx =>
+      upsertAndLinkJourney(tx, {
+        acquisitionId,
+        firstTouchJson,
+        capturedAt: new Date(capturedAt),
+        appUserId,
+      }),
+    { actorId: appUserId ?? acquisitionId, system: true }
+  );
 
   const funnelStage = stageForFunnelPath(parsed.data.currentPath);
   if (funnelStage) {

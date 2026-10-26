@@ -9,6 +9,10 @@ const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockExecute = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mockGetCachedAuth }));
 vi.mock('@/lib/db', () => ({ db: { execute: mockExecute } }));
+vi.mock('@/lib/db/legacy-transaction', () => ({
+  runAtomicDbOperation: (fn: (tx: unknown) => unknown) =>
+    fn({ execute: mockExecute }),
+}));
 
 import { POST } from './route';
 
@@ -51,10 +55,12 @@ describe('POST /api/acquisition', () => {
       recorded: true,
       linked: true,
     });
-    expect(mockExecute).toHaveBeenCalledOnce();
-    const query = mockExecute.mock.calls[0][0];
-    const sqlText = JSON.stringify(query);
-    expect(sqlText).toContain('pe.acquisition_id = claimed.id');
+    // upsert, link, then pixel events: separate statements (a single
+    // data-modifying CTE statement never linked a journey; see
+    // tests/unit/lib/acquisition/journey-link.test.ts).
+    expect(mockExecute).toHaveBeenCalledTimes(3);
+    const sqlText = JSON.stringify(mockExecute.mock.calls.map(c => c[0]));
+    expect(sqlText).toContain('pe.acquisition_id = journey.id');
     expect(sqlText).toContain('pe.user_id IS NULL');
     // Defect guard: getCachedAuth().userId is users.id, so the lookup must key
     // on users.id. Keying on better_auth_user_id never matched, and the
