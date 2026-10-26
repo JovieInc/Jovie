@@ -61,6 +61,8 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import machine_gap  # noqa: E402
+import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
@@ -134,7 +136,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -533,7 +535,9 @@ class Host:
     def base_slots(self, provider: str, default: int) -> int:
         if provider == 'devin' and not devin_free_policy.admission_open(self.agent_timeout):
             return 0
-        return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+        configured = int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+        # Pay-per-use lanes earn slots by measured merged PRs per dollar (slot_yield); everything else is as configured.
+        return slot_yield.ceiling(self.state, provider, configured)[0]
 
     def slots(self, provider: str, default: int) -> int:
         return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))
@@ -1203,8 +1207,35 @@ def goal_contract(issue) -> list[str]:
     ]
 
 
+def machine_gate(host: Host, subject: str, title: str, labels, text: str, provider: str | None,
+                 fp: str | None = None, receipt: dict | None = None) -> list[str]:
+    """Prompt clause of the abstraction gate for this run, after recording it in the fingerprint ledger.
+    Best effort: an unreadable ledger yields the plain reminder, never a failed run."""
+    try:
+        fp = fp or machine_gap.fingerprint(title, labels)
+        decision = machine_gap.decide(host.state, fp, text, labels, est_usd=run_cost_usd(host, provider))
+        machine_gap.record(host.state, fp, "lane-run", subject, est_usd=run_cost_usd(host, provider))
+        if receipt is not None:
+            receipt["machineGate"] = {key: decision[key] for key in ("fp", "required", "reason", "occurrences", "waived")}
+        return machine_gap.clause(decision)
+    except (OSError, ValueError, TypeError, KeyError):
+        return []
+
+
+def run_cost_usd(host: Host, provider: str | None) -> float | None:
+    """Average USD per run for this lane from the capacity metrics the doctor writes (None when unmeasured)."""
+    try:
+        data = json.loads((host.state / "capacity-metrics.json").read_text())
+    except (OSError, ValueError):
+        return None
+    names = {"codex": "openai-codex", "grok": "xai-grok", "claude": "anthropic-claude", "hyperagent": "hyperagent"}
+    row = (data.get("providers") or {}).get(names.get(str(provider), str(provider))) or {}
+    cost, runs = row.get("costUsd"), row.get("runs")
+    return cost / runs if isinstance(cost, (int, float)) and isinstance(runs, (int, float)) and runs else None
+
+
 def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | None = None,
-                  prior_attempts: str = "") -> str:
+                  prior_attempts: str = "", machine: list[str] | None = None) -> str:
     sensitive_contract = []
     if provider in IMPLEMENTATION_ONLY_PROVIDERS:
         sensitive_contract += [
@@ -1245,6 +1276,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "",
         *goal_contract(issue),
         *PLANNING_CONTRACT,
+        *([*machine, ""] if machine else []),
         "## Contract (the harness verifies every line; unmet items fail the run)",
         f"- Repo {REPO_SLUG}. Work on branch `{branch}` from origin/main. Read CLAUDE.md, the",
         "  rules it routes to for the files you touch, and docs/PR_FLOW.md before editing.",
@@ -3348,7 +3380,9 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                 if api is None:
                     raise OSError("Hyperagent transport unavailable")
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent",
-                                       prior_attempts=prior_attempts_context(host, linear, issue))
+                                       prior_attempts=prior_attempts_context(host, linear, issue),
+                                       machine=machine_gate(host, issue.identifier, issue.title, issue.labels,
+                                                            issue.description or "", "hyperagent", receipt=receipt))
                 atomic_write_text(runs / f"{run_id}.prompt.md", prompt)
                 def boundary(spend, mutations, phase):
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
@@ -3469,7 +3503,9 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             worktree_pool.refill_in_background(host.repo)
             brain_context = context_pack(issue)
             prior_attempts = prior_attempts_context(host, linear, issue)
-            prompt = render_prompt(issue, branch, brain_context, provider=name, prior_attempts=prior_attempts)
+            prompt = render_prompt(issue, branch, brain_context, provider=name, prior_attempts=prior_attempts,
+                                   machine=machine_gate(host, issue.identifier, issue.title, issue.labels,
+                                                        issue.description or "", name, receipt=receipt))
             prompt_file = runs / f"{run_id}.prompt.md"
             receipt["contextManifests"] = [write_agent_prompt(
                 prompt_file, prompt, "issue", name,
@@ -7239,6 +7275,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 except (OSError, subprocess.SubprocessError, ValueError):
                     pass  # evidence is best effort; the repair itself must still run
                 prompt = render_fix_prompt(pr, excerpt)
+                prompt += "\n\n" + "\n".join(machine_gate(host, f"PR{pr['number']}", "", (), excerpt, name,
+                                                           fp=machine_gap.check_fingerprint(pr), receipt=receipt))
                 if preserved:
                     prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
                               "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)
