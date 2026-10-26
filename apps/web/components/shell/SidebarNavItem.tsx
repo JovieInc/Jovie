@@ -3,7 +3,7 @@ import { SIDEBAR_ENTRY_ROW_CLASS } from './sidebar-optical';
 import { Tooltip } from './Tooltip';
 
 // SidebarNavItem — single nav row in the shell sidebar. Icon + label with
-// collapsed (icon-only) + nested (workspace child) + tight density modes.
+// collapsed (icon-only) + nested (workspace child) density modes.
 // Active state: filled bg + primary-token text, no border (borderless chrome per #13217).
 // Nested inactive: dimmer icon.
 // Always wrapped in a Tooltip so collapsed mode still shows the label.
@@ -24,7 +24,6 @@ export interface SidebarNavItemProps {
   readonly item: ShellNavItem;
   readonly collapsed: boolean;
   readonly nested?: boolean;
-  readonly tight?: boolean;
 }
 
 interface SidebarNavChromeOptions {
@@ -32,9 +31,6 @@ interface SidebarNavChromeOptions {
   readonly calm?: boolean;
   readonly collapsed?: boolean;
   readonly nested?: boolean;
-  readonly tight?: boolean;
-  /** An absolute trailing action layers over the label's faded edge. */
-  readonly trailingOverlay?: boolean;
   readonly tone?: 'default' | 'secondary' | 'primary';
   readonly className?: string;
 }
@@ -131,7 +127,6 @@ export function SidebarNavItem({
   item,
   collapsed,
   nested,
-  tight,
 }: SidebarNavItemProps) {
   const button = (
     <button
@@ -142,14 +137,12 @@ export function SidebarNavItem({
         active: item.active,
         collapsed,
         nested,
-        tight,
       })}
     >
       <item.icon
         className={getSidebarNavIconClassName({
           active: item.active,
           nested,
-          tight,
         })}
         strokeWidth={2}
         aria-hidden='true'

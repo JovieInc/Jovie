@@ -53,7 +53,6 @@ describe('SidebarThreadsSection', () => {
         threads={threads}
         activeThreadId={null}
         onThreadContextMenu={vi.fn()}
-        tight
         collapsed={false}
       />
     );
@@ -83,7 +82,6 @@ describe('SidebarThreadsSection', () => {
         activeThreadId={null}
         state='error'
         onRetry={vi.fn()}
-        tight
         collapsed={false}
       />
     );
@@ -100,7 +98,6 @@ describe('SidebarThreadsSection', () => {
         threads={[]}
         activeThreadId={null}
         onNewThread={vi.fn()}
-        tight
         collapsed={false}
       />
     );
@@ -127,7 +124,6 @@ describe('SidebarThreadsSection', () => {
         ]}
         activeThreadId={null}
         onThreadContextMenu={vi.fn()}
-        tight
         collapsed={false}
       />
     );
@@ -147,6 +143,10 @@ describe('SidebarThreadsSection', () => {
     });
 
     expect(row).toHaveClass('grid-cols-(--app-shell-sidebar-nav-grid)');
+    // JOV-8595: history rows ride the same converged optical column as every
+    // other rail row — the canonical 28px shared row height, not a private
+    // density mode.
+    expect(row).toHaveClass('h-(--app-shell-sidebar-row-height)');
     expect(action).toHaveClass(
       'right-(--app-shell-sidebar-inset)',
       'hover:bg-surface-0',
@@ -167,7 +167,6 @@ describe('SidebarThreadsSection', () => {
       <SidebarThreadsSection
         threads={threads}
         activeThreadId='thread-newer'
-        tight
         collapsed={false}
       />
     );
@@ -201,7 +200,6 @@ describe('SidebarThreadsSection', () => {
         <SidebarThreadsSection
           threads={threads}
           activeThreadId='thread-newer'
-          tight
           calm={calm}
           collapsed={false}
         />
@@ -233,7 +231,6 @@ describe('SidebarThreadsSection', () => {
         threads={threads.slice(1)}
         activeThreadId={null}
         onThreadContextMenu={onThreadContextMenu}
-        tight
         collapsed={false}
       />
     );
@@ -261,7 +258,6 @@ describe('SidebarThreadsSection', () => {
         threads={threads}
         activeThreadId={null}
         allThreadsActive
-        tight
         collapsed={false}
       />
     );
@@ -279,7 +275,6 @@ describe('SidebarThreadsSection', () => {
       <SidebarThreadsSection
         threads={[threads[0], { ...threads[1], unread: true }]}
         activeThreadId={null}
-        tight
         collapsed={false}
       />
     );
@@ -294,7 +289,6 @@ describe('SidebarThreadsSection', () => {
       <SidebarThreadsSection
         threads={threads}
         activeThreadId={null}
-        tight
         collapsed={false}
       />
     );
@@ -328,7 +322,6 @@ describe('SidebarThreadsSection', () => {
         ]}
         activeThreadId='draft-thread'
         onSelect={onSelect}
-        tight
         collapsed={false}
       />
     );
@@ -353,7 +346,6 @@ describe('SidebarThreadsSection', () => {
         threads={[]}
         activeThreadId={null}
         onNewThread={onNewThread}
-        tight
         collapsed={false}
       />
     );

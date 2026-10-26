@@ -37,7 +37,6 @@ const meta = {
     threads,
     activeThreadId: 'thread-newer',
     collapsed: false,
-    tight: true,
   },
   decorators: [
     Story => (
@@ -66,7 +65,6 @@ export const NewChatEmpty: Story = {
     threads: [],
     activeThreadId: null,
     collapsed: false,
-    tight: true,
     calm: true,
     onNewThread: fn(),
   },

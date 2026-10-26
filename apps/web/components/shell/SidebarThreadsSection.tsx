@@ -73,8 +73,6 @@ export interface SidebarThreadsSectionProps {
   readonly onRetry?: () => void;
   readonly onNewThread?: () => void;
   readonly newThreadAction?: ReactNode;
-  // `tight` drops row height to 24px (h-6) to match dense workspace lists.
-  readonly tight?: boolean;
   // `collapsed` hides the section entirely (sidebar icon mode).
   readonly collapsed: boolean;
 }
@@ -169,19 +167,12 @@ export function toSidebarThread(
 function SidebarThreadStatusRow({
   children,
   icon,
-  tight,
 }: {
   readonly children: ReactNode;
   readonly icon: ReactNode;
-  readonly tight?: boolean;
 }) {
   return (
-    <div
-      className={cn(
-        getSidebarNavRowClassName({ tight }),
-        'text-tertiary-token'
-      )}
-    >
+    <div className={cn(getSidebarNavRowClassName({}), 'text-tertiary-token')}>
       <span className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}>{icon}</span>
       <span className='min-w-0 truncate'>{children}</span>
     </div>
@@ -196,7 +187,6 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   calm,
   active,
   unread,
-  tight,
   onSelect,
   onThreadContextMenu,
 }: {
@@ -204,7 +194,6 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   readonly thread: SidebarThread;
   readonly active: boolean;
   readonly unread: boolean;
-  readonly tight?: boolean;
   readonly onSelect?: (id: string) => void;
   readonly onThreadContextMenu?: (
     e: React.MouseEvent,
@@ -242,12 +231,11 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       globalThis.removeEventListener('resize', measureTitle);
       fonts?.removeEventListener('loadingdone', measureTitle);
     };
-  }, [measureTitle, thread.title, unread, active, calm, tight]);
+  }, [measureTitle, thread.title, unread, active, calm]);
 
   const rowClasses = cn(
     getSidebarNavRowClassName({
       active,
-      tight,
     }),
     'text-left',
     calm &&
@@ -350,7 +338,6 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             <Icon
               name='Ellipsis'
               className={getSidebarNavIconClassName({
-                tight: true,
                 className:
                   'group-hover/thread:text-sidebar-item-foreground focus-visible:text-sidebar-item-foreground',
               })}
@@ -400,7 +387,6 @@ export function SidebarThreadsSection({
   onRetry,
   onNewThread,
   newThreadAction,
-  tight,
   collapsed,
 }: SidebarThreadsSectionProps) {
   const sorted = useMemo(
@@ -474,7 +460,6 @@ export function SidebarThreadsSection({
       <div className={calm ? 'flex flex-col gap-0.5' : 'flex flex-col gap-px'}>
         {state === 'loading' && !hasThreads ? (
           <SidebarThreadStatusRow
-            tight={tight}
             icon={
               <div
                 className='h-3.5 w-3.5 rounded-full skeleton motion-reduce:animate-none'
@@ -491,7 +476,7 @@ export function SidebarThreadsSection({
         {state === 'error' && !hasThreads ? (
           <div
             className={cn(
-              getSidebarNavRowClassName({ tight }),
+              getSidebarNavRowClassName({}),
               'text-xs text-tertiary-token'
             )}
           >
@@ -511,7 +496,7 @@ export function SidebarThreadsSection({
               >
                 <Icon
                   name='RefreshCw'
-                  className={getSidebarNavIconClassName({ tight: true })}
+                  className={getSidebarNavIconClassName({})}
                   aria-hidden='true'
                   strokeWidth={2.25}
                 />
@@ -543,7 +528,6 @@ export function SidebarThreadsSection({
                 thread={t}
                 active={active}
                 unread={unread}
-                tight={tight}
                 onSelect={onSelect}
                 onThreadContextMenu={onThreadContextMenu}
               />
@@ -558,7 +542,6 @@ export function SidebarThreadsSection({
             className={cn(
               getSidebarNavRowClassName({
                 active: allThreadsActive,
-                tight,
               }),
               'text-left',
               calm &&

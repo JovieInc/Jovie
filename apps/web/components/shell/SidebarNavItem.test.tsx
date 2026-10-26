@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
@@ -106,6 +108,22 @@ describe('SidebarNavItem active chrome', () => {
     expect(row).toContain('grid-cols-(--app-shell-sidebar-nav-grid)');
     expect(row).toContain('px-(--app-shell-sidebar-inset)');
     expect(row).not.toContain('grid-cols-[18px');
+  });
+
+  // JOV-8595: the optical column converged every rail row onto the shared
+  // 28px/16px/12px tracks (sidebar-optical.ts). Density modes the helpers
+  // silently ignore are a lying public API — a caller passing one believes
+  // it changed geometry when it changed nothing. The helper and its callers
+  // must not declare or forward any density option outside the converged
+  // optical contract.
+  it('declares no density options beyond the converged optical column', () => {
+    const source = readFileSync(
+      resolve(__dirname, 'SidebarNavItem.tsx'),
+      'utf8'
+    );
+
+    expect(source).not.toContain('tight');
+    expect(source).not.toContain('trailingOverlay');
   });
 
   // JOV-5537 consolidation: this row is a button, so it exposes the active

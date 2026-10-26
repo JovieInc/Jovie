@@ -3270,7 +3270,6 @@ function Sidebar({
                         : undefined,
                   }}
                   collapsed={collapsed}
-                  tight={tight}
                 />
               );
             })}
@@ -3286,7 +3285,6 @@ function Sidebar({
             }
             onSelect={onSelectThread}
             onThreadContextMenu={onThreadContextMenu}
-            tight={tight}
             collapsed={collapsed}
           />
 
@@ -3329,7 +3327,6 @@ function Sidebar({
                       }}
                       collapsed={collapsed}
                       nested={!collapsed}
-                      tight={tight}
                     />
                   );
                 })}
@@ -3358,7 +3355,6 @@ function Sidebar({
                     item={item}
                     collapsed={collapsed}
                     nested={!collapsed}
-                    tight={tight}
                   />
                 ))}
               </SidebarSection>
