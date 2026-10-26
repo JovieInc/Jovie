@@ -44,4 +44,3 @@ Pen does not reliably carry a master edit to its existing instances. Instances k
 4. Re-run `report` until `STALE_CACHE`, `STALE` and `ORPHANED` are 0. Then screenshot one repaired instance per variant, and record the counts in the PR or ledger.
 
 Tests: `node --test scripts/agent/pen-instance-drift.test.mjs` (hermetic fake of the execute API; also runs in the scripts lane).
-
