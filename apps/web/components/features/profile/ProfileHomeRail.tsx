@@ -17,6 +17,9 @@ import {
 } from '@/lib/flags/profile-pac';
 import type { PublicMerchCard } from '@/lib/merch/types';
 import type { ProfileCardAccentAssignment } from '@/lib/profile/mode-card-accent';
+import { pickOneRightThing } from '@/lib/profile/one-right-thing/engine';
+import { featuredEventExtras } from '@/lib/profile/one-right-thing/event-extras';
+import { useVisitorSignals } from '@/lib/profile/one-right-thing/use-visitor-signals';
 import { getProfileReleaseVisibility } from '@/lib/profile/release-visibility';
 import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { Artist } from '@/types/db';
@@ -102,11 +105,8 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
 }: Readonly<ProfileHomeRailProps>) {
   // PAC instrumentation (spec §8): pac_exposure fires when the card is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
-  const { exposureRef } = usePacEvents({
-    profileId: artist.id,
-    assignment: profilePacAssignment,
-    enabled: renderMode !== 'preview',
-  });
+  const isInteractiveRender = renderMode === 'interactive';
+  const visitorSignals = useVisitorSignals(isInteractiveRender);
   // Re-evaluate visibility at the release boundary so the card's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
   // page was served from a stale ISR cache.
@@ -186,6 +186,58 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
       hasPlayableDestinations
   );
 
+  // One right thing: a deterministic, explainable pick for this visitor. The
+  // first render uses neutral signals (identical for everyone, ISR-safe); it
+  // can only change after hydration. Previews and fixtures never personalize.
+  const featuredDecision = useMemo(() => {
+    if (!isInteractiveRender || !hasPacSubject) return null;
+    return pickOneRightThing({
+      signals: visitorSignals,
+      inventory: {
+        release: pacRelease
+          ? {
+              slug: pacRelease.slug,
+              releaseDate: pacRelease.releaseDate ?? null,
+              isUpcoming: isPacReleaseUpcoming(pacRelease, now),
+            }
+          : null,
+        shows: upcomingTourDates.map(show => ({
+          id: show.id,
+          startDate: show.startDate,
+          country: show.country,
+          ticketUrl: show.ticketUrl,
+        })),
+        hasMerch: Boolean(merchCards[0]),
+        hasTip,
+        hasListen: hasPlayableDestinations,
+      },
+      // No artist-facing control for pinning exists yet.
+      artistPriority: null,
+    });
+  }, [
+    hasPacSubject,
+    hasPlayableDestinations,
+    hasTip,
+    isInteractiveRender,
+    merchCards,
+    now,
+    pacRelease,
+    upcomingTourDates,
+    visitorSignals,
+  ]);
+  const featuredShow =
+    featuredDecision?.kind === 'show'
+      ? (upcomingTourDates.find(show => show.id === featuredDecision.refId) ??
+        pacNextShow)
+      : pacNextShow;
+
+  const { exposureRef } = usePacEvents({
+    profileId: artist.id,
+    assignment: profilePacAssignment,
+    enabled: renderMode !== 'preview',
+    baseExtras: featuredEventExtras(featuredDecision),
+  });
+
   // Pen parity (Tim, 2026-09-26/28): the featured editorial card is the only
   // card surface under the identity header — it replaces the highlights
   // carousel in place rather than stacking above it.
@@ -201,7 +253,8 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
           artist={artist}
           release={pacRelease}
           merchCard={merchCards[0] ?? null}
-          nextShow={pacNextShow}
+          nextShow={featuredShow}
+          featured={featuredDecision}
           hasTip={hasTip}
           assignment={profilePacAssignment}
           isSubscribed={isSubscribed}

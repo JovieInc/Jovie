@@ -1,4 +1,5 @@
 import type { ProfilePacS2Slot } from '@/lib/flags/profile-pac';
+import type { FeaturedItemKind } from '@/lib/profile/one-right-thing/engine';
 
 /**
  * Primary Action Card (PAC) visitor state machine.
@@ -58,6 +59,12 @@ export interface PacContext {
    */
   readonly captureSuppressed: boolean;
   readonly inventory: PacInventory;
+  /**
+   * The one-right-thing engine's pick for a cold visitor (see
+   * `lib/profile/one-right-thing`). Only non-listen picks change the resolved
+   * state; `release` and `listen` keep the default listen state.
+   */
+  readonly lead?: FeaturedItemKind | null;
 }
 
 export interface PacState {
@@ -149,7 +156,32 @@ export function resolveS2State(ctx: PacContext): PacState {
  * S0 idle default — that is the JS-off-safe render. The client re-resolves
  * once the anon cookie bootstrap lands.
  */
+/** State for a cold visitor's engine pick, or null to keep the default. */
+function resolveLeadState(ctx: PacContext): PacState | null {
+  const { lead, inventory } = ctx;
+  if (lead === 'merch' && inventory.hasMerch) {
+    return { kind: 'merch', stage: 's2', degraded: false };
+  }
+  if (lead === 'tip' && inventory.hasTip) {
+    return { kind: 'tip', stage: 's2', degraded: false };
+  }
+  if (lead === 'show') {
+    if (inventory.hasTicketedShow) {
+      return { kind: 'tickets', stage: 's2', degraded: false };
+    }
+    if (inventory.hasUpcomingShow) {
+      return { kind: 'rsvp', stage: 's2', degraded: false };
+    }
+  }
+  return null;
+}
+
 export function resolveInitialPacState(ctx: PacContext): PacState {
+  if (ctx.tier === 'cold') {
+    const led = resolveLeadState(ctx);
+    if (led) return led;
+  }
+
   if (ctx.tier === 'captured' && ctx.captureEnabled) {
     return resolveS2State(ctx);
   }

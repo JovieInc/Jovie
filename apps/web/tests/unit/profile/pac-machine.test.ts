@@ -312,3 +312,41 @@ describe('hasReachedListenThreshold', () => {
     expect(hasReachedListenThreshold('30s', 45, 0)).toBe(false);
   });
 });
+
+describe('resolveInitialPacState engine lead (one right thing)', () => {
+  it('a cold visitor led to merch, tip or a show lands on that state', () => {
+    expect(resolveInitialPacState(ctx({ lead: 'merch' }))).toMatchObject({
+      kind: 'merch',
+      degraded: false,
+    });
+    expect(resolveInitialPacState(ctx({ lead: 'tip' })).kind).toBe('tip');
+    expect(resolveInitialPacState(ctx({ lead: 'show' })).kind).toBe('tickets');
+    expect(
+      resolveInitialPacState(
+        ctx({
+          lead: 'show',
+          inventory: { ...fullInventory, hasTicketedShow: false },
+        })
+      ).kind
+    ).toBe('rsvp');
+  });
+
+  it('release and listen leads, or an unavailable lead, keep the default', () => {
+    expect(resolveInitialPacState(ctx({ lead: 'release' })).kind).toBe('idle');
+    expect(resolveInitialPacState(ctx({ lead: 'listen' })).kind).toBe('idle');
+    expect(
+      resolveInitialPacState(
+        ctx({ lead: 'merch', inventory: { ...fullInventory, hasMerch: false } })
+      ).kind
+    ).toBe('idle');
+    expect(resolveInitialPacState(ctx({ lead: null })).kind).toBe('idle');
+  });
+
+  it('never overrides a captured visitor, who follows the experiment slot', () => {
+    expect(
+      resolveInitialPacState(
+        ctx({ tier: 'captured', lead: 'tip', s2Slot: 'merch' })
+      ).kind
+    ).toBe('merch');
+  });
+});

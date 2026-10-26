@@ -33,6 +33,8 @@ export const PAC_CLIENT_EVENTS = [
   'capture_channel_toggle',
   /** Secondary (S2 slot) action clicked — carries `extras.slot`. */
   'pac_secondary_click',
+  /** Primary action of the featured card tapped — carries featured_* extras. */
+  'featured_tap',
 ] as const;
 
 export type PacClientEventName = (typeof PAC_CLIENT_EVENTS)[number];
