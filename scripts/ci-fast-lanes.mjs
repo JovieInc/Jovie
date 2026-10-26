@@ -352,6 +352,17 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Direct writes to core tables live only in registered domain functions
+    // (.claude/rules/domain-writes.md). A new second path, or a social-link
+    // writer without cache invalidation, fails here; grandfathered sites only
+    // shrink. Its contract test runs with SCRIPT_CONTRACT_VITEST_TESTS.
+    id: 'domain-write-guard',
+    command: `node ${shellQuote(fileURLToPath(new URL('./domain-write-guard.mjs', import.meta.url)))}`,
+    inputs:
+      /^(?:apps\/web\/(?:app|lib|components)\/.+\.(?:ts|tsx|mts)$|apps\/web\/lib\/domain\/write-registry\.json$|scripts\/(?:lib\/)?domain-write-guard\.|scripts\/lib\/domain-write-guard\.ratchet\.gen\.json$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     // Every disk-reading web unit test whose path literals name a changed
     // file (scripts/lib/web-source-read-tests.mjs). Such tests ejected ~45
     // merge groups in the 7 days to 2026-10-12 because the import-graph
@@ -1091,6 +1102,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/workflow-triggers.test.mjs',
   'scripts/lib/__tests__/sentry-validation-observation.test.mjs',
   'scripts/lib/__tests__/external-api-guard.test.mjs',
+  'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
