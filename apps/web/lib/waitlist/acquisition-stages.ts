@@ -39,14 +39,11 @@ export async function recordWaitlistJoin(params: {
   const { entryId, acquisitionId, admitted } = params;
   if (!isAcquisitionJourneyId(acquisitionId)) return;
   try {
-    await db.execute(drizzleSql`
-      UPDATE waitlist_entries
-      SET qualification_inputs =
-        COALESCE(qualification_inputs, '{}'::jsonb)
-        || jsonb_build_object('acquisitionId', ${acquisitionId}::text)
-      WHERE id = ${entryId}::uuid
-        AND NOT (COALESCE(qualification_inputs, '{}'::jsonb) ? 'acquisitionId')
-    `);
+    // Lazy: the registered admission module pulls in auth and claim code.
+    const { stampWaitlistAcquisitionId } = await import(
+      '@/lib/waitlist/approval'
+    );
+    await stampWaitlistAcquisitionId(entryId, acquisitionId);
     await recordArtistOfferStage(acquisitionId, 'waitlist-join');
     if (admitted) await recordArtistOfferStage(acquisitionId, 'admitted');
   } catch (error) {
