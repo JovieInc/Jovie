@@ -6543,7 +6543,7 @@ def failed_logs(host: Host, pr: dict) -> dict | None:
         if log is None or log.returncode != 0:
             logs = None
             break
-        logs[str(check.get("name"))] = (log.stdout or "")[-FAILED_LOG_CHARS:]
+        logs[str(check.get("name"))] = fix_red_classes.log_excerpt(log.stdout or "", FAILED_LOG_CHARS)
     if len(_FAILED_LOGS) > 64:
         _FAILED_LOGS.clear()
     _FAILED_LOGS[cache_key] = logs

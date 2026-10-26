@@ -15,6 +15,8 @@ def pr(*names, merge="BLOCKED"):
 class ClassifyTest(unittest.TestCase):
     def test_signatures_map_to_classes_and_actions(self):
         cases = {
+            "Error: Cannot find module '/home/runner/work/Jovie/Jovie/scripts/anti-slop/run.mjs'": ("stale-guard-tree", "sync-main"),
+            "Error: ENOENT: no such file or directory, open '/home/runner/work/Jovie/Jovie/apps/web/lib/domain/write-registry.json'": ("stale-guard-tree", "sync-main"),
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
@@ -39,6 +41,18 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((behind["cls"], behind["action"]), ("stale-branch", "sync-main"))
         still = classes.classify(pr("A", merge="BEHIND"), {"A": "API rate limit exceeded"})
         self.assertEqual(still["action"], "rerun", "a deterministic log outranks the stale-branch default")
+        # A missing trusted-guard file is not fixed by rerunning, and GitHub may still say MERGEABLE.
+        both = "github-quota-deferred\nError: Cannot find module '/repo/scripts/anti-slop/run.mjs'\n"
+        ranked = classes.classify(pr("Source Validation", merge="UNSTABLE"), {"Source Validation": both})
+        self.assertEqual((ranked["cls"], ranked["action"]), ("stale-guard-tree", "sync-main"))
+
+    def test_log_excerpt_keeps_a_guard_error_that_the_tail_would_drop(self):
+        missing = "Error: Cannot find module '/home/runner/work/Jovie/Jovie/scripts/anti-slop/run.mjs'\n"
+        excerpt = classes.log_excerpt(missing + ("pass\n" * 5000), 800)
+        self.assertIn("Cannot find module", excerpt)
+        got = classes.classify(pr("Source Validation", merge="CLEAN"), {"Source Validation": excerpt})
+        self.assertEqual(got["action"], "sync-main")
+        self.assertEqual(classes.log_excerpt("short log", 800), "short log")
 
     def test_key_ignores_volatile_numbers_but_separates_failures(self):
         a = classes.classify(pr("T"), {"T": "AssertionError: expected 12 to equal 3"})

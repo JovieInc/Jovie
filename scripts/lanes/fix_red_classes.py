@@ -43,9 +43,16 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Trusted-base source guards run commands from main against the PR checkout. A branch that has not
+# merged main fails with MODULE_NOT_FOUND / ENOENT for scripts and registries that exist only on main
+# (PR #22920, anti-slop/run.mjs and write-registry.json). Rerunning the check cannot create those files.
+STALE_GUARD_TREE = re.compile(
+    r"Cannot find module ['\"][^'\"]+/(?:scripts|apps)/"
+    r"|ENOENT: no such file or directory, open ['\"][^'\"]+/(?:scripts|apps)/")
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("stale-guard-tree", STALE_GUARD_TREE, SYNC_MAIN),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -58,6 +65,29 @@ AGGREGATE = ("pr ready", "ci summary", "rollup")
 RED = frozenset({"FAILURE", "TIMED_OUT", "STARTUP_FAILURE", "CANCELLED", "ERROR"})
 LLM_VERDICTS = frozenset({"fix-pushed", "fix-no-change", "cancelled", "failed"})
 DEFAULT_BREAKER_N, MAX_BREAKER_N, MIN_CELL_RUNS = 2, 3, 10
+
+
+def log_excerpt(text: str, limit: int = 40000) -> str:
+    """Keep signature lines that a tail slice would drop, then fill with the tail.
+
+    Source Validation keeps running after a guard fails, so MODULE_NOT_FOUND sits in the middle of a
+    log that is far larger than the 40k tail `failed_logs` keeps. Without the head lines, classify
+    sees only later passing tests and sends the red to a model."""
+    raw = str(text or "")
+    if len(raw) <= limit:
+        return raw
+    kept = []
+    for line in raw.splitlines():
+        if any(pattern.search(line) for _, pattern, _ in SIGNATURES):
+            kept.append(line)
+        if len(kept) >= 40:
+            break
+    head = "\n".join(kept)
+    if not head:
+        return raw[-limit:]
+    if len(head) >= limit:
+        return head[:limit]
+    return head + "\n" + raw[-(limit - len(head) - 1):]
 
 
 def error_signature(text: str) -> str:
