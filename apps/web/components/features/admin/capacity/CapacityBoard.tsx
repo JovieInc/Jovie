@@ -1,3 +1,4 @@
+// @coverage-via apps/web/tests/unit/app/admin-capacity.test.tsx
 import Link from 'next/link';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { cn } from '@/lib/utils';
