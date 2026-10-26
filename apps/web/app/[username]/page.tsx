@@ -358,6 +358,10 @@ async function ArtistPageContent({
   // Generate a short-lived HMAC token so the client can authenticate its visit
   // tracking request to /api/audience/visit (requires TRACKING_TOKEN_SECRET).
   // Falls back to undefined gracefully if the secret is not configured.
+  // The featured pick is evaluated at this instant on the server and on the
+  // client, so hydration reproduces it exactly even if a boundary passes
+  // inside the ISR cache window.
+  const featuredRenderedAt = new Date().toISOString();
   const visitTrackingToken =
     getClientTrackingToken(profile.id).token ?? undefined;
 
@@ -564,6 +568,7 @@ async function ArtistPageContent({
         catalogLoadFailed={catalogLoadFailed}
         merchCards={merchCards}
         featuredSeed={featuredSeed}
+        featuredRenderedAt={featuredRenderedAt}
       />
       <ProfileAeoContent
         content={aeoContent}

@@ -43,7 +43,10 @@ const HOST_TO_NAME: ReadonlyArray<readonly [RegExp, string]> = [
   [/(^|\.)music\.youtube\.com$/u, 'youtube_music'],
   [/(^|\.)deezer\.com$/u, 'deezer'],
   [/(^|\.)tidal\.com$/u, 'tidal'],
-  [/(^|\.)music\.amazon\.[a-z.]+$/u, 'amazon_music'],
+  [
+    /(^|\.)music\.amazon\.(com|co\.uk|de|fr|es|it|co\.jp|ca|com\.au|com\.br|in)$/u,
+    'amazon_music',
+  ],
   [/(^|\.)soundcloud\.com$/u, 'soundcloud'],
   [/(^|\.)bandcamp\.com$/u, 'bandcamp'],
   [/(^|\.)instagram\.com$/u, 'instagram'],

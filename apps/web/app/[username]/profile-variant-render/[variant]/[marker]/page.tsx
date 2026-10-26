@@ -8,6 +8,12 @@ import {
   PROFILE_VARIANT_MARKER,
   parseProfileVariantKey,
 } from '@/lib/profile/one-right-thing/variant';
+import {
+  isReservedUsername,
+  USERNAME_MAX_LENGTH,
+  USERNAME_MIN_LENGTH,
+  USERNAME_PATTERN,
+} from '@/lib/validation/username-core';
 
 // Same one-hour ISR cadence as the canonical profile page.
 export const revalidate = 3600;
@@ -35,6 +41,15 @@ export default async function ProfileVariantRenderPage({
   const seed =
     marker === PROFILE_VARIANT_MARKER ? parseProfileVariantKey(variant) : null;
   if (!seed) notFound();
+  // Junk paths must 404 before they write anything to the data cache.
+  if (
+    username.length < USERNAME_MIN_LENGTH ||
+    username.length > USERNAME_MAX_LENGTH ||
+    !USERNAME_PATTERN.test(username) ||
+    isReservedUsername(username)
+  ) {
+    notFound();
+  }
 
   // Tag this variant's cache entry with the profile tag, so
   // revalidateTag(createProfileTag(username)) refreshes every variant even if

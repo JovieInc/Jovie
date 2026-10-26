@@ -219,6 +219,8 @@ interface ProfileCompactSurfaceProps {
   readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly featuredSeed?: ProfileVariantSeed | null;
+  /** ISO time of the server render; the pick is evaluated at this instant. */
+  readonly featuredRenderedAt?: string;
   readonly drawerOpen: boolean;
   readonly drawerView: DrawerView;
   readonly activeMode?: ProfileMode;
@@ -324,6 +326,7 @@ export function ProfileCompactSurface({
   catalogLoadFailed = false,
   merchCards = [],
   featuredSeed = null,
+  featuredRenderedAt,
   drawerOpen,
   drawerView,
   activeMode = 'profile',
@@ -831,6 +834,7 @@ export function ProfileCompactSurface({
                 resolveNearbyTour={resolveNearbyTour}
                 merchCards={merchCards}
                 featuredSeed={featuredSeed}
+                featuredRenderedAt={featuredRenderedAt}
                 releases={releases}
                 hasTip={hasTip}
                 pacArtPriority={!resolvedHeroImageUrl}

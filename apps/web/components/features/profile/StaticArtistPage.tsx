@@ -58,6 +58,8 @@ export interface StaticArtistPageProps {
   readonly merchCards?: readonly PublicMerchCard[];
   /** Request signals from the ISR variant; null renders the neutral pick. */
   readonly featuredSeed?: ProfileVariantSeed | null;
+  /** ISO time of the server render; the pick is evaluated at this instant. */
+  readonly featuredRenderedAt?: string;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly showClaimFooter?: boolean;
@@ -102,6 +104,7 @@ export function StaticArtistPage({
   catalogLoadFailed = false,
   merchCards,
   featuredSeed,
+  featuredRenderedAt,
   hideJovieBranding = false,
   hideMoreMenu = false,
   showClaimFooter = false,
@@ -174,6 +177,7 @@ export function StaticArtistPage({
       catalogLoadFailed={catalogLoadFailed}
       merchCards={viewModel.merchCards}
       featuredSeed={featuredSeed}
+      featuredRenderedAt={featuredRenderedAt}
       hideJovieBranding={hideJovieBranding}
       hideMoreMenu={hideMoreMenu}
       showClaimFooter={showClaimFooter}

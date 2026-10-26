@@ -19,7 +19,6 @@ These cookies are required for basic site functionality and cannot be disabled.
 | `jv_cc` | Stores your cookie consent preferences | 1 year |
 | `jv_cc_required` | Stores whether your region requires Jovie to show cookie consent controls | 30 days |
 | `jv_country` | Stores country code for region-appropriate consent and profile localization | 30 days |
-| `jv_returning` | Set only after you accept cookies; lets the next visit lead with something you have not seen | 90 days |
 | `better-auth.` | Authentication, session management, and account security | Session |
 | `__Secure-better-auth.` | Secure authentication session cookies on HTTPS origins | Session |
 | `__Host-better-auth.` | Host-scoped authentication session cookies on HTTPS origins | Session |
@@ -40,6 +39,7 @@ These cookies remember choices you make on Jovie.
 |------------|---------|----------|
 | `jovie_dsp` | Stores your preferred music service for profile listen links | 1 year |
 | `jv_pref_spotify` | Stores whether Spotify was selected as the preferred music service | 1 year |
+| `jv_returning` | Set on an artist's page only after you accept cookies. Marks that this browser has visited that page so the next visit can lead with a show or release. Removed if you withdraw consent. | 90 days |
 
 ### Analytics Cookies
 

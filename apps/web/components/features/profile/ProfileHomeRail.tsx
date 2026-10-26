@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, useState } from 'react';
 import type { ProfileRenderMode } from '@/features/profile/contracts';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import {
@@ -56,6 +56,8 @@ interface ProfileHomeRailProps {
    * server from these, so hydration reproduces it exactly (no swap).
    */
   readonly featuredSeed?: ProfileVariantSeed | null;
+  /** ISO time of the server render; the pick is evaluated at this instant. */
+  readonly featuredRenderedAt?: string;
   readonly releases?: readonly PublicRelease[];
   readonly hasTip?: boolean;
   /**
@@ -108,6 +110,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   resolveNearbyTour = true,
   merchCards = [],
   featuredSeed = null,
+  featuredRenderedAt,
   releases = [],
   hasTip = false,
   pacArtPriority = false,
@@ -116,7 +119,7 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   // PAC instrumentation (spec §8): pac_exposure fires when the card is ≥50%
   // visible, once per state per session, keyed to the visitor's variant.
   const isInteractiveRender = renderMode === 'interactive';
-  useReturningMarker(isInteractiveRender);
+  useReturningMarker(isInteractiveRender, artist.handle);
   // Re-evaluate visibility at the release boundary so the card's "Drops in"
   // chrome transitions to "Out Now" when the release drops, even if the
   // page was served from a stale ISR cache.
@@ -199,19 +202,23 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
   // One right thing: a deterministic, explainable pick for this visitor. The
   // first render uses neutral signals (identical for everyone, ISR-safe); it
   // can only change after hydration. Previews and fixtures never personalize.
+  // Fixed for the page's lifetime: never advances, so the card cannot swap.
+  const [decisionNow] = useState(() =>
+    featuredRenderedAt ? new Date(featuredRenderedAt) : new Date()
+  );
   const featuredDecision = useMemo(() => {
     if (!isInteractiveRender || !hasPacSubject) return null;
     return pickOneRightThing({
-      signals: signalsFromVariantSeed(featuredSeed, now),
+      signals: signalsFromVariantSeed(featuredSeed, decisionNow),
       inventory: {
         release: pacRelease
           ? {
               slug: pacRelease.slug,
               releaseDate: pacRelease.releaseDate ?? null,
-              isUpcoming: isPacReleaseUpcoming(pacRelease, now),
+              isUpcoming: isPacReleaseUpcoming(pacRelease, decisionNow),
             }
           : null,
-        shows: upcomingTourDates.map(show => ({
+        shows: tourDates.map(show => ({
           id: show.id,
           startDate: show.startDate,
           country: show.country,
@@ -230,9 +237,9 @@ export const ProfileHomeRail = memo(function ProfileHomeRail({
     hasTip,
     isInteractiveRender,
     merchCards,
-    now,
+    decisionNow,
     pacRelease,
-    upcomingTourDates,
+    tourDates,
     featuredSeed,
   ]);
   const featuredShow =

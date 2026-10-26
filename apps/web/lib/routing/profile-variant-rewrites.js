@@ -41,7 +41,7 @@ const VARIANT_COUNTRIES = [
 // Hosts must stay aligned with HOST_TO_NAME dsp entries in visitor-signals.ts
 // (enforced by profile-variant.test.ts).
 const DSP_REFERRER_PATTERN =
-  '^https?://([a-z0-9-]+\\.)*(spotify\\.com|spotify\\.link|music\\.apple\\.com|itunes\\.apple\\.com|music\\.youtube\\.com|deezer\\.com|tidal\\.com|music\\.amazon\\.[a-z.]+|soundcloud\\.com|bandcamp\\.com)(/.*)?$';
+  '^https?://([a-z0-9-]+\\.)*(spotify\\.com|spotify\\.link|music\\.apple\\.com|itunes\\.apple\\.com|music\\.youtube\\.com|deezer\\.com|tidal\\.com|music\\.amazon\\.(com|co\\.uk|de|fr|es|it|co\\.jp|ca|com\\.au|com\\.br|in)|soundcloud\\.com|bandcamp\\.com)(/.*)?$';
 const DSP_UTM_PATTERN =
   '^(spotify|apple_music|apple|applemusic|youtube_music|deezer|tidal|amazon_music|soundcloud|bandcamp)$';
 
@@ -62,7 +62,7 @@ function buildProfileVariantRewrites() {
       : [];
     const returningMissing = returning
       ? []
-      : [{ type: 'cookie', key: RETURNING_COOKIE }];
+      : [{ type: 'cookie', key: RETURNING_COOKIE, value: '1' }];
     const r = returning ? 'r' : 'n';
     // Most specific first: first matching rewrite wins.
     for (const dsp of dspSignals) {

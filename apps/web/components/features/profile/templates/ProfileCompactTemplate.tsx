@@ -107,6 +107,8 @@ interface ProfileCompactTemplateProps {
   readonly catalogLoadFailed?: boolean;
   readonly merchCards?: readonly PublicMerchCard[];
   readonly featuredSeed?: ProfileVariantSeed | null;
+  /** ISO time of the server render; the pick is evaluated at this instant. */
+  readonly featuredRenderedAt?: string;
   readonly hideJovieBranding?: boolean;
   readonly hideMoreMenu?: boolean;
   readonly visualVariant?: 'default';
@@ -283,6 +285,7 @@ export function ProfileCompactTemplate({
   catalogLoadFailed = false,
   merchCards = [],
   featuredSeed = null,
+  featuredRenderedAt,
   hideJovieBranding = false,
   hideMoreMenu = false,
   visualVariant = 'default',
@@ -1119,6 +1122,7 @@ export function ProfileCompactTemplate({
                 visitorAssignmentResolved={visitorAssignmentResolved}
                 merchCards={merchCards}
                 featuredSeed={featuredSeed}
+                featuredRenderedAt={featuredRenderedAt}
                 hideJovieBranding={hideJovieBranding || embeddedPreview}
                 hideMoreMenu={hideMoreMenu}
                 allowFanCapture={allowFanCapture}

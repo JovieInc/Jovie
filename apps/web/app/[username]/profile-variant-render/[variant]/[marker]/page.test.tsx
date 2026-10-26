@@ -54,6 +54,22 @@ describe('profile variant render route', () => {
     expect(artistPage).not.toHaveBeenCalled();
   });
 
+  it('404s junk and reserved paths before writing any cache entry', async () => {
+    for (const username of ['a', 'x'.repeat(80), 'admin', 'has space', 'a/b']) {
+      await expect(
+        ProfileVariantRenderPage({
+          params: Promise.resolve({
+            username,
+            variant: 'dn-US',
+            marker: '__profile-variant',
+          }),
+        })
+      ).rejects.toThrow();
+    }
+    expect(unstableCache).not.toHaveBeenCalled();
+    expect(artistPage).not.toHaveBeenCalled();
+  });
+
   it('keeps canonical, indexable metadata', async () => {
     const meta = await generateMetadata({
       params: Promise.resolve({
