@@ -16,12 +16,12 @@ import { join, resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 import { routedTransport } from '@jovie/copy/transport';
 import {
-  computeHoldoutKappa,
   DEFAULT_KAPPA_THRESHOLD,
   type HumanHoldoutSet,
   type JudgeBinaryLabel,
   loadHumanHoldoutSet,
   pairHoldoutLabels,
+  runJudgeCalibrationGate,
 } from '../../lib/eval/calibration';
 import type { StageJudge } from '../design-ci-judge-dispatch';
 import { FACTORY_RUNS_DIR, readJson, writeJson } from './receipts';
@@ -83,13 +83,18 @@ export async function calibrateVisualJudges(input: {
       input.holdout,
       labels
     );
-    const kappa =
+    const gate =
       missingJudgeLabels.length === 0 && paired.length > 0
-        ? computeHoldoutKappa(paired).kappa
+        ? runJudgeCalibrationGate({
+            holdout: input.holdout,
+            judgeLabels: labels,
+            threshold,
+          })
         : null;
+    const kappa = gate?.kappa ?? null;
     results.push({
       judge: judge.id,
-      passed: kappa !== null && Number.isFinite(kappa) && kappa >= threshold,
+      passed: gate?.passed === true,
       kappa: kappa !== null && Number.isFinite(kappa) ? kappa : null,
       pairedCount: paired.length,
       missing: missingJudgeLabels,

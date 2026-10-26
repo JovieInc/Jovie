@@ -137,6 +137,15 @@ describe('ChangelogEmailSignup', () => {
     expect(screen.getByPlaceholderText('you@email.com')).toBeVisible();
   });
 
+  it('does not load the security check until the visitor touches a deferred form', async () => {
+    render(<ChangelogEmailSignup deferSecurityCheck />);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(turnstileMock.effectCount).toBe(0);
+
+    fireEvent.focus(screen.getByPlaceholderText('you@email.com'));
+    await waitFor(() => expect(turnstileMock.effectCount).toBe(1));
+  });
+
   it('keeps the Turnstile lifecycle stable while the parent rerenders', async () => {
     render(<ChangelogEmailSignup />);
 

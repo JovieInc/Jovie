@@ -19,6 +19,7 @@ import json
 import math
 import os
 import re
+import tempfile
 import subprocess
 import sys
 import time
@@ -908,6 +909,91 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
     return sorted(kinds)[0]
 
 
+RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
+RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
+ANY_HEADING = re.compile(r"^#{1,6}\s")
+JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
+
+
+def red_section_complete(body: str) -> bool:
+    """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
+    lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
+    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
+    if start is None:
+        return False
+    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    section = "\n".join(lines[start + 1:end])
+    command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
+    run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
+    fence = re.search(r"```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```",
+                      section, re.I)
+    text = command.group(1).replace("`", "").strip() if command else ""
+    return len(text) > 2 and text.lower() not in {"todo", "tbd", "n/a", "none"} and bool(fence or run_url)
+
+
+def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
+    """A `## Red-before-green` section built from the PR's own red check: the failing run URL and
+    the failed jobs' error lines the fixer is shown. Fleet Rules treats lane-fix-red as a repair
+    label, so every red lane PR needs this evidence; agents forget it (45 of 138 Fleet Rules
+    failures on 2026-10-25) and the lane already has it. None when no red check names a run."""
+    for check in pr.get("statusCheckRollup") or []:
+        if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
+            continue
+        found = JOB_URL.match(check.get("detailsUrl") or "")
+        if not found:
+            continue
+        run_url = found.group(1)
+        lines = [f"FAIL {check.get('name') or 'check'} (red at head {str(pr.get('headRefOid') or '')[:9]})"]
+        for line in (excerpt or "").splitlines()[:25]:
+            line = line.rstrip()
+            if line.strip() and not line.startswith("```"):
+                lines.append(" " + line if ANY_HEADING.match(line) else line)
+        return "\n".join([
+            "## Red-before-green", "",
+            f"Failing command: `gh run view {run_url.rsplit('/', 1)[-1]} --repo {REPO} --log-failed`",
+            f"Failing run (before fix): {run_url}", "",
+            "```text", *lines, "```", "", RED_BLOCK_MARKER])
+    return None
+
+
+def with_red_section(body: str, block: str) -> str:
+    """Replace an empty/placeholder Red-before-green section with the block, or append one."""
+    lines = (body or "").split("\n")
+    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
+    if start is None:
+        return (body or "").rstrip("\n") + "\n\n" + block + "\n"
+    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
+
+
+def api_gh(args, **_):
+    """gh through the shared client layer (budget, breaker, backoff); subprocess-shaped result."""
+    scripts = str(HERE.parent)
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient.gh import run_gh
+    done = run_gh(list(args), priority="repair")
+    return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
+
+
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh) -> bool:
+    """Write the evidence block into the PR body when its section is missing or incomplete."""
+    block = red_before_green_block(pr, excerpt)
+    if not block or not isinstance(pr.get("number"), int):
+        return False
+    viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
+    if viewed.returncode != 0 or red_section_complete(viewed.stdout or ""):
+        return False
+    updated = with_red_section(viewed.stdout or "", block)
+    with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
+        path = Path(tmp) / "body.md"
+        from atomic_state import atomic_write_text
+        atomic_write_text(path, updated)
+        if RED_BLOCK_MARKER not in path.read_text():
+            return False
+        return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
+
+
 HOLD_DEQUEUE = "dequeued-by-hand"
 FAILURE_HOLD_CONTEXT = "jovie-queue-failure-hold/v1"
 FAILURE_HOLD_WRITERS = frozenset({"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]", "jovie-bot", "jovie-ci-lane", "jovie-symphony-lane", "jovie-agents-lane"})
@@ -1328,6 +1414,32 @@ def spent(record: dict, sha: str, max_attempts: int) -> bool:
     return record.get("count", 0) >= max_attempts and same_generation(record, sha)
 
 
+# Owner quiet window. A non-lane writer (Tim's sessions, Cursor, bots) was still pushing while a
+# lane repaired the PR in 111 of 199 cancelled fix runs (Gem ledger, 3.5 days to 2026-10-25,
+# 21 agent-hours): `target-head-superseded` by a push the lane could not see coming. The
+# head commit age at dispatch measures the owner cadence: 73 of those 112 cancels started
+# within 30 min of the head being pushed, against 59 of 148 productive runs, which only wait.
+OWNER_SETTLE_S = int(os.environ.get("LANES_OWNER_SETTLE_S", "1800"))
+
+
+def owner_settling(pr: dict, record: dict, now: float, settle_s: int | None = None) -> float | None:
+    """Seconds left of the owner's quiet window, else None. Pure: callers log the deferral.
+
+    Only a non-lane branch settles: a lane's own PR is pushed by lanes, whose claims already
+    arbitrate. A head the lane itself pushed never settles, and a PR with no readable head
+    commit time is never deferred (no evidence is not an owner)."""
+    settle_s = OWNER_SETTLE_S if settle_s is None else settle_s
+    if settle_s <= 0 or LANE_BRANCH.match(pr.get("headRefName") or ""):
+        return None
+    if pr.get("headRefOid") and pr.get("headRefOid") == record.get("pushedHead"):
+        return None
+    pushed = iso_ts(pr.get("lastCommitAt"))
+    if pushed is None:
+        return None
+    left = min(pushed + settle_s - now, settle_s)
+    return left if left > 0 else None
+
+
 def terminal_reason(pr: dict, record: dict, max_attempts: int, *, allow_reentry: bool = False) -> str | None:
     """Observation never consumes exhaustion. Only a repair claim may receipt a proven new head."""
     sha = pr.get("headRefOid")
@@ -1562,6 +1674,9 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
 
         if spent(record, pr["headRefOid"], lane.MAX_FIX_ATTEMPTS) or in_flight(record, pr, now):
             continue
+        if (left := owner_settling(pr, record, now)) is not None:
+            lane.note_owner_settle(host, pr, left, now)
+            continue  # The writer is still pushing; the head's checks restart on every push.
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \
                 and str(pr["number"]) not in read_state(host, "synced.json"):

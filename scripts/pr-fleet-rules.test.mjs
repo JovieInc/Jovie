@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
@@ -208,7 +215,7 @@ test('3: premise evidence records assumption and an executed falsifying command/
   ])
     assert.equal(hasPremiseEvidence(body), false);
   // Execute the real Python prompt renderer without importing its worker runtime.
-  const code = `import ast, pathlib\np=ast.parse(pathlib.Path('scripts/lanes/lane_runner.py').read_text())\nf=next(n for n in p.body if isinstance(n,ast.FunctionDef) and n.name=='render_fix_prompt')\nns={'PLANNING_CONTRACT': [], 'REPO_SLUG':'JovieInc/Jovie'}\nexec(compile(ast.Module(body=[f],type_ignores=[]),'prompt','exec'),ns)\nprint(ns['render_fix_prompt']({'number':1,'headRefName':'fix/test'},'same check failed twice'))`;
+  const code = `import ast, pathlib\np=ast.parse(pathlib.Path('scripts/lanes/lane_runner.py').read_text())\nf=next(n for n in p.body if isinstance(n,ast.FunctionDef) and n.name=='render_fix_prompt')\nns={'PLANNING_CONTRACT': [], 'NO_HISTORY_REWRITE': [], 'REPO_SLUG':'JovieInc/Jovie'}\nexec(compile(ast.Module(body=[f],type_ignores=[]),'prompt','exec'),ns)\nprint(ns['render_fix_prompt']({'number':1,'headRefName':'fix/test'},'same check failed twice'))`;
   const result = spawnSync('python3', ['-c', code], { encoding: 'utf8' });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /same check fails twice in a row/i);
@@ -308,7 +315,10 @@ test('runner: reads current paginated PR evidence, rejects stale/incomplete read
   await assert.rejects(
     runFleetRules({
       event,
-      request: async () => ({ number: 1, head: { sha: 'b'.repeat(40) } }),
+      request: async path =>
+        path.includes('/files?')
+          ? []
+          : { number: 1, head: { sha: 'b'.repeat(40) }, changed_files: 0 },
     }),
     /head/
   );
@@ -330,16 +340,237 @@ test('workflow: GITHUB_TOKEN read-only, non-blocking warning step, source requir
     'utf8'
   );
   const workflow = readFileSync('.github/workflows/pr-fleet-rules.yml', 'utf8');
-  assert.match(
-    source,
-    /name: Enforce PR fleet rules[\s\S]*?run: node scripts\/pr-fleet-rules.mjs/
-  );
   assert.match(source, /needs: \[deterministic,/);
+  // Required enforcement reads the evidence status; the key never lives here.
+  const readyJob = source.slice(source.indexOf('\n  ready:'));
+  assert.match(readyJob, /name: Require fleet-rule evidence/);
+  // Trust the evidence workflow's runs (only main's copy can produce them),
+  // never a commit status any branch could post.
+  assert.match(readyJob, /fleet-rules-evidence\.yml\/runs\?head_sha=/);
+  assert.match(readyJob, /event=pull_request_target/);
+  assert.doesNotMatch(readyJob, /\/statuses/);
+  assert.match(
+    readyJob,
+    /EVENT_UPDATED_AT: \$\{\{ github\.event\.pull_request\.updated_at \}\}/
+  );
+  assert.doesNotMatch(source, /pr-fleet-rules\.mjs/);
+  assert.doesNotMatch(readyJob, /create-github-app-token|CI_APP/);
   assert.match(workflow, /types: \[opened, edited, synchronize, labeled/);
   assert.match(workflow, /merge_group:/);
   assert.doesNotMatch(workflow, /continue-on-error:/);
-  assert.match(workflow, /exit 0/);
+  // One evidence read for warnings and enforcement, not two.
+  assert.equal(
+    (workflow.match(/run: node scripts\/pr-fleet-rules\.mjs/g) ?? []).length,
+    1
+  );
+  assert.match(workflow, /pr-fleet-rules\.mjs --with-warnings/);
   assert.doesNotMatch(workflow, /secrets\.|: write/);
+});
+
+const WORKFLOWS_DIR = '.github/workflows';
+const workflowFiles = () =>
+  readdirSync(WORKFLOWS_DIR).filter(f => /\.ya?ml$/.test(f));
+const triggersOf = text => {
+  const start = text.search(/^["']?on["']?:/m);
+  const from = text.slice(start).replace(/^["']?on["']?:/, '');
+  const next = from.search(/^\S/m);
+  const block = next < 0 ? from : from.slice(0, next);
+  // Block form (`  pull_request:`), inline list (`[a, b]`) or scalar (`on: a`).
+  const keys = [...block.matchAll(/^ {2}([a-z_]+):/gm)].map(m => m[1]);
+  const inline = block.match(/^\s*\[?([a-z_,\s]+)\]?\s*$/m)?.[1] ?? '';
+  return new Set([...keys, ...inline.split(/[,\s]+/).filter(Boolean)]);
+};
+// Triggers that execute the PR branch's own copy of the workflow with secrets.
+const BRANCH_CODE_TRIGGERS = [
+  'pull_request',
+  'pull_request_review',
+  'pull_request_review_comment',
+];
+
+test('contract: no app private key is referenced by a workflow that runs the PR branch copy', () => {
+  // Any same-repo branch can edit such a workflow to print the key, and an app
+  // key mints full-installation tokens. Fork-safe base code: pull_request_target,
+  // workflow_run, merge_group. (push/workflow_dispatch run the branch copy too,
+  // so repo-level secrets stay writer-reachable until the key moves to a
+  // main-only environment.) These files predate the
+  // contract and are tracked debt; the list may only shrink.
+  const KNOWN_DEBT = new Map([
+    ['fork-pr-gate.yml', 'CI_APP_PRIVATE_KEY'],
+    ['lane-fix-relay.yml', 'SYMPHONY_APP_PRIVATE_KEY'],
+    ['source-validation.yml', 'JOVIE_BOT_PRIVATE_KEY'],
+  ]);
+  const found = new Map();
+  for (const name of workflowFiles()) {
+    const text = readFileSync(join(WORKFLOWS_DIR, name), 'utf8');
+    const triggers = triggersOf(text);
+    if (!BRANCH_CODE_TRIGGERS.some(t => triggers.has(t))) continue;
+    const keys = [
+      ...new Set(text.match(/secrets\.[A-Z0-9_]*PRIVATE_KEY/g) ?? []),
+    ].map(k => k.replace('secrets.', ''));
+    if (keys.length) found.set(name, keys.join(','));
+  }
+  const fresh = [...found].filter(
+    ([name, keys]) => KNOWN_DEBT.get(name) !== keys
+  );
+  assert.deepEqual(
+    fresh,
+    [],
+    'move the token mint into a pull_request_target/workflow_run workflow'
+  );
+  for (const name of KNOWN_DEBT.keys())
+    assert.ok(
+      found.has(name),
+      `${name} no longer exposes a key to branch code: drop it from KNOWN_DEBT`
+    );
+  // CI_APP_PRIVATE_KEY specifically: only the Fork PR Gate debt remains.
+  assert.deepEqual(
+    [...found]
+      .filter(([, keys]) => keys.includes('CI_APP_PRIVATE_KEY'))
+      .map(([n]) => n),
+    ['fork-pr-gate.yml']
+  );
+});
+
+test('contract: triggersOf reads block, inline and scalar forms', () => {
+  assert.deepEqual(
+    [
+      ...triggersOf(
+        'name: x\non:\n  pull_request:\n    types: [a]\n  group: y\njobs: {}'
+      ),
+    ].sort(),
+    ['group', 'pull_request']
+  );
+  assert.ok(
+    triggersOf('on: [pull_request, push]\njobs: {}').has('pull_request')
+  );
+  assert.ok(
+    triggersOf('on: pull_request_review\njobs: {}').has('pull_request_review')
+  );
+});
+
+test('contract: Fleet Rules Evidence is base-branch code only and never hands the key to setup-node', () => {
+  const text = readFileSync(
+    join(WORKFLOWS_DIR, 'fleet-rules-evidence.yml'),
+    'utf8'
+  );
+  const triggers = triggersOf(text);
+  assert.deepEqual([...triggers].sort(), [
+    'pull_request_target',
+    'workflow_run',
+  ]);
+  // Two mints, both read-only and both in base-branch jobs: the evidence job and the
+  // workflow_run re-run hop (its lookups moved off github.token, 2026-10-26).
+  assert.equal((text.match(/secrets\./g) ?? []).length, 2);
+  assert.equal(
+    (text.match(/private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/g) ?? [])
+      .length,
+    2
+  );
+  assert.match(text, /private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/);
+  assert.match(
+    text,
+    /permission-contents: read\n\s+permission-pull-requests: read/
+  );
+  assert.doesNotMatch(text, /permission-[a-z-]+: write/);
+  // Every checkout is main, sparse, without persisted credentials.
+  const checkouts = (text.match(/actions\/checkout@/g) ?? []).length;
+  assert.ok(checkouts >= 1);
+  assert.equal(
+    (
+      text.match(
+        /ref: main\n\s+fetch-depth: 1\n\s+persist-credentials: false\n\s+sparse-checkout:/g
+      ) ?? []
+    ).length,
+    checkouts
+  );
+  assert.doesNotMatch(text, /github\.event\.pull_request\.head\.(ref|repo)/);
+  // setup-node keeps its default token; the minted token never reaches it.
+  const setupNode = text.slice(
+    text.indexOf('actions/setup-node@'),
+    text.indexOf('- name: Read evidence')
+  );
+  assert.doesNotMatch(setupNode, /token:|fleet-token/);
+  // The minted token is passed only to the evidence script (FLEET_TOKEN) and to the
+  // re-run hop's read lookups (GH_READ_TOKEN); never anywhere else.
+  assert.deepEqual(
+    [
+      ...text.matchAll(
+        /(\w+): \$\{\{ steps\.fleet-token\.outputs\.token \}\}/g
+      ),
+    ].map(match => match[1]),
+    ['FLEET_TOKEN', 'GH_READ_TOKEN']
+  );
+});
+
+test('verdict script maps exit codes to the job result and never turns a deferral into a pass', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-verdict-'));
+  try {
+    mkdirSync(join(dir, 'scripts'));
+    const posts = join(dir, 'posts.log');
+    // Stand-in for packages/api-client/cli.ts: records the gh arguments.
+    writeFileSync(
+      join(dir, 'client.mjs'),
+      `import { appendFileSync } from 'node:fs';\nappendFileSync(${JSON.stringify(posts)}, process.argv.slice(2).join(' ') + '\\n');\n`
+    );
+    const run = (code, lines) => {
+      writeFileSync(posts, '');
+      writeFileSync(
+        join(dir, 'scripts', 'pr-fleet-rules.mjs'),
+        `console.log(${JSON.stringify(lines)}); process.exitCode = ${code};`
+      );
+      const done = spawnSync(
+        'bash',
+        [join(process.cwd(), '.github/scripts/fleet-rules-verdict.sh')],
+        {
+          cwd: dir,
+          encoding: 'utf8',
+          env: {
+            PATH: process.env.PATH,
+            API_CLIENT: join(dir, 'client.mjs'),
+            GH_TOKEN: 'gh-token-value',
+            FLEET_TOKEN: 'app-token-value',
+            REPOSITORY: 'o/r',
+            HEAD_SHA: 'a'.repeat(40),
+            RUN_URL: 'https://example.test/run',
+          },
+        }
+      );
+      return {
+        status: done.status,
+        posts: readFileSync(posts, 'utf8'),
+        out: done.stdout + done.stderr,
+      };
+    };
+    // The job result is the verdict. No commit status is posted: it was
+    // informational and its github.token POST turned a verdict read on the CI
+    // App budget into a quota deferral (run 40164178818).
+    const noStatusPost = result =>
+      assert.doesNotMatch(result.posts, /statuses|-X POST/);
+    const green = run(0, '');
+    assert.equal(green.status, 0);
+    noStatusPost(green);
+    // A decisive verdict looks up the failed Source Validation run to re-run.
+    assert.match(
+      green.posts,
+      /gh --priority repair -- api repos\/o\/r\/actions\/workflows\/source-validation\.yml\/runs/
+    );
+    const red = run(1, '::error::red-before-green: add a command');
+    assert.equal(red.status, 1);
+    noStatusPost(red);
+    const deferred = run(
+      75,
+      '::error::Fleet rule evidence unavailable (github-quota-deferred)'
+    );
+    // A deferral is exit 75, never a pass, and spends no further quota.
+    assert.equal(deferred.status, 75);
+    assert.equal(deferred.posts, '');
+    assert.doesNotMatch(
+      green.out + red.out + deferred.out,
+      /app-token-value|gh-token-value/
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test('CLI warning mode always returns zero, even when evidence or policy fails', async () => {
@@ -350,7 +581,12 @@ test('CLI warning mode always returns zero, even when evidence or policy fails',
   try {
     writeFileSync(path, JSON.stringify(event));
     assert.equal(
-      await main({ args: [], env, request: api(pr()), log: x => logs.push(x) }),
+      await main({
+        args: [],
+        env,
+        request: api(pr()),
+        log: x => logs.push(x),
+      }),
       0
     );
     assert.equal(
@@ -404,6 +640,151 @@ test('CLI warning mode always returns zero, even when evidence or policy fails',
   }
 });
 
+test('quota or outage evidence failures hold once, then defer with the relay marker and never pass', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-quota-'));
+  const path = join(dir, 'event.json');
+  const env = { GITHUB_EVENT_PATH: path };
+  const quota = (retryAt = null, failure = 'primary') =>
+    Object.assign(new Error('github exhausted: secret detail'), {
+      failure,
+      retryAt,
+      exitCode: 75,
+    });
+  const T0 = 1_000_000_000_000;
+  try {
+    writeFileSync(path, JSON.stringify(event));
+    // Reset inside the hold budget: wait once, then read the evidence.
+    {
+      const logs = [];
+      const sleeps = [];
+      let reads = 0;
+      const inner = api(pr());
+      const request = async (...args) => {
+        if (reads++ === 0) throw quota(T0 + 30_000);
+        return inner(...args);
+      };
+      assert.equal(
+        await main({
+          args: ['--with-warnings'],
+          env,
+          request,
+          log: x => logs.push(x),
+          now: () => T0,
+          sleep: async ms => sleeps.push(ms),
+        }),
+        0
+      );
+      assert.deepEqual(sleeps, [31_000]);
+      assert.match(logs[0], /^::notice title=GitHub API hold::/);
+    }
+    // Default clock and sleep: a reset that already passed holds zero seconds.
+    {
+      let reads = 0;
+      const inner = api(pr());
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async (...args) => {
+            if (reads++ === 0) throw quota(Date.now() - 5_000);
+            return inner(args[0]);
+          },
+          log: () => {},
+        }),
+        0
+      );
+    }
+    // Reset past the budget, a second failure, or no reset time: distinct
+    // transient status, marker for the relay, no secret detail, never pass.
+    for (const [label, retryAt] of [
+      ['reset past the budget', T0 + 3_000_000],
+      ['unknown reset', null],
+    ]) {
+      /** @type {string[]} */
+      const logs = [];
+      /** @type {number[]} */
+      const sleeps = [];
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async () => {
+            throw quota(retryAt);
+          },
+          log: x => logs.push(x),
+          now: () => T0,
+          sleep: async ms => sleeps.push(ms),
+        }),
+        75,
+        String(label)
+      );
+      assert.deepEqual(sleeps, [], String(label));
+      assert.match(String(logs.at(-1)), /github-quota-deferred/);
+      assert.doesNotMatch(String(logs.at(-1)), /secret detail/);
+    }
+    {
+      const logs = [];
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async () => {
+            throw quota(T0 + 1_000, 'transient');
+          },
+          log: x => logs.push(x),
+          now: () => T0,
+          sleep: async () => {},
+        }),
+        75
+      );
+      assert.match(logs.at(-1), /github-quota-deferred/);
+    }
+    // A real policy red or an unclassified read failure keeps the old status.
+    {
+      const logs = [];
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async () => {
+            throw new Error('malformed');
+          },
+          log: x => logs.push(x),
+        }),
+        1
+      );
+      assert.doesNotMatch(logs.at(-1), /github-quota-deferred/);
+    }
+    // Warning-only mode never blocks, even on quota.
+    assert.equal(
+      await main({
+        args: ['--warnings-only'],
+        env,
+        request: async () => {
+          throw quota();
+        },
+        log: () => {},
+      }),
+      0
+    );
+    // --with-warnings prints the warning and still enforces the error.
+    const logs = [];
+    assert.equal(
+      await main({
+        args: ['--with-warnings'],
+        env,
+        request: api(pr({ title: 'fix: broken', body: '' })),
+        log: x => logs.push(x),
+      }),
+      1
+    );
+    assert.ok(logs.some(x => x.startsWith('::warning::blast-radius')));
+    assert.ok(logs.some(x => x.startsWith('::error::red-before-green')));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('REST adapter uses only GITHUB_TOKEN, a finite timeout and sanitized errors', async () => {
   const original = globalThis.fetch;
   const store = new MemoryLedgerStore();
@@ -442,7 +823,7 @@ test('runner handles pagination and metadata moving during the read fail-closed'
     return { ...pr(), changed_files: 100, head: event.pull_request.head };
   };
   assert.deepEqual((await runFleetRules({ event, request })).errors, []);
-  assert.equal(reads, 2);
+  assert.equal(reads, 1);
   await assert.rejects(runFleetRules({ event: {}, request }), /metadata/);
   await assert.rejects(
     runFleetRules({
@@ -464,10 +845,10 @@ test('runner handles pagination and metadata moving during the read fail-closed'
           : {
               ...pr(),
               changed_files: 0,
-              head: { sha: ++reads === 1 ? 'a'.repeat(40) : 'b'.repeat(40) },
+              head: { sha: 'b'.repeat(40) },
             },
     }),
-    /changed during read/
+    /head changed/
   );
 });
 
