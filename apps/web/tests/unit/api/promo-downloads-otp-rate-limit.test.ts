@@ -30,6 +30,26 @@ vi.mock('@/lib/notifications/service', () => ({ sendNotification: vi.fn() }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 vi.mock('@/lib/db', () => ({ db: { select: hoisted.dbSelect } }));
 
+function mockActivePromo() {
+  const chain: Record<string, unknown> = {};
+  for (const method of ['from', 'innerJoin', 'leftJoin', 'where']) {
+    chain[method] = vi.fn().mockReturnValue(chain);
+  }
+  chain.limit = vi.fn().mockResolvedValue([
+    {
+      id: 'promo-1',
+      creatorProfileId: 'artist-1',
+      releaseId: 'release-1',
+      title: 'Track',
+      artworkUrl: null,
+      isActive: true,
+      artistName: 'Artist',
+      isPro: true,
+    },
+  ]);
+  hoisted.dbSelect.mockReturnValue(chain);
+}
+
 const ok = { success: true, limit: 5, remaining: 4, reset: Date.now() + 1000 };
 const blocked = { ...ok, success: false, remaining: 0 };
 const params = { params: Promise.resolve({ id: 'promo-1' }) };
@@ -59,6 +79,7 @@ describe('promo download OTP routes are rate limited', () => {
   });
 
   it('request-otp stops at the send limiter before issuing a new code', async () => {
+    mockActivePromo();
     hoisted.send.mockResolvedValue(blocked);
     const { POST } = await import(
       '@/app/api/promo-downloads/[id]/request-otp/route'
@@ -74,6 +95,7 @@ describe('promo download OTP routes are rate limited', () => {
   });
 
   it('request-otp enforces the per-email resend cooldown', async () => {
+    mockActivePromo();
     hoisted.cooldown.mockResolvedValue(blocked);
     const { POST } = await import(
       '@/app/api/promo-downloads/[id]/request-otp/route'
@@ -86,6 +108,27 @@ describe('promo download OTP routes are rate limited', () => {
 
     expect(response.status).toBe(429);
     expect(hoisted.requestEmailOtp).not.toHaveBeenCalled();
+  });
+
+  it('request-otp does not spend the per-email budget on an unknown promo id', async () => {
+    const chain: Record<string, unknown> = {};
+    for (const method of ['from', 'innerJoin', 'leftJoin', 'where']) {
+      chain[method] = vi.fn().mockReturnValue(chain);
+    }
+    chain.limit = vi.fn().mockResolvedValue([]);
+    hoisted.dbSelect.mockReturnValue(chain);
+    const { POST } = await import(
+      '@/app/api/promo-downloads/[id]/request-otp/route'
+    );
+
+    const response = await POST(
+      post('request-otp', { email: 'fan@example.com' }),
+      params
+    );
+
+    expect(response.status).toBe(404);
+    expect(hoisted.send).not.toHaveBeenCalled();
+    expect(hoisted.cooldown).not.toHaveBeenCalled();
   });
 
   it('verify-otp stops at the verify limiter before checking the code', async () => {

@@ -96,11 +96,6 @@ export async function POST(
       );
     }
 
-    // Requesting a code resets the per-code attempt cap, so unlimited requests
-    // would mean unlimited guesses. Same limiters as the fan subscribe OTP.
-    const limited = await limitPromoOtp(request, parsed.data.email);
-    if (limited) return limited;
-
     // Fetch promo download + verify active + artist is Pro
     const [download] = await db
       .select({
@@ -128,6 +123,12 @@ export async function POST(
         { status: 404, headers: NO_STORE_HEADERS }
       );
     }
+
+    // Requesting a code resets the per-code attempt cap, so unlimited requests
+    // would mean unlimited guesses. Same limiters as the fan subscribe OTP. Runs after the promo
+    // lookup so made-up ids cannot burn a victim's per-email budget.
+    const limited = await limitPromoOtp(request, parsed.data.email);
+    if (limited) return limited;
 
     // Extract geo from headers
     const ip =
