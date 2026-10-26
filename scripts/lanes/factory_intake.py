@@ -168,6 +168,7 @@ def observed_before_completion(issue: dict, observed_at: str | None) -> bool:
 def terminal_episode(linear, fp_label: str, item: dict) -> dict | None:
     after, cursors = None, set()
     keys = set(item.get("receiptKeys") or [])
+    missing = set(keys)  # retain only current identities, not an unbounded history union
     while True:
         page = linear.gql(HISTORY, {"l": fp_label, "after": after})["issues"]
         for issue in page["nodes"]:
@@ -177,9 +178,16 @@ def terminal_episode(linear, fp_label: str, item: dict) -> dict | None:
                 same = False  # a legacy aggregate summary cannot identify explicit new receipts
             historical = any(keys <= covered_receipts(previous) and same_evidence(description, previous)
                              for previous in (item.get("receiptHistory") or {}).values()) if keys else False
-            if same or historical or (keys and keys <= covered_receipts(description)) or \
+            receipts = covered_receipts(description) if keys else set()
+            if same or historical or (keys and keys <= receipts) or \
                     observed_before_completion(issue, item.get("observedAt")):
                 return issue
+            # Recovery can span multiple completed episodes and history pages. Only
+            # validated, already-terminal evidence contributes to this union.
+            if keys and observed_before_completion(issue, issue.get("completedAt") or issue.get("canceledAt")):
+                missing.difference_update(receipts)
+                if not missing:
+                    return issue
         if not page["pageInfo"]["hasNextPage"]:
             return None
         cursor = page["pageInfo"]["endCursor"]

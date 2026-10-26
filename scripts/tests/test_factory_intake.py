@@ -329,5 +329,28 @@ class FactoryIntakeTest(unittest.TestCase):
                     fs.write(root, fs.cheap_fixer_signals(receipts))
                     self.assertEqual(fi.run_pass(root, linear)["results"][0]["action"], "filed")
 
+
+    def test_terminal_recovery_unions_receipt_coverage_across_pages_but_allows_an_unseen_receipt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, linear = Path(tmp), EpisodeLinear()
+            def scan(receipts):
+                fs.write(root, [signal(source="cheap-fixer", evidence={"receipts": receipts})])
+                return fi.run_pass(root, linear)["results"][0]
+            original = [str(i) for i in range(6)]
+            self.assertEqual(scan(original)["action"], "filed")
+            linear.issues[-1].update(state="completed", completedAt=datetime.now(timezone.utc).isoformat())
+            self.assertEqual(scan(original[1:] + ["new"])["action"], "filed")
+            linear.issues[-1].update(state="completed", completedAt=datetime.now(timezone.utc).isoformat())
+            (root / "factory-intake.json").unlink()
+            restored = original + ["new"]
+            self.assertEqual(scan(restored)["action"], "exists",
+                             "all receipts were covered by the two terminal episodes together")
+            self.assertEqual(len(linear.created), 2)
+            self.assertIn("1", linear.history_pages, "coverage on the second history page must count")
+            # An unseen receipt still qualifies with the local map missing again.
+            (root / "factory-intake.json").unlink()
+            self.assertEqual(scan(restored + ["unseen"])["action"], "filed")
+            self.assertEqual(len(linear.created), 3)
+
 if __name__ == "__main__":
     unittest.main()
