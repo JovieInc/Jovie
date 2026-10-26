@@ -20,6 +20,11 @@ on:
         required: false
         default: false
         type: boolean
+      native:
+        description: False when only node-only inputs changed; the node checks then run on ubuntu and swift, package:staging and the Mac artifacts are skipped.
+        required: false
+        default: true
+        type: boolean
       mac-child:
         description: Set only by mac-lane.yml; runs the lane on the self-hosted Macs.
         required: false
@@ -32,7 +37,7 @@ permissions:
 jobs:
   mac:
     name: Mac Route
-    if: ${{ inputs.mac-first && !inputs.mac-child }}
+    if: ${{ inputs.mac-first && !inputs.mac-child && inputs.native }}
     permissions:
       actions: write
       contents: read
@@ -47,7 +52,7 @@ jobs:
     needs: [mac]
     if: ${{ !cancelled() && (inputs.mac-child || needs.mac.result == 'skipped' || needs.mac.outputs.run_hosted == 'true') }}
     # macos-15, not 26: MenuMonitor targets macOS 14 / swift-tools 5.10.
-    runs-on: ${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}
+    runs-on: ${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || (inputs.native && 'macos-15' || 'ubuntu-latest') }}
     # ~5 min on a Mac; a sleeping laptop hands the lane to hosted quickly.
     timeout-minutes: ${{ inputs.mac-child && 25 || 45 }}
     steps:
@@ -67,6 +72,7 @@ jobs:
       # spend the merge-queue deadline (same reason as package_cache above).
       - name: Restore Electron downloads
         id: electron-downloads
+        if: ${{ inputs.native }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
@@ -83,7 +89,19 @@ jobs:
           version="$(node apps/desktop/scripts/sync-version.mjs \
             --staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Test and package exact Mac head
+      - name: Swift test and build (macOS only)
+        if: ${{ inputs.native }}
+        run: |
+          set -euo pipefail
+          swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
+          swift build --package-path apps/macos/MenuMonitor -c release
+      - name: Desktop typecheck and test
+        run: |
+          set -euo pipefail
+          pnpm --filter @jovie/desktop run typecheck
+          pnpm --filter @jovie/desktop run test
+      - name: Package exact Mac head (macOS only)
+        if: ${{ inputs.native }}
         env:
           # The staging package is unsigned by design. Hosted runners have no
           # signing identity; a self-hosted Mac has the owner's Developer ID in
@@ -93,16 +111,13 @@ jobs:
           SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}
         run: |
           set -euo pipefail
-          swift test --package-path apps/macos/MenuMonitor --enable-code-coverage
-          swift build --package-path apps/macos/MenuMonitor -c release
-          pnpm --filter @jovie/desktop run typecheck
-          pnpm --filter @jovie/desktop run test
           ELECTRON_ENV=staging \
             DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}" \
             JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA" \
             pnpm --filter @jovie/desktop run package:staging
       - name: Save Electron downloads
         if: >-
+          inputs.native &&
           github.event_name == 'push' &&
           steps.electron-downloads.outputs.cache-hit != 'true'
         continue-on-error: true
@@ -113,6 +128,7 @@ jobs:
             ~/Library/Caches/electron-builder
           key: ${{ steps.electron-downloads.outputs.cache-primary-key }}
       - name: Verify exact Mac artifact set
+        if: ${{ inputs.native }}
         run: |
           set -euo pipefail
           version="${{ steps.desktop-staging-identity.outputs.version }}"
@@ -129,7 +145,7 @@ jobs:
         # laptop uploads the ~460 MB package at ~20 KB/s and would time the
         # job out, so only hosted runners keep it; the artifact set is still
         # verified on every runner above.
-        if: ${{ runner.environment == 'github-hosted' }}
+        if: ${{ inputs.native && runner.environment == 'github-hosted' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-staging-${{ inputs.checkout-ref || github.sha }}

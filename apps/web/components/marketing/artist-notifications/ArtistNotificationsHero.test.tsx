@@ -51,7 +51,7 @@ describe('ArtistNotificationsHero', () => {
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: segmentedAccessibleName('Reach your audience.', 'On autopilot.'),
+        name: segmentedAccessibleName('Reach listeners.', 'On autopilot.'),
       })
     ).not.toHaveClass('line-clamp-2');
     expect(
