@@ -9,6 +9,7 @@ const {
   mockCaptureError,
   mockLoggerInfo,
   mockLoggerError,
+  mockRecordFeaturedSlotEvent,
 } = vi.hoisted(() => ({
   mockCookiesGet: vi.fn(),
   mockPublicProfilePacEventLimiterLimit: vi.fn(),
@@ -17,6 +18,14 @@ const {
   mockCaptureError: vi.fn(async () => undefined),
   mockLoggerInfo: vi.fn(),
   mockLoggerError: vi.fn(),
+  mockRecordFeaturedSlotEvent: vi.fn(async () => true),
+}));
+
+vi.mock('next/server', async importOriginal => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: (task: () => unknown) => {
+    void task();
+  },
 }));
 
 vi.mock('next/headers', () => ({
@@ -47,6 +56,10 @@ vi.mock('@/lib/flags/statsig', () => ({
 
 vi.mock('@/lib/analytics/runtime-aware', () => ({
   trackEvent: mockTrackEvent,
+}));
+
+vi.mock('@/lib/profile/one-right-thing/metrics.server', () => ({
+  recordFeaturedSlotEvent: mockRecordFeaturedSlotEvent,
 }));
 
 vi.mock('@/lib/error-tracking', () => ({
@@ -307,6 +320,31 @@ describe('POST /api/profile/pac-event', () => {
       expect.anything(),
       expect.objectContaining({ extra_rule: 'invalid_email' })
     );
+  });
+
+  it('counts featured-slot impressions and taps, but not for explicit opt-outs', async () => {
+    setCookieValues({});
+    const extras = {
+      featured_kind: 'show',
+      featured_reason: 'stale_release_show_soon',
+      featured_channel: 'social',
+    };
+    const counted = await POST(
+      buildRequest(
+        buildPayload({ event: 'featured_tap', pac_state: 'tickets', extras })
+      )
+    );
+    expect(counted.status).toBe(204);
+    expect(mockRecordFeaturedSlotEvent).toHaveBeenCalledWith({
+      event: 'featured_tap',
+      profileId: PROFILE_ID,
+      extras,
+    });
+
+    mockRecordFeaturedSlotEvent.mockClear();
+    await POST(buildRequest(buildPayload({ extras }), { 'sec-gpc': '1' }));
+    await POST(buildRequest(buildPayload({ extras, consent: 'rejected' })));
+    expect(mockRecordFeaturedSlotEvent).not.toHaveBeenCalled();
   });
 
   it('rejects unknown events with a named failing rule', async () => {

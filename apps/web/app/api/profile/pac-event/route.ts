@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { NextRequest, NextResponse } from 'next/server';
+import { after, NextRequest, NextResponse } from 'next/server';
 import { createRateLimitedResponse } from '@/app/api/notifications/route-helpers';
 import { AUDIENCE_ANON_COOKIE } from '@/constants/app';
 import { trackEvent } from '@/lib/analytics/runtime-aware';
@@ -13,6 +13,7 @@ import {
 } from '@/lib/cookies/consent-state';
 import { captureError } from '@/lib/error-tracking';
 import { logStatsigEvent } from '@/lib/flags/statsig';
+import { recordFeaturedSlotEvent } from '@/lib/profile/one-right-thing/metrics.server';
 import { getClientIP, publicProfilePacEventLimiter } from '@/lib/rate-limit';
 import { pacEventBeaconSchema } from '@/lib/tracking/pac-events-contract';
 import { PAC_IDENTITY_BLOCKED_CONSENTS } from '@/lib/tracking/pac-events-shared';
@@ -161,6 +162,25 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       statsigMetadata
     );
     void trackEvent(event.event, record);
+
+    // Featured-slot counters hold counts only (no ids), but honor explicit
+    // opt-outs the same way identity joining does.
+    // Also honors a granular analytics rejection (jv_cc) even when marketing
+    // was accepted. after() keeps the write alive on serverless.
+    if (
+      !browserOptedOut &&
+      !legacyOptedOut &&
+      !clientOptedOut &&
+      canonicalConsent?.analytics !== false
+    ) {
+      after(() =>
+        recordFeaturedSlotEvent({
+          event: event.event,
+          profileId: event.profile_id,
+          extras: event.extras,
+        })
+      );
+    }
 
     logger.info('[pac-event] accepted', record);
 

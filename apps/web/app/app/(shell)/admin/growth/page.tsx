@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { CanonicalLifecycleFunnel } from '@/components/features/admin/contacts-table/CanonicalLifecycleFunnel';
 import { FounderFunnelDrilldown } from '@/components/features/admin/hud/FounderFunnelDrilldown';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { FeaturedSlotPanel } from '@/components/features/admin/leads/FeaturedSlotPanel';
 import { GoldenPathFunnelPanel } from '@/components/features/admin/leads/GoldenPathFunnelPanel';
 import { GtmCollapsibles } from '@/components/features/admin/leads/GtmCollapsibles';
 import {
@@ -23,6 +24,7 @@ import {
 } from '@/lib/admin/founder-funnel';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { adminGrowthSearchParams } from '@/lib/nuqs';
+import { getFeaturedSlotReport } from '@/lib/profile/one-right-thing/metrics.server';
 import { GrowthFounderFunnel } from './GrowthFounderFunnel';
 
 interface AdminGrowthPageProps {
@@ -55,19 +57,27 @@ export default async function AdminGrowthPage({
   const drilldownStage = isFounderFunnelDrilldownStage(params.funnelStage)
     ? params.funnelStage
     : null;
-  const [counts, funnel, lifecycleMetrics, drilldown, goldenPath] =
-    await Promise.all([
-      getLeadFunnelCounts(),
-      getFounderFunnelData(params.funnelRange),
-      getCanonicalContactMetrics(),
-      drilldownStage
-        ? getFounderFunnelStageRows(drilldownStage, params.funnelRange)
-        : Promise.resolve(null),
-      // A failed read renders an honest error state, never a fake zero.
-      getArtistOfferFunnelReport()
-        .then(report => report.goldenPath ?? null)
-        .catch(() => null),
-    ]);
+  const [
+    counts,
+    funnel,
+    lifecycleMetrics,
+    drilldown,
+    goldenPath,
+    featuredSlot,
+  ] = await Promise.all([
+    getLeadFunnelCounts(),
+    getFounderFunnelData(params.funnelRange),
+    getCanonicalContactMetrics(),
+    drilldownStage
+      ? getFounderFunnelStageRows(drilldownStage, params.funnelRange)
+      : Promise.resolve(null),
+    // A failed read renders an honest error state, never a fake zero.
+    getArtistOfferFunnelReport()
+      .then(report => report.goldenPath ?? null)
+      .catch(() => null),
+    // A failed read renders an honest error state, never a fake zero.
+    getFeaturedSlotReport().catch(() => null),
+  ]);
 
   return (
     <AdminPage
@@ -87,6 +97,7 @@ export default async function AdminGrowthPage({
         />
       ) : null}
       <GoldenPathFunnelPanel report={goldenPath} />
+      <FeaturedSlotPanel report={featuredSlot} />
       <CanonicalLifecycleFunnel metrics={lifecycleMetrics} />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>

@@ -564,6 +564,8 @@ export {
   featureFlagAuditEvents,
   featureFlagOverrides,
 } from './feature-flags';
+// Featured slot daily counters (one-right-thing)
+export { featuredSlotDaily } from './featured-slot';
 // Feedback
 export {
   type FeedbackClassification,
