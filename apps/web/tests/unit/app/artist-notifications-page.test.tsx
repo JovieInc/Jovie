@@ -58,7 +58,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       heroSection.getByRole('heading', {
-        name: segmentedAccessibleName('Reach your audience.', 'On autopilot.'),
+        name: segmentedAccessibleName('Reach listeners.', 'On autopilot.'),
       })
     ).toBeInTheDocument();
     expect(

@@ -49,8 +49,8 @@ export const ARTIST_NOTIFICATIONS_COPY = {
       'Turn new music and nearby shows into repeat visits without writing campaigns.',
   },
   hero: {
-    headline: 'Reach your audience. On autopilot.',
-    headlineLines: ['Reach your audience.', 'On autopilot.'],
+    headline: 'Reach listeners. On autopilot.',
+    headlineLines: ['Reach listeners.', 'On autopilot.'],
     primaryCtaLabel: 'Claim your page',
     primaryCtaHref: CLAIM_HREF,
     floatingCards: [

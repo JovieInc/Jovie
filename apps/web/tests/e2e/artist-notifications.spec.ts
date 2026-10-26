@@ -36,7 +36,7 @@ test.describe('Artist Notifications Landing', () => {
   test('hero renders with the new promise and Pro CTA', async ({ page }) => {
     await expect(
       page.getByRole('heading', {
-        name: /reach your audience\.\s*on autopilot\./i,
+        name: /reach listeners\.\s*on autopilot\./i,
       })
     ).toBeVisible();
     await expect(
@@ -91,7 +91,7 @@ test.describe('Artist Notifications Landing', () => {
 
     await expect(
       page.getByRole('heading', {
-        name: /reach your audience\.\s*on autopilot\./i,
+        name: /reach listeners\.\s*on autopilot\./i,
       })
     ).toBeVisible({
       timeout: SMOKE_TIMEOUTS.VISIBILITY,
