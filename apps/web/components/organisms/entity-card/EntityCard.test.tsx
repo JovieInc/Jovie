@@ -34,17 +34,20 @@ vi.mock('@/components/atoms/ImageWithFallback', () => ({
     alt,
     className,
     priority,
+    sizes,
     src,
   }: {
     readonly alt: string;
     readonly className?: string;
     readonly priority?: boolean;
+    readonly sizes?: string;
     readonly src: string;
   }) =>
     React.createElement('img', {
       alt,
       className,
       'data-priority': priority ? 'true' : 'false',
+      'data-sizes': sizes,
       src,
     }),
 }));
@@ -745,6 +748,32 @@ describe('ProfilePacCard landscape states', () => {
         email: 'fan@example.com',
         source: 'profile_pac',
       })
+    );
+  });
+
+  it('requests a desktop-sized artwork source while phones keep the 104px request', () => {
+    render(
+      <ProfilePacCard
+        artist={pacArtist}
+        release={{
+          title: 'Release',
+          slug: 'release',
+          artworkUrl: '/release.jpg',
+          previewUrl: null,
+          releaseDate: '2020-01-01',
+        }}
+        assignment={DEFAULT_PROFILE_PAC_ASSIGNMENT}
+        layout='profile-landscape'
+        presentation='featured'
+        renderMode='preview'
+        captureEnabled={false}
+      />
+    );
+
+    const art = screen.getByTestId('profile-pac-featured-art');
+    expect(art.querySelector('img')).toHaveAttribute(
+      'data-sizes',
+      '(min-width: 1024px) 400px, 104px'
     );
   });
 
