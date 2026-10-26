@@ -1,3 +1,4 @@
+# github-token-budget: 2 calls/run - reads the prior liveness-state artifact list and download
 name: Automation Liveness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
@@ -55,6 +56,9 @@ jobs:
             packages/api-client
             .nvmrc
           persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
