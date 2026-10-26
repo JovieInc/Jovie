@@ -1063,6 +1063,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ui-story-coverage-policy.test.mjs',
   'scripts/lib/__tests__/ci-fast-pr-structural-guards.test.mjs',
   'scripts/lib/__tests__/ci-structural-inventory.test.mjs',
+  'scripts/lib/__tests__/ci-fixture-annotations.test.mjs',
   'scripts/lib/__tests__/ci-lanes-selftest-guard.test.mjs',
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',
