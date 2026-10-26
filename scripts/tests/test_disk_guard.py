@@ -462,6 +462,10 @@ class CheckTest(unittest.TestCase):
             with patch.object(guard, "free_pct", return_value=guard.LOW_PCT + 20), \
                     patch.object(guard, "mount_points", return_value=set()):
                 self.assertFalse(guard.reclaimable(None, roots=[root]))
+            # An unreadable mount table fails closed: this feeds a deletion decision.
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=None):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
 
     def test_cleanup_lock_serializes_workers_and_recovers_after_release(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
