@@ -20,6 +20,7 @@ import {
   shell,
   type WebContents,
 } from 'electron';
+import * as Sentry from '@sentry/electron/main';
 import { autoUpdater } from 'electron-updater';
 import { openCurrentOvieInBrowser } from './ovie-browser-recovery';
 import {
@@ -38,6 +39,10 @@ import {
   toDesktopBuildIdentityJson,
 } from './build-identity';
 import { BAKED_DESKTOP_BUILD_IDENTITY } from './build-identity.generated';
+import {
+  resolveDesktopSentryOptions,
+  wantsSyntheticSentryError,
+} from './desktop-sentry';
 import {
   clearDesktopBrowserAuthRouteState,
   type DesktopAuthIntent,
@@ -98,7 +103,7 @@ import {
   shouldGrantTrustedHudScreenPermissionCheck,
 } from './desktop-permissions';
 import { createDesktopSecurityReporter } from './desktop-security-reporting';
-import { APP_ENV, APP_URL } from './env';
+import { APP_ENV, APP_URL, SENTRY_DSN } from './env';
 import {
   decideHudBuildReload,
   getHudBuildFingerprint,
@@ -207,6 +212,24 @@ const authNavigationRecoveries = new Map<
   ReturnType<typeof createAuthHandoffNavigationRecovery>
 >();
 const URL_DISPOSITION_OPTIONS = { appUrl: APP_URL, appEnv: APP_ENV } as const;
+
+// Main-process error and native-crash reporting. Off without a baked DSN and in
+// local builds. Release = desktop version, dist = source revision (matches the
+// sourcemaps uploaded by scripts/upload-sourcemaps.mjs).
+const desktopSentryOptions = resolveDesktopSentryOptions({
+  dsn: SENTRY_DSN,
+  appEnv: APP_ENV,
+  version: BAKED_DESKTOP_BUILD_IDENTITY.version,
+  sourceRevision: BAKED_DESKTOP_BUILD_IDENTITY.sourceRevision,
+});
+if (desktopSentryOptions) {
+  Sentry.init(desktopSentryOptions);
+  if (wantsSyntheticSentryError(process.argv)) {
+    // Release proof: launch the installed app with --sentry-synthetic-error.
+    Sentry.captureException(new Error('synthetic-capture-check: desktop main'));
+    void Sentry.flush(5000).finally(() => app.exit(0));
+  }
+}
 const APP_ENTRY_URL = buildAppUrl('/app/chat');
 const SETTINGS_URL = buildAppUrl('/app/settings');
 const APP_BACKGROUND_COLOR = SYSTEM_B_DESKTOP_TOKENS.backgroundColor;
