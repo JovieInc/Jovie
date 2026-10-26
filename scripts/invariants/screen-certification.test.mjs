@@ -210,9 +210,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('rejects stale product names, versions, destinations, locales, and disabled-feature screenshot claims', () => {
     const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.presence');
-    const current = readProductReferenceOwner().getProductProjection({
-      PROFILES_WORKSPACE: true,
-    });
+    const current = readProductReferenceOwner().getProductProjection({});
     const proof = { ...validExternalProof(screen), productReferences: current };
     const errors = candidate =>
       evaluateScreenProof(candidate, { screen, headSha: HEAD }).filter(
@@ -236,12 +234,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       },
       snapshot => {
         snapshot.features[0].destination = '/app/profiles';
-      },
-      snapshot => {
-        snapshot.flags.PROFILES_WORKSPACE = false;
-      },
-      snapshot => {
-        delete snapshot.flags.PROFILES_WORKSPACE;
       },
       snapshot => {
         snapshot.features = [];
@@ -4354,6 +4346,27 @@ if (p.endsWith('/zip')) {
     });
     assert.deepEqual(result.issues, []);
     assert.ok(result.excludedChanges.length >= 4);
+  });
+
+  it('registers the existing sounds page and still requires exact-head rendered evidence', () => {
+    const changedFiles = ['apps/web/app/[username]/[slug]/sounds/page.tsx'];
+    const registration = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+    });
+    assert.deepEqual(registration.issues, []);
+    assert.deepEqual(
+      registration.changedScreens.map(screen => screen.id),
+      ['web.smartlink-sounds']
+    );
+    const certification = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(certification.issues, [
+      'missing exact-head proof for web.smartlink-sounds',
+    ]);
   });
 
   it('rejects missing registration for a changed in-scope screen', () => {

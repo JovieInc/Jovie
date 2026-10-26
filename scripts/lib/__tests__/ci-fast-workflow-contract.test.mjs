@@ -280,6 +280,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // select the identical files with complementary -k expressions so every
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/prod-errors/test_prod_errors.py',
       'scripts/tests/test_gh_retry.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',
@@ -353,7 +354,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(30);
+    expect(LANES_PYTEST_FILES).toHaveLength(32);
+    expect(whole).toContain('scripts/tests/test_factory_signals.py');
+    expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
     expect(command).toContain(
@@ -529,7 +532,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/desktop-release-guard.test.mjs',
       'scripts/desktop-release-publisher.test.mjs',
       'apps/desktop/electron-builder.yml',
-      'apps/desktop/electron-builder.staging.yml',
       'apps/desktop/scripts/notarize-release-dmg.cjs',
     ]) {
       expect(

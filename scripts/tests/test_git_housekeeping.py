@@ -10,6 +10,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -61,3 +62,33 @@ class IsolatedTempdirContractTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MountedTreeRefusalTest(unittest.TestCase):
+    """2026-10-25: a delete of a bind-mounted workspace removed another volume's files."""
+
+    def table(self, tmp, *mounts):
+        path = Path(tmp) / "mountinfo"
+        path.write_text("".join(f"1 0 8:1 / {m} rw - ext4 /dev/x rw\n" for m in mounts))
+        return path
+
+    def test_refuses_a_mount_point_or_a_tree_containing_one(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve() / "ws"
+            (root / "inner").mkdir(parents=True)
+            self.assertEqual(git_housekeeping.mounted_inside(root, self.table(tmp, root)), root)
+            self.assertEqual(git_housekeeping.mounted_inside(root, self.table(tmp, root / "inner")), root / "inner")
+            self.assertIsNone(git_housekeeping.mounted_inside(root, self.table(tmp, Path(tmp).resolve())))
+            self.assertIsNone(git_housekeeping.mounted_inside(root, self.table(tmp, "/srv/other")))
+            with self.assertRaises(OSError):  # unreadable table fails closed
+                git_housekeeping.mounted_inside(root, Path(tmp) / "missing")
+
+    def test_remove_tree_leaves_a_mounted_tree_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "ws"
+            root.mkdir()
+            (root / "keep.txt").write_text("x")
+            with unittest.mock.patch.object(git_housekeeping, "mounted_inside", return_value=root):
+                with self.assertRaises(OSError):
+                    git_housekeeping.remove_tree(root)
+            self.assertTrue((root / "keep.txt").exists())
