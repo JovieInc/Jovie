@@ -128,7 +128,7 @@ export function AudiencePill({
 
   return (
     <li
-      className='artist-profile-audience-pill ds-glass group'
+      className={cn('artist-profile-audience-pill', 'ds-glass', 'group')}
       data-accent={accentIndex % PILL_ACCENTS.length}
     >
       <span className='relative z-10 flex items-center gap-2.5 px-4 py-3'>

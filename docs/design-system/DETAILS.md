@@ -1245,3 +1245,116 @@ for the canonical CSS + Tailwind references.
 | `apps/web/app/(home)/layout.tsx` | Homepage shell — `PublicPageShell` |
 
 ---
+
+## Extraction reference
+
+The following token section preserves the original context extraction snapshot. Its baseline table is historical; current severities and counts live in [DESIGN.md](../../DESIGN.md#enforcement) and the source registries.
+
+## Use Tokens, Not Raw Colors
+
+Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the root cause of black-on-black / white-on-white contrast failures when the app renders across light and dark themes. **Always use System B semantic tokens** so values adapt automatically.
+
+### Banned patterns
+
+| Banned | Why | Use instead |
+|--------|-----|-------------|
+| `text-black` without `dark:text-*` | Black text invisible in dark mode | `text-foreground` |
+| `text-white` without `dark:text-*` | White text invisible in light mode | `text-foreground` or `text-primary-token` |
+| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-base` or `bg-surface-1` |
+| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-base` |
+| `text-[#hex]` / `bg-[#hex]` / `border-[#hex]` | Arbitrary hex bypasses token system entirely | Pick a named token from the Color System tables below |
+
+**Opacity-modified overlay patterns** (`text-black/20`, `bg-white/5`) are intentional and allowed — they represent translucent overlays on known-dark surfaces, not absolute colors.
+
+### Enforcement
+
+`error` blocks; `warn` advises. Baselines are committed allowances, not live
+inventories. All five raw-color contrast buckets are **zero**; new matches fail.
+
+CI lanes are path-selected; blocking failures fail the required aggregate:
+
+- **L** — [Source Validation](../../.github/workflows/source-validation.yml),
+  `pnpm --filter @jovie/web lint:eslint:changed` (author-time full check:
+  `pnpm --filter @jovie/web lint:eslint`).
+- **S** — `ci-fast` → Structural Contract (web), including
+  `pnpm --filter @jovie/web lint:contrast-ratchet` and the optical-grid tests.
+- **G** — Source Validation → `merge-group-unit-guards` on web/UI source PRs;
+  `ci-fast` → Merge-group unit guards on selected merge groups. Both run
+  `tests/unit/design-system` through Vitest.
+- **D** — `ci-fast` → Design governance enforcement, including
+  `lint:touch-target` and `lint:ui-feel`.
+- **I** — `ci-fast` → Design-system source identity ratchet,
+  `pnpm design:source-count-ratchet`.
+
+The commands and selectors live in [ci-fast-lanes.mjs](../../scripts/ci-fast-lanes.mjs).
+Rule severities come from [the web ESLint config](../../apps/web/eslint.config.js).
+Count baselines live in [the design-system test directory](../../apps/web/tests/unit/design-system/)
+unless linked below.
+
+| Gate | Severity | CI lane | Blocks? | Committed baseline |
+| --- | --- | --- | --- | --- |
+| `@jovie/no-hardcoded-theme-colors` | `error` | L | Yes | None (no grandfathered count) |
+| `@jovie/ui-feel` | `off` | L | No | None (enforced by the UI-feel ratchet below) |
+| `arbitrary-radius` | `error` | S + G | Yes | 14 occurrences; 8 files |
+| `arbitrary-values` | `error` | G + I | Yes | 2167 |
+| `component-family` | `error` | G | Yes | button=37; emptyState=6; entityHeader=1; palette=4; shell=21; status=9 |
+| `contrast (computed pairs)` | `error` | S + G | Yes | No count baseline; 4.5:1 normal text, 3:1 large text/UI |
+| `contrast (raw colors)` | `error` | S | Yes | arbitraryHex=0; bareBgBlack=0; bareBgWhite=0; bareTextBlack=0; bareTextWhite=0 |
+| `deprecated-button-alias` | `error` | G | Yes | 91 |
+| `linear-namespace` | `error` | G + I | Yes | 700 |
+| `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
+| `source-identity` | `error` | I | Yes | 2055 |
+| `spacing-scale (conservative)` | `error` | S + G | Yes | 590; armed=true; marketing=46; packages/ui=11; web-other=290; web-shell=243 |
+| `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
+| `touch-target` | `error` | D | Yes | 153 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=264; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
+
+The [raw-color baseline](../../apps/web/contrast-ratchet.baseline.json) and
+[computed pair config](../../apps/web/contrast-pairs.config.json) cover separate
+checks. Computed contrast blocks failing resolvable pairs; unresolved pairs
+warn and skip unless `--strict` is supplied. A zero static baseline is not proof
+of rendered contrast on every screen.
+
+The radius detector is active in `concentric-radius-contract.test.ts`.
+Component-family has `WARN_ONLY = false` and also enforces the explicit
+EmptyState path allowlist. Spacing's strict inventory is report-only;
+conservative growth blocks, including per-family ceilings. The source-identity
+gate blocks new `file + rule + value` identities (including arbitrary CSS
+properties), even when total counts stay flat. It also checks the arbitrary-value
+and linear-namespace count ceilings. Lower count baselines in the same PR when
+removing debt; see each detector's shrink policy for merge-group behavior.
+
+The [no-restyle baseline](../../apps/web/tests/unit/design-system/shadcn-no-restyle.baseline.json)
+grants exact legacy paths a lint override; the changed-file baseline probe and
+unit ratchet still block growth. Test/story files and canonical UI internals
+have scoped rule exemptions in the ESLint config. The separate
+[touch-target](../../apps/web/touch-target-ratchet.baseline.json) and
+[UI-feel](../../apps/web/ui-feel-ratchet.baseline.json) baselines remain blocking even
+though the author-time `@jovie/ui-feel` rule is off.
+
+[enforcement-documentation.test.ts](../../apps/web/tests/unit/design-system/enforcement-documentation.test.ts)
+checks this table against effective ESLint severities, committed counts and spacing
+flags. It runs in G and Source Validation's source-read guard for doc/config edits.
+Update the table with its sources; the test never rewrites allowances.
+
+To fix a violation:
+
+1. Replace with a semantic token (preferred), or
+2. Pair with a `dark:` counterpart (`text-black dark:text-white`), or
+3. Add `// eslint-disable-next-line @jovie/no-hardcoded-theme-colors -- <reason>` for intentional brand/brand-swatch exceptions.
+
+---
+
+## Marketing glass
+
+Use `ds-glass` from `apps/web/styles/primitives/glass.css` for translucent
+marketing surfaces. It owns the restrained 8px blur, 3% Noir Ion tint, and
+1px inner highlight, including solid accessibility fallbacks. Consumers own
+geometry and interaction states; do not add reflections or white washes.
+The docked header uses the same primitive on its existing scroll-state layer.
+
+`pnpm --filter @jovie/web lint:marketing-glass` blocks raw backdrop effects,
+inline filters, and independent glass classes in marketing routes, homepage,
+marketing/site and legacy `features/home` components, and HeaderNav. It runs in web lint, Source Validation,
+and the structural CI lane. The separately owned `homepage/hero-light` subtree
+is explicitly excluded from this migration and guard. Footer files are scanned.

@@ -126,6 +126,7 @@ export const PR_CHEAP_SCAN_COMMANDS = Object.freeze([
   'pnpm tailwind:check',
   'pnpm --filter=@jovie/web run lint:no-native-dialogs',
   'pnpm --filter=@jovie/web run lint:seo',
+  'pnpm --filter=@jovie/web run lint:marketing-glass',
   'pnpm --filter=@jovie/web run lint:contrast-ratchet',
   'pnpm design:shared-ui-visual-arbitrary:check',
   'pnpm design:overlay-layers:check',

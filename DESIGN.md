@@ -111,17 +111,8 @@ Read [the subtraction principle reference](docs/design-system/DETAILS.md#subtrac
 
 Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the root cause of black-on-black / white-on-white contrast failures when the app renders across light and dark themes. **Always use System B semantic tokens** so values adapt automatically.
 
-### Banned patterns
 
-| Banned | Why | Use instead |
-|--------|-----|-------------|
-| `text-black` without `dark:text-*` | Black text invisible in dark mode | `text-foreground` |
-| `text-white` without `dark:text-*` | White text invisible in light mode | `text-foreground` or `text-primary-token` |
-| `bg-white` without `dark:bg-*` | White bg may trap dark text in dark mode | `bg-base` or `bg-surface-1` |
-| `bg-black` without `dark:bg-*` | Black bg may trap light text | `bg-base` |
-| `text-[#hex]` / `bg-[#hex]` / `border-[#hex]` | Arbitrary hex bypasses token system entirely | Pick a named token from the Color System tables below |
-
-**Opacity-modified overlay patterns** (`text-black/20`, `bg-white/5`) are intentional and allowed — they represent translucent overlays on known-dark surfaces, not absolute colors.
+Read the [token usage reference](docs/design-system/DETAILS.md#use-tokens-not-raw-colors) for banned patterns. The live enforcement table below owns current counts.
 
 ### Enforcement
 
@@ -225,20 +216,6 @@ Read [the canonical foundation decisions](docs/design-system/DETAILS.md#ds_found
 ## Borders & Radius
 
 Read [the borders & radius reference](docs/design-system/DETAILS.md#borders--radius) when changing this area.
-
-## Marketing glass
-
-Use `ds-glass` from `apps/web/styles/primitives/glass.css` for translucent
-marketing surfaces. It owns the restrained 8px blur, 3% Noir Ion tint, and
-1px inner highlight, including solid accessibility fallbacks. Consumers own
-geometry and interaction states; do not add reflections or white washes.
-The docked header uses the same primitive on its existing scroll-state layer.
-
-`pnpm --filter @jovie/web lint:marketing-glass` blocks raw backdrop effects,
-inline filters, and independent glass classes in marketing routes, homepage,
-marketing/site and legacy `features/home` components, and HeaderNav. It runs in web lint, Source Validation,
-and the structural CI lane. The separately owned `homepage/hero-light` subtree
-is explicitly excluded from this migration and guard. Footer files are scanned.
 
 ## Shadows
 
