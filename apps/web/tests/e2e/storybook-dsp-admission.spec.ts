@@ -111,7 +111,7 @@ test('rejects an unsafe non-Spotify handoff', async ({ page }) => {
     '/iframe.html?id=release-musicservicedial--three-services&viewMode=story'
   );
   await expect(page.locator('[data-dsp-provider="spotify"]')).toBeVisible();
-  await page.getByRole('button', { name: 'Select Apple Music' }).click();
+  await page.getByRole('option', { name: 'Apple Music' }).click();
   const action = page.locator('[data-dsp-provider="apple_music"]');
   await expect(action).toBeVisible();
   await action.evaluate(element =>
