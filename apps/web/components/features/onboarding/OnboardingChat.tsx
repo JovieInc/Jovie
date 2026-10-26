@@ -1201,14 +1201,14 @@ export function OnboardingChat({
   // send) used to collapse the bottom-anchored composer box ~24px after first
   // paint. The banner height is measured while it is mounted (ghost line,
   // sized provider mount or guidance: whichever it contains), and an inert
-  // spacer of that height holds the space until the first message renders and
-  // the empty-state composer is replaced.
+  // spacer of that height holds the space for as long as the centered
+  // composer stays put (the starter auto-sends, so messages exist before the
+  // composer docks), instead of releasing it when the first message appears.
   const holdsStarterBannerSpace =
     !flowStatus &&
     heldBannerHeight > 0 &&
     hasInitialStarterPrompt &&
-    messages.length === 0 &&
-    chatError === null &&
+    !shouldDockComposer &&
     !isSecurityCheckRecovery;
   useEffect(() => {
     if (shouldDockComposer) return;

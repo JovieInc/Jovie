@@ -190,17 +190,20 @@ export function installReplyLayoutProbe(): void {
         const tag = el.getAttribute('data-testid') ?? el.tagName.toLowerCase();
         return `${tag}:${box.height.toFixed(0)}`;
       };
-      const kids = [...composer.children].flatMap(child => [
-        describe(child),
-        ...[...child.children].map(grand => `  ${describe(grand)}`),
-      ]);
+      const walk = (el: Element, depth: number): string[] => [
+        `${'  '.repeat(depth)}${describe(el)}`,
+        ...(depth < 4
+          ? [...el.children].flatMap(child => walk(child, depth + 1))
+          : []),
+      ];
+      const kids = [...composer.children].flatMap(child => walk(child, 0));
       const signature = `${composer.getBoundingClientRect().height.toFixed(0)} [${kids.join(' | ')}]`;
       if (signature !== lastSignature) {
         lastSignature = signature;
         frames.push(`${Math.round(performance.now())}ms ${signature}`);
       }
     }
-    if (performance.now() < 4000) requestAnimationFrame(sampleComposer);
+    if (performance.now() < 15000) requestAnimationFrame(sampleComposer);
   };
   requestAnimationFrame(sampleComposer);
 
