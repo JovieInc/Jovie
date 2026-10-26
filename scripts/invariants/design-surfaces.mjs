@@ -467,7 +467,8 @@ const TOOLING_ROUTES = new Set(['CLI', 'DEVELOPERS', 'DOCS']);
  * must be declared here with its destination before it can ship.
  */
 export const NAV_LABEL_DESTINATIONS = Object.freeze({
-  Product: ['PRODUCT'],
+  // /product 308s to /artist-profiles (Phase 1 IA), so the label binds there.
+  Product: ['ARTIST_PROFILES'],
   'Command palette': ['PRODUCT_COMMAND_PALETTE'],
   'Release scheduling': ['PRODUCT_RELEASE_SCHEDULING'],
   'DSP Links': ['PRODUCT_DSP_LINKS'],
@@ -525,7 +526,10 @@ function describeDestination(destination) {
 export function allowedNavDestinations(label) {
   const key = label.trim();
   if (PERSONA_LABELS.has(key.toLowerCase())) {
-    return [`SOLUTIONS_${key.toUpperCase()}`];
+    const own = `SOLUTIONS_${key.toUpperCase()}`;
+    // /solutions/artists 308s to /artist-profiles (Phase 1 IA); the artists
+    // label may name either, the redirect owner being its real page.
+    return key.toLowerCase() === 'artists' ? [own, 'ARTIST_PROFILES'] : [own];
   }
   return Object.hasOwn(NAV_LABEL_DESTINATIONS, key)
     ? NAV_LABEL_DESTINATIONS[key]
