@@ -86,7 +86,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       reactivationSection.getByRole('heading', {
-        name: 'Notify listeners automatically.',
+        name: 'Notify listeners for you.',
       })
     ).toBeInTheDocument();
     expect(
