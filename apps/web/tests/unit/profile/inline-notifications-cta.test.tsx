@@ -281,6 +281,33 @@ describe('ProfileInlineNotificationsCTA flow', () => {
     expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
   });
 
+  it('shows success but never the name or birthday step when sign-up has no mailbox proof', async () => {
+    // Returning verified email (or SMS): subscribe resolves 'subscribed' with no
+    // code step, so no signup-session cookie exists and the name save would 403.
+    const handleSubscribe = vi.fn().mockResolvedValue('subscribed');
+    mockUseSubscriptionForm.mockReturnValue(
+      buildFormState({ handleSubscribe })
+    );
+
+    render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^submit$/i }));
+
+    expect(await screen.findByText(/Updates are on for/)).toBeInTheDocument();
+
+    // Wait past the success hold; the flow must close, not advance to a step.
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    expect(screen.queryByTestId('mobile-name-input')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId('mobile-birthday-month')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('heading', { name: 'First Name' })
+    ).not.toBeInTheDocument();
+  });
+
   it('reports overlay open state through onFlowOpenChange', async () => {
     const onFlowOpenChange = vi.fn();
 
