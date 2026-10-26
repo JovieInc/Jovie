@@ -24,6 +24,7 @@ import hashlib
 import importlib
 import math
 import json
+import types
 import os
 import random
 import re
@@ -49,6 +50,9 @@ import lifecycle  # noqa: E402
 import devin_free_policy  # noqa: E402
 import autoscale  # noqa: E402
 import capacity_limit  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 import disk_guard  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
@@ -57,9 +61,16 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
+import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
+from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
+import machine_gap  # noqa: E402
+import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
+import update_drain  # noqa: E402  (drain gate admission while an update waits)
 import linear_app_token  # noqa: E402  (Jovie Lanes OAuth app quota, separate from Tim's user)
 import linear_sync  # noqa: E402  (local issue mirror, claim ledger, write outbox)
 import ownership  # noqa: E402  (started-state live-owner invariant)
+import fleet_ledger  # noqa: E402  (external agent claims, stranded-claim view)
 import pr_events  # noqa: E402
 import remediation  # noqa: E402  (classifier, router, escalation ladder)
 import shipping_attribution  # noqa: E402  (receipt-first merged-PR provenance)
@@ -68,12 +79,19 @@ import worktree_sweep  # noqa: E402  (idle / merged-PR checkout retirement, JOV-
 import worktree_pool  # noqa: E402  (pre-installed worktree pool, JOV-7705)
 import reason_lane  # noqa: E402
 import outcome_lane  # noqa: E402
+import throughput_sentinel  # noqa: E402
+import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
+import capacity_live  # noqa: E402  (live quota reads for the capacity registry)
+import capacity_registry  # noqa: E402  (caps and policies come from ops/registry/capacity.json)
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
 import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
+import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
+import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
 # This module as imported: the event hooks take it as `lane`. Bound once, because other
 # loaders (the HUD) may later rebind sys.modules["lane_runner"] to a fresh copy.
@@ -121,7 +139,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -134,13 +152,18 @@ LANE_TESTS = ["scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_a
               "scripts/tests/test_design_gate.py",
               "scripts/tests/test_file_overlap.py",
               "scripts/tests/test_remediation.py", "scripts/tests/test_autoscale.py",
-              "scripts/tests/test_capacity_limit.py", "scripts/tests/test_fleet_gate_emitter.py",
+              "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py"]
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
+              "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
 # PROMOTION line (JOV-6836).
-RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
+RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted gh) used by the throughput sentinel.
+                  "scripts/apiclient/__init__.py", "scripts/apiclient/__main__.py", "scripts/apiclient/cache.py", "scripts/apiclient/client.py", "scripts/apiclient/contract.py", "scripts/apiclient/credentials.py", "scripts/apiclient/fake.py", "scripts/apiclient/gh.py", "scripts/apiclient/github.py", "scripts/apiclient/headers.py", "scripts/apiclient/legacy.py", "scripts/apiclient/linear.py", "scripts/apiclient/policy.py", "scripts/apiclient/store.py",
+                  "packages/api-client/providers.json",
+                  "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",
                   "scripts/promotion-loss-metrics.mjs", "scripts/merge-group-failure-hold.mjs",
@@ -172,7 +195,9 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", "scripts/fleet-gate/gem-priority
                   "scripts/credentials-spend-check.mjs", "scripts/lib/credentials-live-reads.mjs",
                   "scripts/lib/credentials-registry.mjs", "scripts/lib/linear-issue-intake.mjs",
                   "scripts/lib/linear-cooldown.mjs", "ops/registry/credentials.json",
-                  "ops/registry/spend.json", "ops/registry/third-party-grants.jsonl",
+                  "ops/registry/spend.json", "ops/registry/capacity.json",
+                  "scripts/backlog-orchestrator/config/model-registry.json",
+                  "scripts/tests/fixtures/capacity-pricing-vectors.json", "ops/registry/third-party-grants.jsonl",
                   "ops/registry/inventory.gen.json"]
 # Preserve legacy dated run prefixes; only Hyperagent also owns the exact
 # public 15-hex identity digest generated by run_hyperagent_issue.
@@ -515,7 +540,9 @@ class Host:
     def base_slots(self, provider: str, default: int) -> int:
         if provider == 'devin' and not devin_free_policy.admission_open(self.agent_timeout):
             return 0
-        return int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+        configured = int(os.environ.get(f"LANES_SLOTS_{provider.upper()}", default))
+        # Pay-per-use lanes earn slots by measured merged PRs per dollar (slot_yield); everything else is as configured.
+        return slot_yield.ceiling(self.state, provider, configured)[0]
 
     def slots(self, provider: str, default: int) -> int:
         return autoscale.effective_slots(self.state, provider, self.base_slots(provider, default))
@@ -524,8 +551,13 @@ class Host:
         return autoscale.intake_slots(self.state, provider, self.base_slots(provider, default))
 
 
-def load_providers(path: Path = HERE / "providers.json") -> dict:
-    return json.loads(path.read_text())
+def load_providers(path: Path = HERE / "providers.json", registry: dict | None = None) -> dict:
+    """providers.json plus the registry's quota limits (softRuns, windowS, maxRuns): the numbers live in
+    ops/registry/capacity.json, not here. Custom paths (tests) keep their own numbers unless a registry is passed."""
+    providers = json.loads(path.read_text())
+    if registry is None and Path(path) == HERE / "providers.json":
+        registry = capacity_registry.load()
+    return capacity_registry.apply_limits(providers, registry) if registry else providers
 
 
 # ---------------------------------------------------------------- selection
@@ -897,6 +929,17 @@ def recent_lane_runs(host: "Host", name: str, window_s: float, now: float, tail_
 
 
 def quota_pressure(host: "Host", name: str, spec: dict, now: float) -> dict:
+    """quota_window_pressure plus the registry's pace adjustment (`paceAdjust`, may be negative):
+    a lane behind pace on use-or-lose quota is cheap to route to, a pool ahead of pace costs more."""
+    seen = quota_window_pressure(host, name, spec, now)
+    if seen.get("ok"):
+        pace = capacity_registry.pace_adjust(capacity_registry.load(), host.state, name, now)
+        if pace["adjust"]:
+            seen = {**seen, "paceAdjust": pace["adjust"], "why": f"{seen.get('why')}; {pace['why']}"}
+    return seen
+
+
+def quota_window_pressure(host: "Host", name: str, spec: dict, now: float) -> dict:
     """{ok, why, pressure}: how much of the lane's quota window is spent. Pressure raises the
     effective cost of subscription and credit lanes as they fill; a bank removes them."""
     quota = spec.get("quota") or {}
@@ -963,7 +1006,8 @@ def lane_availability(host: "Host", self_name: str, providers: dict, now: float 
                   and now - last_at < IDLE_BLOCK_S):
                 verdict = {"ok": False, "why": f"blocked:{last['reason']}", "pressure": 0}
             elif not slot_free(host, name, slots):
-                verdict = {"ok": False, "why": "saturated", "pressure": quota["pressure"]}
+                verdict = {"ok": False, "why": "saturated", "pressure": quota["pressure"],
+                           "paceAdjust": quota.get("paceAdjust", 0)}
         cache[name] = verdict
         return verdict
 
@@ -1180,8 +1224,35 @@ def goal_contract(issue) -> list[str]:
     ]
 
 
+def machine_gate(host: Host, subject: str, title: str, labels, text: str, provider: str | None,
+                 fp: str | None = None, receipt: dict | None = None) -> list[str]:
+    """Prompt clause of the abstraction gate for this run, after recording it in the fingerprint ledger.
+    Best effort: an unreadable ledger yields the plain reminder, never a failed run."""
+    try:
+        fp = fp or machine_gap.fingerprint(title, labels)
+        decision = machine_gap.decide(host.state, fp, text, labels, est_usd=run_cost_usd(host, provider))
+        machine_gap.record(host.state, fp, "lane-run", subject, est_usd=run_cost_usd(host, provider))
+        if receipt is not None:
+            receipt["machineGate"] = {key: decision[key] for key in ("fp", "required", "reason", "occurrences", "waived")}
+        return machine_gap.clause(decision)
+    except (OSError, ValueError, TypeError, KeyError):
+        return []
+
+
+def run_cost_usd(host: Host, provider: str | None) -> float | None:
+    """Average USD per run for this lane from the capacity metrics the doctor writes (None when unmeasured)."""
+    try:
+        data = json.loads((host.state / "capacity-metrics.json").read_text())
+    except (OSError, ValueError):
+        return None
+    names = {"codex": "openai-codex", "grok": "xai-grok", "claude": "anthropic-claude", "hyperagent": "hyperagent"}
+    row = (data.get("providers") or {}).get(names.get(str(provider), str(provider))) or {}
+    cost, runs = row.get("costUsd"), row.get("runs")
+    return cost / runs if isinstance(cost, (int, float)) and isinstance(runs, (int, float)) and runs else None
+
+
 def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | None = None,
-                  prior_attempts: str = "") -> str:
+                  prior_attempts: str = "", machine: list[str] | None = None) -> str:
     sensitive_contract = []
     if provider in IMPLEMENTATION_ONLY_PROVIDERS:
         sensitive_contract += [
@@ -1222,6 +1293,7 @@ def render_prompt(issue: Issue, branch: str, context_pack: str, provider: str | 
         "",
         *goal_contract(issue),
         *PLANNING_CONTRACT,
+        *([*machine, ""] if machine else []),
         "## Contract (the harness verifies every line; unmet items fail the run)",
         f"- Repo {REPO_SLUG}. Work on branch `{branch}` from origin/main. Read CLAUDE.md, the",
         "  rules it routes to for the files you touch, and docs/PR_FLOW.md before editing.",
@@ -1378,6 +1450,43 @@ def not_shippable_reason(output: str) -> str | None:
     """The agent's explicit decline, e.g. already fixed on main; routed to Triage, never retried."""
     found = re.findall(r"NOT-SHIPPABLE:\s*(.+)", output)
     return found[-1].strip()[:500] if found else None
+
+
+# Why a fix run that pushed nothing changed nothing (Gem ledger, 253 fix-no-change runs in
+# 3.5 days all carried reasons=[]): 105 were a codex_lane crash before the agent started
+# (account/read app-server timeout, exit 1), 112 were the agent's own NOT-SHIPPABLE decline
+# (infrastructure red or a failure main already has), 17 found the head already green. A
+# specific reason lets the budget, the backoff and the ledger treat each differently.
+LANE_CRASH_SIGNATURES = (
+    ("codex-account-metadata-timeout", re.compile(r"TimeoutError: account/read: app-server response unavailable")),
+)
+DECLINE_INFRA = re.compile(
+    r"rate limit|HTTP 40[38]|HTTP 5\d\d|infrastructure|timed out fetching|outage|flak|Doppler",
+    re.IGNORECASE)
+DECLINE_BASE_RED = re.compile(
+    r"origin/main|untouched main|\bmain\b|merge base|pre-existing|preexisting|inherited|unrelated|"
+    r"identically|already fixed", re.IGNORECASE)
+
+
+def classify_unpushed_repair(exit_code, log_text: str) -> list[str]:
+    """Specific reason codes for a fix run that pushed nothing. The first code is the cause.
+
+    lane-crash:<signature>      the provider wrapper died before an agent worked (attempt refunded)
+    agent-exit:<n>              the agent exited non-zero without pushing
+    agent-declined:<class>:<why> NOT-SHIPPABLE; class infra | base-red | other (infra and
+                                base-red spend the head's budget: a second read declines again)
+    no-change:agent-ended-without-push  the agent finished cleanly and pushed nothing
+    """
+    if exit_code not in (0, None):
+        for name, pattern in LANE_CRASH_SIGNATURES:
+            if pattern.search(log_text):
+                return [f"lane-crash:{name}", f"agent-exit:{exit_code}"]
+        return [f"agent-exit:{exit_code}"]
+    declined = not_shippable_reason(log_text)
+    if declined:
+        kind = "infra" if DECLINE_INFRA.search(declined) else "base-red" if DECLINE_BASE_RED.search(declined) else "other"
+        return [f"agent-declined:{kind}:{declined[:160]}"]
+    return ["no-change:agent-ended-without-push"]
 
 
 def parse_numstat(text: str) -> list[Change]:
@@ -1913,7 +2022,7 @@ def _tmp_fallback_publish(scope_id: str, reset_s: float) -> None:
         _chmod_private(scope, 0o700)
         reset_ms = int(reset_s * 1000)
         record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
-        record.write_text(json.dumps({"schema": 1, "resetAt": reset_ms}))
+        atomic_write_text(record, json.dumps({"schema": 1, "resetAt": reset_ms}))
         _chmod_private(record, 0o600)
     except OSError:
         pass
@@ -2520,6 +2629,408 @@ class AgentProcesses:
         raise RuntimeError("owned-processes-still-running")
 
 
+    def observe_fixed(self, deadline):
+        """This custodian's exact Linux births, never environment/name matching.
+
+        Reuse the maintained proc-stat identity reader, not the self-test scope
+        marker, environment census or its cleanup authority. Default observe and
+        stop remain byte-exact. The root is never reaped while ownership is read.
+        """
+        handles = self.__dict__.setdefault("_fixed_handles", {})
+        rows = {}
+        for entry in Path("/proc").iterdir():
+            if time.monotonic() >= deadline:
+                raise FleetObservationHeld("fleet-observer-process-read-deadline")
+            if entry.name.isdecimal():
+                row = _selftest_process_row(entry, int(entry.name), os.getuid())
+                if row is not None: rows[int(entry.name)] = row
+        live = {pid for pid, birth in self.owned.items() if pid in rows and rows[pid][3] == birth}
+        if not self.owned and self.pid in rows: live.add(self.pid)
+        while True:
+            children = {pid for pid, row in rows.items()
+                        if row[0] in live or row[0] == self._fixed_custodian
+                        or (not self.__dict__.get("_fixed_leader_reaped", False) and row[1] == self.pid)}
+            if children <= live: break
+            live |= children
+        escaped = any(rows[pid][1] != self.pid for pid in live)
+        self._fixed_escaped = self.__dict__.get("_fixed_escaped", False) or escaped
+        for pid in live:
+            row = rows[pid]
+            if pid in self.owned and self.owned[pid] != row[3]:
+                raise FleetObservationHeld("fleet-observer-birth-changed")
+            if pid not in handles:
+                try:
+                    fd = os.pidfd_open(pid, 0)
+                except ProcessLookupError:
+                    if _selftest_process_row(Path("/proc") / str(pid), pid, os.getuid()) is None:
+                        continue
+                    raise FleetObservationHeld("fleet-observer-signal-identity-unavailable") from None
+                after = _selftest_process_row(Path("/proc") / str(pid), pid, os.getuid())
+                if after is None:
+                    os.close(fd)
+                    continue
+                if after[3] != row[3]:
+                    os.close(fd)
+                    raise FleetObservationHeld("fleet-observer-signal-identity-changed")
+                handles[pid] = fd
+            self.owned[pid] = row[3]
+        return {pid: rows[pid] for pid in live if not rows[pid][2].startswith("Z")}, self._fixed_escaped
+
+    def stop_fixed(self, deadline):
+        """TERM/KILL and actual drain fit within the one fixed profile deadline."""
+        import signal
+        term_until = min(time.monotonic() + 2, deadline - 1)
+        sent = set()
+        while time.monotonic() < deadline:
+            rows, _ = self.observe_fixed(deadline)
+            if not rows: return
+            sig = signal.SIGTERM if time.monotonic() < term_until else signal.SIGKILL
+            for pid, row in rows.items():
+                if (pid, row[3], sig) in sent: continue
+                current = _selftest_process_row(Path("/proc") / str(pid), pid, os.getuid())
+                if current is None or current[2].startswith("Z"): continue
+                if current[3] != row[3]:
+                    raise FleetObservationHeld("fleet-observer-signal-identity-changed")
+                try:
+                    signal.pidfd_send_signal(self._fixed_handles[pid], sig, None, 0)
+                except ProcessLookupError:
+                    # This kernel-bound birth exited after the identity read.
+                    # Rescan; ESRCH alone does not establish child drain.
+                    continue
+                sent.add((pid, row[3], sig))
+            time.sleep(min(.01, max(0, deadline - time.monotonic())))
+        raise FleetObservationHeld("fleet-observer-cleanup-unproven")
+
+    def close_fixed(self):
+        for fd in self.__dict__.pop("_fixed_handles", {}).values(): os.close(fd)
+
+
+class FleetObservationHeld(RuntimeError):
+    """A fixed read observer has no launch, observation or cleanup authority."""
+
+
+@dataclass(frozen=True)
+class FleetObservationRequest:
+    # In-process only, from the existing writer protocol, never CLI/JSON input.
+    preparation_started: float
+    control_fd: int | None = None
+
+
+FLEET_OBSERVER_EXECUTABLES = {
+    "/usr/bin/python3.12": "1643dacd9feaedc58f3cc581e4d22577dfe25c09b10282936186ccf0f2e61118",
+    "/usr/bin/gh": "56b8bbbb27b066ecb33dbef9a256dc9d1314adaeff0908a752feba6c34053b40",
+    "/usr/bin/git": "2a8c18fbf43da9f692d75474c72bea9dfd796c260b0f3dfe456376abc3bbd668",
+    "/usr/bin/systemctl": "7ba82b5ba146759c710e1b80fadaa3fdbc0f9b85c8fb2c8c3196b7b1a0037ef8",
+}
+FLEET_OBSERVER_SOURCES = ("gem-priority-gate.py", "closure_health.py", "gem_gate_contract.py",
+                          "summer_ci_audit.py", "symphony_proof_context.py")
+
+
+def _fleet_observer_executable(name):
+    """Verify the actual existing route; never replace a shim by changing PATH."""
+    path = Path("/usr/bin") / name
+    expected = FLEET_OBSERVER_EXECUTABLES.get(str(path))
+    try:
+        actual = shutil.which(name)
+        if not expected or actual is None or Path(actual).resolve(strict=True) != path:
+            raise FleetObservationHeld("fleet-observer-existing-executable-route-unknown")
+        info = path.lstat()
+        raw, opened = lifecycle._read_regular(path, 64 * 1024 * 1024)
+        if (info.st_uid != 0 or info.st_mode & 0o6022 or raw[:4] != b"\x7fELF"
+                or opened.st_uid != 0 or opened.st_mode & 0o6022
+                or hashlib.sha256(raw).hexdigest() != expected):
+            raise FleetObservationHeld("fleet-observer-executable-closure-changed")
+    except OSError:
+        raise FleetObservationHeld("fleet-observer-executable-unavailable") from None
+    return str(path)
+
+
+def _fleet_observer_transport():
+    if any(key.startswith(("LD_", "DYLD_")) or key in {"BASH_ENV", "ENV"} for key in os.environ):
+        raise FleetObservationHeld("fleet-observer-loader-environment-unknown")
+    if os.environ.get("GH_HOST", "github.com") != "github.com":
+        raise FleetObservationHeld("fleet-observer-existing-explicit-github-identity-required")
+    return _fleet_observer_executable("gh")
+
+
+def _fleet_observation_profile(cmd, cwd, request):
+    """Fail before forking on an unknown fixed source/OS/transport closure.
+
+    This exact Gem executable baseline is private pending Native review. A changed
+    binary is a qualification hold, never a fallback to a wrapper or another login.
+    No supplied packet, arbitrary command or environment marks a profile trusted.
+    """
+    import ast
+    import signal
+    import threading
+    now = time.monotonic()
+    if (type(request) is not FleetObservationRequest or type(request.preparation_started) not in (int, float)
+            or not math.isfinite(request.preparation_started) or not 0 <= now - request.preparation_started < 50
+            or sys.platform != "linux" or threading.active_count() != 1
+            or not all(callable(getattr(os, name, None)) for name in ("fork", "waitid", "pidfd_open"))
+            or not callable(getattr(signal, "pidfd_send_signal", None)) or not hasattr(os, "WNOWAIT")):
+        raise FleetObservationHeld("fleet-observer-platform-or-preparation-unavailable")
+    if request.control_fd is not None and (type(request.control_fd) is not int or request.control_fd < 0
+            or not stat.S_ISFIFO(os.fstat(request.control_fd).st_mode)
+            or fcntl.fcntl(request.control_fd, fcntl.F_GETFL) & os.O_ACCMODE != os.O_RDONLY):
+        raise FleetObservationHeld("fleet-observer-explicit-control-pipe-required")
+    state = Path.home() / ".local/state/jovie-lanes"
+    if lifecycle.active() or lifecycle.FD_ENV in os.environ or (state / "current").resolve() != HERE:
+        raise FleetObservationHeld("fleet-observer-canonical-reader-required")
+    gate = HERE.parent / "fleet-gate/gem-priority-gate.py"
+    fixed = [sys.executable, "-I", "-B", "-S", "-X", "pycache_prefix=/dev/null", str(gate), "--observe-work-admission"]
+    if list(cmd) != fixed or Path(cwd) != HERE:
+        raise FleetObservationHeld("fleet-observer-fixed-command-required")
+    _fleet_observer_transport()
+    if not (os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")):
+        raise FleetObservationHeld("fleet-observer-existing-explicit-github-identity-required")
+    # Keep the caller's existing explicit credential; do not fall through to a
+    # minting shim, CLI account lookup or another account. Values never leave env.
+    env = dict(os.environ)
+    for name in FLEET_OBSERVER_EXECUTABLES:
+        _fleet_observer_executable(Path(name).name)
+    if Path(sys.executable).resolve() != Path("/usr/bin/python3.12"):
+        raise FleetObservationHeld("fleet-observer-interpreter-closure-changed")
+    raw, _ = lifecycle._read_regular(HERE / ".release.json", 65536)
+    manifest = lifecycle.validate_release(HERE.parent.parent, json.loads(raw))
+    siblings = {name[:-3] for name in FLEET_OBSERVER_SOURCES}
+    # -B disables writes only. The fixed prefix below the existing null device
+    # prevents bytecode reads too, without deleting a canonical cache.
+    null = Path("/dev/null").lstat()
+    dev = Path("/dev").lstat()
+    if (not stat.S_ISCHR(null.st_mode) or null.st_uid != 0 or null.st_rdev != os.makedev(1, 3)
+            or not stat.S_ISDIR(dev.st_mode) or dev.st_uid != 0 or dev.st_mode & 0o22):
+        raise FleetObservationHeld("fleet-observer-bytecode-boundary-unknown")
+    from importlib.machinery import PathFinder, SourceFileLoader, all_suffixes
+    allowed = {*FLEET_OBSERVER_SOURCES, "scoped_admission.py"}
+    if any(path.name != "__pycache__" and (path.is_dir() and any((path / ("__init__" + suffix)).exists() for suffix in all_suffixes())
+           or any(path.name.endswith(suffix) for suffix in all_suffixes())) and path.name not in allowed
+           for path in gate.parent.iterdir()):
+        raise FleetObservationHeld("fleet-observer-shadow-import-unknown")
+    for name in FLEET_OBSERVER_SOURCES:
+        relative = "scripts/fleet-gate/" + name
+        if relative not in manifest["objects"]:
+            raise FleetObservationHeld("fleet-observer-import-not-manifest-bound")
+        if name != "gem-priority-gate.py":
+            spec = PathFinder.find_spec(name[:-3], [str(gate.parent)])
+            if (spec is None or type(spec.loader) is not SourceFileLoader
+                    or spec.submodule_search_locations is not None or spec.origin != str(gate.parent / name)):
+                raise FleetObservationHeld("fleet-observer-shadow-import-unknown")
+        source, _ = lifecycle._read_regular(gate.parent / name)
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                imports = [node.module] if isinstance(node, ast.ImportFrom) else [alias.name for alias in node.names]
+                for value in imports:
+                    module = (value or "").split(".")[0]
+                    if module in siblings: continue
+                    if module in sys.stdlib_module_names:
+                        if PathFinder.find_spec(module, [str(gate.parent)]) is not None:
+                            raise FleetObservationHeld("fleet-observer-shadow-import-unknown")
+                        continue
+                    # Existing closure policy has an explicit ImportError
+                    # fallback for this optional registry. Never silently drop
+                    # a present registry by adding -S; a present/ambiguous module
+                    # needs its own source binding before this profile may run.
+                    if module == "gem_repo_registry" and importlib.util.find_spec(module) is None:
+                        continue
+                    raise FleetObservationHeld("fleet-observer-import-closure-unknown")
+            if isinstance(node, ast.Call):
+                function = ast.unparse(node.func)
+                if (function in {"os.fork", "os.forkpty", "os.setsid", "os.setpgid", "os.system", "eval", "exec", "__import__"}
+                        or function.startswith(("os.spawn", "os.exec"))
+                        or any(k.arg in {"shell", "start_new_session", "preexec_fn"} and not isinstance(k.value, ast.Constant)
+                               or k.arg in {"shell", "start_new_session", "preexec_fn"} and bool(k.value.value)
+                               for k in node.keywords)):
+                    raise FleetObservationHeld("fleet-observer-nondetaching-closure-unknown")
+        if name == "gem-priority-gate.py":
+            observe = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "observe_signals")
+            entry = next(value for node in ast.walk(observe) if isinstance(node, ast.Dict)
+                         for key, value in zip(node.keys, node.values)
+                         if isinstance(key, ast.Constant) and key.value == "lease")
+            if (not isinstance(entry, ast.IfExp) or ast.unparse(entry.test) != "_WORK_OBSERVATION_ONLY.get()"
+                    or not isinstance(entry.body, ast.Dict)
+                    or any(isinstance(n, ast.Call) for n in ast.walk(entry.body))):
+                raise FleetObservationHeld("fleet-observer-guard-bin-closure-not-excluded")
+    deadline = request.preparation_started + 60
+    if deadline - time.monotonic() < 10:
+        raise FleetObservationHeld("fleet-observer-drain-reserve-exhausted")
+    return fixed, env, deadline
+
+
+def _fleet_observation_drain(owned, process, deadline):
+    """ECHILD, not a zero waitpid result, proves this subreaper has no child."""
+    if not owned.__dict__.get("_fixed_leader_reaped", False):
+        owned.stop_fixed(deadline)
+        owned._fixed_returncode = process.wait(timeout=max(.001, deadline - time.monotonic()))
+        owned._fixed_leader_reaped = True
+    while time.monotonic() < deadline:
+        # A fork/adoption can complete after the preceding /proc enumeration.
+        # Once root is reaped its numeric PGID is no longer an ownership witness.
+        owned.stop_fixed(deadline)
+        try:
+            if os.waitpid(-1, os.WNOHANG)[0] == 0:
+                time.sleep(min(.01, max(0, deadline - time.monotonic())))
+        except ChildProcessError:
+            return owned._fixed_returncode
+    raise FleetObservationHeld("fleet-observer-cleanup-unproven")
+
+
+def _fleet_observation_custodian(command, env, deadline, live_fd, result_fd):
+    """One ephemeral child custodian; no lifecycle, canonical state or retries.
+
+    Linux child-subreaping detects even a pre-snapshot detached orphan as a
+    contract violation. It is not containment against custodian SIGKILL.
+    """
+    import ctypes
+    import select
+    import signal
+    process, owned, payload, cancelled = None, None, bytearray(), [False]
+    result = {"held": "fleet-observer-cleanup-unproven", "drained": False}
+    try:
+        os.setsid()
+        # Close every inherited FD except this invocation's two private ends.
+        for name in os.listdir("/proc/self/fd"):
+            fd = int(name)
+            if fd not in {live_fd, result_fd}:
+                try: os.close(fd)
+                except OSError: pass
+        libc = ctypes.CDLL(None, use_errno=True)
+        if libc.prctl(36, 1, 0, 0, 0) != 0:  # PR_SET_CHILD_SUBREAPER, this process only
+            raise FleetObservationHeld("fleet-observer-subreaper-unavailable")
+        def cancel(*_): cancelled[0] = True
+        signal.signal(signal.SIGTERM, cancel)
+        signal.signal(signal.SIGINT, cancel)
+        signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+        process = subprocess.Popen(command, cwd=HERE, env=env, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                   close_fds=True, start_new_session=True)
+        owned = AgentProcesses(process.pid)
+        owned._fixed_custodian = os.getpid()
+        # A direct, unreaped child cannot have its PID recycled at this point.
+        # Retain its kernel handle before any observation/output failure.
+        owned._fixed_handles = {process.pid: os.pidfd_open(process.pid, 0)}
+        os.set_blocking(process.stdout.fileno(), False)
+        observer_end = deadline - 5
+        failure = None
+        terminal = False
+        while time.monotonic() < deadline:
+            rows, escaped = owned.observe_fixed(deadline)
+            if escaped: failure = "fleet-observer-detached-child"
+            if cancelled[0] or select.select([live_fd], [], [], 0)[0]:
+                failure = "fleet-observer-parent-closed"
+            if time.monotonic() >= observer_end: failure = failure or "fleet-observer-timeout"
+            chunk = os.read(process.stdout.fileno(), 262145 - len(payload)) if select.select([process.stdout], [], [], 0)[0] else b""
+            payload.extend(chunk)
+            if len(payload) > 262144: failure = "fleet-observer-output-bound"
+            terminal = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT) is not None
+            if failure or terminal:
+                code = _fleet_observation_drain(owned, process, deadline)
+                result["drained"] = True
+                if owned.__dict__.get("_fixed_escaped", False):
+                    failure = failure or "fleet-observer-detached-child"
+                if not failure:
+                    while True:
+                        chunk = os.read(process.stdout.fileno(), 262145 - len(payload))
+                        if not chunk: break
+                        payload.extend(chunk)
+                        if len(payload) > 262144: raise FleetObservationHeld("fleet-observer-output-bound")
+                    result = {"returncode": code, "stdout": payload.decode("utf-8"), "drained": True}
+                else:
+                    result = {"held": failure, "drained": True}
+                break
+            select.select([live_fd, process.stdout], [], [], min(.02, max(0, observer_end - time.monotonic())))
+    except BaseException as error:
+        # Do not expose raw exceptions, environments, subprocess stderr or data.
+        result["held"] = (str(error) if isinstance(error, FleetObservationHeld)
+                          else "fleet-observer-output-invalid" if isinstance(error, UnicodeDecodeError)
+                          else "fleet-observer-observation-unavailable")
+        if owned is not None and not result["drained"] and time.monotonic() < deadline:
+            try:
+                _fleet_observation_drain(owned, process, deadline)
+                result["drained"] = True
+            except BaseException: pass
+        if owned is not None and not result["drained"]:
+            # Kernel handles never retarget a recycled PID/PGID, including a
+            # failure during wait itself. Unknown visibility remains held;
+            # best-effort signals cannot be represented as proven drain.
+            for handle in owned.__dict__.get("_fixed_handles", {}).values():
+                try: signal.pidfd_send_signal(handle, signal.SIGKILL, None, 0)
+                except OSError: pass
+    finally:
+        if owned is not None: owned.close_fixed()
+        try:
+            frame = json.dumps(result, separators=(",", ":")).encode()
+            if len(frame) > 1048576:
+                frame = json.dumps({"held": "fleet-observer-result-bound", "drained": result["drained"]}).encode()
+            offset = 0
+            while offset < len(frame) and time.monotonic() < deadline:
+                if select.select([], [result_fd], [], max(0, deadline - time.monotonic()))[1]:
+                    try: offset += os.write(result_fd, frame[offset:])
+                    except BlockingIOError: continue
+        except OSError: pass  # dead reader never receives a positive outcome
+        os._exit(0)
+
+
+def _run_fleet_observation(cmd, cwd, request):
+    """Fixed-profile arm of run_agent; the default provider path is unchanged."""
+    import select
+    command, env, deadline = _fleet_observation_profile(cmd, cwd, request)
+    control = live_r = live_w = result_r = result_w = None
+    pid = None
+    outcome = bytearray()
+    cancelled = False
+    eof = False
+    try:
+        control = os.dup(request.control_fd) if request.control_fd is not None else None
+        live_r, live_w = os.pipe2(os.O_CLOEXEC | os.O_NONBLOCK)
+        result_r, result_w = os.pipe2(os.O_CLOEXEC | os.O_NONBLOCK)
+        watch = select.poll()
+        # POLLHUP is observable even behind queued control bytes. Never consume
+        # or mistake POLLIN/request-body EOF for this explicit writer protocol.
+        if control is not None: watch.register(control, select.POLLHUP | select.POLLERR)
+        if watch.poll(0): raise FleetObservationHeld("fleet-observer-control-unavailable")
+        pid = os.fork()
+        if pid == 0:
+            try:
+                os.close(live_w); os.close(result_r)
+                if control is not None: os.close(control)
+                _fleet_observation_custodian(command, env, deadline, live_r, result_w)
+            finally:
+                os._exit(1)
+        os.close(live_r); live_r = None
+        os.close(result_w); result_w = None
+        while time.monotonic() < deadline:
+            if watch.poll(0) and not cancelled:
+                cancelled = True
+                os.close(live_w); live_w = None
+            ready, _, _ = select.select([result_r], [], [], min(.02, max(0, deadline - time.monotonic())))
+            if ready:
+                chunk = os.read(result_r, 1048577 - len(outcome))
+                if not chunk:
+                    eof = True
+                    break
+                outcome.extend(chunk)
+                if len(outcome) > 1048576: raise FleetObservationHeld("fleet-observer-result-bound")
+        if cancelled: raise FleetObservationHeld("fleet-observer-parent-control-closed")
+        if not eof: raise FleetObservationHeld("fleet-observer-custodian-deadline")
+        try: value = json.loads(outcome)
+        except ValueError: raise FleetObservationHeld("fleet-observer-custodian-unavailable") from None
+        if value.get("drained") is not True or "held" in value:
+            raise FleetObservationHeld(value.get("held", "fleet-observer-cleanup-unproven"))
+        return subprocess.CompletedProcess(command, value["returncode"], value["stdout"], "")
+    finally:
+        for fd in (control, live_r, live_w, result_r, result_w):
+            if fd is not None:
+                try: os.close(fd)
+                except OSError: pass
+        if pid is not None:
+            # Bounded reap only; killing the custodian would discard custody.
+            while time.monotonic() < deadline:
+                if os.waitpid(pid, os.WNOHANG)[0]: break
+                time.sleep(.005)
+
+
 class RunStopped(BaseException):
     """SIGTERM/SIGINT while a provider runs: the caller's `on_kill` revokes publication
     before the owned process tree is killed."""
@@ -2532,7 +3043,7 @@ class CommandNotStarted(OSError):
 def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
               guard_interval: float = 30, on_kill=None,
               _lifecycle_helper: bool = False, _lifecycle_terminal: bool = False,
-              stderr=subprocess.STDOUT) -> subprocess.CompletedProcess:
+              stderr=subprocess.STDOUT, _fleet_observation=None) -> subprocess.CompletedProcess:
     """Track descendants while the provider runs, including detached test sessions.
     Observation cannot recover a child that daemonizes before its first snapshot;
     preserved checkout admission therefore also refuses live working directories.
@@ -2541,6 +3052,11 @@ def run_agent(cmd: list[str], cwd: Path, log, timeout: int, *, guard=None,
     (timeout, guard hold, SIGTERM/SIGINT) writes its revocation receipt first, so a
     stopped run can never be published later (JOV-5060).
     """
+    if _fleet_observation is not None:
+        if (timeout != 60 or log is not None or guard is not None or on_kill is not None
+                or _lifecycle_helper or _lifecycle_terminal or stderr != subprocess.STDOUT):
+            raise FleetObservationHeld("fleet-observer-fixed-profile-required")
+        return _run_fleet_observation(cmd, cwd, _fleet_observation)
     import signal
     free_guard = devin_free_policy.command_guard(cmd, timeout)
     if free_guard:
@@ -2696,7 +3212,7 @@ def cool_down(host: Host, name: str, code: int | None = None) -> bool:
         return False
     path = host.state / "cooldown" / name
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(time.time() + PROVIDER_COOLDOWN_S))
+    atomic_write_text(path, str(time.time() + PROVIDER_COOLDOWN_S))
     return True
 
 
@@ -2881,8 +3397,10 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
                 if api is None:
                     raise OSError("Hyperagent transport unavailable")
                 prompt = render_prompt(issue, branch, context_pack(issue), provider="hyperagent",
-                                       prior_attempts=prior_attempts_context(host, linear, issue))
-                (runs / f"{run_id}.prompt.md").write_text(prompt)
+                                       prior_attempts=prior_attempts_context(host, linear, issue),
+                                       machine=machine_gate(host, issue.identifier, issue.title, issue.labels,
+                                                            issue.description or "", "hyperagent", receipt=receipt))
+                atomic_write_text(runs / f"{run_id}.prompt.md", prompt)
                 def boundary(spend, mutations, phase):
                     execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                                {"spend": spend, "mutations": mutations}, coordination=coordination, boundary_id=phase)
@@ -3002,7 +3520,9 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             worktree_pool.refill_in_background(host.repo)
             brain_context = context_pack(issue)
             prior_attempts = prior_attempts_context(host, linear, issue)
-            prompt = render_prompt(issue, branch, brain_context, provider=name, prior_attempts=prior_attempts)
+            prompt = render_prompt(issue, branch, brain_context, provider=name, prior_attempts=prior_attempts,
+                                   machine=machine_gate(host, issue.identifier, issue.title, issue.labels,
+                                                        issue.description or "", name, receipt=receipt))
             prompt_file = runs / f"{run_id}.prompt.md"
             receipt["contextManifests"] = [write_agent_prompt(
                 prompt_file, prompt, "issue", name,
@@ -3181,6 +3701,10 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
     return gate_pr(host, pr, worktree, log, sensitive=sensitive)
 
 
+UPDATE_DRAIN_REASON = "update-pending-drain"
+STAGING_ADMISSION_WAIT_S = 20.0
+
+
 @contextmanager
 def gate_admission(host: Host, *, staging: bool = False):
     """Serialize seat admission with a non-waiting release proof reservation.
@@ -3191,7 +3715,18 @@ def gate_admission(host: Host, *, staging: bool = False):
     """
     if not staging and lifecycle.draining(host.state):
         raise lifecycle.AdmissionHeld("operator requested natural controller drain")
+    if not staging and update_drain.status(host.state)["active"]:
+        raise lifecycle.AdmissionHeld(UPDATE_DRAIN_REASON)
     admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
+    if staging:
+        # Other workers hold the admission lock for milliseconds while they take a seat; the proof used
+        # to lose to that on the first try. Wait briefly for it, then give up as before.
+        waited = 0.0
+        while not admission.held and waited < STAGING_ADMISSION_WAIT_S:
+            admission.release()
+            time.sleep(0.25)
+            waited += 0.25
+            admission = Locked(host.state / "locks" / "gate-admission.lock", blocking=False)
     seats = []
     try:
         if not admission.held:
@@ -3224,6 +3759,10 @@ def gate_slot(host: Host) -> tuple[Locked, float]:
                         return lock, time.time() - started
                     lock.release()
         except lifecycle.AdmissionHeld as error:
+            if str(error) == UPDATE_DRAIN_REASON:
+                # A pending update is draining the gate: wait in place (bounded by the drain), never cancel.
+                time.sleep(15)
+                continue
             raise RepairStopped(str(error), None, "before-gate-seat") from error
         time.sleep(15)
 
@@ -3293,6 +3832,8 @@ def gate_disposition(pr: dict, held: dict, attempts: dict) -> str | None:
 
 
 def gate_deferral(host: Host, pr: dict) -> str | None:
+    if pr_events.unconfirmed_human_hold(host, pr):
+        return "human-hold-pending"
     held, attempts = held_path(host), host.state / "fix-attempts.json"
     return gate_disposition(pr, json.loads(held.read_text()) if held.exists() else {},
                             json.loads(attempts.read_text()) if attempts.exists() else {})
@@ -3776,6 +4317,25 @@ def read_wake_file(path):
     return data
 
 
+def backlog_wake(host: Host) -> dict:
+    """Event-driven Backlog pass: wake files (issue created/updated, outcome gap, Sentry spike, Tim comment,
+    capacity change) trigger a sync, refill and forced re-rank for just the teams named, now."""
+    teams = {"JOV", *(binding.key for binding in bindings.extra_bindings(THIS))}
+    wakes = binding_refill.drain_wakes(host.state, teams)
+    if not wakes or os.environ.get("LANES_SELFTEST"):
+        return {"wakes": len(wakes)}
+    named = sorted({wake["team"] for wake in wakes})
+    client = Linear(host.linear_env)
+    report = {"wakes": len(wakes), "teams": named,
+              "sync": linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), named)}
+    extra = {binding.key: binding for binding in bindings.extra_bindings(THIS)}
+    for team in named:
+        binding = extra.get(team) or types.SimpleNamespace(key=team, excluded=("hold",), min_todo=0)
+        report[team] = {"refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
+                        "rank": binding_refill.rank_pass(THIS, host, binding, client, force=True)}
+    return report
+
+
 def fix_now(host: Host) -> int:
     """Drain the relay's wake dir immediately instead of waiting for the 5-minute
     tick. Same admission as dispatch(): disk, then the first provider with a free
@@ -3785,6 +4345,10 @@ def fix_now(host: Host) -> int:
     wake_dir = host.state / "wake"
     if not wake_dir.is_dir():
         return 0
+    try:  # backlog events share the wake dir and its path unit; a fault here never blocks red repair
+        backlog_wake(host)
+    except (Exception, SystemExit):
+        pass
     for path in sorted(wake_dir.glob("red-*.json"))[:MAX_WAKE_PER_ACTIVATION]:
         marker = path.with_name(path.name + ".claim")
         try:
@@ -4073,7 +4637,7 @@ def load_escalation(host: Host) -> dict:
 def save_escalation(host: Host, data: dict) -> None:
     path = host.state / "escalation.json"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data))
+    atomic_write_text(path, json.dumps(data))
 
 
 def note_failover(host: Host, previous: str, nxt: str, reason: str) -> None:
@@ -4100,6 +4664,7 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
     """One deduped surface: PR comment, terminal disposition, exhausted label. No second queue."""
     head = pr.get("headRefOid") or ""
     number = pr["number"]
+    hold_pending = False
     already = any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
                   for row in data.get("surfaced") or [])
     if not already:
@@ -4114,10 +4679,16 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
     if classified.get("cls") == "needs-human-decision":
         row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == number
                     and row.get("head") == head), None)
-        if row is not None and not row.get("holdApplied") \
-                and pr_events.add_label(number, pr_events.HUMAN_DECISION_LABEL, sh, prefix=""):
-            row["holdApplied"] = True
-    attempts[str(number)] = {**record, "escalated": True}
+        if row is not None and not row.get("holdApplied"):
+            if pr_events.add_label(number, pr_events.HUMAN_DECISION_LABEL, sh, prefix=""):
+                row["holdApplied"] = True
+                row.pop("holdPending", None)
+            else:
+                # Not confirmed: stay held in every lanes path and retry on a later pass.
+                row["holdPending"] = True
+                hold_pending = True
+    if not hold_pending:
+        attempts[str(number)] = {**record, "escalated": True}
     pr_events.add_label(number, pr_events.EXHAUSTED, sh)
     prefix = ["fix-exhausted"] if record.get("count", 0) else []
     update_json(held_path(host), lambda held, number=number, head=head, prefix=prefix: held.update(
@@ -4137,6 +4708,22 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
         pass
     if number in data["escalating"]:
         data["escalating"] = [item for item in data["escalating"] if item != number]
+
+
+def contain_history_rewrite(host: Host, pr: dict, after: str) -> dict:
+    """A rewritten head leaves the automatic path: the same needs-human-decision surface every
+    other human gate uses (symphony-surface comment, exhausted label, `tim-hold`), keyed to the
+    rewritten head so green-wake, finalizer and fix paths all refuse it."""
+    classified = {"cls": "needs-human-decision", "subtype": "history-rewrite-detected",
+                  "evidence": [f"history-rewrite-detected: {after[:12]} does not descend from "
+                               f"{pr['headRefOid'][:12]}"], "next_action": "tim-decides"}
+    data = load_escalation(host)
+    _surface_exhausted(host, {**pr, "headRefOid": after}, {}, classified, "history-rewrite-detected",
+                       None, {}, data)
+    save_escalation(host, data)
+    row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == pr["number"]
+                and row.get("head") == after), {})
+    return {"surfaced": True, "holdApplied": bool(row.get("holdApplied")), "holdPending": bool(row.get("holdPending"))}
 
 
 def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
@@ -5936,6 +6523,306 @@ def repair_target_node(pr: dict, live) -> dict | None:
         return None
 
 
+PLATFORM_RED_TEXT = fix_red_classes.PLATFORM_TEXT
+
+
+_FAILED_LOGS: dict = {}
+FAILED_LOG_CHECKS, FAILED_LOG_CHARS = 6, 40000
+
+
+def failed_logs(host: Host, pr: dict) -> dict | None:
+    """{check name: failed-job log} for the real red checks on this head, read once per (PR, head); None when a
+    check has no job link or a log is unreadable (an unknown red is never routed around a model)."""
+    cache_key = (str(host.state), pr["number"], pr["headRefOid"])
+    if cache_key in _FAILED_LOGS:
+        return _FAILED_LOGS[cache_key]
+    logs: dict | None = {}
+    for check in fix_red_classes.real_failures(pr)[:FAILED_LOG_CHECKS]:
+        job = re.search(r"/job/(\d+)", check.get("detailsUrl") or "")
+        log = gh_call(["run", "view", "--repo", REPO_SLUG, "--job", job.group(1), "--log-failed"]) if job else None
+        if log is None or log.returncode != 0:
+            logs = None
+            break
+        logs[str(check.get("name"))] = (log.stdout or "")[-FAILED_LOG_CHARS:]
+    if len(_FAILED_LOGS) > 64:
+        _FAILED_LOGS.clear()
+    _FAILED_LOGS[cache_key] = logs
+    return logs
+
+
+def infra_only_red(host: Host, pr: dict) -> str | None:
+    """The infrastructure signature when every real red check on this head failed for a platform
+    reason (rate limit, HTTP 408, missing token, runner loss), else None. 52 of 253 fix-no-change
+    runs were an agent reading such a log and declining; a rerun costs no agent. One rerun per
+    head: a head that is still infra-red after it goes to the agent as before."""
+    kinds = set(pr.get("eventKinds") or [])
+    if pr.get("gateEvidence") or pr.get("queueFailure") or kinds & {"conflict", "review", "dequeued"} \
+            or pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        return None
+    if not fix_red_classes.real_failures(pr):
+        return None
+    logs = failed_logs(host, pr)
+    if not logs:
+        return None
+    found = set()
+    for text in logs.values():
+        hit = PLATFORM_RED_TEXT.search(text)
+        if not hit:
+            return None
+        found.add(re.sub(r"\W+", "-", hit.group(0).lower()).strip("-"))
+    return "+".join(sorted(found))[:60]
+
+
+def claim_infra_rerun(host: Host, pr: dict) -> bool:
+    """True once per (PR, head): the caller may rerun instead of dispatching an agent."""
+    taken = []
+    def change(data: dict) -> None:
+        if data.get(str(pr["number"])) != pr["headRefOid"]:
+            data[str(pr["number"])] = pr["headRefOid"]
+            taken.append(True)
+    try:
+        update_json(host.state / "infra-reruns.json", change)
+    except (OSError, ValueError):
+        return False
+    return bool(taken)
+
+
+OPEN_MIGRATIONS_QUERY = ('query($endCursor:String){repository(owner:"JovieInc",name:"Jovie"){pullRequests(states:OPEN,first:100,'
+                         'after:$endCursor){pageInfo{hasNextPage endCursor}nodes{number files(first:100){nodes{path}}}}}}')
+
+
+def open_pr_migrations(exclude: int) -> dict | None:
+    """{PR number: migration numbers it adds} for every other open PR; None when GitHub cannot be read."""
+    result = gh_call(["api", "graphql", "--paginate", "-f", f"query={OPEN_MIGRATIONS_QUERY}", "--jq",
+                      ".data.repository.pullRequests.nodes[]|{n:.number,f:[.files.nodes[].path]}"])
+    if result.returncode != 0:
+        return None
+    out = {}
+    for line in (result.stdout or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            return None
+        numbers = migration_renumber._numbers(row.get("f") or [])
+        if numbers and row.get("n") != exclude:
+            out[int(row["n"])] = numbers
+    return out
+
+
+def renumber_migrations_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a migration number collision: renumber to the next free number, rebuild the journal and
+    snapshots, merge main and push. Returns a finished-agent stand-in, or None (worktree restored) when it does not apply."""
+    git = lambda *args, **kw: sh(["git", *args], cwd=worktree, log=log, timeout=900, **kw)
+    def restore() -> None:
+        git("merge", "--abort")
+        git("reset", "--hard", f"origin/{pr['headRefName']}")
+        git("clean", "-fdq", "--", migration_renumber.MIG_DIR)
+    others = open_pr_migrations(pr["number"])
+    if others is None:
+        return None
+    def read(*args):
+        done = sh(["git", *args], cwd=worktree, timeout=300)
+        if done.returncode:
+            raise OSError(f"git {args[0]} failed")
+        return done.stdout or ""
+    try:
+        changed = migration_renumber.renumber(worktree, read, "origin/main", pr["number"], others)
+        if not changed:
+            return None
+        git("add", "-A", "--", migration_renumber.MIG_DIR)
+        if git("commit", "-q", "-m", "fix(db): renumber migration to the next free number").returncode:
+            raise OSError("commit failed")
+        if git("merge", "--no-edit", "origin/main").returncode:
+            conflicted = (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split()
+            if conflicted != [f"{migration_renumber.META}/_journal.json"] \
+                    or git("checkout", "--ours", "--", conflicted[0]).returncode or git("add", conflicted[0]).returncode \
+                    or git("commit", "-q", "--no-edit").returncode:
+                raise OSError("merge conflict outside the journal")
+        if git("push", "-q", "origin", f"HEAD:{pr['headRefName']}").returncode:
+            raise OSError("push failed")
+    except (migration_renumber.Unmergeable, OSError, ValueError, KeyError, subprocess.SubprocessError):
+        restore()
+        return None
+    receipt.update(resolution="renumbered-migrations", renumbered=changed[:12])
+    return types.SimpleNamespace(returncode=0)
+
+
+def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
+    finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
+    added = fix_red_classes.wire_ci_fast(worktree, route.get("files") or [])
+    if not added:
+        return None
+    message = "fix(ci): wire " + ", ".join(Path(name).name for name in added)[:80] + " into ci-fast"
+    steps = [["git", "add", "scripts/ci-fast-lanes.mjs"], ["git", "commit", "-q", "-m", message],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="wired-ci-fast", wiredFiles=added)
+    return types.SimpleNamespace(returncode=0)
+
+
+def claim_route(host: Host, pr: dict, action: str) -> bool:
+    """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
+    taken = []
+    def change(data: dict) -> None:
+        row = data.setdefault(str(pr["number"]), {})
+        if row.get(action) != pr["headRefOid"]:
+            row[action] = pr["headRefOid"]
+            taken.append(True)
+    try:
+        update_json(host.state / "class-routes.json", change)
+    except (OSError, ValueError):
+        return False
+    return bool(taken)
+
+
+def route_fix_red(host: Host, pr: dict) -> dict | None:
+    """Classify this red head by its failed logs. Returns the class (always) so the receipt carries a
+    fingerprint; deterministic classes are acted on by the caller."""
+    if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        return None
+    try:
+        logs = failed_logs(host, pr) or {}
+        return fix_red_classes.classify(pr, logs)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
+    """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
+    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN}:
+        return None
+    # One rerun per head, shared with the platform-red gate above; one sync per head.
+    if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
+        return None
+    if route["action"] == fix_red_classes.RERUN:
+        return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None
+    return f"infra-rerun:{route['cls']}" if pr_events.sync_main(host, THIS, pr, time.time(), terminal_ok=True) == "synced" else None
+
+
+# Per-PR circuit breaker across heads. Gem ledger, 762 fix runs: after 3 consecutive unproductive
+# runs on a PR inside 24 h the next run pushed 7% of the time (13 of 192), against 27% for a first
+# run; 52% of all runs went to PRs the lane never pushed. A new head does not reset the streak.
+BREAKER_STREAK = pr_events.BREAKER_STREAK
+BREAKER_WINDOW_S = pr_events.BREAKER_WINDOW_S
+breaker_streak = pr_events.breaker_streak
+pr_breaker_open = pr_events.pr_breaker_open
+
+
+def note_breaker_run(host: Host, pr: dict, receipt: dict, now: float | None = None) -> None:
+    """Record one finished run; the run that completes the streak files one factory signal."""
+    now = time.time() if now is None else now
+    if receipt.get("attemptRefunded") or receipt.get("verdict") in ("recovery-handoff", "reconcile-unavailable", "skipped"):
+        return  # no agent work was charged to the PR
+    productive = receipt.get("verdict") in ("fix-pushed", "pr-opened")
+    opened, tripped = [], []
+    def change(data: dict) -> None:
+        entry = data.setdefault(str(pr["number"]), {"runs": []})
+        entry["runs"] = [row for row in entry.get("runs", []) if now - float(row[0]) < BREAKER_WINDOW_S]
+        entry["runs"].append([now, productive])
+        fp = (receipt.get("failureFingerprint") or {}).get("key")
+        if fp:
+            rows = entry.setdefault("fp", {})
+            rows[fp] = [row for row in rows.get(fp, []) if now - float(row[0]) < BREAKER_WINDOW_S] + [[now, productive]]
+            if productive:
+                entry.pop("fpOpenHead", None)
+            elif breaker_streak(rows[fp], now) >= fingerprint_breaker_n(host):
+                entry["fpOpenHead"] = pr["headRefOid"]
+                tripped.append(fp)
+        entry["lastRunId"] = receipt.get("runId")
+        if breaker_streak(entry["runs"], now) == BREAKER_STREAK and not entry.get("signalAt"):
+            entry["signalAt"] = now
+            opened.append(entry)
+        elif productive:
+            entry.pop("signalAt", None)
+        for stale in [k for k, v in data.items() if not v.get("runs")]:
+            del data[stale]
+    try:
+        update_json(host.state / "pr-breaker.json", change)
+        if opened:
+            (host.state / "runs").mkdir(parents=True, exist_ok=True)
+            row = {"schema": "jovie-factory-signal/v1", "at": now_iso(), "source": "pr-breaker",
+                   "fingerprint": hashlib.sha256(f"pr-breaker:{pr['number']}:{int(now // BREAKER_WINDOW_S)}".encode()).hexdigest()[:16],
+                   "ws": "ci", "subject": {"pr": pr["number"]},
+                   "evidence": {"excerpt": f"PR #{pr['number']}: {BREAKER_STREAK} consecutive unproductive fix runs in 24h; "
+                                            f"last verdict {receipt.get('verdict')} reasons {(receipt.get('reasons') or [])[:2]}; "
+                                            f"last run {receipt.get('runId')}. Lanes stopped repairing it; a human or a "
+                                            "different approach is needed."}}
+            with open(host.state / "runs" / "factory-signals.jsonl", "a") as out:
+                out.write(json.dumps(row) + "\n")
+    except (OSError, ValueError, TypeError):
+        pass
+    if tripped:
+        note_fingerprint_trip(host, pr, {**(receipt.get("failureFingerprint") or {}), "checks": []}, receipt, now)
+
+
+def fingerprint_breaker_n(host: Host) -> int:
+    """No-push model runs on one (PR, fingerprint) before the next is refused: measured from the ledger by the
+    doctor (fix_red_classes.breaker_n -> fix-red-metrics.json); the default until it has enough runs."""
+    try:
+        value = int(json.loads((host.state / "fix-red-metrics.json").read_text())["breakerN"])
+        return min(max(value, 2), fix_red_classes.MAX_BREAKER_N)
+    except (OSError, ValueError, KeyError, TypeError):
+        return fix_red_classes.DEFAULT_BREAKER_N
+
+
+def fingerprint_breaker_open(host: Host, pr: dict, key: str, now: float | None = None) -> bool:
+    now = time.time() if now is None else now
+    try:
+        entry = json.loads((host.state / "pr-breaker.json").read_text()).get(str(pr["number"])) or {}
+        return breaker_streak((entry.get("fp") or {}).get(key) or [], now) >= fingerprint_breaker_n(host)
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
+
+
+def note_fingerprint_trip(host: Host, pr: dict, route: dict, receipt: dict, now: float | None = None) -> None:
+    """One `machine-gap` factory signal per (PR, fingerprint): a model failed to move this failure class
+    repeatedly, so the next unit of work is the machine that fixes the class, not another run."""
+    now = time.time() if now is None else now
+    cls, key = route.get("cls") or "other", route.get("key") or "unknown"
+    fingerprint = f"fix-red-{cls}-{key}"
+    path = host.state / "factory-signals" / f"{fingerprint}.json"
+    if path.exists():
+        return
+    row = {"schema": "jovie-factory-signal/v1", "fingerprint": fingerprint, "source": "fix-red-fingerprint",
+           "extraLabels": ["machine-gap"],
+           "title": f"Machine gap: fix-red `{cls}` failures ({key}) keep reaching a model",
+           "problem": f"PR #{pr['number']}: {fingerprint_breaker_n(host)} model fix runs in 24h on fingerprint `{key}` "
+                      f"(class {cls}; signature {route.get('signature') or 'n/a'}) pushed nothing; last verdict "
+                      f"{receipt.get('verdict')}. Build or extend the deterministic fixer / guard for this class in "
+                      "scripts/lanes/fix_red_classes.py (or the check that emits it) instead of dispatching another run.",
+           "acceptance": ["The failure class is classified in fix_red_classes.SIGNATURES with a deterministic action "
+                          "(or a guard prevents it), with a test fed by the failing log",
+                          "A new red of this class is fixed with no model run"],
+           "metric": {"name": "model fix-red runs on this fingerprint", "baseline": fingerprint_breaker_n(host),
+                      "target": 0, "measuredBy": "python3 scripts/lanes/fix_red_classes.py measure"}}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(path, json.dumps(row, indent=1))
+    except (OSError, ValueError):
+        pass
+
+
+def file_breaker_signals(host: Host, linear) -> int:
+    """File each unfiled breaker signal as one remediation intake issue (idempotent by fingerprint)."""
+    path = host.state / "runs" / "factory-signals.jsonl"
+    if not path.exists():
+        return 0
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    filed = 0
+    for row in rows:
+        if row.get("filedAt") or row.get("source") != "pr-breaker":
+            continue
+        if pr_events.ensure_linear_intake(linear, row):
+            row["filedAt"] = now_iso()
+            filed += 1
+    if filed:
+        atomic_write_text(path, "".join(json.dumps(row) + "\n" for row in rows))
+    return filed
+
+
 def fix_request_source(pr: dict) -> dict:
     """Keep the evidence that requested repair even when its target has become terminal."""
     return {
@@ -5972,7 +6859,11 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
         return str((receipt.get("reasons") or ["recovery-handoff"])[0])
     if verdict == "skipped":
         reason = str((receipt.get("reasons") or [""])[0])
-        return reason if reason.startswith("worktree-unavailable") else None
+        return reason if reason.startswith(("worktree-unavailable", "infra-rerun:")) else None
+    if verdict == "fix-no-change":
+        # The provider wrapper died before any agent worked: the head's budget paid for nothing.
+        reason = str((receipt.get("reasons") or [""])[0])
+        return reason if reason.startswith("lane-crash:") else None
     # `cancelled` keeps its charge: a queued, merged or superseded target is a repair
     # outcome, not host infrastructure spending the budget (the doctor never counts it).
     if verdict == "reconcile-unavailable":
@@ -5987,7 +6878,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 # handoffs: the precondition (an unreadable target, a failed checkout) is host infrastructure,
 # not the PR, and an immediate next-tick re-claim would crash-loop the same failure (Gem
 # 2026-10-23: 7 target-state-unavailable + 6 worktree-unavailable stops in 24h).
-INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable"})
+INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash", "infra-rerun"})
 
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
@@ -6004,6 +6895,14 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
                        repairHeadBefore=receipt.get("headBefore"), repairVerdict=receipt.get("verdict"))
         if receipt.get("verdict") == "fix-pushed" and receipt.get("headAfter"):
             attempt["pushedHead"] = receipt["headAfter"]
+        if str((receipt.get("reasons") or [""])[0]).startswith(("agent-declined:infra:", "agent-declined:base-red:")) \
+                and type(attempt.get("count")) is int:
+            # The agent read this head's failure and declined it (infrastructure, or a red main
+            # already has). A second attempt on the same head re-read the same evidence and
+            # declined again 40 times in 3.5 days; a new head or a moved main is the re-entry.
+            attempt["count"] = max(attempt["count"], MAX_FIX_ATTEMPTS)
+            attempt["declined"] = {"reason": str(receipt["reasons"][0])[:200], "runId": receipt.get("runId"),
+                                   "at": time.time()}
         if (refund := unworked_fix_attempt(receipt)) \
                 and type(attempt.get("count")) is int and attempt["count"] > 0:
             attempt["count"] -= 1
@@ -6014,6 +6913,7 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
             requeued = handoff or refund in pr_events.UNRESUMABLE_PRESERVED \
                 or refund.split(":", 1)[0] in INFRA_PRECONDITION_REASONS
     update_json(host.state / "fix-attempts.json", finish)
+    note_breaker_run(host, pr, receipt)
     if requeued:
         try:
             path = (receipt.get("recovery") or {}).get("worktree") \
@@ -6156,6 +7056,7 @@ def held_back_issues(host: Host, now: float | None = None) -> frozenset[str]:
         cooldowns = {}
     held = {identifier for identifier, row in (cooldowns if isinstance(cooldowns, dict) else {}).items()
             if isinstance(row, dict) and isinstance(row.get("until"), (int, float)) and row["until"] > now}
+    held |= fleet_ledger.external_held(host.state, now)  # Lola/Hyperagent/Summer hold it: do not duplicate
     for marker_path in (host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}"):
         try:
             marker = json.loads(marker_path.read_text())
@@ -6313,7 +7214,7 @@ def preserve_repair(worktree: Path, receipt: dict) -> None:
                   "headBefore": receipt.get("headBefore"), "at": now_iso()}
         receipt["preservedWorktree"] = str(worktree)
         try:
-            (worktree / disk_guard.PRESERVED_REPAIR).write_text(json.dumps(marker, indent=1))
+            atomic_write_text(worktree / disk_guard.PRESERVED_REPAIR, json.dumps(marker, indent=1))
         except OSError as error:
             receipt["preservationError"] = str(error)[:200]
 
@@ -6532,6 +7433,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "startedAt": now_iso()}
     receipt["targetStateReads"] = 1
     try:
+        if pr_events.unconfirmed_human_hold(host, pr):
+            raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, "before-execution-claim")
         live = require_fix_target(pr, "before-execution-claim", repair=True)
     except RepairStopped as error:
         live, reason = error.live, str(error)
@@ -6558,6 +7461,28 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
     pr = live
+    infra = infra_only_red(host, pr) if branch_held else None
+    if infra and claim_infra_rerun(host, pr) and _rerun_failed(pr):
+        receipt.update(verdict="skipped", reasons=[f"infra-rerun:{infra}"], endedAt=now_iso(),
+                       result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
+        end_local_fix_attempt(host, pr, receipt)
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
+        return receipt
+    route = route_fix_red(host, pr) if branch_held else None
+    if route:
+        receipt["failureFingerprint"] = {key: route[key] for key in ("cls", "key", "action", "signature")}
+        reason = deterministic_route_taken(host, pr, route)
+        if not reason and fingerprint_breaker_open(host, pr, route["key"]):
+            reason = f"infra-rerun:breaker-{route['cls']}"
+            note_fingerprint_trip(host, pr, route, receipt)
+        if reason:
+            receipt.update(verdict="skipped", reasons=[reason], endedAt=now_iso(),
+                           result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
+            end_local_fix_attempt(host, pr, receipt)
+            with open(runs / "ledger.jsonl", "a") as ledger:
+                ledger.write(json.dumps(receipt) + "\n")
+            return receipt
     failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
                "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
     ident = execution_attempt.identity("pr-remediation",
@@ -6634,6 +7559,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     return None
                 receipt["targetStateReads"] += 1
                 try:
+                    if pr_events.unconfirmed_human_hold(host, pr):
+                        raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, stage)
                     live = require_fix_target(target, stage, worktree=worktree, repair=True)
                 except RepairStopped as error:
                     # Mid-run, one unreadable snapshot (a check finishing between pages, a
@@ -6682,7 +7609,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
-                prompt = render_fix_prompt(pr, failure_excerpt(pr))
+                excerpt = failure_excerpt(pr)
+                try:
+                    pr_events.ensure_red_before_green(pr, excerpt)
+                except (OSError, subprocess.SubprocessError, ValueError):
+                    pass  # evidence is best effort; the repair itself must still run
+                prompt = render_fix_prompt(pr, excerpt)
+                prompt += "\n\n" + "\n".join(machine_gate(host, f"PR{pr['number']}", "", (), excerpt, name,
+                                                           fp=machine_gap.check_fingerprint(pr), receipt=receipt))
                 if preserved:
                     prompt = ("Resume the preserved repair in this checkout. Inspect git status, diff and local commits; "
                               "retain existing edits and finish verification/publication. Never reset or start over.\n\n" + prompt)
@@ -6693,7 +7627,10 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
-                agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
+                         fix_red_classes.RENUMBER: renumber_migrations_fix}.get((route or {}).get("action"))
+                agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
+                agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),
                                                          "model": str(spec.get("model"))}),
@@ -6715,12 +7652,20 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                         f"{pr['headRefOid'][:12]}"],
                                alert={"kind": "history-rewrite-detected", "pr": pr["number"],
                                       "before": pr["headRefOid"], "after": after})
+                try:
+                    receipt["containment"] = contain_history_rewrite(host, pr, after)
+                except Exception as error:  # the receipt above still stands; never lose it
+                    receipt["containment"] = {"error": f"{type(error).__name__}: {error}"[:200]}
             if pushed and not repair_created_head(worktree, after):
                 raise RepairStopped("target-head-superseded", {**pr, "state": "OPEN", "headRefOid": after},
                                     "after-remote-read")
             if not rewritten:
                 receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                                verdict="fix-pushed" if pushed else "fix-no-change")
+                if not pushed and agent is not None:
+                    log.flush()
+                    receipt["reasons"] = classify_unpushed_repair(
+                        agent.returncode, (runs / f"{run_id}.log").read_text(errors="replace")[-20000:])
             if pushed:
                 verify_target({**pr, "headRefOid": after}, "before-push-effects")
                 labels = {label.lower() for label in pr_events.label_names(pr)}
@@ -7069,6 +8014,42 @@ def repair_inventory_valid(receipt: dict, name: str) -> bool:
             and 0 <= time.time() - stamp < CLAIM_SCAN_TTL_S)
 
 
+def repair_inventory_cause(receipt: dict, name: str, now: float | None = None) -> str | None:
+    """The first reason `repair_inventory_valid` rejects a receipt, or None when it is valid.
+
+    Idle exits used to record one generic `repair-inventory-unknown-or-stale` for every one of
+    these, so a throughput stall could not be attributed (2026-10-24: oversize looked like stale)."""
+    if not isinstance(receipt, dict) or not isinstance(receipt.get("summary"), dict):
+        return "receipt-missing"
+    summary = receipt["summary"]
+    now = time.time() if now is None else now
+    stamp = summary.get("sourceAt")
+    if receipt.get("repository") != REPO_SLUG:
+        return "wrong-repository"
+    if receipt.get("provider") != name:
+        return "wrong-provider"
+    if receipt.get("cacheKey") != "open-prs-labels-v2":
+        return "wrong-cache-key"
+    if receipt.get("cacheRoot") != str(SHARED_CACHE_DIR):
+        return "wrong-cache-root"
+    if receipt.get("sameCallRows") is not True or not isinstance(receipt.get("prs"), list):
+        return "rows-not-same-call"
+    if receipt["prs"] != summary.get("prs"):
+        return "rows-diverged"
+    if summary.get("readable") is not True:
+        return "github-unreadable"
+    if not all(isinstance(pr, dict) and pr.get("labelsComplete") is True for pr in receipt["prs"]):
+        return "labels-incomplete"
+    if type(stamp) not in (int, float) or not math.isfinite(stamp):
+        reason = summary.get("sourceAtReason")
+        return str(reason) if isinstance(reason, str) and reason else "source-unstamped"
+    if now - stamp < 0:
+        return "source-clock-skew"
+    if now - stamp >= CLAIM_SCAN_TTL_S:
+        return "source-stale"
+    return None
+
+
 def overlap_prs_summary() -> list[dict] | None:
     """Cached PR overlap inventory, preserving unreadable rather than certifying empty."""
     prs = open_prs_summary()
@@ -7274,7 +8255,7 @@ def sweep_lane_prs(host: Host, name: str, linear, now: float | None = None) -> N
     marker = host.state / f"sweep-{name}.json"
     if marker.exists() and now - json.loads(marker.read_text()).get("at", 0) < SWEEP_EVERY_S:
         return
-    marker.write_text(json.dumps({"at": now}))
+    atomic_write_text(marker, json.dumps({"at": now}))
     superseded, stale = sweep_plan(lane_prs(name, fields=LIGHT_PR_FIELDS), now, last_pushes())
     for pr, keep in superseded:
         if pr_events.maintenance_hold(host, THIS, pr, now):
@@ -7469,6 +8450,35 @@ def claim_adoptable_pr(host: Host, name: str, prs: list[dict], repair_candidates
     return None
 
 
+OWNER_SETTLE_KEEP_S = 24 * 3600
+
+
+def note_owner_settle(host: Host, pr: dict, left: float, now: float) -> None:
+    """Record one deferral per (PR, head) so the wait is measurable: owner-settle.json keeps the
+    open windows, runs/owner-settle.jsonl one row the first time a head is deferred. Best effort:
+    a failed write never changes the deferral."""
+    key, head = str(pr["number"]), pr.get("headRefOid")
+    fresh = []
+
+    def change(data: dict) -> None:
+        for stale in [k for k, v in data.items() if not isinstance(v, dict)
+                      or now - float(v.get("firstSeenAt") or 0) > OWNER_SETTLE_KEEP_S]:
+            del data[stale]
+        if (data.get(key) or {}).get("head") != head:
+            data[key] = {"head": head, "firstSeenAt": now, "settleUntil": now + left}
+            fresh.append(data[key])
+    try:
+        update_json(host.state / "owner-settle.json", change)
+        if fresh:
+            (host.state / "runs").mkdir(parents=True, exist_ok=True)
+            with open(host.state / "runs" / "owner-settle.jsonl", "a") as out:
+                out.write(json.dumps({"schema": "jovie-owner-settle/v1", "at": now_iso(), "pr": pr["number"],
+                                      "head": head, "branch": pr.get("headRefName"), "settleLeftS": round(left),
+                                      "reason": "owner-active:head-pushed-within-settle-window"}) + "\n")
+    except (OSError, ValueError, TypeError):
+        pass
+
+
 def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict | None:
     """Under the claim lock: pick this lane's red PR and record the attempt before working it."""
     prs = lane_prs(name) if prs is None else prs
@@ -7478,8 +8488,15 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
-    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now)
+    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now, pr.get("headRefOid"))
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
+    settled = []
+    for pr in prs:
+        left = pr_events.owner_settling(pr, attempts.get(str(pr["number"]), {}), now)
+        if left is not None and red_pr([pr], attempts, held) is not None:
+            note_owner_settle(host, pr, left, now)  # only a PR a repair would take is a deferral
+            settled.append(pr["number"])
+    prs = [pr for pr in prs if pr["number"] not in settled]
     pr = red_pr(prs, attempts, held)
     # A head another host is fixing is skipped (no attempt charged); the next red PR is ours.
     while pr:
@@ -7583,7 +8600,16 @@ def record_idle_exit(host: Host, name: str, reason: str, *, deferred=None) -> No
         if deferred: blocks[str(deferred["pr"]["number"])] = deferred
         else: blocks = {number: row for number, row in blocks.items() if row.get("terminal", False)}
         data[name] = {"at": now_iso(), "reason": reason, **({"deferredRequeue": blocks} if blocks else {})}
-        path.write_text(json.dumps(data))
+        # Readers (doctor, HUD, the next worker's deferred-requeue scan, test snapshots) do not take
+        # claim.lock. A truncating write_text let them read an empty file: ClaimScanCacheTest failed
+        # ~5% of runs under load with JSONDecodeError and refused the 07:39Z release on Gem.
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+        try:
+            temporary.write_text(json.dumps(data))
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+        throughput_sentinel.append_idle_exit(host.state, REPO_SLUG, name, reason)
     except (OSError, ValueError):
         pass
     finally:
@@ -7619,11 +8645,28 @@ def occupied_worker_slots(host: Host) -> dict[str, int] | None:
         return None
 
 
+def reserved_binding_pass(host: Host, name: str, spec: dict) -> int:
+    """A provider with no free seat (cap, host ceiling, or autoscaled to 0) still serves a binding's
+    guaranteed seat, so a full or throttled Jovie pool cannot stall another repository. Disk-critical
+    hosts admit nothing: a binding run needs a local checkout like any other."""
+    try:
+        pct = disk_guard.free_pct(host.state)  # observation only: cleanup stays with slot holders
+        if pct is None or pct <= disk_guard.CRITICAL_PCT:
+            return 0
+        bound = bindings.reserve(THIS, host, name, spec)
+    except Exception as error:
+        print(f"reserved binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
+        return 0
+    return 0 if bound is None else reexec(host, name)
+
+
 def worker(host: Host, name: str) -> int:
     spec = load_providers()[name]
     limit = host.slots(name, spec.get("slots", 1))
-    if not spec.get("enabled", True) or limit <= 0:
+    if not spec.get("enabled", True):
         return 0
+    if limit <= 0:
+        return reserved_binding_pass(host, name, spec)
     intake_limit = host.intake_slots(name, spec.get("slots", 1))
     slot = None
     # One ledger and one serialized count/acquire, even while old occupied seats
@@ -7632,10 +8675,9 @@ def worker(host: Host, name: str) -> int:
     try:
         occupied = occupied_worker_slots(host)
         ceiling = autoscale.host_ceiling(host.state)
-        if occupied is None or occupied.get(name, 0) >= limit or (
-                ceiling is not None and sum(occupied.values()) >= ceiling):
-            return 0
-        for index in range(limit):
+        full = occupied is None or occupied.get(name, 0) >= limit or (
+            ceiling is not None and sum(occupied.values()) >= ceiling)
+        for index in range(0 if full else limit):
             maintenance_only = index >= intake_limit
             if maintenance_only and spec.get("repairs") is False:
                 continue
@@ -7647,7 +8689,7 @@ def worker(host: Host, name: str) -> int:
     finally:
         admission.release()
     if slot is None:
-        return 0
+        return reserved_binding_pass(host, name, spec)
     try:
         return worker_with_slot(host, name, spec, slot, maintenance_only=maintenance_only)
     finally:
@@ -7908,6 +8950,26 @@ def record_maintenance_demand(host: Host, name: str, prs: list[dict], candidates
         temporary.unlink(missing_ok=True)
 
 
+def jovie_repair_pending(host: Host, now: float | None = None) -> bool:
+    """True unless a fresh maintenance-demand record from any local lane proves Jovie has no
+    repairable PR. Unknown or stale counts as pending so the Jovie path gets a turn and
+    refreshes the record (a record only goes stale when other work starves the Jovie path)."""
+    now = time.time() if now is None else now
+    lanes = read_json(host.state / "maintenance-demand.json").get("lanes")
+    # Only a lane that repairs Jovie PRs can prove Jovie has none. record_maintenance_demand runs
+    # only for such lanes (`local = spec.get("repairs") is not False`), and this filter keeps a
+    # non-repairing lane's row, should one ever be written, from unblocking LYB intake.
+    providers = read_json(HERE / "providers.json")
+    for lane_name, row in (lanes.items() if isinstance(lanes, dict) else ()):
+        if (providers.get(lane_name) or {}).get("repairs") is False:
+            continue
+        at, pending = (row or {}).get("observedAt"), (row or {}).get("pending")
+        if type(at) in (int, float) and 0 <= now - at <= MAINTENANCE_DEMAND_MAX_AGE_S \
+                and type(pending) is int and pending == 0:
+            return False
+    return True
+
+
 def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, maintenance_only=False) -> int:
     """Release ownership on every exceptional exit, including notification failures."""
     try:
@@ -7923,7 +8985,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     # Extra repository bindings (LYB) share this seat. Jovie-only holds below never block them,
     # and a binding fault never blocks the Jovie path. No configured binding = no reads at all.
     try:
-        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only)
+        bound = bindings.work(THIS, host, name, spec, maintenance_only=maintenance_only,
+                              jovie_repair_pending=jovie_repair_pending(host))
     except Exception as error:
         bound = None
         print(f"binding pass failed: {type(error).__name__}: {error}"[:300], file=sys.stderr)
@@ -8007,6 +9070,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             if not maintenance_only:
                 linear = Linear(host.linear_env)
             if local:
+                linear_optional(file_breaker_signals, host, linear)
                 linear_optional(escalate_exhausted, host,
                                 list({pr["number"]: pr for pr in candidates + events + rung_candidates}.values()), linear,
                                 **({"model_only": True} if maintenance_only else {}),
@@ -8096,7 +9160,8 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
                   f"{REPAIR_INVENTORY_MAX_BYTES} byte limit", file=sys.stderr)
             record_idle_exit(host, name, "repair-inventory-oversize")
         else:
-            record_idle_exit(host, name, "repair-inventory-unknown-or-stale")
+            record_idle_exit(host, name, "repair-inventory-" + (repair_inventory_cause(repair_inventory, name)
+                                                                or "valid-at-recheck"))
         slot.release()
         return 0
     # Every local pass, including one that just claimed a repair. An idle-only sync
@@ -8227,7 +9292,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             count = failure_record(failures.get(issue.identifier))["count"] + 1
             failures[issue.identifier] = {"count": count, "at": time.time(), "release": release_generation(),
                                           **pr_events.failure_reason(receipt, count >= MAX_FAILURES)}
-            failures_path(host).write_text(json.dumps(failures))
+            atomic_write_text(failures_path(host), json.dumps(failures))
         finally:
             claim.release()
         exhausted = failures[issue.identifier]["count"] >= MAX_FAILURES
@@ -8337,17 +9402,69 @@ def recover_unclean_tick(host: Host) -> dict:
     return {"schema": "jovie.unclean-tick-recovery/v1", "refundedFixAttempts": sorted(refunded)}
 
 
+DOCTOR_REFRESH_S = 5 * 60
+
+
+def spawn_doctor_if_stale(host: Host, now: float | None = None) -> bool:
+    """Start a detached doctor pass when the last one is older than DOCTOR_REFRESH_S. The doctor used to run only
+    at the very end of a dispatch tick, so a slow tick left the feed, the HUD and the dead-man stale."""
+    now = time.time() if now is None else now
+    try:
+        at = datetime.fromisoformat(str(json.loads((host.state / "doctor.json").read_text())["at"]).replace("Z", "+00:00")).timestamp()
+    except (OSError, ValueError, KeyError, TypeError):
+        return False  # no doctor report at all (fresh host, fixture): the end-of-tick pass writes the first one
+    if now - at < DOCTOR_REFRESH_S:
+        return False
+    try:
+        with open(host.state / "doctor-spawn.log", "ab") as out:
+            subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "doctor"], stdin=subprocess.DEVNULL,
+                             stdout=out, stderr=out, start_new_session=True, cwd=str(host.repo))
+        return True
+    except OSError:
+        return False
+
+
+def run_doctor(host: Host) -> int:
+    """One doctor pass; a second concurrent pass exits at once (doctor-run.lock)."""
+    lock = Locked(host.state / "locks" / "doctor-run.lock", blocking=False)
+    try:
+        if not lock.held:
+            return 0
+        doctor.run(host, sys.modules[__name__], codex_lane_module())
+        return 0
+    finally:
+        lock.release()
+
+
 def dispatch(host: Host) -> int:
+    lifecycle.HEARTBEAT = host.state / "tick-heartbeat"
+    lifecycle.beat()
+    try:
+        spawn_doctor_if_stale(host)
+    except Exception:  # a doctor that cannot start never blocks dispatch
+        pass
     unclean_previous = None
     try:
         unclean_previous = _begin_tick_intent(host)
     except Exception:
         unclean_previous = {"unavailable": True}  # a failed marker write must not skip the tick
+    started = time.monotonic()
     try:
         result = _dispatch(host, unclean_previous)
     finally:
         _clear_tick_intent(host)
+        record_tick_duration(host, time.monotonic() - started)
     return result
+
+
+def record_tick_duration(host: Host, seconds: float) -> None:
+    """One row per dispatch tick: the number to drive down (it was 25-60 minutes on 2026-10-26; target under 5)."""
+    try:
+        with open(host.state / "runs" / "tick-durations.jsonl", "a") as out:
+            out.write(json.dumps({"at": now_iso(), "dispatchS": round(seconds, 1), "release": read_marker(host),
+                                  "topCommands": lifecycle.top_stats()}) + "\n")
+    except OSError:
+        pass
 
 
 def _dispatch(host: Host, unclean_previous: dict | None) -> int:
@@ -8371,7 +9488,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
             try:
                 bases = {name: (host.base_slots(name, spec.get("slots", 1)) if spec.get("enabled", True) else 0)
                          for name, spec in load_providers().items()}
-                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases)
+                # Remote-only lanes run off gem, so gem host pressure does not size them.
+                remote = sorted(name for name, spec in load_providers().items()
+                                if spec.get("remote") is True or spec.get("repairs") is False)
+                tick["autoscale"] = autoscale.apply_tick(host.state, tick, bases,
+                                                         config={**autoscale.load_config(), "remote": remote})
             except Exception as error:  # a bad sample never blocks the spawn loop
                 tick["autoscaleError"] = f"{type(error).__name__}: {error}"[:200]
         try:
@@ -8409,6 +9530,20 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["linearSync"] = linear_sync.tick(host.state, client, client.admit, (LinearRateLimited,), teams)
             except (Exception, SystemExit) as error:  # dispatch reads the mirror at any age
                 tick["linearSyncError"] = f"{type(error).__name__}: {error}"[:200]
+            try:  # measure the shared hosted-macOS pool (throttled); the LYB refill below reads it
+                tick["macosPool"] = macos_pool.sample(host.state)
+            except (Exception, SystemExit) as error:  # a sampling fault never blocks dispatch
+                tick["macosPoolError"] = f"{type(error).__name__}: {error}"[:200]
+            try:  # Todo below target is refilled from the Backlog the sync just refreshed, per team
+                # Every team refills on its own mirror and seats; JOV has no extra binding, so it gets the same
+                # floor-less pass (Summer's governor writes the same Todo moves idempotently).
+                refill_for = [types.SimpleNamespace(key="JOV", excluded=("hold",), min_todo=0), *bindings.extra_bindings(THIS)]
+                tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
+                                         for binding in refill_for}
+                tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
+                tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
+            except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
+                tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
         try:
             tick["linear"] = linear_sync.status(host.state)
         except Exception as error:
@@ -8461,6 +9596,11 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
     except (Exception, SystemExit) as error:  # outcome verification never takes dispatch down
         tick["outcomeError"] = f"{type(error).__name__}: {error}"[:200]
     try:
+        tick["tasteDefault"] = (taste_default.tick(host, THIS) if HOST == owner else
+                                {"status": "not-owner", "owner": owner})
+    except (Exception, SystemExit) as error:  # taste defaults never take dispatch down
+        tick["tasteDefaultError"] = f"{type(error).__name__}: {error}"[:200]
+    try:
         if not os.environ.get("LANES_SELFTEST"):  # a release self-test never writes to Linear
             teams = ["JOV", *(binding.key for binding in bindings.extra_bindings(THIS))]
             tick["issueReconcile"] = epics.reconcile(THIS, host, lambda: Linear(host.linear_env), teams)
@@ -8511,9 +9651,15 @@ def finish_dispatch(host: Host, tick: dict) -> int:
                                     {"status": "not-owner", "owner": owner})
     except Exception as error:  # registry freshness never takes dispatch down
         tick["credentialsSpend"] = {"status": "error", "error": type(error).__name__}
+    try:
+        # Live quota reads (Codex ledger, Grok /usage) for the capacity registry; metadata only.
+        tick["capacityLive"] = (capacity_live.tick(host.state) if HOST == os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]
+                                else {"status": "not-owner"})
+    except Exception as error:  # a registry read never takes dispatch down
+        tick["capacityLive"] = {"status": "error", "error": type(error).__name__}
     update_json(host.state / "tick.json", lambda data: (data.clear(), data.update(tick)))
     try:
-        doctor.run(host, sys.modules[__name__], codex_lane_module())
+        run_doctor(host)
     except Exception as error:  # never let the doctor take dispatch down
         update_json(host.state / "tick.json", lambda data: data.update(doctorError=f"{type(error).__name__}: {error}"[:200]))
     return 1 if tick["error"] or tick.get("admissionDenied") else 0
@@ -8789,7 +9935,7 @@ def refresh_codex_skills(host: Host, home: Path | None = None) -> dict:
         return {"status": "timeout"}
     except OSError as error:
         return {"status": "error", "error": f"{type(error).__name__}: {error}"[:200]}
-    receipt.write_text(json.dumps({"installed": wanted, "at": now_iso()}))
+    atomic_write_text(receipt, json.dumps({"installed": wanted, "at": now_iso()}))
     return {"status": "updated", "from": head[:12], "to": wanted[:12]}
 
 
@@ -8807,16 +9953,64 @@ def update(host: Host) -> int:
     """Install origin/main's scripts/lanes as a new release after its own tests pass.
     Only the `current` symlink moves; running workers finish on their release. The outcome is
     written to update.json so a refused release is an alert, not a traceback in a journal."""
+    lifecycle.HEARTBEAT = host.state / "tick-heartbeat"  # the self-test is minutes long; its keepalive proves progress
+    lifecycle.beat()
+    # Single flight: two updaters take the gate-admission lock and the seats from each other, so each
+    # reads gate-admission-busy (3 concurrent `lane_runner update` at 17:07Z 2026-10-25, one of them a
+    # manual retry loop, kept #23268 from installing). A second caller exits without touching update.json.
+    single = Locked(host.state / "locks" / "update.lock", blocking=False)
+    if not single.held:
+        print("lane update: update already running", file=sys.stderr)
+        return 0
+    try:
+        return _update_locked(host)
+    finally:
+        single.release()
+
+
+def _update_locked(host: Host) -> int:
     mirror = host_maintenance(host, refresh_object_mirror)  # before install_release's origin fetch
+    before = read_marker(host)
     try:
         code = install_release(host)
         error = None if code == 0 else "release tests failed"
     except Exception as failure:
         code, error = 1, f"{type(failure).__name__}: {failure}"[:300]
     skills = host_maintenance(host, refresh_codex_skills)
+    lag = host_maintenance(host, lambda h: install_lag(h, before, error))
     update_json(host.state / "update.json", lambda data: (data.clear(), data.update(
-        at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills)))
+        at=now_iso(), ok=code == 0, error=error, current=read_marker(host), mirror=mirror, skills=skills,
+        behindS=lag.get("behindS"), behindCommit=lag.get("behindCommit"))))
+    host_maintenance(host, lambda h: update_drain.finish(h.state, lag.get("behindS")) or {"status": "no-drain"})
     return code
+
+
+# Install lag is a stage: merge -> installed. Gem releases (59 since 10-23): p50 22 min, p80 85, p95 215,
+# max 251. 10-25: a flaky self-test refusal (07:39) held three builds 90-111 min; a 60 min wait for a
+# gate seat held #23123. update.json carries behindS while a lane-affecting main commit is not
+# installed, update-lag.jsonl one row per install, and the doctor alerts past its INSTALL_LAG_ALERT_S (90 min).
+def install_lag(host: Host, before: str | None, error: str | None) -> dict:
+    """{'behindS', 'behindCommit'} while main's lane bundle is not installed; one lag row per install."""
+    if os.environ.get("LANES_SELFTEST"):
+        return {"status": "selftest-skipped"}
+    bundle = release_identity(host)
+    paths = sorted(bundle["objects"])
+    stamp = lambda ref: sh(["git", "log", "-1", "--format=%ct %H", ref, "--", *paths], cwd=host.repo).stdout.split()
+    marker = host.state / "current" / ".bundle"
+    installed = marker.read_text().strip() if marker.exists() else None
+    now = time.time()
+    newest = stamp(bundle["sourceCommit"])
+    commit_at = float(newest[0]) if newest else None
+    if installed == bundle["bundleDigest"]:
+        after = read_marker(host)
+        if before is not None and after != before and commit_at is not None:
+            row = {"schema": "jovie-install-lag/v1", "at": now_iso(), "commit": bundle["sourceCommit"],
+                   "commitAt": commit_at, "installedAt": now, "lagS": round(now - commit_at), "from": before, "to": after}
+            with open(host.state / "update-lag.jsonl", "a") as out:
+                out.write(json.dumps(row) + "\n")
+        return {"behindS": 0, "behindCommit": None}
+    return {"behindS": round(now - commit_at) if commit_at is not None else None,
+            "behindCommit": bundle["sourceCommit"], "why": error}
 
 
 def release_identity(host: Host) -> dict:
@@ -9552,7 +10746,7 @@ def install_release(host: Host, *, operator=None) -> int:
                                      cwd=host.repo, capture_output=True, check=True)
             lifecycle.run(["tar", "-x", "-C", str(staging)], input=archive.stdout, check=True)
             def refuse(why: str) -> int:
-                refused_path.write_text(json.dumps({"tree": tree, "at": time.time(), "why": why}))
+                atomic_write_text(refused_path, json.dumps({"tree": tree, "at": time.time(), "why": why}))
                 return 1
             # The staged tree proves itself with its own installer code. On 2026-10-10 the Mac
             # refused every release for a day because the *installed* installer chose a bare
@@ -9612,7 +10806,7 @@ def install_release(host: Host, *, operator=None) -> int:
 
 def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
                     app_key: Path = Path.home() / ".config/jovie-lanes/jovie-bot.pem",
-                    shim_dir: Path | None = None) -> None:
+                    shim_dir: Path | None = None, *, _fleet_observation: bool = False) -> None:
     """A host-specific GitHub identity so each host spends its own API budget instead of everyone
     sharing Tim's token (its secondary limit throttled every lane on 2026-09-27, JOV-6878).
     An explicit GH_TOKEN in github.env wins; otherwise, with the Jovie Bot app key present, a `gh`
@@ -9620,6 +10814,41 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     the agents' own, so a long run never outlives its token. Calls aimed at a different GH_HOST
     (offline harnesses, other enterprises) keep the caller's credentials — the bot token is a
     github.com installation token and would be wrong there."""
+    if _fleet_observation:
+        # Only the existing fixed observer. Even an in-memory token cannot
+        # permit a minting shim or any app-key/token/CLI account fallback.
+        _fleet_observer_transport()
+        try:
+            path.lstat()
+        except FileNotFoundError:
+            raise FleetObservationHeld("fleet-observer-explicit-context-missing") from None
+        except OSError:
+            raise FleetObservationHeld("fleet-observer-explicit-context-unreadable") from None
+        try:
+            raw, _ = lifecycle._read_regular(path, 65536)
+            tokens = []
+            for line in raw.decode("utf-8").splitlines():
+                line = line.strip()
+                if not line or line.startswith("#"): continue
+                match = re.fullmatch(r"(?:export )?([A-Za-z_][A-Za-z0-9_]*)=(.*)", line)
+                if match is None:
+                    raise ValueError("malformed context")
+                if match[1] not in ("GH_TOKEN", "GITHUB_TOKEN"): continue
+                value = match[2]
+                if len(value) >= 2 and value[0] in {"'", '"'} and value[-1] == value[0]: value = value[1:-1]
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,4096}", value):
+                    raise ValueError("malformed explicit context")
+                tokens.append(value)
+            if len(tokens) != 1:
+                raise ValueError("missing or ambiguous explicit context")
+        except FileNotFoundError:
+            raise FleetObservationHeld("fleet-observer-explicit-context-disappeared") from None
+        except OSError:
+            raise FleetObservationHeld("fleet-observer-explicit-context-unreadable") from None
+        except (ValueError, lifecycle.AdmissionHeld):
+            raise FleetObservationHeld("fleet-observer-explicit-context-invalid") from None
+        os.environ["GH_TOKEN"] = tokens[0]
+        return
     try:
         for line in path.read_text().splitlines():
             key, _, value = line.strip().removeprefix("export ").partition("=")
@@ -9641,7 +10870,7 @@ def load_github_env(path: Path = Path.home() / ".config/jovie-lanes/github.env",
     # publisher uses the REST form; Gem 2026-10-20 its 403 froze the public feed). A caller that targets another host
     # (GH_HOST, e.g. the offline real-gh test harness) keeps its own credentials:
     # the Jovie Bot installation token only exists for github.com.
-    shim.write_text(f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
+    atomic_write_text(shim, f'#!/bin/sh\n[ "$1" = gist ] && exec {real} "$@"\n'
                     f'[ "$1" = api ] && case "$2" in gists|gists/*) exec {real} "$@";; esac\n'
                     f'[ -n "${{GH_HOST:-}}" ] && [ "$GH_HOST" != github.com ] && exec {real} "$@"\n'
                     f'GH_TOKEN="$(python3 {HERE / "gh_app_token.py"} --guard "$@")" || exit $?\n'
@@ -9668,6 +10897,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("dispatch")
+    sub.add_parser("doctor", help="one doctor pass (the dispatch tick starts one when the last is stale)")
     sub.add_parser("fix-now", help="drain the relay's red wake files immediately (JOV-8931)")
     sub.add_parser("update")
     prove = sub.add_parser("prove-staging", help="prove a staged release tree with this tree's own installer")
@@ -9731,7 +10961,7 @@ def guarded_main(argv: list[str] | None = None) -> int:
         path = HERE / "context-manifest.json"
         generated = context_manifest_json()
         if args.write:
-            path.write_text(generated, encoding="utf-8")
+            atomic_write_text(path, generated, encoding="utf-8")
         matched = context_manifest_matches(path)
         print(json.dumps({"schema": "jovie-lane-context-generation/v1", "path": str(path),
                           "sha256": hashlib.sha256(generated.encode("utf-8")).hexdigest(),
@@ -9751,6 +10981,8 @@ def guarded_main(argv: list[str] | None = None) -> int:
         return worker(host, args.provider)
     if args.command == "fix-now":
         return fix_now(host)
+    if args.command == "doctor":
+        return run_doctor(host)
     return dispatch(host)
 
 
