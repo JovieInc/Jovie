@@ -25,7 +25,7 @@ import machine_gap
 from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-machine-metrics/v1"
-FILE, FIX_FILE = "machine-metrics.json", "fix-red-metrics.json"
+FILE, FIX_FILE, DAILY_FILE = "machine-metrics.json", "fix-red-metrics.json", "machine-daily.jsonl"
 REFRESH_S = 6 * 3600
 WINDOW_DAYS = 7
 PUBLIC_MAX_BYTES = 1200
@@ -107,7 +107,7 @@ def public_block(record: dict | None) -> dict:
     """Small fields only (the public feed has a byte cap): no per-PR rows, bounded top list."""
     record = record or {}
     block = {key: record.get(key) for key in ("at", "machineMergeShare", "machineMade", "merged", "recurringFingerprints",
-                                              "costPerMergedByClass", "daysTo3rdRepeatToMachine")}
+                                              "costPerMergedByClass", "daysTo3rdRepeatToMachine", "daily")}
     block["topRecurring"] = [[str(fp)[:24], n] for fp, n in (record.get("topRecurring") or [])[:3]]
     text = json.dumps(block, separators=(",", ":"))
     return block if len(text.encode()) <= PUBLIC_MAX_BYTES else {"at": record.get("at"), "truncated": True}
@@ -134,6 +134,36 @@ def fetch_merged(since: float, run=None) -> list[dict]:
             break
         after = page["pageInfo"]["endCursor"]
     return out
+
+
+def daily_row(state: Path, rows: list[dict], record: dict, costs: dict, now: float) -> dict | None:
+    """The reading nobody has to remember: once per UTC day, the previous day's fix-red model runs, push rate and
+    routed-without-model count (fix_red_classes, when installed) with the machine-made share, appended to
+    machine-daily.jsonl and returned for the feed. None when yesterday's row already exists."""
+    midnight = now - (now % 86400)
+    day = datetime.fromtimestamp(midnight - 1, timezone.utc).strftime("%Y-%m-%d")
+    path = Path(state) / DAILY_FILE
+    try:
+        have = [json.loads(line) for line in path.read_text().splitlines() if line.startswith("{")]
+    except (OSError, ValueError):
+        have = []
+    if any(row.get("date") == day for row in have):
+        return have[-1]
+    row = {"date": day, "machineMergeShare": record.get("machineMergeShare"), "machineMade": record.get("machineMade"),
+           "merged": record.get("merged"), "fixRedLlmRuns": None, "fixRedPushRate": None, "fixRedRouted": None}
+    try:
+        import fix_red_classes
+        measured = fix_red_classes.measure(rows, midnight, 1, costs)
+        row.update(fixRedLlmRuns=measured["llmRuns"], fixRedPushRate=measured["pushRate"],
+                   fixRedRouted=measured["routedWithoutModel"])
+    except Exception:  # fix-red classes are optional here; the share still lands
+        pass
+    try:
+        with open(path, "a") as out:
+            out.write(json.dumps(row) + "\n")
+    except OSError:
+        pass
+    return row
 
 
 def read(state: Path) -> dict | None:
@@ -172,6 +202,7 @@ def refresh(state: Path, now: float | None = None, fetch=None, force: bool = Fal
                         machine_gap.record(state, gate["fp"], "machine", f"PR{pr['number']}", machine=True,
                                            now=_epoch(pr.get("mergedAt")) or now)
         record = build(rows, merged, machine_gap.read(state), now, costs)
+        record["daily"] = daily_row(state, rows, record, costs, now)
         atomic_write_text(state / FILE, json.dumps(record))
         return record
     except Exception:

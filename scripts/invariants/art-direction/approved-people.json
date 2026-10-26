@@ -1,0 +1,38 @@
+{
+  "schema": "jovie.approved-people/v1",
+  "people": [
+    {
+      "id": "tim-white",
+      "name": "Tim White",
+      "consent": "self",
+      "provenance": "Tim White own photographs, supplied by him for Jovie use",
+      "source": "own-photo"
+    }
+  ],
+  "images": [
+    {
+      "path": "apps/web/public/images/avatars/tim-white.jpg",
+      "person": "tim-white"
+    },
+    {
+      "path": "apps/web/public/images/avatars/tim-white-founder.jpg",
+      "person": "tim-white"
+    },
+    {
+      "path": "apps/web/public/images/avatars/tim-white.svg",
+      "person": "tim-white"
+    },
+    {
+      "path": "apps/web/public/images/hero/tim-profile.avif",
+      "person": "tim-white"
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/tim-white-dont-look-down-card.jpg",
+      "person": "tim-white"
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/tim-white-dont-look-down-hero.jpg",
+      "person": "tim-white"
+    }
+  ]
+}

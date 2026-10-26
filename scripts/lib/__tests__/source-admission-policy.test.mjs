@@ -51,7 +51,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       { mode: 0o755 }
     );
     // This fixture has no launch, profile, art-direction, ICP-language, copy, or
-    // oasdiff inventory. Isolate those unrelated checkers, as pnpm above
+    // oasdiff inventory, nor apps/web/lib/domain/write-registry.json. Isolate those unrelated checkers, as pnpm above
     // isolates the other guards, while checking its cwd. The older head
     // deletes scripts/, so the real art-direction, ICP-language, and oasdiff
     // runners are not on that checkout.
@@ -59,7 +59,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       join(bin, 'node'),
       `#!/bin/sh
 case "$*" in
-  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*)
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*|*scripts/domain-write-guard.mjs*)
     [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
     exit 0 ;;
 esac

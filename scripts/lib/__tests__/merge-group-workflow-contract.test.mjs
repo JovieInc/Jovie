@@ -1075,8 +1075,8 @@ describe('merge_group workflow contract', () => {
       `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || (inputs.native && 'macos-15' || 'ubuntu-latest') }}`
     );
     expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
-    // Node-only web inputs run the Mac lane's node checks on ubuntu; swift,
-    // package:staging and the artifact set stay macOS-only.
+    // Node-only web inputs run the Mac lane's node checks on ubuntu; swift
+    // and the MenuMonitor artifact stay macOS-only.
     expect(macosCaller).toContain(
       "native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}"
     );
@@ -1086,7 +1086,6 @@ describe('merge_group workflow contract', () => {
     expect(macosRoute).toContain('inputs.native');
     for (const step of [
       'Swift test and build (macOS only)',
-      'Package exact Mac head (macOS only)',
       'Verify exact Mac artifact set',
     ]) {
       const at = MACOS_CI_WORKFLOW.indexOf(`name: ${step}`);
@@ -1119,32 +1118,13 @@ describe('merge_group workflow contract', () => {
       'swift build --package-path apps/macos/MenuMonitor -c release'
     );
     expect(macos).toContain(
-      '--staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"'
-    );
-    expect(macos).toContain('id: desktop-staging-identity');
-    expect(macos).toContain('echo "version=$version" >> "$GITHUB_OUTPUT"');
-    expect(macos).toContain(
-      'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
-    );
-    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA"');
-    expect(macos).toContain(
       'SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}'
     );
-    expect(macos).toContain(
-      'version="${{ steps.desktop-staging-identity.outputs.version }}"'
-    );
+    expect(macos).not.toContain('desktop-staging');
+    expect(macos).not.toContain('package:staging');
     expect(macos).not.toContain(
       'echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"'
     );
-    expect(
-      macos.indexOf('Bind staging package identity to the exact CI attempt')
-    ).toBeLessThan(macos.indexOf('Package exact Mac head (macOS only)'));
-    expect(
-      macos.indexOf(
-        'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
-      )
-    ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
-    expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
       "run_full_ci == 'true' && matrix.shard == 'packages/ui'\n        run: pnpm turbo test --filter=@jovie/ui"
     );

@@ -45,6 +45,15 @@ describe('ArtistNotificationsHero', () => {
     expect(publicAction).toHaveAttribute('data-test-prefetch', 'undefined');
   });
 
+  it('insets the hero dock so the section reads as a contained surface', () => {
+    const { container } = render(
+      <ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />
+    );
+    const dock = container.querySelector('.marketing-hero-dock');
+    expect(dock).not.toBeNull();
+    expect(dock).toHaveClass('marketing-hero-dock--inset');
+  });
+
   it('renders the canonical notification hero with bounded headline and CTA', () => {
     render(<ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />);
 
