@@ -2,15 +2,15 @@
   "decision": "2026-10-26 usage-led hybrid ladder",
   "chosen": "D hybrid: tier ladder with included credits + metered usage/outcomes (recommended)",
   "bar": {
-    "best_y3_arr_usd": 30000000,
-    "best_y3_growth_min": 2.0,
-    "implies": "$100M+ ARR by year 5"
+    "best_arr_usd": 100000000,
+    "by_year": 5,
+    "note": "Tim 2026-10-26: best-case path to $100M ARR"
   },
   "assumptions": [
     {
-      "name": "new signups/yr (Y1,Y2,Y3) worst/base/best",
+      "name": "new signups/yr Y1,Y2,Y3 (Y4-5 flat at Y3) worst/base/best",
       "value": "20k,60k,150k / 100k,400k,1.2M / 300k,1.5M,5M",
-      "source": "assumption; creator-economy scale unverified; biggest swing factor"
+      "source": "assumption; load-bearing; see sensitivity"
     },
     {
       "name": "free to paid conversion D",
@@ -20,56 +20,68 @@
     {
       "name": "starting ARPU/yr D",
       "value": "$330",
-      "source": "assumption: tier mix plus included-credit commit and outcome fees"
+      "source": "assumption"
     },
     {
       "name": "NRR per cohort-year D",
       "value": "0.95 / 1.10 / 1.30",
-      "source": "assumption; usage-priced infra (Exa, ElevenLabs credit tiers) 2026, third-party"
+      "source": "assumption; usage-priced infra, third-party 2026"
     },
     {
-      "name": "enterprise accounts at Y3 / ACV D",
+      "name": "enterprise accounts at Y3 (flat after) and ACV D",
       "value": "4,35,150 at $20k",
-      "source": "assumption: managers, labels, agencies, brands"
+      "source": "assumption"
     }
   ],
   "options": {
     "A flat music tier ($12, Linkfire-style)": {
       "arr": {
-        "worst": [22280, 76528, 201149],
-        "base": [149600, 675040, 2186736],
-        "best": [643200, 3590040, 13196538]
+        "worst": [22280, 76528, 201149, 302826, 389253],
+        "base": [149600, 675040, 2186736, 3529262, 4737536],
+        "best": [643200, 3590040, 13196538, 22265711, 30881426]
       },
-      "best_y3_growth": 3.68,
-      "clears_bar": false
+      "clears_bar": false,
+      "signups_multiplier_needed_best": 3.25,
+      "conversion_multiplier_needed_best": 3.25,
+      "y5_signups_needed": 16256574,
+      "base_signups_multiplier_needed": 21.37
     },
     "B seat ladder Free/Pro20/Max60/Ultra200 + $5 outcome": {
       "arr": {
-        "worst": [267000, 1031250, 2905388],
-        "base": [2225000, 10825000, 36425000],
-        "best": [10600000, 63059047, 239762000]
+        "worst": [267000, 1031250, 2905388, 4674418, 6354997],
+        "base": [2225000, 10825000, 36425000, 61925000, 87425000],
+        "best": [10600000, 63059047, 239762000, 433670628, 646966820]
       },
-      "best_y3_growth": 3.8,
-      "clears_bar": true
+      "clears_bar": true,
+      "signups_multiplier_needed_best": 0.15,
+      "conversion_multiplier_needed_best": 0.15,
+      "y5_signups_needed": 763329,
+      "base_signups_multiplier_needed": 1.14
     },
     "C usage/credit ladder (Exa-style), generous free": {
       "arr": {
-        "worst": [122000, 380800, 942720],
-        "base": [1120000, 4565904, 14284200],
-        "best": [5780000, 28924864, 105268800]
+        "worst": [122000, 380800, 942720, 1403448, 1818103],
+        "base": [1120000, 4565904, 14284200, 24959715, 37228804],
+        "best": [5780000, 28924864, 105268800, 208555334, 352822848]
       },
-      "best_y3_growth": 3.64,
-      "clears_bar": true
+      "clears_bar": true,
+      "signups_multiplier_needed_best": 0.26,
+      "conversion_multiplier_needed_best": 0.26,
+      "y5_signups_needed": 1293603,
+      "base_signups_multiplier_needed": 2.76
     },
     "D hybrid: tier ladder with included credits + metered usage/outcomes (recommended)": {
       "arr": {
-        "worst": [224667, 835433, 2307995],
-        "base": [1718333, 8062944, 26920850],
-        "best": [8425000, 49057851, 188460750]
+        "worst": [224667, 835433, 2307995, 3681595, 4986515],
+        "base": [1718333, 8062944, 26920850, 47393518, 69911528],
+        "best": [8425000, 49057851, 188460750, 368125659, 601602668]
       },
-      "best_y3_growth": 3.84,
-      "clears_bar": true
+      "clears_bar": true,
+      "signups_multiplier_needed_best": 0.16,
+      "conversion_multiplier_needed_best": 0.16,
+      "y5_signups_needed": 795681,
+      "base_signups_multiplier_needed": 1.44
     }
   },
-  "model_script": "scratchpad/pricing-bundle/model.py (inputs reproduced in assumptions above)"
+  "model_script": "scratchpad/pricing-bundle/model.py"
 }

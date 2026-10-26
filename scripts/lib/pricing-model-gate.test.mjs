@@ -7,11 +7,13 @@ import {
   touchesPricing,
 } from './pricing-model-gate.mjs';
 
-const model = (best = [8e6, 49e6, 188e6], over = {}) => ({
-  bar: { best_y3_arr_usd: 30e6, best_y3_growth_min: 2 },
+const model = (best = [8e6, 49e6, 188e6, 368e6, 601e6], over = {}) => ({
+  bar: { best_arr_usd: 100e6, by_year: 5 },
   assumptions: [{ name: 'signups', value: '1M', source: 'assumption' }],
   chosen: 'D',
-  options: { D: { arr: { worst: [1, 2, 3], base: [1, 2, 3], best } } },
+  options: {
+    D: { arr: { worst: [1, 2, 3, 4, 5], base: [1, 2, 3, 4, 5], best } },
+  },
   ...over,
 });
 const read = m => () => JSON.stringify(m);
@@ -63,17 +65,9 @@ test('best case below the bar fails, above passes', () => {
     evaluatePricingModel({
       paths: priced,
       body,
-      readFile: read(model([1e6, 5e6, 13e6])),
+      readFile: read(model([1e6, 5e6, 13e6, 22e6, 31e6])),
     })[0],
     /below the bar/
-  );
-  assert.match(
-    evaluatePricingModel({
-      paths: priced,
-      body,
-      readFile: read(model([1e6, 40e6, 50e6])),
-    })[0],
-    /growth 1\.25x/
   );
   assert.deepEqual(
     evaluatePricingModel({ paths: priced, body, readFile: read(model()) }),
@@ -81,8 +75,8 @@ test('best case below the bar fails, above passes', () => {
   );
 });
 test('a model that lowers the bar is rejected', () => {
-  const low = model([1e6, 2e6, 5e6], {
-    bar: { best_y3_arr_usd: 1e6, best_y3_growth_min: 1 },
+  const low = model([1e6, 2e6, 5e6, 6e6, 7e6], {
+    bar: { best_arr_usd: 1e6, by_year: 5 },
   });
   assert.match(
     evaluatePricingModel({ paths: priced, body, readFile: read(low) })[0],
@@ -95,7 +89,7 @@ test('model needs assumptions, a chosen option and three-year arrays', () => {
     /no assumptions/
   );
   assert.match(checkModel(model(undefined, { chosen: 'Z' })), /not in options/);
-  assert.match(checkModel(model([1, 2])), /3-year ARR array for best/);
+  assert.match(checkModel(model([1, 2])), /5-year ARR array for best/);
   assert.match(checkModel({}), /no bar/);
 });
 test('reference parsing tolerates backticks', () => {
