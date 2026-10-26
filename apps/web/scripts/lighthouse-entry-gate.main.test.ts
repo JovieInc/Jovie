@@ -635,6 +635,35 @@ describe('lighthouse entry gate main', () => {
     }
   });
 
+  it('names the failing route in a GitHub annotation on Actions', async () => {
+    vi.stubEnv('GITHUB_ACTIONS', 'true');
+    const log = vi.mocked(console.log);
+    state.lcp = 9000;
+    const code = await main([
+      '--base-url',
+      'https://x.test',
+      '--route-id',
+      'claim',
+      '--runs',
+      '1',
+    ]);
+    vi.unstubAllEnvs();
+    expect(code).toBe(1);
+    expect(log).toHaveBeenCalledWith(
+      '::error title=Entry-route LCP gate%3A claim::claim (https://x.test/claim): LCP median 9000ms > 4000ms budget'
+    );
+  });
+
+  it('emits no annotation when every route passes on Actions', async () => {
+    vi.stubEnv('GITHUB_ACTIONS', 'true');
+    const log = vi.mocked(console.log);
+    await main(['--base-url', 'https://x.test', '--route-id', 'start']);
+    vi.unstubAllEnvs();
+    expect(
+      log.mock.calls.flat().some(l => String(l).startsWith('::error'))
+    ).toBe(false);
+  });
+
   it('passes the Vercel bypass as a private headers file when configured', async () => {
     process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET = 'secret-for-test';
     await main([
