@@ -40,7 +40,8 @@ export function SupportPageContent() {
             id='support-hero-heading'
             className='system-b-marketing-route-title mt-6 text-primary-token'
           >
-            We&apos;re Here To Help.
+            {/* ui-casing-allow: sentence-case headings per marketing plan phase 1 */}
+            We&apos;re here to help.
           </h1>
           <p className='mt-6 max-w-xl text-lg leading-relaxed text-secondary-token'>
             Browse the Help Center or reach out to our team.
