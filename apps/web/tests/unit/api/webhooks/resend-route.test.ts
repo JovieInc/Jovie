@@ -328,7 +328,8 @@ describe('POST /api/webhooks/resend', () => {
     );
     expect(mockStopEnrollmentsForEmail).toHaveBeenCalledWith(
       'fan@example.com',
-      'bounced'
+      'bounced',
+      { throwOnError: true }
     );
   });
 
@@ -374,5 +375,117 @@ describe('POST /api/webhooks/resend', () => {
         }),
       })
     );
+  });
+
+  describe('fails loud when a bounce or complaint cannot be persisted', () => {
+    function bounceBody(to = ['fan@example.com']) {
+      return JSON.stringify(
+        baseEvent({
+          type: 'email.bounced',
+          data: {
+            email_id: 'email_bounce',
+            from: 'artist@example.com',
+            to,
+            subject: 'Release update',
+            created_at: '2026-05-24T00:00:00.000Z',
+            bounce: { message: 'User unknown', diagnostic_code: '550' },
+          },
+        })
+      );
+    }
+
+    async function post(body: string) {
+      mockHeaders.mockResolvedValue(createSignedHeaders(body, 'evt_fail'));
+      const { POST } = await import('@/app/api/webhooks/resend/route');
+      return POST(
+        new Request('https://example.com/api/webhooks/resend', {
+          method: 'POST',
+          body,
+        }) as never
+      );
+    }
+
+    function setCalls(
+      updateChain: ReturnType<typeof mockDatabase>['updateChain']
+    ) {
+      return updateChain.set.mock.calls.map(
+        call => call[0] as Record<string, unknown>
+      );
+    }
+
+    it('never acknowledges a bounce whose suppression write failed', async () => {
+      const { updateChain } = mockDatabase();
+      mockGetCreatorByMessageId.mockResolvedValue('creator_456');
+      mockAddSuppression.mockResolvedValue({
+        success: false,
+        error: 'connection terminated',
+      });
+
+      const response = await post(bounceBody());
+
+      // Svix retries non-2xx deliveries; a 200 here would lose the bounce.
+      expect(response.status).toBe(500);
+      // Retried in-process before giving up.
+      expect(mockAddSuppression).toHaveBeenCalledTimes(3);
+      const writes = setCalls(updateChain);
+      expect(writes.some(write => write.processed === true)).toBe(false);
+      // Dead-lettered on the stored event row for replay and audit.
+      expect(writes).toContainEqual(
+        expect.objectContaining({
+          error: expect.stringContaining('suppression'),
+        })
+      );
+      expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+        'Resend webhook processing failed',
+        expect.anything(),
+        expect.objectContaining({ eventId: 'evt_fail' })
+      );
+      // Non-idempotent side effects wait until suppression is durable.
+      expect(mockRecordBounce).not.toHaveBeenCalled();
+    });
+
+    it('treats a thrown suppression write the same way', async () => {
+      const { updateChain } = mockDatabase();
+      mockAddSuppression.mockRejectedValue(new Error('db down'));
+
+      const response = await post(bounceBody());
+
+      expect(response.status).toBe(500);
+      expect(
+        setCalls(updateChain).some(write => write.processed === true)
+      ).toBe(false);
+    });
+
+    it('retries a transient suppression failure, then acknowledges', async () => {
+      const { updateChain } = mockDatabase();
+      mockAddSuppression
+        .mockResolvedValueOnce({ success: false, error: 'timeout' })
+        .mockResolvedValue({ success: true, alreadyExists: false });
+
+      const response = await post(bounceBody());
+
+      expect(response.status).toBe(200);
+      expect(mockAddSuppression).toHaveBeenCalledTimes(2);
+      expect(setCalls(updateChain)).toContainEqual(
+        expect.objectContaining({ processed: true })
+      );
+    });
+
+    it('never acknowledges when campaign enrollments could not be stopped', async () => {
+      const { updateChain } = mockDatabase();
+      mockStopEnrollmentsForEmail.mockRejectedValue(new Error('db down'));
+
+      const response = await post(bounceBody());
+
+      expect(response.status).toBe(500);
+      expect(mockStopEnrollmentsForEmail).toHaveBeenCalledWith(
+        'fan@example.com',
+        'bounced',
+        { throwOnError: true }
+      );
+      expect(
+        setCalls(updateChain).some(write => write.processed === true)
+      ).toBe(false);
+    });
   });
 });
