@@ -458,7 +458,14 @@ test('contract: Fleet Rules Evidence is base-branch code only and never hands th
     'pull_request_target',
     'workflow_run',
   ]);
-  assert.equal((text.match(/secrets\./g) ?? []).length, 1);
+  // Two mints, both read-only and both in base-branch jobs: the evidence job and the
+  // workflow_run re-run hop (its lookups moved off github.token, 2026-10-26).
+  assert.equal((text.match(/secrets\./g) ?? []).length, 2);
+  assert.equal(
+    (text.match(/private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/g) ?? [])
+      .length,
+    2
+  );
   assert.match(text, /private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/);
   assert.match(
     text,
@@ -483,10 +490,15 @@ test('contract: Fleet Rules Evidence is base-branch code only and never hands th
     text.indexOf('- name: Read evidence')
   );
   assert.doesNotMatch(setupNode, /token:|fleet-token/);
-  // The minted token is only passed to the evidence script, as FLEET_TOKEN.
-  assert.equal(
-    (text.match(/steps\.fleet-token\.outputs\.token/g) ?? []).length,
-    1
+  // The minted token is passed only to the evidence script (FLEET_TOKEN) and to the
+  // re-run hop's read lookups (GH_READ_TOKEN); never anywhere else.
+  assert.deepEqual(
+    [
+      ...text.matchAll(
+        /(\w+): \$\{\{ steps\.fleet-token\.outputs\.token \}\}/g
+      ),
+    ].map(match => match[1]),
+    ['FLEET_TOKEN', 'GH_READ_TOKEN']
   );
 });
 

@@ -2311,6 +2311,7 @@ describe('source-read guard selection', () => {
       'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
+      'anti-slop',
       'external-api-guard',
       'copy-leak',
     ]);
@@ -2326,6 +2327,7 @@ describe('source-read guard selection', () => {
       'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
+      'anti-slop',
       'external-api-guard',
       'copy-leak',
     ]);
@@ -2459,6 +2461,17 @@ describe('source-read guard selection', () => {
         expect(guard.command).toBe(
           'node --test scripts/invariants/art-direction/container-width.test.mjs'
         );
+        continue;
+      }
+      if (guard.id === 'anti-slop') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain('scripts/anti-slop/run.mjs validate');
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/anti-slop/anti-slop.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
         continue;
       }
       if (guard.id === 'script-contracts') {
