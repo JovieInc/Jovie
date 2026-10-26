@@ -94,6 +94,51 @@ describe('CookieBannerSection consent sync', () => {
     expect(phoneRule).toContain('bottom: var(--profile-bottom-nav-height);');
   });
 
+  it('publishes dock clearance from the real profile dock rect and removes it on dismissal', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    const dock = document.createElement('div');
+    dock.dataset.testid = 'profile-tab-bar';
+    dock.getBoundingClientRect = () => ({ top: 800 }) as DOMRect;
+    document.body.append(dock);
+    vi.spyOn(globalThis, 'innerHeight', 'get').mockReturnValue(1024);
+
+    const { unmount } = render(
+      <mod.CookieBannerSection testOnlyPathname='/profile-admission-fixture' />
+    );
+
+    // 1024 - 800 + 8px gap: the card sits exactly above the dock.
+    expect(
+      document.documentElement.style.getPropertyValue(
+        '--cookie-banner-dock-clearance'
+      )
+    ).toBe('232px');
+
+    unmount();
+    expect(
+      document.documentElement.style.getPropertyValue(
+        '--cookie-banner-dock-clearance'
+      )
+    ).toBe('');
+    dock.remove();
+  });
+
+  it('anchors the tablet profile consent card above the dock, not over the avatar', () => {
+    const css = readFileSync(
+      resolve(process.cwd(), 'styles/design-system.css'),
+      'utf8'
+    );
+    const tabletRule =
+      /@media \(min-width: 768px\) and \(max-width: 1179px\)[\s\S]*?\.cookie-banner-card--above-public-profile-dock \{([^}]*)\}/.exec(
+        css
+      )?.[1];
+
+    expect(tabletRule).toContain('top: auto;');
+    expect(tabletRule).toContain('--cookie-banner-dock-clearance');
+    expect(tabletRule).not.toMatch(/top: var\(--page-pad\)/);
+  });
+
   it('calls setConsentState accepted on acceptAll', async () => {
     const { setConsentState } = await import('@/lib/tracking/consent');
     const mod = await import('@/components/organisms/CookieBannerSection');
