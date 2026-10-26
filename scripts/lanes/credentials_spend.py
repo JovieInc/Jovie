@@ -23,6 +23,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from redact import redact
+
 INTERVAL_S = 6 * 3600
 RETRY_S = 1800
 TIMEOUT_S = 120
@@ -114,6 +116,9 @@ def tick(state_dir: Path, release: Path, run=subprocess.run, now: float | None =
     try:
         done = run(args, cwd=str(release),
                    env=env, capture_output=True, text=True, timeout=TIMEOUT_S, stdin=subprocess.DEVNULL)
+        # Child output may echo credentials; redact against the env the child ran with.
+        done.stdout = redact(done.stdout, env)
+        done.stderr = redact(done.stderr, env)
         if done.returncode != 0:
             raise RuntimeError(f"exit {done.returncode}")
         result = {"status": "ok", **summarize(done.stdout), "filing": "linear-app" if access else "unavailable"}

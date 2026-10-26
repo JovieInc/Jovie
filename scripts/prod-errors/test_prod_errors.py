@@ -22,10 +22,11 @@ class FakeSentry:
 
 class FakeLinear:
     def __init__(self):
-        self.created, self.comments, self.states, self.n = [], [], [], 0
+        self.created, self.comments, self.states, self.n, self.closed = [], [], [], 0, set()
 
-    def find_by_label(self, name):
-        return next((c["id"] for c in self.created if name in c["labels"]), None)
+    def find_by_label(self, name, open_only=False):
+        return next((c["id"] for c in self.created if name in c["labels"]
+                     and not (open_only and c["id"] in self.closed)), None)
 
     def create(self, title, body, labels, priority):
         self.n += 1
@@ -111,6 +112,31 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(m["regressionRate"], 0.5)
         self.assertEqual(m["firstSeenToFixHours"]["p50"], 2.0)
         self.assertEqual(len((self.dir / "sentry-loop-metrics.jsonl").read_text().splitlines()), 1)
+
+    def test_blocked_pr_with_open_bot_threads_files_one_issue_then_dedupes(self):
+        graph = {"data": {"repository": {"pullRequest": {"reviewThreads": {"nodes": [
+            {"id": "T1", "isResolved": False, "isOutdated": False, "path": "a.ts", "line": 3,
+             "comments": {"nodes": [{"author": {"login": "sentry"}, "body": "**Bug:** x"}]}},
+            {"id": "T2", "isResolved": True, "isOutdated": False, "path": "b.ts", "line": 1,
+             "comments": {"nodes": [{"author": {"login": "sentry"}, "body": "old"}]}}]}}}}}
+        def gh(args):
+            return [{"number": 9, "title": "t", "mergeStateStatus": "BLOCKED"}] if args[0] == "pr" else graph
+        with mock.patch.object(pe, "gh_json", side_effect=gh):
+            self.assertEqual(pe.bot_threads(self.l, self.dir), {"threads-filed": 1})
+            self.assertEqual(pe.bot_threads(self.l, self.dir), {"threads-filed": 0})
+        self.assertEqual(len(self.l.created), 1)
+        self.assertIn("resolveReviewThread", self.l.created[0]["body"])
+        self.assertIn("T1", self.l.created[0]["body"])
+        self.assertNotIn("old", self.l.created[0]["body"])
+
+    def test_repeat_episode_after_closed_alert_files_a_new_issue(self):
+        # JOV-9007: dedupe against CLOSED issues silently swallowed a recurring identical incident.
+        pe.alert("dead-man", "watchers unhealthy: ci-main is erroring", False, self.l, self.dir)
+        pe.alert("dead-man", "watchers unhealthy: ci-main is erroring", False, self.l, self.dir)
+        self.assertEqual(len(self.l.created), 1)  # same open episode still dedupes
+        self.l.closed.add("JOV-1")  # recovered, issue completed
+        pe.alert("dead-man", "watchers unhealthy: ci-main is erroring", False, self.l, self.dir)
+        self.assertEqual(len(self.l.created), 2)
 
     def test_query_is_production_only(self):
         urls = []
@@ -301,11 +327,21 @@ class LoopTest(unittest.TestCase):
             pe.EXPECTED_RUNS = old_expected
 
     def test_ci_cancelled_superseded_by_newer_sha_is_ignored(self):
-        # JOV-8916: those cancelled runs were superseded when a newer main push started a newer
-        # run for a different SHA -- normal concurrency, never a hang. Three sweeps, no issue.
-        runs = [self.ghrun(2, status="in_progress", conclusion=None, headSha="sha-new"),
-                self.ghrun(1, conclusion="cancelled", headSha="sha-old")]
-        self.ci_sweeps([runs, runs, runs])
+        # JOV-8916: each cancelled run was superseded the moment the next main push started a
+        # newer run for a different SHA -- normal concurrency under fast merges, never a hang.
+        # Three DISTINCT superseded cancels (the exact fast-merge incident shape that filed the
+        # false "cancelled 3x in a row" issue) must not alert; repeated sweeps of the same
+        # superseded run stay deduped too.
+        sweep1 = [self.ghrun(2, status="in_progress", conclusion=None, headSha="sha-new1"),
+                  self.ghrun(1, conclusion="cancelled", headSha="sha-old1")]
+        sweep2 = [self.ghrun(3, status="in_progress", conclusion=None, headSha="sha-new2"),
+                  self.ghrun(2, conclusion="cancelled", headSha="sha-new1"),
+                  self.ghrun(1, conclusion="cancelled", headSha="sha-old1")]
+        sweep3 = [self.ghrun(4, status="in_progress", conclusion=None, headSha="sha-new3"),
+                  self.ghrun(3, conclusion="cancelled", headSha="sha-new2"),
+                  self.ghrun(2, conclusion="cancelled", headSha="sha-new1"),
+                  self.ghrun(1, conclusion="cancelled", headSha="sha-old1")]
+        self.ci_sweeps([sweep1, sweep2, sweep3, sweep3])  # 4th sweep: same runs, still deduped
         self.assertEqual(self.l.created, [])
 
     def test_ci_cancelled_with_no_newer_run_still_flags(self):
