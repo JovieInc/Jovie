@@ -4974,6 +4974,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/app/(shell)/admin/capacity/page.tsx",
+      "kind": "page",
+      "route": "/app/admin/capacity",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/app/(shell)/admin/certifications/page.tsx",
       "kind": "page",
       "route": "/app/admin/certifications",
