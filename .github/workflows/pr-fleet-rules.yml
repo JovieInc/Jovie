@@ -38,6 +38,9 @@ jobs:
       - name: Test fleet policy with coverage
         if: github.event_name != 'pull_request' || contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
         run: node --test --experimental-test-coverage --test-coverage-include=scripts/pr-fleet-rules.mjs --test-coverage-lines=95 --test-coverage-functions=100 --test-coverage-branches=90 scripts/pr-fleet-rules.test.mjs
+      - name: Test pricing-model gate
+        if: github.event_name != 'pull_request' || contains(fromJSON('["opened","synchronize","reopened"]'), github.event.action)
+        run: node --test scripts/lib/pricing-model-gate.test.mjs
       # One evidence read prints the blast-radius warnings and enforces the
       # blocking rules. Two reads doubled this workflow's installation-budget
       # spend on every PR event. Quota or outage exits 75 with a
@@ -45,4 +48,5 @@ jobs:
       - name: Enforce receipts, red-before-green and locked areas
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PRICING_MODEL_GATE: '1'
         run: node scripts/pr-fleet-rules.mjs --with-warnings

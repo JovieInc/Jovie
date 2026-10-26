@@ -19,6 +19,7 @@ import {
   isLockedArea,
   main,
   onlyWeakensAssertions,
+  readRepoFile,
   runFleetRules,
   validateDoneReceipt,
 } from './pr-fleet-rules.mjs';
@@ -927,6 +928,42 @@ test('missing test patches and placeholder decision references cannot bypass blo
       }),
       [file('auth/session.ts')]
     ).errors,
+    []
+  );
+});
+
+test('pricing changes require a passing pricing-model link', () => {
+  const priced = [file('apps/web/lib/config/plan-prices.ts')];
+  const good = JSON.stringify({
+    bar: { best_arr_usd: 100e6, by_year: 5 },
+    assumptions: [{ name: 'a' }],
+    chosen: 'D',
+    options: {
+      D: {
+        arr: {
+          worst: [1, 2, 3, 4, 5],
+          base: [1, 2, 3, 4, 5],
+          best: [8e6, 49e6, 188e6, 368e6, 601e6],
+        },
+      },
+    },
+  });
+  const withLink = pr({
+    body: proof + '\npricing-model: docs/pricing-models/x.json',
+  });
+  assert.deepEqual(evaluateFleetRules({ pr: pr(), files: priced }).errors, []);
+  assert.match(
+    evaluateFleetRules({
+      pr: pr(),
+      files: priced,
+      readFile: () => good,
+    }).errors.join('\n'),
+    /pricing-model:/
+  );
+  assert.match(readRepoFile('package.json'), /"name"/);
+  assert.deepEqual(
+    evaluateFleetRules({ pr: withLink, files: priced, readFile: () => good })
+      .errors,
     []
   );
 });

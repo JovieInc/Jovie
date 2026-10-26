@@ -2,6 +2,7 @@
 // One policy for PR feedback, native admission, and durable delivery receipts.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { evaluatePricingModel } from './lib/pricing-model-gate.mjs';
 
 const RUN_URL =
   /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/actions\/runs\/([1-9]\d*)(?:\/attempts\/[1-9]\d*)?$/;
@@ -154,6 +155,7 @@ export function evaluateFleetRules({
   pr,
   files,
   repository = 'JovieInc/Jovie',
+  readFile = undefined,
 }) {
   const errors = [],
     warnings = [];
@@ -242,10 +244,16 @@ export function evaluateFleetRules({
     errors.push(
       `locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for ${[...new Set(locked)].join(', ')}.`
     );
+  // Needs the PR tree on disk: only the full-checkout PR Fleet Rules job opts in.
+  if (readFile) errors.push(...evaluatePricingModel({ paths, body, readFile }));
   return { errors, warnings };
 }
 
 /** Refresh metadata on edits/labels; never interpolate PR content into shell. */
+export function readRepoFile(path) {
+  return readFileSync(path, 'utf8');
+}
+
 export async function runFleetRules({ event, request }) {
   // This policy concerns source PR metadata; synthetic heads have no PR body.
   // Source PR Ready and native admission independently enforce the same policy.
@@ -278,7 +286,12 @@ export async function runFleetRules({ event, request }) {
     files.some(file => typeof file.filename !== 'string')
   )
     throw new Error('incomplete PR file count');
-  return evaluateFleetRules({ pr: current, files, repository });
+  return evaluateFleetRules({
+    pr: current,
+    files,
+    repository,
+    readFile: process.env.PRICING_MODEL_GATE === '1' ? readRepoFile : undefined,
+  });
 }
 
 /**

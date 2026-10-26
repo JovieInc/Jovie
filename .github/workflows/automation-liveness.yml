@@ -1,3 +1,4 @@
+# github-token-budget: 2 calls/run - reads the prior liveness-state artifact list and download
 name: Automation Liveness
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
