@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -141,5 +147,22 @@ class Probe(unittest.TestCase):
     );
     expect(output).toContain('no changed release self-test lanes tests');
     expect(status).toBe(0);
+  });
+
+  // The qualification guard pins the hash of its fixture file. A PR editing the
+  // fixture must run the pinning test at PR time, not first in a merge group.
+  it('maps the qualification guard fixture to its pinning test', () => {
+    const guardSource = readFileSync(
+      new URL('../../lanes/qualification_guard.py', import.meta.url),
+      'utf8'
+    );
+    const fixture =
+      /DEFAULT_POLICY = SafetyPolicy\(\s*"[0-9a-f]{40}",\s*"([^"]+)"/.exec(
+        guardSource
+      )?.[1];
+    expect(fixture).toMatch(/^scripts\/tests\/test_.*\.py$/);
+    expect(LANES_SELFTEST_CHANGED_TESTS_SCRIPT).toContain(
+      `${fixture}) cand="$cand $f scripts/tests/test_qualification_guard.py"`
+    );
   });
 });
