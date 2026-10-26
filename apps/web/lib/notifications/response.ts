@@ -84,8 +84,7 @@ export const buildSubscribeSuccessResponse = (
  * is pending without an email OTP step.
  */
 export const buildSmsPendingSubscribeResponse = (
-  audienceIdentified: boolean,
-  durationMs: number
+  audienceIdentified: boolean
 ): NotificationSubscribeDomainResponse => ({
   status: 200,
   audienceIdentified,
@@ -93,7 +92,9 @@ export const buildSmsPendingSubscribeResponse = (
     success: true,
     message: 'Confirm by text message to finish subscribing',
     emailDispatched: false,
-    durationMs,
+    // Constant on purpose: a suppressed number returns before any write, and a
+    // real duration would reveal that through timing.
+    durationMs: 0,
     pendingConfirmation: true,
     requiresOtp: false,
   },

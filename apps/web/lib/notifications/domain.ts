@@ -793,10 +793,7 @@ export const subscribeToNotificationsDomain = async (
         source
       )
     ) {
-      return buildSmsPendingSubscribeResponse(
-        dynamicEnabled,
-        Math.round(Date.now() - runtimeStart)
-      );
+      return buildSmsPendingSubscribeResponse(dynamicEnabled);
     }
 
     // Default preferences: all content categories enabled
@@ -859,22 +856,9 @@ export const subscribeToNotificationsDomain = async (
     });
 
     if (channel === 'sms') {
-      // Double opt-in: the form post only records a pending row. Funnel and
-      // CAPI "subscribed" events fire when the join text confirms it.
-      await trackSubscribeSuccess({
-        artist_id,
-        channel,
-        phone_present: Boolean(normalizedPhone),
-        country_code: countryCode ?? undefined,
-        source,
-        source_context,
-        creator_is_pro: creatorIsPro,
-        dynamic_enabled: dynamicEnabled,
-      });
-      return buildSmsPendingSubscribeResponse(
-        dynamicEnabled,
-        Math.round(Date.now() - runtimeStart)
-      );
+      // Double opt-in: the form post only records a pending row. Funnel, CAPI
+      // and subscribe-success events fire when the join text confirms it.
+      return buildSmsPendingSubscribeResponse(dynamicEnabled);
     }
 
     await trackSubscribeSuccess({

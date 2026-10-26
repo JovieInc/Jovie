@@ -245,6 +245,9 @@ describe('notifications/domain', () => {
         const { recordFunnelStep } = await import(
           '@/lib/analytics/signup-funnel.server'
         );
+        const { trackSubscribeSuccess } = await import(
+          '@/lib/notifications/analytics'
+        );
         mockArtist();
 
         const result = await subscribeToNotificationsDomain(smsPayload);
@@ -269,6 +272,8 @@ describe('notifications/domain', () => {
         expect(conflict.set).not.toHaveProperty('unsubscribedAt');
         expect(fireSubscribeCAPIEvent).not.toHaveBeenCalled();
         expect(recordFunnelStep).not.toHaveBeenCalled();
+        expect(trackSubscribeSuccess).not.toHaveBeenCalled();
+        expect(result.body).toMatchObject({ durationMs: 0 });
       });
 
       it('does not re-subscribe a STOP or blocked number without a fresh opt-in', async () => {
