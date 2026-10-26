@@ -30,6 +30,9 @@ declare global {
       unguidedFirst: boolean;
       first: number[] | null;
       guided: number[] | null;
+      /** Diagnostic: rect heights/tops of the layout chain at both samples. */
+      firstDetail?: Record<string, string>;
+      guidedDetail?: Record<string, string>;
     };
   }
 }
@@ -93,11 +96,32 @@ export function installDelayedGuidanceLayoutProbe(fontSize: number): void {
       const guidance = document.querySelector(
         '[data-testid="onboarding-flow-status"] > p[role="status"]'
       );
+      const detail = () => {
+        const out: Record<string, string> = {};
+        for (const [name, selector] of [
+          ['status', '[data-testid="onboarding-flow-status"]'],
+          ['ghost', '[data-testid="onboarding-verification-instruction-size"]'],
+          ['composer', '[data-testid="chat-empty-state-centered-composer"]'],
+          ['field', '[data-testid="chat-input-inline-field"]'],
+          ['textarea', '[aria-label="Chat message input" i]'],
+        ] as const) {
+          const el = document.querySelector(selector) as HTMLElement | null;
+          const r = el?.getBoundingClientRect();
+          out[name] = r
+            ? `y=${r.y.toFixed(1)} h=${r.height.toFixed(1)}${name === 'textarea' ? ` style=${el?.style.height}` : ''}`
+            : 'absent';
+        }
+        return out;
+      };
       if (!metric.first) {
+        metric.firstDetail = detail();
         metric.first = positions;
         metric.unguidedFirst = !guidance?.getBoundingClientRect().height;
       }
-      if (guidance?.getBoundingClientRect().height) metric.guided = positions;
+      if (guidance?.getBoundingClientRect().height) {
+        metric.guidedDetail = detail();
+        metric.guided = positions;
+      }
     }
     if (!metric.guided) requestAnimationFrame(sample);
   };
