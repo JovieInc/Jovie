@@ -297,10 +297,27 @@ def retired_workspace_roots() -> list[Path]:
 
 
 def reclaimable(host, roots=None) -> bool:
-    """Cheap: a retired Symphony workspace root still holds a directory the sweep can remove."""
+    """Cheap: a retired Symphony workspace root still holds a directory the sweep can remove.
+
+    Only what sweep_retired_workspaces would act on counts: a bind-mounted child (it is skipped
+    whole) or one on a filesystem above LOW_PCT free never frees the state disk. Counting them
+    held "disk-reclamation-pending" with nothing reclaimable for hours on 2026-10-25."""
+    mounts = False  # read lazily: most hosts have no candidate at all
     for root in retired_workspace_roots() if roots is None else roots:
         try:
-            if root.is_dir() and not root.is_symlink() and any(child.is_dir() for child in root.iterdir()):
+            if not root.is_dir() or root.is_symlink():
+                continue
+            for child in root.iterdir():
+                if child.is_symlink() or not child.is_dir():
+                    continue
+                pct = free_pct(child)
+                if pct is not None and pct > LOW_PCT:
+                    continue
+                mounts = mount_points() if mounts is False else mounts
+                if mounts is not None:
+                    resolved = child.resolve()
+                    if any(mount == resolved or resolved in mount.parents for mount in mounts):
+                        continue
                 return True
         except OSError:
             continue

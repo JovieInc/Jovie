@@ -56,13 +56,24 @@ export function ChangelogEmailSignup({
   initialEmail = '',
   copy = DEFAULT_COPY,
   marketingSection = false,
+  deferSecurityCheck = false,
 }: {
   readonly source?: string;
   readonly initialEmail?: string;
   readonly copy?: ChangelogEmailSignupCopy;
   readonly marketingSection?: boolean;
+  /**
+   * Load the Cloudflare check only after the visitor touches the form.
+   * Footer signups sit on pages whose job is something else (pricing, claim
+   * funnel); loading a vendor iframe that polls forever on every view costs
+   * LCP/INP and keeps the page from ever reaching network idle.
+   */
+  readonly deferSecurityCheck?: boolean;
 }) {
   const formId = useId();
+  const [securityCheckArmed, setSecurityCheckArmed] = useState(
+    !deferSecurityCheck
+  );
   const statusRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState(initialEmail);
   const [submittedEmail, setSubmittedEmail] = useState('');
@@ -83,10 +94,6 @@ export function ChangelogEmailSignup({
   const inputRef = useRef<HTMLInputElement>(null);
   const turnstileRequired =
     isTurnstileClientConfigured() && !isTurnstileClientBypassed();
-  // Turnstile is third-party script weight and a CSP probe: load it only once
-  // the visitor shows intent to submit this form, never on page load.
-  const [turnstileArmed, setTurnstileArmed] = useState(false);
-  const armTurnstile = useCallback(() => setTurnstileArmed(true), []);
   const [turnstileFailed, setTurnstileFailed] = useState(false);
   const [turnstileRetryable, setTurnstileRetryable] = useState(false);
 
@@ -355,9 +362,8 @@ export function ChangelogEmailSignup({
       <div className='mt-4 grid'>
         <form
           onSubmit={handleSubmit}
-          onFocusCapture={armTurnstile}
-          onPointerEnter={armTurnstile}
-          onTouchStart={armTurnstile}
+          onFocusCapture={() => setSecurityCheckArmed(true)}
+          onPointerDownCapture={() => setSecurityCheckArmed(true)}
           data-testid='changelog-subscribe-form'
           aria-hidden={settled || undefined}
           inert={settled}
@@ -414,8 +420,7 @@ export function ChangelogEmailSignup({
               {copy.buttonLabel}
             </Button>
           </div>
-          {status === 'subscribed' ||
-          (turnstileRequired && !turnstileArmed) ? null : (
+          {status === 'subscribed' || !securityCheckArmed ? null : (
             <InvisibleTurnstile
               onToken={setTurnstileToken}
               onStateChange={handleTurnstileStateChange}

@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { type ReactElement, useEffect } from 'react';
+import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChangelogEmailSignup } from '@/app/(marketing)/changelog/ChangelogEmailSignup';
 
@@ -80,13 +80,6 @@ vi.mock('@/components/atoms/InvisibleTurnstile', () => ({
   isTurnstileClientConfigured: () => true,
 }));
 
-/** Turnstile mounts on intent to submit (see turnstile-lazy-mount.test.tsx). */
-function renderArmed(ui: ReactElement) {
-  const view = render(ui);
-  fireEvent.focus(screen.getByLabelText('Email Address'));
-  return view;
-}
-
 describe('ChangelogEmailSignup', () => {
   it('binds the shared marketing opt-in on its actual semantic root', () => {
     const { unmount } = render(
@@ -104,7 +97,7 @@ describe('ChangelogEmailSignup', () => {
       'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx'
     );
     unmount();
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
     expect(screen.queryByTestId('marketing-section-capture')).toBeNull();
   });
 
@@ -127,7 +120,7 @@ describe('ChangelogEmailSignup', () => {
   });
 
   it('renders one compact subscribe form without a duplicate reveal CTA', () => {
-    const { container } = renderArmed(<ChangelogEmailSignup />);
+    const { container } = render(<ChangelogEmailSignup />);
     const revealRoot = container.querySelector("[data-pen-source='qKrDn']");
     expect(revealRoot).toHaveAttribute('data-visual-state', 'idle');
 
@@ -144,8 +137,17 @@ describe('ChangelogEmailSignup', () => {
     expect(screen.getByPlaceholderText('you@email.com')).toBeVisible();
   });
 
+  it('does not load the security check until the visitor touches a deferred form', async () => {
+    render(<ChangelogEmailSignup deferSecurityCheck />);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(turnstileMock.effectCount).toBe(0);
+
+    fireEvent.focus(screen.getByPlaceholderText('you@email.com'));
+    await waitFor(() => expect(turnstileMock.effectCount).toBe(1));
+  });
+
   it('keeps the Turnstile lifecycle stable while the parent rerenders', async () => {
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
 
     await waitFor(() => expect(turnstileMock.effectCount).toBe(1));
     fireEvent.change(screen.getByPlaceholderText('you@email.com'), {
@@ -156,7 +158,7 @@ describe('ChangelogEmailSignup', () => {
   });
 
   it('does not steal focus when Turnstile requires interaction', async () => {
-    const { container } = renderArmed(<ChangelogEmailSignup />);
+    const { container } = render(<ChangelogEmailSignup />);
     const revealRoot = container.querySelector("[data-pen-source='qKrDn']");
     const input = screen.getByPlaceholderText('you@email.com');
 
@@ -170,7 +172,7 @@ describe('ChangelogEmailSignup', () => {
   });
 
   it('preserves a Turnstile failure while the compact form stays open', async () => {
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
 
     act(() => {
       turnstileMock.onToken?.('');
@@ -192,7 +194,7 @@ describe('ChangelogEmailSignup', () => {
       json: async () => ({ state: 'confirmation_required' }),
     } as Response);
 
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
 
     const input = screen.getByPlaceholderText('you@email.com');
     fireEvent.change(input, { target: { value: 'test@example.com' } });
@@ -233,7 +235,7 @@ describe('ChangelogEmailSignup', () => {
   it('does not submit an empty turnstile token when verification is required', async () => {
     turnstileMock.provideToken = false;
 
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
 
     const input = screen.getByPlaceholderText('you@email.com');
     fireEvent.change(input, { target: { value: 'test@example.com' } });
@@ -252,7 +254,7 @@ describe('ChangelogEmailSignup', () => {
     turnstileMock.failureMessage =
       'Security check could not load. Refresh the page and try again.';
 
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
 
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent(turnstileMock.failureMessage);
@@ -320,7 +322,7 @@ describe('ChangelogEmailSignup', () => {
       ok: true,
       json: async () => ({ state: 'subscribed' }),
     } as Response);
-    renderArmed(<ChangelogEmailSignup source='marketing:/blog' />);
+    render(<ChangelogEmailSignup source='marketing:/blog' />);
     fireEvent.change(screen.getByLabelText('Email Address'), {
       target: { value: 'reader@example.com' },
     });
@@ -349,7 +351,7 @@ describe('ChangelogEmailSignup', () => {
       json: async () => ({ state: 'confirmation_required' }),
     } as Response);
 
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
     fireEvent.change(screen.getByLabelText('Email Address'), {
       target: { value: 'artist@exmaple.com' },
     });
@@ -397,7 +399,7 @@ describe('ChangelogEmailSignup', () => {
       json: async () => ({ state: 'confirmation_required' }),
     } as Response);
 
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
     fireEvent.change(screen.getByLabelText('Email Address'), {
       target: { value: 'reader@example.com' },
     });
@@ -435,7 +437,7 @@ describe('ChangelogEmailSignup', () => {
       json: async () => ({ state: 'confirmation_required' }),
     } as Response);
 
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
     fireEvent.change(screen.getByLabelText('Email Address'), {
       target: { value: 'reader@example.com' },
     });
@@ -471,7 +473,7 @@ describe('ChangelogEmailSignup', () => {
       ok: true,
       json: async () => ({}),
     } as Response);
-    renderArmed(<ChangelogEmailSignup />);
+    render(<ChangelogEmailSignup />);
     fireEvent.change(screen.getByLabelText('Email Address'), {
       target: { value: 'reader@example.com' },
     });
