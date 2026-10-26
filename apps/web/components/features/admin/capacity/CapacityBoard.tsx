@@ -425,7 +425,7 @@ function PathsCard({ view }: Readonly<{ view: CapacityView }>) {
               .map(row => (
                 <li
                   key={row.id}
-                  className='grid gap-x-3 gap-y-0.5 py-2 sm:grid-cols-[1.2fr_1fr_1fr_2fr]'
+                  className='grid gap-x-3 gap-y-0.5 py-2 sm:grid-cols-4'
                 >
                   <span className='text-primary-token'>{row.model}</span>
                   <span className='text-secondary-token'>
