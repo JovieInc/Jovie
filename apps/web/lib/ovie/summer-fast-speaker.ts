@@ -1,4 +1,6 @@
 import type {
+  SummerAck,
+  SummerProgress,
   SummerSpeakEvent,
   SummerSpeaker,
   SummerSpeakInput,
@@ -40,6 +42,64 @@ export function fastChatEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 type Frame = { event: string; data: Record<string, unknown> };
+
+const str = (value: unknown) => (typeof value === 'string' ? value : null);
+const num = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+/** Copies a `done` frame into a typed ack; no ack unless the endpoint named its request, route and model. */
+export function toAck(data: Record<string, unknown>): SummerAck | null {
+  const requestId = str(data.requestId);
+  const route = str(data.route);
+  const model = str(data.model);
+  if (!requestId || !route || !model) return null;
+  return {
+    requestId,
+    route,
+    model,
+    ttftMs: num(data.ttftMs),
+    totalMs: num(data.totalMs),
+  };
+}
+
+/** Types an endpoint frame as progress. Unknown or malformed frames yield nothing: no invention. */
+export function toProgress(frame: Frame): SummerProgress | null {
+  const d = frame.data;
+  switch (frame.event) {
+    case 'meta': {
+      const requestId = str(d.requestId);
+      const route = str(d.route);
+      const model = str(d.model);
+      return requestId && route && model
+        ? { kind: 'meta', requestId, route, model }
+        : null;
+    }
+    case 'tool': {
+      const name = str(d.name);
+      const phase = d.phase;
+      return name &&
+        (phase === 'start' || phase === 'done' || phase === 'error')
+        ? { kind: 'tool', name, phase, ms: num(d.ms) }
+        : null;
+    }
+    case 'status': {
+      const phase = str(d.phase);
+      return phase
+        ? { kind: 'status', phase, model: str(d.model), text: str(d.text) }
+        : null;
+    }
+    case 'plan': {
+      const planId = str(d.planId);
+      const model = str(d.model);
+      const summary = str(d.summary);
+      return planId && model && summary !== null
+        ? { kind: 'plan', planId, path: str(d.path), model, summary }
+        : null;
+    }
+    default:
+      return null;
+  }
+}
 
 export async function* parseSseFrames(
   body: ReadableStream<Uint8Array>
@@ -120,6 +180,7 @@ export function createFallbackSummerSpeaker(input: {
       }
       let sawText = false;
       let failed = false;
+      let ack: SummerAck | null = null;
       for await (const frame of parseSseFrames(response.body)) {
         if (frame.event === 'delta' && typeof frame.data.text === 'string') {
           sawText = true;
@@ -127,6 +188,11 @@ export function createFallbackSummerSpeaker(input: {
         } else if (frame.event === 'error') {
           failed = true;
           break;
+        } else if (frame.event === 'done') {
+          ack = toAck(frame.data);
+        } else {
+          const progress = toProgress(frame);
+          if (progress) yield { type: 'progress', progress };
         }
       }
       if (!sawText) {
@@ -134,7 +200,14 @@ export function createFallbackSummerSpeaker(input: {
         yield* input.eve.speak(turn);
         return;
       }
-      if (failed) yield { type: 'error', state: 'failure' };
+      // Shown text without the endpoint's terminal ack is a truncated stream: say so,
+      // never present it as a completed answer.
+      if (failed || !ack) {
+        yield { type: 'error', state: 'failure' };
+        return;
+      }
+      // The ack is the endpoint's own terminal event, forwarded only after text was shown.
+      yield { type: 'ack', ack };
     },
   };
 }

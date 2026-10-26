@@ -165,13 +165,22 @@ jobs:
           export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
           node --input-type=module -e '
             import { spawnSync } from "node:child_process";
+            import { randomUUID } from "node:crypto";
             const { selectSourceGuards, listAllChangedFiles } = await import(process.env.SOURCE_GUARD_MODULE);
             const guards = selectSourceGuards(process.env.GITHUB_EVENT_NAME, listAllChangedFiles(process.cwd()));
             let exitCode = 0;
             for (const guard of guards) {
+              // Guard tests print mocked `::error::` / `::warning::` lines (a fake
+              // rate-limit reset misled three workers on 2026-10-25). Stop workflow
+              // commands for the guard, then resume; a failing guard gets one real
+              // annotation from this loop instead.
+              const token = randomUUID();
+              console.log(`::stop-commands::${token}`);
               const result = spawnSync(guard.command, { shell: true, cwd: process.cwd(), stdio: "inherit" });
+              console.log(`::${token}::`);
               const code = result.status ?? 1;
               console.log(`[source-guards] ${guard.id}: exit ${code}`);
+              if (code !== 0) console.log(`::error title=source guard ${guard.id}::${guard.id} failed (exit ${code}); read its output above.`);
               if (code !== 0 && exitCode === 0) exitCode = code;
             }
             process.exitCode = exitCode;
