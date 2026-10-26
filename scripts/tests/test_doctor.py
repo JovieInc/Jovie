@@ -2751,6 +2751,26 @@ class DeliveryTest(unittest.TestCase):
 
 
 class RunTest(unittest.TestCase):
+    def test_factory_adapter_and_intake_failures_do_not_abort_doctor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / "factory-signals").mkdir()
+            (state / "factory-signals/pending.json").write_text(json.dumps({
+                "schema": "jovie-factory-signal/v1", "fingerprint": "pending", "title": "Repair",
+                "problem": "Evidence", "acceptance": ["Reproduce and repair"], "metric": {"name": "failures", "target": 0}}))
+            class Down:
+                def gql(self, query, variables):
+                    raise RuntimeError("fixture Linear down")
+            tracker = FakeTracker()
+            tracker.linear = Down()
+            with mock.patch.dict(os.environ, {"LANES_SELFTEST": "1"}), \
+                    mock.patch.object(doctor, "observe", return_value=obs()), \
+                    mock.patch.object(doctor.factory_signals, "sentinel_signals", side_effect=ValueError("bad adapter")):
+                result = doctor.run(SimpleNamespace(state=state), SimpleNamespace(HOST="test"), None, tracker)
+            self.assertIn("fixture Linear down", result["factoryIntake"]["error"])
+            self.assertEqual(json.loads((state / "doctor.json").read_text())["factoryIntake"], result["factoryIntake"])
+            self.assertTrue((state / "factory-signals/pending.json").exists())
+
     def test_legacy_admission_alarm_survives_unknown_inventory_and_restart(self):
         for timer in (None, 998000):
             with self.subTest(timer=timer), tempfile.TemporaryDirectory() as tmp:
