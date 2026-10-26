@@ -46,13 +46,32 @@ for (const [job, stepId] of Object.entries(READ_JOBS)) {
   });
 }
 
-// The marker-heal job dispatches a workflow (actions: write), which no App token here is
-// granted; that single rare write stays on github.token on purpose.
-test('heal-interrupted-marker is the only controller job still on github.token', () => {
+// The marker-heal job dispatches a workflow, so its App token also carries actions: write.
+// It is job-scoped and fail-closed; no controller job may hold github.token.
+test('no controller job holds github.token; heal mints a write-scoped App token', () => {
   const holders = Object.entries(wf.jobs)
     .filter(([, job]) =>
       JSON.stringify(job.steps ?? []).includes('github.token')
     )
     .map(([name]) => name);
-  assert.deepEqual(holders, ['heal-interrupted-marker']);
+  assert.deepEqual(holders, []);
+  const steps = wf.jobs['heal-interrupted-marker'].steps;
+  const mint = steps.find(s => s.id === 'dispatch-token');
+  assert.ok(mint);
+  assert.equal(mint['continue-on-error'], undefined);
+  assert.equal(mint.with['permission-actions'], 'write');
+  assert.equal(mint.with['permission-contents'], 'read');
+  const dispatch = steps.find(s => s.env?.GH_TOKEN);
+  assert.equal(
+    dispatch.env.GH_TOKEN,
+    '${{ steps.dispatch-token.outputs.token }}'
+  );
+  for (const [name, job] of Object.entries(wf.jobs)) {
+    if (name === 'heal-interrupted-marker') continue;
+    assert.doesNotMatch(
+      JSON.stringify(job.steps ?? []),
+      /permission-actions\\?": ?\\?"write/,
+      name
+    );
+  }
 });

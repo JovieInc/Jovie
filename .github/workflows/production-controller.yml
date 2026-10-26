@@ -1723,9 +1723,17 @@ jobs:
       actions: write
       contents: read
     steps:
+      - name: Mint Jovie Bot token scoped to the marker-recovery dispatch
+        id: dispatch-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: write
+          permission-contents: read
       - name: Dispatch bounded marker recovery for an interrupted generation
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.dispatch-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
