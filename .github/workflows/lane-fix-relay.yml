@@ -89,7 +89,14 @@ jobs:
           GH_REPOSITORY: ${{ github.repository }}
         run: node scripts/pr-unacquired-runner-rerun.mjs
 
-  # Success on every pull_request branch starts this job so a stale lane-fix-red
+  # Success wakes come only from Source Validation (2026-10-26). It publishes PR Ready and
+  # Migration Guard and is the slowest required producer (minutes, against seconds for
+  # Fork PR Gate and PR Size Guard), so a head becomes required-green on its completion;
+  # waking on every other workflow's success started ~3 extra runs per head, each paying
+  # the 20 s debounce, a checkout, an App mint and several github.token calls (a stale
+  # lane-fix-red on a head whose last producer was not SV is cleared by the next SV
+  # completion or by Green Enroll). Failures still wake from every listed workflow.
+  # Success on a pull_request branch starts this job so a stale lane-fix-red
   # can be deleted with this job's existing GITHUB_TOKEN (issues: write,
   # pull-requests: write). `green` is still applied only to a lane draft
   # (pr_events.in_scope). Non-lane successes skip the debounce sleep: they
@@ -109,7 +116,8 @@ jobs:
       (github.event_name == 'pull_request_review_comment' && github.event.comment.user.type == 'User') ||
       contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) ||
       (github.event.workflow_run.event == 'pull_request' &&
-       contains(fromJSON('["failure","timed_out","startup_failure","success"]'), github.event.workflow_run.conclusion)) ||
+       (contains(fromJSON('["failure","timed_out","startup_failure"]'), github.event.workflow_run.conclusion) ||
+        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'Source Validation'))) ||
       (github.event.workflow_run.head_branch == 'main' &&
        contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event.workflow_run.event) &&
        contains(fromJSON('["failure","timed_out","startup_failure","cancelled"]'), github.event.workflow_run.conclusion)))
@@ -138,6 +146,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/lanes
+            scripts/apiclient
             scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
 

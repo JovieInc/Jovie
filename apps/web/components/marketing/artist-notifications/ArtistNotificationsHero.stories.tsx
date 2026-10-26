@@ -7,6 +7,12 @@ const meta = {
   component: ArtistNotificationsHero,
   parameters: {
     layout: 'fullscreen',
+    docs: {
+      description: {
+        component:
+          'Floating activity cards are illustrations and carry a visible Example label.',
+      },
+    },
   },
   args: {
     hero: ARTIST_NOTIFICATIONS_COPY.hero,

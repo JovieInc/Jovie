@@ -71,10 +71,9 @@ describe('MarketingFooter', () => {
     expect(screen.queryByRole('heading', { name: 'Company' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Resources' })).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Connect' })).toBeNull();
-    expect(screen.getByRole('link', { name: 'Fan Capture' })).toHaveAttribute(
-      'href',
-      '/artist-profiles#capture-every-fan'
-    );
+    expect(
+      screen.getByRole('link', { name: 'Audience capture' })
+    ).toHaveAttribute('href', '/artist-profiles#capture-every-fan');
   });
 
   it('renames the Music column when generic creator nav is passed', () => {
@@ -97,7 +96,7 @@ describe('MarketingFooter', () => {
     expect(
       screen.getByRole('link', { name: 'Audience Reactivation' })
     ).toHaveAttribute('href', '/artist-profiles#bring-them-back-automatically');
-    expect(screen.queryByRole('link', { name: 'Fan Capture' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Audience capture' })).toBeNull();
   });
 
   it('keeps the current footer columns while the about refresh flag is off', () => {
