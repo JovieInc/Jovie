@@ -121,3 +121,15 @@ test('the real Source Validation workflow yields the gates workers keep missing'
   ])
     assert.ok(runnable.includes(gate), `${gate} missing from derived plan`);
 });
+
+test('no derived step writes a fixed shared /tmp path', () => {
+  const steps = deriveSteps(
+    readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8')
+  );
+  for (const step of steps)
+    assert.doesNotMatch(
+      step.run,
+      /(?<![\w$}/])\/tmp\/[\w.-]/,
+      `${step.name} uses a fixed /tmp path; use mktemp or RUNNER_TEMP`
+    );
+});
