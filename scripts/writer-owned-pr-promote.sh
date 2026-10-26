@@ -71,6 +71,9 @@ compensate_to_draft() {
           attempted=true
           gh api graphql -f query='mutation($id:ID!){dequeuePullRequest(input:{id:$id}){clientMutationId}}' \
             -f id="$pr_id" >/dev/null 2>&1 || { jq --argjson attempted "$attempted" '. + {compensationAttempted:$attempted}' <<<"$state"; return 1; }
+          # Dequeue reason discipline: leave the same machine-readable record as queue-dequeue.mjs.
+          gh pr comment "$PR_NUMBER" -R "$REPO" --body "Dequeued from the merge queue (other): writer-owned promotion compensation reverted the PR to draft after a failed promote step.
+<!-- queue-dequeue {\"code\":\"other\",\"actor\":\"writer-owned-pr-promote\"} -->" >/dev/null 2>&1 || true
         fi ;;
       draft)
         if [[ "$(jq -r '.draft' <<<"$state")" != "true" ]]; then

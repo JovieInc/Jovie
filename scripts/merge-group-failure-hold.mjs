@@ -1034,7 +1034,13 @@ export async function applyMergeGroupFailure(
     fetchTimeoutText = '',
     aheadGroup,
   },
-  { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
+  {
+    writeStatus,
+    readPullRequest,
+    dequeuePullRequest,
+    disableAutoMerge,
+    recordDequeue,
+  }
 ) {
   const front = validateRun(run, repository);
   const sourceHeadSha = sourceHeadForRun(timeline, run.created_at);
@@ -1199,6 +1205,19 @@ export async function applyMergeGroupFailure(
         await dequeuePullRequest(current.id);
         dequeued = true;
         dequeueOutcome = 'dequeued';
+        // Dequeue reason discipline: every removal leaves a machine-readable PR
+        // comment (same marker as scripts/queue-dequeue.mjs). Never fatal.
+        try {
+          await recordDequeue?.({
+            number: front.prNumber,
+            code: 'poison',
+            reason: `merge-group failure hold: run ${run.id} failed for head ${sourceHeadSha.slice(0, 12)}`,
+          });
+        } catch (error) {
+          console.error(
+            `::warning::merge-group-failure-hold could not record the dequeue reason: ${errorText(error).slice(0, 200)}`
+          );
+        }
       } catch (error) {
         const denial = classifyDequeueDenial(error);
         if (!denial) throw error;
@@ -1668,6 +1687,15 @@ async function main(argv) {
           'mutation($id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$id}){clientMutationId}}',
           { id }
         ),
+      recordDequeue: async ({ number, code, reason }) =>
+        gh([
+          'api',
+          '-X',
+          'POST',
+          `repos/${repository}/issues/${number}/comments`,
+          '-f',
+          `body=Dequeued from the merge queue (${code}): ${reason}\n<!-- queue-dequeue ${JSON.stringify({ code, reason, actor: 'merge-group-failure-hold', at: new Date().toISOString() })} -->`,
+        ]),
     }
   );
   const serialized = JSON.stringify(result);

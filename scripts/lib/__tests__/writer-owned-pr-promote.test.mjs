@@ -444,3 +444,13 @@ test('merge after compensation read but before draft mutation is reread without 
   assert.match(r.comment, /"attempted": true/);
   assert.match(r.comment, /"verified": false/);
 });
+
+test('compensation dequeue leaves a machine-readable queue-dequeue record', () => {
+  const src = readFileSync(
+    new URL('../../writer-owned-pr-promote.sh', import.meta.url),
+    'utf8'
+  );
+  const i = src.indexOf('dequeuePullRequest(input');
+  assert.ok(i > 0);
+  assert.match(src.slice(i, i + 900), /queue-dequeue \{/);
+});

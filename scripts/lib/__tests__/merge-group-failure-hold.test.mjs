@@ -1731,6 +1731,48 @@ describe('terminal failure hold application', () => {
     });
   });
 
+  it('records a machine-readable reason for the dequeue and survives a recorder failure', async () => {
+    const make = recordDequeue => {
+      let state = {
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: true,
+        mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+        autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+      };
+      return {
+        writeStatus: vi.fn(),
+        readPullRequest: vi.fn(async () => structuredClone(state)),
+        dequeuePullRequest: vi.fn(async () => {
+          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+        }),
+        disableAutoMerge: vi.fn(async () => {
+          state = { ...state, autoMergeRequest: null };
+        }),
+        recordDequeue,
+      };
+    };
+    const record = vi.fn();
+    const ok = await applyMergeGroupFailure(failureInput, make(record));
+    expect(ok.dequeued).toBe(true);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record.mock.calls[0][0]).toMatchObject({
+      number: 42,
+      code: 'poison',
+    });
+    expect(record.mock.calls[0][0].reason.length).toBeGreaterThanOrEqual(15);
+    const failing = await applyMergeGroupFailure(
+      failureInput,
+      make(
+        vi.fn(async () => {
+          throw new Error('comment API down');
+        })
+      )
+    );
+    expect(failing.dequeued).toBe(true);
+  });
+
   it('keeps a second infrastructure failure retryable but blocks a second attributable one', async () => {
     const io = () => ({
       writeStatus: vi.fn(),
