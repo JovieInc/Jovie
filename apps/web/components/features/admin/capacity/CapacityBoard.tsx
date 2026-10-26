@@ -437,7 +437,7 @@ function PathsCard({ view }: Readonly<{ view: CapacityView }>) {
                       ? `${row.list.inUsdPerMTok} / ${row.list.outUsdPerMTok} per MTok`
                       : 'not listed'}
                   </span>
-                  <span className='text-secondary-token'>
+                  <span className='tabular-nums text-secondary-token'>
                     {row.accessPath === 'subscription'
                       ? row.accounts
                           .map(a => seatNote(view, row.provider, a))
@@ -530,7 +530,7 @@ function ProviderScreen({
       <ContentSurfaceCard surface='details'>
         <div className='space-y-3 p-4'>
           <div className='flex flex-wrap items-center gap-2'>
-            <h2 className='text-lg font-semibold text-primary-token'>
+            <h2 className='text-balance text-lg font-semibold text-primary-token'>
               {provider.label}
             </h2>
             <span className='rounded-full border border-subtle px-2 py-0.5 text-2xs text-secondary-token'>
