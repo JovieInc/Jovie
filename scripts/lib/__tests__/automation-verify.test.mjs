@@ -2151,10 +2151,20 @@ describe('automation-verify affected scope', () => {
 
     function runSelection(changedPath) {
       const repo = mkdtempSync(resolve(tmpdir(), 'scripts-typecheck-select-'));
-      const git = args =>
-        spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      const git = args => {
+        const result = spawnSync('git', args, {
+          cwd: repo,
+          encoding: 'utf8',
+        });
+        expect(result.status, `git ${args.join(' ')}: ${result.stderr}`).toBe(
+          0
+        );
+        return result;
+      };
       try {
         git(['init', '-q', '-b', 'main']);
+        // Synthetic fixture commits must not invoke a developer's signing agent.
+        git(['config', '--local', 'commit.gpgsign', 'false']);
         git(['config', 'user.email', 'test@example.com']);
         git(['config', 'user.name', 'test']);
         writeFileSync(resolve(repo, 'README.md'), 'base\n');
@@ -3666,6 +3676,85 @@ describe('automation-verify affected scope', () => {
       });
       expect(missing.mode).toBe('full');
       expect(missing.fallbackReason).toContain(source);
+    });
+  });
+
+  describe.each([
+    [
+      'apps/web/tests/e2e/utils/start-entry-layout.ts',
+      'apps/web/tests/unit/e2e/start-entry-layout.test.ts',
+    ],
+    [
+      'apps/web/tests/e2e/helpers/golden-path-keyframes.ts',
+      'apps/web/tests/unit/e2e/golden-path-keyframes.test.ts',
+    ],
+  ])('anonymous entry helper binding: %s', (source, testFile) => {
+    const unknownNeighbor = source.replace(/\.ts$/, '-neighbor.ts');
+    const selectorFiles = [
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+
+    it('selects the existing behavioral test for a helper-only change', () => {
+      const plan = buildAffectedTestPlan([source]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual([testFile]);
+      expect(plan.selectedTests).toEqual([testFile]);
+      expect(buildSelectedTestCommands(plan, '1')).toEqual([
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            testFile.replace('apps/web/', ''),
+            '--passWithNoTests',
+            '--maxWorkers',
+            '1',
+          ],
+        ],
+      ]);
+    });
+
+    it('fails closed when its declared behavioral test is missing', () => {
+      const plan = buildAffectedTestPlan([source], {
+        isFileAvailable: file => file !== testFile,
+      });
+
+      expect(plan.mode).toBe('full');
+      expect(plan.fallbackReason).toContain(source);
+    });
+
+    it.each([
+      [unknownNeighbor],
+      [source, unknownNeighbor],
+      [source, testFile, 'apps/web/lib/unknown.ts'],
+      [source, ...selectorFiles, 'apps/web/lib/unknown.ts'],
+      [source, 'apps/web/tests/setup.ts'],
+      [source, 'package.json'],
+    ])(
+      'preserves full fallback for unknown or global inputs %j',
+      (...files) => {
+        expect(buildAffectedTestPlan(files).mode).toBe('full');
+      }
+    );
+
+    it('includes selector regression tests when the complete pair accompanies the helper', () => {
+      const plan = buildAffectedTestPlan([source, ...selectorFiles]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual([testFile]);
+      expect(plan.selectedTests).toEqual([testFile]);
+      expect(plan.scriptVitestTests).toEqual([selectorFiles[1]]);
+    });
+
+    it('fails closed when the selector implementation changes without its proof', () => {
+      const plan = buildAffectedTestPlan([source, testFile, selectorFiles[0]]);
+
+      expect(plan.mode).toBe('full');
     });
   });
 

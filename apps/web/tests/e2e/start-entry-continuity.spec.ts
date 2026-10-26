@@ -1,7 +1,11 @@
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { inspectEssentialViewport } from './helpers/golden-path-keyframes';
-import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 import {
+  installRuntimeAutomationBypass,
+  ONBOARDING_SESSION_COOKIE_NAME,
+} from './utils/runtime-automation-bypass';
+import {
+  type ClaimSignInFrame,
   installDelayedGuidanceLayoutProbe,
   installReplyLayoutProbe,
 } from './utils/start-entry-layout';
@@ -19,6 +23,7 @@ function expectZeroLayoutShift(
         total: number | null;
         entries?: readonly unknown[];
         composerFrames?: readonly string[];
+        signInFrames?: readonly ClaimSignInFrame[];
       }
     | undefined,
   testInfo: TestInfo
@@ -30,7 +35,7 @@ function expectZeroLayoutShift(
     if (metric!.entries) {
       expect(
         metric!.total,
-        `layout-shift entries ${JSON.stringify(metric!.entries)} composerFrames ${JSON.stringify(metric!.composerFrames)}`
+        `layout-shift entries ${JSON.stringify(metric!.entries)} composerFrames ${JSON.stringify(metric!.composerFrames)} signInFrames ${JSON.stringify(metric!.signInFrames)}`
       ).toBe(0);
     } else {
       expect(metric!.total).toBe(0);
@@ -75,15 +80,15 @@ async function expectEssentials(page: Page) {
     '[aria-label="Chat message input" i]',
     'button[aria-label="Send message"], button[aria-label="Stop generating"], button[aria-label="Interrupt and send"]',
   ];
-  for (const selector of [
+  const whenRenderedSelectors = [
     '[data-testid="onboarding-empty-intro"] h1',
     '[data-testid="onboarding-flow-status"] [role="status"]',
     '[data-testid="onboarding-turnstile-widget-frame"][data-turnstile-mount="inline"]',
     '[data-onboarding-session] [role="alert"]',
-  ]) {
-    if (await page.locator(selector).isVisible()) selectors.push(selector);
-  }
-  expect(await inspectEssentialViewport(page, selectors)).toEqual({
+  ];
+  expect(
+    await inspectEssentialViewport(page, selectors, { whenRenderedSelectors })
+  ).toEqual({
     supported: true,
     findings: [],
   });
@@ -309,13 +314,21 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       // resends the starter, so keep the server's Set-Cookie on the fixture
       // reply: the reload below must look like production, where the cookie
       // exists after the first send.
-      const serverCookie =
-        route.request().method() === 'POST'
-          ? await route
-              .fetch()
-              .then(response => response.headers()['set-cookie'])
-              .catch(() => undefined)
-          : undefined;
+      let serverCookie: string | undefined;
+      if (route.request().method() === 'POST') {
+        const response = await route.fetch();
+        serverCookie = response
+          .headersArray()
+          .find(
+            header =>
+              header.name.toLowerCase() === 'set-cookie' &&
+              header.value.startsWith(`${ONBOARDING_SESSION_COOKIE_NAME}=`)
+          )?.value;
+        expect(
+          Boolean(serverCookie),
+          'The real first send must establish an onboarding session before testing reload continuity'
+        ).toBe(true);
+      }
       await replyReady;
       await route.fulfill({
         headers: {

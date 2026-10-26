@@ -48,13 +48,19 @@ export interface EssentialViewportAudit {
   }[];
 }
 
+export interface EssentialViewportAuditOptions {
+  /** Audit these only while rendered, selecting them in the audit's DOM snapshot. */
+  readonly whenRenderedSelectors?: readonly string[];
+}
+
 /** State-specific actions only: transcript/list items may legitimately scroll. */
 export async function inspectEssentialViewport(
   page: Page,
-  selectors: readonly string[]
+  selectors: readonly string[],
+  { whenRenderedSelectors = [] }: EssentialViewportAuditOptions = {}
 ): Promise<EssentialViewportAudit> {
   // Plain JS avoids transpiler helpers in serialized browser functions.
-  return page.evaluate(`((selectors) => {
+  return page.evaluate(`((selectors, whenRenderedSelectors) => {
     const viewport = window.visualViewport;
     if (!viewport) return { supported: false, findings: [] };
     const findings = [];
@@ -66,7 +72,21 @@ export async function inspectEssentialViewport(
       }
       return true;
     };
-    for (const selector of selectors) {
+    // Match the layout-presence check previously made with locator.isVisible().
+    // Opacity zero still counts as rendered and must fail the strict audit below.
+    const rendered = el => {
+      if (el.checkVisibility && !el.checkVisibility()) return false;
+      if (getComputedStyle(el).visibility !== 'visible') return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
+    // A starter can replace its intro between browser calls. Select optional
+    // landmarks and inspect them synchronously so a previous state cannot leak in.
+    const currentSelectors = new Set(selectors);
+    for (const selector of whenRenderedSelectors) {
+      if (Array.from(document.querySelectorAll(selector)).some(rendered)) currentSelectors.add(selector);
+    }
+    for (const selector of currentSelectors) {
       const matches = Array.from(document.querySelectorAll(selector)).filter(visible);
       if (matches.length !== 1) {
         findings.push({ selector, reason: matches.length ? 'duplicate' : 'missing' });
@@ -117,7 +137,7 @@ export async function inspectEssentialViewport(
       if (points.some(([px,py]) => occludedAt(px, py))) findings.push({ selector, reason: 'occluded', box });
     }
     return { supported: true, findings };
-  })(${JSON.stringify(selectors)})`);
+  })(${JSON.stringify(selectors)}, ${JSON.stringify(whenRenderedSelectors)})`);
 }
 
 const pageErrors = new WeakMap<Page, string[]>();
