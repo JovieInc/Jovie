@@ -14,16 +14,21 @@ handoff, flaky/red-check class, the factory-audit synthesis, rework rate) drops 
 naming the fleet metric that must move (a factory change counts only when it does). `apply` files
 the ones with no open issue carrying the label `factory-fp:<fingerprint>` in Todo with labels
 `factory` and `ws:symphony-throughput`, so the existing lanes admission (workstream rank) runs
-them like any other issue. The doctor pass files them (run_pass); the CLI only prints the plan. Dedupe is the label, like remediation:<fp>.
+them like any other issue. The doctor pass files them (run_pass); the CLI only prints the plan. Open work dedupes by label;
+terminal issues dedupe only evidence already covered by that work. `factory-intake.json` records
+observations consumed while an issue is open; old installs also reconcile terminal issue bodies.
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
+
+from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-factory-signal/v1"
 FP = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -75,7 +80,12 @@ def body(row: dict) -> str:
              "on the install; the issue is Done only when the metric moved, not when the PR merged.", "",
              f"Factory work (signal source `{row.get('source', 'unknown')}`, fingerprint `{row['fingerprint']}`); "
              "filed by scripts/lanes/factory_intake.py."]
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    # Adapter evidence stays stable across wording changes. Legacy producers use the body.
+    evidence = {"fingerprint": row["fingerprint"], "source": row.get("source"),
+                "evidence": row.get("evidence", text)}
+    digest = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
+    return f"{text}\n\n<!-- factory-evidence:{digest} -->"
 
 
 def plan(signals: list[dict]) -> list[dict]:
@@ -85,13 +95,52 @@ def plan(signals: list[dict]) -> list[dict]:
 
 EXISTING = ('query($l:String!){issues(first:1,filter:{team:{key:{eq:"JOV"}},labels:{name:{eq:$l}},'
             'state:{type:{nin:["completed","canceled"]}}}){nodes{id identifier}}}')
+HISTORY = ('query($l:String!,$after:String){issues(first:50,after:$after,includeArchived:true,filter:{team:{key:{eq:"JOV"}},'
+           'labels:{name:{eq:$l}},state:{type:{in:["completed","canceled"]}}})'
+           '{nodes{id identifier description} pageInfo{hasNextPage endCursor}}}')
+EVIDENCE = re.compile(r"\n\n<!-- factory-evidence:([a-f0-9]{64}) -->\s*$")
+
+
+def same_evidence(description: str | None, proposed: str) -> bool:
+    old, new = EVIDENCE.search(description or ""), EVIDENCE.search(proposed)
+    if old:
+        return bool(new and old[1] == new[1])
+    # Old issues had no episode marker. Exact legacy body equality proves a replay.
+    return (description or "").strip() == EVIDENCE.sub("", proposed).strip()
+
+
+def terminal_episode(linear, fp_label: str, description: str) -> dict | None:
+    after, cursors = None, set()
+    while True:
+        page = linear.gql(HISTORY, {"l": fp_label, "after": after})["issues"]
+        for issue in page["nodes"]:
+            if same_evidence(issue.get("description"), description):
+                return issue
+        if not page["pageInfo"]["hasNextPage"]:
+            return None
+        cursor = page["pageInfo"]["endCursor"]
+        if not cursor or cursor in cursors:
+            raise RuntimeError("linear: factory history cursor did not advance")
+        cursors.add(cursor)
+        after = cursor
+
+
 TEAM = ('query{teams(filter:{key:{eq:"JOV"}}){nodes{id states{nodes{id name}} labels(first:250){nodes{id name}}}}}')
 CREATE = 'mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id identifier}}}'
 LABEL_CREATE = 'mutation($i:IssueLabelCreateInput!){issueLabelCreate(input:$i){success issueLabel{id name}}}'
 
 
-def apply(linear, items: list[dict], limit: int = MAX_PER_PASS) -> list[dict]:
-    """File items with no open issue under their fingerprint label. Returns what was filed/skipped."""
+def apply(linear, items: list[dict], limit: int = MAX_PER_PASS, *, covered=None, save=None) -> list[dict]:
+    """Keep open work; file only evidence episodes not already handled under the fingerprint label."""
+    covered = covered if covered is not None else {}
+
+    def remember(item, digest, issue):
+        episodes = covered.setdefault(item["fingerprint"], {})
+        if episodes.get(digest) != issue:
+            episodes[digest] = issue
+            if save is not None:
+                save(covered)
+
     team = linear.gql(TEAM, {})["teams"]["nodes"][0]
     todo = next(s["id"] for s in team["states"]["nodes"] if s["name"] == "Todo")
     labels = {l["name"]: l["id"] for l in team["labels"]["nodes"]}
@@ -99,9 +148,16 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS) -> list[dict]:
     filed = 0
     for item in items:
         fp_label = item["labels"][-1]
+        marker = EVIDENCE.search(item["description"])
+        digest = marker[1] if marker else hashlib.sha256(item["description"].encode()).hexdigest()
         found = linear.gql(EXISTING, {"l": fp_label})["issues"]["nodes"]
-        if found:
-            results.append({"fingerprint": item["fingerprint"], "action": "exists", "issue": found[0]["identifier"]})
+        receipt = covered.get(item["fingerprint"], {}).get(digest)
+        prior = found[0] if found else ({"identifier": receipt} if receipt else
+                                       terminal_episode(linear, fp_label, item["description"]))
+        if prior:
+            # New observations while unresolved belong to that work, even after it closes.
+            remember(item, digest, prior["identifier"])
+            results.append({"fingerprint": item["fingerprint"], "action": "exists", "issue": prior["identifier"]})
             continue
         if filed >= limit:
             results.append({"fingerprint": item["fingerprint"], "action": "deferred"})
@@ -118,6 +174,7 @@ def apply(linear, items: list[dict], limit: int = MAX_PER_PASS) -> list[dict]:
         if created.get("success") is not True or not (created.get("issue") or {}).get("identifier"):
             raise RuntimeError("linear: factory issue readback mismatch")
         filed += 1
+        remember(item, digest, created["issue"]["identifier"])
         results.append({"fingerprint": item["fingerprint"], "action": "filed", "issue": created["issue"]["identifier"]})
     return results
 
@@ -126,7 +183,17 @@ def run_pass(state: Path, linear) -> dict:
     """Doctor hook: file pending signals (bounded), never raising into the doctor."""
     try:
         signals, bad = read_signals(state / "factory-signals")
-        results = apply(linear, plan(signals)) if signals else []
+        path = state / "factory-intake.json"
+        try:
+            covered = json.loads(path.read_text())
+        except FileNotFoundError:  # old installs bootstrap from fingerprint labels + issue bodies
+            covered = {}
+        if not isinstance(covered, dict) or any(not isinstance(episodes, dict) or
+                any(not isinstance(issue, str) or not issue for issue in episodes.values())
+                for episodes in covered.values()):
+            raise ValueError("invalid factory intake receipts")
+        results = apply(linear, plan(signals), covered=covered,
+                        save=lambda receipts: atomic_write_text(path, json.dumps(receipts))) if signals else []
         return {"signals": len(signals), "invalid": bad[:5], "results": results}
     except Exception as error:  # Linear down or a malformed reply: the next pass retries
         return {"error": f"{type(error).__name__}: {error}"[:200]}
