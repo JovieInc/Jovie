@@ -13,7 +13,7 @@ const OUTCOME_RESULTS = {
   'straight-to-listen': 'Listen Comes First',
   'local-dates-first': 'Nearby Show Leads',
   'support-without-friction': 'Support Stays Simple',
-  'capture-the-fan': 'Fan Opts In',
+  'capture-the-fan': 'Listener opts in',
   'one-link-everywhere': 'One Link Stays',
 } as const;
 
@@ -47,7 +47,7 @@ export function ArtistProfileOutcomesCarousel({
         <ol
           data-testid='artist-profile-outcomes-grid'
           className='ap-outcomes__ledger mt-10 border-t border-subtle'
-          aria-label='Fan Outcomes'
+          aria-label='Audience Outcomes'
         >
           {ledgerRows.map((outcome, index) => (
             <li

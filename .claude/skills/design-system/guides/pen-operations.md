@@ -27,3 +27,20 @@ Reading `.pen` with Read/Grep is forbidden (encrypted). Reading another file thr
 - Every Pen write batch ends with: `GetVariables`/component readback for what changed, `save()` on the attached canvas, mtime gate, then the registry audit when the registry changed.
 - Measure: log batch start/end, node counts changed and, for agent-mode runs, the `--usage` JSON, keyed by PR or job id.
 - Never keep per-task copies of the canonical file; scratch copies are deleted when the job ends.
+
+## After editing a master (instance drift check)
+Pen does not reliably carry a master edit to its existing instances. Instances keep a stale resolution when the master gains a property it did not have before (for example a nested button height), `Update` cannot delete an instance override key, and an override can sit under a node the master has since disabled. So every master edit ends with the drift check, `scripts/agent/pen-instance-drift.js`. It is an `execute` snippet: set `CONFIG` at the top and send the whole file as the `input`.
+
+1. Before the edit: run with `mode: 'before'` and `masters: [<id>]`. That snapshots the master so the check only looks at fields you changed. Without a snapshot, it compares every field and reports intentional overrides too.
+2. After the edit: run with `mode: 'report'`. Classes:
+   - `STALE_CACHE`: the instance has no override but still differs from the master.
+   - `OVERRIDE`: an intentional instance override. It is kept.
+   - `STALE`: an override equal to the old default, or one listed in `CONFIG.stale`. It now blocks the change.
+   - `ORPHANED`: an override under a node the master disabled.
+   - `RETIRED`: an override on a node the master turned off. It is left off.
+3. Then run `mode: 'repair'`. It re-instantiates each affected direct instance, keeping intentional overrides, dropping stale ones, applying `CONFIG.moves` when the master moved a property to a new node (`{from: {to, fields}}`), and, with `reenableOrphans`, re-enabling the parent of orphaned overrides.
+   - Repaired instances get new ids.
+   - Instances addressed by a path from another node's overrides are skipped and reported. Fix those with explicit overrides in their parent master.
+4. Re-run `report` until `STALE_CACHE`, `STALE` and `ORPHANED` are 0. Then screenshot one repaired instance per variant, and record the counts in the PR or ledger.
+
+Tests: `node --test scripts/agent/pen-instance-drift.test.mjs` (hermetic fake of the execute API; also runs in the scripts lane).
