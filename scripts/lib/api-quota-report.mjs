@@ -169,6 +169,60 @@ export function projectDrain(samples, nowSeconds, options = {}) {
   return alerts.sort((a, b) => a.bucket.localeCompare(b.bucket));
 }
 
+const TALLY_NOTICE =
+  /workflow=(.+?) job=(\S+) calls=(\d+) github_token=(\d+) other=(\d+) top=(.*)$/;
+
+/** @param {string} message */
+export function parseTallyNotice(message) {
+  const match = TALLY_NOTICE.exec(String(message ?? ''));
+  if (!match) return null;
+  return {
+    workflow: match[1],
+    job: match[2],
+    calls: Number(match[3]),
+    githubToken: Number(match[4]),
+    other: Number(match[5]),
+    top: match[6],
+  };
+}
+
+/**
+ * gh invocations per workflow and job from `gh-tally` job notices: runs, calls and
+ * github.token calls, and each job's mean github.token calls per run. `hours` turns
+ * the totals into per-hour rates.
+ *
+ * @param {Array<ReturnType<typeof parseTallyNotice>>} records
+ * @param {number} hours
+ */
+export function summarizeTally(records, hours = 1) {
+  const rows = new Map();
+  for (const record of records) {
+    if (!record) continue;
+    const key = `${record.workflow} / ${record.job}`;
+    const row = rows.get(key) ?? {
+      key,
+      runs: 0,
+      calls: 0,
+      githubToken: 0,
+      other: 0,
+    };
+    row.runs += 1;
+    row.calls += record.calls;
+    row.githubToken += record.githubToken;
+    row.other += record.other;
+    rows.set(key, row);
+  }
+  return [...rows.values()]
+    .map(row => ({
+      ...row,
+      githubTokenPerRun: Math.round((row.githubToken / row.runs) * 10) / 10,
+      githubTokenPerHour: Math.round(row.githubToken / hours),
+    }))
+    .sort(
+      (a, b) => b.githubToken - a.githubToken || a.key.localeCompare(b.key)
+    );
+}
+
 /** Seconds a job ran, or null when it never started or finished. */
 export function jobSeconds(job) {
   const started = Date.parse(job?.started_at);
@@ -265,6 +319,59 @@ function drain(argv) {
   if (alerts.length) process.exitCode = 3;
 }
 
+const TALLY_WORKFLOWS = ['lane-fix-relay.yml', 'fleet-rules-evidence.yml'];
+
+function collectTally(argv) {
+  const hours = flag(argv, 'hours', 1);
+  const maxRuns = flag(argv, 'max-runs', 60);
+  const since = new Date(Date.now() - hours * 3600_000).toISOString();
+  const records = [];
+  for (const workflow of TALLY_WORKFLOWS) {
+    const runs = ghJson(
+      `repos/${REPOSITORY}/actions/workflows/${workflow}/runs?created=>=${since}&per_page=100`
+    )
+      .workflow_runs.filter(
+        run => run.conclusion && run.conclusion !== 'skipped'
+      )
+      .slice(0, maxRuns);
+    for (const run of runs) {
+      const jobs = ghJson(
+        `repos/${REPOSITORY}/actions/runs/${run.id}/jobs?per_page=50`
+      ).jobs;
+      for (const job of jobs) {
+        if (job.conclusion === 'skipped') continue;
+        for (const annotation of ghJson(
+          `repos/${REPOSITORY}/check-runs/${job.id}/annotations?per_page=50`
+        ))
+          if (annotation.title === 'gh-tally')
+            records.push(parseTallyNotice(annotation.message));
+      }
+    }
+  }
+  return { hours, records };
+}
+
+function tally(argv) {
+  const { hours, records } = collectTally(argv);
+  const rows = summarizeTally(records, hours);
+  if (argv.includes('--json')) {
+    console.log(
+      JSON.stringify({
+        schema: 'jovie-gh-call-tally/v1',
+        generatedAt: new Date().toISOString(),
+        hours,
+        rows,
+      })
+    );
+    return;
+  }
+  for (const row of rows)
+    console.log(
+      `${row.key.padEnd(52)} runs=${row.runs} calls=${row.calls} github.token=${row.githubToken} (${row.githubTokenPerRun}/run, ${row.githubTokenPerHour}/h) other=${row.other}`
+    );
+  if (rows.length === 0) console.log('no gh-tally notices in window');
+}
+
 function admission(argv) {
   const count = flag(argv, 'runs', 40);
   const runs = ghJson(
@@ -290,9 +397,10 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   else if (command === 'headroom') headroom(rest);
   else if (command === 'admission') admission(rest);
   else if (command === 'drain') drain(rest);
+  else if (command === 'tally') tally(rest);
   else {
     console.error(
-      'usage: api-quota-report.mjs quota|headroom|drain|admission [--hours N] [--runs N]'
+      'usage: api-quota-report.mjs quota|headroom|drain|tally|admission [--hours N] [--runs N]'
     );
     process.exit(2);
   }

@@ -73,6 +73,25 @@ jobs:
     outputs:
       requested: ${{ steps.rerun.outputs.requested }}
     steps:
+      - name: Count gh calls (start)
+        shell: bash
+        env:
+          GITHUB_TOKEN_FOR_TALLY: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # One line per gh invocation, tagged with a hash of the token it ran with, so the
+          # job can report how many calls spent github.token. Reported by the last step.
+          d="$RUNNER_TEMP/gh-tally-bin"; mkdir -p "$d"
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'printf "%s\t%s %s\n" "$(printf %s "${GH_TOKEN:-${GITHUB_TOKEN:-}}" | sha256sum | cut -c1-8)" "${1:-}" "${2:-}" >> "$GH_CALL_TALLY_FILE" 2>/dev/null || true' \
+            'exec "$GH_CALL_TALLY_REAL" "$@"' > "$d/gh"
+          chmod +x "$d/gh"
+          echo "$d" >> "$GITHUB_PATH"
+          {
+            echo "GH_CALL_TALLY_FILE=$RUNNER_TEMP/gh-calls.tsv"
+            echo "GH_CALL_TALLY_REAL=$(command -v gh)"
+            echo "GH_CALL_TALLY_GITHUB_HASH=$(printf %s "$GITHUB_TOKEN_FOR_TALLY" | sha256sum | cut -c1-8)"
+          } >> "$GITHUB_ENV"
       - name: Checkout trusted rerun policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,8 +107,28 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPOSITORY: ${{ github.repository }}
         run: node scripts/pr-unacquired-runner-rerun.mjs
+      - name: Report gh call tally
+        if: always()
+        shell: bash
+        run: |
+          f="${GH_CALL_TALLY_FILE:-}"
+          if [ -z "$f" ] || [ ! -s "$f" ]; then
+            echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=0 github_token=0 other=0 top="
+            exit 0
+          fi
+          total="$(wc -l < "$f" | tr -d ' ')"
+          gt="$(awk -F'\t' -v h="${GH_CALL_TALLY_GITHUB_HASH:-}" '$1==h' "$f" | wc -l | tr -d ' ')"
+          top="$(cut -f2 "$f" | sort | uniq -c | sort -rn | head -4 | awk '{c=$1; $1=""; sub(/^ /,""); printf "%s:%s,", $0, c}')"
+          echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=$total github_token=$gt other=$((total-gt)) top=${top%,}"
 
-  # Success on every pull_request branch starts this job so a stale lane-fix-red
+  # Success wakes come only from Source Validation (2026-10-26). It publishes PR Ready and
+  # Migration Guard and is the slowest required producer (minutes, against seconds for
+  # Fork PR Gate and PR Size Guard), so a head becomes required-green on its completion;
+  # waking on every other workflow's success started ~3 extra runs per head, each paying
+  # the 20 s debounce, a checkout, an App mint and several github.token calls (a stale
+  # lane-fix-red on a head whose last producer was not SV is cleared by the next SV
+  # completion or by Green Enroll). Failures still wake from every listed workflow.
+  # Success on a pull_request branch starts this job so a stale lane-fix-red
   # can be deleted with this job's existing GITHUB_TOKEN (issues: write,
   # pull-requests: write). `green` is still applied only to a lane draft
   # (pr_events.in_scope). Non-lane successes skip the debounce sleep: they
@@ -109,7 +148,8 @@ jobs:
       (github.event_name == 'pull_request_review_comment' && github.event.comment.user.type == 'User') ||
       contains(fromJSON('["push","workflow_dispatch"]'), github.event_name) ||
       (github.event.workflow_run.event == 'pull_request' &&
-       contains(fromJSON('["failure","timed_out","startup_failure","success"]'), github.event.workflow_run.conclusion)) ||
+       (contains(fromJSON('["failure","timed_out","startup_failure"]'), github.event.workflow_run.conclusion) ||
+        (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'Source Validation'))) ||
       (github.event.workflow_run.head_branch == 'main' &&
        contains(fromJSON('["push","schedule","workflow_dispatch"]'), github.event.workflow_run.event) &&
        contains(fromJSON('["failure","timed_out","startup_failure","cancelled"]'), github.event.workflow_run.conclusion)))
@@ -131,6 +171,25 @@ jobs:
         if: github.event_name == 'workflow_run'
         run: sleep 20
 
+      - name: Count gh calls (start)
+        shell: bash
+        env:
+          GITHUB_TOKEN_FOR_TALLY: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # One line per gh invocation, tagged with a hash of the token it ran with, so the
+          # job can report how many calls spent github.token. Reported by the last step.
+          d="$RUNNER_TEMP/gh-tally-bin"; mkdir -p "$d"
+          printf '%s\n' '#!/usr/bin/env bash' \
+            'printf "%s\t%s %s\n" "$(printf %s "${GH_TOKEN:-${GITHUB_TOKEN:-}}" | sha256sum | cut -c1-8)" "${1:-}" "${2:-}" >> "$GH_CALL_TALLY_FILE" 2>/dev/null || true' \
+            'exec "$GH_CALL_TALLY_REAL" "$@"' > "$d/gh"
+          chmod +x "$d/gh"
+          echo "$d" >> "$GITHUB_PATH"
+          {
+            echo "GH_CALL_TALLY_FILE=$RUNNER_TEMP/gh-calls.tsv"
+            echo "GH_CALL_TALLY_REAL=$(command -v gh)"
+            echo "GH_CALL_TALLY_GITHUB_HASH=$(printf %s "$GITHUB_TOKEN_FOR_TALLY" | sha256sum | cut -c1-8)"
+          } >> "$GITHUB_ENV"
       - name: Checkout trusted lane policy
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -166,3 +225,16 @@ jobs:
           GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && 'backfill' || 'relay' }}
         run: python3 scripts/lanes/pr_events.py "$MODE"
+      - name: Report gh call tally
+        if: always()
+        shell: bash
+        run: |
+          f="${GH_CALL_TALLY_FILE:-}"
+          if [ -z "$f" ] || [ ! -s "$f" ]; then
+            echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=0 github_token=0 other=0 top="
+            exit 0
+          fi
+          total="$(wc -l < "$f" | tr -d ' ')"
+          gt="$(awk -F'\t' -v h="${GH_CALL_TALLY_GITHUB_HASH:-}" '$1==h' "$f" | wc -l | tr -d ' ')"
+          top="$(cut -f2 "$f" | sort | uniq -c | sort -rn | head -4 | awk '{c=$1; $1=""; sub(/^ /,""); printf "%s:%s,", $0, c}')"
+          echo "::notice title=gh-tally::workflow=$GITHUB_WORKFLOW job=$GITHUB_JOB calls=$total github_token=$gt other=$((total-gt)) top=${top%,}"
