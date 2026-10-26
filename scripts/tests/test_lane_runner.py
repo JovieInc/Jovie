@@ -2304,19 +2304,21 @@ class RepairInventoryBoundaryTest(unittest.TestCase):
         self.assertEqual(original['summary']['sourceAt'], 1000.0)
 
     def test_lock_wait_refreshes_outside_lock_and_observes_competing_claim(self):
-        original = lane.capture_repair_inventory('codex')
+        self.clock[0] = started = datetime(2026, 10, 26, tzinfo=timezone.utc).timestamp()
+        number = str(self.rows[0]['number'])
+        original = lane.capture_repair_inventory('grok')
         owner = lane.Locked(self.host.state/'claim.lock', blocking=False)
         waiting = threading.Event()
         real_locked = lane.Locked
         result = []
         errors = []
-        competing = {'sha': 'b' * 40, 'lane': 'grok', 'count': 1, 'at': 1061.0}
+        competing = {'sha': 'b' * 40, 'lane': 'grok', 'count': 1, 'at': started + 61}
         def lock(path, blocking):
             if threading.current_thread() is thread and blocking: waiting.set()
             return real_locked(path, blocking)
         def select():
             try:
-                claim, receipt = lane.lock_repair_inventory(self.host, 'codex', original)
+                claim, receipt = lane.lock_repair_inventory(self.host, 'grok', original)
                 try:
                     contender = real_locked(self.host.state/'claim.lock', blocking=False)
                     try: self.assertFalse(contender.held, 'selection must still be serialized')
@@ -2331,23 +2333,36 @@ class RepairInventoryBoundaryTest(unittest.TestCase):
                 self.assertTrue(waiting.wait(2), 'worker must reach the held lock')
                 self.clock[0] += 61
                 self.rows[0]['headRefOid'] = competing['sha']
-                (self.host.state/'fix-attempts.json').write_text(json.dumps({'7': competing}))
+                (self.host.state/'fix-attempts.json').write_text(json.dumps({number: competing}))
             finally: owner.release()
             thread.join(2)
         self.assertFalse(thread.is_alive())
         self.assertEqual(errors, [])
-        self.assertEqual(self.reads, [1000.0, 1061.0])
+        self.assertEqual(self.reads, [started, started + 61])
         receipt, attempts = result[0]
-        self.assertTrue(lane.repair_inventory_valid(receipt, 'codex'))
+        self.assertTrue(lane.repair_inventory_valid(receipt, 'grok'))
         self.assertEqual(receipt['prs'][0]['headRefOid'], competing['sha'])
-        self.assertEqual(receipt['summary']['sourceAt'], 1061.0)
-        self.assertEqual(attempts, {'7': competing})
+        self.assertEqual(receipt['summary']['sourceAt'], started + 61)
+        self.assertEqual(attempts, {number: competing})
         providers = {'codex': {'enabled': True, 'tier': 0}, 'grok': {'enabled': True, 'tier': 1}}
         with patch.object(lane, 'load_providers', return_value=providers), \
                 patch.object(lane, 'post_claim') as publish:
-            self.assertIsNone(lane.claim_red_pr(self.host, 'codex', receipt['prs']))
+            self.assertIsNone(lane.claim_red_pr(self.host, 'grok', receipt['prs']))
         publish.assert_not_called()
         self.assertEqual(json.loads((self.host.state/'fix-attempts.json').read_text()), attempts)
+
+        # Positive control: the exact same PR is eligible once the competing
+        # fixture lease is absent. Keep the actual target/claim/CAS functions.
+        (self.host.state/'fix-attempts.json').write_text('{}')
+        with patch.object(lane, 'load_providers', return_value=providers), \
+                patch.object(lane, 'claimed_elsewhere', return_value=False), \
+                patch.object(lane, 'reconcile_fix_target', return_value=copy.deepcopy(receipt['prs'][0])), \
+                patch.object(lane, 'post_claim') as publish:
+            selected = lane.claim_red_pr(self.host, 'grok', receipt['prs'])
+        self.assertEqual(selected['headRefOid'], competing['sha'])
+        publish.assert_called_once_with(int(number), competing['sha'], 'fix')
+        charged = json.loads((self.host.state/'fix-attempts.json').read_text())[number]
+        self.assertEqual((charged['count'], charged['lane']), (1, 'grok'))
 
 
 class ClaimScanCacheTest(unittest.TestCase):
