@@ -37,7 +37,7 @@ import {
   mkdtempSync,
   readFileSync,
 } from 'node:fs';
-import { homedir, tmpdir } from 'node:os';
+import { cpus, freemem, homedir, loadavg, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
@@ -145,6 +145,56 @@ export function splitStatements(script) {
 const SET_E = /^set\s+-[a-z]*e[a-z]*\b/;
 const TYPECHECK = /^(\s*)(pnpm\b[^\n]*\btypecheck[^\n]*)$/gm;
 
+/**
+ * Statements preflight does not run, each with the reason. Hosted CI runs them
+ * on free runners; running them on a shared dev host costs shipping capacity
+ * (fleet charter). A test requires every statement matching a heavy pattern in
+ * the real workflow to be listed here, so nothing is dropped silently.
+ */
+export const EXCLUDED_STATEMENTS = Object.freeze([
+  [/\btypecheck(?::[a-z]+)?\b/, 'full typecheck; hosted CI runs it'],
+  [
+    /\bbiome:check\b/,
+    'whole-repo biome; the pre-commit hook checks changed files',
+  ],
+  [/\bci:control:test\b/, 'full control suite; hosted CI runs it'],
+  [
+    /\bnext build\b|\brun build\b|\bpack:dry\b|\bchaos:gate\b|\btest:coverage\b/,
+    'build or full coverage run; hosted CI runs it',
+  ],
+  [/storybook/i, 'Storybook build; hosted CI runs it'],
+]);
+
+/** Reason a single command line is excluded; empty when it should run. */
+export function lineExclusion(line) {
+  const text = line.trim();
+  if (text.endsWith('\\')) return '';
+  // Only commands are excluded, never assignments or conditionals around them.
+  if (!/^(?:[A-Z_]+=\S+\s+)*(?:pnpm|node)\b/.test(text)) return '';
+  for (const [pattern, reason] of EXCLUDED_STATEMENTS)
+    if (pattern.test(text)) return reason;
+  return '';
+}
+
+/** Excluded lines of a statement, and the statement with them made no-ops. */
+export function applyExclusions(statement) {
+  const excluded = [];
+  const text = statement
+    .split('\n')
+    .map(line => {
+      const reason = lineExclusion(line);
+      if (!reason) return line;
+      excluded.push({ label: line.trim(), reason });
+      return `${line.match(/^\s*/)[0]}true`;
+    })
+    .join('\n');
+  return { text, excluded };
+}
+
+// Kept for callers that ask about a whole single-line statement.
+export const exclusionReason = statement =>
+  statement.includes('\n') ? '' : lineExclusion(statement);
+
 /** Statement-level adjustments that keep one failure from hiding the rest. */
 export function prepareStatement(statement, { flockPath = '' } = {}) {
   let text = statement;
@@ -157,6 +207,25 @@ export function prepareStatement(statement, { flockPath = '' } = {}) {
   return text;
 }
 
+/**
+ * Steps in separate shells are independent (CI runs them as separate shells),
+ * so they can overlap. Bound it by what the host has: keep 8 GB RAM free
+ * (fleet charter), assume ~3 GB per extra step, and stay serial when the load
+ * average already exceeds 1.5x the cores. PREFLIGHT_JOBS overrides.
+ */
+export function chooseConcurrency({
+  freeGb,
+  load1,
+  cores,
+  override = '',
+  max = 3,
+}) {
+  const forced = Number(override);
+  if (Number.isInteger(forced) && forced >= 1) return forced;
+  if (load1 / cores > 1.5) return 1;
+  return Math.max(1, Math.min(max, Math.floor((freeGb - 8) / 3)));
+}
+
 const MARK = '@@PF';
 
 /** The bash program for one step; markers delimit each statement's output. */
@@ -166,7 +235,7 @@ export function buildProgram(statements, envVars, opts = {}) {
     lines.push(`export ${key}=${JSON.stringify(String(value))}`);
   statements.forEach((statement, index) => {
     lines.push(`printf '\\n${MARK}-BEGIN ${index}\\n'`);
-    lines.push(prepareStatement(statement, opts));
+    lines.push(prepareStatement(applyExclusions(statement).text, opts));
     lines.push(`__pf_rc=$?; printf '\\n${MARK}-END ${index} %s\\n' "$__pf_rc"`);
   });
   return lines.join('\n');
@@ -378,7 +447,9 @@ export async function main({
     }
     let skip = step.skip;
     if (!skip && unresolved.length)
-      skip = `needs CI context (${[...new Set(unresolved)].join(', ')})`;
+      skip = unresolved.includes('github.token')
+        ? 'no GH_TOKEN; export GH_TOKEN=$(gh auth token) to run it locally'
+        : `needs CI context (${[...new Set(unresolved)].join(', ')})`;
     return { ...step, run: script.text, stepEnv, skip };
   });
 
@@ -394,14 +465,17 @@ export async function main({
   const failures = [];
   const timings = [];
   const skipped = [];
+  const excluded = [];
   let passed = 0;
+  const runnable = [];
   for (const step of plan) {
     if (args.only && !step.name.includes(args.only)) continue;
-    if (step.skip) {
-      skipped.push({ name: step.name, reason: step.skip });
-      continue;
-    }
-    log(`\n== ${step.name}`);
+    if (step.skip) skipped.push({ name: step.name, reason: step.skip });
+    else runnable.push(step);
+  }
+
+  const execStep = async step => {
+    const out = [`\n== ${step.name}`];
     const statements = splitStatements(step.run);
     const program = buildProgram(
       statements,
@@ -420,19 +494,17 @@ export async function main({
       seen.add(index);
       const took = Date.now() - mark;
       mark = Date.now();
-      timings.push({
-        step: step.name,
-        label: labelFor(statements[index]),
-        ms: took,
-      });
       const label = labelFor(statements[index]);
+      for (const item of applyExclusions(statements[index]).excluded)
+        excluded.push({ step: step.name, ...item });
+      timings.push({ step: step.name, label, ms: took });
       if (code !== 0) {
         failures.push({ step: step.name, label, code, output });
-        log(`  FAIL (${code})  ${label} (${(took / 1000).toFixed(1)}s)`);
+        out.push(`  FAIL (${code})  ${label} (${(took / 1000).toFixed(1)}s)`);
       } else {
         passed += 1;
         if (!PLUMBING.test(label))
-          log(`  ok  ${label} (${(took / 1000).toFixed(1)}s)`);
+          out.push(`  ok  ${label} (${(took / 1000).toFixed(1)}s)`);
       }
     });
     statements.forEach((statement, index) => {
@@ -443,10 +515,25 @@ export async function main({
         code: 'not run',
         output: ['the step shell ended before this statement'],
       });
-      log(`  FAIL (not run)  ${labelFor(statement)}`);
+      out.push(`  FAIL (not run)  ${labelFor(statement)}`);
     });
-    log(`  (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
-  }
+    out.push(`  (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
+    log(out.join('\n'));
+  };
+
+  const jobs = chooseConcurrency({
+    freeGb: freemem() / 2 ** 30,
+    load1: loadavg()[0],
+    cores: cpus().length,
+    override: env.PREFLIGHT_JOBS,
+  });
+  log(`[preflight] running ${runnable.length} steps, ${jobs} at a time`);
+  const queue = [...runnable];
+  await Promise.all(
+    Array.from({ length: Math.min(jobs, queue.length) }, async () => {
+      while (queue.length) await execStep(queue.shift());
+    })
+  );
 
   let bodyIssues = { errors: [], warnings: [] };
   if (args.bodyFile) {
@@ -464,15 +551,19 @@ export async function main({
   }
 
   log('\n== preflight summary');
-  for (const item of skipped) log(`  skipped  ${item.name}  [${item.reason}]`);
+  for (const item of skipped) log(`  SKIPPED: ${item.name} (${item.reason})`);
+  for (const item of excluded)
+    log(`  EXCLUDED: ${item.label} (${item.reason})`);
   if (failures.length === 0) log(`  all clear (${passed} statements passed)`);
   for (const failure of failures) {
     log(`\n[ ] ${failure.step}: ${failure.label} (exit ${failure.code})`);
     const lines = failure.output.filter(Boolean);
-    const loud = lines.filter(line =>
-      /\b(?:fail|error|violation|missing|not registered)\b|✗|×|TS\d{4}/i.test(
-        line
-      )
+    const loud = lines.filter(
+      line =>
+        !/\bfail 0\b|^\s*✔/.test(line) &&
+        /::error|exit [1-9]|\b(?:fail|error|violation|missing|not registered)\b|✗|×|TS\d{4}/i.test(
+          line
+        )
     );
     for (const line of (loud.length ? loud : lines).slice(-15))
       log(`      ${line.slice(0, 240)}`);
