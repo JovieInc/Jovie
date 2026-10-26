@@ -46,6 +46,13 @@
       "tables": ["discogReleases"]
     },
     {
+      "id": "release.create",
+      "entity": "release",
+      "module": "apps/web/lib/domain/releases.ts",
+      "exports": ["createReleaseForProfile"],
+      "tables": ["discogReleases"]
+    },
+    {
       "id": "profile.fields",
       "entity": "profile",
       "module": "apps/web/lib/services/profile/mutations.ts",
@@ -54,6 +61,13 @@
         "updateProfileByClerkId",
         "publishProfile"
       ],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "profile.edit",
+      "entity": "profile",
+      "module": "apps/web/lib/domain/profile.ts",
+      "exports": ["applyProfileUpdate"],
       "tables": ["creatorProfiles"]
     },
     {
@@ -179,8 +193,8 @@
       "kind": "read"
     },
     "chat:proposeProfileEdit": {
-      "kind": "debt",
-      "reason": "commit is /api/chat/confirm-edit (name and bio only); Ovie agent-first worker owns the fix"
+      "kind": "domain",
+      "domain": "profile.edit"
     },
     "chat:importBioFromUrl": {
       "kind": "read"
@@ -220,8 +234,8 @@
       "domain": "release.metadata"
     },
     "chat:createRelease": {
-      "kind": "debt",
-      "reason": "calls upsertRelease directly with its own slug rule and no status, reveal date, genres or explicit flag; Ovie agent-first worker owns the fix"
+      "kind": "domain",
+      "domain": "release.create"
     },
     "chat:generateReleasePitch": {
       "kind": "domain",

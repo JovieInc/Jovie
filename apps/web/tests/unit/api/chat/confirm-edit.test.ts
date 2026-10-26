@@ -19,6 +19,19 @@ const hoisted = vi.hoisted(() => ({
   captureExceptionMock: vi.fn(),
 }));
 
+// The write is the shared domain function (also used by the settings form);
+// here it stands in as the observable write through `updateMock`.
+vi.mock('@/lib/domain/profile', () => ({
+  applyProfileUpdate: async (input: {
+    appUserId: string;
+    profileId: string;
+    updates: Record<string, unknown>;
+  }) => {
+    await hoisted.updateMock().set(input).where();
+    return { ok: true, profile: {} };
+  },
+}));
+
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: hoisted.authMock,
   getOptionalAuth: hoisted.authMock,
