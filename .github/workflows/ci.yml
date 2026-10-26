@@ -550,6 +550,10 @@ jobs:
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
+      # 'false' only when the Mac lane is selected solely by node-only inputs
+      # (MAC_NODE_ONLY_RULES): the lane then runs on ubuntu. Absent from an older
+      # trusted classifier, so it defaults to the macOS lane.
+      run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}
       # 'mac' when a self-hosted Mac runner heartbeat is fresh, else 'hosted'.
       # Hosted macOS is one small org-wide pool; LogYourBody's queue filled it
       # on 2026-10-10 and Jovie's Mac job waited the full 60-minute budget.
@@ -3726,6 +3730,7 @@ jobs:
     uses: ./.github/workflows/macos-ci.yml
     with:
       mac-first: true
+      native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}
       supersede-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}
 
   ci-cross-product-integration:

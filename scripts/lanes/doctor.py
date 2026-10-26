@@ -80,6 +80,8 @@ AGED_PR_S = 7 * 24 * 3600
 MERGE_THROUGHPUT_REFRESH_S = 5 * 60
 MERGE_THROUGHPUT_CACHE_S = 10 * 60
 PROMOTION_SCRIPT = Path(__file__).resolve().parents[1] / "promotion-loss-metrics.mjs"
+QUOTA_DEFERRED_SCRIPT = Path(__file__).resolve().parents[1] / "quota-deferred-heads.mjs"
+QUOTA_DEFERRED_REFRESH_S = 15 * 60  # about 100 REST reads per refresh; the lanes clock calls often
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OPS_REPORT_SCRIPT = Path(__file__).resolve().with_name("ops-report.mjs")
 
@@ -243,6 +245,26 @@ def automation_registry(repo: Path, run=subprocess.run) -> list[dict] | None:
     return rows
 
 
+TEAM_RECEIPT = re.compile(r"^[A-Z][A-Z0-9]*$")
+
+
+def _newest_receipt_mtime(path: Path) -> float:
+    """mtime of a receipt. A `<TEAM>` path component is a per-team template (refill/<TEAM>.json): the newest
+    receipt of any team counts. The watcher used to stat the literal `<TEAM>.json`, so gem:backlog-refill and
+    gem:backlog-decompose read `missing` while their receipts were minutes old (2026-10-25)."""
+    if "<TEAM>" not in path.name:
+        return path.stat().st_mtime
+    stem_prefix, _, suffix = path.name.partition("<TEAM>")
+    found = []
+    for candidate in path.parent.glob(f"{stem_prefix}*{suffix}"):
+        team = candidate.name[len(stem_prefix):len(candidate.name) - len(suffix) if suffix else None]
+        if TEAM_RECEIPT.fullmatch(team):
+            found.append(candidate.stat().st_mtime)
+    if not found:
+        raise FileNotFoundError(str(path))
+    return max(found)
+
+
 def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: Path | None = None) -> dict:
     """Host-local receipts of this host's live automations: missing or older than
     maxStalenessMinutes is silence. The hosted automation-liveness check watches Gem."""
@@ -260,7 +282,7 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
         path = Path(location.split(":", 1)[1].replace("~", str(home), 1))
         limit = float(row.get("maxStalenessMinutes") or 0) * 60
         try:
-            age = now - path.stat().st_mtime
+            age = now - _newest_receipt_mtime(path)
         except OSError:
             silent[row["id"]] = {"location": location, "ageS": None}
             continue
@@ -461,6 +483,9 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             merge_throughput, merge_throughput_error = sample_merge_throughput(state, now)
         except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
             merge_throughput_error = f"{type(error).__name__}: {error}"[:200]
+    quota_deferred, quota_deferred_error = None, None
+    if not os.environ.get("LANES_SELFTEST"):
+        quota_deferred, quota_deferred_error = sample_quota_deferred_heads(state, now)
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
@@ -523,6 +548,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             fetch_remote=not os.environ.get("LANES_SELFTEST")),
         "linearError": linear_error, "linearSkipped": linear_skipped, "githubRemaining": github,
         "linearSync": linear_sync.status(state, now),
+        "publicFeed": read_json(state / "public-feed-sizes.json", {}),
         "installLag": {key: read_json(state / "update.json", {}).get(key) for key in ("behindS", "behindCommit", "error", "at")},
         "linearAppCredential": _linear_app_credential(lane),
         "strandedClaims": stranded_claims,
@@ -538,6 +564,7 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
+        "quotaDeferredHeads": quota_deferred, "quotaDeferredHeadsError": quota_deferred_error,
         "redDispatch": red_dispatch_summary(state, now),
         "failedByReason": failed_by_reason(failures),
         "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
@@ -648,6 +675,35 @@ def sample_merge_throughput(state: Path, now: float, run=lifecycle.run) -> tuple
                 and 0 <= now - observed <= MERGE_THROUGHPUT_CACHE_S:
             return cached, f"{type(error).__name__}: {error}"[:200]
         return None, f"{type(error).__name__}: {error}"[:200]
+
+
+def sample_quota_deferred_heads(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
+    """Open PR heads whose Fleet Rules verdict stayed quota-deferred past an hour (a deferred
+    result is infrastructure, never a verdict, and must have been re-run). Refreshed at most
+    every QUOTA_DEFERRED_REFRESH_S; the script exits 1 when there are any, so both codes parse."""
+    path = Path(state) / "quota-deferred-heads.json"
+    cached = read_json(path, {})
+    observed = cached.get("observedAt")
+    if isinstance(observed, (int, float)) and not isinstance(observed, bool) \
+            and 0 <= now - observed < QUOTA_DEFERRED_REFRESH_S:
+        return cached, None
+    try:
+        result = run(["node", str(QUOTA_DEFERRED_SCRIPT)], capture_output=True, text=True, timeout=240)
+        if result.returncode not in (0, 1):
+            raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+        metric = json.loads(result.stdout)
+        if metric.get("metric") != "quota_deferred_heads_older_than_1h" \
+                or isinstance(metric.get("value"), bool) or not isinstance(metric.get("value"), int):
+            raise ValueError("quota-deferred-heads output missing the metric")
+        signal = {"schema": "jovie-quota-deferred-heads/v1", "observedAt": now,
+                  "value": metric["value"], "heads": (metric.get("heads") or [])[:20]}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached if cached.get("schema") else None), f"{type(error).__name__}: {error}"[:200]
 
 
 def failed_by_reason(failures: dict) -> dict[str, int]:
@@ -956,6 +1012,22 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    gaps = alert_issue_gaps(dict(alerts), ((previous or {}).get("issues") or {}), time.time())
+    if gaps:
+        shown = "; ".join(f"{key} ({why[:80]})" for key, why in list(gaps.items())[:4])
+        alerts["alert-issue-missing"] = (f"{len(gaps)} active doctor alert(s) older than {ALERT_ISSUE_GRACE_S // 60} min "
+                                         f"have no Linear issue: {shown}")
+    feed_size = obs.get("publicFeed") or {}
+    if isinstance(feed_size.get("ratio"), (int, float)) and feed_size["ratio"] >= PUBLIC_FEED_WARN_RATIO:
+        top = ", ".join(f"{name} {size // 1024}K" for name, size in list((feed_size.get("sections") or {}).items())[:3])
+        alerts["public-feed-near-limit"] = (f"public lanes status feed is {feed_size['bytes']} bytes, "
+                                            f"{round(feed_size['ratio'] * 100)}% of the {feed_size['maxBytes']} byte cap "
+                                            f"(largest: {top}); past the cap every HUD tile and dead-man check reads unavailable")
+    ttl = feed_size.get("secondsToCap")
+    if isinstance(ttl, (int, float)) and 0 <= ttl < FEED_GROWTH_ALERT_S and "public-feed-near-limit" not in alerts:
+        alerts["public-feed-growth"] = (f"public lanes status feed grows {feed_size.get('growthBytesPerHour')} bytes/h "
+                                        f"and reaches the {feed_size.get('maxBytes')} byte cap in about {round(ttl / 3600, 1)}h "
+                                        f"(now {feed_size.get('bytes')}, {round((feed_size.get('ratio') or 0) * 100)}%)")
     lag = obs.get("installLag") or {}
     if isinstance(lag.get("behindS"), (int, float)) and lag["behindS"] > INSTALL_LAG_ALERT_S:
         alerts["install-lag"] = (f"main's lane bundle {str(lag.get('behindCommit'))[:8]} is {round(lag['behindS'] / 60)}m "
@@ -1151,6 +1223,11 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                + (f" ({row['reason']})" if row.get("reason") else "")
                                for row in aged[:8])
             alerts["aged-prs"] = (f"{len(aged)} open PRs are older than {AGED_PR_S // 86400}d: {listed}")
+    deferred = obs.get("quotaDeferredHeads") or {}
+    if deferred.get("value"):
+        listed = ", ".join(f"#{row.get('number')} {row.get('ageMinutes')}m" for row in (deferred.get("heads") or [])[:8])
+        alerts["quota-deferred-heads"] = (f"{deferred['value']} open PR heads sit on a quota-deferred Fleet Rules "
+                                          f"verdict past 1h (never a verdict; the re-run loop is broken): {listed}")
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -1169,6 +1246,7 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "spawn-exit": "dispatch-provider-workers",
         "hud-stale": "restart-hud-service",
         "orphan-prs": "reconcile-pr-ownership",
+        "quota-deferred-heads": "rerun-quota-deferred-fleet-evidence",
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
@@ -1399,6 +1477,7 @@ class Tracker:
         self.linear, self.host = linear, host_name
         self._team_node = None
         self.last_writing_report = None
+        self.last_error = None  # why the last open() returned no issue id (never swallowed silently)
 
     def title(self, key: str) -> str:
         if key == "bottleneck:merge-queue":
@@ -1490,15 +1569,20 @@ class Tracker:
                 'state:{type:{nin:["completed","canceled"]}}}){nodes{id}}}', {"t": self.title(key)})
             nodes = data["issues"]["nodes"]
             return nodes[0]["id"] if nodes else None
-        except Exception:
+        except Exception as error:
+            self.existing_error = f"{type(error).__name__}: {str(error)[:160]}"
             return None
 
     def open(self, key: str, text: str, condition: dict | None = None) -> str | None:
         self.last_writing_report = None
+        self.last_error = None
+        self.existing_error = None
         found = self.existing(key)
         if found:
             self.apply_alert_label(found, key)
             return found
+        if found is None and getattr(self, "existing_error", None):
+            self.last_error = f"lookup-failed:{self.existing_error}"
         try:
             priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:", "production-deploy:")) or key in (
                 "linear-down", "spawn-exit", "tick-error", "delivery-stalled") else 2
@@ -1526,7 +1610,8 @@ class Tracker:
                        "title": self.title(key),
                        "description": description}})
             return data["issueCreate"]["issue"]["id"]
-        except Exception:
+        except Exception as error:
+            self.last_error = f"create-failed:{type(error).__name__}: {str(error)[:160]}"
             return None
 
     def contradict_invariant(self, event: dict) -> None:
@@ -1589,6 +1674,26 @@ class Tracker:
         return True
 
 
+ALERT_ISSUE_GRACE_S = 15 * 60
+
+
+def alert_issue_gaps(alerts: dict, issues: dict, now: float, grace_s: int = ALERT_ISSUE_GRACE_S) -> dict[str, str]:
+    """Invariant: no active alert older than 15 min without a Linear issue id or a logged reason.
+    Returns key -> why for every violation or visible gap: an alert with no id past the grace (the reason
+    when one is recorded, `untracked` when none is, which is itself a bug)."""
+    gaps = {}
+    for key in alerts:
+        entry = issues.get(key) or {}
+        if entry.get("id"):
+            continue
+        since = entry.get("since")
+        if not isinstance(since, (int, float)):
+            continue  # first sighting this tick: reconcile records it with a reason
+        if now - since >= grace_s:
+            gaps[key] = entry.get("reason") or "untracked"
+    return gaps
+
+
 def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
               conditions: dict[str, dict] | None = None) -> dict:
     """Carry issue ids across ticks; acknowledge remote transitions before advancing receipts."""
@@ -1616,7 +1721,14 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
                 "writingReview": writing_report["review"],
                 "writingDecision": writing_report["decision"],
             }
-        issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
+        if issue_id:
+            issues[key] = {"id": issue_id, "closedAt": None}
+        else:
+            # retry a failed open next tick, but never silently: keep when it started failing and why.
+            reason = (getattr(tracker, "last_error", None) if tracker else None) or ("no-tracker" if tracker is None else "open-returned-no-id")
+            issues[key] = {"id": None, "closedAt": None, "reason": reason,
+                           "since": (entry or {}).get("since") or now}
+            print(f"doctor: no Linear issue for alert {key}: {reason}", file=sys.stderr)
         if tracker and issue_id and conditions and key in conditions:
             contradict = getattr(tracker, "contradict_invariant", None)
             if contradict:
@@ -1827,6 +1939,113 @@ STATUS_DETAIL_NAME = "lanes-status-details.json"
 STAGE_EVENTS_NAME = "stage-events.ndjson"
 
 
+# 2026-10-25 13:50Z: the public feed hit 410,142 bytes against the 262,144 cap and every HUD tile and
+# dead-man check read "unavailable". Measured sections (lanes-status.json, 557 KB complete):
+# fileOverlap 217 KB (737 pair rows), remediation 82 KB (312 fingerprints, 72 KB of ask text), conditions
+# 54 KB, shippingAttribution 153 KB of per-PR rows before the existing projection. The public feed keeps
+# aggregates, top hotspots and operational identity; every dropped row stays in lanes-status-details.json
+# (same gist) and local state, addressed by a jsonPointer.
+PUBLIC_OVERLAP_TOP = 10
+PUBLIC_FEED_WARN_RATIO = 0.70
+PUBLIC_REMEDIATION_FIELDS = ("state", "issue", "cls", "lane")
+
+
+def _compact_overlap(public: dict) -> None:
+    overlap = public.get("fileOverlap")
+    pairs = overlap.get("pairs") if isinstance(overlap, dict) else None
+    if not isinstance(pairs, list):
+        return
+    rows = [pair for pair in pairs if isinstance(pair, dict)]
+    files = Counter(name for pair in rows for name in pair.get("files") or [] if isinstance(name, str))
+    overlap.pop("pairs")
+    overlap["pairsSummary"] = {
+        "count": len(pairs),
+        "queueOwned": sum(1 for pair in rows if pair.get("queueOwned")),
+        "byAction": dict(Counter(str(pair.get("actionTaken")) for pair in rows)),
+        "topHotspots": [{"file": name, "pairs": count} for name, count in files.most_common(PUBLIC_OVERLAP_TOP)],
+        "pairsRef": {"recordCount": len(pairs), "jsonPointer": "/fileOverlap/pairs"},
+    }
+
+
+# Conditions grew 54 KB -> 69 KB in about an hour (2026-10-25): 33 of 52 receipts were `resolved`, kept
+# forever locally (generation numbers must survive for idempotency keys), each carrying its writing-review
+# bindings (~1.5 KB). The public feed keeps every active condition and recent resolutions without the heavy
+# review/evidence blobs, plus a count summary; the complete receipts stay in lanes-status-details.json.
+PUBLIC_CONDITION_RESOLVED_KEEP_S = 6 * 3600
+PUBLIC_CONDITION_DROP = ("writingReview", "writingDecision", "recoveryEvidence")  # heavy; full copy in the details file
+
+
+def _compact_conditions(public: dict, now: float | None = None) -> None:
+    conditions = public.get("conditions")
+    if not isinstance(conditions, dict):
+        return
+    now = time.time() if now is None else now
+    kept, omitted = {}, 0
+    for key, event in conditions.items():
+        if not isinstance(event, dict):
+            kept[key] = event
+            continue
+        resolved = event.get("state") == "resolved"
+        if resolved:
+            stamp = event.get("resolvedAt")
+            try:
+                age = now - datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+            except (TypeError, ValueError):
+                age = None
+            if age is None or age > PUBLIC_CONDITION_RESOLVED_KEEP_S:
+                omitted += 1
+                continue
+        row = {name: value for name, value in event.items() if name not in PUBLIC_CONDITION_DROP}
+        kept[key] = row
+    states = Counter(str(event.get("state")) for event in conditions.values() if isinstance(event, dict))
+    public["conditions"] = kept
+    public["conditionsSummary"] = {
+        "total": len(conditions), "byState": dict(states), "resolvedOmitted": omitted,
+        "resolvedKeptForS": PUBLIC_CONDITION_RESOLVED_KEEP_S,
+        "ref": {"recordCount": len(conditions), "jsonPointer": "/conditions"}}
+
+
+def _compact_remediation(public: dict) -> None:
+    remediation_block = public.get("remediation")
+    rows = remediation_block.get("byFingerprint") if isinstance(remediation_block, dict) else None
+    if not isinstance(rows, dict):
+        return
+    remediation_block["byFingerprint"] = {
+        key: ({name: row.get(name) for name in PUBLIC_REMEDIATION_FIELDS} if isinstance(row, dict) else row)
+        for key, row in rows.items()}
+    remediation_block["byFingerprintRef"] = {"recordCount": len(rows), "jsonPointer": "/remediation/byFingerprint",
+                                             "omitted": "ask, recurrence and history text"}
+
+
+FEED_SAMPLE_WINDOW_S = 6 * 3600
+FEED_SAMPLE_MIN_SPAN_S = 20 * 60
+FEED_GROWTH_ALERT_S = 6 * 3600  # alert when the projected time to the cap is under 6 hours
+
+
+def feed_growth(samples: list, now: float, total: int, cap: int = PUBLIC_FEED_MAX_BYTES) -> dict:
+    """Bytes/hour over the retained samples and the projected seconds until the cap. Needs >=3 samples
+    spanning >=20 min; a shrinking or flat feed projects nothing."""
+    window = [row for row in (samples or []) if isinstance(row, list) and len(row) == 2
+              and 0 <= now - row[0] <= FEED_SAMPLE_WINDOW_S]
+    window.append([now, total])
+    span = window[-1][0] - window[0][0]
+    if len(window) < 3 or span < FEED_SAMPLE_MIN_SPAN_S:
+        return {"samples": window, "growthBytesPerHour": None, "secondsToCap": None}
+    rate = (window[-1][1] - window[0][1]) / span  # bytes per second
+    return {"samples": window[-72:], "growthBytesPerHour": round(rate * 3600),
+            "secondsToCap": round((cap - total) / rate) if rate > 0 else None}
+
+
+def feed_section_sizes(text: str) -> dict:
+    """Bytes per top-level section of the published feed, largest first, with the cap ratio."""
+    data = json.loads(text)
+    sizes = {key: len(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8"))
+             for key, value in data.items()}
+    total = len(text.encode("utf-8"))
+    return {"bytes": total, "maxBytes": PUBLIC_FEED_MAX_BYTES, "ratio": round(total / PUBLIC_FEED_MAX_BYTES, 3),
+            "sections": dict(sorted(sizes.items(), key=lambda item: -item[1])[:12])}
+
+
 def public_status_projection(feed: dict, full_text: str) -> str:
     """Keep operational fields whole; detailed attribution lives in the same gist."""
     def identity(value, limit):
@@ -1853,6 +2072,9 @@ def public_status_projection(feed: dict, full_text: str) -> str:
                     "recordCount": len(rows),
                     "jsonPointer": f"/shippingAttribution/projects/{index}/pullRequests",
                 }
+    _compact_overlap(public)
+    _compact_remediation(public)
+    _compact_conditions(public)
     public["publicProjection"] = {
         "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
     }
@@ -1884,6 +2106,13 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     if body.read_bytes() != full_text.encode("utf-8"):
         raise RuntimeError("status-feed-evidence-readback-changed")
     public_text = public_status_projection(feed, full_text)
+    try:
+        sizes = feed_section_sizes(public_text)
+        previous_sizes = read_json(host.state / "public-feed-sizes.json", {})
+        sizes.update(feed_growth(previous_sizes.get("samples") or [], time.time(), sizes["bytes"]))
+        atomic_write_text(host.state / "public-feed-sizes.json", json.dumps({"at": now_iso(), **sizes}))
+    except (OSError, ValueError):
+        pass  # a metric never blocks the publish
     packet = {"files": {
         "lanes-status.json": {"content": public_text},
         STATUS_DETAIL_NAME: {"content": full_text},

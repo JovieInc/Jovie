@@ -21,9 +21,25 @@ ghx() { local priority="$1"; shift; node "$API_CLIENT" gh --priority "$priority"
 out="$(mktemp)"
 trap 'rm -f "$out"' EXIT
 
+# A deferred read (75) is GitHub quota or an outage, never a verdict, and nothing
+# wakes this job again, so PR Ready would stay red on it for good (2026-10-25:
+# #22978, #23005, #23089). Retry in the job, with a growing pause, before giving up;
+# the doctor's quota-deferred-heads alert covers whatever is still deferred after.
+MAX_DEFERRED_RETRIES="${FLEET_DEFERRED_RETRIES:-3}"
+BACKOFF_STEP_S="${FLEET_DEFERRED_BACKOFF_STEP_S:-20}"
+BACKOFF_CAP_S="${FLEET_DEFERRED_BACKOFF_CAP_S:-80}"
+retry=0
 set +e
-GITHUB_TOKEN="${FLEET_TOKEN:-$GH_TOKEN}" node scripts/pr-fleet-rules.mjs --with-warnings 2>&1 | tee "$out"
-rc="${PIPESTATUS[0]}"
+while :; do
+  GITHUB_TOKEN="${FLEET_TOKEN:-$GH_TOKEN}" node scripts/pr-fleet-rules.mjs --with-warnings 2>&1 | tee "$out"
+  rc="${PIPESTATUS[0]}"
+  { [ "$rc" = 75 ] && [ "$retry" -lt "$MAX_DEFERRED_RETRIES" ]; } || break
+  retry=$((retry + 1))
+  pause=$((BACKOFF_STEP_S * retry))
+  [ "$pause" -le "$BACKOFF_CAP_S" ] || pause="$BACKOFF_CAP_S"
+  echo "::notice::github-quota-deferred; fleet evidence retry $retry/$MAX_DEFERRED_RETRIES after ${pause}s."
+  sleep "$pause"
+done
 
 case "$rc" in
   0) state=success ;;
