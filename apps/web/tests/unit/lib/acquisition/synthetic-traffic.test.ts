@@ -36,10 +36,10 @@ beforeAll(async () => {
   );
   for (const entry of journal.entries) {
     await client.exec(
-      readFileSync(
-        path.join(dir, `${entry.tag}.drizzleSql`),
-        'utf8'
-      ).replaceAll('--> statement-breakpoint', '')
+      readFileSync(path.join(dir, `${entry.tag}.sql`), 'utf8').replaceAll(
+        '--> statement-breakpoint',
+        ''
+      )
     );
   }
   holder.db = drizzle(client);
