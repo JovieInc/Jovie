@@ -48,6 +48,8 @@ const revokeSchema = z.object({
 });
 const requestSchema = z.union([captureSchema, revokeSchema]);
 
+const ANONYMOUS_ACTOR_ID = 'system:acquisition-capture';
+
 /**
  * Persist first touch and, when authenticated, link exactly that browser
  * journey and its events to the app user in one SQL statement. The guards
@@ -104,7 +106,7 @@ export async function POST(request: NextRequest) {
 
   // One transaction: the upsert and the user link must both commit (they are
   // separate statements; see lib/acquisition/journey-link.ts).
-  await runAtomicDbOperation(
+  const linked = await runAtomicDbOperation(
     tx =>
       upsertAndLinkJourney(tx, {
         acquisitionId,
@@ -112,7 +114,8 @@ export async function POST(request: NextRequest) {
         capturedAt: new Date(capturedAt),
         appUserId,
       }),
-    { actorId: appUserId ?? acquisitionId, system: true, retry: 'never' }
+    // Never a request-derived value (legacy-transaction.ts actor contract).
+    { actorId: ANONYMOUS_ACTOR_ID, system: true, retry: 'never' }
   );
 
   const funnelStage = stageForFunnelPath(parsed.data.currentPath);
@@ -122,7 +125,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     recorded: true,
-    linked: appUserId !== null,
+    linked,
     acquisitionId,
   });
 }

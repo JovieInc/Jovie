@@ -7,11 +7,14 @@ import { supportedAgentDecision } from '@/tests/fixtures/agent-handoff';
 
 const mockGetCachedAuth = vi.hoisted(() => vi.fn());
 const mockExecute = vi.hoisted(() => vi.fn());
+const mockAtomic = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: mockGetCachedAuth }));
 vi.mock('@/lib/db', () => ({ db: { execute: mockExecute } }));
 vi.mock('@/lib/db/legacy-transaction', () => ({
-  runAtomicDbOperation: (fn: (tx: unknown) => unknown) =>
-    fn({ execute: mockExecute }),
+  runAtomicDbOperation: (fn: (tx: unknown) => unknown, options: unknown) => {
+    mockAtomic(options);
+    return fn({ execute: mockExecute });
+  },
 }));
 
 import { POST } from './route';
@@ -31,7 +34,7 @@ describe('POST /api/acquisition', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    mockExecute.mockResolvedValue({ rows: [] });
+    mockExecute.mockResolvedValue({ rows: [{ id: 'journey' }] });
   });
 
   it('stays database-free during secretless visual capture', async () => {
@@ -68,6 +71,34 @@ describe('POST /api/acquisition', () => {
     expect(sqlText).toContain('WHERE id = ');
     expect(sqlText).not.toContain('better_auth_user_id =');
     expect(sqlText).toContain('0f8b2c1e-5d3a-4f6b-9a7c-1e2d3c4b5a69');
+  });
+
+  it('uses a constant actor id, never the request-supplied journey id', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: null });
+    await POST(request());
+    expect(mockAtomic).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'system:acquisition-capture' })
+    );
+    mockAtomic.mockClear();
+    mockGetCachedAuth.mockResolvedValue({
+      userId: '0f8b2c1e-5d3a-4f6b-9a7c-1e2d3c4b5a69',
+    });
+    await POST(request());
+    expect(mockAtomic).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'system:acquisition-capture' })
+    );
+  });
+
+  it('reports linked false when the link guard refused the journey', async () => {
+    mockGetCachedAuth.mockResolvedValue({
+      userId: '0f8b2c1e-5d3a-4f6b-9a7c-1e2d3c4b5a69',
+    });
+    mockExecute.mockResolvedValue({ rows: [] });
+    const response = await POST(request());
+    expect(await response.json()).toMatchObject({
+      recorded: true,
+      linked: false,
+    });
   });
 
   it('does not claim a link for a non-uuid auth id', async () => {
@@ -113,7 +144,7 @@ describe('signed acquisition capture', () => {
       userId: '0f8b2c1e-5d3a-4f6b-9a7c-1e2d3c4b5a69',
     });
     mockExecute.mockReset();
-    mockExecute.mockResolvedValue({ rows: [] });
+    mockExecute.mockResolvedValue({ rows: [{ id: 'journey' }] });
     vi.stubEnv('ACQUISITION_FIRST_TOUCH_SECRET', 'capture-test-signing-key');
   });
   it('persists signed source and identity instead of unsigned browser values', async () => {
