@@ -591,8 +591,8 @@ jobs:
           git add -- "${CHANGED[@]}"
           TREE=$(git write-tree)
           TEST_COMMIT=$(printf '%s\n' 'hosted remediation verification tree' | \
-            GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jov.ie' \
-            GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jov.ie' \
+            GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jovie.com' \
+            GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jovie.com' \
             GIT_AUTHOR_DATE='@0 +0000' GIT_COMMITTER_DATE='@0 +0000' \
             git commit-tree "$TREE" -p "$EXPECTED_HEAD")
           git checkout --detach "$TEST_COMMIT"
@@ -744,8 +744,8 @@ jobs:
           git add -- "${CHANGED[@]}"
           TREE=$(git write-tree)
           VERIFY_COMMIT=$(printf '%s\n' 'hosted remediation verification tree' | \
-            GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jov.ie' \
-            GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jov.ie' \
+            GIT_AUTHOR_NAME='Jovie CI' GIT_AUTHOR_EMAIL='ci@jovie.com' \
+            GIT_COMMITTER_NAME='Jovie CI' GIT_COMMITTER_EMAIL='ci@jovie.com' \
             GIT_AUTHOR_DATE='@0 +0000' GIT_COMMITTER_DATE='@0 +0000' \
             git commit-tree "$TREE" -p "$EXPECTED_HEAD")
           git checkout --detach "$VERIFY_COMMIT"

@@ -1695,7 +1695,7 @@ already knows. A good test: would this insight save time in a future session? If
 
 ## Step 4: Version bump (auto-decide)
 
-> **Jovie override — version stamping is MAIN-ONLY, and CHANGELOG.md is post-land.** This repo bumps the version
+> **JOVIE OVERRIDE — version stamping is MAIN-ONLY, and CHANGELOG.md is post-land.** This repo bumps the version
 > fan-out (`VERSION`, `version.json`, root + workspace `package.json` versions, dated
 > `CHANGELOG.md` headings) only on the main/release path via `pnpm version:stamp`, never
 > on feature branches. `/ship` runs from a feature branch (Step 1), so **SKIP this entire

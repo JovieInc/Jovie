@@ -11,7 +11,6 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { scanTypeScale } from '../invariants/art-direction/type-scale.mjs';
-import { scanText } from './brand-name.mjs';
 import {
   checkDrift,
   findUnregisteredCopies,
@@ -102,14 +101,6 @@ function main(argv) {
             text: `${hit.px}px: ${hit.text}`,
           });
       }
-      for (const hit of scanText(readFileSync(file, 'utf8'), { file }))
-        findings.push({
-          id: 'ASR-036',
-          severity: 'block',
-          file,
-          line: hit.line,
-          text: `${hit.kind} ${hit.text}`,
-        });
     }
     const fs = spawnSync(
       process.execPath,

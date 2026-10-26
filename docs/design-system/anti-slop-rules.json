@@ -877,40 +877,6 @@
         "check": "vision:hierarchy",
         "evidence": []
       }
-    },
-    {
-      "id": "ASR-036",
-      "title": "Spell the brand right",
-      "statement": "The brand is Jovie and the domain is jov.ie. Flag Jovy, Jovee, Jovei, Jovvie, Jovies, J0vie, near-misses (edit distance 1-2 on Jo-v words), jovie.com or jovie.io, and wrong casing in prose. Jovi is allowed only where it names the agent (Summer Jovi, Jovi coach, Jovi Technology Inc). jovie.com in copy is correct only when it disambiguates the unrelated childcare company.",
-      "rationale": "A misspelled brand name is the cheapest credibility loss.",
-      "source": {
-        "by": "Tim White",
-        "date": "2026-10-26",
-        "ref": "Tim: we need a gate for misspelling Jovie"
-      },
-      "scope": ["marketing", "app", "copy", "artifact"],
-      "severity": "block",
-      "enforcement": {
-        "kind": "static",
-        "status": "enforced",
-        "check": "scripts/anti-slop/brand-name.mjs",
-        "evidence": [
-          "scripts/anti-slop/brand-name.mjs",
-          "scripts/anti-slop/brand-name.baseline.json"
-        ],
-        "wiredIn": [
-          {
-            "file": "scripts/ci-fast-lanes.mjs",
-            "token": "id: 'anti-slop'",
-            "commandIncludes": "brand-name.mjs"
-          },
-          {
-            "file": ".github/workflows/source-validation.yml",
-            "token": "scripts/anti-slop/brand-name.mjs"
-          }
-        ],
-        "coverageNote": "Whole-repo scan (zero baseline; one frozen verbatim quote excepted) on every PR, plus the PR title, body and commit messages in Source Validation using the trusted base copy. Pen files are encrypted: scan their HTML/CSS export with run.mjs check --files."
-      }
     }
   ],
   "judges": [

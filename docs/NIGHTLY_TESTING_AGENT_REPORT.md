@@ -7,7 +7,7 @@
 
 # Nightly Testing Agent — Daily Report
 
-Repo: `jovie`
+Repo: jovie
 Generated: 2026-10-20T02:01:54.271Z
 Workflow conclusion: success
 
