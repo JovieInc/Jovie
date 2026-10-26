@@ -29,6 +29,7 @@ One skill for design-system work across Pen and code. Read this page, pick the r
 | Anything that touches a `.pen` file, the `pen` CLI or `mcp__pencil__*` | [guides/pen-operations.md](guides/pen-operations.md) |
 | Make code match Pen, or Pen match code; drift ledger; conformance gate; Storybook evidence | [guides/code-parity.md](guides/code-parity.md) |
 | Component certificate, benchmark judgment, alignment and a11y rules, what "done" means | [guides/certification.md](guides/certification.md) |
+| Marketing motion and shaders: matte field, hero zoom, shell parallax, chat takeover; motion budgets; registering an effect (ASR-039) | [guides/motion.md](guides/motion.md) |
 
 Surface-specific rules that stay where they are: `docs/marketing/AGENT_GUIDE.md` (marketing), `.claude/rules/ui.md`, `docs/design-system/state-matrix.md`, `docs/design-system/component-ownership.json`.
 
@@ -39,6 +40,7 @@ Surface-specific rules that stay where they are: `docs/marketing/AGENT_GUIDE.md`
 - System-1 judges (Jev/Clef through the shared system-1 router so calls are logged) do fast visual and conformance judgments on renders. Escalate to a stronger model when the measured judge accuracy is worse.
 - Machines review correctness. Humans review taste, after ship, on staging and the design lane (3440x1440 ultra-wide on the office display) with Pen side by side.
 - Every defect found leaves a guard (lint rule, token check, manifest entry, test, benchmark entry). Record defect -> guard in the PR.
+- After editing any Pen master, run the instance drift check (`scripts/agent/pen-instance-drift.js`; steps in [guides/pen-operations.md](guides/pen-operations.md#after-editing-a-master-instance-drift-check)) and repair until it reports zero stale, orphaned or cached instances. A master change is not done while its instances still show the old design.
 
 ## Legacy skills (kept as tools, routed from the guides)
 

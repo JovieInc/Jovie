@@ -113,3 +113,14 @@ test('the recorded homepage and general-page baseline matches the tree', () => {
   assert.equal(result.count, result.ids.length);
   assert.ok(result.count > 0);
 });
+
+test('allowed product phrases are not audience terms; the rest of the line is', () => {
+  const file = 'apps/web/lib/billing/offer-truth.ts';
+  const ok = "export const plan = 'Start your Artist Presence trial';";
+  assert.deepEqual(violationsInSource(ok, file, config).ids, []);
+  const mixed = "export const plan = 'Artist Presence for every artist';";
+  assert.deepEqual(
+    violationsInSource(mixed, file, config).ids.map(id => id.split(':')[0]),
+    ['artist']
+  );
+});
