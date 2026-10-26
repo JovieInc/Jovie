@@ -193,7 +193,8 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       expect(metric?.guided).toHaveLength(4);
       for (let index = 0; index < 4; index++) {
         expect(
-          Math.abs(metric!.first![index]! - metric!.guided![index]!)
+          Math.abs(metric!.first![index]! - metric!.guided![index]!),
+          `element ${index} (h1, composer, input, send) y first=${JSON.stringify(metric!.first)} guided=${JSON.stringify(metric!.guided)}`
         ).toBeLessThanOrEqual(1);
       }
       await expectEssentials(page);
