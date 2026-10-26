@@ -1160,15 +1160,23 @@ export function OnboardingChat({
     (isAwaitingFirstToken ||
       shouldReserveStarterVerification ||
       verificationRequested);
+  const sizeStarterInstruction =
+    shouldReserveStarterVerification &&
+    turnstileHasSiteKey &&
+    (turnstileStatus === 'loading' || turnstileStatus === 'interactive');
+  // Latch: once the reserved instruction line has painted, its height must
+  // survive its withdrawal (the site key can also vanish under the automation
+  // bypass, so the spacer cannot key off turnstileHasSiteKey).
+  const [starterInstructionWasSized, setStarterInstructionWasSized] =
+    useState(false);
+  if (sizeStarterInstruction && !starterInstructionWasSized) {
+    setStarterInstructionWasSized(true);
+  }
   const flowStatus = shouldShowTurnstileBanner ? (
     <OnboardingFlowStatus
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
-      sizeStarterInstruction={
-        shouldReserveStarterVerification &&
-        turnstileHasSiteKey &&
-        (turnstileStatus === 'loading' || turnstileStatus === 'interactive')
-      }
+      sizeStarterInstruction={sizeStarterInstruction}
     />
   ) : null;
   const userTurnCount = messages.filter(
@@ -1183,9 +1191,9 @@ export function OnboardingChat({
   // paint. Hold the same height with an inert spacer until the first message
   // renders and the empty-state composer is replaced.
   const holdsStarterBannerSpace =
-    !flowStatus &&
+    starterInstructionWasSized &&
+    !sizeStarterInstruction &&
     hasInitialStarterPrompt &&
-    turnstileHasSiteKey === true &&
     messages.length === 0 &&
     chatError === null &&
     !isSecurityCheckRecovery;
