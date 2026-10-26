@@ -162,7 +162,9 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/$B" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
   'files="$(git diff --name-only --diff-filter=d "origin/$B" HEAD -- scripts/lanes scripts/tests)"',
   'cand=""',
-  'for f in $files; do case "$f" in scripts/tests/test_*.py) cand="$cand $f";; scripts/lanes/lane_runner.py) ;; scripts/lanes/*.py) cand="$cand scripts/tests/test_$(basename "$f" .py).py";; esac; done',
+  // The qualification guard pins the sha256 of scripts/tests/test_disk_guard.py; editing that fixture without
+  // adding its hash ejected seven merge groups and six bystanders (#23280, 2026-10-25), so run its pinning test.
+  'for f in $files; do case "$f" in scripts/tests/test_disk_guard.py) cand="$cand $f scripts/tests/test_qualification_guard.py";; scripts/tests/test_*.py) cand="$cand $f";; scripts/lanes/lane_runner.py) ;; scripts/lanes/*.py) cand="$cand scripts/tests/test_$(basename "$f" .py).py";; esac; done',
   // The release self-test runs only LANE_TESTS (lane_runner.py), with unittest and no conftest.
   // A lane_runner.py edit alone does not pull in test_lane_runner.py (867 tests, ~90s); edit that test to run it.
   'tests=""',
@@ -278,7 +280,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|scripts\/invariants\/art-direction\/)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|scripts\/invariants\/art-direction\/)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -291,6 +293,17 @@ export const SOURCE_GUARDS = Object.freeze([
       'node scripts/invariants/icp-language/check.mjs && node --test --test-isolation=none scripts/invariants/icp-language/icp-language.test.mjs',
     inputs:
       /^(?:apps\/web\/(?:app\/(?:\(home\)|\(marketing\)|brand\/|layout\.tsx$|manifest\.ts$|llms(?:-full)?\.txt\/)|components\/(?:homepage|marketing|site|organisms|features\/home)\/|data\/|content\/|lib\/(?:config\/plan-prices\.ts$|billing\/offer-truth\.ts$))|scripts\/invariants\/icp-language\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    // Anti-slop registry (docs/design-system/anti-slop-rules.json): schema,
+    // evidence and wiring of every enforced rule, and prose copies of the
+    // anti-slop list that drifted from the registry (Tim, 2026-10-26).
+    id: 'anti-slop',
+    command:
+      'node scripts/anti-slop/run.mjs validate && node --test --test-isolation=none scripts/anti-slop/anti-slop.test.mjs',
+    inputs:
+      /^(?:docs\/|scripts\/(?:anti-slop\/|invariants\/|design-frontend-skill-check|ci-fast-lanes\.mjs$)|packages\/copy\/|\.github\/workflows\/source-validation\.yml$|\.claude\/(?:skills|rules)\/|\.agents\/skills\/|canon\/[^/]*\.md$|package\.json$|CLAUDE\.md$|AGENTS\.md$)/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -941,6 +954,7 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && 
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/ci-timing-collector.test.mjs',
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
   'scripts/lib/__tests__/mesh-current-wire.test.mjs',
@@ -1062,6 +1076,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/ui-story-coverage-policy.test.mjs',
   'scripts/lib/__tests__/ci-fast-pr-structural-guards.test.mjs',
   'scripts/lib/__tests__/ci-structural-inventory.test.mjs',
+  'scripts/lib/__tests__/ci-fixture-annotations.test.mjs',
   'scripts/lib/__tests__/ci-lanes-selftest-guard.test.mjs',
   'scripts/lib/__tests__/unstack-merged-parent.test.mjs',
   'scripts/lib/__tests__/vercel-branch-exclusions.test.mjs',

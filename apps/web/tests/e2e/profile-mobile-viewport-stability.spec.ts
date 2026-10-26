@@ -1043,6 +1043,7 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
             topChromeButtons: Array.from(
               document.querySelectorAll('.profile-cover-chrome button')
             ).map(rect),
+            identity: rect(document.querySelector('h1')),
             banner: rect(banner),
             actions: rect(actions),
             bannerScrollWidth: banner?.scrollWidth ?? null,
@@ -1063,6 +1064,17 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
           '--cookie-banner-h',
           '146px'
         );
+
+        // Mirror CookieBannerSection: tablet consent anchors above the dock.
+        const dockTop = document
+          .querySelector('[data-testid="profile-tab-bar"]')
+          ?.getBoundingClientRect().top;
+        if (dockTop !== undefined) {
+          document.documentElement.style.setProperty(
+            '--cookie-banner-dock-clearance',
+            `${Math.max(8, window.innerHeight - dockTop + 8)}px`
+          );
+        }
 
         const banner = document.createElement('aside');
         banner.setAttribute('aria-label', 'Cookie Consent');
@@ -1189,6 +1201,18 @@ test.describe('Public Profile Home Editorial Card @smoke @critical', () => {
           after.banner?.bottom ?? Number.POSITIVE_INFINITY,
           'phone consent card should clear the glass dock'
         ).toBeLessThanOrEqual((after.dock?.top ?? 0) - 8);
+      }
+
+      if (after.banner && after.identity) {
+        const coversIdentity =
+          after.banner.left < after.identity.right &&
+          after.banner.right > after.identity.left &&
+          after.banner.top < after.identity.bottom &&
+          after.banner.bottom > after.identity.top;
+        expect(
+          coversIdentity,
+          `${viewport.label} consent card must not cover the artist name`
+        ).toBe(false);
       }
 
       if (after.banner && after.dock) {
