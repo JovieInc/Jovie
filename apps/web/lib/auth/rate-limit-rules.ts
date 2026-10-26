@@ -16,17 +16,20 @@ import { env } from '@/lib/env-server';
 const TEST_OTP_EMAIL_PATTERN = /\+(e2e|clerk_test)(\+[^@]*)?@/i;
 
 /**
- * Staging synthetic principals: on a Vercel preview-class deployment (staging
- * is VERCEL_ENV=preview) the canonical test-email shape on our own test
- * domains may use the deterministic code without E2E_TEST_MODE, so agents can
- * walk sign-up on staging with no DB access. Never other domains.
+ * Staging synthetic principals: on the staging deployment (VERCEL_ENV=preview
+ * built from main) the canonical test-email shape on our own test domains may
+ * use the deterministic code without E2E_TEST_MODE, so agents can walk sign-up
+ * on staging with no DB access. One strict anchored pattern: own domains only,
+ * never an admin-looking local part (the seeded admin persona must not be
+ * passwordless on staging).
  */
-const STAGING_SYNTHETIC_EMAIL_DOMAINS = ['jov.ie', 'test.jovie.com'] as const;
+const STAGING_SYNTHETIC_EMAIL =
+  /^(?!.*admin)[a-z0-9._-]+(\+[a-z0-9._-]+)*\+(e2e|clerk_test)(\+[a-z0-9._-]*)?@(jov\.ie|test\.jovie\.com)$/i;
 
-function isStagingSyntheticDomain(email: string): boolean {
-  const domain = email.slice(email.lastIndexOf('@') + 1).toLowerCase();
-  return (STAGING_SYNTHETIC_EMAIL_DOMAINS as readonly string[]).includes(
-    domain
+/** Positive staging signal: PR previews are VERCEL_ENV=preview too. */
+function isStagingDeployment(): boolean {
+  return (
+    env.VERCEL_ENV === 'preview' && process.env.VERCEL_GIT_COMMIT_REF === 'main'
   );
 }
 
@@ -34,10 +37,10 @@ function isStagingSyntheticDomain(email: string): boolean {
  * Deterministic test-OTP gate. Fail closed:
  * - the email must match the canonical test shape (never any other address);
  * - VERCEL_ENV=production is always refused;
- * - VERCEL_ENV=preview (staging): our own test domains, or E2E_TEST_MODE=1;
- * - any other value (development, or unset on local/CI runners) needs the
- *   explicit E2E_TEST_MODE=1 opt-in, so an unknown environment is refused by
- *   default.
+ * - on Vercel (VERCEL=1) with VERCEL_ENV unset or unknown: refused;
+ * - staging (preview built from main): only STAGING_SYNTHETIC_EMAIL;
+ * - other preview deployments, development, and local/CI runners (no Vercel):
+ *   need the explicit E2E_TEST_MODE=1 opt-in.
  *
  * Lives here (not better-auth.ts) because the OTP rate-limit rules below need
  * it and better-auth.ts imports this module — importing it there would cycle.
@@ -45,9 +48,14 @@ function isStagingSyntheticDomain(email: string): boolean {
 export function isDeterministicTestOtpEmail(email: string): boolean {
   if (!TEST_OTP_EMAIL_PATTERN.test(email)) return false;
   if (env.VERCEL_ENV === 'production') return false;
-  if (env.VERCEL_ENV === 'preview') {
-    return env.E2E_TEST_MODE === '1' || isStagingSyntheticDomain(email);
+  if (
+    process.env.VERCEL === '1' &&
+    env.VERCEL_ENV !== 'preview' &&
+    env.VERCEL_ENV !== 'development'
+  ) {
+    return false;
   }
+  if (isStagingDeployment() && STAGING_SYNTHETIC_EMAIL.test(email)) return true;
   return env.E2E_TEST_MODE === '1';
 }
 
@@ -87,7 +95,15 @@ async function deterministicTestOtpRule(
   request: Request
 ): Promise<false | { window: number; max: number }> {
   const email = await readOtpRequestEmail(request);
-  if (email && isDeterministicTestOtpEmail(email)) return false;
+  if (email && isDeterministicTestOtpEmail(email)) {
+    console.info(
+      `[auth] deterministic test OTP rate limit bypassed ${JSON.stringify({
+        vercelEnv: env.VERCEL_ENV ?? 'unset',
+        email: `${email.slice(0, 2)}***${email.slice(email.lastIndexOf('@'))}`,
+      })}`
+    );
+    return false;
+  }
   return { window: 60, max: 3 };
 }
 
