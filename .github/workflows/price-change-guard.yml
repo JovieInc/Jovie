@@ -1,0 +1,36 @@
+name: Price change guard
+
+# An existing plan's live price cannot change without a scheduled-change record
+# that was merged at least 30 days earlier (customers get notice before a price
+# change; Terms promise, PR #23317). See apps/web/lib/billing/price-changes/.
+# Compares the live price table and registry at the PR base with the PR head.
+
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: price-change-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Price change guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A PR checkout is the test merge commit; depth 2 keeps its base parent.
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Setup Node and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+
+      - name: Reject price edits without a merged scheduled-change record
+        run: pnpm check:price-change-guard --base HEAD^1

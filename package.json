@@ -141,6 +141,7 @@
     "build": "node scripts/turbo-local.mjs build",
     "build:web": "node scripts/turbo-local.mjs build --filter=@jovie/web",
     "auth:redirect-uris": "tsx scripts/auth-redirect-uris.ts",
+    "check:price-change-guard": "tsx scripts/check-price-change-guard.ts",
     "check:summer-eve-pin": "tsx scripts/check-summer-eve-pin.ts",
     "factory:truth-sync": "pnpm --filter @jovie/web exec tsx scripts/factory-truth-sync.ts",
     "factory:calibrate-judges": "pnpm --filter @jovie/web exec tsx scripts/marketing-factory/judge-calibration.ts",

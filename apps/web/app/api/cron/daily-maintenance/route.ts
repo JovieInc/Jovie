@@ -28,6 +28,7 @@
 import { NextResponse } from 'next/server';
 import { recordDailyGatewaySpend } from '@/lib/ai/gateway-spend';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
+import { runPriceChangeSweepFromCron } from '@/lib/billing/price-changes/run';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { sweepUnderEnrichedProfilesForCron } from '@/lib/discography/re-enrich';
 import { env } from '@/lib/env-server';
@@ -113,6 +114,13 @@ export async function GET(request: Request) {
         errors: r.errors.length,
       };
     }
+  );
+
+  // 3b. Price-change notices: schedule -> notify -> gate -> switch. A no-op
+  // while the registry is empty; real sends/switches need explicit env switches.
+  results.priceChangeNotices = await runSubJob(
+    'priceChangeNotices',
+    runPriceChangeSweepFromCron
   );
 
   // A missing binding leaves the feed disabled; an activated feed fails visibly
