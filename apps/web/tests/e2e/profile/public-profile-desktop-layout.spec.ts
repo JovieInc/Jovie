@@ -82,12 +82,13 @@ async function openFixture(page: Page, width: number, height: number) {
   });
 }
 
-test.describe('desktop artist profile layout', () => {
-  test.skip(
-    PROFILE_DESKTOP_SURFACE_SHIPPED,
-    'The flagged wide surface replaces the compact composition'
-  );
+// The flagged wide surface replaces the compact composition, so this suite is
+// only registered while the compact desktop layout is what ships.
+const describeCompactDesktop = (title: string, body: () => void) => {
+  if (!PROFILE_DESKTOP_SURFACE_SHIPPED) test.describe(title, body);
+};
 
+describeCompactDesktop('desktop artist profile layout', () => {
   test('390px stays a single stacked phone column (unchanged)', async ({
     page,
   }) => {
