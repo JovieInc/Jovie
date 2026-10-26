@@ -388,9 +388,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T22:18:41.922Z",
-        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements.",
-        "sourceDigest": "8e04962d231d816b3936aaef2002e05d3d28994daa8a970035b91ce66eca8536"
+        "at": "2026-10-26T00:28:40.959Z",
+        "ref": "docs/screenshots/jov-8925-pricing-renewal/README.md. PR #22920 changes the shared MarketingFooter owner: /pricing keeps its expanded navigation and gains Cookies/DMCA legal links. Local Chromium: 10 pricing and 2 homepage footer tests passed, including accessibility, focus, plan selection and layout stability. Fresh 320/390/768/1440 captures have matching header/main/footer container edges and no horizontal overflow; homepage-only locked classes remain absent on /pricing.",
+        "sourceDigest": "08f8253d00c0004b2ca7fbf18c9b0591589c5df9766367c6e711bccbc54009e7"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },

@@ -1,0 +1,169 @@
+{
+  "observedAt": "2026-10-26T00:28:40.959Z",
+  "baseURL": "http://localhost:33120",
+  "browser": "Chromium",
+  "sourceHead": "dedf699cef82c19d47a7dae031c07b96a2d91ca0",
+  "tests": {
+    "pricing": 10,
+    "homepageFooter": 2,
+    "failed": 0
+  },
+  "observations": [
+    {
+      "width": 320,
+      "overflow": false,
+      "header": {
+        "x": 24,
+        "width": 272,
+        "height": 71
+      },
+      "main": {
+        "x": 24,
+        "width": 272,
+        "height": 234.78125
+      },
+      "footer": {
+        "x": 24,
+        "width": 272,
+        "height": 1200.96875
+      },
+      "footerVariant": "expanded",
+      "locked": false,
+      "legal": [
+        {
+          "label": "Privacy",
+          "href": "/legal/privacy"
+        },
+        {
+          "label": "Terms",
+          "href": "/legal/terms"
+        },
+        {
+          "label": "Cookies",
+          "href": "/legal/cookies"
+        },
+        {
+          "label": "DMCA",
+          "href": "/legal/dmca"
+        }
+      ]
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "header": {
+        "x": 24,
+        "width": 342,
+        "height": 71
+      },
+      "main": {
+        "x": 24,
+        "width": 342,
+        "height": 169.984375
+      },
+      "footer": {
+        "x": 24,
+        "width": 342,
+        "height": 1161.78125
+      },
+      "footerVariant": "expanded",
+      "locked": false,
+      "legal": [
+        {
+          "label": "Privacy",
+          "href": "/legal/privacy"
+        },
+        {
+          "label": "Terms",
+          "href": "/legal/terms"
+        },
+        {
+          "label": "Cookies",
+          "href": "/legal/cookies"
+        },
+        {
+          "label": "DMCA",
+          "href": "/legal/dmca"
+        }
+      ]
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "header": {
+        "x": 32,
+        "width": 704,
+        "height": 71
+      },
+      "main": {
+        "x": 32,
+        "width": 704,
+        "height": 164.546875
+      },
+      "footer": {
+        "x": 32,
+        "width": 704,
+        "height": 905.984375
+      },
+      "footerVariant": "expanded",
+      "locked": false,
+      "legal": [
+        {
+          "label": "Privacy",
+          "href": "/legal/privacy"
+        },
+        {
+          "label": "Terms",
+          "href": "/legal/terms"
+        },
+        {
+          "label": "Cookies",
+          "href": "/legal/cookies"
+        },
+        {
+          "label": "DMCA",
+          "href": "/legal/dmca"
+        }
+      ]
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "header": {
+        "x": 71,
+        "width": 1298,
+        "height": 71
+      },
+      "main": {
+        "x": 71,
+        "width": 1298,
+        "height": 164.546875
+      },
+      "footer": {
+        "x": 71,
+        "width": 1298,
+        "height": 655.578125
+      },
+      "footerVariant": "expanded",
+      "locked": false,
+      "legal": [
+        {
+          "label": "Privacy",
+          "href": "/legal/privacy"
+        },
+        {
+          "label": "Terms",
+          "href": "/legal/terms"
+        },
+        {
+          "label": "Cookies",
+          "href": "/legal/cookies"
+        },
+        {
+          "label": "DMCA",
+          "href": "/legal/dmca"
+        }
+      ]
+    }
+  ]
+}
