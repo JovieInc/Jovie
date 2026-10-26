@@ -14,20 +14,17 @@
  *   - an image whose name says so (portrait, headshot, model, stock, selfie,
  *     the editorial P01-P12 portrait series, and similar).
  * A person image that is not in the registry is an `unapproved-person:<path>`
- * id. Ids only shrink, same ratchet as the other image checks.
+ * id. There is no baseline: any id fails.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ancestorIds, ratchet } from './images.mjs';
 
 const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 
 export const PEOPLE_REGISTRY =
   'scripts/invariants/art-direction/approved-people.json';
-export const PEOPLE_BASELINE =
-  'scripts/invariants/art-direction/people.baseline.json';
 
 const ROOTS = ['apps/web/public'];
 const SKIP_DIRS = new Set([
@@ -143,12 +140,8 @@ export function scanPeople(repoRoot = REPO_ROOT) {
   return { ids, errors };
 }
 
-export async function check(repoRoot = REPO_ROOT, recordedIds) {
+export async function check(repoRoot = REPO_ROOT) {
+  // Zero tolerance, no baseline: an unapproved person image is a failure.
   const { ids, errors } = scanPeople(repoRoot);
-  const recorded = recordedIds ?? readJson(join(repoRoot, PEOPLE_BASELINE)).ids;
-  const ancestor = ancestorIds(repoRoot, PEOPLE_BASELINE);
-  const failures = [...errors];
-  if (!ancestor.ok) failures.push(ancestor.error);
-  else failures.push(...ratchet(ids, recorded, ancestor.ancestor));
-  return { failures, ids };
+  return { failures: [...errors, ...ids], ids };
 }

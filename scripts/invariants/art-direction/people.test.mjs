@@ -87,7 +87,7 @@ describe('approved people registry', () => {
     );
   });
 
-  it('matches the registry and shrink-only baseline', async () => {
+  it('matches the registry with no unapproved person image', async () => {
     assert.deepEqual((await check()).failures, []);
   });
 });
