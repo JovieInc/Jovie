@@ -228,6 +228,16 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Growth loop registry + experiment ledger (Tim 2026-10-26): malformed
+    // entries, outbound/paid loops without Tim approval and duplicate sources fail.
+    id: 'growth-registry',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/growth-registry.test.mjs',
+    inputs:
+      /^(?:canon\/growth-(?:loops|experiments)\.jsonl|scripts\/lib\/(?:growth-registry\.mjs|__tests__\/growth-registry\.test\.mjs))$/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'synthetic-canary-liveness',
     command:
       'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs',
