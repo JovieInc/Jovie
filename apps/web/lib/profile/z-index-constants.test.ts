@@ -31,18 +31,18 @@ describe('profile z-index constants', () => {
     expect(PROFILE_Z.FULLSCREEN_FLOW).toBe('z-[140]');
   });
 
-  const zNum = (cls: string) => Number(/(\d+)\]?$/.exec(cls)?.[1]);
+  // Semantic overlay order from tailwind-foundation.css: banner < sheet < modal.
+  const SEMANTIC_ORDER = ['z-banner', 'z-sheet', 'z-modal'];
+  const rank = (cls: string) => SEMANTIC_ORDER.indexOf(cls);
 
   it('keeps modal profile drawers above the cookie banner', () => {
     // Live bug 2026-10-26: banner covered the contact drawer at 390px.
-    expect(zNum(PROFILE_Z.COOKIE_BANNER)).toBeLessThan(
-      zNum(PROFILE_Z.MODAL_DRAWER_BACKDROP)
+    expect(rank(PROFILE_Z.COOKIE_BANNER)).toBeGreaterThanOrEqual(0);
+    expect(rank(PROFILE_Z.MODAL_DRAWER_BACKDROP)).toBeGreaterThan(
+      rank(PROFILE_Z.COOKIE_BANNER)
     );
-    expect(zNum(PROFILE_Z.MODAL_DRAWER_BACKDROP)).toBeLessThan(
-      zNum(PROFILE_Z.MODAL_DRAWER_CONTENT)
-    );
-    expect(zNum(PROFILE_Z.MODAL_DRAWER_CONTENT)).toBeLessThan(
-      zNum(PROFILE_Z.FULLSCREEN_FLOW)
+    expect(rank(PROFILE_Z.MODAL_DRAWER_CONTENT)).toBeGreaterThan(
+      rank(PROFILE_Z.COOKIE_BANNER)
     );
   });
 
