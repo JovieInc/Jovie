@@ -93,6 +93,22 @@ class PromptTest(unittest.TestCase):
             fix = lane.machine_gate(host, "PR4", "", (), "", "codex", fp=gap.check_fingerprint(pr))
             self.assertTrue(any("Abstraction gate" in line for line in fix))
 
+    def test_binding_and_epic_prompts_carry_the_gate_too(self):
+        import bindings
+        import epics
+        binding = SimpleNamespace(slug="JovieInc/LogYourBody", key="LYB")
+        pr = {"number": 3, "headRefOid": "h", "statusCheckRollup": [{"name": "Lint", "conclusion": "FAILURE"}]}
+        clause = ["## Abstraction gate (build the machine, not the thing)", "- REQUIRED: x"]
+        repair = bindings.render_prompt(binding, "fix/x", pr=pr, machine=clause)
+        issue = SimpleNamespace(title="t", identifier="LYB-1", description="d")
+        coder = bindings.render_prompt(binding, "b", issue=issue, machine=clause)
+        for prompt in (repair, coder):
+            self.assertIn("## Abstraction gate", prompt)
+            self.assertLess(prompt.index("Abstraction gate"), prompt.index("## Contract"))
+        plan = epics.render_prompt(SimpleNamespace(identifier="JOV-1", title="e", description="d"), [])
+        self.assertIn("Build the machine, not the thing", plan)
+        self.assertIn("machine-gap", plan)
+
     def test_a_broken_ledger_never_fails_the_run(self):
         import lane_runner as lane
         host = lane.Host(state=Path("/proc/does-not-exist"), repo=Path("/"))
