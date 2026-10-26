@@ -1,4 +1,5 @@
 import type { MarketingCopyClaim } from '@/data/marketing/copy';
+import { COMPARATIVE_CLAIM_RECEIPTS } from './comparative-claims';
 
 /**
  * Publish-safe evidence receipts for the factual claims on the comparison,
@@ -353,6 +354,7 @@ export const PUBLISHED_CLAIM_RECEIPTS = {
     verifiedAt: '2026-10-01',
     reviewAfter: '2026-12-15',
   },
+  ...COMPARATIVE_CLAIM_RECEIPTS,
 } as const satisfies Readonly<Record<string, PublishedClaimReceipt>>;
 
 export type PublishedClaimId = keyof typeof PUBLISHED_CLAIM_RECEIPTS;
@@ -456,7 +458,7 @@ export function validatePublishedClaimReceipts(
  */
 export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/compare/linktree':
-    '515e0a4c0437680b5b264fb2b3829a8b9486eb1371d3a20112811396911e4cd7',
+    '5c63dc6c98618f95c9e515660e25eb2d33afcfdef86f9a521375b20e95ae716d',
   '/compare/linkfire':
     '0b2d66dc78d69d39852ecd247f4e7b28c8243ea471cd65b56b7e6ded91d421d5',
   '/alternatives/linktree':
