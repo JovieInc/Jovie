@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# The release self-test uses unittest without pytest's conftest path setup.
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
 os.environ.setdefault("LANES_EXECUTION_BACKEND", "local-test")
 
 
@@ -515,6 +517,46 @@ class RouterLadderTest(unittest.TestCase):
                 {"author": {"type": "User", "login": "reviewer"}, "body": body,
                  "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
             self.assertEqual(remediation.classify_blocker(subject)["cls"], "needs-human-decision", body)
+
+    def test_url_rejection_evidence_does_not_block_engineering_repairs(self):
+        assurance = ("Media uses the canonical image-host policy, rejecting unsupported hosts, "
+                     "HTTP, credentials and nondefault ports before rendering.")
+        red = {"statusCheckRollup": checks(conclusion="FAILURE")}
+        subject = pr(number=23005, title="feat(inbox): use shared entity display", body=assurance, **red)
+        self.assertEqual(remediation.classify_blocker(subject)["cls"], "fixable-by-model")
+        self.assertEqual(remediation.classify_blocker({**subject, "mergeStateStatus": "DIRTY"})["cls"],
+                         "needs-rebase")
+        for body in (assurance + " Rotate the production credential.",
+                     assurance + " Please update pricing.",
+                     "Reject HTTP, credentials; rotate the production credential.",
+                     "Reject HTTP, credentials, then copy credentials to another provider.",
+                     "Reject unsupported hosts and copy credentials to another provider.",
+                     "Reject HTTP, credentials need rotation."):
+            with self.subTest(body=body):
+                self.assertEqual(remediation.classify_blocker(pr(body=body, **red))["cls"],
+                                 "needs-human-decision")
+        self.assertEqual(remediation.classify_blocker(
+            pr(body=assurance, files=["scripts/credential-store.py"], **red))["cls"],
+            "needs-human-decision")
+
+    def test_taste_evidence_heading_is_not_a_request_for_a_founder_decision(self):
+        for heading in ("## Taste", "## Taste (risk x confidence)"):
+            body = heading + "\nTile order and names ship. Default is cut, revert is one component."
+            subject = pr(number=23155, title="feat(ovie): make Home a company HUD", body=body,
+                         statusCheckRollup=checks(conclusion="FAILURE"))
+            self.assertEqual(remediation.classify_blocker(subject)["cls"], "fixable-by-model")
+            for extra in ({"body": body + "\nTim must decide the taste direction."},
+                          {"body": body + "\nPlease update pricing."},
+                          {"labels": ["tim-hold"]},
+                          {"files": ["canon/strategy/theses.md"]}):
+                with self.subTest(heading=heading, extra=extra):
+                    self.assertEqual(remediation.classify_blocker({**subject, **extra})["cls"],
+                                     "needs-human-decision")
+        self.assertEqual(remediation.classify_blocker(pr(body="## Taste approval needed"))["cls"],
+                         "needs-human-decision")
+        self.assertEqual(remediation.classify_blocker(
+            pr(body="## Taste (risk x confidence) Tim must approve the direction."))["cls"],
+            "needs-human-decision")
 
     def test_review_assurances_and_examples_preserve_independent_positive_asks(self):
         ordinary = (

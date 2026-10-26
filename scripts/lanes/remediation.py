@@ -131,6 +131,23 @@ _CREDENTIAL_ASSURANCE = re.compile(
     r"|\bscreenshot/(?P<testref>credentials?)\s+tests?\b",
     re.IGNORECASE,
 )
+# URL validation rejects embedded authentication; it does not request access to
+# a provider credential. Recognize only a URL-property rejection list, and only
+# remove its credential item. A following rotation/copy request stays visible.
+_URL_CREDENTIAL_REJECTION = re.compile(
+    r"\b(?:reject(?:s|ed|ing)?|block(?:s|ed|ing)?|disallow(?:s|ed|ing)?)\s+"
+    r"(?:(?:(?:unsupported|unapproved)\s+hosts?|https?|non-?default\s+ports?)\s*,\s*)+"
+    r"(?P<credential>credentials?)"
+    r"(?=\s*(?:$|[,;]|and\s+non-?default\s+ports?\b))",
+    re.IGNORECASE,
+)
+# PRs document an already-made design choice under this evidence heading. The
+# heading alone is not a founder ask; every word in the section remains input,
+# as do headings such as "Taste approval needed" and all protected paths.
+_TASTE_EVIDENCE_HEADING = re.compile(
+    r"^(#{1,6}[ \t]+)taste(?=[ \t]*(?:\(risk[ \t]+x[ \t]+confidence\)[ \t]*)?#*[ \t]*$)",
+    re.IGNORECASE | re.MULTILINE,
+)
 ACTIONABLE_FIX = re.compile(
     r"computeRatePercent|use `|replace `|change `|fix:|add (?:the |a )?(?:story|test|colocated)|"
     r"@coverage-via|remove [`']?hold",
@@ -267,6 +284,7 @@ def _actionable(text: str) -> bool:
 
 def _strip_negated_policy(text: str) -> str:
     """Remove assurance-only credential mentions, one sentence at a time."""
+    text = _TASTE_EVIDENCE_HEADING.sub(r"\1", text)
     pieces = re.split(r"([.!\n])", text)
     stripped = []
     for index, piece in enumerate(pieces):
@@ -278,6 +296,8 @@ def _strip_negated_policy(text: str) -> str:
             piece = _BARE_LIST_CREDENTIAL.sub("", piece)
         piece = _CREDENTIAL_ASSURANCE.sub(
             lambda match: match[0].replace(match[match.lastgroup], "", 1), piece)
+        piece = _URL_CREDENTIAL_REJECTION.sub(
+            lambda match: match[0][:match.start("credential") - match.start()], piece)
         stripped.append(piece)
     return "".join(stripped)
 
