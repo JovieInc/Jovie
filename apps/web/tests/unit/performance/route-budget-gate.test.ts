@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { APP_ROUTES } from '@/constants/routes';
 import type { BuildManifest } from '@/scripts/compare-chunks';
 import {
   classifyRouteSurface,
@@ -38,6 +39,16 @@ describe('route surface classification (JOV-8561)', () => {
     expect(classifyRouteSurface('/app/chat')).toBe('dashboard');
     // Admin precedence must win over the /app dashboard rule.
     expect(classifyRouteSurface('/app/admin')).toBe('admin');
+  });
+
+  it('follows ADMIN and LEGACY_ADMIN from constants/routes.ts', () => {
+    expect(classifyRouteSurface(APP_ROUTES.ADMIN)).toBe('admin');
+    expect(classifyRouteSurface(`${APP_ROUTES.ADMIN}/chat`)).toBe('admin');
+    expect(classifyRouteSurface(APP_ROUTES.LEGACY_ADMIN)).toBe('admin');
+    expect(classifyRouteSurface(`${APP_ROUTES.LEGACY_ADMIN}/users`)).toBe(
+      'admin'
+    );
+    expect(classifyRouteSurface(APP_ROUTES.DASHBOARD)).toBe('dashboard');
   });
 });
 
@@ -118,7 +129,10 @@ describe('per-route initialJS enforcement (JOV-8561)', () => {
   it('charges shared root chunks to every route they ship on', () => {
     const budgets = loadRouteInitialJsBudgets(budgetPath());
     const result = evaluateRouteBudgets(
-      manifest({ '/': ['static/chunks/page.js'] }),
+      {
+        pages: { '/': ['static/chunks/page.js'] },
+        rootMainFiles: ['static/chunks/framework.js'],
+      },
       budgets,
       path =>
         path === 'static/chunks/page.js'

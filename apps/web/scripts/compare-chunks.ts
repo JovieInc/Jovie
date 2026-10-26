@@ -24,7 +24,6 @@ import { existsSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
-import { APP_ROUTES } from '../constants/routes';
 
 const WEB_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const BASELINE_PATH = join(
@@ -395,19 +394,50 @@ export function loadRouteInitialJsBudgets(
   return { surfaces };
 }
 
+const ROUTES_SOURCE_PATH = join(WEB_ROOT, 'constants/routes.ts');
+let cachedAdminPrefixes: readonly string[] | null = null;
+
+/**
+ * Admin page keys follow constants/routes.ts. Read that file instead of
+ * importing it: the JOV-6585 CLI gate copies this script alone into a temp
+ * directory and must still fail closed before any route classification.
+ */
+function adminRoutePrefixes(): readonly string[] {
+  if (cachedAdminPrefixes) return cachedAdminPrefixes;
+  if (!existsSync(ROUTES_SOURCE_PATH)) {
+    throw new TypeError(
+      `Canonical routes file is missing: ${ROUTES_SOURCE_PATH}. Admin classification follows constants/routes.ts.`
+    );
+  }
+  const source = readFileSync(ROUTES_SOURCE_PATH, 'utf8');
+  const prefixes: string[] = [];
+  for (const name of ['ADMIN', 'LEGACY_ADMIN'] as const) {
+    const match = source.match(
+      new RegExp(`^\\s*${name}:\\s*['"]([^'"]+)['"]`, 'm')
+    );
+    const prefix = match?.[1];
+    if (!prefix) {
+      throw new TypeError(
+        `Canonical routes file is malformed: ${ROUTES_SOURCE_PATH} has no ${name} constant.`
+      );
+    }
+    prefixes.push(prefix);
+  }
+  cachedAdminPrefixes = prefixes;
+  return cachedAdminPrefixes;
+}
+
 /**
  * Classify a build-manifest page key into a route-budgets.json surface.
- * Precedence mirrors the declared examples: /app/admin* is admin, other /app
- * routes are dashboard, public-profile shapes (/r/*, a leading dynamic
- * segment, or a single-segment slug route) are public, everything else is
- * marketing. Unmatched pages default to marketing — the tightest declared
- * budget — so an unmapped route can never ride a looser ceiling.
+ * Precedence mirrors the declared examples: canonical ADMIN and LEGACY_ADMIN
+ * prefixes are admin, other /app routes are dashboard, public-profile shapes
+ * (/r/*, a leading dynamic segment, or a single-segment slug route) are
+ * public, everything else is marketing. Unmatched pages default to marketing
+ * — the tightest declared budget — so an unmapped route can never ride a
+ * looser ceiling.
  */
 export function classifyRouteSurface(page: string): string {
-  if (
-    page.startsWith(APP_ROUTES.ADMIN) ||
-    page.startsWith(APP_ROUTES.LEGACY_ADMIN)
-  ) {
+  if (adminRoutePrefixes().some(prefix => page.startsWith(prefix))) {
     return 'admin';
   }
   if (page.startsWith('/app')) return 'dashboard';
