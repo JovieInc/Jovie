@@ -16,19 +16,39 @@ import { env } from '@/lib/env-server';
 const TEST_OTP_EMAIL_PATTERN = /\+(e2e|clerk_test)(\+[^@]*)?@/i;
 
 /**
- * Deterministic E2E OTP gate (triple-guarded, plan security row 11):
- * requires E2E_TEST_MODE=1, hard-blocked on production deploys, and only for
- * the repo's canonical test-email shapes.
+ * Staging synthetic principals: on a Vercel preview-class deployment (staging
+ * is VERCEL_ENV=preview) the canonical test-email shape on our own test
+ * domains may use the deterministic code without E2E_TEST_MODE, so agents can
+ * walk sign-up on staging with no DB access. Never other domains.
+ */
+const STAGING_SYNTHETIC_EMAIL_DOMAINS = ['jov.ie', 'test.jovie.com'] as const;
+
+function isStagingSyntheticDomain(email: string): boolean {
+  const domain = email.slice(email.lastIndexOf('@') + 1).toLowerCase();
+  return (STAGING_SYNTHETIC_EMAIL_DOMAINS as readonly string[]).includes(
+    domain
+  );
+}
+
+/**
+ * Deterministic test-OTP gate. Fail closed:
+ * - the email must match the canonical test shape (never any other address);
+ * - VERCEL_ENV=production is always refused;
+ * - VERCEL_ENV=preview (staging): our own test domains, or E2E_TEST_MODE=1;
+ * - any other value (development, or unset on local/CI runners) needs the
+ *   explicit E2E_TEST_MODE=1 opt-in, so an unknown environment is refused by
+ *   default.
  *
  * Lives here (not better-auth.ts) because the OTP rate-limit rules below need
  * it and better-auth.ts imports this module — importing it there would cycle.
  */
 export function isDeterministicTestOtpEmail(email: string): boolean {
-  return (
-    env.E2E_TEST_MODE === '1' &&
-    env.VERCEL_ENV !== 'production' &&
-    TEST_OTP_EMAIL_PATTERN.test(email)
-  );
+  if (!TEST_OTP_EMAIL_PATTERN.test(email)) return false;
+  if (env.VERCEL_ENV === 'production') return false;
+  if (env.VERCEL_ENV === 'preview') {
+    return env.E2E_TEST_MODE === '1' || isStagingSyntheticDomain(email);
+  }
+  return env.E2E_TEST_MODE === '1';
 }
 
 /**
