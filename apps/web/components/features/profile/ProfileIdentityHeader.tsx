@@ -102,6 +102,9 @@ export function ProfileIdentityHeader({
         src={imageUrl}
         size={80}
         priority={imagePriority}
+        // 80px on phones; the desktop composition shows it at 160px, so ask
+        // for a >= 320px source (2x) there. Phones keep the 80px request.
+        sizes='(min-width: 1024px) 320px, 80px'
         verified={isVerified}
         className='h-20 w-20'
         data-testid='profile-identity-portrait'
