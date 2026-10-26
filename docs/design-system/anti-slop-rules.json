@@ -892,17 +892,29 @@
       "severity": "block",
       "enforcement": {
         "kind": "static",
-        "status": "shadow",
+        "status": "enforced",
         "check": "scripts/anti-slop/heading-lines.mjs",
-        "evidence": ["scripts/anti-slop/heading-lines.mjs"],
+        "evidence": [
+          "scripts/anti-slop/heading-lines.mjs",
+          "apps/web/tests/e2e/visual-regression.spec.ts",
+          "scripts/anti-slop/heading-lines.baseline.json"
+        ],
         "wiredIn": [
+          {
+            "file": "apps/web/tests/e2e/visual-regression.spec.ts",
+            "token": "measureHeadings(page)"
+          },
+          {
+            "file": ".github/workflows/visual-regression.yml",
+            "token": "tests/e2e/visual-regression.spec.ts"
+          },
           {
             "file": "scripts/ci-fast-lanes.mjs",
             "token": "id: 'anti-slop'",
             "commandIncludes": "heading-lines.test.mjs"
           }
         ],
-        "coverageNote": "Measured in a real browser (content height / line-height) at 1440 and 390. `run.mjs check --render --files page.html` covers Pen HTML exports and founder artifacts; visual-capture passes call measureHeadings(page). Shadow until the dogfood and visual-capture passes call it on live pages; the unit tests and a real-browser deliberate red run in CI."
+        "coverageNote": "Playwright pass over 20 public marketing routes at 1440 and 390 (visual-regression.spec.ts, run by the Visual regression workflow), plus run.mjs check --render for Pen HTML exports and founder artifacts. Authenticated app routes are not yet in the route list. 23 existing 3+ line headings on /artist-profiles, /pay, /instant-merch, /card, /launch and /solutions/artists are in a shrink-only baseline (each needs a copy or layout decision); new ones fail."
       }
     },
     {
@@ -921,6 +933,25 @@
         "kind": "human+vision",
         "status": "planned",
         "check": "vision:hierarchy and a new one_idea question; human review until labeled",
+        "evidence": []
+      }
+    },
+    {
+      "id": "ASR-039",
+      "title": "Founder face never dominates",
+      "statement": "The homepage never shows Tim's face. Product pages (artist profile examples) may show it, without dominating the frame; marketing must not read as an ad for the founder. Allowed faces and routes come from the approved-people registry's per-route allowlist.",
+      "rationale": "A large founder portrait makes a product page feel like an ad for a person.",
+      "source": {
+        "by": "Tim White",
+        "date": "2026-10-26",
+        "ref": "Tim 2026-10-25 20:49: a whole lot of my face, shouldn't feel like an ad for me (taste label founder-face-dominant)"
+      },
+      "scope": ["marketing", "artifact", "pen"],
+      "severity": "block",
+      "enforcement": {
+        "kind": "static+vision",
+        "status": "in-review",
+        "check": "approved-people registry per-route allowlist (marketing worker, PR #23329 follow-up) + vision judge for dominance",
         "evidence": []
       }
     }

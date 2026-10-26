@@ -92,15 +92,27 @@ export async function checkTargets(targets, { browserType } = {}) {
         : pathToFileURL(resolve(target)).href;
       for (const viewport of VIEWPORTS) {
         const page = await browser.newPage({ viewport });
-        await page.goto(url, { waitUntil: 'load' });
-        for (const h of await measureHeadings(page)) {
-          measured.push({ target, width: viewport.width, ...h });
-          if (h.lines > MAX_LINES)
-            failures.push(
-              `ASR-037 ${target} @${viewport.width}: <${h.tag}> wraps to ${h.lines} lines (max ${MAX_LINES}): "${h.text}"`
-            );
+        try {
+          await page.goto(url, {
+            waitUntil: 'domcontentloaded',
+            timeout: 45000,
+          });
+          await page.evaluate('document.fonts && document.fonts.ready');
+          await page.waitForTimeout(400);
+          for (const h of await measureHeadings(page)) {
+            measured.push({ target, width: viewport.width, ...h });
+            if (h.lines > MAX_LINES)
+              failures.push(
+                `ASR-037 ${target} @${viewport.width}: <${h.tag}> wraps to ${h.lines} lines (max ${MAX_LINES}): "${h.text}"`
+              );
+          }
+        } catch (error) {
+          failures.push(
+            `ASR-037 ${target} @${viewport.width}: could not measure (${String(error.message).split('\n')[0]})`
+          );
+        } finally {
+          await page.close();
         }
-        await page.close();
       }
     }
   } finally {
