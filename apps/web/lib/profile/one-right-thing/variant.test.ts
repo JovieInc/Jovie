@@ -1,10 +1,13 @@
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 import {
+  allProfileVariantKeys,
   encodeProfileVariantKey,
   PROFILE_VARIANT_MARKER,
   parseProfileVariantKey,
+  profileVariantPaths,
   signalsFromVariantSeed,
+  VARIANT_COUNTRIES,
 } from './variant';
 import { classifyVisitorSource } from './visitor-signals';
 
@@ -181,5 +184,29 @@ describe('edge rewrites agree with the engine signals', () => {
           if (k) keys.add(k);
         }
     expect(keys.size).toBeLessThanOrEqual(56);
+  });
+});
+
+describe('invalidation covers exactly the edge variant space', () => {
+  it('lists the same countries as the edge rewrites', () => {
+    expect([...VARIANT_COUNTRIES]).toEqual([...rewrites.VARIANT_COUNTRIES]);
+  });
+
+  it('every key the edge can produce is invalidated, and nothing else', () => {
+    const all = new Set(allProfileVariantKeys());
+    expect(all.size).toBe(56);
+    for (const cc of [...rewrites.VARIANT_COUNTRIES, 'ZA'])
+      for (const ref of [undefined, 'https://open.spotify.com/'])
+        for (const ret of [undefined, '1']) {
+          const key = edgeKey({
+            headers: {
+              'x-vercel-ip-country': cc,
+              ...(ref ? { referer: ref } : {}),
+            },
+            cookies: ret ? { jv_returning: ret } : {},
+          });
+          if (key) expect(all.has(key), key).toBe(true);
+        }
+    expect(profileVariantPaths('tim')).toHaveLength(56);
   });
 });

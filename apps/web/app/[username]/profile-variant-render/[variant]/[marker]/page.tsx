@@ -1,7 +1,9 @@
+import { unstable_cache } from 'next/cache';
 import { notFound } from 'next/navigation';
 import ArtistPage, {
   generateMetadata as generatePublicProfileMetadata,
 } from '@/app/[username]/page';
+import { createProfileTag } from '@/lib/cache/tags';
 import {
   PROFILE_VARIANT_MARKER,
   parseProfileVariantKey,
@@ -33,6 +35,14 @@ export default async function ProfileVariantRenderPage({
   const seed =
     marker === PROFILE_VARIANT_MARKER ? parseProfileVariantKey(variant) : null;
   if (!seed) notFound();
+
+  // Tag this variant's cache entry with the profile tag, so
+  // revalidateTag(createProfileTag(username)) refreshes every variant even if
+  // a data loader on the page is not tagged.
+  await unstable_cache(async () => true, ['profile-variant-tag', username], {
+    tags: [createProfileTag(username.toLowerCase())],
+    revalidate: 3600,
+  })();
 
   return ArtistPage({
     params: Promise.resolve({ username, __featuredSeed: seed }),

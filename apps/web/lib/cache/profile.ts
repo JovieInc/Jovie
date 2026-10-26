@@ -3,6 +3,7 @@
 import { revalidatePath, revalidateTag } from 'next/cache';
 import { APP_ROUTES } from '@/constants/routes';
 import { invalidateHandleCache } from '@/lib/onboarding/handle-availability-cache';
+import { profileVariantPaths } from '@/lib/profile/one-right-thing/variant';
 import { invalidateProfileEdgeCache } from '@/lib/services/profile/queries';
 import {
   CACHE_TAGS,
@@ -10,6 +11,18 @@ import {
   createProfileTag,
   createSocialLinksTag,
 } from './tags';
+
+/**
+ * Invalidate the public profile page AND every one-right-thing ISR variant of
+ * it, so an artist's edit shows up on all variants immediately. Variant
+ * renders are also tagged with the profile tag (see profile-variant-render).
+ */
+function revalidateProfilePages(usernameNormalized: string): void {
+  revalidatePath(`/${usernameNormalized}`);
+  for (const path of profileVariantPaths(usernameNormalized)) {
+    revalidatePath(path);
+  }
+}
 
 /**
  * Centralized cache invalidation for creator profiles.
@@ -38,7 +51,7 @@ export async function invalidateProfileCache(
 
   // Invalidate the public profile page for the current username
   if (usernameNormalized) {
-    revalidatePath(`/${usernameNormalized}`);
+    revalidateProfilePages(usernameNormalized);
     if (options.privacyChanged)
       revalidatePath(`/${usernameNormalized}`, 'layout');
     // Invalidate Redis edge cache
@@ -52,7 +65,7 @@ export async function invalidateProfileCache(
   // If username changed, also invalidate the old path
   if (oldUsernameNormalized && oldUsernameNormalized !== usernameNormalized) {
     revalidateTag(createProfileTag(oldUsernameNormalized), cacheLife);
-    revalidatePath(`/${oldUsernameNormalized}`);
+    revalidateProfilePages(oldUsernameNormalized);
     if (options.privacyChanged)
       revalidatePath(`/${oldUsernameNormalized}`, 'layout');
     // Invalidate Redis edge cache for old username
@@ -107,7 +120,7 @@ export async function invalidateSocialLinksCache(
   // Social links affect the public profile display
   if (usernameNormalized) {
     revalidateTag(createProfileTag(usernameNormalized), 'max');
-    revalidatePath(`/${usernameNormalized}`);
+    revalidateProfilePages(usernameNormalized);
   }
 
   // Also invalidate dashboard where links are managed
@@ -134,7 +147,7 @@ export async function invalidateAvatarCache(
   // Avatar affects public profile display
   if (usernameNormalized) {
     revalidateTag(createProfileTag(usernameNormalized), 'max');
-    revalidatePath(`/${usernameNormalized}`);
+    revalidateProfilePages(usernameNormalized);
   }
 
   // Dashboard also shows avatar

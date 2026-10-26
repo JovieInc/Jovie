@@ -57,3 +57,41 @@ export function signalsFromVariantSeed(
     now,
   };
 }
+
+/**
+ * Markets that get their own variant. Must equal VARIANT_COUNTRIES in
+ * profile-variant-rewrites.js (tested), which owns the edge side.
+ */
+export const VARIANT_COUNTRIES = [
+  'US',
+  'GB',
+  'DE',
+  'FR',
+  'CA',
+  'AU',
+  'BR',
+  'MX',
+  'JP',
+  'NL',
+  'SE',
+  'ES',
+  'IT',
+] as const;
+
+/** Every variant key the edge can produce (the bounded set, 56 keys). */
+export function allProfileVariantKeys(): string[] {
+  const keys: string[] = [];
+  for (const dsp of [true, false])
+    for (const returning of [true, false])
+      for (const country of [null, ...VARIANT_COUNTRIES])
+        keys.push(encodeProfileVariantKey({ dsp, returning, country }));
+  return keys;
+}
+
+/** Internal paths of every variant render for a profile, for invalidation. */
+export function profileVariantPaths(usernameNormalized: string): string[] {
+  return allProfileVariantKeys().map(
+    key =>
+      `/${usernameNormalized}/profile-variant-render/${key}/${PROFILE_VARIANT_MARKER}`
+  );
+}
