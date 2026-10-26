@@ -1,6 +1,7 @@
 import 'server-only';
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
+import { runLegacyDbTransaction } from '@/lib/db/legacy-transaction';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import {
   notificationContacts,
@@ -37,6 +38,7 @@ import {
 } from '@/lib/notifications/sms-intents';
 import {
   hashPhoneE164,
+  isPhoneSmsSuppressed,
   normalizePhoneE164,
   reactivatePhoneAfterVerifiedOptIn,
   suppressPhoneForStop,
@@ -68,6 +70,7 @@ export interface WebhookHandleResult {
     | 'join_expired'
     | 'join_already_consumed'
     | 'join_not_found'
+    | 'join_blocked'
     | 'join_disabled'
     | 'unknown_command'
     | 'error';
@@ -314,98 +317,100 @@ async function confirmSubscriptionFromIntent(input: {
     | { kind: 'already_consumed' }
     | { kind: 'not_found' };
 
-  const consumeStatus = await db.transaction<ConsumeOutcome>(async tx => {
-    const consume = await consumeIntentByCode(
-      input.code,
-      {
-        phone: phoneNorm,
-        provider: input.providerName,
-        providerMessageId: input.providerEventId,
-      },
-      tx
-    );
+  const consumeStatus = await runLegacyDbTransaction<ConsumeOutcome>(
+    async tx => {
+      const consume = await consumeIntentByCode(
+        input.code,
+        {
+          phone: phoneNorm,
+          provider: input.providerName,
+          providerMessageId: input.providerEventId,
+        },
+        tx
+      );
 
-    if (consume.status !== 'confirmed') {
-      return { kind: consume.status };
-    }
+      if (consume.status !== 'confirmed') {
+        return { kind: consume.status };
+      }
 
-    // Global contact: insert with first-write-wins consent fields. On
-    // conflict (existing phone), bump phoneVerifiedAt + reactivate from
-    // 'stopped' (CTIA convention via codex F3). Preserve 'blocked' — that
-    // state is reserved for admin/carrier-level permanent bans and must
-    // not be cleared by an inbound JOIN (Greptile P1).
-    await tx
-      .insert(notificationContacts)
-      .values({
-        phone: phoneNorm,
-        phoneHash,
-        phoneVerifiedAt: now,
-        smsStatus: 'active',
-        smsConsentAt: now,
-        smsConsentTextHash: consentSnapshot.textHash,
-        smsConsentVersion: consentSnapshot.version,
-        firstSource: input.source,
-        firstSourceUrl: input.sourceUrl,
-      })
-      .onConflictDoUpdate({
-        target: notificationContacts.phoneHash,
-        // Required: the unique index on phone_hash is partial
-        // (WHERE phone_hash IS NOT NULL); PostgreSQL needs the predicate
-        // to match the partial index for ON CONFLICT inference.
-        targetWhere: drizzleSql`${notificationContacts.phoneHash} IS NOT NULL`,
-        set: {
+      // Global contact: insert with first-write-wins consent fields. On
+      // conflict (existing phone), bump phoneVerifiedAt + reactivate from
+      // 'stopped' (CTIA convention via codex F3). Preserve 'blocked' — that
+      // state is reserved for admin/carrier-level permanent bans and must
+      // not be cleared by an inbound JOIN (Greptile P1).
+      await tx
+        .insert(notificationContacts)
+        .values({
+          phone: phoneNorm,
+          phoneHash,
           phoneVerifiedAt: now,
-          smsStatus: drizzleSql`CASE WHEN ${notificationContacts.smsStatus} = 'blocked' THEN ${notificationContacts.smsStatus} ELSE 'active' END`,
-          updatedAt: now,
-        },
-      });
+          smsStatus: 'active',
+          smsConsentAt: now,
+          smsConsentTextHash: consentSnapshot.textHash,
+          smsConsentVersion: consentSnapshot.version,
+          firstSource: input.source,
+          firstSourceUrl: input.sourceUrl,
+        })
+        .onConflictDoUpdate({
+          target: notificationContacts.phoneHash,
+          // Required: the unique index on phone_hash is partial
+          // (WHERE phone_hash IS NOT NULL); PostgreSQL needs the predicate
+          // to match the partial index for ON CONFLICT inference.
+          targetWhere: drizzleSql`${notificationContacts.phoneHash} IS NOT NULL`,
+          set: {
+            phoneVerifiedAt: now,
+            smsStatus: drizzleSql`CASE WHEN ${notificationContacts.smsStatus} = 'blocked' THEN ${notificationContacts.smsStatus} ELSE 'active' END`,
+            updatedAt: now,
+          },
+        });
 
-    // Per-artist subscription: ensure exactly one row per (artist, phone).
-    // confirmedAt is set only if the existing row is still pending.
-    // smsConsent fields are stamped on first-confirm and never overwritten
-    // afterward — preserves audit trail across multi-artist races (F2).
-    await tx
-      .insert(notificationSubscriptions)
-      .values({
-        creatorProfileId: consume.intent.creatorProfileId,
-        channel: 'sms',
-        phone: phoneNorm,
-        countryCode: consume.intent.countryCode ?? null,
-        source: SMS_NATIVE_INTENT_SOURCE,
-        confirmedAt: now,
-        smsConsentAt: now,
-        smsConsentTextHash: consentSnapshot.textHash,
-        smsConsentVersion: consentSnapshot.version,
-        unsubscribedAt: null,
-        preferences: {
-          newMusic: true,
-          tourDates: true,
-          merch: true,
-          general: true,
-        },
-      })
-      .onConflictDoUpdate({
-        target: [
-          notificationSubscriptions.creatorProfileId,
-          notificationSubscriptions.phone,
-        ],
-        set: {
-          confirmedAt: drizzleSql`COALESCE(${notificationSubscriptions.confirmedAt}, ${now})`,
-          smsConsentAt: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentAt}, ${now})`,
-          smsConsentTextHash: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentTextHash}, ${consentSnapshot.textHash})`,
-          smsConsentVersion: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentVersion}, ${consentSnapshot.version})`,
-          unsubscribedAt: drizzleSql`NULL`,
+      // Per-artist subscription: ensure exactly one row per (artist, phone).
+      // confirmedAt is set only if the existing row is still pending.
+      // smsConsent fields are stamped on first-confirm and never overwritten
+      // afterward — preserves audit trail across multi-artist races (F2).
+      await tx
+        .insert(notificationSubscriptions)
+        .values({
+          creatorProfileId: consume.intent.creatorProfileId,
+          channel: 'sms',
+          phone: phoneNorm,
+          countryCode: consume.intent.countryCode ?? null,
           source: SMS_NATIVE_INTENT_SOURCE,
-        },
-      });
+          confirmedAt: now,
+          smsConsentAt: now,
+          smsConsentTextHash: consentSnapshot.textHash,
+          smsConsentVersion: consentSnapshot.version,
+          unsubscribedAt: null,
+          preferences: {
+            newMusic: true,
+            tourDates: true,
+            merch: true,
+            general: true,
+          },
+        })
+        .onConflictDoUpdate({
+          target: [
+            notificationSubscriptions.creatorProfileId,
+            notificationSubscriptions.phone,
+          ],
+          set: {
+            confirmedAt: drizzleSql`COALESCE(${notificationSubscriptions.confirmedAt}, ${now})`,
+            smsConsentAt: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentAt}, ${now})`,
+            smsConsentTextHash: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentTextHash}, ${consentSnapshot.textHash})`,
+            smsConsentVersion: drizzleSql`COALESCE(${notificationSubscriptions.smsConsentVersion}, ${consentSnapshot.version})`,
+            unsubscribedAt: drizzleSql`NULL`,
+            source: SMS_NATIVE_INTENT_SOURCE,
+          },
+        });
 
-    // Audience member: best-effort upsert on (creatorProfileId, fingerprint)
-    // is the existing pattern. If we don't have a fingerprint at this
-    // point (webhook context, no browser session), skip the audience write
-    // and let next profile visit fold the engagement signal in.
+      // Audience member: best-effort upsert on (creatorProfileId, fingerprint)
+      // is the existing pattern. If we don't have a fingerprint at this
+      // point (webhook context, no browser session), skip the audience write
+      // and let next profile visit fold the engagement signal in.
 
-    return { kind: 'confirmed', intent: consume.intent };
-  });
+      return { kind: 'confirmed', intent: consume.intent };
+    }
+  );
 
   if (consumeStatus.kind === 'expired') {
     return { kind: 'join_expired' };
@@ -510,6 +515,18 @@ async function handleJoinCommand(
   const phoneNorm = normalizePhoneE164(message.fromPhone);
   if (!phoneNorm) {
     return { status: 400, kind: 'malformed' };
+  }
+
+  // A blocked number (admin or carrier level ban) never confirms, even with a
+  // valid code. A merely STOP'd number may: texting a fresh code is the
+  // user-initiated opt-in. No reply, and the code is not consumed.
+  const suppression = await isPhoneSmsSuppressed(phoneNorm);
+  if (suppression.reason === 'blocked') {
+    logger.warn('SMS JOIN refused for blocked number', {
+      phone: logSafePhone(phoneNorm),
+      code: logSafeCode(command.code),
+    });
+    return { status: 200, kind: 'join_blocked' };
   }
 
   const confirmResult = await confirmSubscriptionFromIntent({
