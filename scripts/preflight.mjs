@@ -300,6 +300,45 @@ export async function main({
     return 0;
   }
   const workflowFile = path.resolve(cwd, args.workflow ?? WORKFLOW_PATH);
+  // A branch behind base fails CI on files it never saw (#23313: a missing
+  // scripts/anti-slop/run.mjs). Bring base in first; the hook only reports.
+  if (!args.list) {
+    spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], {
+      cwd,
+    });
+    const hasBase =
+      spawnSync('git', ['rev-parse', '--verify', '-q', `origin/${args.base}`], {
+        cwd,
+      }).status === 0;
+    const behind =
+      hasBase &&
+      spawnSync(
+        'git',
+        ['merge-base', '--is-ancestor', `origin/${args.base}`, 'HEAD'],
+        { cwd }
+      ).status !== 0;
+    if (behind && args.hook) {
+      log(
+        `[preflight] branch is behind origin/${args.base}; merge it, then push.`
+      );
+      return 1;
+    }
+    if (behind) {
+      log(`[preflight] merging origin/${args.base} into the branch first`);
+      const merged = spawnSync(
+        'git',
+        ['merge', '--no-edit', `origin/${args.base}`],
+        { cwd }
+      );
+      if (merged.status !== 0) {
+        spawnSync('git', ['merge', '--abort'], { cwd });
+        log(
+          `[preflight] merge of origin/${args.base} conflicts; resolve it, then rerun.`
+        );
+        return 1;
+      }
+    }
+  }
   const steps = deriveSteps(readFileSync(workflowFile, 'utf8'));
   // Gates refuse the ambient Node when it violates engines (gem ships 22).
   const pinned = spawnSync('bash', ['scripts/hooks/resolve-repo-node.sh'], {
@@ -353,6 +392,7 @@ export async function main({
 
   const started = Date.now();
   const failures = [];
+  const timings = [];
   const skipped = [];
   let passed = 0;
   for (const step of plan) {
@@ -374,16 +414,25 @@ export async function main({
       { flockPath }
     );
     const seen = new Set();
+    let mark = Date.now();
     const t0 = Date.now();
     await runProgram(program, cwd, procEnv, ({ index, code, output }) => {
       seen.add(index);
+      const took = Date.now() - mark;
+      mark = Date.now();
+      timings.push({
+        step: step.name,
+        label: labelFor(statements[index]),
+        ms: took,
+      });
       const label = labelFor(statements[index]);
       if (code !== 0) {
         failures.push({ step: step.name, label, code, output });
-        log(`  FAIL (${code})  ${label}`);
+        log(`  FAIL (${code})  ${label} (${(took / 1000).toFixed(1)}s)`);
       } else {
         passed += 1;
-        if (!PLUMBING.test(label)) log(`  ok  ${label}`);
+        if (!PLUMBING.test(label))
+          log(`  ok  ${label} (${(took / 1000).toFixed(1)}s)`);
       }
     });
     statements.forEach((statement, index) => {
@@ -436,6 +485,7 @@ export async function main({
       head: headSha,
       durationMs: Date.now() - started,
       red: failures.map(f => `${f.step}: ${f.label}`),
+      timings: timings.filter(t => t.ms >= 1000),
     },
     env
   );
