@@ -1170,6 +1170,64 @@ class OutcomeLaneTest(unittest.TestCase):
                 self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
                 self.assertEqual(esc.missing_steps(row), [])
 
+    def test_verify_routes_sanitized_gap_correlation_so_later_help_replies_are_evaluated(self):
+        esc = outcome.esc
+        unknown = self.outcome_probe_fixture(criterion="Authenticated chat replies stream", capability="signed-in-browser",
+                                             helpCorr="oh-0000000000")
+        proved = {"criterion": "Build contains the binding merge", "status": "pass", "evidence": "git merge-base confirmed the binding SHA"}
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA,
+                   "items": [proved, {**proved, "criterion": "Related tests pass"}, unknown]}
+        corr = esc.correlation_id("uuid-7771", unknown, SHA)
+        self.assertNotEqual(corr, unknown["helpCorr"], "the lane replaces model-supplied correlation metadata")
+        for reply_verdict in ("supported", "contradicted"):
+            with self.subTest(reply_verdict=reply_verdict):
+                with patch.object(esc, "browser_probe", return_value={"ok": True, "status": 200,
+                        "finalUrl": "https://jov.ie/api/version", "text": '{"buildId":"abc1234"}'}):
+                    # Exercise the real verify -> escalate -> judge -> route_gaps path, with only I/O faked.
+                    result, calls, comments, state = self.drain(verdict, manifest_extra={"receiptNotBefore": "2026-10-20T00:00:00Z"})
+                queries, resolutions = [], []
+                thread = self.help_thread(corr, "Signed in on this build: observed chat response state")
+
+                class ReplyLinear:
+                    def gql(self, query, variables):
+                        queries.append((query, variables))
+                        return {"issue": {"id": "uuid-7771", "identifier": "JOV-7771", "state": {"name": "Validating"},
+                                          "comments": {"nodes": thread}}}
+                    def comment(self, issue_id, body):
+                        resolutions.append(body)
+
+                with patch.object(esc, "evaluate_reply", return_value={"ran": True, "verdict": reply_verdict,
+                        "result": "criterion-specific fixture observation"}) as evaluate:
+                    resolved = esc.followup_replies(state, ReplyLinear(), 5.0)
+                    self.assertEqual(len(queries), 1, "a sanitized gap must retain the correlation needed to query its issue")
+                    evaluate.assert_called_once()
+                    self.assertEqual(esc.followup_replies(state, ReplyLinear(), 6.0), [], "a resolved gap is not evaluated twice")
+                self.assertEqual(result["done"][0]["decision"], "pass", "the existing proven-majority policy is unchanged")
+                self.assertEqual((resolved[0]["verdict"], resolved[0]["sha"], resolved[0]["episode"]),
+                                 (reply_verdict, SHA, "2026-10-20T00:00:00Z"))
+                stored = json.loads((state / esc.GAP_FILE).read_text())["JOV-7771"]["gaps"][0]
+                self.assertEqual((stored["helpCorr"], stored["evidence"]), (corr, unknown["evidence"]))
+                self.assertEqual(stored["resolved"]["verdict"], reply_verdict)
+                self.assertEqual(evaluate.call_args.args[0]["criterion"], unknown["criterion"])
+                self.assertIn(esc.RESOLUTION_MARKER, resolutions[0])
+                self.assertTrue(any(f"corr={corr}" in body for _, body in comments), "the original help request uses the stored correlation")
+
+    def test_judge_preserves_only_well_formed_help_correlation_metadata(self):
+        attempts = [{"step": step, "result": "fixture attempted"} for step in ("tools", "telemetry", "agent-help")]
+        for corr in ("oh-0123456789", None, 123, {}, [], "", "oh-012345678", "oh-01234567890",
+                     "oh-012345678g", "oh-ABCDEF0123", "oh-0123456789\n", "prefix-oh-0123456789"):
+            with self.subTest(corr=corr):
+                item = self.outcome_probe_fixture(helpCorr=corr, attempts=attempts, unexpectedMetadata={"keep": "no"})
+                decision = outcome.judge({"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA,
+                                          "items": [item]}, "JOV-7771", SHA)
+                row = decision["items"][0]
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertNotIn("unexpectedMetadata", row)
+                if corr == "oh-0123456789":
+                    self.assertEqual(row.get("helpCorr"), corr)
+                else:
+                    self.assertNotIn("helpCorr", row)
+
     def test_stale_help_evidence_for_another_build_cannot_decide_a_current_unknown(self):
         esc = outcome.esc
         item = self.outcome_probe_fixture(criterion="Installed protocol rollout is complete", capability="process-record")

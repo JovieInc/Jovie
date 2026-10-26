@@ -230,6 +230,10 @@ def judge(verdict, issue: str, sha: str) -> dict:
             if item.get(key):
                 row[key] = item[key]
         if status == "unverifiable":
+            # Keep the lane's bounded help-request identifier so routed gaps can consume later replies.
+            help_corr = item.get("helpCorr")
+            if isinstance(help_corr, str) and re.fullmatch(r"oh-[0-9a-f]{10}", help_corr):
+                row["helpCorr"] = help_corr
             missing = esc.missing_steps(row)
             if missing:  # no shrugs: the capability must be pursued before an item is left unverifiable
                 row["status"] = "fail"
