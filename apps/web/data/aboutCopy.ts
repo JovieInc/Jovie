@@ -31,7 +31,7 @@ export const ABOUT_DEFINITION =
 
 export const ABOUT_COPY = {
   eyebrow: 'About',
-  headline: 'A public profile that is easy to find and easy to reach.',
+  headline: 'Easy to find. Easy to reach.',
   metadataTitle: 'About Jovie',
   metadataDescription: `Jovie is a public profile that makes any creator easy to find and easy to reach, for people and for agents. Founded by ${ABOUT_FACTS.founder}. Based in Los Angeles.`,
   openGraphDescription: `Jovie is a public profile that makes any creator easy to find and easy to reach. Founded by ${ABOUT_FACTS.founder}.`,
