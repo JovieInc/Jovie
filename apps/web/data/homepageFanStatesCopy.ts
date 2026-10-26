@@ -16,7 +16,7 @@ function landingCard(id: (typeof LANDING_CARDS)[number]['id']) {
 }
 
 export const HOMEPAGE_FAN_STATES_COPY = {
-  headline: 'Each visit gets the right next step.',
+  headline: 'Your profile leads with one clear thing.',
   galleryLabel: 'Profile states',
   states: [
     {
@@ -36,7 +36,7 @@ export const HOMEPAGE_FAN_STATES_COPY = {
     {
       id: 'stay-close',
       scenarioId: 'tim-white-profile-subscribe-mobile',
-      alt: "Tim White's Jovie profile asking a fan to get updates by email.",
+      alt: "Tim White's Jovie profile asking a listener to get updates by email.",
       title: landingCard('capture-the-fan').title,
       body: landingCard('capture-the-fan').description,
     },

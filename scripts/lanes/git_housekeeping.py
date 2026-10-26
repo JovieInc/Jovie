@@ -209,6 +209,19 @@ def _settled_absent(root: Path, seconds: float) -> bool:
     return not root.exists() and not root.is_symlink() and not processes_under(root)
 
 
+def mounted_inside(path: Path | str, mountinfo: Path | str = "/proc/self/mountinfo") -> Path | None:
+    """The first mount point equal to `path` or beneath it, else None. Unreadable mount
+    table raises OSError: a delete must fail closed when it cannot prove the tree is local."""
+    root = Path(path).resolve()
+    for line in Path(mountinfo).read_text().splitlines():
+        fields = line.split()
+        if len(fields) > 4:
+            mount = Path(fields[4].replace("\\040", " "))
+            if mount == root or root in mount.parents:
+                return mount
+    return None
+
+
 def remove_tree(path: Path | str) -> None:
     """Delete `path`. Retry only while a departing git process refills it.
 
@@ -217,6 +230,10 @@ def remove_tree(path: Path | str) -> None:
     on the first successful remove.
     """
     root = Path(path)
+    # 2026-10-25: an rm -rf of a bind-mounted retired workspace deleted another volume's data.
+    mount = mounted_inside(root) if root.exists() else None
+    if mount is not None:
+        raise OSError(errno.EBUSY, f"refusing to delete {root}: mount point {mount} is at or inside it")
     last: OSError | None = None
     repository = _repository(root)
     for attempt in range(12):

@@ -550,6 +550,10 @@ jobs:
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
+      # 'false' only when the Mac lane is selected solely by node-only inputs
+      # (MAC_NODE_ONLY_RULES): the lane then runs on ubuntu. Absent from an older
+      # trusted classifier, so it defaults to the macOS lane.
+      run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}
       # 'mac' when a self-hosted Mac runner heartbeat is fresh, else 'hosted'.
       # Hosted macOS is one small org-wide pool; LogYourBody's queue filled it
       # on 2026-10-10 and Jovie's Mac job waited the full 60-minute budget.
@@ -2191,7 +2195,7 @@ jobs:
           # Component receipts are executable test evidence; Storybook config and
           # the shared-UI token audit feed structural component proof.
           STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
-          STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder(\.staging)?\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
+          STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
           # A new scripts test must prove it is wired into a lane (inventory guard)
           # before the queue; #18714 was ejected for an unwired one.
           NEW_SCRIPT_TESTS=$(git diff --diff-filter=AR --name-only "origin/${{ github.base_ref }}" HEAD | grep -E '^scripts/.*\.test\.(mjs|ts)$' || true)
@@ -3726,6 +3730,7 @@ jobs:
     uses: ./.github/workflows/macos-ci.yml
     with:
       mac-first: true
+      native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}
       supersede-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}
 
   ci-cross-product-integration:
@@ -6693,29 +6698,6 @@ jobs:
 
           cd "$GITHUB_WORKSPACE"
           BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter @jovie/web run test:e2e:golden-path:ci
-
-          # JOV-5489: recorded visual review of the golden-path keyframes. A
-          # suspected blocker is re-reviewed once; only a reproduced blocker fails.
-          # The gateway key is mapped in for the reviewer only, never the server.
-          KEYFRAMES="$GITHUB_WORKSPACE/apps/web/test-results/golden-path-keyframes"
-          # The review runs as its own guarded producer scoped to the keyframes
-          # only, so the staged evidence includes verdict.json and only these
-          # journey keyframes are declared public (failure captures never are).
-          review() {
-            AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
-              PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
-              PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
-              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-              pnpm --filter @jovie/web exec tsx scripts/golden-path-visual-review.ts "$@"
-          }
-          review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/verdict.json"
-          if [ "$(jq '.suspected | length' "$KEYFRAMES/first/verdict.json")" -gt 0 ]; then
-            echo "::warning::Golden path visual review suspects a blocker; re-reviewing to confirm."
-            # ponytail: independent second review of the same keyframes, not a
-            # journey replay: the journey claims a protected fixture once per DB.
-            # Ceiling: a capture-timing flake is judged twice on one frame.
-            review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/confirm.json" --confirm-against "$KEYFRAMES/first/verdict.json"
-          fi
         env:
           # JOV-5489: deterministic keyframes (PNG evidence; video is refused by
           # the artifact secret guard) and a reviewer-only gateway key
@@ -6743,6 +6725,40 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}
           STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
+
+      # Visual review is its own gate with its own verdict. It must never change
+      # the auth/billing journey evidence, which is built from the journey step.
+      - name: Review golden-path keyframes (visual verdict)
+        id: visual_review
+        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          # JOV-5489: recorded visual review of the golden-path keyframes. A
+          # suspected blocker is re-reviewed once; only a reproduced blocker fails.
+          # The gateway key is mapped in for the reviewer only, never the server.
+          KEYFRAMES="$GITHUB_WORKSPACE/apps/web/test-results/golden-path-keyframes"
+          # The review runs as its own guarded producer scoped to the keyframes
+          # only, so the staged evidence includes verdict.json and only these
+          # journey keyframes are declared public (failure captures never are).
+          review() {
+            AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
+              PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm --filter @jovie/web exec tsx scripts/golden-path-visual-review.ts "$@"
+          }
+          review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/verdict.json"
+          if [ "$(jq '.suspected | length' "$KEYFRAMES/first/verdict.json")" -gt 0 ]; then
+            echo "::warning::Golden path visual review suspects a blocker; re-reviewing to confirm."
+            # ponytail: independent second review of the same keyframes, not a
+            # journey replay: the journey claims a protected fixture once per DB.
+            # Ceiling: a capture-timing flake is judged twice on one frame.
+            review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/confirm.json" --confirm-against "$KEYFRAMES/first/verdict.json"
+          fi
+        env:
+          GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
 
       # Evidence for the pre-promotion gate (promotion-journey-gate.mjs). Built
       # from the Playwright report of THIS run, so a skipped, mocked or red
