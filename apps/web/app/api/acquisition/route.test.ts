@@ -42,7 +42,9 @@ describe('POST /api/acquisition', () => {
   });
 
   it('records and links only the exact acquisition id for an authenticated user', async () => {
-    mockGetCachedAuth.mockResolvedValue({ userId: 'ba-user-1' });
+    mockGetCachedAuth.mockResolvedValue({
+      userId: '0f8b2c1e-5d3a-4f6b-9a7c-1e2d3c4b5a69',
+    });
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
@@ -54,6 +56,21 @@ describe('POST /api/acquisition', () => {
     const sqlText = JSON.stringify(query);
     expect(sqlText).toContain('pe.acquisition_id = claimed.id');
     expect(sqlText).toContain('pe.user_id IS NULL');
+    // Defect guard: getCachedAuth().userId is users.id, so the lookup must key
+    // on users.id. Keying on better_auth_user_id never matched, and the
+    // funnel's sign-in stage read 0 for every journey.
+    expect(sqlText).toContain('WHERE id = ');
+    expect(sqlText).not.toContain('better_auth_user_id =');
+    expect(sqlText).toContain('0f8b2c1e-5d3a-4f6b-9a7c-1e2d3c4b5a69');
+  });
+
+  it('does not claim a link for a non-uuid auth id', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'ba-user-1' });
+    const response = await POST(request());
+    expect(await response.json()).toMatchObject({ linked: false });
+    expect(JSON.stringify(mockExecute.mock.calls[0][0])).not.toContain(
+      'ba-user-1'
+    );
   });
 
   it('rejects malformed ids without writing', async () => {
@@ -86,7 +103,9 @@ async function signedRequest(body: Record<string, unknown>) {
 describe('signed acquisition capture', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
-    mockGetCachedAuth.mockResolvedValue({ userId: 'authorized-user' });
+    mockGetCachedAuth.mockResolvedValue({
+      userId: '0f8b2c1e-5d3a-4f6b-9a7c-1e2d3c4b5a69',
+    });
     mockExecute.mockReset();
     mockExecute.mockResolvedValue({ rows: [] });
     vi.stubEnv('ACQUISITION_FIRST_TOUCH_SECRET', 'capture-test-signing-key');

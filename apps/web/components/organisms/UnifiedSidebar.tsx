@@ -105,7 +105,9 @@ function SettingsNavGroup({
   );
 }
 
-const TOOLS_OPEN_KEY = 'ovie.nav.tools-open.v1';
+/** Tools keeps its original key so saved preferences survive; others append the id. */
+const groupOpenKey = (id: string) =>
+  id === 'tools' ? 'ovie.nav.tools-open.v1' : `ovie.nav.${id}-open.v1`;
 
 /**
  * One operator nav group. Tools is collapsed by default (Tim 2026-10-21: Ovie
@@ -129,11 +131,13 @@ function OperatorNavGroup({
   useEffect(() => {
     if (!section.collapsible) return;
     try {
-      setStored(globalThis.localStorage?.getItem(TOOLS_OPEN_KEY) === '1');
+      setStored(
+        globalThis.localStorage?.getItem(groupOpenKey(section.id)) === '1'
+      );
     } catch {
       // Storage is a per-viewer convenience; the group defaults to closed.
     }
-  }, [section.collapsible]);
+  }, [section.collapsible, section.id]);
   const isActive = (item: NavItem) =>
     isOperatorNavigationHrefActive(pathname, item.href);
   const holdsActive = section.items.some(isActive);
@@ -142,7 +146,10 @@ function OperatorNavGroup({
     const next = !stored;
     setStored(next);
     try {
-      globalThis.localStorage?.setItem(TOOLS_OPEN_KEY, next ? '1' : '0');
+      globalThis.localStorage?.setItem(
+        groupOpenKey(section.id),
+        next ? '1' : '0'
+      );
     } catch {
       // Ignore unavailable storage.
     }

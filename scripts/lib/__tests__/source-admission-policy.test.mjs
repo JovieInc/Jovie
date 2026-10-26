@@ -1220,7 +1220,7 @@ test('a red, foreign, or unreadable predecessor runs the full source contract', 
 test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
   const workflow = sourceValidationWorkflow();
   const gate = "steps.reuse.outputs.reuse != 'true'";
-  const [client, runtime, reuseStep] = workflow.jobs.deterministic.steps;
+  const [client, prime, runtime, reuseStep] = workflow.jobs.deterministic.steps;
   assert.equal(client.with.ref, '${{ github.event.pull_request.base.sha }}');
   assert.equal(client.with['persist-credentials'], false);
   assert.match(client.with['sparse-checkout'], /packages\/api-client/);
@@ -1228,7 +1228,16 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     runtime.with['node-version-file'],
     '.source-validation-client/.nvmrc'
   );
+  // The quota-client runtime is primed from nodejs.org so a metadata edit does
+  // not spend a GITHUB_TOKEN manifest call in each of the jobs (2026-10-25).
+  assert.match(prime.run, /prime-node-toolcache\/prime\.sh/);
+  assert.equal(prime.env.NODE_VERSION_FILE, '.source-validation-client/.nvmrc');
+  assert.match(
+    client.with['sparse-checkout'],
+    /prime-node-toolcache\/prime\.sh/
+  );
   assert.equal(client.if, reuseStep.if);
+  assert.match(prime.if, /github\.event\.action == 'edited'/);
   assert.equal(runtime.if, reuseStep.if);
   assert.equal(reuseStep.id, 'reuse');
   // Base retargets change the compared tree, so they never reuse a proof.
@@ -1237,8 +1246,10 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     "${{ github.event.action == 'edited' && !github.event.changes.base }}"
   );
   for (const job of ['security', 'migration', 'coverage', 'unit']) {
-    const [jobClient, jobRuntime, first, ...rest] = workflow.jobs[job].steps;
+    const [jobClient, jobPrime, jobRuntime, first, ...rest] =
+      workflow.jobs[job].steps;
     assert.deepEqual(jobClient, client, job);
+    assert.deepEqual(jobPrime, prime, job);
     assert.deepEqual(jobRuntime, runtime, job);
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);

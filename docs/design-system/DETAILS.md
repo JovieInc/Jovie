@@ -627,6 +627,20 @@ canonical semantic or hit-target treatment; the icon itself is not decorated.
 
 ---
 
+## Marketing glass
+
+Use `ds-glass` from `apps/web/styles/primitives/glass.css` for translucent
+marketing surfaces. It owns the restrained 8px blur, 3% Noir Ion tint, and
+1px inner highlight, including solid accessibility fallbacks. Consumers own
+geometry and interaction states; do not add reflections or white washes.
+The docked header uses the same primitive on its existing scroll-state layer.
+
+`pnpm --filter @jovie/web lint:marketing-glass` blocks raw backdrop effects,
+inline filters, and independent glass classes in marketing routes, homepage,
+marketing/site and legacy `features/home` components, and HeaderNav. It runs in web lint, Source Validation,
+and the structural CI lane. The separately owned `homepage/hero-light` subtree
+is explicitly excluded from this migration and guard. Footer files are scanned.
+
 ## Shadows
 
 ### Light Mode

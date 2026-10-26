@@ -189,21 +189,115 @@ function ancestorIds(repoRoot, relPath) {
       error:
         'origin/main is not available; the ratchet cannot prove it only shrinks',
     };
-  const spec = `origin/main:${relPath}`;
+  const revision = rev.stdout.trim();
+  const spec = `${revision}:${relPath}`;
   if (
     spawnSync('git', ['cat-file', '-e', spec], { cwd: repoRoot }).status !== 0
   ) {
-    return { ok: true, ancestor: null };
+    return { ok: true, ancestor: null, revision };
   }
   const show = spawnSync('git', ['show', spec], {
     cwd: repoRoot,
     encoding: 'utf8',
   });
   if (show.status !== 0) return { ok: false, error: `unable to read ${spec}` };
-  return { ok: true, ancestor: JSON.parse(show.stdout).ids };
+  return { ok: true, ancestor: JSON.parse(show.stdout).ids, revision };
 }
 
-function ratchet(current, recorded, ancestor) {
+// A relocated legacy triad consumes exactly one existing ancestor allowance.
+// File, selector, full rule body and enclosing contexts must be unchanged.
+function triadRule(source, id) {
+  if (typeof source !== 'string') return null;
+  const identity = /^triad:(.+):(\d+)$/.exec(id);
+  if (!identity) return null;
+  if (
+    hueViolations(source, identity[1]).filter(value => value === id).length !==
+    1
+  )
+    return null;
+  // Mask syntax only for locating braces; fingerprint the original bytes so
+  // quoted values, comments and selector/context changes cannot spend a slot.
+  const text = source.replace(
+    /\/\*[\s\S]*?\*\/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\\[\s\S]/g,
+    part => part.replace(/[^\n]/g, ' ')
+  );
+  for (const match of text.matchAll(/\{[^{}]*\}/g)) {
+    const offset = match.index ?? 0;
+    const body = source.slice(offset, offset + match[0].length);
+    if (
+      text.slice(0, offset).split('\n').length !== Number(identity[2]) ||
+      signals(stripComments(body)).roles.length < 3
+    )
+      continue;
+    const contexts = [];
+    let boundary = 0;
+    for (const brace of text.slice(0, offset).matchAll(/[{}]/g)) {
+      const at = brace.index ?? 0;
+      if (brace[0] === '{') contexts.push(source.slice(boundary, at).trim());
+      else if (contexts.length) contexts.pop();
+      else return null;
+      boundary = at + 1;
+    }
+    return JSON.stringify([
+      ...contexts,
+      source.slice(boundary, offset).trim(),
+      body,
+    ]);
+  }
+  return null;
+}
+
+function relocatedTriads(repoRoot, current, ancestor) {
+  if (!ancestor.ancestor) return new Set();
+  const known = new Set(ancestor.ancestor);
+  const used = new Set(current.filter(id => known.has(id)));
+  const relocated = new Set();
+  const sources = new Map();
+  const source = (file, old) => {
+    const key = `${old}:${file}`;
+    if (!sources.has(key)) {
+      let value = null;
+      if (old) {
+        const result = spawnSync(
+          'git',
+          ['show', `${ancestor.revision}:${file}`],
+          {
+            cwd: repoRoot,
+            encoding: 'utf8',
+          }
+        );
+        if (result.status === 0) value = result.stdout;
+      } else {
+        try {
+          value = readFileSync(join(repoRoot, file), 'utf8');
+        } catch {}
+      }
+      sources.set(key, value);
+    }
+    return sources.get(key);
+  };
+  for (const id of current) {
+    if (known.has(id)) continue;
+    const identity = /^triad:(.+):(\d+)$/.exec(id);
+    if (!identity) continue;
+    const file = identity[1];
+    const rule = triadRule(source(file, false), id);
+    if (rule === null) continue;
+    const previous = ancestor.ancestor.find(
+      candidate =>
+        !used.has(candidate) &&
+        /^triad:(.+):(\d+)$/.exec(candidate)?.[1] === file &&
+        triadRule(source(file, true), candidate) === rule
+    );
+    if (previous) {
+      used.add(previous);
+      relocated.add(id);
+    }
+  }
+  return relocated;
+}
+
+function ratchet(current, recorded, ancestor, relocated) {
   const errors = [];
   const known = new Set(recorded);
   const live = new Set(current);
@@ -218,7 +312,10 @@ function ratchet(current, recorded, ancestor) {
       `baseline can only shrink; delete ${removed.length} resolved id(s):\n${removed.map(id => `  - ${id}`).join('\n')}`
     );
   if (ancestor) {
-    const grown = current.filter(id => !new Set(ancestor).has(id));
+    const knownAncestor = new Set(ancestor);
+    const grown = current.filter(
+      id => !knownAncestor.has(id) && !relocated.has(id)
+    );
     if (grown.length)
       errors.push(
         `new violations are not allowed (${grown.length}):\n${grown.map(id => `  + ${id}`).join('\n')}`
@@ -237,7 +334,12 @@ export function checkHue(repoRoot = REPO_ROOT, recordedIds) {
   const ancestor = ancestorIds(repoRoot, HUE_BASELINE);
   if (!ancestor.ok) return { failures: [ancestor.error], ids: current };
   return {
-    failures: ratchet(current, recorded, ancestor.ancestor),
+    failures: ratchet(
+      current,
+      recorded,
+      ancestor.ancestor,
+      relocatedTriads(repoRoot, current, ancestor)
+    ),
     ids: current,
   };
 }

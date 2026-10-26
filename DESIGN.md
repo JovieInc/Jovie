@@ -80,15 +80,15 @@ asymmetric mark must name its evidence, reviewer, confidence, and rollback.
 
 ## Surface Classification
 
-Read [the surface classification reference](docs/design-system/DETAILS.md#surface-classification) when changing this area.
+Read [surface classification](docs/design-system/DETAILS.md#surface-classification) before edits.
 
 ## Typography
 
-Read [the typography reference](docs/design-system/DETAILS.md#typography) when changing this area.
+Read [typography](docs/design-system/DETAILS.md#typography) before edits.
 
 ## Copywriting
 
-Read [the copywriting reference](docs/design-system/DETAILS.md#copywriting) when changing this area.
+Read [copywriting](docs/design-system/DETAILS.md#copywriting) before edits.
 
 ### Icon and Text Alignment
 
@@ -105,7 +105,7 @@ Follow [the Ovie guardrail](docs/design-system/DETAILS.md#ovie-ops-cockpit-guard
 
 ## Subtraction Principle
 
-Read [the subtraction principle reference](docs/design-system/DETAILS.md#subtraction-principle) when changing this area.
+Read [subtraction principle](docs/design-system/DETAILS.md#subtraction-principle) before edits.
 
 ## Use Tokens, Not Raw Colors
 
@@ -160,11 +160,11 @@ unless linked below.
 | `deprecated-button-alias` | `error` | G | Yes | 91 |
 | `linear-namespace` | `error` | G + I | Yes | 700 |
 | `shadcn/no-restyle` | `error` | L + G | Yes | 217 files; 3105 messages (grandfathered) |
-| `source-identity` | `error` | I | Yes | 2055 |
+| `source-identity` | `error` | I | Yes | 2053 |
 | `spacing-scale (conservative)` | `error` | S + G | Yes | 590; armed=true; marketing=46; packages/ui=11; web-other=290; web-shell=243 |
 | `spacing-scale (strict)` | `warn` | S + G | No | 2190; armed=false; marketing=143; packages/ui=60; web-other=1126; web-shell=837 |
 | `touch-target` | `error` | D | Yes | 153 |
-| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=266; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
+| `ui-feel ratchet` | `error` | D | Yes | headingNeedsBalance=264; missingTabularNums=71; nonConcentricRadius=0; undersizedHitArea=71 |
 
 The [raw-color baseline](apps/web/contrast-ratchet.baseline.json) and
 [computed pair config](apps/web/contrast-pairs.config.json) cover separate
@@ -204,7 +204,7 @@ To fix a violation:
 
 ## Color System
 
-Read [the color system reference](docs/design-system/DETAILS.md#color-system) when changing this area.
+Read [color system](docs/design-system/DETAILS.md#color-system) before edits.
 
 Mint = success. Orange = warning. Red = danger. Use semantic tokens, not these names as raw CSS values.
 
@@ -214,7 +214,7 @@ Mint = success. Orange = warning. Red = danger. Use semantic tokens, not these n
 
 ## Spacing
 
-Read [the spacing reference](docs/design-system/DETAILS.md#spacing) when changing this area.
+Read [spacing](docs/design-system/DETAILS.md#spacing) before edits.
 
 ## DS_FOUNDATION_V1 canonical decisions
 
@@ -228,17 +228,7 @@ Read [the borders & radius reference](docs/design-system/DETAILS.md#borders--rad
 
 ## Marketing glass
 
-Use `ds-glass` from `apps/web/styles/primitives/glass.css` for translucent
-marketing surfaces. It owns the restrained 8px blur, 3% Noir Ion tint, and
-1px inner highlight, including solid accessibility fallbacks. Consumers own
-geometry and interaction states; do not add reflections or white washes.
-The docked header uses the same primitive on its existing scroll-state layer.
-
-`pnpm --filter @jovie/web lint:marketing-glass` blocks raw backdrop effects,
-inline filters, and independent glass classes in marketing routes, homepage,
-marketing/site and legacy `features/home` components, and HeaderNav. It runs in web lint, Source Validation,
-and the structural CI lane. The separately owned `homepage/hero-light` subtree
-is explicitly excluded from this migration and guard. Footer files are scanned.
+Read [marketing glass](docs/design-system/DETAILS.md#marketing-glass) before edits.
 
 ## Shadows
 
