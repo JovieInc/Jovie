@@ -809,6 +809,8 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/preflight.test.mjs',
+  'scripts/ci-rounds-report.test.mjs',
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',

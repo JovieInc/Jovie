@@ -203,6 +203,8 @@
     "ci:incident-contract:validate": "node scripts/ci-release-incident-contract.mjs",
     "postmortem:linkage:check": "node scripts/postmortem-linkage-check.mjs",
     "postmortem:review": "node scripts/postmortem-review.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "ci:rounds": "node scripts/ci-rounds-report.mjs",
     "ci:duration-ratchet": "node scripts/ci-duration-ratchet.mjs",
     "ci:duration-ratchet:validate": "node scripts/ci-duration-ratchet.mjs validate",
     "ci:duration-ratchet:check": "node scripts/ci-duration-ratchet.mjs check",
