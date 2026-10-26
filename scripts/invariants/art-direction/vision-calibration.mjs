@@ -20,6 +20,7 @@ import { REPO_ROOT } from './paths.mjs';
 const DIR = 'scripts/invariants/art-direction';
 export const OBSERVATIONS = `${DIR}/vision-observations.jsonl`;
 export const LABELS = `${DIR}/vision-labels.jsonl`;
+export const TASTE_LABELS = 'docs/design-system/taste-labels/labels.jsonl';
 export const MIN_POSITIVES = 20;
 export const MIN_NEGATIVES = 20;
 /** Criterion -> the answer word that flags a defect. */
@@ -36,6 +37,25 @@ const JUDGE_CRITERION = Object.freeze({
   hierarchy: 'hierarchy',
   'mockup-quality': 'mockup_quality',
 });
+
+/** Judge labels carried by Tim's approve/reject rows; they join observations by row id. */
+export function tasteJudgeLabels(root) {
+  let rows = [];
+  try {
+    rows = readJsonl(root, TASTE_LABELS);
+  } catch {
+    return [];
+  }
+  return rows.flatMap(row =>
+    (row.judgeLabels ?? []).map(j => ({
+      key: row.id,
+      judge: j.criterion,
+      truth: j.truth,
+      source: `taste-labels/${row.id}`,
+      evidence: row.words,
+    }))
+  );
+}
 
 const readJsonl = (root, rel) =>
   readFileSync(join(root, rel), 'utf8')
@@ -114,10 +134,10 @@ const fmt = value =>
   value === null || value === undefined ? 'n/a' : value.toFixed(2);
 
 export function calibrate(root = REPO_ROOT, config) {
-  const metrics = measure(
-    readJsonl(root, OBSERVATIONS),
-    readJsonl(root, LABELS)
-  );
+  const metrics = measure(readJsonl(root, OBSERVATIONS), [
+    ...readJsonl(root, LABELS),
+    ...tasteJudgeLabels(root),
+  ]);
   const judges = {};
   for (const [criterion, m] of Object.entries(metrics)) {
     judges[criterion] = { ...m, ...verdict(m, config.hamelFloors) };
@@ -142,7 +162,7 @@ export function checkCalibration(root, config) {
       ([, c]) => c === criterion
     )?.[0];
     const mode = state ? (modes[state] ?? 'shadow') : 'advisory';
-    return `vision ${criterion}: ${mode}; precision ${fmt(j.precision)} (95% lower ${fmt(j.precisionLower95)}), recall ${fmt(j.recall)}, ${j.positives} defects / ${j.negatives} clean labeled; ${j.mayBlock ? 'meets floors' : 'blocked from promotion: ' + j.why[0]}`;
+    return `vision ${criterion}: ${mode}; precision ${fmt(j.precision)} (95% lower ${fmt(j.precisionLower95)}), recall ${fmt(j.recall)}, ${j.positives} defects / ${j.negatives} clean labeled; ${j.unmatched ? `${j.unmatched} labeled but not yet judged; ` : ''}${j.mayBlock ? 'meets floors' : 'blocked from promotion: ' + j.why[0]}`;
   });
   return { failures, shadow, judges };
 }
