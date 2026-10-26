@@ -19,6 +19,7 @@ import {
   isLockedArea,
   main,
   onlyWeakensAssertions,
+  readRepoFile,
   runFleetRules,
   validateDoneReceipt,
 } from './pr-fleet-rules.mjs';
@@ -950,10 +951,16 @@ test('pricing changes require a passing pricing-model link', () => {
   const withLink = pr({
     body: proof + '\npricing-model: docs/pricing-models/x.json',
   });
+  assert.deepEqual(evaluateFleetRules({ pr: pr(), files: priced }).errors, []);
   assert.match(
-    evaluateFleetRules({ pr: pr(), files: priced }).errors.join('\n'),
+    evaluateFleetRules({
+      pr: pr(),
+      files: priced,
+      readFile: () => good,
+    }).errors.join('\n'),
     /pricing-model:/
   );
+  assert.match(readRepoFile('package.json'), /"name"/);
   assert.deepEqual(
     evaluateFleetRules({ pr: withLink, files: priced, readFile: () => good })
       .errors,

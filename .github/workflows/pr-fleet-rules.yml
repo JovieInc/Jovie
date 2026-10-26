@@ -48,4 +48,5 @@ jobs:
       - name: Enforce receipts, red-before-green and locked areas
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          PRICING_MODEL_GATE: '1'
         run: node scripts/pr-fleet-rules.mjs --with-warnings

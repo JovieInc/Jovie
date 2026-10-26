@@ -71,6 +71,7 @@ jobs:
           sparse-checkout: |
             .nvmrc
             scripts/pr-fleet-rules.mjs
+            scripts/lib/pricing-model-gate.mjs
             packages/api-client
             .github/scripts/fleet-rules-verdict.sh
             .github/scripts/fleet-rules-rerun.sh
