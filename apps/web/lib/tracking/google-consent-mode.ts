@@ -1,5 +1,8 @@
 import type { Consent } from '@/lib/cookies/consent';
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import {
+  COOKIE_BANNER_REQUIRED_COOKIE,
+  isCookieBannerRequiredFromCookieString,
+} from '@/lib/cookies/consent-regions';
 import { isDNTEnabled, isGPCEnabled } from '@/lib/tracking/consent';
 
 export type GoogleConsentModeValue = 'granted' | 'denied';
@@ -60,15 +63,9 @@ export function shouldMountGoogleAnalytics(params: {
 }
 
 export function isCookieBannerRequiredFromClient(): boolean {
-  if (globalThis.document === undefined) return false;
+  if (globalThis.document === undefined) return true;
 
-  const bannerCookie = globalThis.document.cookie
-    .split(';')
-    .find(cookie =>
-      cookie.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`)
-    );
-
-  return bannerCookie?.split('=')[1]?.trim() === '1';
+  return isCookieBannerRequiredFromCookieString(globalThis.document.cookie);
 }
 
 export function readStoredConsentFromClient(): Consent | null {
@@ -163,8 +160,8 @@ gtag('consent', 'default', {
     gtag('consent', 'update', denied);
     return;
   }
-  var bannerRequired = document.cookie.split(';').some(function (cookie) {
-    return cookie.trim().indexOf('${COOKIE_BANNER_REQUIRED_COOKIE}=1') === 0;
+  var bannerRequired = !document.cookie.split(';').some(function (cookie) {
+    return cookie.trim() === '${COOKIE_BANNER_REQUIRED_COOKIE}=0';
   });
   var storedConsent = null;
   try {

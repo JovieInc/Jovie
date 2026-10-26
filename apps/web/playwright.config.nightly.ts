@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 import { RELIABILITY_CANARY_E2E_GLOBS } from './lib/testing/reliability-detectors';
-import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
+import {
+  E2E_DEFAULT_GEO_HEADERS,
+  vercelAutomationHeaders,
+} from './tests/e2e/utils/vercel-automation-headers';
 
 const vercelAutomation = vercelAutomationHeaders();
 
@@ -59,9 +62,10 @@ export default defineConfig({
     screenshot: isCI ? 'off' : 'only-on-failure',
     navigationTimeout: 45_000,
     actionTimeout: 20_000,
-    ...(vercelAutomation.active && {
-      extraHTTPHeaders: vercelAutomation.headers,
-    }),
+    extraHTTPHeaders: {
+      ...vercelAutomation.headers,
+      ...E2E_DEFAULT_GEO_HEADERS,
+    },
     storageState: 'tests/.auth/user.json',
   },
 

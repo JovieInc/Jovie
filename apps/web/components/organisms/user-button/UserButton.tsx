@@ -34,7 +34,7 @@ import { useKeyboardShortcutsSafe } from '@/contexts/KeyboardShortcutsContext';
 import { DESKTOP_UPDATE_COPY } from '@/data/supportDesktopUpdateCopy';
 import { track } from '@/lib/analytics';
 import { getCurrentAppShellWorkspace } from '@/lib/app-shell/workspaces';
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
 import type { DesktopUpdateViewState } from '@/lib/desktop/desktop-updates';
 import { useIsElectronRuntime } from '@/lib/desktop/electron-bridge';
 import { GLYPH_CMD, GLYPH_OPT, GLYPH_SHIFT } from '@/lib/keyboard-shortcuts';
@@ -356,12 +356,9 @@ function buildDropdownItems({
 
   // Only show Cookie Settings in GDPR-regulated regions, matching footer behavior
   const ccRequired =
-    typeof document === 'undefined'
-      ? undefined
-      : document.cookie
-          .split(';')
-          .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`));
-  if (ccRequired && ccRequired.split('=')[1]?.trim() !== '0') {
+    typeof document !== 'undefined' &&
+    isCookieBannerRequiredFromCookieString(document.cookie);
+  if (ccRequired) {
     learnMoreItems.push({
       type: 'action',
       id: 'cookie-settings',

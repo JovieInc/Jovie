@@ -12,24 +12,20 @@ import {
   shouldSuppressCookieBannerForPathname,
 } from '@/lib/cookies/banner-visibility';
 import { saveConsent } from '@/lib/cookies/consent';
-import { COOKIE_BANNER_REQUIRED_COOKIE } from '@/lib/cookies/consent-regions';
+import { isCookieBannerRequiredFromCookieString } from '@/lib/cookies/consent-regions';
 import { setConsentState } from '@/lib/tracking/consent';
 
 const CONSENT_SAVE_ERROR =
   'We could not save preferences. Check your connection and try again.';
 
 /**
- * Read the cookie-banner-required flag from document.cookie.
- * The middleware sets `jv_cc_required=1` for EU/EEA visitors and `0` otherwise.
- * If the cookie is absent (e.g. first visit before middleware runs) we default to showing the banner.
+ * Read the cookie-banner-required flag from document.cookie. The proxy sets
+ * `jv_cc_required=1` for consent-required geographies and `0` only for a known
+ * non-required one. Fail closed: an absent or malformed flag shows the banner.
  */
 function isBannerRequiredFromCookie(): boolean {
   if (typeof document === 'undefined') return true;
-  const match = document.cookie
-    .split(';')
-    .find(c => c.trim().startsWith(`${COOKIE_BANNER_REQUIRED_COOKIE}=`));
-  if (!match) return false; // cookie not set yet -- middleware sets it on every request
-  return match.split('=')[1]?.trim() !== '0';
+  return isCookieBannerRequiredFromCookieString(document.cookie);
 }
 
 export function CookieBannerSection({
@@ -347,10 +343,16 @@ export function CookieBannerSection({
           className={`cookie-banner-card fixed bottom-4 right-4 z-[60] w-[calc(100vw-2rem)] max-w-85 ${
             shouldClearProfileDock
               ? 'cookie-banner-card--above-public-profile-dock'
-              : 'sm:max-w-95'
+              : 'max-sm:inset-x-0 max-sm:bottom-0 max-sm:right-auto max-sm:w-full max-sm:max-w-none sm:max-w-95'
           }`}
         >
-          <div className='rounded-2xl border border-(--app-shell-frame-seam) bg-surface-1 px-4 py-3 shadow-card'>
+          <div
+            className={`border border-(--app-shell-frame-seam) bg-surface-1 px-4 py-3 shadow-card ${
+              shouldClearProfileDock
+                ? 'rounded-2xl'
+                : 'max-sm:rounded-b-none max-sm:pb-[max(0.75rem,env(safe-area-inset-bottom))] rounded-2xl'
+            }`}
+          >
             <div className='min-w-0'>
               <p className='text-xs leading-snug text-secondary-token'>
                 Essential cookies keep Jovie working. Choose whether to allow

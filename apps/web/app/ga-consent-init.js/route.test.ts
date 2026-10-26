@@ -12,6 +12,6 @@ describe('/ga-consent-init.js', () => {
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=300');
     expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff');
     expect(body).toContain("gtag('consent', 'default'");
-    expect(body).toContain('jv_cc_required=1');
+    expect(body).toContain('jv_cc_required=0');
   });
 });

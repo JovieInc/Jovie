@@ -166,10 +166,10 @@ describe('CookieBannerSection', () => {
     ).toBeInTheDocument();
   });
 
-  it('hides the banner when jv_cc_required cookie is absent', () => {
+  it('shows the banner when jv_cc_required cookie is absent (fail closed)', () => {
     setCookie('');
     render(<CookieBannerSection />);
-    expect(screen.queryByTestId('cookie-banner')).not.toBeInTheDocument();
+    expect(screen.getByTestId('cookie-banner')).toBeInTheDocument();
   });
 
   it('hides the banner when jv_cc_required cookie is 0', () => {
@@ -361,8 +361,9 @@ describe('CookieBannerSection', () => {
     render(<CookieBannerSection />);
     expect(screen.queryByText(/manage/i)).not.toBeInTheDocument();
     const banner = screen.getByTestId('cookie-banner');
-    // No old full-width specific classes
-    expect(banner.className).not.toContain('inset-x-0');
+    // No unprefixed full-width classes: wider than a phone it stays a card
+    // (the phone bottom sheet is max-sm: scoped).
+    expect(banner.className.split(' ')).not.toContain('inset-x-0');
     expect(banner.className).not.toContain('backdrop-blur-md');
   });
 });

@@ -101,7 +101,12 @@ function buildRequest(
   return new NextRequest('http://localhost/api/profile/pac-event', {
     method: 'POST',
     body: typeof body === 'string' ? body : JSON.stringify(body),
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: {
+      'Content-Type': 'application/json',
+      // Known non-consent geography; a missing geo header fails closed.
+      'x-vercel-ip-country': 'JP',
+      ...headers,
+    },
   });
 }
 
@@ -201,6 +206,14 @@ describe('POST /api/profile/pac-event', () => {
         [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
       },
       headers: { 'x-vercel-ip-country': 'DE' },
+    },
+    {
+      name: 'missing geo header (fail closed)',
+      cookies: {
+        [AUDIENCE_ANON_COOKIE]: JV_AID,
+        [COOKIE_BANNER_REQUIRED_COOKIE]: '0',
+      },
+      headers: { 'x-vercel-ip-country': '' },
     },
     {
       name: 'Global Privacy Control',

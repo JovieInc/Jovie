@@ -1,7 +1,10 @@
 import { defineConfig, devices } from '@playwright/test';
 import { worktreeMetadata } from './scripts/playwright-worktree';
 import { DESKTOP_SMOKE_SPECS } from './tests/e2e/smoke-manifest';
-import { vercelAutomationHeaders } from './tests/e2e/utils/vercel-automation-headers';
+import {
+  E2E_DEFAULT_GEO_HEADERS,
+  vercelAutomationHeaders,
+} from './tests/e2e/utils/vercel-automation-headers';
 import { resolveWebServerWarmupProfile } from './tests/e2e/utils/warmup-profile';
 
 const vercelAutomation = vercelAutomationHeaders();
@@ -83,9 +86,10 @@ export default defineConfig({
     video: 'off',
     navigationTimeout: 60_000,
     actionTimeout: 20_000,
-    ...(vercelAutomation.active && {
-      extraHTTPHeaders: vercelAutomation.headers,
-    }),
+    extraHTTPHeaders: {
+      ...vercelAutomation.headers,
+      ...E2E_DEFAULT_GEO_HEADERS,
+    },
     storageState: { cookies: [], origins: [] },
   },
 
