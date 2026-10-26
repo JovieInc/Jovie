@@ -79,6 +79,12 @@ async function fetchArtistSearch(
   }
 }
 
+// The picker effect depends on search's identity. Keep this option stable so
+// settling a response does not restart the consumer's debounced search.
+function shouldBypassArtistSearchDebounce(query: string): boolean {
+  return query.length === 1 && /^[a-zA-Z]$/.test(query);
+}
+
 export function useArtistSearchQuery(
   options: UseArtistSearchQueryOptions = {}
 ): UseArtistSearchQueryReturn {
@@ -89,7 +95,6 @@ export function useArtistSearchQuery(
     minQueryLength,
     queryKey: queryKeys.spotify.artistSearch,
     searchFn: fetchArtistSearch,
-    shouldBypassDebounce: query =>
-      query.length === 1 && /^[a-zA-Z]$/.test(query),
+    shouldBypassDebounce: shouldBypassArtistSearchDebounce,
   });
 }
