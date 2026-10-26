@@ -77,7 +77,7 @@ describe('ArtistNotificationsPage', () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        'Turn streams, show traffic, QR scans, and support moments into a fan list Jovie can bring back.'
+        'Turn streams, show traffic, QR scans, and support moments into an audience list Jovie can bring back.'
       )
     ).toBeInTheDocument();
 
@@ -112,7 +112,7 @@ describe('ArtistNotificationsPage', () => {
     );
     expect(
       benefitsSection.getByRole('heading', {
-        name: 'Bring fans back when it matters.',
+        name: 'Bring listeners back when it matters.',
       })
     ).toBeInTheDocument();
     expect(
@@ -141,7 +141,7 @@ describe('ArtistNotificationsPage', () => {
       screen.getByTestId('artist-notifications-section-faq')
     );
     expect(
-      faqSection.getByText('How does Jovie bring fans back?')
+      faqSection.getByText('How does Jovie bring listeners back?')
     ).toBeInTheDocument();
     expect(
       faqSection.getByText(
@@ -152,7 +152,7 @@ describe('ArtistNotificationsPage', () => {
       faqSection.getByText('Why use Jovie instead of writing newsletters?')
     ).toBeInTheDocument();
     expect(
-      faqSection.getByText('Where do fans land after they click?')
+      faqSection.getByText('Where do listeners land after they click?')
     ).toBeInTheDocument();
     expect(
       faqSection.getByText(
@@ -161,7 +161,7 @@ describe('ArtistNotificationsPage', () => {
     ).toBeInTheDocument();
 
     expect(screen.getByTestId('final-cta-headline')).toHaveTextContent(
-      'Ready to Amplify?'
+      'Ready to reach your audience?'
     );
     expect(screen.getByTestId('final-cta-action')).toHaveAttribute(
       'href',
