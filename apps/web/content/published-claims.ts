@@ -460,9 +460,9 @@ export const SCOPED_CLAIM_SURFACE_HASHES = {
   '/compare/linkfire':
     '0974d7e2ab63e31a3048640fc074e08dd686994eaf18f25ed3d336338e0177b1',
   '/alternatives/linktree':
-    '142452c97cc161ef4356c8473c55d5dbdb40c1e875e82c9c0895ab39d729777a',
+    'f921a9800b1dde66eb234a14d7bab3b59c52b3bd11f0b490b9d1fddd95be0160',
   '/alternatives/link-in-bio':
-    'c37310308b9660cf66823717e73cb0d93a421d50e6108d933329c655c3bb923f',
+    'bd6abd37bd0b7e84d3d409434203227f60cf1096449ad8dc706d077456c9cb15',
   '/llms.txt':
     '2bc4a4c5e14ec0e63d188d161392bb104d807118a74cedad5b03dc3144aa2bc1',
   '/llms-full.txt':

@@ -169,7 +169,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
     ],
   },
   reactivation: {
-    headline: 'Notify every listener automatically.',
+    headline: 'Notify listeners automatically.',
     subhead:
       'When new music drops or a nearby show is coming up, Jovie brings the right listeners back.',
     workflow: {

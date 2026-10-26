@@ -4,7 +4,9 @@ import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import {
   ArtistNotificationFloatingCardView,
+  ArtistProfileCaptureVisual,
   ArtistProfileReactivationVisual,
+  ExampleLabel,
 } from './MarketingStoryPrimitives';
 
 describe('MarketingStoryPrimitives', () => {
@@ -51,5 +53,23 @@ describe('MarketingStoryPrimitives', () => {
         'rounded-3xl'
       );
     }
+  });
+
+  it('marks illustrative activity with a visible example label', () => {
+    const { container } = render(<ExampleLabel />);
+    const label = container.querySelector('[data-example-label="true"]');
+    expect(label).toHaveTextContent('Example');
+
+    const card = ARTIST_NOTIFICATIONS_COPY.hero.floatingCards[0];
+    const cardView = render(<ArtistNotificationFloatingCardView card={card} />);
+    expect(
+      cardView.container.querySelector('[data-example-label="true"]')
+    ).not.toBeNull();
+  });
+
+  it('labels the capture visual as example activity, not real people', () => {
+    const { capture } = ARTIST_PROFILE_COPY;
+    render(<ArtistProfileCaptureVisual capture={capture} />);
+    expect(screen.getByText('Example activity, not real people')).toBeVisible();
   });
 });
