@@ -1681,15 +1681,21 @@ describe('alert state preservation (JOV-8843)', () => {
     expect(decisions.find(row => row.fingerprint === FINGERPRINT)?.action).toBe(
       'green'
     );
+    // main() also returns the export-automations payload, which has no decisions.
+    if (!('decisions' in result)) {
+      throw new Error('expected a liveness report with decisions');
+    }
     expect(applyRemediationDecisionWithRetry).toHaveBeenCalledTimes(
       result.decisions.length
     );
   });
 
   it('keeps the prior state for a fingerprint whose filing failed', async () => {
+    // checkJs accepts only a real applyRemediationDecision return. The intake reads ok.
     vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
       ok: false,
-      reason: 'linear-4xx',
+      action: 'green',
+      results: [],
     });
     const path = persistState({ [FINGERPRINT]: 'red' });
     try {
@@ -1703,6 +1709,7 @@ describe('alert state preservation (JOV-8843)', () => {
     } finally {
       vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
         ok: true,
+        action: 'skip',
       });
     }
   });
