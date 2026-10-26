@@ -97,6 +97,19 @@ describe('ProfileIdentityHeader', () => {
     expect(onListenClick).toHaveBeenCalledTimes(1);
   });
 
+  it('draws the keyboard focus ring on the 28px pill face, not the 44px hit slot', () => {
+    renderHeader();
+
+    const listen = screen.getByRole('link', { name: 'Listen' });
+    const pillFace = listen.firstElementChild;
+    expect(pillFace).toHaveClass(
+      'group-has-focus-visible:ring-2',
+      'group-has-focus-visible:ring-focus'
+    );
+    expect(listen.className).toContain('focus-visible:outline-none');
+    expect(listen.className).not.toContain('focus-visible:ring');
+  });
+
   it('marks Listen as the current page while Music is open', () => {
     renderHeader({ isListenActive: true });
     expect(screen.getByRole('link', { name: 'Listen' })).toHaveAttribute(

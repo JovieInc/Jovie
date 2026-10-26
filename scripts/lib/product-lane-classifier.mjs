@@ -8,7 +8,7 @@ export const PRODUCT_LANES = ['ios', 'mac', 'web'];
 /**
  * Rules whose only Mac-lane effect is the node checks (`@jovie/desktop`
  * typecheck and test). A change selected for Mac solely by these runs the Mac
- * lane on ubuntu; anything else keeps macOS for swift and package:staging.
+ * lane on ubuntu; anything else keeps macOS for swift and the MenuMonitor artifact.
  */
 export const MAC_NODE_ONLY_RULES = Object.freeze(
   new Set(['mac-desktop-node-input'])
@@ -35,9 +35,8 @@ const GATE_RECEIPTS = {
   },
   mac: {
     tests:
-      'swift build --package-path apps/macos/MenuMonitor -c release && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging',
-    artifact:
-      'desktop-staging-<merge-group-head-sha> with MenuMonitor release binary',
+      'swift build --package-path apps/macos/MenuMonitor -c release && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test',
+    artifact: 'MenuMonitor release binary',
     releaseWorkflow: '.github/workflows/desktop-release.yml',
   },
   web: {
@@ -165,7 +164,7 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
   ],
   [
     // Files outside apps/desktop that `@jovie/desktop` test and
-    // package:staging read: prepare-icons runs apps/web's brand generator
+    // Desktop tests read apps/web's brand generator
     // (which reads the iOS AppIcon set), system-b-tokens.test reads the web
     // CSS, url-disposition.test reads the route manifest, and the dogfood
     // inventory must resolve its web sources. A guard test derives the
@@ -176,8 +175,9 @@ const RULES = /** @type {Array<[string, string, string[], RegExp]>} */ ([
     /^apps\/ios\/Jovie\/Resources\/Assets\.xcassets\/AppIcon\.appiconset\/Contents\.json$/,
   ],
   [
-    // Web files the packaged app is built from (prepare-icons runs the brand
-    // generator): the Mac lane must package, so it needs macOS.
+    // Brand-generator inputs the desktop app is built from. They stay on the
+    // macOS lane with swift and the desktop checks. Node-only web reads are
+    // mac-desktop-node-input and do not take a macOS runner.
     'mac-consumed-web-input',
     'web',
     ['mac', 'web'],

@@ -2108,6 +2108,11 @@ describe('source-read guard selection', () => {
     /\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$/u.test(path)
       ? ['external-api-guard']
       : [];
+  // domain-write-guard scans the web app and its registry.
+  const domainGuard = path =>
+    /^apps\/web\/(?:app|lib|components)\/.+\.(?:ts|tsx|mts)$/u.test(path)
+      ? ['domain-write-guard']
+      : [];
 
   it.each(['pull_request', 'merge_group', 'push'])(
     'runs profile conformance for adapters on %s',
@@ -2231,6 +2236,7 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', [path])).toEqual([
       ...guards,
       ...apiGuard(path),
+      ...domainGuard(path),
       'web-source-read-tests',
       'script-contracts',
       ...(/^(?:apps\/web\/components\/|packages\/ui\/)/u.test(path)
@@ -2279,7 +2285,12 @@ describe('source-read guard selection', () => {
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
       const expected = path.startsWith('apps/web/lib/')
-        ? ['artist-profile-conformance', ...apiGuard(path), 'copy-leak']
+        ? [
+            'artist-profile-conformance',
+            ...apiGuard(path),
+            ...domainGuard(path),
+            'copy-leak',
+          ]
         : ['copy-leak'];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
@@ -2312,6 +2323,7 @@ describe('source-read guard selection', () => {
       'icp-language',
       'anti-slop',
       'external-api-guard',
+      'domain-write-guard',
       'copy-leak',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
@@ -2327,6 +2339,7 @@ describe('source-read guard selection', () => {
       'icp-language',
       'anti-slop',
       'external-api-guard',
+      'domain-write-guard',
       'copy-leak',
     ]);
   });
@@ -2418,6 +2431,12 @@ describe('source-read guard selection', () => {
             'utf8'
           )
         ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'domain-write-guard') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/domain-write-guard.mjs')
+        );
         continue;
       }
       if (guard.id === 'external-api-guard') {
