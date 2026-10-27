@@ -2,7 +2,10 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ROUTE_CAPABILITY_BINDINGS } from '@/data/marketing/featureAvailability';
-import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
+import {
+  getMarketingRouteHealthTarget,
+  MARKETING_ROUTE_MANIFEST,
+} from '@/data/marketing/routeManifest';
 import {
   getMarketingFooterColumns,
   MARKETING_CUSTOMERS_FLYOUT,
@@ -47,6 +50,20 @@ function allNavHrefs(): string[] {
 }
 
 describe('marketing IA guards (phase 1)', () => {
+  it('health probes for redirected paths expect the canonical destination', () => {
+    for (const entry of MARKETING_ROUTE_MANIFEST) {
+      const target = getMarketingRouteHealthTarget(entry);
+      const redirect = PUBLIC_URL_POLICY.find(
+        row => row.path === target.path && row.action === 'redirect'
+      );
+      if (!redirect || redirect.action !== 'redirect') continue;
+      expect(target.expected, target.path).toBe('redirect');
+      expect(target.allowedFinalPaths, target.path).toContain(
+        redirect.destination
+      );
+    }
+  });
+
   it('every manifest redirect has a matching 308 in the public URL policy', () => {
     const redirects = MARKETING_ROUTE_MANIFEST.filter(
       entry =>

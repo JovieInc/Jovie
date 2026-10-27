@@ -601,7 +601,8 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/solutions/*',
     healthCheck: {
       path: '/solutions/artists',
-      expected: 'page',
+      expected: 'redirect',
+      allowedFinalPaths: ['/artist-profiles'],
     },
     productEvidence: {
       kind: 'framed-screenshot',

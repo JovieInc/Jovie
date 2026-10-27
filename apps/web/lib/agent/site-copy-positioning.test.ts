@@ -28,6 +28,25 @@ function expectCreatorPositioning(body: string): void {
 }
 
 describe('agent-facing site copy positioning (JOV-7638 follow-up)', () => {
+  it('advertises canonical public routes without exposing unlisted or redirected routes', () => {
+    const body = buildSiteLlmsGuidance();
+    for (const route of [
+      '/pay',
+      '/card',
+      '/instant-merch',
+      '/youtube-thumbnails',
+      '/voice',
+      '/launch',
+      '/new',
+      '/product',
+      '/product/pre-save',
+    ]) {
+      expect(body, route).not.toContain(`[${route}](`);
+    }
+    expect(body).toContain('[/artist-profiles](');
+    expect(body).toContain('[/smart-links](');
+  });
+
   it('keeps /llms.txt on the shared creator identity', async () => {
     const body = await getLlmsTxt().text();
 

@@ -204,6 +204,7 @@ describe('marketing route health contract', () => {
     ).toEqual({
       '/new': ['/'],
       '/artist-profile': ['/artist-profiles'],
+      '/solutions/artists': ['/artist-profiles'],
       '/product': ['/'],
       '/product/command-palette': ['/'],
       '/product/link-analytics': ['/smart-links'],
