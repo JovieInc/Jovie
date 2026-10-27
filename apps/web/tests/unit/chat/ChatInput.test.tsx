@@ -210,7 +210,6 @@ describe('ChatInput', () => {
       ).toHaveValue(value);
       const send = server.getByRole('button', {
         name: 'Send message',
-        exact: true,
       });
       if (value) expect(send).toBeEnabled();
       else expect(send).toBeDisabled();

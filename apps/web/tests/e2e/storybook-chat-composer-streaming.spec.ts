@@ -61,7 +61,7 @@ for (const viewport of [
         return { pending, complete: box() };
       });
 
-    await testInfo.attach('composer-toolbar-arrival', {
+    await testInfo.attach('composer-toolbar-arrival.json', {
       body: JSON.stringify(geometry),
       contentType: 'application/json',
     });
