@@ -661,21 +661,32 @@ describe('UnifiedSidebar library route', () => {
     const fetchMock = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(() => new Promise(() => {}));
-    renderUnifiedSidebar({
-      pathname: APP_ROUTES.ADMIN_OPS,
-      section: 'ov',
-      variant: 'ov',
-    });
-    const nav = screen.getByRole('navigation', { name: 'OV Navigation' });
-    const link = within(nav).getByRole('link', { name: 'Shipping' });
-    fireEvent.mouseOver(link);
-    fireEvent.focus(link);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/hud/shipping-state',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
-    );
-    fetchMock.mockRestore();
+    const shippingRequests = () =>
+      fetchMock.mock.calls.filter(([url]) => url === '/api/hud/shipping-state');
+
+    try {
+      renderUnifiedSidebar({
+        pathname: APP_ROUTES.ADMIN_OPS,
+        section: 'ov',
+        variant: 'ov',
+      });
+      // The lazy lists section makes its own request when it mounts. Observe
+      // Shipping specifically so chunk timing cannot masquerade as a duplicate.
+      await screen.findByRole('button', { name: 'New List' });
+      expect(shippingRequests()).toHaveLength(0);
+      const nav = screen.getByRole('navigation', { name: 'OV Navigation' });
+      const link = within(nav).getByRole('link', { name: 'Shipping' });
+      fireEvent.mouseOver(link);
+      await waitFor(() => expect(shippingRequests()).toHaveLength(1));
+      fireEvent.focus(link);
+      await waitFor(() => expect(shippingRequests()).toHaveLength(1));
+      expect(shippingRequests()[0]).toEqual([
+        '/api/hud/shipping-state',
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
+      ]);
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 
   it('renders dedicated operator navigation without the customer dashboard nav', () => {

@@ -139,10 +139,16 @@ describe('ChatsPageClient', () => {
 
     render(<ThreadsPageClient />);
 
-    expect(screen.getByRole('link', { name: 'Unread answer' })).toHaveClass(
-      'text-primary-token'
+    const unread = screen.getByRole('link', { name: 'Unread answer' });
+    expect(unread).toHaveClass('text-primary-token');
+    expect(unread).toHaveAccessibleDescription('Working · Unread');
+    expect(unread).toHaveAttribute('href', `${APP_ROUTES.CHAT}/thread-unread`);
+    const spinner = unread.querySelector('.animate-spin');
+    expect(spinner).toHaveClass('motion-reduce:animate-none');
+    expect(spinner?.querySelector('svg')).toHaveAttribute(
+      'aria-hidden',
+      'true'
     );
-    expect(document.querySelector('.anim-calm-breath')).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole('searchbox', { name: 'Search Chats' }), {
       target: { value: 'Pitch' },
@@ -152,6 +158,14 @@ describe('ChatsPageClient', () => {
     expect(
       screen.getByRole('link', { name: 'Pitch tasks' })
     ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search Chats' }), {
+      target: { value: '' },
+    });
+
+    const restoredUnread = screen.getByRole('link', { name: 'Unread answer' });
+    expect(restoredUnread).toHaveClass('text-primary-token');
+    expect(restoredUnread).toHaveAccessibleDescription('Working · Unread');
   });
 
   it('renders the empty state when the local search does not match', () => {
