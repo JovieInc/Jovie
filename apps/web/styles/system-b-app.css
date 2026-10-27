@@ -3240,9 +3240,30 @@
 }
 
 :where(.system-b-chat-composer-input-grid) {
-  /* Reserve the toolbar before its streamed HTML arrives. The same minimum
-     as min-h-9 scales with root text; auto still admits enlarged controls. */
-  grid-template-rows: auto minmax(calc(var(--spacing) * 9), auto);
+  /* Match the textarea's measured height/min-h-6 plus field pt-0.5 before
+     either child streams. Auto still admits chips and multiline drafts. */
+  --system-b-chat-composer-textarea-min-height: calc(var(--spacing) * 6);
+  grid-template-rows:
+    minmax(
+      calc(
+        max(
+          var(--system-b-chat-composer-measured-input-height),
+          var(--system-b-chat-composer-textarea-min-height)
+        ) +
+        var(--spacing) *
+        0.5
+      ),
+      auto
+    )
+    minmax(calc(var(--spacing) * 9), auto);
+}
+
+:where(
+  .system-b-chat-composer-surface[data-hero="true"]
+    .system-b-chat-composer-input-grid
+) {
+  /* Filled hero fields use min-h-7; the empty hero pill is a separate flex row. */
+  --system-b-chat-composer-textarea-min-height: calc(var(--spacing) * 7);
 }
 
 .system-b-chat-composer-input {

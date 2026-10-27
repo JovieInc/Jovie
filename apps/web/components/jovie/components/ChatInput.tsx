@@ -6,6 +6,7 @@ import { Button } from '@jovie/ui';
 import { FileAudio2, Paperclip } from 'lucide-react';
 import { motion, useReducedMotion } from 'motion/react';
 import {
+  type CSSProperties,
   forwardRef,
   type ReactNode,
   useCallback,
@@ -1318,6 +1319,11 @@ function InputRow({
         layout={reducedMotion ? false : 'size'}
         ref={containerRef}
         transition={reducedMotion ? undefined : TRANSITION_SURFACE}
+        style={
+          {
+            '--system-b-chat-composer-measured-input-height': `${measuredHeight}px`,
+          } as CSSProperties
+        }
         className={cn(
           'relative',
           // Symmetric token padding (px-4 / py-2) so placeholder + text are evenly
