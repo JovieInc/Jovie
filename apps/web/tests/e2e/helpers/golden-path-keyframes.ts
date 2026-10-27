@@ -138,6 +138,34 @@ export async function inspectEssentialViewport(
 const pageErrors = new WeakMap<Page, string[]>();
 let sequence = 0;
 
+// Attribute only inspected static API routes. Unknown paths can contain
+// credentials or account identifiers, even after removing query and fragment.
+const KEYFRAME_RESOURCE_PATHS = new Set([
+  '/api/analytics/navigation',
+  '/api/chat/usage',
+  '/api/billing/status',
+  '/api/onboarding/conversation',
+  '/api/spotify/search',
+]);
+
+function keyframeResourcePath(
+  resourceUrl: string,
+  pageUrl: string
+): string | null {
+  try {
+    // No base URL: relative and malformed locations must fail closed.
+    const resource = new URL(resourceUrl);
+    const page = new URL(pageUrl);
+    return (resource.protocol === 'http:' || resource.protocol === 'https:') &&
+      resource.origin === page.origin &&
+      KEYFRAME_RESOURCE_PATHS.has(resource.pathname)
+      ? resource.pathname
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function trackErrors(page: Page): string[] {
   let errors = pageErrors.get(page);
   if (!errors) {
@@ -146,7 +174,10 @@ function trackErrors(page: Page): string[] {
     const list = errors;
     page.on('pageerror', error => list.push(`pageerror: ${error.message}`));
     page.on('console', message => {
-      if (message.type() === 'error') list.push(message.text().slice(0, 300));
+      if (message.type() !== 'error') return;
+      const text = message.text().slice(0, 300);
+      const resource = keyframeResourcePath(message.location().url, page.url());
+      list.push(resource ? `${text} [resource: ${resource}]` : text);
     });
   }
   return errors;
