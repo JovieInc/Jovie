@@ -1052,11 +1052,12 @@ class QuotaRelayTest(unittest.TestCase):
         return "transient-server" if "HTTP 502" in text else "none"
 
     def shell(self, logs, jobs=(1,), jobs_reply=None):
-        routes = {("gh", "pr", "view"): self.VIEW,
-                  ("gh", "api", f"repos/{events.REPO}/actions/runs/900/jobs?filter=latest&per_page=100"):
-                      jobs_reply or (0, json.dumps(list(jobs)))}
+        routes = {("gh", "pr", "view"): self.VIEW}
+        for attempt in range(1, events.INFRA_RERUN_MAX_ATTEMPT + 1):
+            routes[("gh", "api", f"repos/{events.REPO}/actions/runs/900/attempts/{attempt}/jobs?per_page=100")] = \
+                jobs_reply or (0, json.dumps(list(jobs)))
         for job, log in zip(jobs, logs):
-            routes[("gh", "api", f"repos/{events.REPO}/actions/jobs/{job}/logs")] = (0, log)
+            routes[("gh", "run", "view", "--repo", events.REPO, "--job", str(job))] = (0, log)
         return Shell(routes)
 
     def relay(self, shell, run=None):
@@ -1083,6 +1084,112 @@ class QuotaRelayTest(unittest.TestCase):
         with patch.object(events, "classify_github_failure", lambda t: "primary-rate-limit" if "github-quota-deferred" in t else "none"):
             self.assertEqual(events.relay("workflow_run", {"workflow_run": {**self.RUN, "name": "PR Fleet Rules"}}, shell, set()), [])
         self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"], shell.calls)
+
+    def test_fleet_ansi_log_uses_safe_exact_attempt_view(self):
+        # Hosted gh 2.102 refuses ANSI-bearing raw API log bodies, even when
+        # stdout is captured. Its run view reader sanitizes the same bytes.
+        safe_log = "\n".join(f"PR Fleet Rules\tEnforce receipts\t{line}"
+                             for line in self.FLEET_LOG.splitlines())
+        shell = self.shell([])
+        for path in ("jobs?filter=latest&per_page=100", "attempts/1/jobs?per_page=100"):
+            shell.routes[("gh", "api", f"repos/{events.REPO}/actions/runs/900/{path}")] = (0, "[1]")
+        shell.routes[("gh", "api", f"repos/{events.REPO}/actions/jobs/1/logs")] = (
+            1, "the response contains terminal escape sequences")
+        safe_args = ("gh", "run", "view", "--repo", events.REPO, "--job", "1",
+                     "--attempt", "1", "--log")
+        shell.routes[safe_args] = (0, safe_log)
+        self.assertEqual(events.quota_failure(self.RUN, shell), "primary-rate-limit")
+        self.assertEqual(shell.made("gh", "run", "view"), [list(safe_args)])
+        self.assertFalse(any("--allow-escape-sequences" in call for call in shell.calls))
+        self.assertTrue(events.gh_read_only(list(safe_args)))
+
+    def test_log_discovery_and_reads_stay_on_the_triggering_attempt(self):
+        shell = self.shell([self.QUOTA_LOG] * 3, jobs=(1, 2, 3))
+        run = {**self.RUN, "run_attempt": 2}
+        self.assertEqual(events.quota_failure(run, shell, self.classify), "primary-rate-limit")
+        self.assertEqual(shell.calls[0][2],
+                         f"repos/{events.REPO}/actions/runs/900/attempts/2/jobs?per_page=100")
+        reads = shell.made("gh", "run", "view")
+        self.assertEqual(len(reads), 3)
+        self.assertTrue(all(call[-3:] == ["--attempt", "2", "--log"] for call in reads))
+
+    def test_production_safe_reader_uses_canonical_admission_and_existing_read_token(self):
+        from apiclient.store import MemoryLedgerStore
+        for read_token in ("read-fixture", ""):
+            with self.subTest(read_token=bool(read_token)), \
+                    patch.dict(events.os.environ, {"GH_TOKEN": "write-fixture", "GH_READ_TOKEN": read_token}, clear=True), \
+                    patch("apiclient.gh.default_store", return_value=MemoryLedgerStore()), \
+                    patch.object(events.lifecycle, "run") as execute:
+                execute.side_effect = [subprocess.CompletedProcess([], 0, "[1]", ""),
+                                       subprocess.CompletedProcess([], 0, self.QUOTA_LOG, "")]
+                self.assertEqual(events.quota_failure(self.RUN, classify=self.classify), "primary-rate-limit")
+                self.assertEqual(execute.call_count, 2)
+                safe = execute.call_args
+                self.assertEqual(safe.args[0], ["gh", "run", "view", "--repo", events.REPO,
+                                                "--job", "1", "--attempt", "1", "--log"])
+                self.assertEqual(safe.kwargs["timeout"], 60)
+                self.assertEqual(safe.kwargs["env"]["GH_TOKEN"], read_token or "write-fixture")
+                self.assertEqual(safe.kwargs["env"]["NO_COLOR"], "1")
+
+    def test_production_safe_reader_never_retries_or_waits_after_read_failure(self):
+        from apiclient.store import MemoryLedgerStore
+        for error in ("gh: API rate limit exceeded (HTTP 403)", "gh: Bad Gateway (HTTP 502)"):
+            with self.subTest(error=error), \
+                    patch("apiclient.gh.default_store", return_value=MemoryLedgerStore()), \
+                    patch("apiclient.gh.time.sleep") as sleep, patch.object(events.lifecycle, "run") as execute:
+                execute.side_effect = [subprocess.CompletedProcess([], 0, "[1]", ""),
+                                       subprocess.CompletedProcess([], 1, "", error)]
+                self.assertIsNone(events.quota_failure(self.RUN, classify=self.classify))
+                self.assertEqual(execute.call_count, 2, "one discovery and one safe read only")
+                sleep.assert_not_called()
+
+    def test_production_safe_reader_refuses_insufficient_budget_without_execution(self):
+        from apiclient.policy import credential_state
+        from apiclient.store import MemoryLedgerStore, hash_credential, now_ms
+        store, at = MemoryLedgerStore(), now_ms()
+        def seed(ledger):
+            state = credential_state(ledger, hash_credential("github", "read-fixture"), at)
+            state["buckets"]["core"] = {"limit": None, "remaining": 4,
+                                           "resetAt": at + 60000, "observedAt": at}
+        store.transact("github", seed)
+        with patch.dict(events.os.environ, {"GH_TOKEN": "write-fixture", "GH_READ_TOKEN": "read-fixture"}, clear=True), \
+                patch("apiclient.gh.default_store", return_value=store), \
+                patch.object(events.lifecycle, "run") as execute, patch("apiclient.gh.time.sleep") as sleep:
+            result = events.quota_log_gh(["gh", "run", "view", "--repo", events.REPO,
+                                          "--job", "1", "--attempt", "1", "--log"])
+            self.assertEqual(result.returncode, 75)
+            execute.assert_not_called()
+            sleep.assert_not_called()
+
+    def test_production_safe_reader_preserves_timeout_without_retry(self):
+        from apiclient.store import MemoryLedgerStore
+        args = ["gh", "run", "view", "--repo", events.REPO, "--job", "1", "--attempt", "1", "--log"]
+        with patch("apiclient.gh.default_store", return_value=MemoryLedgerStore()), \
+                patch.object(events.lifecycle, "run", side_effect=subprocess.TimeoutExpired(args, 60)) as execute, \
+                patch("apiclient.gh.time.sleep") as sleep:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                events.quota_log_gh(args)
+            execute.assert_called_once()
+            self.assertEqual(execute.call_args.kwargs["timeout"], 60)
+            sleep.assert_not_called()
+
+    def test_unknown_identity_or_unreadable_safe_log_never_authorizes_rerun(self):
+        for value in (None, True, 0, -1, "1"):
+            for field in ("id", "run_attempt"):
+                with self.subTest(field=field, value=value):
+                    shell = self.shell([self.QUOTA_LOG])
+                    self.assertIsNone(events.quota_failure({**self.RUN, field: value}, shell, self.classify))
+                    self.assertEqual(shell.calls, [])
+        for ids in ([], [True], [0], ["1"], [1, 2, 3, 4]):
+            with self.subTest(ids=ids):
+                shell = self.shell([], jobs_reply=(0, json.dumps(ids)))
+                self.assertIsNone(events.quota_failure(self.RUN, shell, self.classify))
+                self.assertFalse(shell.made("gh", "run", "view"))
+        shell = self.shell([])
+        shell.routes[("gh", "run", "view")] = (1, "log unavailable")
+        self.assertEqual(self.relay(shell), [(5, "red")])
+        self.assertFalse(shell.made("gh", "api", "-X", "POST",
+                                    f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"))
 
     def test_failed_rerun_preserves_red_until_current_healthy_reconciliation(self):
         rerun = ("gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs")
