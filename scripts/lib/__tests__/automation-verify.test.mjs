@@ -3682,13 +3682,16 @@ describe('automation-verify affected scope', () => {
   describe.each([
     [
       'apps/web/tests/e2e/utils/start-entry-layout.ts',
-      'apps/web/tests/unit/e2e/start-entry-layout.test.ts',
+      [
+        'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+        'apps/web/tests/unit/e2e/start-entry-layout.test.ts',
+      ],
     ],
     [
       'apps/web/tests/e2e/helpers/golden-path-keyframes.ts',
-      'apps/web/tests/unit/e2e/golden-path-keyframes.test.ts',
+      ['apps/web/tests/unit/e2e/start-entry-essentials.test.ts'],
     ],
-  ])('anonymous entry helper binding: %s', (source, testFile) => {
+  ])('anonymous entry helper binding: %s', (source, testFiles) => {
     const unknownNeighbor = source.replace(/\.ts$/, '-neighbor.ts');
     const selectorFiles = [
       'scripts/run-affected-tests.mjs',
@@ -3699,8 +3702,8 @@ describe('automation-verify affected scope', () => {
       const plan = buildAffectedTestPlan([source]);
 
       expect(plan.mode).toBe('selected');
-      expect(plan.mandatoryTests).toEqual([testFile]);
-      expect(plan.selectedTests).toEqual([testFile]);
+      expect(plan.mandatoryTests).toEqual(testFiles);
+      expect(plan.selectedTests).toEqual(testFiles);
       expect(buildSelectedTestCommands(plan, '1')).toEqual([
         [
           'pnpm',
@@ -3710,7 +3713,7 @@ describe('automation-verify affected scope', () => {
             'exec',
             'vitest',
             'run',
-            testFile.replace('apps/web/', ''),
+            ...testFiles.map(file => file.replace('apps/web/', '')),
             '--passWithNoTests',
             '--maxWorkers',
             '1',
@@ -3719,19 +3722,22 @@ describe('automation-verify affected scope', () => {
       ]);
     });
 
-    it('fails closed when its declared behavioral test is missing', () => {
-      const plan = buildAffectedTestPlan([source], {
-        isFileAvailable: file => file !== testFile,
-      });
+    it.each(testFiles)(
+      'fails closed when declared behavioral test %s is missing',
+      missingTest => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== missingTest,
+        });
 
-      expect(plan.mode).toBe('full');
-      expect(plan.fallbackReason).toContain(source);
-    });
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
 
     it.each([
       [unknownNeighbor],
       [source, unknownNeighbor],
-      [source, testFile, 'apps/web/lib/unknown.ts'],
+      [source, ...testFiles, 'apps/web/lib/unknown.ts'],
       [source, ...selectorFiles, 'apps/web/lib/unknown.ts'],
       [source, 'apps/web/tests/setup.ts'],
       [source, 'package.json'],
@@ -3746,13 +3752,17 @@ describe('automation-verify affected scope', () => {
       const plan = buildAffectedTestPlan([source, ...selectorFiles]);
 
       expect(plan.mode).toBe('selected');
-      expect(plan.mandatoryTests).toEqual([testFile]);
-      expect(plan.selectedTests).toEqual([testFile]);
+      expect(plan.mandatoryTests).toEqual(testFiles);
+      expect(plan.selectedTests).toEqual(testFiles);
       expect(plan.scriptVitestTests).toEqual([selectorFiles[1]]);
     });
 
     it('fails closed when the selector implementation changes without its proof', () => {
-      const plan = buildAffectedTestPlan([source, testFile, selectorFiles[0]]);
+      const plan = buildAffectedTestPlan([
+        source,
+        ...testFiles,
+        selectorFiles[0],
+      ]);
 
       expect(plan.mode).toBe('full');
     });

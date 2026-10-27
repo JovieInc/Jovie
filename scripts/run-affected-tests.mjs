@@ -87,11 +87,14 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
   ],
   [
     'apps/web/tests/e2e/utils/start-entry-layout.ts',
-    ['apps/web/tests/unit/e2e/start-entry-layout.test.ts'],
+    [
+      'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+      'apps/web/tests/unit/e2e/start-entry-layout.test.ts',
+    ],
   ],
   [
     'apps/web/tests/e2e/helpers/golden-path-keyframes.ts',
-    ['apps/web/tests/unit/e2e/golden-path-keyframes.test.ts'],
+    ['apps/web/tests/unit/e2e/start-entry-essentials.test.ts'],
   ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler

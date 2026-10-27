@@ -145,7 +145,7 @@ _URL_CREDENTIAL_REJECTION = re.compile(
 # heading alone is not a founder ask; every word in the section remains input,
 # as do headings such as "Taste approval needed" and all protected paths.
 _TASTE_EVIDENCE_HEADING = re.compile(
-    r"^(#{1,6}[ \t]+)taste(?=[ \t]*(?:\(risk[ \t]+x[ \t]+confidence\)[ \t]*)?#*[ \t]*$)",
+    r"^(#{1,6}[ \t]+)taste(?=[ \t]*(?:\(risk[ \t]+x[ \t]+confidence\)[ \t]*)?#*[ \t]*\r?$)",
     re.IGNORECASE | re.MULTILINE,
 )
 ACTIONABLE_FIX = re.compile(

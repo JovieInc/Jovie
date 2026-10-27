@@ -6,6 +6,7 @@ import {
 } from './utils/runtime-automation-bypass';
 import {
   type ClaimSignInFrame,
+  inspectStartEntryEssentialViewport,
   installDelayedGuidanceLayoutProbe,
   installReplyLayoutProbe,
 } from './utils/start-entry-layout';
@@ -76,19 +77,7 @@ async function draftProgress(page: Page) {
 }
 
 async function expectEssentials(page: Page) {
-  const selectors = [
-    '[aria-label="Chat message input" i]',
-    'button[aria-label="Send message"], button[aria-label="Stop generating"], button[aria-label="Interrupt and send"]',
-  ];
-  const whenRenderedSelectors = [
-    '[data-testid="onboarding-empty-intro"] h1',
-    '[data-testid="onboarding-flow-status"] [role="status"]',
-    '[data-testid="onboarding-turnstile-widget-frame"][data-turnstile-mount="inline"]',
-    '[data-onboarding-session] [role="alert"]',
-  ];
-  expect(
-    await inspectEssentialViewport(page, selectors, { whenRenderedSelectors })
-  ).toEqual({
+  expect(await inspectStartEntryEssentialViewport(page)).toEqual({
     supported: true,
     findings: [],
   });
@@ -144,6 +133,56 @@ declare global {
 }
 
 test.describe('current-state essential actions (JOV-7771)', () => {
+  for (const viewport of [
+    { width: 1440, height: 900, fontSize: 16 },
+    { width: 390, height: 615, fontSize: 16 },
+    { width: 390, height: 615, fontSize: 24 },
+    { width: 1440, height: 900, fontSize: 32 },
+    { width: 390, height: 844, fontSize: 32 },
+    { width: 390, height: 615, fontSize: 32 },
+  ]) {
+    test(`fresh entry keeps its entire composer visible at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px root text`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript(fontSize => {
+        const apply = () => {
+          if (!document.documentElement) return false;
+          document.documentElement.style.fontSize = `${fontSize}px`;
+          return true;
+        };
+        if (!apply()) {
+          const observer = new MutationObserver(() => {
+            if (apply()) observer.disconnect();
+          });
+          observer.observe(document, { childList: true });
+        }
+      }, viewport.fontSize);
+      await page.goto('/start');
+      await expect(page.locator('html')).toHaveCSS(
+        'font-size',
+        `${viewport.fontSize}px`
+      );
+      await expect(
+        page.locator('[data-testid="onboarding-empty-intro"] h1')
+      ).toBeVisible();
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+      });
+      await expectEssentials(page);
+      await page
+        .getByRole('textbox', { name: 'Chat message input', exact: false })
+        .fill('Tim White');
+      await expect(
+        page.getByRole('button', { name: 'Send message', exact: true })
+      ).toBeEnabled();
+      await expectEssentials(page);
+    });
+  }
+
   for (const viewport of [
     { width: 1440, height: 900, fontSize: 12 },
     { width: 390, height: 844, fontSize: 12 },

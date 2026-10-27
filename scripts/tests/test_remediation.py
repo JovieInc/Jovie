@@ -541,22 +541,27 @@ class RouterLadderTest(unittest.TestCase):
 
     def test_taste_evidence_heading_is_not_a_request_for_a_founder_decision(self):
         for heading in ("## Taste", "## Taste (risk x confidence)"):
-            body = heading + "\nTile order and names ship. Default is cut, revert is one component."
-            subject = pr(number=23155, title="feat(ovie): make Home a company HUD", body=body,
-                         statusCheckRollup=checks(conclusion="FAILURE"))
-            self.assertEqual(remediation.classify_blocker(subject)["cls"], "fixable-by-model")
-            for extra in ({"body": body + "\nTim must decide the taste direction."},
-                          {"body": body + "\nPlease update pricing."},
-                          {"labels": ["tim-hold"]},
-                          {"files": ["canon/strategy/theses.md"]}):
-                with self.subTest(heading=heading, extra=extra):
-                    self.assertEqual(remediation.classify_blocker({**subject, **extra})["cls"],
-                                     "needs-human-decision")
+            for newline in ("\n", "\r\n"):
+                body = heading + newline + "Tile order and names ship. Default is cut, revert is one component."
+                subject = pr(number=23155, title="feat(ovie): make Home a company HUD", body=body,
+                             statusCheckRollup=checks(conclusion="FAILURE"))
+                self.assertEqual(remediation.classify_blocker(subject)["cls"], "fixable-by-model")
+                for extra in ({"body": body + newline + "Tim must decide the taste direction."},
+                              {"body": body + newline + "Please update pricing."},
+                              {"labels": ["tim-hold"]},
+                              {"files": ["canon/strategy/theses.md"]}):
+                    with self.subTest(heading=heading, newline=repr(newline), extra=extra):
+                        self.assertEqual(remediation.classify_blocker({**subject, **extra})["cls"],
+                                         "needs-human-decision")
         self.assertEqual(remediation.classify_blocker(pr(body="## Taste approval needed"))["cls"],
                          "needs-human-decision")
         self.assertEqual(remediation.classify_blocker(
             pr(body="## Taste (risk x confidence) Tim must approve the direction."))["cls"],
             "needs-human-decision")
+        for body in ("## Taste approval needed\r\n",
+                     "## Taste (risk x confidence) Tim must approve the direction.\r\n"):
+            with self.subTest(body=body):
+                self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"], "needs-human-decision")
 
     def test_review_assurances_and_examples_preserve_independent_positive_asks(self):
         ordinary = (

@@ -1,4 +1,22 @@
 /** Browser probes must stay self-contained for Playwright init-script serialization. */
+import type { Page } from '@playwright/test';
+import { inspectEssentialViewport } from '../helpers/golden-path-keyframes';
+
+export async function inspectStartEntryEssentialViewport(page: Page) {
+  return inspectEssentialViewport(
+    page,
+    [
+      '[aria-label="Chat message input" i]',
+      'button[aria-label="Send message"], button[aria-label="Stop generating"], button[aria-label="Interrupt and send"]',
+    ],
+    [
+      '[data-testid="onboarding-empty-intro"] h1',
+      '[data-testid="onboarding-flow-status"] [role="status"]',
+      '[data-testid="onboarding-turnstile-widget-frame"][data-turnstile-mount="inline"]',
+      '[data-onboarding-session] [role="alert"]',
+    ]
+  );
+}
 
 export type ClaimLayoutShiftSource = {
   node: {
