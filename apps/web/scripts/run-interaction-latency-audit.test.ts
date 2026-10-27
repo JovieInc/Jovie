@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { type Browser, chromium } from '@playwright/test';
 import { describe, expect, it, vi } from 'vitest';
@@ -107,19 +106,6 @@ describe('interaction audit harness', () => {
     } finally {
       dom.window.close();
     }
-  });
-
-  it('keeps browser measurement out of source PR flights', () => {
-    const workflow = readFileSync(
-      new URL(
-        '../../../.github/workflows/interaction-latency-audit.yml',
-        import.meta.url
-      ),
-      'utf8'
-    );
-    expect(workflow).not.toMatch(/^  pull_request(?:_target)?:/m);
-    expect(workflow).toMatch(/^  workflow_dispatch:/m);
-    expect(workflow).toMatch(/^  push:/m);
   });
 
   it.each(scenarios)(

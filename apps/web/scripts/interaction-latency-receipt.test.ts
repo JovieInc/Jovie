@@ -34,6 +34,19 @@ function latestReceipt() {
 }
 
 describe('interaction latency receipt', () => {
+  it('keeps browser measurement out of source PR flights', () => {
+    const workflow = readFileSync(
+      resolve(
+        import.meta.dirname,
+        '../../../.github/workflows/interaction-latency-audit.yml'
+      ),
+      'utf8'
+    );
+    expect(workflow).not.toMatch(/^  pull_request(?:_target)?:/m);
+    expect(workflow).toMatch(/^  workflow_dispatch:/m);
+    expect(workflow).toMatch(/^  push:/m);
+  });
+
   it('records a measured median and p95 for every declared scenario', () => {
     const receipt = latestReceipt();
     expect(receipt.budgetsChanged).toBeNull();
