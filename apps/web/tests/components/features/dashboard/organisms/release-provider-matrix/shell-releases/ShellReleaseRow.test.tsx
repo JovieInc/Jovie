@@ -411,8 +411,6 @@ describe('ShellReleaseRow DSP interaction', () => {
       await user.keyboard('{Enter} ');
       expect(onSelect).not.toHaveBeenCalled();
 
-      // The row remains selectable through the same input method; only the
-      // nested DSP control owns its activation.
       if (activation === 'pointer') {
         await user.click(row);
       } else {

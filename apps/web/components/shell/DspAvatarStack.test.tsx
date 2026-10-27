@@ -278,8 +278,6 @@ describe('DspAvatarStack', () => {
     const next = screen.getByRole('button', { name: 'Next control' });
     expect(details).toHaveFocus();
 
-    // FocusScope completes unmount autofocus asynchronously. A later real
-    // focus owner must win over the earlier Escape restoration request.
     fireEvent.keyDown(details, { key: 'Escape' });
     act(() => next.focus());
     await act(async () => {

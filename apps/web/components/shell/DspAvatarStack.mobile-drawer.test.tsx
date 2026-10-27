@@ -9,14 +9,11 @@ import { ReleaseEntityHeader } from '@/components/organisms/release-sidebar/Rele
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-// Only viewport selection is controlled. The drawer, header, Popover and
-// document-level mobile focus boundary are their real implementations.
 vi.mock('@/hooks/useBreakpoint', async importOriginal => ({
   ...(await importOriginal<typeof import('@/hooks/useBreakpoint')>()),
   useBreakpointDown: () => true,
 }));
 
-// Same ten-provider release as the dedicated real-browser story.
 const drawerRelease: ReleaseViewModel = {
   id: 'dsp-drawer-release',
   profileId: 'dsp-drawer-profile',
@@ -149,8 +146,6 @@ describe('DSP details inside the real mobile release drawer', () => {
       expect(background).not.toHaveFocus();
       expect(owner.contains(document.activeElement)).toBe(true);
 
-      // The owning drawer still has a working Escape path once the nested
-      // details are gone; its previous survival was not a no-op handler.
       act(() =>
         within(owner).getByRole('button', { name: 'Close inspector' }).focus()
       );

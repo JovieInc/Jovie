@@ -77,8 +77,6 @@ export const DspDetails: Story = {
       getComputedStyle(document.documentElement).fontSize
     );
 
-    // Bind this proof to the actual dense dashboard row. The
-    // global Storybook stylesheet excludes dashboard utilities.
     await expect(rowHeight).toBe(rootFontSize * 2);
 
     for (const activation of ['pointer', 'Enter', 'Space']) {
@@ -100,8 +98,6 @@ export const DspDetails: Story = {
         });
         expect(dialog).toBeVisible();
 
-        // CSS visibility alone ignores clipping by the dense row. Both ends
-        // of the real details must paint and receive pointer hits outside it.
         for (const name of ['Spotify', 'TIDAL']) {
           const label = within(dialog).getByText(name, { exact: true });
           const bounds = label.getBoundingClientRect();

@@ -329,7 +329,7 @@ export function DspAvatarStack({
         size='bare'
         align='end'
         sideOffset={6}
-        className='w-56'
+        className='w-56 min-w-0'
         portalProps={{ container: portalContainer }}
         onOpenAutoFocus={event => {
           event.preventDefault();

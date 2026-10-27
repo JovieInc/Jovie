@@ -11,6 +11,7 @@ const CASES = [
     mobile: true,
     overflows: false,
     lastProvider: /^Qobuz$/,
+    lastStatus: 'Live',
   },
   {
     id: 'mobile-root32',
@@ -22,6 +23,7 @@ const CASES = [
     mobile: true,
     overflows: true,
     lastProvider: /^Qobuz$/,
+    lastStatus: 'Live',
   },
   {
     id: 'short-row-root32',
@@ -33,11 +35,14 @@ const CASES = [
     mobile: false,
     overflows: true,
     lastProvider: /^Tidal$/i,
+    lastStatus: 'Missing',
   },
 ] as const;
 
 async function dialogGeometry(details: Locator) {
   return details.evaluate(element => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
     scrollTop: element.scrollTop,
@@ -88,8 +93,6 @@ for (const scenario of CASES) {
       `${scenario.root}px`
     );
     if (!scenario.mobile) {
-      // Position the real row near the lower viewport edge to exercise
-      // collision handling. Do not override its clipping or panel styles.
       await page.addStyleTag({
         content:
           '#storybook-root { position: fixed; bottom: 8px; left: 0; right: 0; }',
@@ -147,8 +150,6 @@ for (const scenario of CASES) {
       expect((await dialogGeometry(details)).scrollTop).toBe(0);
     }
     await page.keyboard.press('End');
-    // Native scrolling can animate after key dispatch. Wait for the actual
-    // end position; never assign scrollTop or scroll a label into view.
     await expect
       .poll(async () => {
         const state = await dialogGeometry(details);
@@ -159,14 +160,21 @@ for (const scenario of CASES) {
       .toBeLessThan(2);
     await expect(details).toBeFocused();
     const lastLabel = list.getByText(scenario.lastProvider);
-    await expect
-      .poll(async () => {
-        const paint = await labelPaint(lastLabel);
-        return paint.inViewport && paint.hit;
-      })
-      .toBe(true);
+    const lastStatus = lastLabel
+      .locator('..')
+      .getByText(scenario.lastStatus, { exact: true });
+    for (const target of [details, lastLabel, lastStatus]) {
+      await expect
+        .poll(async () => {
+          const paint = await labelPaint(target);
+          return paint.inViewport && paint.hit;
+        })
+        .toBe(true);
+    }
     const final = await dialogGeometry(details);
+    expect(final.scrollWidth).toBeLessThanOrEqual(final.clientWidth);
     const last = await labelPaint(lastLabel);
+    const status = await labelPaint(lastStatus);
     const screenshot = info.outputPath('last-provider.png');
     await page.screenshot({ path: screenshot, fullPage: true });
     await info.attach('last-provider.png', {
@@ -174,7 +182,13 @@ for (const scenario of CASES) {
       contentType: 'image/png',
     });
     await info.attach('native-scroll.json', {
-      body: JSON.stringify({ scenario: scenario.id, initial, final, last }),
+      body: JSON.stringify({
+        scenario: scenario.id,
+        initial,
+        final,
+        last,
+        status,
+      }),
       contentType: 'application/json',
     });
 
@@ -182,7 +196,6 @@ for (const scenario of CASES) {
     await expect(details).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(details).toBeHidden();
-    // Radix delivers close autofocus after unmount, not on a fixed frame.
     await expect(trigger).toBeFocused();
     if (scenario.mobile) {
       await expect(owner).toHaveAttribute('aria-modal', 'true');
