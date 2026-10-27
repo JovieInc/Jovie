@@ -7,8 +7,6 @@ import { ReleaseEntityHeader } from '@/components/organisms/release-sidebar/Rele
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ReleaseViewModel } from '@/lib/discography/types';
 
-// Migrated from the initial InReleaseDrawer preparation without changing
-// the release/provider data. Ten providers require genuine list scrolling.
 const drawerRelease: ReleaseViewModel = {
   id: 'dsp-drawer-release',
   profileId: 'dsp-drawer-profile',

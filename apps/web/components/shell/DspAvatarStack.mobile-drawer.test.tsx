@@ -104,7 +104,7 @@ describe('DSP details inside the real mobile release drawer', () => {
       const background = screen.getByTestId('dsp-background-action');
       act(() => background.focus());
       expect(background).not.toHaveFocus();
-      expect(owner).toContainElement(document.activeElement);
+      expect(owner.contains(document.activeElement)).toBe(true);
 
       const trigger = within(owner).getByRole('button', {
         name: /^View DSP Distribution Details/i,
@@ -123,7 +123,7 @@ describe('DSP details inside the real mobile release drawer', () => {
       });
       expect(details).toHaveFocus();
       expect(owner).toContainElement(details);
-      expect(owner).toContainElement(document.activeElement);
+      expect(owner.contains(document.activeElement)).toBe(true);
       expect(
         within(list).getByText('Spotify', { exact: true })
       ).toBeInTheDocument();
@@ -147,7 +147,7 @@ describe('DSP details inside the real mobile release drawer', () => {
 
       act(() => background.focus());
       expect(background).not.toHaveFocus();
-      expect(owner).toContainElement(document.activeElement);
+      expect(owner.contains(document.activeElement)).toBe(true);
 
       // The owning drawer still has a working Escape path once the nested
       // details are gone; its previous survival was not a no-op handler.
