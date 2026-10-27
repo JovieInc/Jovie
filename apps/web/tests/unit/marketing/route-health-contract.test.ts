@@ -28,6 +28,26 @@ function signupPages(): readonly string[] {
 }
 
 describe('marketing route health contract', () => {
+  it('never treats a redirected health target as a public rendered-screen proof', () => {
+    const capture = readFileSync(
+      resolve(
+        process.cwd(),
+        'tests/product-screenshots/public-screens-proof.spec.ts'
+      ),
+      'utf8'
+    );
+    const routes = [
+      ...capture.matchAll(/screenId: '[^']+', route: '([^']+)'/g),
+    ].map(match => match[1]);
+    expect(routes.length).toBeGreaterThan(0);
+    for (const route of routes) {
+      const target = MARKETING_ROUTE_HEALTH_TARGETS.find(
+        target => target.path === route
+      );
+      if (target) expect(target.expected, route).toBe('page');
+    }
+  });
+
   it('registers the generated integrations directory as a sanctioned reference route', () => {
     const entry = getRouteManifestEntry('(marketing)/integrations/page.tsx');
     expect(entry).toMatchObject({

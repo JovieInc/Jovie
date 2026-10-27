@@ -27,9 +27,8 @@ const PUBLIC_SCREENS = [
   { screenId: 'web.brand', route: '/brand' },
   { screenId: 'web.report', route: '/report' },
   { screenId: 'web.start', route: '/start' },
-  // /solutions/* is a wildcard manifest family; /solutions/artists is its
-  // declared concrete health-check path.
-  { screenId: 'web.marketing-solutions', route: '/solutions/artists' },
+  // /solutions/artists redirects. Its destination has its own marketing
+  // proof; capturing it here would not render the registered factory source.
   // /unfazed is the reserved capture profile: the same noop-DB fallback that
   // lets the web.public-profile producer render also renders its about page.
   { screenId: 'web.public-profile-about', route: '/unfazed/about' },

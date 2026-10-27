@@ -155,14 +155,20 @@ describe('per-record sweep (JOV-7283)', () => {
       '/solutions/founders',
     ]);
     expect(targets[1]?.recordContract?.recordId).toBe('solutions.founders');
+    expect(targets[0]?.recordContract?.copyScope).toBe('music');
     // Without records the wildcard falls back to its health-check path.
     expect(sweepTargets([family], []).map(t => t.pathname)).toEqual([
       '/solutions/artists',
     ]);
+    // The real published route now redirects; its destination is swept under
+    // its own contract, without claiming the factory record was rendered.
+    const published = sweepTargets();
     expect(
-      sweepTargets().find(t => t.pathname === '/solutions/artists')
-        ?.recordContract?.copyScope
-    ).toBe('music');
+      published.find(t => t.pathname === '/solutions/artists')
+    ).toBeUndefined();
+    expect(
+      published.find(t => t.pathname === '/artist-profiles')
+    ).toBeDefined();
   });
 
   it('fails copy-scope when a record page renders a forbidden term', () => {

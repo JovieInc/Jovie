@@ -166,9 +166,9 @@ export const SCREEN_PROOF_ROUTES = Object.freeze({
   // database. Signed-out requests, including production, redirect to
   // /signin.
   'web.onboarding-checkout': '/onboarding/checkout',
-  // /solutions/* registers the whole (marketing)/solutions directory;
-  // /solutions/artists is the family's declared concrete health-check path.
-  'web.marketing-solutions': '/solutions/artists',
+  // The solutions factory remains registered below, but its only published
+  // route redirects. A destination capture cannot prove the factory source.
+  // Changes to that source still require their own exact-head evidence.
   'web.public-profile-about': '/unfazed/about',
 });
 export const SCREEN_PLATFORMS = Object.freeze(['web', 'macos-electron', 'ios']);
