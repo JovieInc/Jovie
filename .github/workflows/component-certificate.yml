@@ -84,12 +84,22 @@ jobs:
           node scripts/lib/component-certificate-summary.mjs \
             "$RUNNER_TEMP/component-certificate/report.json" >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Locate certificate report
+        id: certificate_report
+        if: always()
+        run: |
+          set -euo pipefail
+          available=false
+          if [ -s "$RUNNER_TEMP/component-certificate/report.json" ]; then available=true; fi
+          printf 'available=%s\n' "$available" >> "$GITHUB_OUTPUT"
+
       - name: Upload certificate report
-        if: ${{ always() && hashFiles('**/component-certificate/report.json') != '' }}
+        if: ${{ always() && steps.certificate_report.outputs.available == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: component-certificate-${{ github.run_id }}
           path: ${{ runner.temp }}/component-certificate/report.json
+          if-no-files-found: error
           retention-days: 30
 
       - name: Resolve CRON_SECRET

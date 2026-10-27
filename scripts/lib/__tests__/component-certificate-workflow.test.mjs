@@ -1,6 +1,17 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  globSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { renderCertificateSummary } from '../component-certificate-summary.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -8,6 +19,96 @@ const workflow = readFileSync(
   resolve(REPO_ROOT, '.github/workflows/component-certificate.yml'),
   'utf8'
 );
+const { load } = createRequire(import.meta.url)('js-yaml');
+const steps = load(workflow).jobs.certify.steps;
+const fixtureRoots = [];
+
+afterEach(() => {
+  for (const root of fixtureRoots.splice(0))
+    rmSync(root, { recursive: true, force: true });
+});
+
+/** @param {{report?: string, workspaceDecoy?: boolean}} options */
+function reportUploadEligible({ report, workspaceDecoy = false }) {
+  const root = mkdtempSync(
+    resolve(tmpdir(), 'component-certificate-artifact-')
+  );
+  fixtureRoots.push(root);
+  const workspace = resolve(root, 'workspace');
+  const runner = resolve(root, 'runner');
+  mkdirSync(workspace);
+  mkdirSync(resolve(runner, 'component-certificate'), { recursive: true });
+  if (report !== undefined)
+    writeFileSync(resolve(runner, 'component-certificate/report.json'), report);
+  if (workspaceDecoy) {
+    mkdirSync(resolve(workspace, 'component-certificate'));
+    writeFileSync(
+      resolve(workspace, 'component-certificate/report.json'),
+      '{"decoy":true}'
+    );
+  }
+  const outputPath = resolve(root, 'outputs');
+  const context = {};
+  const probe = steps.find(step => step.id === 'certificate_report');
+  if (probe) {
+    const result = spawnSync('bash', ['-c', probe.run], {
+      cwd: workspace,
+      env: { ...process.env, RUNNER_TEMP: runner, GITHUB_OUTPUT: outputPath },
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    context[probe.id] = {
+      outputs: Object.fromEntries(
+        readFileSync(outputPath, 'utf8')
+          .trim()
+          .split('\n')
+          .map(line => line.split('='))
+      ),
+    };
+  }
+  const upload = steps.find(step => step.name === 'Upload certificate report');
+  const expression = upload.if.replace(/^\$\{\{\s*|\s*\}\}$/g, '');
+  const enabled = Function(
+    'always',
+    'hashFiles',
+    'steps',
+    `return (${expression});`
+  )(
+    () => true,
+    pattern =>
+      globSync(pattern, { cwd: workspace }).length
+        ? 'workspace-file-digest'
+        : '',
+    context
+  );
+  return {
+    enabled,
+    reportExists: existsSync(
+      resolve(runner, 'component-certificate/report.json')
+    ),
+    upload,
+  };
+}
+
+describe('certificate artifact retention with separate runner and checkout roots', () => {
+  it('uploads the actual runner-temp report even when the checkout has no matching file', () => {
+    const result = reportUploadEligible({ report: '{"components":[]}' });
+    expect(result.reportExists).toBe(true);
+    expect(result.enabled).toBe(true);
+  });
+
+  it.each([undefined, ''])(
+    'does not upload a missing or empty actual report (%s)',
+    report => {
+      expect(reportUploadEligible({ report }).enabled).toBe(false);
+    }
+  );
+
+  it('does not let a workspace decoy authorize uploading a missing runner report', () => {
+    expect(reportUploadEligible({ workspaceDecoy: true }).enabled).toBe(false);
+  });
+});
 
 describe('Component Certificate workflow contract', () => {
   it('runs on the gem pool only, with no hosted fallback', () => {
