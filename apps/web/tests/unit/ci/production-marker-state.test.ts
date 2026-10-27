@@ -258,6 +258,7 @@ describe('entry ratchet artifact handoff', () => {
               encoding: 'utf8',
               timeout: 5000,
               env: {
+                NODE_ENV: 'test',
                 PATH: process.env.PATH,
                 RUNNER_TEMP: directory,
                 EXPECTED_SHA: sha,
