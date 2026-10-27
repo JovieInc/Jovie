@@ -49,6 +49,7 @@ describe('lanes release self-test env at PR time', () => {
       'packages/api-client/contract.ts',
       'ops/registry/capacity.json',
       '.nvmrc',
+      'apps/web/data/product-truth/registry.ts',
     ]) {
       expect(ids('pull_request', [file])).toContain(
         'lanes-selftest-changed-tests'
@@ -221,9 +222,10 @@ describe('shipped import closure before native enrollment', () => {
       }
       mkdirSync(join(work, 'scripts/lanes'), { recursive: true });
       mkdirSync(join(work, 'scripts/tests'), { recursive: true });
+      const catalogCase = change.startsWith('catalog-');
       writeFileSync(
         join(work, 'scripts/lanes/lane_runner.py'),
-        `RELEASE_EXTRAS = ${JSON.stringify(extras)}\nLANE_TESTS = ["scripts/tests/test_lane_runner.py"]\n`
+        `RELEASE_EXTRAS = ${JSON.stringify(extras)}\nLANE_TESTS = ${JSON.stringify(['scripts/tests/test_lane_runner.py', ...(catalogCase ? ['scripts/tests/test_design_gate.py'] : [])])}\n`
       );
       // Run the actual release closure class, including its real staged Node imports.
       writeFileSync(
@@ -249,12 +251,79 @@ class AtomicState(unittest.TestCase):
         self.assertEqual(os.environ.get("LANES_SELFTEST"), "1")
 `
       );
+      const registry = join(work, 'apps/web/data/product-truth/registry.ts');
+      const publication = value => {
+        let source = readFileSync(registry, 'utf8');
+        for (const id of ['instant-merch', 'pay', 'youtube-thumbnails']) {
+          const field = new RegExp(
+            `((?:'${id}'|${id}): \\{[\\s\\S]*?publication: )'[^']+'`
+          );
+          expect(source).toMatch(field);
+          source = source.replace(field, `$1'${value}'`);
+        }
+        writeFileSync(registry, source);
+      };
+      const regenerateCatalog = () =>
+        execFileSync(
+          'python3',
+          [
+            '-c',
+            `
+import json, sys
+from pathlib import Path
+sys.path.insert(0, 'scripts/lanes')
+import design_gate
+path = Path('scripts/lanes/certified-capabilities.gen.json')
+catalog = json.loads(path.read_text())
+catalog['ids'], catalog['registryIds'] = design_gate.certified_ids_from_registry_source(Path('apps/web/data/product-truth/registry.ts').read_text())
+path.write_text(json.dumps(catalog, indent=2) + '\\n')
+`,
+          ],
+          { cwd: work, encoding: 'utf8' }
+        );
+      if (catalogCase) {
+        mkdirSync(join(registry, '..'), { recursive: true });
+        cpSync(
+          new URL('apps/web/data/product-truth/registry.ts', sourceRoot),
+          registry
+        );
+        for (const name of [
+          'design_gate.py',
+          'certified-capabilities.gen.json',
+        ])
+          cpSync(
+            new URL(`scripts/lanes/${name}`, sourceRoot),
+            join(work, 'scripts/lanes', name)
+          );
+        const certifiedClass = readFileSync(
+          new URL('scripts/tests/test_design_gate.py', sourceRoot),
+          'utf8'
+        )
+          .split('class CertifiedSyncTest(unittest.TestCase):')[1]
+          .split('\nclass ')[0];
+        writeFileSync(
+          join(work, 'scripts/tests/test_design_gate.py'),
+          `
+import sys, unittest
+from pathlib import Path
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT / 'scripts/lanes'))
+import design_gate
+class CertifiedSyncTest(unittest.TestCase):${certifiedClass}
+`
+        );
+        publication('public');
+        regenerateCatalog();
+      }
       git(work, 'add', '-A');
       git(work, 'commit', '-q', '-m', 'complete release');
       git(work, 'push', '-q', 'origin', 'HEAD:main');
       git(work, 'checkout', '-q', '-b', 'pr');
       const module = 'scripts/merge-group-failure-hold.mjs';
-      if (change === 'missing') {
+      if (catalogCase && change !== 'catalog-unrelated') {
+        publication('unlisted');
+        if (change === 'catalog-regenerated') regenerateCatalog();
+      } else if (change === 'missing') {
         writeFileSync(
           join(work, 'scripts/closure-canary.mjs'),
           'export const canary = true;\n'
@@ -344,4 +413,26 @@ class AtomicState(unittest.TestCase):
       expect(result.status).toBe(0);
     }
   );
+
+  it('rejects registry publication drift through the actual CertifiedSyncTest', () => {
+    const result = run('catalog-stale');
+    expect(result.output).toContain('CertifiedSyncTest');
+    expect(result.output).toContain('instant-merch');
+    expect(result.status).not.toBe(0);
+  });
+
+  it('qualifies a registry change with its canonically regenerated catalog', () => {
+    const result = run('catalog-regenerated');
+    expect(result.output).toContain('CertifiedSyncTest');
+    expect(result.output).toContain('ReleaseImportClosureTest');
+    expect(result.output).toContain('Ran 7 tests');
+    expect(result.status).toBe(0);
+  });
+
+  it('does not run the catalog consistency check for an unrelated change', () => {
+    const result = run('catalog-unrelated');
+    expect(result.output).not.toContain('CertifiedSyncTest');
+    expect(result.output).toContain('no changed release self-test lanes tests');
+    expect(result.status).toBe(0);
+  });
 });

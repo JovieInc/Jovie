@@ -8,13 +8,10 @@
     "artist-notifications",
     "artist-profiles",
     "cli",
-    "instant-merch",
-    "pay",
     "public-ask",
     "public-profile",
     "release-launch",
-    "smart-links",
-    "youtube-thumbnails"
+    "smart-links"
   ],
   "registryIds": [
     "ab-testing",
