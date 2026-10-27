@@ -519,11 +519,17 @@ class RelayTest(unittest.TestCase):
 
         for status in ("CLEAN", "HAS_HOOKS", "UNSTABLE"):
             added, shell = success(status)
-            self.assertEqual(added, [(5, "cleared-red")], status)
+            self.assertEqual(added, [(5, "cleared-red"), (5, "enroll-wake")], status)
             delete = ["gh", "api", "-X", "DELETE",
                       f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]
             self.assertIn(delete, shell.calls, status)
             self.assertFalse(events.gh_read_only(delete), status)
+            # JOV-8788: the GITHUB_TOKEN DELETE wakes nothing (recursion guard),
+            # so the relay hands the now-eligible head straight to green enroll.
+            wake = ["gh", "workflow", "run", events.GREEN_ENROLL_WORKFLOW,
+                    "--repo", events.REPO, "--ref", "main", "-f", "pr_number=5"]
+            self.assertIn(wake, shell.calls, status)
+            self.assertFalse(events.gh_read_only(wake), status)
             self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], status)
         for status in ("BLOCKED", "DIRTY", "BEHIND", "UNKNOWN"):
             added, shell = success(status)
@@ -558,6 +564,16 @@ class RelayTest(unittest.TestCase):
                "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
         self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+        self.assertEqual(shell.made("gh", "workflow", "run"), [])
+
+    def test_a_green_success_that_fails_the_enroll_wake_records_it(self):
+        view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "workflow", "run"): (1, "")})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
+                         [(5, "cleared-red"), (5, "enroll-wake-failed")])
+        self.assertEqual(len(shell.made("gh", "workflow", "run")), 1)
 
     def test_a_green_lane_draft_drops_lane_fix_red_and_can_still_be_marked_green(self):
         view = pr(draft=True, merge="CLEAN", labels=["lane-fix-red"], state="OPEN", sha="h1")
@@ -1055,6 +1071,19 @@ class QuotaRelayTest(unittest.TestCase):
         self.assertNotIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/5/labels", "-f",
                           "labels[]=lane-fix-red"], shell.calls)
 
+    FLEET_LOG = ("##[group]Run node scripts/pr-fleet-rules.mjs --with-warnings\n"
+                 "##[error]Fleet rule evidence unavailable: GitHub API quota or outage (github-quota-deferred); "
+                 "not a verdict on this PR. Re-run after the quota resets.\n"
+                 "##[error]Process completed with exit code 1.")
+
+    def test_a_quota_deferred_fleet_rules_run_is_rerun_not_labelled(self):
+        """2026-10-25: 30 PRs sat red on a quota-deferred PR Fleet Rules because the relay was never
+        woken by that workflow. The marker must classify as quota so the relay re-runs it."""
+        shell = self.shell([self.FLEET_LOG])
+        with patch.object(events, "classify_github_failure", lambda t: "primary-rate-limit" if "github-quota-deferred" in t else "none"):
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": {**self.RUN, "name": "PR Fleet Rules"}}, shell, set()), [])
+        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"], shell.calls)
+
     def test_failed_rerun_preserves_red_until_current_healthy_reconciliation(self):
         rerun = ("gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs")
         for code in (1, 124, -15):
@@ -1191,6 +1220,22 @@ class ClaimCommentTest(unittest.TestCase):
 
 
 class ClaimTest(unittest.TestCase):
+    def test_explicit_queue_inventory_never_refills_and_preserves_input(self):
+        module = fake_lane(Shell())
+        module.open_prs_summary = Mock(side_effect=AssertionError('unexpected inventory refill'))
+        self.assertEqual(events.queued_prs(module, events.FIX_KINDS, inventory=[]), [])
+        rows = [pr(labels=['lane-fix-red', 'lane-fix-green'], labelsComplete=True)]
+        before = json.loads(json.dumps(rows))
+        fixed = events.queued_prs(module, events.FIX_KINDS, inventory=rows)
+        ticked = events.queued_prs(module, ('green',), inventory=rows)
+        fixed[0]['eventKinds'].append('stale')
+        self.assertEqual(ticked[0]['eventKinds'], ['green'])
+        self.assertEqual(rows, before)
+        with self.assertRaisesRegex(RuntimeError, 'event-label-inventory-incomplete'):
+            events.queued_prs(module, events.FIX_KINDS, inventory=[pr(labelsComplete=False)])
+        module.open_prs_summary.assert_not_called()
+        self.assertEqual(module.sh.calls, [])
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.host = SimpleNamespace(state=Path(self.tmp.name))
@@ -2778,3 +2823,116 @@ class GreenPublicationProofTest(unittest.TestCase):
                     self.assertFalse((host.state/'runs/ledger.jsonl').exists())
                 finally:
                     if claim:claim.lock.release()
+
+
+class WakeFileTest(unittest.TestCase):
+    """JOV-8931: the relay's gem-side wake job writes red-<pr>-<sha>-<attempt>.json
+    wake files atomically; fix-now drains them."""
+
+    def test_write_wake_file_is_atomic_and_well_named(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = events.write_wake_file(Path(tmp), pr=22868, sha="a" * 40,
+                                          run_id=987654, run_attempt=2,
+                                          red_at="2026-10-23T18:27:30Z")
+            self.assertEqual(path.name, f"red-22868-{'a' * 40}-2.json")
+            self.assertEqual(path.parent, Path(tmp) / "wake")
+            data = json.loads(path.read_text())
+            self.assertEqual(data["schema"], "jovie-lane-red-wake/v1")
+            self.assertEqual(data["pr"], 22868)
+            self.assertEqual(data["sha"], "a" * 40)
+            self.assertEqual(data["runId"], 987654)
+            self.assertEqual(data["runAttempt"], 2)
+            self.assertEqual(data["redAt"], "2026-10-23T18:27:30Z")
+            # A dot-prefixed tmp never shows up as a red-*.json wake file.
+            self.assertEqual(list(path.parent.glob("red-*.json")), [path])
+            self.assertEqual(list(path.parent.glob(".*tmp")), [])
+
+    def test_write_wake_file_replaces_whole_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            first = events.write_wake_file(Path(tmp), pr=1, sha="a" * 40, run_id=1,
+                                           run_attempt=1, red_at="2026-10-23T18:00:00Z")
+            second = events.write_wake_file(Path(tmp), pr=1, sha="a" * 40, run_id=1,
+                                            run_attempt=1, red_at="2026-10-23T18:01:00Z")
+            self.assertEqual(first, second)
+            self.assertEqual(json.loads(second.read_text())["redAt"], "2026-10-23T18:01:00Z")
+
+    def test_wake_cli_writes_one_file_per_red_pr_from_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 987654, "run_attempt": 2, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868,22869"]), 0)
+            names = sorted(p.name for p in (state / "wake").glob("red-*.json"))
+            self.assertEqual(names, [f"red-22868-{'a' * 40}-2.json", f"red-22869-{'a' * 40}-2.json"])
+            for name in names:
+                data = json.loads((state / "wake" / name).read_text())
+                self.assertEqual(data["redAt"], "2026-10-23T18:27:30Z")
+                self.assertEqual(data["sha"], "a" * 40)
+
+    def test_wake_cli_without_state_dir_is_a_no_op(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 1, "run_attempt": 1, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            env = {"GITHUB_EVENT_PATH": str(event_path), "LANES_EXECUTION_BACKEND": "local-test"}
+            env = {k: v for k, v in os.environ.items() if k != "LANES_STATE"} | env
+            with patch.dict(os.environ, env):
+                self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
+
+    def test_wake_cli_ignores_non_numeric_prs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event = {"workflow_run": {"id": 1, "run_attempt": 1, "head_sha": "a" * 40,
+                                      "updated_at": "2026-10-23T18:27:30Z"}}
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps(event))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868,bogus"]), 0)
+            names = list((state / "wake").glob("red-*.json"))
+            self.assertEqual([p.name for p in names], [f"red-22868-{'a' * 40}-1.json"])
+
+    def test_wake_cli_writes_nothing_without_workflow_run_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            event_path = Path(tmp) / "event.json"
+            event_path.write_text(json.dumps({"push": {}}))
+            state = Path(tmp) / "state"
+            with patch.dict(os.environ, {"LANES_STATE": str(state),
+                                         "GITHUB_EVENT_PATH": str(event_path)}):
+                self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
+            self.assertFalse((state / "wake").exists())
+
+
+class RedBeforeGreenEvidenceTests(unittest.TestCase):
+    PR = {"number": 7, "headRefOid": "a" * 40, "statusCheckRollup": [
+        {"name": "Source Validation", "conclusion": "FAILURE",
+         "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
+
+    def test_block_carries_the_failing_run_and_red_output_and_passes_the_parser_shape(self):
+        block = events.red_before_green_block(self.PR, "### Source Validation\n# not a heading\nAssertionError: x")
+        self.assertIn("Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123", block)
+        self.assertTrue(events.red_section_complete("Intro\n\n" + block + "\n\n## Next\nx"))
+        self.assertNotIn("\n# not a heading", block, "a log line must not end the section")
+
+    def test_no_red_check_means_no_block(self):
+        self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
+
+    def test_placeholder_section_is_replaced_and_complete_one_is_untouched(self):
+        block = events.red_before_green_block(self.PR, "FAIL x")
+        body = "## Summary\nx\n\n## Red-before-green\n\nFailing command:\n\n## Blast radius\ny\n"
+        updated = events.with_red_section(body, block)
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertIn("## Blast radius\ny", updated)
+        self.assertEqual(updated.count("## Red-before-green"), 1)
+        self.assertFalse(events.red_section_complete(body))
+
+    def test_ensure_edits_only_an_incomplete_body(self):
+        for body, edits in (("## Summary\nx", 1), (events.red_before_green_block(self.PR), 0)):
+            shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
+            events.ensure_red_before_green(self.PR, "FAIL x", shell)
+            self.assertEqual(len(shell.made("pr", "edit")), edits)

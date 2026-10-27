@@ -32,11 +32,11 @@ describe('UtmLinksLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/utm-links/UtmLinksLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent(UTM_LINKS_COPY.headline);
     expect(heading).toHaveAttribute('data-wrap', 'editorial-title');
-    expect(heading).toHaveClass('utm-links-title');
+    expect(heading).toHaveClass('product-feature-title');
     expect(heading).not.toHaveClass('line-clamp-2');
     expect(screen.getByText(UTM_LINKS_COPY.support)).toBeVisible();
 
@@ -52,7 +52,7 @@ describe('UtmLinksLanding', () => {
     ).not.toBeInTheDocument();
 
     const panel = screen.getByTestId('utm-links-panel');
-    expect(panel).toHaveClass('rounded-3xl', 'border', 'border-subtle');
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
 
     for (const link of UTM_LINKS_COPY.links) {
       expect(screen.getByRole('link', { name: link.label })).toHaveAttribute(

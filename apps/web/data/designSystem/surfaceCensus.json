@@ -29,6 +29,7 @@
         "apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx",
         "apps/web/app/app/(shell)/admin/algorithm-health/page.tsx",
         "apps/web/app/app/(shell)/admin/campaigns/page.tsx",
+        "apps/web/app/app/(shell)/admin/capacity/page.tsx",
         "apps/web/app/app/(shell)/admin/certifications/page.tsx",
         "apps/web/app/app/(shell)/admin/chat-playground/page.tsx",
         "apps/web/app/app/(shell)/admin/chat/page.tsx",
@@ -388,9 +389,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T19:00:44.000Z",
-        "ref": "PR 22831 single-container renewal: header, hero and footer share one .public-container edge on /pricing (x 71-1369 at 1440, 24-366 at 390, no horizontal overflow), measured with a Playwright run against the dev build of the PR source (merge base of main a4eb75a8627); full-page captures at 1440 and 390; prior JOV-8097 interaction states unchanged",
-        "sourceDigest": "c9b5369b7347ee82a453dd6ef25fec3f8ca61eeca9b0e43f60248c4fd8598c22"
+        "at": "2026-10-23T22:18:41.922Z",
+        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements.",
+        "sourceDigest": "8e04962d231d816b3936aaef2002e05d3d28994daa8a970035b91ce66eca8536"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
@@ -681,6 +682,13 @@
       "to": "holdout",
       "at": "2026-10-23T18:26:27.418Z",
       "evidence": "PR #22804 re-registers the command palette product page after merging main including pre-save. Original branch observation: 2026-10-23T12:30:00Z; previous repair registration: 2026-10-23T16:58:51Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/capacity/page.tsx",
+      "from": null,
+      "to": "migrating",
+      "at": "2026-10-26T02:17:00Z",
+      "evidence": "PR #23313 introduces the admin agent plans page inside the admin shell migration (JOV-8098); source registration only."
     }
   ]
 }

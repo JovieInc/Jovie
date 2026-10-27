@@ -1,6 +1,6 @@
 {
   "name": "jovie-monorepo",
-  "version": "26.10.14",
+  "version": "26.10.16",
   "private": true,
   "config": {
     "commitizen": {
@@ -55,15 +55,15 @@
       "@opentelemetry/propagator-jaeger": "2.10.0",
       "@vitest/browser": "5.0.5",
       "sharp": "0.35.5",
-      "body-parser@^1.0.0": "1.20.6",
-      "body-parser@^2.0.0": "2.3.0",
-      "fast-uri": "3.1.4",
+      "body-parser@^1.0.0": "1.20.9",
+      "body-parser@^2.0.0": "2.4.0",
+      "fast-uri": "3.1.9",
       "form-data": "4.0.6",
       "kysely": "0.28.17",
       "ajv@^8.0.0": "^8.18.0",
       "undici": ">=6.27.0",
       "webpack": "5.105.0",
-      "qs": "6.15.2",
+      "qs": "6.16.1",
       "js-cookie": "3.0.7",
       "ws": "8.22.0",
       "devalue": "5.8.1",
@@ -84,7 +84,11 @@
       "playwright-core": "1.60.0",
       "@apidevtools/json-schema-ref-parser>js-yaml": "^5.2.2",
       "promptfoo>js-yaml": "^5.2.2",
-      "@peculiar/asn1-schema": "2.9.5"
+      "@peculiar/asn1-schema": "2.9.5",
+      "zod@4.1.11": "4.6.7",
+      "zod@4.3.6": "4.6.7",
+      "zod@3.22.4": "4.6.7",
+      "@lhci/utils>lighthouse": "13.4.1"
     },
     "patchedDependencies": {
       "@better-auth/oauth-provider@1.7.6": "patches/@better-auth__oauth-provider@1.7.6.patch",
@@ -199,6 +203,8 @@
     "ci:incident-contract:validate": "node scripts/ci-release-incident-contract.mjs",
     "postmortem:linkage:check": "node scripts/postmortem-linkage-check.mjs",
     "postmortem:review": "node scripts/postmortem-review.mjs",
+    "preflight": "node scripts/preflight.mjs",
+    "ci:rounds": "node scripts/ci-rounds-report.mjs",
     "ci:duration-ratchet": "node scripts/ci-duration-ratchet.mjs",
     "ci:duration-ratchet:validate": "node scripts/ci-duration-ratchet.mjs validate",
     "ci:duration-ratchet:check": "node scripts/ci-duration-ratchet.mjs check",
@@ -282,6 +288,7 @@
     "component-ownership:test": "node --test scripts/component-ownership-check.test.mjs",
     "design-eight-invariants:test": "node --test scripts/component-ownership-check.test.mjs && vitest --root scripts --config vitest.config.mts run lib/__tests__/component-rendered-invariant-policy.test.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/home/homepage-certified-optical-grid.test.ts tests/unit/home/homepage-optical-polish-v1.test.tsx",
     "design:conformance:gate": "pnpm design:conformance:test && pnpm design:conformance:check && pnpm design:oklch-palette:check && pnpm design:shared-ui-visual-arbitrary:check && pnpm design:frontend-skill:check",
+    "anti-slop:check": "node scripts/anti-slop/run.mjs validate",
     "design:frontend-skill:check": "node scripts/design-frontend-skill-check.mjs --diff-base origin/main",
     "design:governance:audit": "node scripts/design-governance-audit.mjs",
     "design:drift-ledger": "node scripts/design-drift-ledger.mjs --update",

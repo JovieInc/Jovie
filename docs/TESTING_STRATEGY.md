@@ -303,7 +303,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Ovie Typecheck (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck` |
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
-| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test` |
 | `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |
@@ -327,6 +327,23 @@ Sensitive changes are classified deterministically on source PRs. Smoke and prev
 | Environment and runtime config | high | yes | yes | no |
 | Public UI and profile surfaces | medium | no | yes | no |
 <!-- ci-harness:end -->
+
+### Pre-merge exact marketing route capture
+
+`tests/product-screenshots/marketing-routes.spec.ts` (every registered marketing
+route, console/HTTP/axe quality checks, no retries) used to run only on main push
+in `screenshots.yml`, so failing feature pages merged untested. It now also runs
+before merge, unchanged, in two places on builds those lanes already make:
+
+- PRs that change marketing inputs: `PR Visual Review` -> `Capture changed UI
+  (desktop + mobile)` -> step `Capture exact marketing routes (marketing-routes.spec.ts)`.
+- The merge queue (`run_marketing_dom`): `Visual Snapshot Compare` -> the same
+  step name. `PR Ready` requires that job whenever marketing inputs are
+  selected, so a failing route is ejected from the queue before it reaches main.
+
+Keep the spec, config and flags identical to `screenshots.yml`'s
+`Capture exact marketing routes` step; `.github/scripts/marketing-dom-workflow.test.mjs`
+fails if they drift.
 
 ### Adopting intentional visual changes
 

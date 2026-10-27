@@ -38,7 +38,7 @@ describe('IsrcLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/isrc/IsrcLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       ISRC_COPY.headline
     );
@@ -55,7 +55,7 @@ describe('IsrcLanding', () => {
     expect(within(editor).getByText(ISRC_FIXTURE.tracks[0].isrc)).toBeVisible();
 
     const panel = screen.getByTestId('isrc-panel');
-    expect(panel).toHaveClass('rounded-3xl', 'border', 'border-subtle');
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
 
     for (const link of ISRC_COPY.links) {
       expect(screen.getByRole('link', { name: link.label })).toHaveAttribute(

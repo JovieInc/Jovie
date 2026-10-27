@@ -5,6 +5,9 @@ from __future__ import annotations
 
 import base64, calendar, json, os, subprocess, sys, time, urllib.request
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 APP_ID = os.environ.get("JOVIE_BOT_APP_ID", "2934433")
 INSTALLATION_ID = os.environ.get("JOVIE_BOT_INSTALLATION_ID", "112037986")
@@ -36,7 +39,7 @@ def token(now: int | None = None) -> str:
     CACHE.parent.mkdir(parents=True, exist_ok=True)
     old = os.umask(0o077)
     try:
-        CACHE.write_text(json.dumps({"token": data["token"], "expiresAt": expires}))
+        atomic_write_text(CACHE, json.dumps({"token": data["token"], "expiresAt": expires}))
     finally:
         os.umask(old)
     return data["token"]

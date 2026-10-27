@@ -43,7 +43,7 @@ describe('PreSaveLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/pre-save/PreSaveLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
       PRE_SAVE_COPY.headline
     );
@@ -62,7 +62,7 @@ describe('PreSaveLanding', () => {
     expect(within(countdown).getByText('YR')).toBeVisible();
 
     const panel = screen.getByTestId('pre-save-panel');
-    expect(panel).toHaveClass('rounded-3xl', 'border', 'border-subtle');
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
 
     for (const link of PRE_SAVE_COPY.links) {
       expect(screen.getByRole('link', { name: link.label })).toHaveAttribute(

@@ -7,7 +7,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "43e227649b57a96160f38afb85023e0bdefde8e551f69235e49765ae80fa052d"
+    "bodySha256": "4a7155851f35a74b98c58dff79391b949cec590b8c8ae0be609407b7103f5bb7"
   },
   {
     "file": ".claude/rules/code-style.md",
@@ -18,6 +18,11 @@
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
     "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
+  },
+  {
+    "file": ".claude/rules/domain-writes.md",
+    "paths": ["apps/web/**"],
+    "bodySha256": "95d9db99d51c78dd7d07d0836f4692415ef8c2180896e9ed820fae44c99601c4"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -53,7 +58,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "f946155ee825bd90ecab6f451012b05f69fe819e0e615748c8d07be5f6580199"
+    "bodySha256": "46fa336beeef6a6d9bfba990205368a7af77f17a50a405ef4451d303bf706a81"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -103,7 +108,7 @@
       "apps/ios/Packages/JovieKit/**",
       "docs/macos/**"
     ],
-    "bodySha256": "d1f70045679136a6f2e7c273318e1d606163d570cdedb03094c7934d8b83ebd5"
+    "bodySha256": "bfabfbafb0ea988e669fba7b3ea3b4c62810855ea3f977a112746271a8ba77ab"
   },
   {
     "file": ".claude/rules/motion.md",
@@ -135,7 +140,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "58152f4ec8c78b5f966f72df3eba353992a1d6bfd2f853220634c3406a59e90b"
+    "bodySha256": "7dee862a9ed0c472a84092c02648891b2cb8790fcbbf26e894ea5997e5799ad7"
   },
   {
     "file": ".claude/rules/security.md",
@@ -146,7 +151,7 @@
       ".github/**",
       "scripts/**"
     ],
-    "bodySha256": "2f5b5b01bd34142deb0a9a71784152ebe60d1be2c18e56bb7cd6aaa44a68d3fa"
+    "bodySha256": "8fc3a2864799b7d08f7512eeda0c5ec7a074e6b2f1c283ab750fc50d60b77e30"
   },
   {
     "file": ".claude/rules/swarm.md",
@@ -166,7 +171,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "07808bc5df7c7a6f5ffbaba2c2547ca58d6223b47f976708a4abe960a754dea3"
+    "bodySha256": "a3607894c34105c8152b296e3a26cfbdd01d8d9b4db61841119849217ba3ef9c"
   },
   {
     "file": ".claude/rules/ui.md",
@@ -177,6 +182,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "d658f8e48f3cd948d64e2676b020486b9c945618bbb163d09d0a6614da590bf2"
+    "bodySha256": "09c791e90bb8d3b89d72a2d24ae7c7fd6edb1097c2f2f204f4372006f549911c"
   }
 ]

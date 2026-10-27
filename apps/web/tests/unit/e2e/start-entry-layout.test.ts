@@ -105,6 +105,13 @@ describe('start entry layout probes', () => {
       document.querySelector('#claim-delay-guidance')!.remove();
       paintFrame();
       expect(window.__claimInitialLayout?.guided).toEqual([10, 20, 30, 40]);
+      expect(window.__claimInitialLayout?.firstDetail).toMatchObject({
+        composer: 'y=20.0 h=44.0',
+        textarea: 'y=30.0 h=44.0 style=',
+      });
+      expect(window.__claimInitialLayout?.guidedDetail).toEqual(
+        window.__claimInitialLayout?.firstDetail
+      );
       expect(frames).toHaveLength(0);
       expect(observe).toHaveBeenCalledTimes(supported ? 1 : 0);
     }
@@ -153,6 +160,9 @@ describe('start entry layout probes', () => {
       { value: 0.4, hadRecentInput: true },
     ]);
     expect(window.__claimInitialLayout?.total).toBe(0.2);
+    expect(window.__claimInitialLayout?.entries).toEqual([
+      { value: 0.2, startTime: 0, sources: undefined },
+    ]);
     deliverShifts([{ value: Number.NaN, hadRecentInput: false }]);
     expect(window.__claimInitialLayout?.total).toBeNaN();
   });

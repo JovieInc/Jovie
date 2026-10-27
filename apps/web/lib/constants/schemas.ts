@@ -10,6 +10,8 @@ export const SCHEMA_IDS = {
   organization: `${BASE_URL}#organization`,
   website: `${BASE_URL}#website`,
   software: `${BASE_URL}#software`,
+  founder: `${BASE_URL}/tim#person`,
+  aboutPage: `${BASE_URL}/about#webpage`,
 } as const;
 
 /** Reusable schema fragments shared across marketing pages */
@@ -79,8 +81,28 @@ export function buildWebsiteSchema(overrides: {
   });
 }
 
+/** Offer shape accepted by buildSoftwareSchema (schema.org Offer subset). */
+type SoftwareApplicationOffer = {
+  readonly '@type': 'Offer';
+  readonly name?: string;
+  readonly price: string;
+  readonly priceCurrency: string;
+  readonly description?: string;
+  readonly availability?: string;
+};
+
 /** Build a SoftwareApplication schema with page-specific description */
-export function buildSoftwareSchema(description: string) {
+export function buildSoftwareSchema(
+  description: string,
+  /**
+   * Canonical offer truth for the page. Defaults to the shared free-offer
+   * fragment; pages carrying billing claims (e.g. the homepage artist-profile
+   * launch, JOV-8565) pass offers derived from lib/billing/offer-truth.
+   */
+  offers:
+    | SoftwareApplicationOffer
+    | readonly SoftwareApplicationOffer[] = SCHEMA_FRAGMENTS.offers
+) {
   return jsonLd({
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -90,7 +112,7 @@ export function buildSoftwareSchema(description: string) {
     url: BASE_URL,
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
-    offers: SCHEMA_FRAGMENTS.offers,
+    offers,
     // aggregateRating intentionally omitted — no verified user reviews yet
     author: { '@id': SCHEMA_IDS.organization },
   });
@@ -102,6 +124,10 @@ export function buildOrganizationSchema(overrides: {
   description: string;
   /** Only include founder-confirmed public identity URLs. */
   sameAs?: string[];
+  /** Person node (by @id) that founded the organization. */
+  founderId?: string;
+  /** Overrides the default support contact point, for example to add an email. */
+  contactPoint?: Record<string, unknown>;
 }) {
   return jsonLd({
     '@context': 'https://schema.org',
@@ -114,11 +140,54 @@ export function buildOrganizationSchema(overrides: {
     image: `${BASE_URL}/og/default.png`,
     description: overrides.description,
     ...(overrides.sameAs?.length ? { sameAs: overrides.sameAs } : {}),
-    contactPoint: SCHEMA_FRAGMENTS.contactPoint,
+    contactPoint: overrides.contactPoint ?? SCHEMA_FRAGMENTS.contactPoint,
     address: SCHEMA_FRAGMENTS.address,
+    ...(overrides.founderId ? { founder: { '@id': overrides.founderId } } : {}),
     foundingDate: '2024',
     additionalType: 'https://schema.org/SoftwareApplication',
     knowsAbout: [...COMPANY_IDENTITY.knowsAbout],
+  });
+}
+
+/**
+ * Build the founder Person node. Minimal on purpose: name, role, employer and
+ * verified identity links only. No biography (Tim, 2026-10-26).
+ */
+export function buildFounderSchema(overrides: {
+  name: string;
+  url: string;
+  /** Only include URLs verified to exist and to belong to this person. */
+  sameAs?: string[];
+}) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Person',
+    '@id': SCHEMA_IDS.founder,
+    name: overrides.name,
+    jobTitle: 'Founder',
+    url: overrides.url,
+    worksFor: { '@id': SCHEMA_IDS.organization },
+    ...(overrides.sameAs?.length ? { sameAs: overrides.sameAs } : {}),
+  });
+}
+
+/** Build an AboutPage node that points at the organization it describes. */
+export function buildAboutPageSchema(overrides: {
+  name: string;
+  description: string;
+  url: string;
+}) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    '@id': SCHEMA_IDS.aboutPage,
+    name: overrides.name,
+    description: overrides.description,
+    url: overrides.url,
+    inLanguage: 'en-US',
+    isPartOf: { '@id': SCHEMA_IDS.website },
+    about: { '@id': SCHEMA_IDS.organization },
+    mainEntity: { '@id': SCHEMA_IDS.organization },
   });
 }
 
@@ -221,7 +290,8 @@ const LISTEN_ACTION_PRIORITY: readonly string[] = [
 
 export function buildListenActions(
   providerLinks: Array<{ providerId: string; url: string }>,
-  providerLabels?: Record<string, { label: string }>
+  providerLabels?: Record<string, { label: string }>,
+  maxActions = 5
 ): Array<Record<string, unknown>> {
   return [...providerLinks]
     .filter(link => link.url)
@@ -230,7 +300,7 @@ export function buildListenActions(
       const bi = LISTEN_ACTION_PRIORITY.indexOf(b.providerId);
       return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
     })
-    .slice(0, 5)
+    .slice(0, maxActions)
     .map(link => ({
       '@type': 'ListenAction',
       target: {

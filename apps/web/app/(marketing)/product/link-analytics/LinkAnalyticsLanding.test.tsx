@@ -41,7 +41,7 @@ describe('LinkAnalyticsLanding', () => {
       'data-marketing-owner',
       'apps/web/app/(marketing)/product/link-analytics/LinkAnalyticsLanding.tsx'
     );
-    expect(hero).toHaveAttribute('data-accent', 'ion');
+    expect(hero.closest('[data-accent="ion"]')).not.toBeNull();
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toHaveTextContent(LINK_ANALYTICS_COPY.headline);
@@ -52,12 +52,7 @@ describe('LinkAnalyticsLanding', () => {
     const analytics = screen.getByTestId('release-smart-link-analytics');
     expect(analytics).toBeVisible();
     const panel = screen.getByTestId('link-analytics-panel');
-    expect(panel).toHaveClass(
-      'rounded-3xl',
-      'border',
-      'border-subtle',
-      'bg-surface-1'
-    );
+    expect(panel).toHaveClass('marketing-rounded-frame', 'border');
     expect(panel).toContainElement(analytics);
     expect(screen.getByText('Total Clicks')).toBeVisible();
 

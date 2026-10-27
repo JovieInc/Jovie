@@ -48,13 +48,17 @@ export interface EssentialViewportAudit {
   }[];
 }
 
-/** State-specific actions only: transcript/list items may legitimately scroll. */
+/**
+ * State-specific actions only: transcript/list items may legitimately scroll.
+ * Optional states are selected and audited in the same browser snapshot.
+ */
 export async function inspectEssentialViewport(
   page: Page,
-  selectors: readonly string[]
+  selectors: readonly string[],
+  optionalSelectors: readonly string[] = []
 ): Promise<EssentialViewportAudit> {
   // Plain JS avoids transpiler helpers in serialized browser functions.
-  return page.evaluate(`((selectors) => {
+  return page.evaluate(`((selectors, optionalSelectors) => {
     const viewport = window.visualViewport;
     if (!viewport) return { supported: false, findings: [] };
     const findings = [];
@@ -66,8 +70,9 @@ export async function inspectEssentialViewport(
       }
       return true;
     };
-    for (const selector of selectors) {
+    for (const selector of new Set([...selectors, ...optionalSelectors])) {
       const matches = Array.from(document.querySelectorAll(selector)).filter(visible);
+      if (!matches.length && !selectors.includes(selector)) continue;
       if (matches.length !== 1) {
         findings.push({ selector, reason: matches.length ? 'duplicate' : 'missing' });
         continue;
@@ -117,7 +122,7 @@ export async function inspectEssentialViewport(
       if (points.some(([px,py]) => occludedAt(px, py))) findings.push({ selector, reason: 'occluded', box });
     }
     return { supported: true, findings };
-  })(${JSON.stringify(selectors)})`);
+  })(${JSON.stringify(selectors)}, ${JSON.stringify(optionalSelectors)})`);
 }
 
 const pageErrors = new WeakMap<Page, string[]>();

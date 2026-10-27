@@ -280,6 +280,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // select the identical files with complementary -k expressions so every
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/prod-errors/test_prod_errors.py',
       'scripts/tests/test_gh_retry.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',
@@ -353,8 +354,14 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(LANES_PYTEST_FILES).toHaveLength(32);
+    expect(whole).toContain('scripts/tests/test_factory_signals.py');
+    expect(whole).toContain('scripts/tests/test_factory_intake.py');
+    expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
+    expect(command).toContain(
+      'coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90'
+    );
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
@@ -363,6 +370,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
       combine
+    );
+    expect(command).toContain(
+      'python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90'
     );
   });
 
@@ -403,6 +413,69 @@ describe('ci-fast bounded parallel workflow', () => {
         rmSync(root, { recursive: true, force: true });
       }
     }
+  });
+
+  describe('lanes pytest retry-once', () => {
+    // Timing-sensitive lanes tests ejected unrelated product PRs from merge
+    // groups (test_update_installs_tested_release_and_only_moves_the_symlink,
+    // 7 distinct PRs). A deterministic failure must still fail the shard.
+    const run = ({ failedLines, retryRc }) => {
+      const root = mkdtempSync(join(tmpdir(), 'lanes-retry-'));
+      try {
+        const bin = join(root, 'bin');
+        mkdirSync(bin);
+        const failures = failedLines
+          .map(line => `echo "FAILED ${line} - boom"`)
+          .join('\n');
+        writeFileSync(
+          join(bin, 'python3'),
+          `#!/bin/sh\necho "$COVERAGE_FILE $*" >> "${root}/calls.log"\ncase "$*" in *"coverage run -a --branch"*) exit ${retryRc} ;; esac\ncase "$COVERAGE_FILE" in *jovie-lanes-a.coverage) ${failures || ':'}; [ -n "${failedLines.length}" ] && [ "${failedLines.length}" != 0 ] && exit 1 ;; esac\nexit 0\n`,
+          { mode: 0o755 }
+        );
+        const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
+        const result = spawnSync('sh', ['-c', command], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            RUNNER_TEMP: root,
+          },
+        });
+        return { result, calls: readFileSync(join(root, 'calls.log'), 'utf8') };
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    };
+    it('passes the shard when its one failed node passes on retry, and says so', () => {
+      const { result, calls } = run({
+        failedLines: ['scripts/tests/test_x.py::T::flaky'],
+        retryRc: 0,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(
+        '::warning title=lanes pytest retry::shard a retried 1 failed node(s) once: scripts/tests/test_x.py::T::flaky'
+      );
+      expect(calls).toContain(
+        'coverage run -a --branch -m pytest scripts/tests/test_x.py::T::flaky'
+      );
+      expect(calls).toContain('-m coverage combine');
+    });
+    it('still fails when the retry fails too (deterministic regression)', () => {
+      const { result, calls } = run({
+        failedLines: ['scripts/tests/test_x.py::T::real'],
+        retryRc: 4,
+      });
+      expect(result.status).toBe(4);
+      expect(calls).not.toContain('-m coverage report');
+    });
+    it('never retries a wide failure', () => {
+      const { result, calls } = run({
+        failedLines: [1, 2, 3, 4].map(n => `scripts/tests/test_x.py::T::t${n}`),
+        retryRc: 0,
+      });
+      expect(result.status).toBe(1);
+      expect(calls).not.toContain('coverage run -a');
+    });
   });
 
   it('runs the scanner-heavy invariant suites outside the V8-coverage node --test batch', () => {
@@ -459,7 +532,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/desktop-release-guard.test.mjs',
       'scripts/desktop-release-publisher.test.mjs',
       'apps/desktop/electron-builder.yml',
-      'apps/desktop/electron-builder.staging.yml',
       'apps/desktop/scripts/notarize-release-dmg.cjs',
     ]) {
       expect(

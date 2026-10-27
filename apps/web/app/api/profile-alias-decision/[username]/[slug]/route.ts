@@ -38,6 +38,7 @@ export async function GET(
       getContentBySlug,
       findRedirectByOldSlug: (creatorProfileId, aliasSlug) =>
         findRedirectByOldSlug(creatorProfileId, aliasSlug, {
+          includeSuperseded: false,
           onError: 'throw',
         }),
       getUnpublishedReleasePresence: (creatorProfileId, aliasSlug) =>

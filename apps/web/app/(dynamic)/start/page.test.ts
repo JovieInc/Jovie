@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -10,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   getSession: vi.fn(),
   resolveSyntheticPassage: vi.fn().mockResolvedValue(null),
   resolveStartEntryProfile: vi.fn().mockResolvedValue(null),
+  getCurrentOnboardingSessionId: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('@/lib/onboarding/session', () => ({
+  getCurrentOnboardingSessionId: mocks.getCurrentOnboardingSessionId,
 }));
 
 vi.mock('next/headers', () => ({
@@ -60,6 +67,30 @@ describe('StartPage', () => {
         sessionLabel: 'pending',
       },
     });
+  });
+
+  it('seeds an empty snapshot for a visitor with no account and no onboarding cookie', async () => {
+    const result = await StartPage({ searchParams: Promise.resolve({}) });
+
+    expect(result.props.initialSnapshot).toEqual({
+      identityId: null,
+      conversationId: null,
+      owned: false,
+      messages: [],
+    });
+  });
+
+  it('never seeds a snapshot when an onboarding cookie or an account may own history', async () => {
+    mocks.getCurrentOnboardingSessionId.mockResolvedValueOnce('session-1');
+    const withCookie = await StartPage({ searchParams: Promise.resolve({}) });
+    expect(withCookie.props.initialSnapshot).toBeUndefined();
+
+    mocks.resolveUserState.mockResolvedValueOnce({
+      state: 'NEEDS_ONBOARDING',
+      context: { email: 'test@example.com' },
+    });
+    const signedIn = await StartPage({ searchParams: Promise.resolve({}) });
+    expect(signedIn.props.initialSnapshot).toBeUndefined();
   });
 
   it('passes signed-in state into the chat shell after OTP', async () => {
@@ -261,5 +292,14 @@ describe('StartPage', () => {
       expect(result.props.entryProfile).toEqual(entry);
       expect(result.props.turnstileTestMode).toBe(true);
     });
+  });
+
+  // LCP guard: a loading.tsx makes Next stream the real page behind a Suspense
+  // boundary that React reveals from a throttled inline script, so the visible
+  // heading painted 2.3s+ late and read 7.9s in the throttled-mobile entry gate
+  // (apps/web/performance-entry-budgets.json, budget 4000ms). Keep the heading
+  // in the first HTML instead.
+  it('has no loading.tsx, so the LCP heading is in the first HTML', () => {
+    expect(existsSync(path.join(__dirname, 'loading.tsx'))).toBe(false);
   });
 });

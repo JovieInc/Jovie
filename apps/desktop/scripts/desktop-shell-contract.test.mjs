@@ -4,15 +4,254 @@ import { mkdtemp, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import { runInNewContext } from 'node:vm';
+import { build } from 'esbuild';
 import ts from 'typescript';
 import { bundleDesktopPreload } from './bundle-preload.mjs';
 import { deriveStagingReleaseVersion } from './sync-version.mjs';
 
 const desktopRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const execFileAsync = promisify(execFile);
+
+const helpBuildIdentity = {
+  channel: 'production',
+  version: '26.10.11',
+  sourceRevision: 'a'.repeat(40),
+  builtAt: '2026-10-21T00:00:00.000Z',
+  provenance: 'verified',
+};
+
+const desktopContractModules = new Map();
+const desktopContractDirectories = [];
+test.after(async () => {
+  await Promise.all(
+    desktopContractDirectories.map(directory =>
+      rm(directory, { recursive: true, force: true })
+    )
+  );
+});
+
+async function loadDesktopContractModule(name) {
+  if (!desktopContractModules.has(name)) {
+    desktopContractModules.set(
+      name,
+      (async () => {
+        const directory = await mkdtemp(join(tmpdir(), 'jovie-menu-contract-'));
+        desktopContractDirectories.push(directory);
+        const filename = join(directory, `${name}-contract.mjs`);
+        const result = await build({
+          entryPoints: [join(desktopRoot, 'src', `${name}.ts`)],
+          outfile: filename,
+          bundle: true,
+          platform: 'node',
+          format: 'esm',
+          write: false,
+          sourcemap: 'inline',
+        });
+        await writeFile(filename, result.outputFiles[0].text);
+        return import(pathToFileURL(filename).href);
+      })()
+    );
+  }
+  return desktopContractModules.get(name);
+}
+
+for (const platform of ['darwin', 'win32']) {
+  test(`application menu exposes native Help and launches available links in the browser on ${platform}`, async () => {
+    const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+    const ast = ts.createSourceFile(
+      'main.ts',
+      source,
+      ts.ScriptTarget.Latest,
+      true
+    );
+    const nativeHelp = await loadDesktopContractModule('native-help-menu');
+    const navigation = await loadDesktopContractModule('navigation');
+    const imports = ['./native-help-menu', './navigation'].map(name => {
+      const node = ast.statements.find(
+        statement =>
+          ts.isImportDeclaration(statement) &&
+          statement.moduleSpecifier.text === name
+      );
+      assert.ok(node, `main must import its real ${name} owner`);
+      return node.getText(ast);
+    });
+    const declarations = [
+      'buildApplicationMenu',
+      'isAllowedExternalUrl',
+      'openExternalUrl',
+    ].map(name => {
+      const node = ast.statements.find(
+        statement =>
+          ts.isFunctionDeclaration(statement) && statement.name?.text === name
+      );
+      assert.ok(node, `real ${name} must exist`);
+      return node.getText(ast);
+    });
+    const compiled = ts.transpileModule(
+      [...imports, ...declarations].join('\n'),
+      {
+        compilerOptions: {
+          target: ts.ScriptTarget.ES2022,
+          module: ts.ModuleKind.CommonJS,
+        },
+      }
+    ).outputText;
+    const opened = [];
+    const errors = [];
+    let failOpen = false;
+    const context = {
+      exports: {},
+      require: name =>
+        name === './native-help-menu' ? nativeHelp : navigation,
+      app: { name: 'Jovie' },
+      process: { platform, arch: 'arm64' },
+      desktopBuildIdentity: helpBuildIdentity,
+      URL_DISPOSITION_OPTIONS: {
+        appUrl: 'https://jov.ie',
+        appEnv: 'production',
+      },
+      Menu: { buildFromTemplate: template => template },
+      buildViewMenu: () => [{ label: 'existing view action' }],
+      buildUpdateMenuItem: () => ({ label: 'Check for Updates' }),
+      getDesktopAppDisplayName: () => 'Jovie',
+      openPreferences() {},
+      showDesktopAboutWindow() {},
+      publicProfilePreviewWindow: null,
+      shell: {
+        openExternal: async url => {
+          if (failOpen) throw new Error('browser unavailable');
+          opened.push(url);
+        },
+      },
+      console: { error: (...args) => errors.push(args) },
+    };
+    runInNewContext(compiled, context);
+    const menu = context.buildApplicationMenu();
+    const helpMenus = menu.filter(item => item.role === 'help');
+    assert.equal(
+      helpMenus.length,
+      1,
+      'installed template must contain one Help role'
+    );
+    assert.equal(menu.at(-1), helpMenus[0], 'Help follows Window');
+    assert.deepEqual(
+      Array.from(menu, item => item.role ?? item.label),
+      platform === 'darwin'
+        ? ['Jovie', 'File', 'editMenu', 'View', 'windowMenu', 'help']
+        : ['File', 'editMenu', 'View', 'windowMenu', 'help']
+    );
+    const items = helpMenus[0].submenu;
+    assert.deepEqual(
+      Array.from(items, item => item.label ?? item.type),
+      [
+        'Jovie Support',
+        'Help Center',
+        'System Status',
+        "What's New",
+        'separator',
+        'Report a Problem',
+      ]
+    );
+    assert.deepEqual(
+      Array.from(
+        items.filter(item => item.label),
+        item => item.enabled
+      ),
+      [true, true, false, true, false]
+    );
+    assert.deepEqual(
+      opened,
+      [],
+      'constructing menus must not launch a browser'
+    );
+    for (const item of items.filter(item => item.enabled)) item.click();
+    assert.deepEqual(opened, [
+      'https://jov.ie/support',
+      'https://docs.jov.ie/',
+      'https://jov.ie/changelog',
+    ]);
+
+    // Disabled in the native menu, but its prepared callback must preserve build
+    // context through the real guarded opener when the contact owner restores it.
+    items.at(-1).click();
+    const report = new URL(opened.at(-1));
+    assert.equal(
+      report.origin + report.pathname,
+      'https://docs.jov.ie/contact'
+    );
+    assert.deepEqual(
+      JSON.parse(report.searchParams.get('desktopBuild')),
+      helpBuildIdentity
+    );
+    assert.equal(report.searchParams.get('platform'), platform);
+    assert.equal(report.searchParams.get('architecture'), 'arm64');
+
+    failOpen = true;
+    items[0].click();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(
+      errors.length,
+      1,
+      'browser failures are handled by the guarded opener'
+    );
+    failOpen = false;
+    items[0].click();
+    assert.equal(
+      opened.at(-1),
+      'https://jov.ie/support',
+      'the action can be retried'
+    );
+  });
+}
+
+test('prepared problem report preserves missing metadata, provenance, and URL encoding without private fields', async () => {
+  const { buildDesktopProblemReportUrl, buildNativeHelpMenu } =
+    await loadDesktopContractModule('native-help-menu');
+  for (const provenance of ['verified', 'development', 'unverified']) {
+    const identity = {
+      ...helpBuildIdentity,
+      sourceRevision: null,
+      builtAt: null,
+      provenance,
+    };
+    const options = {
+      identity: {
+        ...identity,
+        account: 'must not be shared',
+        currentPage: 'private',
+      },
+      platform: 'darwin & test',
+      architecture: 'arm64+test',
+    };
+    const url = new URL(buildDesktopProblemReportUrl(options));
+    assert.deepEqual(
+      [...url.searchParams.keys()],
+      ['desktopBuild', 'platform', 'architecture']
+    );
+    assert.deepEqual(
+      JSON.parse(url.searchParams.get('desktopBuild')),
+      identity
+    );
+    assert.equal(url.searchParams.get('platform'), options.platform);
+    assert.equal(url.searchParams.get('architecture'), options.architecture);
+    const opened = [];
+    const menu = buildNativeHelpMenu({
+      ...options,
+      openExternal: async value => opened.push(value),
+    });
+    menu.submenu.find(item => item.label === 'System Status').click();
+    menu.submenu.find(item => item.label === 'Report a Problem').click();
+    assert.deepEqual(opened, ['https://status.jov.ie', url.toString()]);
+    assert.equal(
+      identity.provenance,
+      provenance,
+      'report preparation must not mutate identity'
+    );
+  }
+});
 
 async function readBundledPreload(t) {
   const directory = await mkdtemp(join(tmpdir(), 'jovie-shell-preload-'));
@@ -39,7 +278,9 @@ test('desktop window enters the authenticated chat shell instead of the web root
     /await shell\.openExternal\(parsed\.toString\(\)\);/
   );
   assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_X = 20;/);
-  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 17;/);
+  // JOV-8974: 17px native + one app-shell gap (8px) — the lights ride the
+  // titlebar band down below the window's top gutter.
+  assert.match(mainSource, /const MACOS_TRAFFIC_LIGHT_Y = 25;/);
   assert.match(
     mainSource,
     /const MACOS_TRAFFIC_LIGHT_POSITION = \{\s*x: MACOS_TRAFFIC_LIGHT_X,\s*y: MACOS_TRAFFIC_LIGHT_Y,\s*\} as const;/
@@ -474,10 +715,6 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
     join(desktopRoot, 'electron-builder.local.yml'),
     'utf8'
   );
-  const stagingBuilder = await readFile(
-    join(desktopRoot, 'electron-builder.staging.yml'),
-    'utf8'
-  );
   const productionBuilder = await readFile(
     join(desktopRoot, 'electron-builder.yml'),
     'utf8'
@@ -488,7 +725,7 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   );
 
   assert.match(webWordmark, /<svg/);
-  for (const config of [localBuilder, stagingBuilder, productionBuilder]) {
+  for (const config of [localBuilder, productionBuilder]) {
     assert.match(
       config,
       /from: \.\.\/web\/public\/brand\/Jovie-Wordmark-Cream\.svg/
@@ -538,7 +775,27 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
     firstCreateWindow > preloadAwait,
     'wordmark preload must resolve before the first createWindow'
   );
-  assert.doesNotMatch(splashFn, /@keyframes|animation:|translateX\(/);
+  // splash-b-everywhere-v1 (2026-09-02): the wordmark appears, then settles to
+  // just the O. Motion is opacity/scale only (no layout shift), no sunburst.
+  assert.doesNotMatch(
+    splashFn,
+    /translateX\(|translateY\(|sunburst|conic-gradient|repeating-/
+  );
+  const keyframes = [...splashFn.matchAll(/@keyframes [\w-]+ \{([^\n]*)\}/g)];
+  assert.ok(keyframes.length >= 2, 'wordmark-to-O keyframes must exist');
+  for (const [, body] of keyframes) {
+    assert.doesNotMatch(
+      body,
+      /\b(width|height|top|left|right|bottom|margin|padding|inset|font-size)\s*:/
+    );
+  }
+  assert.match(splashFn, /SYSTEM_B_DESKTOP_TOKENS\.splashMarkSizePx/);
+  assert.match(splashFn, /class="settled-mark"/);
+  assert.match(splashFn, /data-splash-settled="o"/);
+  assert.match(
+    splashFn,
+    /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?animation: none;[\s\S]*?\.settled-mark \{ opacity: 1; \}/
+  );
   assert.doesNotMatch(splashFn, /180px/);
   assert.doesNotMatch(splashFn, /<h1>/);
   assert.doesNotMatch(splashFn, /Loading Jovie/);
@@ -548,7 +805,7 @@ test('Mac boot splash uses the locked cinematic wordmark and quiet corner mark',
   assert.doesNotMatch(mainSource, /height:\s*180px/);
 });
 
-test('Mac cinematic splash renders the static final lockup', async () => {
+test('Mac cinematic splash renders the wordmark lockup that settles to the 32px cream O', async () => {
   const mainSource = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
   const splashFn = mainSource.match(
     /function buildDesktopBootSplashHtml\(\): string \{[\s\S]*?\n\}/
@@ -587,6 +844,7 @@ test('Mac cinematic splash renders the static final lockup', async () => {
     macCornerMarkOpacity: 0.35,
     macCinematicCanvas: '#030407',
     markCream: '#F5F4F0',
+    splashMarkSizePx: 32,
   };
   const context = {
     app: { isPackaged: true },
@@ -617,8 +875,16 @@ test('Mac cinematic splash renders the static final lockup', async () => {
   assert.match(html, /data-desktop-splash="cinematic"/);
   assert.match(html, /opacity: 0\.35/);
   assert.match(html, /width: min\(40px, 1\.786vw\)/);
-  assert.doesNotMatch(html, /@keyframes|animation:|translateX\(/);
+  assert.doesNotMatch(html, /translateX\(|sunburst|conic-gradient/);
   assert.match(html, /class="suffix">for Mac<\/span>/);
+  // Settled state: the 32px cream O on the empty field.
+  assert.match(
+    html,
+    /\.settled-mark \{ width: 32px; height: 32px; color: var\(--mac-cream\)/
+  );
+  assert.match(html, /--mac-cream: #F5F4F0/);
+  assert.match(html, /<svg class="settled-mark"[^>]*data-splash-settled="o"/);
+  assert.doesNotMatch(html, /<h1>|Loading Jovie|180px/);
   assert.match(html, /data:image\/svg\+xml;base64/);
   assert.ok(
     html.includes(
@@ -651,7 +917,6 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
     'entitlements.mac.plist',
     'entitlements.mac.inherit.plist',
     'entitlements.mac.production.plist',
-    'entitlements.mac.staging.plist',
   ]) {
     const entitlements = await readFile(
       join(desktopRoot, 'build', fileName),
@@ -670,12 +935,9 @@ test('desktop macOS entitlements keep only allow-jit (no sandbox-weakening flags
 });
 
 // A keychain-access-groups entitlement the embedded profile does not
-// authorize stops the app from launching, so each channel pairs its own.
-test('signed channels pair Touch ID entitlements with a matching Developer ID profile (JOV-6727)', async () => {
-  for (const [config, bundleId] of [
-    ['electron-builder.yml', 'app.jov.ie'],
-    ['electron-builder.staging.yml', 'app.jov.ie.staging'],
-  ]) {
+// authorize stops the app from launching, so production pairs its own.
+test('production Touch ID entitlements pair with a matching Developer ID profile (JOV-6727)', async () => {
+  for (const [config, bundleId] of [['electron-builder.yml', 'app.jov.ie']]) {
     const builder = await readFile(join(desktopRoot, config), 'utf8');
     assert.match(
       builder,
@@ -792,13 +1054,11 @@ test('desktop profile navigation never loads the protected main shell', async ()
   assert.match(mainSource, /showPublicProfilePreview\(directProfileUrl\)/);
 });
 test('desktop production bundle declares the jovie auth protocol', async () => {
-  const [builderConfig, mainSource, stagingConfig, localConfig] =
-    await Promise.all([
-      readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
-      readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
-      readFile(join(desktopRoot, 'electron-builder.staging.yml'), 'utf8'),
-      readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
-    ]);
+  const [builderConfig, mainSource, localConfig] = await Promise.all([
+    readFile(join(desktopRoot, 'electron-builder.yml'), 'utf8'),
+    readFile(join(desktopRoot, 'src/main.ts'), 'utf8'),
+    readFile(join(desktopRoot, 'electron-builder.local.yml'), 'utf8'),
+  ]);
 
   assert.match(builderConfig, /CFBundleURLTypes:/);
   assert.match(builderConfig, /CFBundleURLName: Jovie Auth/);
@@ -822,18 +1082,10 @@ test('desktop production bundle declares the jovie auth protocol', async () => {
     mainSource,
     /app\.setAsDefaultProtocolClient\(AUTH_RETURN_SCHEME/
   );
-  assert.match(stagingConfig, /CFBundleURLTypes:/);
-  assert.match(stagingConfig, /CFBundleURLName: Jovie Staging Auth/);
-  assert.match(stagingConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-staging/);
-  assert.match(stagingConfig, /publish:\s*\n\s*provider: generic/);
-  assert.match(
-    stagingConfig,
-    /url: https:\/\/github\.com\/JovieInc\/Jovie\/releases\/download\/desktop-staging/
-  );
   assert.match(localConfig, /CFBundleURLTypes:/);
   assert.match(localConfig, /CFBundleURLName: Jovie Local Auth/);
   assert.match(localConfig, /CFBundleURLSchemes:\s*\n\s*- jovie-local/);
-  for (const config of [builderConfig, stagingConfig, localConfig]) {
+  for (const config of [builderConfig, localConfig]) {
     assert.match(config, /extraResources:/);
     assert.match(config, /from: build\/build-identity\.json/);
     assert.match(config, /to: build-identity\.json/);
@@ -1471,11 +1723,9 @@ test('desktop main-window hub regression contracts (desktop QA)', async () => {
   assert.match(mainSource, /function surfaceNoPendingAuthFlow\(\): void/);
   assert.match(mainSource, /surfaceNoPendingAuthFlow\(\);/);
 
-  // Fix: local builds use the staging icon shipped by electron-builder.local.yml.
-  assert.match(
-    mainSource,
-    /APP_ENV === 'production' \? 'icon\.png' : 'icon-staging\.png'/
-  );
+  // Fix: every desktop environment uses the single production icon asset.
+  assert.match(mainSource, /const APP_ICON_FILENAME = 'icon\.png';/);
+  assert.doesNotMatch(mainSource, /icon-staging/);
 
   // Fix: doc references must point at files that exist.
   assert.doesNotMatch(mainSource, /BUILDS\.md/);
@@ -1525,7 +1775,17 @@ test('hosted web app has an early Electron runtime marker before first paint', a
     /--electron-traffic-light-safe-width:\s*\d+px;/
   );
   assert.match(globalsCss, /--electron-traffic-light-x: 20px;/);
-  assert.match(globalsCss, /--electron-traffic-light-y: 17px;/);
+  assert.match(globalsCss, /--electron-traffic-light-y: 25px;/);
+  // JOV-8974: the shell keeps one gutter on every edge. The body's top
+  // padding and the titlebar band's top offset both use the shell gap.
+  assert.match(
+    globalsCss,
+    /\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\] \{[^}]*padding-top:\s*var\(--app-shell-gap\);/s
+  );
+  assert.match(
+    globalsCss,
+    /\[data-electron-titlebar="true"\] \{[^}]*top:\s*var\(--app-shell-gap\);/s
+  );
   assert.match(
     globalsCss,
     /--electron-sidebar-width: var\(--app-shell-sidebar-width\);/
@@ -1623,6 +1883,13 @@ test('macOS titlebar reserve safely contains traffic lights at every supported w
     titlebarHeight >= y + controlDiameter,
     `titlebar height (${titlebarHeight}px) must contain y=${y}px + traffic-light height`
   );
+
+  // JOV-8974: the CSS mirror of the native light position must track
+  // MACOS_TRAFFIC_LIGHT_Y — the band and the lights sit one shell gap down.
+  const cssLightY = Number(
+    globalsCss.match(/--electron-traffic-light-y:\s*(\d+)px;/)?.[1]
+  );
+  assert.equal(cssLightY, y);
 
   // Main-content clearance comes from the header-inset path: the shared top
   // row reserves the fixed control-row width so chrome never overlaps the
@@ -1972,4 +2239,99 @@ test('auth handoff uses compact outer bounds and stays inside the active work ar
     /screen\.getDisplayMatching\(mainWindow\.getBounds\(\)\)/
   );
   assert.doesNotMatch(mainSource, /const AUTH_HANDOFF_WINDOW_BOUNDS/);
+});
+
+test('View Toggle Sidebar sends one command through the real preload and unsubscribes', async t => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  const menuSource = source.slice(
+    source.indexOf('function buildViewMenu()'),
+    source.indexOf('function buildApplicationMenu()')
+  );
+  const listeners = new Map();
+  let api;
+  runInNewContext(await readBundledPreload(t), {
+    exports: {},
+    process: { platform: 'darwin', versions: { electron: '44' } },
+    document: { documentElement: { dataset: {} } },
+    require(id) {
+      assert.equal(id, 'electron');
+      return {
+        contextBridge: {
+          exposeInMainWorld(name, value) {
+            if (name === 'electronAPI') api = value;
+          },
+        },
+        ipcRenderer: {
+          on: (channel, listener) => listeners.set(channel, listener),
+          removeListener: (channel, listener) => {
+            assert.equal(listeners.get(channel), listener);
+            listeners.delete(channel);
+          },
+        },
+      };
+    },
+  });
+  let toggles = 0;
+  const unsubscribe = api.onToggleSidebar(() => toggles++);
+  let destroyed = false;
+  const context = {
+    ENABLE_DEVTOOLS: false,
+    mainWindow: {
+      isDestroyed: () => destroyed,
+      webContents: { send: channel => listeners.get(channel)?.() },
+    },
+  };
+  const compiled = ts.transpileModule(menuSource, {}).outputText;
+  const menu = runInNewContext(`${compiled}\nbuildViewMenu()`, context);
+  const toggle = menu.find(item => item.label === 'Toggle Sidebar');
+  assert.equal(toggle.accelerator, 'CommandOrControl+B');
+  toggle.click();
+  assert.equal(toggles, 1);
+  destroyed = true;
+  toggle.click();
+  assert.equal(toggles, 1);
+  context.mainWindow = null;
+  toggle.click();
+  assert.equal(toggles, 1);
+  unsubscribe();
+  assert.equal(listeners.size, 0);
+});
+
+test('Cmd+B reaches the renderer policy without consuming editor input or other menu accelerators', async () => {
+  const source = await readFile(join(desktopRoot, 'src/main.ts'), 'utf8');
+  assert.match(source, /mainWindow = win;\s+configureSidebarShortcut\(win\);/);
+  const policySource = source.slice(
+    source.indexOf('function configureSidebarShortcut('),
+    source.indexOf('function buildViewMenu()')
+  );
+  let beforeInput;
+  const ignored = [];
+  const win = {
+    webContents: {
+      on: (event, listener) => {
+        assert.equal(event, 'before-input-event');
+        beforeInput = listener;
+      },
+      setIgnoreMenuShortcuts: value => ignored.push(value),
+    },
+  };
+  const compiled = ts.transpileModule(policySource, {}).outputText;
+  runInNewContext(`${compiled}\nconfigureSidebarShortcut(win)`, { win });
+  const input = {
+    key: 'b',
+    meta: true,
+    control: false,
+    alt: false,
+    shift: false,
+  };
+  const event = {
+    preventDefault: () => assert.fail('must preserve editor key input'),
+  };
+  beforeInput(event, input);
+  beforeInput(event, { ...input, meta: false, control: true, key: 'B' });
+  beforeInput(event, { ...input, key: 'c' });
+  beforeInput(event, { ...input, shift: true });
+  beforeInput(event, { ...input, alt: true });
+  beforeInput(event, { ...input, meta: false });
+  assert.deepEqual(ignored, [true, true, false, false, false, false]);
 });

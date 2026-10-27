@@ -1,6 +1,6 @@
 {
   "name": "@jovie/web",
-  "version": "26.10.14",
+  "version": "26.10.16",
   "private": true,
   "sideEffects": false,
   "engines": {
@@ -13,9 +13,11 @@
     "dev:local:browse": "tsx scripts/drizzle-migrate.ts || echo '[dev:browse] drizzle:migrate failed - starting dev anyway (see error above)'; E2E_USE_TEST_AUTH_BYPASS=1 NEXT_PUBLIC_CLERK_MOCK=1 NEXT_PUBLIC_CLERK_PROXY_DISABLED=1 node scripts/dev-fast.mjs",
     "dev:local:playwright": "NEXT_PUBLIC_E2E_MODE=1 NEXT_DISABLE_TOOLBAR=1 node scripts/dev-fast.mjs -- --webpack",
     "backfill:audience-action-owners": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-audience-action-owners.ts",
+    "backfill:credit-spotify-ids": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-credit-spotify-ids.ts",
     "backfill:collaborator-profiles": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-collaborator-profiles.ts",
     "validate-env": "tsx scripts/validate-env.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
+    "check:stripe-price-ids": "node scripts/check-stripe-price-ids.mjs",
     "visibility-audit": "tsx scripts/visibility-audit.ts",
     "seo:ratchet": "vitest run tests/unit/seo --config=vitest.config.mts",
     "seo:ratchet:live": "tsx scripts/seo-ratchet-live-check.ts",
@@ -113,7 +115,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:synthetic": "playwright test --config=playwright.synthetic.config.ts",
     "test:e2e:golden-path": "playwright test tests/e2e/golden-path.spec.ts",
-    "test:e2e:golden-path:ci": "CI=true GOLDEN_PATH_REQUIRED=1 playwright test tests/e2e/claim-prebuilt.smoke.spec.ts tests/e2e/golden-path-home-welcome.spec.ts tests/e2e/golden-path.spec.ts tests/e2e/start-entry-continuity.spec.ts --project=chromium",
+    "test:e2e:golden-path:ci": "CI=true GOLDEN_PATH_REQUIRED=1 playwright test tests/e2e/claim-prebuilt.smoke.spec.ts tests/e2e/golden-path-home-welcome.spec.ts tests/e2e/golden-path.spec.ts tests/e2e/start-entry-continuity.spec.ts tests/e2e/entry-first-html-visual.spec.ts --project=chromium",
     "test:e2e:chat-production": "playwright test --config=playwright.chat-production.config.ts",
     "qa:journey:smoke": "PLAYWRIGHT_TEST_BASE_URL=${BASE_URL:-https://jov.ie} playwright test tests/e2e/canary-auth-signup-onboarding.spec.ts --config=playwright.synthetic.config.ts",
     "qa:journey:scout": "tsx scripts/journey-scout.ts",

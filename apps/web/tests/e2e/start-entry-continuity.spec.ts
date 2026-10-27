@@ -2,6 +2,7 @@ import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { inspectEssentialViewport } from './helpers/golden-path-keyframes';
 import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 import {
+  inspectStartEntryEssentialViewport,
   installDelayedGuidanceLayoutProbe,
   installReplyLayoutProbe,
 } from './utils/start-entry-layout';
@@ -18,6 +19,7 @@ function expectZeroLayoutShift(
         supported: boolean;
         total: number | null;
         entries?: readonly unknown[];
+        composerFrames?: readonly string[];
       }
     | undefined,
   testInfo: TestInfo
@@ -29,7 +31,7 @@ function expectZeroLayoutShift(
     if (metric!.entries) {
       expect(
         metric!.total,
-        `layout-shift entries ${JSON.stringify(metric!.entries)}`
+        `layout-shift entries ${JSON.stringify(metric!.entries)} composerFrames ${JSON.stringify(metric!.composerFrames)}`
       ).toBe(0);
     } else {
       expect(metric!.total).toBe(0);
@@ -52,6 +54,7 @@ async function readReplyLayout(page: Page) {
       supported: metric.supported,
       total: metric.total,
       entries: window.__claimLayoutEntries ?? [],
+      composerFrames: window.__claimComposerFrames ?? [],
     };
   });
 }
@@ -69,19 +72,7 @@ async function draftProgress(page: Page) {
 }
 
 async function expectEssentials(page: Page) {
-  const selectors = [
-    '[aria-label="Chat message input" i]',
-    'button[aria-label="Send message"], button[aria-label="Stop generating"], button[aria-label="Interrupt and send"]',
-  ];
-  for (const selector of [
-    '[data-testid="onboarding-empty-intro"] h1',
-    '[data-testid="onboarding-flow-status"] [role="status"]',
-    '[data-testid="onboarding-turnstile-widget-frame"][data-turnstile-mount="inline"]',
-    '[data-onboarding-session] [role="alert"]',
-  ]) {
-    if (await page.locator(selector).isVisible()) selectors.push(selector);
-  }
-  expect(await inspectEssentialViewport(page, selectors)).toEqual({
+  expect(await inspectStartEntryEssentialViewport(page)).toEqual({
     supported: true,
     findings: [],
   });
@@ -193,7 +184,8 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       expect(metric?.guided).toHaveLength(4);
       for (let index = 0; index < 4; index++) {
         expect(
-          Math.abs(metric!.first![index]! - metric!.guided![index]!)
+          Math.abs(metric!.first![index]! - metric!.guided![index]!),
+          `element ${index} (h1, composer, input, send) y first=${JSON.stringify(metric!.first)} guided=${JSON.stringify(metric!.guided)} firstDetail=${JSON.stringify(metric!.firstDetail)} guidedDetail=${JSON.stringify(metric!.guidedDetail)}`
         ).toBeLessThanOrEqual(1);
       }
       await expectEssentials(page);
@@ -301,11 +293,24 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     let chatPosts = 0;
     await page.route('**/api/chat', async route => {
       if (route.request().method() === 'POST') chatPosts++;
+      // The first real send mints the signed onboarding cookie. A server-seeded
+      // fresh /start (#23270) treats a cookieless reload as a new visitor and
+      // resends the starter, so keep the server's Set-Cookie on the fixture
+      // reply: the reload below must look like production, where the cookie
+      // exists after the first send.
+      const serverCookie =
+        route.request().method() === 'POST'
+          ? await route
+              .fetch()
+              .then(response => response.headers()['set-cookie'])
+              .catch(() => undefined)
+          : undefined;
       await replyReady;
       await route.fulfill({
         headers: {
           'content-type': 'text/event-stream',
           'x-vercel-ai-ui-message-stream': 'v1',
+          ...(serverCookie ? { 'set-cookie': serverCookie } : {}),
         },
         body: 'data: {"type":"start","messageId":"reply"}\n\ndata: {"type":"text-start","id":"reply-text"}\n\ndata: {"type":"text-delta","id":"reply-text","delta":"Your draft is saved."}\n\ndata: {"type":"text-end","id":"reply-text"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n',
       });

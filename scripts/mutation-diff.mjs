@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
   createTestSelector,
+  HIGH_RISK_PREFIXES,
   readExecutedTests,
   readModuleSource,
   readReportMutants,
@@ -25,6 +26,10 @@ import {
   selectHighRiskSources,
   WEB_ROOT,
 } from './lib/mutation-diff.mjs';
+import {
+  buildWorkflowRunUrl,
+  fileMutationFloorIssues,
+} from './lib/mutation-floor-intake.mjs';
 import {
   evaluateMutationScore,
   loadMutationScoreBaseline,
@@ -45,6 +50,7 @@ const { values } = parseArgs({
     'max-tests': { type: 'string', default: '15' },
     low: { type: 'string', default: '60' },
     summary: { type: 'string' },
+    scope: { type: 'string', default: 'high-risk' },
     'list-only': { type: 'boolean', default: false },
   },
 });
@@ -77,7 +83,13 @@ for (const [name, value] of caps) {
   }
 }
 const readModule = readModuleSource(webRoot);
-const sources = selectHighRiskSources(changedPaths(), readModule);
+if (!['high-risk', 'all'].includes(values.scope)) {
+  throw new Error('--scope must be high-risk or all');
+}
+// `all` is the rolling sweep: any apps/web source with a related test.
+const sources = selectHighRiskSources(changedPaths(), readModule, {
+  prefixes: values.scope === 'all' ? null : HIGH_RISK_PREFIXES,
+});
 const toRun = sources.slice(0, maxFiles);
 const skipped = sources.slice(maxFiles);
 const selectTests =
@@ -182,7 +194,7 @@ for (const source of toRun) {
   }
 }
 
-/** @type {{ file: string, score: number | null, floor: number }[]} */
+/** @type {{ file: string, score: number | null, floor: number, valid?: number }[]} */
 const floorFailures = [];
 if (!values['list-only']) {
   for (const result of results) {
@@ -202,7 +214,30 @@ if (!values['list-only']) {
         file: verdict.file,
         score: verdict.score,
         floor: verdict.floor,
+        valid: scored.valid,
       });
+    }
+  }
+  if (floorFailures.length > 0) {
+    // JOV-8857: file one deduped Linear issue per breached file. Filing
+    // failures (including a missing LINEAR_API_KEY) are logged and never
+    // change the exit code, which stays driven by the floor failures.
+    const intake = await fileMutationFloorIssues({
+      failures: floorFailures,
+      runUrl: buildWorkflowRunUrl(process.env),
+      artifactName: process.env.GITHUB_RUN_ID
+        ? `mutation-diff-${process.env.GITHUB_RUN_ID}`
+        : null,
+      sourceSha: process.env.GITHUB_SHA ?? null,
+    });
+    for (const entry of intake.filed) {
+      const where = entry.url ?? entry.identifier ?? entry.reason ?? 'unknown';
+      console.log(
+        `Linear intake (${entry.file}): ${entry.action ?? 'failed'} — ${where}`
+      );
+    }
+    for (const entry of intake.skipped) {
+      console.log(`Linear intake skipped (${entry.file}): ${entry.reason}`);
     }
   }
   const summary = renderSummary({

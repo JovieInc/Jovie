@@ -80,6 +80,7 @@ import {
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
+import { readGoldenPathTurnContext } from '@/lib/waitlist/golden-path-admission.server';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 
 /** Existing Statsig kill switch for all `/api/chat` traffic. */
@@ -655,10 +656,17 @@ export async function tryHandleAnonymousOnboardingChat(
     latestClientMessageId: latestUserMessage.clientMessageId,
   });
   const turnCount = uiMessages.filter(m => m.role === 'user').length;
+  // Read once per turn, only while the controlled-access gate is on. Null
+  // (unreadable, not green, or no spare capacity) holds the artist.
+  const goldenPath = accessControlled
+    ? await readGoldenPathTurnContext()
+    : { verdict: null, holdReason: null };
   const onboardingState = createOnboardingTurnState({
     sessionId,
     turnCount,
     accessControlled,
+    goldenPathVerdict: goldenPath.verdict,
+    goldenPathHold: goldenPath.holdReason,
     messages: serverToolHistory,
   });
   const tools = buildOnboardingTools(onboardingState);
@@ -732,6 +740,8 @@ export async function tryHandleAnonymousOnboardingChat(
       sessionId,
       turnCount,
       accessControlled,
+      goldenPathVerdict: goldenPath.verdict,
+      goldenPathHold: goldenPath.holdReason,
       messages: serverToolHistory,
     });
     const turn: FallbackTurn = await decideFallbackTurn({

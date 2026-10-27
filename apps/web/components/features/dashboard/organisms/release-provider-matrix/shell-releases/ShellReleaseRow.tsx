@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import {
+  type ComponentPropsWithoutRef,
   type KeyboardEvent,
   type MouseEvent,
   memo,
@@ -312,6 +313,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
   actionMenuItems,
   smartLinkLockReason = null,
   syncStatus = null,
+  ...hostProps
 }: {
   readonly release: ReleaseViewModel;
   readonly isSelected: boolean;
@@ -324,7 +326,18 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
    * label. Degrades to nothing when `null` (the common idle case).
    */
   readonly syncStatus?: ShellReleaseSyncStatus;
-}) {
+} & Omit<
+  ComponentPropsWithoutRef<'li'>,
+  | 'children'
+  | 'className'
+  | 'onClick'
+  | 'onKeyDown'
+  | 'onPointerEnter'
+  | 'onFocus'
+  | 'aria-label'
+  | 'role'
+  | 'tabIndex'
+>) {
   const dspItems = useMemo(() => releaseToDspItems(release), [release]);
   const dropMeta = useMemo(
     () => (release.releaseDate ? dropDateMeta(release.releaseDate) : null),
@@ -369,7 +382,7 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
     status: release.status,
   };
 
-  function handleKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLLIElement>) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       onSelect();
@@ -378,11 +391,13 @@ export const ShellReleaseRow = memo(function ShellReleaseRow({
 
   return (
     <ShellListRowFrame
-      role='listitem'
-      // `listitem` is name-from-author (unlike the old `option`, which was
-      // name-from-content): give the row an explicit accessible name so
-      // role-based queries and screen-reader item navigation announce the
-      // release title.
+      as='li'
+      // The row IS the list item (implicit listitem): axe's `list` rule
+      // rejects suppressed-role wrapper children of a ul, and any wrapper
+      // element breaks the singular listitem queries the shell lists rely
+      // on. `listitem` is name-from-author, so keep the explicit accessible
+      // name for role-based queries and screen-reader item navigation.
+      {...hostProps}
       aria-label={release.title}
       tabIndex={0}
       onClick={onSelect}
