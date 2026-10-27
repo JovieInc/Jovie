@@ -4,6 +4,7 @@ import {
   applyReferenceCommand,
   createReferenceSession,
   importReferenceCandidates,
+  referenceEligibleIds,
   referencePreferenceTerms,
   referenceScopeKey,
   referenceUrlIdentity,
@@ -13,6 +14,17 @@ import { candidate, command, now, scope, session } from './fixtures.test-utils';
 import { MediaAnchorSchema, ReferenceSessionSchema } from './types';
 
 describe('adaptive reference review', () => {
+  it('shares full scoped eligibility without UI truncation', () => {
+    const state = session(51);
+    expect(referenceEligibleIds(state, scope)).toHaveLength(51);
+    expect(() =>
+      referenceEligibleIds(state, { ...scope, tenantId: 'other' })
+    ).toThrow('scope');
+    state.media['ref-001'].verification = 'unverified';
+    state.media['ref-002'].rights.previewAllowed = false;
+    state.corpus.references['ref-003'].status = 'rejected';
+    expect(referenceEligibleIds(state, scope)).toHaveLength(48);
+  });
   it('counts only new references against capacity while preserving bounded input and immutable IDs', () => {
     let full = createReferenceSession(scope, now);
     for (let offset = 0; offset < 500; offset += 100)

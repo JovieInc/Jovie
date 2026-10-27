@@ -72,6 +72,14 @@ function category(anchor: MediaAnchor): string | null {
   const c = anchor.classification;
   return c && c.inputSha256 === anchor.sha256 ? c.category : null;
 }
+/** Full scoped eligibility for consumers; independent of UI batch/top limits. */
+export function referenceEligibleIds(
+  state: ReferenceSession,
+  scope: ReferenceScope
+): string[] {
+  assertScope(state, scope);
+  return Object.keys(state.media).filter(id => eligible(state, id));
+}
 export function referencePreferenceTerms(
   state: ReferenceSession,
   scope: ReferenceScope
