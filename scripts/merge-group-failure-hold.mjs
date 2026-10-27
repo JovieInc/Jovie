@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { runGh } from '../packages/api-client/gh.ts';
 import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.mjs';
 import {
   attributeAgainstAheadRun,
@@ -1202,14 +1203,13 @@ export async function applyMergeGroupFailure(
     current = await readPullRequest(front.prNumber);
     if (currentMatches() && current.isInMergeQueue && current.mergeQueueEntry) {
       try {
-        await dequeuePullRequest(current.id);
-        dequeued = true;
-        dequeueOutcome = 'dequeued';
-        // Dequeue reason discipline: every removal leaves a machine-readable PR
-        // comment (same marker as scripts/queue-dequeue.mjs). Never fatal.
+        // The durable exact-head failure status above is authoritative even if
+        // this advisory comment fails. Record intent before the removal so a
+        // crash cannot turn a completed action into an unrecorded one.
         try {
           await recordDequeue?.({
             number: front.prNumber,
+            head: sourceHeadSha,
             code: 'poison',
             reason: `merge-group failure hold: run ${run.id} failed for head ${sourceHeadSha.slice(0, 12)}`,
           });
@@ -1217,6 +1217,16 @@ export async function applyMergeGroupFailure(
           console.error(
             `::warning::merge-group-failure-hold could not record the dequeue reason: ${errorText(error).slice(0, 200)}`
           );
+        }
+        current = await readPullRequest(front.prNumber);
+        if (
+          currentMatches() &&
+          current.isInMergeQueue &&
+          current.mergeQueueEntry
+        ) {
+          await dequeuePullRequest(current.id);
+          dequeued = true;
+          dequeueOutcome = 'dequeued';
         }
       } catch (error) {
         const denial = classifyDequeueDenial(error);
@@ -1300,6 +1310,35 @@ function gh(args) {
     maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+}
+
+export async function recordDequeueReason(
+  { repository, number, code, reason, head },
+  { run = runGh, now = () => new Date().toISOString() } = {}
+) {
+  const record = {
+    code,
+    reason,
+    actor: 'merge-group-failure-hold',
+    at: now(),
+    head,
+    outcome: 'requested',
+  };
+  const result = await run(
+    [
+      'api',
+      '-X',
+      'POST',
+      `repos/${repository}/issues/${number}/comments`,
+      '-f',
+      `body=Dequeue requested (${code}): ${reason}\n<!-- queue-dequeue ${JSON.stringify(record)} -->`,
+    ],
+    { priority: 'repair' }
+  );
+  if (result.code !== 0)
+    throw new Error(
+      result.stderr || `reason recording failed (${result.code})`
+    );
 }
 
 function ghJson(args) {
@@ -1687,15 +1726,7 @@ async function main(argv) {
           'mutation($id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$id}){clientMutationId}}',
           { id }
         ),
-      recordDequeue: async ({ number, code, reason }) =>
-        gh([
-          'api',
-          '-X',
-          'POST',
-          `repos/${repository}/issues/${number}/comments`,
-          '-f',
-          `body=Dequeued from the merge queue (${code}): ${reason}\n<!-- queue-dequeue ${JSON.stringify({ code, reason, actor: 'merge-group-failure-hold', at: new Date().toISOString() })} -->`,
-        ]),
+      recordDequeue: data => recordDequeueReason({ repository, ...data }),
     }
   );
   const serialized = JSON.stringify(result);

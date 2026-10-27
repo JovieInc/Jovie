@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -33,7 +34,8 @@ const head = 'a'.repeat(40);
  * runs?: number, mergedOnUndo?: boolean, viewerLogin?: unknown, writerLogin?: string,
  * graphqlErrors?: unknown, unreadableState?: boolean,
  * missingPullRequest?: boolean, missingViewer?: boolean, readyFails?: boolean,
- * dropProof?: boolean
+ * dropProof?: boolean, queued?: boolean, recordFails?: boolean,
+ * movedAfterRecord?: boolean, dequeueFails?: boolean
  * }} [options]
  */
 function scenario({
@@ -54,23 +56,34 @@ function scenario({
   missingViewer = false,
   readyFails = false,
   dropProof = false,
+  queued = false,
+  recordFails = false,
+  movedAfterRecord = false,
+  dequeueFails = false,
 } = {}) {
   const dir = realpathSync(mkdtempSync(join(tmpdir(), 'writer-promotion-')));
+  const fixtureScripts = join(dir, 'scripts');
   try {
-    mkdirSync(join(dir, 'lib'));
+    mkdirSync(join(fixtureScripts, 'lib'), { recursive: true });
     mkdirSync(join(dir, 'bin'));
+    mkdirSync(join(dir, 'packages'));
+    cpSync(
+      join(scripts, '../packages/api-client'),
+      join(dir, 'packages/api-client'),
+      { recursive: true }
+    );
     for (const file of [
       'writer-owned-pr-promote.sh',
       'lib/gh-retry.sh',
       'lib/writer-owned-pr-promotion.mjs',
     ])
-      copyFileSync(join(scripts, file), join(dir, file));
+      copyFileSync(join(scripts, file), join(fixtureScripts, file));
     writeFileSync(
-      join(dir, 'lib/upsert-pr-comment.sh'),
+      join(fixtureScripts, 'lib/upsert-pr-comment.sh'),
       '#!/bin/sh\nprintf "%s" "$3" > "$FIXTURE/comment"\n'
     );
     writeFileSync(
-      join(dir, 'native-merge-intent.mjs'),
+      join(fixtureScripts, 'native-merge-intent.mjs'),
       String.raw`import {appendFileSync} from 'node:fs'; appendFileSync(process.env.FIXTURE+'/calls', '\nnative-intent'); console.log(JSON.stringify({status:${JSON.stringify(native)},reason:'test-outcome'})); process.exitCode=${native === 'unknown' || native === 'blocked' ? 1 : 0};`
     );
     writeFileSync(
@@ -83,7 +96,7 @@ function scenario({
         draft: !restart,
         body: '',
         labels: [],
-        queued: false,
+        queued,
         autoMerge: false,
       })
     );
@@ -95,6 +108,16 @@ import {spawnSync} from 'node:child_process';
 const dir=process.env.FIXTURE,args=process.argv.slice(2),path=dir+'/state';
 fs.appendFileSync(dir+'/calls',JSON.stringify(args)+'\n');
 let state=JSON.parse(fs.readFileSync(path));
+if(args[0]==='pr'&&args[1]==='comment'){
+ if(${recordFails}){console.error('record rejected');process.exit(1);}
+ fs.writeFileSync(dir+'/dequeue-record',args[args.indexOf('--body')+1]);
+ if(${movedAfterRecord})state.head='b'.repeat(40);
+ fs.writeFileSync(path,JSON.stringify(state));process.exit(0);
+}
+if(args.some(x=>x.includes('mutation(')&&x.includes('dequeuePullRequest'))){
+ if(${dequeueFails}){console.error('dequeue rejected');process.exit(1);}
+ state.queued=false;fs.writeFileSync(path,JSON.stringify(state));process.exit(0);
+}
 if(args[0]==='api' && args[1]==='user'){console.error('Resource not accessible by integration');process.exit(1);}
 if(args[0]==='api' && args[1]==='graphql'){
  if(${unreadableState}){console.error('state transport denied');process.exit(1);}
@@ -133,7 +156,7 @@ fs.writeFileSync(path,JSON.stringify(state));
       result = spawnSync(
         'bash',
         [
-          join(dir, 'writer-owned-pr-promote.sh'),
+          join(fixtureScripts, 'writer-owned-pr-promote.sh'),
           '--pr',
           '42',
           '--issue',
@@ -157,6 +180,7 @@ fs.writeFileSync(path,JSON.stringify(state));
           env: {
             ...process.env,
             FIXTURE: dir,
+            LANES_STATE: join(dir, 'lanes-state'),
             PATH: `${join(dir, 'bin')}:${dirname(process.execPath)}:${process.env.PATH}`,
             GH_RETRY_BASE_DELAY: '0',
           },
@@ -172,6 +196,9 @@ fs.writeFileSync(path,JSON.stringify(state));
       ...result,
       calls,
       comment,
+      dequeueRecord: existsSync(join(dir, 'dequeue-record'))
+        ? readFileSync(join(dir, 'dequeue-record'), 'utf8')
+        : '',
       state: JSON.parse(readFileSync(join(dir, 'state'), 'utf8')),
     };
   } finally {
@@ -445,12 +472,51 @@ test('merge after compensation read but before draft mutation is reread without 
   assert.match(r.comment, /"verified": false/);
 });
 
-test('compensation dequeue leaves a machine-readable queue-dequeue record', () => {
-  const src = readFileSync(
-    new URL('../../writer-owned-pr-promote.sh', import.meta.url),
-    'utf8'
+test('compensation records reason through the real client before dequeue', () => {
+  const r = scenario({ restart: true, queued: true, ticketEvidence: '' });
+  assert.equal(r.status, 2, r.stderr);
+  assert.equal(r.state.queued, false);
+  const record = JSON.parse(
+    r.dequeueRecord.match(/<!-- queue-dequeue (.+) -->/)[1]
   );
-  const i = src.indexOf('dequeuePullRequest(input');
-  assert.ok(i > 0);
-  assert.match(src.slice(i, i + 900), /queue-dequeue \{/);
+  assert.equal(record.code, 'other');
+  assert.equal(record.actor, 'writer-owned-pr-promote');
+  assert.equal(record.head, head);
+  assert.equal(record.outcome, 'requested');
+  assert.match(record.reason, /compensation/);
+  assert.ok(Number.isFinite(Date.parse(record.at)));
+  assert.ok(
+    r.calls.indexOf('"comment"') < r.calls.indexOf('dequeuePullRequest(input')
+  );
+  assert.match(r.comment, /"verified": true/);
+});
+
+test('an uncertain reason record or moved head cannot authorize compensation dequeue', () => {
+  for (const options of [{ recordFails: true }, { movedAfterRecord: true }]) {
+    const r = scenario({
+      restart: true,
+      queued: true,
+      ticketEvidence: '',
+      ...options,
+    });
+    assert.equal(r.status, 2, r.stderr);
+    assert.equal(r.state.queued, true);
+    assert.doesNotMatch(r.calls, /dequeuePullRequest\(input|--undo/);
+    assert.equal(r.calls.split('"comment"').length - 1, 1);
+    assert.match(r.comment, /"verified": false/);
+  }
+});
+
+test('an ambiguous dequeue leaves truthful requested evidence and is never replayed', () => {
+  const r = scenario({
+    restart: true,
+    queued: true,
+    ticketEvidence: '',
+    dequeueFails: true,
+  });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.dequeueRecord, /"outcome":"requested"/);
+  assert.doesNotMatch(r.dequeueRecord, /Dequeued from/);
+  assert.equal(r.calls.split('dequeuePullRequest(input').length - 1, 1);
+  assert.match(r.comment, /"verified": false/);
 });
