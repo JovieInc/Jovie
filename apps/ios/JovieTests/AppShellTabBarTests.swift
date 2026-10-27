@@ -391,6 +391,8 @@ struct SharedPressFeedbackStyleTests {
     #expect(JovieIconButtonStyle.pressedOpacity == 0.72)
     #expect(JovieIconButtonStyle.targetSize == 44)
     #expect(JoviePressFeedbackButtonStyle.defaultPressedOpacity == 0.72)
+    #expect(JoviePressFeedbackButtonStyle().allowsScale)
+    #expect(!JoviePressFeedbackButtonStyle(allowsScale: false).allowsScale)
   }
 }
 

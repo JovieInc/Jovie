@@ -337,11 +337,18 @@ struct JoviePressFeedbackButtonStyle: ButtonStyle {
     self.allowsScale = allowsScale
   }
 
+  @ViewBuilder
   func makeBody(configuration: Configuration) -> some View {
-    configuration.label
-      .opacity(configuration.isPressed ? pressedOpacity : 1)
-      .scaleEffect(configuration.isPressed && allowsScale ? JovieMotion.pressScale : 1)
-      .animation(JovieMotion.subtle, value: configuration.isPressed)
+    if allowsScale {
+      configuration.label
+        .opacity(configuration.isPressed ? pressedOpacity : 1)
+        .scaleEffect(configuration.isPressed ? JovieMotion.pressScale : 1)
+        .animation(JovieMotion.subtle, value: configuration.isPressed)
+    } else {
+      configuration.label
+        .opacity(configuration.isPressed ? pressedOpacity : 1)
+        .animation(JovieMotion.subtle, value: configuration.isPressed)
+    }
   }
 }
 
