@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@jovie/ui';
-import { CircleAlert, LoaderCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import React, {
@@ -275,10 +274,18 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
       <span className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}>
         {thread.status === 'running' ? (
           <span className='animate-spin motion-reduce:animate-none'>
-            <LoaderCircle className='size-3 text-info' aria-hidden='true' />
+            <Icon
+              name='Loader2'
+              className='size-3 text-info'
+              aria-hidden='true'
+            />
           </span>
         ) : thread.status === 'errored' ? (
-          <CircleAlert className='size-3 text-warning' aria-hidden='true' />
+          <Icon
+            name='AlertCircle'
+            className='size-3 text-warning'
+            aria-hidden='true'
+          />
         ) : unread ? (
           <span className='size-1.5 rounded-full bg-info' aria-hidden='true' />
         ) : null}
