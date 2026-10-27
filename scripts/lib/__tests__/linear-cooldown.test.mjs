@@ -37,6 +37,14 @@ afterEach(() => {
   fs.mkdirSync(root, { recursive: true });
 });
 
+function deferredSignal() {
+  let resolve = () => {};
+  const promise = new Promise(done => {
+    resolve = () => done(undefined);
+  });
+  return { promise, resolve };
+}
+
 describe('shared linear cooldown', () => {
   it('has no blocking filesystem calls in the shared request helper', () => {
     const file = new URL('../linear-cooldown.mjs', import.meta.url);
@@ -173,10 +181,10 @@ describe('shared linear cooldown', () => {
     const fsPromises = createRequire(import.meta.url)('node:fs/promises');
     const originalRename = fsPromises.rename;
     const originalReaddir = fsPromises.readdir;
-    const renameReached = Promise.withResolvers();
-    const releaseRename = Promise.withResolvers();
-    const pendingObserved = Promise.withResolvers();
-    const readWaiting = Promise.withResolvers();
+    const renameReached = deferredSignal();
+    const releaseRename = deferredSignal();
+    const pendingObserved = deferredSignal();
+    const readWaiting = deferredSignal();
     const waitingCallbacks = [];
     let monotonic = 0;
     let waitCount = 0;
