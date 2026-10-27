@@ -187,16 +187,21 @@ jobs:
           changed=false
           [ "$(dependency_digest)" = "$head_digest" ] || changed=true
           printf 'dependency_changed=%s\nprepared=true\n' "$changed" >> "$GITHUB_OUTPUT"
+          if [ "$changed" = true ]; then
+            # Local post actions reload their metadata after source restoration.
+            # Retain only this generation's action closure until job cleanup.
+            node scripts/lib/source-guard-action-snapshot.mjs
+          fi
           # A baked browser path belongs to the prior installed generation.
           [ "$changed" != true ] || echo 'PLAYWRIGHT_BROWSERS_PATH=' >> "$GITHUB_ENV"
       - name: Setup merged source dependencies
         id: source_merge_dependencies
         if: steps.source_guard_merge.outputs.dependency_changed == 'true'
-        uses: ./.github/actions/setup-node-pnpm
+        uses: ./tmp/source-guard-actions/setup-node-pnpm
       - name: Setup merged source browsers
         id: source_merge_browsers
         if: steps.source_guard_merge.outputs.dependency_changed == 'true'
-        uses: ./.github/actions/setup-playwright
+        uses: ./tmp/source-guard-actions/setup-playwright
       - name: Validate disk-read source contracts from trusted base
         shell: bash
         env:
