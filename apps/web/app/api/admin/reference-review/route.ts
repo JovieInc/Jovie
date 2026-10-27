@@ -16,6 +16,10 @@ import { getFreshAuth } from '@/lib/auth/cached';
 import { captureError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { requireOvieApiAccess } from '@/lib/ovie/privacy-lock/access';
+import {
+  DesignContextQuerySchema,
+  referenceDesignContext,
+} from '@/lib/ovie/reference-review/design-context';
 import { referenceRepository } from '@/lib/ovie/reference-review/store.server';
 
 const headers = { 'Cache-Control': 'private, no-store' } as const;
@@ -50,13 +54,25 @@ export async function GET(request: Request) {
   });
   if (!selection.success)
     return json({ error: 'Choose a context and branch.' }, 400);
+  const designQuery =
+    url.searchParams.get('format') === 'design-context'
+      ? DesignContextQuerySchema.safeParse({
+          surface: url.searchParams.get('surface'),
+          terms: (url.searchParams.get('terms') ?? '')
+            .split(',')
+            .filter(Boolean),
+          limit: Number(url.searchParams.get('limit') ?? 5),
+        })
+      : null;
+  if (designQuery && !designQuery.success)
+    return json({ error: 'Choose a valid reference surface and limit.' }, 400);
   try {
     const scope = await scopeFor(selection.data);
+    const state = await readReferenceSession(referenceRepository, scope);
     return json(
-      referenceView(
-        await readReferenceSession(referenceRepository, scope),
-        scope
-      )
+      designQuery?.success
+        ? referenceDesignContext(state, scope, designQuery.data)
+        : referenceView(state, scope)
     );
   } catch (error) {
     await captureError('Reference review read failed', error);

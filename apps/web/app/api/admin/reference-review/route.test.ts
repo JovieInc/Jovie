@@ -58,6 +58,43 @@ beforeEach(() => {
   mocks.capture.mockResolvedValue(undefined);
 });
 describe('private reference API boundary', () => {
+  it('exposes canonical design context through the same actor-owned private read', async () => {
+    const owned = {
+      ...session(3),
+      scope: { ...scope, tenantId: 'test-actor' },
+    };
+    mocks.read.mockResolvedValue(owned);
+    const response = await GET(
+      new Request(
+        `${url}?contextId=editorial&branchId=main&format=design-context&surface=editorial&limit=2&tenantId=other`
+      )
+    );
+    expect(response.status).toBe(200);
+    const context = await response.json();
+    expect(context.schema).toBe('jovie.design-agent-reference-context/v1');
+    expect(context.references).toHaveLength(2);
+    expect(
+      context.references.every(
+        (reference: { rating: number | null }) => reference.rating === null
+      )
+    ).toBe(true);
+    expect(mocks.read).toHaveBeenCalledWith({}, owned.scope);
+    expect(context).not.toHaveProperty('scope');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
+  });
+  it('rejects invalid agent retrieval before reading private data', async () => {
+    for (const query of ['surface=editorial&limit=6', 'surface=&limit=1'])
+      expect(
+        (
+          await GET(
+            new Request(
+              `${url}?contextId=editorial&branchId=main&format=design-context&${query}`
+            )
+          )
+        ).status
+      ).toBe(400);
+    expect(mocks.read).not.toHaveBeenCalled();
+  });
   it('denies signed-out/privacy-locked access before reading or writing', async () => {
     mocks.gate.mockResolvedValue(
       NextResponse.json({ error: 'denied' }, { status: 403 })
