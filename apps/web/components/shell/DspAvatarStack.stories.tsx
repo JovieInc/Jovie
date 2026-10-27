@@ -68,7 +68,7 @@ export const KeyboardDetails: Story = {
 
     await userEvent.click(trigger);
     await expect(
-      body.getByRole('region', { name: 'DSP Availability' })
+      body.getByRole('dialog', { name: 'DSP Distribution Details' })
     ).toHaveFocus();
     await userEvent.keyboard('{Escape}');
     await waitFor(() =>
@@ -77,7 +77,7 @@ export const KeyboardDetails: Story = {
     await expect(trigger).toHaveFocus();
     await userEvent.keyboard('{Enter}');
     await expect(
-      body.getByRole('region', { name: 'DSP Availability' })
+      body.getByRole('dialog', { name: 'DSP Distribution Details' })
     ).toHaveFocus();
     await waitFor(() => {
       expect(

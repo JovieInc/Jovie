@@ -144,28 +144,23 @@ describe('DspAvatarStack', () => {
 
     await user.click(trigger);
     expect(clicks).toHaveLength(1);
-    expect(
-      screen.getByRole('region', { name: 'DSP Availability' })
-    ).toHaveFocus();
+    const details = screen.getByRole('dialog', {
+      name: 'DSP Distribution Details',
+    });
+    expect(details).toHaveFocus();
 
     act(() => trigger.focus());
     await user.keyboard('{Enter}');
     expect(clicks).toHaveLength(2);
-    expect(
-      screen.getByRole('region', { name: 'DSP Availability' })
-    ).toHaveFocus();
+    expect(details).toHaveFocus();
 
     act(() => trigger.focus());
     await user.keyboard(' ');
     expect(clicks).toHaveLength(3);
-    expect(
-      screen.getByRole('region', { name: 'DSP Availability' })
-    ).toHaveFocus();
+    expect(details).toHaveFocus();
 
     await user.tab();
-    expect(
-      screen.getByRole('region', { name: 'DSP Availability' })
-    ).toHaveFocus();
+    expect(details).toHaveFocus();
     await user.keyboard('{Escape}');
     await waitFor(() =>
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -207,13 +202,15 @@ describe('DspAvatarStack', () => {
     expect(trigger).toHaveFocus();
 
     await user.keyboard('{Enter}');
-    const list = screen.getByRole('region', { name: 'DSP Availability' });
-    expect(list).toHaveFocus();
+    const details = screen.getByRole('dialog', {
+      name: 'DSP Distribution Details',
+    });
+    expect(details).toHaveFocus();
     await user.keyboard('{Alt>}t{/Alt}');
     expect(screen.getByRole('status', { name: 'Theme' })).toHaveTextContent(
       'light'
     );
-    expect(list).toHaveFocus();
+    expect(details).toHaveFocus();
   });
 
   it('reopens a focus preview after Escape, blur, and a new Tab focus', async () => {
@@ -275,13 +272,15 @@ describe('DspAvatarStack', () => {
       </>
     );
     await revealDetails();
-    const list = screen.getByRole('region', { name: 'DSP Availability' });
+    const details = screen.getByRole('dialog', {
+      name: 'DSP Distribution Details',
+    });
     const next = screen.getByRole('button', { name: 'Next control' });
-    expect(list).toHaveFocus();
+    expect(details).toHaveFocus();
 
     // FocusScope completes unmount autofocus asynchronously. A later real
     // focus owner must win over the earlier Escape restoration request.
-    fireEvent.keyDown(list, { key: 'Escape' });
+    fireEvent.keyDown(details, { key: 'Escape' });
     act(() => next.focus());
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 0));

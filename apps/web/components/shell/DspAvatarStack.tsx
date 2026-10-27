@@ -93,7 +93,7 @@ function isolateActivation(event: KeyboardEvent<HTMLElement>) {
  * restrained, expensive design philosophy.
  *
  * Hover or focus previews the details without moving focus. Explicit
- * activation enters the portaled list for keyboard scrolling; Escape returns
+ * activation enters the portaled dialog for keyboard scrolling; Escape returns
  * focus to the trigger. The caller owns brand metadata (`color`, `iconPath`,
  * `glyph`, `label`), so this component has no built-in DSP knowledge.
  *
@@ -125,7 +125,6 @@ export function DspAvatarStack({
   const [portalContainer, setPortalContainer] = useState<HTMLElement>();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const listRef = useRef<HTMLElement>(null);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const returnFocusRef = useRef(false);
@@ -225,9 +224,9 @@ export function DspAvatarStack({
               activationFocusRef.current = true;
               openDetails();
               // Focus may have already opened a preview before the click.
-              // Explicit activation enters the list in either lifecycle.
-              if (listRef.current) {
-                listRef.current.focus();
+              // Explicit activation enters the dialog in either lifecycle.
+              if (contentRef.current) {
+                contentRef.current.focus();
                 activationFocusRef.current = false;
               }
             }}
@@ -335,7 +334,7 @@ export function DspAvatarStack({
         onOpenAutoFocus={event => {
           event.preventDefault();
           if (activationFocusRef.current) {
-            listRef.current?.focus();
+            contentRef.current?.focus();
             activationFocusRef.current = false;
           }
         }}
@@ -388,13 +387,7 @@ export function DspAvatarStack({
             {liveCount}/{ordered.length} Live
           </span>
         </div>
-        <section
-          ref={listRef}
-          aria-label='DSP Availability'
-          // biome-ignore lint/a11y/noNoninteractiveTabindex: native scrolling needs a keyboard entry point retained by the popover focus loop
-          tabIndex={0}
-          className='max-h-44 overflow-y-auto'
-        >
+        <section aria-label='DSP Availability'>
           {ordered.map(dsp => (
             <div
               key={dsp.id}

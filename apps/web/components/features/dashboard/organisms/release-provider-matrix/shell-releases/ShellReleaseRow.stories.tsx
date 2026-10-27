@@ -88,7 +88,9 @@ export const DspDetails: Story = {
         await userEvent.keyboard(activation === 'Enter' ? '{Enter}' : ' ');
       }
       await expect(
-        within(document.body).getByRole('region', { name: 'DSP Availability' })
+        within(document.body).getByRole('dialog', {
+          name: 'DSP Distribution Details',
+        })
       ).toHaveFocus();
       await expect(args.onSelect).not.toHaveBeenCalled();
 

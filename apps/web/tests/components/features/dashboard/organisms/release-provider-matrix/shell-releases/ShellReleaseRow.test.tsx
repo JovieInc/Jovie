@@ -400,12 +400,14 @@ describe('ShellReleaseRow DSP interaction', () => {
         await user.keyboard(key);
       }
 
-      const list = screen.getByRole('region', { name: 'DSP Availability' });
-      expect(list).toHaveFocus();
+      const details = screen.getByRole('dialog', {
+        name: 'DSP Distribution Details',
+      });
+      expect(details).toHaveFocus();
       expect(onSelect).not.toHaveBeenCalled();
 
       await user.click(screen.getByText('Spotify'));
-      act(() => list.focus());
+      act(() => details.focus());
       await user.keyboard('{Enter} ');
       expect(onSelect).not.toHaveBeenCalled();
 

@@ -121,7 +121,7 @@ describe('DSP details inside the real mobile release drawer', () => {
       const list = within(details).getByRole('region', {
         name: 'DSP Availability',
       });
-      expect(list).toHaveFocus();
+      expect(details).toHaveFocus();
       expect(owner).toContainElement(details);
       expect(owner).toContainElement(document.activeElement);
       expect(
@@ -132,7 +132,7 @@ describe('DSP details inside the real mobile release drawer', () => {
       ).toBeInTheDocument();
 
       await user.tab();
-      expect(list).toHaveFocus();
+      expect(details).toHaveFocus();
       await user.keyboard('{Escape}');
       await waitFor(() =>
         expect(

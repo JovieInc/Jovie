@@ -9,6 +9,7 @@ const CASES = [
     root: 16,
     activation: 'pointer',
     mobile: true,
+    overflows: false,
     lastProvider: /^Qobuz$/,
   },
   {
@@ -19,6 +20,7 @@ const CASES = [
     root: 32,
     activation: 'Space',
     mobile: true,
+    overflows: true,
     lastProvider: /^Qobuz$/,
   },
   {
@@ -29,12 +31,13 @@ const CASES = [
     root: 32,
     activation: 'Enter',
     mobile: false,
+    overflows: true,
     lastProvider: /^Tidal$/i,
   },
 ] as const;
 
-async function listGeometry(list: Locator) {
-  return list.evaluate(element => ({
+async function dialogGeometry(details: Locator) {
+  return details.evaluate(element => ({
     clientHeight: element.clientHeight,
     scrollHeight: element.scrollHeight,
     scrollTop: element.scrollTop,
@@ -114,7 +117,7 @@ for (const scenario of CASES) {
     });
     const list = details.getByRole('region', { name: 'DSP Availability' });
     await expect(details).toBeVisible();
-    await expect(list).toBeFocused();
+    await expect(details).toBeFocused();
     if (scenario.mobile) {
       await expect(
         owner.getByRole('dialog', { name: 'DSP Distribution Details' })
@@ -128,25 +131,33 @@ for (const scenario of CASES) {
         .toBe(true);
     }
 
-    const initial = await listGeometry(list);
+    const initial = await dialogGeometry(details);
     expect(initial.clientHeight).toBeGreaterThan(0);
-    expect(initial.scrollHeight).toBeGreaterThan(initial.clientHeight);
+    if (scenario.overflows) {
+      expect(initial.scrollHeight).toBeGreaterThan(initial.clientHeight);
+    } else {
+      expect(initial.scrollHeight).toBeLessThanOrEqual(initial.clientHeight);
+    }
     await page.keyboard.press('PageDown');
-    await expect
-      .poll(async () => (await listGeometry(list)).scrollTop)
-      .toBeGreaterThan(0);
+    if (scenario.overflows) {
+      await expect
+        .poll(async () => (await dialogGeometry(details)).scrollTop)
+        .toBeGreaterThan(0);
+    } else {
+      expect((await dialogGeometry(details)).scrollTop).toBe(0);
+    }
     await page.keyboard.press('End');
     // Native scrolling can animate after key dispatch. Wait for the actual
     // end position; never assign scrollTop or scroll a label into view.
     await expect
       .poll(async () => {
-        const state = await listGeometry(list);
+        const state = await dialogGeometry(details);
         return Math.abs(
           state.scrollHeight - state.clientHeight - state.scrollTop
         );
       })
       .toBeLessThan(2);
-    await expect(list).toBeFocused();
+    await expect(details).toBeFocused();
     const lastLabel = list.getByText(scenario.lastProvider);
     await expect
       .poll(async () => {
@@ -154,7 +165,7 @@ for (const scenario of CASES) {
         return paint.inViewport && paint.hit;
       })
       .toBe(true);
-    const final = await listGeometry(list);
+    const final = await dialogGeometry(details);
     const last = await labelPaint(lastLabel);
     const screenshot = info.outputPath('last-provider.png');
     await page.screenshot({ path: screenshot, fullPage: true });
@@ -168,7 +179,7 @@ for (const scenario of CASES) {
     });
 
     await page.keyboard.press('Tab');
-    await expect(list).toBeFocused();
+    await expect(details).toBeFocused();
     await page.keyboard.press('Escape');
     await expect(details).toBeHidden();
     // Radix delivers close autofocus after unmount, not on a fixed frame.
