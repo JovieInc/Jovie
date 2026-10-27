@@ -86,3 +86,50 @@ it('preserves the action group through keyboard edit cancellation and restores i
   expect(onAction).toHaveBeenCalledOnce();
   expect(screen.queryByRole('textbox')).toBeNull();
 });
+
+it('keeps compact actions touch safe and preserves native link keyboard activation', async () => {
+  const user = userEvent.setup();
+  const onOpen = vi.fn();
+  const onParentClick = vi.fn();
+  render(
+    <DrawerEditableTextField
+      label='Artist URL'
+      value='https://example.com/artist'
+      actions={[
+        { id: 'inspect', ariaLabel: 'Inspect artist', onClick: vi.fn() },
+        {
+          id: 'open',
+          ariaLabel: 'Open artist',
+          href: 'https://example.com/artist',
+          onClick: onOpen,
+        },
+      ]}
+    />
+  );
+  const link = screen.getByRole('link', { name: 'Open artist' });
+  for (const control of [
+    screen.getByRole('button', { name: 'Copy Artist URL' }),
+    screen.getByRole('button', { name: 'Inspect artist' }),
+    link,
+  ]) {
+    expect(control).toHaveClass('h-6', 'w-6', 'before:h-11', 'before:w-11');
+  }
+  expect(link).toHaveAttribute('href', 'https://example.com/artist');
+  expect(link).toHaveAttribute('target', '_blank');
+  expect(link).toHaveAttribute('rel', 'noreferrer');
+  // Keep the native activation in the fixture without navigating jsdom.
+  link.addEventListener('click', event => event.preventDefault());
+  await user.tab();
+  await user.tab();
+  await user.tab();
+  expect(link).toHaveFocus();
+  document.addEventListener('click', onParentClick);
+  try {
+    await user.keyboard('{Enter}');
+    expect(onOpen).toHaveBeenCalledOnce();
+    expect(onParentClick).not.toHaveBeenCalled();
+    expect(link).toHaveFocus();
+  } finally {
+    document.removeEventListener('click', onParentClick);
+  }
+});

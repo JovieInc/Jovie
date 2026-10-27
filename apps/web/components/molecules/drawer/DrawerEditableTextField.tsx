@@ -283,12 +283,13 @@ export const DrawerEditableTextField = React.memo(
 
               {!isEditing && (copyValue ?? value) ? (
                 <DrawerInlineIconButton
+                  size='xs'
                   onClick={event => {
                     event.stopPropagation();
                     handleCopyClick();
                   }}
                   aria-label={copyLabel ?? `Copy ${label}`}
-                  className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
+                  className='text-tertiary-token'
                 >
                   {isSuccess ? (
                     <Check className='h-3.5 w-3.5 text-success' />
@@ -302,13 +303,14 @@ export const DrawerEditableTextField = React.memo(
                 ? null
                 : visibleActions.map(action =>
                     action.href ? (
-                      <a
+                      <DrawerInlineIconButton
                         key={action.id}
+                        size='xs'
                         href={action.href}
                         target='_blank'
                         rel='noreferrer'
                         aria-label={action.ariaLabel}
-                        className='inline-flex h-6 w-6 items-center justify-center rounded-md text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-surface-0 hover:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55 focus-visible:ring-offset-2 focus-visible:ring-offset-(--linear-bg-page)'
+                        className='text-tertiary-token'
                         onClick={event => {
                           event.stopPropagation();
                           action.onClick?.();
@@ -317,16 +319,17 @@ export const DrawerEditableTextField = React.memo(
                         {action.icon ?? (
                           <ExternalLink className='h-3.5 w-3.5' />
                         )}
-                      </a>
+                      </DrawerInlineIconButton>
                     ) : (
                       <DrawerInlineIconButton
                         key={action.id}
+                        size='xs'
                         onClick={event => {
                           event.stopPropagation();
                           action.onClick?.();
                         }}
                         aria-label={action.ariaLabel}
-                        className='h-6 w-6 min-h-6 min-w-6 text-tertiary-token'
+                        className='text-tertiary-token'
                       >
                         {action.icon ?? (
                           <ExternalLink className='h-3.5 w-3.5' />

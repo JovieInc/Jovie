@@ -57,8 +57,7 @@ describe('DrawerEditableTextField', () => {
     );
 
     const copyButton = screen.getByLabelText('Copy UPC');
-    expect(copyButton.className).toContain('min-h-6');
-    expect(copyButton.className).toContain('min-w-6');
+    expect(copyButton).toHaveClass('h-6', 'w-6', 'before:h-11', 'before:w-11');
     expect(copyButton.parentElement).toHaveClass(
       'opacity-0',
       'group-focus-within:opacity-100',
