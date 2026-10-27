@@ -48,6 +48,7 @@ function fixture(t, change, { conflict = false } = {}) {
     mkdirSync(dirname(join(repo, path)), { recursive: true });
     writeFileSync(join(repo, path), contents);
   };
+  /** @type {NodeJS.ProcessEnv} */
   const env = {
     ...fixtureEnv,
     PATH: `${bin}:${dirname(process.execPath)}:${process.env.PATH}`,
@@ -158,7 +159,7 @@ if (process.env.SOURCE_FIXTURE_FAIL_GUARD === 'true') process.exitCode = 43;
           .trim()
           .split('\n')
           .filter(Boolean)
-          .map(JSON.parse)
+          .map(line => JSON.parse(line))
       : [];
   return {
     root,
