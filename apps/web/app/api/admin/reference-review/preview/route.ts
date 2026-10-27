@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import {
+  referenceEligibleIds,
   referenceScopeKey,
-  referenceView,
 } from '@/lib/agent-os/design-reference-corpus/adaptive/engine';
 import { readReferenceSession } from '@/lib/agent-os/design-reference-corpus/adaptive/repository';
 import { ReferenceScopeSchema } from '@/lib/agent-os/design-reference-corpus/adaptive/types';
@@ -34,14 +34,11 @@ export async function GET(request: Request) {
     const state = await readReferenceSession(referenceRepository, scope);
     const id = url.searchParams.get('referenceId') ?? '';
     const media = state.media[id];
-    const view = referenceView(state, scope);
     // Both review and highly-rated boards can display only eligible material.
     if (
       !media ||
       media.previewSlot === null ||
-      ![...view.items, ...view.top, ...Object.values(view.boards).flat()].some(
-        item => item.id === id
-      )
+      !referenceEligibleIds(state, scope).includes(id)
     )
       return NextResponse.json(
         { error: 'Preview unavailable.' },

@@ -57,6 +57,18 @@ beforeEach(() => {
   mocks.preview.mockResolvedValue(preview());
 });
 describe('authenticated private reference previews', () => {
+  it('serves an eligible source beyond the screen top25', async () => {
+    const state = session(51);
+    state.scope = ownedScope;
+    for (const id of Object.keys(state.media)) state.ratings[id] = 5;
+    state.media['ref-026'].sha256 = sha256;
+    state.media['ref-026'].previewSlot = 25;
+    mocks.read.mockResolvedValue(state);
+    expect((await GET(request('ref-026'))).status).toBe(200);
+    expect(mocks.preview).toHaveBeenCalledWith(
+      referencePreviewKey(ownedScope, 25)
+    );
+  });
   it('refuses a locked session before any data access', async () => {
     mocks.gate.mockResolvedValue(
       NextResponse.json({ error: 'locked' }, { status: 403 })

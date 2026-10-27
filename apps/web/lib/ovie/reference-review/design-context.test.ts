@@ -6,6 +6,17 @@ import {
 import { referenceDesignContext } from './design-context';
 
 describe('private design-agent reference context', () => {
+  it('retrieves a relevant rated reference beyond the screen top25', () => {
+    const state = session(51);
+    for (const id of Object.keys(state.media)) state.ratings[id] = 5;
+    state.corpus.references['ref-026'].reference.pageType = 'homepage';
+    const context = referenceDesignContext(state, scope, {
+      surface: 'homepage',
+    });
+    expect(context.references.map(reference => reference.id)).toEqual([
+      'ref-026',
+    ]);
+  });
   it('uses the canonical context builder and preserves unrated provenance without exposing ownership', () => {
     const state = session(3),
       before = JSON.stringify(state);
@@ -44,6 +55,9 @@ describe('private design-agent reference context', () => {
       5,
       null,
     ]);
+    expect(context.promptBlock).toContain(
+      'Preference order: ref-003 (5), ref-001 (unrated)'
+    );
   });
   it('rejects cross-scope reads and omits unverified, rejected or disallowed previews', () => {
     const state = session(3);
