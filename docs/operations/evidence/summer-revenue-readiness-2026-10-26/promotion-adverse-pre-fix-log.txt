@@ -20,9 +20,9 @@
 test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:12:1
 ✖ malformed range cannot omit required journey proof (1.021061ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   'pass' !== 'blocked'
-  
+
       at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:12:70)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -41,9 +41,9 @@ test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:12:1
 test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
 ✖ invalid failure/skip counters null cannot certify (0.270553ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   'pass' !== 'blocked'
-  
+
       at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:13:134)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -62,9 +62,9 @@ test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
 test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
 ✖ invalid failure/skip counters -1 cannot certify (0.426407ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   'pass' !== 'blocked'
-  
+
       at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:13:134)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -83,9 +83,9 @@ test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
 test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
 ✖ invalid failure/skip counters "unknown" cannot certify (0.142553ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   'pass' !== 'blocked'
-  
+
       at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:13:134)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1402:25)
@@ -104,9 +104,9 @@ test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:13:44
 test at ../../tmp/summer-independent-gate/promotion-adverse.test.mjs:14:1
 ✖ later exact-build failed execution invalidates prior green (0.265122ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   'pass' !== 'blocked'
-  
+
       at TestContext.<anonymous> (file:///tmp/summer-independent-gate/promotion-adverse.test.mjs:14:78)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1402:25)

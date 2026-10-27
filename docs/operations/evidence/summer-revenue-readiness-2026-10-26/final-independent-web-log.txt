@@ -20,4 +20,3 @@ Both esbuild and oxc options were set. oxc options will be used and esbuild opti
       Tests  94 passed (94)
    Start at  23:06:00
    Duration  7.07s (environment 42%, tests 30%, import 13%, setup 9%, transform 5%)
-

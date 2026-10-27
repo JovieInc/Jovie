@@ -69,12 +69,12 @@ Both esbuild and oxc options were set. oxc options will be used and esbuild opti
 
  % Coverage report from v8
 -------------------|---------|----------|---------|---------|-------------------
-File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s 
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
 -------------------|---------|----------|---------|---------|-------------------
-All files          |   93.35 |    91.95 |   93.33 |    93.3 |                   
- lib/acquisition   |   92.94 |     91.7 |   93.22 |   92.85 |                   
-  ...lity-cache.ts |   97.95 |     92.3 |     100 |     100 | 126,179-183       
-  ...ity.server.ts |   88.23 |    88.98 |      84 |   88.18 | ...36,560-561,593 
+All files          |   93.35 |    91.95 |   93.33 |    93.3 |
+ lib/acquisition   |   92.94 |     91.7 |   93.22 |   92.85 |
+  ...lity-cache.ts |   97.95 |     92.3 |     100 |     100 | 126,179-183
+  ...ity.server.ts |   88.23 |    88.98 |      84 |   88.18 | ...36,560-561,593
 -------------------|---------|----------|---------|---------|-------------------
 
 =============================== Coverage summary ===============================

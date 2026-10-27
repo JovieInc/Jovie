@@ -817,7 +817,7 @@
         },
         {
           "kind": "source_gap",
-          "ref": "docs/operations/evidence/summer-revenue-readiness-2026-10-26.json",
+          "ref": "docs/operations/evidence/summer-revenue-readiness-2026-10-26.jsonl",
           "summary": "Dated JOV-7701 acceptance index: local fail-closed admission/evidence repairs and provider observations; full deployed journey, measurement integrity, scheduled repair cycle and human authorization remain unverified. This index does not renew runtime certification or authorize admissions."
         }
       ],

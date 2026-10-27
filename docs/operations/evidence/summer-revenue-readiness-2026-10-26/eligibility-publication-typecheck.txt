@@ -5,10 +5,10 @@
    • Remote caching disabled, using shared worktree cache
 
 @jovie/console:typecheck: cache hit, replaying logs 8f6da9ba61235c83
-@jovie/console:typecheck: 
+@jovie/console:typecheck:
 @jovie/console:typecheck: > @jovie/console@26.10.16 typecheck /workspace/Jovie/apps/console
 @jovie/console:typecheck: > tsc --noEmit
-@jovie/console:typecheck: 
+@jovie/console:typecheck:
 @jovie/canary-otp:typecheck: cache hit, replaying logs c4a815f83ac8c322
 @jovie/cli:typecheck: > tsc -p tsconfig.json --noEmit
 @jovie/extension:typecheck: > tsc -p tsconfig.json --noEmit
@@ -18,4 +18,4 @@
 @jovie/web:typecheck: [typecheck-singleflight] phase=child-complete role=owner elapsedMs=95751 pid=12394 childPid=12425 cpuPct=n/a rssKb=n/a tsbuildinfo=.cache/tsbuildinfo tsbuildinfoAgeMs=198 tsbuildinfoBytes=2829287 exit=0 command=tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo
  Tasks:    20 successful, 20 total
 Cached:    18 cached, 20 total
-  Time:    2m22.176s 
+  Time:    2m22.176s

@@ -5,10 +5,10 @@
    • Remote caching disabled
 
 @jovie/action-contracts:typecheck: cache hit, replaying logs db00b0bd9895c94a
-@jovie/action-contracts:typecheck: 
+@jovie/action-contracts:typecheck:
 @jovie/action-contracts:typecheck: > @jovie/action-contracts@ typecheck /workspace/Jovie/packages/action-contracts
 @jovie/action-contracts:typecheck: > tsc --noEmit
-@jovie/action-contracts:typecheck: 
+@jovie/action-contracts:typecheck:
 @jovie/auth-routing:typecheck: cache hit, replaying logs cc32fee498bfc7f3
 @jovie/cli:typecheck: > tsc -p tsconfig.json --noEmit
 @jovie/extension:typecheck: > tsc -p tsconfig.json --noEmit
@@ -18,4 +18,4 @@
 @jovie/web:typecheck: [typecheck-singleflight] phase=child-complete role=owner elapsedMs=131403 pid=14218 childPid=14249 cpuPct=n/a rssKb=n/a tsbuildinfo=.cache/tsbuildinfo tsbuildinfoAgeMs=217 tsbuildinfoBytes=3611283 exit=0 command=tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo
  Tasks:    20 successful, 20 total
 Cached:    18 cached, 20 total
-  Time:    2m21.936s 
+  Time:    2m21.936s

@@ -6,12 +6,12 @@ Both esbuild and oxc options were set. oxc options will be used and esbuild opti
 JSON report written to /tmp/jovie-readiness-evidence/admission-final.json
  % Coverage report from v8
 -------------------|---------|----------|---------|---------|---------------------------------
-File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s               
+File               | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s
 -------------------|---------|----------|---------|---------|---------------------------------
-All files          |    93.3 |    87.77 |   86.11 |   93.54 |                                 
- access-request.ts |   95.12 |     89.2 |   88.23 |   95.83 | 120,407,647,738,768             
- auto-accept.ts    |   88.31 |    81.66 |      80 |   87.67 | 113-119,138,252,275,301,311-312 
- qualification.ts  |     100 |    93.33 |     100 |     100 | 50-56                           
+All files          |    93.3 |    87.77 |   86.11 |   93.54 |
+ access-request.ts |   95.12 |     89.2 |   88.23 |   95.83 | 120,407,647,738,768
+ auto-accept.ts    |   88.31 |    81.66 |      80 |   87.67 | 113-119,138,252,275,301,311-312
+ qualification.ts  |     100 |    93.33 |     100 |     100 | 50-56
 -------------------|---------|----------|---------|---------|---------------------------------
 
 =============================== Coverage summary ===============================

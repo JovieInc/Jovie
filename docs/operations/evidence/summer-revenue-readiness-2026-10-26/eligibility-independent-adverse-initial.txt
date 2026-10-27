@@ -20,9 +20,9 @@
 test at ../../tmp/summer-independent-gate/eligibility-cache-adverse.ts:2:4068
 ✖ malformed cache cannot raise existing freshness budget (2.916386ms)
   AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
-  
+
   true !== false
-  
+
       at TestContext.<anonymous> (/tmp/summer-independent-gate/eligibility-cache-adverse.ts:14:145)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1402:25)
