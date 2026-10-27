@@ -3679,6 +3679,41 @@ describe('automation-verify affected scope', () => {
     });
   });
 
+  describe('onboarding confirmed-handle helper binding', () => {
+    const source =
+      'apps/web/components/features/onboarding/onboardingChatHelpers.ts';
+    const testFiles = [
+      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
+      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
+    ];
+
+    it('runs both live and restored confirmation regressions for a helper-only change', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      for (const testFile of testFiles) {
+        expect(plan.mandatoryTests).toContain(testFile);
+        expect(plan.selectedTests).toContain(testFile);
+      }
+      const commands = buildSelectedTestCommands(plan, '1');
+      for (const testFile of testFiles) {
+        expect(commands.flatMap(([, args]) => args)).toContain(
+          testFile.replace('apps/web/', '')
+        );
+      }
+    });
+
+    it.each(testFiles)(
+      'fails closed when behavioral proof %s is missing',
+      testFile => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== testFile,
+        });
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+  });
+
   describe.each([
     [
       'apps/web/tests/e2e/utils/start-entry-layout.ts',
