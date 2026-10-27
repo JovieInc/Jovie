@@ -1,11 +1,11 @@
 {
   "schema": "jovie-blog-publish-latency/v1",
-  "generatedAt": "2026-10-24T12:01:12.415Z",
+  "generatedAt": "2026-10-26T14:13:27.436Z",
   "sampleCount": 0,
   "classification": {
-    "mergedPrCount": 2228,
+    "mergedPrCount": 2051,
     "classifiedPrCount": 80,
-    "unclassifiedPrCount": 2148,
+    "unclassifiedPrCount": 1971,
     "complete": false
   },
   "cohorts": {

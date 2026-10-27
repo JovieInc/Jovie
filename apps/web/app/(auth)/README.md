@@ -15,7 +15,8 @@ do not import `@clerk/*`.
 - Provider enablement is the hardcoded allowlist in
   `apps/web/lib/auth/oauth-providers.ts` (`apple` + `google`).
 - Email OTP uses Better Auth's emailOTP plugin. Local/E2E may use the
-  deterministic `424242` code when `E2E_TEST_MODE=1`.
+  deterministic `424242` code when `E2E_TEST_MODE=1`, or on staging (VERCEL_ENV=preview)
+  for `+clerk_test`/`+e2e` addresses on jov.ie and test.jovie.com. Never in production.
 - Local QA uses `/api/dev/test-auth/enter?persona=creator&redirect=/app`.
 
 ## Testing Notes
