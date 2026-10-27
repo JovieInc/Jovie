@@ -11,9 +11,38 @@ import {
   referenceView,
 } from './engine';
 import { candidate, command, now, scope, session } from './fixtures.test-utils';
-import { MediaAnchorSchema, ReferenceSessionSchema } from './types';
+import {
+  MediaAnchorSchema,
+  ReferenceIntakeSchema,
+  ReferenceSessionSchema,
+} from './types';
 
 describe('adaptive reference review', () => {
+  it('admits only reference IDs that rating and skip commands can address', () => {
+    const state = session(1),
+      source = candidate(2);
+    for (const id of [
+      'room study',
+      'a'.repeat(101),
+      '__proto__',
+      'constructor',
+      'toString',
+    ]) {
+      const invalid = { ...source, reference: { ...source.reference, id } };
+      expect(ReferenceIntakeSchema.safeParse(invalid).success).toBe(false);
+      expect(() =>
+        importReferenceCandidates(state, scope, [invalid], now)
+      ).toThrow();
+      const parsed = ReferenceSessionSchema.safeParse({
+        ...state,
+        media: { ...state.media, [id]: source.media },
+      });
+      expect(parsed.success && Object.hasOwn(parsed.data.media, id)).toBe(
+        false
+      );
+    }
+    expect(Object.keys(state.media)).toHaveLength(1);
+  });
   it('shares full scoped eligibility without UI truncation', () => {
     const state = session(51);
     expect(referenceEligibleIds(state, scope)).toHaveLength(51);

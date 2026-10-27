@@ -114,7 +114,10 @@ export const MediaAnchorSchema = z
   .strict();
 export type MediaAnchor = z.infer<typeof MediaAnchorSchema>;
 export const ReferenceIntakeSchema = z
-  .object({ reference: DesignReferenceSchema, media: MediaAnchorSchema })
+  .object({
+    reference: DesignReferenceSchema.extend({ id }),
+    media: MediaAnchorSchema,
+  })
   .strict();
 export const ReferenceActionSchema = z.discriminatedUnion('type', [
   z
@@ -162,7 +165,7 @@ export const ReferenceSessionSchema = z
     scope: ReferenceScopeSchema,
     revision: z.number().int().nonnegative(),
     corpus: DesignReferenceCorpusSchema,
-    media: z.record(z.string(), MediaAnchorSchema),
+    media: z.record(id, MediaAnchorSchema),
     ratings: z.record(z.string(), z.number().int().min(1).max(5)),
     skipped: z.array(id),
     clusters: z.record(z.string(), z.string().max(80)),
