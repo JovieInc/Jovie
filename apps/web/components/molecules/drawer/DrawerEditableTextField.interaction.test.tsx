@@ -35,3 +35,54 @@ it.each(['ISRC', 'UPC', 'Label'])(
     writeText.mockRestore();
   }
 );
+
+it('preserves the action group through keyboard edit cancellation and restores its actions', async () => {
+  const user = userEvent.setup();
+  const onSave = vi.fn();
+  const onAction = vi.fn();
+  const { container } = render(
+    <DrawerEditableTextField
+      label='Label'
+      value='Original'
+      editable
+      onSave={onSave}
+      actions={[
+        { id: 'inspect', ariaLabel: 'Inspect Label', onClick: onAction },
+      ]}
+    />
+  );
+  const action = screen.getByRole('button', { name: 'Inspect Label' });
+  const slot = action.parentElement;
+  expect(slot).toBe(container.firstElementChild?.lastElementChild);
+  expect(slot).toHaveAttribute(
+    'data-slot',
+    'drawer-editable-text-field-actions'
+  );
+  expect(slot?.children).toHaveLength(2);
+
+  await user.tab();
+  expect(screen.getByRole('button', { name: /Edit Label/ })).toHaveFocus();
+  await user.keyboard('{Enter}');
+  const input = screen.getByRole('textbox', { name: 'Edit Label' });
+  expect(input).toHaveFocus();
+  await user.type(input, 'Unsaved');
+  expect(container.firstElementChild?.lastElementChild).toBe(slot);
+  expect(slot).toHaveAttribute('aria-hidden', 'true');
+  expect(slot?.children).toHaveLength(2);
+  expect(screen.queryByRole('button', { name: 'Inspect Label' })).toBeNull();
+
+  await user.keyboard('{Escape}');
+  expect(onSave).not.toHaveBeenCalled();
+  expect(screen.getByText('Original')).toBeInTheDocument();
+  expect(container.firstElementChild?.lastElementChild).toBe(slot);
+  expect(slot).not.toHaveAttribute('aria-hidden');
+  const restored = screen.getByRole('button', { name: 'Inspect Label' });
+  expect(restored.parentElement).toBe(slot);
+  await user.tab();
+  await user.tab();
+  await user.tab();
+  expect(restored).toHaveFocus();
+  await user.keyboard('{Enter}');
+  expect(onAction).toHaveBeenCalledOnce();
+  expect(screen.queryByRole('textbox')).toBeNull();
+});
