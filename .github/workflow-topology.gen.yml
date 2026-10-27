@@ -115,7 +115,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:liveness
-    jobCount: 1
+    jobCount: 2
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -363,7 +363,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-production-publish
@@ -431,6 +430,18 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:assess
+    jobCount: 2
+  - name: Fleet Rules Evidence
+    path: .github/workflows/fleet-rules-evidence.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_run
+    terminalReceipt: job:rerun
     jobCount: 2
   - name: Fork PR Gate
     path: .github/workflows/fork-pr-gate.yml
@@ -828,6 +839,18 @@ nodes:
       - repository_dispatch
     terminalReceipt: job:sync-issue
     jobCount: 1
+  - name: Ovie Summer Canary
+    path: .github/workflows/ovie-summer-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:canary
+    jobCount: 1
   - name: Pen still diff (advisory)
     path: .github/workflows/pen-still-diff.yml
     active: true
@@ -885,7 +908,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -1272,6 +1296,7 @@ nodes:
     allowedConsumers:
       - Auto-Ready Agent Drafts
       - Dependabot Pin Sync
+      - Fleet Rules Evidence
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Review (shadow)
@@ -1480,6 +1505,9 @@ edges:
   - from: CI
     to: Fleet Gate Refresh
     type: workflow_run
+  - from: Source Validation
+    to: Fleet Rules Evidence
+    type: workflow_run
   - from: iOS CI
     to: Mac Lane Route
     type: workflow_call
@@ -1499,6 +1527,9 @@ edges:
     to: Lane Fix Relay
     type: workflow_run
   - from: PR Size Guard
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: PR Fleet Rules
     to: Lane Fix Relay
     type: workflow_run
   - from: CI

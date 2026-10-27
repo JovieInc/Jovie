@@ -797,6 +797,8 @@ export function OnboardingChat({
   const wasAwaitingTurnstileRetryRef = useRef(false);
   const wasSecurityCheckRecoveryRef = useRef(false);
   const pendingVerifiedSubmitRef = useRef(false);
+  const starterBannerWrapRef = useRef<HTMLDivElement>(null);
+  const [heldBannerHeight, setHeldBannerHeight] = useState(0);
   const [localAutomationBypass, setLocalAutomationBypass] = useState<
     boolean | null
   >(null);
@@ -1160,18 +1162,34 @@ export function OnboardingChat({
     (isAwaitingFirstToken ||
       shouldReserveStarterVerification ||
       verificationRequested);
+  const sizeStarterInstruction =
+    shouldReserveStarterVerification &&
+    turnstileHasSiteKey &&
+    (turnstileStatus === 'loading' || turnstileStatus === 'interactive');
   const flowStatus = shouldShowTurnstileBanner ? (
     <OnboardingFlowStatus
       shouldShowTurnstileBanner={shouldShowTurnstileBanner}
       turnstilePanel={turnstilePanel}
-      sizeStarterInstruction={
-        shouldReserveStarterVerification &&
-        turnstileHasSiteKey &&
-        (turnstileStatus === 'loading' || turnstileStatus === 'interactive')
-      }
+      sizeStarterInstruction={sizeStarterInstruction}
     />
   ) : null;
-
+  const starterBannerMounted =
+    Boolean(flowStatus) && chatError?.errorCode !== 'TURNSTILE_REQUIRED';
+  useLayoutEffect(() => {
+    const element = starterBannerWrapRef.current;
+    if (!element) return;
+    // Measured before paint and on every size change while mounted, so the
+    // spacer always matches the banner it replaces.
+    const measure = () => {
+      const height = element.offsetHeight;
+      if (height > 0) setHeldBannerHeight(height);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [starterBannerMounted]);
   const userTurnCount = messages.filter(
     message => message.role === 'user'
   ).length;
@@ -1179,6 +1197,19 @@ export function OnboardingChat({
   const shouldDockComposer =
     chatError !== null || userTurnCount > 1 || selectedArtist !== null;
   const isSecurityCheckRecovery = chatError?.errorCode === 'TURNSTILE_REQUIRED';
+  // Withdrawing the starter banner (token usable, automation bypass, first
+  // send) used to collapse the bottom-anchored composer box ~24px after first
+  // paint. The banner height is measured while it is mounted (ghost line,
+  // sized provider mount or guidance: whichever it contains), and an inert
+  // spacer of that height holds the space for as long as the centered
+  // composer stays put (the starter auto-sends, so messages exist before the
+  // composer docks), instead of releasing it when the first message appears.
+  const holdsStarterBannerSpace =
+    !flowStatus &&
+    heldBannerHeight > 0 &&
+    hasInitialStarterPrompt &&
+    !shouldDockComposer &&
+    !isSecurityCheckRecovery;
   useEffect(() => {
     if (shouldDockComposer) return;
     const scrollContainer = scrollContainerRef.current;
@@ -1213,7 +1244,17 @@ export function OnboardingChat({
   const sendLocalError = chatError;
   const onboardingComposerSurface = (
     <div className='mx-auto w-full max-w-[45rem]'>
-      {isSecurityCheckRecovery ? null : flowStatus}
+      {isSecurityCheckRecovery || !flowStatus ? null : (
+        <div ref={starterBannerWrapRef}>{flowStatus}</div>
+      )}
+      {holdsStarterBannerSpace ? (
+        <div
+          aria-hidden='true'
+          className='pointer-events-none'
+          data-testid='onboarding-starter-banner-space'
+          style={{ height: heldBannerHeight }}
+        />
+      ) : null}
       {isSecurityCheckRecovery ? (
         <OnboardingSecurityCheckRecovery
           status={turnstileStatus}

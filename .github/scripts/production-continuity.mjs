@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { appendFileSync } from 'node:fs';
 import { appendFile, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 
@@ -116,13 +117,28 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
   if (!Array.isArray(observations) || observations.length === 0) {
     throw new Error('continuity aggregation requires at least one observation');
   }
-  const unhealthy = observations.filter(item => item.healthy !== true);
+  // Unknown required evidence is never healthy (JOV-7694: "Unknown required
+  // evidence behaves as RED"). `healthy: false` is a verified failure;
+  // anything other than strict true/false is unknown and keeps the rollup
+  // non-healthy. A verified failure always outranks unknown.
+  const unhealthy = observations.filter(item => item.healthy === false);
+  const unknown = observations.filter(
+    item => item.healthy !== true && item.healthy !== false
+  );
+  const status =
+    unhealthy.length > 0
+      ? 'unhealthy'
+      : unknown.length > 0
+        ? 'unknown'
+        : 'healthy';
   return {
     schema: CONTINUITY_SCHEMA,
     observedAt: new Date(now).toISOString(),
-    status: unhealthy.length === 0 ? 'healthy' : 'unhealthy',
+    status,
     targets: observations,
     affectedTargets: unhealthy.map(item => item.id),
+    unknownTargets: unknown.map(item => item.id),
+    unknownReasons: unknown.map(item => item.reason ?? 'unknown'),
     incidentClasses: [...new Set(unhealthy.map(item => item.incidentClass))],
     requiresFounderNotification: unhealthy.length > 0,
     // A stale production is a release-pipeline failure, not a provider
@@ -135,17 +151,55 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
 
 export const FRESHNESS_TARGET_ID = 'jovie-production-freshness';
 export const FRESHNESS_INCIDENT_CLASS = 'production-stale';
-// Twice the controller's own starvation bound (release-lineage-gate.sh), so
-// this only fires once the in-band guard has already failed to ship.
-export const DEFAULT_STALE_AFTER_SECONDS = 7200;
+// Fallback only: 246 minutes, the measured p95 of normal merge-to-production lag over the 7 days to 2026-10-25.
+// The live bound is recomputed weekly from the trailing 7 days by the lanes doctor (its deploy_health module)
+// and read from the public lanes feed (`deployHealth.limits`); see resolveStaleAfterSeconds.
+export const DEFAULT_STALE_AFTER_SECONDS = 14760;
+const MIN_STALE_AFTER_SECONDS = 3600;
+const MAX_STALE_AFTER_SECONDS = 86_400;
+
+/** The freshness bound for `repository`: the feed's measured limit when readable and sane, else the fallback. */
+export async function resolveStaleAfterSeconds({
+  fetchImpl = fetch,
+  limitsUrl = '',
+  repository = '',
+  fallback = DEFAULT_STALE_AFTER_SECONDS,
+  timeoutMs = 5000,
+} = {}) {
+  if (!limitsUrl || !repository) return fallback;
+  try {
+    const response = await fetchImpl(limitsUrl, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) return fallback;
+    const age = (await response.json())?.deployHealth?.limits?.[repository]
+      ?.ageS;
+    return Number.isFinite(age) &&
+      age >= MIN_STALE_AFTER_SECONDS &&
+      age <= MAX_STALE_AFTER_SECONDS
+      ? Math.floor(age)
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
+// Strict: only a real string can be a SHA (RegExp.test would stringify arrays).
+const isSha = value => typeof value === 'string' && SHA_PATTERN.test(value);
+// Strict: the compare API returns ahead_by as a JSON number. Only a finite
+// non-negative integer number is accepted; null, '', false, undefined, numeric
+// strings such as '3', negatives, fractions, NaN and anything else are unknown.
+// Number()/parseInt coercion is deliberately avoided (Number(null) === 0).
+const isCommitCount = value => Number.isSafeInteger(value) && value >= 0;
 
 /**
  * Production freshness: how long has main carried commits that production
  * lacks? Reads the live SHA from build-info and the unshipped range from the
- * GitHub compare API. Fails open (healthy with a reason) when either source is
- * unreadable so a GitHub hiccup never pages; runtime outages are already
- * reported by the jovie-production target.
+ * GitHub compare API. When either source is unreadable the result is
+ * `healthy: null` (unknown) with a reason, never healthy: absence of evidence
+ * is not evidence of freshness (JOV-7694, JOV-7674). An unknown does not page
+ * or file by itself, but it cannot report healthy or resolve an incident.
+ * Runtime outages are reported by the jovie-production target.
  */
 export async function observeProductionFreshness({
   buildInfoUrl = DEFAULT_TARGETS[0].url,
@@ -170,6 +224,9 @@ export async function observeProductionFreshness({
     oldestUnshippedAt: null,
     unshippedAgeSeconds: 0,
   };
+  const unknownResult = extra => ({ ...base, ...extra, healthy: null });
+  // Not configured is an absent probe (the CLI only passes `freshness` when
+  // GITHUB_REPOSITORY is set), not an unreadable source, so it stays healthy.
   if (!/^[^/]+\/[^/]+$/.test(repository ?? '')) {
     return { ...base, reason: 'repository-not-configured' };
   }
@@ -196,8 +253,8 @@ export async function observeProductionFreshness({
   };
   const buildInfo = await readJson(buildInfoUrl);
   const liveSha = buildInfo?.commitSha;
-  if (!SHA_PATTERN.test(liveSha ?? '')) {
-    return { ...base, reason: 'live-sha-unreadable' };
+  if (!isSha(liveSha)) {
+    return unknownResult({ reason: 'live-sha-unreadable' });
   }
   const githubHeaders = token ? { Authorization: `Bearer ${token}` } : {};
   const head = await readJson(
@@ -205,8 +262,8 @@ export async function observeProductionFreshness({
     githubHeaders
   );
   const mainSha = head?.sha;
-  if (!SHA_PATTERN.test(mainSha ?? '')) {
-    return { ...base, liveSha, reason: 'main-sha-unreadable' };
+  if (!isSha(mainSha)) {
+    return unknownResult({ liveSha, reason: 'main-sha-unreadable' });
   }
   if (mainSha === liveSha) {
     return { ...base, liveSha, mainSha, reason: 'production-current' };
@@ -215,23 +272,27 @@ export async function observeProductionFreshness({
     `${githubApiUrl}/repos/${repository}/compare/${liveSha}...${mainSha}`,
     githubHeaders
   );
-  const unshippedCommits = Number(compare?.ahead_by);
+  const unshippedCommits = compare?.ahead_by;
   const oldestUnshippedAt = compare?.commits?.[0]?.commit?.committer?.date;
-  if (!Number.isInteger(unshippedCommits) || unshippedCommits < 0) {
-    return { ...base, liveSha, mainSha, reason: 'unshipped-range-unreadable' };
+  if (!isCommitCount(unshippedCommits)) {
+    return unknownResult({
+      liveSha,
+      mainSha,
+      reason: 'unshipped-count-unreadable',
+    });
   }
   if (unshippedCommits === 0) {
     return { ...base, liveSha, mainSha, reason: 'production-current' };
   }
-  const oldestEpoch = Date.parse(oldestUnshippedAt ?? '');
+  const oldestEpoch =
+    typeof oldestUnshippedAt === 'string' ? Date.parse(oldestUnshippedAt) : NaN;
   if (!Number.isFinite(oldestEpoch)) {
-    return {
-      ...base,
+    return unknownResult({
       liveSha,
       mainSha,
       unshippedCommits,
       reason: 'unshipped-age-unreadable',
-    };
+    });
   }
   const unshippedAgeSeconds = Math.max(
     0,
@@ -383,6 +444,17 @@ export async function observeProductionContinuity({
   return aggregateContinuity(observations, { now });
 }
 
+/**
+ * Remediation verdict for the intake: only an observed `healthy` rollup from a
+ * successful observe job is `success`. A failed observe job or `unhealthy`
+ * rollup is `failure` (a verified failure outranks unknown). Anything else,
+ * including `unknown` and a missing status, is `unknown` and never resolves.
+ */
+export function remediationConclusion({ observeResult, status } = {}) {
+  if (observeResult !== 'success' || status === 'unhealthy') return 'failure';
+  return status === 'healthy' ? 'success' : 'unknown';
+}
+
 export function continuityIncidentKey(result) {
   if (result?.schema !== CONTINUITY_SCHEMA) {
     throw new Error(
@@ -390,6 +462,9 @@ export function continuityIncidentKey(result) {
     );
   }
   if (result.status === 'healthy') return 'production-continuity:healthy';
+  if (result.status === 'unknown') {
+    return `production-continuity:unknown:${result.unknownTargets.join(',')}`;
+  }
   return `production-continuity:${result.affectedTargets.join(',')}:${result.incidentClasses.join(',')}`;
 }
 
@@ -532,7 +607,15 @@ export async function runCli({
   const result = await observeProductionContinuity({
     fetchImpl,
     freshness: repository
-      ? { repository, token: env.GH_TOKEN?.trim() ?? '' }
+      ? {
+          repository,
+          token: env.GH_TOKEN?.trim() ?? '',
+          staleAfterSeconds: await resolveStaleAfterSeconds({
+            fetchImpl,
+            limitsUrl: env.PRODUCTION_LIMITS_FEED_URL?.trim() ?? '',
+            repository,
+          }),
+        }
       : null,
     now,
     targets: parseTargets(args.targets),
@@ -547,6 +630,8 @@ export async function runCli({
         `status=${result.status}`,
         `affected_targets=${result.affectedTargets.join(',')}`,
         `incident_classes=${result.incidentClasses.join(',')}`,
+        `unknown_targets=${result.unknownTargets.join(',')}`,
+        `unknown_reasons=${result.unknownReasons.join(',')}`,
         `incident_key=${incidentKey}`,
         `requires_agent_ingress=${result.requiresAgentIngress}`,
       ].join('\n') + '\n',
@@ -557,7 +642,19 @@ export async function runCli({
   return { ...result, incidentKey };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+if (
+  import.meta.url === pathToFileURL(process.argv[1] ?? '').href &&
+  process.argv[2] === '--remediation-conclusion'
+) {
+  const conclusion = remediationConclusion({
+    observeResult: process.env.OBSERVE_RESULT,
+    status: process.env.OBSERVE_STATUS,
+  });
+  if (process.env.GITHUB_OUTPUT) {
+    appendFileSync(process.env.GITHUB_OUTPUT, `conclusion=${conclusion}\n`);
+  }
+  process.stdout.write(`${conclusion}\n`);
+} else if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   runCli().catch(error => {
     process.stderr.write(
       `production-continuity: ${error instanceof Error ? error.message : String(error)}\n`
