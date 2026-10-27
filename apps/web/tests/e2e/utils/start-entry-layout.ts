@@ -19,10 +19,24 @@ export type ClaimLayoutShiftEntry = {
   sources: ClaimLayoutShiftSource[];
 };
 
+type GuidanceLayoutShiftRect = { y: number; h: number; w: number };
+
+type GuidanceLayoutShiftEntry = {
+  value: number;
+  startTime: number;
+  sources?: {
+    node: string | null;
+    previous: GuidanceLayoutShiftRect | null;
+    current: GuidanceLayoutShiftRect | null;
+  }[];
+};
+
 declare global {
   interface Window {
     __claimLayout?: { supported: boolean; total: number | null };
     __claimLayoutEntries?: ClaimLayoutShiftEntry[];
+    /** Diagnostic: composer child heights, one entry per change, first 4s. */
+    __claimComposerFrames?: string[];
     __armClaimLayout?: () => void;
     __claimInitialLayout?: {
       supported: boolean;
@@ -30,6 +44,10 @@ declare global {
       unguidedFirst: boolean;
       first: number[] | null;
       guided: number[] | null;
+      entries?: GuidanceLayoutShiftEntry[];
+      /** Diagnostic: rect heights/tops of the layout chain at both samples. */
+      firstDetail?: Record<string, string>;
+      guidedDetail?: Record<string, string>;
     };
   }
 }
@@ -38,7 +56,7 @@ export function installDelayedGuidanceLayoutProbe(fontSize: number): void {
   const supported =
     typeof PerformanceObserver === 'function' &&
     PerformanceObserver.supportedEntryTypes.includes('layout-shift');
-  const metric = {
+  const metric: NonNullable<Window['__claimInitialLayout']> = {
     supported,
     total: supported ? 0 : (null as number | null),
     unguidedFirst: false,
@@ -59,6 +77,32 @@ export function installDelayedGuidanceLayoutProbe(fontSize: number): void {
           metric.total = Number.NaN;
         } else if (!shift.hadRecentInput) {
           metric.total = (metric.total ?? 0) + shift.value;
+          const node = (
+            shift as unknown as {
+              sources?: Array<{
+                node?: Node | null;
+                previousRect?: DOMRectReadOnly;
+                currentRect?: DOMRectReadOnly;
+              }>;
+            }
+          ).sources?.map(source => {
+            const el = source.node instanceof Element ? source.node : null;
+            const box = (rect?: DOMRectReadOnly) =>
+              rect ? { y: rect.y, h: rect.height, w: rect.width } : null;
+            return {
+              node: el
+                ? (el.getAttribute('data-testid') ??
+                  `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)}`)
+                : null,
+              previous: box(source.previousRect),
+              current: box(source.currentRect),
+            };
+          });
+          (metric.entries ??= []).push({
+            value: shift.value,
+            startTime: shift.startTime,
+            sources: node,
+          });
         }
       }
     }).observe({ type: 'layout-shift', buffered: true });
@@ -93,11 +137,32 @@ export function installDelayedGuidanceLayoutProbe(fontSize: number): void {
       const guidance = document.querySelector(
         '[data-testid="onboarding-flow-status"] > p[role="status"]'
       );
+      const detail = () => {
+        const out: Record<string, string> = {};
+        for (const [name, selector] of [
+          ['status', '[data-testid="onboarding-flow-status"]'],
+          ['ghost', '[data-testid="onboarding-verification-instruction-size"]'],
+          ['composer', '[data-testid="chat-empty-state-centered-composer"]'],
+          ['field', '[data-testid="chat-input-inline-field"]'],
+          ['textarea', '[aria-label="Chat message input" i]'],
+        ] as const) {
+          const el = document.querySelector(selector) as HTMLElement | null;
+          const r = el?.getBoundingClientRect();
+          out[name] = r
+            ? `y=${r.y.toFixed(1)} h=${r.height.toFixed(1)}${name === 'textarea' ? ` style=${el?.style.height}` : ''}`
+            : 'absent';
+        }
+        return out;
+      };
       if (!metric.first) {
+        metric.firstDetail = detail();
         metric.first = positions;
         metric.unguidedFirst = !guidance?.getBoundingClientRect().height;
       }
-      if (guidance?.getBoundingClientRect().height) metric.guided = positions;
+      if (guidance?.getBoundingClientRect().height) {
+        metric.guidedDetail = detail();
+        metric.guided = positions;
+      }
     }
     if (!metric.guided) requestAnimationFrame(sample);
   };
@@ -150,6 +215,36 @@ export function installReplyLayoutProbe(): void {
     since = performance.now();
     recompute();
   };
+
+  const frames: string[] = [];
+  window.__claimComposerFrames = frames;
+  let lastSignature = '';
+  const sampleComposer = () => {
+    const composer = document.querySelector(
+      '[data-testid="chat-empty-state-centered-composer"]'
+    );
+    if (composer) {
+      const describe = (el: Element) => {
+        const box = el.getBoundingClientRect();
+        const tag = el.getAttribute('data-testid') ?? el.tagName.toLowerCase();
+        return `${tag}:${box.height.toFixed(0)}`;
+      };
+      const walk = (el: Element, depth: number): string[] => [
+        `${'  '.repeat(depth)}${describe(el)}`,
+        ...(depth < 4
+          ? [...el.children].flatMap(child => walk(child, depth + 1))
+          : []),
+      ];
+      const kids = [...composer.children].flatMap(child => walk(child, 0));
+      const signature = `${composer.getBoundingClientRect().height.toFixed(0)} [${kids.join(' | ')}]`;
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        frames.push(`${Math.round(performance.now())}ms ${signature}`);
+      }
+    }
+    if (performance.now() < 15000) requestAnimationFrame(sampleComposer);
+  };
+  requestAnimationFrame(sampleComposer);
 
   if (!supported) return;
 

@@ -7934,14 +7934,14 @@ def _inventory_unreadable(path, error) -> dict:
     return {"sourceAtReason": "inventory-unreadable"}
 
 
-def open_prs_summary(*, capture: list[dict] | None = None) -> list[dict]:
+def open_prs_summary(*, capture: list[dict] | None = None, refresh: bool = False) -> list[dict]:
     """Every open PR with its aggregate check state, in a few cheap GraphQL pages, cached for a
     minute. Per-check rollups over dozens of PRs 504 or trip GitHub's secondary rate limit
     (2026-09-27: devin had 43 red PRs and saw none of them, so it idled over budget). The
     aggregate state stands in as one synthetic check; `with_checks` loads the real ones for
     the single PR a worker claims. Empty when GitHub cannot be read."""
     now = time.time()
-    if now - _SUMMARY["at"] < SUMMARY_TTL_S:
+    if not refresh and now - _SUMMARY["at"] < SUMMARY_TTL_S:
         if capture is not None:
             capture.append(copy.deepcopy(_SUMMARY))
         return _SUMMARY["prs"]
@@ -7984,13 +7984,13 @@ class RepairInventoryHold(Exception):
     """The initial repair census cannot qualify this pass; exit after releasing claim.lock."""
 
 
-def capture_repair_inventory(name: str) -> dict:
+def capture_repair_inventory(name: str, *, refresh: bool = False) -> dict:
     """Copy one summary invocation's rows and provenance outside global claim.lock."""
     identity = {"repository": REPO_SLUG, "provider": name,
                 "cacheKey": "open-prs-labels-v2", "cacheRoot": str(SHARED_CACHE_DIR)}
     paired = []
     try:
-        returned = copy.deepcopy(open_prs_summary(capture=paired))
+        returned = copy.deepcopy(open_prs_summary(capture=paired, **({"refresh": True} if refresh else {})))
         summary = paired[0] if len(paired) == 1 else {}
         same = isinstance(returned, list) and isinstance(summary, dict) and returned == summary.get("prs")
     except (OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError):
@@ -8048,6 +8048,23 @@ def repair_inventory_cause(receipt: dict, name: str, now: float | None = None) -
     if now - stamp >= CLAIM_SCAN_TTL_S:
         return "source-stale"
     return None
+
+
+def lock_repair_inventory(host: Host, name: str, receipt: dict) -> tuple[Locked, dict]:
+    """Fence a copied census after optional preflight, then after one lock wait.
+
+    Only age can request another ordinary census outside claim.lock. A refresh
+    supplies its own rows and provenance; unreadable/mismatched receipts still
+    fail closed. Bound retries so contention cannot spin or repeat admission.
+    """
+    if repair_inventory_cause(receipt, name) == "source-stale":
+        receipt = capture_repair_inventory(name, refresh=True)
+    claim = Locked(host.state / "claim.lock", blocking=True)
+    if repair_inventory_cause(receipt, name) == "source-stale":
+        claim.release()
+        receipt = capture_repair_inventory(name, refresh=True)
+        claim = Locked(host.state / "claim.lock", blocking=True)
+    return claim, receipt
 
 
 def overlap_prs_summary() -> list[dict] | None:
@@ -8139,8 +8156,8 @@ def org_merged_prs(identifier: str) -> list[dict] | None:
 
 
 def in_flight_issues() -> frozenset[str] | None:
-    """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
-    lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
+    """Issues that already have an open PR (lane branch, canonical reference or legacy marker)
+    from any lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
     unknown in-flight set is not permission to open a duplicate PR (JOV-6833). A parked PR the
     sweep requeued (`lane-rebuild`, JOV-7708) stays open but no longer holds its issue."""
     def fetch():
@@ -8157,6 +8174,7 @@ def in_flight_issues() -> frozenset[str] | None:
         branch = LANE_BRANCH.match(pr.get("headRefName") or "")
         marker = ISSUE_MARKER.search(pr.get("body") or "")
         keys |= {key.upper() for key in (branch and branch.group("issue"), marker and marker.group(1)) if key}
+        keys |= ownership.referenced(pr.get("body") or "")
     return frozenset(keys)
 
 
@@ -9013,7 +9031,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     routing_needed = spec.get("repairs") is not False and repair_routing_needed(host, rung_inventory)
     routing_providers = load_providers() if routing_needed else {}
     routing_context = capture_repair_routing(host, routing_providers, rung_inventory) if routing_needed else None
-    claim = Locked(host.state / "claim.lock", blocking=True)
+    if repair_inventory is not None:
+        claim, repair_inventory = lock_repair_inventory(host, name, repair_inventory)
+    else:
+        claim = Locked(host.state / "claim.lock", blocking=True)
     # Bulk repair inventory fills under its per-key lock outside this global lock.
     # Current local filters and selected-head/owner/claim arbitration remain serialized.
     red = adopt = issue = route_decision = None
@@ -9029,6 +9050,12 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         local = spec.get("repairs") is not False
         if local and not repair_inventory_valid(repair_inventory, name):
             raise RepairInventoryHold()
+        if local:
+            # Project the refreshed same-call pair while claim ownership is held.
+            # Optional file witnesses retain their original binding and are
+            # revalidated by the new-issue path before use.
+            scan_summary = repair_inventory["summary"]
+            rung_inventory = {key: scan_summary.get(key) for key in ("readable", "sourceAt", "prs")}
         candidates = [pr for pr in fix_candidates(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
         # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
         # gated and readied like this lane's own drafts. Derived from the one cached scan so

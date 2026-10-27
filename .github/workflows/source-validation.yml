@@ -154,6 +154,9 @@ jobs:
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          # Source guards that read GitHub (gh-api-hold) ran unauthenticated and
+          # hit the per-IP limit ("outside the 30s budget", 2026-10-21).
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
@@ -359,6 +362,12 @@ jobs:
           pnpm screen-registration-gate
           pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts
           pnpm ci:control:test
+      # A PR that removes a data-pen-contract node a required layout spec still
+      # locates only failed in the merge group (#23332: FAQ removed from /about,
+      # three ejections). Fail it on its own PR instead.
+      - name: Check layout-guard pen contracts are still rendered
+        if: steps.reuse.outputs.reuse != 'true'
+        run: node scripts/layout-guard-pen-contracts.mjs
       # The merge group's ci-fast runs the same path-aware shadcn baseline
       # probe; Source Validation previously skipped it, so a restyle that fit
       # a PR's diff still ejected the whole merge group (group 36902907269,
