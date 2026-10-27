@@ -110,6 +110,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
@@ -208,6 +209,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
@@ -875,10 +877,11 @@ jobs:
           })));
           NODE
 
-  # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): every stop label
-  # (hold, gated, incident, do-not-merge, tim-hold variants) needs a receipt
-  # comment naming an owner plus an expiry or a head-change release.
-  # Ownerless holds past their grace period and expired or released receipts
+  # Human-owned tim-hold variants and do-not-merge require authorized
+  # disposition; this sweep never expires them or their coexisting stops.
+  # Other stop labels use the hold contract (scripts/hold-contract.mjs,
+  # jovie-hold/v1): a receipt names an owner and an expiry or head-change release.
+  # Ownerless machine holds past their grace period and expired receipts
   # are removed with one comment. The Jovie Bot unlabel event then wakes the
   # enroll job above; required checks still gate admission. Expiry is checked
   # on the next event after it lapses: a landing on main, a merge-group CI

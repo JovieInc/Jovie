@@ -1,7 +1,11 @@
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { inspectEssentialViewport } from './helpers/golden-path-keyframes';
-import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 import {
+  installRuntimeAutomationBypass,
+  ONBOARDING_SESSION_COOKIE_NAME,
+} from './utils/runtime-automation-bypass';
+import {
+  type ClaimSignInFrame,
   inspectStartEntryEssentialViewport,
   installDelayedGuidanceLayoutProbe,
   installReplyLayoutProbe,
@@ -20,6 +24,7 @@ function expectZeroLayoutShift(
         total: number | null;
         entries?: readonly unknown[];
         composerFrames?: readonly string[];
+        signInFrames?: readonly ClaimSignInFrame[];
       }
     | undefined,
   testInfo: TestInfo
@@ -31,7 +36,7 @@ function expectZeroLayoutShift(
     if (metric!.entries) {
       expect(
         metric!.total,
-        `layout-shift entries ${JSON.stringify(metric!.entries)} composerFrames ${JSON.stringify(metric!.composerFrames)}`
+        `layout-shift entries ${JSON.stringify(metric!.entries)} composerFrames ${JSON.stringify(metric!.composerFrames)} signInFrames ${JSON.stringify(metric!.signInFrames)}`
       ).toBe(0);
     } else {
       expect(metric!.total).toBe(0);
@@ -128,6 +133,56 @@ declare global {
 }
 
 test.describe('current-state essential actions (JOV-7771)', () => {
+  for (const viewport of [
+    { width: 1440, height: 900, fontSize: 16 },
+    { width: 390, height: 615, fontSize: 16 },
+    { width: 390, height: 615, fontSize: 24 },
+    { width: 1440, height: 900, fontSize: 32 },
+    { width: 390, height: 844, fontSize: 32 },
+    { width: 390, height: 615, fontSize: 32 },
+  ]) {
+    test(`fresh entry keeps its entire composer visible at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px root text`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript(fontSize => {
+        const apply = () => {
+          if (!document.documentElement) return false;
+          document.documentElement.style.fontSize = `${fontSize}px`;
+          return true;
+        };
+        if (!apply()) {
+          const observer = new MutationObserver(() => {
+            if (apply()) observer.disconnect();
+          });
+          observer.observe(document, { childList: true });
+        }
+      }, viewport.fontSize);
+      await page.goto('/start');
+      await expect(page.locator('html')).toHaveCSS(
+        'font-size',
+        `${viewport.fontSize}px`
+      );
+      await expect(
+        page.locator('[data-testid="onboarding-empty-intro"] h1')
+      ).toBeVisible();
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+      });
+      await expectEssentials(page);
+      await page
+        .getByRole('textbox', { name: 'Chat message input', exact: false })
+        .fill('Tim White');
+      await expect(
+        page.getByRole('button', { name: 'Send message', exact: true })
+      ).toBeEnabled();
+      await expectEssentials(page);
+    });
+  }
+
   for (const viewport of [
     { width: 1440, height: 900, fontSize: 12 },
     { width: 390, height: 844, fontSize: 12 },
@@ -298,13 +353,21 @@ test.describe('current-state essential actions (JOV-7771)', () => {
       // resends the starter, so keep the server's Set-Cookie on the fixture
       // reply: the reload below must look like production, where the cookie
       // exists after the first send.
-      const serverCookie =
-        route.request().method() === 'POST'
-          ? await route
-              .fetch()
-              .then(response => response.headers()['set-cookie'])
-              .catch(() => undefined)
-          : undefined;
+      let serverCookie: string | undefined;
+      if (route.request().method() === 'POST') {
+        const response = await route.fetch();
+        serverCookie = response
+          .headersArray()
+          .find(
+            header =>
+              header.name.toLowerCase() === 'set-cookie' &&
+              header.value.startsWith(`${ONBOARDING_SESSION_COOKIE_NAME}=`)
+          )?.value;
+        expect(
+          Boolean(serverCookie),
+          'The real first send must establish an onboarding session before testing reload continuity'
+        ).toBe(true);
+      }
       await replyReady;
       await route.fulfill({
         headers: {

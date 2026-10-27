@@ -192,6 +192,19 @@ describe('start entry essential viewport snapshot', () => {
     ).toEqual([]);
   });
 
+  it.each(['self', 'ancestor'])(
+    'rejects an optional status with zero opacity on its %s',
+    async target => {
+      const message = addStatus();
+      const transparent = target === 'self' ? message : message.parentElement!;
+      transparent.style.opacity = '0';
+      expect(
+        (await inspectStartEntryEssentialViewport(pageAtAuditBoundary()))
+          .findings
+      ).toEqual([{ selector: status, reason: 'missing' }]);
+    }
+  );
+
   it('rejects an occluded optional status and restores pointer events', async () => {
     const message = addStatus();
     message.style.pointerEvents = 'none';

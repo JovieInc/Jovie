@@ -1221,6 +1221,12 @@ export function OnboardingChat({
     scrollContainer.scrollTop = 0;
   }, [displayMessages.length, scrollContainerRef, shouldDockComposer, status]);
 
+  // Card drafts and user confirmation taps are provisional. A persisted tool
+  // confirmation keeps later questions from inheriting the old handle prompt.
+  const hasConfirmedHandle = hasToolOutputAction(
+    messages,
+    WIDGET_COMPLETION_ACTIONS.HANDLE_CONFIRMED
+  );
   const onboardingChatInputProps = {
     value: input,
     onChange: handleInputChange,
@@ -1230,7 +1236,7 @@ export function OnboardingChat({
     isStreaming,
     onStop: stop,
     placeholder: getOnboardingComposerPlaceholder(
-      handleDraft,
+      hasConfirmedHandle ? null : handleDraft,
       hasConversationStarted
     ),
     dictationEnabled: false,

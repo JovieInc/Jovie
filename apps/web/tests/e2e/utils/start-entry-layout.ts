@@ -37,6 +37,22 @@ export type ClaimLayoutShiftEntry = {
   sources: ClaimLayoutShiftSource[];
 };
 
+export type ClaimSignInFrame = {
+  startTime: number;
+  text: string | null;
+  rect: { x: number; y: number; width: number; height: number } | null;
+  style: {
+    font: string;
+    fontSize: string;
+    fontFamily: string;
+    paddingInlineStart: string;
+    paddingInlineEnd: string;
+    borderInlineStartWidth: string;
+    borderInlineEndWidth: string;
+  } | null;
+  fontStatus: FontFaceSet['status'] | null;
+};
+
 type GuidanceLayoutShiftRect = { y: number; h: number; w: number };
 
 type GuidanceLayoutShiftEntry = {
@@ -63,6 +79,8 @@ declare global {
       first: number[] | null;
       guided: number[] | null;
       entries?: GuidanceLayoutShiftEntry[];
+      /** Diagnostic: changed sign-in text/style/geometry frames, first 2s. */
+      signInFrames?: ClaimSignInFrame[];
       /** Diagnostic: rect heights/tops of the layout chain at both samples. */
       firstDetail?: Record<string, string>;
       guidedDetail?: Record<string, string>;
@@ -82,6 +100,45 @@ export function installDelayedGuidanceLayoutProbe(fontSize: number): void {
     guided: null as number[] | null,
   };
   window.__claimInitialLayout = metric;
+  // Observe the sign-in control separately: the guidance geometry sampler
+  // stops once guidance appears, before late text or font changes can land.
+  // Read only, retain changes only, and stop after two seconds.
+  const signInFrames: ClaimSignInFrame[] = [];
+  metric.signInFrames = signInFrames;
+  const signInDeadline = performance.now() + 2000;
+  let previousSignInSignature = '';
+  const sampleSignIn = () => {
+    const link = document.querySelector(
+      '[data-testid="onboarding-sign-in-header"] a.btn-linear-login'
+    );
+    const rect = link?.getBoundingClientRect();
+    const style = link ? getComputedStyle(link) : null;
+    const snapshot: Omit<ClaimSignInFrame, 'startTime'> = {
+      text: link?.textContent ?? null,
+      rect: rect
+        ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+        : null,
+      style: style
+        ? {
+            font: style.font,
+            fontSize: style.fontSize,
+            fontFamily: style.fontFamily,
+            paddingInlineStart: style.paddingInlineStart,
+            paddingInlineEnd: style.paddingInlineEnd,
+            borderInlineStartWidth: style.borderInlineStartWidth,
+            borderInlineEndWidth: style.borderInlineEndWidth,
+          }
+        : null,
+      fontStatus: document.fonts?.status ?? null,
+    };
+    const signature = JSON.stringify(snapshot);
+    if (signature !== previousSignInSignature) {
+      previousSignInSignature = signature;
+      signInFrames.push({ startTime: performance.now(), ...snapshot });
+    }
+    if (performance.now() < signInDeadline) requestAnimationFrame(sampleSignIn);
+  };
+  requestAnimationFrame(sampleSignIn);
   // CLS is optional; the style fixture and essential-control geometry are
   // required even when Firefox cannot observe layout-shift entries.
   if (supported) {

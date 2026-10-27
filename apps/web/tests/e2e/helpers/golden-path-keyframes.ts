@@ -70,9 +70,19 @@ export async function inspectEssentialViewport(
       }
       return true;
     };
+    // Preserve locator.isVisible() selection: opacity zero still has a layout
+    // box, so it must reach the strict painted-visibility audit and fail below.
+    const rendered = el => {
+      if (!el.getClientRects().length) return false;
+      if (el.checkVisibility && !el.checkVisibility()) return false;
+      if (getComputedStyle(el).visibility !== 'visible') return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
     for (const selector of new Set([...selectors, ...optionalSelectors])) {
-      const matches = Array.from(document.querySelectorAll(selector)).filter(visible);
-      if (!matches.length && !selectors.includes(selector)) continue;
+      const candidates = Array.from(document.querySelectorAll(selector));
+      if (!selectors.includes(selector) && !candidates.some(rendered)) continue;
+      const matches = candidates.filter(visible);
       if (matches.length !== 1) {
         findings.push({ selector, reason: matches.length ? 'duplicate' : 'missing' });
         continue;
@@ -128,6 +138,34 @@ export async function inspectEssentialViewport(
 const pageErrors = new WeakMap<Page, string[]>();
 let sequence = 0;
 
+// Attribute only inspected static API routes. Unknown paths can contain
+// credentials or account identifiers, even after removing query and fragment.
+const KEYFRAME_RESOURCE_PATHS = new Set([
+  '/api/analytics/navigation',
+  '/api/chat/usage',
+  '/api/billing/status',
+  '/api/onboarding/conversation',
+  '/api/spotify/search',
+]);
+
+function keyframeResourcePath(
+  resourceUrl: string,
+  pageUrl: string
+): string | null {
+  try {
+    // No base URL: relative and malformed locations must fail closed.
+    const resource = new URL(resourceUrl);
+    const page = new URL(pageUrl);
+    return (resource.protocol === 'http:' || resource.protocol === 'https:') &&
+      resource.origin === page.origin &&
+      KEYFRAME_RESOURCE_PATHS.has(resource.pathname)
+      ? resource.pathname
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function trackErrors(page: Page): string[] {
   let errors = pageErrors.get(page);
   if (!errors) {
@@ -136,7 +174,10 @@ function trackErrors(page: Page): string[] {
     const list = errors;
     page.on('pageerror', error => list.push(`pageerror: ${error.message}`));
     page.on('console', message => {
-      if (message.type() === 'error') list.push(message.text().slice(0, 300));
+      if (message.type() !== 'error') return;
+      const text = message.text().slice(0, 300);
+      const resource = keyframeResourcePath(message.location().url, page.url());
+      list.push(resource ? `${text} [resource: ${resource}]` : text);
     });
   }
   return errors;
