@@ -1,4 +1,18 @@
 import assert from 'node:assert/strict';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it } from 'vitest';
 import {
   buildReport,
@@ -10,6 +24,14 @@ import {
   statesCovered,
   summarizeGuards,
 } from '../component-certificate.mjs';
+import { moduleKey } from '../mutation-sweep.mjs';
+
+const sourceHash = source => createHash('sha256').update(source).digest('hex');
+const gitBlob = source =>
+  createHash('sha1')
+    .update(`blob ${Buffer.byteLength(source)}\0`)
+    .update(source)
+    .digest('hex');
 
 describe('component certificate', () => {
   const clean = `export function Card({ title }: { title: string }) { return <div className="bg-surface-1 text-primary-token">{title}</div>; }`;
@@ -92,13 +114,22 @@ export function Drawer({ open }) {
   });
 
   it('fully evidenced component certifies; stale benchmark and low mutation do not', () => {
+    const binding = sourceHash(full.source);
+    const mutation = {
+      status: 'scored',
+      score: 90,
+      valid: 40,
+      survived: 4,
+      sha: 'a'.repeat(40),
+      blob: moduleKey(gitBlob(full.source), [gitBlob(full.testSource)]),
+    };
     const evidence = {
-      sourceHash: 'h',
-      mutation: { status: 'scored', score: 90, valid: 40, survived: 4 },
-      visual: { status: 'pass', captured: 5 },
+      sourceHash: binding,
+      mutation,
+      visual: { status: 'pass', captured: 5, sourceHash: binding },
       benchmark: {
         libraryVersion: 1,
-        sourceHash: 'h',
+        sourceHash: binding,
         gaps: [
           { item: 'x', decision: 'adopt', status: 'done' },
           { item: 'y', decision: 'skip', reason: 'n/a' },
@@ -121,20 +152,138 @@ export function Drawer({ open }) {
       storySource,
       evidence: {
         ...evidence,
-        mutation: { status: 'scored', score: 50, valid: 40, survived: 20 },
+        mutation: { ...mutation, score: 50, survived: 20 },
       },
     });
     assert.equal(low.certified, false);
     const stale = certifyComponent({
       path: 'apps/web/components/molecules/List.tsx',
       ...full,
+      source: `${full.source}\n// changed source`,
       storySource,
-      evidence: { ...evidence, sourceHash: 'changed' },
+      evidence: {
+        ...evidence,
+        sourceHash: sourceHash(`${full.source}\n// changed source`),
+      },
     });
     assert.equal(
       stale.criteria.find(c => c.id === 'benchmark').status,
       'unknown'
     );
+  });
+
+  it('certificate binding is computed from source rather than caller metadata', () => {
+    const cert = certifyComponent({
+      path: 'Card.tsx',
+      source: clean,
+      evidence: { sourceHash: 'invented' },
+    });
+    assert.equal(cert.binding, sourceHash(clean));
+  });
+
+  it('fresh failed observations stay failed; stale or unbound observations are unknown', () => {
+    for (const id of ['a11y', 'visual']) {
+      for (const [binding, expected] of [
+        [sourceHash(clean), 'fail'],
+        [sourceHash('old source'), 'unknown'],
+        [undefined, 'unknown'],
+      ]) {
+        const cert = certifyComponent({
+          path: 'Card.tsx',
+          source: clean,
+          evidence: {
+            [id]: {
+              status: 'fail',
+              sourceHash: binding,
+              detail: 'observed failure',
+            },
+          },
+        });
+        assert.equal(
+          cert.criteria.find(row => row.id === id).status,
+          expected,
+          id
+        );
+        assert.ok(cert.missing.some(row => row.criterion === id));
+      }
+    }
+  });
+
+  it('mutation receipts require a known run and complete current test inputs', () => {
+    const evidence = {
+      mutation: {
+        status: 'scored',
+        score: 100,
+        valid: 5,
+        sha: 'a'.repeat(40),
+        blob: moduleKey(gitBlob(clean), []),
+      },
+    };
+    for (const override of [
+      { mutationTestSources: null },
+      { evidence: { mutation: { ...evidence.mutation, sha: 'unknown' } } },
+      {
+        evidence: { mutation: { ...evidence.mutation, blob: 'b'.repeat(40) } },
+      },
+    ]) {
+      const cert = certifyComponent({
+        path: 'Card.tsx',
+        source: clean,
+        evidence,
+        ...override,
+      });
+      assert.equal(
+        cert.criteria.find(row => row.id === 'mutation').status,
+        'unknown'
+      );
+    }
+  });
+
+  it('fresh-bound malformed mutation measurements stay unknown without changing the score floor', () => {
+    const mutation = {
+      status: 'scored',
+      score: 100,
+      valid: 10,
+      sha: 'a'.repeat(40),
+      blob: moduleKey(gitBlob(clean), []),
+    };
+    for (const fields of [
+      { score: '100' },
+      { score: Infinity },
+      { score: NaN },
+      { score: -1 },
+      { score: 101 },
+      { score: null },
+      { valid: undefined },
+      { valid: -1 },
+      { valid: 1.5 },
+      { valid: '10' },
+    ]) {
+      const cert = certifyComponent({
+        path: 'Card.tsx',
+        source: clean,
+        evidence: { mutation: { ...mutation, ...fields } },
+      });
+      assert.equal(
+        cert.criteria.find(row => row.id === 'mutation').status,
+        'unknown'
+      );
+      assert.ok(cert.missing.some(row => row.criterion === 'mutation'));
+    }
+    for (const [score, valid, expected] of [
+      [80, 0, 'pass'],
+      [79.5, 10, 'fail'],
+    ]) {
+      const cert = certifyComponent({
+        path: 'Card.tsx',
+        source: clean,
+        evidence: { mutation: { ...mutation, score, valid } },
+      });
+      assert.equal(
+        cert.criteria.find(row => row.id === 'mutation').status,
+        expected
+      );
+    }
   });
 
   it('waiver with a reason satisfies a state; report totals and agent spec', () => {
@@ -220,5 +369,289 @@ export function Drawer({ open }) {
       }).errors.length,
       1
     );
+  });
+});
+
+describe('component certificate CLI evidence freshness', () => {
+  const cli = fileURLToPath(
+    new URL('../../component-certificate.mjs', import.meta.url)
+  );
+  const component = 'apps/web/components/molecules/Card.tsx';
+  const testPath = component.replace('.tsx', '.test.tsx');
+  const additionalTest = 'apps/web/tests/unit/Card.test.tsx';
+  const original = 'export function Card() { return <div />; }\n';
+  const changed =
+    'export function Card() { return <div title="updated" />; }\n';
+
+  it('the CLI import closure works with only its existing TypeScript dependency', () => {
+    const root = mkdtempSync(join(tmpdir(), 'component-certificate-imports-'));
+    const sourceRoot = dirname(dirname(cli));
+    try {
+      for (const path of [
+        'scripts/component-certificate.mjs',
+        'scripts/component-ship-policy.mjs',
+        'scripts/lib/component-certificate.mjs',
+        'scripts/lib/mutation-sweep.mjs',
+        'scripts/lib/mutation-diff.mjs',
+      ]) {
+        mkdirSync(dirname(join(root, path)), { recursive: true });
+        cpSync(join(sourceRoot, path), join(root, path));
+      }
+      mkdirSync(join(root, 'node_modules'));
+      symlinkSync(
+        dirname(fileURLToPath(import.meta.resolve('typescript/package.json'))),
+        join(root, 'node_modules/typescript'),
+        'dir'
+      );
+      const result = spawnSync(
+        process.execPath,
+        [
+          join(root, 'scripts/component-certificate.mjs'),
+          '--repo-root',
+          root,
+          '--all',
+          '--summary',
+        ],
+        { cwd: root, encoding: 'utf8' }
+      );
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      assert.match(result.stdout, /components 0, certified 0/);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  function fixture(run) {
+    const root = mkdtempSync(join(tmpdir(), 'component-certificate-cli-'));
+    const env = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+    );
+    const write = (path, value) => {
+      mkdirSync(dirname(join(root, path)), { recursive: true });
+      writeFileSync(join(root, path), value);
+    };
+    const json = (path, value) => write(path, JSON.stringify(value));
+    const git = (...args) =>
+      execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
+        cwd: root,
+        env,
+        encoding: 'utf8',
+      }).trim();
+    const records = {};
+    const save = () => {
+      json('mutation.json', {
+        modules: { [component.replace('apps/web/', '')]: records.mutation },
+      });
+      for (const kind of ['visual', 'a11y', 'benchmark'])
+        json(`${kind}.json`, { components: { [component]: records[kind] } });
+    };
+    const refresh = () => {
+      const binding = sourceHash(readFileSync(join(root, component), 'utf8'));
+      records.mutation = {
+        status: 'scored',
+        score: 100,
+        valid: 10,
+        survived: 0,
+        sha: git('rev-parse', 'HEAD'),
+        blob: moduleKey(git('hash-object', component), [
+          git('hash-object', testPath),
+          git('hash-object', additionalTest),
+        ]),
+      };
+      records.visual = { status: 'pass', captured: 1, sourceHash: binding };
+      records.a11y = { status: 'pass', sourceHash: binding };
+      records.benchmark = { libraryVersion: 1, sourceHash: binding, gaps: [] };
+      save();
+    };
+    const invoke = () => {
+      const output = join(root, 'report.json');
+      const result = spawnSync(
+        process.execPath,
+        [
+          cli,
+          '--repo-root',
+          root,
+          '--component',
+          component,
+          '--mutation-state',
+          'mutation.json',
+          '--visual',
+          'visual.json',
+          '--a11y',
+          'a11y.json',
+          '--benchmarks',
+          'benchmark.json',
+          '--out',
+          output,
+        ],
+        { cwd: root, env, encoding: 'utf8' }
+      );
+      assert.equal(result.status, 0, result.stdout + result.stderr);
+      return JSON.parse(readFileSync(output, 'utf8')).certificates[0];
+    };
+    try {
+      git('init', '-q', '-b', 'main');
+      git('config', 'user.name', 'Certificate fixture');
+      git('config', 'user.email', 'certificate@example.invalid');
+      write(component, original);
+      write(testPath, 'it("renders", () => { expect(1).toBe(1); });\n');
+      write(
+        additionalTest,
+        'it("additional assertion", () => { expect(2).toBe(2); });\n'
+      );
+      write(
+        component.replace('.tsx', '.stories.tsx'),
+        'export const Loading={}; export const Empty={}; export const Error={}; export const Partial={}; export const LongContent={}; export const Offline={}; export const PermissionDenied={}; export const Rtl={};\n'
+      );
+      git('add', '.');
+      git('commit', '-qm', 'component and tests');
+      refresh();
+      run({ root, write, records, save, refresh, invoke, git });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+
+  it('component edit and benchmark-only refresh cannot reuse old CI or mutation evidence', () => {
+    fixture(f => {
+      assert.equal(f.invoke().certified, true);
+      f.write(component, changed);
+      f.records.benchmark.sourceHash = sourceHash(changed);
+      f.save();
+      const stale = f.invoke();
+      assert.equal(stale.certified, false);
+      for (const id of ['a11y', 'visual', 'mutation']) {
+        assert.equal(
+          stale.criteria.find(row => row.id === id).status,
+          'unknown',
+          id
+        );
+        assert.ok(
+          stale.missing.some(row => row.criterion === id),
+          id
+        );
+      }
+      assert.equal(
+        stale.criteria.find(row => row.id === 'benchmark').status,
+        'pass'
+      );
+      f.refresh();
+      assert.equal(f.invoke().certified, true);
+    });
+  });
+
+  for (const [criterion, field] of [
+    ['a11y', 'sourceHash'],
+    ['visual', 'sourceHash'],
+    ['mutation', 'blob'],
+    ['mutation', 'sha'],
+  ]) {
+    it(`unbound ${criterion} evidence without ${field} remains unknown`, () => {
+      fixture(f => {
+        delete f.records[criterion][field];
+        f.save();
+        const cert = f.invoke();
+        assert.equal(cert.certified, false);
+        assert.equal(
+          cert.criteria.find(row => row.id === criterion).status,
+          'unknown'
+        );
+      });
+    });
+  }
+
+  it('same-stem test edits invalidate the canonical mutation key, including non-colocated tests', () => {
+    fixture(f => {
+      f.write(
+        additionalTest,
+        'it("changed assertion", () => { expect(3).toBe(3); });\n'
+      );
+      const stale = f.invoke();
+      assert.equal(
+        stale.criteria.find(row => row.id === 'mutation').status,
+        'unknown'
+      );
+      assert.equal(
+        stale.criteria.find(row => row.id === 'visual').status,
+        'pass'
+      );
+      f.refresh();
+      assert.equal(f.invoke().certified, true);
+    });
+  });
+
+  it('unchanged source/test mutation receipts remain reusable across unrelated revisions', () => {
+    fixture(f => {
+      const measuredSha = f.records.mutation.sha;
+      f.write('unrelated.txt', 'independent work\n');
+      f.git('add', 'unrelated.txt');
+      f.git('commit', '-qm', 'unrelated revision');
+      assert.notEqual(f.git('rev-parse', 'HEAD'), measuredSha);
+      assert.equal(f.invoke().certified, true);
+    });
+  });
+
+  it('conflicting mutation source metadata cannot override its otherwise fresh key', () => {
+    fixture(f => {
+      f.records.mutation.sourceHash = sourceHash(changed);
+      f.save();
+      const cert = f.invoke();
+      assert.equal(
+        cert.criteria.find(row => row.id === 'mutation').status,
+        'unknown'
+      );
+      assert.equal(cert.certified, false);
+    });
+  });
+
+  it('current unit axe evidence remains independent of a stale CI a11y receipt', () => {
+    fixture(f => {
+      f.write(
+        testPath,
+        'it("axe", async () => { expect(1).toBe(1); await expectNoA11yViolations(container); });\n'
+      );
+      f.refresh();
+      f.records.a11y.sourceHash = sourceHash(changed);
+      f.save();
+      const cert = f.invoke();
+      assert.equal(
+        cert.criteria.find(row => row.id === 'a11y').source,
+        'unit-axe'
+      );
+      assert.equal(cert.certified, true);
+    });
+  });
+
+  it('missing tracked tests or Git inventory cannot reuse a partial mutation key', () => {
+    fixture(f => {
+      rmSync(join(f.root, additionalTest));
+      const missingTest = f.invoke();
+      assert.equal(
+        missingTest.criteria.find(row => row.id === 'mutation').status,
+        'unknown'
+      );
+      assert.equal(missingTest.certified, false);
+      rmSync(join(f.root, '.git'), { recursive: true, force: true });
+      const missingGit = f.invoke();
+      assert.equal(
+        missingGit.criteria.find(row => row.id === 'mutation').status,
+        'unknown'
+      );
+      assert.equal(
+        missingGit.criteria.find(row => row.id === 'visual').status,
+        'pass'
+      );
+    });
+  });
+
+  it('fresh UTF-8 source uses the canonical Git blob byte length', () => {
+    fixture(f => {
+      f.write(
+        component,
+        'export function Card() { return <div title="café 🎵" />; }\n'
+      );
+      f.refresh();
+      assert.equal(f.invoke().certified, true);
+    });
   });
 });
