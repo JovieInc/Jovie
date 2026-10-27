@@ -2439,19 +2439,32 @@ def template(args: list[str], values: dict) -> list[str]:
 
 
 def process_group_alive(group: int) -> bool:
+    permission_error = None
     try:
         os.killpg(group, 0)
-        return True
     except ProcessLookupError:
         return False
-    except PermissionError:
-        # Darwin can report EPERM for an empty group after its leader is reaped.
-        # Verify membership instead of treating a real permission denial as success.
+    except PermissionError as error:
+        permission_error = error
+    # A successful signal probe also sees zombie-only groups on Linux; Darwin
+    # can report EPERM for an empty group. Neither proves a live member remains.
+    try:
         members = subprocess.run(["ps", "-axo", "pgid=,stat="], capture_output=True, text=True, timeout=5)
-        if members.returncode != 0:
-            raise
-        return any(fields[0] == str(group) and not fields[1].startswith("Z")
-                   for line in members.stdout.splitlines() if len(fields := line.split()) == 2)
+    except (OSError, subprocess.SubprocessError):
+        if permission_error is not None:
+            raise permission_error
+        return True  # unreadable membership cannot prove drainage
+    rows = [line.split() for line in (members.stdout or "").splitlines() if line.strip()] if members.returncode == 0 else []
+    # ps includes itself, so an empty or partially parsed table is unknown.
+    # Preserve Linux/BSD state modifiers instead of mistaking them for rows to drop.
+    valid = rows and all(len(fields) == 2 and re.fullmatch(r"[0-9]+", fields[0])
+                         and re.fullmatch(r"[DIRSTUWZXIt][<NLsl+>AEVWXJKCP]*", fields[1]) for fields in rows)
+    if not valid:
+        if permission_error is not None:
+            raise permission_error
+        return True
+    return any(fields[0] == str(group) and not fields[1].startswith("Z")
+               for fields in rows)
 
 
 def process_snapshot() -> dict:

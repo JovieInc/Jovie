@@ -4091,6 +4091,43 @@ class RunAgentTest(unittest.TestCase):
                 with self.assertRaises(PermissionError):
                     lane.process_group_alive(99)
 
+    def test_successful_group_probe_requires_non_zombie_members(self):
+        with patch.object(lane.os, "killpg", return_value=None):
+            for listing, expected in (("99 S\n", True), ("99 Z\n", False),
+                                      ("99 Z\n99 S\n", True), ("99 Z\n100 S\n", False),
+                                      ("100 S\n", False), ("99 Zs+\n100 R<\n", False),
+                                      ("99 Sl+\n100 SN\n", True), ("99 U<\n100 I\n", True)):
+                with self.subTest(listing=listing), patch.object(lane.subprocess, "run",
+                        return_value=SimpleNamespace(returncode=0, stdout=listing)):
+                    self.assertEqual(lane.process_group_alive(99), expected)
+
+    def test_unreadable_group_membership_never_proves_drainage(self):
+        for denied in (False, True):
+            for failure in (SimpleNamespace(returncode=1), OSError("ps unavailable"),
+                            subprocess.TimeoutExpired("ps", 5)):
+                with self.subTest(denied=denied, failure=type(failure).__name__), \
+                        patch.object(lane.os, "killpg", side_effect=PermissionError if denied else None), \
+                        patch.object(lane.subprocess, "run", **(
+                            {"side_effect": failure} if isinstance(failure, Exception) else {"return_value": failure})):
+                    if denied:
+                        with self.assertRaises(PermissionError):
+                            lane.process_group_alive(99)
+                    else:
+                        self.assertTrue(lane.process_group_alive(99))
+
+    def test_malformed_group_membership_never_proves_drainage(self):
+        for denied in (False, True):
+            for listing in ("99\n100 S\n", "not-a-group S\n", "", "\n  \n", "pgid stat\n",
+                            "99 Z\n100\n", "99 invalid\n"):
+                with self.subTest(denied=denied, listing=listing), \
+                        patch.object(lane.os, "killpg", side_effect=PermissionError if denied else None), \
+                        patch.object(lane.subprocess, "run", return_value=SimpleNamespace(returncode=0, stdout=listing)):
+                    if denied:
+                        with self.assertRaises(PermissionError):
+                            lane.process_group_alive(99)
+                    else:
+                        self.assertTrue(lane.process_group_alive(99))
+
     def test_guard_cancellation_kills_child_even_when_leader_exits_on_term(self):
         with tempfile.TemporaryDirectory() as tmp, open(os.devnull, "w") as log:
             child_script = Path(tmp) / "child.py"
@@ -4165,9 +4202,8 @@ class RunAgentTest(unittest.TestCase):
             child = int((Path(tmp) / "child.pid").read_text())
             for _ in range(20):  # the group kill is asynchronous; give the kernel a moment
                 time.sleep(0.1)
-                try:
-                    os.kill(child, 0)
-                except ProcessLookupError:
+                rows = lane.process_snapshot()
+                if child not in rows or rows[child][2].startswith("Z"):
                     break
             else:
                 self.fail("background child of the timed-out agent is still alive")
@@ -8076,6 +8112,7 @@ class GateSingleflightTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.host = lane.Host(state=Path(self.tmp.name))
+        self.enterContext(patch.dict(os.environ, {"LANES_STATE": str(self.host.state)}))
         self.pr = {"number": 7, "headRefOid": "abc", "headRefName": "devin/jov-1", "isDraft": True}
         self.fake = FakeShell([self.pr])
 
