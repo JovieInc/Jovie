@@ -5,6 +5,10 @@ import {
 } from '../../e2e/utils/start-entry-layout';
 
 let frames: FrameRequestCallback[];
+let frameTime: number;
+let nextFrameId: number;
+let fontStatus: FontFaceSet['status'];
+let originalFontsDescriptor: PropertyDescriptor | undefined;
 let deliverEntries: PerformanceObserverCallback;
 const observe = vi.fn();
 
@@ -33,18 +37,33 @@ function deliverShifts(
   );
 }
 
-function paintFrame() {
-  const frame = frames.shift();
-  expect(frame, 'the geometry probe must schedule a frame').toBeDefined();
-  frame!(0);
+function paintFrame(elapsedMs = 16) {
+  frameTime += elapsedMs;
+  // A browser runs every callback queued for this frame together. Requests
+  // made by those callbacks belong to the next frame, not this batch.
+  const callbacks = frames;
+  frames = [];
+  expect(callbacks.length, 'the probes must schedule a frame').toBeGreaterThan(
+    0
+  );
+  for (const callback of callbacks) callback(frameTime);
 }
 
 beforeEach(() => {
   frames = [];
+  frameTime = 0;
+  nextFrameId = 0;
+  fontStatus = 'loading';
+  originalFontsDescriptor = Object.getOwnPropertyDescriptor(document, 'fonts');
+  Object.defineProperty(document, 'fonts', {
+    configurable: true,
+    get: () => ({ status: fontStatus }),
+  });
+  vi.spyOn(performance, 'now').mockImplementation(() => frameTime);
   observe.mockClear();
   vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
     frames.push(callback);
-    return frames.length;
+    return ++nextFrameId;
   });
   vi.stubGlobal(
     'MutationObserver',
@@ -66,8 +85,9 @@ beforeEach(() => {
         (this.getAttribute('role') === 'status' &&
           document.querySelector('#claim-delay-guidance'));
       return {
+        x: Number(this.dataset.x ?? 0),
         y: Number(this.dataset.y ?? 0),
-        width: 120,
+        width: Number(this.dataset.width ?? 120),
         height: hidden ? 0 : 44,
       } as DOMRect;
     }
@@ -79,7 +99,13 @@ afterEach(() => {
   delete window.__claimInitialLayout;
   delete window.__claimLayout;
   delete window.__claimLayoutEntries;
+  delete window.__claimComposerFrames;
   delete window.__armClaimLayout;
+  if (originalFontsDescriptor) {
+    Object.defineProperty(document, 'fonts', originalFontsDescriptor);
+  } else {
+    Reflect.deleteProperty(document, 'fonts');
+  }
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
@@ -112,10 +138,93 @@ describe('start entry layout probes', () => {
       expect(window.__claimInitialLayout?.guidedDetail).toEqual(
         window.__claimInitialLayout?.firstDetail
       );
+      // Guidance sampling has stopped; the independent sign-in trace remains
+      // active until its bounded observation window ends.
+      expect(frames).toHaveLength(1);
+      paintFrame(2000);
       expect(frames).toHaveLength(0);
       expect(observe).toHaveBeenCalledTimes(supported ? 1 : 0);
     }
   );
+
+  it('records only changed sign-in frames and keeps tracing after guidance appears', () => {
+    installObserver(false);
+    installDelayedGuidanceLayoutProbe(32);
+    paintFrame();
+    expect(window.__claimInitialLayout?.signInFrames).toEqual([
+      {
+        startTime: 16,
+        text: null,
+        rect: null,
+        style: null,
+        fontStatus: 'loading',
+      },
+    ]);
+
+    const header = document.createElement('div');
+    header.dataset.testid = 'onboarding-sign-in-header';
+    const link = document.createElement('a');
+    link.className = 'btn-linear-login';
+    link.dataset.width = '34';
+    link.style.cssText =
+      'font: 450 13px Inter; padding-inline-start: 16px; padding-inline-end: 16px; border-inline-start-width: 1px; border-inline-end-width: 1px';
+    header.append(link);
+    document.body.append(header);
+    document.querySelector('#claim-delay-guidance')!.remove();
+    paintFrame();
+    expect(window.__claimInitialLayout?.guided).toEqual([10, 20, 30, 40]);
+    expect(window.__claimInitialLayout?.signInFrames?.at(-1)).toMatchObject({
+      startTime: 32,
+      text: '',
+      rect: { x: 0, y: 0, width: 34, height: 44 },
+      style: {
+        fontSize: '13px',
+        fontFamily: 'Inter',
+        paddingInlineStart: '16px',
+        paddingInlineEnd: '16px',
+        borderInlineStartWidth: '1px',
+        borderInlineEndWidth: '1px',
+      },
+    });
+
+    paintFrame();
+    expect(window.__claimInitialLayout?.signInFrames).toHaveLength(2);
+    link.textContent = 'Sign in';
+    link.dataset.width = '76';
+    paintFrame();
+    expect(window.__claimInitialLayout?.signInFrames?.at(-1)).toMatchObject({
+      startTime: 64,
+      text: 'Sign in',
+      rect: { width: 76 },
+      fontStatus: 'loading',
+    });
+    fontStatus = 'loaded';
+    paintFrame();
+    expect(window.__claimInitialLayout?.signInFrames).toHaveLength(4);
+    expect(window.__claimInitialLayout?.signInFrames?.at(-1)).toMatchObject({
+      startTime: 80,
+      text: 'Sign in',
+      fontStatus: 'loaded',
+    });
+  });
+
+  it('stops scheduling the sign-in diagnostic after two seconds', () => {
+    installObserver(true);
+    installDelayedGuidanceLayoutProbe(12);
+    paintFrame();
+    document.querySelector('#claim-delay-guidance')!.remove();
+    paintFrame();
+    expect(frames).toHaveLength(1);
+    paintFrame(1968);
+    expect(frameTime).toBe(2000);
+    expect(frames).toHaveLength(0);
+    expect(window.__claimInitialLayout?.signInFrames).toHaveLength(1);
+    // Ending the optional diagnostic does not stop the CLS observer or alter
+    // the already captured essential-control geometry.
+    expect(window.__claimInitialLayout?.guided).toEqual([10, 20, 30, 40]);
+    deliverShifts([{ value: 0.1, hadRecentInput: false, startTime: 2100 }]);
+    expect(window.__claimInitialLayout?.total).toBe(0.1);
+  });
 
   it('keeps sampling when PerformanceObserver is absent', () => {
     vi.stubGlobal('PerformanceObserver', undefined);
@@ -214,7 +323,7 @@ describe('start entry layout probes', () => {
       {} as PerformanceObserver
     );
     expect(window.__claimLayout?.total).toBe(0.1503125);
-    vi.spyOn(performance, 'now').mockReturnValue(1_000);
+    frameTime = 1_000;
     window.__armClaimLayout?.();
     expect(window.__claimLayout?.total).toBe(0);
     expect(window.__claimLayoutEntries?.[0]).toMatchObject({
@@ -250,7 +359,7 @@ describe('start entry layout probes', () => {
   it('poisons the reply window when an in-window shift value is not finite', () => {
     installObserver(true);
     installReplyLayoutProbe();
-    vi.spyOn(performance, 'now').mockReturnValue(100);
+    frameTime = 100;
     window.__armClaimLayout?.();
     deliverShifts([
       { value: Number.NaN, hadRecentInput: false, startTime: 10 },

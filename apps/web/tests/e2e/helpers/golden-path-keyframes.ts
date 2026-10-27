@@ -70,9 +70,19 @@ export async function inspectEssentialViewport(
       }
       return true;
     };
+    // Preserve locator.isVisible() selection: opacity zero still has a layout
+    // box, so it must reach the strict painted-visibility audit and fail below.
+    const rendered = el => {
+      if (!el.getClientRects().length) return false;
+      if (el.checkVisibility && !el.checkVisibility()) return false;
+      if (getComputedStyle(el).visibility !== 'visible') return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
     for (const selector of new Set([...selectors, ...optionalSelectors])) {
-      const matches = Array.from(document.querySelectorAll(selector)).filter(visible);
-      if (!matches.length && !selectors.includes(selector)) continue;
+      const candidates = Array.from(document.querySelectorAll(selector));
+      if (!selectors.includes(selector) && !candidates.some(rendered)) continue;
+      const matches = candidates.filter(visible);
       if (matches.length !== 1) {
         findings.push({ selector, reason: matches.length ? 'duplicate' : 'missing' });
         continue;
