@@ -355,6 +355,10 @@ function fakeGh({
   runs = [run()],
   ciRun = ci(),
   rerunFails = false,
+  rerunError,
+  readError,
+  failPath,
+  observe = () => {},
   jobs = [
     { id: 11, name: 'authorize-staging', conclusion: 'failure' },
     { id: 12, name: 'staging-result', conclusion: 'success' },
@@ -369,8 +373,10 @@ function fakeGh({
   const calls = [];
   const gh = args => {
     calls.push(args);
+    observe(args);
     const [cmd, second] = args;
     if (cmd === 'run' && second === 'rerun') {
+      if (rerunError) throw rerunError;
       if (rerunFails) throw new Error('HTTP 403: Resource not accessible');
       return '';
     }
@@ -380,6 +386,7 @@ function fakeGh({
           arg === 'rate_limit' ||
           (typeof arg === 'string' && arg.startsWith('repos/'))
       ) ?? second;
+    if (path === failPath) throw readError;
     if (path === 'rate_limit')
       return JSON.stringify({ resources: { core: { remaining, reset } } });
     if (path.includes('/attempts/')) return JSON.stringify({ jobs });
@@ -519,6 +526,23 @@ describe('runReplay', () => {
     );
   });
 
+  it('does not dispatch when the pending intent cannot be persisted', async () => {
+    const slept = [];
+    const { gh, calls } = fakeGh({ remaining: 900, reset: 0 });
+    const failure = new Error('receipt disk unavailable');
+    await assert.rejects(
+      runReplay({
+        event,
+        ...deps(gh, slept),
+        recordDecision: () => {
+          throw failure;
+        },
+      }),
+      error => error === failure
+    );
+    assert.equal(calls.filter(args => args[0] === 'run').length, 0);
+  });
+
   it('ignores workflows it does not own', async () => {
     const result = await runReplay({
       event: {
@@ -532,6 +556,152 @@ describe('runReplay', () => {
 });
 
 describe('runCli', () => {
+  function fixture() {
+    const dir = mkdtempSync(join(tmpdir(), 'replay-cli-'));
+    const eventPath = join(dir, 'event.json');
+    writeFileSync(eventPath, JSON.stringify({ workflow_run: run() }));
+    const out = join(dir, 'out');
+    const slept = [];
+    return {
+      dir,
+      slept,
+      env: {
+        GITHUB_EVENT_PATH: eventPath,
+        GITHUB_REPOSITORY: 'JovieInc/Jovie',
+        GITHUB_STEP_SUMMARY: join(dir, 'summary.md'),
+        REPLAY_EVENTS_PATH: join(out, 'stage-events.ndjson'),
+      },
+      deps: {
+        sleep: async s => slept.push(s),
+        now: () => T0,
+        liveSha: async () => LIVE,
+      },
+      decision: () =>
+        JSON.parse(readFileSync(join(out, 'decision.json'), 'utf8')),
+      events: () =>
+        readFileSync(join(out, 'stage-events.ndjson'), 'utf8')
+          .trim()
+          .split('\n')
+          .map(JSON.parse),
+    };
+  }
+
+  for (const [failure, failureKind] of [
+    ['HTTP 403: API rate limit exceeded for installation', 'quota'],
+    ['HTTP 429: Too Many Requests', 'quota'],
+    ['HTTP 403: Resource not accessible by integration', 'permission-denied'],
+    ['HTTP 401: Bad credentials', 'permission-denied'],
+    ['HTTP 500: Internal Server Error', 'upstream-5xx'],
+    ['HTTP 502: Bad Gateway', 'upstream-5xx'],
+    ['ECONNRESET', 'network'],
+    ['unrecognized read failure', 'unknown'],
+  ]) {
+    it(`persists the post-wait main read failure: ${failure}`, async () => {
+      const f = fixture();
+      const readError = Object.assign(new Error('gh failed'), {
+        stderr: failure,
+      });
+      const { gh, calls } = fakeGh({
+        remaining: 900,
+        reset: 0,
+        readError,
+        failPath: 'repos/JovieInc/Jovie/commits/main',
+        observe: () => {
+          assert.equal(f.decision().outcome, 'open');
+          assert.equal(f.decision().requestOutcome, 'not-attempted');
+          assert.equal(f.events()[0].exitedAt, null);
+        },
+      });
+      await assert.rejects(
+        runCli({ env: f.env, deps: { ...f.deps, gh } }),
+        error => error === readError
+      );
+      assert.deepEqual(f.slept, [120]);
+      assert.equal(calls.filter(args => args[0] === 'run').length, 0);
+      assert.equal(calls.filter(args => args[1] === 'rate_limit').length, 1);
+      assert.equal(f.decision().failureKind, failureKind);
+      assert.equal(f.decision().requestOutcome, 'not-attempted');
+      assert.equal(f.decision().replay, false);
+      assert.equal(f.decision().runId, run().id);
+      assert.equal(f.decision().attempt, 1);
+      assert.deepEqual(
+        f.events().map(e => [e.stage, e.outcome]),
+        [['blocked', 'failed']]
+      );
+    });
+  }
+
+  it('preserves a receipt even when the first quota read fails', async () => {
+    const f = fixture();
+    const { gh, calls } = fakeGh({
+      failPath: 'rate_limit',
+      readError: new Error('HTTP 403: API rate limit exceeded'),
+    });
+    await assert.rejects(
+      runCli({ env: f.env, deps: { ...f.deps, gh } }),
+      /HTTP 403/
+    );
+    assert.equal(f.decision().failureKind, 'quota');
+    assert.deepEqual(f.slept, []);
+    assert.deepEqual(calls, [['api', 'rate_limit']]);
+  });
+
+  for (const [failure, requestOutcome] of [
+    ['HTTP 403: Resource not accessible', 'rejected'],
+    ['ECONNRESET after dispatch', 'unknown'],
+    ['HTTP 403: API rate limit exceeded', 'unknown'],
+  ]) {
+    it(`records one ${requestOutcome} dispatch without claiming replay: ${failure}`, async () => {
+      const f = fixture();
+      const { gh, calls } = fakeGh({
+        remaining: 900,
+        reset: 0,
+        rerunError: new Error(failure),
+        observe: args => {
+          if (args[0] !== 'run') return;
+          assert.equal(f.decision().requestOutcome, 'pending');
+          assert.equal(f.decision().outcome, 'open');
+          assert.deepEqual(
+            f.events().map(e => [e.stage, e.outcome, e.exitedAt]),
+            [['blocked', 'open', null]]
+          );
+        },
+      });
+      await assert.rejects(
+        runCli({ env: f.env, deps: { ...f.deps, gh } }),
+        /rerun request failed/
+      );
+      assert.equal(calls.filter(args => args[0] === 'run').length, 1);
+      assert.deepEqual(calls.at(-1), [
+        'run',
+        'rerun',
+        '39621392739',
+        '--repo',
+        'JovieInc/Jovie',
+      ]);
+      assert.deepEqual(f.slept, [120]);
+      assert.equal(f.decision().requestOutcome, requestOutcome);
+      assert.deepEqual(
+        f.events().map(e => [e.stage, e.outcome]),
+        [['blocked', 'failed']]
+      );
+      const summary = readFileSync(f.env.GITHUB_STEP_SUMMARY, 'utf8');
+      assert.doesNotMatch(summary, /Decision: \*\*replayed\*\*/);
+      assert.match(summary, new RegExp(requestOutcome));
+    });
+  }
+
+  it('does no remote work if the initial durable receipt cannot be written', async () => {
+    const f = fixture();
+    writeFileSync(join(f.dir, 'out'), 'not a directory');
+    const { gh, calls } = fakeGh();
+    await assert.rejects(
+      runCli({ env: f.env, deps: { ...f.deps, gh } }),
+      /EEXIST/
+    );
+    assert.deepEqual(calls, []);
+  });
+
   it('writes NDJSON stage events, the decision and a step summary', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'replay-'));
     const eventPath = join(dir, 'event.json');
@@ -577,6 +747,8 @@ describe('runCli', () => {
     );
     assert.equal(decision.schema, 'jovie-controller-replay/v1');
     assert.equal(decision.replay, true);
+    assert.equal(decision.requestOutcome, 'accepted');
+    assert.equal(decision.outcome, 'advanced');
     assert.match(readFileSync(summary, 'utf8'), /Decision: \*\*replayed\*\*/);
   });
 
