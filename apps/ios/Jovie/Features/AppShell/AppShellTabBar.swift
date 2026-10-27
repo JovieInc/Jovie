@@ -195,20 +195,21 @@ enum AppShellPanePolicy {
   }
 
   /// The same ordered root ontology as canonicalSidebarNavigation on web.
-  /// Inbox and Calendar are workflows within Work, not extra product roots.
+  /// Chat is a workspace action; Calendar remains a workflow within Work.
   static func rootDestinations(chatEnabled: Bool, audienceEnabled: Bool) -> [AppShellTab] {
-    var roots: [AppShellTab] = chatEnabled ? [.chat] : []
-    roots.append(contentsOf: [.profile, .library])
+    var roots: [AppShellTab] = [.inbox, .profile, .library]
     if audienceEnabled { roots.append(.audience) }
     return roots
   }
 
   static func childDestinations(of root: AppShellTab) -> [AppShellTab] {
-    root == .library ? [.inbox, .calendar] : []
+    root == .library ? [.calendar] : []
   }
 
   static func sidebarDestinations(chatEnabled: Bool, audienceEnabled: Bool) -> [AppShellTab] {
-    rootDestinations(chatEnabled: chatEnabled, audienceEnabled: audienceEnabled)
+    let navigation = rootDestinations(chatEnabled: chatEnabled, audienceEnabled: audienceEnabled)
       .flatMap { [$0] + childDestinations(of: $0) }
+    // The brand header returns to the existing chat; the history plus starts a new one.
+    return navigation + (chatEnabled ? [.chat] : [])
   }
 }

@@ -40,6 +40,17 @@ struct AppShellDrawerThreadsFilterTests {
     #expect(filtered.map(\.id) == ["conv-1"])
   }
 
+  @Test func blankTitlesHaveTheSameSearchableFallbackAsTheRow() {
+    let untitled = MobileConversationSummary(
+      id: "blank", title: "  \n  ", createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-04T00:00:00Z", latestMessageRole: nil, latestTurnStatus: nil
+    )
+    #expect(AppShellDrawerThreadsFilter.title(for: untitled) == "New chat")
+    #expect(
+      AppShellDrawerThreadsFilter.filtered(conversations: [untitled], query: "new chat") == [untitled]
+    )
+  }
+
   @Test func queryFallsBackToNewConversationTitle() {
     let untitled = MobileConversationSummary(
       id: "conv-3",
@@ -129,5 +140,32 @@ struct AppShellDrawerBasePlaneOcclusionTests {
     #expect(
       appShellDrawerBasePlaneOpacity(isShowingDrawer: true, drawerDragOffset: -32) == 1
     )
+  }
+}
+
+struct AppShellDrawerThreadStatusTests {
+  @Test func inFlightTurnsUseOneWorkingState() {
+    for status in ["reserved", "running", "streaming"] {
+      let indicator = AppShellDrawerThreadStatus(latestTurnStatus: status)
+      #expect(indicator == .working)
+      #expect(indicator.accessibilityValue == "Working")
+    }
+  }
+
+  @Test func failedTurnsExplainWhyTheyNeedAttention() {
+    for status in ["failed_tool_unavailable", "failed_model_error", "failed_timeout", "failed_network", "failed"] {
+      let indicator = AppShellDrawerThreadStatus(latestTurnStatus: status)
+      #expect(indicator == .attention)
+      #expect(indicator.accessibilityValue == "Needs attention")
+    }
+  }
+
+  @Test func completedCanceledAndUnknownTurnsStayQuiet() {
+    let quietStatuses: [String?] = [nil, "completed", "canceled", "future_state"]
+    for status in quietStatuses {
+      let indicator = AppShellDrawerThreadStatus(latestTurnStatus: status)
+      #expect(indicator == .quiet)
+      #expect(indicator.accessibilityValue.isEmpty)
+    }
   }
 }

@@ -297,6 +297,7 @@ struct AppShellView<
           AppShellLeftDrawer(
             isPresented: isDrawerPresented,
             profile: profile,
+            workspaceName: workspaceMode.displayName,
             chatEnabled: chatEnabled,
             audienceEnabled: audienceEnabled,
             selectedTab: selectedTab,
