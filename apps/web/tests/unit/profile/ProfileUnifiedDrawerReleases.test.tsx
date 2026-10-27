@@ -11,6 +11,13 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { Artist } from '@/types/db';
 
+vi.mock('next/dynamic', async () => {
+  const { default: appDynamic } = await vi.importActual<
+    typeof import('next/dist/shared/lib/app-dynamic')
+  >('next/dist/shared/lib/app-dynamic');
+  return { default: appDynamic };
+});
+
 vi.mock('@/features/profile/ProfileDrawerShell', () => ({
   ProfileDrawerShell: ({
     open,
@@ -201,13 +208,15 @@ describe('ProfileUnifiedDrawer — Releases', () => {
   it('renders releases list when view is releases', async () => {
     render(<ProfileUnifiedDrawer {...defaultProps} />);
 
-    expect(screen.getByTestId('profile-mode-drawer-releases')).toBeDefined();
+    expect(
+      await screen.findByTestId('profile-mode-drawer-releases')
+    ).toBeDefined();
   });
 
-  it('passes embedded presentation through to the shared drawer shell', () => {
+  it('passes embedded presentation through to the shared drawer shell', async () => {
     render(<ProfileUnifiedDrawer {...defaultProps} presentation='embedded' />);
 
-    expect(screen.getByTestId('profile-menu-drawer')).toHaveAttribute(
+    expect(await screen.findByTestId('profile-menu-drawer')).toHaveAttribute(
       'data-presentation',
       'embedded'
     );
@@ -246,9 +255,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} />);
 
-    expect(screen.getByText('First Song')).toBeDefined();
-    expect(screen.getByText('Second Song')).toBeDefined();
-    expect(screen.getAllByTestId('release-artwork')).toHaveLength(2);
+    expect(await screen.findByText('First Song')).toBeDefined();
+    expect(await screen.findByText('Second Song')).toBeDefined();
+    expect(await screen.findAllByTestId('release-artwork')).toHaveLength(2);
   });
 
   it('links release rows to smartlink pages', async () => {
@@ -258,9 +267,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} />);
 
-    const links = screen
-      .getByTestId('profile-mode-drawer-releases')
-      .querySelectorAll('a');
+    const links = (
+      await screen.findByTestId('profile-mode-drawer-releases')
+    ).querySelectorAll('a');
     expect(links[0]?.getAttribute('href')).toBe('/testartist/first-song');
     expect(links[1]?.getAttribute('href')).toBe('/testartist/second-song');
   });
@@ -281,9 +290,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    expect(screen.getByText(/DJ Snake, Lil Jon/)).toBeDefined();
+    expect(await screen.findByText(/DJ Snake, Lil Jon/)).toBeDefined();
     // The owner name "Test Artist" should not appear as a collaborator
-    const container = screen.getByTestId('profile-mode-drawer-releases');
+    const container = await screen.findByTestId('profile-mode-drawer-releases');
     const secondaryText = container.querySelectorAll('.text-2xs');
     for (const el of secondaryText) {
       expect(el.textContent).not.toMatch(/^Test Artist/);
@@ -306,9 +315,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    expect(screen.getByText('Solo Track')).toBeDefined();
+    expect(await screen.findByText('Solo Track')).toBeDefined();
     // Only metadata, no collaborator prefix
-    const container = screen.getByTestId('profile-mode-drawer-releases');
+    const container = await screen.findByTestId('profile-mode-drawer-releases');
     const metaEl = container.querySelector('.text-2xs');
     expect(metaEl?.textContent).toMatch(/Single/);
     expect(metaEl?.textContent).not.toContain('Test Artist');
@@ -330,7 +339,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    const badges = screen.getAllByText('Video');
+    const badges = await screen.findAllByText('Video');
     expect(badges.length).toBeGreaterThanOrEqual(1);
     // The badge should have pill styling
     const badge = badges[0]!;
@@ -353,7 +362,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    const container = screen.getByTestId('profile-mode-drawer-releases');
+    const container = await screen.findByTestId('profile-mode-drawer-releases');
     const metaEl = container.querySelector('.text-2xs');
     expect(metaEl?.textContent).toContain('Single');
     expect(metaEl?.textContent).not.toMatch(/\d{4}/);
@@ -375,7 +384,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    const container = screen.getByTestId('profile-mode-drawer-releases');
+    const container = await screen.findByTestId('profile-mode-drawer-releases');
     expect(within(container).getByText(/2024/)).toBeInTheDocument();
   });
 
@@ -395,9 +404,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     );
 
     // Should have year header dividers
-    const headers = screen
-      .getByTestId('profile-mode-drawer-releases')
-      .querySelectorAll('.font-caption');
+    const headers = (
+      await screen.findByTestId('profile-mode-drawer-releases')
+    ).querySelectorAll('.font-caption');
     expect(headers.length).toBeGreaterThanOrEqual(1);
   });
 
@@ -417,9 +426,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
     );
 
     // No year header dividers
-    const headers = screen
-      .getByTestId('profile-mode-drawer-releases')
-      .querySelectorAll('.font-caption');
+    const headers = (
+      await screen.findByTestId('profile-mode-drawer-releases')
+    ).querySelectorAll('.font-caption');
     expect(headers.length).toBe(0);
   });
 
@@ -432,8 +441,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
       <ProfileUnifiedDrawer {...defaultProps} view='menu' hasReleases={true} />
     );
 
+    await screen.findByRole('menu');
     expect(screen.queryByText('Releases')).toBeNull();
-    expect(screen.getByText('Share Profile')).toBeDefined();
+    expect(await screen.findByText('Share Profile')).toBeDefined();
   });
 
   it('hides Releases menu item when hasReleases is false', async () => {
@@ -445,6 +455,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
       <ProfileUnifiedDrawer {...defaultProps} view='menu' hasReleases={false} />
     );
 
+    await screen.findByRole('menu');
     expect(screen.queryByText('Releases')).toBeNull();
   });
 
@@ -467,6 +478,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
       />
     );
 
+    await screen.findByRole('menu');
     expect(screen.queryByText('Releases')).toBeNull();
   });
 
@@ -486,9 +498,9 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    const link = screen
-      .getByTestId('profile-mode-drawer-releases')
-      .querySelector('a');
+    const link = (
+      await screen.findByTestId('profile-mode-drawer-releases')
+    ).querySelector('a');
     // Label-in-name (WCAG 2.5.3): the accessible name is the visible text,
     // which already names the collaborator, so no overriding aria-label.
     expect(link?.hasAttribute('aria-label')).toBe(false);
@@ -524,7 +536,7 @@ describe('ProfileUnifiedDrawer — Releases', () => {
 
     render(<ProfileUnifiedDrawer {...defaultProps} releases={releases} />);
 
-    expect(screen.getByText('Good Song')).toBeDefined();
+    expect(await screen.findByText('Good Song')).toBeDefined();
     expect(screen.queryByText('Bad Song')).toBeNull();
   });
 });

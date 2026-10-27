@@ -28,6 +28,7 @@ vi.mock('next/link', () => ({
 }));
 
 const lazyOverlays = vi.hoisted(() => ({
+  requested: vi.fn(),
   pending: new Map<
     string,
     {
@@ -48,12 +49,13 @@ vi.mock('next/dynamic', async () => {
       const kind = String(loader).includes('ProfileUnifiedDrawer')
         ? 'drawer'
         : 'notifications';
-      return appDynamic(
-        () =>
+      return appDynamic(() => {
+        lazyOverlays.requested(kind);
+        return (
           lazyOverlays.pending.get(kind)?.promise ??
-          Promise.resolve({ default: () => null }),
-        options
-      );
+          Promise.resolve({ default: () => null })
+        );
+      }, options);
     },
   };
 });
@@ -233,9 +235,84 @@ function renderSurface(
 describe('ProfileCompactSurface', () => {
   beforeEach(() => {
     mockUseIsAuthenticated.mockReturnValue(false);
+    lazyOverlays.requested.mockClear();
   });
 
-  it.each(['drawer', 'notifications'])(
+  it('lets a pending drawer cancel with Escape or Cancel without reopening when its module arrives', async () => {
+    let releaseModule!: (value: { default: React.ComponentType }) => void;
+    const promise = new Promise<{ default: React.ComponentType }>(resolve => {
+      releaseModule = resolve;
+    });
+    lazyOverlays.pending.set('drawer', { promise, resolve: releaseModule });
+    const Content = () => <button type='button'>Drawer ready</button>;
+    function Harness() {
+      const [open, setOpen] = React.useState(false);
+      return (
+        <React.Suspense fallback={<div role='status'>Loading profile</div>}>
+          <ProfileCompactSurface
+            artist={artist}
+            socialLinks={[]}
+            contacts={[]}
+            presentation='embedded'
+            drawerOpen={open}
+            drawerView='menu'
+            onDrawerOpenChange={setOpen}
+            onDrawerViewChange={vi.fn()}
+            onBack={vi.fn()}
+            onOpenMenu={() => setOpen(true)}
+            onPlayClick={vi.fn()}
+            onShare={vi.fn()}
+            profileHref='/timwhite'
+            visitorAssignmentResolved={false}
+          />
+        </React.Suspense>
+      );
+    }
+    render(<Harness />);
+    const menu = screen.getByRole('button', { name: 'Menu' });
+    const heading = screen.getByRole('heading', { name: artist.name });
+    try {
+      expect(lazyOverlays.requested).not.toHaveBeenCalledWith('drawer');
+      menu.focus();
+      fireEvent.click(menu);
+      expect(screen.getByRole('dialog', { name: 'Menu' })).toBeVisible();
+      expect(
+        screen.getByRole('status', { name: 'Loading Menu' })
+      ).toBeVisible();
+      expect(screen.getByText('Loading Menu…')).toBeVisible();
+      expect(screen.queryByText('Loading profile')).toBeNull();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+      expect(heading).toBeVisible();
+
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(menu).toHaveFocus();
+
+      fireEvent.click(menu);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(menu).toHaveFocus();
+      await act(async () => releaseModule({ default: Content }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.queryByText('Drawer ready')).toBeNull();
+      expect(menu).toHaveFocus();
+
+      fireEvent.click(menu);
+      expect(
+        screen.getByRole('button', { name: 'Drawer ready' })
+      ).toHaveFocus();
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(menu).toHaveFocus();
+      expect(
+        lazyOverlays.requested.mock.calls.filter(([kind]) => kind === 'drawer')
+      ).toHaveLength(1);
+    } finally {
+      await act(async () => releaseModule({ default: Content }));
+      lazyOverlays.pending.delete('drawer');
+    }
+  });
+
+  it.each(['notifications'])(
     'keeps the mounted profile and focused claim available while the %s module loads',
     async kind => {
       let releaseModule!: (value: { default: React.ComponentType }) => void;
@@ -258,7 +335,7 @@ describe('ProfileCompactSurface', () => {
                 artist={artist}
                 socialLinks={[]}
                 contacts={[]}
-                drawerOpen={false}
+                drawerOpen={kind === 'drawer' && ready}
                 drawerView='menu'
                 activeMode='profile'
                 onDrawerOpenChange={vi.fn()}
@@ -269,7 +346,6 @@ describe('ProfileCompactSurface', () => {
                 onShare={vi.fn()}
                 profileHref='/timwhite'
                 proofClaimCta={{ href: '/start', label: 'Claim yours' }}
-                renderInteractiveOverlays={kind === 'drawer' ? ready : true}
                 visitorAssignmentResolved={
                   kind === 'notifications' ? ready : false
                 }
@@ -279,16 +355,17 @@ describe('ProfileCompactSurface', () => {
         </React.Suspense>
       );
       const view = render(profile(false));
-      // The already-present closed drawer may resolve before the per-visitor
-      // assignment enables the separate notifications module.
       await act(async () => {});
       const heading = screen.getByRole('heading', { name: artist.name });
       const claim = screen.getByRole('link', { name: /Claim yours/ });
       const dock = screen.getByTestId('profile-tab-bar');
       claim.focus();
       expect(claim).toHaveFocus();
-      view.rerender(profile(true));
       try {
+        // A closed drawer must not fetch its module before the first opening.
+        expect(lazyOverlays.requested).not.toHaveBeenCalledWith('drawer');
+        view.rerender(profile(true));
+        expect(lazyOverlays.requested).toHaveBeenCalledWith(kind);
         expect(heading).toBeVisible();
         expect(claim).toBeVisible();
         expect(dock).toBeVisible();

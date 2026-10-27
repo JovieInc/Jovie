@@ -10,11 +10,18 @@
  * Invariant: when capability transiently flips false (refetch with empty
  * data), the drawer must NOT call `onViewChange`.
  */
-import { cleanup, render } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import React from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { Artist } from '@/types/db';
+
+vi.mock('next/dynamic', async () => {
+  const { default: appDynamic } = await vi.importActual<
+    typeof import('next/dist/shared/lib/app-dynamic')
+  >('next/dist/shared/lib/app-dynamic');
+  return { default: appDynamic };
+});
 
 // ─── Mocks aligned with ProfileUnifiedDrawerReleases.test.tsx ────────────────
 
@@ -144,7 +151,7 @@ describe('ProfileUnifiedDrawer — no-flicker invariant (JOV-2150)', () => {
 
   afterEach(() => cleanup());
 
-  it('does NOT call onViewChange when releases data transiently empties', () => {
+  it('does NOT call onViewChange when releases data transiently empties', async () => {
     const onViewChange = vi.fn();
     const onOpenChange = vi.fn();
 
@@ -158,6 +165,7 @@ describe('ProfileUnifiedDrawer — no-flicker invariant (JOV-2150)', () => {
       />
     );
 
+    await screen.findByTestId('profile-mode-drawer-releases');
     // Simulate refetch race: data temporarily empty.
     rerender(
       <ProfileUnifiedDrawer
@@ -169,13 +177,14 @@ describe('ProfileUnifiedDrawer — no-flicker invariant (JOV-2150)', () => {
       />
     );
 
+    await screen.findByRole('menu');
     // The drawer must keep view='releases' in parent state. The pre-fix
     // effect would have called onViewChange('menu') here, producing the
     // flicker — the post-fix rendering handles this without mutation.
     expect(onViewChange).not.toHaveBeenCalled();
   });
 
-  it('recovers cleanly when releases data comes back without mutating view', () => {
+  it('recovers cleanly when releases data comes back without mutating view', async () => {
     const onViewChange = vi.fn();
     const onOpenChange = vi.fn();
 
@@ -189,6 +198,7 @@ describe('ProfileUnifiedDrawer — no-flicker invariant (JOV-2150)', () => {
       />
     );
 
+    await screen.findByRole('menu');
     expect(onViewChange).not.toHaveBeenCalled();
 
     rerender(
@@ -201,6 +211,7 @@ describe('ProfileUnifiedDrawer — no-flicker invariant (JOV-2150)', () => {
       />
     );
 
+    await screen.findByTestId('profile-mode-drawer-releases');
     expect(onViewChange).not.toHaveBeenCalled();
   });
 });

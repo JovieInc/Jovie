@@ -5,6 +5,13 @@ import type { PublicContact } from '@/types/contacts';
 import { ProfileUnifiedDrawer } from './ProfileUnifiedDrawer';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
 
+vi.mock('next/dynamic', async () => {
+  const { default: appDynamic } = await vi.importActual<
+    typeof import('next/dist/shared/lib/app-dynamic')
+  >('next/dist/shared/lib/app-dynamic');
+  return { default: appDynamic };
+});
+
 vi.mock('@/features/profile/ProfileDrawerShell', () => ({
   ProfileDrawerShell: ({
     children,
@@ -125,7 +132,7 @@ const baseProps = {
 describe('ProfileUnifiedDrawer', () => {
   afterEach(() => cleanup());
 
-  it('routes selected credits and contacts into the About destination (JOV-6199)', () => {
+  it('routes selected credits and contacts into the About destination (JOV-6199)', async () => {
     render(
       <ProfileUnifiedDrawer
         {...baseProps}
@@ -142,7 +149,7 @@ describe('ProfileUnifiedDrawer', () => {
       />
     );
 
-    const about = screen.getByTestId('profile-mode-drawer-about');
+    const about = await screen.findByTestId('profile-mode-drawer-about');
     expect(about).toBeInTheDocument();
     const section = screen.getByTestId('about-section');
     expect(section).toHaveAttribute(
@@ -152,11 +159,11 @@ describe('ProfileUnifiedDrawer', () => {
     expect(section).toHaveAttribute('data-contacts', 'contact-1');
   });
 
-  it('offers release credits from the menu only when a handler is provided', () => {
+  it('offers release credits from the menu only when a handler is provided', async () => {
     const { rerender } = render(
       <ProfileUnifiedDrawer {...baseProps} view='menu' />
     );
-    expect(screen.getByTestId('menu-view')).toHaveAttribute(
+    expect(await screen.findByTestId('menu-view')).toHaveAttribute(
       'data-has-release-credits',
       'false'
     );
@@ -173,21 +180,21 @@ describe('ProfileUnifiedDrawer', () => {
     );
   });
 
-  it('renders the unsubscribe control as a plain button, not a stray menuitem', () => {
+  it('renders the unsubscribe control as a plain button, not a stray menuitem', async () => {
     render(<ProfileUnifiedDrawer {...baseProps} view='notifications' />);
 
     // The notifications list is not an ARIA menu; a `role="menuitem"`
     // without a `role="menu"` ancestor fails axe aria-required-parent.
-    const unsubscribe = screen.getByRole('button', {
+    const unsubscribe = await screen.findByRole('button', {
       name: /turn off notifications/i,
     });
     expect(unsubscribe).not.toHaveAttribute('role');
   });
 
-  it('omits credits and contacts from About when the profile has none', () => {
+  it('omits credits and contacts from About when the profile has none', async () => {
     render(<ProfileUnifiedDrawer {...baseProps} view='about' contacts={[]} />);
 
-    const section = screen.getByTestId('about-section');
+    const section = await screen.findByTestId('about-section');
     expect(section).toHaveAttribute('data-credit-segments', '');
     expect(section).toHaveAttribute('data-contacts', '');
   });

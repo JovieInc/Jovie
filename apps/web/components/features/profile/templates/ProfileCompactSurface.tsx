@@ -29,7 +29,10 @@ import { ProfileHomeRail } from '@/features/profile/ProfileHomeRail';
 import { ProfileIdentityHeader } from '@/features/profile/ProfileIdentityHeader';
 import type { ProfilePrimaryActionCardRelease } from '@/features/profile/ProfilePrimaryActionCard';
 import { ProfilePrimaryTabPanel } from '@/features/profile/ProfilePrimaryTabPanel';
-import type { DrawerView } from '@/features/profile/ProfileUnifiedDrawer';
+import {
+  type DrawerView,
+  ProfileUnifiedDrawer,
+} from '@/features/profile/ProfileUnifiedDrawer';
 import { ProofClaimCtaLink } from '@/features/profile/ProofClaimCtaLink';
 import {
   getPublicProfileHistoryServerSnapshot,
@@ -79,14 +82,6 @@ import { useProfileMobileOverflow } from './useProfileMobileOverflow';
 // Optional overlays must suspend locally. A late visitor assignment can mount
 // their lazy modules after the profile is visible; without a local fallback,
 // the page-level loading boundary hides the artist and navigation together.
-const ProfileUnifiedDrawer = dynamic(
-  () =>
-    import('@/features/profile/ProfileUnifiedDrawer').then(mod => ({
-      default: mod.ProfileUnifiedDrawer,
-    })),
-  { loading: () => null }
-);
-
 const ProfileInlineNotificationsCTA = dynamic(
   () =>
     import(
@@ -354,6 +349,10 @@ export function ProfileCompactSurface({
   renderInteractiveOverlays = true,
   renderSemanticHeading = true,
 }: Readonly<ProfileCompactSurfaceProps>) {
+  const [hasOpenedDrawer, setHasOpenedDrawer] = useState(drawerOpen);
+  useEffect(() => {
+    if (drawerOpen) setHasOpenedDrawer(true);
+  }, [drawerOpen]);
   const [notificationsPortalContainer, setNotificationsPortalContainer] =
     useState<HTMLDivElement | null>(null);
   // While the notifications overlay/modal is open the flow owns navigation —
@@ -937,7 +936,10 @@ export function ProfileCompactSurface({
         ) : null}
       </div>
 
-      {renderMode !== 'preview' && renderInteractiveOverlays ? (
+      {/* Defer the module until first use, then preserve close transitions and state. */}
+      {renderMode !== 'preview' &&
+      renderInteractiveOverlays &&
+      (drawerOpen || hasOpenedDrawer) ? (
         <ProfileUnifiedDrawer
           open={drawerOpen}
           onOpenChange={onDrawerOpenChange}

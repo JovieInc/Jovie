@@ -4,6 +4,13 @@ import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
 
+vi.mock('next/dynamic', async () => {
+  const { default: appDynamic } = await vi.importActual<
+    typeof import('next/dist/shared/lib/app-dynamic')
+  >('next/dist/shared/lib/app-dynamic');
+  return { default: appDynamic };
+});
+
 vi.mock('@/features/profile/ProfileDrawerShell', () => ({
   ProfileDrawerShell: ({
     children,
@@ -61,7 +68,7 @@ describe('ProfileUnifiedDrawer — contact person name', () => {
     cleanup();
   });
 
-  it('renders the management person name in the compact contact list', () => {
+  it('renders the management person name in the compact contact list', async () => {
     render(
       <ProfileUnifiedDrawer
         open
@@ -112,7 +119,7 @@ describe('ProfileUnifiedDrawer — contact person name', () => {
       />
     );
 
-    expect(screen.getByText('Management')).toBeTruthy();
+    expect(await screen.findByText('Management')).toBeTruthy();
     expect(
       screen.getByTestId('profile-mode-drawer-contact-meta').textContent
     ).toBe('Kelly Strickland');

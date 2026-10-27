@@ -1,4 +1,5 @@
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -6,14 +7,22 @@ import {
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, Suspense, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
 import { ProfileUnifiedDrawer } from '@/components/features/profile/ProfileUnifiedDrawer';
+import { ProfileUnifiedDrawerContent } from '@/components/features/profile/ProfileUnifiedDrawerContent';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
 import { MenuView } from '@/features/profile/views/MenuView';
 import type { ShareContext } from '@/lib/share/types';
 import { mockArtist } from '@/lib/test-utils/mock-data';
+
+vi.mock('next/dynamic', async () => {
+  const { default: appDynamic } = await vi.importActual<
+    typeof import('next/dist/shared/lib/app-dynamic')
+  >('next/dist/shared/lib/app-dynamic');
+  return { default: appDynamic };
+});
 
 vi.mock('vaul', () => {
   const Pass = ({ children }: { readonly children: ReactNode }) => children;
@@ -337,6 +346,74 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
 describe('ProfileUnifiedDrawer public menu interactions', () => {
   afterEach(resetScrollLock);
 
+  it('keeps the same modal and return target when pending menu content arrives', async () => {
+    let releaseContent!: () => void;
+    let contentReady = false;
+    const pending = new Promise<void>(resolve => {
+      releaseContent = resolve;
+    });
+    function PendingBody({ children }: { readonly children: ReactNode }) {
+      if (!contentReady) throw pending;
+      return children;
+    }
+    const onOpenChange = vi.fn();
+    render(<button type='button'>Open menu</button>);
+    const opener = screen.getByRole('button', { name: 'Open menu' });
+    opener.focus();
+    const view = render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={onOpenChange}
+        title='Menu'
+        presentation='embedded'
+      >
+        <Suspense
+          fallback={
+            <button type='button' onClick={() => onOpenChange(false)}>
+              Cancel
+            </button>
+          }
+        >
+          <PendingBody>
+            <ProfileUnifiedDrawerContent
+              {...drawerProps}
+              open
+              onOpenChange={onOpenChange}
+              renderedView='menu'
+              visibleReleases={[]}
+              canOpenReleasesDrawer={false}
+              canOpenTourDrawer={false}
+            />
+          </PendingBody>
+        </Suspense>
+      </ProfileDrawerShell>
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Menu' });
+    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    await act(async () => {
+      contentReady = true;
+      releaseContent();
+    });
+    expect(screen.getByRole('dialog', { name: 'Menu' })).toBe(dialog);
+    expect(
+      screen.getByRole('menuitem', { name: 'Share Profile' })
+    ).toHaveFocus();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+    view.rerender(
+      <ProfileDrawerShell
+        open={false}
+        onOpenChange={onOpenChange}
+        title='Menu'
+        presentation='embedded'
+      >
+        <div />
+      </ProfileDrawerShell>
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(opener).toHaveFocus();
+  });
+
   it('uses the shared Pay dial for the selected artist profile', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
@@ -359,8 +436,11 @@ describe('ProfileUnifiedDrawer public menu interactions', () => {
     );
 
     expect(
-      screen.getByRole('group', { name: 'Choose a payment method' })
+      await screen.findByRole('group', { name: 'Choose a payment method' })
     ).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toContainElement(
+      document.activeElement as HTMLElement
+    );
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/tips/create-checkout?profileId=artist-1',
@@ -371,7 +451,7 @@ describe('ProfileUnifiedDrawer public menu interactions', () => {
 
   it.each(['standalone', 'embedded', 'modal'] as const)(
     'keeps Share → Pay → Contact order and gating in %s mode',
-    presentation => {
+    async presentation => {
       render(
         <ProfileUnifiedDrawer
           {...drawerProps}
@@ -382,7 +462,7 @@ describe('ProfileUnifiedDrawer public menu interactions', () => {
         />
       );
       expect(
-        within(screen.getByRole('menu'))
+        within(await screen.findByRole('menu'))
           .getAllByRole('menuitem')
           .map(item => item.textContent)
       ).toEqual(['Share Profile', 'Pay', 'Contact']);
@@ -434,7 +514,7 @@ describe('ProfileUnifiedDrawer public menu interactions', () => {
       );
     }
     render(<Harness />);
-    screen.getByRole('menuitem', { name: 'Share Profile' }).focus();
+    (await screen.findByRole('menuitem', { name: 'Share Profile' })).focus();
     await user.keyboard('{Enter}');
     expect(onViewChange).toHaveBeenCalledWith('share');
     expect(screen.getByTestId('profile-menu-drawer')).toBeInTheDocument();

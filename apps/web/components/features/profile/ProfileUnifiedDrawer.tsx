@@ -2,24 +2,10 @@
 
 // @coverage-via apps/web/tests/components/profile/ProfileDrawerShell.interaction.test.tsx
 
-import { Switch } from '@jovie/ui';
-import { BellOff } from 'lucide-react';
-import { AnimatePresence, motion } from 'motion/react';
-import { useCallback, useEffect, useMemo } from 'react';
-import { ChannelIcon } from '@/features/profile/artist-contacts-button/ContactIcons';
-import { formatPublicContactChannelAriaLabel } from '@/features/profile/artist-contacts-button/contact-channel-label';
-import { useArtistContacts } from '@/features/profile/artist-contacts-button/useArtistContacts';
-import { ArtistNotificationsCTA } from '@/features/profile/artist-notifications-cta/ArtistNotificationsCTA';
-import { TwoStepNotificationsCTA } from '@/features/profile/artist-notifications-cta/TwoStepNotificationsCTA';
+import { Spinner } from '@jovie/ui';
+import dynamic from 'next/dynamic';
+import { Suspense, useMemo } from 'react';
 import type { ProfileSurfacePresentation } from '@/features/profile/contracts';
-import { TourDrawerContent } from '@/features/profile/TourModePanel';
-import {
-  extractVenmoUsername,
-  isAllowedVenmoUrl,
-} from '@/features/profile/utils/venmo';
-import { PublicShareActionList } from '@/features/share/PublicShareMenu';
-import { track } from '@/lib/analytics';
-import { formatPublicContactSubtitle } from '@/lib/contacts/format-public-contact';
 import type { AvailableDSP } from '@/lib/dsp';
 import type { EntityMentionSegment } from '@/lib/profile/entity-mentions';
 import type { ShareContext } from '@/lib/share/types';
@@ -27,22 +13,19 @@ import type { TourDateViewModel } from '@/lib/tour-dates/types';
 import type { PublicContact, PublicContactChannel } from '@/types/contacts';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import type { NotificationContentType } from '@/types/notifications';
-import { NOTIFICATION_CONTENT_TYPES } from '@/types/notifications';
 import type { PressPhoto } from '@/types/press-photos';
-import { AboutSection } from './AboutSection';
 import { ProfileDrawerShell } from './ProfileDrawerShell';
-import {
-  PROFILE_DRAWER_DANGER_ITEM_CLASS,
-  PROFILE_DRAWER_META_CLASS,
-  PROFILE_DRAWER_TITLE_CLASS,
-  PROFILE_DRAWER_TOGGLE_ROW_CLASS,
-} from './profile-drawer-classes';
+import { PROFILE_DRAWER_MENU_ITEM_CLASS } from './profile-drawer-classes';
 import type { PublicRelease } from './releases/types';
-import { StaticListenInterface } from './StaticListenInterface';
-import { MenuView } from './views/MenuView';
-import { PayView } from './views/PayView';
-import { ReleasesView } from './views/ReleasesView';
 import { PROFILE_VIEW_REGISTRY } from './views/registry';
+
+// Keep the modal shell synchronous so Escape, cancellation and focus ownership
+// are available while only the heavier destination content loads.
+const ProfileUnifiedDrawerContent = dynamic(() =>
+  import('./ProfileUnifiedDrawerContent').then(
+    mod => mod.ProfileUnifiedDrawerContent
+  )
+);
 
 export type DrawerView =
   | 'menu'
@@ -56,7 +39,7 @@ export type DrawerView =
   | 'tour'
   | 'releases';
 
-interface ProfileUnifiedDrawerProps {
+export interface ProfileUnifiedDrawerProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly view: DrawerView;
@@ -88,8 +71,6 @@ interface ProfileUnifiedDrawerProps {
   readonly presentation?: ProfileSurfacePresentation;
   readonly onOpenReleaseCredits?: () => void;
 }
-
-const PAY_AMOUNTS = [5, 10, 20];
 
 function resolveRegistryKey(
   view: DrawerView
@@ -139,398 +120,75 @@ function resolveRenderedView({
   return view;
 }
 
-function ContactList({
-  artistHandle,
-  contacts,
-  primaryChannel,
-}: {
-  readonly artistHandle: string;
-  readonly contacts: PublicContact[];
-  readonly primaryChannel: (contact: PublicContact) => PublicContactChannel;
-}) {
-  const { getActionHref, trackAction } = useArtistContacts({
-    contacts,
-    artistHandle,
-  });
-
-  return (
-    <div
-      className='flex flex-col gap-0.5'
-      data-testid='profile-mode-drawer-contact'
-    >
-      {contacts.map(contact => {
-        const primary = primaryChannel(contact);
-        const primaryHref = getActionHref(primary);
-        const subtitle = formatPublicContactSubtitle(contact);
-
-        return (
-          <div key={contact.id} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
-            {primaryHref ? (
-              <a
-                href={primaryHref}
-                className='flex min-w-0 flex-1 flex-col items-start gap-0.5 text-left'
-                onClick={() => trackAction(primary, contact)}
-              >
-                <span className={PROFILE_DRAWER_TITLE_CLASS}>
-                  {contact.roleLabel}
-                </span>
-                {subtitle ? (
-                  <span
-                    className={PROFILE_DRAWER_META_CLASS}
-                    data-testid='profile-mode-drawer-contact-meta'
-                  >
-                    {subtitle}
-                  </span>
-                ) : null}
-              </a>
-            ) : null}
-            <div className='flex shrink-0 items-center gap-2'>
-              {contact.channels.map(channel => {
-                const channelHref = getActionHref(channel);
-                if (!channelHref) return null;
-                return (
-                  <a
-                    key={`${contact.id}-${channel.type}`}
-                    href={channelHref}
-                    className='flex h-8 w-8 items-center justify-center rounded-full text-tertiary-token transition-colors duration-subtle ease-subtle hover:bg-interactive-active hover:text-primary-token'
-                    aria-label={formatPublicContactChannelAriaLabel(
-                      channel.type,
-                      contact
-                    )}
-                    onClick={() => trackAction(channel, contact)}
-                    data-testid='contact-drawer-channel-action'
-                  >
-                    <ChannelIcon type={channel.type} />
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-export function ProfileUnifiedDrawer({
-  open,
-  onOpenChange,
-  view,
-  onViewChange,
-  artist,
-  socialLinks,
-  contacts,
-  primaryChannel,
-  dsps,
-  isSubscribed,
-  contentPrefs,
-  onTogglePref,
-  onUnsubscribe,
-  isUnsubscribing,
-  shareContext,
-  enableDynamicEngagement = false,
-  subscribeTwoStep = false,
-  hasTip,
-  hasContacts,
-  genres,
-  pressPhotos = [],
-  allowPhotoDownloads = false,
-  creditSegments,
-  tourDates = [],
-  hasTourDates,
-  hasReleases,
-  releases = [],
-  onOpenReleaseCredits,
-  presentation = 'standalone',
-}: ProfileUnifiedDrawerProps) {
+export function ProfileUnifiedDrawer(props: ProfileUnifiedDrawerProps) {
+  const {
+    open,
+    onOpenChange,
+    view,
+    onViewChange,
+    hasReleases,
+    hasTourDates,
+    releases = [],
+    tourDates = [],
+    presentation = 'standalone',
+  } = props;
   const visibleReleases = useMemo(
-    () => releases.filter(r => Boolean(r.slug)),
+    () => releases.filter(release => Boolean(release.slug)),
     [releases]
   );
   const canOpenReleasesDrawer = hasReleases && visibleReleases.length > 0;
   const canOpenTourDrawer = hasTourDates && tourDates.length > 0;
-
-  const registryKey = resolveRegistryKey(view);
   const meta = resolveViewMeta({
     view,
     canOpenReleasesDrawer,
     canOpenTourDrawer,
-    registryKey,
+    registryKey: resolveRegistryKey(view),
   });
+  // Capability churn changes the rendered fallback, never the parent's intent.
   const renderedView = resolveRenderedView({
     view,
     canOpenReleasesDrawer,
     canOpenTourDrawer,
   });
-
-  const handleOpenChange = useCallback(
-    (next: boolean) => {
-      onOpenChange(next);
-    },
-    [onOpenChange]
-  );
-
-  const navigateTo = useCallback(
-    (next: DrawerView) => {
-      onViewChange(next);
-    },
-    [onViewChange]
-  );
-
-  // Track mode views
-  useEffect(() => {
-    if (!open) return;
-    switch (view) {
-      case 'listen':
-        track('listen_drawer_open', { handle: artist.handle });
-        break;
-      case 'contact':
-        track('contacts_drawer_open', {
-          handle: artist.handle,
-          contacts_count: contacts.length,
-        });
-        break;
-      case 'pay':
-        track('tip_drawer_open', { handle: artist.handle });
-        // @ts-expect-error joviePixel is injected by JoviePixel
-        globalThis.joviePixel?.track?.('tip_page_view');
-        break;
-      case 'releases':
-        track('releases_drawer_open', {
-          handle: artist.handle,
-          releases_count: visibleReleases.length,
-        });
-        break;
-      case 'tour':
-        if (canOpenTourDrawer) {
-          track('tour_drawer_open', {
-            handle: artist.handle,
-            tour_dates_count: tourDates.length,
-          });
-        }
-        break;
-      default:
-        break;
-    }
-  }, [
-    open,
-    view,
-    artist.handle,
-    canOpenTourDrawer,
-    contacts.length,
-    tourDates.length,
-    visibleReleases.length,
-  ]);
-
-  // Intentionally do NOT mutate `view` when capability flips false.
-  // `resolveRenderedView` already returns 'menu' for that case (line 124),
-  // and `resolveViewMeta` falls back to the menu title (line 104). Mutating
-  // here causes the drawer to flicker whenever the releases query refetches
-  // and transiently returns empty data — the effect would snap view back to
-  // 'menu', the data would resolve, and the user would see a blink as the
-  // drawer re-rendered releases content. The view stays as 'releases' in
-  // parent state; rendering is the source of truth for what the user sees.
-  // See JOV-2150.
-
-  const venmoLink =
-    socialLinks.find(link => link.platform === 'venmo')?.url ?? null;
-  const hasValidVenmoLink = venmoLink !== null && isAllowedVenmoUrl(venmoLink);
-  const venmoUsername = extractVenmoUsername(venmoLink);
-
   const isSubView = renderedView !== 'menu';
 
   return (
     <ProfileDrawerShell
       open={open}
-      onOpenChange={handleOpenChange}
+      onOpenChange={onOpenChange}
       title={meta.title}
       subtitle={'subtitle' in meta ? meta.subtitle : undefined}
-      onBack={isSubView ? () => navigateTo('menu') : undefined}
+      onBack={isSubView ? () => onViewChange('menu') : undefined}
       navigationLevel={isSubView ? 'secondary' : 'root'}
       dataTestId='profile-menu-drawer'
       presentation={presentation}
       centerTitle={renderedView === 'pay'}
     >
-      <AnimatePresence mode='wait' initial={false}>
-        <motion.div
-          key={renderedView}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.12, ease: 'linear' }}
-        >
-          {renderedView === 'menu' && (
-            <MenuView
-              onNavigate={next => navigateTo(next as DrawerView)}
-              hasReleases={canOpenReleasesDrawer}
-              hasTourDates={canOpenTourDrawer}
-              hasTip={hasTip}
-              hasContacts={hasContacts}
-              onOpenReleaseCredits={
-                onOpenReleaseCredits
-                  ? () => {
-                      handleOpenChange(false);
-                      onOpenReleaseCredits();
-                    }
-                  : undefined
-              }
-            />
-          )}
-
-          {renderedView === 'share' && (
-            <PublicShareActionList
-              context={shareContext}
-              onActionComplete={() => handleOpenChange(false)}
-            />
-          )}
-
-          {renderedView === 'notifications' && (
-            <div className='flex flex-col gap-1'>
-              {NOTIFICATION_CONTENT_TYPES.map(pref => (
-                <div key={pref.key} className={PROFILE_DRAWER_TOGGLE_ROW_CLASS}>
-                  <div className='flex flex-col gap-0.5'>
-                    <span className={PROFILE_DRAWER_TITLE_CLASS}>
-                      {pref.label}
-                    </span>
-                    <span className={PROFILE_DRAWER_META_CLASS}>
-                      {pref.description}
-                    </span>
-                  </div>
-                  <Switch
-                    checked={contentPrefs[pref.key]}
-                    onCheckedChange={() => onTogglePref(pref.key)}
-                    aria-label={pref.label}
-                  />
-                </div>
-              ))}
-
-              <div className='mx-1 my-1 h-px bg-[color:var(--color-border-subtle)]' />
-
-              {/* A plain destructive button: this notifications list is not
-                  an ARIA menu, so the unsubscription control must not claim
-                  `role="menuitem"` (axe aria-required-parent). */}
-              <button
-                type='button'
-                className={PROFILE_DRAWER_DANGER_ITEM_CLASS}
-                onClick={onUnsubscribe}
-                disabled={isUnsubscribing}
-              >
-                <BellOff className='size-4 text-error/60' />
-                {isUnsubscribing
-                  ? 'Turning off\u2026'
-                  : 'Turn off notifications'}
-              </button>
+      <Suspense
+        fallback={
+          <div className='space-y-3'>
+            <div className='flex items-center gap-3 px-4 py-3 text-sm text-secondary-token'>
+              <Spinner size='sm' label={`Loading ${meta.title}`} />
+              <span>Loading {meta.title}…</span>
             </div>
-          )}
-
-          {renderedView === 'listen' && (
-            <div
-              className='flex justify-center'
-              data-testid='profile-mode-drawer-listen'
+            <button
+              type='button'
+              className={PROFILE_DRAWER_MENU_ITEM_CLASS}
+              onClick={() => onOpenChange(false)}
             >
-              <StaticListenInterface
-                artist={artist}
-                handle={artist.handle}
-                dspsOverride={dsps}
-                enableDynamicEngagement={enableDynamicEngagement}
-              />
-            </div>
-          )}
-
-          {renderedView === 'subscribe' && (
-            <div data-testid='profile-mode-drawer-subscribe'>
-              {subscribeTwoStep ? (
-                <TwoStepNotificationsCTA
-                  artist={artist}
-                  startExpanded
-                  presentation='overlay'
-                />
-              ) : (
-                <ArtistNotificationsCTA
-                  artist={artist}
-                  presentation='overlay'
-                  variant='button'
-                  autoOpen
-                  forceExpanded
-                  hideListenFallback
-                />
-              )}
-            </div>
-          )}
-
-          {renderedView === 'contact' && (
-            <ContactList
-              artistHandle={artist.handle}
-              contacts={contacts}
-              primaryChannel={primaryChannel}
-            />
-          )}
-
-          {renderedView === 'about' && (
-            <div data-testid='profile-mode-drawer-about'>
-              <AboutSection
-                artist={artist}
-                genres={genres}
-                pressPhotos={pressPhotos}
-                allowPhotoDownloads={allowPhotoDownloads}
-                creditSegments={creditSegments}
-                contacts={contacts}
-              />
-            </div>
-          )}
-
-          {renderedView === 'tour' && (
-            <div data-testid='profile-mode-drawer-tour'>
-              <TourDrawerContent artist={artist} tourDates={tourDates} />
-            </div>
-          )}
-
-          {renderedView === 'releases' && canOpenReleasesDrawer && (
-            <ReleasesView
-              releases={visibleReleases}
-              artistId={artist.id}
-              artistHandle={artist.handle}
-              artistName={artist.name}
-            />
-          )}
-
-          {renderedView === 'pay' && (
-            <div data-testid='profile-mode-drawer-pay'>
-              {hasValidVenmoLink ? (
-                <>
-                  <div
-                    className='mb-4 text-center'
-                    data-testid='profile-pay-recipient'
-                  >
-                    <p className='text-sm font-semibold text-primary-token'>
-                      Pay {artist.name}
-                    </p>
-                    <p className='mt-1 text-xs text-tertiary-token'>
-                      @{artist.handle}
-                    </p>
-                  </div>
-                  <PayView
-                    profileId={artist.id}
-                    artistHandle={artist.handle}
-                    venmoLink={venmoLink ?? ''}
-                    venmoUsername={venmoUsername}
-                    amounts={PAY_AMOUNTS}
-                  />
-                </>
-              ) : (
-                <div className='rounded-(--profile-drawer-radius-mobile) border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
-                  <p className='text-sm font-semibold text-primary-token'>
-                    Payments not available yet
-                  </p>
-                  <p className='mt-2 text-sm leading-6 text-tertiary-token'>
-                    This profile has not added a public Venmo link.
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
+              Cancel
+            </button>
+          </div>
+        }
+      >
+        <ProfileUnifiedDrawerContent
+          {...props}
+          renderedView={renderedView}
+          visibleReleases={visibleReleases}
+          canOpenReleasesDrawer={canOpenReleasesDrawer}
+          canOpenTourDrawer={canOpenTourDrawer}
+        />
+      </Suspense>
     </ProfileDrawerShell>
   );
 }

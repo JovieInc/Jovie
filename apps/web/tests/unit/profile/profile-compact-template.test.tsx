@@ -98,6 +98,10 @@ vi.mock('next/dynamic', () => ({
   },
 }));
 
+vi.mock('@/features/profile/ProfileUnifiedDrawer', () => ({
+  ProfileUnifiedDrawer: (props: unknown) => mockProfileUnifiedDrawer(props),
+}));
+
 vi.mock('next/link', () => ({
   default: ({
     children,
@@ -420,6 +424,89 @@ describe('ProfileCompactTemplate', () => {
     vi.useRealTimers();
     document.cookie =
       'jv_country=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+  });
+
+  it('mounts the compact drawer on first open and retains its state through close and reopen', () => {
+    const onDrawerOpenChange = vi.fn();
+    mockProfileUnifiedDrawer.mockImplementation(
+      (props: {
+        readonly open: boolean;
+        readonly onOpenChange: (open: boolean) => void;
+      }) => (
+        <div data-testid='persistent-drawer' data-open={String(props.open)}>
+          <input aria-label='Drawer draft' defaultValue='' />
+          <button type='button' onClick={() => props.onOpenChange(false)}>
+            Close persistent drawer
+          </button>
+        </div>
+      )
+    );
+    const surface = (drawerOpen: boolean) => (
+      <ProfileCompactSurface
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        drawerOpen={drawerOpen}
+        drawerView='menu'
+        onDrawerOpenChange={onDrawerOpenChange}
+        onDrawerViewChange={vi.fn()}
+        onBack={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onShare={vi.fn()}
+        profileHref='/test-artist'
+      />
+    );
+    const view = render(surface(false));
+    expect(mockProfileUnifiedDrawer).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('persistent-drawer')).toBeNull();
+
+    view.rerender(surface(true));
+    const drawer = screen.getByTestId('persistent-drawer');
+    const draft = screen.getByRole('textbox', { name: 'Drawer draft' });
+    fireEvent.change(draft, { target: { value: 'Keep this draft' } });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Close persistent drawer' })
+    );
+    expect(onDrawerOpenChange).toHaveBeenLastCalledWith(false);
+
+    view.rerender(surface(false));
+    expect(screen.getByTestId('persistent-drawer')).toBe(drawer);
+    expect(drawer).toHaveAttribute('data-open', 'false');
+    expect(draft).toHaveValue('Keep this draft');
+
+    view.rerender(surface(true));
+    expect(screen.getByTestId('persistent-drawer')).toBe(drawer);
+    expect(drawer).toHaveAttribute('data-open', 'true');
+    expect(screen.getByRole('textbox', { name: 'Drawer draft' })).toBe(draft);
+    expect(draft).toHaveValue('Keep this draft');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Close persistent drawer' })
+    );
+    expect(onDrawerOpenChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders an initially open compact drawer and its deep-linked view on the server', () => {
+    const html = renderToString(
+      <ProfileCompactSurface
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        drawerOpen
+        drawerView='contact'
+        onDrawerOpenChange={vi.fn()}
+        onDrawerViewChange={vi.fn()}
+        onBack={vi.fn()}
+        onOpenMenu={vi.fn()}
+        onPlayClick={vi.fn()}
+        onShare={vi.fn()}
+        profileHref='/test-artist'
+      />
+    );
+
+    expect(html).toContain('data-testid="mock-profile-unified-drawer"');
+    expect(html).toContain('data-open="true"');
+    expect(html).toContain('data-view="contact"');
   });
 
   it('keeps the signed-in escape hatch on a live tablet profile that uses embedded presentation', async () => {
@@ -822,6 +909,7 @@ describe('ProfileCompactTemplate', () => {
     expect(
       screen.queryByRole('button', { name: 'Release credits' })
     ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
     const drawerProps = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as {
       onOpenReleaseCredits?: () => void;
     };
@@ -854,6 +942,7 @@ describe('ProfileCompactTemplate', () => {
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
     const drawerProps = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as {
       onOpenReleaseCredits?: () => void;
     };
@@ -1819,10 +1908,9 @@ describe('ProfileCompactTemplate', () => {
         'data-mode',
         'subscribe'
       );
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-open',
-        'false'
-      );
+      expect(
+        screen.queryByTestId('mock-profile-unified-drawer')
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
@@ -2001,10 +2089,9 @@ describe('ProfileCompactTemplate', () => {
         'data-mode',
         'listen'
       );
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-open',
-        'false'
-      );
+      expect(
+        screen.queryByTestId('mock-profile-unified-drawer')
+      ).not.toBeInTheDocument();
     });
 
     expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
@@ -2518,10 +2605,9 @@ describe('ProfileCompactTemplate', () => {
         'data-mode',
         'listen'
       );
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-open',
-        'false'
-      );
+      expect(
+        screen.queryByTestId('mock-profile-unified-drawer')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -2555,10 +2641,9 @@ describe('ProfileCompactTemplate', () => {
         'data-mode',
         'subscribe'
       );
-      expect(screen.getByTestId('mock-profile-unified-drawer')).toHaveAttribute(
-        'data-open',
-        'false'
-      );
+      expect(
+        screen.queryByTestId('mock-profile-unified-drawer')
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -3327,10 +3412,7 @@ describe('ProfileCompactTemplate', () => {
         />
       );
 
-      const firstDrawerCall = mockProfileUnifiedDrawer.mock.calls[0]?.[0] as
-        | { presentation?: string }
-        | undefined;
-      expect(firstDrawerCall?.presentation).toBe('standalone');
+      expect(mockProfileUnifiedDrawer).not.toHaveBeenCalled();
 
       await waitFor(() => {
         expect(
@@ -3423,6 +3505,7 @@ describe('ProfileCompactTemplate', () => {
       ).toHaveTextContent('Banner');
       // Drawers and sheets stay inside the column (embedded presentation),
       // never the viewport-wide desktop modal.
+      fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
       const lastDrawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
         | { presentation?: string }
         | undefined;
@@ -3453,6 +3536,7 @@ describe('ProfileCompactTemplate', () => {
           'true'
         );
       });
+      fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
       const lastDrawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
         | { presentation?: string }
         | undefined;
@@ -3508,6 +3592,7 @@ describe('ProfileCompactTemplate', () => {
       | { creditSegments?: unknown }
       | undefined;
     expect(panelCall?.creditSegments).toBe(creditSegments);
+    fireEvent.click(screen.getByRole('button', { name: 'Menu' }));
     const drawerCall = mockProfileUnifiedDrawer.mock.calls.at(-1)?.[0] as
       | { creditSegments?: unknown }
       | undefined;
