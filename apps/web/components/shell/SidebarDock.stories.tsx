@@ -11,7 +11,8 @@ const release = {
   id: 'dock-story-release',
   title: 'Your latest releases',
   date: '2026-10-15',
-  summary: '',
+  summary:
+    'Release links, audience updates, and your latest work in one place.',
   url: '/changelog',
   highlights: [],
   dogfood: [],

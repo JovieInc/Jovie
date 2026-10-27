@@ -1,5 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { Music, SquarePen } from 'lucide-react';
+import { expect, within } from 'storybook/test';
+import { SidebarMenu } from '@/components/organisms/sidebar';
+import { APP_ROUTES } from '@/constants/routes';
+import { homeNavItem } from './config';
 import { NavMenuItem } from './NavMenuItem';
 
 const meta: Meta<typeof NavMenuItem> = {
@@ -24,7 +28,9 @@ const meta: Meta<typeof NavMenuItem> = {
   decorators: [
     Story => (
       <div className='w-60 bg-sidebar p-3'>
-        <Story />
+        <SidebarMenu>
+          <Story />
+        </SidebarMenu>
       </div>
     ),
   ],
@@ -52,8 +58,7 @@ export const Active: Story = {
   },
 };
 
-// Elevated New Chat create row (JOV-6181): the primary tone drops the
-// terminal label fade so the full label renders on the compact w-fit pill.
+// Compact create controls use the same crisp label treatment as destinations.
 export const PrimaryCreate: Story = {
   args: {
     item: {
@@ -64,5 +69,42 @@ export const PrimaryCreate: Story = {
       tone: 'primary',
     },
     isActive: false,
+  },
+};
+
+export const LongLabelWithBadge: Story = {
+  args: {
+    calm: true,
+    item: {
+      id: 'library',
+      name: 'A long destination with a separate count',
+      href: APP_ROUTES.LIBRARY,
+      icon: Music,
+      badge: '12',
+    },
+    isActive: false,
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const label = canvas.getByText(args.item.name);
+    const badge = canvas.getByText('12');
+    const link = canvas.getByRole('link');
+    await expect(link).toHaveAccessibleName(`${args.item.name} 12`);
+    await expect(label.scrollWidth).toBeGreaterThan(label.clientWidth);
+    await expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(
+      badge.getBoundingClientRect().left
+    );
+    await expect(globalThis.getComputedStyle(label).maskImage).toBe('none');
+    await expect(globalThis.getComputedStyle(label).textOverflow).toBe(
+      'ellipsis'
+    );
+  },
+};
+
+export const InboxDestination: Story = {
+  args: {
+    calm: true,
+    item: homeNavItem,
+    isActive: true,
   },
 };

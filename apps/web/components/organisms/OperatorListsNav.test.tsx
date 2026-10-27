@@ -72,6 +72,10 @@ describe('OperatorListsNav', () => {
       'h-(--app-shell-sidebar-row-height)'
     );
     expect(collab).toHaveClass('h-(--app-shell-sidebar-row-height)');
+    expect(screen.getByText('New List')).toHaveClass(
+      'text-left',
+      'justify-self-stretch'
+    );
     expect(screen.getByLabelText('12 creators')).toHaveTextContent('12');
     expect(screen.getByLabelText('4 creators')).toHaveTextContent('4');
   });

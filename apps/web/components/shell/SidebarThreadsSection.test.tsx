@@ -47,6 +47,47 @@ describe('SidebarThreadsSection', () => {
     localStorage.clear();
   });
 
+  it.each([
+    ['running', false, 'Working'],
+    ['errored', true, 'Needs attention · Unread'],
+    ['complete', true, 'Unread'],
+  ] as const)(
+    'exposes %s status in calm history without changing the link name',
+    (status, unread, description) => {
+      render(
+        <SidebarThreadRow
+          thread={{ ...threads[0], status }}
+          active={false}
+          unread={unread}
+          calm
+        />
+      );
+      const link = screen.getByRole('link', { name: 'Release rollout' });
+      expect(link).toHaveAccessibleDescription(description);
+      expect(link).toHaveAttribute('href', threads[0].href);
+      expect(link.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
+    }
+  );
+
+  it('removes resolved status without leaving stale descriptions or moving the title', () => {
+    const view = (status: SidebarThread['status'], unread: boolean) => (
+      <SidebarThreadRow
+        thread={{ ...threads[0], status }}
+        active={false}
+        unread={unread}
+        calm
+      />
+    );
+    const { rerender } = render(view('running', true));
+    const link = screen.getByRole('link', { name: 'Release rollout' });
+    const title = screen.getByText('Release rollout');
+    expect(link).toHaveAccessibleDescription('Working · Unread');
+    rerender(view('complete', false));
+    expect(link).not.toHaveAttribute('aria-describedby');
+    expect(screen.getByText('Release rollout')).toBe(title);
+    expect(screen.queryByText('Working · Unread')).not.toBeInTheDocument();
+  });
+
   it('routes thread utility glyphs through the shared sidebar icon contracts', () => {
     const { rerender } = render(
       <SidebarThreadsSection

@@ -5,7 +5,6 @@ import {
   Gauge,
   Gift,
   HandCoins,
-  Home,
   IdCard,
   Inbox,
   Layers,
@@ -59,8 +58,8 @@ export const homeNavItem: NavItem = {
   name: 'Inbox',
   href: APP_ROUTES.DASHBOARD,
   id: 'home',
-  icon: Home,
-  iconName: 'Home',
+  icon: Inbox,
+  iconName: 'Inbox',
   tier: 'core',
   description: 'Review attention, approvals, and replies',
 };

@@ -2,6 +2,7 @@ import { TooltipProvider } from '@jovie/ui';
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { expect, within } from 'storybook/test';
 import { RenderedFamily } from '@/.storybook/rendered-family';
 import { SidebarProvider } from '@/components/organisms/sidebar';
 import type { SidebarListsPayload } from '@/lib/ovie/lists/types';
@@ -60,6 +61,17 @@ export const ListsAndSmartViews: Story = {
       ],
     }),
   ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const textStart = (label: string) => {
+      const range = document.createRange();
+      range.selectNodeContents(canvas.getByText(label));
+      return range.getBoundingClientRect().left;
+    };
+    await expect(
+      Math.abs(textStart('New List') - textStart('Collab list'))
+    ).toBeLessThan(1);
+  },
 };
 
 /** Empty smart views are omitted, so a fresh workspace shows only New list. */

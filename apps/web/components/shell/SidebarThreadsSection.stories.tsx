@@ -102,3 +102,34 @@ export const CanonicalCreation: Story = {
     ),
   },
 };
+
+export const CalmActivity: Story = {
+  args: {
+    calm: true,
+    activeThreadId: null,
+    onNewThread: fn(),
+    onThreadContextMenu: fn(),
+    threads: [
+      {
+        ...threads[0],
+        id: 'working',
+        title: 'Preparing release notes',
+        status: 'running',
+      },
+      {
+        ...threads[0],
+        id: 'attention',
+        title: 'Distribution needs attention',
+        status: 'errored',
+        unread: true,
+      },
+      {
+        ...threads[0],
+        id: 'unread',
+        title: 'Your campaign is ready to review',
+        unread: true,
+      },
+      { ...threads[1], id: 'read', title: 'Summer tour plans' },
+    ],
+  },
+};

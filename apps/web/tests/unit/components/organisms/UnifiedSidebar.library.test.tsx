@@ -263,6 +263,8 @@ describe('UnifiedSidebar library route', () => {
 
   afterEach(() => {
     document.cookie = 'sidebar:state=; path=/; max-age=0';
+    globalThis.localStorage.removeItem('ovie.nav.tools-open.v1');
+    globalThis.localStorage.removeItem('ovie.nav.business-open.v1');
     electronRuntimeMock.isElectronRuntime = true;
     document.documentElement.removeAttribute('data-desktop-runtime');
     signOutMock.mockReset();
@@ -462,16 +464,17 @@ describe('UnifiedSidebar library route', () => {
     expect(linearTokens).not.toMatch(/--linear-app-frame-seam/);
   });
 
-  it('uses the single unified header-height token for route/operator sidebar headers (founder lock 2026-09-25)', () => {
-    const source = readFileSync(
-      join(__dirname, '../../../..', 'components/organisms/UnifiedSidebar.tsx'),
-      'utf8'
-    );
-
-    expect(source).toContain("'h-(--app-shell-header-height) py-0.5'");
-    expect(source).not.toContain(
-      "'h-(--app-shell-header-height-compact) py-0.5'"
-    );
+  it.each([
+    { section: 'dashboard' as const, pathname: APP_ROUTES.DASHBOARD },
+    { section: 'library' as const, pathname: APP_ROUTES.LIBRARY },
+    { section: 'settings' as const, pathname: APP_ROUTES.SETTINGS },
+    { section: 'admin' as const, pathname: APP_ROUTES.ADMIN_OPS },
+    { section: 'ov' as const, pathname: APP_ROUTES.OV },
+  ])('uses the same header geometry in the $section shell', options => {
+    const { container } = renderUnifiedSidebar(options);
+    const header = container.querySelector('[data-sidebar="header"]');
+    expect(header).toHaveClass('h-(--app-shell-header-height)', 'py-0.5');
+    expect(header).not.toHaveClass('h-16', 'pt-5', 'pb-4');
   });
 
   it('preserves the generic route-override contract for legitimate consumers', async () => {
@@ -806,6 +809,58 @@ describe('UnifiedSidebar library route', () => {
     );
     expect(globalThis.localStorage?.getItem('ovie.nav.tools-open.v1')).toBe(
       '1'
+    );
+  });
+
+  it('keeps collapsed operator headings out of keyboard and accessible navigation', () => {
+    const { container } = renderUnifiedSidebar({
+      pathname: APP_ROUTES.OV,
+      section: 'ov',
+      sidebarDefaultOpen: false,
+    });
+    const navigation = screen.getByRole('navigation', {
+      name: 'OV Navigation',
+    });
+    for (const label of ['Business', 'Tools']) {
+      expect(
+        within(navigation).queryByRole('button', { name: label })
+      ).toBeNull();
+      const heading = within(navigation).getByText(label);
+      expect(heading.closest('[inert]')).not.toBeNull();
+      expect(heading.closest('[aria-hidden="true"]')).not.toBeNull();
+    }
+    for (const label of ['Home', 'Inbox', 'Shipping', 'Fleet', 'Capacity']) {
+      expect(
+        within(navigation).getByRole('link', { name: label })
+      ).toBeInTheDocument();
+    }
+    expect(
+      container.querySelector('[data-testid="ov-nav-section-tools"]')
+    ).not.toHaveAttribute('hidden');
+  });
+
+  it('restores operator disclosure preferences and returns focus when its heading hides', () => {
+    globalThis.localStorage.setItem('ovie.nav.tools-open.v1', '1');
+    globalThis.localStorage.setItem('ovie.nav.business-open.v1', '0');
+    electronRuntimeMock.isElectronRuntime = false;
+    renderUnifiedSidebar({ pathname: APP_ROUTES.OV, section: 'ov' });
+    const tools = screen.getByRole('button', { name: 'Tools' });
+    expect(tools).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('link', { name: 'Presence' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Business' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    tools.focus();
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+    expect(screen.queryByRole('button', { name: 'Tools' })).toBeNull();
+    expect(document.activeElement).toHaveAttribute('data-rail-toggle', 'left');
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }));
+    expect(screen.getByRole('button', { name: 'Tools' })).toBe(tools);
+    expect(tools).toHaveAttribute('aria-expanded', 'true');
+    expect(globalThis.localStorage.getItem('ovie.nav.tools-open.v1')).toBe('1');
+    expect(globalThis.localStorage.getItem('ovie.nav.business-open.v1')).toBe(
+      '0'
     );
   });
 

@@ -170,6 +170,7 @@ async function readSidebarAnchors(
       // AskJovieMark intentionally rests at 60% opacity. Ancestor staging
       // must never fade it below that visible resting treatment.
       brandPainted: painted && opacity >= 0.5 && brandBox.width > 0,
+      headerHeight: header.getBoundingClientRect().height,
       headerBottom: header.getBoundingClientRect().bottom,
       footerTop: footer.getBoundingClientRect().top,
       accountTop: accountBox.top,
@@ -189,6 +190,7 @@ function expectStableSidebar(
   ).toBe(true);
   for (const key of [
     'brandY',
+    'headerHeight',
     'headerBottom',
     'footerTop',
     'accountTop',
@@ -264,6 +266,7 @@ for (const product of [
       });
       const expanded = await readSidebarAnchors(page);
       expect(expanded.brandPainted).toBe(true);
+      expect(expanded.headerHeight).toBe(44);
       if (product.endsWith('operator')) {
         expect(expanded.rows.length).toBeGreaterThan(3);
       } else {
@@ -412,6 +415,9 @@ for (const history of ['composed-history', 'composed-empty-history']) {
         element.dataset.mountReceipt = 'original';
       });
       const expanded = await readSidebarAnchors(page);
+      const expandedToggle = await page
+        .getByTestId('sidebar-rail-toggle')
+        .boundingBox();
       const headingAction = nav.locator(
         '[data-sidebar-search-slot] [aria-label="New Chat"]'
       );
@@ -482,17 +488,18 @@ for (const history of ['composed-history', 'composed-empty-history']) {
       await page
         .getByRole('button', { name: 'Expand sidebar', exact: true })
         .hover();
-      const toggle = page.getByRole('button', {
-        name: 'Expand sidebar',
-        exact: true,
-      });
-      const beforeHover = await toggle.boundingBox();
+      const toggle = page.getByTestId('sidebar-rail-toggle');
       await toggle.hover();
       await create.hover();
       await toggle.focus();
-      await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      // Preview opens the visible rail without pinning it. The same toggle
+      // offers Pin sidebar until the user commits the expanded state.
+      await expect(toggle).toHaveAccessibleName('Pin sidebar');
+      await expect(toggle).toHaveAttribute('aria-expanded', 'true');
       await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-      expect(await toggle.boundingBox()).toEqual(beforeHover);
+      // A preview uses expanded chrome while leaving the content plane
+      // unpinned. Its pin control occupies the same slot as expanded mode.
+      expect(await toggle.boundingBox()).toEqual(expandedToggle);
       await expect(create).toHaveCount(1);
       await expect(headingAction).toHaveCount(1);
       await toggle.click();
@@ -549,6 +556,21 @@ test('mobile history keeps direct creation access in a short drawer', async ({
   await page.screenshot({
     path: testInfo.outputPath('mobile-history-short.png'),
   });
+  const close = page.getByRole('button', {
+    name: 'Close sidebar',
+    exact: true,
+  });
+  await expect(close).toHaveAttribute('aria-expanded', 'true');
+  await expect(close).not.toHaveAttribute('aria-pressed');
+  await expect(close).not.toHaveAttribute('data-rail-pinned');
+  await close.click();
+  await expect(nav).toBeHidden();
+  await page.keyboard.press('[');
+  await expect(nav).toBeVisible();
+  await expect(close).toHaveAttribute('aria-expanded', 'true');
+  await close.focus();
+  await page.keyboard.press('Enter');
+  await expect(nav).toBeHidden();
 });
 
 test.describe('touch sidebar controls', () => {
@@ -580,4 +602,49 @@ test.describe('touch sidebar controls', () => {
     await name.fill('Tour collaborators');
     await page.screenshot({ path: testInfo.outputPath('touch-new-list.png') });
   });
+});
+
+test('operator disclosures restore preferences without invisible keyboard stops', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem('ovie.nav.tools-open.v1') === null) {
+      localStorage.setItem('ovie.nav.tools-open.v1', '1');
+      localStorage.setItem('ovie.nav.business-open.v1', '1');
+    }
+  });
+  await page.goto(
+    '/iframe.html?id=organisms-unifiedsidebar--operator&viewMode=story'
+  );
+  const nav = page.getByRole('navigation', { name: 'OV Navigation' });
+  const business = nav.getByRole('button', { name: 'Business', exact: true });
+  const tools = nav.getByRole('button', { name: 'Tools', exact: true });
+  await expect(tools).toHaveAttribute('aria-expanded', 'true');
+  await expect(business).toHaveAttribute('aria-expanded', 'true');
+  await business.focus();
+  // Preserve focus on the disclosure while an external rail command closes it.
+  await page
+    .getByTestId('sidebar-rail-toggle')
+    .evaluate(element => (element as HTMLButtonElement).click());
+  const toggle = page.getByRole('button', {
+    name: 'Expand sidebar',
+    exact: true,
+  });
+  await expect(toggle).toBeFocused();
+  await expect(business).toHaveCount(0);
+  await expect(tools).toHaveCount(0);
+  await expect(
+    nav.getByRole('link', { name: 'Home', exact: true })
+  ).toBeVisible();
+  await toggle.press('Enter');
+  await expect(business).toHaveAttribute('aria-expanded', 'true');
+  await expect(tools).toHaveAttribute('aria-expanded', 'true');
+  await business.click();
+  await expect(business).toHaveAttribute('aria-expanded', 'false');
+  expect(
+    await page.evaluate(() => localStorage.getItem('ovie.nav.business-open.v1'))
+  ).toBe('0');
+  await page.reload();
+  await expect(business).toHaveAttribute('aria-expanded', 'false');
+  await expect(tools).toHaveAttribute('aria-expanded', 'true');
 });

@@ -321,17 +321,8 @@ export function NavMenuItem({
       <span
         className={cn(
           'min-w-0 w-full justify-self-stretch truncate overflow-hidden whitespace-nowrap text-left',
-          // A terminal fade reads as intentional truncation only on a
-          // full-width label track (long destinations fade instead of hard
-          // cropping). Compact w-fit create rows (New Chat, primary tone) hug
-          // the text in an auto track — the same fade there sheared the
-          // trailing glyph with rail space free (JOV-6181).
-          item.tone !== 'primary' && item.tone !== 'secondary'
-            ? '[-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]'
-            : null,
-          item.tone !== 'primary' && item.tone !== 'secondary'
-            ? '[mask-image:linear-gradient(to_right,black_calc(100%_-_1.5rem),transparent)]'
-            : null,
+          // The grid already reserves a separate badge track. A single
+          // ellipsis handles overflow without fading letters that still fit.
           // Staged rail-motion exit (JOV-4522): absolute positioning lifts the
           // label out of the collapsed single-column grid so it fades/drifts
           // instead of snapping to display:none or wrapping a phantom row.

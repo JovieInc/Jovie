@@ -7,7 +7,7 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useDashboardData } from '@/app/app/(shell)/dashboard/DashboardDataContext';
 import { AskJovieMark } from '@/components/ask-jovie/AskJovie';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
@@ -42,6 +42,7 @@ import {
 } from '@/features/dashboard/dashboard-nav/config';
 import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
@@ -127,8 +128,10 @@ function OperatorNavGroup({
       void queryClient.prefetchQuery(shippingStateQueryOptions);
     }
   };
+  const { state, isMobile } = useSidebar();
+  const chromeHidden = state === 'closed' && !isMobile;
   const [stored, setStored] = useState(false);
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     if (!section.collapsible) return;
     try {
       setStored(
@@ -158,27 +161,33 @@ function OperatorNavGroup({
   return (
     <div data-testid={`ov-nav-section-${section.id}`}>
       {section.label && section.collapsible ? (
-        <button
-          type='button'
-          className={cn(
-            OPERATOR_NAV_GROUP_LABEL,
-            SHELL_RAIL_LABEL,
-            'flex w-full items-center gap-1 text-left hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
-          )}
-          aria-expanded={open}
-          aria-controls={groupId}
-          disabled={holdsActive}
-          onClick={toggle}
+        <RailStagedContent
+          hidden={chromeHidden}
+          stage={false}
+          className='contents'
         >
-          <ChevronRight
-            aria-hidden='true'
+          <button
+            type='button'
             className={cn(
-              'size-3 transition-transform duration-subtle motion-reduce:transition-none',
-              open && 'rotate-90'
+              OPERATOR_NAV_GROUP_LABEL,
+              SHELL_RAIL_LABEL,
+              'flex w-full items-center gap-1 text-left hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
             )}
-          />
-          {section.label}
-        </button>
+            aria-expanded={open}
+            aria-controls={groupId}
+            disabled={holdsActive}
+            onClick={toggle}
+          >
+            <ChevronRight
+              aria-hidden='true'
+              className={cn(
+                'size-3 transition-transform duration-subtle motion-reduce:transition-none',
+                open && 'rotate-90'
+              )}
+            />
+            {section.label}
+          </button>
+        </RailStagedContent>
       ) : section.label ? (
         <span className={cn(OPERATOR_NAV_GROUP_LABEL, SHELL_RAIL_LABEL)}>
           {section.label}
@@ -490,9 +499,7 @@ export function UnifiedSidebar({
         data-electron-drag-region='true'
         className={cn(
           'relative justify-center gap-0 px-(--app-shell-sidebar-inset) group-data-[collapsible=icon]:px-0',
-          isRouteSidebar || isOperatorSection
-            ? 'h-(--app-shell-header-height) py-0.5'
-            : 'h-16 pt-5 pb-4'
+          'h-(--app-shell-header-height) py-0.5'
         )}
       >
         <SidebarHeaderNav

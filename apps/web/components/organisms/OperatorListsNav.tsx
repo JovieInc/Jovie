@@ -165,7 +165,12 @@ function NewListRow() {
             className={getSidebarNavIconClassName({ calm: true })}
             aria-hidden='true'
           />
-          <span className={cn('min-w-0 truncate', SHELL_RAIL_LABEL_OVERLAY)}>
+          <span
+            className={cn(
+              'min-w-0 w-full justify-self-stretch truncate text-left',
+              SHELL_RAIL_LABEL_OVERLAY
+            )}
+          >
             New List
           </span>
         </button>

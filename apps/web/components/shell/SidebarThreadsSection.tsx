@@ -1,10 +1,12 @@
 'use client';
 
 import { Button } from '@jovie/ui';
+import { CircleAlert, LoaderCircle } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import React, {
   useCallback,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -211,6 +213,17 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
     thread: SidebarThread
   ) => void;
 }) {
+  const statusId = useId();
+  const statusLabel = [
+    thread.status === 'running'
+      ? 'Working'
+      : thread.status === 'errored'
+        ? 'Needs attention'
+        : null,
+    unread ? 'Unread' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   const titleRef = useRef<HTMLSpanElement>(null);
   const [titleClipped, setTitleClipped] = useState(false);
   const [tooltipSide, setTooltipSide] = useState<'bottom' | 'right'>('bottom');
@@ -260,18 +273,15 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
   const rowContent = (
     <>
       <span className={SIDEBAR_ENTRY_ICON_SLOT_CLASS}>
-        <span
-          className={cn(
-            calm ? 'sr-only' : 'h-1.5 w-1.5 rounded-full',
-            thread.status === 'running'
-              ? 'bg-cyan-300/85 anim-calm-breath'
-              : thread.status === 'errored'
-                ? 'bg-rose-400/85'
-                : unread
-                  ? 'bg-cyan-300/85'
-                  : 'bg-white/25'
-          )}
-        />
+        {thread.status === 'running' ? (
+          <span className='animate-spin motion-reduce:animate-none'>
+            <LoaderCircle className='size-3 text-info' aria-hidden='true' />
+          </span>
+        ) : thread.status === 'errored' ? (
+          <CircleAlert className='size-3 text-warning' aria-hidden='true' />
+        ) : unread ? (
+          <span className='size-1.5 rounded-full bg-info' aria-hidden='true' />
+        ) : null}
       </span>
       <span
         ref={titleRef}
@@ -290,7 +300,13 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         <time
           aria-hidden='true'
           dateTime={thread.updatedAt}
-          className='shrink-0 text-(length:--text-2xs) text-tertiary-token'
+          className={cn(
+            'shrink-0 tabular-nums text-(length:--text-2xs) text-tertiary-token',
+            // Date and action share one stable track. Touch always exposes
+            // the action; mouse and keyboard swap it in without reflow.
+            onThreadContextMenu &&
+              '[@media(hover:none)]:opacity-0 [@media(pointer:coarse)]:opacity-0 group-hover/thread:opacity-0 group-focus-within/thread:opacity-0'
+          )}
         >
           {formatSidebarThreadTime(thread.updatedAt)}
         </time>
@@ -303,6 +319,11 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
         'group/thread relative flex items-center h-(--app-shell-sidebar-row-height)'
       )}
     >
+      {statusLabel ? (
+        <span id={statusId} className='sr-only'>
+          {statusLabel}
+        </span>
+      ) : null}
       <Tooltip
         label={thread.title}
         disabled={!titleClipped}
@@ -315,6 +336,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             href={thread.href}
             prefetch={false}
             aria-current={active ? 'page' : undefined}
+            aria-describedby={statusLabel ? statusId : undefined}
             className={rowClasses}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
           >
@@ -327,6 +349,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             onClick={() => onSelect?.(thread.id)}
             onContextMenu={e => onThreadContextMenu?.(e, thread)}
             aria-pressed={active}
+            aria-describedby={statusLabel ? statusId : undefined}
             className={rowClasses}
           >
             {rowContent}
@@ -344,7 +367,7 @@ const SidebarThreadRow = React.memo(function SidebarThreadRow({
             className={cn(
               // The reserved trailing track keeps this action off the title.
               'absolute right-(--app-shell-sidebar-inset) top-1/2 grid h-5 w-5 -translate-y-1/2 place-items-center rounded-full text-quaternary-token transition-[background-color,color,opacity] duration-subtle ease-subtle hover:bg-surface-0 active:bg-surface-0 hover:text-primary-token focus-visible:bg-transparent focus-visible:text-primary-token focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/55',
-              '[@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/thread:opacity-100 focus-visible:opacity-100'
+              '[@media(hover:hover)_and_(pointer:fine)]:opacity-0 group-hover/thread:opacity-100 group-focus-within/thread:opacity-100 focus-visible:opacity-100'
             )}
           >
             <Icon
@@ -384,11 +407,8 @@ export function formatSidebarThreadTime(
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// Status dot tones:
-//   running → cyan, anim-calm-breath
-//   errored → rose
-//   unread  → cyan static
-//   read    → dim white
+// One status slot: activity, attention, or unread. Read conversations stay
+// quiet; accessible descriptions retain combined states without extra badges.
 export function SidebarThreadsSection({
   calm = false,
   threads,
