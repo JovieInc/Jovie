@@ -13,7 +13,7 @@ export const musicResolveSchema = z
   .strict();
 
 const nullableText = z.string().nullable();
-const artistMetadataSchema = z
+export const coreArtistMetadataSchema = z
   .object({
     source: z.literal('musicbrainz'),
     sourceUrl: z.url(),
@@ -26,27 +26,6 @@ const artistMetadataSchema = z
     isnis: z.array(z.string()),
     ipis: z.array(z.string()),
     wikidataIds: z.array(z.string()),
-    externalLinks: z.array(
-      z
-        .object({
-          provider: nullableText,
-          url: z.url(),
-          relationship: z.string(),
-          provenance: z.literal('musicbrainz_url_rel'),
-        })
-        .strict()
-    ),
-    releaseGroups: z.array(
-      z
-        .object({
-          mbid: z.string(),
-          title: z.string(),
-          primaryType: nullableText,
-          firstReleaseDate: nullableText,
-        })
-        .strict()
-    ),
-    releaseGroupsComplete: z.boolean(),
   })
   .strict();
 
@@ -77,6 +56,36 @@ export const musicResolveOutputSchema = z
     confidence: z.number().min(0).max(1),
     provenance: z.record(z.string(), z.string()),
     candidateCount: z.number().int().nonnegative(),
-    artistMetadata: artistMetadataSchema.optional(),
+    artistMetadata: coreArtistMetadataSchema.optional(),
   })
   .strict();
+
+/** Shared resolve failures; HTTP status and MCP framing are transport concerns. */
+export const musicResolveFailureSchema = z.strictObject({
+  error: z.strictObject({
+    code: z.enum([
+      'BODY_TIMEOUT',
+      'CANCELLED',
+      'FORBIDDEN',
+      'INVALID_BODY',
+      'INVALID_INPUT',
+      'PAYLOAD_TOO_LARGE',
+      'RATE_LIMITED',
+      'RATE_LIMIT_UNAVAILABLE',
+      'UNSUPPORTED_MEDIA_TYPE',
+      'UPSTREAM_FAILURE',
+      'UPSTREAM_TIMEOUT',
+    ]),
+    retryable: z.boolean(),
+  }),
+});
+
+export const musicResolveResultSchema = z.union([
+  musicResolveOutputSchema,
+  musicResolveFailureSchema,
+]);
+
+export type MusicResolveInput = z.input<typeof musicResolveSchema>;
+export type MusicResolveOutput = z.infer<typeof musicResolveOutputSchema>;
+export type MusicResolveFailure = z.infer<typeof musicResolveFailureSchema>;
+export type MusicResolveResult = z.infer<typeof musicResolveResultSchema>;
