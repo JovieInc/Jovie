@@ -86,6 +86,13 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
   ],
   [
+    'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
+    [
+      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
+      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
+    ],
+  ],
+  [
     'apps/web/tests/e2e/utils/start-entry-layout.ts',
     [
       'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
