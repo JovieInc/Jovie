@@ -416,20 +416,20 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
-  it('registers provider-host layouts that ship with start and public profile', () => {
+  it('registers live provider-host layouts and retires the deleted start loading screen', () => {
     assert.equal(
       kindOf('apps/web/app/(dynamic)/start/layout.tsx'),
       'registered'
     );
     assert.equal(
       kindOf('apps/web/app/(dynamic)/start/loading.tsx'),
-      'registered'
+      'unregistered'
     );
     assert.equal(kindOf('apps/web/app/[username]/layout.tsx'), 'registered');
     const result = evaluateChangedScreens({
       changedFiles: [
         { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
-        { path: 'apps/web/app/(dynamic)/start/loading.tsx', status: 'M' },
+        { path: 'apps/web/app/(dynamic)/start/loading.tsx', status: 'D' },
         { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
       ],
       headSha: HEAD,
@@ -440,6 +440,35 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'web.public-profile',
       'web.start',
     ]);
+    assert.deepEqual(result.removedScreens, [
+      'apps/web/app/(dynamic)/start/loading.tsx',
+    ]);
+    const missingProof = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
+        { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
+      ],
+      headSha: HEAD,
+      proofs: [],
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(missingProof.issues, [
+      'missing exact-head proof for web.start',
+      'missing exact-head proof for web.public-profile',
+    ]);
+    for (const status of ['A', 'M']) {
+      const reintroduced = evaluateChangedScreens({
+        changedFiles: [
+          { path: 'apps/web/app/(dynamic)/start/loading.tsx', status },
+        ],
+        headSha: HEAD,
+        proofs: [],
+        requireExternalEvidence: true,
+      });
+      assert.deepEqual(reintroduced.issues, [
+        'missing registration for changed in-scope screen apps/web/app/(dynamic)/start/loading.tsx',
+      ]);
+    }
   });
 
   it('registers the artist pay page when that screen changes', () => {

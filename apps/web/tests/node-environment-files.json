@@ -576,7 +576,6 @@
   "tests/unit/app/shell-route-boundary-guard.test.ts",
   "tests/unit/app/shell-route-matches.test.ts",
   "tests/unit/app/signup-metadata.test.ts",
-  "tests/unit/app/start-loading-system-b-style-guard.test.ts",
   "tests/unit/app/surface-elevation-guardrails.test.ts",
   "tests/unit/app/unified-app-shell-slice-0-contract.test.ts",
   "tests/unit/app/username-s-platform-route.test.ts",

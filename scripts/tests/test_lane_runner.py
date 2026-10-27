@@ -2215,6 +2215,11 @@ def repair_inventory_process(root, role, entered, release, preclaim, done, outpu
                      (lane.pr_events,'cleanup_one_event',{}),
                      (socket.socket,'connect',{'side_effect':forbidden})]
             for obj,name,opts in patches:stack.enter_context(patch.object(obj,name,**opts))
+            if scenario == 'stale':
+                # This negative control has no fresh source available on either
+                # bounded retry. Refresh success has separate real-cache coverage.
+                stale = lane.capture_repair_inventory(role)
+                stack.enter_context(patch.object(lane, 'capture_repair_inventory', return_value=stale))
             host=lane.Host(state=state,repo=state,linear_env=state/'nonexistent')
             slot=lane.Locked(state/'slots'/f'{role}.0.lock',blocking=False);assert slot.held
             result=lane.worker_with_slot(host,role,providers[role],slot,maintenance_only=True)
@@ -2253,6 +2258,113 @@ class IdleExitAtomicityTest(unittest.TestCase):
             self.assertEqual([p.name for p in host.state.iterdir() if p.name.endswith(".tmp")], [])
 
 
+class RepairInventoryBoundaryTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.host = lane.Host(state=Path(self.tmp.name))
+        self.clock = [1000.0]
+        self.rows = [repair_inventory_pr()]
+        for guard in (
+                patch.dict(os.environ, {'LANES_EXECUTION_BACKEND': 'local-test'}),
+                patch.object(lane, 'SHARED_CACHE_DIR', Path(self.tmp.name)/'cache'),
+                patch.object(lane, '_SUMMARY', {'at': 0, 'prs': [], 'readable': False}),
+                patch.object(lane.time, 'time', side_effect=lambda: self.clock[0])):
+            guard.start(); self.addCleanup(guard.stop)
+        self.reads = []
+        def census(*args):
+            free = lane.Locked(self.host.state/'claim.lock', blocking=False)
+            try: self.assertTrue(free.held, 'bulk census must not hold claim.lock')
+            finally: free.release()
+            self.reads.append(self.clock[0])
+            return copy.deepcopy(self.rows)
+        guard = patch.object(lane.pr_events, 'open_prs_state', side_effect=census)
+        guard.start(); self.addCleanup(guard.stop)
+
+    def test_refresh_cannot_donate_freshness_to_stale_or_changed_source(self):
+        original = lane.capture_repair_inventory('codex')
+        self.clock[0] += 61
+        for fault in ('stale', 'source-mismatch', 'wrong-repository', 'incomplete-labels'):
+            with self.subTest(fault=fault):
+                bad = copy.deepcopy(original)
+                if fault != 'stale': bad['summary']['sourceAt'] = self.clock[0]
+                if fault == 'source-mismatch': bad['summary']['prs'][0]['headRefOid'] = 'changed'
+                if fault == 'wrong-repository': bad['repository'] = 'other/repository'
+                if fault == 'incomplete-labels':
+                    bad['prs'][0]['labelsComplete'] = False
+                    bad['summary']['prs'][0]['labelsComplete'] = False
+                with patch.object(lane, 'capture_repair_inventory', return_value=bad) as capture:
+                    claim, receipt = lane.lock_repair_inventory(self.host, 'codex', original)
+                try:
+                    self.assertTrue(claim.held)
+                    self.assertFalse(lane.repair_inventory_valid(receipt, 'codex'))
+                    self.assertEqual(receipt, bad)
+                    self.assertLessEqual(capture.call_count, 2, 'refresh is bounded')
+                finally: claim.release()
+        self.assertEqual(original['summary']['sourceAt'], 1000.0)
+
+    def test_lock_wait_refreshes_outside_lock_and_observes_competing_claim(self):
+        self.clock[0] = started = datetime(2026, 10, 26, tzinfo=timezone.utc).timestamp()
+        number = str(self.rows[0]['number'])
+        original = lane.capture_repair_inventory('grok')
+        owner = lane.Locked(self.host.state/'claim.lock', blocking=False)
+        waiting = threading.Event()
+        real_locked = lane.Locked
+        result = []
+        errors = []
+        competing = {'sha': 'b' * 40, 'lane': 'grok', 'count': 1, 'at': started + 61}
+        def lock(path, blocking):
+            if threading.current_thread() is thread and blocking: waiting.set()
+            return real_locked(path, blocking)
+        def select():
+            try:
+                claim, receipt = lane.lock_repair_inventory(self.host, 'grok', original)
+                try:
+                    contender = real_locked(self.host.state/'claim.lock', blocking=False)
+                    try: self.assertFalse(contender.held, 'selection must still be serialized')
+                    finally: contender.release()
+                    result.append((receipt, json.loads((self.host.state/'fix-attempts.json').read_text())))
+                finally: claim.release()
+            except BaseException as error: errors.append(error)
+        thread = threading.Thread(target=select)
+        with patch.object(lane, 'Locked', side_effect=lock):
+            thread.start()
+            try:
+                self.assertTrue(waiting.wait(2), 'worker must reach the held lock')
+                self.clock[0] += 61
+                self.rows[0]['headRefOid'] = competing['sha']
+                (self.host.state/'fix-attempts.json').write_text(json.dumps({number: competing}))
+            finally: owner.release()
+            thread.join(2)
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(self.reads, [started, started + 61])
+        receipt, attempts = result[0]
+        self.assertTrue(lane.repair_inventory_valid(receipt, 'grok'))
+        self.assertEqual(receipt['prs'][0]['headRefOid'], competing['sha'])
+        self.assertEqual(receipt['summary']['sourceAt'], started + 61)
+        self.assertEqual(attempts, {number: competing})
+        providers = {'codex': {'enabled': True, 'tier': 0}, 'grok': {'enabled': True, 'tier': 1}}
+        with patch.object(lane, 'load_providers', return_value=providers), \
+                patch.object(lane, 'post_claim') as publish:
+            self.assertIsNone(lane.claim_red_pr(self.host, 'grok', receipt['prs']))
+        publish.assert_not_called()
+        self.assertEqual(json.loads((self.host.state/'fix-attempts.json').read_text()), attempts)
+
+        # Positive control: the exact same PR is eligible once the competing
+        # fixture lease is absent. Keep the actual target/claim/CAS functions.
+        (self.host.state/'fix-attempts.json').write_text('{}')
+        with patch.object(lane, 'load_providers', return_value=providers), \
+                patch.object(lane, 'claimed_elsewhere', return_value=False), \
+                patch.object(lane, 'reconcile_fix_target', return_value=copy.deepcopy(receipt['prs'][0])), \
+                patch.object(lane, 'post_claim') as publish:
+            selected = lane.claim_red_pr(self.host, 'grok', receipt['prs'])
+        self.assertEqual(selected['headRefOid'], competing['sha'])
+        publish.assert_called_once_with(int(number), competing['sha'], 'fix')
+        charged = json.loads((self.host.state/'fix-attempts.json').read_text())[number]
+        self.assertEqual((charged['count'], charged['lane']), (1, 'grok'))
+
+
 class ClaimScanCacheTest(unittest.TestCase):
     def test_repair_receipt_copies_same_call_rows_without_later_metadata_donation(self):
         now = self.clock['now']
@@ -2269,6 +2381,34 @@ class ClaimScanCacheTest(unittest.TestCase):
             rows[0]['headRefOid'] = 'changed'
             self.assertEqual(receipt['prs'][0]['headRefOid'], 'a'*40)
             self.assertEqual(receipt['prs'], receipt['summary']['prs'])
+
+    def test_newer_process_cache_cannot_conceal_expired_shared_source(self):
+        self.clock['now'] = 1000.0
+        _, rows = self._inventory_cache(at=941.0)
+        host = lane.Host(state=Path(self.tmp.name)/'host')
+        changed = {**rows[0], 'headRefOid': 'b' * 40}
+        def census(*args):
+            contender = lane.Locked(host.state/'claim.lock', blocking=False)
+            try: self.assertTrue(contender.held, 'refresh must run outside claim.lock')
+            finally: contender.release()
+            return [changed]
+        with patch.object(lane.time, 'time', side_effect=lambda: self.clock['now']), \
+                patch.object(lane.pr_events, 'open_prs_state', side_effect=census) as fetch:
+            original = lane.capture_repair_inventory('codex')
+            self.assertEqual(original['summary']['at'], 1000.0)
+            self.assertEqual(original['summary']['sourceAt'], 941.0)
+            fetch.assert_not_called()
+            self.clock['now'] = 1002.0
+            claim, refreshed = lane.lock_repair_inventory(host, 'codex', original)
+            try:
+                self.assertTrue(lane.repair_inventory_valid(refreshed, 'codex'))
+                self.assertEqual(refreshed['summary']['sourceAt'], 1002.0)
+                self.assertEqual(refreshed['prs'][0]['headRefOid'], 'b' * 40)
+                self.assertEqual(refreshed['prs'], refreshed['summary']['prs'])
+            finally: claim.release()
+        fetch.assert_called_once()
+        self.assertEqual(original['summary']['sourceAt'], 941.0)
+        self.assertEqual(original['prs'][0]['headRefOid'], 'a' * 40)
 
     def test_repair_receipt_qualifies_raw_cache_value_before_rollup_normalization(self):
         now = self.clock['now']
@@ -2469,6 +2609,8 @@ class ClaimScanCacheTest(unittest.TestCase):
                     self.assertEqual(row['attempts'], {})
                     self.assertEqual(row['claimPublications'], 0)
                     self.assertRegex(row['idle']['codex']['reason'], r'^repair-inventory-(?!unknown-or-stale)[a-z-]+$')
+                    if scenario == 'stale':
+                        self.assertEqual(row['idle']['codex']['reason'], 'repair-inventory-source-stale')
                     lock = lane.Locked(Path(tmp)/'claim.lock', blocking=False)
                     try: self.assertTrue(lock.held)
                     finally: lock.release()
@@ -3814,6 +3956,54 @@ class WorkerTest(unittest.TestCase):
             self.assertEqual(lane.worker(self.host, "devin"), 0)
         repair.assert_called_once(); new_work.assert_not_called()
 
+    def test_optional_preflight_age_refreshes_the_real_census_before_repair_selection(self):
+        # Optional file/provider reads can exceed the census TTL. A new same-call
+        # receipt must select the current head, never donate a timestamp to old rows.
+        for delay_in in ('scope', 'routing'):
+            with self.subTest(delay_in=delay_in):
+                clock = [1000.0]
+                old = repair_inventory_pr()
+                current = {**old, 'headRefOid': 'b' * 40}
+                reads = []
+                def census(*args):
+                    contender = lane.Locked(self.host.state/'claim.lock', blocking=False)
+                    try: self.assertTrue(contender.held, 'census I/O must stay outside claim.lock')
+                    finally: contender.release()
+                    reads.append(clock[0])
+                    return copy.deepcopy([old if len(reads) == 1 else current])
+                def delay(*args):
+                    clock[0] += 61
+                    return {}
+                with contextlib.ExitStack() as guards:
+                    guards.enter_context(patch.object(lane, '_SUMMARY', {'at': 0, 'prs': [], 'readable': False}))
+                    guards.enter_context(patch.object(lane.time, 'time', side_effect=lambda: clock[0]))
+                    guards.enter_context(patch.object(lane.pr_events, 'open_prs_state', side_effect=census))
+                    guards.enter_context(patch.object(lane.pr_events, 'capture_target_file_witnesses',
+                        side_effect=delay if delay_in == 'scope' else None, return_value={}))
+                    guards.enter_context(patch.object(lane, 'repair_routing_needed', return_value=delay_in == 'routing'))
+                    guards.enter_context(patch.object(lane, 'capture_repair_routing', side_effect=delay))
+                    guards.enter_context(patch.object(lane, 'requeue_verified'))
+                    guards.enter_context(patch.object(lane.bindings, 'work', return_value=None))
+                    candidates = guards.enter_context(patch.object(lane, 'fix_candidates',
+                        side_effect=lambda name, *, inventory: inventory))
+                    guards.enter_context(patch.object(lane, 'claim_red_pr', side_effect=lambda host, name, prs: prs[0]))
+                    repair = guards.enter_context(patch.object(lane, 'fix_red_pr'))
+                    new_work = guards.enter_context(patch.object(lane, 'run_issue'))
+                    guards.enter_context(patch.object(lane, 'revisit_terminal_prs'))
+                    guards.enter_context(patch.object(lane, 'yield_deferred_requeues'))
+                    slot = lane.Locked(self.host.state/'slots/devin.0.lock', blocking=False)
+                    try:
+                        self.assertEqual(lane.worker_with_slot(self.host, 'devin',
+                            lane.load_providers()['devin'], slot), 0)
+                    finally:
+                        if not slot.handle.closed: slot.release()
+                self.assertEqual(reads, [1000.0, 1061.0])
+                self.assertEqual([pr['headRefOid'] for pr in candidates.call_args.kwargs['inventory']],
+                                 [current['headRefOid']])
+                self.assertEqual(repair.call_args.args[3]['headRefOid'], current['headRefOid'])
+                self.assertEqual(old['headRefOid'], 'a' * 40)
+                new_work.assert_not_called()
+
     def test_oversize_inventory_idles_with_a_distinct_reason_and_stderr_line(self):
         good = lane.capture_repair_inventory('devin')
         bad = {**good, 'summary': {**good['summary'], 'sourceAt': None,
@@ -4109,10 +4299,10 @@ class WorkerTest(unittest.TestCase):
         real_summary = lane.open_prs_summary
         default_summary = lane._SUMMARY
         summary = copy.deepcopy(lane._SUMMARY)
-        def known_empty_summary(*, capture=None):
+        def known_empty_summary(*, capture=None, refresh=False):
             if lane._SUMMARY is default_summary:
                 lane._SUMMARY.update(at=time.time(), sourceAt=time.time(), prs=[], readable=True)
-            return real_summary(capture=capture)
+            return real_summary(capture=capture, refresh=refresh)
         summary_fixture = patch.object(lane, 'open_prs_summary', side_effect=known_empty_summary)
         summary_fixture.start()
         self.addCleanup(summary_fixture.stop)
@@ -8733,14 +8923,15 @@ class ReleaseImportClosureTest(unittest.TestCase):
     staged tree, which refuses the update as an opaque "release tests failed" and ejects every
     merge group behind it (2026-10-24: #22870 made source-admission-policy.mjs import
     scripts/pr-fleet-rules.mjs without adding it to RELEASE_EXTRAS). Static imports only: the
-    lazy `await import()` branches are guarded at their call sites."""
+    lazy `await import()` branches are guarded at their call sites. Shipped TypeScript
+    modules must close over their runtime imports and data contracts too."""
     STATIC_IMPORT = re.compile(r"""(?m)(?:\bfrom\s*|^\s*import\s+)['"](\.{1,2}/[^'"]+)['"]""")
 
     def missing_from_release(self, extras, lanes_sources, root=None):
         root = Path(root or ROOT)
         shipped = set(extras)
         missing = []
-        for rel in sorted({*(e for e in extras if e.endswith((".mjs", ".js"))), *lanes_sources}):
+        for rel in sorted({*(e for e in extras if e.endswith((".mjs", ".js", ".ts", ".mts", ".cts"))), *lanes_sources}):
             base = (root / rel).parent
             code = re.sub(r"/\*.*?\*/", "", (root / rel).read_text(), flags=re.DOTALL)
             code = re.sub(r"//.*$", "", code, flags=re.MULTILINE)
@@ -8802,6 +8993,44 @@ assert.match(result.blockers[0], /^red-before-green:/);
             (root / "scripts/b.mjs").write_text("export default 1;\n")
             found = self.missing_from_release(["scripts/a.mjs", "scripts/b.mjs"], [], root=root)
             self.assertEqual(found, ["scripts/a.mjs imports ../../outside.mjs, which resolves outside the repo root"])
+
+    def test_typescript_transitive_imports_include_the_provider_registry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "scripts").mkdir()
+            (root / "packages").mkdir()
+            (root / "scripts/a.mjs").write_text("import '../packages/client.ts';\n")
+            (root / "packages/client.ts").write_text("import './contract.ts';\n")
+            (root / "packages/contract.ts").write_text(
+                "import providers from './providers.json' with { type: 'json' };\n")
+            (root / "packages/providers.json").write_text("{}\n")
+            extras = ["scripts/a.mjs", "packages/client.ts", "packages/contract.ts"]
+            self.assertEqual(self.missing_from_release(extras, [], root=root),
+                             ["packages/contract.ts imports packages/providers.json"])
+            self.assertEqual(self.missing_from_release(
+                [*extras, "packages/providers.json"], [], root=root), [])
+            self.assertEqual(self.missing_from_release(extras[:-1], [], root=root),
+                             ["packages/client.ts imports packages/contract.ts"])
+
+    def test_staged_failure_hold_imports_its_client_and_requires_provider_registry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            staging = Path(tmp).resolve()
+            for relative in lane.RELEASE_EXTRAS:
+                target = staging / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, target)
+            module = (staging / "scripts/merge-group-failure-hold.mjs").as_uri()
+            command = ["node", "--input-type=module", "-e", f"await import({json.dumps(module)});"]
+            result = subprocess.run(command, cwd=staging, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            # A complete TS graph without its data contract is still an unusable release.
+            (staging / "packages/api-client/providers.json").unlink()
+            missing_registry = subprocess.run(
+                command, cwd=staging, capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(missing_registry.returncode, 0)
+            self.assertIn("ERR_MODULE_NOT_FOUND", missing_registry.stderr)
+            self.assertIn("providers.json", missing_registry.stderr)
 
     def test_the_closure_check_names_an_unshipped_import(self):
         extras = [e for e in lane.RELEASE_EXTRAS if e != "scripts/lib/merge-group-member-policy.mjs"]
@@ -11465,6 +11694,39 @@ class OnePrPerIssueTest(unittest.TestCase):
             self.assertIsNone(lane.in_flight_issues())
         finally:
             lane.sh = saved
+
+    def test_canonical_stacked_pr_references_retain_issue_ownership(self):
+        marker = ("<!-- linear-issue-id: 64abf97b-29a0-435e-9ea6-4c911fe32661 -->\n"
+                  "<!-- linear-issue-identifier: JOV-8672 -->")
+        cases = [
+            ("claim-state", "codex/jov-8672-claim-state-20261021", "Refs JOV-8672.\n" + marker, [], {"JOV-8672"}),
+            ("review-focus", "codex/jov-8672-review-focus-20261021", "Refs JOV-8672.\n" + marker, [], {"JOV-8672"}),
+            ("canonical-marker", "feat/anything", marker, [], {"JOV-8672"}),
+            ("explicit-refs", "feat/anything", "Refs JOV-8672.", [], {"JOV-8672"}),
+            ("uuid-only", "feat/anything", marker.splitlines()[0], [], set()),
+            ("parent-followup", "codex/jov-8051-20261020t192739",
+             "Refs JOV-8051.\n<!-- linear-issue-identifier:JOV-8051 -->\n"
+             "Remaining integration is tracked in [JOV-8672](https://linear.app/jovie/issue/JOV-8672).",
+             [], {"JOV-8051"}),
+            ("rebuild", "codex/jov-8672-claim-state-20261021", "Refs JOV-8672.\n" + marker,
+             [{"name": "lane-rebuild"}], set()),
+            ("exhausted-incumbent", "codex/jov-8672-review-focus-20261021", marker,
+             [{"name": "lane-fix-exhausted"}], {"JOV-8672"}),
+        ]
+        for name, branch, body, labels, expected in cases:
+            with self.subTest(name=name), patch.object(lane, "sh", return_value=SimpleNamespace(
+                    returncode=0, stderr="", stdout=json.dumps([
+                        {"headRefName": branch, "body": body, "labels": labels}]))):
+                in_flight = lane.in_flight_issues()
+                self.assertEqual(in_flight, frozenset(expected))
+                owner = lane.ownership.owner_of(
+                    {"id": "issue-id", "identifier": "JOV-8672", "state": "In Progress", "labels": []},
+                    {"status": "released"}, "ended", open_prs=in_flight, merged=set(), handoffs=set(),
+                    worktrees=set(), open_children=set(), now=self.NOW)
+                self.assertEqual(owner, "pr" if "JOV-8672" in expected else None)
+                candidate = issue("JOV-8672")
+                admitted = lane.pick_issue([candidate], {}, now=self.NOW, in_flight=in_flight)
+                self.assertIs(admitted, None if "JOV-8672" in expected else candidate)
 
     def test_sweep_supersedes_duplicates_and_closes_stale_red_drafts(self):
         day = lane.STALE_DRAFT_S
@@ -15665,8 +15927,14 @@ class RepairRoutingWorkerPathTest(unittest.TestCase):
             return original_lock(path, *args, **kwargs)
         self.host.linear_env = Path("unused")
         before = self.path.read_bytes()
+        def census(*args):
+            contender = original_lock(self.host.state/'claim.lock', blocking=False)
+            try: self.assertTrue(contender.held, 'inventory refresh must run outside claim.lock')
+            finally: contender.release()
+            return [{**copy.deepcopy(self.pr), 'rollup': 'FAILURE'}]
         with contextlib.ExitStack() as stack:
             self.idle_dependencies(stack)
+            refreshed = stack.enter_context(patch.object(lane.pr_events, "open_prs_state", side_effect=census))
             stack.enter_context(patch.object(lane, "Locked", side_effect=acquire))
             stack.enter_context(patch.object(lane.disk_guard, "check", return_value={"admitted": True}))
             stack.enter_context(patch.object(lane.bindings, "work", return_value=None))
@@ -15683,11 +15951,17 @@ class RepairRoutingWorkerPathTest(unittest.TestCase):
             client = stack.enter_context(patch.object(lane, "Linear"))
             new_work = stack.enter_context(patch.object(lane, "run_issue"))
             self.assertEqual(lane.worker_with_slot(self.host, "grok", self.providers["grok"], SimpleNamespace(release=Mock())), 0)
-            self.assertRegex(idle.call_args.args[-1], r"^repair-inventory-(?!unknown-or-stale)[a-z-]+$")
+            # Fresh inventory must not certify the expired provider-health context.
+            self.assertEqual(idle.call_args.args[-1], "routing-preflight-required:routing-context-expired")
+            refreshed.assert_called_once()
             self.assertEqual(self.path.read_bytes(), before)
             payload.assert_not_called(); self.posted.assert_not_called()
             self.assertFalse((self.host.state / "failures.json").exists())
             self.assertFalse((self.host.state / "handoff-cooldown.json").exists())
+            # A valid census preserves the baseline idle housekeeping path; it
+            # still dispatches no new issue while routing evidence is expired.
+            client.assert_called_once_with(self.host.linear_env); client.reset_mock()
+            new_work.assert_not_called()
             self.summary.update(sourceAt=self.now, at=self.now)
             self.assertEqual(lane.worker_with_slot(self.host, "grok", self.providers["grok"], SimpleNamespace(release=Mock())), 0)
             payload.assert_called_once(); self.posted.assert_called_once()

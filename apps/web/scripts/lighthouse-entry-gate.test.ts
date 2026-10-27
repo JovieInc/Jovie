@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  describeLcpElement,
   evaluateEntryRoute,
+  extractLcpDiagnostics,
   median,
   parseBudgets,
   resolveRoutePath,
@@ -73,4 +75,201 @@ describe('lighthouse entry gate', () => {
     );
     for (const b of budgets) expect(b.lcpMs).toBeLessThanOrEqual(4000);
   });
+
+  it('identifies the direct node in the Lighthouse 13 insight without exposing its content', () => {
+    // Shape produced by Lighthouse 13.4.1 LCPBreakdownInsight.makeSubpartsTable
+    // and Audit.makeListDetails / makeNodeItem; labels are not stable keys.
+    expect(
+      describeLcpElement({
+        details: {
+          type: 'list',
+          items: [
+            {
+              type: 'table',
+              items: [
+                { subpart: 'timeToFirstByte', duration: 120 },
+                { subpart: 'resourceLoadDelay', duration: 30 },
+                { subpart: 'resourceLoadDuration', duration: 200 },
+                { subpart: 'elementRenderDelay', duration: 50 },
+              ],
+            },
+            {
+              type: 'node',
+              snippet:
+                '<img src="https://example.test/cover?token=private-value">',
+              selector: '#private-user-id > img',
+              nodeLabel: 'private-profile-name',
+            },
+          ],
+        },
+      })
+    ).toBe('img');
+  });
+
+  it('keeps legacy attribution without logging page text or attributes', () => {
+    expect(
+      describeLcpElement({
+        details: {
+          items: [
+            {
+              items: [
+                {
+                  node: {
+                    snippet: '<p class="text-xs">',
+                    nodeLabel: 'Essential cookies keep Jovie working.',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      })
+    ).toBe('p');
+    expect(describeLcpElement(undefined)).toBe('unknown element');
+  });
+
+  it('reads observed subparts by stable ids regardless of translated labels or list order', () => {
+    const result = extractLcpDiagnostics({
+      lighthouseVersion: '13.4.1',
+      finalDisplayedUrl: 'https://jov.ie/tim?claim=1',
+      finalUrl: 'https://wrong.example.test/legacy',
+      audits: {
+        'lcp-breakdown-insight': {
+          details: {
+            type: 'list',
+            items: [
+              { type: 'node', snippet: '<P data-private="hidden">' },
+              {
+                type: 'table',
+                items: [
+                  {
+                    subpart: 'elementRenderDelay',
+                    label: 'translated',
+                    duration: 180,
+                  },
+                  { subpart: 'private-key', duration: 9999 },
+                  {
+                    subpart: 'timeToFirstByte',
+                    label: 'translated',
+                    duration: 0,
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(result).toEqual({
+      lighthouseVersion: '13.4.1',
+      finalOrigin: 'https://jov.ie',
+      finalPath: '/tim',
+      element: { tag: 'p' },
+      observedLcpBreakdownMs: { timeToFirstByte: 0, elementRenderDelay: 180 },
+      diagnosticSource: 'lcp-breakdown-insight',
+    });
+  });
+
+  it('omits invalid phase durations instead of fabricating zero measurements', () => {
+    const result = extractLcpDiagnostics({
+      audits: {
+        'lcp-breakdown-insight': {
+          details: {
+            items: [
+              {
+                type: 'table',
+                items: [
+                  { subpart: 'timeToFirstByte', duration: -1 },
+                  { subpart: 'resourceLoadDelay', duration: Number.NaN },
+                  {
+                    subpart: 'resourceLoadDuration',
+                    duration: Number.POSITIVE_INFINITY,
+                  },
+                  { subpart: 'elementRenderDelay', duration: '50' },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(result.observedLcpBreakdownMs).toEqual({});
+    expect(result.element).toEqual({ tag: 'unknown' });
+  });
+
+  it('supports legacy reports without exposing their text, attributes or URL credentials', () => {
+    const destination = new URL(
+      'http://localhost:3000/claim?token=secret#secret'
+    );
+    destination.username = 'user';
+    destination.password = 'password';
+    const result = extractLcpDiagnostics({
+      lighthouseVersion: '12.8.2',
+      finalUrl: destination.href,
+      audits: {
+        'largest-contentful-paint-element': {
+          details: {
+            items: [
+              {
+                items: [
+                  {
+                    node: {
+                      snippet: '<video poster="private">',
+                      nodeLabel: 'private',
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(result).toEqual({
+      lighthouseVersion: '12.8.2',
+      finalOrigin: 'http://localhost:3000',
+      finalPath: '/claim',
+      element: { tag: 'video' },
+      observedLcpBreakdownMs: {},
+      diagnosticSource: 'legacy',
+    });
+  });
+
+  it.each([
+    '<private-user-name>',
+    '<constructor>',
+    '<img-private>',
+    'private text',
+    null,
+  ])('never emits unknown element content: %s', snippet => {
+    expect(
+      describeLcpElement({
+        details: { items: [{ type: 'node', snippet }] },
+      })
+    ).toBe('unknown element');
+  });
+
+  it.each([
+    undefined,
+    null,
+    [],
+    {
+      lighthouseVersion: '13.4.1 private',
+      finalDisplayedUrl: 'data:text/html,private',
+      finalUrl: 'not a URL',
+      audits: { 'lcp-breakdown-insight': null },
+    },
+  ])(
+    'keeps unavailable diagnostics explicit for malformed optional data',
+    report => {
+      expect(extractLcpDiagnostics(report)).toEqual({
+        lighthouseVersion: null,
+        finalOrigin: null,
+        finalPath: null,
+        element: { tag: 'unknown' },
+        observedLcpBreakdownMs: {},
+        diagnosticSource: 'unavailable',
+      });
+    }
+  );
 });

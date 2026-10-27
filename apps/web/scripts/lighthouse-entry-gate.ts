@@ -115,11 +115,142 @@ function argValue(argv: readonly string[], name: string): string | undefined {
   return index >= 0 ? argv[index + 1] : undefined;
 }
 
+interface LighthouseAudit {
+  readonly numericValue?: number;
+}
+
+const LCP_ELEMENT_TAGS = new Set([
+  'img',
+  'image',
+  'p',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'div',
+  'span',
+  'a',
+  'button',
+  'li',
+  'label',
+  'blockquote',
+  'video',
+  'svg',
+  'canvas',
+]);
+const LCP_SUBPARTS = [
+  'timeToFirstByte',
+  'resourceLoadDelay',
+  'resourceLoadDuration',
+  'elementRenderDelay',
+] as const;
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function items(value: unknown): readonly unknown[] {
+  const result = record(value)?.items;
+  return Array.isArray(result) ? result : [];
+}
+
+function lcpElement(audit: unknown): { tag: string } {
+  const details = items(record(audit)?.details);
+  // LH13 lists the node directly beside the subparts table. Older reports
+  // nest it under a table row. Never emit selectors, labels or HTML attributes.
+  const node =
+    details.map(record).find(item => item?.type === 'node') ??
+    details
+      .flatMap(items)
+      .map(item => record(record(item)?.node))
+      .find(Boolean);
+  const snippet = node?.snippet;
+  const tag =
+    typeof snippet === 'string'
+      ? /^<([a-z][a-z0-9]*)[\s/>]/i.exec(snippet.trimStart())?.[1].toLowerCase()
+      : undefined;
+  return { tag: tag && LCP_ELEMENT_TAGS.has(tag) ? tag : 'unknown' };
+}
+
+/** DOM tag only: even a div can be an image LCP via a CSS background. */
+export function describeLcpElement(audit: unknown): string {
+  const element = lcpElement(audit);
+  return element.tag === 'unknown' ? 'unknown element' : element.tag;
+}
+
+function finalDestination(report: Record<string, unknown>) {
+  for (const candidate of [report.finalDisplayedUrl, report.finalUrl]) {
+    if (typeof candidate !== 'string') continue;
+    try {
+      const url = new URL(candidate);
+      if (url.protocol === 'https:' || url.protocol === 'http:') {
+        return { finalOrigin: url.origin, finalPath: url.pathname };
+      }
+    } catch {
+      // Optional diagnostics must not change the measured budget verdict.
+    }
+  }
+  return { finalOrigin: null, finalPath: null };
+}
+
+/**
+ * A small allowlist survives in native job logs after temporary reports are
+ * removed. Insight phases are observed trace milliseconds, NOT components of
+ * the simulated Lighthouse LCP used by the unchanged budget verdict.
+ */
+export function extractLcpDiagnostics(value: unknown) {
+  const report = record(value) ?? {};
+  const audits = record(report.audits);
+  const insight = record(audits?.['lcp-breakdown-insight']);
+  const legacy = record(audits?.['largest-contentful-paint-element']);
+  const rows = items(insight?.details)
+    .filter(item => record(item)?.type === 'table')
+    .flatMap(items);
+  const observedLcpBreakdownMs: Partial<
+    Record<(typeof LCP_SUBPARTS)[number], number>
+  > = {};
+  for (const subpart of LCP_SUBPARTS) {
+    const row = rows.map(record).find(item => item?.subpart === subpart);
+    const duration = row?.duration;
+    if (
+      typeof duration === 'number' &&
+      Number.isFinite(duration) &&
+      duration >= 0
+    ) {
+      observedLcpBreakdownMs[subpart] = duration;
+    }
+  }
+  return {
+    lighthouseVersion:
+      typeof report.lighthouseVersion === 'string' &&
+      /^\d{1,3}(?:\.\d{1,3}){1,3}$/.test(report.lighthouseVersion)
+        ? report.lighthouseVersion
+        : null,
+    ...finalDestination(report),
+    element: lcpElement(insight ?? legacy),
+    observedLcpBreakdownMs,
+    diagnosticSource: insight
+      ? 'lcp-breakdown-insight'
+      : legacy
+        ? 'legacy'
+        : 'unavailable',
+  };
+}
+
 function runLighthouse(
   url: string,
   headersFile: string | null,
   outFile: string
-): { lcp: number; cls: number } {
+): {
+  lcp: number;
+  cls: number;
+  element: string;
+  diagnostics: ReturnType<typeof extractLcpDiagnostics>;
+} {
   const require = createRequire(import.meta.url);
   const lhciDir = path.dirname(require.resolve('@lhci/cli/package.json'));
   const cli = require.resolve('lighthouse/cli/index.js', { paths: [lhciDir] });
@@ -140,14 +271,22 @@ function runLighthouse(
   });
   if (run.status !== 0) throw new Error(`lighthouse failed for ${url}`);
   const report = JSON.parse(readFileSync(outFile, 'utf8')) as {
-    audits: Record<string, { numericValue?: number }>;
+    audits: Record<string, LighthouseAudit>;
   };
   const lcp = report.audits['largest-contentful-paint']?.numericValue;
   const cls = report.audits['cumulative-layout-shift']?.numericValue;
   if (typeof lcp !== 'number' || typeof cls !== 'number') {
     throw new Error(`lighthouse produced no LCP/CLS for ${url}`);
   }
-  return { lcp, cls };
+  return {
+    lcp,
+    cls,
+    element: describeLcpElement(
+      report.audits['lcp-breakdown-insight'] ??
+        report.audits['largest-contentful-paint-element']
+    ),
+    diagnostics: extractLcpDiagnostics(report),
+  };
 }
 
 export async function main(argv: readonly string[]): Promise<number> {
@@ -200,7 +339,10 @@ export async function main(argv: readonly string[]): Promise<number> {
         lcpSamples.push(sample.lcp);
         clsSamples.push(sample.cls);
         console.log(
-          `  ${budget.id} sample ${run + 1}/${runs}: LCP ${Math.round(sample.lcp)}ms CLS ${sample.cls.toFixed(3)}`
+          `  ${budget.id} sample ${run + 1}/${runs}: LCP ${Math.round(sample.lcp)}ms CLS ${sample.cls.toFixed(3)} element ${sample.element}`
+        );
+        console.log(
+          `  ${budget.id} diagnostics ${JSON.stringify(sample.diagnostics)}`
         );
       }
       verdicts.push(
