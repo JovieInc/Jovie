@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ProfileUnifiedDrawer } from '@/features/profile/ProfileUnifiedDrawer';
 import type { PublicContact } from '@/types/contacts';
@@ -119,7 +119,10 @@ describe('ProfileUnifiedDrawer — contact person name', () => {
       />
     );
 
-    expect(await screen.findByText('Management')).toBeTruthy();
+    await act(async () => {
+      await vi.dynamicImportSettled();
+    });
+    expect(screen.getByText('Management')).toBeTruthy();
     expect(
       screen.getByTestId('profile-mode-drawer-contact-meta').textContent
     ).toBe('Kelly Strickland');

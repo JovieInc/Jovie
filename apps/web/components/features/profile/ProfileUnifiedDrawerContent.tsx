@@ -283,7 +283,7 @@ export function ProfileUnifiedDrawerContent({
               </div>
             ))}
 
-            <div className='mx-1 my-1 h-px bg-[color:var(--color-border-subtle)]' />
+            <div className='mx-1 my-1 h-px bg-subtle' />
 
             {/* A plain destructive button: this notifications list is not
                   an ARIA menu, so the unsubscription control must not claim
@@ -395,7 +395,7 @@ export function ProfileUnifiedDrawerContent({
                 />
               </>
             ) : (
-              <div className='rounded-(--profile-drawer-radius-mobile) border border-subtle bg-[color:var(--color-interactive-hover)] px-4 py-5 text-center'>
+              <div className='rounded-(--profile-drawer-radius-mobile) border border-subtle bg-interactive-hover px-4 py-5 text-center'>
                 <p className='text-sm font-semibold text-primary-token'>
                   Payments not available yet
                 </p>
