@@ -67,15 +67,15 @@ export interface AdminNavRegistryItem {
   readonly section: AdminNavigationSection;
 }
 
+/** Ovie is one Home (Tim 2026-10-21); everything else lives under Tools. */
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'overview',
-  'growth',
-  'product',
-  'operations',
-  'needs_you',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 export const ADMIN_SETTINGS_TOOL_IDS = [
+  'growth',
+  'product',
+  'operations',
   'ops',
   'certifications',
   'outbound',
@@ -105,28 +105,21 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     label: 'Growth',
     href: APP_ROUTES.ADMIN_GROWTH,
     description: 'Visited through expanded, with people behind every stage',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'product',
     label: 'Product',
     href: APP_ROUTES.ADMIN_PRODUCT,
     description: 'Certified, deployed, exposed, and observed customer reality',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'operations',
     label: 'Operations',
     href: APP_ROUTES.ADMIN_OPERATIONS,
     description: 'Autonomous execution outcomes, exceptions, costs, and queues',
-    section: 'workspaces',
-  },
-  {
-    id: 'needs_you',
-    label: 'Needs You',
-    href: APP_ROUTES.ADMIN_NEEDS_YOU,
-    description: 'Founder judgments that automation cannot safely make',
-    section: 'workspaces',
+    section: 'utilities',
   },
   {
     id: 'ops',
@@ -394,6 +387,11 @@ export const ADMIN_LEGACY_REDIRECT_MAP = {
   [APP_ROUTES.ADMIN_GROWTH_YC_METRICS]: {
     workspace: 'ops',
     href: APP_ROUTES.ADMIN_OPS,
+  },
+  // Needs You folded into Home's asks (Tim 2026-10-21: one Home).
+  [APP_ROUTES.ADMIN_NEEDS_YOU]: {
+    workspace: 'overview',
+    href: APP_ROUTES.OV,
   },
 } as const;
 

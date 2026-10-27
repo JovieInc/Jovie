@@ -7,6 +7,7 @@ import {
   requiresManualVerification,
 } from '@/lib/claim/artist-offer-claim';
 import {
+  applyPendingClaimCookie,
   clearPendingClaimContext,
   readPendingClaimContext,
   writePendingClaimContext,
@@ -140,7 +141,7 @@ export async function GET(
       const lead = await lookupLeadByClaimToken(token);
       await setLeadAttributionCookieFromToken(token);
       await markLeadClaimPageViewedFromToken(token);
-      await writePendingClaimContext({
+      const context = await writePendingClaimContext({
         mode: 'token_backed',
         creatorProfileId: profile.id,
         username: profile.usernameNormalized,
@@ -150,18 +151,24 @@ export async function GET(
       });
 
       if (searchParams.get('next') === 'auth') {
-        return redirectTo(
-          request,
-          buildAuthStartPath({
-            username: profile.usernameNormalized,
-            spotifyArtistName: profile.displayName ?? profile.username,
-            spotifyUrl: getCanonicalSpotifyUrl(profile),
-            isSignedIn: Boolean(userId),
-          })
+        return applyPendingClaimCookie(
+          redirectTo(
+            request,
+            buildAuthStartPath({
+              username: profile.usernameNormalized,
+              spotifyArtistName: profile.displayName ?? profile.username,
+              spotifyUrl: getCanonicalSpotifyUrl(profile),
+              isSignedIn: Boolean(userId),
+            })
+          ),
+          context
         );
       }
 
-      return redirectTo(request, claimPreviewUrl);
+      return applyPendingClaimCookie(
+        redirectTo(request, claimPreviewUrl),
+        context
+      );
     }
 
     await clearLeadAttributionCookie();
@@ -224,21 +231,24 @@ export async function GET(
       );
     }
 
-    await writePendingClaimContext({
+    const context = await writePendingClaimContext({
       mode: 'direct_profile',
       creatorProfileId: profile.id,
       username: profile.usernameNormalized,
       expectedSpotifyArtistId: profile.spotifyId,
     });
 
-    return redirectTo(
-      request,
-      buildAuthStartPath({
-        username: profile.usernameNormalized,
-        spotifyArtistName: profile.displayName ?? profile.username,
-        spotifyUrl: getCanonicalSpotifyUrl(profile),
-        isSignedIn: Boolean(userId),
-      })
+    return applyPendingClaimCookie(
+      redirectTo(
+        request,
+        buildAuthStartPath({
+          username: profile.usernameNormalized,
+          spotifyArtistName: profile.displayName ?? profile.username,
+          spotifyUrl: getCanonicalSpotifyUrl(profile),
+          isSignedIn: Boolean(userId),
+        })
+      ),
+      context
     );
   }
 

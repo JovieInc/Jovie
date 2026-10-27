@@ -47,6 +47,15 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/claim/context', () => ({
   writePendingClaimContext: mockWritePendingClaimContext,
+  applyPendingClaimCookie: (
+    response: {
+      cookies: { set: (name: string, value: string) => void };
+    },
+    _context: unknown
+  ) => {
+    response.cookies.set('jovie_pending_claim', 'attached');
+    return response;
+  },
 }));
 
 vi.mock('@/lib/leads/funnel-events', () => ({
@@ -139,6 +148,7 @@ describe('Claim token route', () => {
       leadId: 'lead_1',
       expectedSpotifyArtistId: 'spotify_123',
     });
+    expect(response.cookies.get('jovie_pending_claim')?.value).toBe('attached');
   });
 
   it('admits the dedicated fixture only after token verification', async () => {

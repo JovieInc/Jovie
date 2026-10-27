@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events';
+import { sql as drizzleSql } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DbType } from './types';
 
@@ -49,6 +50,10 @@ vi.mock('../schema', () => ({}));
 vi.mock('./logging', () => ({
   logDbError: mocks.logDbError,
   logDbInfo: vi.fn(),
+}));
+vi.mock('@/lib/db', async () => ({
+  db: (await import('./connection')).db,
+  applyRlsTransactionUser: vi.fn(),
 }));
 
 describe('checked-out database client failures (JOV-8523)', () => {
@@ -147,19 +152,195 @@ describe('checked-out database client failures (JOV-8523)', () => {
     expect(mocks.clients[0].release).toHaveBeenCalledExactlyOnceWith(error);
   });
 
-  it('discards the client when driver rollback fails', async () => {
-    const rollbackError = new Error('rollback transport failed');
+  it('preserves a mid-transaction connection failure when rollback also fails', async () => {
+    const connectionError = new Error('connection terminated unexpectedly');
+    const rollbackError = new Error('client is not queryable');
     mocks.query
       .mockResolvedValueOnce({ rows: [] })
-      .mockRejectedValueOnce(rollbackError);
-    const failure = await database
-      .transaction(async () => {
-        throw new Error('operation failed');
+      .mockImplementationOnce(async () => {
+        mocks.clients[0].emit('error', connectionError);
+        throw connectionError;
       })
+      .mockRejectedValueOnce(rollbackError);
+
+    const failure = await database
+      .transaction(tx => tx.execute(drizzleSql`select 1`))
       .catch(error => error);
-    expect(failure.cause).toBe(rollbackError);
+
+    expect(failure).toMatchObject({
+      query: 'select 1',
+      cause: connectionError,
+    });
+    expect(mocks.query.mock.calls.map(call => call[0].text)).toEqual([
+      'begin ',
+      'select 1',
+      'rollback',
+    ]);
+    expect(mocks.logDbError).toHaveBeenCalledWith(
+      'transaction_rollback_failed',
+      expect.objectContaining({ query: 'rollback', cause: rollbackError }),
+      expect.objectContaining({ operationErrorName: 'Error' }),
+      { asBreadcrumb: true }
+    );
+    expect(mocks.clients[0].release).toHaveBeenCalledExactlyOnceWith(failure);
+    expect(mocks.clients[0].listenerCount('error')).toBe(0);
+    await expect(database.transaction(async () => 'recovered')).resolves.toBe(
+      'recovered'
+    );
+    expect(mocks.clients).toHaveLength(2);
+  });
+
+  it('preserves an uncertain commit failure when rollback also fails', async () => {
+    const commitError = new Error('connection lost during COMMIT');
+    const rollbackError = new Error('client is not queryable');
+    const operation = vi.fn(async () => 'written');
+    mocks.query
+      .mockResolvedValueOnce({ rows: [] })
+      .mockRejectedValueOnce(commitError)
+      .mockRejectedValueOnce(rollbackError);
+
+    const failure = await database.transaction(operation).catch(error => error);
+
+    expect(failure).toMatchObject({ query: 'commit', cause: commitError });
+    expect(operation).toHaveBeenCalledTimes(1);
+    expect(mocks.query.mock.calls.map(call => call[0].text)).toEqual([
+      'begin ',
+      'commit',
+      'rollback',
+    ]);
+    expect(mocks.logDbError).toHaveBeenCalledWith(
+      'transaction_rollback_failed',
+      expect.objectContaining({ query: 'rollback', cause: rollbackError }),
+      expect.any(Object),
+      { asBreadcrumb: true }
+    );
     expect(mocks.clients[0].release).toHaveBeenCalledExactlyOnceWith(failure);
   });
+
+  it('preserves nested failures even if both savepoint and transaction rollback fail', async () => {
+    const operationError = new Error('connection died inside a savepoint');
+    mocks.query.mockImplementation(async query => {
+      if (query.text.startsWith('rollback')) {
+        throw new Error('client is not queryable');
+      }
+      return { rows: [] };
+    });
+
+    await expect(
+      database.transaction(tx =>
+        tx.transaction(async () => {
+          mocks.clients[0].emit('error', operationError);
+          throw operationError;
+        })
+      )
+    ).rejects.toBe(operationError);
+    expect(mocks.clients).toHaveLength(1);
+    expect(mocks.clients[0].release).toHaveBeenCalledExactlyOnceWith(
+      operationError
+    );
+    expect(
+      mocks.logDbError.mock.calls.filter(
+        call => call[0] === 'transaction_rollback_failed'
+      )
+    ).toHaveLength(2);
+  });
+
+  it.each(['legacy', 'atomic'] as const)(
+    'preserves commit errors through the %s wrapper without replay',
+    async wrapper => {
+      const { runAtomicDbOperation, runLegacyDbTransaction } = await import(
+        '../legacy-transaction'
+      );
+      const commitError = new Error('connection lost during COMMIT');
+      mocks.query.mockImplementation(async query => {
+        if (query.text === 'commit') throw commitError;
+        if (query.text === 'rollback')
+          throw new Error('client is not queryable');
+        return { rows: [] };
+      });
+      const operation = vi.fn(async () => 'written');
+
+      const result =
+        wrapper === 'legacy'
+          ? runLegacyDbTransaction(operation)
+          : runAtomicDbOperation(operation, {
+              actorId: 'trusted-user',
+              retry: 'serialization',
+            });
+      const failure = await result.catch(error => error);
+
+      expect(failure).toMatchObject({ query: 'commit', cause: commitError });
+      expect(operation).toHaveBeenCalledTimes(1);
+      expect(mocks.clients).toHaveLength(1);
+      expect(mocks.clients[0].release).toHaveBeenCalledExactlyOnceWith(failure);
+    }
+  );
+
+  it('aborts when the caller catches a failed savepoint rollback', async () => {
+    const operationError = new Error('connection lost inside a savepoint');
+    mocks.query.mockImplementation(async query => {
+      if (query.text.startsWith('rollback to')) {
+        throw new Error('savepoint rollback failed');
+      }
+      return { rows: [] };
+    });
+    await expect(
+      database.transaction(async tx => {
+        await tx
+          .transaction(async () => {
+            throw operationError;
+          })
+          .catch(() => undefined);
+        return 'must not commit';
+      })
+    ).rejects.toBe(operationError);
+    expect(mocks.query.mock.calls.map(call => call[0].text)).toEqual([
+      'begin ',
+      'savepoint sp1',
+      'rollback to savepoint sp1',
+      'rollback',
+    ]);
+    expect(mocks.clients[0].release).toHaveBeenCalledExactlyOnceWith(
+      operationError
+    );
+  });
+
+  it('commits after a recovered savepoint error when rollback succeeds', async () => {
+    await expect(
+      database.transaction(async tx => {
+        await tx
+          .transaction(async () => {
+            throw new Error('recoverable failure');
+          })
+          .catch(() => undefined);
+        return 'committed';
+      })
+    ).resolves.toBe('committed');
+    expect(mocks.query.mock.calls.map(call => call[0].text)).toEqual([
+      'begin ',
+      'savepoint sp1',
+      'rollback to savepoint sp1',
+      'commit',
+    ]);
+    expect(mocks.clients[0].release).toHaveBeenCalledExactlyOnceWith(undefined);
+  });
+
+  it.each([undefined, null, 'operation failed'])(
+    'preserves non-Error callback rejection %s when rollback fails',
+    async operationError => {
+      mocks.query
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(new Error('rollback failed'));
+      await expect(
+        database.transaction(async () => {
+          throw operationError;
+        })
+      ).rejects.toBe(operationError);
+      expect(mocks.clients[0].release).toHaveBeenCalledExactlyOnceWith(
+        expect.any(Error)
+      );
+    }
+  );
 
   it('keeps nested savepoints on the same checked-out client', async () => {
     await expect(

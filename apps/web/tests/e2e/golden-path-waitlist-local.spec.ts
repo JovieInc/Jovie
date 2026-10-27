@@ -260,7 +260,13 @@ test.describe('local seeded waitlist golden path', () => {
     await page.goto('/', { waitUntil: 'domcontentloaded' });
     await waitForHydration(page);
     await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('a[href="/signup"]').first()).toBeVisible();
+    // The homepage front door is the jov.ie/you claim (form GET /start) plus
+    // the "Find yourself" header CTA (#19151); it no longer links to /signup.
+    await expect(page.getByTestId('homepage-claim-form')).toHaveAttribute(
+      'action',
+      '/start'
+    );
+    await expect(page.getByTestId('homepage-primary-cta')).toBeVisible();
     await capture(page, testInfo, 'golden-path-01-homepage');
 
     const { email, clerkUserId } = await createFreshUser(page, seed);

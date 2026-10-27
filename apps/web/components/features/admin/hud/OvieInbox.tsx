@@ -104,8 +104,11 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
 
   return (
     <ContentSurfaceCard data-testid='ovie-inbox'>
-      <div className='min-h-64 p-4'>
-        <div className='flex items-center justify-between gap-3'>
+      <div
+        data-testid='ovie-inbox-scrollport'
+        className='flex h-64 flex-col overflow-hidden p-4'
+      >
+        <div className='flex shrink-0 items-center justify-between gap-3'>
           <h2 className='whitespace-nowrap text-sm font-semibold text-primary-token'>
             Inbox
           </h2>
@@ -118,155 +121,154 @@ export function OvieInbox({ caseId }: { readonly caseId?: string }) {
             Refresh
           </DrawerButton>
         </div>
-        <div
-          className='mt-3 space-y-3'
-          aria-busy={query.isPending || submitting}
-        >
-          {query.isPending ? (
-            <p role='status'>Loading decisions…</p>
-          ) : query.isError ? (
-            <div role='alert'>
-              <p>{query.error.message}</p>
-              <DrawerButton
-                type='button'
-                tone='secondary'
-                onClick={() => void query.refetch()}
-              >
-                Retry
-              </DrawerButton>
-            </div>
-          ) : item ? (
-            <article data-testid='ovie-inbox-decision' key={item.id}>
-              {item.certification ? (
-                <CertificationReviewCard {...item.certification} />
-              ) : (
-                <>
-                  <h3 className='text-balance text-app font-medium text-primary-token'>
-                    {item.title}
-                  </h3>
-                  <p className='mt-2 whitespace-pre-wrap text-app text-secondary-token'>
-                    {item.body}
-                  </p>
-                  <p className='mt-3 text-app text-secondary-token'>
-                    {item.recommendation}
-                  </p>
-                </>
-              )}
-              {item.certification ? null : (
-                <ul className='mt-3 space-y-1'>
-                  {item.evidence
-                    .filter(
-                      ref =>
-                        /^https?:\/\//u.test(ref) ||
-                        ref.startsWith('/api/admin/hud/visual-qa/')
-                    )
-                    .map(ref => (
-                      <li key={ref}>
-                        <a
-                          className='break-all text-xs underline'
-                          href={ref}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                        >
-                          View evidence: {ref}
-                        </a>
-                      </li>
-                    ))}
-                </ul>
-              )}
-              {item.decisionTarget ? (
-                <div className='mt-4 space-y-3'>
-                  <label
-                    hidden={item.decisionTarget.kind === 'linear'}
-                    className='block text-xs text-secondary-token'
-                  >
-                    Decision notes
-                    <textarea
-                      className='mt-1 block w-full rounded-lg border border-subtle bg-surface-0 p-2 text-app text-primary-token'
-                      value={notes}
-                      onChange={event => setNotes(event.target.value)}
-                      rows={3}
-                      maxLength={2000}
-                      disabled={submitting}
-                    />
-                  </label>
-                  <div className='flex flex-wrap gap-2'>
-                    <DrawerButton
-                      type='button'
-                      tone='primary'
-                      disabled={submitting || query.isFetching}
-                      onClick={() => void decide('approve')}
-                    >
-                      {item.decisionTarget.kind === 'linear'
-                        ? 'Mark done'
-                        : item.decisionTarget.kind === 'certification'
-                          ? 'Certify'
-                          : 'Approve'}
-                    </DrawerButton>
-                    <DrawerButton
-                      type='button'
-                      tone='secondary'
-                      disabled={submitting || query.isFetching}
-                      onClick={() => void decide('reject')}
+        <div className='mt-3 min-h-0 flex-1 overflow-y-auto'>
+          <div className='space-y-3' aria-busy={query.isPending || submitting}>
+            {query.isPending ? (
+              <p role='status'>Loading decisions…</p>
+            ) : query.isError ? (
+              <div role='alert'>
+                <p>{query.error.message}</p>
+                <DrawerButton
+                  type='button'
+                  tone='secondary'
+                  onClick={() => void query.refetch()}
+                >
+                  Retry
+                </DrawerButton>
+              </div>
+            ) : item ? (
+              <article data-testid='ovie-inbox-decision' key={item.id}>
+                {item.certification ? (
+                  <CertificationReviewCard {...item.certification} />
+                ) : (
+                  <>
+                    <h3 className='text-balance text-app font-medium text-primary-token'>
+                      {item.title}
+                    </h3>
+                    <p className='mt-2 whitespace-pre-wrap text-app text-secondary-token'>
+                      {item.body}
+                    </p>
+                    <p className='mt-3 text-app text-secondary-token'>
+                      {item.recommendation}
+                    </p>
+                  </>
+                )}
+                {item.certification ? null : (
+                  <ul className='mt-3 space-y-1'>
+                    {item.evidence
+                      .filter(
+                        ref =>
+                          /^https?:\/\//u.test(ref) ||
+                          ref.startsWith('/api/admin/hud/visual-qa/')
+                      )
+                      .map(ref => (
+                        <li key={ref}>
+                          <a
+                            className='break-all text-xs underline'
+                            href={ref}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                          >
+                            View evidence: {ref}
+                          </a>
+                        </li>
+                      ))}
+                  </ul>
+                )}
+                {item.decisionTarget ? (
+                  <div className='mt-4 space-y-3'>
+                    <label
                       hidden={item.decisionTarget.kind === 'linear'}
+                      className='block text-xs text-secondary-token'
                     >
-                      Reject
-                    </DrawerButton>
-                    {item.decisionTarget.kind === 'certification' ? (
+                      Decision notes
+                      <textarea
+                        className='mt-1 block w-full rounded-lg border border-subtle bg-surface-0 p-2 text-app text-primary-token'
+                        value={notes}
+                        onChange={event => setNotes(event.target.value)}
+                        rows={3}
+                        maxLength={2000}
+                        disabled={submitting}
+                      />
+                    </label>
+                    <div className='flex flex-wrap gap-2'>
+                      <DrawerButton
+                        type='button'
+                        tone='primary'
+                        disabled={submitting || query.isFetching}
+                        onClick={() => void decide('approve')}
+                      >
+                        {item.decisionTarget.kind === 'linear'
+                          ? 'Mark done'
+                          : item.decisionTarget.kind === 'certification'
+                            ? 'Certify'
+                            : 'Approve'}
+                      </DrawerButton>
                       <DrawerButton
                         type='button'
                         tone='secondary'
                         disabled={submitting || query.isFetching}
-                        onClick={() => void decide('modify')}
+                        onClick={() => void decide('reject')}
+                        hidden={item.decisionTarget.kind === 'linear'}
                       >
-                        Request changes
+                        Reject
                       </DrawerButton>
-                    ) : null}
+                      {item.decisionTarget.kind === 'certification' ? (
+                        <DrawerButton
+                          type='button'
+                          tone='secondary'
+                          disabled={submitting || query.isFetching}
+                          onClick={() => void decide('modify')}
+                        >
+                          Request changes
+                        </DrawerButton>
+                      ) : null}
+                    </div>
                   </div>
-                </div>
-              ) : (
-                <p className='mt-3 text-xs text-secondary-token'>
-                  More evidence is required before this decision can be
-                  recorded.
-                </p>
-              )}
-            </article>
-          ) : caseId !== undefined ? (
-            <p role='status'>
-              This decision is not in the current inbox. Refresh to check its
-              status.
-            </p>
-          ) : (
-            <p role='status'>
-              {query.data?.issues.length
-                ? 'No pending decisions in connected sources.'
-                : 'No pending founder decisions.'}
-            </p>
-          )}
-          {error ? (
-            <p role='alert' className='text-xs text-error'>
-              {error}
-            </p>
-          ) : null}
-          {query.data?.issues.length ? (
-            <p role='status' className='text-xs text-secondary-token'>
-              Some sources are unavailable. {query.data.issues.join(' ')}
-            </p>
-          ) : null}
-        </div>
-        <details
-          className='mt-4 border-t border-subtle pt-3'
-          onToggle={event => setCaptureOpen(event.currentTarget.open)}
-        >
-          <summary className='cursor-pointer text-xs text-secondary-token'>
-            Capture A Note
-          </summary>
-          <div className='mt-3'>
-            {captureOpen ? (
-              <FounderReviewRecorder target={FOUNDER_NOTE_TARGET} />
+                ) : (
+                  <p className='mt-3 text-xs text-secondary-token'>
+                    More evidence is required before this decision can be
+                    recorded.
+                  </p>
+                )}
+              </article>
+            ) : caseId !== undefined ? (
+              <p role='status'>
+                This decision is not in the current inbox. Refresh to check its
+                status.
+              </p>
+            ) : (
+              <p role='status'>
+                {query.data?.issues.length
+                  ? 'No pending decisions in connected sources.'
+                  : 'No pending founder decisions.'}
+              </p>
+            )}
+            {error ? (
+              <p role='alert' className='text-xs text-error'>
+                {error}
+              </p>
+            ) : null}
+            {query.data?.issues.length ? (
+              <p role='status' className='text-xs text-secondary-token'>
+                Some sources are unavailable. {query.data.issues.join(' ')}
+              </p>
             ) : null}
           </div>
-        </details>
+          <details
+            className='mt-4 border-t border-subtle pt-3'
+            onToggle={event => setCaptureOpen(event.currentTarget.open)}
+          >
+            <summary className='cursor-pointer text-xs text-secondary-token'>
+              Capture A Note
+            </summary>
+            <div className='mt-3'>
+              {captureOpen ? (
+                <FounderReviewRecorder target={FOUNDER_NOTE_TARGET} />
+              ) : null}
+            </div>
+          </details>
+        </div>
       </div>
     </ContentSurfaceCard>
   );

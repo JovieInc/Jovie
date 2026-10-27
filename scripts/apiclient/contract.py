@@ -25,6 +25,20 @@ def provider_spec(provider: str) -> dict:
     return spec
 
 
+class BlockedProviderError(ValueError):
+    def __init__(self, provider: str, reason: str):
+        super().__init__(f"{provider} is blocked: {reason}")
+        self.provider = provider
+
+
+def callable_spec(provider: str) -> dict:
+    """The spec of a provider the client may call; blocked providers raise (mirror of callableSpec)."""
+    spec = provider_spec(provider)
+    if spec.get("status") == "blocked":
+        raise BlockedProviderError(provider, spec.get("blockedReason") or "see packages/api-client/providers.json")
+    return spec
+
+
 def priority_policy(priority: str) -> dict:
     policy = CONTRACT["priorities"].get(priority)
     if policy is None:

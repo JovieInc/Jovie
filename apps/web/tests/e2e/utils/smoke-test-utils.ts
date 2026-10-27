@@ -284,10 +284,18 @@ export function setupPageMonitoring(page: Page): {
       ) {
         return;
       }
-      consoleErrors.push(text);
       if (text.includes('Failed to load resource')) {
-        consoleNetworkErrors.push(text);
+        // 401/403 is the designed fail-closed answer (signed-out or missing
+        // admin step-up), matching isCriticalNetworkFailure. Name the
+        // resource so a real 404/5xx is triageable from the log alone.
+        if (/status of 40[13]\b/.test(text)) return;
+        const resourceUrl = msg.location().url;
+        const described = resourceUrl ? `${text} [${resourceUrl}]` : text;
+        consoleErrors.push(described);
+        consoleNetworkErrors.push(described);
+        return;
       }
+      consoleErrors.push(text);
     }
   };
 
@@ -903,6 +911,17 @@ export async function smokeNavigateWithRetry(
  * Check if an error is a transient infrastructure issue (server crash,
  * network timeout, browser closed) rather than a real test failure.
  */
+/**
+ * Playwright throws this when `page.evaluate` races a navigation. It is not a
+ * product failure, and it is intentionally absent from
+ * `isTransientNavigationError` so page-health checks do not record it as a
+ * redirect.
+ */
+export function isDestroyedExecutionContext(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  return msg.includes('Execution context was destroyed');
+}
+
 export function isTransientNavigationError(error: unknown): boolean {
   const msg = error instanceof Error ? error.message : String(error);
   return (

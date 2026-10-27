@@ -223,7 +223,19 @@ describe('buildDoneToday', () => {
 describe('buildPulse', () => {
   it('shows Not measured, neutral tone, and no was for an empty summary', () => {
     const pulse = buildPulse(delivery());
-    expect(pulse).toHaveLength(7);
+    expect(pulse.map(tile => tile.key)).toEqual([
+      'prod',
+      'merges-hour',
+      'queue',
+      'red-prs',
+      'lanes',
+      'eligible',
+      'held',
+      'ownerless',
+      'merges-today',
+      'merges-7d',
+      'gem-disk',
+    ]);
     for (const tile of pulse) {
       expect(tile.value).toBe(OVIE_NOT_MEASURED);
       expect(tile.measured).toBe(false);
@@ -427,6 +439,29 @@ describe('buildOvieAsks', () => {
     };
   }
 
+  it('badges escalated no-default cases and ignores anything else', () => {
+    const cases: readonly OvieInboxCase[] = [
+      {
+        ...inboxCase('late', 'needs_you'),
+        escalation: { level: 2, waitingHours: 52.7 },
+      },
+      {
+        ...inboxCase('fresh', 'needs_you'),
+        escalation: { level: 0, waitingHours: 3 },
+      },
+      {
+        ...inboxCase('odd', 'needs_you'),
+        escalation: { level: 'high' },
+      } as unknown as OvieInboxCase,
+    ];
+    const asks = buildOvieAsks({ issues: [], cases });
+    expect(asks.map(ask => ask.escalation)).toEqual([
+      { level: 2, waitingHours: 52 },
+      null,
+      null,
+    ]);
+  });
+
   it('keeps only founder decisions, in inbox order', () => {
     const inbox: OvieInbox = {
       cases: [
@@ -452,6 +487,7 @@ describe('buildOvieAsks', () => {
         evidence: ['https://example.com/receipt'],
         decisionDefault: null,
         canFeedback: true,
+        escalation: null,
       },
       {
         id: 'c',
@@ -464,6 +500,7 @@ describe('buildOvieAsks', () => {
         evidence: ['https://example.com/receipt'],
         decisionDefault: null,
         canFeedback: false,
+        escalation: null,
       },
       {
         id: 'd',
@@ -472,10 +509,12 @@ describe('buildOvieAsks', () => {
         why: 'Why this matters',
         decidable: true,
         actionLabel: 'Mark done',
-        canReply: false,
+        // Linear replies are posted back to the issue as the answer.
+        canReply: true,
         evidence: ['https://example.com/receipt'],
         decisionDefault: null,
         canFeedback: false,
+        escalation: null,
       },
     ]);
   });

@@ -28,14 +28,31 @@ def _file_locked(path: Path, fn):
                 ledger.writelines(json.dumps(row, sort_keys=True) + "\n" for row in additions)
                 ledger.flush(); os.fsync(ledger.fileno())
         return result
+GET_TIMEOUT_S = 90
+
+
 def _gh(coordination: dict, method: str, endpoint: str, body=None):
     token = os.environ.get(coordination.get("tokenEnv", "GH_TOKEN")) or os.environ.get("GITHUB_TOKEN")
     # No token in the environment means `gh` authenticates itself (the lanes' Jovie Bot shim mints
     # one per call); requiring GH_TOKEN here crashed every fix run once the shim landed.
     args = ["gh", "api", "-X", method, endpoint]
     args += ["--paginate", "--slurp"] if method == "GET" else ["--input", "-"]
-    ran = lifecycle.run(args, input=None if body is None else json.dumps(body), capture_output=True, text=True,
-                         env={**os.environ, "GH_TOKEN": token} if token else None, timeout=30)
+    env = {**os.environ, "GH_TOKEN": token} if token else None
+    if method == "GET":
+        # Paginated status-history reads grow with the ledger: a flat 30 s timed out 14 claims
+        # in 24h (2026-10-21), each failing a run before any agent work. Reads are idempotent:
+        # 90 s, one retry. Writes keep 30 s and are never replayed.
+        for attempt in (1, 2):
+            try:
+                ran = lifecycle.run(args, input=None, capture_output=True, text=True, env=env,
+                                    timeout=GET_TIMEOUT_S)
+                break
+            except subprocess.TimeoutExpired:
+                if attempt == 2:
+                    raise
+    else:
+        ran = lifecycle.run(args, input=json.dumps(body) if body is not None else None, capture_output=True,
+                            text=True, env=env, timeout=30)
     if ran.returncode:
         if body and body.get("ref") and "422" in ran.stderr: return None
         raise RuntimeError(f"execution-coordinator-http-{ran.returncode}")

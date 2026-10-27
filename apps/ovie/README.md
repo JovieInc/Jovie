@@ -13,7 +13,7 @@ must exercise both apps when shared code changes.
 
 ## Local commands
 
-Use pinned Node 24.21.0 and pnpm 9.15.9. Build and typecheck sequentially;
+Use pinned Node 24.22.1 and pnpm 9.15.9. Build and typecheck sequentially;
 both generate route adapters.
 
 ```sh

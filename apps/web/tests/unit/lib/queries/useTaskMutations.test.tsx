@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { queryKeys } from '@/lib/queries';
 import {
+  resetQueuedTaskUpdatesForTests,
   useMoveTaskMutation,
   useUpdateTaskMutation,
 } from '@/lib/queries/useTaskMutations';
@@ -13,6 +14,7 @@ import type {
   TaskStats,
   TaskStatus,
   TaskView,
+  UpdateTaskInput,
 } from '@/lib/tasks/types';
 
 const mockUpdateTask = vi.hoisted(() => vi.fn());
@@ -111,6 +113,7 @@ describe('useTaskMutations', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetQueuedTaskUpdatesForTests();
     queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -122,6 +125,55 @@ describe('useTaskMutations', () => {
         },
       },
     });
+  });
+
+  it('commits overlapping edits with the version each write advances', async () => {
+    let version = 4;
+    const seen: Array<number | undefined> = [];
+    mockUpdateTask.mockImplementation(
+      async (_taskId: string, data: UpdateTaskInput) => {
+        seen.push(data.expectedMutationVersion);
+        if (data.expectedMutationVersion !== version) {
+          throw new Error('Task changed in another session');
+        }
+        version += 1;
+        return createTask({
+          mutationVersion: version,
+          ...(data.priority === undefined ? {} : { priority: data.priority }),
+          ...(data.status === undefined ? {} : { status: data.status }),
+          ...(data.assigneeKind === undefined
+            ? {}
+            : { assigneeKind: data.assigneeKind }),
+          ...(data.title === undefined ? {} : { title: data.title }),
+        });
+      }
+    );
+
+    const { result } = renderHook(() => useUpdateTaskMutation(), { wrapper });
+
+    await act(async () => {
+      await Promise.all([
+        result.current.mutateAsync({
+          taskId: 'task-1',
+          data: { priority: 'urgent', expectedMutationVersion: 4 },
+        }),
+        result.current.mutateAsync({
+          taskId: 'task-1',
+          data: { assigneeKind: 'jovie', expectedMutationVersion: 4 },
+        }),
+        result.current.mutateAsync({
+          taskId: 'task-1',
+          data: {
+            title: 'Layout QA task fixture 1',
+            status: 'in_progress',
+            expectedMutationVersion: 4,
+          },
+        }),
+      ]);
+    });
+
+    expect(seen).toEqual([4, 5, 6]);
+    expect(version).toBe(7);
   });
 
   it('reorders a cached list by board order when status changes', async () => {

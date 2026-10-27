@@ -519,19 +519,57 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it('fails closed when GitHub pagination exceeds the bounded page budget', async () => {
-    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
-    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
-    hoisted.env.HUD_GITHUB_REPO = 'jovie';
-    let page = 0;
-    const fetchMock = vi.fn(async () => {
-      page += 1;
-      return new Response(
-        JSON.stringify({
+  it.each([
+    ['7d', 30, false, 100],
+    ['7d', 30, true, 100],
+    ['30d', 75, false, 100],
+    ['1y', 180, false, 100],
+    ['7d', 1, false, 3001],
+  ] as const)(
+    'discards partial %s counts after %i requests (verified cache: %s; nodes per page: %i)',
+    async (range, expectedFetches, hasVerifiedCache, nodesPerPage) => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+      hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+      hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+      hoisted.env.HUD_GITHUB_REPO = 'jovie';
+      const cachedAt = '2026-08-30T11:55:00.000Z';
+      const verifiedData = [
+        {
+          date: '2026-08-30',
+          merged: 3,
+          opened: 1,
+          closed: 0,
+          mergeP50Hours: 2,
+        },
+      ];
+      const set = vi.fn();
+      hoisted.getRedis.mockReturnValue({
+        get: vi
+          .fn()
+          .mockResolvedValue(
+            hasVerifiedCache
+              ? { data: verifiedData, range, cachedAt, observation: 'fresh' }
+              : null
+          ),
+        set,
+      });
+      const nodes = Array.from({ length: nodesPerPage }, () => ({
+        state: 'MERGED',
+        merged: true,
+        createdAt: '2026-08-30T08:00:00.000Z',
+        updatedAt: '2026-08-30T10:00:00.000Z',
+        mergedAt: '2026-08-30T10:00:00.000Z',
+        closedAt: '2026-08-30T10:00:00.000Z',
+      }));
+      let page = 0;
+      const fetchMock = vi.fn(async () => {
+        page += 1;
+        return Response.json({
           data: {
             repository: {
               pullRequests: {
-                nodes: [],
+                nodes,
                 pageInfo: {
                   hasNextPage: true,
                   endCursor: `cursor-${page}`,
@@ -539,9 +577,72 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
               },
             },
           },
-        }),
-        { status: 200 }
+        });
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const { GET } = await import(
+        '@/app/api/admin/hud/shipping-velocity/route'
       );
+      const response = await GET(
+        new Request(
+          `http://localhost/api/admin/hud/shipping-velocity?range=${range}`
+        )
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      await expect(response.json()).resolves.toMatchObject({
+        data: hasVerifiedCache ? verifiedData : [],
+        range,
+        cachedAt: hasVerifiedCache ? cachedAt : '2026-08-30T12:00:00.000Z',
+        observation: hasVerifiedCache ? 'stale' : 'unavailable',
+        errorMessage: 'Shipping velocity scan limit reached for this range.',
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(expectedFetches);
+      expect(set).not.toHaveBeenCalled();
+      expect(hoisted.captureError).not.toHaveBeenCalled();
+      expect(hoisted.logger.error).not.toHaveBeenCalled();
+      expect(hoisted.logger.warn).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('publishes complete counts when pagination ends on the final allowed page', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-30T12:00:00.000Z'));
+    hoisted.env.HUD_GITHUB_TOKEN = 'test-token';
+    hoisted.env.HUD_GITHUB_OWNER = 'JovieInc';
+    hoisted.env.HUD_GITHUB_REPO = 'jovie';
+    const set = vi.fn();
+    hoisted.getRedis.mockReturnValue({
+      get: vi.fn().mockResolvedValue(null),
+      set,
+    });
+    let page = 0;
+    const fetchMock = vi.fn(async () => {
+      page += 1;
+      return Response.json({
+        data: {
+          repository: {
+            pullRequests: {
+              nodes: [
+                {
+                  state: 'MERGED',
+                  merged: true,
+                  createdAt: '2026-08-30T08:00:00.000Z',
+                  updatedAt: '2026-08-30T10:00:00.000Z',
+                  mergedAt: '2026-08-30T10:00:00.000Z',
+                  closedAt: '2026-08-30T10:00:00.000Z',
+                },
+              ],
+              pageInfo: {
+                hasNextPage: page < 30,
+                endCursor: page < 30 ? `cursor-${page}` : null,
+              },
+            },
+          },
+        },
+      });
     });
     vi.stubGlobal('fetch', fetchMock);
 
@@ -550,11 +651,19 @@ describe('GET /api/admin/hud/shipping-velocity', () => {
       new Request('http://localhost/api/admin/hud/shipping-velocity?range=7d')
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(30);
-    await expect(response.json()).resolves.toEqual({
-      error: 'Failed to fetch shipping velocity data',
+    const result = await response.json();
+    expect(result.observation).toBe('fresh');
+    expect(result.data).toContainEqual({
+      date: '2026-08-30',
+      merged: 30,
+      opened: 30,
+      closed: 0,
+      mergeP50Hours: 2,
     });
+    expect(set).toHaveBeenCalledWith(expect.any(String), result, { ex: 600 });
+    expect(hoisted.captureError).not.toHaveBeenCalled();
   });
 
   it('allows a one-year range to traverse more than 100 bounded pages', async () => {

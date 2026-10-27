@@ -50,10 +50,11 @@ Do not use this register as a new human merge gate; preserve JOV-INV-028.
 
 ## MKT-D02 — Broad visibility positioning (superseded for `/`)
 
-JOV-5885 under JOV-5881 supersedes this historical homepage direction with
-[the YouTube artist MVP](YOUTUBE_ARTIST_MVP.md): Find me on `/`, the four product
-surfaces, attributed founder proof, machine certification then Tim Taste. Atoms
-stay. No waitlist-first homepage or “Drop more music”. Historical record follows.
+EVENT 2026-10-20 (Tim) supersedes this historical homepage direction and the
+JOV-5885 [YouTube artist MVP](YOUTUBE_ARTIST_MVP.md) draft: `/` sells the artist
+profile and its offer through the [homepage recipe](RECIPE_CATALOG.md#recipe-homepage).
+Metadata and structured data stay general. Atoms stay. No waitlist-first
+homepage or “Drop more music”. Historical record follows.
 
 - **Scope:** homepage narrative and audience brief, not every product surface.
 - **Requirement:** primarily address founders/investors discovering Tim through

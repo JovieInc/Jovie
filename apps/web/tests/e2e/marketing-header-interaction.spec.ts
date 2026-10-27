@@ -124,7 +124,13 @@ test('marketing header targets activate their own action and feedback follows ra
     if (!box) throw new Error('Missing action bounds');
     await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2 - 21);
     await expect(action).toHaveAttribute('data-test-activations', '1');
+    // Arrive by keyboard. Firefox keeps a programmatic focus that follows a
+    // mouse click non-:focus-visible even after Enter; Tab focus is visible
+    // in every engine.
     await action.focus();
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Tab');
+    await expect(action).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(action).toHaveAttribute('data-test-activations', '2');
     expect(

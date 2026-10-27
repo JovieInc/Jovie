@@ -301,7 +301,9 @@ describe('DashboardAudienceTable', () => {
     expect(
       screen.getByTestId('dashboard-audience-empty-state')
     ).toBeInTheDocument();
+    expect(screen.getByTestId('unified-table')).toBeInTheDocument();
     expect(screen.getByText('Grow Your Audience')).toBeInTheDocument();
+    expect(capturedTableData).toEqual([]);
   });
 
   it('shows unified empty state with correct testId in subscribers mode', () => {

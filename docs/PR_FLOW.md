@@ -180,16 +180,19 @@ before you open the PR (source: `.github/ci-harness/manifest.json` `riskRules`):
 ### Native build capacity (JOV-6107)
 
 **Ship now:** immediate groups (`min_entries_to_merge=1`, wait zero) with up
-to five green entries per merge push (`max_entries_to_merge=5`). Each entry
+to ten green entries per merge push (`max_entries_to_merge=10`). Each entry
 still builds its own synthetic head on the entry ahead, and the changed-path
 classifier selects the Web, Mac, iOS, operations/tooling, and shared-contract
-lanes per member. The checked-in `max_entries_to_build=6` matches live (synced
-2026-10-13, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
+lanes per member. The checked-in `max_entries_to_build=10` matches live (synced
+2026-10-21, see the tuning log in `.github/MERGE_QUEUE.md`); any lower live
 count remains a supported runner-capacity brake.
 
 On 2026-09-23 the 20-minute response deadline proved shorter than required
 CI paths configured for 30 and 40 minutes. The source-first repair landed and
-live ruleset `10512119` was read back at 60 minutes on 2026-09-24. Re-read the
+live ruleset `10512119` was read back at 60 minutes on 2026-09-24. On
+2026-10-21 (Tim-approved) it went back to 20 minutes: merge-group runs now
+finish well inside it (3 of 287 exceeded 20 minutes in the first 12 hours, no
+timeout removals). Watch iOS and Mac selecting groups for timeouts. Re-read the
 live ruleset before changing capacity and retain exact queue attempts and
 removal reasons as outcome evidence. This changes waiting time, not required
 checks or ALLGREEN.
@@ -385,8 +388,8 @@ existed. Contract:
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on
    web-impacting source heads without repository secrets; the native queue
    repeats it on the synthetic combined head and must finish inside the
-   current merge-queue check budget (20 minutes until the 60-minute ruleset
-   cutover). Non-web heads emit an explicit
+   current merge-queue check budget (20 minutes since the 2026-10-21 tuning).
+   Non-web heads emit an explicit
    non-applicable receipt. Nightly retains the global risk-surface debt check,
    so stale unrelated debt cannot deadlock promotion.
    Regression receipt: source run 32547855063 spent 3180.55 seconds collecting

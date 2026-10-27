@@ -50,7 +50,7 @@ jobs:
             .github/scripts/controller-quota-replay.mjs
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
-        with: {node-version: 24.21.0}
+        with: {node-version: 24.22.1}
       - name: Decide and replay
         env:
           GH_TOKEN: ${{ github.token }}

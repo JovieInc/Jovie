@@ -1,3 +1,5 @@
+'use client';
+
 // @coverage-via apps/web/components/organisms/home-loop/HomeLoopParts.test.tsx
 
 import { AlertTriangle, CheckCircle2, CircleAlert } from 'lucide-react';
@@ -8,6 +10,7 @@ import type {
   HomeLoopTone,
 } from '@/lib/home-loop/contract';
 import { cn } from '@/lib/utils';
+import { useFitList } from './useFitList';
 
 const TONE_DOT: Record<HomeLoopTone, string> = {
   good: 'bg-success',
@@ -35,7 +38,7 @@ const PLACEHOLDER_SLOTS = [
 ] as const;
 
 const TILE_FRAME =
-  'flex h-24 min-w-0 flex-col justify-between gap-1 rounded-lg border border-subtle bg-surface-1 px-3 py-2';
+  'flex h-20 min-w-34 flex-1 basis-0 flex-col justify-between gap-0.5 rounded-lg bg-surface-1 px-3 py-2';
 
 /** The single highest-severity condition; a quiet line when there is none. */
 export function HomeLoopConstraintBanner({
@@ -56,7 +59,7 @@ export function HomeLoopConstraintBanner({
     <div
       role='status'
       aria-live='polite'
-      className='flex min-h-10 items-center gap-2 rounded-lg border border-subtle bg-surface-1 px-3 py-2 text-sm'
+      className='flex min-h-10 items-center gap-2 rounded-lg bg-surface-1 px-3 py-2 text-sm'
       data-testid='home-loop-constraint'
       data-tone={loading ? 'loading' : (constraint?.tone ?? 'clear')}
     >
@@ -95,6 +98,7 @@ export function HomeLoopTileCard({
   return (
     <div
       className={TILE_FRAME}
+      data-fit-item
       data-measured={tile.measured}
       data-testid={`home-loop-tile-${tile.key}`}
       data-tone={tile.tone}
@@ -126,7 +130,11 @@ export function HomeLoopTileCard({
   );
 }
 
-/** Metric tiles: current value with the previous one underneath. */
+/**
+ * Metric tiles in one row: current value with the previous one underneath.
+ * Tiles arrive in priority order; the row shows as many as fit the width
+ * and hides the rest rather than wrapping or scrolling.
+ */
 export function HomeLoopPulse({
   tiles,
   loading = false,
@@ -136,9 +144,15 @@ export function HomeLoopPulse({
   readonly loading?: boolean;
   readonly placeholderCount?: number;
 }>) {
+  const { ref } = useFitList<HTMLDivElement>(
+    loading
+      ? 'loading'
+      : tiles.map(tile => `${tile.key}:${tile.value}`).join('|')
+  );
   return (
     <div
-      className='grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7'
+      ref={ref}
+      className='relative flex h-20 shrink-0 flex-wrap gap-2 overflow-hidden'
       data-testid='home-loop-pulse'
       aria-busy={loading}
     >
@@ -148,6 +162,7 @@ export function HomeLoopPulse({
             <div
               key={slot}
               className={TILE_FRAME}
+              data-fit-item
               data-testid='home-loop-tile-placeholder'
             >
               {loading ? (

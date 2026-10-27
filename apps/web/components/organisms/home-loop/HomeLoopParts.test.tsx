@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { mockFitLayout } from './fit-layout.test-utils';
 import {
+  HOME_LOOP_FIXTURE_BUSY_DONE,
   HOME_LOOP_FIXTURE_DONE,
   HOME_LOOP_FIXTURE_PULSE,
   HOME_LOOP_FIXTURE_ROWS,
@@ -106,6 +108,33 @@ describe('HomeLoopStageRows', () => {
     const done = screen.getByTestId('home-loop-done');
     expect(done).toHaveTextContent('3 merges');
     expect(within(done).getAllByText('Verified in production')).toHaveLength(2);
+  });
+});
+
+describe('Home loop fit', () => {
+  it('hides pulse tiles that do not fit one row, keeping priority order', () => {
+    const restore = mockFitLayout('home-loop-pulse', 250);
+    try {
+      render(<HomeLoopPulse tiles={HOME_LOOP_FIXTURE_PULSE} />);
+      const tiles = screen.getAllByTestId(/^home-loop-tile-/);
+      expect(
+        tiles.filter(tile => tile.getAttribute('aria-hidden') !== 'true')
+      ).toEqual(tiles.slice(0, 2));
+    } finally {
+      restore();
+    }
+  });
+
+  it('collapses done chips that do not fit into +N more', () => {
+    const restore = mockFitLayout('home-loop-done', 250);
+    try {
+      render(<HomeLoopDoneChips items={HOME_LOOP_FIXTURE_BUSY_DONE} fit />);
+      expect(screen.getByTestId('home-loop-done-more')).toHaveTextContent(
+        `+${HOME_LOOP_FIXTURE_BUSY_DONE.length - 2} more`
+      );
+    } finally {
+      restore();
+    }
   });
 });
 

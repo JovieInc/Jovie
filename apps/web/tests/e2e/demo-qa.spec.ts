@@ -106,13 +106,18 @@ test.describe('Demo page — structural QA', () => {
       timeout: 60_000,
     });
 
-    const releasesNav = page.getByRole('button', { name: 'Releases' });
-    await expect(releasesNav).toBeVisible({ timeout: 30_000 });
-    await releasesNav.click();
-
-    const previewToggle = page.getByRole('button', {
-      name: 'Toggle release preview',
+    // /demo opens on the releases workspace. The "Releases" toolbar button
+    // is the Filter Releases menu trigger now; opening it would hide the
+    // toolbar behind a modal menu.
+    await expect(page.getByTestId('release-row').first()).toBeVisible({
+      timeout: 30_000,
     });
+
+    // The page toolbar and the compact header can both mount the toggle;
+    // drive the innermost one, as linear-shell-parity does.
+    const previewToggle = page
+      .getByRole('button', { name: 'Toggle release preview' })
+      .last();
     await expect(previewToggle).toBeVisible({ timeout: 15_000 });
     await previewToggle.click();
 

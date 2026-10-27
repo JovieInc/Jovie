@@ -18,6 +18,7 @@ import {
   buildCanvasTurns,
   partitionCanvasCards,
 } from '@/lib/ovie/home/canvas-turns';
+import { buildStageStrip } from '@/lib/ovie/home/flow-home';
 import {
   buildOvieAsks,
   buildOvieHomeShipping,
@@ -41,6 +42,8 @@ const OVIE_HOME_COPY: HomeLoopCopy = {
   inFlightError: 'Shipping data could not load.',
   doneTitle: 'Done Today',
   doneEmpty: 'Nothing has landed yet today.',
+  latencyTitle: 'Stage Time 7d (P50 / P95)',
+  latencyEmpty: 'Not measured',
 };
 
 const INBOX_QUERY_KEY = ['ovie', 'inbox'] as const;
@@ -100,6 +103,10 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
     useState<OviePulseMemory>(readPulseMemory);
 
   const snapshot = shipping.isPending ? null : shipping;
+  const strip = useMemo(
+    () => (snapshot ? buildStageStrip(snapshot.view.delivery) : null),
+    [snapshot]
+  );
   const home = useMemo(
     () =>
       snapshot
@@ -151,7 +158,9 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
         id: ask.id,
         label:
           decision === 'approve'
-            ? ovieAskAction(target?.kind).committedLabel
+            ? notes
+              ? `Answered: ${notes}`
+              : ovieAskAction(target?.kind).committedLabel
             : `Replied: ${notes}`,
         commit: async () => {
           if (!target) throw new Error('This decision is no longer open.');
@@ -296,12 +305,15 @@ export function OvieHomeCanvas({ chat }: Readonly<OvieHomeCanvasProps>) {
       asksStatus={asksStatus}
       asksNotice={asksNotice}
       answers={answers}
-      onApprove={ask => decide(ask, 'approve', '')}
+      onApprove={(ask, option) => decide(ask, 'approve', option ?? '')}
       onReply={(ask, text) => decide(ask, 'reject', text)}
       onFeedback={sendFeedback}
       onRetryLoop={() => void shipping.refetch()}
       onRetryAsks={() => void inbox.refetch()}
       asksMoreHref={APP_ROUTES.ADMIN_INBOX}
+      inFlightMoreHref={APP_ROUTES.ADMIN_SHIPPING}
+      strip={strip?.items ?? []}
+      stripCoverage={strip?.coverage ?? null}
     />
   );
 }

@@ -40,3 +40,26 @@ export const OverflowLinksToInbox: Story = {
     moreHref: '/app/ov/inbox',
   },
 };
+
+export const WithAskerOptions: Story = {
+  args: {
+    asks: HOME_LOOP_FIXTURE_ASKS.map((ask, index) =>
+      index === 0
+        ? { ...ask, options: ['Signed in', 'Restarted it myself'] }
+        : ask
+    ),
+  },
+};
+
+/** No-default decisions that waited past 24h and 48h rise to the top. */
+export const Escalated: Story = {
+  args: {
+    asks: HOME_LOOP_FIXTURE_ASKS.map((ask, index) => ({
+      ...ask,
+      escalation:
+        index === 0
+          ? { level: 2 as const, waitingHours: 52 }
+          : { level: 1 as const, waitingHours: 26 },
+    })),
+  },
+};

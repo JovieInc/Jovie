@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   ARTIST_OFFER_FUNNEL_STAGES,
   buildArtistOfferFunnelReport,
+  isOfferLanding,
   isRecordedArtistOfferStage,
+  landingPathname,
   percentile,
   stageForFunnelPath,
 } from './artist-offer-funnel';
@@ -169,5 +171,41 @@ describe('artist-offer funnel contract', () => {
       conversionFromParent: 0.5,
       fromParentSeconds: { samples: 1, p50: 3_600, p95: 3_600 },
     });
+  });
+
+  it('normalizes stored landings, including full pixel URLs', () => {
+    expect(landingPathname('https://jov.ie/pricing?utm=x')).toBe('/pricing');
+    expect(landingPathname('/claim/?plan=pro')).toBe('/claim');
+    expect(landingPathname('https://jov.ie')).toBe('/');
+    expect(landingPathname(null)).toBe('/');
+    expect(landingPathname('tim')).toBe('/tim');
+  });
+
+  it('counts only the offer front door and claim path as offer landings', () => {
+    expect(isOfferLanding('/pricing')).toBe(true);
+    expect(isOfferLanding('https://jov.ie/claim/start?spotify=x')).toBe(true);
+    expect(isOfferLanding('/')).toBe(true);
+    expect(isOfferLanding('https://jov.ie/some-artist')).toBe(false);
+    expect(isOfferLanding('/pricing-old')).toBe(false);
+  });
+
+  it('passes diagnostics through and defaults them to empty', () => {
+    const base = {
+      start: new Date('2026-10-01T00:00:00Z'),
+      end: new Date('2026-10-02T00:00:00Z'),
+      totalVisits: 10,
+      timelines: [],
+    };
+    expect(buildArtistOfferFunnelReport(base).diagnostics).toEqual({
+      visitsByLanding: { offer: 0, other: 0 },
+      stageEventsInWindow: {},
+    });
+    const diagnostics = {
+      visitsByLanding: { offer: 2, other: 8 },
+      stageEventsInWindow: { pricing: 3 },
+    };
+    expect(
+      buildArtistOfferFunnelReport({ ...base, diagnostics }).diagnostics
+    ).toEqual(diagnostics);
   });
 });

@@ -92,6 +92,10 @@ jobs:
               ./scripts/security/scan-secrets.sh ci-pr "${{ github.event.before }}"
             fi
           else
+            # Worktree-sweep snapshots live under refs/jovie-preserved/* in this
+            # public repo; checkout fetches only branches and tags, so map them
+            # into local heads for the full-history scan.
+            git fetch --no-tags origin '+refs/jovie-preserved/*:refs/heads/jovie-preserved/*'
             ./scripts/security/scan-secrets.sh full
           fi
 
@@ -222,6 +226,7 @@ jobs:
               ./scripts/security/scan-secrets.sh ci-pr-trufflehog "${{ github.event.before }}"
             fi
           else
+            git fetch --no-tags origin '+refs/jovie-preserved/*:refs/heads/jovie-preserved/*'
             ./scripts/security/scan-secrets.sh full-trufflehog
           fi
 
@@ -239,6 +244,7 @@ jobs:
             exit 1
           fi
           TRUFFLEHOG_BIN="$trufflehog_bin" ./scripts/security/scan-secrets.test.sh
+          node --test scripts/security/prepare-ci-secret-scan-range.test.mjs
 
   trivy:
     name: Trivy Vulnerability Scanning
@@ -277,6 +283,9 @@ jobs:
     # until x-ratelimit-reset, then retries the same request. That retry adds a
     # second Authorization header and GitHub answers 401 while the token is
     # still valid. The guard waits on the job token and stops that retry.
+    # A GitHub GraphQL "Something went wrong" or HTTP 5xx on that query is
+    # retried inside the guard (three attempts, short backoff, same token
+    # margin). Any other Scorecard error fails the job. The scan is not skipped.
     timeout-minutes: 50
     if: github.event_name != 'pull_request'
     permissions:

@@ -314,10 +314,45 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
   test('rejects a two-line heading whose cap crops descenders (/ hero)', async ({
     page,
   }) => {
+    const font = readFileSync('public/fonts/Satoshi-Latin.woff2').toString(
+      'base64'
+    );
+    await page.setContent(
+      `<style>@font-face{font-family:Fixture;src:url(data:font/woff2;base64,${font})}</style><main><section><h1 style="font-family:Fixture;width:640px;font-size:64px;line-height:1.06;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-block-size:calc(2 * 1lh);overflow:hidden">One profile.<br>For every fan.</h1></section></main>`
+    );
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    await expectDeliberateRed(page, 'marketing', 'clipped-heading');
+  });
+
+  test('rejects a spanned two-line heading whose cap crops descenders', async ({
+    page,
+  }) => {
     await page.setContent(
       '<main><section><h1 style="width:640px;font-family:serif;font-size:64px;line-height:0.9;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;max-block-size:calc(2 * 1lh);overflow:hidden">One profile.<br>For <span>every fan.</span></h1></section></main>'
     );
     await expectDeliberateRed(page, 'marketing', 'clipped-heading');
+  });
+
+  test('accepts font-box overflow when all heading ink fits', async ({
+    page,
+  }) => {
+    for (const [text, transform] of [
+      ['HIT', 'none'],
+      ['high', 'uppercase'],
+    ]) {
+      await page.setContent(
+        `<main><section><h1 style="font:64px/1 Arial;width:640px;text-transform:${transform};display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden">${text}<br>${text}</h1></section></main>`
+      );
+      expect(
+        await page
+          .locator('h1')
+          .evaluate(el => el.scrollHeight - el.clientHeight)
+      ).toBeGreaterThan(1);
+      const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
+      expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
+        'clipped-heading'
+      );
+    }
   });
 
   test('passes overflowing font boxes when the heading glyphs fit', async ({
@@ -342,16 +377,15 @@ test.describe('Route DOM detector deliberate-red fixtures', () => {
     );
   });
 
-  test('passes an intentionally clipped screen-reader heading', async ({
-    page,
-  }) => {
+  test('accepts visually hidden accessible headings', async ({ page }) => {
     await page.setContent(
-      '<main><section><h1>Merch options</h1><h2 style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Merch Concepts</h2></section></main>'
+      '<main><section><h1>Merch</h1><h2 style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0">Merch Concepts</h2></section></main>'
     );
     const snapshot = await inspectRouteDom(page, { surface: 'marketing' });
-    expect(snapshot.findings.filter(f => f.kind === 'clipped-heading')).toEqual(
-      []
+    expect(snapshot.findings.map(finding => finding.kind)).not.toContain(
+      'clipped-heading'
     );
+    expect(await page.locator('h2').ariaSnapshot()).toContain('Merch Concepts');
   });
 
   test('rejects an unstyled terminal CTA stack (/product footer CTA)', async ({

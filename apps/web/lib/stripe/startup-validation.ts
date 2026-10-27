@@ -1,8 +1,15 @@
 import 'server-only';
 
 import * as Sentry from '@sentry/nextjs';
+import { ARTIST_VISIBILITY_OFFER } from '@/lib/config/plan-prices';
 import { env } from '@/lib/env-server';
 import { getActivePriceIds, validateStripeConfig } from '@/lib/stripe/config';
+
+/** Startup copy for a missing Artist Visibility price. Amount comes from the offer. */
+function missingArtistVisibilityPriceIssue(): string {
+  const { displayName, monthlyUsd } = ARTIST_VISIBILITY_OFFER.pro;
+  return `No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the ${displayName} $${monthlyUsd}/month USD recurring price ID.`;
+}
 
 /**
  * Issue fingerprint of the last fatal startup alert emitted in this process.
@@ -45,9 +52,7 @@ export function validateStripeBillingConfig(): {
         ? [visibilityPriceId]
         : [];
   if (configuredPriceIds.length === 0) {
-    issues.push(
-      'No Stripe price IDs configured — checkout will reject all requests. Set STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY to the Artist Presence $199/month USD recurring price ID.'
-    );
+    issues.push(missingArtistVisibilityPriceIssue());
   }
 
   if (issues.length > 0) {

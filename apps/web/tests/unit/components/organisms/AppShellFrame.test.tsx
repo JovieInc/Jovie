@@ -68,6 +68,21 @@ describe('AppShellFrame', () => {
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
   });
 
+  it('drops the route inset when content is flush', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        main={<div>Main Content</div>}
+        flushContent
+      />
+    );
+
+    const mainContent = screen.getByRole('main');
+    expect(
+      mainContent.querySelector('[data-app-shell-content-inset]')
+    ).not.toHaveClass('p-(--app-shell-content-inset)');
+  });
+
   it('keeps the header and route on the same token-owned paint plane', () => {
     render(
       <AppShellFrame

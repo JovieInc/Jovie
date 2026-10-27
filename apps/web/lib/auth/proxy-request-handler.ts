@@ -17,6 +17,7 @@ import { isCentralAuthPassThroughRoute } from '@/lib/auth/central-auth-routing';
 import { buildFinalResponse } from '@/lib/auth/final-response';
 import { captureError } from '@/lib/error-tracking';
 import { resolveLegacyRootPathRedirect } from '@/lib/routing/legacy-root-path-redirects';
+import { resolveProfileModeAliasAtEdge } from '@/lib/routing/profile-alias-edge';
 import {
   analyzeHost,
   categorizePath,
@@ -278,6 +279,32 @@ export async function handleProxyRequest(
         if (isBlocked) {
           return NextResponse.redirect('https://jov.ie');
         }
+      }
+    }
+
+    // ========================================================================
+    // Fast legacy profile-mode alias redirect
+    //
+    // /<username>/<reserved-alias> historically 307s through the ISR'd
+    // catch-all resolver function, so every alias hop pays a serverless
+    // invocation that intermittently costs 500-700ms on cold instances and
+    // broke the staged canonical navigation alias budgets. The edge decision
+    // endpoint (CDN-cached) lets the middleware emit the byte-identical 307
+    // here instead. Anything uncertain falls through to the rewrite +
+    // resolver page below, which keeps owning content collisions, moved
+    // slugs, and missing creators exactly as before.
+    // ========================================================================
+    if (isNavigationMethod && hostInfo.isMainHost) {
+      const aliasSegments = pathname.split('/').filter(Boolean);
+      const aliasUsername = aliasSegments[0];
+      const aliasSlug = aliasSegments[1];
+      if (aliasUsername && aliasSlug && aliasSegments.length === 2) {
+        const aliasResponse = await resolveProfileModeAliasAtEdge(
+          req,
+          aliasUsername,
+          aliasSlug
+        );
+        if (aliasResponse) return aliasResponse;
       }
     }
 

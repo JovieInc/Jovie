@@ -100,6 +100,14 @@ class GitHubRateLimitError extends Error {
   }
 }
 
+/** A complete scan did not fit the request budget; partial counts are unusable. */
+class GitHubScanBudgetError extends Error {
+  constructor(resource: 'page' | 'node') {
+    super(`GitHub GraphQL ${resource} budget exceeded`);
+    this.name = 'GitHubScanBudgetError';
+  }
+}
+
 function rateLimitResetAtIso(response: Response): string | null {
   const resetHeader = response.headers.get('x-ratelimit-reset');
   if (!resetHeader) return null;
@@ -112,6 +120,15 @@ function rateLimitRetryMessage(error: GitHubRateLimitError): string {
   return error.resetAtIso
     ? `GitHub rate limit exceeded; shipping velocity refreshes after ${error.resetAtIso}.`
     : 'GitHub rate limit exceeded; try again shortly.';
+}
+
+function expectedRefreshErrorMessage(error: unknown): string | null {
+  if (error instanceof GitHubRateLimitError)
+    return rateLimitRetryMessage(error);
+  if (error instanceof GitHubScanBudgetError) {
+    return 'Shipping velocity scan limit reached for this range.';
+  }
+  return null;
 }
 
 const SHIPPING_VELOCITY_QUERY = `query ShippingVelocity($owner: String!, $name: String!, $cursor: String) {
@@ -248,7 +265,7 @@ async function fetchBucketsFromGitHub(
   for (;;) {
     pageCount += 1;
     if (pageCount > budget.maxPages) {
-      throw new Error('GitHub GraphQL page budget exceeded');
+      throw new GitHubScanBudgetError('page');
     }
     const payload = await fetchGraphQLPage(token, owner, repo, cursor, signal);
 
@@ -272,7 +289,7 @@ async function fetchBucketsFromGitHub(
       }
       nodeCount += 1;
       if (nodeCount > maxNodes) {
-        throw new Error('GitHub GraphQL node budget exceeded');
+        throw new GitHubScanBudgetError('node');
       }
       incrementBucket(buckets, toDateString(node.createdAt), 'opened');
       countMergedPr(node, buckets, mergeHoursByDate);
@@ -549,18 +566,18 @@ export async function GET(request: Request): Promise<Response> {
     try {
       result = await computation;
     } catch (error) {
-      const isRateLimited = error instanceof GitHubRateLimitError;
+      const expectedErrorMessage = expectedRefreshErrorMessage(error);
       if (cached?.response.observation !== undefined) {
         const stale = normalizeVelocityResponse({
           ...cached.response,
           observation: 'stale',
-          errorMessage: isRateLimited
-            ? rateLimitRetryMessage(error)
-            : 'Refresh unavailable; showing last verified shipping velocity.',
+          errorMessage:
+            expectedErrorMessage ??
+            'Refresh unavailable; showing last verified shipping velocity.',
         });
-        if (isRateLimited) {
+        if (expectedErrorMessage) {
           logger.warn(
-            '[hud/shipping-velocity] GitHub rate limit exceeded; serving stale cache',
+            `[hud/shipping-velocity] ${expectedErrorMessage} Serving stale cache`,
             error
           );
         } else {
@@ -579,9 +596,9 @@ export async function GET(request: Request): Promise<Response> {
           headers: NO_STORE_HEADERS,
         });
       }
-      if (isRateLimited) {
+      if (expectedErrorMessage) {
         logger.warn(
-          '[hud/shipping-velocity] GitHub rate limit exceeded; no cache available',
+          `[hud/shipping-velocity] ${expectedErrorMessage} No cache available`,
           error
         );
         const unavailable: ShippingVelocityResponse = {
@@ -589,7 +606,7 @@ export async function GET(request: Request): Promise<Response> {
           range,
           cachedAt: new Date().toISOString(),
           observation: 'unavailable',
-          errorMessage: rateLimitRetryMessage(error),
+          errorMessage: expectedErrorMessage,
         };
         return NextResponse.json(unavailable, {
           status: 200,

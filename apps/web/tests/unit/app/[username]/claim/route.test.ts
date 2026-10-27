@@ -33,6 +33,15 @@ vi.mock('@/lib/claim/context', () => ({
   clearPendingClaimContext: mockClearPendingClaimContext,
   readPendingClaimContext: mockReadPendingClaimContext,
   writePendingClaimContext: mockWritePendingClaimContext,
+  applyPendingClaimCookie: (
+    response: {
+      cookies: { set: (name: string, value: string) => void };
+    },
+    _context: unknown
+  ) => {
+    response.cookies.set('jovie_pending_claim', 'attached');
+    return response;
+  },
 }));
 
 vi.mock('@/lib/db', () => ({

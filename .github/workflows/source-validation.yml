@@ -214,6 +214,10 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git fetch --no-tags origin "${{ github.base_ref }}"
           node scripts/verify-workflow-references.mjs
+          # A workflow GitHub cannot load runs zero jobs and stalls every queue
+          # group in AWAITING_CHECKS (2026-10-20). Check the head and the tree the
+          # queue builds by merging it into the current base.
+          node scripts/workflow-expression-budget.mjs --ref HEAD --merge-with "origin/${{ github.base_ref }}"
           node scripts/workflow-token-scope.mjs
           node --test scripts/workflow-token-scope.test.mjs
           node scripts/lockfile-specifier-preflight.mjs

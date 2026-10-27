@@ -5,8 +5,9 @@
  * and specialist artist APIs may keep music-domain language. Do not treat this
  * as a nav/taxonomy registry (JOV-4491) or a homepage taste rewrite (JOV-5861).
  *
- * seoTitle / seoDescription / homepageHeadline must stay identical to the
- * approved homepage copy in `homepageIdentityCopy.ts`.
+ * The homepage page body sells the artist profile (EVENT 2026-10-20) from
+ * `homepageCopy.ts`; its metadata description and structured data still read
+ * this general identity. `homepageHeadline` is the auth brand-panel line.
  */
 export const COMPANY_IDENTITY = {
   productName: 'Jovie',

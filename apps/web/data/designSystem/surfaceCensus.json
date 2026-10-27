@@ -52,7 +52,6 @@
         "apps/web/app/app/(shell)/admin/lists/[id]/page.tsx",
         "apps/web/app/app/(shell)/admin/lists/page.tsx",
         "apps/web/app/app/(shell)/admin/lists/views/[viewId]/page.tsx",
-        "apps/web/app/app/(shell)/admin/needs-you/page.tsx",
         "apps/web/app/app/(shell)/admin/operations/page.tsx",
         "apps/web/app/app/(shell)/admin/ops/page.tsx",
         "apps/web/app/app/(shell)/admin/outbound/page.tsx",
@@ -382,9 +381,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-21T05:44:03.216Z",
+        "at": "2026-10-21T09:34:45Z",
         "ref": "docs/screenshots/jov-8097/README.md",
-        "sourceDigest": "2757fea8de89291f29de54ed1439db8db1529c9d0ff511222f81d0d13da8a8ec"
+        "sourceDigest": "3b81badb69eb5c619810a2762a09e4c69ac2145ad87457064631da0f798d56b4"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },

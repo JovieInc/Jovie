@@ -72,19 +72,21 @@ describe('exclusive customer vs OV navigation', () => {
     ).toEqual([]);
   });
 
-  it('organizes the founder cockpit around the five company decisions', () => {
-    expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual([
-      'overview',
-      'growth',
-      'product',
-      'operations',
-      'needs_you',
-    ]);
+  it('organizes Ovie as one Home with everything else under Tools (Tim 2026-10-21)', () => {
+    expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual(['overview']);
     expect(
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
         item => item.label
       )
-    ).toEqual(['Home', 'Growth', 'Product', 'Operations', 'Needs You']);
+    ).toEqual(['Home']);
+    expect(ADMIN_NAV_REGISTRY.some(item => item.id === 'needs_you')).toBe(
+      false
+    );
+    expect(ADMIN_SETTINGS_TOOL_IDS.slice(0, 3)).toEqual([
+      'growth',
+      'product',
+      'operations',
+    ]);
     expect(
       ADMIN_NAV_REGISTRY.find(item => item.id === 'activity')
     ).toMatchObject({ label: 'Timeline', section: 'utilities' });

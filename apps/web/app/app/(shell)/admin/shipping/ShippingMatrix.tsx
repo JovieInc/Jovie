@@ -388,6 +388,24 @@ function matrixSummary(
 }
 
 /**
+ * An empty matrix means "no open lane PRs" only on a fresh observation.
+ * Failed, stale, or syncing caches leave in-flight work unknown, never zero.
+ */
+export function emptyMatrixMessage(
+  isError: boolean,
+  feed: Pick<TaskFeed, 'syncState' | 'lastSyncedAt'> | undefined
+): string {
+  if (isError || !feed || feed.syncState === 'failed') {
+    return 'Work matrix unavailable. In-flight work is unknown.';
+  }
+  if (feed.syncState === 'stale') {
+    return `Shipping cache is stale (${feed.lastSyncedAt ? `last synced ${formatTimeAgo(feed.lastSyncedAt)}` : 'never synced'}). In-flight work is unknown until the next sync.`;
+  }
+  if (feed.syncState === 'syncing') return 'Syncing in-flight work…';
+  return 'No open lane pull requests.';
+}
+
+/**
  * Live PR / merge-queue status matrix: one row per Linear-owned work item in
  * flight, with checks, queue state, owner, age, and last transition. Rows open
  * the right rail for GitHub/Linear drill-in (JOV-6893).
@@ -498,9 +516,7 @@ export function ShippingMatrix() {
                     colSpan={7}
                     className='p-6 text-center text-secondary-token'
                   >
-                    {query.isError
-                      ? 'Work matrix unavailable.'
-                      : 'No open lane pull requests.'}
+                    {emptyMatrixMessage(query.isError, feed)}
                   </td>
                 </tr>
               ) : (

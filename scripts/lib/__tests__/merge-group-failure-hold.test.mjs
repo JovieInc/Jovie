@@ -30,7 +30,9 @@ import {
   failureReceiptStatus,
   humanFailureReleaseIntent,
   humanReleaseDisposition,
+  isHeldWorkflowFailure,
   ownerHoldReleaseIntent,
+  PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
   REVISION_FAILED_AT_HEAD,
   reenrollmentDisposition,
@@ -39,6 +41,7 @@ import {
   revisionFailureDisposition,
   sourceHeadForRun,
   supersededByLiveEntry,
+  WORKFLOW_LOAD_STEP,
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
@@ -2011,5 +2014,139 @@ describe('poison re-enqueue loop (JOV-7708, #20354)', () => {
       )
     ).toBe(true);
     expect(autoMergeWasNotArmed(new Error('Bad credentials'))).toBe(false);
+  });
+});
+
+// 2026-10-20 21:13–21:52Z: #21826 grew ci.yml's path-detect run script past
+// GitHub's 21,000-character expression limit. Every group containing it got a
+// zero-job CI run attributed to push, no merge_group check ever reported, and
+// ten entries sat in AWAITING_CHECKS. PR Size Guard's load step now fails the
+// group that introduced it; the hold must keep that exact head out.
+describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => {
+  const sizeGuardRun = {
+    ...run,
+    workflow_id: PR_SIZE_GUARD_WORKFLOW_ID,
+    path: '.github/workflows/pr-size-guard.yml',
+  };
+  const queuedPr = () => ({
+    id: 'PR_42',
+    state: 'OPEN',
+    headRefOid: SOURCE,
+    isInMergeQueue: true,
+    mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+    autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+  });
+
+  it('classifies the load step as a source failure', () => {
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [WORKFLOW_LOAD_STEP],
+      })
+    ).toBe('deterministic-source');
+  });
+
+  it('holds only the PR Size Guard load step, never other size failures', () => {
+    expect(isHeldWorkflowFailure(run, [])).toBe(true);
+    expect(isHeldWorkflowFailure(sizeGuardRun, [WORKFLOW_LOAD_STEP])).toBe(
+      true
+    );
+    expect(
+      isHeldWorkflowFailure(sizeGuardRun, [
+        'Enforce combined-tree payload and member size policy',
+      ])
+    ).toBe(false);
+    expect(
+      isHeldWorkflowFailure({ ...sizeGuardRun, workflow_id: 1 }, [
+        WORKFLOW_LOAD_STEP,
+      ])
+    ).toBe(false);
+  });
+
+  it('holds the exact head even while the group ahead is unproven', async () => {
+    // The guard fails only when the group's base loads, so the failure is
+    // this group's own diff whatever the group ahead is doing.
+    let state = queuedPr();
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        run: sizeGuardRun,
+        failedSteps: [WORKFLOW_LOAD_STEP],
+        aheadGroup: { baseOnMain: false, aheadConclusion: null },
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => structuredClone(state)),
+        dequeuePullRequest: vi.fn(async () => {
+          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+        }),
+        disableAutoMerge: vi.fn(async () => {
+          state = { ...state, autoMergeRequest: null };
+        }),
+      }
+    );
+    // First the exact-head hold receipt, then the required context failed on
+    // the synthetic group head so the queue ejects it now.
+    expect(writeStatus.mock.calls.map(([receipt]) => receipt)).toEqual([
+      expect.objectContaining({
+        sha: SOURCE,
+        context: FAILURE_HOLD_CONTEXT,
+        state: 'success',
+        description: expect.stringContaining('class=deterministic-source'),
+      }),
+      expect.objectContaining({
+        sha: GROUP,
+        context: 'PR Ready',
+        state: 'failure',
+      }),
+    ]);
+    expect(result).toMatchObject({
+      prNumber: 42,
+      classification: 'deterministic-source',
+      retryDisposition: 'blocked-until-new-source-head',
+      autoMergeDisabled: true,
+      groupEjected: true,
+    });
+    expect(result.skipped).toBeUndefined();
+  });
+
+  it('never reports PR Ready failed for an ordinary CI failure', async () => {
+    let state = queuedPr();
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus,
+      readPullRequest: vi.fn(async () => structuredClone(state)),
+      dequeuePullRequest: vi.fn(async () => {
+        state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+      }),
+      disableAutoMerge: vi.fn(async () => {
+        state = { ...state, autoMergeRequest: null };
+      }),
+    });
+    expect(
+      writeStatus.mock.calls.some(
+        ([receipt]) => receipt?.context === 'PR Ready'
+      )
+    ).toBe(false);
+    expect(result).not.toHaveProperty('groupEjected');
+  });
+
+  it('rejects a PR Size Guard run from any other workflow path', async () => {
+    await expect(
+      applyMergeGroupFailure(
+        {
+          ...failureInput,
+          run: { ...sizeGuardRun, path: '.github/workflows/ci.yml' },
+          failedSteps: [WORKFLOW_LOAD_STEP],
+        },
+        {
+          writeStatus: vi.fn(),
+          readPullRequest: vi.fn(),
+          dequeuePullRequest: vi.fn(),
+          disableAutoMerge: vi.fn(),
+        }
+      )
+    ).rejects.toThrow(/terminal merge-group CI failure/);
   });
 });

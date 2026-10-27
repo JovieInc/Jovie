@@ -1022,7 +1022,7 @@ jobs:
             --volume "$RUNNER_TEMP/trusted-run-affected-tests.mjs:/workspace/scripts/run-affected-tests.mjs:ro" \
             --volume "$RUNNER_TEMP/trusted-blog-content-ci.mjs:/workspace/scripts/lib/blog-content-ci.mjs:ro" \
             --workdir /workspace \
-            'node:24.21.0-bookworm@sha256:6dac556d980b7f0e5498d08f08cee0ca67798b4ad6c23964a9214920e67758d0' \
+            'node:24.22.1-bookworm@sha256:6449e19d8184d84062525b6a7524def03146c2cb04a7f08b076680d0e8e4240a' \
             bash -lc 'corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile && node scripts/run-affected-tests.mjs --base "$SOURCE_HEAD" --max-workers 2'
           verify_rc=$?
           set -e

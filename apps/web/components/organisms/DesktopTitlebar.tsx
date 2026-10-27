@@ -160,17 +160,21 @@ export function DesktopTitlebar() {
         !sidebarOpen && !isMobile ? 'icon' : undefined
       }
       data-testid='electron-titlebar-row'
-      data-electron-drag-region='true'
-      style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+      data-electron-no-drag='true'
+      style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
     >
       {isDesktop ? (
         <div
           data-testid='electron-titlebar-sidebar-cell'
+          data-electron-no-drag='true'
           className='flex w-full min-w-0 items-center gap-1.5 px-2.5'
+          style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
         >
           <div
             data-testid='electron-traffic-light-safe-area'
-            className='w-(--electron-traffic-light-safe-width) shrink-0'
+            data-electron-drag-region='true'
+            className='w-(--electron-traffic-light-safe-width) shrink-0 self-stretch'
+            style={{ WebkitAppRegion: 'drag' } as CSSProperties}
             aria-hidden='true'
           />
           {/* Single canonical sidebar toggle for Electron: the same rail
@@ -229,6 +233,13 @@ export function DesktopTitlebar() {
               <ChevronRight className='h-3.5 w-3.5' strokeWidth={2} />
             </button>
           </div>
+          <div
+            data-testid='electron-titlebar-drag-strip'
+            data-electron-drag-region='true'
+            className='h-full min-w-0 flex-1 self-stretch'
+            style={{ WebkitAppRegion: 'drag' } as CSSProperties}
+            aria-hidden='true'
+          />
         </div>
       ) : null}
     </div>

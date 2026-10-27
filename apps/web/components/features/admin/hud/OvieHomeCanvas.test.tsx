@@ -2,20 +2,23 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HomeCanvasState } from '@/components/jovie/types';
+import { mockFitLayout } from '@/components/organisms/home-loop/fit-layout.test-utils';
 import { HOME_LOOP_UNDO_WINDOW_MS } from '@/components/organisms/home-loop/useUndoableAnswers';
+import { APP_ROUTES } from '@/constants/routes';
 import type { OvieInbox } from '@/lib/ovie/inbox';
 import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { SUMMER_OPS_CARD_SCHEMA } from '@/lib/ovie/ops-card';
 import { emptyDeliverySummary } from '@/lib/ovie/shipping-state/contract';
 import { OvieHomeCanvas } from './OvieHomeCanvas';
 
-vi.mock('@/components/feedback', () => ({
-  toast: Object.assign(vi.fn(), {
+const toastMock = vi.hoisted(() =>
+  Object.assign(vi.fn(), {
     dismiss: vi.fn(),
     error: vi.fn(),
     success: vi.fn(),
-  }),
-}));
+  })
+);
+vi.mock('@/components/feedback', () => ({ toast: toastMock }));
 
 const shipping = vi.hoisted(() => ({
   data: undefined as unknown,
@@ -165,13 +168,16 @@ function chatState(overrides: Partial<HomeCanvasState> = {}): HomeCanvasState {
 
 describe('OvieHomeCanvas', () => {
   const fetchMock = vi.fn();
+  let inbox: OvieInbox;
 
   beforeEach(() => {
     shipping.data = snapshot();
+    inbox = INBOX;
+    toastMock.mockClear();
     fetchMock.mockReset();
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
       if (url === '/api/ovie/inbox')
-        return new Response(JSON.stringify(INBOX), { status: 200 });
+        return new Response(JSON.stringify(inbox), { status: 200 });
       if (init?.method === 'POST')
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       return new Response('not found', { status: 404 });
@@ -192,10 +198,76 @@ describe('OvieHomeCanvas', () => {
       '1 item is blocked'
     );
     expect(screen.getByTestId('home-loop-done')).toHaveTextContent('3 merges');
-    expect(screen.getByTestId('home-loop-stage-row')).toHaveAttribute(
+    const strip = screen.getByTestId('home-loop-stage-strip');
+    expect(strip).toHaveTextContent('Not measured');
+    expect(strip).toHaveTextContent('Stage events not published yet');
+    expect(within(strip).queryByTestId('home-loop-strip-item')).toBeNull();
+    expect(screen.getByTestId('home-loop-kanban-card')).toHaveAttribute(
       'data-attention',
       'blocked'
     );
+  });
+
+  it('renders live stage spans and measurement coverage', () => {
+    const base = snapshot();
+    shipping.data = {
+      ...base,
+      view: {
+        ...base.view,
+        delivery: {
+          ...base.view.delivery,
+          lanes: {
+            ...base.view.delivery.lanes,
+            stageSummary: {
+              at: '2026-10-21T12:00:00.000Z',
+              stagesTotal: 31,
+              stagesWithData: 14,
+              regressions: [],
+              slowestP95: [],
+              endToEnd7d: [
+                {
+                  pipeline: 'shipping:pr-open->merged',
+                  p50: 2280,
+                  p95: 102600,
+                  n: 571,
+                  regressed: false,
+                },
+              ],
+            },
+          },
+        },
+      },
+    };
+    renderCanvas();
+    const strip = screen.getByRole('region', {
+      name: 'Stage Time 7d (P50 / P95)',
+    });
+    expect(strip).toHaveTextContent('Shipping · PR Open → Merged 38m / 29h');
+    expect(strip).toHaveTextContent('14 of 31 stages measured');
+    expect(strip).not.toHaveTextContent('Not measured');
+  });
+
+  it('links overflowing in-flight tasks to the shipping surface', () => {
+    const base = snapshot();
+    shipping.data = {
+      ...base,
+      operationalTasks: {
+        ...base.operationalTasks,
+        tasks: Array.from({ length: 4 }, (_, index) => ({
+          ...base.operationalTasks.tasks[0],
+          id: `linear:JOV-${index + 1}`,
+          linearIdentifier: `JOV-${index + 1}`,
+        })),
+      },
+    };
+    const restore = mockFitLayout('home-loop-kanban-cards', 150);
+    try {
+      renderCanvas();
+      const more = screen.getByRole('link', { name: '+3 more' });
+      expect(more).toHaveAttribute('href', APP_ROUTES.ADMIN_SHIPPING);
+    } finally {
+      restore();
+    }
   });
 
   it('shows loading while shipping state has not arrived', () => {
@@ -298,6 +370,108 @@ describe('OvieHomeCanvas', () => {
     );
   });
 
+  describe('Linear answers', () => {
+    beforeEach(() => {
+      inbox = {
+        issues: [],
+        cases: [
+          {
+            ...INBOX.cases[0],
+            id: 'linear:JOV-9',
+            title: 'Sign in to the build runner',
+            answers: ['Signed in', 'Restarted it myself'],
+            decisionTarget: { kind: 'linear', id: 'JOV-9' },
+          },
+        ],
+      };
+    });
+
+    it.each(['Signed in', 'Restarted it myself', 'written reply'])(
+      'sends %s as the answer only after the undo window closes',
+      async answer => {
+        renderCanvas();
+        await screen.findByRole('button', { name: 'Signed in' });
+        expect(
+          screen.queryByRole('button', { name: 'Mark done' })
+        ).not.toBeInTheDocument();
+        vi.useFakeTimers();
+        if (answer === 'written reply') {
+          fireEvent.change(
+            screen.getByRole('textbox', {
+              name: 'Reply: Sign in to the build runner',
+            }),
+            { target: { value: answer } }
+          );
+          fireEvent.click(screen.getByRole('button', { name: 'Send Reply' }));
+        } else {
+          fireEvent.click(screen.getByRole('button', { name: answer }));
+        }
+        expect(
+          within(screen.getByTestId('home-loop-ask')).getByRole('status')
+        ).toHaveTextContent(
+          `${answer === 'written reply' ? 'Replied' : 'Answered'}: ${answer}`
+        );
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS - 1);
+        });
+        expect(fetchMock).not.toHaveBeenCalledWith(
+          '/api/admin/hud/tim-actions',
+          expect.anything()
+        );
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1);
+        });
+        const posts = fetchMock.mock.calls.filter(
+          ([url]) => url === '/api/admin/hud/tim-actions'
+        );
+        expect(posts).toHaveLength(1);
+        expect(posts[0][1]).toEqual({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ issueId: 'JOV-9', answer }),
+        });
+      }
+    );
+
+    it('cancels the Linear answer when undone', async () => {
+      renderCanvas();
+      const option = await screen.findByRole('button', { name: 'Signed in' });
+      vi.useFakeTimers();
+      fireEvent.click(option);
+      const action = toastMock.mock.calls.at(-1)?.[1]?.action;
+      expect(action).toEqual({ label: 'Undo', onClick: expect.any(Function) });
+      act(() => {
+        if (action && typeof action !== 'function') action.onClick();
+      });
+      expect(screen.getByRole('button', { name: 'Signed in' })).toBeVisible();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+      });
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        '/api/admin/hud/tim-actions',
+        expect.anything()
+      );
+    });
+
+    it('restores the answer controls when Linear cannot record the answer', async () => {
+      renderCanvas();
+      const option = await screen.findByRole('button', { name: 'Signed in' });
+      fetchMock.mockResolvedValueOnce(new Response('{}', { status: 502 }));
+      vi.useFakeTimers();
+      fireEvent.click(option);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(HOME_LOOP_UNDO_WINDOW_MS);
+      });
+      expect(screen.getByRole('alert')).toHaveTextContent(
+        'Not recorded. Try again.'
+      );
+      expect(screen.getByRole('button', { name: 'Signed in' })).toBeVisible();
+      expect(
+        within(screen.getByTestId('home-loop-ask')).queryByRole('status')
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it('keeps loaded asks and names the missing source when the inbox is partial', async () => {
     fetchMock.mockImplementation(async (url: string) => {
       if (url === '/api/ovie/inbox') {
@@ -362,7 +536,7 @@ describe('OvieHomeCanvas', () => {
     expect(
       screen.getByTestId('home-loop-in-flight-generated')
     ).toHaveTextContent('Shipping Now');
-    expect(screen.queryByTestId('home-loop-stage-row')).toBeNull();
+    expect(screen.queryByTestId('home-loop-kanban-card')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: 'Previous Answer' }));
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
@@ -371,7 +545,7 @@ describe('OvieHomeCanvas', () => {
     expect(screen.getByTestId('home-loop-answer')).toHaveTextContent(
       'Monthly Revenue'
     );
-    expect(screen.getByTestId('home-loop-stage-row')).toBeVisible();
+    expect(screen.getByTestId('home-loop-kanban-card')).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Conversation' }));
     expect(chat.onOpenTranscript).toHaveBeenCalledOnce();

@@ -163,6 +163,9 @@ const markdownAllowedJobs = new Set([
   'postdeploy-probes.yml:auth-smoke',
   'production-controller.yml:ci-post-deploy-auth-smoke',
   'visual-regression.yml:visual-regression',
+  // Failure-only claim dogfood evidence includes Playwright error-context.md.
+  // The guard redacts known secrets before that page snapshot is uploaded.
+  'claim-checkout-dogfood.yml:dogfood',
 ]);
 // Workflow-level secrets a Playwright child may inherit (remote build cache).
 const inheritedSecretAllowlist = new Set(['TURBO_TOKEN', 'TURBO_TEAM']);

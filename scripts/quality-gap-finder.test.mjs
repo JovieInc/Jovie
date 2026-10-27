@@ -811,29 +811,26 @@ describe('quality-gap-finder', () => {
           log: () => {},
           fetchImpl: async (_url, init) => {
             incompleteCalls.push(String(init?.body ?? ''));
-            return {
-              ok: true,
-              json: async () => ({
-                data: {
-                  issues: {
-                    nodes: [
-                      {
-                        id: 'issue-9',
-                        identifier: 'JOV-9',
-                        description: 'product fix only',
-                        labels: { nodes: [{ name: 'escaped-defect' }] },
-                        comments: { nodes: [] },
-                        team: {
-                          states: {
-                            nodes: [{ id: 'done-id', name: 'Done' }],
-                          },
+            return Response.json({
+              data: {
+                issues: {
+                  nodes: [
+                    {
+                      id: 'issue-9',
+                      identifier: 'JOV-9',
+                      description: 'product fix only',
+                      labels: { nodes: [{ name: 'escaped-defect' }] },
+                      comments: { nodes: [] },
+                      team: {
+                        states: {
+                          nodes: [{ id: 'done-id', name: 'Done' }],
                         },
                       },
-                    ],
-                  },
+                    },
+                  ],
                 },
-              }),
-            };
+              },
+            });
           },
         }),
         /Refusing to mark JOV-9 Done/
@@ -853,36 +850,30 @@ describe('quality-gap-finder', () => {
           const body = String(init?.body ?? '');
           completeCalls.push(body);
           if (body.includes('issueUpdate')) {
-            return {
-              ok: true,
-              json: async () => ({
-                data: { issueUpdate: { success: true } },
-              }),
-            };
+            return Response.json({
+              data: { issueUpdate: { success: true } },
+            });
           }
-          return {
-            ok: true,
-            json: async () => ({
-              data: {
-                issues: {
-                  nodes: [
-                    {
-                      id: 'issue-9',
-                      identifier: 'JOV-9',
-                      description: escapedDefectEvidence(),
-                      labels: { nodes: [{ name: 'escaped-defect' }] },
-                      comments: { nodes: [] },
-                      team: {
-                        states: {
-                          nodes: [{ id: 'done-id', name: 'Done' }],
-                        },
+          return Response.json({
+            data: {
+              issues: {
+                nodes: [
+                  {
+                    id: 'issue-9',
+                    identifier: 'JOV-9',
+                    description: escapedDefectEvidence(),
+                    labels: { nodes: [{ name: 'escaped-defect' }] },
+                    comments: { nodes: [] },
+                    team: {
+                      states: {
+                        nodes: [{ id: 'done-id', name: 'Done' }],
                       },
                     },
-                  ],
-                },
+                  },
+                ],
               },
-            }),
-          };
+            },
+          });
         },
       });
       assert.deepEqual(transitioned, { identifier: 'JOV-9', state: 'Done' });

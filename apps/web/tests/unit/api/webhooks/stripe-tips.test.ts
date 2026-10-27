@@ -12,6 +12,7 @@ const mockDbInsert = vi.hoisted(() => vi.fn());
 const mockDbSelect = vi.hoisted(() => vi.fn());
 const mockDbUpdate = vi.hoisted(() => vi.fn());
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
+const mockCaptureForReconciliation = vi.hoisted(() => vi.fn());
 const mockEnv = vi.hoisted(() => ({
   STRIPE_WEBHOOK_SECRET_TIPS: 'whsec_tips' as string | undefined,
 }));
@@ -51,6 +52,15 @@ vi.mock('@/lib/error-tracking', () => ({
   captureCriticalError: mockCaptureCriticalError,
 }));
 
+// Durable capture is exercised against real Postgres in
+// tests/integration/stripe-webhook-reconciliation.test.ts.
+vi.mock('@/lib/stripe/webhooks/reconciliation', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('@/lib/stripe/webhooks/reconciliation')
+  >()),
+  captureStripeEventForReconciliation: mockCaptureForReconciliation,
+}));
+
 vi.mock('@/lib/services/tips/process-tip-completed', () => ({
   processTipCompleted: mockProcessTipCompleted,
 }));
@@ -85,21 +95,19 @@ describe('POST /api/webhooks/stripe-tips', () => {
     vi.resetModules();
     mockEnv.STRIPE_WEBHOOK_SECRET_TIPS = 'whsec_tips';
     mockCaptureCriticalError.mockResolvedValue(undefined);
+    mockCaptureForReconciliation.mockResolvedValue(undefined);
   });
 
-  it('acknowledges a missing tip webhook secret without a 500', async () => {
+  it('returns 500 for a missing tip webhook secret so Stripe keeps retrying', async () => {
     mockEnv.STRIPE_WEBHOOK_SECRET_TIPS = undefined;
-    const { logger } = await import('@/lib/utils/logger');
     const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
     const response = await POST(makeRequest());
 
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({
-      received: false,
-      reason: 'not_configured',
-    });
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('STRIPE_WEBHOOK_SECRET_TIPS')
+    expect(response.status).toBe(500);
+    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
+      'STRIPE_WEBHOOK_SECRET_TIPS is not configured',
+      expect.any(Error),
+      expect.objectContaining({ route: '/api/webhooks/stripe-tips' })
     );
     expect(mockDbInsert).not.toHaveBeenCalled();
   });
@@ -202,7 +210,7 @@ describe('POST /api/webhooks/stripe-tips', () => {
     );
   });
 
-  it('acknowledges a resolved handle with no matching creator profile and records critical context', async () => {
+  it('acknowledges a resolved handle with no matching creator profile only after capturing it for reconciliation', async () => {
     // Override the shared db mock's limit() so the by-handle lookup resolves
     // empty (profile not found), distinct from the shared beforeEach default
     // that always finds 'profile-123'. This exercises the branch at
@@ -234,22 +242,29 @@ describe('POST /api/webhooks/stripe-tips', () => {
     const response = await POST(makeRequest());
 
     expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      received: true,
+      reconciliation: 'needs_reconciliation',
+    });
     expect(mockDbSelect).toHaveBeenCalled();
     expect(mockDbInsert).not.toHaveBeenCalled();
     expect(mockProcessTipCompleted).not.toHaveBeenCalled();
-    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-      'Tip checkout completed but no creator profile found',
-      expect.any(Error),
+    expect(mockCaptureForReconciliation).toHaveBeenCalledWith(
       expect.objectContaining({
         route: '/api/webhooks/stripe-tips',
-        handle: 'ghostartist',
-        session_id: 'cs_no_profile',
-        amount: 900,
+        error: expect.objectContaining({
+          reason: 'tip_unattributed',
+          context: expect.objectContaining({
+            handle: 'ghostartist',
+            checkoutSessionId: 'cs_no_profile',
+            amountTotal: 900,
+          }),
+        }),
       })
     );
   });
 
-  it('acknowledges unattributable checkout sessions and records critical context', async () => {
+  it('acknowledges unattributable checkout sessions only after capturing them for reconciliation', async () => {
     const { stripe } = await import('@/lib/stripe/client');
     vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
       type: 'checkout.session.completed',
@@ -271,16 +286,43 @@ describe('POST /api/webhooks/stripe-tips', () => {
     expect(response.status).toBe(200);
     expect(mockDbInsert).not.toHaveBeenCalled();
     expect(mockProcessTipCompleted).not.toHaveBeenCalled();
-    expect(mockCaptureCriticalError).toHaveBeenCalledWith(
-      'Tip checkout completed without handle or profile_id metadata',
-      expect.any(Error),
+    expect(mockCaptureForReconciliation).toHaveBeenCalledWith(
       expect.objectContaining({
         route: '/api/webhooks/stripe-tips',
-        session_id: 'cs_missing_creator',
-        amount: 500,
-        customer_email_domain: 'example.com',
+        error: expect.objectContaining({
+          reason: 'tip_unattributed',
+          context: expect.objectContaining({
+            checkoutSessionId: 'cs_missing_creator',
+            amountTotal: 500,
+            customerEmailDomain: 'example.com',
+          }),
+        }),
       })
     );
+  });
+
+  it('returns 500 so Stripe retries when an unattributable tip cannot be captured', async () => {
+    mockCaptureForReconciliation.mockRejectedValue(new Error('db down'));
+    const { stripe } = await import('@/lib/stripe/client');
+    vi.mocked(stripe.webhooks.constructEvent).mockReturnValue({
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          metadata: {},
+          payment_intent: 'pi_capture_fails',
+          amount_total: 500,
+          customer_details: { email: 'fan@example.com', name: 'Test Fan' },
+          customer_email: null,
+          id: 'cs_capture_fails',
+        },
+      },
+    } as never);
+
+    const { POST } = await import('@/app/api/webhooks/stripe-tips/route');
+    const response = await POST(makeRequest());
+
+    expect(response.status).toBe(500);
+    expect(mockDbInsert).not.toHaveBeenCalled();
   });
 
   it('skips processTipCompleted when tipper email is null', async () => {

@@ -73,7 +73,13 @@ test.describe('Jovie Card marketing page', () => {
 
       const overflows = await page.evaluate(() =>
         Array.from(document.querySelectorAll<HTMLElement>('main *'))
-          .filter(element => element.scrollWidth > element.clientWidth + 1)
+          // clientWidth is always 0 for inline boxes; Firefox still reports
+          // their text scrollWidth, so only block-level boxes can overflow.
+          .filter(
+            element =>
+              getComputedStyle(element).display !== 'inline' &&
+              element.scrollWidth > element.clientWidth + 1
+          )
           .map(element => element.tagName)
           .slice(0, 5)
       );

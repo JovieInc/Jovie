@@ -10,7 +10,11 @@ import type {
   FounderFunnelStageRows,
   FounderFunnelTimeRange,
 } from '@/lib/admin/types';
-import { FounderFunnelBand } from './FounderFunnelBand';
+import {
+  FounderFunnelBand,
+  founderFunnelScopeLabel,
+  founderFunnelStageFooter,
+} from './FounderFunnelBand';
 import { FounderFunnelDrilldown } from './FounderFunnelDrilldown';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
@@ -240,5 +244,82 @@ describe('FounderFunnelBand', () => {
     expect(back.get('q')).toBe('Ada');
     expect(back.getAll('tag')).toEqual(['a', 'b']);
     client.clear();
+  });
+});
+
+describe('FounderFunnelBand honest labels', () => {
+  const zeroTail: FounderFunnelData = {
+    ...funnel,
+    biggestDropOffKey: 'profile_claimed',
+    stages: [
+      ...funnel.stages,
+      {
+        key: 'profile_claimed',
+        label: 'Profile claimed',
+        description: 'Claimed',
+        count: 0,
+        conversionRate: 0,
+        dropOff: 40,
+        identifiable: true,
+        drillDownHref: null,
+      },
+      {
+        key: 'onboarding_complete',
+        label: 'Onboarding complete',
+        description: 'Onboarded',
+        count: 0,
+        conversionRate: null,
+        dropOff: null,
+        identifiable: true,
+        drillDownHref: null,
+      },
+      {
+        key: 'paid',
+        label: 'Paid',
+        description: 'Paid',
+        count: 0,
+        conversionRate: null,
+        dropOff: null,
+        identifiable: true,
+        drillDownHref: null,
+      },
+    ],
+  };
+
+  it('labels only the first stage as top of funnel', () => {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <FounderFunnelBand initialFunnel={zeroTail} />
+      </QueryClientProvider>
+    );
+
+    expect(screen.getAllByText('Top of funnel')).toHaveLength(1);
+    expect(
+      screen.getByTestId('founder-funnel-stage-onboarding_chats')
+    ).toHaveTextContent('Top of funnel');
+    for (const key of ['onboarding_complete', 'paid']) {
+      expect(
+        screen.getByTestId(`founder-funnel-stage-${key}`)
+      ).toHaveTextContent('No entrants from previous step');
+    }
+    expect(screen.getByTestId('founder-funnel-scope')).toHaveTextContent(
+      'Cohort entered in last 30d · accounts excl. internal/test'
+    );
+  });
+
+  it('describes every range window and the excluded population', () => {
+    expect(founderFunnelScopeLabel('7d')).toMatch(
+      /^Cohort entered in last 7d · /
+    );
+    expect(founderFunnelScopeLabel('all')).toMatch(/^All time · /);
+    expect(founderFunnelScopeLabel('30d')).toContain('excl. internal/test');
+  });
+
+  it('reports loss for a downstream stage with a non-empty previous step', () => {
+    const stage = zeroTail.stages[2];
+    expect(founderFunnelStageFooter(stage, 2, false)).toBe('−40 lost');
+    expect(founderFunnelStageFooter(stage, 2, true)).toBe(
+      'Biggest drop-off · −40'
+    );
   });
 });

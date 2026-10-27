@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -6,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ALLOWLIST_PATH,
   baseCountsAt,
+  baseProvidersAt,
   baseRatchetAt,
   buildRules,
   checkGuard,
@@ -42,8 +44,23 @@ describe('external API guard', () => {
       ...Object.keys(found),
       ...Object.keys(ratchet),
     ]);
+    // Same admission as the CLI: calls to a provider this tree newly
+    // registered may be grandfathered by --onboard.
+    const onboarded = onboardedHits(
+      found,
+      baseProvidersAt(base, repoRoot),
+      loadProviders(repoRoot),
+      path => readFileSync(resolve(repoRoot, path), 'utf8')
+    );
     expect(
-      checkGuard({ found, ratchet, allowlist, baseRatchet, baseCounts })
+      checkGuard({
+        found,
+        ratchet,
+        allowlist,
+        baseRatchet,
+        baseCounts,
+        onboarded,
+      })
     ).toEqual([]);
   });
 
@@ -97,6 +114,14 @@ describe('external API guard', () => {
     expect(baseCountsAt(null, repoRoot, rules, [])).toBeNull();
   });
 
+  it('fails raw calls to a blocked provider (composio)', () => {
+    const py = scan(
+      'scripts/new_tool.py',
+      'post_json("https://backend.composio.dev/api/v3/tools/execute")'
+    );
+    expect(check(py)[0]).toMatch(/new_tool\.py:1 provider-host: 1 direct call/);
+  });
+
   it('rejects a new raw fetch to a provider host in TS and Python', () => {
     const ts = scan(
       'apps/web/lib/new.ts',
@@ -147,6 +172,26 @@ describe('external API guard', () => {
         scan('.github/workflows/y.yml', 'uses: actions/github-script@abc\n')
       )[0]
     ).toMatch(/github-script/);
+  });
+
+  it('requires shell command recommendations to use the shared client', () => {
+    const path = 'scripts/security/scan-secrets.sh';
+    expect(
+      check(
+        scan(
+          path,
+          'echo "Run history scans in CI (gh workflow run security.yml)"'
+        )
+      )[0]
+    ).toMatch(/scan-secrets\.sh:1 gh-shell: 1 direct call/);
+    expect(
+      check(
+        scan(
+          path,
+          'echo "Run node packages/api-client/cli.ts gh --priority repair -- workflow run security.yml"'
+        )
+      )
+    ).toEqual([]);
   });
 
   it('accepts the client layer and its shell entry point', () => {
