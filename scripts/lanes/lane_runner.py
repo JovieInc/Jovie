@@ -8156,8 +8156,8 @@ def org_merged_prs(identifier: str) -> list[dict] | None:
 
 
 def in_flight_issues() -> frozenset[str] | None:
-    """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
-    lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
+    """Issues that already have an open PR (lane branch, canonical reference or legacy marker)
+    from any lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
     unknown in-flight set is not permission to open a duplicate PR (JOV-6833). A parked PR the
     sweep requeued (`lane-rebuild`, JOV-7708) stays open but no longer holds its issue."""
     def fetch():
@@ -8174,6 +8174,7 @@ def in_flight_issues() -> frozenset[str] | None:
         branch = LANE_BRANCH.match(pr.get("headRefName") or "")
         marker = ISSUE_MARKER.search(pr.get("body") or "")
         keys |= {key.upper() for key in (branch and branch.group("issue"), marker and marker.group(1)) if key}
+        keys |= ownership.referenced(pr.get("body") or "")
     return frozenset(keys)
 
 

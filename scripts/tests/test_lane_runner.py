@@ -11656,6 +11656,39 @@ class OnePrPerIssueTest(unittest.TestCase):
         finally:
             lane.sh = saved
 
+    def test_canonical_stacked_pr_references_retain_issue_ownership(self):
+        marker = ("<!-- linear-issue-id: 64abf97b-29a0-435e-9ea6-4c911fe32661 -->\n"
+                  "<!-- linear-issue-identifier: JOV-8672 -->")
+        cases = [
+            ("claim-state", "codex/jov-8672-claim-state-20261021", "Refs JOV-8672.\n" + marker, [], {"JOV-8672"}),
+            ("review-focus", "codex/jov-8672-review-focus-20261021", "Refs JOV-8672.\n" + marker, [], {"JOV-8672"}),
+            ("canonical-marker", "feat/anything", marker, [], {"JOV-8672"}),
+            ("explicit-refs", "feat/anything", "Refs JOV-8672.", [], {"JOV-8672"}),
+            ("uuid-only", "feat/anything", marker.splitlines()[0], [], set()),
+            ("parent-followup", "codex/jov-8051-20261020t192739",
+             "Refs JOV-8051.\n<!-- linear-issue-identifier:JOV-8051 -->\n"
+             "Remaining integration is tracked in [JOV-8672](https://linear.app/jovie/issue/JOV-8672).",
+             [], {"JOV-8051"}),
+            ("rebuild", "codex/jov-8672-claim-state-20261021", "Refs JOV-8672.\n" + marker,
+             [{"name": "lane-rebuild"}], set()),
+            ("exhausted-incumbent", "codex/jov-8672-review-focus-20261021", marker,
+             [{"name": "lane-fix-exhausted"}], {"JOV-8672"}),
+        ]
+        for name, branch, body, labels, expected in cases:
+            with self.subTest(name=name), patch.object(lane, "sh", return_value=SimpleNamespace(
+                    returncode=0, stderr="", stdout=json.dumps([
+                        {"headRefName": branch, "body": body, "labels": labels}]))):
+                in_flight = lane.in_flight_issues()
+                self.assertEqual(in_flight, frozenset(expected))
+                owner = lane.ownership.owner_of(
+                    {"id": "issue-id", "identifier": "JOV-8672", "state": "In Progress", "labels": []},
+                    {"status": "released"}, "ended", open_prs=in_flight, merged=set(), handoffs=set(),
+                    worktrees=set(), open_children=set(), now=self.NOW)
+                self.assertEqual(owner, "pr" if "JOV-8672" in expected else None)
+                candidate = issue("JOV-8672")
+                admitted = lane.pick_issue([candidate], {}, now=self.NOW, in_flight=in_flight)
+                self.assertIs(admitted, None if "JOV-8672" in expected else candidate)
+
     def test_sweep_supersedes_duplicates_and_closes_stale_red_drafts(self):
         day = lane.STALE_DRAFT_S
         prs = [{**self.pr(1), "labels": [{"name": "duplicate"}]}, self.pr(2, draft=False, state="CLEAN"),          # jov-7: keep the green one
