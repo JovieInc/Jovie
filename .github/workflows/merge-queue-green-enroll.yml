@@ -110,6 +110,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
@@ -208,6 +209,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs

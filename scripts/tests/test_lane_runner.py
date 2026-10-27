@@ -8923,14 +8923,15 @@ class ReleaseImportClosureTest(unittest.TestCase):
     staged tree, which refuses the update as an opaque "release tests failed" and ejects every
     merge group behind it (2026-10-24: #22870 made source-admission-policy.mjs import
     scripts/pr-fleet-rules.mjs without adding it to RELEASE_EXTRAS). Static imports only: the
-    lazy `await import()` branches are guarded at their call sites."""
+    lazy `await import()` branches are guarded at their call sites. Shipped TypeScript
+    modules must close over their runtime imports and data contracts too."""
     STATIC_IMPORT = re.compile(r"""(?m)(?:\bfrom\s*|^\s*import\s+)['"](\.{1,2}/[^'"]+)['"]""")
 
     def missing_from_release(self, extras, lanes_sources, root=None):
         root = Path(root or ROOT)
         shipped = set(extras)
         missing = []
-        for rel in sorted({*(e for e in extras if e.endswith((".mjs", ".js"))), *lanes_sources}):
+        for rel in sorted({*(e for e in extras if e.endswith((".mjs", ".js", ".ts", ".mts", ".cts"))), *lanes_sources}):
             base = (root / rel).parent
             code = re.sub(r"/\*.*?\*/", "", (root / rel).read_text(), flags=re.DOTALL)
             code = re.sub(r"//.*$", "", code, flags=re.MULTILINE)
@@ -8992,6 +8993,44 @@ assert.match(result.blockers[0], /^red-before-green:/);
             (root / "scripts/b.mjs").write_text("export default 1;\n")
             found = self.missing_from_release(["scripts/a.mjs", "scripts/b.mjs"], [], root=root)
             self.assertEqual(found, ["scripts/a.mjs imports ../../outside.mjs, which resolves outside the repo root"])
+
+    def test_typescript_transitive_imports_include_the_provider_registry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp).resolve()
+            (root / "scripts").mkdir()
+            (root / "packages").mkdir()
+            (root / "scripts/a.mjs").write_text("import '../packages/client.ts';\n")
+            (root / "packages/client.ts").write_text("import './contract.ts';\n")
+            (root / "packages/contract.ts").write_text(
+                "import providers from './providers.json' with { type: 'json' };\n")
+            (root / "packages/providers.json").write_text("{}\n")
+            extras = ["scripts/a.mjs", "packages/client.ts", "packages/contract.ts"]
+            self.assertEqual(self.missing_from_release(extras, [], root=root),
+                             ["packages/contract.ts imports packages/providers.json"])
+            self.assertEqual(self.missing_from_release(
+                [*extras, "packages/providers.json"], [], root=root), [])
+            self.assertEqual(self.missing_from_release(extras[:-1], [], root=root),
+                             ["packages/client.ts imports packages/contract.ts"])
+
+    def test_staged_failure_hold_imports_its_client_and_requires_provider_registry(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            staging = Path(tmp).resolve()
+            for relative in lane.RELEASE_EXTRAS:
+                target = staging / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, target)
+            module = (staging / "scripts/merge-group-failure-hold.mjs").as_uri()
+            command = ["node", "--input-type=module", "-e", f"await import({json.dumps(module)});"]
+            result = subprocess.run(command, cwd=staging, capture_output=True, text=True, timeout=15)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+            # A complete TS graph without its data contract is still an unusable release.
+            (staging / "packages/api-client/providers.json").unlink()
+            missing_registry = subprocess.run(
+                command, cwd=staging, capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(missing_registry.returncode, 0)
+            self.assertIn("ERR_MODULE_NOT_FOUND", missing_registry.stderr)
+            self.assertIn("providers.json", missing_registry.stderr)
 
     def test_the_closure_check_names_an_unshipped_import(self):
         extras = [e for e in lane.RELEASE_EXTRAS if e != "scripts/lib/merge-group-member-policy.mjs"]
