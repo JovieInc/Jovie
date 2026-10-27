@@ -351,7 +351,7 @@ describe('buildStageEvents', () => {
 function fakeGh({
   remaining = 0,
   reset,
-  logs = [QUOTA_LOG],
+  logs = [QUOTA_LOG, QUOTA_LOG],
   runs = [run()],
   ciRun = ci(),
   rerunFails = false,
@@ -391,11 +391,7 @@ function fakeGh({
       return JSON.stringify({ resources: { core: { remaining, reset } } });
     if (path.includes('/attempts/')) return JSON.stringify({ jobs });
     if (path.endsWith('/jobs/11/logs')) return logs[0] ?? '';
-    if (path.endsWith('/jobs/14/logs')) {
-      const error = new Error('gh failed');
-      error.stderr = logs[1] ?? 'HTTP 404';
-      throw error;
-    }
+    if (path.endsWith('/jobs/14/logs')) return logs[1] ?? '';
     if (path.includes('/workflows/'))
       return JSON.stringify({ workflow_runs: runs });
     if (path.endsWith('/commits/main')) return `${MAIN}\n`;
@@ -585,6 +581,55 @@ describe('runCli', () => {
           .map(JSON.parse),
     };
   }
+
+  for (const [failure, failureKind] of [
+    ['HTTP 403: API rate limit exceeded for installation', 'quota'],
+    ['HTTP 429: Too Many Requests', 'quota'],
+    ['HTTP 403: Resource not accessible by integration', 'permission-denied'],
+    ['unrecognized log transport failure', 'unknown'],
+  ]) {
+    it(`preserves unknown source evidence when a job log read fails: ${failure}`, async () => {
+      const f = fixture();
+      const readError = Object.assign(new Error('gh failed'), {
+        stderr: failure,
+      });
+      const { gh, calls } = fakeGh({
+        remaining: 900,
+        reset: 0,
+        jobs: [{ id: 11, name: 'authorize-staging', conclusion: 'failure' }],
+        failPath: 'repos/JovieInc/Jovie/actions/jobs/11/logs',
+        readError,
+      });
+      await assert.rejects(
+        runCli({ env: f.env, deps: { ...f.deps, gh } }),
+        error => error === readError
+      );
+      assert.equal(calls.filter(args => args[0] === 'run').length, 0);
+      assert.deepEqual(f.slept, [120]);
+      assert.equal(f.decision().failureKind, failureKind);
+      assert.equal(f.decision().requestOutcome, 'not-attempted');
+      assert.equal(f.decision().replay, false);
+      assert.doesNotMatch(f.decision().reason, /deterministic/);
+      assert.deepEqual(
+        f.events().map(e => [e.stage, e.outcome]),
+        [['blocked', 'failed']]
+      );
+    });
+  }
+
+  it('retains a deterministic verdict only after complete job log reads', async () => {
+    const f = fixture();
+    const { gh, calls } = fakeGh({
+      remaining: 900,
+      reset: 0,
+      jobs: [{ id: 11, name: 'authorize-staging', conclusion: 'failure' }],
+      logs: ['AssertionError: Expected 3 to equal 4'],
+    });
+    await runCli({ env: f.env, deps: { ...f.deps, gh } });
+    assert.equal(calls.filter(args => args[0] === 'run').length, 0);
+    assert.equal(f.decision().outcome, 'abandoned');
+    assert.match(f.decision().reason, /deterministic/);
+  });
 
   for (const [failure, failureKind] of [
     ['HTTP 403: API rate limit exceeded for installation', 'quota'],
