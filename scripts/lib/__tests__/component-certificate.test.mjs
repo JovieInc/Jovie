@@ -13,16 +13,14 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, it } from 'vitest';
+import { afterEach, beforeEach, describe, it } from 'vitest';
 import {
   buildReport,
   certifyComponent,
   findJank,
   findRawColors,
   findRawElements,
-  renderAgentSpec,
   statesCovered,
-  summarizeGuards,
 } from '../component-certificate.mjs';
 import { moduleKey } from '../mutation-sweep.mjs';
 
@@ -32,6 +30,41 @@ const gitBlob = source =>
     .update(`blob ${Buffer.byteLength(source)}\0`)
     .update(source)
     .digest('hex');
+
+const stories = [
+  'Loading',
+  'Empty',
+  'Error',
+  'Partial',
+  'LongContent',
+  'Offline',
+  'PermissionDenied',
+  'Rtl',
+]
+  .map(name => `export const ${name}={};`)
+  .join('\n');
+const criterion = (cert, id) => cert.criteria.find(row => row.id === id);
+function assertCriteria(cert, expected) {
+  for (const [id, status] of Object.entries(expected)) {
+    assert.equal(criterion(cert, id).status, status, id);
+    assert.equal(
+      cert.missing.some(row => row.criterion === id),
+      ['fail', 'unknown'].includes(status),
+      id
+    );
+  }
+  if (
+    Object.values(expected).some(status => ['fail', 'unknown'].includes(status))
+  )
+    assert.equal(cert.certified, false);
+}
+const mutationReceipt = (source, tests = []) => ({
+  status: 'scored',
+  score: 100,
+  valid: 10,
+  sha: 'a'.repeat(40),
+  blob: moduleKey(gitBlob(source), tests.map(gitBlob)),
+});
 
 describe('component certificate', () => {
   const clean = `export function Card({ title }: { title: string }) { return <div className="bg-surface-1 text-primary-token">{title}</div>; }`;
@@ -115,17 +148,8 @@ export function Drawer({ open }) {
 
   it('fully evidenced component certifies; stale benchmark and low mutation do not', () => {
     const binding = sourceHash(full.source);
-    const mutation = {
-      status: 'scored',
-      score: 90,
-      valid: 40,
-      survived: 4,
-      sha: 'a'.repeat(40),
-      blob: moduleKey(gitBlob(full.source), [gitBlob(full.testSource)]),
-    };
     const evidence = {
-      sourceHash: binding,
-      mutation,
+      mutation: mutationReceipt(full.source, [full.testSource]),
       visual: { status: 'pass', captured: 5, sourceHash: binding },
       benchmark: {
         libraryVersion: 1,
@@ -136,157 +160,96 @@ export function Drawer({ open }) {
         ],
       },
     };
-    const storySource =
-      'export const Loading={}; export const Empty={}; export const Error={}; export const Partial={}; export const LongContent={}; export const Offline={}; export const PermissionDenied={}; export const Rtl={};';
-    const ok = certifyComponent({
-      path: 'apps/web/components/molecules/List.tsx',
-      ...full,
-      storySource,
-      evidence,
-      waivers: {},
-    });
-    assert.equal(ok.certified, true, JSON.stringify(ok.missing));
-    const low = certifyComponent({
-      path: 'apps/web/components/molecules/List.tsx',
-      ...full,
-      storySource,
-      evidence: {
-        ...evidence,
-        mutation: { ...mutation, score: 50, survived: 20 },
-      },
-    });
-    assert.equal(low.certified, false);
-    const stale = certifyComponent({
-      path: 'apps/web/components/molecules/List.tsx',
-      ...full,
-      source: `${full.source}\n// changed source`,
-      storySource,
-      evidence: {
-        ...evidence,
-        sourceHash: sourceHash(`${full.source}\n// changed source`),
-      },
-    });
-    assert.equal(
-      stale.criteria.find(c => c.id === 'benchmark').status,
-      'unknown'
+    const input = { path: 'List.tsx', ...full, storySource: stories, evidence };
+    assert.equal(certifyComponent(input).certified, true);
+    assertCriteria(
+      certifyComponent({
+        ...input,
+        evidence: {
+          ...evidence,
+          mutation: { ...evidence.mutation, score: 50, survived: 20 },
+        },
+      }),
+      { mutation: 'fail' }
+    );
+    assertCriteria(
+      certifyComponent({
+        ...input,
+        source: `${full.source}\n// changed`,
+        evidence: {
+          ...evidence,
+          sourceHash: sourceHash(`${full.source}\n// changed`),
+        },
+      }),
+      { benchmark: 'unknown' }
     );
   });
 
   it('certificate binding is computed from source rather than caller metadata', () => {
-    const cert = certifyComponent({
-      path: 'Card.tsx',
-      source: clean,
-      evidence: { sourceHash: 'invented' },
-    });
-    assert.equal(cert.binding, sourceHash(clean));
+    assert.equal(
+      certifyComponent({
+        path: 'Card.tsx',
+        source: clean,
+        evidence: { sourceHash: 'invented' },
+      }).binding,
+      sourceHash(clean)
+    );
   });
 
-  it('fresh failed observations stay failed; stale or unbound observations are unknown', () => {
-    for (const id of ['a11y', 'visual']) {
+  it.each(['a11y', 'visual'])(
+    '%s observations retain fresh failures and reject stale/unbound evidence',
+    id => {
       for (const [binding, expected] of [
         [sourceHash(clean), 'fail'],
-        [sourceHash('old source'), 'unknown'],
+        [sourceHash('old'), 'unknown'],
         [undefined, 'unknown'],
       ]) {
-        const cert = certifyComponent({
-          path: 'Card.tsx',
-          source: clean,
-          evidence: {
-            [id]: {
-              status: 'fail',
-              sourceHash: binding,
-              detail: 'observed failure',
+        assertCriteria(
+          certifyComponent({
+            path: 'Card.tsx',
+            source: clean,
+            evidence: {
+              [id]: {
+                status: 'fail',
+                sourceHash: binding,
+                detail: 'observed failure',
+              },
             },
-          },
-        });
-        assert.equal(
-          cert.criteria.find(row => row.id === id).status,
-          expected,
-          id
+          }),
+          { [id]: expected }
         );
-        assert.ok(cert.missing.some(row => row.criterion === id));
       }
     }
-  });
+  );
 
-  it('mutation receipts require a known run and complete current test inputs', () => {
-    const evidence = {
-      mutation: {
-        status: 'scored',
-        score: 100,
-        valid: 5,
-        sha: 'a'.repeat(40),
-        blob: moduleKey(gitBlob(clean), []),
-      },
-    };
-    for (const override of [
-      { mutationTestSources: null },
-      { evidence: { mutation: { ...evidence.mutation, sha: 'unknown' } } },
-      {
-        evidence: { mutation: { ...evidence.mutation, blob: 'b'.repeat(40) } },
-      },
-    ]) {
-      const cert = certifyComponent({
+  const mutationCase = (fields = {}, inputs = {}, status = 'unknown') => ({
+    fields,
+    inputs,
+    status,
+  });
+  it.each([
+    mutationCase({}, { mutationTestSources: null }),
+    mutationCase({ sha: 'unknown' }),
+    mutationCase({ blob: 'b'.repeat(40) }),
+    ...['100', Infinity, NaN, -1, 101, null].map(score =>
+      mutationCase({ score })
+    ),
+    ...[undefined, -1, 1.5, '10'].map(valid => mutationCase({ valid })),
+    mutationCase({ score: 80, valid: 0 }, {}, 'pass'),
+    mutationCase({ score: 79.5 }, {}, 'fail'),
+  ])('mutation validation: %j', ({ inputs, fields, status }) => {
+    assertCriteria(
+      certifyComponent({
         path: 'Card.tsx',
         source: clean,
-        evidence,
-        ...override,
-      });
-      assert.equal(
-        cert.criteria.find(row => row.id === 'mutation').status,
-        'unknown'
-      );
-    }
+        ...inputs,
+        evidence: { mutation: { ...mutationReceipt(clean), ...fields } },
+      }),
+      { mutation: status }
+    );
   });
 
-  it('fresh-bound malformed mutation measurements stay unknown without changing the score floor', () => {
-    const mutation = {
-      status: 'scored',
-      score: 100,
-      valid: 10,
-      sha: 'a'.repeat(40),
-      blob: moduleKey(gitBlob(clean), []),
-    };
-    for (const fields of [
-      { score: '100' },
-      { score: Infinity },
-      { score: NaN },
-      { score: -1 },
-      { score: 101 },
-      { score: null },
-      { valid: undefined },
-      { valid: -1 },
-      { valid: 1.5 },
-      { valid: '10' },
-    ]) {
-      const cert = certifyComponent({
-        path: 'Card.tsx',
-        source: clean,
-        evidence: { mutation: { ...mutation, ...fields } },
-      });
-      assert.equal(
-        cert.criteria.find(row => row.id === 'mutation').status,
-        'unknown'
-      );
-      assert.ok(cert.missing.some(row => row.criterion === 'mutation'));
-    }
-    for (const [score, valid, expected] of [
-      [80, 0, 'pass'],
-      [79.5, 10, 'fail'],
-    ]) {
-      const cert = certifyComponent({
-        path: 'Card.tsx',
-        source: clean,
-        evidence: { mutation: { ...mutation, score, valid } },
-      });
-      assert.equal(
-        cert.criteria.find(row => row.id === 'mutation').status,
-        expected
-      );
-    }
-  });
-
-  it('waiver with a reason satisfies a state; report totals and agent spec', () => {
+  it('waivers and certificate output preserve unresolved criteria', () => {
     const cert = certifyComponent({
       path: 'apps/web/components/molecules/List.tsx',
       ...full,
@@ -309,9 +272,6 @@ export function Drawer({ open }) {
     });
     assert.equal(report.totals.components, 1);
     assert.equal(report.totals.certified, 0);
-    const spec = renderAgentSpec(cert);
-    assert.match(spec, /Missing criteria/);
-    assert.match(spec, /component-certificate\.mjs --component/);
   });
 
   it('nested bordered surfaces: three levels flagged, flat surface is not', () => {
@@ -322,52 +282,6 @@ export function Drawer({ open }) {
     const flat = `export const D = () => <div className="border rounded"><input className="bg-surface-1" /></div>;`;
     assert.ok(
       !findJank(flat, 'a.tsx').some(f => f.rule === 'surface:nested-bordered')
-    );
-  });
-
-  it('defect-guard registry: every defect needs a guard; weekly human vs guard counts', () => {
-    const ok = summarizeGuards({
-      defects: [
-        {
-          id: 'D1',
-          class: 'surface',
-          foundBy: 'human',
-          foundAt: '2026-10-25T00:00:00Z',
-          guard: {
-            type: 'lint-ast-rule',
-            ref: 'surface:nested-bordered',
-            status: 'landed',
-          },
-        },
-        {
-          id: 'D2',
-          class: 'search',
-          foundBy: 'guard',
-          foundAt: '2026-10-26T00:00:00Z',
-          guard: {
-            type: 'search-relevance-fixture',
-            ref: 'x',
-            status: 'planned',
-          },
-        },
-      ],
-    });
-    assert.deepEqual(ok.errors, []);
-    assert.equal(ok.guardsLanded, 1);
-    assert.deepEqual(ok.weeks['2026-W43'], { human: 1, guard: 0, agent: 0 });
-    assert.equal(ok.weeks['2026-W44'].guard, 1);
-    assert.equal(
-      summarizeGuards({
-        defects: [
-          {
-            id: 'D3',
-            class: 'c',
-            foundBy: 'human',
-            foundAt: '2026-10-25T00:00:00Z',
-          },
-        ],
-      }).errors.length,
-      1
     );
   });
 });
@@ -383,45 +297,8 @@ describe('component certificate CLI evidence freshness', () => {
   const changed =
     'export function Card() { return <div title="updated" />; }\n';
 
-  it('the CLI import closure works with only its existing TypeScript dependency', () => {
-    const root = mkdtempSync(join(tmpdir(), 'component-certificate-imports-'));
-    const sourceRoot = dirname(dirname(cli));
-    try {
-      for (const path of [
-        'scripts/component-certificate.mjs',
-        'scripts/component-ship-policy.mjs',
-        'scripts/lib/component-certificate.mjs',
-        'scripts/lib/mutation-sweep.mjs',
-        'scripts/lib/mutation-diff.mjs',
-      ]) {
-        mkdirSync(dirname(join(root, path)), { recursive: true });
-        cpSync(join(sourceRoot, path), join(root, path));
-      }
-      mkdirSync(join(root, 'node_modules'));
-      symlinkSync(
-        dirname(fileURLToPath(import.meta.resolve('typescript/package.json'))),
-        join(root, 'node_modules/typescript'),
-        'dir'
-      );
-      const result = spawnSync(
-        process.execPath,
-        [
-          join(root, 'scripts/component-certificate.mjs'),
-          '--repo-root',
-          root,
-          '--all',
-          '--summary',
-        ],
-        { cwd: root, encoding: 'utf8' }
-      );
-      assert.equal(result.status, 0, result.stdout + result.stderr);
-      assert.match(result.stdout, /components 0, certified 0/);
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
-
-  function fixture(run) {
+  let f;
+  beforeEach(() => {
     const root = mkdtempSync(join(tmpdir(), 'component-certificate-cli-'));
     const env = Object.fromEntries(
       Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
@@ -431,11 +308,12 @@ describe('component certificate CLI evidence freshness', () => {
       writeFileSync(join(root, path), value);
     };
     const json = (path, value) => write(path, JSON.stringify(value));
-    const git = (...args) =>
+    const git = (args, options = {}) =>
       execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
         cwd: root,
         env,
         encoding: 'utf8',
+        ...options,
       }).trim();
     const records = {};
     const save = () => {
@@ -452,10 +330,10 @@ describe('component certificate CLI evidence freshness', () => {
         score: 100,
         valid: 10,
         survived: 0,
-        sha: git('rev-parse', 'HEAD'),
-        blob: moduleKey(git('hash-object', component), [
-          git('hash-object', testPath),
-          git('hash-object', additionalTest),
+        sha: git(['rev-parse', 'HEAD']),
+        blob: moduleKey(git(['hash-object', component]), [
+          git(['hash-object', testPath]),
+          git(['hash-object', additionalTest]),
         ]),
       };
       records.visual = { status: 'pass', captured: 1, sourceHash: binding };
@@ -463,12 +341,12 @@ describe('component certificate CLI evidence freshness', () => {
       records.benchmark = { libraryVersion: 1, sourceHash: binding, gaps: [] };
       save();
     };
-    const invoke = () => {
+    const invoke = (entry = cli) => {
       const output = join(root, 'report.json');
       const result = spawnSync(
         process.execPath,
         [
-          cli,
+          entry,
           '--repo-root',
           root,
           '--component',
@@ -489,169 +367,133 @@ describe('component certificate CLI evidence freshness', () => {
       assert.equal(result.status, 0, result.stdout + result.stderr);
       return JSON.parse(readFileSync(output, 'utf8')).certificates[0];
     };
-    try {
-      git('init', '-q', '-b', 'main');
-      git('config', 'user.name', 'Certificate fixture');
-      git('config', 'user.email', 'certificate@example.invalid');
-      write(component, original);
-      write(testPath, 'it("renders", () => { expect(1).toBe(1); });\n');
-      write(
-        additionalTest,
-        'it("additional assertion", () => { expect(2).toBe(2); });\n'
-      );
-      write(
-        component.replace('.tsx', '.stories.tsx'),
-        'export const Loading={}; export const Empty={}; export const Error={}; export const Partial={}; export const LongContent={}; export const Offline={}; export const PermissionDenied={}; export const Rtl={};\n'
-      );
-      git('add', '.');
-      git('commit', '-qm', 'component and tests');
-      refresh();
-      run({ root, write, records, save, refresh, invoke, git });
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  }
+    f = { root, write, records, save, refresh, invoke, git };
+    git(['init', '-q', '-b', 'main']);
+    git(['config', 'user.name', 'Certificate fixture']);
+    git(['config', 'user.email', 'certificate@example.invalid']);
+    write(component, original);
+    write(testPath, 'it("renders", () => { expect(1).toBe(1); });\n');
+    write(additionalTest, 'it("additional", () => { expect(2).toBe(2); });\n');
+    write(component.replace('.tsx', '.stories.tsx'), stories);
+    git(['add', '.']);
+    git(['commit', '-qm', 'component and tests']);
+    refresh();
+  });
+  afterEach(() => rmSync(f.root, { recursive: true, force: true }));
 
-  it('component edit and benchmark-only refresh cannot reuse old CI or mutation evidence', () => {
-    fixture(f => {
-      assert.equal(f.invoke().certified, true);
-      f.write(component, changed);
-      f.records.benchmark.sourceHash = sourceHash(changed);
-      f.save();
-      const stale = f.invoke();
-      assert.equal(stale.certified, false);
-      for (const id of ['a11y', 'visual', 'mutation']) {
-        assert.equal(
-          stale.criteria.find(row => row.id === id).status,
-          'unknown',
-          id
-        );
-        assert.ok(
-          stale.missing.some(row => row.criterion === id),
-          id
-        );
-      }
-      assert.equal(
-        stale.criteria.find(row => row.id === 'benchmark').status,
-        'pass'
-      );
-      f.refresh();
-      assert.equal(f.invoke().certified, true);
-    });
+  it('the CLI import closure works with only its existing TypeScript dependency', () => {
+    for (const path of [
+      'scripts/component-certificate.mjs',
+      'scripts/component-ship-policy.mjs',
+      'scripts/lib/component-certificate.mjs',
+      'scripts/lib/mutation-sweep.mjs',
+      'scripts/lib/mutation-diff.mjs',
+    ]) {
+      mkdirSync(dirname(join(f.root, path)), { recursive: true });
+      cpSync(join(dirname(dirname(cli)), path), join(f.root, path));
+    }
+    mkdirSync(join(f.root, 'node_modules'));
+    symlinkSync(
+      dirname(fileURLToPath(import.meta.resolve('typescript/package.json'))),
+      join(f.root, 'node_modules/typescript'),
+      'dir'
+    );
+    assert.equal(
+      f.invoke(join(f.root, 'scripts/component-certificate.mjs')).certified,
+      true
+    );
   });
 
-  for (const [criterion, field] of [
+  it('component edit and benchmark-only refresh cannot reuse old CI or mutation evidence', () => {
+    assert.equal(f.invoke().certified, true);
+    f.write(component, changed);
+    f.records.benchmark.sourceHash = sourceHash(changed);
+    f.save();
+    assertCriteria(f.invoke(), {
+      a11y: 'unknown',
+      visual: 'unknown',
+      mutation: 'unknown',
+      benchmark: 'pass',
+    });
+    f.refresh();
+    assert.equal(f.invoke().certified, true);
+  });
+
+  it.each([
     ['a11y', 'sourceHash'],
     ['visual', 'sourceHash'],
     ['mutation', 'blob'],
     ['mutation', 'sha'],
-  ]) {
-    it(`unbound ${criterion} evidence without ${field} remains unknown`, () => {
-      fixture(f => {
-        delete f.records[criterion][field];
-        f.save();
-        const cert = f.invoke();
-        assert.equal(cert.certified, false);
-        assert.equal(
-          cert.criteria.find(row => row.id === criterion).status,
-          'unknown'
-        );
-      });
-    });
-  }
+  ])('unbound %s evidence without %s remains unknown', (id, field) => {
+    delete f.records[id][field];
+    f.save();
+    assertCriteria(f.invoke(), { [id]: 'unknown' });
+  });
 
-  it('same-stem test edits invalidate the canonical mutation key, including non-colocated tests', () => {
-    fixture(f => {
-      f.write(
-        additionalTest,
-        'it("changed assertion", () => { expect(3).toBe(3); });\n'
-      );
-      const stale = f.invoke();
-      assert.equal(
-        stale.criteria.find(row => row.id === 'mutation').status,
-        'unknown'
-      );
-      assert.equal(
-        stale.criteria.find(row => row.id === 'visual').status,
-        'pass'
-      );
-      f.refresh();
-      assert.equal(f.invoke().certified, true);
-    });
+  it('non-colocated same-stem test edits invalidate the canonical mutation key', () => {
+    f.write(additionalTest, 'it("changed", () => { expect(3).toBe(3); });\n');
+    assertCriteria(f.invoke(), { mutation: 'unknown', visual: 'pass' });
+    f.refresh();
+    assert.equal(f.invoke().certified, true);
   });
 
   it('unchanged source/test mutation receipts remain reusable across unrelated revisions', () => {
-    fixture(f => {
-      const measuredSha = f.records.mutation.sha;
-      f.write('unrelated.txt', 'independent work\n');
-      f.git('add', 'unrelated.txt');
-      f.git('commit', '-qm', 'unrelated revision');
-      assert.notEqual(f.git('rev-parse', 'HEAD'), measuredSha);
-      assert.equal(f.invoke().certified, true);
-    });
+    const measuredSha = f.records.mutation.sha;
+    f.write('unrelated.txt', 'independent work\n');
+    f.git(['add', 'unrelated.txt']);
+    f.git(['commit', '-qm', 'unrelated revision']);
+    assert.notEqual(f.git(['rev-parse', 'HEAD']), measuredSha);
+    assert.equal(f.invoke().certified, true);
   });
 
   it('conflicting mutation source metadata cannot override its otherwise fresh key', () => {
-    fixture(f => {
-      f.records.mutation.sourceHash = sourceHash(changed);
-      f.save();
-      const cert = f.invoke();
-      assert.equal(
-        cert.criteria.find(row => row.id === 'mutation').status,
-        'unknown'
-      );
-      assert.equal(cert.certified, false);
-    });
+    f.records.mutation.sourceHash = sourceHash(changed);
+    f.save();
+    assertCriteria(f.invoke(), { mutation: 'unknown' });
   });
 
   it('current unit axe evidence remains independent of a stale CI a11y receipt', () => {
-    fixture(f => {
-      f.write(
-        testPath,
-        'it("axe", async () => { expect(1).toBe(1); await expectNoA11yViolations(container); });\n'
-      );
-      f.refresh();
-      f.records.a11y.sourceHash = sourceHash(changed);
-      f.save();
-      const cert = f.invoke();
-      assert.equal(
-        cert.criteria.find(row => row.id === 'a11y').source,
-        'unit-axe'
-      );
-      assert.equal(cert.certified, true);
-    });
+    f.write(
+      testPath,
+      'it("axe", async () => { expect(1).toBe(1); await expectNoA11yViolations(container); });\n'
+    );
+    f.refresh();
+    f.records.a11y.sourceHash = sourceHash(changed);
+    f.save();
+    const cert = f.invoke();
+    assert.equal(criterion(cert, 'a11y').source, 'unit-axe');
+    assert.equal(cert.certified, true);
   });
 
-  it('missing tracked tests or Git inventory cannot reuse a partial mutation key', () => {
-    fixture(f => {
-      rmSync(join(f.root, additionalTest));
-      const missingTest = f.invoke();
-      assert.equal(
-        missingTest.criteria.find(row => row.id === 'mutation').status,
-        'unknown'
-      );
-      assert.equal(missingTest.certified, false);
-      rmSync(join(f.root, '.git'), { recursive: true, force: true });
-      const missingGit = f.invoke();
-      assert.equal(
-        missingGit.criteria.find(row => row.id === 'mutation').status,
-        'unknown'
-      );
-      assert.equal(
-        missingGit.criteria.find(row => row.id === 'visual').status,
-        'pass'
-      );
-    });
-  });
+  it.each([additionalTest, '.git'])(
+    'missing %s cannot reuse a partial mutation key',
+    path => {
+      rmSync(join(f.root, path), { recursive: true, force: true });
+      assertCriteria(f.invoke(), { mutation: 'unknown', visual: 'pass' });
+    }
+  );
 
   it('fresh UTF-8 source uses the canonical Git blob byte length', () => {
-    fixture(f => {
-      f.write(
-        component,
-        'export function Card() { return <div title="café 🎵" />; }\n'
-      );
-      f.refresh();
-      assert.equal(f.invoke().certified, true);
+    f.write(
+      component,
+      'export function Card() { return <div title="café 🎵" />; }\n'
+    );
+    f.refresh();
+    assert.equal(f.invoke().certified, true);
+  });
+
+  it('a real Git inventory above 1 MiB retains complete mutation evidence', () => {
+    const blob = f.git(['hash-object', '-w', component]);
+    const rows = Array.from(
+      { length: 12000 },
+      (_, i) =>
+        `100644 ${blob}\tapps/web/fixtures/${'inventory-'.repeat(8)}${i}.txt\0`
+    ).join('');
+    f.git(['update-index', '-z', '--index-info'], { input: rows });
+    const inventory = f.git(['ls-files', '-z', '--', 'apps/web'], {
+      maxBuffer: 16 * 1024 * 1024,
     });
+    assert.ok(Buffer.byteLength(inventory) > 1024 * 1024);
+    assert.equal(f.invoke().certified, true);
   });
 });

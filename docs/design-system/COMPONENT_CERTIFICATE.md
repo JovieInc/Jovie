@@ -5,7 +5,7 @@ One machine-checkable record per shippable component (`jovie.component-certifica
 persistent whole-tree ledger that says what each component still lacks.
 
 Run: `node scripts/component-certificate.mjs --all --out report.json --summary`
-or `--component <path> --spec` for the agent-ready work order.
+or `--component <path>` for an individual certificate.
 
 Fail-closed: a criterion with no evidence is `unknown` and counts as missing.
 
@@ -43,5 +43,5 @@ Mutation sweep default scope is `lib/,app/api/`; pass
 `benchmark-library.json` maps a job to the best-in-class behavior and to the
 Jovie primitive that expresses it. Peak moments come first: checkout success,
 profile claimed, first release live, first fan subscribed. Adopt the behavior,
-never the visual identity. Adopted gaps become acceptance criteria in the
-component's work order.
+never the visual identity. Adopted gaps become acceptance criteria for the
+component.
