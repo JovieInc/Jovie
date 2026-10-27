@@ -186,7 +186,7 @@ struct AppShellLeftDrawer: View {
     }
     .frame(width: drawerWidth, alignment: .leading)
     .frame(maxHeight: .infinity)
-    .background(JovieColor.backgroundBase)
+    .background(JovieColor.surface0)
     .allowsHitTesting(isPresented)
     .accessibilityHidden(!isPresented)
     .accessibilityIdentifier("shell-drawer")

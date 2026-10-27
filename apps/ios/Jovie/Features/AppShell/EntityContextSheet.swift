@@ -287,7 +287,7 @@ struct AppShellRightRail: View {
     }
     .padding(JovieSpacing.large)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(JovieColor.backgroundBase)
+    .background(JovieColor.surface2)
     .accessibilityElement(children: .contain)
     .accessibilityIdentifier("shell-right-rail")
   }

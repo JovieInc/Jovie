@@ -54,7 +54,7 @@ struct DashboardView: View {
 
   var body: some View {
     ZStack {
-      JovieColor.backgroundBase.ignoresSafeArea()
+      JovieColor.surface1.ignoresSafeArea()
 
       content
         .padding(JovieSpacing.xLarge)

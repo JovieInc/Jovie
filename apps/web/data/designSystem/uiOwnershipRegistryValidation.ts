@@ -234,6 +234,122 @@ const swiftFunctionBody = (body: string, functionName: string): string => {
   }
   return depth === 0 ? body.slice(openingBrace + 1, cursor - 1) : '';
 };
+
+// These are the native shell's existing paint owners, not a new surface
+// registry. Check the masked, rendered View property so a comment, another
+// card, or an unused helper cannot stand in for the actual backing plane.
+function validateNativeShellSurfaces(
+  swiftSources: readonly UINativeSwiftSource[],
+  issues: UIOwnershipRegistryIssue[]
+) {
+  const codeByPath = new Map(
+    swiftSources.map(source => [source.path, maskSwiftNonCode(source.source)])
+  );
+  const blockAt = (code: string, openingBrace: number): string => {
+    let depth = 1;
+    let cursor = openingBrace + 1;
+    while (cursor < code.length && depth > 0) {
+      if (code[cursor] === '{') depth += 1;
+      if (code[cursor] === '}') depth -= 1;
+      cursor += 1;
+    }
+    return depth === 0 ? code.slice(openingBrace + 1, cursor - 1) : '';
+  };
+  const check = (
+    featurePath: string,
+    owner: string,
+    property: string,
+    paint: RegExp
+  ) => {
+    const code = codeByPath.get(`apps/ios/Jovie/Features/${featurePath}`) ?? '';
+    const declaration = [...code.matchAll(swiftDeclarationPattern)].find(
+      match => match.groups?.name === owner
+    );
+    const ownerBody = declaration
+      ? blockAt(code, (declaration.index ?? 0) + declaration[0].length - 1)
+      : '';
+    const member = new RegExp(
+      `\\bvar\\s+${property}\\s*:\\s*some\\s+View\\s*\\{`
+    ).exec(ownerBody);
+    const viewBody = member
+      ? blockAt(ownerBody, (member.index ?? 0) + member[0].length - 1)
+      : '';
+    if (!viewBody || !paint.test(viewBody)) {
+      bad(issues, 'invalid-native-shell-surface', `${owner}.${property}`);
+    }
+  };
+
+  check(
+    'AppShell/AppShellLeftDrawer.swift',
+    'AppShellLeftDrawer',
+    'body',
+    /\.background\(JovieColor\.surface0\)\s*\.allowsHitTesting\(isPresented\)/
+  );
+  check(
+    'AppShell/AppShellView.swift',
+    'AppShellView',
+    'body',
+    /\.background\(JovieColor\.surface0\)\s*\.sheet\(item:\s*\$entityContext\)/
+  );
+  check(
+    'AppShell/AppShellView.swift',
+    'AppShellView',
+    'shellContent',
+    /ZStack\s*\{\s*ZStack\s*\{\s*JovieColor\.surface1\.ignoresSafeArea\(\)/
+  );
+  check(
+    'AppShell/AppShellView.swift',
+    'AppShellView',
+    'shellContent',
+    /\.background\(JovieColor\.surface1\)\s*\.clipShape\(shellContentClipShape\(isElevated:\s*isElevated\)\)\s*\.background\s*\{\s*if !isElevated\s*\{\s*JovieColor\.surface1\.ignoresSafeArea\(edges:\s*\.bottom\)/
+  );
+  check(
+    'AppShell/AppShellView.swift',
+    'AppShellView',
+    'shellToolbar',
+    /\.padding\(\.vertical,\s*JovieSpacing\.small\)\s*\.background\(JovieColor\.surface1\)/
+  );
+  check(
+    'AppShell/EntityContextSheet.swift',
+    'AppShellRightRail',
+    'body',
+    /\.background\(JovieColor\.surface2\)\s*\.accessibilityElement\(children:\s*\.contain\)/
+  );
+  for (const [folder, owner] of [
+    ['Chat', 'MobileChatView'],
+    ['Chat', 'MobileChatPlaceholderView'],
+    ['Library', 'LibrarySurfaceView'],
+    ['Calendar', 'CalendarSurfaceView'],
+    ['Inbox', 'InboxSurfaceView'],
+    ['Dashboard', 'DashboardView'],
+    ['Audience', 'AudienceHighlightsView'],
+  ] as const) {
+    check(
+      `${folder}/${owner}.swift`,
+      owner,
+      'body',
+      /ZStack\s*\{\s*JovieColor\.surface1\.ignoresSafeArea\(\)/
+    );
+  }
+  check(
+    'Library/LibrarySurfaceView.swift',
+    'LibraryItemScreen',
+    'body',
+    /\.frame\(maxWidth:\s*\.infinity,\s*maxHeight:\s*\.infinity,\s*alignment:\s*\.topLeading\)\s*\.background\(JovieColor\.surface1\)/
+  );
+  check(
+    'Chat/MobileChatView.swift',
+    'MobileChatView',
+    'composerChrome',
+    /\.background\(JovieColor\.surface1\)\s*$/
+  );
+  check(
+    'Chat/MobileChatPlaceholderView.swift',
+    'MobileChatPlaceholderView',
+    'body',
+    /\.padding\(\.bottom,\s*JovieSpacing\.medium\)\s*\.background\(JovieColor\.surface1\)/
+  );
+}
 const ownsCanonicalPressRecipe = (declarationBody: string) => {
   const body = swiftFunctionBody(declarationBody, 'makeBody');
   return (
@@ -748,5 +864,8 @@ export function validateUIOwnershipRegistry({
     bad(issues, issue.code, issue.id);
   }
   validateNativeButtonOwnership(entries, swiftSources, issues, repoRoot);
+  if (entries.some(entry => entry.id === 'organism.app-shell-frame')) {
+    validateNativeShellSurfaces(swiftSources, issues);
+  }
   return issues;
 }

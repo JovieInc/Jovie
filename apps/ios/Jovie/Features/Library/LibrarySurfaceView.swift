@@ -30,7 +30,7 @@ struct LibrarySurfaceView: View {
 
   var body: some View {
     ZStack {
-      JovieColor.backgroundBase.ignoresSafeArea()
+      JovieColor.surface1.ignoresSafeArea()
 
       VStack(alignment: .leading, spacing: 0) {
         if let openCollection {
@@ -443,7 +443,7 @@ struct LibraryItemScreen: View {
       }
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(JovieColor.backgroundBase)
+    .background(JovieColor.surface1)
     // `.contain` keeps this container out of the accessibility tree so the
     // back button and friends keep their own identifiers. Without it the
     // container identifier propagates to every child (SwiftUI accessibility

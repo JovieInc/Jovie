@@ -20,7 +20,7 @@ struct AudienceHighlightsView: View {
 
   var body: some View {
     ZStack {
-      JovieColor.backgroundBase.ignoresSafeArea()
+      JovieColor.surface1.ignoresSafeArea()
 
       ScrollView {
         VStack(alignment: .leading, spacing: JovieSpacing.xLarge) {

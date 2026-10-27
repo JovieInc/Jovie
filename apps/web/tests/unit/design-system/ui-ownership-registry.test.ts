@@ -57,6 +57,80 @@ const nativeFixture = (
 });
 
 describe('cross-surface UI ownership registry', () => {
+  it('binds the native shell and every opaque main root to their semantic surfaces', () => {
+    expect(
+      validateUIOwnershipRegistry({
+        swiftSources: productionSwiftSources,
+        repoRoot: root,
+      }).filter(issue => issue.code === 'invalid-native-shell-surface')
+    ).toEqual([]);
+  });
+
+  it('RED: rejects wrong native surface roles, transparency and missing paint owners', () => {
+    const cases = [
+      {
+        file: 'AppShell/AppShellLeftDrawer.swift',
+        before: '.background(JovieColor.surface0)',
+        after: '.background(JovieColor.surface1)',
+        owner: 'AppShellLeftDrawer.body',
+      },
+      {
+        file: 'AppShell/EntityContextSheet.swift',
+        before: '.background(JovieColor.surface2)',
+        after: '.background(JovieColor.surface0)',
+        owner: 'AppShellRightRail.body',
+      },
+      {
+        file: 'AppShell/AppShellView.swift',
+        before: 'JovieColor.surface1.ignoresSafeArea()',
+        after: 'JovieColor.surface0.ignoresSafeArea()',
+        owner: 'AppShellView.shellContent',
+      },
+      {
+        file: 'AppShell/AppShellView.swift',
+        before: '.background(JovieColor.surface1)\n  }\n}',
+        after: '.background(JovieColor.surface1.opacity(0.96))\n  }\n}',
+        owner: 'AppShellView.shellToolbar',
+      },
+      {
+        file: 'Chat/MobileChatView.swift',
+        before: 'JovieColor.surface1.ignoresSafeArea()',
+        after: 'JovieColor.backgroundBase.ignoresSafeArea()',
+        owner: 'MobileChatView.body',
+      },
+      {
+        file: 'Library/LibrarySurfaceView.swift',
+        before: 'JovieColor.surface1.ignoresSafeArea()',
+        after: '// JovieColor.surface1.ignoresSafeArea()',
+        owner: 'LibrarySurfaceView.body',
+      },
+    ];
+    for (const fixture of cases) {
+      const target = `apps/ios/Jovie/Features/${fixture.file}`;
+      const original = productionSwiftSources.find(
+        source => source.path === target
+      );
+      expect(original?.source, target).toContain(fixture.before);
+      const swiftSources = productionSwiftSources.map(source =>
+        source.path === target
+          ? {
+              ...source,
+              source: source.source.replace(fixture.before, fixture.after),
+            }
+          : source
+      );
+      expect(
+        validateUIOwnershipRegistry({ swiftSources, repoRoot: root }).filter(
+          issue => issue.code === 'invalid-native-shell-surface'
+        ),
+        fixture.owner
+      ).toContainEqual({
+        code: 'invalid-native-shell-surface',
+        id: fixture.owner,
+      });
+    }
+  });
+
   it('is source-backed, closed-world, and complete', () => {
     expect(UI_OWNERSHIP_REGISTRY_SCHEMA).toBe('jovie.ui-ownership/v1');
     expect(UI_OWNERSHIP_REGISTRY.map(entry => entry.id)).toEqual(
