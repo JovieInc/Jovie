@@ -3239,6 +3239,12 @@
   box-shadow: none;
 }
 
+:where(.system-b-chat-composer-input-grid) {
+  /* Reserve the toolbar before its streamed HTML arrives. The same minimum
+     as min-h-9 scales with root text; auto still admits enlarged controls. */
+  grid-template-rows: auto minmax(calc(var(--spacing) * 9), auto);
+}
+
 .system-b-chat-composer-input {
   color: var(--color-text-primary-token);
   caret-color: var(--color-text-primary-token);
