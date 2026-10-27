@@ -871,6 +871,23 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       page,
       uniqueHandle
     );
+    // The real /start rail must expose its full preview at the hosted desktop
+    // viewport, including the enrichment detail below the phone.
+    const profilePreview = page.getByTestId('onboarding-profile-rail');
+    await expect(profilePreview).toBeVisible();
+    await profilePreview.focus();
+    await expect(profilePreview).toBeFocused();
+    await page.keyboard.press('End');
+    await expect(
+      profilePreview.getByText(/Spotify followers \(source: enrichment\)/)
+    ).toBeInViewport({ ratio: 1 });
+    await page.keyboard.press('Home');
+    await expect(
+      profilePreview.getByTestId('onboarding-profile-preview-badge')
+    ).toBeInViewport({ ratio: 1 });
+    await profilePreview.evaluate(element => {
+      if (element instanceof HTMLElement) element.blur();
+    });
     await captureKeyframe(page, 'anonymous-chat');
 
     // ──────────────────────────────────────────────────────────────────

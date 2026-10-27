@@ -328,11 +328,13 @@ export function OnboardingProfileRail({
 
   return (
     <aside
+      aria-label='Profile Preview'
+      tabIndex={isInline ? undefined : 0}
       className={cn(
-        'overflow-hidden bg-(--app-shell-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
+        'overflow-x-hidden bg-(--app-shell-content-surface) text-primary-token transition-[opacity,transform,width,border-color] duration-cinematic ease-out',
         isInline
-          ? 'relative z-0 w-full rounded-3xl lg:hidden'
-          : 'z-30 max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--app-shell-border)'
+          ? 'relative z-0 w-full overflow-y-hidden rounded-3xl lg:hidden'
+          : 'z-30 overflow-y-auto overscroll-contain max-lg:hidden lg:relative lg:h-full lg:w-95 lg:border-l lg:border-(--app-shell-border)'
       )}
       data-testid={
         isInline ? 'onboarding-profile-rail-inline' : 'onboarding-profile-rail'
@@ -342,8 +344,8 @@ export function OnboardingProfileRail({
     >
       <div
         className={cn(
-          'flex h-full min-h-0 items-center justify-center',
-          isInline ? 'px-0 py-2' : 'lg:w-95 lg:px-4 lg:py-4'
+          'flex min-h-0 items-center justify-center',
+          isInline ? 'h-full px-0 py-2' : 'min-h-full lg:w-95 lg:px-4 lg:py-4'
         )}
       >
         <div className='flex min-h-0 w-full flex-col items-center'>
