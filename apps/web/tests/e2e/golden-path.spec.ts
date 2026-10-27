@@ -714,6 +714,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
       timeout: 30_000,
     })
     .toBe(handle);
+  await expect(input).toHaveAttribute('placeholder', 'Reply to Jovie…');
 
   return conversationId;
 }

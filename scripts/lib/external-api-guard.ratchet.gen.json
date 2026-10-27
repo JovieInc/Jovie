@@ -672,7 +672,7 @@
       "gh-subprocess": 2
     },
     "scripts/unstack-merged-parent.sh": {
-      "gh-shell": 4
+      "gh-shell": 3
     },
     "scripts/visual-baseline-adopt.mjs": {
       "gh-subprocess": 1
