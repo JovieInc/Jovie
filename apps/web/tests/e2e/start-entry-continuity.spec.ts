@@ -2,6 +2,7 @@ import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { inspectEssentialViewport } from './helpers/golden-path-keyframes';
 import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
 import {
+  inspectStartEntryEssentialViewport,
   installDelayedGuidanceLayoutProbe,
   installReplyLayoutProbe,
 } from './utils/start-entry-layout';
@@ -71,19 +72,7 @@ async function draftProgress(page: Page) {
 }
 
 async function expectEssentials(page: Page) {
-  const selectors = [
-    '[aria-label="Chat message input" i]',
-    'button[aria-label="Send message"], button[aria-label="Stop generating"], button[aria-label="Interrupt and send"]',
-  ];
-  for (const selector of [
-    '[data-testid="onboarding-empty-intro"] h1',
-    '[data-testid="onboarding-flow-status"] [role="status"]',
-    '[data-testid="onboarding-turnstile-widget-frame"][data-turnstile-mount="inline"]',
-    '[data-onboarding-session] [role="alert"]',
-  ]) {
-    if (await page.locator(selector).isVisible()) selectors.push(selector);
-  }
-  expect(await inspectEssentialViewport(page, selectors)).toEqual({
+  expect(await inspectStartEntryEssentialViewport(page)).toEqual({
     supported: true,
     findings: [],
   });
