@@ -1,4 +1,5 @@
-import { randomBytes } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { createHash, randomBytes } from 'node:crypto';
 import {
   mkdirSync,
   mkdtempSync,
@@ -8,11 +9,13 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { gzipSync } from 'node:zlib';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   BASELINE_HEADROOM_RATIO,
   checkBudgets,
   checkFirstLoadBudgets,
+  collectRouteJsProvenance,
   evaluateBudgets,
   FORBIDDEN_CLIENT_CODE,
   findForbiddenClientCode,
@@ -100,6 +103,133 @@ describe('route-js-budget', () => {
     expect(byRoute['/app/settings'].gzipKb).toBeLessThan(62);
     expect(byRoute['/app/chat'].chunks).toBe(3);
     expect(byRoute['/app/chat'].gzipKb).toBeGreaterThanOrEqual(160);
+  });
+
+  it('reports selected first-load chunks with exact hashes, gzip bytes and deduplicated totals', () => {
+    const nextDir = buildFixture();
+    const main = 'static/chunks/main.js';
+    const shell = 'static/chunks/shell.js';
+    writeFileSync(join(nextDir, 'BUILD_ID'), 'fixture-build\n');
+    writeFileSync(
+      join(nextDir, 'app-build-manifest.json'),
+      JSON.stringify({
+        pages: {
+          '/[username]/page': [shell, main, shell],
+          '/exp/page-builder/page': ['static/chunks/heavy.js'],
+        },
+      })
+    );
+    const context = {
+      sourceSha: 'a'.repeat(40),
+      githubSha: 'a'.repeat(40),
+      runId: '123',
+      runAttempt: '2',
+      producer: 'ci-build-layout',
+    };
+    const receipt = collectRouteJsProvenance(
+      nextDir,
+      ['/[username]', '/[username]'],
+      context
+    );
+    expect(receipt).toMatchObject({
+      schema: 'jovie.route-js-provenance/v1',
+      buildId: 'fixture-build',
+      gzipLevel: 9,
+      ...context,
+    });
+    expect(receipt.routes).toHaveLength(1);
+    const row = receipt.routes[0];
+    expect(row.route).toBe('/[username]');
+    expect(row.files.map(file => file.path)).toEqual([main, shell]);
+    for (const file of row.files) {
+      const bytes = readFileSync(join(nextDir, file.path));
+      expect(file).toEqual({
+        path: file.path,
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        rawBytes: bytes.length,
+        gzipBytes: gzipSync(bytes, { level: 9 }).length,
+      });
+    }
+    expect(row.rawBytes).toBe(60 * 1024);
+    expect(row.gzipBytes).toBe(
+      row.files.reduce((total, file) => total + file.gzipBytes, 0)
+    );
+    expect(row.gzipKb).toBe(
+      measureFirstLoadJs(nextDir).find(row => row.route === '/[username]')
+        ?.gzipKb
+    );
+    expect(row.chunks).toBe(2);
+  });
+
+  it('reports the same client-reference fallback as the budget and refuses missing selections', () => {
+    const nextDir = buildFixture();
+    writeFileSync(join(nextDir, 'BUILD_ID'), 'fallback-build');
+    writeManifest(nextDir, '../[username]', '/[username]/page', {
+      root: ['static/chunks/main.js'],
+      page: ['static/chunks/shell.js'],
+    });
+    const receipt = collectRouteJsProvenance(nextDir, ['/[username]']);
+    expect(receipt.routes[0].gzipKb).toBe(
+      measureFirstLoadJs(nextDir).find(row => row.route === '/[username]')
+        ?.gzipKb
+    );
+    expect(() =>
+      collectRouteJsProvenance(nextDir, ['/[username]', '/missing'])
+    ).toThrow('Selected routes missing from first-load manifests: /missing');
+  });
+
+  it('emits the selected receipt before an unchanged failing budget exit', () => {
+    const nextDir = buildFixture();
+    writeFileSync(join(nextDir, 'BUILD_ID'), 'failing-budget-build');
+    writeFileSync(
+      join(nextDir, 'app-build-manifest.json'),
+      JSON.stringify({
+        pages: { '/[username]/page': ['static/chunks/heavy.js'] },
+      })
+    );
+    const budgetsPath = join(nextDir, 'budgets.json');
+    const budgets = JSON.parse(
+      readFileSync(join(__dirname, 'route-js-budgets.json'), 'utf8')
+    );
+    budgets.firstLoad.baselines['/[username]'] = 100;
+    writeFileSync(budgetsPath, JSON.stringify(budgets));
+    const args = [
+      join(__dirname, 'route-js-budget.mjs'),
+      '--next-dir',
+      nextDir,
+      '--budgets',
+      budgetsPath,
+    ];
+    const before = spawnSync(process.execPath, args, { encoding: 'utf8' });
+    const after = spawnSync(
+      process.execPath,
+      [...args, '--provenance-route', '/[username]'],
+      { encoding: 'utf8' }
+    );
+    expect(before.status).toBe(1);
+    expect(after.status).toBe(before.status);
+    expect(after.stderr).toBe(before.stderr);
+    expect(after.stderr).toContain('/[username] ships 120 KB gzip');
+    expect(before.stdout).not.toContain('jovie.route-js-provenance/v1');
+    const json = after.stdout
+      .split('::group::Selected route JS provenance\n')[1]
+      ?.split('\n::endgroup::')[0];
+    expect(json).toBeTruthy();
+    expect(JSON.parse(json!)).toMatchObject({
+      buildId: 'failing-budget-build',
+      routes: [{ route: '/[username]', chunks: 2 }],
+    });
+    const missing = spawnSync(
+      process.execPath,
+      [...args, '--provenance-route', '/missing'],
+      { encoding: 'utf8' }
+    );
+    expect(missing.status).toBe(before.status);
+    expect(missing.stderr).toContain(before.stderr);
+    expect(missing.stderr).toContain(
+      '::warning::Route JS provenance unavailable: Selected routes missing from first-load manifests: /missing'
+    );
+    expect(missing.stdout).not.toContain('jovie.route-js-provenance/v1');
   });
 
   it('fails a route over its ceiling and uses the default otherwise', () => {
