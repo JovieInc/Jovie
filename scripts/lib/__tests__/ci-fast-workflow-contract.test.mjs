@@ -638,6 +638,7 @@ describe('ci-fast bounded parallel workflow', () => {
         kbd: 'false',
         crawler: 'true',
         desktop_update: 'false',
+        dsp: 'false',
         overlay: 'false',
         privacy: 'false',
         tasks: 'false',
@@ -771,6 +772,119 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
   });
 
+  it('selects DSP details only for its real consumers and runs the maintained browser proof', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/DSP_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    const affected = [
+      'apps/web/components/shell/DspAvatarStack.tsx',
+      'apps/web/components/shell/DspAvatarStack.test.tsx',
+      'apps/web/components/shell/DspAvatarStack.stories.tsx',
+      'apps/web/components/shell/DspAvatarStack.mobile-drawer.test.tsx',
+      'apps/web/components/shell/DspAvatarStack.mobile-drawer.stories.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.stories.tsx',
+      'apps/web/components/organisms/release-sidebar/ReleaseSidebarSections.tsx',
+      'apps/web/components/molecules/drawer/RightDrawer.tsx',
+      'apps/web/lib/a11y/modal-focus-boundary.ts',
+      'apps/web/tests/e2e/storybook-dsp-details.spec.ts',
+    ];
+    const unrelated = 'apps/web/components/shell/Other.tsx';
+    for (const path of [...affected, unrelated, `${affected[0]}.bak`]) {
+      const match = spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+        input: `${path}\n`,
+        encoding: 'utf8',
+      });
+      expect(match.status, path).toBe(affected.includes(path) ? 0 : 1);
+    }
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Start ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'dsp-storybook-selection-'));
+    try {
+      for (const [changed, selected] of [
+        [affected.join('\n'), 'true'],
+        [unrelated, 'false'],
+      ]) {
+        const output = join(root, `output-${selected}`);
+        const result = spawnSync(
+          'bash',
+          ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CHANGED_PATHS: changed,
+              RUNNER_TEMP: root,
+              GITHUB_OUTPUT: output,
+            },
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const values = Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        );
+        expect(values.dsp).toBe(selected);
+        expect(values.run).toBe(selected);
+      }
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CRAWLER: 'false',
+            RUN_OVERLAY: 'false',
+            RUN_PRIVACY: 'false',
+            RUN_TASKS: 'false',
+            RUN_DESKTOP_UPDATE: 'false',
+            RUN_DSP: 'true',
+          },
+        }
+      );
+      const spec = 'tests/e2e/storybook-dsp-details.spec.ts';
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim().split('\n')).toEqual([spec]);
+      expect(remaining).toContain(
+        'RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}'
+      );
+      const surfaces = jobBlock(
+        'ci-storybook-surfaces',
+        'ci-cross-product-integration'
+      );
+      const invocation = surfaces.match(
+        /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+      );
+      expect(invocation).not.toBeNull();
+      expect(
+        invocation[1].match(/tests\/e2e\/storybook-dsp-details\.spec\.ts/g)
+      ).toHaveLength(1);
+      expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -845,6 +959,7 @@ describe('ci-fast bounded parallel workflow', () => {
         overlay: 'false',
         tasks: 'true',
         desktop_update: 'false',
+        dsp: 'false',
         privacy: 'false',
       });
 
