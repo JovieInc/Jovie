@@ -1,8 +1,16 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
+import {
+  planSourceGuardActions,
+  ROOT_ACTIONS,
+  SNAPSHOT_RELATIVE,
+} from './lib/source-guard-action-snapshot.mjs';
+
+const { load } = createRequire(import.meta.url)('js-yaml');
 
 const WORKFLOW_EXTENSIONS = new Set(['.yml', '.yaml']);
 const LOCAL_PATH_PREFIXES = ['./', '.github/', 'apps/', 'scripts/'];
@@ -98,6 +106,73 @@ function resolveWorkspaceNames(root) {
   return names;
 }
 
+/** Static references to the runtime snapshot must prove their source and producer. */
+function generatedActionReferences(root, relativeWorkflow, source) {
+  const valid = new Set();
+  if (relativeWorkflow !== '.github/workflows/source-validation.yml')
+    return valid;
+  try {
+    const document = load(source);
+    const job = document?.jobs?.deterministic;
+    const steps = job?.steps;
+    if (!Array.isArray(steps)) return valid;
+    const producerIndex = steps.findIndex(
+      step => step.id === 'source_guard_actions'
+    );
+    const producer = steps[producerIndex];
+    const mergeIndex = steps.findIndex(
+      step => step.id === 'source_guard_merge'
+    );
+    const condition =
+      "steps.source_guard_merge.outputs.dependency_changed == 'true'";
+    const helper = 'scripts/lib/source-guard-action-snapshot.mjs';
+    if (
+      !producer ||
+      mergeIndex < 0 ||
+      mergeIndex >= producerIndex ||
+      steps.filter(step => step.id === producer.id).length !== 1 ||
+      producer.run?.trim() !== `node ${helper}` ||
+      producer.if !== condition ||
+      producer['continue-on-error'] ||
+      producer['working-directory'] ||
+      job.defaults?.run?.['working-directory'] ||
+      document.defaults?.run?.['working-directory'] ||
+      !fs.existsSync(path.join(root, helper))
+    )
+      return valid;
+    for (const [index, action] of ROOT_ACTIONS.entries()) {
+      const consumer = steps[producerIndex + index + 1];
+      if (
+        consumer?.uses !== `./${SNAPSHOT_RELATIVE}/${action}` ||
+        consumer.if !== condition ||
+        consumer['continue-on-error']
+      )
+        return valid;
+    }
+    // Same validation as the real writer, including nested local metadata and
+    // package/link boundaries. Never create a snapshot to make the check pass.
+    planSourceGuardActions(root);
+    for (const action of ROOT_ACTIONS)
+      valid.add(`./${SNAPSHOT_RELATIVE}/${action}`);
+    // A second occurrence in another job has no producer proof.
+    for (const [id, other] of Object.entries(document.jobs)) {
+      if (
+        id !== 'deterministic' &&
+        other.steps?.some(step => valid.has(step.uses))
+      )
+        return new Set();
+    }
+    for (const reference of valid) {
+      if (steps.filter(step => step.uses === reference).length !== 1)
+        return new Set();
+    }
+  } catch {
+    // Missing/invalid source closure or workflow structure remains unresolved.
+    return new Set();
+  }
+  return valid;
+}
+
 export function validateWorkflowReferences(root = process.cwd()) {
   const workflowRoot = path.join(root, '.github', 'workflows');
   const errors = [];
@@ -112,6 +187,11 @@ export function validateWorkflowReferences(root = process.cwd()) {
     const relativeWorkflow = path.relative(root, workflowFile);
     const source = fs.readFileSync(workflowFile, 'utf8');
     const lines = source.split(/\r?\n/);
+    const generatedActions = generatedActionReferences(
+      root,
+      relativeWorkflow,
+      source
+    );
 
     for (const line of findGhJqArgMisuse(source)) {
       errors.push(
@@ -123,6 +203,14 @@ export function validateWorkflowReferences(root = process.cwd()) {
       const localAction = line.match(/\buses:\s*(['"]?)(\.\/[^\s#'"}]+)\1/);
       if (localAction) {
         const actionPath = localAction[2];
+        if (actionPath.startsWith(`./${SNAPSHOT_RELATIVE}/`)) {
+          if (!generatedActions.has(actionPath)) {
+            errors.push(
+              `${relativeWorkflow}:${index + 1}: generated action has no valid source and producer: ${actionPath}`
+            );
+          }
+          continue;
+        }
         if (actionPath.startsWith('./.github/workflows/')) {
           if (!fs.existsSync(path.join(root, actionPath))) {
             errors.push(

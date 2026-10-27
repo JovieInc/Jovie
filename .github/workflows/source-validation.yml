@@ -187,13 +187,14 @@ jobs:
           changed=false
           [ "$(dependency_digest)" = "$head_digest" ] || changed=true
           printf 'dependency_changed=%s\nprepared=true\n' "$changed" >> "$GITHUB_OUTPUT"
-          if [ "$changed" = true ]; then
-            # Local post actions reload their metadata after source restoration.
-            # Retain only this generation's action closure until job cleanup.
-            node scripts/lib/source-guard-action-snapshot.mjs
-          fi
           # A baked browser path belongs to the prior installed generation.
           [ "$changed" != true ] || echo 'PLAYWRIGHT_BROWSERS_PATH=' >> "$GITHUB_ENV"
+      # Local post actions reload their metadata after source restoration.
+      # Retain only this generation's action closure until job cleanup.
+      - name: Preserve merged action generation
+        id: source_guard_actions
+        if: steps.source_guard_merge.outputs.dependency_changed == 'true'
+        run: node scripts/lib/source-guard-action-snapshot.mjs
       - name: Setup merged source dependencies
         id: source_merge_dependencies
         if: steps.source_guard_merge.outputs.dependency_changed == 'true'

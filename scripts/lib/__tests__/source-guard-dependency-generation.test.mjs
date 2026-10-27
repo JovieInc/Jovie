@@ -7,6 +7,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -43,6 +44,14 @@ function fixture(
   const runner = join(root, 'runner');
   const bin = join(root, 'bin');
   for (const directory of [repo, runner, bin]) mkdirSync(directory);
+  // The normal initial install provides the pinned YAML parser. Keep that
+  // actual dependency available to the helper copied into this Git fixture.
+  mkdirSync(join(repo, 'node_modules'));
+  symlinkSync(
+    dirname(createRequire(import.meta.url).resolve('js-yaml/package.json')),
+    join(repo, 'node_modules/js-yaml'),
+    'dir'
+  );
   const write = (path, contents) => {
     mkdirSync(dirname(join(repo, path)), { recursive: true });
     writeFileSync(join(repo, path), contents);

@@ -9,13 +9,18 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+const { load } = createRequire(import.meta.url)('js-yaml');
 export const SNAPSHOT_RELATIVE = 'tmp/source-guard-actions';
 const LOCAL_PREFIX = './.github/actions/';
 const SNAPSHOT_PREFIX = `./${SNAPSHOT_RELATIVE}/`;
-const ROOT_ACTIONS = ['setup-node-pnpm', 'setup-playwright'];
+export const ROOT_ACTIONS = Object.freeze([
+  'setup-node-pnpm',
+  'setup-playwright',
+]);
 
 /** Keep the complete action package, including a subaction's ../dist payload. */
 function packageRoot(action) {
@@ -65,14 +70,33 @@ function files(directory, relative = '') {
   return paths;
 }
 
-/**
- * The runner reloads local action metadata and post scripts at job cleanup.
- * A Git reset must not replace or delete that registered generation. This
- * job-owned cache uses the existing ignored /tmp directory and intentionally
- * outlives source restoration and every registered post hook. Hosted job
- * cleanup (or the next checkout's normal clean) disposes of it.
- */
-export function snapshotSourceGuardActions(repoRoot = process.cwd()) {
+function validatePayloads(source, manifest, packageDirectory) {
+  const runs = load(source)?.runs;
+  if (runs?.using === 'composite') return;
+  if (!/^node\d+$/.test(runs?.using ?? '')) {
+    throw new Error(`Unsupported source action runtime: ${manifest}`);
+  }
+  for (const name of ['main', 'pre', 'post']) {
+    const entry = runs[name];
+    if (name !== 'main' && entry === undefined) continue;
+    if (typeof entry !== 'string' || !entry) {
+      throw new Error(`Missing source action ${name}: ${manifest}`);
+    }
+    const payload = resolve(dirname(manifest), entry);
+    if (
+      !payload.startsWith(`${packageDirectory}${sep}`) ||
+      !existsSync(payload) ||
+      !lstatSync(payload).isFile()
+    ) {
+      throw new Error(
+        `Source action ${name} payload does not resolve inside its package: ${entry}`
+      );
+    }
+  }
+}
+
+/** Resolve and validate the source closure without creating runtime artifacts. */
+export function planSourceGuardActions(repoRoot = process.cwd()) {
   repoRoot = realpathSync(repoRoot);
   const source = join(repoRoot, '.github/actions');
   const pending = [...ROOT_ACTIONS];
@@ -89,12 +113,29 @@ export function snapshotSourceGuardActions(repoRoot = process.cwd()) {
     packages.set(root, paths);
     for (const path of paths) {
       if (!/(?:^|\/)action\.ya?ml$/.test(path)) continue;
-      localUses(readFileSync(join(source, root, path), 'utf8'), dependency => {
+      const manifest = join(source, root, path);
+      const content = readFileSync(manifest, 'utf8');
+      validatePayloads(content, manifest, join(source, root));
+      localUses(content, dependency => {
         pending.push(dependency);
       });
     }
   }
 
+  return { repoRoot, source, packages };
+}
+
+/**
+ * The runner reloads local action metadata and post scripts at job cleanup.
+ * A Git reset must not replace or delete that registered generation. This
+ * job-owned cache uses the existing ignored /tmp directory and intentionally
+ * outlives source restoration and every registered post hook. Hosted job
+ * cleanup (or the next checkout's normal clean) disposes of it.
+ */
+export function snapshotSourceGuardActions(repoRoot = process.cwd()) {
+  const plan = planSourceGuardActions(repoRoot);
+  const { source, packages } = plan;
+  repoRoot = plan.repoRoot;
   const parent = join(repoRoot, 'tmp');
   if (existsSync(parent) && !lstatSync(parent).isDirectory()) {
     throw new Error('Source action cache parent must be an ordinary directory');
