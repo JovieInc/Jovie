@@ -16,8 +16,10 @@
  * downward-only baselines for existing over-target routes.
  *
  * Usage: node scripts/route-js-budget.mjs [--next-dir .next] [--budgets file] [--json]
+ *        [--provenance-route /route] (repeat for selected first-load routes)
  */
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -243,6 +245,62 @@ export function measureFirstLoadJs(nextDir) {
   return measureRouteJs(nextDir, collectFirstLoadFiles(nextDir));
 }
 
+/**
+ * Optional evidence from the exact files counted by the first-load gate.
+ * @param {string} nextDir
+ * @param {string[]} selectedRoutes
+ * @param {Record<string, string | null>} [context]
+ */
+export function collectRouteJsProvenance(
+  nextDir,
+  selectedRoutes,
+  context = {}
+) {
+  const routesByName = new Map(
+    collectFirstLoadFiles(nextDir).map(row => [row.route, row.files])
+  );
+  const selected = [...new Set(selectedRoutes)].sort();
+  const missing = selected.filter(route => !routesByName.has(route));
+  if (missing.length) {
+    throw new Error(
+      `Selected routes missing from first-load manifests: ${missing.join(', ')}`
+    );
+  }
+  return {
+    schema: 'jovie.route-js-provenance/v1',
+    sourceSha: context.sourceSha ?? null,
+    githubSha: context.githubSha ?? null,
+    runId: context.runId ?? null,
+    runAttempt: context.runAttempt ?? null,
+    producer: context.producer ?? null,
+    buildId: readFileSync(join(nextDir, 'BUILD_ID'), 'utf8').trim(),
+    gzipLevel: 9,
+    routes: selected.map(route => {
+      const files = [...routesByName.get(route)].sort().map(path => {
+        const bytes = readFileSync(join(nextDir, path));
+        return {
+          path,
+          sha256: createHash('sha256').update(bytes).digest('hex'),
+          rawBytes: bytes.length,
+          gzipBytes: gzipSync(bytes, { level: 9 }).length,
+        };
+      });
+      const gzipBytes = files.reduce(
+        (total, file) => total + file.gzipBytes,
+        0
+      );
+      return {
+        route,
+        chunks: files.length,
+        rawBytes: files.reduce((total, file) => total + file.rawBytes, 0),
+        gzipBytes,
+        gzipKb: Math.round(gzipBytes / 1024),
+        files,
+      };
+    }),
+  };
+}
+
 export function resolveFirstLoadTarget(route, firstLoad) {
   if (firstLoad.routes && Object.hasOwn(firstLoad.routes, route)) {
     return firstLoad.routes[route];
@@ -461,13 +519,19 @@ function parseArgs(argv) {
     nextDir: resolve(SCRIPT_DIR, '..', '.next'),
     budgetsPath: join(SCRIPT_DIR, 'route-js-budgets.json'),
     json: false,
+    provenanceRoutes: [],
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--next-dir') options.nextDir = resolve(argv[++index]);
     else if (arg === '--budgets') options.budgetsPath = resolve(argv[++index]);
     else if (arg === '--json') options.json = true;
-    else throw new Error(`Unknown argument: ${arg}`);
+    else if (arg === '--provenance-route') {
+      const route = argv[++index];
+      if (!route?.startsWith('/'))
+        throw new Error('--provenance-route requires an absolute route');
+      options.provenanceRoutes.push(route);
+    } else throw new Error(`Unknown argument: ${arg}`);
   }
   return options;
 }
@@ -520,6 +584,32 @@ function main() {
     console.error(
       `::error::${hit.file} ships forbidden client code (${hit.id}) in ${hit.routes.length} /app routes, e.g. ${hit.routes[0]}. ${hit.fix}`
     );
+  }
+  if (options.provenanceRoutes.length) {
+    try {
+      const head = git(REPO_ROOT, ['rev-parse', 'HEAD']);
+      if (head.status !== 0)
+        throw new Error('Unable to identify checkout HEAD');
+      const receipt = collectRouteJsProvenance(
+        options.nextDir,
+        options.provenanceRoutes,
+        {
+          sourceSha: head.stdout.trim(),
+          githubSha: process.env.GITHUB_SHA ?? null,
+          runId: process.env.GITHUB_RUN_ID ?? null,
+          runAttempt: process.env.GITHUB_RUN_ATTEMPT ?? null,
+          producer: process.env.GITHUB_JOB ?? null,
+        }
+      );
+      console.log('::group::Selected route JS provenance');
+      console.log(JSON.stringify(receipt, null, 2));
+      console.log('::endgroup::');
+    } catch (error) {
+      // Missing diagnostic evidence must not change the existing budget decision.
+      console.warn(
+        `::warning::Route JS provenance unavailable: ${error.message}`
+      );
+    }
   }
   process.exit(result.ok && forbidden.length === 0 ? 0 : 1);
 }
