@@ -11,11 +11,11 @@ describe('CompactGlassModule', () => {
       </CompactGlassModule>
     );
 
-    const moduleEl = document.querySelector('.compact-capture-module');
+    const moduleEl = document.querySelector('.compact-glass-module');
     expect(moduleEl).toBeInTheDocument();
     expect(screen.getByText('Module body')).toBeInTheDocument();
     expect(
-      document.querySelector('.compact-capture-module__label')
+      document.querySelector('.compact-glass-module__label')
     ).not.toBeInTheDocument();
   });
 
@@ -27,7 +27,7 @@ describe('CompactGlassModule', () => {
     );
 
     expect(screen.getByText('Fan updates')).toHaveClass(
-      'compact-capture-module__label'
+      'compact-glass-module__label'
     );
   });
 
@@ -38,7 +38,7 @@ describe('CompactGlassModule', () => {
       </CompactGlassModule>
     );
 
-    expect(document.querySelector('.compact-capture-module')).toHaveClass(
+    expect(document.querySelector('.compact-glass-module')).toHaveClass(
       'w-full'
     );
   });

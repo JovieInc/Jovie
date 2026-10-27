@@ -132,10 +132,9 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     expect(headerCss).toContain('eoUUU');
     expect(headerCss).toContain('re-seated as a docked bar');
     expect(headerCss).toContain('--marketing-glass-height: 2.75rem');
-    const glass = readWebSource('styles/primitives/glass.css');
-    expect(glass).toContain('var(--noir-ion-shell) 82%');
-    expect(glass).toContain('var(--noir-ion-ion) 3%');
-    expect(glass).toContain('blur(8px)');
+    expect(headerCss).toContain('var(--noir-ion-shell) 82%');
+    expect(headerCss).toContain('var(--noir-ion-shell) 90%');
+    expect(headerCss).toContain('blur(20px) saturate(165%)');
     expect(headerCss).toContain('data-presentation="marketing-glass"');
     expect(DARK_GLASS_MEDIA_RECIPE.never.join(' ')).toMatch(/HeaderNav\.css/);
   });
@@ -169,10 +168,10 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     );
 
     expect(css).toContain('.artist-profile-audience-pill');
-    const glass = readWebSource('styles/primitives/glass.css');
-    expect(glass).toContain('var(--noir-ion-shell) 82%');
-    expect(glass).toContain('backdrop-filter: blur(8px)');
-    expect(css).not.toContain('backdrop-filter');
+    expect(css).toContain(
+      'color-mix(in oklab, var(--system-b-cinematic-black) 82%, transparent)'
+    );
+    expect(css).toContain('backdrop-filter: blur(14px)');
     expect(css).toContain('border-radius: 9999px');
     expect(css).toContain('min-height: 3rem');
     expect(css).toContain('max-width: min(21rem, calc(100vw - 4rem))');
@@ -223,7 +222,7 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     expect(promptBlock).toContain('GTcgO');
     expect(promptBlock).toContain('soft optical bloom B');
     expect(promptBlock).toContain('#22C1FC');
-    expect(promptBlock).toContain('blur(8px)');
+    expect(promptBlock).toContain('blur(20px) saturate(165%)');
     expect(promptBlock).not.toContain('homepage-v2-hero__glow-blob');
   });
 
@@ -270,10 +269,10 @@ describe('marketing media recipe contract (JOV-6246)', () => {
         pillHeightPx: 44,
         ctaHeightPx: 28,
         chromeMarkPx: 20,
-        blurPx: 8,
-        saturatePercent: 100,
+        blurPx: 20,
+        saturatePercent: 165,
         shellMixPercent: 82,
-        scrolledShellMixPercent: 82,
+        scrolledShellMixPercent: 90,
       })
     ).toEqual([]);
 
@@ -291,7 +290,7 @@ describe('marketing media recipe contract (JOV-6246)', () => {
     expect(
       auditMarketingMediaRecipeDecision({
         recipeId: 'compact-glass',
-        blurPx: 8,
+        blurPx: 14,
         shellMixPercent: 82,
       })
     ).toEqual([]);

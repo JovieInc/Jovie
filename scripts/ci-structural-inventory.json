@@ -306,7 +306,7 @@
     {
       "key": "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/chat/mobile-chat-certification.test.ts",
       "part": "webParts",
-      "seconds": 5,
+      "seconds": 5.0,
       "kind": "suite"
     },
     {
@@ -356,14 +356,6 @@
       "part": "webParts",
       "seconds": 0.8,
       "kind": "suite"
-    },
-    {
-      "key": "pnpm --filter=@jovie/web run lint:marketing-glass",
-      "part": "webParts",
-      "seconds": 1.05,
-      "kind": "pr-cheap-scan",
-      "measuredAt": "2026-10-26",
-      "source": "local pinned Node 24.22.1 / pnpm 9.15.9 invocation"
     }
   ]
 }

@@ -59,7 +59,7 @@ export function CaptureActionPill({
 
   return (
     <div
-      className='ap-capture-action w-full max-w-108 rounded-full p-1.5 ds-glass'
+      className='ap-capture-action w-full max-w-108 rounded-full p-1.5 backdrop-blur-xl'
       data-phase={phase}
       aria-live='polite'
     >
@@ -128,7 +128,7 @@ export function AudiencePill({
 
   return (
     <li
-      className={cn('artist-profile-audience-pill', 'ds-glass', 'group')}
+      className='artist-profile-audience-pill group'
       data-accent={accentIndex % PILL_ACCENTS.length}
     >
       <span className='relative z-10 flex items-center gap-2.5 px-4 py-3'>

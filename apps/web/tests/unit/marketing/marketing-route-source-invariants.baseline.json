@@ -17,7 +17,7 @@
   "arbitrary-value::components/marketing/MarketingSectionIntro.tsx": 2,
   "arbitrary-value::components/marketing/MarketingSnapRail.tsx": 6,
   "arbitrary-value::components/marketing/MarketingStoryPrimitives.tsx": 11,
-  "arbitrary-value::components/marketing/MarketingSurfaceCard.tsx": 11,
+  "arbitrary-value::components/marketing/MarketingSurfaceCard.tsx": 13,
   "arbitrary-value::components/marketing/NumberedSection.tsx": 1,
   "arbitrary-value::components/marketing/ProductScreenshotFrame.tsx": 1,
   "arbitrary-value::components/media/NormalizedLogoAsset.tsx": 4,
@@ -61,7 +61,7 @@
   "raw-color::app/(marketing)/renders/[state]/MarketingStateRenderClient.tsx": 1,
   "raw-color::components/features/auth/AuthenticatedAuthEntryGuard.tsx": 1,
   "raw-color::components/features/home/HomeTrustSection.tsx": 3,
-  "raw-color::components/marketing/MarketingSurfaceCard.tsx": 19,
+  "raw-color::components/marketing/MarketingSurfaceCard.tsx": 21,
   "raw-color::components/marketing/ProductScreenshotFrame.tsx": 1,
   "raw-color::components/site/MarketingFooterCta.tsx": 7,
   "raw-palette::components/atoms/VerifiedBadge.tsx": 2

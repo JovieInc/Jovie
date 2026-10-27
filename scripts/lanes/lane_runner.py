@@ -61,6 +61,9 @@ import execution_attempt  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
+import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
+import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
+from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
 import slot_yield  # noqa: E402  (slot ceilings from measured merged-per-dollar)  (abstraction gate: build the machine on the 3rd repeat or a costly task)
 import update_drain  # noqa: E402  (drain gate admission while an update waits)
@@ -136,7 +139,7 @@ MAX_GATE_TIMEOUTS = 3
 CLAIM_TTL_S = pr_events.CLAIM_TTL_S
 HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
-LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py",
+LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
               "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
@@ -6520,6 +6523,306 @@ def repair_target_node(pr: dict, live) -> dict | None:
         return None
 
 
+PLATFORM_RED_TEXT = fix_red_classes.PLATFORM_TEXT
+
+
+_FAILED_LOGS: dict = {}
+FAILED_LOG_CHECKS, FAILED_LOG_CHARS = 6, 40000
+
+
+def failed_logs(host: Host, pr: dict) -> dict | None:
+    """{check name: failed-job log} for the real red checks on this head, read once per (PR, head); None when a
+    check has no job link or a log is unreadable (an unknown red is never routed around a model)."""
+    cache_key = (str(host.state), pr["number"], pr["headRefOid"])
+    if cache_key in _FAILED_LOGS:
+        return _FAILED_LOGS[cache_key]
+    logs: dict | None = {}
+    for check in fix_red_classes.real_failures(pr)[:FAILED_LOG_CHECKS]:
+        job = re.search(r"/job/(\d+)", check.get("detailsUrl") or "")
+        log = gh_call(["run", "view", "--repo", REPO_SLUG, "--job", job.group(1), "--log-failed"]) if job else None
+        if log is None or log.returncode != 0:
+            logs = None
+            break
+        logs[str(check.get("name"))] = (log.stdout or "")[-FAILED_LOG_CHARS:]
+    if len(_FAILED_LOGS) > 64:
+        _FAILED_LOGS.clear()
+    _FAILED_LOGS[cache_key] = logs
+    return logs
+
+
+def infra_only_red(host: Host, pr: dict) -> str | None:
+    """The infrastructure signature when every real red check on this head failed for a platform
+    reason (rate limit, HTTP 408, missing token, runner loss), else None. 52 of 253 fix-no-change
+    runs were an agent reading such a log and declining; a rerun costs no agent. One rerun per
+    head: a head that is still infra-red after it goes to the agent as before."""
+    kinds = set(pr.get("eventKinds") or [])
+    if pr.get("gateEvidence") or pr.get("queueFailure") or kinds & {"conflict", "review", "dequeued"} \
+            or pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        return None
+    if not fix_red_classes.real_failures(pr):
+        return None
+    logs = failed_logs(host, pr)
+    if not logs:
+        return None
+    found = set()
+    for text in logs.values():
+        hit = PLATFORM_RED_TEXT.search(text)
+        if not hit:
+            return None
+        found.add(re.sub(r"\W+", "-", hit.group(0).lower()).strip("-"))
+    return "+".join(sorted(found))[:60]
+
+
+def claim_infra_rerun(host: Host, pr: dict) -> bool:
+    """True once per (PR, head): the caller may rerun instead of dispatching an agent."""
+    taken = []
+    def change(data: dict) -> None:
+        if data.get(str(pr["number"])) != pr["headRefOid"]:
+            data[str(pr["number"])] = pr["headRefOid"]
+            taken.append(True)
+    try:
+        update_json(host.state / "infra-reruns.json", change)
+    except (OSError, ValueError):
+        return False
+    return bool(taken)
+
+
+OPEN_MIGRATIONS_QUERY = ('query($endCursor:String){repository(owner:"JovieInc",name:"Jovie"){pullRequests(states:OPEN,first:100,'
+                         'after:$endCursor){pageInfo{hasNextPage endCursor}nodes{number files(first:100){nodes{path}}}}}}')
+
+
+def open_pr_migrations(exclude: int) -> dict | None:
+    """{PR number: migration numbers it adds} for every other open PR; None when GitHub cannot be read."""
+    result = gh_call(["api", "graphql", "--paginate", "-f", f"query={OPEN_MIGRATIONS_QUERY}", "--jq",
+                      ".data.repository.pullRequests.nodes[]|{n:.number,f:[.files.nodes[].path]}"])
+    if result.returncode != 0:
+        return None
+    out = {}
+    for line in (result.stdout or "").splitlines():
+        try:
+            row = json.loads(line)
+        except ValueError:
+            return None
+        numbers = migration_renumber._numbers(row.get("f") or [])
+        if numbers and row.get("n") != exclude:
+            out[int(row["n"])] = numbers
+    return out
+
+
+def renumber_migrations_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a migration number collision: renumber to the next free number, rebuild the journal and
+    snapshots, merge main and push. Returns a finished-agent stand-in, or None (worktree restored) when it does not apply."""
+    git = lambda *args, **kw: sh(["git", *args], cwd=worktree, log=log, timeout=900, **kw)
+    def restore() -> None:
+        git("merge", "--abort")
+        git("reset", "--hard", f"origin/{pr['headRefName']}")
+        git("clean", "-fdq", "--", migration_renumber.MIG_DIR)
+    others = open_pr_migrations(pr["number"])
+    if others is None:
+        return None
+    def read(*args):
+        done = sh(["git", *args], cwd=worktree, timeout=300)
+        if done.returncode:
+            raise OSError(f"git {args[0]} failed")
+        return done.stdout or ""
+    try:
+        changed = migration_renumber.renumber(worktree, read, "origin/main", pr["number"], others)
+        if not changed:
+            return None
+        git("add", "-A", "--", migration_renumber.MIG_DIR)
+        if git("commit", "-q", "-m", "fix(db): renumber migration to the next free number").returncode:
+            raise OSError("commit failed")
+        if git("merge", "--no-edit", "origin/main").returncode:
+            conflicted = (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split()
+            if conflicted != [f"{migration_renumber.META}/_journal.json"] \
+                    or git("checkout", "--ours", "--", conflicted[0]).returncode or git("add", conflicted[0]).returncode \
+                    or git("commit", "-q", "--no-edit").returncode:
+                raise OSError("merge conflict outside the journal")
+        if git("push", "-q", "origin", f"HEAD:{pr['headRefName']}").returncode:
+            raise OSError("push failed")
+    except (migration_renumber.Unmergeable, OSError, ValueError, KeyError, subprocess.SubprocessError):
+        restore()
+        return None
+    receipt.update(resolution="renumbered-migrations", renumbered=changed[:12])
+    return types.SimpleNamespace(returncode=0)
+
+
+def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
+    finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
+    added = fix_red_classes.wire_ci_fast(worktree, route.get("files") or [])
+    if not added:
+        return None
+    message = "fix(ci): wire " + ", ".join(Path(name).name for name in added)[:80] + " into ci-fast"
+    steps = [["git", "add", "scripts/ci-fast-lanes.mjs"], ["git", "commit", "-q", "-m", message],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="wired-ci-fast", wiredFiles=added)
+    return types.SimpleNamespace(returncode=0)
+
+
+def claim_route(host: Host, pr: dict, action: str) -> bool:
+    """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
+    taken = []
+    def change(data: dict) -> None:
+        row = data.setdefault(str(pr["number"]), {})
+        if row.get(action) != pr["headRefOid"]:
+            row[action] = pr["headRefOid"]
+            taken.append(True)
+    try:
+        update_json(host.state / "class-routes.json", change)
+    except (OSError, ValueError):
+        return False
+    return bool(taken)
+
+
+def route_fix_red(host: Host, pr: dict) -> dict | None:
+    """Classify this red head by its failed logs. Returns the class (always) so the receipt carries a
+    fingerprint; deterministic classes are acted on by the caller."""
+    if pr.get("mergeStateStatus") == "DIRTY" or pr.get("reviewDecision") == "CHANGES_REQUESTED":
+        return None
+    try:
+        logs = failed_logs(host, pr) or {}
+        return fix_red_classes.classify(pr, logs)
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
+    """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
+    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN}:
+        return None
+    # One rerun per head, shared with the platform-red gate above; one sync per head.
+    if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
+        return None
+    if route["action"] == fix_red_classes.RERUN:
+        return f"infra-rerun:{route['cls']}" if _rerun_failed(pr) else None
+    return f"infra-rerun:{route['cls']}" if pr_events.sync_main(host, THIS, pr, time.time(), terminal_ok=True) == "synced" else None
+
+
+# Per-PR circuit breaker across heads. Gem ledger, 762 fix runs: after 3 consecutive unproductive
+# runs on a PR inside 24 h the next run pushed 7% of the time (13 of 192), against 27% for a first
+# run; 52% of all runs went to PRs the lane never pushed. A new head does not reset the streak.
+BREAKER_STREAK = pr_events.BREAKER_STREAK
+BREAKER_WINDOW_S = pr_events.BREAKER_WINDOW_S
+breaker_streak = pr_events.breaker_streak
+pr_breaker_open = pr_events.pr_breaker_open
+
+
+def note_breaker_run(host: Host, pr: dict, receipt: dict, now: float | None = None) -> None:
+    """Record one finished run; the run that completes the streak files one factory signal."""
+    now = time.time() if now is None else now
+    if receipt.get("attemptRefunded") or receipt.get("verdict") in ("recovery-handoff", "reconcile-unavailable", "skipped"):
+        return  # no agent work was charged to the PR
+    productive = receipt.get("verdict") in ("fix-pushed", "pr-opened")
+    opened, tripped = [], []
+    def change(data: dict) -> None:
+        entry = data.setdefault(str(pr["number"]), {"runs": []})
+        entry["runs"] = [row for row in entry.get("runs", []) if now - float(row[0]) < BREAKER_WINDOW_S]
+        entry["runs"].append([now, productive])
+        fp = (receipt.get("failureFingerprint") or {}).get("key")
+        if fp:
+            rows = entry.setdefault("fp", {})
+            rows[fp] = [row for row in rows.get(fp, []) if now - float(row[0]) < BREAKER_WINDOW_S] + [[now, productive]]
+            if productive:
+                entry.pop("fpOpenHead", None)
+            elif breaker_streak(rows[fp], now) >= fingerprint_breaker_n(host):
+                entry["fpOpenHead"] = pr["headRefOid"]
+                tripped.append(fp)
+        entry["lastRunId"] = receipt.get("runId")
+        if breaker_streak(entry["runs"], now) == BREAKER_STREAK and not entry.get("signalAt"):
+            entry["signalAt"] = now
+            opened.append(entry)
+        elif productive:
+            entry.pop("signalAt", None)
+        for stale in [k for k, v in data.items() if not v.get("runs")]:
+            del data[stale]
+    try:
+        update_json(host.state / "pr-breaker.json", change)
+        if opened:
+            (host.state / "runs").mkdir(parents=True, exist_ok=True)
+            row = {"schema": "jovie-factory-signal/v1", "at": now_iso(), "source": "pr-breaker",
+                   "fingerprint": hashlib.sha256(f"pr-breaker:{pr['number']}:{int(now // BREAKER_WINDOW_S)}".encode()).hexdigest()[:16],
+                   "ws": "ci", "subject": {"pr": pr["number"]},
+                   "evidence": {"excerpt": f"PR #{pr['number']}: {BREAKER_STREAK} consecutive unproductive fix runs in 24h; "
+                                            f"last verdict {receipt.get('verdict')} reasons {(receipt.get('reasons') or [])[:2]}; "
+                                            f"last run {receipt.get('runId')}. Lanes stopped repairing it; a human or a "
+                                            "different approach is needed."}}
+            with open(host.state / "runs" / "factory-signals.jsonl", "a") as out:
+                out.write(json.dumps(row) + "\n")
+    except (OSError, ValueError, TypeError):
+        pass
+    if tripped:
+        note_fingerprint_trip(host, pr, {**(receipt.get("failureFingerprint") or {}), "checks": []}, receipt, now)
+
+
+def fingerprint_breaker_n(host: Host) -> int:
+    """No-push model runs on one (PR, fingerprint) before the next is refused: measured from the ledger by the
+    doctor (fix_red_classes.breaker_n -> fix-red-metrics.json); the default until it has enough runs."""
+    try:
+        value = int(json.loads((host.state / "fix-red-metrics.json").read_text())["breakerN"])
+        return min(max(value, 2), fix_red_classes.MAX_BREAKER_N)
+    except (OSError, ValueError, KeyError, TypeError):
+        return fix_red_classes.DEFAULT_BREAKER_N
+
+
+def fingerprint_breaker_open(host: Host, pr: dict, key: str, now: float | None = None) -> bool:
+    now = time.time() if now is None else now
+    try:
+        entry = json.loads((host.state / "pr-breaker.json").read_text()).get(str(pr["number"])) or {}
+        return breaker_streak((entry.get("fp") or {}).get(key) or [], now) >= fingerprint_breaker_n(host)
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
+
+
+def note_fingerprint_trip(host: Host, pr: dict, route: dict, receipt: dict, now: float | None = None) -> None:
+    """One `machine-gap` factory signal per (PR, fingerprint): a model failed to move this failure class
+    repeatedly, so the next unit of work is the machine that fixes the class, not another run."""
+    now = time.time() if now is None else now
+    cls, key = route.get("cls") or "other", route.get("key") or "unknown"
+    fingerprint = f"fix-red-{cls}-{key}"
+    path = host.state / "factory-signals" / f"{fingerprint}.json"
+    if path.exists():
+        return
+    row = {"schema": "jovie-factory-signal/v1", "fingerprint": fingerprint, "source": "fix-red-fingerprint",
+           "extraLabels": ["machine-gap"],
+           "title": f"Machine gap: fix-red `{cls}` failures ({key}) keep reaching a model",
+           "problem": f"PR #{pr['number']}: {fingerprint_breaker_n(host)} model fix runs in 24h on fingerprint `{key}` "
+                      f"(class {cls}; signature {route.get('signature') or 'n/a'}) pushed nothing; last verdict "
+                      f"{receipt.get('verdict')}. Build or extend the deterministic fixer / guard for this class in "
+                      "scripts/lanes/fix_red_classes.py (or the check that emits it) instead of dispatching another run.",
+           "acceptance": ["The failure class is classified in fix_red_classes.SIGNATURES with a deterministic action "
+                          "(or a guard prevents it), with a test fed by the failing log",
+                          "A new red of this class is fixed with no model run"],
+           "metric": {"name": "model fix-red runs on this fingerprint", "baseline": fingerprint_breaker_n(host),
+                      "target": 0, "measuredBy": "python3 scripts/lanes/fix_red_classes.py measure"}}
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_text(path, json.dumps(row, indent=1))
+    except (OSError, ValueError):
+        pass
+
+
+def file_breaker_signals(host: Host, linear) -> int:
+    """File each unfiled breaker signal as one remediation intake issue (idempotent by fingerprint)."""
+    path = host.state / "runs" / "factory-signals.jsonl"
+    if not path.exists():
+        return 0
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    filed = 0
+    for row in rows:
+        if row.get("filedAt") or row.get("source") != "pr-breaker":
+            continue
+        if pr_events.ensure_linear_intake(linear, row):
+            row["filedAt"] = now_iso()
+            filed += 1
+    if filed:
+        atomic_write_text(path, "".join(json.dumps(row) + "\n" for row in rows))
+    return filed
+
+
 def fix_request_source(pr: dict) -> dict:
     """Keep the evidence that requested repair even when its target has become terminal."""
     return {
@@ -6556,7 +6859,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
         return str((receipt.get("reasons") or ["recovery-handoff"])[0])
     if verdict == "skipped":
         reason = str((receipt.get("reasons") or [""])[0])
-        return reason if reason.startswith("worktree-unavailable") else None
+        return reason if reason.startswith(("worktree-unavailable", "infra-rerun:")) else None
     if verdict == "fix-no-change":
         # The provider wrapper died before any agent worked: the head's budget paid for nothing.
         reason = str((receipt.get("reasons") or [""])[0])
@@ -6575,7 +6878,7 @@ def unworked_fix_attempt(receipt: dict) -> str | None:
 # handoffs: the precondition (an unreadable target, a failed checkout) is host infrastructure,
 # not the PR, and an immediate next-tick re-claim would crash-loop the same failure (Gem
 # 2026-10-23: 7 target-state-unavailable + 6 worktree-unavailable stops in 24h).
-INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash"})
+INFRA_PRECONDITION_REASONS = frozenset({"target-state-unavailable", "worktree-unavailable", "lane-crash", "infra-rerun"})
 
 
 def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
@@ -6610,6 +6913,7 @@ def end_local_fix_attempt(host: Host, pr: dict, receipt: dict) -> None:
             requeued = handoff or refund in pr_events.UNRESUMABLE_PRESERVED \
                 or refund.split(":", 1)[0] in INFRA_PRECONDITION_REASONS
     update_json(host.state / "fix-attempts.json", finish)
+    note_breaker_run(host, pr, receipt)
     if requeued:
         try:
             path = (receipt.get("recovery") or {}).get("worktree") \
@@ -7157,6 +7461,28 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
     pr = live
+    infra = infra_only_red(host, pr) if branch_held else None
+    if infra and claim_infra_rerun(host, pr) and _rerun_failed(pr):
+        receipt.update(verdict="skipped", reasons=[f"infra-rerun:{infra}"], endedAt=now_iso(),
+                       result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
+        end_local_fix_attempt(host, pr, receipt)
+        with open(runs / "ledger.jsonl", "a") as ledger:
+            ledger.write(json.dumps(receipt) + "\n")
+        return receipt
+    route = route_fix_red(host, pr) if branch_held else None
+    if route:
+        receipt["failureFingerprint"] = {key: route[key] for key in ("cls", "key", "action", "signature")}
+        reason = deterministic_route_taken(host, pr, route)
+        if not reason and fingerprint_breaker_open(host, pr, route["key"]):
+            reason = f"infra-rerun:breaker-{route['cls']}"
+            note_fingerprint_trip(host, pr, route, receipt)
+        if reason:
+            receipt.update(verdict="skipped", reasons=[reason], endedAt=now_iso(),
+                           result={"verdict": "skipped", "commit": None, "pr": pr["number"]})
+            end_local_fix_attempt(host, pr, receipt)
+            with open(runs / "ledger.jsonl", "a") as ledger:
+                ledger.write(json.dumps(receipt) + "\n")
+            return receipt
     failure = {"checks": [(check.get("name"), check.get("conclusion")) for check in pr.get("statusCheckRollup") or []],
                "merge": pr.get("mergeStateStatus"), "review": pr.get("reviewDecision")}
     ident = execution_attempt.identity("pr-remediation",
@@ -7301,7 +7627,10 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 boundary("before-agent")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
-                agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
+                         fix_red_classes.RENUMBER: renumber_migrations_fix}.get((route or {}).get("action"))
+                agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
+                agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),
                                                          "model": str(spec.get("model"))}),
@@ -7605,14 +7934,14 @@ def _inventory_unreadable(path, error) -> dict:
     return {"sourceAtReason": "inventory-unreadable"}
 
 
-def open_prs_summary(*, capture: list[dict] | None = None) -> list[dict]:
+def open_prs_summary(*, capture: list[dict] | None = None, refresh: bool = False) -> list[dict]:
     """Every open PR with its aggregate check state, in a few cheap GraphQL pages, cached for a
     minute. Per-check rollups over dozens of PRs 504 or trip GitHub's secondary rate limit
     (2026-09-27: devin had 43 red PRs and saw none of them, so it idled over budget). The
     aggregate state stands in as one synthetic check; `with_checks` loads the real ones for
     the single PR a worker claims. Empty when GitHub cannot be read."""
     now = time.time()
-    if now - _SUMMARY["at"] < SUMMARY_TTL_S:
+    if not refresh and now - _SUMMARY["at"] < SUMMARY_TTL_S:
         if capture is not None:
             capture.append(copy.deepcopy(_SUMMARY))
         return _SUMMARY["prs"]
@@ -7655,13 +7984,13 @@ class RepairInventoryHold(Exception):
     """The initial repair census cannot qualify this pass; exit after releasing claim.lock."""
 
 
-def capture_repair_inventory(name: str) -> dict:
+def capture_repair_inventory(name: str, *, refresh: bool = False) -> dict:
     """Copy one summary invocation's rows and provenance outside global claim.lock."""
     identity = {"repository": REPO_SLUG, "provider": name,
                 "cacheKey": "open-prs-labels-v2", "cacheRoot": str(SHARED_CACHE_DIR)}
     paired = []
     try:
-        returned = copy.deepcopy(open_prs_summary(capture=paired))
+        returned = copy.deepcopy(open_prs_summary(capture=paired, **({"refresh": True} if refresh else {})))
         summary = paired[0] if len(paired) == 1 else {}
         same = isinstance(returned, list) and isinstance(summary, dict) and returned == summary.get("prs")
     except (OSError, ValueError, TypeError, KeyError, AttributeError, subprocess.SubprocessError):
@@ -7719,6 +8048,23 @@ def repair_inventory_cause(receipt: dict, name: str, now: float | None = None) -
     if now - stamp >= CLAIM_SCAN_TTL_S:
         return "source-stale"
     return None
+
+
+def lock_repair_inventory(host: Host, name: str, receipt: dict) -> tuple[Locked, dict]:
+    """Fence a copied census after optional preflight, then after one lock wait.
+
+    Only age can request another ordinary census outside claim.lock. A refresh
+    supplies its own rows and provenance; unreadable/mismatched receipts still
+    fail closed. Bound retries so contention cannot spin or repeat admission.
+    """
+    if repair_inventory_cause(receipt, name) == "source-stale":
+        receipt = capture_repair_inventory(name, refresh=True)
+    claim = Locked(host.state / "claim.lock", blocking=True)
+    if repair_inventory_cause(receipt, name) == "source-stale":
+        claim.release()
+        receipt = capture_repair_inventory(name, refresh=True)
+        claim = Locked(host.state / "claim.lock", blocking=True)
+    return claim, receipt
 
 
 def overlap_prs_summary() -> list[dict] | None:
@@ -7810,8 +8156,8 @@ def org_merged_prs(identifier: str) -> list[dict] | None:
 
 
 def in_flight_issues() -> frozenset[str] | None:
-    """Issues that already have an open PR (lane branch or `linear-issue-id` marker) from any
-    lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
+    """Issues that already have an open PR (lane branch, canonical reference or legacy marker)
+    from any lane, host, or agent. GitHub is the shared truth. None when GitHub cannot be read: an
     unknown in-flight set is not permission to open a duplicate PR (JOV-6833). A parked PR the
     sweep requeued (`lane-rebuild`, JOV-7708) stays open but no longer holds its issue."""
     def fetch():
@@ -7828,6 +8174,7 @@ def in_flight_issues() -> frozenset[str] | None:
         branch = LANE_BRANCH.match(pr.get("headRefName") or "")
         marker = ISSUE_MARKER.search(pr.get("body") or "")
         keys |= {key.upper() for key in (branch and branch.group("issue"), marker and marker.group(1)) if key}
+        keys |= ownership.referenced(pr.get("body") or "")
     return frozenset(keys)
 
 
@@ -8159,7 +8506,7 @@ def claim_red_pr(host: Host, name: str, prs: list[dict] | None = None) -> dict |
     providers = load_providers()
     order, now = pr_events.cost_order(providers), time.time()
     disabled = set(providers) - set(order)
-    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now)
+    prs = [pr for pr in prs if not pr_recovery_held(host, pr, now) and not pr_breaker_open(host, pr["number"], now, pr.get("headRefOid"))
            and pr_events.may_take(name, pr, attempts.get(str(pr["number"]), {}), order, now)]
     settled = []
     for pr in prs:
@@ -8684,7 +9031,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
     routing_needed = spec.get("repairs") is not False and repair_routing_needed(host, rung_inventory)
     routing_providers = load_providers() if routing_needed else {}
     routing_context = capture_repair_routing(host, routing_providers, rung_inventory) if routing_needed else None
-    claim = Locked(host.state / "claim.lock", blocking=True)
+    if repair_inventory is not None:
+        claim, repair_inventory = lock_repair_inventory(host, name, repair_inventory)
+    else:
+        claim = Locked(host.state / "claim.lock", blocking=True)
     # Bulk repair inventory fills under its per-key lock outside this global lock.
     # Current local filters and selected-head/owner/claim arbitration remain serialized.
     red = adopt = issue = route_decision = None
@@ -8700,6 +9050,12 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
         local = spec.get("repairs") is not False
         if local and not repair_inventory_valid(repair_inventory, name):
             raise RepairInventoryHold()
+        if local:
+            # Project the refreshed same-call pair while claim ownership is held.
+            # Optional file witnesses retain their original binding and are
+            # revalidated by the new-issue path before use.
+            scan_summary = repair_inventory["summary"]
+            rung_inventory = {key: scan_summary.get(key) for key in ("readable", "sourceAt", "prs")}
         candidates = [pr for pr in fix_candidates(name, inventory=repair_inventory["prs"]) if not pr_recovery_held(host, pr)] if local else []
         # Reclaimed abandoned drafts (the only non-lane drafts among the fix candidates) are
         # gated and readied like this lane's own drafts. Derived from the one cached scan so
@@ -8741,6 +9097,7 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             if not maintenance_only:
                 linear = Linear(host.linear_env)
             if local:
+                linear_optional(file_breaker_signals, host, linear)
                 linear_optional(escalate_exhausted, host,
                                 list({pr["number"]: pr for pr in candidates + events + rung_candidates}.values()), linear,
                                 **({"model_only": True} if maintenance_only else {}),

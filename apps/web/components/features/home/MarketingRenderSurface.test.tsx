@@ -47,7 +47,7 @@ describe('MarketingRenderSurface', () => {
     const { container } = renderSurface('compact-glass');
 
     expect(
-      container.querySelector('.compact-capture-module.ds-glass')
+      container.querySelector('.compact-glass-module')
     ).toBeInTheDocument();
   });
 

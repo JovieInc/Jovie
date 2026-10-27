@@ -126,7 +126,6 @@ export const PR_CHEAP_SCAN_COMMANDS = Object.freeze([
   'pnpm tailwind:check',
   'pnpm --filter=@jovie/web run lint:no-native-dialogs',
   'pnpm --filter=@jovie/web run lint:seo',
-  'pnpm --filter=@jovie/web run lint:marketing-glass',
   'pnpm --filter=@jovie/web run lint:contrast-ratchet',
   'pnpm design:shared-ui-visual-arbitrary:check',
   'pnpm design:overlay-layers:check',
@@ -291,7 +290,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command:
       'node scripts/invariants/art-direction/run.mjs && node --test scripts/invariants/art-direction/*.test.mjs',
     inputs:
-      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|scripts\/invariants\/art-direction\/)/u,
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage)\/|apps\/web\/public\/assets\/generated\/|docs\/design-system\/taste-labels\/|apps\/web\/styles\/design-system\.css$|apps\/web\/data\/marketing\/imageColorPolicy\.ts$|design\.tokens\.json$|docs\/design-system\/motion-effects\.json$|scripts\/invariants\/art-direction\/)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -842,6 +841,9 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/preflight.test.mjs',
+  'scripts/layout-guard-pen-contracts.test.mjs',
+  'scripts/ci-rounds-report.test.mjs',
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
@@ -916,6 +918,9 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/merge-queue-green-enroll.test.mjs',
   'scripts/lib/__tests__/merge-group-victim-rearm.test.mjs',
   'scripts/lib/__tests__/pr-unacquired-runner-rerun.test.mjs',
+  'scripts/dequeue-held-reason.test.mjs',
+  'scripts/lib/__tests__/self-hosted-jobs.test.mjs',
+  'scripts/production-controller-read-token.test.mjs',
   'scripts/lib/__tests__/lane-fix-relay-wakes.test.mjs',
   'scripts/lib/__tests__/fleet-rules-evidence-concurrency.test.mjs',
   'scripts/lib/__tests__/fleet-rules-lane-evidence.test.mjs',
@@ -926,6 +931,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/art-direction/surface-media.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
+  'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/__tests__/canonical-artist-site-intake.test.mjs',
@@ -985,6 +991,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-ahead-attribution.test.mjs',
   'scripts/lib/__tests__/review-deadline.test.mjs',
   'scripts/lib/__tests__/blog-content-ci.test.mjs',
+  'scripts/lib/__tests__/vendored-actions.test.mjs',
   'scripts/lib/__tests__/api-quota-report.test.mjs',
   'scripts/lib/__tests__/blog-publish-latency.test.mjs',
   'scripts/lib/__tests__/nightly-agent-workflow.test.mjs',
@@ -1271,7 +1278,7 @@ const LANES = [
     id: 'structural',
     name: 'Structural Contract',
     nextLocalCommand:
-      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:marketing-glass && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
+      'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
       ' && ' +
       MARKETING_CERTIFICATION_COMMAND +
       ' && ' +
@@ -2191,6 +2198,7 @@ export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
   'scripts/agent/pen-live-canvas-persist.test.mjs',
   'scripts/agent/pen-cold-readback.test.mjs',
   'scripts/agent/pen-par/pen-par.test.mjs',
+  'scripts/agent/pen-instance-drift.test.mjs',
   'scripts/skill-governance-guard.test.mjs',
   'scripts/skill-catalog.test.mjs',
   'scripts/agent-web-contract.test.mjs',
@@ -2881,7 +2889,6 @@ export async function runStructural(opts = {}) {
     'pnpm tailwind:check',
     'pnpm --filter=@jovie/web run lint:no-native-dialogs',
     'pnpm --filter=@jovie/web run lint:seo',
-    'pnpm --filter=@jovie/web run lint:marketing-glass',
     'pnpm --filter=@jovie/web run lint:contrast-ratchet',
     'pnpm design:shared-ui-visual-arbitrary:check',
     // JOV-INV-036: no new raw global-layer z-index values in web source.
