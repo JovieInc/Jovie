@@ -3905,6 +3905,10 @@ describe('automation-verify affected scope', () => {
     expect(runner).toContain('--diff-filter=ACDMR');
   });
 
+  /**
+   * @param {number} pid
+   * @param {(command: string, args: string[], options: {encoding: 'utf8', timeout: number}) => {status: number | null, stdout: string, error?: unknown}} [inspect]
+   */
   function processCanRun(pid, inspect = spawnSync) {
     try {
       process.kill(pid, 0);

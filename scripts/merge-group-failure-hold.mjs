@@ -1019,7 +1019,7 @@ export function aheadEntryUnproven({
 // GitHub already removes the PR when the merge_group run fails.
 /**
  * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, fetchTimeoutText?: string, aheadGroup?: AheadGroup }} input
- * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
+ * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function, recordDequeue?: Function }} io
  */
 export async function applyMergeGroupFailure(
   {

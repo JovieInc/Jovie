@@ -1881,7 +1881,12 @@ describe('terminal failure hold application', () => {
   });
 
   it('records truthful dequeue intent through the shared repair budget', async () => {
-    const run = vi.fn(async () => ({ code: 0, stdout: '', stderr: '' }));
+    const run = vi.fn(async (_args, _options) => ({
+      code: 0,
+      stdout: '',
+      stderr: '',
+      deferred: false,
+    }));
     await recordDequeueReason(
       {
         repository: REPOSITORY,
@@ -1917,10 +1922,18 @@ describe('terminal failure hold application', () => {
         {
           repository: REPOSITORY,
           number: 42,
+          head: SOURCE,
           code: 'poison',
           reason: 'failure',
         },
-        { run: async () => ({ code: 75, stderr: 'github-quota-deferred' }) }
+        {
+          run: async () => ({
+            code: 75,
+            stdout: '',
+            stderr: 'github-quota-deferred',
+            deferred: true,
+          }),
+        }
       )
     ).rejects.toThrow('github-quota-deferred');
   });
