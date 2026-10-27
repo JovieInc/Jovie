@@ -117,16 +117,80 @@ function argValue(argv: readonly string[], name: string): string | undefined {
 
 interface LighthouseAudit {
   readonly numericValue?: number;
-  readonly details?: {
-    readonly items?: readonly {
-      readonly items?: readonly {
-        readonly node?: {
-          readonly snippet?: string;
-          readonly nodeLabel?: string;
-        };
-      }[];
-    }[];
+}
+
+interface LighthouseDiagnostics {
+  readonly lighthouseVersion: string | null;
+  readonly throttlingMethod: string | null;
+  readonly element: {
+    readonly selector: string | null;
+    readonly label: string | null;
   };
+  readonly metricsMs: {
+    readonly firstContentfulPaint: number | null;
+    readonly totalBlockingTime: number | null;
+    readonly observedFirstContentfulPaint: number | null;
+    readonly observedLargestContentfulPaint: number | null;
+  };
+  /** Insight subparts are observed timings, not the simulated gate metric. */
+  readonly observedLcpBreakdownMs: {
+    readonly timeToFirstByte: number | null;
+    readonly resourceLoadDelay: number | null;
+    readonly resourceLoadDuration: number | null;
+    readonly elementRenderDelay: number | null;
+  };
+  readonly warnings: readonly string[];
+}
+
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function detailItems(audit: unknown): readonly unknown[] {
+  const items = record(record(audit)?.details)?.items;
+  return Array.isArray(items) ? items : [];
+}
+
+function lcpNode(audit: unknown): Record<string, unknown> | undefined {
+  const items = detailItems(audit);
+  // Lighthouse 13 replaced largest-contentful-paint-element with this list
+  // insight: a breakdown table and a node, whose order is not significant.
+  for (const item of items) {
+    const candidate = record(item);
+    if (candidate?.type === 'node') return candidate;
+  }
+  // Retain compatibility with reports produced by older Lighthouse versions.
+  for (const item of items) {
+    const nested = record(item)?.items;
+    if (!Array.isArray(nested)) continue;
+    for (const row of nested) {
+      const candidate = record(record(row)?.node);
+      if (candidate) return candidate;
+    }
+  }
+  return undefined;
+}
+
+function shortText(value: unknown, limit: number): string | null {
+  if (typeof value !== 'string') return null;
+  // Lighthouse warnings and node labels can contain signed URLs. Remove the
+  // whole URL before truncation, including credentials, query and fragment.
+  return (
+    value
+      .replace(/\b[a-z][a-z\d+.-]*:\/\/[^\s<>"'`]+/gi, '[URL]')
+      .replace(/(^|[\s("'=])\.{0,2}\/[^\s<>"'`]+/g, '$1[URL]')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, limit) || null
+  );
+}
+
+function durationMs(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+    ? Math.round(value)
+    : null;
 }
 
 /**
@@ -134,19 +198,89 @@ interface LighthouseAudit {
  * 2026-10-26 failures needed a manual trace to learn it was a cookie card and a
  * Suspense-hidden heading).
  */
-export function describeLcpElement(audit: LighthouseAudit | undefined): string {
-  const node = audit?.details?.items?.[0]?.items?.[0]?.node;
-  const snippet = node?.snippet?.replace(/\s+/g, ' ').slice(0, 90);
-  if (!snippet) return 'unknown element';
-  const label = node?.nodeLabel?.replace(/\s+/g, ' ').slice(0, 40);
-  return label ? `${snippet} "${label}"` : snippet;
+export function describeLcpElement(
+  audit: unknown,
+  legacyAudit?: unknown
+): string {
+  const node = lcpNode(audit) ?? lcpNode(legacyAudit);
+  // Raw HTML can contain sensitive attribute values; attribution needs only
+  // the selector and human-readable label.
+  const selector = shortText(node?.selector, 90);
+  const label = shortText(node?.nodeLabel, 40);
+  if (!selector) return label ?? 'unknown element';
+  return label ? `${selector} "${label}"` : selector;
+}
+
+/** Allowlisted, bounded evidence only: never serialize report config/headers. */
+export function summarizeLighthouseDiagnostics(
+  report: unknown
+): LighthouseDiagnostics {
+  const source = record(report);
+  const audits = record(source?.audits) ?? {};
+  const breakdown = audits['lcp-breakdown-insight'];
+  const node =
+    lcpNode(breakdown) ?? lcpNode(audits['largest-contentful-paint-element']);
+  const metrics = record(detailItems(audits.metrics)[0]);
+  const rows: readonly unknown[] = detailItems(breakdown).flatMap(item => {
+    const table = record(item);
+    return table?.type === 'table' && Array.isArray(table.items)
+      ? table.items
+      : [];
+  });
+  const subpart = (name: string) =>
+    durationMs(
+      record(rows.find(row => record(row)?.subpart === name))?.duration
+    );
+  const warnings: readonly unknown[] = Array.isArray(source?.runWarnings)
+    ? source.runWarnings
+    : [];
+  return {
+    lighthouseVersion: shortText(source?.lighthouseVersion, 40),
+    throttlingMethod: shortText(
+      record(source?.configSettings)?.throttlingMethod,
+      24
+    ),
+    element: {
+      selector: shortText(node?.selector, 160),
+      label: shortText(node?.nodeLabel, 80),
+    },
+    metricsMs: {
+      firstContentfulPaint: durationMs(
+        record(audits['first-contentful-paint'])?.numericValue
+      ),
+      totalBlockingTime: durationMs(
+        record(audits['total-blocking-time'])?.numericValue
+      ),
+      observedFirstContentfulPaint: durationMs(
+        metrics?.observedFirstContentfulPaint
+      ),
+      observedLargestContentfulPaint: durationMs(
+        metrics?.observedLargestContentfulPaint
+      ),
+    },
+    observedLcpBreakdownMs: {
+      timeToFirstByte: subpart('timeToFirstByte'),
+      resourceLoadDelay: subpart('resourceLoadDelay'),
+      resourceLoadDuration: subpart('resourceLoadDuration'),
+      elementRenderDelay: subpart('elementRenderDelay'),
+    },
+    warnings: warnings
+      .slice(0, 3)
+      .map(warning => shortText(warning, 160))
+      .filter((warning): warning is string => warning !== null),
+  };
 }
 
 function runLighthouse(
   url: string,
   headersFile: string | null,
   outFile: string
-): { lcp: number; cls: number; element: string } {
+): {
+  lcp: number;
+  cls: number;
+  element: string;
+  diagnostics: LighthouseDiagnostics;
+} {
   const require = createRequire(import.meta.url);
   const lhciDir = path.dirname(require.resolve('@lhci/cli/package.json'));
   const cli = require.resolve('lighthouse/cli/index.js', { paths: [lhciDir] });
@@ -178,8 +312,10 @@ function runLighthouse(
     lcp,
     cls,
     element: describeLcpElement(
+      report.audits['lcp-breakdown-insight'],
       report.audits['largest-contentful-paint-element']
     ),
+    diagnostics: summarizeLighthouseDiagnostics(report),
   };
 }
 
@@ -234,6 +370,9 @@ export async function main(argv: readonly string[]): Promise<number> {
         clsSamples.push(sample.cls);
         console.log(
           `  ${budget.id} sample ${run + 1}/${runs}: LCP ${Math.round(sample.lcp)}ms CLS ${sample.cls.toFixed(3)} element ${sample.element}`
+        );
+        console.log(
+          `  ${budget.id} sample ${run + 1}/${runs} diagnostics ${JSON.stringify(sample.diagnostics)}`
         );
       }
       verdicts.push(
