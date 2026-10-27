@@ -156,6 +156,65 @@ async function waitForSettledProfileLayout(
   });
 }
 
+async function expectMenuFocusAfterEscape(
+  page: Page,
+  testInfo: TestInfo,
+  attachmentName: string
+) {
+  const menu = page.getByRole('button', { name: 'Menu', exact: true });
+  const originalMenu = await menu.elementHandle();
+  await menu.click();
+  await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByTestId('profile-menu-drawer')).toBeHidden();
+  try {
+    await expect(menu).toBeFocused();
+  } finally {
+    const observation = await menu
+      .evaluateAll((elements, original) => {
+        const current = elements[0] ?? null;
+        const active = document.activeElement;
+        const modals = Array.from(
+          document.querySelectorAll('dialog, [role="dialog"]')
+        ).map(element => {
+          const style = getComputedStyle(element);
+          return {
+            tag: element.tagName.toLowerCase(),
+            role: element.getAttribute('role'),
+            testId: element.getAttribute('data-testid'),
+            display: style.display,
+            visibility: style.visibility,
+            hasRects: element.getClientRects().length > 0,
+          };
+        });
+        return {
+          activeElement: active
+            ? {
+                tag: active.tagName.toLowerCase(),
+                role: active.getAttribute('role'),
+                ariaLabel: active.getAttribute('aria-label')?.slice(0, 160),
+                testId: active.getAttribute('data-testid'),
+              }
+            : null,
+          menuConnected: original?.isConnected ?? false,
+          menuFocused: active === original,
+          currentMenuConnected: current?.isConnected ?? false,
+          currentMenuFocused: active === current,
+          sameMenuElement: original === current,
+          visibleModalCount: modals.filter(
+            modal => modal.hasRects && modal.visibility !== 'hidden'
+          ).length,
+          modals: modals.slice(0, 10),
+        };
+      }, originalMenu)
+      .catch(() => ({ captureUnavailable: true }));
+    await testInfo.attach(attachmentName, {
+      body: Buffer.from(JSON.stringify(observation, null, 2)),
+      contentType: 'application/json',
+    });
+  }
+}
+
 test.describe('public profile browser admission', () => {
   for (const viewport of [1179, 1180].map(width => ({
     width,
@@ -385,6 +444,24 @@ test.describe('public profile browser admission', () => {
     ).toBeLessThanOrEqual(2);
   });
 
+  test('1512px initial Home menu restores its opener after Escape', async ({
+    page,
+  }, testInfo) => {
+    await installPublicRouteMocks(page);
+    await page.setViewportSize({ width: 1512, height: 982 });
+    const response = await page.goto(
+      '/renders/profile-admission?layout=public',
+      { waitUntil: 'domcontentloaded' }
+    );
+    expect(response?.status()).toBe(200);
+    await waitForSettledProfileLayout(page, expectedPublicProfileLayout(1512));
+
+    const home = page.getByRole('button', { name: 'Home', exact: true });
+    await expect(home).toHaveAttribute('aria-current', 'page');
+    await expectMenuFocusAfterEscape(page, testInfo, 'home-menu-focus.json');
+    await expect(home).toHaveAttribute('aria-current', 'page');
+  });
+
   const responsiveCases = [
     { width: 1179, height: 932 },
     { width: 1180, height: 932 },
@@ -439,12 +516,11 @@ test.describe('public profile browser admission', () => {
         const music = page.getByRole('button', { name: 'Music', exact: true });
         await music.click();
         await expect(music).toHaveAttribute('aria-current', 'page');
-        const menu = page.getByRole('button', { name: 'Menu', exact: true });
-        await menu.click();
-        await expect(page.getByTestId('profile-menu-drawer')).toBeVisible();
-        await page.keyboard.press('Escape');
-        await expect(page.getByTestId('profile-menu-drawer')).toBeHidden();
-        await expect(menu).toBeFocused();
+        await expectMenuFocusAfterEscape(
+          page,
+          testInfo,
+          'music-menu-focus.json'
+        );
       }
     });
   }
