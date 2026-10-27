@@ -28,6 +28,18 @@ export interface ReferencePreviewRepository {
   readPreview(key: string): Promise<PrivateReferencePreview | null>;
   insertPreview(key: string, value: PrivateReferencePreview): Promise<boolean>;
 }
+function matchesPreview(
+  saved: PrivateReferencePreview | null,
+  verified: PrivateReferencePreview
+) {
+  return (
+    saved?.schema === verified.schema &&
+    saved.scopeKey === verified.scopeKey &&
+    saved.sha256 === verified.sha256 &&
+    saved.contentType === verified.contentType &&
+    saved.base64 === verified.base64
+  );
+}
 export function referencePreviewKey(scope: ReferenceScope, slot: number) {
   if (
     !Number.isInteger(slot) ||
@@ -53,7 +65,10 @@ export async function ingestReferenceCapture(input: {
 }) {
   const candidate = ReferenceIntakeSchema.parse(input.candidate);
   const current = await readReferenceSession(input.repository, input.scope);
-  if (current.revision !== input.revision)
+  const existing = current.media[candidate.reference.id];
+  // An exact capture retry can reconcile a lost successful response. Identity
+  // and all media fields are still checked by importReferenceCandidates below.
+  if (current.revision !== input.revision && !existing)
     throw new ReferenceConflict('Reference intake revision changed.');
   const slot =
     current.media[candidate.reference.id]?.previewSlot ??
@@ -103,6 +118,20 @@ export async function ingestReferenceCapture(input: {
           : 'image/webp',
     base64: Buffer.from(input.bytes).toString('base64'),
   };
+  if (existing) {
+    if (
+      !matchesPreview(
+        await input.repository.readPreview(
+          referencePreviewKey(input.scope, slot)
+        ),
+        preview
+      )
+    )
+      throw new ReferenceConflict(
+        'Preview slot needs reconciliation before another intake.'
+      );
+    return current;
+  }
   // Immutable bytes first. An interrupted intake may leave a bounded private
   // orphan, but never a session pointing to missing bytes or a public image.
   const inserted = await input.repository.insertPreview(
@@ -113,10 +142,7 @@ export async function ingestReferenceCapture(input: {
     const previous = await input.repository.readPreview(
       referencePreviewKey(input.scope, slot)
     );
-    if (
-      previous?.sha256 !== sha256 ||
-      previous.scopeKey !== referenceScopeKey(input.scope)
-    )
+    if (!matchesPreview(previous, preview))
       throw new ReferenceConflict(
         'Preview slot needs reconciliation before another intake.'
       );

@@ -3,6 +3,7 @@ import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import {
   createReferenceSession,
+  importReferenceCandidates,
   referenceScopeKey,
   referenceView,
 } from '@/lib/agent-os/design-reference-corpus/adaptive/engine';
@@ -62,6 +63,196 @@ async function captured() {
   return { bytes, data };
 }
 describe('private captured-reference intake', () => {
+  it('replays the final committed capture at the 500-reference cap', async () => {
+    const { bytes, data } = await captured(),
+      repository = store();
+    let full = createReferenceSession(scope, now);
+    for (let offset = 0; offset < 499; offset += 100)
+      full = importReferenceCandidates(
+        full,
+        scope,
+        Array.from({ length: Math.min(100, 499 - offset) }, (_, i) =>
+          candidate(offset + i + 2)
+        ),
+        now
+      );
+    repository.sessions.set(referenceScopeKey(scope), full);
+    const input = {
+      repository,
+      scope,
+      candidate: data,
+      bytes,
+      revision: full.revision,
+      now,
+    };
+    const saved = await ingestReferenceCapture(input);
+    expect(Object.keys(saved.media)).toHaveLength(500);
+    const replay = await ingestReferenceCapture(input);
+    expect(replay.revision).toBe(saved.revision);
+    expect(repository.previews.size).toBe(1);
+    expect(replay.media[data.reference.id].previewSlot).toBe(499);
+  });
+  it('reconciles a failed commit by replaying the exact capture without another preview allocation', async () => {
+    const { bytes, data } = await captured(),
+      repository = store();
+    const commit = repository.compareAndSet;
+    repository.compareAndSet = async () => {
+      throw new Error('connection lost before commit');
+    };
+    const input = {
+      repository,
+      scope,
+      candidate: data,
+      bytes,
+      revision: 0,
+      now,
+    };
+    await expect(ingestReferenceCapture(input)).rejects.toThrow(
+      'connection lost'
+    );
+    expect(repository.sessions.size).toBe(0);
+    expect(repository.previews.size).toBe(1);
+    const reservation = structuredClone(
+      repository.previews.get(referencePreviewKey(scope, 0))
+    );
+    repository.compareAndSet = commit;
+    const result = await ingestReferenceCapture(input);
+    expect(result.revision).toBe(1);
+    expect(result.ratings).toEqual({});
+    expect(repository.previews.size).toBe(1);
+    expect(repository.previews.get(referencePreviewKey(scope, 0))).toEqual(
+      reservation
+    );
+  });
+  it('reconciles a lost successful response without advancing the revision or duplicating the capture', async () => {
+    const { bytes, data } = await captured(),
+      repository = store();
+    const commit = repository.compareAndSet;
+    repository.compareAndSet = async (...args) => {
+      await commit(...args);
+      throw new Error('response lost after commit');
+    };
+    const input = {
+      repository,
+      scope,
+      candidate: data,
+      bytes,
+      revision: 0,
+      now,
+    };
+    await expect(ingestReferenceCapture(input)).rejects.toThrow(
+      'response lost'
+    );
+    repository.compareAndSet = commit;
+    for (let i = 0; i < 4; i++) {
+      const recovered = await ingestReferenceCapture(input);
+      expect(recovered.revision).toBe(1);
+      expect(Object.keys(recovered.media)).toEqual([data.reference.id]);
+    }
+    expect(repository.previews.size).toBe(1);
+  });
+  it('keeps a different capture blocked until the reserved capture is reconciled at the current revision', async () => {
+    const { bytes, data } = await captured(),
+      repository = store();
+    const commit = repository.compareAndSet;
+    repository.compareAndSet = async () => false;
+    await expect(
+      ingestReferenceCapture({
+        repository,
+        scope,
+        candidate: data,
+        bytes,
+        revision: 0,
+        now,
+      })
+    ).rejects.toThrow('changed');
+    repository.sessions.set(referenceScopeKey(scope), {
+      ...createReferenceSession(scope, now),
+      revision: 4,
+    });
+    repository.compareAndSet = commit;
+    const otherBytes = await sharp({
+      create: { width: 8, height: 8, channels: 3, background: '#000000' },
+    })
+      .png()
+      .toBuffer();
+    const other = candidate(2, {
+      ...data.media,
+      sourceUrl: 'https://source.example/reference/2',
+      originalUrl: 'https://media.example/other.png',
+      sha256: createHash('sha256').update(otherBytes).digest('hex'),
+    });
+    for (let i = 0; i < 4; i++)
+      await expect(
+        ingestReferenceCapture({
+          repository,
+          scope,
+          candidate: other,
+          bytes: otherBytes,
+          revision: 4,
+          now,
+        })
+      ).rejects.toThrow('reconciliation');
+    expect(repository.previews.size).toBe(1);
+    expect(repository.previews.get(referencePreviewKey(scope, 0))?.sha256).toBe(
+      data.media.sha256
+    );
+    const recovered = await ingestReferenceCapture({
+      repository,
+      scope,
+      candidate: data,
+      bytes,
+      revision: 4,
+      now,
+    });
+    const next = await ingestReferenceCapture({
+      repository,
+      scope,
+      candidate: other,
+      bytes: otherBytes,
+      revision: recovered.revision,
+      now,
+    });
+    expect(next.revision).toBe(6);
+    expect(repository.previews.size).toBe(2);
+    expect(Object.keys(next.media)).toHaveLength(2);
+  });
+  it.each(['scope', 'bytes', 'content-type', 'missing'] as const)(
+    'refuses %s corruption during reservation reconciliation',
+    async fault => {
+      const { bytes, data } = await captured(),
+        repository = store();
+      const commit = repository.compareAndSet;
+      repository.compareAndSet = async () => false;
+      const input = {
+        repository,
+        scope,
+        candidate: data,
+        bytes,
+        revision: 0,
+        now,
+      };
+      await expect(ingestReferenceCapture(input)).rejects.toThrow('changed');
+      const key = referencePreviewKey(scope, 0),
+        preview = repository.previews.get(key)!;
+      if (fault === 'missing') repository.readPreview = async () => null;
+      else
+        repository.previews.set(key, {
+          ...preview,
+          ...(fault === 'scope'
+            ? { scopeKey: referenceScopeKey({ ...scope, tenantId: 'other' }) }
+            : fault === 'bytes'
+              ? { base64: 'AQID' }
+              : { contentType: 'image/jpeg' }),
+        });
+      repository.compareAndSet = commit;
+      await expect(ingestReferenceCapture(input)).rejects.toThrow(
+        'reconciliation'
+      );
+      expect(repository.sessions.size).toBe(0);
+      expect(repository.previews.size).toBe(1);
+    }
+  );
   it('does not store a fresh digest for an already-known media URL', async () => {
     const { bytes, data } = await captured(),
       repository = store();
