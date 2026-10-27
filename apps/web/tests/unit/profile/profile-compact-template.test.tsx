@@ -3513,4 +3513,106 @@ describe('ProfileCompactTemplate', () => {
       | undefined;
     expect(drawerCall?.creditSegments).toBe(creditSegments);
   });
+
+  describe('desktop module loading', () => {
+    const desktopModuleImported = vi.fn();
+
+    beforeEach(() => {
+      vi.resetModules();
+      desktopModuleImported.mockClear();
+      vi.doMock('@/features/profile/templates/ProfileDesktopSurface', () => {
+        desktopModuleImported();
+        return { ProfileDesktopSurface: MockProfileDesktopSurface };
+      });
+      vi.doMock('next/dynamic', async () => {
+        const { default: appDynamic } = await import(
+          'next/dist/shared/lib/app-dynamic'
+        );
+        return {
+          default: (
+            loader: Parameters<typeof appDynamic>[0],
+            options: Parameters<typeof appDynamic>[1]
+          ) => {
+            const source = String(loader);
+            if (source.includes('ProfileDesktopSurface'))
+              return appDynamic(loader, options);
+            if (source.includes('ProfileUnifiedDrawer'))
+              return (props: unknown) => mockProfileUnifiedDrawer(props);
+            if (source.includes('ProfileInlineNotificationsCTA'))
+              return (props: unknown) =>
+                mockProfileInlineNotificationsCTA(props);
+            return () => null;
+          },
+        };
+      });
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+      vi.doUnmock('next/dynamic');
+      vi.doUnmock('@/features/profile/templates/ProfileDesktopSurface');
+      vi.resetModules();
+    });
+
+    it('does not import the disabled desktop module on a cold profile render', async () => {
+      vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
+      const { ProfileCompactTemplate: ColdTemplate } = await import(
+        '../../../components/features/profile/templates/ProfileCompactTemplate'
+      );
+      expect(desktopModuleImported).not.toHaveBeenCalled();
+      render(
+        <ColdTemplate
+          mode='profile'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+        />
+      );
+      await act(async () => {
+        await vi.dynamicImportSettled();
+      });
+      expect(desktopModuleImported).not.toHaveBeenCalled();
+      expect(screen.getByTestId('profile-compact-shell')).toHaveAttribute(
+        'data-interactive-ready',
+        'true'
+      );
+      expect(screen.queryByTestId('profile-desktop-shell')).toBeNull();
+    });
+
+    it('loads the enabled desktop module and preserves the ready handoff and props', async () => {
+      vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '1');
+      const restoreViewport = mockViewport('desktop');
+      const { ProfileCompactTemplate: ColdTemplate } = await import(
+        '../../../components/features/profile/templates/ProfileCompactTemplate'
+      );
+      expect(desktopModuleImported).not.toHaveBeenCalled();
+      render(
+        <ColdTemplate
+          mode='listen'
+          artist={mockArtist}
+          socialLinks={[]}
+          contacts={[]}
+          catalogLoadFailed
+        />
+      );
+      await act(async () => {
+        await vi.dynamicImportSettled();
+      });
+      expect(desktopModuleImported).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('mock-profile-desktop-surface')).toBeVisible();
+      expect(screen.getByTestId('public-profile-layout-shell')).toHaveAttribute(
+        'data-desktop-ready',
+        'true'
+      );
+      expect(mockProfileDesktopSurface).toHaveBeenCalledWith(
+        expect.objectContaining({
+          artist: mockArtist,
+          activeMode: 'listen',
+          catalogLoadFailed: true,
+          presentation: 'modal',
+        })
+      );
+      restoreViewport();
+    });
+  });
 });
