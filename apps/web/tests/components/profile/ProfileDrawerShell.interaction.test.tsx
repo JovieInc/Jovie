@@ -17,6 +17,10 @@ import { MenuView } from '@/features/profile/views/MenuView';
 import type { ShareContext } from '@/lib/share/types';
 import { mockArtist } from '@/lib/test-utils/mock-data';
 
+// The global fast-test motion stub removes non-table DOM wrappers and refs.
+// Focus handoff needs the real motion.div ref and its mounted content node.
+vi.unmock('motion/react');
+
 vi.mock('next/dynamic', async () => {
   const { default: appDynamic } = await vi.importActual<
     typeof import('next/dist/shared/lib/app-dynamic')
