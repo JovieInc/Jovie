@@ -3905,6 +3905,46 @@ describe('automation-verify affected scope', () => {
     expect(runner).toContain('--diff-filter=ACDMR');
   });
 
+  function processCanRun(pid, inspect = spawnSync) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      return error.code !== 'ESRCH';
+    }
+    // A killed orphan can remain Z when a container's PID 1 does not reap it.
+    // kill(0) sees that PID, but it cannot execute. Unknown evidence stays live.
+    try {
+      const result = inspect('ps', ['-o', 'stat=', '-p', String(pid)], {
+        encoding: 'utf8',
+        timeout: 1000,
+      });
+      return result.error ||
+        result.status !== 0 ||
+        !/^Z[<NLsl+>AEVWXJKCP]*$/.test(result.stdout.trim())
+        ? true
+        : false;
+    } catch {
+      return true;
+    }
+  }
+
+  it('does not treat unreadable or invalid process-state evidence as stopped', () => {
+    for (const result of [
+      { status: 1, stdout: '' },
+      { status: 0, stdout: '' },
+      { status: 0, stdout: 'Z malformed' },
+      { status: 0, stdout: 'Z\nR' },
+      { status: 0, stdout: 'R' },
+      { status: 0, stdout: 'Z', error: new Error('unreadable') },
+    ])
+      expect(processCanRun(process.pid, () => result)).toBe(true);
+    expect(
+      processCanRun(process.pid, () => {
+        throw new Error('denied');
+      })
+    ).toBe(true);
+  });
+
   it.each(['SIGINT', 'SIGTERM'])(
     'terminates the owned child process group on %s',
     async signal => {
@@ -3929,6 +3969,11 @@ describe('automation-verify affected scope', () => {
         ['--input-type=module', '-e', wrapperCode],
         { stdio: 'ignore' }
       );
+      const unrelated = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)'],
+        { stdio: 'ignore' }
+      );
       let grandchildPid;
       try {
         const deadline = Date.now() + 5000;
@@ -3945,6 +3990,8 @@ describe('automation-verify affected scope', () => {
           }
         }
         expect(grandchildPid).toBeGreaterThan(0);
+        expect(processCanRun(grandchildPid)).toBe(true);
+        expect(processCanRun(unrelated.pid)).toBe(true);
         wrapper.kill(signal);
         await Promise.race([
           new Promise(resolveExit => wrapper.once('exit', resolveExit)),
@@ -3955,15 +4002,14 @@ describe('automation-verify affected scope', () => {
         const exitDeadline = Date.now() + 5000;
         let alive = true;
         while (alive && Date.now() < exitDeadline) {
-          try {
-            process.kill(grandchildPid, 0);
+          alive = processCanRun(grandchildPid);
+          if (alive)
             await new Promise(resolveWait => setTimeout(resolveWait, 25));
-          } catch {
-            alive = false;
-          }
         }
         expect(alive).toBe(false);
+        expect(processCanRun(unrelated.pid)).toBe(true);
       } finally {
+        unrelated.kill('SIGKILL');
         if (wrapper.exitCode === null) wrapper.kill('SIGKILL');
         if (grandchildPid) {
           try {
