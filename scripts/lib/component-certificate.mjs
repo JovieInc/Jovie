@@ -98,12 +98,6 @@ function stringLiterals(sf) {
       ts.isTemplateTail(n)
     )
       out.push(n.text);
-    else if (
-      ts.isJsxAttribute(n) &&
-      n.initializer &&
-      ts.isStringLiteral(n.initializer)
-    )
-      out.push(n.initializer.text);
     ts.forEachChild(n, visit);
   };
   visit(sf);

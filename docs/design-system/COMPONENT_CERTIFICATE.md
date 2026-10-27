@@ -8,6 +8,7 @@ Run: `node scripts/component-certificate.mjs --all --out report.json --summary`
 or `--component <path>` for an individual certificate.
 
 Fail-closed: a criterion with no evidence is `unknown` and counts as missing.
+Invalid JSON in an input file blocks report generation with a nonzero exit.
 
 | Criterion | Pass when | Evidence |
 | --- | --- | --- |

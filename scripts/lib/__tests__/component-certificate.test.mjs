@@ -69,12 +69,13 @@ const mutationReceipt = (source, tests = []) => ({
 describe('component certificate', () => {
   const clean = `export function Card({ title }: { title: string }) { return <div className="bg-surface-1 text-primary-token">{title}</div>; }`;
 
-  it('raw colours: palette, hex and colour functions are flagged; tokens are not', () => {
+  it.each([
+    `const a = "bg-blue-500 text-white"; const b = '#fff'; const c = "rgb(1,2,3)";`,
+    `const A = () => <div className="bg-blue-500 text-white" data-hex="#fff" data-rgb="rgb(1,2,3)" />;`,
+    `const A = () => <div className={"bg-blue-500 text-white"} data-hex={'#fff'} data-rgb={"rgb(1,2,3)"} />;`,
+  ])('raw colours are counted once and tokens excluded: %s', source => {
     assert.equal(findRawColors(clean, 'a.tsx').length, 0);
-    const kinds = findRawColors(
-      `const a = "bg-blue-500 text-white"; const b = '#fff'; const c = "rgb(1,2,3)";`,
-      'a.tsx'
-    ).map(h => h.kind);
+    const kinds = findRawColors(source, 'a.tsx').map(h => h.kind);
     assert.deepEqual(kinds.sort(), [
       'color-function',
       'hex',
