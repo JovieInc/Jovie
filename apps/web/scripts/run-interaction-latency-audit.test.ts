@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { type Browser, chromium } from '@playwright/test';
 import { describe, expect, it, vi } from 'vitest';
@@ -54,6 +55,73 @@ function samples(): InteractionLatencySample[] {
 }
 
 describe('interaction audit harness', () => {
+  it('counts delayed frame loss until measurement stops, excluding idle time', () => {
+    const dom = new JSDOM(harnessHtml('command-palette-open'), {
+      runScripts: 'dangerously',
+      pretendToBeVisual: true,
+    });
+    try {
+      const callbacks = new Map<number, FrameRequestCallback>();
+      let sequence = 0;
+      dom.window.requestAnimationFrame = callback => {
+        callbacks.set(++sequence, callback);
+        return sequence;
+      };
+      dom.window.cancelAnimationFrame = id => {
+        callbacks.delete(id);
+      };
+      const frame = (at: number) => {
+        const pending = [...callbacks.values()];
+        callbacks.clear();
+        for (const callback of pending) callback(at);
+      };
+      const harness = (
+        dom.window as unknown as {
+          __jovieHarness: {
+            startFrames(): void;
+            stopFrames(): void;
+            dropped(): number;
+            reset(): void;
+          };
+        }
+      ).__jovieHarness;
+      harness.startFrames();
+      frame(16);
+      frame(100);
+      expect(harness.dropped()).toBe(0);
+      dom.window.document.dispatchEvent(
+        new dom.window.KeyboardEvent('keydown', { key: 'k', ctrlKey: true })
+      );
+      frame(116);
+      frame(180);
+      expect(harness.dropped()).toBe(1);
+      harness.stopFrames();
+      frame(300);
+      expect(callbacks.size).toBe(0);
+      expect(harness.dropped()).toBe(1);
+      harness.reset();
+      harness.startFrames();
+      frame(400);
+      frame(500);
+      expect(harness.dropped()).toBe(0);
+    } finally {
+      dom.window.close();
+    }
+  });
+
+  it('keeps browser measurement out of source PR flights', () => {
+    const workflow = readFileSync(
+      new URL(
+        '../../../.github/workflows/interaction-latency-audit.yml',
+        import.meta.url
+      ),
+      'utf8'
+    );
+    expect(workflow).not.toMatch(/^  pull_request(?:_target)?:/m);
+    expect(workflow).toMatch(/^  workflow_dispatch:/m);
+    expect(workflow).toMatch(/^  push:/m);
+  });
+
   it.each(scenarios)(
     'executes $id against its declared selectors',
     async scenario => {
@@ -116,7 +184,7 @@ describe('interaction audit receipt', () => {
     const receipt = buildReceipt(generatedAt, 'test-browser', samples());
     expect(receipt.status).toBe('pass');
     expect(receipt.manifestStatus).toBe('pass');
-    expect(receipt.budgetsChanged).toBe(false);
+    expect(receipt.budgetsChanged).toBeNull();
     expect(receipt.productShellMeasured).toBe(false);
     expect(receipt.scenarios.map(scenario => scenario.id)).toEqual(
       scenarios.map(scenario => scenario.id)
@@ -150,6 +218,8 @@ describe('interaction audit receipt', () => {
       'authenticated Jovie app shell was not measured'
     );
     expect(markdown).toContain('concurrently from the action start');
+    expect(markdown).toContain('Budget changes were not compared');
+    expect(markdown).not.toContain('Budgets were not changed');
   });
 
   it('retains actual budget misses in JSON and Markdown', () => {

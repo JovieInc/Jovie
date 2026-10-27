@@ -38,6 +38,7 @@ const playwrightVersion = createRequire(import.meta.url)(
 interface Harness {
   reset: () => void;
   startFrames: () => void;
+  stopFrames: () => void;
   dropped: () => number;
   renderToInteractiveMs: number | null;
 }
@@ -82,12 +83,12 @@ function paint(phase) {
   if (scenarioId === 'command-palette-open') {
     if (!acted) return;
     const palette = el('div', { 'data-testid': 'shared-command-palette', role: 'dialog' });
-    palette.append(el('input', { 'aria-label': 'Command palette search' }));
+    palette.append(el('input', { 'aria-label': 'Command Palette Search' }));
     app.append(palette);
     return;
   }
   if (scenarioId === 'command-palette-filter') {
-    const input = el('input', { 'aria-label': 'Command palette search' });
+    const input = el('input', { 'aria-label': 'Command Palette Search' });
     app.append(input);
     input.focus();
     if (acted) app.append(el('div', { 'cmdk-item': '' }, 'Home'));
@@ -156,18 +157,18 @@ function paint(phase) {
 }
 const harness = {
   renderToInteractiveMs: null,
-  reset() { this.renderToInteractiveMs = null; armed = false; paint('idle'); },
+  reset() { this.stopFrames(); this.renderToInteractiveMs = null; paint('idle'); },
   startFrames() {
     dropped = 0;
     lastFrame = 0;
     cancelAnimationFrame(raf);
     raf = requestAnimationFrame(frames);
   },
+  stopFrames() { armed = false; cancelAnimationFrame(raf); },
   dropped() { return dropped; },
   act() {
     armed = true;
     paint('acted');
-    requestAnimationFrame(() => { armed = false; });
   },
 };
 document.addEventListener('keydown', event => {
@@ -298,7 +299,7 @@ export function renderMarkdown(receipt: ReturnType<typeof buildReceipt>) {
     '',
     receipt.measurementSurface,
     '',
-    'Budgets were not changed. Median is nearest-rank p50 (`ceil(p/100*n)-1`).',
+    'Budget changes were not compared with a baseline. Median is nearest-rank p50 (`ceil(p/100*n)-1`).',
     `Machine-readable receipt: docs/performance/generated/interaction-latency-${receipt.date}.json`,
     'measureInteractionLatency observes next paint, first feedback and usable state concurrently from the action start. Each visible milestone waits two animation frames to include a paint; simultaneous milestones share that paint instead of accumulating extra frame waits.',
     '',
@@ -344,59 +345,65 @@ export async function measureAll() {
       await page.setContent(harnessHtml(scenario.id));
       for (let run = 0; run < WARMUP_RUNS + SCORED_RUNS; run += 1) {
         await prepare(page);
-        const sample = await measureInteractionLatency(page, {
-          action: () => actions[scenario.id]!(page),
-          firstFeedback: () =>
-            page
-              .locator(selector)
-              .first()
-              .waitFor({ state: 'visible', timeout: 2000 }),
-          usableState: usable
-            ? () =>
-                page
-                  .locator(usable)
-                  .first()
-                  .waitFor({ state: 'visible', timeout: 2000 })
-            : undefined,
-          runIndex: run,
-          scenarioId: scenario.id,
-        });
-        if (run < WARMUP_RUNS) continue;
-        await page.evaluate(
-          () =>
-            new Promise<void>(resolvePaint => {
-              requestAnimationFrame(() =>
-                requestAnimationFrame(() => resolvePaint())
-              );
-            })
-        );
-        const extra = await readHarness(page);
-        if (
-          scenario.id === 'chat-message-round-trip' &&
-          (extra.renderToInteractiveMs === null ||
-            extra.renderToInteractiveMs < 0)
-        ) {
-          throw new Error('chat render-to-interactive was not recorded');
-        }
-        const scored: InteractionLatencySample = {
-          ...sample,
-          firstFeedbackMs: roundMs(sample.firstFeedbackMs),
-          nextPaintMs:
-            sample.nextPaintMs === undefined
-              ? undefined
-              : roundMs(sample.nextPaintMs),
-          usableStateMs:
-            sample.usableStateMs === undefined
-              ? undefined
-              : roundMs(sample.usableStateMs),
-          runIndex: run - WARMUP_RUNS,
-          droppedFrameCount: extra.droppedFrameCount,
-          renderToInteractiveMs:
-            scenario.id === 'chat-message-round-trip'
-              ? roundMs(extra.renderToInteractiveMs ?? 0)
+        try {
+          const sample = await measureInteractionLatency(page, {
+            action: () => actions[scenario.id]!(page),
+            firstFeedback: () =>
+              page
+                .locator(selector)
+                .first()
+                .waitFor({ state: 'visible', timeout: 2000 }),
+            usableState: usable
+              ? () =>
+                  page
+                    .locator(usable)
+                    .first()
+                    .waitFor({ state: 'visible', timeout: 2000 })
               : undefined,
-        };
-        samples.push(scored);
+            runIndex: run,
+            scenarioId: scenario.id,
+          });
+          if (run < WARMUP_RUNS) continue;
+          await page.evaluate(
+            () =>
+              new Promise<void>(resolvePaint => {
+                requestAnimationFrame(() =>
+                  requestAnimationFrame(() => resolvePaint())
+                );
+              })
+          );
+          const extra = await readHarness(page);
+          if (
+            scenario.id === 'chat-message-round-trip' &&
+            (extra.renderToInteractiveMs === null ||
+              extra.renderToInteractiveMs < 0)
+          ) {
+            throw new Error('chat render-to-interactive was not recorded');
+          }
+          const scored: InteractionLatencySample = {
+            ...sample,
+            firstFeedbackMs: roundMs(sample.firstFeedbackMs),
+            nextPaintMs:
+              sample.nextPaintMs === undefined
+                ? undefined
+                : roundMs(sample.nextPaintMs),
+            usableStateMs:
+              sample.usableStateMs === undefined
+                ? undefined
+                : roundMs(sample.usableStateMs),
+            runIndex: run - WARMUP_RUNS,
+            droppedFrameCount: extra.droppedFrameCount,
+            renderToInteractiveMs:
+              scenario.id === 'chat-message-round-trip'
+                ? roundMs(extra.renderToInteractiveMs ?? 0)
+                : undefined,
+          };
+          samples.push(scored);
+        } finally {
+          await page.evaluate(() => {
+            (window as HarnessWindow).__jovieHarness?.stopFrames();
+          });
+        }
       }
     }
     await context.close();
@@ -467,10 +474,10 @@ export function buildReceipt(
     schemaVersion: 1,
     generatedAt,
     date: receiptDate(generatedAt),
-    budgetsChanged: false,
+    budgetsChanged: null,
     productShellMeasured: false,
     measurementSurface:
-      'Playwright Chromium harness using the declared manifest selectors and measureInteractionLatency. The authenticated Jovie app shell was not measured. Pass/fail is the harness against the unchanged budgets.',
+      'Playwright Chromium harness using the declared manifest selectors and measureInteractionLatency. The authenticated Jovie app shell was not measured. Pass/fail is the harness against the current manifest budgets; budget changes were not compared.',
     warmupRuns: WARMUP_RUNS,
     runsPerScenario: SCORED_RUNS,
     percentileMethod: 'nearest-rank (ceil(p/100*n)-1); median is p50',

@@ -1,8 +1,8 @@
 # Interaction latency receipt (2026-10-23)
 
-Playwright Chromium harness using the declared manifest selectors and measureInteractionLatency. The authenticated Jovie app shell was not measured. Pass/fail is the harness against the unchanged budgets.
+Playwright Chromium harness using the declared manifest selectors and measureInteractionLatency. The authenticated Jovie app shell was not measured. Pass/fail is the harness against the recorded budgets; budget changes were not compared.
 
-Budgets were not changed. Median is nearest-rank p50 (`ceil(p/100*n)-1`).
+Budget changes were not compared with a baseline. This metadata correction preserves the original measured samples. Median is nearest-rank p50 (`ceil(p/100*n)-1`).
 Machine-readable receipt: docs/performance/generated/interaction-latency-2026-10-23.json
 measureInteractionLatency observes next paint, first feedback and usable state concurrently from the action start. Each visible milestone waits two animation frames to include a paint; simultaneous milestones share that paint instead of accumulating extra frame waits.
 

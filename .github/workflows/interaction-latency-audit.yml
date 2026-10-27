@@ -2,15 +2,6 @@ name: Interaction latency audit
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - 'apps/web/scripts/run-interaction-latency-audit.ts'
-      - 'apps/web/scripts/performance-interaction-manifest.ts'
-      - 'apps/web/scripts/performance-interaction-report.ts'
-      - 'apps/web/tests/e2e/utils/interaction-latency-utils.ts'
-      - 'docs/performance/receipts/interaction-latency-*'
-      - 'docs/performance/generated/interaction-latency-*'
-      - '.github/workflows/interaction-latency-audit.yml'
   push:
     branches: [main]
     paths:

@@ -17,7 +17,7 @@ function latestReceipt() {
   if (!name)
     throw new Error(`No interaction latency receipt in ${receiptsDir}`);
   return JSON.parse(readFileSync(resolve(receiptsDir, name), 'utf8')) as {
-    budgetsChanged: boolean;
+    budgetsChanged: boolean | null;
     productShellMeasured: boolean;
     measurementSurface: string;
     runsPerScenario: number;
@@ -36,7 +36,7 @@ function latestReceipt() {
 describe('interaction latency receipt', () => {
   it('records a measured median and p95 for every declared scenario', () => {
     const receipt = latestReceipt();
-    expect(receipt.budgetsChanged).toBe(false);
+    expect(receipt.budgetsChanged).toBeNull();
     expect(receipt.productShellMeasured).toBe(false);
     expect(receipt.measurementSurface).toContain(
       'authenticated Jovie app shell was not measured'

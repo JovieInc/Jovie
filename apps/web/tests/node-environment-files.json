@@ -315,6 +315,7 @@
   "scripts/public-route-qa-output.test.ts",
   "scripts/reconcile-vercel-build-env.test.ts",
   "scripts/resolve-package-json.test.mjs",
+  "scripts/run-interaction-latency-audit.test.ts",
   "scripts/seed-database-guard.test.ts",
   "scripts/seo-ratchet-live.test.ts",
   "scripts/stage-screenshot-catalog-transfer.test.ts",

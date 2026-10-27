@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "generatedAt": "2026-10-23T06:29:16.667Z",
   "date": "2026-10-23",
-  "budgetsChanged": false,
+  "budgetsChanged": null,
   "productShellMeasured": false,
-  "measurementSurface": "Playwright Chromium harness using the declared manifest selectors and measureInteractionLatency. The authenticated Jovie app shell was not measured. Pass/fail is the harness against the unchanged budgets.",
+  "measurementSurface": "Playwright Chromium harness using the declared manifest selectors and measureInteractionLatency. The authenticated Jovie app shell was not measured. Pass/fail is the harness against the recorded budgets; budget changes were not compared.",
   "warmupRuns": 2,
   "runsPerScenario": 20,
   "percentileMethod": "nearest-rank (ceil(p/100*n)-1); median is p50",
@@ -250,5 +250,6 @@
         30.2, 31.1, 30.9, 30.8, 30.6, 28, 31, 31
       ]
     }
-  ]
+  ],
+  "budgetComparison": "Not performed; this metadata correction preserves the original measured samples."
 }
