@@ -13,6 +13,52 @@ import { candidate, command, now, scope, session } from './fixtures.test-utils';
 import { MediaAnchorSchema, ReferenceSessionSchema } from './types';
 
 describe('adaptive reference review', () => {
+  it('counts only new references against capacity while preserving bounded input and immutable IDs', () => {
+    let full = createReferenceSession(scope, now);
+    for (let offset = 0; offset < 500; offset += 100)
+      full = importReferenceCandidates(
+        full,
+        scope,
+        Array.from({ length: 100 }, (_, i) => candidate(offset + i + 1)),
+        now
+      );
+    const replay = importReferenceCandidates(
+      full,
+      scope,
+      [candidate(500)],
+      now
+    );
+    expect(Object.keys(replay.media)).toHaveLength(500);
+    const duplicate = candidate(501, {
+      ...candidate(500).media,
+      sourceUrl: candidate(501).media.sourceUrl,
+    });
+    expect(
+      Object.keys(
+        importReferenceCandidates(full, scope, [duplicate], now).media
+      )
+    ).toHaveLength(500);
+    expect(() =>
+      importReferenceCandidates(full, scope, [candidate(501)], now)
+    ).toThrow('limit');
+    expect(() =>
+      importReferenceCandidates(
+        full,
+        scope,
+        Array.from({ length: 101 }, () => candidate(500)),
+        now
+      )
+    ).toThrow('limit');
+    expect(() =>
+      importReferenceCandidates(
+        full,
+        scope,
+        [candidate(500, { credit: 'changed' })],
+        now
+      )
+    ).toThrow('already exists');
+    expect(Object.keys(full.media)).toHaveLength(500);
+  });
   it('rejects prototype-property command IDs and independently caps the feedback journal', () => {
     const s = session(1),
       c = command(s, { type: 'rate', referenceId: s.batch.ids[0], rating: 5 });

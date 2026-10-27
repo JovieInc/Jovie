@@ -148,11 +148,7 @@ export function importReferenceCandidates(
   now: string
 ): ReferenceSession {
   assertScope(state, scope);
-  if (
-    inputs.length > REFERENCE_LIMITS.intake ||
-    Object.keys(state.media).length + inputs.length >
-      REFERENCE_LIMITS.references
-  )
+  if (inputs.length > REFERENCE_LIMITS.intake)
     throw new Error('Reference intake limit reached.');
   const next = structuredClone(state);
   for (const raw of inputs) {
@@ -181,6 +177,8 @@ export function importReferenceCandidates(
           m.timecodeMs === media.timecodeMs)
     );
     if (duplicate) continue;
+    if (Object.keys(next.media).length >= REFERENCE_LIMITS.references)
+      throw new Error('Reference intake limit reached.');
     next.corpus = ingestDesignReference(next.corpus, reference, now);
     next.media[reference.id] = media;
   }
