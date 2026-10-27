@@ -25,7 +25,15 @@ Every design task starts with the references and direction for its surface:
 ```bash
 pnpm --filter web design-refs pull --surface homepage            # prompt block
 pnpm --filter web design-refs pull --surface golden-path --json  # + image paths
+pnpm --filter web design-refs pull --surface homepage --json --require-images
 ```
+
+`pull` returns an image path only when local bytes are readable and match the
+stored digest and dimensions. Missing, altered or unsafe cache entries return
+`image: null` and an `imageStatus`; source metadata remains usable. Visual tasks
+use `--require-images`, which exits 2 when any selected reference pixels are
+unavailable or no references match. It never silently downloads or regenerates
+missing captures.
 
 Add a reference from a URL (Playwright fold capture, or a direct image fetch)
 or from a screenshot file:

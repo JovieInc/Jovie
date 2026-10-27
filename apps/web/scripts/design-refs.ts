@@ -11,7 +11,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { lstatSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, extname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
@@ -293,21 +293,81 @@ async function commandAdd(flags: Flags, deps: DesignRefsDeps): Promise<number> {
   return 0;
 }
 
-function commandPull(flags: Flags, deps: DesignRefsDeps): number {
+async function availableReferenceImage(
+  reference: DesignReference,
+  cacheDir: string
+) {
+  const media = reference.media;
+  if (!media) return { image: null, imageStatus: 'not-captured' };
+  if (basename(media.file) !== media.file || media.file === '..')
+    return { image: null, imageStatus: 'unsafe-path' };
+  const path = join(cacheDir, media.file);
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.size > 8 * 1024 * 1024)
+      return { image: null, imageStatus: 'unreadable' };
+    const bytes = readFileSync(path);
+    if (
+      `sha256:${createHash('sha256').update(bytes).digest('hex')}` !==
+      media.sha256
+    )
+      return { image: null, imageStatus: 'digest-mismatch' };
+    const image = sharp(bytes, { limitInputPixels: 40_000_000 });
+    const metadata = await image.metadata();
+    await image.stats();
+    if (
+      metadata.format !== 'jpeg' ||
+      metadata.width !== media.width ||
+      metadata.height !== media.height
+    )
+      return { image: null, imageStatus: 'metadata-mismatch' };
+    return { image: path, imageStatus: 'available' };
+  } catch {
+    return { image: null, imageStatus: 'unavailable' };
+  }
+}
+
+async function commandPull(
+  flags: Flags,
+  deps: DesignRefsDeps
+): Promise<number> {
   const surface = flags.values.get('surface');
   if (!surface) throw new Error('pull needs --surface.');
+  const limit = Number(flags.values.get('limit') ?? 5);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 25)
+    throw new Error('pull --limit must be an integer from 1 to 25.');
   const context = buildDesignRefContext(
     loadCorpus(deps.dir),
     loadDirections(deps.dir),
     {
       surface,
       terms: list(flags, 'terms'),
-      limit: Number(flags.values.get('limit') ?? 5),
+      limit,
     }
   );
+  const references = await Promise.all(
+    context.references.map(async ({ record, score }) => ({
+      id: record.reference.id,
+      status: record.status,
+      score,
+      url: record.reference.source.url,
+      capturedAt: record.reference.source.capturedAt,
+      sha256: record.reference.media?.sha256 ?? null,
+      ...(await availableReferenceImage(record.reference, deps.cacheDir)),
+    }))
+  );
+  const missing = references.filter(reference => reference.image === null);
+  const promptBlock =
+    context.promptBlock +
+    (missing.length
+      ? `\n\nReference pixels unavailable: ${missing.map(reference => reference.id).join(', ')}. Use source metadata only; visual comparison is not established.`
+      : '');
   if (!flags.switches.has('json')) {
-    deps.log(context.promptBlock);
-    return 0;
+    deps.log(promptBlock);
+    return flags.switches.has('require-images') &&
+      (missing.length > 0 || references.length === 0)
+      ? 2
+      : 0;
   }
   deps.log(
     JSON.stringify(
@@ -315,22 +375,17 @@ function commandPull(flags: Flags, deps: DesignRefsDeps): number {
         surface,
         direction: context.direction?.id ?? null,
         candidates: context.candidates.map(entry => entry.id),
-        references: context.references.map(({ record, score }) => ({
-          id: record.reference.id,
-          status: record.status,
-          score,
-          url: record.reference.source.url,
-          image: record.reference.media
-            ? join(deps.cacheDir, record.reference.media.file)
-            : null,
-        })),
-        promptBlock: context.promptBlock,
+        references,
+        promptBlock,
       },
       null,
       2
     )
   );
-  return 0;
+  return flags.switches.has('require-images') &&
+    (missing.length > 0 || references.length === 0)
+    ? 2
+    : 0;
 }
 
 async function commandGuard(

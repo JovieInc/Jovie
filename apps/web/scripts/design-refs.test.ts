@@ -5,6 +5,8 @@ import {
   mkdtempSync,
   readdirSync,
   readFileSync,
+  symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -244,8 +246,86 @@ describe('design-refs add / pull / guard', () => {
     expect(json.references[0]).toMatchObject({
       id: 'orb',
       image: join(deps.cacheDir, 'orb.jpg'),
+      imageStatus: 'available',
     });
+    expect(
+      await runDesignRefs(
+        ['pull', '--surface', 'golden-path', '--json', '--require-images'],
+        deps
+      )
+    ).toBe(0);
     await expect(runDesignRefs(['pull'], deps)).rejects.toThrow(/--surface/u);
+  });
+
+  it.each(['missing', 'corrupt', 'symlink', 'path', 'geometry'])(
+    'does not advertise %s pixels as usable references',
+    async fault => {
+      await runDesignRefs(
+        ['add', await file('orb.png', ORB), '--surface', 'homepage'],
+        deps
+      );
+      const image = join(deps.cacheDir, 'orb.jpg');
+      if (fault === 'missing') unlinkSync(image);
+      if (fault === 'corrupt') writeFileSync(image, Buffer.from('corrupt'));
+      if (fault === 'symlink') {
+        const target = join(dir, 'outside.jpg');
+        writeFileSync(target, readFileSync(image));
+        unlinkSync(image);
+        symlinkSync(target, image);
+      }
+      if (fault === 'path' || fault === 'geometry') {
+        const corpus = loadCorpus(dir);
+        const record = corpus.references.orb;
+        writeCorpus(dir, {
+          ...corpus,
+          references: {
+            ...corpus.references,
+            orb: {
+              ...record,
+              reference: {
+                ...record.reference,
+                media: {
+                  ...record.reference.media!,
+                  ...(fault === 'path'
+                    ? { file: '../outside.jpg' }
+                    : { width: 1 }),
+                },
+              },
+            },
+          },
+        });
+      }
+      lines = [];
+      expect(
+        await runDesignRefs(
+          ['pull', '--surface', 'homepage', '--json', '--require-images'],
+          deps
+        )
+      ).toBe(2);
+      const context = JSON.parse(lines[0]);
+      expect(context.references[0].image).toBeNull();
+      expect(context.references[0].imageStatus).not.toBe('available');
+      expect(context.references[0]).toHaveProperty('sha256');
+      expect(context.promptBlock).toContain(
+        'visual comparison is not established'
+      );
+      expect(
+        await runDesignRefs(['pull', '--surface', 'homepage', '--json'], deps)
+      ).toBe(0);
+    }
+  );
+
+  it('bounds retrieval and refuses an empty visual-reference session', async () => {
+    for (const limit of ['NaN', '0', '-1', '26'])
+      await expect(
+        runDesignRefs(['pull', '--surface', 'homepage', '--limit', limit], deps)
+      ).rejects.toThrow('integer');
+    expect(
+      await runDesignRefs(
+        ['pull', '--surface', 'homepage', '--require-images'],
+        deps
+      )
+    ).toBe(2);
   });
 
   it('guard exits 1 on a near-copy and 0 on original work', async () => {
