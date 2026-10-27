@@ -160,7 +160,7 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'cd "$t/wt"',
   'git fetch -q --no-tags origin "$B" || true',
   'git -c user.name=ci -c user.email=ci@invalid merge -q --no-edit "origin/$B" >/dev/null 2>&1 || { echo "merge with base conflicts; skipped"; exit 0; }',
-  'files="$(git diff --name-only --diff-filter=d "origin/$B" HEAD -- scripts/lanes scripts/tests)"',
+  'files="$(git diff --name-only "origin/$B" HEAD)"',
   'cand=""',
   // The qualification guard pins the sha256 of scripts/tests/test_disk_guard.py; editing that fixture without
   // adding its hash ejected seven merge groups and six bystanders (#23280, 2026-10-25), so run its pinning test.
@@ -174,6 +174,20 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
   'lanes_py=0; for f in $files; do case "$f" in scripts/lanes/*.py) lanes_py=1;; esac; done',
   'extra=""',
   'if [ "$lanes_py" = 1 ]; then case " $tests " in *" scripts/tests/test_lanes_atomic_state.py "*) ;; *) tests="$tests scripts/tests/test_lanes_atomic_state.py";; esac; extra="scripts.tests.test_lane_runner.UpdateTest"; fi',
+  // Read the one release inventory as data, never execute lane_runner just to select tests.
+  // Shipped JS/TS edits otherwise skip this guard and first fail inside the native queue.
+  `release_closure="$(python3 -c ${shellQuote(
+    [
+      'import ast,sys',
+      'from pathlib import Path',
+      'tree=ast.parse(Path("scripts/lanes/lane_runner.py").read_text())',
+      'extras=next(ast.literal_eval(n.value) for n in tree.body if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=="RELEASE_EXTRAS" for t in n.targets))',
+      'assert isinstance(extras,list) and all(isinstance(p,str) for p in extras)',
+      'changed=set(sys.argv[1].splitlines())',
+      'print(int(bool(changed.intersection(extras)) or any(p.startswith("scripts/lanes/") for p in changed)))',
+    ].join('; ')
+  )} "$files")"`,
+  'if [ "$release_closure" = 1 ]; then case " $tests " in *" scripts/tests/test_lane_runner.py "*) ;; *) extra="$extra scripts.tests.test_lane_runner.ReleaseImportClosureTest";; esac; fi',
   '[ -n "${tests// /}$extra" ] || { echo "no changed release self-test lanes tests"; exit 0; }',
   'mkdir -p "$t/state/home"',
   'echo "release self-test env (LANES_SELFTEST=1) on:$tests $extra"',
@@ -442,7 +456,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // env on the PR merged with base. The full 336s pytest stays merge-group.
     id: 'lanes-selftest-changed-tests',
     command: `bash -c ${shellQuote(LANES_SELFTEST_CHANGED_TESTS_SCRIPT)}`,
-    inputs: /^scripts\/(?:lanes\/|tests\/test_)/u,
+    // Candidate roots only; the command intersects changed paths with RELEASE_EXTRAS.
+    inputs:
+      /^(?:scripts\/|packages\/|ops\/registry\/|\.nvmrc$|pnpm-lock\.yaml$)/u,
     prOnly: true,
   }),
   Object.freeze({
@@ -931,6 +947,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/art-direction/surface-media.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
+  'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
   'scripts/retire-coverage-reports.test.mjs',
   'scripts/publish-coverage-report.test.mjs',
   'scripts/lib/__tests__/canonical-artist-site-intake.test.mjs',
@@ -1121,6 +1138,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/external-api-guard.test.mjs',
   'scripts/lib/__tests__/domain-write-guard.test.mjs',
   'scripts/lib/__tests__/screen-audit-receipts.test.mjs',
+  'scripts/lib/__tests__/component-certificate.test.mjs',
 ]);
 export const MESH_HOST_ACK_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/mesh-host-ack.test.mjs --coverage.enabled --coverage.provider=v8 --coverage.include=lanes/mesh-host-ack.mjs --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-mesh-host-ack-coverage" --coverage.reporter=text --coverage.reporter=json --coverage.reporter=json-summary --coverage.thresholds.perFile=true --coverage.thresholds.lines=99 --coverage.thresholds.statements=99 --coverage.thresholds.branches=90 --coverage.thresholds.functions=100';
