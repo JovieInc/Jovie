@@ -519,11 +519,17 @@ class RelayTest(unittest.TestCase):
 
         for status in ("CLEAN", "HAS_HOOKS", "UNSTABLE"):
             added, shell = success(status)
-            self.assertEqual(added, [(5, "cleared-red")], status)
+            self.assertEqual(added, [(5, "cleared-red"), (5, "enroll-wake")], status)
             delete = ["gh", "api", "-X", "DELETE",
                       f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]
             self.assertIn(delete, shell.calls, status)
             self.assertFalse(events.gh_read_only(delete), status)
+            # JOV-8788: the GITHUB_TOKEN DELETE wakes nothing (recursion guard),
+            # so the relay hands the now-eligible head straight to green enroll.
+            wake = ["gh", "workflow", "run", events.GREEN_ENROLL_WORKFLOW,
+                    "--repo", events.REPO, "--ref", "main", "-f", "pr_number=5"]
+            self.assertIn(wake, shell.calls, status)
+            self.assertFalse(events.gh_read_only(wake), status)
             self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], status)
         for status in ("BLOCKED", "DIRTY", "BEHIND", "UNKNOWN"):
             added, shell = success(status)
@@ -558,6 +564,16 @@ class RelayTest(unittest.TestCase):
                "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
         self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+        self.assertEqual(shell.made("gh", "workflow", "run"), [])
+
+    def test_a_green_success_that_fails_the_enroll_wake_records_it(self):
+        view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "workflow", "run"): (1, "")})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
+                         [(5, "cleared-red"), (5, "enroll-wake-failed")])
+        self.assertEqual(len(shell.made("gh", "workflow", "run")), 1)
 
     def test_a_green_lane_draft_drops_lane_fix_red_and_can_still_be_marked_green(self):
         view = pr(draft=True, merge="CLEAN", labels=["lane-fix-red"], state="OPEN", sha="h1")
@@ -1054,6 +1070,19 @@ class QuotaRelayTest(unittest.TestCase):
                       shell.calls)
         self.assertNotIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/issues/5/labels", "-f",
                           "labels[]=lane-fix-red"], shell.calls)
+
+    FLEET_LOG = ("##[group]Run node scripts/pr-fleet-rules.mjs --with-warnings\n"
+                 "##[error]Fleet rule evidence unavailable: GitHub API quota or outage (github-quota-deferred); "
+                 "not a verdict on this PR. Re-run after the quota resets.\n"
+                 "##[error]Process completed with exit code 1.")
+
+    def test_a_quota_deferred_fleet_rules_run_is_rerun_not_labelled(self):
+        """2026-10-25: 30 PRs sat red on a quota-deferred PR Fleet Rules because the relay was never
+        woken by that workflow. The marker must classify as quota so the relay re-runs it."""
+        shell = self.shell([self.FLEET_LOG])
+        with patch.object(events, "classify_github_failure", lambda t: "primary-rate-limit" if "github-quota-deferred" in t else "none"):
+            self.assertEqual(events.relay("workflow_run", {"workflow_run": {**self.RUN, "name": "PR Fleet Rules"}}, shell, set()), [])
+        self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"], shell.calls)
 
     def test_failed_rerun_preserves_red_until_current_healthy_reconciliation(self):
         rerun = ("gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs")
@@ -2877,3 +2906,33 @@ class WakeFileTest(unittest.TestCase):
                                          "GITHUB_EVENT_PATH": str(event_path)}):
                 self.assertEqual(events.main(["wake", "--prs", "22868"]), 0)
             self.assertFalse((state / "wake").exists())
+
+
+class RedBeforeGreenEvidenceTests(unittest.TestCase):
+    PR = {"number": 7, "headRefOid": "a" * 40, "statusCheckRollup": [
+        {"name": "Source Validation", "conclusion": "FAILURE",
+         "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
+
+    def test_block_carries_the_failing_run_and_red_output_and_passes_the_parser_shape(self):
+        block = events.red_before_green_block(self.PR, "### Source Validation\n# not a heading\nAssertionError: x")
+        self.assertIn("Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123", block)
+        self.assertTrue(events.red_section_complete("Intro\n\n" + block + "\n\n## Next\nx"))
+        self.assertNotIn("\n# not a heading", block, "a log line must not end the section")
+
+    def test_no_red_check_means_no_block(self):
+        self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
+
+    def test_placeholder_section_is_replaced_and_complete_one_is_untouched(self):
+        block = events.red_before_green_block(self.PR, "FAIL x")
+        body = "## Summary\nx\n\n## Red-before-green\n\nFailing command:\n\n## Blast radius\ny\n"
+        updated = events.with_red_section(body, block)
+        self.assertTrue(events.red_section_complete(updated))
+        self.assertIn("## Blast radius\ny", updated)
+        self.assertEqual(updated.count("## Red-before-green"), 1)
+        self.assertFalse(events.red_section_complete(body))
+
+    def test_ensure_edits_only_an_incomplete_body(self):
+        for body, edits in (("## Summary\nx", 1), (events.red_before_green_block(self.PR), 0)):
+            shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
+            events.ensure_red_before_green(self.PR, "FAIL x", shell)
+            self.assertEqual(len(shell.made("pr", "edit")), edits)

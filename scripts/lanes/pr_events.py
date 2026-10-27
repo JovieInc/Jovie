@@ -19,6 +19,7 @@ import json
 import math
 import os
 import re
+import tempfile
 import subprocess
 import sys
 import time
@@ -36,6 +37,9 @@ import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner im
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
 LANE_FIX_RED = PREFIX + "red"
+# The only writer that enqueues green PRs (.github/workflows/merge-queue-green-enroll.yml).
+GREEN_ENROLL_WORKFLOW = "merge-queue-green-enroll.yml"
+GH_BIN = "gh"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
 TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
@@ -486,6 +490,32 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     return deleted.returncode == 0
 
 
+def wake_green_enroll(number: int, sh=run) -> bool:
+    """Dispatch Merge Queue Green Enroll for this exact PR (JOV-8788).
+
+    Label writes stay on GITHUB_TOKEN so a relay label never fans out into
+    label-triggered runs, which also means the DELETE that clears lane-fix-red
+    wakes nothing: with an already required-green, unchanged head no later
+    check completion comes either (#22417 sat green and unqueued 33 minutes
+    until an unrelated main push sweep). workflow_dispatch is the recursion-guard
+    exception, the relay job's actions: write grant pays for it, and green
+    enroll's own blocked recheck already uses the same hop. The enroll run
+    re-reads eligibility itself, so a hold, freeze or newer head stays safe.
+    """
+    args = ["workflow", "run", GREEN_ENROLL_WORKFLOW,
+            "--repo", REPO, "--ref", "main", "-f", f"pr_number={number}"]
+    # Production goes through the budgeted client layer (external-api-guard ratchet);
+    # an injected shell (tests) sees the full command line.
+    if sh is run:
+        try:
+            dispatched = api_gh(args)
+        except ImportError:  # sparse relay checkout without the client layer: plain gh still wakes
+            dispatched = sh([GH_BIN, *args])
+    else:
+        dispatched = sh([GH_BIN, *args])
+    return dispatched.returncode == 0
+
+
 # The dispatch tick re-read the same stuck PRs' claim comments every pass (~84 reads an hour on
 # Gem, 2026-10-12 gh ledger) though they rarely change. `since` is floored to this bucket, so the
 # URL stays stable long enough for a conditional request: a 304 costs no rate limit. A floored
@@ -908,6 +938,91 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
     return sorted(kinds)[0]
 
 
+RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
+RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
+ANY_HEADING = re.compile(r"^#{1,6}\s")
+JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
+
+
+def red_section_complete(body: str) -> bool:
+    """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
+    lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
+    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
+    if start is None:
+        return False
+    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    section = "\n".join(lines[start + 1:end])
+    command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
+    run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
+    fence = re.search(r"```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```",
+                      section, re.I)
+    text = command.group(1).replace("`", "").strip() if command else ""
+    return len(text) > 2 and text.lower() not in {"todo", "tbd", "n/a", "none"} and bool(fence or run_url)
+
+
+def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
+    """A `## Red-before-green` section built from the PR's own red check: the failing run URL and
+    the failed jobs' error lines the fixer is shown. Fleet Rules treats lane-fix-red as a repair
+    label, so every red lane PR needs this evidence; agents forget it (45 of 138 Fleet Rules
+    failures on 2026-10-25) and the lane already has it. None when no red check names a run."""
+    for check in pr.get("statusCheckRollup") or []:
+        if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
+            continue
+        found = JOB_URL.match(check.get("detailsUrl") or "")
+        if not found:
+            continue
+        run_url = found.group(1)
+        lines = [f"FAIL {check.get('name') or 'check'} (red at head {str(pr.get('headRefOid') or '')[:9]})"]
+        for line in (excerpt or "").splitlines()[:25]:
+            line = line.rstrip()
+            if line.strip() and not line.startswith("```"):
+                lines.append(" " + line if ANY_HEADING.match(line) else line)
+        return "\n".join([
+            "## Red-before-green", "",
+            f"Failing command: `gh run view {run_url.rsplit('/', 1)[-1]} --repo {REPO} --log-failed`",
+            f"Failing run (before fix): {run_url}", "",
+            "```text", *lines, "```", "", RED_BLOCK_MARKER])
+    return None
+
+
+def with_red_section(body: str, block: str) -> str:
+    """Replace an empty/placeholder Red-before-green section with the block, or append one."""
+    lines = (body or "").split("\n")
+    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
+    if start is None:
+        return (body or "").rstrip("\n") + "\n\n" + block + "\n"
+    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
+    return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
+
+
+def api_gh(args, **_):
+    """gh through the shared client layer (budget, breaker, backoff); subprocess-shaped result."""
+    scripts = str(HERE.parent)
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient.gh import run_gh
+    done = run_gh(list(args), priority="repair")
+    return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
+
+
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh) -> bool:
+    """Write the evidence block into the PR body when its section is missing or incomplete."""
+    block = red_before_green_block(pr, excerpt)
+    if not block or not isinstance(pr.get("number"), int):
+        return False
+    viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
+    if viewed.returncode != 0 or red_section_complete(viewed.stdout or ""):
+        return False
+    updated = with_red_section(viewed.stdout or "", block)
+    with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
+        path = Path(tmp) / "body.md"
+        from atomic_state import atomic_write_text
+        atomic_write_text(path, updated)
+        if RED_BLOCK_MARKER not in path.read_text():
+            return False
+        return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
+
+
 HOLD_DEQUEUE = "dequeued-by-hand"
 FAILURE_HOLD_CONTEXT = "jovie-queue-failure-hold/v1"
 FAILURE_HOLD_WRITERS = frozenset({"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]", "jovie-bot", "jovie-ci-lane", "jovie-symphony-lane", "jovie-agents-lane"})
@@ -973,6 +1088,13 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             pr["labels"] = [label for label in (pr.get("labels") or [])
                             if (label.get("name") if isinstance(label, dict) else str(label)).lower()
                             != LANE_FIX_RED]
+            # The relay's GITHUB_TOKEN DELETE wakes nothing (recursion guard),
+            # and a final check completion has already fired its own enroll wake
+            # before this deletion, so hand the now-eligible head straight to the
+            # enroll controller. A draft is promoted by auto-ready instead.
+            if not pr.get("isDraft"):
+                cleared.append((number, "enroll-wake" if wake_green_enroll(number, sh)
+                                else "enroll-wake-failed"))
         if terminal_signal(pr) or not in_scope(pr, kind, disabled):
             continue
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
@@ -1328,6 +1450,31 @@ def spent(record: dict, sha: str, max_attempts: int) -> bool:
     return record.get("count", 0) >= max_attempts and same_generation(record, sha)
 
 
+BREAKER_STREAK = 3
+BREAKER_WINDOW_S = 24 * 3600
+
+
+def breaker_streak(runs: list, now: float) -> int:
+    streak = 0
+    for at, productive in reversed([row for row in runs if isinstance(row, list) and len(row) == 2
+                                    and now - float(row[0]) < BREAKER_WINDOW_S]):
+        if productive:
+            break
+        streak += 1
+    return streak
+
+
+def pr_breaker_open(host, number: int, now: float, head: str | None = None) -> bool:
+    """Open after BREAKER_STREAK unproductive runs, or for the exact head a fingerprint breaker tripped on."""
+    try:
+        entry = json.loads((host.state / "pr-breaker.json").read_text()).get(str(number)) or {}
+        if head and entry.get("fpOpenHead") == head:
+            return True
+        return breaker_streak(entry.get("runs") or [], now) >= BREAKER_STREAK
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
+
+
 # Owner quiet window. A non-lane writer (Tim's sessions, Cursor, bots) was still pushing while a
 # lane repaired the PR in 111 of 199 cancelled fix runs (Gem ledger, 3.5 days to 2026-10-25,
 # 21 agent-hours): `target-head-superseded` by a push the lane could not see coming. The
@@ -1591,6 +1738,8 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
         if (left := owner_settling(pr, record, now)) is not None:
             lane.note_owner_settle(host, pr, left, now)
             continue  # The writer is still pushing; the head's checks restart on every push.
+        if pr_breaker_open(host, pr["number"], now, pr.get("headRefOid")):
+            continue  # 3 unproductive runs in 24h across heads: one factory signal is filed instead
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \
                 and str(pr["number"]) not in read_state(host, "synced.json"):
@@ -2623,6 +2772,10 @@ def main(argv: list[str] | None = None) -> int:
     for number, kind in added:
         if kind == "cleared-red":
             print(f"#{number} cleared lane-fix-red")
+        elif kind == "enroll-wake":
+            print(f"#{number} enroll wake dispatched")
+        elif kind == "enroll-wake-failed":
+            print(f"#{number} enroll wake dispatch failed", file=sys.stderr)
         else:
             print(f"#{number} {PREFIX}{kind}")
     print(f"labeled={len(added)}")

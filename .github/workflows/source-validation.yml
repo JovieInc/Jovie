@@ -39,6 +39,18 @@ jobs:
           sparse-checkout: |
             .nvmrc
             packages/api-client
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+      # Edited-event jobs ran setup-node unprimed in all 8 jobs of a run
+      # (run 40176111773, 2026-10-25): one REST manifest call each.
+      - &quota-prime
+        name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
+        # A run step, not `uses:`: the client checkout path does not exist when
+        # workflow references are validated, so a local action there is rejected.
+        env:
+          NODE_VERSION_FILE: .source-validation-client/.nvmrc
+        run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
       - &quota-runtime
         name: Setup the quota client runtime
         if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
@@ -142,24 +154,52 @@ jobs:
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          # Source guards that read GitHub (gh-api-hold) ran unauthenticated and
+          # hit the per-IP limit ("outside the 30s budget", 2026-10-21).
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git fetch --no-tags origin "${{ github.base_ref }}"
           trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
           guard_root="$(mktemp -d "$RUNNER_TEMP/source-read-guard.XXXXXX")"
-          trap 'rm -rf "$guard_root"' EXIT
+          merging=false
+          # Restore the PR head checkout for every later step, however this one ends.
+          trap '[ "$merging" != true ] || git reset --hard --quiet "$EXPECTED_HEAD"; rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
+          # Guard code and the guard list come from the trusted base (above); the
+          # files they read must be the ones this PR would land: base plus head.
+          # Run against the head alone, a PR behind the base fails every guard
+          # that reads a file the base added after the PR branched (#23313,
+          # #23336: domain-write-guard ENOENT on write-registry.json). The merge
+          # is uncommitted, so HEAD and the changed-file list stay the PR's. A
+          # dirty tree (a local run) is never reset: it keeps the head-only run.
+          clean=true
+          git diff --quiet HEAD 2>/dev/null || clean=false
+          [ "$clean" = true ] || echo "::notice::working tree has local changes; source guards run on the head alone"
+          [ "$clean" != true ] || merging=true
+          merge_ok=true
+          [ "$merging" != true ] || git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1 || merge_ok=false
+          [ "$merge_ok" = true ] || { conflicts="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"; echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base} in: ${conflicts:-unknown files}. Resolve the conflict (lane-fix-conflict); source guards judge the merged tree and cannot run on a conflicted one."; echo "merge conflict with ${GITHUB_BASE_REF:-base}: ${conflicts:-unknown files}"; exit 1; }
           export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
           node --input-type=module -e '
             import { spawnSync } from "node:child_process";
+            import { randomUUID } from "node:crypto";
             const { selectSourceGuards, listAllChangedFiles } = await import(process.env.SOURCE_GUARD_MODULE);
             const guards = selectSourceGuards(process.env.GITHUB_EVENT_NAME, listAllChangedFiles(process.cwd()));
             let exitCode = 0;
             for (const guard of guards) {
+              // Guard tests print mocked `::error::` / `::warning::` lines (a fake
+              // rate-limit reset misled three workers on 2026-10-25). Stop workflow
+              // commands for the guard, then resume; a failing guard gets one real
+              // annotation from this loop instead.
+              const token = randomUUID();
+              console.log(`::stop-commands::${token}`);
               const result = spawnSync(guard.command, { shell: true, cwd: process.cwd(), stdio: "inherit" });
+              console.log(`::${token}::`);
               const code = result.status ?? 1;
               console.log(`[source-guards] ${guard.id}: exit ${code}`);
+              if (code !== 0) console.log(`::error title=source guard ${guard.id}::${guard.id} failed (exit ${code}); read its output above.`);
               if (code !== 0 && exitCode === 0) exitCode = code;
             }
             process.exitCode = exitCode;
@@ -322,6 +362,12 @@ jobs:
           pnpm screen-registration-gate
           pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts
           pnpm ci:control:test
+      # A PR that removes a data-pen-contract node a required layout spec still
+      # locates only failed in the merge group (#23332: FAQ removed from /about,
+      # three ejections). Fail it on its own PR instead.
+      - name: Check layout-guard pen contracts are still rendered
+        if: steps.reuse.outputs.reuse != 'true'
+        run: node scripts/layout-guard-pen-contracts.mjs
       # The merge group's ci-fast runs the same path-aware shadcn baseline
       # probe; Source Validation previously skipped it, so a restyle that fit
       # a PR's diff still ejected the whole merge group (group 36902907269,
@@ -376,6 +422,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       # TruffleHog reads the object store directly and cannot use a partial
@@ -429,6 +476,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - &reused-checkout
@@ -474,6 +522,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -589,6 +638,7 @@ jobs:
         shard: ['1/4', '2/4', '3/4', '4/4']
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -664,6 +714,7 @@ jobs:
       contents: read
     steps:
       - *quota-client
+      - *quota-prime
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
@@ -743,7 +794,12 @@ jobs:
             .nvmrc
             packages/api-client
             .github/workflows/fleet-rules-evidence.yml
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ (always() && github.event_name == 'pull_request') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         if: ${{ always() && github.event_name == 'pull_request' }}
         with:
@@ -770,7 +826,7 @@ jobs:
           fi
           floor="$(date -u -d "$EVENT_UPDATED_AT" +%s)"
           runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
-          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10))] | sort_by(.created_at) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
           IFS=$'\t' read -r status conclusion url <<<"$row"
           case "$status/$conclusion" in
             completed/success) echo "Fleet rules passed: $url" ;;

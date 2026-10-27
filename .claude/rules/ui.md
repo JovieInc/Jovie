@@ -253,6 +253,21 @@ Scene Palette v1 from `apps/web/data/marketing/imageColorPolicy.ts`. The
 softened scene references are for set design, light, material, wardrobe, and
 prompt contracts only; they do not replace the shipped Noir Ion UI anchors.
 
+Marketing page sections and those images follow
+[Imagery and color](../../canon/MARKETING.md#imagery-and-color). One primary
+color per image, never mixed. Each section gets exactly one accent, chosen
+per section and image: Ion `#3FAFF3`, Ultra `#A789F0`, or Pulse `#EB6AC6`,
+never blended. A gradient's key color is that accent hue; other tones are
+only neutral black falloff. Fades and light reveals are strongly asymmetric:
+a lit wedge, and the rest to black. Image-generation prompt templates name
+the single hue and forbid secondary hues. Orange as a scene or cue color, and
+a literal triad, stay forbidden. The orange, red, and green rotation above
+does not apply to these marketing images or section accents. The prose
+frontend skill is not in this repo (`~/.codex/skills/frontend-skill`); this
+contract is the in-repo copy. Blocking source checks are
+`scripts/invariants/art-direction/accent.mjs` and `hue.mjs`; they ratchet
+source violations without certifying generated pixels or prompt compliance.
+
 ### Do not fuck with art (founder-locked 2026-08-13)
 
 Hard product and marketing rules from `DESIGN.md`. Not aesthetic taste.
@@ -369,6 +384,8 @@ Exact exceptions in `scripts/invariants/copy-leak/config.json` require reasons.
 - During refactors and polish passes, explicitly audit for what can be deleted, merged, flattened, or simplified before introducing anything new.
 
 ### No AI-Slop Product UI
+
+The machine-readable rule list is `docs/design-system/anti-slop-rules.json` (ASR ids; `node scripts/anti-slop/run.mjs list`). Run `node scripts/anti-slop/run.mjs check --files <paths>` before showing UI. Agent-first default for app and admin: ASR-031. Redundant chrome: ASR-035. Eyebrows: ASR-022.
 
 - Jovie product UI must feel closer to Linear than generic AI-generated dashboards: compact, quiet, precise, and premium.
 - Default to small typography, restrained weight changes, and clean spacing before adding decorative treatment.

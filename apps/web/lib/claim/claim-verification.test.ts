@@ -6,6 +6,7 @@ import {
   claimVerificationPendingMessage,
   decideClaimVerificationRecord,
   isClaimVerificationOpen,
+  isProofBlockingPublication,
   markClaimVerificationPaid,
   readClaimVerification,
   requiresClaimVerification,
@@ -165,5 +166,62 @@ describe('operator decision transition', () => {
     expect(decideClaimVerificationRecord(null, input)).toBeNull();
     const rejected = decideClaimVerificationRecord(pending(), input);
     expect(decideClaimVerificationRecord(rejected, input)).toBeNull();
+  });
+});
+
+describe('proof-only requests (free admission, private page)', () => {
+  it('open for review immediately without a payment timestamp', () => {
+    const record = buildClaimVerificationRequest({
+      spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+      artistName: 'Mid Artist',
+      reach: 3_200,
+      paid: false,
+      proofOnly: true,
+      now,
+    });
+    expect(record.status).toBe('pending_verification');
+    expect(record.paidAt).toBeNull();
+  });
+
+  it('keeps the default: unpaid and not proof-only waits for payment', () => {
+    expect(request(false).status).toBe('awaiting_payment');
+  });
+});
+
+describe('isProofBlockingPublication', () => {
+  const settingsWith = (record: object) =>
+    withClaimVerification({}, record as never);
+  const proof = (status: 'pending_verification' | 'verified' | 'rejected') => ({
+    ...buildClaimVerificationRequest({
+      spotifyArtistId: '06HL4z0CvFAxyc27GXpf02',
+      artistName: 'Mid Artist',
+      reach: 3_200,
+      paid: false,
+      proofOnly: true,
+      now,
+    }),
+    status,
+  });
+
+  it('blocks publication while proof is open or rejected, never once verified', () => {
+    expect(
+      isProofBlockingPublication(settingsWith(proof('pending_verification')))
+    ).toBe(true);
+    expect(isProofBlockingPublication(settingsWith(proof('rejected')))).toBe(
+      true
+    );
+    expect(isProofBlockingPublication(settingsWith(proof('verified')))).toBe(
+      false
+    );
+  });
+
+  it('never blocks paid high-reach requests or profiles without a record', () => {
+    expect(isProofBlockingPublication(settingsWith(request(true)))).toBe(false);
+    expect(isProofBlockingPublication({})).toBe(false);
+    expect(isProofBlockingPublication(null)).toBe(false);
+  });
+
+  it('records proofOnly on the request so it survives any waitlist write', () => {
+    expect(proof('pending_verification').proofOnly).toBe(true);
   });
 });
