@@ -182,7 +182,7 @@ export const INTERACTION_HOT_PATHS = [
     ],
     selectors: {
       firstFeedback: '[data-testid="shared-command-palette"]',
-      usableState: 'input[aria-label="Command palette search"]',
+      usableState: 'input[aria-label="Command Palette Search"]',
     },
     firstSlice: true,
   },
@@ -214,7 +214,7 @@ export const INTERACTION_HOT_PATHS = [
     ],
     selectors: {
       firstFeedback: '[cmdk-item]',
-      focusOrigin: 'input[aria-label="Command palette search"]',
+      focusOrigin: 'input[aria-label="Command Palette Search"]',
       usableState: '[cmdk-item]',
     },
     firstSlice: true,
