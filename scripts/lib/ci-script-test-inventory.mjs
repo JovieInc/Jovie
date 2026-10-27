@@ -50,8 +50,6 @@ export const RUNNER_ONLY_EXCEPTIONS = Object.freeze({});
  * @type {Readonly<Record<string, string>>}
  */
 export const KNOWN_RED_ORPHANS = Object.freeze({
-  'scripts/generate-llms-design-manifest.test.mjs':
-    'red on main: "--check detects drift" reports no drift.',
   'scripts/repo-hygiene-guard.test.mjs':
     'red on main: 3 cleanup --apply cases no longer remove the fixture caches/packs.',
   'scripts/summer-commissioning/architecture-freshness.test.mjs':

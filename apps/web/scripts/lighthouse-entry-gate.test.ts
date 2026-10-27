@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
+  describeLcpElement,
   evaluateEntryRoute,
   median,
   parseBudgets,
@@ -72,5 +73,27 @@ describe('lighthouse entry gate', () => {
       ['/[handle]?claim=1', '/claim', '/start'].sort()
     );
     for (const b of budgets) expect(b.lcpMs).toBeLessThanOrEqual(4000);
+  });
+
+  it('names the LCP element so a failing budget says what to fix', () => {
+    expect(
+      describeLcpElement({
+        details: {
+          items: [
+            {
+              items: [
+                {
+                  node: {
+                    snippet: '<p class="text-xs">',
+                    nodeLabel: 'Essential cookies keep Jovie working.',
+                  },
+                },
+              ],
+            },
+          ],
+        },
+      })
+    ).toBe('<p class="text-xs"> "Essential cookies keep Jovie working."');
+    expect(describeLcpElement(undefined)).toBe('unknown element');
   });
 });

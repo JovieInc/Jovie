@@ -37,6 +37,9 @@ import remediation  # noqa: E402  (classifier + non-PR intake; no lane_runner im
 REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 PREFIX = "lane-fix-"
 LANE_FIX_RED = PREFIX + "red"
+# The only writer that enqueues green PRs (.github/workflows/merge-queue-green-enroll.yml).
+GREEN_ENROLL_WORKFLOW = "merge-queue-green-enroll.yml"
+GH_BIN = "gh"
 FIX_KINDS = ("red", "conflict", "dequeued", "review", "stale")
 TICK_KINDS = ("green", "orphan")
 RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
@@ -485,6 +488,32 @@ def clear_stale_lane_fix_red(number: int, pr: dict, sh=run) -> bool:
     deleted = sh(["gh", "api", "-X", "DELETE",
                   f"repos/{REPO}/issues/{number}/labels/{LANE_FIX_RED}"])
     return deleted.returncode == 0
+
+
+def wake_green_enroll(number: int, sh=run) -> bool:
+    """Dispatch Merge Queue Green Enroll for this exact PR (JOV-8788).
+
+    Label writes stay on GITHUB_TOKEN so a relay label never fans out into
+    label-triggered runs, which also means the DELETE that clears lane-fix-red
+    wakes nothing: with an already required-green, unchanged head no later
+    check completion comes either (#22417 sat green and unqueued 33 minutes
+    until an unrelated main push sweep). workflow_dispatch is the recursion-guard
+    exception, the relay job's actions: write grant pays for it, and green
+    enroll's own blocked recheck already uses the same hop. The enroll run
+    re-reads eligibility itself, so a hold, freeze or newer head stays safe.
+    """
+    args = ["workflow", "run", GREEN_ENROLL_WORKFLOW,
+            "--repo", REPO, "--ref", "main", "-f", f"pr_number={number}"]
+    # Production goes through the budgeted client layer (external-api-guard ratchet);
+    # an injected shell (tests) sees the full command line.
+    if sh is run:
+        try:
+            dispatched = api_gh(args)
+        except ImportError:  # sparse relay checkout without the client layer: plain gh still wakes
+            dispatched = sh([GH_BIN, *args])
+    else:
+        dispatched = sh([GH_BIN, *args])
+    return dispatched.returncode == 0
 
 
 # The dispatch tick re-read the same stuck PRs' claim comments every pass (~84 reads an hour on
@@ -1059,6 +1088,13 @@ def relay(event: str, payload: dict, sh=run, disabled: set[str] | None = None) -
             pr["labels"] = [label for label in (pr.get("labels") or [])
                             if (label.get("name") if isinstance(label, dict) else str(label)).lower()
                             != LANE_FIX_RED]
+            # The relay's GITHUB_TOKEN DELETE wakes nothing (recursion guard),
+            # and a final check completion has already fired its own enroll wake
+            # before this deletion, so hand the now-eligible head straight to the
+            # enroll controller. A draft is promoted by auto-ready instead.
+            if not pr.get("isDraft"):
+                cleared.append((number, "enroll-wake" if wake_green_enroll(number, sh)
+                                else "enroll-wake-failed"))
         if terminal_signal(pr) or not in_scope(pr, kind, disabled):
             continue
         if kind == "dequeued" and mark_poison(number, pr, time.time(), sh):
@@ -1414,6 +1450,31 @@ def spent(record: dict, sha: str, max_attempts: int) -> bool:
     return record.get("count", 0) >= max_attempts and same_generation(record, sha)
 
 
+BREAKER_STREAK = 3
+BREAKER_WINDOW_S = 24 * 3600
+
+
+def breaker_streak(runs: list, now: float) -> int:
+    streak = 0
+    for at, productive in reversed([row for row in runs if isinstance(row, list) and len(row) == 2
+                                    and now - float(row[0]) < BREAKER_WINDOW_S]):
+        if productive:
+            break
+        streak += 1
+    return streak
+
+
+def pr_breaker_open(host, number: int, now: float, head: str | None = None) -> bool:
+    """Open after BREAKER_STREAK unproductive runs, or for the exact head a fingerprint breaker tripped on."""
+    try:
+        entry = json.loads((host.state / "pr-breaker.json").read_text()).get(str(number)) or {}
+        if head and entry.get("fpOpenHead") == head:
+            return True
+        return breaker_streak(entry.get("runs") or [], now) >= BREAKER_STREAK
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
+
+
 # Owner quiet window. A non-lane writer (Tim's sessions, Cursor, bots) was still pushing while a
 # lane repaired the PR in 111 of 199 cancelled fix runs (Gem ledger, 3.5 days to 2026-10-25,
 # 21 agent-hours): `target-head-superseded` by a push the lane could not see coming. The
@@ -1677,6 +1738,8 @@ def claim_event_pr(host, lane, name: str, prs: list[dict], now: float | None = N
         if (left := owner_settling(pr, record, now)) is not None:
             lane.note_owner_settle(host, pr, left, now)
             continue  # The writer is still pushing; the head's checks restart on every push.
+        if pr_breaker_open(host, pr["number"], now, pr.get("headRefOid")):
+            continue  # 3 unproductive runs in 24h across heads: one factory signal is filed instead
         if set(pr.get("eventKinds") or []) == {"dequeued"} and pr.get("mergeStateStatus") != "DIRTY" \
                 and POISON_LABEL not in label_names(pr) \
                 and str(pr["number"]) not in read_state(host, "synced.json"):
@@ -2709,6 +2772,10 @@ def main(argv: list[str] | None = None) -> int:
     for number, kind in added:
         if kind == "cleared-red":
             print(f"#{number} cleared lane-fix-red")
+        elif kind == "enroll-wake":
+            print(f"#{number} enroll wake dispatched")
+        elif kind == "enroll-wake-failed":
+            print(f"#{number} enroll wake dispatch failed", file=sys.stderr)
         else:
             print(f"#{number} {PREFIX}{kind}")
     print(f"labeled={len(added)}")

@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -290,5 +292,14 @@ describe('StartPage', () => {
       expect(result.props.entryProfile).toEqual(entry);
       expect(result.props.turnstileTestMode).toBe(true);
     });
+  });
+
+  // LCP guard: a loading.tsx makes Next stream the real page behind a Suspense
+  // boundary that React reveals from a throttled inline script, so the visible
+  // heading painted 2.3s+ late and read 7.9s in the throttled-mobile entry gate
+  // (apps/web/performance-entry-budgets.json, budget 4000ms). Keep the heading
+  // in the first HTML instead.
+  it('has no loading.tsx, so the LCP heading is in the first HTML', () => {
+    expect(existsSync(path.join(__dirname, 'loading.tsx'))).toBe(false);
   });
 });
