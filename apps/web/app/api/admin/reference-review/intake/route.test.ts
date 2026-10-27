@@ -50,6 +50,19 @@ beforeEach(() => {
   });
 });
 describe('private capture intake boundary', () => {
+  it('refuses IDs that cannot be rated before storing capture bytes', async () => {
+    for (const id of ['room study', 'a'.repeat(101), '__proto__']) {
+      const invalid = {
+        ...body,
+        candidate: {
+          ...body.candidate,
+          reference: { ...body.candidate.reference, id },
+        },
+      };
+      expect((await POST(request(invalid))).status).toBe(400);
+    }
+    expect(mocks.ingest).not.toHaveBeenCalled();
+  });
   it('authorizes before parsing or persisting and refuses cross-origin intake', async () => {
     mocks.gate.mockResolvedValue(
       NextResponse.json({ error: 'locked' }, { status: 403 })
