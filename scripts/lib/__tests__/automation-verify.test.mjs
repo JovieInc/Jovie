@@ -3694,6 +3694,10 @@ describe('automation-verify affected scope', () => {
         'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
       ],
     ],
+    [
+      'apps/web/tests/e2e/helpers/golden-path-tracking.ts',
+      ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
+    ],
   ])('anonymous entry helper binding: %s', (source, testFiles) => {
     const unknownNeighbor = source.replace(/\.ts$/, '-neighbor.ts');
     const selectorFiles = [
