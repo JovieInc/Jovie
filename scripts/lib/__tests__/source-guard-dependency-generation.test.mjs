@@ -22,14 +22,9 @@ const { load } = createRequire(import.meta.url)('js-yaml');
 const workflow = load(
   readFileSync('.github/workflows/source-validation.yml', 'utf8')
 );
-const composite = load(
-  readFileSync('.github/actions/setup-node-pnpm/action.yml', 'utf8')
-);
-const browserComposite = load(
-  readFileSync('.github/actions/setup-playwright/action.yml', 'utf8')
-);
 const guardName = 'Validate disk-read source contracts from trusted base';
 const helper = 'scripts/lib/ci-dependency-workspace.mjs';
+const actionHelper = 'scripts/lib/source-guard-action-snapshot.mjs';
 const fixtureEnv = Object.fromEntries(
   Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
 );
@@ -37,7 +32,11 @@ const fixtureEnv = Object.fromEntries(
 // Only the network/toolchain installation boundary is simulated. Every Git
 // transaction, workflow condition, guard shell and dependency receipt check
 // below executes the checked-in implementation.
-function fixture(t, change, { conflict = false } = {}) {
+function fixture(
+  t,
+  change,
+  { conflict = false, actionGeneration = 'unchanged' } = {}
+) {
   const root = mkdtempSync(join(tmpdir(), 'source-dependency-generation-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const repo = join(root, 'repo');
@@ -101,7 +100,7 @@ if (process.argv[2] === '--version') {
   git('init', '-q', '-b', 'main');
   git('config', 'user.name', 'Source dependency fixture');
   git('config', 'user.email', 'source-dependency@example.invalid');
-  write('.gitignore', 'node_modules/\n');
+  write('.gitignore', 'node_modules/\ntmp/\n');
   write('.npmrc', 'strict-peer-dependencies=false\n');
   write('.nvmrc', `${process.version.slice(1)}\n`);
   write('package.json', '{"name":"fixture","packageManager":"pnpm@9.15.9"}\n');
@@ -114,6 +113,61 @@ if (process.argv[2] === '--version') {
   write('patches/fixture.patch', 'original patch\n');
   write('shared.txt', 'fork\n');
   write(helper, readFileSync(helper));
+  write(actionHelper, readFileSync(actionHelper));
+  write(
+    'scripts/lib/source-action-contract.mjs',
+    readFileSync('scripts/lib/source-action-contract.mjs')
+  );
+  const actionRoot = '.github/actions/';
+  const writeActions = (generation, localPnpm = true) => {
+    const setup = readFileSync(
+      `${actionRoot}setup-node-pnpm/action.yml`,
+      'utf8'
+    );
+    write(
+      `${actionRoot}setup-node-pnpm/action.yml`,
+      localPnpm
+        ? setup
+        : setup.replace(
+            './.github/actions/vendor/pnpm-action-setup',
+            `pnpm/action-setup@${'a'.repeat(40)}`
+          )
+    );
+    write(
+      `${actionRoot}setup-playwright/action.yml`,
+      readFileSync(`${actionRoot}setup-playwright/action.yml`)
+    );
+    write(
+      `${actionRoot}prime-node-toolcache/action.yml`,
+      'runs:\n  using: composite\n  steps: []\n'
+    );
+    for (const subaction of ['restore', 'save']) {
+      write(
+        `${actionRoot}vendor/actions-cache/${subaction}/action.yml`,
+        readFileSync(
+          `${actionRoot}vendor/actions-cache/${subaction}/action.yml`
+        )
+      );
+      write(
+        `${actionRoot}vendor/actions-cache/dist/${subaction}-only/index.js`,
+        'console.log("fixture cache");\n'
+      );
+    }
+    if (!localPnpm) return;
+    write(
+      `${actionRoot}vendor/pnpm-action-setup/action.yml`,
+      readFileSync(`${actionRoot}vendor/pnpm-action-setup/action.yml`)
+    );
+    write(
+      `${actionRoot}vendor/pnpm-action-setup/dist/index.js`,
+      'console.log(JSON.stringify(require("./generation.json")));\n'
+    );
+    write(
+      `${actionRoot}vendor/pnpm-action-setup/dist/generation.json`,
+      JSON.stringify({ generation })
+    );
+  };
+  writeActions('head', actionGeneration !== 'added');
   write(
     'scripts/dependency-probe.mjs',
     `import { appendFileSync } from 'node:fs';
@@ -140,6 +194,7 @@ if (process.env.SOURCE_FIXTURE_FAIL_GUARD === 'true') process.exitCode = 43;
   write('base-only.txt', 'new main source\n');
   if (conflict) write('shared.txt', 'main conflict\n');
   change?.(write);
+  if (actionGeneration !== 'unchanged') writeActions('merged');
   git('add', '.');
   git('commit', '-qm', 'main advances');
   const base = git('rev-parse', 'HEAD');
@@ -212,6 +267,7 @@ function transaction(f, options = {}) {
   );
   const state = {};
   const results = [];
+  const posts = [];
   let failed = false;
   const context = {
     steps: state,
@@ -232,6 +288,28 @@ function transaction(f, options = {}) {
       step.if
     );
     return (explicitStatus || scope.success()) && expression(step.if, scope);
+  };
+  // The runner saves a local action's path, then reloads its metadata at job
+  // cleanup. Exercise that lifetime with small provider payloads; the composite
+  // manifests, snapshot helper, Git transaction and dependency proof are real.
+  const registerPosts = (reference, phase, visited = new Set()) => {
+    if (visited.has(reference)) return;
+    visited.add(reference);
+    const directory = join(f.repo, reference);
+    const manifest = join(directory, 'action.yml');
+    const action = load(readFileSync(manifest, 'utf8'));
+    if (action.runs.using === 'composite') {
+      for (const child of action.runs.steps) {
+        if (child.uses?.startsWith('./'))
+          registerPosts(child.uses, phase, visited);
+      }
+    } else {
+      assert.ok(
+        existsSync(join(directory, action.runs.main)),
+        'complete local main payload'
+      );
+      if (action.runs.post) posts.push({ manifest, phase });
+    }
   };
   for (const [index, step] of steps.slice(start, end + 1).entries()) {
     const id = step.id ?? (step.name === guardName ? 'guard' : `step_${index}`);
@@ -256,14 +334,26 @@ function transaction(f, options = {}) {
       SOURCE_FIXTURE_FAIL_GUARD: options.failGuard ? 'true' : 'false',
     });
     let result;
-    if (step.uses === './.github/actions/setup-playwright') {
-      const install = browserComposite.runs.steps.find(
+    const actionReference =
+      options.legacyActionPaths && id.startsWith('source_merge_')
+        ? step.uses?.replace(
+            './tmp/source-guard-actions/',
+            './.github/actions/'
+          )
+        : step.uses;
+    const action = actionReference
+      ? load(readFileSync(join(f.repo, actionReference, 'action.yml'), 'utf8'))
+      : null;
+    if (actionReference && options.capturePosts)
+      registerPosts(actionReference, id);
+    if (actionReference?.endsWith('/setup-playwright')) {
+      const install = action.runs.steps.find(
         item => item.name === 'Install Playwright (Chromium)'
       );
       assert.ok(install, 'use the normal browser install command');
       result = f.bash(install.run, extra);
     } else if (step.uses) {
-      assert.equal(step.uses, './.github/actions/setup-node-pnpm');
+      assert.ok(actionReference.endsWith('/setup-node-pnpm'));
       // Provisioning is the only seam: use the real composite's frozen install
       // shell and receipt stamping, with a local pnpm artifact fixture.
       const setupContext = {
@@ -280,10 +370,10 @@ function transaction(f, options = {}) {
           'runner-prereqs': { outputs: { dependencies_warm: 'false' } },
         },
       };
-      const install = composite.runs.steps.find(
+      const install = action.runs.steps.find(
         item => item.name === 'Install dependencies'
       );
-      const stamp = composite.runs.steps.find(
+      const stamp = action.runs.steps.find(
         item => item.name === 'Stamp installed workspace receipt'
       );
       assert.ok(install && stamp, 'use the normal installed-tree producer');
@@ -319,6 +409,21 @@ function transaction(f, options = {}) {
     failed,
     results,
     state,
+    runPosts: () =>
+      posts.map(({ manifest, phase }) => {
+        const action = load(readFileSync(manifest, 'utf8'));
+        const output = execFileSync(
+          process.execPath,
+          [join(dirname(manifest), action.runs.post)],
+          {
+            cwd: f.repo,
+            env: f.env,
+            encoding: 'utf8',
+            timeout: 5000,
+          }
+        );
+        return { phase, ...JSON.parse(output) };
+      }),
     text: results.map(r => r.stdout + r.stderr).join('\n'),
   };
 }
@@ -338,6 +443,62 @@ function restored(f) {
     'trusted helper directories are cleaned'
   );
 }
+
+for (const actionGeneration of ['added', 'changed']) {
+  test(`registered ${actionGeneration} action generation survives exact-head restoration`, t => {
+    const makeFixture = () =>
+      fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'), {
+        actionGeneration,
+      });
+    const f = makeFixture();
+    const result = transaction(f, { capturePosts: true });
+    assert.equal(result.failed, false, result.text);
+    restored(f);
+    assert.deepEqual(
+      result
+        .runPosts()
+        .filter(row => row.phase === 'source_merge_dependencies'),
+      [{ phase: 'source_merge_dependencies', generation: 'merged' }]
+    );
+
+    // Deliberate red control: the former live-worktree uses path either
+    // disappears or silently executes the source head's older post payload.
+    const legacy = makeFixture();
+    const oldResult = transaction(legacy, {
+      capturePosts: true,
+      legacyActionPaths: true,
+    });
+    assert.equal(oldResult.failed, false, oldResult.text);
+    restored(legacy);
+    if (actionGeneration === 'added')
+      assert.throws(() => oldResult.runPosts(), /ENOENT/);
+    else
+      assert.deepEqual(
+        oldResult
+          .runPosts()
+          .filter(row => row.phase === 'source_merge_dependencies'),
+        [{ phase: 'source_merge_dependencies', generation: 'head' }]
+      );
+  });
+}
+
+test('an existing action snapshot is preserved and cannot authorize merged setup', t => {
+  const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'));
+  f.write('tmp/source-guard-actions/owner.txt', 'pre-existing local work\n');
+  const result = transaction(f);
+  assert.equal(result.failed, true);
+  assert.match(result.text, /EEXIST/);
+  assert.equal(result.state.source_merge_dependencies.outcome, 'skipped');
+  assert.deepEqual(
+    f.installs().map(row => row.phase),
+    ['initial']
+  );
+  assert.equal(
+    readFileSync(join(f.repo, 'tmp/source-guard-actions/owner.txt'), 'utf8'),
+    'pre-existing local work\n'
+  );
+  restored(f);
+});
 
 for (const [name, change] of [
   [
@@ -412,22 +573,35 @@ test('unchanged dependency generation needs no second install', t => {
 });
 
 test('guard failure remains failed after restoring the head and its installed tree', t => {
-  const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'));
-  const result = transaction(f, { failGuard: true });
+  const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'), {
+    actionGeneration: 'added',
+  });
+  const result = transaction(f, { failGuard: true, capturePosts: true });
   assert.equal(result.failed, true);
   assert.match(result.text, /exact-dependency-probe: exit 43/);
   assert.equal(result.state.source_head_dependencies.outcome, 'success');
   restored(f);
+  assert.deepEqual(result.runPosts(), [
+    { phase: 'source_merge_dependencies', generation: 'merged' },
+  ]);
 });
 
 test('partially failed merged install skips guards and still reinstalls exact-head dependencies', t => {
-  const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'));
-  const result = transaction(f, { failInstall: 'source_merge_dependencies' });
+  const f = fixture(t, write => write('pnpm-lock.yaml', 'changed lock\n'), {
+    actionGeneration: 'added',
+  });
+  const result = transaction(f, {
+    failInstall: 'source_merge_dependencies',
+    capturePosts: true,
+  });
   assert.equal(result.failed, true);
   assert.equal(f.guards().length, 0);
   assert.equal(result.state.source_merge_dependencies.outcome, 'failure');
   assert.equal(result.state.source_head_dependencies.outcome, 'success');
   restored(f);
+  assert.deepEqual(result.runPosts(), [
+    { phase: 'source_merge_dependencies', generation: 'merged' },
+  ]);
 });
 
 test('changed Node pin cannot reuse the prior runtime receipt', t => {
