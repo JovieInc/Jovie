@@ -1,9 +1,17 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, test } from 'node:test';
+import {
+  contractChildren,
+  contractLines,
+  contractMap,
+  contractScalar,
+  contractSteps,
+} from './lib/source-action-contract.mjs';
 import { snapshotSourceGuardActions } from './lib/source-guard-action-snapshot.mjs';
 import {
   findGhJqArgMisuse,
@@ -140,6 +148,15 @@ function generatedFixture() {
     },
   };
   write('package.json', '{"name":"fixture"}');
+  for (const script of [
+    'verify-workflow-references.mjs',
+    'lib/source-action-contract.mjs',
+  ]) {
+    write(
+      `scripts/${script}`,
+      fs.readFileSync(new URL(script, import.meta.url))
+    );
+  }
   write(
     'scripts/lib/source-guard-action-snapshot.mjs',
     fs.readFileSync(
@@ -352,5 +369,268 @@ test('the validated closure is the real snapshot and linked or unsupported sourc
       )
     );
     assert.equal(fs.existsSync(path.join(broken.root, 'tmp')), false);
+  }
+});
+
+test('cold Node-only checkout validates and snapshots without installed dependencies', () => {
+  const f = generatedFixture();
+  const run = script =>
+    spawnSync(process.execPath, [script], {
+      cwd: f.root,
+      encoding: 'utf8',
+      env: { PATH: '/nonexistent', NODE_PATH: '' },
+    });
+  assert.equal(fs.existsSync(path.join(f.root, 'node_modules')), false);
+  const good = run('scripts/verify-workflow-references.mjs');
+  assert.equal(good.status, 0, good.stderr);
+  const copied = run('scripts/lib/source-guard-action-snapshot.mjs');
+  assert.equal(copied.status, 0, copied.stderr);
+  fs.rmSync(
+    path.join(f.root, '.github/actions/vendor/pnpm-action-setup/dist/index.js')
+  );
+  const bad = run('scripts/verify-workflow-references.mjs');
+  assert.equal(bad.status, 1);
+  assert.match(bad.stderr, /generated action has no valid source and producer/);
+  assert.doesNotMatch(bad.stderr, /MODULE_NOT_FOUND/);
+  assert.equal(fs.existsSync(path.join(f.root, 'node_modules')), false);
+});
+
+test('supported workflow fields agree with the canonical YAML parser including quota aliases', () => {
+  const source = fs.readFileSync(
+    new URL('../.github/workflows/source-validation.yml', import.meta.url),
+    'utf8'
+  );
+  const canonical = load(source);
+  const jobs = contractChildren(contractMap(contractLines(source)).get('jobs'));
+  const anchors = new Map();
+  for (const [id, entry] of jobs) {
+    const steps = contractSteps(contractChildren(entry).get('steps'), anchors);
+    assert.equal(steps.length, canonical.jobs[id].steps.length);
+    for (const [index, step] of steps.entries()) {
+      for (const key of [
+        'id',
+        'uses',
+        'if',
+        'working-directory',
+        'continue-on-error',
+      ]) {
+        if (step.fields.has(key)) {
+          assert.equal(
+            contractScalar(step.fields.get(key)),
+            canonical.jobs[id].steps[index][key]
+          );
+        } else assert.equal(canonical.jobs[id].steps[index][key], undefined);
+      }
+    }
+  }
+});
+
+test('unknown or ambiguous generated-contract syntax stays red before installation', () => {
+  const mutations = [
+    source =>
+      source.replace(
+        'id: source_guard_actions',
+        'id: source_guard_actions\n        id: innocent'
+      ),
+    source =>
+      source.replace(
+        'id: source_guard_actions',
+        "id: source_guard_actions\n        'id': innocent"
+      ),
+    source => source.replace('jobs:', 'jobs: &jobs'),
+    source => source.replace('deterministic:', 'deterministic: &job'),
+    source => source.replace('steps:', 'steps: &steps'),
+    source =>
+      source.replace(
+        '- name: Preserve merged action generation',
+        '- &producer\n        name: Preserve merged action generation'
+      ),
+    source =>
+      source.replace(
+        'run: node scripts/lib/source-guard-action-snapshot.mjs',
+        'run: *command'
+      ),
+    source =>
+      source.replace(
+        'id: source_guard_actions',
+        'id: source_guard_actions\n        <<: *override'
+      ),
+    source => `${source}\n---\njobs: {}\n`,
+    source => `${source}\njobs: {}\n`,
+    source =>
+      source.replace('id: source_guard_actions', '\tid: source_guard_actions'),
+  ];
+  for (const mutate of mutations) {
+    const f = generatedFixture();
+    const file = path.join(f.root, '.github/workflows/source-validation.yml');
+    const before = fs.readFileSync(file, 'utf8');
+    const after = mutate(before);
+    assert.notEqual(after, before, 'control must actually change the workflow');
+    fs.writeFileSync(file, after);
+    assert.ok(
+      validateWorkflowReferences(f.root).some(error =>
+        error.includes('generated action has no valid source and producer')
+      )
+    );
+    assert.equal(fs.existsSync(path.join(f.root, 'tmp')), false);
+  }
+  for (const body of [
+    'runs: {using: node24, main: dist/index.js}',
+    'runs:\n  using: node24\n  main: dist/index.js\n  main: missing.js',
+    'runs:\n  using: node24\n  main: *payload',
+    'runs:\n  <<: *runtime\n  using: node24\n  main: dist/index.js',
+    'runs:\n  using: composite\n  steps:\n    - *unknown',
+  ]) {
+    const f = generatedFixture();
+    f.write('.github/actions/vendor/pnpm-action-setup/action.yml', body);
+    assert.ok(
+      validateWorkflowReferences(f.root).some(error =>
+        error.includes('generated action has no valid source and producer')
+      )
+    );
+    assert.throws(() => snapshotSourceGuardActions(f.root));
+  }
+});
+
+test('script-body references never become action dependencies or get rewritten', () => {
+  const f = generatedFixture();
+  const source =
+    'runs:\n  using: composite\n  steps:\n    - shell: bash\n      run: |\n        cat <<EOF\n        uses: ./.github/actions/nonexistent\n        EOF\n';
+  f.write('.github/actions/setup-playwright/action.yml', source);
+  assert.deepEqual(validateWorkflowReferences(f.root), []);
+  snapshotSourceGuardActions(f.root);
+  assert.equal(
+    fs.readFileSync(
+      path.join(f.root, 'tmp/source-guard-actions/setup-playwright/action.yml'),
+      'utf8'
+    ),
+    source
+  );
+});
+
+test('quoted payloads preserve literal hashes and cannot become truncated filenames', () => {
+  for (const quoted of ["'foo # bar'", '"foo # bar"']) {
+    const f = generatedFixture();
+    f.write(
+      '.github/actions/vendor/pnpm-action-setup/action.yml',
+      `runs:\n  using: 'node24' # runtime\n  main: ${quoted} # payload\n`
+    );
+    f.write(".github/actions/vendor/pnpm-action-setup/'foo", 'wrong payload');
+    f.write('.github/actions/vendor/pnpm-action-setup/"foo', 'wrong payload');
+    assert.throws(
+      () => snapshotSourceGuardActions(f.root),
+      /payload does not resolve/
+    );
+    f.write(
+      '.github/actions/vendor/pnpm-action-setup/foo # bar',
+      'correct payload'
+    );
+    assert.deepEqual(validateWorkflowReferences(f.root), []);
+    snapshotSourceGuardActions(f.root);
+  }
+  for (const value of [
+    "'unclosed",
+    '"unclosed',
+    "'ok' trailing",
+    '"ok" trailing',
+  ]) {
+    const f = generatedFixture();
+    f.write(
+      '.github/actions/vendor/pnpm-action-setup/action.yml',
+      `runs:\n  using: node24\n  main: ${value}\n`
+    );
+    f.write(
+      `.github/actions/vendor/pnpm-action-setup/${value}`,
+      'not a literal filename'
+    );
+    assert.throws(() => snapshotSourceGuardActions(f.root));
+  }
+});
+
+test('YAML non-string payloads stay invalid even when a matching filename exists', () => {
+  for (const value of [
+    'true',
+    'FALSE',
+    '42',
+    '0x10',
+    '0o10',
+    '1e3',
+    'null',
+    '~',
+    '.NaN',
+    '-.Inf',
+    '0b10',
+    '2026-10-27',
+  ]) {
+    const f = generatedFixture();
+    f.write(
+      '.github/actions/vendor/pnpm-action-setup/action.yml',
+      `runs:\n  using: node24\n  main: ${value}\n`
+    );
+    f.write(
+      `.github/actions/vendor/pnpm-action-setup/${value}`,
+      'wrong typed payload'
+    );
+    // These last two are strings in the installed YAML core schema, but
+    // other YAML schemas coerce them. The bounded contract requires quotes.
+    if (!['0b10', '2026-10-27'].includes(value)) {
+      assert.notEqual(typeof load(`main: ${value}`).main, 'string');
+    }
+    assert.throws(
+      () => snapshotSourceGuardActions(f.root),
+      /Unsupported contract scalar/
+    );
+    assert.ok(
+      validateWorkflowReferences(f.root).some(error =>
+        error.includes('generated action has no valid source and producer')
+      )
+    );
+    f.write(
+      '.github/actions/vendor/pnpm-action-setup/action.yml',
+      `runs:\n  using: node24\n  main: '${value}'\n`
+    );
+    assert.deepEqual(validateWorkflowReferences(f.root), []);
+  }
+});
+
+test('unsupported generated references fail explicitly even when lexical scanning cannot see them', () => {
+  for (const hide of [
+    source => source.replaceAll('uses: ./tmp/', 'uses: &hidden ./tmp/'),
+    source => source.replaceAll('uses: ./tmp/', '"uses": ./tmp/'),
+    source =>
+      source.replace(
+        /uses: (\.\/tmp\/[^\n]+)/g,
+        (_line, value) => `uses: "${value.replace('./', '\\u002e/')}"`
+      ),
+    source => source.replace(/uses: \.\/tmp\/[^\n]+/g, 'uses: *unknown'),
+  ]) {
+    const f = generatedFixture();
+    const file = path.join(f.root, '.github/workflows/source-validation.yml');
+    const source = fs
+      .readFileSync(file, 'utf8')
+      .replace(
+        'run: node scripts/lib/source-guard-action-snapshot.mjs',
+        'run: echo NO_SNAPSHOT_CREATED'
+      );
+    const hidden = hide(source);
+    assert.notEqual(hidden, source);
+    fs.writeFileSync(file, hidden);
+    fs.rmSync(path.join(f.root, '.github/actions'), { recursive: true });
+    assert.ok(
+      validateWorkflowReferences(f.root).some(error =>
+        error.includes('missing or unsupported contract')
+      )
+    );
+    const cli = spawnSync(
+      process.execPath,
+      ['scripts/verify-workflow-references.mjs'],
+      {
+        cwd: f.root,
+        encoding: 'utf8',
+        env: { PATH: '/nonexistent', NODE_PATH: '' },
+      }
+    );
+    assert.equal(cli.status, 1, cli.stderr);
+    assert.match(cli.stderr, /missing or unsupported contract/);
   }
 });

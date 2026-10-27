@@ -1,16 +1,20 @@
 #!/usr/bin/env node
 
 import fs from 'node:fs';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 import process from 'node:process';
+import {
+  contractChildren,
+  contractLines,
+  contractMap,
+  contractScalar,
+  contractSteps,
+} from './lib/source-action-contract.mjs';
 import {
   planSourceGuardActions,
   ROOT_ACTIONS,
   SNAPSHOT_RELATIVE,
 } from './lib/source-guard-action-snapshot.mjs';
-
-const { load } = createRequire(import.meta.url)('js-yaml');
 
 const WORKFLOW_EXTENSIONS = new Set(['.yml', '.yaml']);
 const LOCAL_PATH_PREFIXES = ['./', '.github/', 'apps/', 'scripts/'];
@@ -112,40 +116,58 @@ function generatedActionReferences(root, relativeWorkflow, source) {
   if (relativeWorkflow !== '.github/workflows/source-validation.yml')
     return valid;
   try {
-    const document = load(source);
-    const job = document?.jobs?.deterministic;
-    const steps = job?.steps;
-    if (!Array.isArray(steps)) return valid;
+    const document = contractMap(contractLines(source));
+    const jobs = contractChildren(document.get('jobs'));
+    const job = contractChildren(jobs.get('deterministic'));
+    // Defaults and merged mappings need broader YAML semantics; this one
+    // generated contract deliberately has neither.
+    if (document.has('defaults') || job.has('defaults')) return valid;
+    const anchors = new Map();
+    const allSteps = new Map(
+      [...jobs].map(([id, entry]) => [
+        id,
+        contractSteps(contractChildren(entry).get('steps'), anchors),
+      ])
+    );
+    const steps = allSteps.get('deterministic');
+    const field = (step, key) =>
+      step.fields.has(key) ? contractScalar(step.fields.get(key)) : undefined;
+    const ids = steps.map(step => field(step, 'id')).filter(Boolean);
+    if (new Set(ids).size !== ids.length) return valid;
     const producerIndex = steps.findIndex(
-      step => step.id === 'source_guard_actions'
+      step => field(step, 'id') === 'source_guard_actions'
     );
     const producer = steps[producerIndex];
     const mergeIndex = steps.findIndex(
-      step => step.id === 'source_guard_merge'
+      step => field(step, 'id') === 'source_guard_merge'
     );
     const condition =
       "steps.source_guard_merge.outputs.dependency_changed == 'true'";
     const helper = 'scripts/lib/source-guard-action-snapshot.mjs';
     if (
       !producer ||
+      producer.anchor ||
       mergeIndex < 0 ||
       mergeIndex >= producerIndex ||
-      steps.filter(step => step.id === producer.id).length !== 1 ||
-      producer.run?.trim() !== `node ${helper}` ||
-      producer.if !== condition ||
-      producer['continue-on-error'] ||
-      producer['working-directory'] ||
-      job.defaults?.run?.['working-directory'] ||
-      document.defaults?.run?.['working-directory'] ||
+      steps[mergeIndex].anchor ||
+      [...producer.fields.keys()].some(
+        key => !['name', 'id', 'if', 'run'].includes(key)
+      ) ||
+      field(producer, 'run') !== `node ${helper}` ||
+      field(producer, 'if') !== condition ||
       !fs.existsSync(path.join(root, helper))
     )
       return valid;
     for (const [index, action] of ROOT_ACTIONS.entries()) {
       const consumer = steps[producerIndex + index + 1];
       if (
-        consumer?.uses !== `./${SNAPSHOT_RELATIVE}/${action}` ||
-        consumer.if !== condition ||
-        consumer['continue-on-error']
+        !consumer ||
+        consumer.anchor ||
+        [...consumer.fields.keys()].some(
+          key => !['name', 'id', 'if', 'uses'].includes(key)
+        ) ||
+        field(consumer, 'uses') !== `./${SNAPSHOT_RELATIVE}/${action}` ||
+        field(consumer, 'if') !== condition
       )
         return valid;
     }
@@ -154,17 +176,17 @@ function generatedActionReferences(root, relativeWorkflow, source) {
     planSourceGuardActions(root);
     for (const action of ROOT_ACTIONS)
       valid.add(`./${SNAPSHOT_RELATIVE}/${action}`);
-    // A second occurrence in another job has no producer proof.
-    for (const [id, other] of Object.entries(document.jobs)) {
+    // Resolve the workflow's existing whole-step quota aliases, but no generated
+    // step or containing map may be anchored or borrow another job's producer.
+    for (const [id, otherSteps] of allSteps) {
       if (
         id !== 'deterministic' &&
-        other.steps?.some(step => valid.has(step.uses))
+        otherSteps.some(step => valid.has(field(step, 'uses')))
       )
         return new Set();
     }
     for (const reference of valid) {
-      if (steps.filter(step => step.uses === reference).length !== 1)
-        return new Set();
+      if (source.split(reference).length !== 2) return new Set();
     }
   } catch {
     // Missing/invalid source closure or workflow structure remains unresolved.
@@ -192,6 +214,18 @@ export function validateWorkflowReferences(root = process.cwd()) {
       relativeWorkflow,
       source
     );
+    // This workflow owns the generated contract. A refused projection is a
+    // failed proof even if quotes, anchors or aliases hide its local `uses`
+    // from the older lexical scanner below.
+    if (
+      generatedActions.size === 0 &&
+      (relativeWorkflow === '.github/workflows/source-validation.yml' ||
+        source.includes(SNAPSHOT_RELATIVE))
+    ) {
+      errors.push(
+        `${relativeWorkflow}: generated action has no valid source and producer (missing or unsupported contract)`
+      );
+    }
 
     for (const line of findGhJqArgMisuse(source)) {
       errors.push(

@@ -9,11 +9,16 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { createRequire } from 'node:module';
 import { dirname, join, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import {
+  contractChildren,
+  contractLines,
+  contractMap,
+  contractScalar,
+  contractSteps,
+} from './source-action-contract.mjs';
 
-const { load } = createRequire(import.meta.url)('js-yaml');
 export const SNAPSHOT_RELATIVE = 'tmp/source-guard-actions';
 const LOCAL_PREFIX = './.github/actions/';
 const SNAPSHOT_PREFIX = `./${SNAPSHOT_RELATIVE}/`;
@@ -36,18 +41,35 @@ function packageRoot(action) {
 
 /** Only local uses references move; remote pins and executable bodies stay intact. */
 function localUses(source, visit) {
-  return source.replace(
-    /^(\s*(?:-\s+)?uses:\s*)(['"]?)(\.\/[^\s'"#]+)\2(.*)$/gm,
-    (_line, lead, quote, reference, tail) => {
+  const runs = contractChildren(contractMap(contractLines(source)).get('runs'));
+  if (contractScalar(runs.get('using')) !== 'composite') return source;
+  const lines = source.split(/\r?\n/);
+  for (const { fields, anchor } of contractSteps(runs.get('steps'))) {
+    if (anchor) throw new Error('Unsupported source action step anchor');
+    const uses = fields.get('uses');
+    if (!uses) continue;
+    const reference = contractScalar(uses);
+    if (reference.startsWith('./')) {
       if (!reference.startsWith(LOCAL_PREFIX)) {
         throw new Error(`Unsupported source action dependency: ${reference}`);
       }
       const action = reference.slice(LOCAL_PREFIX.length);
       packageRoot(action);
       visit(action);
-      return `${lead}${quote}${SNAPSHOT_PREFIX}${action}${quote}${tail}`;
+      if (!lines[uses.line].includes(reference)) {
+        throw new Error('Local action reference must use a literal path');
+      }
+      lines[uses.line] = lines[uses.line].replace(
+        reference,
+        `${SNAPSHOT_PREFIX}${action}`
+      );
+    } else if (reference.includes('${')) {
+      throw new Error(
+        `Unsupported remote source action dependency: ${reference}`
+      );
     }
-  );
+  }
+  return lines.join(source.includes('\r\n') ? '\r\n' : '\n');
 }
 
 function files(directory, relative = '') {
@@ -71,17 +93,18 @@ function files(directory, relative = '') {
 }
 
 function validatePayloads(source, manifest, packageDirectory) {
-  const runs = load(source)?.runs;
-  if (runs?.using === 'composite') return;
-  if (!/^node\d+$/.test(runs?.using ?? '')) {
+  const runs = contractChildren(contractMap(contractLines(source)).get('runs'));
+  const using = contractScalar(runs.get('using'));
+  if (using === 'composite') return;
+  if (!/^node\d+$/.test(using)) {
     throw new Error(`Unsupported source action runtime: ${manifest}`);
   }
   for (const name of ['main', 'pre', 'post']) {
-    const entry = runs[name];
-    if (name !== 'main' && entry === undefined) continue;
-    if (typeof entry !== 'string' || !entry) {
+    if (name !== 'main' && !runs.has(name)) continue;
+    if (!runs.has(name)) {
       throw new Error(`Missing source action ${name}: ${manifest}`);
     }
+    const entry = contractScalar(runs.get(name));
     const payload = resolve(dirname(manifest), entry);
     if (
       !payload.startsWith(`${packageDirectory}${sep}`) ||
