@@ -781,8 +781,8 @@ def hold_context(number: int, sh=run) -> dict | None:
 
 # Reassessment proves one machine disposition; it never creates repair admission.
 MACHINE_HOLD_SCHEMA = "jovie-machine-hold-reassessment/v1"
-NARRATIVE_CLASSIFIER_COMMIT = "a002520a564eba21c5e025a28251416828d0be66"
-NARRATIVE_CLASSIFIER_BLOB = "6c08a9ad0434f6717b7c90461d52d04df9df6a7d"
+NARRATIVE_CLASSIFIER_COMMIT = "40408f69ea9d501f5508cd0614d60582a5db78ee"
+NARRATIVE_CLASSIFIER_BLOB = "0a125f1a51368e1a44d08d12a134b8554b38bfcb"
 HUMAN_STOP_NOTE = re.compile(r"(?i)\b(?:on hold|hold off|hold (?:this|the pr|until)|keep (?:this|it|the pr) (?:as )?(?:a )?draft|do not merge|don't merge|stop (?:this|the pr)|wait for (?:me|my|tim)|needs? (?:my|tim's?|founder) (?:approval|decision))\b")
 
 
