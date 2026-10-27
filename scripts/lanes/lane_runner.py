@@ -2069,6 +2069,7 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
     if root is None:
         return reset_s
     scope = root / _linear_scope_id(key)
+    staging = None
     try:
         root.mkdir(parents=True, exist_ok=True)
         _chmod_private(root, 0o700)
@@ -2081,16 +2082,29 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
                 if existing is not None and existing > reset_s:
                     reset_s = existing
                 reset_ms = int(reset_s * 1000)
-                record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
-                fd = os.open(record, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                publication_id = uuid.uuid4()
+                record = scope / f"{reset_ms}-{publication_id}.json"
+                staging = scope / f".pending-{publication_id}"
+                fd = os.open(staging, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "w") as pending:
+                    json.dump({"schema": 1, "resetAt": reset_ms}, pending)
+                    pending.flush()
+                    os.fsync(pending.fileno())
+                _chmod_private(staging, 0o600)
+                os.rename(staging, record)
+                directory_fd = os.open(scope, os.O_RDONLY)
                 try:
-                    os.write(fd, json.dumps({"schema": 1, "resetAt": reset_ms}).encode())
+                    os.fsync(directory_fd)
                 finally:
-                    os.close(fd)
-                _chmod_private(record, 0o600)
+                    os.close(directory_fd)
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
     except Exception as error:
+        if staging is not None:
+            try:
+                staging.unlink(missing_ok=True)
+            except OSError:
+                pass  # Leftover staging still fail-closes strict JS readers.
         _cooldown_write_failed(root, scope.name, reset_s, error)
     return reset_s
 
