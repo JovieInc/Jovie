@@ -6,7 +6,7 @@
  * Optional evidence inputs (absent evidence = `unknown`, which counts as missing):
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
  */
-import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -85,6 +85,33 @@ const journeyMap = readJson(values.journeys, { components: {}, journeys: {} });
 const benchmarks =
   readJson(values.benchmarks, { components: {} }).components ?? {};
 
+// Match mutation-sweep's same-stem test inventory, but hash the bytes being
+// certified rather than index blobs: local source/test edits must invalidate
+// an old run even before they are staged. Missing Git/input evidence stays
+// unknown; it must not fall back to a smaller test set with a different key.
+const mutationInventory = (() => {
+  if (!Object.keys(mutation).length) return null;
+  try {
+    const paths = execFileSync('git', ['ls-files', '-z', '--', 'apps/web'], {
+      cwd: root,
+      encoding: 'utf8',
+      maxBuffer: 16 * 1024 * 1024,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+      .split('\0')
+      .filter(Boolean);
+    const tests = new Map();
+    for (const path of paths) {
+      const match = /([^/]+)\.test\.tsx?$/.exec(path);
+      if (!match) continue;
+      tests.set(match[1], [...(tests.get(match[1]) ?? []), read(path)]);
+    }
+    return { tracked: new Set(paths), tests };
+  } catch {
+    return null;
+  }
+})();
+
 /** @type {any[]} */
 let list = [];
 if (values.all)
@@ -108,7 +135,14 @@ const certificates = list.map(c => {
   const source = read(c.sourceRel) ?? '';
   const testSource = c.testRel ? read(c.testRel) : null;
   const storySource = c.storyRel ? read(c.storyRel) : null;
-  const sourceHash = createHash('sha256').update(source).digest('hex');
+  const mutationTests = mutationInventory?.tracked.has(c.sourceRel)
+    ? (mutationInventory.tests.get(
+        c.sourceRel
+          .split('/')
+          .pop()
+          .replace(/\.tsx?$/, '')
+      ) ?? [])
+    : null;
   const webRel = c.sourceRel.replace(/^apps\/web\//, '');
   const jm = journeyMap.components?.[c.sourceRel];
   const journeys = jm
@@ -124,11 +158,13 @@ const certificates = list.map(c => {
     source,
     testSource,
     storySource,
+    mutationTestSources: mutationTests?.every(text => typeof text === 'string')
+      ? mutationTests
+      : null,
     waivers: registry.waivers?.[c.sourceRel] ?? {},
     policy,
     packagesUi: c.sourceRel.startsWith('packages/ui/'),
     evidence: {
-      sourceHash,
       mutation: mutation[webRel],
       a11y: a11y[c.sourceRel],
       visual: visual[c.sourceRel],

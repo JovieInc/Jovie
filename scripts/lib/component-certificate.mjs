@@ -9,9 +9,8 @@
  * hermetic (no git, gh, network).
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
 import ts from 'typescript';
+import { moduleKey } from './mutation-sweep.mjs';
 
 export const CERT_SCHEMA = 'jovie.component-certificate/v1';
 export const REPORT_SCHEMA = 'jovie.component-certificate-report/v1';
@@ -58,6 +57,11 @@ export const DEFAULT_POLICY = Object.freeze({
 });
 
 const sha = text => createHash('sha256').update(text).digest('hex');
+const gitBlob = text =>
+  createHash('sha1')
+    .update(`blob ${Buffer.byteLength(text)}\0`)
+    .update(text)
+    .digest('hex');
 
 const RAW_COLOR_PATTERNS = [
   [
@@ -380,27 +384,37 @@ const INTERACTIVE =
   /\b(onClick|onChange|onSubmit|onKeyDown|onPress|onSelect|onOpenChange)\b|<(button|input|textarea|select|form|a)\b|<(Button|Input|Textarea|Select|Dialog|Sheet|Drawer|Menu)\b/;
 const TEXT_INPUT = /<(input|textarea)\b|<(Input|Textarea)\b/;
 
-export function hashParts(parts) {
-  return sha(parts.map(([k, v]) => `${k}:${sha(v ?? '')}`).join('\n'));
-}
-
 function crit(id, status, extra = {}) {
   return { id, status, ...extra };
 }
 
 /**
- * @param {{path: string, source: string, testSource?: string|null, storySource?: string|null, evidence?: any, waivers?: any, policy?: any, packagesUi?: boolean}} input
+ * @param {{path: string, source: string, testSource?: string|null, storySource?: string|null, mutationTestSources?: string[]|null, evidence?: any, waivers?: any, policy?: any, packagesUi?: boolean}} input
  */
 export function certifyComponent({
   path,
   source,
   testSource = null,
   storySource = null,
+  mutationTestSources,
   evidence = {},
   waivers = {},
   policy = DEFAULT_POLICY,
   packagesUi = false,
 }) {
+  // Receipt metadata cannot choose the bytes this certificate binds to.
+  const sourceHash = sha(source);
+  const sourceBound = receipt => receipt?.sourceHash === sourceHash;
+  const mutationTests =
+    mutationTestSources === undefined
+      ? testSource === null
+        ? []
+        : [testSource]
+      : mutationTestSources;
+  const mutationKey =
+    mutationTests === null
+      ? null
+      : moduleKey(gitBlob(source), mutationTests.map(gitBlob));
   const criteria = [];
   const missing = [];
   const miss = (criterion, reason, how) =>
@@ -513,9 +527,10 @@ export function certifyComponent({
       testSource
     );
   const a11yEv = evidence.a11y;
-  if (a11yEv && a11yEv.status === 'pass')
+  const a11yCurrent = sourceBound(a11yEv);
+  if (a11yCurrent && a11yEv.status === 'pass')
     criteria.push(crit('a11y', 'pass', { source: 'storybook-a11y' }));
-  else if (a11yEv && a11yEv.status === 'fail') {
+  else if (a11yCurrent && a11yEv.status === 'fail') {
     criteria.push(crit('a11y', 'fail', { detail: a11yEv.detail }));
     miss(
       'a11y',
@@ -527,12 +542,17 @@ export function certifyComponent({
   else {
     criteria.push(
       crit('a11y', 'unknown', {
-        detail: 'no axe assertion in unit test and no CI a11y evidence',
+        detail:
+          a11yEv && !a11yCurrent
+            ? 'CI a11y evidence is stale or missing a source hash'
+            : 'no axe assertion in unit test and no CI a11y evidence',
       })
     );
     miss(
       'a11y',
-      'no axe evidence',
+      a11yEv && !a11yCurrent
+        ? 'no current source-bound axe evidence'
+        : 'no axe evidence',
       'Call expectNoA11yViolations(container) from apps/web/tests/utils/a11y.ts in the unit test for each rendered state'
     );
   }
@@ -568,19 +588,52 @@ export function certifyComponent({
 
   // mutation
   const m = evidence.mutation;
-  if (!m || m.status !== 'scored') {
+  // The canonical sweep's blob is moduleKey(source blob, same-stem test
+  // blobs). Its sha records the run's revision; an unchanged content key can
+  // legitimately be reused after unrelated commits, as the sweep itself does.
+  const mutationCurrent =
+    m &&
+    mutationKey !== null &&
+    m.blob === mutationKey &&
+    typeof m.sha === 'string' &&
+    /^[0-9a-f]{40}$/i.test(m.sha) &&
+    (m.sourceHash === undefined || sourceBound(m));
+  const mutationMeasurement =
+    m &&
+    Number.isFinite(m.score) &&
+    m.score >= 0 &&
+    m.score <= 100 &&
+    Number.isInteger(m.valid) &&
+    m.valid >= 0;
+  if (!m || m.status !== 'scored' || !mutationCurrent || !mutationMeasurement) {
     criteria.push(
       crit('mutation', 'unknown', {
-        detail: m ? `status ${m.status}` : 'not scored',
+        detail:
+          m?.status === 'scored'
+            ? !mutationCurrent
+              ? 'mutation evidence is stale or unbound (source/test key or run revision)'
+              : 'invalid mutation measurement (finite numeric score 0..100 and nonnegative integer valid required)'
+            : m
+              ? `status ${m.status}`
+              : 'not scored',
       })
     );
     miss(
       'mutation',
-      'no mutation score',
+      m?.status === 'scored'
+        ? 'no current well-formed source/test-bound mutation score'
+        : 'no mutation score',
       `node scripts/mutation-sweep.mjs --include ${path.replace(/^apps\/web\//, '')} (score must be >= ${policy.mutationMin})`
     );
   } else if (m.score >= policy.mutationMin)
-    criteria.push(crit('mutation', 'pass', { score: m.score, valid: m.valid }));
+    criteria.push(
+      crit('mutation', 'pass', {
+        score: m.score,
+        valid: m.valid,
+        sha: m.sha,
+        blob: m.blob,
+      })
+    );
   else {
     criteria.push(
       crit('mutation', 'fail', {
@@ -598,16 +651,26 @@ export function certifyComponent({
 
   // visual
   const v = evidence.visual;
-  if (v && v.status === 'pass')
+  const visualCurrent = sourceBound(v);
+  if (visualCurrent && v.status === 'pass')
     criteria.push(crit('visual', 'pass', { captured: v.captured }));
-  else if (v && v.status === 'fail') {
+  else if (visualCurrent && v.status === 'fail') {
     criteria.push(crit('visual', 'fail', { detail: v.detail }));
     miss('visual', v.detail ?? 'visual diff', 'Review the CI capture diff');
   } else {
-    criteria.push(crit('visual', 'unknown', { detail: 'no CI capture' }));
+    criteria.push(
+      crit('visual', 'unknown', {
+        detail:
+          v && !visualCurrent
+            ? 'CI capture is stale or missing a source hash'
+            : 'no CI capture',
+      })
+    );
     miss(
       'visual',
-      'no CI-captured baseline for the state stories',
+      v && !visualCurrent
+        ? 'no current source-bound CI capture'
+        : 'no CI-captured baseline for the state stories',
       'Land state stories; the component-certificate workflow captures them in CI (never a Storybook build on gem)'
     );
   }
@@ -642,7 +705,7 @@ export function certifyComponent({
     );
   } else if (
     b.libraryVersion !== policy.benchmarkLibraryVersion ||
-    b.sourceHash !== evidence.sourceHash
+    b.sourceHash !== sourceHash
   ) {
     criteria.push(
       crit('benchmark', 'unknown', {
@@ -685,7 +748,7 @@ export function certifyComponent({
     applicable: criteria.filter(c => c.status !== 'na').length,
     criteria,
     missing,
-    binding: evidence.sourceHash ?? sha(source),
+    binding: sourceHash,
   };
 }
 
@@ -717,29 +780,25 @@ export function renderAgentSpec(
   cert,
   { journeyNotes = [], benchmarkGaps = [] } = {}
 ) {
-  const lines = [
+  const section = (heading, rows) =>
+    rows.length ? ['', heading, ...rows] : [];
+  return [
     `# Certify ${cert.component}`,
     '',
     'Goal: make every criterion below pass so the component certificate reports certified. One small PR; UI fast lane if the diff stays visual-only (labels ui + fast and a Fast-track UI eligibility section with Why eligible, Before, After, Checks run).',
     '',
     '## Missing criteria',
     ...cert.missing.map(m => `- [${m.criterion}] ${m.reason}. Do: ${m.how}`),
-  ];
-  if (benchmarkGaps.length)
-    lines.push(
-      '',
+    ...section(
       '## Adopted benchmark gaps (acceptance criteria)',
-      ...benchmarkGaps.map(
+      benchmarkGaps.map(
         g => `- (${g.decision}) ${g.item} - reference: ${g.reference}`
       )
-    );
-  if (journeyNotes.length)
-    lines.push(
-      '',
+    ),
+    ...section(
       '## Golden-path journeys touching this component',
-      ...journeyNotes.map(n => `- ${n}`)
-    );
-  lines.push(
+      journeyNotes.map(n => `- ${n}`)
+    ),
     '',
     '## Rules',
     '- Read DESIGN.md, .claude/rules/ui.md, .claude/rules/motion.md and the frontend skill contract (scripts/design-frontend-skill-check.mjs) first.',
@@ -750,22 +809,8 @@ export function renderAgentSpec(
     '## Verify (targeted, do not run the full suite)',
     `- pnpm --filter @jovie/web exec vitest run ${cert.component.replace(/^apps\/web\//, '').replace(/\.tsx$/, '')}`,
     `- node scripts/component-certificate.mjs --component ${cert.component}`,
-    '- pnpm design:conformance:gate'
-  );
-  return lines.join('\n');
-}
-
-export function readIfExists(path) {
-  return existsSync(path) ? readFileSync(path, 'utf8') : null;
-}
-
-export function siblingPaths(repoRoot, rel) {
-  const base = join(repoRoot, rel.replace(/\.tsx$/, ''));
-  return {
-    test: `${base}.test.tsx`,
-    story: `${base}.stories.tsx`,
-    dir: dirname(join(repoRoot, rel)),
-  };
+    '- pnpm design:conformance:gate',
+  ].join('\n');
 }
 
 export const GUARD_TYPES = Object.freeze([
