@@ -126,4 +126,24 @@ describe('HomepageHeroCanvas', () => {
       document.querySelector('[aria-label="Distribution partners"]')
     ).toBeNull();
   });
+
+  it('renders no proof phone when no profile capture is passed', () => {
+    render(
+      <HomepageHeroCanvas
+        headingId='home-hero-heading'
+        headline={hero.headline}
+        subhead={hero.subhead}
+        claim={hero.claim}
+        supportNote={hero.supportNote}
+        sectionOwner='apps/web/components/homepage/HomepageArtistProfile.tsx'
+      />
+    );
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
+      hero.headline
+    );
+    expect(document.querySelector('.homepage-hero-canvas__proof')).toBeNull();
+    expect(document.querySelector('.homepage-artist-hero__phone')).toBeNull();
+    expect(screen.queryByRole('img')).toBeNull();
+  });
 });

@@ -422,6 +422,10 @@ describe('production freshness', () => {
     assert.equal(fresh.healthy, true);
     assert.equal(fresh.incidentClass, null);
     assert.match(fresh.reason, /^unshipped-for-2292s-within-14760s$/);
+    assert.equal(fresh.catchingUp, true);
+    assert.equal(fresh.summary, 'behind by 4, catching up');
+    assert.equal(stale.catchingUp, false);
+    assert.equal(stale.summary, 'behind by 4, stale');
   });
 
   it('treats the measured p95 (246 minutes) as the freshness bound by default as the production freshness bound', async () => {
@@ -519,7 +523,8 @@ describe('production freshness', () => {
     assert.equal(staleOnly.status, 'unhealthy');
     assert.deepEqual(staleOnly.incidentClasses, [FRESHNESS_INCIDENT_CLASS]);
     assert.equal(staleOnly.requiresFounderNotification, true);
-    assert.equal(staleOnly.requiresAgentIngress, false);
+    assert.equal(staleOnly.requiresAgentIngress, true);
+    assert.equal(staleOnly.agentIngressFailure, 'production-controller-failed');
 
     const paused = aggregateContinuity(
       [
@@ -532,6 +537,7 @@ describe('production freshness', () => {
       { now: NOW }
     );
     assert.equal(paused.requiresAgentIngress, true);
+    assert.equal(paused.agentIngressFailure, 'provider-unavailable');
   });
 
   it('rolls unknown freshness up as unknown, not healthy, with an explicit unknownTargets list', async () => {
@@ -821,7 +827,7 @@ describe('production freshness', () => {
     });
     assert.equal(result.status, 'unhealthy');
     assert.deepEqual(result.affectedTargets, [FRESHNESS_TARGET_ID]);
-    assert.match(outputs.join(''), /requires_agent_ingress=false/);
+    assert.match(outputs.join(''), /requires_agent_ingress=true/);
 
     const without = await runCli({
       appendFileImpl: async () => {},

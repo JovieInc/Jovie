@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { runGh } from '../packages/api-client/gh.ts';
 import { isTransientAdmissionFailureMessage } from './lib/merge-group-admission.mjs';
 import {
   attributeAgainstAheadRun,
@@ -1018,7 +1019,7 @@ export function aheadEntryUnproven({
 // GitHub already removes the PR when the merge_group run fails.
 /**
  * @param {{ repository: string, run: object, timeline: object[], failedSteps?: string[], statuses?: object[], annotationText?: string, changedFiles?: string[], mainSha?: string, admissionText?: string, fetchTimeoutText?: string, aheadGroup?: AheadGroup }} input
- * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function }} io
+ * @param {{ writeStatus: Function, readPullRequest: Function, dequeuePullRequest: Function, disableAutoMerge: Function, recordDequeue?: Function }} io
  */
 export async function applyMergeGroupFailure(
   {
@@ -1034,7 +1035,13 @@ export async function applyMergeGroupFailure(
     fetchTimeoutText = '',
     aheadGroup,
   },
-  { writeStatus, readPullRequest, dequeuePullRequest, disableAutoMerge }
+  {
+    writeStatus,
+    readPullRequest,
+    dequeuePullRequest,
+    disableAutoMerge,
+    recordDequeue,
+  }
 ) {
   const front = validateRun(run, repository);
   const sourceHeadSha = sourceHeadForRun(timeline, run.created_at);
@@ -1196,9 +1203,31 @@ export async function applyMergeGroupFailure(
     current = await readPullRequest(front.prNumber);
     if (currentMatches() && current.isInMergeQueue && current.mergeQueueEntry) {
       try {
-        await dequeuePullRequest(current.id);
-        dequeued = true;
-        dequeueOutcome = 'dequeued';
+        // The durable exact-head failure status above is authoritative even if
+        // this advisory comment fails. Record intent before the removal so a
+        // crash cannot turn a completed action into an unrecorded one.
+        try {
+          await recordDequeue?.({
+            number: front.prNumber,
+            head: sourceHeadSha,
+            code: 'poison',
+            reason: `merge-group failure hold: run ${run.id} failed for head ${sourceHeadSha.slice(0, 12)}`,
+          });
+        } catch (error) {
+          console.error(
+            `::warning::merge-group-failure-hold could not record the dequeue reason: ${errorText(error).slice(0, 200)}`
+          );
+        }
+        current = await readPullRequest(front.prNumber);
+        if (
+          currentMatches() &&
+          current.isInMergeQueue &&
+          current.mergeQueueEntry
+        ) {
+          await dequeuePullRequest(current.id);
+          dequeued = true;
+          dequeueOutcome = 'dequeued';
+        }
       } catch (error) {
         const denial = classifyDequeueDenial(error);
         if (!denial) throw error;
@@ -1281,6 +1310,35 @@ function gh(args) {
     maxBuffer: 64 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
   });
+}
+
+export async function recordDequeueReason(
+  { repository, number, code, reason, head },
+  { run = runGh, now = () => new Date().toISOString() } = {}
+) {
+  const record = {
+    code,
+    reason,
+    actor: 'merge-group-failure-hold',
+    at: now(),
+    head,
+    outcome: 'requested',
+  };
+  const result = await run(
+    [
+      'api',
+      '-X',
+      'POST',
+      `repos/${repository}/issues/${number}/comments`,
+      '-f',
+      `body=Dequeue requested (${code}): ${reason}\n<!-- queue-dequeue ${JSON.stringify(record)} -->`,
+    ],
+    { priority: 'repair' }
+  );
+  if (result.code !== 0)
+    throw new Error(
+      result.stderr || `reason recording failed (${result.code})`
+    );
 }
 
 function ghJson(args) {
@@ -1668,6 +1726,7 @@ async function main(argv) {
           'mutation($id:ID!){disablePullRequestAutoMerge(input:{pullRequestId:$id}){clientMutationId}}',
           { id }
         ),
+      recordDequeue: data => recordDequeueReason({ repository, ...data }),
     }
   );
   const serialized = JSON.stringify(result);
