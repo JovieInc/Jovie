@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { clearRemediationLabelCache } from '../linear-issue-intake.mjs';
@@ -151,7 +153,7 @@ describe('gateSteadyGreen', () => {
 
   it('fails closed on red when Linear has no key', async () => {
     const result = await applyRemediationDecision(
-      { action: 'red', fingerprint: 'production-monitor-continuity' },
+      { action: 'red', fingerprint: 'production-monitor-vercel-deploy' },
       { source: 'production-continuity.yml', apiKey: '' }
     );
     expect('reason' in result && result.reason).toBe('missing_linear_api_key');
@@ -184,7 +186,7 @@ function linearStub(issueNodes) {
             nodes: [
               {
                 id: 'lbl-key',
-                name: 'remediation:production-monitor-continuity',
+                name: 'remediation:production-monitor-vercel-deploy',
               },
               {
                 id: 'lbl-prod',
@@ -225,7 +227,10 @@ function linearStub(issueNodes) {
 }
 
 describe('red remediation is agent-ready', () => {
-  const red = { action: 'red', fingerprint: 'production-monitor-continuity' };
+  const red = {
+    action: 'red',
+    fingerprint: 'production-monitor-vercel-deploy',
+  };
   const context = run => ({
     source: 'production-continuity.yml',
     runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
@@ -256,13 +261,13 @@ describe('red remediation is agent-ready', () => {
         identifier: 'JOV-2',
         url: 'u',
         title:
-          'P0: production-monitor-continuity is red (production-monitor-continuity)',
+          'P0: production-monitor-vercel-deploy is red (production-monitor-vercel-deploy)',
         state: { id: 'st-done', name: 'Done', type: 'completed' },
         labels: {
           nodes: [
             {
               id: 'lbl-key',
-              name: 'remediation:production-monitor-continuity',
+              name: 'remediation:production-monitor-vercel-deploy',
             },
           ],
         },
@@ -286,7 +291,10 @@ describe('red remediation is agent-ready', () => {
 });
 
 describe('applyRemediationDecisionWithRetry', () => {
-  const red = { action: 'red', fingerprint: 'production-monitor-continuity' };
+  const red = {
+    action: 'red',
+    fingerprint: 'production-monitor-vercel-deploy',
+  };
   const context = fetchImpl => ({
     source: 'production-continuity.yml',
     runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
@@ -462,7 +470,7 @@ describe('real monitor intake preserves quota canary identity', () => {
     expect(
       decideMonitorSignal({
         conclusion: 'success',
-        fingerprint: 'production-monitor-continuity',
+        fingerprint: 'production-monitor-vercel-deploy',
       }).fingerprints
     ).toBeUndefined();
   });
@@ -471,7 +479,7 @@ describe('real monitor intake preserves quota canary identity', () => {
     clearRemediationLabelCache();
     const run = linearStub([]);
     await applyRemediationDecision(
-      { action: 'red', fingerprint: 'production-monitor-continuity' },
+      { action: 'red', fingerprint: 'production-monitor-vercel-deploy' },
       {
         source: 'production-continuity.yml',
         runUrl: 'https://example.invalid/run',
@@ -482,5 +490,157 @@ describe('real monitor intake preserves quota canary identity', () => {
     const create = run.calls.find(call => call.query.includes('issueCreate'));
     expect(create.variables.title).toMatch(/^P0:/);
     expect(create.variables.priority).toBe(1);
+  });
+});
+
+describe('continuity intake treats unknown freshness as neither green nor silent', () => {
+  let entry = 0;
+  /**
+   * @param {{
+   *   conclusion: string,
+   *   previous?: string,
+   *   seedState?: string,
+   *   run: { calls: any[], fetchImpl: (...args: any[]) => any },
+   * }} options
+   */
+  async function runContinuityIntake({ conclusion, previous, seedState, run }) {
+    clearRemediationLabelCache();
+    const dir = mkdtempSync(join(tmpdir(), 'continuity-intake-'));
+    const previousFile = join(dir, 'previous');
+    const stateFile = join(dir, 'status');
+    if (previous !== undefined) writeFileSync(previousFile, `${previous}\n`);
+    if (seedState !== undefined) writeFileSync(stateFile, `${seedState}\n`);
+    const values = {
+      LINEAR_API_KEY: 'lin_test',
+      REMEDIATION_MODE: 'monitor',
+      REMEDIATION_CONCLUSION: conclusion,
+      REMEDIATION_FINGERPRINT: 'production-monitor-vercel-deploy',
+      REMEDIATION_SOURCE: 'production-continuity.yml',
+      REMEDIATION_RUN_URL:
+        'https://github.com/JovieInc/Jovie/actions/runs/40070879025',
+      REMEDIATION_DETAIL:
+        'production-continuity:unknown:jovie-production-freshness main-sha-unreadable',
+      REMEDIATION_INTAKE_DISABLED: '',
+      REMEDIATION_GATE_STEADY_GREEN: '1',
+      REMEDIATION_PREVIOUS_FILE: previousFile,
+      REMEDIATION_STATE_FILE: stateFile,
+    };
+    for (const [key, value] of Object.entries(values)) vi.stubEnv(key, value);
+    vi.stubGlobal('fetch', run.fetchImpl);
+    const logs = [];
+    const log = vi
+      .spyOn(console, 'log')
+      .mockImplementation(message => logs.push(String(message)));
+    try {
+      entry += 1;
+      const url = new URL(
+        `../../remediation-signal-intake.mjs?continuity-${entry}`,
+        import.meta.url
+      );
+      await import(url.href);
+    } finally {
+      log.mockRestore();
+      vi.unstubAllGlobals();
+      vi.unstubAllEnvs();
+      clearRemediationLabelCache();
+    }
+    return {
+      logs,
+      state: existsSync(stateFile)
+        ? readFileSync(stateFile, 'utf8').trim()
+        : null,
+      queries: run.calls.map(call => call.query),
+    };
+  }
+  const anyLinear = () => {
+    const calls = [];
+    const fetchImpl = vi.fn(async (_url, init) => {
+      calls.push(JSON.parse(String(init.body)));
+      return new Response(
+        JSON.stringify({
+          data: {
+            team: { states: { nodes: [] }, labels: { nodes: [] } },
+            issues: { nodes: [] },
+          },
+        })
+      );
+    });
+    return { calls, fetchImpl };
+  };
+
+  it('decides hold for unknown and never green', () => {
+    const held = decideMonitorSignal({ conclusion: 'unknown' });
+    expect(held).toEqual({ action: 'hold', reason: 'unknown_evidence' });
+    expect(gateSteadyGreen(held, 'red', '1').action).toBe('hold');
+  });
+
+  it('(1)(2) unknown after a recorded red leaves the incident open, writes nothing, and warns visibly', async () => {
+    const run = anyLinear();
+    const out = await runContinuityIntake({
+      conclusion: 'unknown',
+      previous: 'red',
+      seedState: 'red',
+      run,
+    });
+    // No resolve, no comment, no create: zero Linear calls.
+    expect(out.queries).toEqual([]);
+    expect(run.fetchImpl).not.toHaveBeenCalled();
+    // The pre-seeded recorded red is still red after the unknown run.
+    expect(out.state).toBe('red');
+    const json = JSON.parse(out.logs.find(line => line.startsWith('{')));
+    expect(json).toMatchObject({
+      ok: true,
+      action: 'hold',
+      reason: 'unknown_evidence',
+      previous: 'red',
+    });
+    expect(out.logs.join('\n')).toMatch(
+      /::warning title=Remediation held::production-monitor-vercel-deploy not resolved: unknown_evidence \(previous state: red\)/
+    );
+  });
+
+  it('(2) unknown with no prior state is reported as held, not skipped silently', async () => {
+    const run = anyLinear();
+    const out = await runContinuityIntake({ conclusion: 'unknown', run });
+    expect(out.queries).toEqual([]);
+    expect(out.logs.join('\n')).toContain('"action":"hold"');
+    expect(out.logs.join('\n')).toContain('::warning title=Remediation held::');
+  });
+
+  it('(3) a stale or unavailable result mixed with unknown still files red', async () => {
+    // The workflow maps a stale+unknown rollup (status=unhealthy) to failure.
+    const run = linearStub([]);
+    const out = await runContinuityIntake({
+      conclusion: 'failure',
+      previous: 'green',
+      run,
+    });
+    expect(out.queries.some(query => query.includes('issueCreate'))).toBe(true);
+    expect(out.state).toBe('red');
+  });
+
+  it('(4) verified production-current after red still resolves', async () => {
+    const run = anyLinear();
+    const out = await runContinuityIntake({
+      conclusion: 'success',
+      previous: 'red',
+      run,
+    });
+    expect(
+      out.queries.some(query => query.includes('FindRemediationForGreen'))
+    ).toBe(true);
+    expect(out.state).toBe('green');
+  });
+});
+
+describe('production-continuity workflow maps unknown freshness to a non-resolving conclusion', () => {
+  const body = readFileSync(workflows.continuity, 'utf8');
+  it('(5) the conclusion comes from the unit-tested mapper, not an inline expression', () => {
+    expect(body).toContain('--remediation-conclusion');
+    expect(body).toContain(
+      'REMEDIATION_CONCLUSION: ${{ steps.verdict.outputs.conclusion }}'
+    );
+    expect(body).not.toMatch(/REMEDIATION_CONCLUSION:.*'success'/);
+    expect(body).toContain('unknown_targets');
   });
 });

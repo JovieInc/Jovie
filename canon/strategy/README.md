@@ -1,29 +1,23 @@
-# Strategy canon
+# Strategy canon (private)
 
-Compact map of active company theses and invariants distilled from founder
-direction. Read this before planning strategy-sensitive work: pricing,
+The strategy canon (active company theses, the `theses.jsonl` index and the
+thesis documents) is private and lives in the `JovieInc/Ops` repo under
+`jovie-private/canon/strategy/`. It was removed from this public repo on
+2026-10-28. Read it before planning strategy-sensitive work: pricing,
 packaging, free tiers, business model, creator workflow, autonomy/delegation,
 model routing, agent UX, orchestration, execution substrate, or company-level
 architecture.
 
-Machine-readable index: [`theses.jsonl`](./theses.jsonl) — one record per
-thesis with provenance, status, retrieval anchors, and supersession. The
-Symphony context gate (`scripts/backlog-orchestrator/context-gate.mjs`) binds
-the matching thesis GBrain pages into the pre-lease receipt; a relevant
-strategy miss is a retrieval defect, not a silent proceed.
+How to read it:
 
-| Thesis | Status | Effective | Applies to |
-|---|---|---|---|
-| [APIs/MCPs are a core Jovie line, not first](theses/2026-09-03-apis-mcps-core-not-first.md) | active | 2026-09-03 | product priority, YouTube artist loop, agent-native access, API/MCP/CLI, distribution |
-| [Sell outcomes, eliminate creator side quests, keep the execution substrate replaceable](theses/2026-10-02-sell-outcomes-replaceable-substrate.md) | active | 2026-10-02 | business model, pricing, free tier, creator workflow, delegation, orchestration, substrate |
-| [First paid offer: $12/month self-serve artist profile](theses/2026-10-20-first-paid-offer-artist-profile-12.md) | active | 2026-10-20 | pricing, checkout, claim, revenue |
+- Local checkout: `$JOVIE_PRIVATE_DIR/canon/strategy/README.md`, where
+  `JOVIE_PRIVATE_DIR` is the `jovie-private/` folder of a local `JovieInc/Ops`
+  checkout (default `~/Ops/jovie-private`).
+- Remote: `gh api repos/JovieInc/Ops/contents/jovie-private/canon/strategy/README.md -H 'Accept: application/vnd.github.raw'`
+  (swap the path for `theses/<file>.md` or `theses.jsonl`).
 
-Rules:
-
-- Newer founder direction can amend or supersede a thesis. Mark the loser
-  `status: "superseded"` with `supersededBy` pointing at the winner; never
-  delete it — history and provenance are retained.
-- The GBrain mirror slug for each thesis is its `slug` field
-  (`strategy/<name>`); the distilled artifact here is canonical, GBrain holds
-  the retrieval copy.
-- Do not add raw transcripts or ephemeral telemetry; distill first.
+The Symphony context gate (`scripts/backlog-orchestrator/context-gate.mjs`)
+loads the index from `JOVIE_PRIVATE_DIR`; a relevant strategy miss, including an
+unreachable index, is a retrieval defect and blocks the lease, not a silent
+proceed. Do not add strategy theses, investor, fundraising or security-map
+material back to this repo; the private-data guard blocks those paths.

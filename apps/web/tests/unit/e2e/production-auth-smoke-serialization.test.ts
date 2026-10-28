@@ -17,6 +17,9 @@ describe('production auth smoke session contract', () => {
       "test('dashboard tab navigation works', async"
     );
     expect(source).toContain('navigationPath: APP_ROUTES.RELEASES');
+    // Claim step: the signed-in identity owns a profile that renders publicly.
+    expect(source).toContain('/api/dashboard/profile');
+    expect(source).toContain('must render publicly');
     expect(source).toContain('readyPath: APP_ROUTES.LIBRARY');
     expect(source).toContain("readyTestId: 'shell-releases-view'");
     expect(source).not.toContain("readyTestId: 'library-surface'");
