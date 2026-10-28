@@ -156,7 +156,7 @@ jobs:
       - name: Cheap agent (no shell, no key or GitHub token in env, hard cost stop)
         if: steps.prep.outputs.action == 'agent'
         env:
-          SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL || 'https://ai-gateway.vercel.sh/v1' }}
+          SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
           SWARM_MODELS: ${{ vars.SWARM_MODELS || 'zai/glm-5.3-flash,deepseek/deepseek-v4-flash,zai/glm-5.2' }}
           SWARM_ATTEMPT_USD_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
         run: python3 scripts/swarm/pr_remediation_swarm.py agent --plan "$PLAN" --cwd pr --log "$LOG" --meta "$META" --key-file "$RUNNER_TEMP/swarm-key" --max-steps 25 --timeout 600
@@ -178,14 +178,14 @@ jobs:
         id: repro
         if: steps.prep.outputs.action == 'agent' && steps.guard.outputs.guard == 'ok'
         working-directory: pr
-        continue-on-error: true
-        run: pnpm preflight
+        run: |
+          if pnpm preflight; then echo "result=ok" >> "$GITHUB_OUTPUT"; else echo "result=fail" >> "$GITHUB_OUTPUT"; fi
       - name: Push one commit if the gate held, receipt, release claim
         if: always() && steps.prep.outcome == 'success'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           GUARD: ${{ steps.guard.outputs.guard || 'fail' }}
-          REPRO: ${{ steps.prep.outputs.action == 'agent' && (steps.repro.outcome == 'success' && 'ok' || 'fail') || 'n/a' }}
+          REPRO: ${{ steps.prep.outputs.action == 'agent' && (steps.repro.outputs.result == 'ok' && 'ok' || 'fail') || 'n/a' }}
         run: python3 scripts/swarm/pr_remediation_swarm.py finalize --plan "$PLAN" --cwd pr --guard "$GUARD" --repro "$REPRO" --agent-meta "$META" --metrics "$METRICS"
       - name: Upload attempt metrics
         if: always()

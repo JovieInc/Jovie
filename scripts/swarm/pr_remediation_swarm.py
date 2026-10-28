@@ -24,8 +24,10 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "lanes"))
 import fix_red_classes as classes  # noqa: E402
+from apiclient.gh import run_gh  # noqa: E402
 
 SCHEMA = "jovie-remediation-swarm/v1"
 HOST = "gha-swarm"
@@ -59,11 +61,16 @@ def sh(cmd: list[str], cwd: str | None = None, timeout: int = 300, check: bool =
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout, check=check)
 
 
-def gh(args: list[str], *, input_text: str | None = None) -> subprocess.CompletedProcess:
-    """The only GitHub call site; counts every call for the receipt."""
+class _Result:
+    def __init__(self, r: dict):
+        self.returncode, self.stdout, self.stderr = r["code"], r["stdout"], r["stderr"]
+
+
+def gh(args: list[str], *, input_text: str | None = None, priority: str = "repair") -> _Result:
+    """The only GitHub call site: the budgeted apiclient layer (ledger, backoff, breaker); counts calls."""
     global calls
     calls += 1
-    return subprocess.run(["gh", *args], capture_output=True, text=True, input=input_text, timeout=120)
+    return _Result(run_gh(args, priority=priority))
 
 
 def gh_json(args: list[str]):
@@ -390,6 +397,14 @@ Do not commit or push. Stop after the minimal fix; if the failure is not fixable
 edits, change nothing."""
 
 
+def gateway_base() -> str:
+    """OpenAI-compatible base URL: SWARM_BASE_URL, else the registered ai-gateway host (one registry)."""
+    if os.environ.get("SWARM_BASE_URL"):
+        return os.environ["SWARM_BASE_URL"]
+    registry = json.loads((Path(__file__).resolve().parents[2] / "packages/api-client/providers.json").read_text())
+    return "https://" + registry["providers"]["ai-gateway"]["hosts"][0] + "/v1"
+
+
 def pick_model(base: str, key: str, candidates: list[str]) -> tuple[str, float, float]:
     import urllib.request
     req = urllib.request.Request(base.rstrip("/") + "/models", headers={"Authorization": f"Bearer {key}"})
@@ -419,7 +434,7 @@ def cmd_agent(a) -> int:
     """Run opencode with no shell, no key in its env (provider key is read from a file outside the
     checkout), and a hard stop when the running cost passes the per-attempt cap."""
     plan = json.loads(Path(a.plan).read_text())
-    base = os.environ.get("SWARM_BASE_URL", "https://ai-gateway.vercel.sh/v1")
+    base = gateway_base()
     key_file = Path(a.key_file)
     key = key_file.read_text().strip()
     cands = [m.strip() for m in os.environ.get("SWARM_MODELS", "zai/glm-5.3-flash,deepseek/deepseek-v4-flash,zai/glm-5.2").split(",")]
