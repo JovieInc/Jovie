@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       prs:
-        description: Comma-separated PR numbers (empty = every lane-fix-red PR)
+        description: Comma-separated PR numbers (empty = every lane-fix-red PR, plus lane-fix-conflict PRs for sync-main only)
         required: false
         default: ''
       limit:
@@ -120,7 +120,7 @@ jobs:
         id: prep
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py prepare --pr "${{ matrix.pr }}" --plan "$PLAN" --log "$LOG"
+        run: python3 scripts/swarm/pr_remediation_swarm.py prepare --pr "${{ matrix.pr }}" --mode "${{ matrix.mode || 'red' }}" --plan "$PLAN" --log "$LOG"
       - name: Checkout PR head (no persisted credentials)
         if: steps.prep.outputs.action != 'none'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

@@ -29,7 +29,7 @@ class SwarmPolicyTest(unittest.TestCase):
             a = A(); a.dir = str(d); a.out = str(d / "o.md")
             swarm.cmd_summarize(a)
             text = (d / "o.md").read_text()
-            self.assertIn("attempts=2 pushed-or-rerun=1 cost=$0.0420 api_calls=13", text)
+            self.assertIn("attempts=2 reds=2 reds-pushed-or-rerun=1 conflicts=0 conflicts-cleared=0 cost=$0.0420 api_calls=13", text)
 
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"

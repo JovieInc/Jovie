@@ -35,6 +35,7 @@ REPO = os.environ.get("GITHUB_REPOSITORY", "JovieInc/Jovie")
 CLAIM_TTL_S = 2 * 3600
 RECENT_PUSH_S = 20 * 60
 LABEL = "lane-fix-red"
+CONFLICT_LABEL = "lane-fix-conflict"
 SKIP_LABELS = {"lane-fix-exhausted", "queue-poison", "swarm-gave-up", "hold", "do-not-merge"}
 # The launch shepherd owns these; never touched (coordinator 2026-10-28).
 EXCLUDED = {23495, 23499, 23500, 23506, 23511, 23512, 23514, 23517, 23519}
@@ -73,8 +74,8 @@ def gh(args: list[str], *, input_text: str | None = None, priority: str = "repai
     return _Result(run_gh(args, priority=priority))
 
 
-def gh_json(args: list[str]):
-    out = gh(args)
+def gh_json(args: list[str], priority: str = "repair"):
+    out = gh(args, priority=priority)
     if out.returncode != 0:
         raise RuntimeError(f"gh {' '.join(args[:3])}: {out.stderr.strip()[:200]}")
     return json.loads(out.stdout or "null")
@@ -103,26 +104,28 @@ def cmd_select(a) -> int:
         out_var("matrix", "[]")
         out_var("reason", "quota-low")
         return 0
+    modes: dict[int, str] = {}
     if a.pr:
-        numbers = [int(n) for n in a.pr.split(",") if n.strip()]
+        for n in (int(x) for x in a.pr.split(",") if x.strip()):
+            modes[n] = "red"
     else:
-        numbers = []
-        for page in range(1, 6):
-            rows = gh_json(["api", f"repos/{REPO}/issues?labels={LABEL}&state=open&per_page=100&page={page}"])
-            for row in rows:
-                labels = {l["name"].lower() for l in row.get("labels", [])}
-                if "pull_request" in row and not labels & SKIP_LABELS:
-                    numbers.append(row["number"])
-            if len(rows) < 100:
-                break
-    numbers = [n for n in numbers if n not in EXCLUDED]
+        for label, mode in ((LABEL, "red"), (CONFLICT_LABEL, "conflict")):
+            for page in range(1, 6):
+                rows = gh_json(["api", f"repos/{REPO}/issues?labels={label}&state=open&per_page=100&page={page}"], priority="report")
+                for row in rows:
+                    labels = {l["name"].lower() for l in row.get("labels", [])}
+                    if "pull_request" in row and not labels & SKIP_LABELS:
+                        modes.setdefault(row["number"], mode)  # red wins: sync-main is part of its ladder
+                if len(rows) < 100:
+                    break
+    numbers = [n for n in modes if n not in EXCLUDED]
     spent = day_spend_cents(a.ledger_prefix)
     budget_left = max(0.0, a.daily_cap_usd * 100 - spent)
     afford = int(budget_left // max(1.0, a.attempt_cap_usd * 100))
     # Each attempt costs ~6 calls; keep a quarter of the remaining quota in reserve.
     by_quota = int((remaining * 0.75) // 8)
     take = max(0, min(len(numbers), a.limit, afford, by_quota))
-    matrix = [{"pr": n} for n in numbers[:take]]
+    matrix = [{"pr": n, "mode": modes[n]} for n in numbers[:take]]
     print(f"red={len(numbers)} take={take} quota={remaining}/{limit} spent_cents={spent} afford={afford}")
     out_var("matrix", json.dumps(matrix))
     out_var("reason", "ok" if matrix else ("daily-cap" if afford == 0 else "none"))
@@ -165,7 +168,7 @@ def claim_live(number: int, sha: str) -> bool:
     return False
 
 
-def latest_failures(sha: str) -> list[dict]:
+def latest_failures(sha: str) -> tuple[list[dict], bool]:
     """Latest result per check name, red ones only."""
     runs = gh_json(["api", f"repos/{REPO}/commits/{sha}/check-runs?per_page=100"])["check_runs"]
     latest: dict[str, dict] = {}
@@ -173,8 +176,10 @@ def latest_failures(sha: str) -> list[dict]:
         name = run["name"]
         if name not in latest or run["id"] > latest[name]["id"]:
             latest[name] = run
-    return [r for r in latest.values() if (r.get("conclusion") or "").lower() in
-            {"failure", "timed_out", "cancelled", "startup_failure"}]
+    pending = any(r.get("status") != "completed" for r in latest.values())
+    red = [r for r in latest.values() if (r.get("conclusion") or "").lower() in
+           {"failure", "timed_out", "cancelled", "startup_failure"}]
+    return red, pending
 
 
 def job_log_tail(run: dict, n: int = 400) -> str:
@@ -192,7 +197,7 @@ def attempts_for(number: int, key: str) -> int:
 
 def cmd_prepare(a) -> int:
     n = a.pr
-    plan: dict = {"schema": SCHEMA, "pr": n, "startedAt": iso(), "outcome": "skipped", "action": "none"}
+    plan: dict = {"kind": a.mode, "schema": SCHEMA, "pr": n, "startedAt": iso(), "outcome": "skipped", "action": "none"}
     Path(a.plan).write_text(json.dumps(plan))
     try:
         pr = gh_json(["api", f"repos/{REPO}/pulls/{n}"])
@@ -218,7 +223,16 @@ def cmd_prepare(a) -> int:
         body = f"🤖 lane claim kind=fix sha={plan['sha']} host={HOST} at={iso()} run={os.environ.get('GITHUB_RUN_ID', '')}"
         cid = gh_json(["api", f"repos/{REPO}/issues/{n}/comments", "-f", f"body={body}"])["id"]
         plan["claimId"] = cid
-        failures = latest_failures(plan["sha"])
+        if a.mode == "conflict":
+            if pr.get("mergeable_state") != "dirty":
+                plan.update(outcome="skipped", reason="not-conflicting", action="none")
+            else:
+                plan.update(cls="conflict", action="sync-main", fp="conflict")
+            return finish_plan(plan, a)
+        failures, pending = latest_failures(plan["sha"])
+        if pending:
+            plan.update(outcome="skipped", reason="ci-running", action="none")
+            return finish_plan(plan, a)
         logs = {r["name"]: job_log_tail(r) for r in failures[:4]}
         view = {"mergeStateStatus": "BEHIND" if pr.get("mergeable_state") == "behind" else "BLOCKED",
                 "statusCheckRollup": [{"name": r["name"], "conclusion": (r["conclusion"] or "").upper()} for r in failures]}
@@ -249,6 +263,8 @@ def rerun_failed(failures: list[dict]) -> None:
 
 
 def finish_plan(plan: dict, a) -> int:
+    if plan.get("action", "none") != "none" and plan.get("outcome") == "skipped":
+        plan["outcome"] = "attempting"  # a fix is in flight; finalize decides pushed vs gave-up
     plan["calls"] = calls
     Path(a.plan).write_text(json.dumps(plan))
     out_var("action", plan.get("action", "none"))
@@ -508,7 +524,12 @@ def cmd_summarize(a) -> int:
     cost = sum(float(r.get("costUsd") or 0) for r in rows)
     api = sum(int(r.get("calls") or 0) for r in rows)
     greened = by.get("deterministic-fixed", 0) + by.get("agent-fixed", 0)
-    lines = [f"## Remediation swarm", "", f"attempts={len(rows)} pushed-or-rerun={greened} cost=${cost:.4f} api_calls={api}", "",
+    conflicts = [r for r in rows if r.get("kind") == "conflict"]
+    cleared = sum(1 for r in conflicts if r["outcome"] == "deterministic-fixed")
+    reds = [r for r in rows if r.get("kind") != "conflict"]
+    greened = sum(1 for r in reds if r["outcome"] in ("deterministic-fixed", "agent-fixed"))
+    lines = [f"## Remediation swarm", "", f"attempts={len(rows)} reds={len(reds)} reds-pushed-or-rerun={greened} "
+             f"conflicts={len(conflicts)} conflicts-cleared={cleared} cost=${cost:.4f} api_calls={api}", "",
              "| outcome | n |", "|---|---|", *[f"| {k} | {v} |" for k, v in sorted(by.items())]]
     Path(a.out).write_text("\n".join(lines) + "\n")
     out_var("cents", str(int(round(cost * 100 + 0.499))))
@@ -522,7 +543,7 @@ def main() -> int:
     s = sub.add_parser("select"); s.add_argument("--pr", default=""); s.add_argument("--limit", type=int, default=30)
     s.add_argument("--daily-cap-usd", type=float, default=5.0); s.add_argument("--attempt-cap-usd", type=float, default=0.10)
     s.add_argument("--ledger-prefix", default="swarm-ledger")
-    pr = sub.add_parser("prepare"); pr.add_argument("--pr", type=int, required=True); pr.add_argument("--plan", required=True); pr.add_argument("--log", required=True)
+    pr = sub.add_parser("prepare"); pr.add_argument("--pr", type=int, required=True); pr.add_argument("--plan", required=True); pr.add_argument("--log", required=True); pr.add_argument("--mode", default="red")
     for name in ("fix", "guard"):
         x = sub.add_parser(name); x.add_argument("--plan", required=True); x.add_argument("--cwd", required=True)
     g = sub.add_parser("agent"); g.add_argument("--plan", required=True); g.add_argument("--cwd", required=True)
