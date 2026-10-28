@@ -177,6 +177,39 @@ describe('runProductionCertification', () => {
   });
 });
 
+describe('quality observations', () => {
+  it('attaches measured contract observations from the browser run to the surface receipt', async () => {
+    const steps = [
+      {
+        kind: 'observation',
+        surface: 'chat',
+        contractId: 'conversation.message-echo',
+        dimension: 'responsiveness',
+        value: 31,
+        unit: 'ms',
+        sampleSize: 1,
+      },
+    ];
+    const { receipts } = await runProductionCertification({
+      fetchImpl: fakeFetch(),
+      steps,
+      authStatus: 'passed',
+    });
+    expect(receipts.find(r => r.surface === 'chat').observations).toEqual([
+      {
+        contractId: 'conversation.message-echo',
+        dimension: 'responsiveness',
+        value: 31,
+        unit: 'ms',
+        sampleSize: 1,
+      },
+    ]);
+    expect(receipts.find(r => r.surface === 'landing').observations).toEqual(
+      []
+    );
+  });
+});
+
 describe('fileSurfaceIssues', () => {
   it('upserts one fingerprinted issue per failed surface and closes passed ones', async () => {
     const upsert = vi.fn(async () => ({ ok: true }));

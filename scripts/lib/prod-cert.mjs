@@ -299,7 +299,18 @@ export function stepChecks(
   now = () => new Date().toISOString()
 ) {
   const bySurface = {};
+  const observationsBySurface = {};
   for (const step of steps ?? []) {
+    if (step.kind === 'observation') {
+      (observationsBySurface[step.surface] ??= []).push({
+        contractId: step.contractId,
+        dimension: step.dimension,
+        value: step.value,
+        unit: step.unit,
+        sampleSize: step.sampleSize ?? 1,
+      });
+      continue;
+    }
     (bySurface[step.surface] ??= []).push({
       id: step.id,
       status: step.status,
@@ -308,7 +319,7 @@ export function stepChecks(
       summary: step.summary ?? '',
     });
   }
-  return { bySurface, authStatus, now };
+  return { bySurface, observationsBySurface, authStatus, now };
 }
 
 /** The browser-owned checks every surface is expected to carry. */
@@ -404,6 +415,7 @@ export async function runProductionCertification({
         runUrl,
         startedAt,
         endedAt: now(),
+        observations: stepState.observationsBySurface[surface] ?? [],
       })
     );
   }
