@@ -1,7 +1,11 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { loadRegistry, runCheck } from '../../credentials-spend-check.mjs';
+import {
+  GRANTS_PATH,
+  loadRegistry,
+  runCheck,
+} from '../../credentials-spend-check.mjs';
 import { loadCredentialsPlans } from '../../remediation-sweep.mjs';
 import {
   codexOverlays,
@@ -308,15 +312,26 @@ describe('committed registry', () => {
     expect(counts.unclaimedSecretNames).toBe(0);
   });
 
-  it('loads every third-party grant with a platform, account and revoke URL', () => {
-    const { thirdPartyGrants } = loadRegistry();
-    expect(thirdPartyGrants.length).toBeGreaterThan(100);
-    for (const grant of thirdPartyGrants) {
-      expect(grant.platform, grant.id).toBeTruthy();
-      expect(grant.account, grant.id).toBeTruthy();
-      expect(grant.revokeAt, grant.id).toMatch(/^https:\/\//);
-    }
+  it('loads no grants when the private grants file is absent', () => {
+    const { thirdPartyGrants } = loadRegistry({
+      grantsPath: '/nonexistent/third-party-grants.jsonl',
+    });
+    expect(thirdPartyGrants).toEqual([]);
   });
+
+  // The grants file is private (JovieInc/Ops jovie-private/); validate it when a checkout is available.
+  it.skipIf(!existsSync(GRANTS_PATH))(
+    'loads every third-party grant with a platform, account and revoke URL',
+    () => {
+      const { thirdPartyGrants } = loadRegistry();
+      expect(thirdPartyGrants.length).toBeGreaterThan(100);
+      for (const grant of thirdPartyGrants) {
+        expect(grant.platform, grant.id).toBeTruthy();
+        expect(grant.account, grant.id).toBeTruthy();
+        expect(grant.revokeAt, grant.id).toMatch(/^https:\/\//);
+      }
+    }
+  );
 
   it('records metadata only: no secret values', () => {
     const text = ['ops/registry/credentials.json', 'ops/registry/spend.json']

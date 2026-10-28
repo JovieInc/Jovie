@@ -321,7 +321,7 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
-  const { state, isMobile, open: pinned } = useSidebar();
+  const { state, isMobile, isPreview, open: pinned } = useSidebar();
   const chromeHidden = state === 'closed' && !isMobile;
   const { inboxNavigation, selectedProfile } = useDashboardData();
 
@@ -433,7 +433,9 @@ function SidebarHeaderNav({
 
       {!isDesktop ? (
         <RailStagedContent
-          hidden={!pinned && !isMobile && headerOwnsCollapsedToggle}
+          hidden={
+            !pinned && !isPreview && !isMobile && headerOwnsCollapsedToggle
+          }
           stage={headerOwnsCollapsedToggle}
           className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
         >
