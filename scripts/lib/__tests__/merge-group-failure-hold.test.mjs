@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   budgets,
@@ -27,7 +29,11 @@ import {
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
   FAILURE_RETRY_CONTEXT,
+  FETCH_STEP,
+  FETCH_TIMEOUT_MESSAGE,
+  FETCH_TIMEOUT_TITLE,
   failureReceiptStatus,
+  fetchTimeoutEvidence,
   humanFailureReleaseIntent,
   humanReleaseDisposition,
   isHeldWorkflowFailure,
@@ -35,6 +41,7 @@ import {
   PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
   REVISION_FAILED_AT_HEAD,
+  recordDequeueReason,
   reenrollmentDisposition,
   retryReleasedDescription,
   retrySpentDescription,
@@ -45,6 +52,93 @@ import {
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
+
+it('imports the real failure policy from both workflow sparse checkouts', () => {
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const workflow = readFileSync(
+    join(root, '.github/workflows/merge-queue-green-enroll.yml'),
+    'utf8'
+  );
+  const manifests = [
+    ...workflow.matchAll(/sparse-checkout: \|\n((?: {12}\S[^\n]*\n)+)/g),
+  ]
+    .map(match =>
+      match[1]
+        .trim()
+        .split('\n')
+        .map(line => line.trim())
+    )
+    .filter(paths => paths.includes('scripts/merge-group-failure-hold.mjs'));
+  expect(manifests).toHaveLength(2);
+  for (const paths of manifests) {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-sparse-'));
+    const execute = (command, args, input) => {
+      const result = spawnSync(command, args, {
+        cwd: dir,
+        encoding: 'utf8',
+        input,
+        timeout: 10_000,
+      });
+      expect(result.error, result.stderr).toBeUndefined();
+      expect(result.status, result.stderr).toBe(0);
+      return result;
+    };
+    try {
+      // Seed all real imports, then let Git enforce the workflow's actual
+      // non-cone manifest. Omitting the client or providers.json must fail.
+      for (const path of new Set([...paths, 'packages/api-client'])) {
+        mkdirSync(dirname(join(dir, path)), { recursive: true });
+        cpSync(join(root, path), join(dir, path), { recursive: true });
+      }
+      execute('git', ['init', '-q']);
+      execute('git', ['add', '.']);
+      execute('git', [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        'commit',
+        '-qm',
+        'fixture',
+      ]);
+      const importArgs = [
+        '--input-type=module',
+        '-e',
+        `await import(${JSON.stringify(pathToFileURL(join(dir, 'scripts/merge-group-failure-hold.mjs')).href)})`,
+      ];
+      for (const extra of [[], ['packages/api-client/*.ts']]) {
+        execute(
+          'git',
+          ['sparse-checkout', 'set', '--no-cone', '--stdin'],
+          [
+            ...paths.filter(path => path !== 'packages/api-client'),
+            ...extra,
+          ].join('\n')
+        );
+        const missing = spawnSync(process.execPath, importArgs, {
+          cwd: dir,
+          encoding: 'utf8',
+          timeout: 10_000,
+        });
+        expect(missing.error).toBeUndefined();
+        expect(missing.status).not.toBe(0);
+        expect(missing.stderr).toContain('ERR_MODULE_NOT_FOUND');
+        expect(missing.stderr).toContain(
+          extra.length ? 'providers.json' : 'gh.ts'
+        );
+      }
+      execute(
+        'git',
+        ['sparse-checkout', 'set', '--no-cone', '--stdin'],
+        paths.join('\n')
+      );
+      execute(process.execPath, importArgs);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 const SOURCE = 'a'.repeat(40);
 const NEW_SOURCE = 'b'.repeat(40);
 const BASE = 'c'.repeat(40);
@@ -1727,6 +1821,123 @@ describe('terminal failure hold application', () => {
     });
   });
 
+  it('records a machine-readable reason for the dequeue and survives a recorder failure', async () => {
+    const make = (recordDequeue, moveHead = false) => {
+      let state = {
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: true,
+        mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+        autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+      };
+      return {
+        writeStatus: vi.fn(),
+        readPullRequest: vi.fn(async () => structuredClone(state)),
+        dequeuePullRequest: vi.fn(async () => {
+          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+        }),
+        disableAutoMerge: vi.fn(async () => {
+          state = { ...state, autoMergeRequest: null };
+        }),
+        recordDequeue: async data => {
+          expect(state.isInMergeQueue).toBe(true);
+          await recordDequeue(data);
+          if (moveHead) state.headRefOid = NEW_SOURCE;
+        },
+      };
+    };
+    const record = vi.fn();
+    const ok = await applyMergeGroupFailure(failureInput, make(record));
+    expect(ok.dequeued).toBe(true);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record.mock.calls[0][0]).toMatchObject({
+      number: 42,
+      code: 'poison',
+      head: SOURCE,
+    });
+    expect(record.mock.calls[0][0].reason.length).toBeGreaterThanOrEqual(15);
+    const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failing = await applyMergeGroupFailure(
+      failureInput,
+      make(
+        vi.fn(async () => {
+          throw new Error('comment API down');
+        })
+      )
+    );
+    expect(failing.dequeued).toBe(true);
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '::warning::merge-group-failure-hold could not record'
+      )
+    );
+    warning.mockRestore();
+    const moved = make(vi.fn(), true);
+    const movedResult = await applyMergeGroupFailure(failureInput, moved);
+    expect(movedResult.dequeued).toBe(false);
+    expect(moved.dequeuePullRequest).not.toHaveBeenCalled();
+    expect(moved.disableAutoMerge).not.toHaveBeenCalled();
+  });
+
+  it('records truthful dequeue intent through the shared repair budget', async () => {
+    const run = vi.fn(async (_args, _options) => ({
+      code: 0,
+      stdout: '',
+      stderr: '',
+      deferred: false,
+    }));
+    await recordDequeueReason(
+      {
+        repository: REPOSITORY,
+        number: 42,
+        head: SOURCE,
+        code: 'poison',
+        reason: 'attributable failure on the exact source head',
+      },
+      { run, now: () => '2026-10-27T00:00:00.000Z' }
+    );
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0][1]).toEqual({ priority: 'repair' });
+    const args = run.mock.calls[0][0];
+    expect(args.slice(0, 4)).toEqual([
+      'api',
+      '-X',
+      'POST',
+      'repos/JovieInc/Jovie/issues/42/comments',
+    ]);
+    const body = args.at(-1);
+    const record = JSON.parse(body.match(/<!-- queue-dequeue (.+) -->/)[1]);
+    expect(record).toEqual({
+      code: 'poison',
+      reason: 'attributable failure on the exact source head',
+      actor: 'merge-group-failure-hold',
+      at: '2026-10-27T00:00:00.000Z',
+      head: SOURCE,
+      outcome: 'requested',
+    });
+    expect(body).not.toContain('Dequeued from');
+    await expect(
+      recordDequeueReason(
+        {
+          repository: REPOSITORY,
+          number: 42,
+          head: SOURCE,
+          code: 'poison',
+          reason: 'failure',
+        },
+        {
+          run: async () => ({
+            code: 75,
+            stdout: '',
+            stderr: 'github-quota-deferred',
+            deferred: true,
+          }),
+        }
+      )
+    ).rejects.toThrow('github-quota-deferred');
+  });
+
   it('keeps a second infrastructure failure retryable but blocks a second attributable one', async () => {
     const io = () => ({
       writeStatus: vi.fn(),
@@ -2084,15 +2295,13 @@ describe('terminal failure hold application', () => {
   });
 
   it('treats an already-removed pull request as a logged non-fatal dequeue', async () => {
-    let reads = 0;
+    let queued = true;
     const disableAutoMerge = vi.fn(async () => {
       throw new Error("Can't disable auto-merge for this pull request.");
     });
     const result = await applyMergeGroupFailure(failureInput, {
       writeStatus: vi.fn(),
       readPullRequest: vi.fn(async () => {
-        reads += 1;
-        const queued = reads < 4;
         return {
           id: 'PR_42',
           state: 'OPEN',
@@ -2105,6 +2314,7 @@ describe('terminal failure hold application', () => {
         };
       }),
       dequeuePullRequest: vi.fn(async () => {
+        queued = false;
         throw new Error('The pull request is not in the merge queue');
       }),
       disableAutoMerge,
@@ -2419,5 +2629,324 @@ describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => 
         }
       )
     ).rejects.toThrow(/terminal merge-group CI failure/);
+  });
+});
+
+describe('base-branch fetch timeout (merge-group infrastructure)', () => {
+  const TIMEOUT_TEXT = [
+    'Process completed with exit code 1.',
+    FETCH_TIMEOUT_MESSAGE,
+  ].join('\n');
+  const CASCADE = [
+    'Require every ci-fast lane group to pass',
+    'Join exact lane results',
+    'Evaluate combined-head checks',
+  ];
+  const classifyFetch = (failedSteps, fetchTimeoutText = TIMEOUT_TEXT) =>
+    classifyMergeGroupFailure({
+      conclusion: 'failure',
+      failedSteps,
+      fetchTimeoutText,
+    });
+  const timeoutNote = (overrides = {}) => ({
+    annotation_level: 'failure',
+    title: FETCH_TIMEOUT_TITLE,
+    message: FETCH_TIMEOUT_MESSAGE,
+    ...overrides,
+  });
+  const exitNote = {
+    annotation_level: 'failure',
+    title: '',
+    message: 'Process completed with exit code 1.',
+  };
+  const fetchJob = (overrides = {}) => ({
+    id: 9,
+    run_id: run.id,
+    run_attempt: run.run_attempt,
+    check_run_url: 'https://api.github.com/repos/JovieInc/Jovie/check-runs/77',
+    steps: [{ name: FETCH_STEP, conclusion: 'failure' }],
+    ...overrides,
+  });
+
+  it('classifies only the exact fetch timeout as transient infrastructure', () => {
+    expect(classifyFetch([FETCH_STEP])).toBe('transient-infrastructure');
+    expect(classifyFetch([FETCH_STEP, ...CASCADE])).toBe(
+      'transient-infrastructure'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Post Checkout', 'Complete job'])).toBe(
+      'transient-infrastructure'
+    );
+  });
+
+  it('keeps every other failure of the fetch step unclassified (fail closed)', () => {
+    for (const text of [
+      '',
+      'Process completed with exit code 1.',
+      'Process completed with exit code 1.\ngit fetch exited 128',
+      `${FETCH_TIMEOUT_MESSAGE} (retrying)`,
+      `prefix ${FETCH_TIMEOUT_MESSAGE}`,
+      `${FETCH_TIMEOUT_MESSAGE}\nanother failure`,
+      'background fetch did not finish within 300s',
+    ]) {
+      expect(classifyFetch([FETCH_STEP], text)).toBe('unclassified');
+    }
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [FETCH_STEP],
+      })
+    ).toBe('unclassified');
+  });
+
+  it('lets a stronger failure win over the fetch timeout', () => {
+    expect(classifyFetch([FETCH_STEP, 'Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Run unit tests'])).toBe(
+      'retryable-product'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Await ci-fast lanes'])).toBe(
+      'unclassified'
+    );
+    expect(
+      classifyFetch([FETCH_STEP, 'Run ./.github/actions/setup-node-pnpm'])
+    ).toBe('unclassified');
+    expect(classifyFetch([FETCH_STEP, WORKFLOW_LOAD_STEP])).toBe(
+      'deterministic-source'
+    );
+  });
+
+  it('never reclassifies the structural lane or the cascade without the fetch step', () => {
+    expect(classifyFetch(['Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classifyFetch(CASCADE)).toBe('unclassified');
+    expect(classifyFetch(['Await ci-fast lanes', ...CASCADE])).toBe(
+      'unclassified'
+    );
+  });
+
+  it('reads timeout evidence only from the exact run and attempt', () => {
+    const read = notes => vi.fn(() => notes);
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], read([exitNote, timeoutNote()]))
+    ).toBe(TIMEOUT_TEXT);
+    for (const job of [
+      fetchJob({ run_id: run.id + 1 }),
+      fetchJob({ run_attempt: run.run_attempt + 1 }),
+      fetchJob({ run_id: undefined }),
+      fetchJob({ run_attempt: undefined }),
+    ]) {
+      const reader = read([exitNote, timeoutNote()]);
+      expect(fetchTimeoutEvidence(run, [job], reader)).toBe('');
+      expect(reader).not.toHaveBeenCalled();
+    }
+    // A timeout on another job of the run does not cover a fetch failure elsewhere.
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob(), fetchJob({ id: 10 })], job =>
+        job.id === 9 ? [exitNote, timeoutNote()] : [exitNote]
+      )
+    ).toBe('');
+  });
+
+  it('fails closed on missing, partial or unreadable evidence', () => {
+    expect(fetchTimeoutEvidence(run, [], () => [timeoutNote()])).toBe('');
+    expect(
+      fetchTimeoutEvidence(
+        run,
+        [
+          {
+            ...fetchJob(),
+            steps: [{ name: FETCH_STEP, conclusion: 'success' }],
+          },
+        ],
+        () => [timeoutNote()]
+      )
+    ).toBe('');
+    expect(fetchTimeoutEvidence(run, undefined, () => [timeoutNote()])).toBe(
+      ''
+    );
+    for (const notes of [
+      [],
+      [exitNote],
+      [exitNote, timeoutNote({ title: 'Other title' })],
+      [exitNote, timeoutNote({ title: undefined })],
+      [
+        exitNote,
+        timeoutNote(),
+        { annotation_level: 'failure', message: 'git fetch exited 128' },
+      ],
+      [exitNote, timeoutNote({ message: undefined })],
+      [exitNote, timeoutNote({ message: `${FETCH_TIMEOUT_MESSAGE}.` })],
+      null,
+      'unreadable',
+    ]) {
+      expect(
+        fetchTimeoutEvidence(
+          run,
+          [fetchJob()],
+          () => /** @type {any} */ (notes)
+        )
+      ).toBe('');
+    }
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], () => {
+        throw new Error('annotations unavailable');
+      })
+    ).toBe('');
+    // Non-failure annotations (notices) are ignored.
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], () => [
+        exitNote,
+        timeoutNote(),
+        {
+          annotation_level: 'notice',
+          message: 'ubuntu-latest label will migrate',
+        },
+      ])
+    ).toBe(TIMEOUT_TEXT);
+  });
+
+  it('retries a fetch timeout once, then holds on a repeat via the existing budget', async () => {
+    const io = () => ({
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => ({
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: false,
+        mergeQueueEntry: null,
+        autoMergeRequest: null,
+      })),
+      dequeuePullRequest: vi.fn(),
+      disableAutoMerge: vi.fn(),
+    });
+    const first = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: [FETCH_STEP, ...CASCADE],
+        fetchTimeoutText: TIMEOUT_TEXT,
+        statuses: [],
+      },
+      io()
+    );
+    expect(first).toMatchObject({
+      classification: 'transient-infrastructure',
+      failureNumber: 1,
+      retryDisposition: 'one-queue-authority-retry',
+    });
+    const infra = (number, runId) =>
+      status({ classification: 'transient-infrastructure', number, runId });
+    const spent = runId =>
+      status({
+        runId,
+        context: FAILURE_RETRY_CONTEXT,
+        description: retrySpentDescription({ runId, runAttempt: 1 }),
+      });
+    expect(disposition([infra(1, 123)])).toMatchObject({
+      action: 'retry-once',
+      reason: 'bounded-infrastructure-recovery',
+    });
+    // The retry was spent and the same timeout repeated: no second free retry.
+    expect(disposition([infra(1, 123), spent(123)])).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    expect(
+      disposition([infra(1, 123), spent(123), infra(2, 124), spent(124)])
+    ).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    // Without the signature, the same step failure is held at once.
+    const unproven = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: [FETCH_STEP, ...CASCADE], statuses: [] },
+      io()
+    );
+    expect(unproven).toMatchObject({
+      classification: 'unclassified',
+      retryDisposition: 'blocked-until-new-source-head',
+    });
+  });
+
+  // Replays run 39561016233 (PR #22390): ci-fast (remaining) hit the fetch
+  // timeout and the aggregate jobs only reported it.
+  describe('real run 39561016233 shape', () => {
+    const realRun = { ...run, id: 39561016233, run_attempt: 1 };
+    const job = (id, name, step, overrides = {}) => ({
+      id,
+      name,
+      run_id: 39561016233,
+      run_attempt: 1,
+      check_run_url: `https://api.github.com/repos/JovieInc/Jovie/check-runs/${id}`,
+      steps: [{ name: step, conclusion: 'failure' }],
+      ...overrides,
+    });
+    const jobs = [
+      job(119092450020, 'ci-fast (remaining)', FETCH_STEP),
+      job(119096342018, 'ci-fast', 'Require every ci-fast lane group to pass'),
+      job(119096374291, 'Product Lane Receipt', 'Join exact lane results'),
+      job(119096483064, 'PR Ready', 'Evaluate combined-head checks'),
+    ];
+    const closed = lanes => ({
+      annotation_level: 'failure',
+      title: 'ci-fast failed closed',
+      message: lanes,
+    });
+    const closedOnlyRemaining =
+      'typecheck=success remaining=failure profile-browser=success structural-python=success structural-web=success';
+    const annotations = (closedLine = closedOnlyRemaining) => ({
+      119092450020: [exitNote, timeoutNote()],
+      119096342018: [exitNote, closed(closedLine)],
+      119096374291: [exitNote],
+      119096483064: [
+        exitNote,
+        {
+          annotation_level: 'failure',
+          message:
+            'ci-fast did not pass on the merge-group combined head (result: failure)',
+        },
+      ],
+    });
+    const replay = (notes, jobList = jobs) => {
+      const text = fetchTimeoutEvidence(
+        realRun,
+        jobList,
+        j => notes[j.id] ?? []
+      );
+      return classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: jobList.flatMap(j => j.steps.map(s => s.name)),
+        fetchTimeoutText: text,
+      });
+    };
+
+    it('classifies the real fetch timeout as transient infrastructure', () => {
+      expect(replay(annotations())).toBe('transient-infrastructure');
+    });
+
+    it('does not reclassify when another lane of the failed-closed line failed', () => {
+      for (const line of [
+        closedOnlyRemaining.replace(
+          'structural-web=success',
+          'structural-web=failure'
+        ),
+        closedOnlyRemaining.replace('typecheck=success', 'typecheck=cancelled'),
+        'remaining=success typecheck=success',
+        'not a lane line',
+      ]) {
+        expect(replay(annotations(line))).toBe('unclassified');
+      }
+      const missing = annotations();
+      missing[119096342018] = [exitNote];
+      expect(replay(missing)).toBe('unclassified');
+    });
+
+    it('rejects an aggregate job from another attempt', () => {
+      const other = jobs.map(j =>
+        j.id === 119096342018 ? { ...j, run_attempt: 2 } : j
+      );
+      expect(replay(annotations(), other)).toBe('unclassified');
+    });
   });
 });

@@ -12,7 +12,6 @@ import {
 } from '@/components/organisms/SharedCommandPalette';
 import {
   commandsForSurface,
-  isCommandVisible,
   type NavCommand,
   type SkillCommand,
 } from '@/lib/commands/registry';
@@ -39,7 +38,7 @@ export function CommandPaletteSurface() {
   const commands = commandsForSurface('cmdk', {
     youtubeWorkspaceNav: false,
     jovieWorkNav: false,
-  }).filter(command => isCommandVisible(command, {}));
+  });
   const skills = commands.filter(
     (command): command is SkillCommand => command.kind === 'skill'
   );
@@ -61,6 +60,21 @@ export function CommandPaletteSurface() {
 
   function onKeyDown(event: KeyboardEvent) {
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229) {
+      return;
+    }
+    if (
+      (event.metaKey || event.ctrlKey) &&
+      !(event.metaKey && event.ctrlKey) &&
+      !event.altKey &&
+      !event.shiftKey &&
+      (event.key === '1' || event.key === '2' || event.key === '3')
+    ) {
+      const nextIndex = Number(event.key) - 1;
+      if (nextIndex < items.length) {
+        event.preventDefault();
+        // Match CmdKPalette: indexed shortcuts select; Enter commits.
+        setSelectedIndex(nextIndex);
+      }
       return;
     }
     if (event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) {
