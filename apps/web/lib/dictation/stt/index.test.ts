@@ -3,7 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/env-server', () => ({ env: {} }));
 
-import { resolveSttProviders, transcribeDictationClip } from './index';
+import {
+  DEFAULT_ORDER,
+  resolveSttProviders,
+  transcribeDictationClip,
+} from './index';
 import type { SttClip, SttProvider } from './types';
 
 const clip: SttClip = {
@@ -31,6 +35,16 @@ describe('dictation STT adapter', () => {
     expect(
       resolveSttProviders('elevenlabs,cloudflare,nope', [a, b]).map(p => p.id)
     ).toEqual(['elevenlabs']);
+  });
+
+  it('defaults to ElevenLabs first, Cloudflare as the fallback', () => {
+    expect(DEFAULT_ORDER).toBe('elevenlabs,cloudflare');
+    const cf = provider('cloudflare', 0.0005, async () => 'a');
+    const xi = provider('elevenlabs', 0.0067, async () => 'b');
+    expect(resolveSttProviders(undefined, [cf, xi]).map(p => p.id)).toEqual([
+      'elevenlabs',
+      'cloudflare',
+    ]);
   });
 
   it('falls back to the next provider and logs cost per clip', async () => {

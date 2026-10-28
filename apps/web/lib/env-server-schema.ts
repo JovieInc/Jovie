@@ -438,10 +438,10 @@ export const ServerEnvSchema = z.object({
   // Cloudflare zone analytics (AI crawler intelligence — GH-12748)
   CLOUDFLARE_ZONE_ID: z.string().optional(),
 
-  // Dictation speech-to-text (JOV-9665): Workers AI first, ElevenLabs fallback.
+  // Dictation speech-to-text (JOV-9665): ElevenLabs first, Workers AI fallback.
   CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
   CLOUDFLARE_WORKERS_AI_TOKEN: z.string().optional(),
-  /** Comma-separated provider order, e.g. "cloudflare,elevenlabs". */
+  /** Comma-separated provider order, default "elevenlabs,cloudflare". */
   DICTATION_STT_PROVIDERS: z.string().optional(),
 
   // Development tools

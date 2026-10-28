@@ -6,6 +6,11 @@ export interface SttClip {
   readonly durationMs: number;
 }
 
+/**
+ * Server providers implement this behind /api/chat/transcribe. An on-device
+ * provider (macOS SpeechAnalyzer, iOS) can implement the same interface in the
+ * client and skip the route; the order config selects between them.
+ */
 export interface SttProvider {
   readonly id: string;
   /** USD per audio minute, for the call log and the spend cap. */

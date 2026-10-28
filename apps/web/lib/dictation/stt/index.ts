@@ -6,8 +6,9 @@ import { clipCostUsd, type SttClip, type SttProvider } from './types';
 
 export type { SttClip, SttProvider } from './types';
 
-const REGISTRY: readonly SttProvider[] = [cloudflareStt, elevenLabsStt];
-const DEFAULT_ORDER = 'cloudflare,elevenlabs';
+const REGISTRY: readonly SttProvider[] = [elevenLabsStt, cloudflareStt];
+/** ElevenLabs first for now; Cloudflare is the fallback once its token exists. */
+export const DEFAULT_ORDER = 'elevenlabs,cloudflare';
 
 /** Providers to try, in order, from DICTATION_STT_PROVIDERS; unknown ids ignored. */
 export function resolveSttProviders(
