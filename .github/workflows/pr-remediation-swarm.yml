@@ -64,7 +64,6 @@ jobs:
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-pull-requests: read
           permission-issues: read
-          permission-actions: read
       - name: Quota-aware selection
         id: pick
         env:
@@ -73,7 +72,8 @@ jobs:
           LIMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.limit || '1' }}
           DAILY_CAP: ${{ vars.SWARM_DAILY_USD_CAP || '5' }}
           ATTEMPT_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP"
+          LEDGER_ISSUE: ${{ vars.SWARM_LEDGER_ISSUE }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE"
 
   remediate:
     name: Remediate #${{ matrix.pr }}
@@ -120,7 +120,7 @@ jobs:
         id: prep
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py prepare --pr "${{ matrix.pr }}" --mode "${{ matrix.mode || 'red' }}" --plan "$PLAN" --log "$LOG"
+        run: python3 scripts/swarm/pr_remediation_swarm.py prepare --pr "${{ matrix.pr }}" --mode "${{ matrix.mode || 'red' }}" --agent "${{ matrix.agent }}" --plan "$PLAN" --log "$LOG"
       - name: Checkout PR head (no persisted credentials)
         if: steps.prep.outputs.action != 'none'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -192,6 +192,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: swarm-attempt-${{ matrix.pr }}
+          retention-days: 2
           path: ${{ runner.temp }}/metrics.jsonl
           if-no-files-found: ignore
 
@@ -227,9 +228,14 @@ jobs:
           name: swarm-metrics-${{ github.run_id }}
           path: ${{ runner.temp }}/out/swarm-metrics.jsonl
           if-no-files-found: ignore
-      - name: Upload daily-cap ledger marker
-        run: echo "${{ steps.sum.outputs.cents }}" > "$RUNNER_TEMP/cents.txt"
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      - name: Mint App token (ledger write)
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          name: swarm-ledger-${{ github.run_id }}-c${{ steps.sum.outputs.cents }}
-          path: ${{ runner.temp }}/cents.txt
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-issues: write
+      - name: Append spend to the ledger issue
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py ledger --issue "${{ vars.SWARM_LEDGER_ISSUE }}" --run "${{ github.run_id }}" --cents "${{ steps.sum.outputs.cents }}"

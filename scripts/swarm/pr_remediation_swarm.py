@@ -118,35 +118,65 @@ def cmd_select(a) -> int:
                         modes.setdefault(row["number"], mode)  # red wins: sync-main is part of its ladder
                 if len(rows) < 100:
                     break
-    numbers = [n for n in modes if n not in EXCLUDED]
-    spent = day_spend_cents(a.ledger_prefix)
-    budget_left = max(0.0, a.daily_cap_usd * 100 - spent)
-    afford = int(budget_left // max(1.0, a.attempt_cap_usd * 100))
-    # Each attempt costs ~6 calls; keep a quarter of the remaining quota in reserve.
+    modes = {n: m for n, m in modes.items() if n not in EXCLUDED}
+    spent = day_spend_cents(a.ledger_issue)
+    # Each attempt costs ~8 calls; keep a quarter of the remaining quota in reserve.
     by_quota = int((remaining * 0.75) // 8)
-    take = max(0, min(len(numbers), a.limit, afford, by_quota))
-    matrix = [{"pr": n, "mode": modes[n]} for n in numbers[:take]]
-    print(f"red={len(numbers)} take={take} quota={remaining}/{limit} spent_cents={spent} afford={afford}")
+    matrix = plan_matrix(modes, limit=a.limit, by_quota=by_quota, spent_cents=spent,
+                         daily_cap_usd=a.daily_cap_usd, attempt_cap_usd=a.attempt_cap_usd)
+    agents = sum(1 for m in matrix if m["agent"])
+    print(f"red={len(modes)} take={len(matrix)} agent_slots={agents} quota={remaining}/{limit} "
+          f"spent_cents={'UNREADABLE (fail closed: no model attempts)' if spent is None else spent}")
     out_var("matrix", json.dumps(matrix))
-    out_var("reason", "ok" if matrix else ("daily-cap" if afford == 0 else "none"))
+    out_var("reason", "ledger-unreadable" if spent is None else ("daily-cap" if agents == 0 and matrix else ("ok" if matrix else "none")))
     return 0
 
 
-def day_spend_cents(prefix: str) -> int:
-    """Today's swarm spend, from artifact names `<prefix>-<run>-c<cents>`; no download needed."""
-    if not prefix:
-        return 0
+LEDGER_RE = re.compile(r"^🤖 swarm-ledger run=(\d+) cents=(\d+) at=(\S+)")
+
+
+def day_spend_cents(issue: str) -> int | None:
+    """Today's swarm spend in cents: the sum of `swarm-ledger` comments on the ledger issue since UTC
+    midnight. (The Actions artifacts listing 5xx's on this repo, so it cannot be the ledger.) None when
+    the ledger issue is unset or unreadable in full: the caller must treat that as the cap reached
+    (a cap that fails open is not a cap)."""
+    if not issue or not str(issue).isdigit():
+        return None
+    since = iso()[:10] + "T00:00:00Z"
+    total, seen = 0, set()
     try:
-        data = gh_json(["api", f"repos/{REPO}/actions/artifacts?per_page=100"])
-    except RuntimeError:
-        return 0
-    today = iso()[:10]
-    total = 0
-    for art in data.get("artifacts", []):
-        m = re.search(r"-c(\d+)$", art.get("name", ""))
-        if m and art.get("name", "").startswith(prefix) and str(art.get("created_at", ""))[:10] == today:
-            total += int(m.group(1))
-    return total
+        for page in range(1, 11):
+            rows = gh_json(["api", f"repos/{REPO}/issues/{issue}/comments?per_page=100&page={page}&since={since}"],
+                           priority="report")
+            for row in rows:
+                m = LEDGER_RE.match(row.get("body") or "")
+                if m and m.group(3)[:10] == since[:10] and m.group(1) not in seen:
+                    seen.add(m.group(1))
+                    total += int(m.group(2))
+            if len(rows) < 100:
+                return total
+    except (RuntimeError, ValueError, TypeError, KeyError, AttributeError):
+        return None
+    return None
+
+
+def cmd_ledger(a) -> int:
+    """Append this run's spend to the ledger issue (retry once; a miss is loud, not silent)."""
+    body = f"🤖 swarm-ledger run={a.run} cents={a.cents} at={iso()}"
+    for _ in range(2):
+        if gh(["api", f"repos/{REPO}/issues/{a.issue}/comments", "-f", f"body={body}"], priority="repair").returncode == 0:
+            return 0
+    print("::error::swarm ledger write failed; the next selector will under-count today's spend")
+    return 1
+
+
+def plan_matrix(modes: dict[int, str], *, limit: int, by_quota: int, spent_cents: int | None,
+                daily_cap_usd: float, attempt_cap_usd: float) -> list[dict]:
+    """PRs to dispatch. `agent` is true only for as many PRs as the remaining daily budget affords; an
+    unreadable ledger affords none. Deterministic actions cost $0, so PRs are still dispatched."""
+    afford = 0 if spent_cents is None else int(max(0.0, daily_cap_usd * 100 - spent_cents) // max(1.0, attempt_cap_usd * 100))
+    take = max(0, min(len(modes), limit, by_quota))
+    return [{"pr": n, "mode": modes[n], "agent": i < afford} for i, n in enumerate(list(modes)[:take])]
 
 
 # ---------------------------------------------------------------- prepare
@@ -241,7 +271,9 @@ def cmd_prepare(a) -> int:
                     checks=cls["checks"], signature=cls["signature"], mergeable=pr.get("mergeable_state"))
         if pr.get("mergeable_state") == "dirty":
             plan.update(action="sync-main", cls="conflict")
-        if plan["action"] == classes.AGENT:
+        if plan["action"] == classes.AGENT and a.agent != "true":
+            plan.update(outcome="skipped", reason="model-budget-closed", action="none")
+        elif plan["action"] == classes.AGENT:
             if attempts_for(n, cls["key"]) >= MAX_ATTEMPTS:
                 plan.update(outcome="gave-up", reason="attempt-cap->lanes", action="none")
             else:
@@ -542,8 +574,8 @@ def main() -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("select"); s.add_argument("--pr", default=""); s.add_argument("--limit", type=int, default=30)
     s.add_argument("--daily-cap-usd", type=float, default=5.0); s.add_argument("--attempt-cap-usd", type=float, default=0.10)
-    s.add_argument("--ledger-prefix", default="swarm-ledger")
-    pr = sub.add_parser("prepare"); pr.add_argument("--pr", type=int, required=True); pr.add_argument("--plan", required=True); pr.add_argument("--log", required=True); pr.add_argument("--mode", default="red")
+    s.add_argument("--ledger-issue", default="")
+    pr = sub.add_parser("prepare"); pr.add_argument("--pr", type=int, required=True); pr.add_argument("--plan", required=True); pr.add_argument("--log", required=True); pr.add_argument("--mode", default="red"); pr.add_argument("--agent", default="true")
     for name in ("fix", "guard"):
         x = sub.add_parser(name); x.add_argument("--plan", required=True); x.add_argument("--cwd", required=True)
     g = sub.add_parser("agent"); g.add_argument("--plan", required=True); g.add_argument("--cwd", required=True)
@@ -552,10 +584,11 @@ def main() -> int:
     f = sub.add_parser("finalize"); f.add_argument("--plan", required=True); f.add_argument("--cwd", required=True)
     f.add_argument("--guard", default="fail"); f.add_argument("--repro", default="n/a"); f.add_argument("--agent-meta", default="")
     f.add_argument("--metrics", required=True)
+    l = sub.add_parser("ledger"); l.add_argument("--issue", required=True); l.add_argument("--run", required=True); l.add_argument("--cents", required=True)
     m = sub.add_parser("summarize"); m.add_argument("--dir", required=True); m.add_argument("--out", required=True)
     a = p.parse_args()
     return {"select": cmd_select, "prepare": cmd_prepare, "fix": cmd_fix, "agent": cmd_agent, "guard": cmd_guard,
-            "finalize": cmd_finalize, "summarize": cmd_summarize}[a.cmd](a)
+            "finalize": cmd_finalize, "ledger": cmd_ledger, "summarize": cmd_summarize}[a.cmd](a)
 
 
 if __name__ == "__main__":
