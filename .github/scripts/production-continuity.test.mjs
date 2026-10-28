@@ -519,7 +519,8 @@ describe('production freshness', () => {
     assert.equal(staleOnly.status, 'unhealthy');
     assert.deepEqual(staleOnly.incidentClasses, [FRESHNESS_INCIDENT_CLASS]);
     assert.equal(staleOnly.requiresFounderNotification, true);
-    assert.equal(staleOnly.requiresAgentIngress, false);
+    assert.equal(staleOnly.requiresAgentIngress, true);
+    assert.equal(staleOnly.agentIngressFailure, 'production-controller-failed');
 
     const paused = aggregateContinuity(
       [
@@ -532,6 +533,7 @@ describe('production freshness', () => {
       { now: NOW }
     );
     assert.equal(paused.requiresAgentIngress, true);
+    assert.equal(paused.agentIngressFailure, 'provider-unavailable');
   });
 
   it('rolls unknown freshness up as unknown, not healthy, with an explicit unknownTargets list', async () => {
@@ -821,7 +823,7 @@ describe('production freshness', () => {
     });
     assert.equal(result.status, 'unhealthy');
     assert.deepEqual(result.affectedTargets, [FRESHNESS_TARGET_ID]);
-    assert.match(outputs.join(''), /requires_agent_ingress=false/);
+    assert.match(outputs.join(''), /requires_agent_ingress=true/);
 
     const without = await runCli({
       appendFileImpl: async () => {},
