@@ -277,7 +277,8 @@ QUALITY GATES — execute in order, do not skip:
 7. Run focused tests if applicable
 8. git add -A && git commit -m 'type(scope): description (${linear_id})'
 9. git push -u origin HEAD
-10. gh pr create --fill  # ready PR when green; draft OK while iterating
+10. gh pr create --fill --body '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'  # ready PR when green; draft OK while iterating.
+    # The marker is the internal default (docs/CHANGELOG_PUBLICATION.md); a customer-visible change replaces it with a customer outcome block.
 
 CRITICAL:
 - Do NOT modify drizzle/migrations that already exist on main

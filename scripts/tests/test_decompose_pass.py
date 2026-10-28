@@ -22,7 +22,7 @@ def row(n, labels=("readiness-checked",), state="Backlog", description=LONG, par
             "labelsComplete": True, "parent": {"id": parent} if parent else None, "stateType": "backlog"}
 
 
-def setup(rows, todo=3, target=34):
+def make_state(rows, todo=3, target=34):
     tmp = tempfile.TemporaryDirectory()
     state = Path(tmp.name)
     path = ls.mirror_path(state, "LYB")
@@ -43,18 +43,18 @@ GOOD = [{"title": "Rolling selector pure function with fixtures", "scope": "Add 
 
 class TriggerTests(unittest.TestCase):
     def test_runs_only_below_half_target_with_a_splittable_epic(self):
-        tmp, state = setup([row(1)]); self.addCleanup(tmp.cleanup)
+        tmp, state = make_state([row(1)]); self.addCleanup(tmp.cleanup)
         mirror = ls.read_mirror(state, "LYB")
         self.assertTrue(dp.triggered({"todo": 16, "target": 34}, mirror, NOW, {})["run"])
         self.assertEqual(dp.triggered({"todo": 17, "target": 34}, mirror, NOW, {})["why"], "todo-at-or-above-half-target")
         self.assertEqual(dp.triggered({"todo": 3, "target": 0}, mirror, NOW, {})["why"], "no-target")
 
     def test_no_run_without_an_epic_or_inside_the_cooldown_or_with_children(self):
-        tmp, state = setup([row(1, labels=("lyb",), description="short")]); self.addCleanup(tmp.cleanup)
+        tmp, state = make_state([row(1, labels=("lyb",), description="short")]); self.addCleanup(tmp.cleanup)
         self.assertEqual(dp.triggered({"todo": 1, "target": 34}, ls.read_mirror(state, "LYB"), NOW, {})["why"], "no-splittable-epic")
-        tmp2, state2 = setup([row(1), row(2, labels=("lyb",), parent="id1", description="child")]); self.addCleanup(tmp2.cleanup)
+        tmp2, state2 = make_state([row(1), row(2, labels=("lyb",), parent="id1", description="child")]); self.addCleanup(tmp2.cleanup)
         self.assertFalse(dp.triggered({"todo": 1, "target": 34}, ls.read_mirror(state2, "LYB"), NOW, {})["run"])
-        tmp3, state3 = setup([row(1)]); self.addCleanup(tmp3.cleanup)
+        tmp3, state3 = make_state([row(1)]); self.addCleanup(tmp3.cleanup)
         self.assertFalse(dp.triggered({"todo": 1, "target": 34}, ls.read_mirror(state3, "LYB"), NOW, {"LYB-1": NOW - 86400})["run"])
 
     def test_holds_and_planning_only_intakes_are_never_split(self):
@@ -82,7 +82,7 @@ class ValidateTests(unittest.TestCase):
 
 class RunTests(unittest.TestCase):
     def test_run_enqueues_idempotent_creates_labels_and_a_parent_note(self):
-        tmp, state = setup([row(1)]); self.addCleanup(tmp.cleanup)
+        tmp, state = make_state([row(1)]); self.addCleanup(tmp.cleanup)
         receipt = dp.run(state, "LYB", NOW, judge=lambda prompt: json.dumps(GOOD))
         self.assertEqual(receipt["proposals"]["LYB-1"]["ready"], 1)
         self.assertEqual(receipt["proposals"]["LYB-1"]["decisions"], 1)
@@ -95,7 +95,7 @@ class RunTests(unittest.TestCase):
         self.assertEqual(len([e for e in json.loads((state / "linear" / "outbox.json").read_text())["entries"] if e["op"] == "create"]), 2)
 
     def test_min_interval_and_kill_switch_and_dry_run(self):
-        tmp, state = setup([row(1)]); self.addCleanup(tmp.cleanup)
+        tmp, state = make_state([row(1)]); self.addCleanup(tmp.cleanup)
         dp.run(state, "LYB", NOW, judge=lambda p: "[]")
         self.assertEqual(dp.run(state, "LYB", NOW + 60, judge=lambda p: "[]")["held"], "min-interval")
         import os
@@ -104,7 +104,7 @@ class RunTests(unittest.TestCase):
         self.assertEqual(dp.run(state, "LYB", NOW + 10**6, judge=lambda p: json.dumps(GOOD))["held"], "kill-switch")
 
     def test_dry_run_writes_nothing(self):
-        tmp, state = setup([row(1)]); self.addCleanup(tmp.cleanup)
+        tmp, state = make_state([row(1)]); self.addCleanup(tmp.cleanup)
         dp.run(state, "LYB", NOW, judge=lambda p: json.dumps(GOOD), dry_run=True)
         self.assertFalse((state / "linear" / "outbox.json").exists())
 

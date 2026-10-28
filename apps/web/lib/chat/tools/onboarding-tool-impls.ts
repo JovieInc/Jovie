@@ -27,6 +27,10 @@ import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
+import type {
+  GoldenPathAdmissionReason,
+  GoldenPathVerdict,
+} from '@/lib/waitlist/golden-path-admission';
 
 /**
  * Onboarding tool execute closures.
@@ -68,6 +72,9 @@ export interface OnboardingTurnState {
   sessionId: string;
   /** DB-backed controlled-access state resolved once by the request handler. */
   accessControlled: boolean;
+  /** Golden-path verdict for this turn; null holds the artist (fail closed). */
+  goldenPathVerdict?: GoldenPathVerdict | null;
+  goldenPathHold?: GoldenPathAdmissionReason | null;
   /** Set when confirmSpotifyArtist is called. */
   spotifyArtistId: string | null;
   /**
@@ -194,11 +201,15 @@ export function createOnboardingTurnState(input: {
   sessionId: string;
   turnCount: number;
   accessControlled?: boolean;
+  goldenPathVerdict?: GoldenPathVerdict | null;
+  goldenPathHold?: GoldenPathAdmissionReason | null;
   messages?: readonly UIMessage[];
 }): OnboardingTurnState {
   const state: OnboardingTurnState = {
     sessionId: input.sessionId,
     accessControlled: input.accessControlled ?? false,
+    goldenPathVerdict: input.goldenPathVerdict ?? null,
+    goldenPathHold: input.goldenPathHold ?? null,
     spotifyArtistId: null,
     publicProfileUrl: null,
     spotifyArtistName: null,
@@ -551,6 +562,8 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
         // The DB-backed controlled-access gate stays authoritative inside it.
         const decision = decideOnboardingAccess({
           accessControlled: state.accessControlled,
+          goldenPathVerdict: state.goldenPathVerdict,
+          goldenPathHold: state.goldenPathHold,
           spotifyArtistId: state.spotifyArtistId,
           publicProfileUrl: state.publicProfileUrl,
           spotifyFollowers: state.spotifyFollowers,
