@@ -380,7 +380,13 @@ export function silenceBudgetMinutes(entry) {
  * nothing reads green because no news arrived.
  */
 export function evaluateEntry(entry, observation, nowMs) {
-  const budget = silenceBudgetMinutes(entry);
+  // An observation may carry the budget it was measured against (the production promotion heartbeat reads the
+  // measured p95 from the lanes feed); the entry's own value is the fallback.
+  const budget =
+    Number.isInteger(observation?.budgetMinutes) &&
+    observation.budgetMinutes > 0
+      ? observation.budgetMinutes
+      : silenceBudgetMinutes(entry);
   const base = {
     id: entry.id,
     owner: entry.owner,

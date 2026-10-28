@@ -20,11 +20,14 @@ import {
   mergeCheckoutCorrelation,
   toCheckoutCorrelationReceiptFields,
 } from '@/lib/stripe/checkout-correlation';
-import { getPlanFromPriceId } from '@/lib/stripe/config';
 import {
   type BillingAuditEventType,
   updateUserBillingStatus,
 } from '@/lib/stripe/customer-sync';
+import {
+  resolvePlanFromPriceIds,
+  subscriptionPriceIds,
+} from '@/lib/stripe/subscription-plan';
 import { StripeReconciliationRequiredError } from '@/lib/stripe/webhooks/reconciliation';
 
 import type {
@@ -271,9 +274,7 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
     // Resolve the plan from any subscription item. A subscription can carry
     // more than one item (an add-on next to the plan), so the first item is
     // not necessarily the plan price.
-    const priceIds = subscription.items.data
-      .map(item => item.price?.id)
-      .filter((id): id is string => Boolean(id));
+    const priceIds = subscriptionPriceIds(subscription);
     if (priceIds.length === 0) {
       await captureCriticalError(
         'No price ID found in subscription',
@@ -286,10 +287,8 @@ export abstract class BaseSubscriptionHandler implements WebhookHandler {
       throw new Error('No price ID in subscription');
     }
 
-    const resolved = priceIds
-      .map(id => ({ priceId: id, plan: getPlanFromPriceId(id) }))
-      .find(candidate => candidate.plan !== null);
-    if (!resolved?.plan) {
+    const resolved = resolvePlanFromPriceIds(priceIds);
+    if (!resolved) {
       // A paid, active subscription on a price we cannot map. Never ack and
       // forget it: the route durably marks the stored event
       // needs_reconciliation before any 2xx, and replay grants it once the
