@@ -297,8 +297,10 @@ class Linear:
                 {"t": team_id, "n": name})["issueLabelCreate"]["issueLabel"]["id"]
         return self._labels[name]
 
-    def find_by_label(self, name: str) -> str | None:
-        d = self.gql("query($n:String!){issues(filter:{labels:{name:{eq:$n}}},first:1){nodes{identifier}}}", {"n": name})
+    def find_by_label(self, name: str, open_only: bool = False) -> str | None:
+        """open_only: an episode that was completed/canceled must not swallow a NEW identical episode (JOV-9007)."""
+        flt = "labels:{name:{eq:$n}}" + (",state:{type:{nin:[\"completed\",\"canceled\"]}}" if open_only else "")
+        d = self.gql("query($n:String!){issues(filter:{" + flt + "},first:1){nodes{identifier}}}", {"n": name})
         nodes = d["issues"]["nodes"]
         return nodes[0]["identifier"] if nodes else None
 
@@ -343,7 +345,7 @@ def alert(kind: str, text: str, siren: bool = False, linear: Linear | None = Non
     if linear is not None and kind not in ("sentry-issue",):
         try:
             key = f"alert:{hashlib.sha1((kind + text[:80]).encode()).hexdigest()[:10]}"
-            if not linear.find_by_label(key):
+            if not linear.find_by_label(key, open_only=True):
                 linear.create(f"[prod-errors] {kind}: {text[:120]}", msg, ["tim-alert", "prod-errors", key], 1)
         except Exception:
             pass
@@ -505,6 +507,53 @@ def write_bottleneck(ledger: dict, state: Path = STATE) -> dict:
     return frag
 
 
+THREAD_REPOS = [r for r in os.environ.get("PROD_ERRORS_THREAD_REPOS", "JovieInc/summer-config").split(",") if r]
+BOT_AUTHORS = {"sentry", "sentry[bot]", "cursor", "cursor[bot]", "coderabbitai", "coderabbitai[bot]"}
+THREADS_Q = ("query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){"
+             "reviewThreads(first:50){nodes{id isResolved isOutdated path line comments(first:1){nodes{author{login} body}}}}}}}")
+
+
+def bot_threads(linear: Linear, state: Path = STATE) -> dict:
+    """Unresolved bot review threads block repos with required conversation resolution (summer-config) even when
+    every check is green. File ONE agent-ready Linear issue per blocked PR (fix the real bug, reply, resolve)."""
+    seen = read_json(state / "threads.json", {})
+    filed = 0
+    for repo in THREAD_REPOS:
+        owner, name = repo.split("/")
+        for pr in gh_json(["pr", "list", "-R", repo, "--state", "open", "--json", "number,title,mergeStateStatus",
+                           "--limit", "30"]) or []:
+            if pr.get("mergeStateStatus") != "BLOCKED":
+                continue
+            d = gh_json(["api", "graphql", "-f", f"query={THREADS_Q}", "-F", f"o={owner}", "-F", f"r={name}",
+                         "-F", f"n={pr['number']}"]) or {}
+            nodes = (((d.get("data") or {}).get("repository") or {}).get("pullRequest") or {}).get(
+                "reviewThreads", {}).get("nodes", [])
+            open_t = [t for t in nodes if not t["isResolved"] and t["comments"]["nodes"]
+                      and ((t["comments"]["nodes"][0].get("author") or {}).get("login") or "").lower() in BOT_AUTHORS]
+            key = f"threads:{repo}#{pr['number']}"
+            sig = hashlib.sha1("".join(sorted(t["id"] for t in open_t)).encode()).hexdigest()[:10]
+            if not open_t or seen.get(key, {}).get("sig") == sig:
+                continue
+            body = [f"**Owner:** {OWNER}. {repo}#{pr['number']} is BLOCKED by unresolved bot review threads "
+                    "(required conversation resolution), not by a missing approval.", ""]
+            for t in open_t:
+                body.append(f"- `{t['path']}:{t['line']}` thread `{t['id']}`: "
+                            f"{t['comments']['nodes'][0]['body'][:400]}")
+            body += ["", "Do: fix each real bug on the PR branch, reply with the commit, then resolve the thread "
+                     "(GraphQL `resolveReviewThread`). If a finding is wrong, reply with the evidence and resolve."]
+            ident = seen.get(key, {}).get("linear") if seen.get(key, {}).get("open", True) else None
+            ident = ident or linear.find_by_label(key, open_only=True)
+            if ident:
+                linear.comment(ident, "\n".join(body))
+            else:
+                ident = linear.create(f"[review threads] {repo}#{pr['number']} {pr['title']}"[:200],
+                                      "\n".join(body), [key, "prod-error", "agent-ready"], 2)
+            seen[key] = {"sig": sig, "linear": ident, "at": iso(now())}
+            filed += 1
+    write_json(state / "threads.json", seen)
+    return {"threads-filed": filed}
+
+
 def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
     at = now()
     ledger = read_json(state / "ledger.json", {})
@@ -536,6 +585,10 @@ def sweep(sentry: Sentry, linear: Linear, state: Path = STATE) -> dict:
     advance(ledger, linear, sentry, prs, at, state)
     write_json(state / "ledger.json", ledger)
     record_metrics(ledger, list(issues.values()), at, state)
+    try:
+        counts.update(bot_threads(linear, state))
+    except Exception as e:  # never let the thread watcher break the Sentry sweep
+        counts["threads-error"] = str(e)[:80]
     for f in inbox:
         f.unlink(missing_ok=True)
     return counts
@@ -569,7 +622,7 @@ def ci_main(linear: Linear, state: Path = STATE) -> dict:
         entry = seen.setdefault(key, {"workflow": wf})
         if r["conclusion"] in ("failure", "timed_out", "startup_failure"):
             if entry.get("state") != "red":
-                ident = linear.find_by_label(key) or linear.create(
+                ident = linear.find_by_label(key, open_only=True) or linear.create(
                     f"[main red] {wf}", f"**Owner:** {OWNER}\nLatest main run failed: {r['url']}\n"
                     "Fix the real failure; do not loosen the gate. Closes when the next main run is green.",
                     [key, "prod-error", "ci-main", "agent-ready"], 2)

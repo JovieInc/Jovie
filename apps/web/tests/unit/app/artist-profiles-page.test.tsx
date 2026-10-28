@@ -364,7 +364,7 @@ describe('ArtistProfilesPage', () => {
       screen.getAllByTestId('artist-profile-related-feature')
     ).toHaveLength(4);
     expect(
-      screen.getByRole('link', { name: /See Fan Notifications/i })
+      screen.getByRole('link', { name: /See audience notifications/i })
     ).toHaveAttribute('href', '/artist-notifications');
     expect(
       screen.getByRole('link', { name: /See Instant Merch/i })
