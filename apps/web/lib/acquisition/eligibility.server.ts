@@ -22,25 +22,25 @@ import { serverFetch } from '@/lib/http/server-fetch';
 import { getRedis } from '@/lib/redis';
 import { logger } from '@/lib/utils/logger';
 import {
-  COMMERCE_DECISION_PROJECTION_CONTRACT,
   type CommerceDecisionProjection,
   type CommerceEvidenceKind,
   projectCommerceDecisions,
 } from './commerce-decision';
 import {
-  ACQUISITION_ELIGIBILITY_CONTRACT,
   type AcquisitionEligibility,
   type ConeEvidence,
   type ConeRequirementId,
   evaluateAcquisitionEligibility,
   unknownAcquisitionEligibility,
 } from './eligibility';
+import {
+  DAILY_CANARY_MAX_AGE_MS,
+  DAILY_WORKFLOW_MAX_AGE_MS,
+  LIVE_MAX_AGE_MS,
+  revalidateAcquisitionEligibilityReport,
+} from './eligibility-cache';
 
 const PRODUCTION_BASE_URL = 'https://jov.ie';
-const HOUR_MS = 60 * 60_000;
-const LIVE_MAX_AGE_MS = 15 * 60_000;
-const DAILY_CANARY_MAX_AGE_MS = 30 * HOUR_MS;
-const DAILY_WORKFLOW_MAX_AGE_MS = 48 * HOUR_MS;
 const CACHE_KEY = 'acquisition:eligibility:v1';
 const CACHE_TTL_SECONDS = 10 * 60;
 
@@ -275,14 +275,23 @@ async function canaryEvidence(
         status: 'unknown',
       };
     }
-    const failed = report.checks.filter(check => !check.ok);
+    if (!Array.isArray(report.checks) || report.checks.length === 0) {
+      return {
+        ...base,
+        detail: 'No canary checks executed.',
+        observedAt: report.runAt,
+        status: 'unknown',
+      };
+    }
+    const failed = report.checks.filter(check => check?.ok !== true);
+    const passed = report.pass === true && failed.length === 0;
     return {
       ...base,
-      detail: report.pass
+      detail: passed
         ? `${report.checks.length} checks passed.`
         : `${failed.length} of ${report.checks.length} checks failed.`,
       observedAt: report.runAt,
-      status: report.pass ? 'green' : 'red',
+      status: passed ? 'green' : 'red',
     };
   } catch (error) {
     return {
@@ -535,18 +544,6 @@ export async function computeAcquisitionEligibility(
   }
 }
 
-function isCachedReport(value: unknown): value is AcquisitionEligibilityReport {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { contract?: unknown }).contract ===
-      ACQUISITION_ELIGIBILITY_CONTRACT &&
-    typeof (value as { eligible?: unknown }).eligible === 'boolean' &&
-    (value as { commerce?: { contract?: unknown } }).commerce?.contract ===
-      COMMERCE_DECISION_PROJECTION_CONTRACT
-  );
-}
-
 /**
  * Cache-only read for request paths that must never trigger the GitHub and
  * canary recompute (anonymous chat turns). A miss, an outage or a malformed
@@ -558,7 +555,7 @@ export async function readCachedAcquisitionEligibility(): Promise<AcquisitionEli
   try {
     const cached = await redis.get<unknown>(CACHE_KEY);
     const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
-    return isCachedReport(parsed) ? parsed : null;
+    return revalidateAcquisitionEligibilityReport(parsed, new Date());
   } catch (error) {
     logger.warn('[acquisition/eligibility] cache-only read failed', error);
     return null;
@@ -579,7 +576,8 @@ export async function getAcquisitionEligibility(
     try {
       const cached = await redis.get<unknown>(CACHE_KEY);
       const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
-      if (isCachedReport(parsed)) return parsed;
+      const report = revalidateAcquisitionEligibilityReport(parsed, deps.now());
+      if (report) return report;
     } catch (error) {
       logger.warn('[acquisition/eligibility] cache read failed', error);
     }
