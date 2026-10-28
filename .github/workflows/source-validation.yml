@@ -23,6 +23,7 @@ env:
   CF_TURBO_URL: ${{ secrets.CF_TURBO_CACHE_URL }}
   CF_TURBO_ROLE: ro
   CF_TURBO_TOKEN: ${{ secrets.CF_TURBO_CACHE_RO_TOKEN }}
+  CF_TURBO_SIGNATURE_KEY: ${{ secrets.CF_TURBO_SIGNATURE_KEY }}
 jobs:
   deterministic:
     name: Source Validation
