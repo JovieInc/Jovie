@@ -9,7 +9,6 @@ artifactBuildCompleted: scripts/notarize-release-dmg.cjs
 files:
   - dist-electron/**
   - assets/icon.png
-  - assets/icon-staging.png
   - package.json
 extraResources:
   - from: build/build-identity.json

@@ -24,6 +24,12 @@ interface UseTextareaAutosizeReturn {
   hiddenDivRef: React.RefObject<HTMLDivElement | null>;
 }
 
+/**
+ * Height remeasure() yields for any single-line value: the 24px line plus the
+ * hidden mirror's 1px top and bottom padding (HIDDEN_DIV_STYLES).
+ */
+export const SINGLE_LINE_MEASURED_HEIGHT = 26;
+
 export function getTextareaMeasurementText(value: string): string {
   // A zero-width final glyph preserves an intentional trailing newline without
   // turning every non-empty single-line draft into two measured rows.
@@ -47,7 +53,12 @@ export function useTextareaAutosize({
   maxHeight,
   textareaRef,
 }: UseTextareaAutosizeOptions): UseTextareaAutosizeReturn {
-  const [measuredHeight, setMeasuredHeight] = useState(minHeight);
+  // Start at the height a one-line measurement settles on. Starting at
+  // minHeight (24) made every server-rendered composer paint 2px short and
+  // jump to 26px on hydration, a visible layout shift on /start.
+  const [measuredHeight, setMeasuredHeight] = useState(() =>
+    Math.min(maxHeight, Math.max(minHeight, SINGLE_LINE_MEASURED_HEIGHT))
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const hiddenDivRef = useRef<HTMLDivElement>(null);
 

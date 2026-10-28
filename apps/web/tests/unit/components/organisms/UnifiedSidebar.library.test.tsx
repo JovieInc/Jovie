@@ -246,6 +246,13 @@ describe('UnifiedSidebar library route', () => {
     expect(link).toHaveAttribute('data-prefetch', 'false');
   });
 
+  it('mounts the flyout-capable rail as the left navigation region', () => {
+    renderUnifiedSidebar();
+    const rail = document.querySelector('#shell-left-rail');
+    expect(rail).toHaveAttribute('data-rail-preview-region', 'left');
+    expect(rail?.querySelector('[data-sidebar="sidebar"]')).not.toBeNull();
+  });
+
   it('pins the sidebar content scrollport so focusing New Chat does not shift the shell', () => {
     renderUnifiedSidebar();
 
