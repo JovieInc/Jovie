@@ -5,6 +5,7 @@ import {
   aggregateContinuity,
   classifyEndpointObservation,
   continuityIncidentKey,
+  DEFAULT_STALE_AFTER_SECONDS,
   FRESHNESS_INCIDENT_CLASS,
   FRESHNESS_TARGET_ID,
   forecastBudgetExhaustion,
@@ -13,6 +14,8 @@ import {
   parseCliArgs,
   parseTargets,
   planBudgetContinuityAction,
+  remediationConclusion,
+  resolveStaleAfterSeconds,
   runCli,
 } from './production-continuity.mjs';
 
@@ -137,8 +140,11 @@ describe('production continuity classification', () => {
     const writes = [];
     const appends = [];
     const stdout = [];
+    // Hermetic: availability-only targets. An ambient GITHUB_REPOSITORY (set in
+    // CI) would otherwise enable the freshness probe against the real network.
     const result = await runCli({
       argv,
+      env: {},
       fetchImpl: async () => new Response('{"ok":true}', { status: 200 }),
       now: NOW,
       writeFileImpl: async (...args) => writes.push(args),
@@ -307,6 +313,56 @@ describe('founder-first staged budget policy', () => {
   });
 });
 
+describe('remediation conclusion mapping', () => {
+  it('maps healthy, unknown, unhealthy, stale+unknown and a failed observe job', async () => {
+    const unknownRow = {
+      id: 'f',
+      healthy: null,
+      reason: 'main-sha-unreadable',
+    };
+    const staleRow = {
+      id: 's',
+      healthy: false,
+      incidentClass: 'production-stale',
+    };
+    const ok = observation({ status: 200 });
+    const status = rows => aggregateContinuity(rows, { now: NOW }).status;
+    const cases = [
+      [{ observeResult: 'success', status: status([ok]) }, 'success'],
+      [
+        { observeResult: 'success', status: status([ok, unknownRow]) },
+        'unknown',
+      ],
+      [{ observeResult: 'success', status: status([ok, staleRow]) }, 'failure'],
+      [
+        {
+          observeResult: 'success',
+          status: status([ok, staleRow, unknownRow]),
+        },
+        'failure',
+      ],
+      [
+        {
+          observeResult: 'success',
+          status: status([observation({ status: 503 }), unknownRow]),
+        },
+        'failure',
+      ],
+      [{ observeResult: 'failure', status: 'healthy' }, 'failure'],
+      [{ observeResult: 'cancelled', status: '' }, 'failure'],
+      [{ observeResult: 'success', status: '' }, 'unknown'],
+      [{ observeResult: 'success', status: undefined }, 'unknown'],
+      [{ observeResult: 'success', status: 'surprise' }, 'unknown'],
+    ];
+    for (const [input, expected] of cases)
+      assert.equal(
+        remediationConclusion(input),
+        expected,
+        JSON.stringify(input)
+      );
+  });
+});
+
 describe('production freshness', () => {
   const LIVE = 'c'.repeat(40);
   const MAIN = 'd'.repeat(40);
@@ -314,7 +370,7 @@ describe('production freshness', () => {
     liveSha = LIVE,
     mainSha = MAIN,
     aheadBy = 4,
-    oldestAt = '2026-09-13T13:00:00Z',
+    oldestAt = '2026-09-13T10:00:00Z',
     failCompare = false,
   } = {}) => {
     const calls = [];
@@ -353,19 +409,29 @@ describe('production freshness', () => {
     });
 
   it('reports production-stale once main has carried unshipped commits past the bound', async () => {
-    const stale = await observe({ oldestAt: '2026-09-13T13:00:00Z' });
+    const stale = await observe({ oldestAt: '2026-09-13T10:00:00Z' });
     assert.equal(stale.healthy, false);
     assert.equal(stale.incidentClass, FRESHNESS_INCIDENT_CLASS);
     assert.equal(stale.id, FRESHNESS_TARGET_ID);
     assert.equal(stale.unshippedCommits, 4);
-    assert.equal(stale.unshippedAgeSeconds, 9492);
+    assert.equal(stale.unshippedAgeSeconds, 20292);
     assert.equal(stale.liveSha, LIVE);
     assert.equal(stale.mainSha, MAIN);
 
     const fresh = await observe({ oldestAt: '2026-09-13T15:00:00Z' });
     assert.equal(fresh.healthy, true);
     assert.equal(fresh.incidentClass, null);
-    assert.match(fresh.reason, /^unshipped-for-2292s-within-7200s$/);
+    assert.match(fresh.reason, /^unshipped-for-2292s-within-14760s$/);
+  });
+
+  it('treats the measured p95 (246 minutes) as the freshness bound by default as the production freshness bound', async () => {
+    const within = await observe({ oldestAt: '2026-09-13T11:33:12Z' });
+    assert.equal(within.healthy, true);
+    assert.match(within.reason, /^unshipped-for-14700s-within-14760s$/);
+    const over = await observe({ oldestAt: '2026-09-13T11:31:12Z' });
+    assert.equal(over.healthy, false);
+    assert.equal(over.incidentClass, FRESHNESS_INCIDENT_CLASS);
+    assert.equal(over.unshippedAgeSeconds, 14820);
   });
 
   it('is healthy when production already carries main', async () => {
@@ -375,15 +441,16 @@ describe('production freshness', () => {
     assert.deepEqual([zero.healthy, zero.reason], [true, 'production-current']);
   });
 
-  it('fails open with a reason when live, main, or the range is unreadable', async () => {
+  it('reports unknown, never healthy, when live, main, or the range is unreadable', async () => {
     const cases = [
       [{ liveSha: 'nope' }, 'live-sha-unreadable'],
       [{ mainSha: '' }, 'main-sha-unreadable'],
-      [{ failCompare: true }, 'unshipped-range-unreadable'],
+      [{ failCompare: true }, 'unshipped-count-unreadable'],
     ];
     for (const [overrides, reason] of cases) {
       const result = await observe(overrides);
-      assert.equal(result.healthy, true, reason);
+      assert.equal(result.healthy, null, reason);
+      assert.equal(result.incidentClass, null, reason);
       assert.equal(result.reason, reason);
     }
     const unconfigured = await observeProductionFreshness({
@@ -412,13 +479,13 @@ describe('production freshness', () => {
     });
     assert.deepEqual(
       [hung.healthy, hung.reason],
-      [true, 'live-sha-unreadable']
+      [null, 'live-sha-unreadable']
     );
   });
 
-  it('fails open when the unshipped range has no commit date', async () => {
+  it('reports unknown when the unshipped range has no commit date', async () => {
     const result = await observe({ oldestAt: null });
-    assert.equal(result.healthy, true);
+    assert.equal(result.healthy, null);
     assert.equal(result.reason, 'unshipped-age-unreadable');
     assert.equal(result.unshippedCommits, 4);
   });
@@ -452,7 +519,8 @@ describe('production freshness', () => {
     assert.equal(staleOnly.status, 'unhealthy');
     assert.deepEqual(staleOnly.incidentClasses, [FRESHNESS_INCIDENT_CLASS]);
     assert.equal(staleOnly.requiresFounderNotification, true);
-    assert.equal(staleOnly.requiresAgentIngress, false);
+    assert.equal(staleOnly.requiresAgentIngress, true);
+    assert.equal(staleOnly.agentIngressFailure, 'production-controller-failed');
 
     const paused = aggregateContinuity(
       [
@@ -465,10 +533,271 @@ describe('production freshness', () => {
       { now: NOW }
     );
     assert.equal(paused.requiresAgentIngress, true);
+    assert.equal(paused.agentIngressFailure, 'provider-unavailable');
+  });
+
+  it('rolls unknown freshness up as unknown, not healthy, with an explicit unknownTargets list', async () => {
+    const unknown = await observe({ mainSha: '' });
+    const rollup = aggregateContinuity(
+      [
+        observation({ status: 200 }),
+        observation({ id: 'summer-production', status: 200 }),
+        unknown,
+      ],
+      { now: NOW }
+    );
+    assert.equal(rollup.status, 'unknown');
+    assert.deepEqual(rollup.unknownTargets, [FRESHNESS_TARGET_ID]);
+    assert.deepEqual(rollup.unknownReasons, ['main-sha-unreadable']);
+    assert.deepEqual(rollup.affectedTargets, []);
+    assert.equal(rollup.requiresFounderNotification, false);
+    assert.equal(rollup.requiresAgentIngress, false);
+    assert.equal(
+      continuityIncidentKey(rollup),
+      'production-continuity:unknown:jovie-production-freshness'
+    );
+    const healthy = aggregateContinuity(
+      [observation({ status: 200 }), await observe({ mainSha: LIVE })],
+      { now: NOW }
+    );
+    assert.equal(healthy.status, 'healthy');
+    assert.deepEqual(healthy.unknownTargets, []);
+  });
+
+  it('lets a verified stale or unavailable result outrank an unknown one', async () => {
+    const unknown = await observe({ mainSha: '' });
+    const stale = await observe({});
+    const staleAndUnknown = aggregateContinuity(
+      [
+        observation({ status: 200 }),
+        { ...unknown, id: 'other-freshness' },
+        stale,
+      ],
+      { now: NOW }
+    );
+    assert.equal(staleAndUnknown.status, 'unhealthy');
+    assert.deepEqual(staleAndUnknown.affectedTargets, [FRESHNESS_TARGET_ID]);
+    assert.deepEqual(staleAndUnknown.unknownTargets, ['other-freshness']);
+    const unavailableAndUnknown = aggregateContinuity(
+      [observation({ status: 503 }), unknown],
+      { now: NOW }
+    );
+    assert.equal(unavailableAndUnknown.status, 'unhealthy');
+    assert.deepEqual(unavailableAndUnknown.unknownTargets, [
+      FRESHNESS_TARGET_ID,
+    ]);
+  });
+
+  it('never reports HTTP 200 with a null mainSha as healthy (run 40070879025 replay)', () => {
+    // Observed JSON from run 40070879025 job 120803832280 (2026-10-24T06:37:10Z),
+    // which logged status=healthy and then resolved JOV-7674.
+    const observed = {
+      schema: 'jovie-production-continuity/v1',
+      observedAt: '2026-10-24T06:37:10.710Z',
+      status: 'healthy',
+      targets: [
+        {
+          id: 'jovie-production',
+          url: 'https://jov.ie/api/health/build-info',
+          healthy: true,
+          incidentClass: null,
+          reason: 'http-200',
+          status: 200,
+          providerError: null,
+        },
+        {
+          id: 'summer-production',
+          url: 'https://summer.jov.ie/runtime/v1/health',
+          healthy: true,
+          incidentClass: null,
+          reason: 'http-200',
+          status: 200,
+          providerError: null,
+        },
+        {
+          id: 'jovie-production-freshness',
+          url: 'https://jov.ie/api/health/build-info',
+          healthy: true,
+          incidentClass: null,
+          status: null,
+          providerError: null,
+          liveSha: 'd1a37ae5b264f90585a572a9324dc3f3b78efa8b',
+          mainSha: null,
+          unshippedCommits: 0,
+          oldestUnshippedAt: null,
+          unshippedAgeSeconds: 0,
+          reason: 'main-sha-unreadable',
+        },
+      ],
+    };
+    // Old producer behavior: the freshness row was healthy:true and the rollup healthy.
+    assert.equal(observed.status, 'healthy');
+    // Same live inputs through the current producer: both endpoints 200, main unreadable.
+    const json = body => ({
+      status: 200,
+      json: async () => body,
+      text: async () => JSON.stringify(body),
+      headers: {},
+    });
+    return observeProductionContinuity({
+      fetchImpl: async url => {
+        if (url.endsWith('/commits/main'))
+          return {
+            status: 403,
+            json: async () => ({}),
+            text: async () => '',
+            headers: {},
+          };
+        if (url.endsWith('/runtime/v1/health')) return json({ ok: true });
+        return json({ commitSha: observed.targets[2].liveSha });
+      },
+      freshness: { repository: 'JovieInc/Jovie', token: 'ghs_test' },
+      now: new Date(observed.observedAt),
+    }).then(result => {
+      assert.equal(result.targets[0].healthy, true);
+      assert.equal(result.targets[1].healthy, true);
+      assert.equal(result.targets[2].healthy, null);
+      assert.equal(result.targets[2].mainSha, null);
+      assert.equal(result.status, 'unknown');
+      assert.notEqual(result.status, 'healthy');
+      assert.deepEqual(result.unknownTargets, [FRESHNESS_TARGET_ID]);
+    });
+  });
+
+  it('keys the CLI receipt as unknown when a repository is set but SHAs are unreadable', async () => {
+    const result = await runCli({
+      appendFileImpl: async () => {},
+      argv: [],
+      env: { GITHUB_REPOSITORY: 'JovieInc/Jovie' },
+      // Endpoints answer 200 with no commitSha; GitHub answers 404.
+      fetchImpl: async url => ({
+        status: url.startsWith('https://api.github.com/') ? 404 : 200,
+        text: async () => '{}',
+        json: async () => ({}),
+        headers: {},
+      }),
+      now: NOW,
+      stdout: { write() {} },
+      writeFileImpl: async () => {},
+    });
+    assert.equal(result.status, 'unknown');
+    assert.equal(
+      result.incidentKey,
+      'production-continuity:unknown:jovie-production-freshness'
+    );
+  });
+
+  it('accepts only a finite non-negative integer ahead_by (table-driven)', async () => {
+    const rawFetch = compare => async url => {
+      const json = body => ({
+        status: 200,
+        json: async () => body,
+        text: async () => JSON.stringify(body),
+        headers: {},
+      });
+      if (url.endsWith('/build-info')) return json({ commitSha: LIVE });
+      if (url.endsWith('/commits/main')) return json({ sha: MAIN });
+      return json(compare);
+    };
+    const commits = [
+      { commit: { committer: { date: '2026-09-13T10:00:00Z' } } },
+    ];
+    const run = ahead => {
+      const compare = { commits };
+      if (ahead !== undefined) compare.ahead_by = ahead;
+      return observeProductionFreshness({
+        fetchImpl: rawFetch(compare),
+        now: NOW,
+        repository: 'JovieInc/Jovie',
+      });
+    };
+    const malformed = [
+      null,
+      '',
+      false,
+      undefined,
+      '3',
+      -1,
+      1.5,
+      Number.NaN,
+      'abc',
+      true,
+      [],
+      {},
+      Number.POSITIVE_INFINITY,
+    ];
+    for (const value of malformed) {
+      const result = await run(value);
+      assert.equal(result.healthy, null, String(value));
+      assert.equal(result.reason, 'unshipped-count-unreadable', String(value));
+      assert.equal(result.incidentClass, null, String(value));
+    }
+    const current = await observeProductionFreshness({
+      fetchImpl: rawFetch({ ahead_by: 0, commits: [] }),
+      now: NOW,
+      repository: 'JovieInc/Jovie',
+    });
+    assert.deepEqual(
+      [current.healthy, current.reason],
+      [true, 'production-current']
+    );
+    const stale = await run(4);
+    assert.deepEqual(
+      [stale.healthy, stale.incidentClass],
+      [false, FRESHNESS_INCIDENT_CLASS]
+    );
+    const fresh = await observeProductionFreshness({
+      fetchImpl: rawFetch({
+        ahead_by: 4,
+        commits: [{ commit: { committer: { date: '2026-09-13T15:00:00Z' } } }],
+      }),
+      now: NOW,
+      repository: 'JovieInc/Jovie',
+    });
+    assert.deepEqual(
+      [fresh.healthy, fresh.reason],
+      [true, 'unshipped-for-2292s-within-14760s']
+    );
+  });
+
+  it('treats non-string SHAs and non-string commit dates as unknown', async () => {
+    const make = ({
+      live = LIVE,
+      main = MAIN,
+      date = '2026-09-13T10:00:00Z',
+    }) =>
+      observeProductionFreshness({
+        fetchImpl: async url => {
+          const json = body => ({
+            status: 200,
+            json: async () => body,
+            text: async () => '',
+            headers: {},
+          });
+          if (url.endsWith('/build-info')) return json({ commitSha: live });
+          if (url.endsWith('/commits/main')) return json({ sha: main });
+          return json({
+            ahead_by: 2,
+            commits: [{ commit: { committer: { date } } }],
+          });
+        },
+        now: NOW,
+        repository: 'JovieInc/Jovie',
+      });
+    for (const [input, reason] of [
+      [{ live: [LIVE] }, 'live-sha-unreadable'],
+      [{ main: [MAIN] }, 'main-sha-unreadable'],
+      [{ date: 0 }, 'unshipped-age-unreadable'],
+      [{ date: 1757768400000 }, 'unshipped-age-unreadable'],
+      [{ date: 'not-a-date' }, 'unshipped-age-unreadable'],
+    ]) {
+      const result = await make(input);
+      assert.deepEqual([result.healthy, result.reason], [null, reason], reason);
+    }
   });
 
   it('includes freshness in the CLI only when a repository is configured', async () => {
-    const { fetchImpl } = freshnessFetch({ oldestAt: '2026-09-13T13:00:00Z' });
+    const { fetchImpl } = freshnessFetch({ oldestAt: '2026-09-13T10:00:00Z' });
     const outputs = [];
     const result = await runCli({
       appendFileImpl: async (_path, text) => outputs.push(text),
@@ -494,7 +823,7 @@ describe('production freshness', () => {
     });
     assert.equal(result.status, 'unhealthy');
     assert.deepEqual(result.affectedTargets, [FRESHNESS_TARGET_ID]);
-    assert.match(outputs.join(''), /requires_agent_ingress=false/);
+    assert.match(outputs.join(''), /requires_agent_ingress=true/);
 
     const without = await runCli({
       appendFileImpl: async () => {},
@@ -513,6 +842,51 @@ describe('production freshness', () => {
     assert.equal(
       without.targets.some(t => t.id === FRESHNESS_TARGET_ID),
       false
+    );
+  });
+});
+
+describe('resolveStaleAfterSeconds (weekly measured limit from the lanes feed)', () => {
+  const feed = ageS => async () => ({
+    ok: true,
+    json: async () => ({
+      deployHealth: { limits: { 'JovieInc/Jovie': { ageS } } },
+    }),
+  });
+  const base = {
+    limitsUrl: 'https://feed.test/lanes.json',
+    repository: 'JovieInc/Jovie',
+  };
+
+  it('uses the feed limit when sane and the fallback otherwise', async () => {
+    assert.equal(
+      await resolveStaleAfterSeconds({ ...base, fetchImpl: feed(9000) }),
+      9000
+    );
+    for (const bad of [10, 999_999, null, 'x'])
+      assert.equal(
+        await resolveStaleAfterSeconds({ ...base, fetchImpl: feed(bad) }),
+        DEFAULT_STALE_AFTER_SECONDS
+      );
+    assert.equal(
+      await resolveStaleAfterSeconds({
+        ...base,
+        fetchImpl: async () => ({ ok: false }),
+      }),
+      DEFAULT_STALE_AFTER_SECONDS
+    );
+    assert.equal(
+      await resolveStaleAfterSeconds({
+        ...base,
+        fetchImpl: async () => {
+          throw new Error('down');
+        },
+      }),
+      DEFAULT_STALE_AFTER_SECONDS
+    );
+    assert.equal(
+      await resolveStaleAfterSeconds({ repository: 'JovieInc/Jovie' }),
+      DEFAULT_STALE_AFTER_SECONDS
     );
   });
 });

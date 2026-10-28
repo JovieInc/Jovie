@@ -46,8 +46,11 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || github.event.pull_request.number }}
-  # pull_request: never cancel — duplicate same-head-SHA runs must each reach
+  group: pr-size-${{ github.event_name == 'merge_group' && github.event.merge_group.head_sha || format('{0}-{1}', github.event.pull_request.number, github.run_id) }}
+  # pull_request: the group is unique per run. A shared per-PR group lets
+  # GitHub cancel the older PENDING run when a second one queues (body edit,
+  # label, sync) even without cancel-in-progress, pinning a CANCELLED required
+  # check (run 40737641015, #23473/#23474). Never cancel — duplicate same-head-SHA runs must each reach
   # a terminal success/failure so the rollup cannot pin a CANCELLED run for
   # this required context (JOV-3580). merge_group stays keyed by exact head.
   cancel-in-progress: ${{ github.event_name == 'merge_group' }}

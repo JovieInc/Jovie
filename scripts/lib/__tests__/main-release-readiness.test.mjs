@@ -8,7 +8,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { delimiter, join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   checkMainQueueProvenance,
   describeProvenance,
@@ -45,6 +45,20 @@ function exactSuccessfulRun(id = 41) {
 }
 
 describe('main release readiness', () => {
+  // In-process holds write `::warning::Holding ...` to stderr. Capture it so the
+  // runner never parses a mocked rate-limit hold as a workflow annotation.
+  /** @type {import('vitest').MockInstance[]} */
+  let spies = [];
+  beforeEach(() => {
+    spies = [
+      vi.spyOn(console, 'error').mockImplementation(() => {}),
+      vi.spyOn(process.stderr, 'write').mockImplementation(() => true),
+    ];
+  });
+  afterEach(() => {
+    for (const spy of spies) spy.mockRestore();
+  });
+
   it('accepts only an exact successful merge-group PR Ready proof', () => {
     const run = exactSuccessfulRun();
     const successJobs = new Map([
