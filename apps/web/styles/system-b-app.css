@@ -661,6 +661,22 @@
   --color-skeleton-shimmer: rgba(255, 255, 255, 0.11);
 }
 
+/* Ovie consumes the canonical Noir Ion ramp instead of a second near-identical
+   graphite palette. Home, dashboards, shell chrome, and composer share one
+   content tone; cards retain their existing borders and geometry. */
+.dark [data-app-shell-workspace="ov"],
+[data-app-shell-workspace="ov"].dark {
+  --app-shell-content-surface: var(--noir-ion-card);
+  --color-bg-surface-0: var(--noir-ion-shell);
+  --color-bg-surface-1: var(--noir-ion-card);
+  --color-bg-surface-2: var(--noir-ion-elevated);
+  --color-bg-surface-3: var(--noir-ion-floating);
+  --color-bg-elevated: var(--noir-ion-elevated);
+  --color-bg-tooltip: var(--noir-ion-floating);
+  --color-bg-input: var(--noir-ion-card);
+  --color-skeleton-base: var(--noir-ion-elevated);
+}
+
 /* A selected row mode owns the same geometry during loading and after data arrives. */
 [data-table-row-mode] tbody > .system-b-table-row-height {
   height: var(--table-row-height);
@@ -5048,206 +5064,6 @@
   color: var(--color-text-secondary-token);
   font-size: var(--text-app);
   line-height: var(--leading-normal);
-}
-
-/* ============================================
-   SYSTEM B START LOADING PRIMITIVES
-   ============================================ */
-
-/* Host matching the SidebarProvider wrapper the resolved /start page renders
-   around AppShellFrame (flex h-svh w-full overflow-x-hidden bg-base). */
-:where(.system-b-start-loading-page) {
-  display: flex;
-  width: 100%;
-  height: 100svh;
-  overflow-x: hidden;
-  background: var(--system-b-bg-page);
-  color: var(--system-b-text-primary);
-  color-scheme: dark;
-}
-
-/* OnboardingShell main wrapper + chat section: fills the shell content panel. */
-:where(.system-b-start-loading-main) {
-  position: relative;
-  display: flex;
-  min-height: 0;
-  flex: 1 1 auto;
-  flex-direction: column;
-  overflow: hidden;
-  background: var(--system-b-app-content-surface);
-}
-
-/* Chat scroll area (px-4 py-5 sm:px-6 lg:px-8 on the resolved page). */
-:where(.system-b-start-loading-scroll) {
-  position: relative;
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding-block: var(--space-5);
-  padding-inline: var(--space-4);
-}
-
-@media (min-width: 640px) {
-  :where(.system-b-start-loading-scroll) {
-    padding-inline: var(--space-6);
-  }
-}
-
-@media (min-width: 1024px) {
-  :where(.system-b-start-loading-scroll) {
-    padding-inline: var(--space-8);
-  }
-}
-
-/* Centering column (max-w-[52rem] justify-center on the resolved page). */
-:where(.system-b-start-loading-column) {
-  display: flex;
-  width: 100%;
-  min-height: 100%;
-  max-width: 52rem;
-  flex-direction: column;
-  justify-content: center;
-  margin-inline: auto;
-}
-
-/* ChatEmptyStateComposerRegion: content shell + centered flex region. */
-:where(.system-b-start-loading-region) {
-  position: relative;
-  display: flex;
-  width: 100%;
-  max-width: var(--system-b-chat-composer-max-width);
-  min-height: 100%;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-inline: auto;
-  padding-block: var(--space-8);
-  padding-inline: var(--space-1);
-}
-
-/* Empty-state intro, anchored to the region midline exactly like the resolved
-   `above` slot (absolute inset-x-0 bottom-1/2 mb-12, max-w-[44rem]). */
-:where(.system-b-start-loading-intro) {
-  position: absolute;
-  inset-inline: 0;
-  bottom: 50%;
-  z-index: 1;
-  display: flex;
-  width: 100%;
-  max-width: 44rem;
-  max-height: min(46svh, calc(var(--space-24) * 4));
-  flex-direction: column;
-  gap: var(--space-4);
-  margin-inline: auto;
-  margin-bottom: var(--space-12);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-inline: var(--space-1);
-  padding-bottom: var(--space-1);
-}
-
-:where(.system-b-start-loading-intro-message) {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-:where(.system-b-start-loading-intro-message) > * {
-  width: 72%;
-  height: var(--space-4);
-}
-
-:where(.system-b-start-loading-intro-message) > *:last-child {
-  width: 46%;
-}
-
-:where(.system-b-start-loading-intro-pills) {
-  display: flex;
-  gap: var(--space-2);
-  overflow: hidden;
-}
-
-:where(.system-b-start-loading-intro-pills) > * {
-  height: var(--space-8);
-  flex-shrink: 0;
-  border-radius: var(--system-b-radius-pill);
-}
-
-:where(.system-b-start-loading-intro-pills) > *:nth-child(1) {
-  width: calc(var(--space-24) + var(--space-20));
-}
-
-:where(.system-b-start-loading-intro-pills) > *:nth-child(2) {
-  width: calc(var(--space-24) + var(--space-10));
-}
-
-:where(.system-b-start-loading-intro-pills) > *:nth-child(3) {
-  width: calc(var(--space-24) + var(--space-16));
-}
-
-:where(.system-b-start-loading-intro-pills) > *:nth-child(4) {
-  width: calc(var(--space-24) + var(--space-20));
-}
-
-:where(.system-b-start-loading-intro) > :last-child {
-  width: calc(var(--space-24) + var(--space-24));
-  height: var(--space-3);
-  margin-inline: auto;
-}
-
-:where(.system-b-start-loading-composer-anchor) {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-}
-
-:where(.system-b-start-loading-composer-wrap) {
-  width: 100%;
-  max-width: var(--system-b-chat-composer-max-width);
-  margin-inline: auto;
-}
-
-/* Resolved composer surface: 1px seam border, 3xl radius, content-surface
-   fill, shared chat loading composer height token (matches ChatInput empty
-   geometry within a couple px). */
-:where(.system-b-start-loading-composer) {
-  height: var(--system-b-chat-loading-composer-height);
-  overflow: hidden;
-  border: 1px solid
-    color-mix(in oklab, var(--system-b-app-frame-seam) 84%, transparent);
-  border-radius: var(--radius-3xl);
-  background: var(--system-b-app-content-surface);
-}
-
-:where(.system-b-start-loading-composer-row) {
-  display: flex;
-  height: 100%;
-  align-items: center;
-  gap: var(--space-2);
-  padding-block: var(--space-2);
-  padding-inline: var(--space-3);
-}
-
-:where(.system-b-start-loading-copy-slot) {
-  min-width: 0;
-  flex: 1 1 auto;
-  padding-inline: var(--space-3);
-}
-
-:where(.system-b-start-loading-copy-slot) > * {
-  width: min(58%, calc(var(--space-24) * 2));
-  height: var(--space-5);
-}
-
-:where(.system-b-start-loading-actions) {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-:where(.system-b-start-loading-actions) > * {
-  width: calc(var(--space-8) + var(--space-1));
-  height: calc(var(--space-8) + var(--space-1));
 }
 
 /* ============================================
