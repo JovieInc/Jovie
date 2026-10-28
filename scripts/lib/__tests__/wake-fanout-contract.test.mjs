@@ -31,3 +31,19 @@ test('Merge Queue Green Enroll does not wake on Fork PR Gate completions', () =>
   for (const name of ['Source Validation', 'CI', 'PR Size Guard'])
     assert.ok(list.includes(name), `${name} stays subscribed`);
 });
+
+test('Merge Queue Green Enroll does not wake on pull_request_target synchronize', () => {
+  const text = read('merge-queue-green-enroll.yml');
+  const types = text.match(
+    /\n {2}pull_request_target:\n(?: {4}#.*\n)* {4}types: \[(.*?)\]/
+  );
+  assert.ok(types, 'pull_request_target types exist');
+  assert.ok(!types[1].includes('synchronize'));
+  for (const kept of [
+    'ready_for_review',
+    'unlabeled',
+    'reopened',
+    'converted_to_draft',
+  ])
+    assert.ok(types[1].includes(kept), `${kept} stays`);
+});
