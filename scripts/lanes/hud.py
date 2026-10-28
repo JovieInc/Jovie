@@ -37,6 +37,9 @@ import urllib.request
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 
@@ -721,7 +724,7 @@ def fetch_target_titles(numbers: list[int], cache: Path | None, now: float | Non
         if cache:
             try:
                 stored = {"prs": entries, "alerted": stored.get("alerted", {}) if isinstance(stored, dict) else {}}
-                cache.write_text(json.dumps(stored, sort_keys=True))
+                atomic_write_text(cache, json.dumps(stored, sort_keys=True))
             except OSError:
                 pass
     return {f"PR{n}": entries[str(n)] for n in numbers if str(n) in entries}, error
@@ -750,7 +753,7 @@ def record_closed_target_alerts(targets: dict, cache: Path | None, log: Path | N
                 pass
     if fresh:
         try:
-            cache.write_text(json.dumps(stored, sort_keys=True))
+            atomic_write_text(cache, json.dumps(stored, sort_keys=True))
         except OSError:
             pass
     return fresh
