@@ -30,6 +30,63 @@ const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
     )
   )
 );
+
+describe('certification steps outside the workspace', () => {
+  it.each(['missing', 'empty', 'recorded'])(
+    'reports whether %s evidence can be uploaded',
+    state => {
+      const root = mkdtempSync(join(tmpdir(), 'prod-cert-handoff-'));
+      const workspace = join(root, 'workspace');
+      const stepsFile = join(root, 'prod-cert-steps.jsonl');
+      const output = join(root, 'output');
+      try {
+        mkdirSync(workspace);
+        if (state !== 'missing')
+          writeFileSync(
+            stepsFile,
+            state === 'empty' ? '' : '{"status":"passed"}\n'
+          );
+        const check = workflow.jobs['auth-smoke'].steps.find(
+          step => step.id === 'check-cert-steps'
+        );
+        expect(check?.run).toBeTypeOf('string');
+        const result = spawnSync('bash', ['-e', '-c', check.run], {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: output,
+            PROD_CERT_STEPS_FILE: stepsFile,
+          },
+          encoding: 'utf8',
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(output, 'utf8').trim()).toBe(
+          `available=${state === 'recorded'}`
+        );
+        const upload = workflow.jobs['auth-smoke'].steps.find(
+          step => step.id === 'upload-cert-steps'
+        );
+        const condition = upload.if
+          .replace(/^\$\{\{|\}\}$/g, '')
+          .replace(/steps\.([\w-]+)/g, 'steps["$1"]');
+        expect(
+          runInNewContext(condition, {
+            always: () => true,
+            steps: {
+              'check-cert-steps': {
+                outputs: Object.fromEntries([
+                  readFileSync(output, 'utf8').trim().split('='),
+                ]),
+              },
+            },
+          })
+        ).toBe(state === 'recorded');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+});
 const trigger = workflow.jobs['resolve-target'].steps.find(
   step => step.id === 'trigger'
 );
