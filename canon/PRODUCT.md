@@ -214,6 +214,19 @@ possible in terms of DS and IA."
   One-click answers execute immediately with a five-second undo. Ovie Home is
   dashboard-dense on a MacBook Pro.
 
+### Dogfood Jovie with the founder's own careers (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: Ovie is the closed-loop company OS and Jovie is
+the closed-loop creator OS. Tim runs his own music, YouTube, acting/modeling and
+fitness channels from Jovie, so running the company also means dogfooding the
+real product.
+
+- Tim's creator accounts are permanent Jovie dogfood. Product gaps they hit
+  become product issues; there are no private workarounds.
+- Onboarding, chat and Home empty states in both apps use the same shared shell
+  and realtime generated UI, picking the best layout for the moment. The visual
+  reference is the new Shopify admin: full-bleed and editorial.
+
 ### Ovie is one Home (founder decision, 2026-10-21)
 
 **EVENT:** Tim White, 2026-10-21: "Move the shipping dashboard into Ovie, and
