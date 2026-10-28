@@ -226,6 +226,7 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
   'ci-profile-admission-browser',
+  'ci-fast-remaining',
 ]);
 
 // Jobs whose full base fetch runs in the background during dependency
@@ -1072,9 +1073,30 @@ describe('merge_group workflow contract', () => {
       'uses: ./.github/workflows/mac-lane-route.yml'
     );
     expect(macos).toContain(
-      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || 'macos-15' }}`
+      `runs-on: \${{ inputs.mac-child && fromJSON('["self-hosted","macOS","ARM64","jovie-mac"]') || (inputs.native && 'macos-15' || 'ubuntu-latest') }}`
     );
     expect(macos).toContain("needs.mac.outputs.run_hosted == 'true'");
+    // Node-only web inputs run the Mac lane's node checks on ubuntu; swift
+    // and the MenuMonitor artifact stay macOS-only.
+    expect(macosCaller).toContain(
+      "native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}"
+    );
+    expect(CI_WORKFLOW).toContain(
+      "run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}"
+    );
+    expect(macosRoute).toContain('inputs.native');
+    for (const step of [
+      'Swift test and build (macOS only)',
+      'Verify exact Mac artifact set',
+    ]) {
+      const at = MACOS_CI_WORKFLOW.indexOf(`name: ${step}`);
+      expect(at, step).toBeGreaterThan(-1);
+      expect(MACOS_CI_WORKFLOW.slice(at, at + 160), step).toContain(
+        'inputs.native'
+      );
+    }
+    expect(macos).toContain('pnpm --filter @jovie/desktop run typecheck');
+    expect(macos).toContain('pnpm --filter @jovie/desktop run test');
     expect(macos).not.toContain('runs-on: macos-26');
     expect(CI_WORKFLOW).not.toContain('mac_runner_class');
     expect(CI_WORKFLOW).not.toContain('mac-runner-heartbeat.yml');
@@ -1097,32 +1119,13 @@ describe('merge_group workflow contract', () => {
       'swift build --package-path apps/macos/MenuMonitor -c release'
     );
     expect(macos).toContain(
-      '--staging-version "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT"'
-    );
-    expect(macos).toContain('id: desktop-staging-identity');
-    expect(macos).toContain('echo "version=$version" >> "$GITHUB_OUTPUT"');
-    expect(macos).toContain(
-      'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
-    );
-    expect(macos).toContain('JOVIE_DESKTOP_SOURCE_REVISION="$SOURCE_SHA"');
-    expect(macos).toContain(
       'SOURCE_SHA: ${{ inputs.checkout-ref || github.sha }}'
     );
-    expect(macos).toContain(
-      'version="${{ steps.desktop-staging-identity.outputs.version }}"'
-    );
+    expect(macos).not.toContain('desktop-staging');
+    expect(macos).not.toContain('package:staging');
     expect(macos).not.toContain(
       'echo "DESKTOP_VERSION=$version" >> "$GITHUB_ENV"'
     );
-    expect(
-      macos.indexOf('Bind staging package identity to the exact CI attempt')
-    ).toBeLessThan(macos.indexOf('Test and package exact Mac head'));
-    expect(
-      macos.indexOf(
-        'DESKTOP_VERSION="${{ steps.desktop-staging-identity.outputs.version }}"'
-      )
-    ).toBeGreaterThan(macos.indexOf('pnpm --filter @jovie/desktop run test'));
-    expect(macos).toContain('pnpm --filter @jovie/desktop run package:staging');
     expect(unitTests).toContain(
       "run_full_ci == 'true' && matrix.shard == 'packages/ui'\n        run: pnpm turbo test --filter=@jovie/ui"
     );
@@ -1293,12 +1296,22 @@ describe('merge_group workflow contract', () => {
     expect(setupAt).toBeGreaterThan(startAt);
     expect(waitAt).toBeGreaterThan(setupAt);
     expect(firstConsumer).toBeGreaterThan(waitAt);
-    // Guards here read historical blobs, so the fetch must stay full.
-    expect(start).not.toContain('--filter=blob:none');
+    // Blobless (186 MB / 11 s versus 2 GB / 259 s full, which stalled past
+    // the 540 s await deadline and ejected PRs from the merge queue). Guards
+    // that read historical blobs lazily fetch them with the job token
+    // exported via GIT_CONFIG_* (not persisted), and a stalled attempt is
+    // bounded and retried.
+    expect(start).toContain('--unshallow --filter=blob:none');
+    expect(start).toContain('timeout 150 git');
+    expect(start).toContain('for attempt in 1 2 3; do');
+    expect(start).toContain(
+      'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader'
+    );
+    expect(start).toContain('>> "$GITHUB_ENV"');
     expect(start).toContain('set -euo pipefail');
     // The exit status is published atomically only after git fetch returns.
     expect(start).toMatch(
-      /echo "\$\?" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
+      /echo "\$fetch_rc" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
     );
     expect(start).toContain('< /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &');
     // The awaiting step holds no token and fails closed on every failure mode.

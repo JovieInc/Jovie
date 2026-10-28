@@ -34,7 +34,6 @@ export function HomepageArtistHero({
       subhead={copy.subhead}
       claim={copy.claim}
       supportNote={copy.supportNote}
-      profile={copy.profile}
       sectionOwner={OWNER}
       sectionVariant='split-claim-card'
     />

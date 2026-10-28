@@ -62,7 +62,8 @@ const RESOURCE_LINKS = [
   },
   {
     href: '/api-versioning',
-    label: 'API Versioning And Deprecation Policy',
+    // ui-casing-allow: sentence-case labels per marketing plan phase 1
+    label: 'API versioning and deprecation policy',
     description:
       // "Deprecation" and "Sunset" are the literal RFC 9745/8594 HTTP header
       // names (ui-casing-allow: literal HTTP header names)
