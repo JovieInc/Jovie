@@ -955,7 +955,7 @@ jobs:
     name: Post-Deploy Auth Smoke (Production)
     needs: [authorize-production, production-release]
     if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' && needs.authorize-production.outputs.release_requires_smoke == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -1067,7 +1067,7 @@ jobs:
     needs: [authorize-production, production-release]
     # Run after successful deploy (tests homepage + /tim profile)
     if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' && needs.authorize-production.outputs.release_lane == 'high' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read

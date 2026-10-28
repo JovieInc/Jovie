@@ -50,7 +50,7 @@ export const CANCEL_AND_REFUND_TRUTH =
   'Cancel anytime, keep Pro to the end of the paid month, no partial refunds.';
 
 export const FREE_PROFILE_TRUTH =
-  'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
+  'Your Jovie profile stays free forever and keeps audience capture.';
 
 export const MAX_NO_TRIAL_TRUTH = 'Paid Max plan. No Max trial.';
 
