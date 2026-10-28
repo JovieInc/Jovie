@@ -16,6 +16,9 @@ import {
 } from '../strategy-index.mjs';
 import { contextEvidenceFor } from './pre-lease.mjs';
 
+// The real thesis index is private (JovieInc/Ops jovie-private/); tests use a synthetic fixture.
+process.env.JOVIE_PRIVATE_DIR = new URL('./fixtures/private-dir', import.meta.url).pathname;
+
 const NOW = new Date().toISOString();
 const THESIS_SLUG = 'strategy/sell-outcomes-replaceable-substrate';
 const THESIS_ID = 'STRAT-2026-10-02-01';
