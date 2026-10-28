@@ -116,7 +116,7 @@ export interface OvieCertificationInventoryDeps {
   readonly customers?: CustomerCertificationSource;
   /**
    * ACQUISITION_ELIGIBLE (JOV-7696). Prospect outreach is acquisition, so a
-   * prospect reaches the founder only while the $199 cone is green. Absent
+   * prospect reaches the founder only while the $12 cone is green. Absent
    * reads as unknown and holds prospects (fail closed).
    */
   readonly acquisitionEligibility?: () => Promise<

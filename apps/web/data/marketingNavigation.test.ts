@@ -68,8 +68,8 @@ describe('public marketing navigation', () => {
       'Music Smart Links',
       'Notifications',
       'Pay',
-      'Fan Capture',
-      'Fan Reactivation',
+      'Audience capture',
+      'Audience reactivation',
       'Product Demo',
       'Release System',
     ]);
@@ -124,7 +124,8 @@ describe('public marketing navigation', () => {
     expect(
       getPublicCommercialFooterLinks(true).some(
         link =>
-          link.label === 'Fan Capture' || link.label === 'Fan Reactivation'
+          link.label === 'Audience capture' ||
+          link.label === 'Audience reactivation'
       )
     ).toBe(false);
   });

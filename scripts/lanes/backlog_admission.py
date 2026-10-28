@@ -26,6 +26,7 @@ import zlib
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import execution_attempt
+import ledger_archive
 
 SCHEMA = "jovie.backlog-admission-observation/v1"
 MAX_AGE_S = 60
@@ -1153,6 +1154,10 @@ def _collect_packet(reads, row, binding, observed_at):
             raise Unavailable("native-attempt-ledger-unreadable")
         if str(entry.get("issue") or entry.get("identifier") or "").lower() == identifier.lower():
             unknown.append({"source": "native-prior-attempt", "startedAt": entry.get("startedAt"), "provider": entry.get("provider")})
+    archived = ledger_archive.read_index(reads.state).get(identifier.upper())
+    if archived:  # rows rotated out of the live ledger still count as a prior native attempt
+        unknown.append({"source": "native-prior-attempt", "startedAt": archived.get("lastStartedAt"),
+                        "provider": archived.get("provider")})
     fresh = reads.issue(row["id"])
     if _issue_digest(fresh) != _issue_digest(row):
         raise Unavailable("linear-preimage-changed")

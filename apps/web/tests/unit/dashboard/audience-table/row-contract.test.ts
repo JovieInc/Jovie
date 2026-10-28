@@ -16,6 +16,7 @@ const anonymousMember: Pick<
 > = {
   displayName: null,
   email: null,
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
 };
