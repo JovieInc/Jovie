@@ -29,8 +29,10 @@ const OVERLAY_SELECTOR = [
   '[data-state="open"]',
 ].join(', ');
 
+// print / download pdf call window.print(): Firefox opens a modal print
+// dialog that automation cannot dismiss, freezing every later evaluate.
 const SAFE_TRIGGER_DENYLIST =
-  /start free|get started|claim profile|continue|pay|buy|checkout|open in|venmo|spotify|apple music|youtube music|sign in|sign up|more options|view on mobile|back|close/i;
+  /start free|get started|claim profile|continue|pay|buy|checkout|open in|venmo|spotify|apple music|youtube music|sign in|sign up|more options|view on mobile|back|close|^print$|download pdf/i;
 
 const NON_VISIBLE_READY_SELECTORS = new Set([
   'h1',

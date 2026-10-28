@@ -51,7 +51,7 @@ export const LifecycleCoverageSchema = z
     /**
      * For covered/partial: the test command, Playwright project, or repo doc
      * that evidences the coverage (e.g. `pnpm test:auth:ios`,
-     * `playwright.config.ts webkit project`, `RELIABILITY_AUDIT.md`).
+     * `playwright.config.ts webkit project`, `docs/hardening/RELIABILITY_AUDIT.md`).
      */
     evidence: z.array(z.string().trim().min(1)).min(1).optional(),
     /** What is still missing when status is partial or required. */
@@ -97,8 +97,10 @@ const PLAYWRIGHT_PROJECTS =
   'apps/web/playwright.config.ts projects (chromium, firefox, webkit, mobile Pixel 5)';
 const MOBILE_SMOKE = 'apps/web/playwright.config.smoke.mobile.ts';
 const IOS_AUTH = 'pnpm test:auth:ios — AppStateTests and auth callback harness';
-const RELIABILITY_AUDIT = 'RELIABILITY_AUDIT.md (JOV-2712 evidence)';
-const PARITY_AUDIT = 'PLATFORM_PARITY_AUDIT.md (JOV-2712 evidence)';
+const RELIABILITY_AUDIT =
+  'docs/hardening/RELIABILITY_AUDIT.md (JOV-2712 evidence)';
+const PARITY_AUDIT =
+  'docs/hardening/PLATFORM_PARITY_AUDIT.md (JOV-2712 evidence)';
 const MACOS_SUITE =
   'JOV-4571 macOS platform regression suite (composed, not absorbed)';
 

@@ -21,6 +21,7 @@ import {
   type RequestSessionRead,
 } from '@/lib/auth/request-session';
 import { checkUserStatus } from '@/lib/auth/status-checker';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { attachSentryContext } from '@/lib/sentry/set-user-context';
 
 /**
@@ -113,6 +114,11 @@ async function readBetterAuthSession(mode: SessionRead): Promise<AuthResult> {
 
     const appUser = await getAppUserByBetterAuthId(session.user.id);
     if (!appUser) {
+      captureRevenueSpineFailure({
+        stage: 'auth_resolution',
+        failureCode: 'identity_unlinked',
+        severity: 'degraded',
+      });
       // BA knows the user (provisioning hook ran) but the app `users` row
       // isn't linked yet — gate.ts' lazy-create heals on the next request.
       // Treat as not-yet-provisioned so callers fall through to /start.
@@ -136,6 +142,11 @@ async function readBetterAuthSession(mode: SessionRead): Promise<AuthResult> {
     if (isMissingAuthRequestContext(error)) {
       return NULL_AUTH_RESULT;
     }
+    captureRevenueSpineFailure({
+      stage: 'auth_resolution',
+      severity: 'blocked',
+      error,
+    });
     throw error;
   }
 }

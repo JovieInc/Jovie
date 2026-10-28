@@ -1,0 +1,13 @@
+{
+  "schema": "summer.provider-trial-ledger/v1",
+  "months": {
+    "2026-09": {
+      "workers-ai": { "bookedMicroUsd": 50000000, "alerted": [80, 100] },
+      "anthropic-api": { "bookedMicroUsd": 1000000, "alerted": [] }
+    },
+    "2026-10": {
+      "anthropic-api": { "bookedMicroUsd": 24500000, "alerted": [80] }
+    }
+  },
+  "trials": {}
+}

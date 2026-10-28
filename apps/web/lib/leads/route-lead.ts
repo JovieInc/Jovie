@@ -1,9 +1,10 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
-import { getAppUrl } from '@/constants/domains';
+import { and, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { leadPipelineSettings, leads } from '@/lib/db/schema/leads';
+import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { getOutboundClaimUrl } from '@/lib/outbound/claim-url';
 import { generateClaimTokenPair } from '@/lib/security/claim-token';
 import { DEFAULT_DM_TEMPLATE } from './constants';
 import { filterEmail } from './email-filter';
@@ -73,7 +74,27 @@ export async function routeLead(leadId: string): Promise<RouteLeadResult> {
   const tokenPair = isTokenValid
     ? { token, tokenHash, expiresAt }
     : await generateClaimTokenPair();
-  const claimUrl = getAppUrl(`/claim/${tokenPair.token}`);
+  const claimUrl = getOutboundClaimUrl(tokenPair.token);
+
+  // One canonical token: the claim route resolves creator_profiles first, so
+  // the profile must hold the hash of the exact token this lead sends. Ingestion
+  // stores its own pair on the profile; without this sync the link we send
+  // carries a token the profile has never seen.
+  if (lead.creatorProfileId) {
+    await db
+      .update(creatorProfiles)
+      .set({
+        claimToken: tokenPair.tokenHash,
+        claimTokenExpiresAt: tokenPair.expiresAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(creatorProfiles.id, lead.creatorProfileId),
+          eq(creatorProfiles.isClaimed, false)
+        )
+      );
+  }
 
   // 7. Build DM copy if needed
   let dmCopy: string | null = null;

@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   budgets,
@@ -27,18 +29,116 @@ import {
   enqueueWasRejected,
   FAILURE_HOLD_CONTEXT,
   FAILURE_RETRY_CONTEXT,
+  FETCH_STEP,
+  FETCH_TIMEOUT_MESSAGE,
+  FETCH_TIMEOUT_TITLE,
   failureReceiptStatus,
+  fetchTimeoutEvidence,
+  humanFailureReleaseIntent,
+  humanReleaseDisposition,
+  isHeldWorkflowFailure,
   ownerHoldReleaseIntent,
+  PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
+  REVISION_FAILED_AT_HEAD,
+  recordDequeueReason,
   reenrollmentDisposition,
   retryReleasedDescription,
   retrySpentDescription,
   revisionFailureDisposition,
   sourceHeadForRun,
   supersededByLiveEntry,
+  WORKFLOW_LOAD_STEP,
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
+
+it('imports the real failure policy from both workflow sparse checkouts', () => {
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const workflow = readFileSync(
+    join(root, '.github/workflows/merge-queue-green-enroll.yml'),
+    'utf8'
+  );
+  const manifests = [
+    ...workflow.matchAll(/sparse-checkout: \|\n((?: {12}\S[^\n]*\n)+)/g),
+  ]
+    .map(match =>
+      match[1]
+        .trim()
+        .split('\n')
+        .map(line => line.trim())
+    )
+    .filter(paths => paths.includes('scripts/merge-group-failure-hold.mjs'));
+  expect(manifests).toHaveLength(2);
+  for (const paths of manifests) {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-sparse-'));
+    const execute = (command, args, input) => {
+      const result = spawnSync(command, args, {
+        cwd: dir,
+        encoding: 'utf8',
+        input,
+        timeout: 10_000,
+      });
+      expect(result.error, result.stderr).toBeUndefined();
+      expect(result.status, result.stderr).toBe(0);
+      return result;
+    };
+    try {
+      // Seed all real imports, then let Git enforce the workflow's actual
+      // non-cone manifest. Omitting the client or providers.json must fail.
+      for (const path of new Set([...paths, 'packages/api-client'])) {
+        mkdirSync(dirname(join(dir, path)), { recursive: true });
+        cpSync(join(root, path), join(dir, path), { recursive: true });
+      }
+      execute('git', ['init', '-q']);
+      execute('git', ['add', '.']);
+      execute('git', [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        'commit',
+        '-qm',
+        'fixture',
+      ]);
+      const importArgs = [
+        '--input-type=module',
+        '-e',
+        `await import(${JSON.stringify(pathToFileURL(join(dir, 'scripts/merge-group-failure-hold.mjs')).href)})`,
+      ];
+      for (const extra of [[], ['packages/api-client/*.ts']]) {
+        execute(
+          'git',
+          ['sparse-checkout', 'set', '--no-cone', '--stdin'],
+          [
+            ...paths.filter(path => path !== 'packages/api-client'),
+            ...extra,
+          ].join('\n')
+        );
+        const missing = spawnSync(process.execPath, importArgs, {
+          cwd: dir,
+          encoding: 'utf8',
+          timeout: 10_000,
+        });
+        expect(missing.error).toBeUndefined();
+        expect(missing.status).not.toBe(0);
+        expect(missing.stderr).toContain('ERR_MODULE_NOT_FOUND');
+        expect(missing.stderr).toContain(
+          extra.length ? 'providers.json' : 'gh.ts'
+        );
+      }
+      execute(
+        'git',
+        ['sparse-checkout', 'set', '--no-cone', '--stdin'],
+        paths.join('\n')
+      );
+      execute(process.execPath, importArgs);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 const SOURCE = 'a'.repeat(40);
 const NEW_SOURCE = 'b'.repeat(40);
 const BASE = 'c'.repeat(40);
@@ -48,6 +148,104 @@ const classify = (conclusion, failedSteps = []) =>
   classifyMergeGroupFailure({ conclusion, failedSteps });
 const disposition = statuses =>
   revisionFailureDisposition({ repository: REPOSITORY, statuses });
+
+describe('human release of a failed head (JOV-6620)', () => {
+  const unlabeled = (overrides = {}) => ({
+    action: 'unlabeled',
+    label: { name: 'queue-poison' },
+    sender: { login: 'itstimwhite', type: 'User' },
+    pull_request: {
+      number: 22280,
+      state: 'open',
+      draft: false,
+      head: { sha: SOURCE },
+    },
+    ...overrides,
+  });
+  const failed = disposition([status({ classification: 'retryable-product' })]);
+
+  it('only a person removing hold or queue-poison from the exact head releases it', () => {
+    const release = humanFailureReleaseIntent({
+      eventName: 'pull_request_target',
+      event: unlabeled(),
+    });
+    expect(release).toMatchObject({ prNumber: 22280, headSha: SOURCE });
+    expect(
+      humanReleaseDisposition({
+        failure: failed,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toMatchObject({ action: 'retry-once', reason: 'human-failure-release' });
+    expect(
+      humanFailureReleaseIntent({
+        eventName: 'pull_request_target',
+        event: unlabeled({ label: { name: 'hold' } }),
+      })
+    ).not.toBeNull();
+    // A new head is its own revision; an old release never moves to it.
+    expect(
+      humanReleaseDisposition({
+        failure: failed,
+        release,
+        prNumber: 22280,
+        headSha: NEW_SOURCE,
+      })
+    ).toBe(failed);
+  });
+
+  it('replays #22280/#21869: jovie-bot lifting queue-poison never releases the failed head', () => {
+    for (const sender of [
+      { login: 'jovie-bot[bot]', type: 'Bot' },
+      { login: 'github-actions[bot]', type: 'Bot' },
+      { login: 'jovie-bot[bot]', type: 'User' },
+      undefined,
+    ])
+      expect(
+        humanFailureReleaseIntent({
+          eventName: 'pull_request_target',
+          event: unlabeled({ sender }),
+        })
+      ).toBeNull();
+    for (const event of [
+      unlabeled({ action: 'labeled' }),
+      unlabeled({ label: { name: 'lane-fix-red' } }),
+      unlabeled({ pull_request: { ...unlabeled().pull_request, draft: true } }),
+    ])
+      expect(
+        humanFailureReleaseIntent({ eventName: 'pull_request_target', event })
+      ).toBeNull();
+    expect(
+      humanFailureReleaseIntent({ eventName: 'push', event: unlabeled() })
+    ).toBeNull();
+  });
+
+  it('never releases a deterministic failure or an unblocked head', () => {
+    const release = humanFailureReleaseIntent({
+      eventName: 'pull_request_target',
+      event: unlabeled(),
+    });
+    const deterministic = disposition([status()]);
+    expect(
+      humanReleaseDisposition({
+        failure: deterministic,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toBe(deterministic);
+    const clean = disposition([]);
+    expect(
+      humanReleaseDisposition({
+        failure: clean,
+        release,
+        prNumber: 22280,
+        headSha: SOURCE,
+      })
+    ).toBe(clean);
+  });
+});
 
 it('restores only a current exact-head owner hold release, never an unchanged CI retry', () => {
   const event = {
@@ -592,6 +790,218 @@ process.stdout.write(JSON.stringify(result));
       }
     );
     expect(disposition([trusted]).action).toBe('block');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+it.each([
+  ['proven', 'ahead-22328-lanes-flake.txt', false],
+  ['unproven', 'poison-22331-api-guard.txt', true],
+])(
+  'CLI attributes against a completed failed ahead run from its job logs (%s)',
+  (_label, aheadLogName, waits) => {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-attribution-'));
+    try {
+      const logs = resolve(import.meta.dirname, 'fixtures/ahead-attribution');
+      const fixturePath = join(dir, 'fixture.json');
+      writeFileSync(
+        fixturePath,
+        JSON.stringify({
+          run,
+          timeline,
+          source: SOURCE,
+          currentLog: join(logs, 'poison-22331-api-guard.txt'),
+          // The unproven case feeds the poison log as the ahead evidence too:
+          // its own failing commands never passed there.
+          aheadLog: join(logs, aheadLogName),
+        })
+      );
+      writeFileSync(
+        join(dir, 'gh'),
+        `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+const failed = id => [
+  { id, name: 'ci-fast (remaining)', conclusion: 'failure',
+    steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] },
+  { id: id + 1, name: 'PR Ready', conclusion: 'failure',
+    steps: [{ name: 'Evaluate combined-head checks', conclusion: 'failure' }] },
+];
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].endsWith('/actions/jobs/11/logs')) { process.stdout.write(fs.readFileSync(fixture.currentLog, 'utf8')); process.exit(0); }
+else if (args[1].endsWith('/actions/jobs/21/logs')) { process.stdout.write(fs.readFileSync(fixture.aheadLog, 'utf8')); process.exit(0); }
+else if (args[1].includes('/compare/')) result = { status: 'behind' };
+else if (args[1].includes('/actions/runs?head_sha=')) result = { workflow_runs: [
+  { id: 900, workflow_id: 178737329, created_at: '2026-10-12T08:43:05Z', conclusion: 'failure' },
+] };
+else if (args[1].includes('/runs/900/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(21) : [] };
+else if (args[1].includes('/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(11) : [] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+        { mode: 0o755 }
+      );
+      const eventPath = join(dir, 'event.json');
+      writeFileSync(
+        eventPath,
+        JSON.stringify({
+          repository: { full_name: REPOSITORY },
+          workflow_run: { id: run.id },
+        })
+      );
+      const execution = spawnSync(
+        process.execPath,
+        [
+          resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+          '--event-path',
+          eventPath,
+        ],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${dir}:${process.env.PATH}`,
+            HOLD_TEST_FIXTURE: fixturePath,
+            GITHUB_OUTPUT: join(dir, 'output'),
+          },
+        }
+      );
+      expect(execution.status, execution.stderr).toBe(0);
+      const receipt = JSON.parse(execution.stdout);
+      expect(Boolean(receipt.aheadEntryUnproven)).toBe(waits);
+      expect(receipt.statusWritten).toBe(!waits);
+      expect(receipt.aheadAttribution?.attributable).toBe(!waits);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+);
+
+it('CLI attributes against a successful ahead ci-fast (remaining) job even when the ahead run failed elsewhere (JOV-8760)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'failure-hold-ahead-success-'));
+  try {
+    const logs = resolve(import.meta.dirname, 'fixtures/ahead-attribution');
+    const aheadLog = readFileSync(
+      join(logs, 'ahead-22328-lanes-flake.txt'),
+      'utf8'
+    );
+    // A ci-fast (remaining) job that SUCCEEDED has no failed structural
+    // commands and reports every lane as success. Build that log from the
+    // 2026-10-21 ahead fixture by dropping its one failing command.
+    const successfulAhead = aheadLog
+      .split('\n')
+      .filter(line => !/^\| 58 \|/.test(line))
+      .filter(line => !line.includes('Structural command 58/58 failed'))
+      .filter(line => !line.startsWith('[ci-fast] 1 lane(s) failed'))
+      .map(line =>
+        line.replace(
+          '[ci-fast] structural: failure (311.9s)',
+          '[ci-fast] structural: success (311.9s)'
+        )
+      )
+      .join('\n');
+    expect(successfulAhead).not.toBe(aheadLog);
+    expect(successfulAhead).not.toContain('exit 1');
+    expect(successfulAhead).toContain('| 31 | 149.1s | pass |');
+    const aheadLogPath = join(dir, 'ahead-success.txt');
+    writeFileSync(aheadLogPath, successfulAhead);
+    const fixturePath = join(dir, 'fixture.json');
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({
+        run,
+        timeline,
+        source: SOURCE,
+        currentLog: join(logs, 'poison-22331-api-guard.txt'),
+        aheadLog: aheadLogPath,
+      })
+    );
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!${process.execPath}
+const fs = require('node:fs');
+const fixture = JSON.parse(fs.readFileSync(process.env.HOLD_TEST_FIXTURE, 'utf8'));
+const args = process.argv.slice(2);
+const failed = id => [
+  { id, name: 'ci-fast (remaining)', conclusion: 'failure',
+    steps: [{ name: 'Run structural ci-fast lane', conclusion: 'failure' }] },
+  { id: id + 1, name: 'PR Ready', conclusion: 'failure',
+    steps: [{ name: 'Evaluate combined-head checks', conclusion: 'failure' }] },
+];
+// The ahead run failed in a Unit Tests shard while its ci-fast (remaining)
+// job succeeded — the successful log is the evidence (JOV-8760).
+const aheadJobs = [
+  { id: 21, name: 'ci-fast (remaining)', conclusion: 'success' },
+  { id: 23, name: 'Unit Tests (1/4)', conclusion: 'failure' },
+  { id: 22, name: 'PR Ready', conclusion: 'failure' },
+];
+let result;
+if (args[1] === 'graphql') {
+  const query = args.find(arg => arg.startsWith('query='));
+  const pr = query.includes('timelineItems')
+    ? { timelineItems: { nodes: fixture.timeline, pageInfo: { hasNextPage: false } } }
+    : { id: 'PR_42', state: 'OPEN', headRefOid: fixture.source,
+        isInMergeQueue: false, mergeQueueEntry: null, autoMergeRequest: null };
+  result = { data: { repository: { pullRequest: pr } } };
+} else if (args.includes('POST')) result = {};
+else if (args[1].endsWith('/actions/jobs/11/logs')) { process.stdout.write(fs.readFileSync(fixture.currentLog, 'utf8')); process.exit(0); }
+else if (args[1].endsWith('/actions/jobs/21/logs')) { process.stdout.write(fs.readFileSync(fixture.aheadLog, 'utf8')); process.exit(0); }
+else if (args[1].includes('/compare/')) result = { status: 'behind' };
+else if (args[1].includes('/actions/runs?head_sha=')) result = { workflow_runs: [
+  { id: 900, workflow_id: 178737329, created_at: '2026-10-12T08:43:05Z', conclusion: 'failure' },
+] };
+else if (args[1].includes('/runs/900/jobs?')) result = { jobs: args[1].includes('page=1') ? aheadJobs : [] };
+else if (args[1].includes('/jobs?')) result = { jobs: args[1].includes('page=1') ? failed(11) : [] };
+else if (args[1].includes('/statuses')) result = [];
+else result = fixture.run;
+process.stdout.write(JSON.stringify(result));
+`,
+      { mode: 0o755 }
+    );
+    const eventPath = join(dir, 'event.json');
+    writeFileSync(
+      eventPath,
+      JSON.stringify({
+        repository: { full_name: REPOSITORY },
+        workflow_run: { id: run.id },
+      })
+    );
+    const execution = spawnSync(
+      process.execPath,
+      [
+        resolve(import.meta.dirname, '../../merge-group-failure-hold.mjs'),
+        '--event-path',
+        eventPath,
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          HOLD_TEST_FIXTURE: fixturePath,
+          GITHUB_OUTPUT: join(dir, 'output'),
+        },
+      }
+    );
+    expect(execution.status, execution.stderr).toBe(0);
+    const receipt = JSON.parse(execution.stdout);
+    expect(receipt.aheadEntryUnproven).toBeFalsy();
+    expect(receipt.statusWritten).toBe(true);
+    expect(receipt.aheadAttribution).toEqual({
+      attributable: true,
+      reason: 'failing-signals-passed-on-ahead-run',
+    });
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -1186,8 +1596,8 @@ describe('failure classification and revision-scoped suppression', () => {
       expect(enqueueWasRejected(error)).toBe(false);
   });
 
-  it('newest trusted release restores the unused retry; a later reservation blocks it', () => {
-    const first = status({ classification: 'unclassified' });
+  it('newest trusted release restores the unused infrastructure retry; a later reservation blocks it', () => {
+    const first = status({ classification: 'transient-infrastructure' });
     const spent = status({
       context: 'jovie-queue-failure-retry/v1',
       description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
@@ -1219,14 +1629,10 @@ describe('failure classification and revision-scoped suppression', () => {
       action: 'block',
       reason: 'deterministic-source-failure',
     });
+    // A released reservation never re-admits an attributable failure.
     expect(
-      disposition([
-        released,
-        spent,
-        first,
-        status({ classification: 'unclassified', number: 2, runId: 124 }),
-      ])
-    ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+      disposition([released, spent, status({ classification: 'unclassified' })])
+    ).toMatchObject({ action: 'block', reason: REVISION_FAILED_AT_HEAD });
   });
 
   it('blocks the unchanged deterministic head while a new head has no hold', () => {
@@ -1255,13 +1661,13 @@ describe('failure classification and revision-scoped suppression', () => {
     expect(
       disposition([infra(1, 123), spent(123), infra(2, 124), spent(124)])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-spent' });
-    // One attributable failure plus infrastructure noise keeps its retry; a
-    // second attributable failure still exhausts the revision.
+    // An attributable failure blocks its head even after infrastructure
+    // noise; infrastructure after a released attributable failure retries.
     const unclassified = (number, runId) =>
       status({ classification: 'unclassified', number, runId });
     expect(
       disposition([infra(1, 123), spent(123), unclassified(2, 124)])
-    ).toMatchObject({ action: 'retry-once' });
+    ).toMatchObject({ action: 'block', reason: REVISION_FAILED_AT_HEAD });
     expect(
       disposition([unclassified(1, 123), spent(123), unclassified(2, 124)])
     ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
@@ -1270,27 +1676,17 @@ describe('failure classification and revision-scoped suppression', () => {
     ).toMatchObject({ action: 'retry-once' });
   });
 
-  it('allows one non-deterministic retry, then blocks the same revision', () => {
-    const first = status({ classification: 'unclassified' });
-    expect(disposition([first])).toMatchObject({ action: 'retry-once' });
-    const spent = status({
-      context: 'jovie-queue-failure-retry/v1',
-      description: retrySpentDescription({ runId: 123, runAttempt: 1 }),
-    });
-    expect(disposition([first, spent])).toMatchObject({
-      action: 'block',
-      reason: 'revision-retry-spent',
-    });
-    expect(
-      disposition([
-        first,
-        status({
-          classification: 'unclassified',
-          number: 2,
-          runId: 124,
-        }),
-      ])
-    ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+  it('blocks a failed head at once, whatever non-infrastructure step failed (JOV-6620)', () => {
+    for (const classification of ['unclassified', 'retryable-product']) {
+      const first = status({ classification });
+      expect(disposition([first])).toMatchObject({
+        action: 'block',
+        reason: REVISION_FAILED_AT_HEAD,
+      });
+      expect(
+        disposition([first, status({ classification, number: 2, runId: 124 })])
+      ).toMatchObject({ action: 'block', reason: 'revision-retry-exhausted' });
+    }
   });
 });
 
@@ -1425,6 +1821,123 @@ describe('terminal failure hold application', () => {
     });
   });
 
+  it('records a machine-readable reason for the dequeue and survives a recorder failure', async () => {
+    const make = (recordDequeue, moveHead = false) => {
+      let state = {
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: true,
+        mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+        autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+      };
+      return {
+        writeStatus: vi.fn(),
+        readPullRequest: vi.fn(async () => structuredClone(state)),
+        dequeuePullRequest: vi.fn(async () => {
+          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+        }),
+        disableAutoMerge: vi.fn(async () => {
+          state = { ...state, autoMergeRequest: null };
+        }),
+        recordDequeue: async data => {
+          expect(state.isInMergeQueue).toBe(true);
+          await recordDequeue(data);
+          if (moveHead) state.headRefOid = NEW_SOURCE;
+        },
+      };
+    };
+    const record = vi.fn();
+    const ok = await applyMergeGroupFailure(failureInput, make(record));
+    expect(ok.dequeued).toBe(true);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record.mock.calls[0][0]).toMatchObject({
+      number: 42,
+      code: 'poison',
+      head: SOURCE,
+    });
+    expect(record.mock.calls[0][0].reason.length).toBeGreaterThanOrEqual(15);
+    const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failing = await applyMergeGroupFailure(
+      failureInput,
+      make(
+        vi.fn(async () => {
+          throw new Error('comment API down');
+        })
+      )
+    );
+    expect(failing.dequeued).toBe(true);
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '::warning::merge-group-failure-hold could not record'
+      )
+    );
+    warning.mockRestore();
+    const moved = make(vi.fn(), true);
+    const movedResult = await applyMergeGroupFailure(failureInput, moved);
+    expect(movedResult.dequeued).toBe(false);
+    expect(moved.dequeuePullRequest).not.toHaveBeenCalled();
+    expect(moved.disableAutoMerge).not.toHaveBeenCalled();
+  });
+
+  it('records truthful dequeue intent through the shared repair budget', async () => {
+    const run = vi.fn(async (_args, _options) => ({
+      code: 0,
+      stdout: '',
+      stderr: '',
+      deferred: false,
+    }));
+    await recordDequeueReason(
+      {
+        repository: REPOSITORY,
+        number: 42,
+        head: SOURCE,
+        code: 'poison',
+        reason: 'attributable failure on the exact source head',
+      },
+      { run, now: () => '2026-10-27T00:00:00.000Z' }
+    );
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0][1]).toEqual({ priority: 'repair' });
+    const args = run.mock.calls[0][0];
+    expect(args.slice(0, 4)).toEqual([
+      'api',
+      '-X',
+      'POST',
+      'repos/JovieInc/Jovie/issues/42/comments',
+    ]);
+    const body = args.at(-1);
+    const record = JSON.parse(body.match(/<!-- queue-dequeue (.+) -->/)[1]);
+    expect(record).toEqual({
+      code: 'poison',
+      reason: 'attributable failure on the exact source head',
+      actor: 'merge-group-failure-hold',
+      at: '2026-10-27T00:00:00.000Z',
+      head: SOURCE,
+      outcome: 'requested',
+    });
+    expect(body).not.toContain('Dequeued from');
+    await expect(
+      recordDequeueReason(
+        {
+          repository: REPOSITORY,
+          number: 42,
+          head: SOURCE,
+          code: 'poison',
+          reason: 'failure',
+        },
+        {
+          run: async () => ({
+            code: 75,
+            stdout: '',
+            stderr: 'github-quota-deferred',
+            deferred: true,
+          }),
+        }
+      )
+    ).rejects.toThrow('github-quota-deferred');
+  });
+
   it('keeps a second infrastructure failure retryable but blocks a second attributable one', async () => {
     const io = () => ({
       writeStatus: vi.fn(),
@@ -1477,10 +1990,20 @@ describe('terminal failure hold application', () => {
       },
       io()
     );
+    // JOV-6620: any attributable failure blocks its exact head at once.
     expect(afterInfra).toMatchObject({
       classification: 'unclassified',
       failureNumber: 2,
-      retryDisposition: 'one-queue-authority-retry',
+      retryDisposition: 'blocked-until-new-source-head',
+    });
+    const firstProduct = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: ['Run unit tests'], statuses: [] },
+      io()
+    );
+    expect(firstProduct).toMatchObject({
+      classification: 'retryable-product',
+      failureNumber: 1,
+      retryDisposition: 'blocked-until-new-source-head',
     });
   });
 
@@ -1616,6 +2139,65 @@ describe('terminal failure hold application', () => {
     }
   });
 
+  it('holds when the completed ahead run proves the failure is this entry own (#22331)', async () => {
+    const writeStatus = vi.fn();
+    const signatureAttribution = {
+      attributable: true,
+      reason: 'failing-signals-passed-on-ahead-run',
+    };
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        aheadGroup: {
+          baseOnMain: false,
+          aheadConclusion: 'failure',
+          aheadRunId: 39536019717,
+          signatureAttribution,
+        },
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => ({
+          id: 'PR_42',
+          state: 'OPEN',
+          headRefOid: SOURCE,
+          isInMergeQueue: false,
+          mergeQueueEntry: null,
+          autoMergeRequest: null,
+        })),
+        dequeuePullRequest: vi.fn(),
+        disableAutoMerge: vi.fn(),
+      }
+    );
+    expect(result).not.toHaveProperty('skipped');
+    expect(result).not.toHaveProperty('aheadEntryUnproven');
+    expect(result).toMatchObject({
+      statusWritten: true,
+      aheadAttribution: signatureAttribution,
+    });
+    expect(writeStatus).toHaveBeenCalled();
+  });
+
+  it('keeps waiting when ahead attribution is unproven', () => {
+    expect(
+      aheadEntryUnproven({
+        baseOnMain: false,
+        aheadConclusion: 'failure',
+        signatureAttribution: {
+          attributable: false,
+          reason: 'ci-fast-log-missing',
+        },
+      })
+    ).toBe(true);
+    expect(
+      aheadEntryUnproven({
+        baseOnMain: false,
+        aheadConclusion: 'failure',
+        signatureAttribution: { attributable: true, reason: 'x' },
+      })
+    ).toBe(false);
+  });
+
   it('holds when the base is main, the group ahead passed, or the base is unreadable', () => {
     expect(aheadEntryUnproven({ baseOnMain: true })).toBe(false);
     expect(
@@ -1713,15 +2295,13 @@ describe('terminal failure hold application', () => {
   });
 
   it('treats an already-removed pull request as a logged non-fatal dequeue', async () => {
-    let reads = 0;
+    let queued = true;
     const disableAutoMerge = vi.fn(async () => {
       throw new Error("Can't disable auto-merge for this pull request.");
     });
     const result = await applyMergeGroupFailure(failureInput, {
       writeStatus: vi.fn(),
       readPullRequest: vi.fn(async () => {
-        reads += 1;
-        const queued = reads < 4;
         return {
           id: 'PR_42',
           state: 'OPEN',
@@ -1734,6 +2314,7 @@ describe('terminal failure hold application', () => {
         };
       }),
       dequeuePullRequest: vi.fn(async () => {
+        queued = false;
         throw new Error('The pull request is not in the merge queue');
       }),
       disableAutoMerge,
@@ -1914,5 +2495,458 @@ describe('poison re-enqueue loop (JOV-7708, #20354)', () => {
       )
     ).toBe(true);
     expect(autoMergeWasNotArmed(new Error('Bad credentials'))).toBe(false);
+  });
+});
+
+// 2026-10-20 21:13–21:52Z: #21826 grew ci.yml's path-detect run script past
+// GitHub's 21,000-character expression limit. Every group containing it got a
+// zero-job CI run attributed to push, no merge_group check ever reported, and
+// ten entries sat in AWAITING_CHECKS. PR Size Guard's load step now fails the
+// group that introduced it; the hold must keep that exact head out.
+describe('workflow-load guard failures (2026-10-20 queue stall, #21826)', () => {
+  const sizeGuardRun = {
+    ...run,
+    workflow_id: PR_SIZE_GUARD_WORKFLOW_ID,
+    path: '.github/workflows/pr-size-guard.yml',
+  };
+  const queuedPr = () => ({
+    id: 'PR_42',
+    state: 'OPEN',
+    headRefOid: SOURCE,
+    isInMergeQueue: true,
+    mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+    autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+  });
+
+  it('classifies the load step as a source failure', () => {
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [WORKFLOW_LOAD_STEP],
+      })
+    ).toBe('deterministic-source');
+  });
+
+  it('holds only the PR Size Guard load step, never other size failures', () => {
+    expect(isHeldWorkflowFailure(run, [])).toBe(true);
+    expect(isHeldWorkflowFailure(sizeGuardRun, [WORKFLOW_LOAD_STEP])).toBe(
+      true
+    );
+    expect(
+      isHeldWorkflowFailure(sizeGuardRun, [
+        'Enforce combined-tree payload and member size policy',
+      ])
+    ).toBe(false);
+    expect(
+      isHeldWorkflowFailure({ ...sizeGuardRun, workflow_id: 1 }, [
+        WORKFLOW_LOAD_STEP,
+      ])
+    ).toBe(false);
+  });
+
+  it('holds the exact head even while the group ahead is unproven', async () => {
+    // The guard fails only when the group's base loads, so the failure is
+    // this group's own diff whatever the group ahead is doing.
+    let state = queuedPr();
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
+    const result = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        run: sizeGuardRun,
+        failedSteps: [WORKFLOW_LOAD_STEP],
+        aheadGroup: { baseOnMain: false, aheadConclusion: null },
+      },
+      {
+        writeStatus,
+        readPullRequest: vi.fn(async () => structuredClone(state)),
+        dequeuePullRequest: vi.fn(async () => {
+          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+        }),
+        disableAutoMerge: vi.fn(async () => {
+          state = { ...state, autoMergeRequest: null };
+        }),
+      }
+    );
+    // First the exact-head hold receipt, then the required context failed on
+    // the synthetic group head so the queue ejects it now.
+    expect(writeStatus.mock.calls.map(([receipt]) => receipt)).toEqual([
+      expect.objectContaining({
+        sha: SOURCE,
+        context: FAILURE_HOLD_CONTEXT,
+        state: 'success',
+        description: expect.stringContaining('class=deterministic-source'),
+      }),
+      expect.objectContaining({
+        sha: GROUP,
+        context: 'PR Ready',
+        state: 'failure',
+      }),
+    ]);
+    expect(result).toMatchObject({
+      prNumber: 42,
+      classification: 'deterministic-source',
+      retryDisposition: 'blocked-until-new-source-head',
+      autoMergeDisabled: true,
+      groupEjected: true,
+    });
+    expect(result.skipped).toBeUndefined();
+  });
+
+  it('never reports PR Ready failed for an ordinary CI failure', async () => {
+    let state = queuedPr();
+    const writeStatus = vi.fn(async (/** @type {any} */ _receipt) => {});
+    const result = await applyMergeGroupFailure(failureInput, {
+      writeStatus,
+      readPullRequest: vi.fn(async () => structuredClone(state)),
+      dequeuePullRequest: vi.fn(async () => {
+        state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+      }),
+      disableAutoMerge: vi.fn(async () => {
+        state = { ...state, autoMergeRequest: null };
+      }),
+    });
+    expect(
+      writeStatus.mock.calls.some(
+        ([receipt]) => receipt?.context === 'PR Ready'
+      )
+    ).toBe(false);
+    expect(result).not.toHaveProperty('groupEjected');
+  });
+
+  it('rejects a PR Size Guard run from any other workflow path', async () => {
+    await expect(
+      applyMergeGroupFailure(
+        {
+          ...failureInput,
+          run: { ...sizeGuardRun, path: '.github/workflows/ci.yml' },
+          failedSteps: [WORKFLOW_LOAD_STEP],
+        },
+        {
+          writeStatus: vi.fn(),
+          readPullRequest: vi.fn(),
+          dequeuePullRequest: vi.fn(),
+          disableAutoMerge: vi.fn(),
+        }
+      )
+    ).rejects.toThrow(/terminal merge-group CI failure/);
+  });
+});
+
+describe('base-branch fetch timeout (merge-group infrastructure)', () => {
+  const TIMEOUT_TEXT = [
+    'Process completed with exit code 1.',
+    FETCH_TIMEOUT_MESSAGE,
+  ].join('\n');
+  const CASCADE = [
+    'Require every ci-fast lane group to pass',
+    'Join exact lane results',
+    'Evaluate combined-head checks',
+  ];
+  const classifyFetch = (failedSteps, fetchTimeoutText = TIMEOUT_TEXT) =>
+    classifyMergeGroupFailure({
+      conclusion: 'failure',
+      failedSteps,
+      fetchTimeoutText,
+    });
+  const timeoutNote = (overrides = {}) => ({
+    annotation_level: 'failure',
+    title: FETCH_TIMEOUT_TITLE,
+    message: FETCH_TIMEOUT_MESSAGE,
+    ...overrides,
+  });
+  const exitNote = {
+    annotation_level: 'failure',
+    title: '',
+    message: 'Process completed with exit code 1.',
+  };
+  const fetchJob = (overrides = {}) => ({
+    id: 9,
+    run_id: run.id,
+    run_attempt: run.run_attempt,
+    check_run_url: 'https://api.github.com/repos/JovieInc/Jovie/check-runs/77',
+    steps: [{ name: FETCH_STEP, conclusion: 'failure' }],
+    ...overrides,
+  });
+
+  it('classifies only the exact fetch timeout as transient infrastructure', () => {
+    expect(classifyFetch([FETCH_STEP])).toBe('transient-infrastructure');
+    expect(classifyFetch([FETCH_STEP, ...CASCADE])).toBe(
+      'transient-infrastructure'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Post Checkout', 'Complete job'])).toBe(
+      'transient-infrastructure'
+    );
+  });
+
+  it('keeps every other failure of the fetch step unclassified (fail closed)', () => {
+    for (const text of [
+      '',
+      'Process completed with exit code 1.',
+      'Process completed with exit code 1.\ngit fetch exited 128',
+      `${FETCH_TIMEOUT_MESSAGE} (retrying)`,
+      `prefix ${FETCH_TIMEOUT_MESSAGE}`,
+      `${FETCH_TIMEOUT_MESSAGE}\nanother failure`,
+      'background fetch did not finish within 300s',
+    ]) {
+      expect(classifyFetch([FETCH_STEP], text)).toBe('unclassified');
+    }
+    expect(
+      classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: [FETCH_STEP],
+      })
+    ).toBe('unclassified');
+  });
+
+  it('lets a stronger failure win over the fetch timeout', () => {
+    expect(classifyFetch([FETCH_STEP, 'Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Run unit tests'])).toBe(
+      'retryable-product'
+    );
+    expect(classifyFetch([FETCH_STEP, 'Await ci-fast lanes'])).toBe(
+      'unclassified'
+    );
+    expect(
+      classifyFetch([FETCH_STEP, 'Run ./.github/actions/setup-node-pnpm'])
+    ).toBe('unclassified');
+    expect(classifyFetch([FETCH_STEP, WORKFLOW_LOAD_STEP])).toBe(
+      'deterministic-source'
+    );
+  });
+
+  it('never reclassifies the structural lane or the cascade without the fetch step', () => {
+    expect(classifyFetch(['Run structural ci-fast lane'])).toBe(
+      'deterministic-source'
+    );
+    expect(classifyFetch(CASCADE)).toBe('unclassified');
+    expect(classifyFetch(['Await ci-fast lanes', ...CASCADE])).toBe(
+      'unclassified'
+    );
+  });
+
+  it('reads timeout evidence only from the exact run and attempt', () => {
+    const read = notes => vi.fn(() => notes);
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], read([exitNote, timeoutNote()]))
+    ).toBe(TIMEOUT_TEXT);
+    for (const job of [
+      fetchJob({ run_id: run.id + 1 }),
+      fetchJob({ run_attempt: run.run_attempt + 1 }),
+      fetchJob({ run_id: undefined }),
+      fetchJob({ run_attempt: undefined }),
+    ]) {
+      const reader = read([exitNote, timeoutNote()]);
+      expect(fetchTimeoutEvidence(run, [job], reader)).toBe('');
+      expect(reader).not.toHaveBeenCalled();
+    }
+    // A timeout on another job of the run does not cover a fetch failure elsewhere.
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob(), fetchJob({ id: 10 })], job =>
+        job.id === 9 ? [exitNote, timeoutNote()] : [exitNote]
+      )
+    ).toBe('');
+  });
+
+  it('fails closed on missing, partial or unreadable evidence', () => {
+    expect(fetchTimeoutEvidence(run, [], () => [timeoutNote()])).toBe('');
+    expect(
+      fetchTimeoutEvidence(
+        run,
+        [
+          {
+            ...fetchJob(),
+            steps: [{ name: FETCH_STEP, conclusion: 'success' }],
+          },
+        ],
+        () => [timeoutNote()]
+      )
+    ).toBe('');
+    expect(fetchTimeoutEvidence(run, undefined, () => [timeoutNote()])).toBe(
+      ''
+    );
+    for (const notes of [
+      [],
+      [exitNote],
+      [exitNote, timeoutNote({ title: 'Other title' })],
+      [exitNote, timeoutNote({ title: undefined })],
+      [
+        exitNote,
+        timeoutNote(),
+        { annotation_level: 'failure', message: 'git fetch exited 128' },
+      ],
+      [exitNote, timeoutNote({ message: undefined })],
+      [exitNote, timeoutNote({ message: `${FETCH_TIMEOUT_MESSAGE}.` })],
+      null,
+      'unreadable',
+    ]) {
+      expect(
+        fetchTimeoutEvidence(
+          run,
+          [fetchJob()],
+          () => /** @type {any} */ (notes)
+        )
+      ).toBe('');
+    }
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], () => {
+        throw new Error('annotations unavailable');
+      })
+    ).toBe('');
+    // Non-failure annotations (notices) are ignored.
+    expect(
+      fetchTimeoutEvidence(run, [fetchJob()], () => [
+        exitNote,
+        timeoutNote(),
+        {
+          annotation_level: 'notice',
+          message: 'ubuntu-latest label will migrate',
+        },
+      ])
+    ).toBe(TIMEOUT_TEXT);
+  });
+
+  it('retries a fetch timeout once, then holds on a repeat via the existing budget', async () => {
+    const io = () => ({
+      writeStatus: vi.fn(),
+      readPullRequest: vi.fn(async () => ({
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: false,
+        mergeQueueEntry: null,
+        autoMergeRequest: null,
+      })),
+      dequeuePullRequest: vi.fn(),
+      disableAutoMerge: vi.fn(),
+    });
+    const first = await applyMergeGroupFailure(
+      {
+        ...failureInput,
+        failedSteps: [FETCH_STEP, ...CASCADE],
+        fetchTimeoutText: TIMEOUT_TEXT,
+        statuses: [],
+      },
+      io()
+    );
+    expect(first).toMatchObject({
+      classification: 'transient-infrastructure',
+      failureNumber: 1,
+      retryDisposition: 'one-queue-authority-retry',
+    });
+    const infra = (number, runId) =>
+      status({ classification: 'transient-infrastructure', number, runId });
+    const spent = runId =>
+      status({
+        runId,
+        context: FAILURE_RETRY_CONTEXT,
+        description: retrySpentDescription({ runId, runAttempt: 1 }),
+      });
+    expect(disposition([infra(1, 123)])).toMatchObject({
+      action: 'retry-once',
+      reason: 'bounded-infrastructure-recovery',
+    });
+    // The retry was spent and the same timeout repeated: no second free retry.
+    expect(disposition([infra(1, 123), spent(123)])).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    expect(
+      disposition([infra(1, 123), spent(123), infra(2, 124), spent(124)])
+    ).toMatchObject({
+      action: 'block',
+      reason: 'revision-retry-spent',
+    });
+    // Without the signature, the same step failure is held at once.
+    const unproven = await applyMergeGroupFailure(
+      { ...failureInput, failedSteps: [FETCH_STEP, ...CASCADE], statuses: [] },
+      io()
+    );
+    expect(unproven).toMatchObject({
+      classification: 'unclassified',
+      retryDisposition: 'blocked-until-new-source-head',
+    });
+  });
+
+  // Replays run 39561016233 (PR #22390): ci-fast (remaining) hit the fetch
+  // timeout and the aggregate jobs only reported it.
+  describe('real run 39561016233 shape', () => {
+    const realRun = { ...run, id: 39561016233, run_attempt: 1 };
+    const job = (id, name, step, overrides = {}) => ({
+      id,
+      name,
+      run_id: 39561016233,
+      run_attempt: 1,
+      check_run_url: `https://api.github.com/repos/JovieInc/Jovie/check-runs/${id}`,
+      steps: [{ name: step, conclusion: 'failure' }],
+      ...overrides,
+    });
+    const jobs = [
+      job(119092450020, 'ci-fast (remaining)', FETCH_STEP),
+      job(119096342018, 'ci-fast', 'Require every ci-fast lane group to pass'),
+      job(119096374291, 'Product Lane Receipt', 'Join exact lane results'),
+      job(119096483064, 'PR Ready', 'Evaluate combined-head checks'),
+    ];
+    const closed = lanes => ({
+      annotation_level: 'failure',
+      title: 'ci-fast failed closed',
+      message: lanes,
+    });
+    const closedOnlyRemaining =
+      'typecheck=success remaining=failure profile-browser=success structural-python=success structural-web=success';
+    const annotations = (closedLine = closedOnlyRemaining) => ({
+      119092450020: [exitNote, timeoutNote()],
+      119096342018: [exitNote, closed(closedLine)],
+      119096374291: [exitNote],
+      119096483064: [
+        exitNote,
+        {
+          annotation_level: 'failure',
+          message:
+            'ci-fast did not pass on the merge-group combined head (result: failure)',
+        },
+      ],
+    });
+    const replay = (notes, jobList = jobs) => {
+      const text = fetchTimeoutEvidence(
+        realRun,
+        jobList,
+        j => notes[j.id] ?? []
+      );
+      return classifyMergeGroupFailure({
+        conclusion: 'failure',
+        failedSteps: jobList.flatMap(j => j.steps.map(s => s.name)),
+        fetchTimeoutText: text,
+      });
+    };
+
+    it('classifies the real fetch timeout as transient infrastructure', () => {
+      expect(replay(annotations())).toBe('transient-infrastructure');
+    });
+
+    it('does not reclassify when another lane of the failed-closed line failed', () => {
+      for (const line of [
+        closedOnlyRemaining.replace(
+          'structural-web=success',
+          'structural-web=failure'
+        ),
+        closedOnlyRemaining.replace('typecheck=success', 'typecheck=cancelled'),
+        'remaining=success typecheck=success',
+        'not a lane line',
+      ]) {
+        expect(replay(annotations(line))).toBe('unclassified');
+      }
+      const missing = annotations();
+      missing[119096342018] = [exitNote];
+      expect(replay(missing)).toBe('unclassified');
+    });
+
+    it('rejects an aggregate job from another attempt', () => {
+      const other = jobs.map(j =>
+        j.id === 119096342018 ? { ...j, run_attempt: 2 } : j
+      );
+      expect(replay(annotations(), other)).toBe('unclassified');
+    });
   });
 });

@@ -18,7 +18,7 @@ const FULL_CATALOG_STORIES = [
   // matrix, JOV-2156) that are not tied to a single component directory.
   './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-  // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
+  // packages/ui atoms — highest-reuse surface; must enter Storybook
   // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
   '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
 ] as const;
@@ -28,7 +28,7 @@ export function storybookAddonsForEnvironment(
   hasManualAxeSuite = process.env.JOVIE_STORYBOOK_MANUAL_AXE === '1'
 ) {
   // The live certificate reads the preview iframe directly and injects its
-  // own pinned Axe bundle. Loading docs, Vitest, Chromatic, and MCP here adds
+  // own pinned Axe bundle. Loading docs, Vitest, and MCP here adds
   // an unrelated production build graph that can exhaust the source-gate
   // runner before any canonical story is measured.
   if (isLiveStorybookCert) return [];
@@ -41,7 +41,6 @@ export function storybookAddonsForEnvironment(
     // two axe runs cannot race.
     ...(hasManualAxeSuite ? [] : ['@storybook/addon-a11y']),
     '@storybook/addon-vitest',
-    '@chromatic-com/storybook',
     '@storybook/addon-mcp',
   ];
 }
@@ -90,9 +89,12 @@ export function resolvePrivacyBoundaryShellAlias(
 
 const config: StorybookConfig = {
   stories:
-    process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
-      ? [...LIVE_CERT_STORIES]
-      : [...FULL_CATALOG_STORIES],
+    // Deliberately invalid controls belong only to the explicit runner diagnostic.
+    process.env.JOVIE_STORYBOOK_A11Y_CONTROLS === '1'
+      ? ['../tests/fixtures/storybook-a11y-runner/controls.stories.tsx']
+      : process.env.JOVIE_LIVE_STORYBOOK_CERT === '1'
+        ? [...LIVE_CERT_STORIES]
+        : [...FULL_CATALOG_STORIES],
   addons: storybookAddonsForEnvironment(),
   framework: storybookFrameworkForEnvironment(),
   docs: {},
@@ -189,6 +191,13 @@ const config: StorybookConfig = {
           // homepage Recently Shipped section; serve fixture releases instead.
           find: '@/lib/recent-releases',
           replacement: require.resolve('./recent-releases-mock.ts'),
+        },
+        {
+          // lib/observability/revenue-spine imports node:crypto at module
+          // scope and is reachable from auth/session/entitlement modules that
+          // stories render; the externalized import blanks those stories.
+          find: '@/lib/observability/revenue-spine',
+          replacement: require.resolve('./revenue-spine-mock.ts'),
         },
         {
           find: '@/lib/releases/release-matrix-loader',

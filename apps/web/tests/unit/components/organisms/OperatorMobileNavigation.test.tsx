@@ -99,38 +99,14 @@ describe('OperatorMobileNavigation', () => {
     const menu = screen.getByRole('navigation', {
       name: 'OV Navigation Menu',
     });
-    expect(within(menu).getByRole('link', { name: 'Now' })).toHaveFocus();
+    expect(within(menu).getByRole('link', { name: 'Home' })).toHaveFocus();
 
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Growth' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Product' })).toHaveFocus();
-
-    await user.tab();
-    expect(
-      within(menu).getByRole('link', { name: 'Operations' })
-    ).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Needs You' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Chat' })).toHaveFocus();
-
-    await user.tab();
-    expect(
-      within(menu).getByRole('link', { name: 'Certifications' })
-    ).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Outbound' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'Shipping' })).toHaveFocus();
-
-    await user.tab();
-    expect(within(menu).getByRole('link', { name: 'People' })).toHaveFocus();
+    for (const item of ADMIN_NAV_REGISTRY.slice(1, 10)) {
+      await user.tab();
+      expect(
+        within(menu).getByRole('link', { name: item.label })
+      ).toHaveFocus();
+    }
 
     await user.keyboard('{Escape}');
     expect(
@@ -156,7 +132,7 @@ describe('OperatorMobileNavigation', () => {
     expect(
       within(
         screen.getByRole('navigation', { name: 'OV Navigation Menu' })
-      ).getByRole('link', { name: 'Now' })
+      ).getByRole('link', { name: 'Home' })
     ).toHaveFocus();
 
     pathnameMock.mockReturnValue(APP_ROUTES.ADMIN_OPERATIONS);
@@ -170,7 +146,7 @@ describe('OperatorMobileNavigation', () => {
     expect(more).not.toHaveFocus();
   });
 
-  it('marks only the exact Now destination current while keeping Chat in utilities', async () => {
+  it('marks only the exact Home destination current while keeping Ops in utilities', async () => {
     pathnameMock.mockReturnValue(APP_ROUTES.ADMIN_NOW);
     const user = userEvent.setup();
     render(<OperatorMobileNavigation />);
@@ -179,7 +155,7 @@ describe('OperatorMobileNavigation', () => {
       name: 'OV Mobile Navigation',
     });
     expect(
-      within(primaryNavigation).getByRole('link', { name: 'Now' })
+      within(primaryNavigation).getByRole('link', { name: 'Home' })
     ).toHaveAttribute('aria-current', 'page');
     expect(
       primaryNavigation.querySelectorAll('[aria-current="page"]')
@@ -190,14 +166,30 @@ describe('OperatorMobileNavigation', () => {
       name: 'OV Navigation Menu',
     });
     expect(
-      within(expandedNavigation).getByRole('link', { name: 'Chat' })
+      within(expandedNavigation).getByRole('link', { name: 'Ops' })
     ).not.toHaveAttribute('aria-current');
     expect(
-      within(expandedNavigation).getByRole('link', { name: 'Now' })
+      within(expandedNavigation).getByRole('link', { name: 'Home' })
     ).toHaveAttribute('aria-current', 'page');
     expect(
       expandedNavigation.querySelectorAll('[aria-current="page"]')
     ).toHaveLength(1);
+  });
+
+  it('exposes Inbox directly and selects it without selecting Home', () => {
+    pathnameMock.mockReturnValue(APP_ROUTES.ADMIN_INBOX);
+    render(<OperatorMobileNavigation />);
+    const tabs = screen.getByRole('navigation', {
+      name: 'OV Mobile Navigation',
+    });
+    const inbox = within(tabs).getByRole('link', { name: 'Inbox' });
+    expect(inbox).toHaveAttribute('href', APP_ROUTES.ADMIN_INBOX);
+    expect(inbox).toHaveAttribute('aria-current', 'page');
+    expect(
+      within(tabs).getByRole('link', { name: 'Home' })
+    ).not.toHaveAttribute('aria-current');
+    expect(tabs.querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    expect(screen.queryByRole('link', { name: 'Needs You' })).toBeNull();
   });
 
   it('keeps five 44px bottom-bar targets within the 320px contract', () => {

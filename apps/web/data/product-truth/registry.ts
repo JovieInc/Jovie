@@ -593,7 +593,6 @@ export const PRODUCT_CAPABILITIES = {
     publication: 'internal_only',
     access: 'enrolled',
     entitlementKeys: ['canAccessInbox'],
-    flagKey: 'INBOX_HOME',
     evidence: { captureScenarios: [], routes: [] },
   },
   'profile-monitoring': {
@@ -723,8 +722,6 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   MERCH_MVP: { capabilityId: 'instant-merch' },
   BULK_PRESS_PHOTO_IMPORT: { nonMarketing: 'workspace import utility' },
   TELEPROMPTER_RECORDING: { nonMarketing: 'internal recording tool' },
-  INBOX_HOME: { capabilityId: 'inbox' },
-  PROFILES_WORKSPACE: { nonMarketing: 'workspace navigation layout' },
   PROFILE_SEARCH_MONITORING: { capabilityId: 'profile-monitoring' },
   ONBOARDING_WOW_TASK_QUEUE: { nonMarketing: 'onboarding orchestration' },
   PAID_WELCOME_EMAIL: { nonMarketing: 'transactional email kill switch' },
@@ -772,6 +769,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
   SOCIAL_HTML_ISOLATED_PROVIDER: {
     nonMarketing:
       'internal ingestion routing kill switch; reserved for future isolated provider rollout',
+  },
+  STRIPE_TEST_PRICE_CONFIGURED: {
+    nonMarketing:
+      'CI Stripe test-price secret readiness; default off names the missing GitHub secret and still fails closed',
   },
   INVESTOR_PORTAL_YC_DECK: {
     nonMarketing:

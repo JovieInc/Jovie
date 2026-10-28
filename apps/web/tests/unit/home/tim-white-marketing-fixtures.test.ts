@@ -5,10 +5,6 @@ import { describe, expect, it } from 'vitest';
 const FIXTURE_PATHS = [
   'components/features/demo/demo-fixtures.ts',
   'components/features/home/featured-creators-fallback.ts',
-  'components/features/home/HomeSandboxCard.tsx',
-  'components/features/home/StickyPhoneTour.tsx',
-  'components/features/home/StickyPhoneTourClient.tsx',
-  'components/features/home/demo/mock-data.ts',
   'components/features/home/homepage-profile-preview-fixture.ts',
 ] as const;
 
@@ -32,23 +28,6 @@ describe('Tim White marketing fixtures', () => {
       const source = readFixture(path);
       expect(source).not.toContain("Don't Look Down");
       expect(source).not.toContain('dont-look-down');
-    }
-  });
-
-  it('uses /tim for visible marketing shortlinks instead of /timwhite', () => {
-    const sandboxSource = readFixture(
-      'components/features/home/HomeSandboxCard.tsx'
-    );
-    expect(sandboxSource).not.toContain('jov.ie/timwhite');
-    expect(sandboxSource).toContain('jov.ie/tim');
-
-    for (const path of [
-      'components/features/home/StickyPhoneTour.tsx',
-      'components/features/home/StickyPhoneTourClient.tsx',
-    ] as const) {
-      const source = readFixture(path);
-      expect(source).not.toContain("artistHandle = 'timwhite'");
-      expect(source).toContain("artistHandle = 'tim'");
     }
   });
 });

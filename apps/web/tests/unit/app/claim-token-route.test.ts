@@ -27,6 +27,11 @@ const {
   mockGetClientIP: vi.fn(),
 }));
 
+const mockRecordArtistOfferStage = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: mockRecordArtistOfferStage,
+}));
+
 vi.mock('@/lib/rate-limit', () => ({
   claimTokenAccessLimiter: { limit: mockClaimLimit },
   getClientIP: mockGetClientIP,
@@ -47,6 +52,15 @@ vi.mock('@/lib/rate-limit', () => ({
 
 vi.mock('@/lib/claim/context', () => ({
   writePendingClaimContext: mockWritePendingClaimContext,
+  applyPendingClaimCookie: (
+    response: {
+      cookies: { set: (name: string, value: string) => void };
+    },
+    _context: unknown
+  ) => {
+    response.cookies.set('jovie_pending_claim', 'attached');
+    return response;
+  },
 }));
 
 vi.mock('@/lib/leads/funnel-events', () => ({
@@ -107,6 +121,8 @@ describe('Claim token route', () => {
     );
     expect(mockClearLeadAttributionCookie).toHaveBeenCalledTimes(1);
     expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+    // An invalid token is not a claim-link open.
+    expect(mockRecordArtistOfferStage).not.toHaveBeenCalled();
   });
 
   it('stores claim context and redirects valid tokens to the public profile preview', async () => {
@@ -115,7 +131,11 @@ describe('Claim token route', () => {
     mockLookupLeadByClaimToken.mockResolvedValue({ id: 'lead_1' });
 
     const response = await GET(
-      new NextRequest('http://localhost/claim/valid-token'),
+      new NextRequest('http://localhost/claim/valid-token', {
+        headers: {
+          cookie: 'jv_acquisition_id=9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+        },
+      }),
       {
         params: Promise.resolve({ token: 'valid-token' }),
       }
@@ -124,6 +144,10 @@ describe('Claim token route', () => {
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
       'http://localhost/claimableartist?claim=1'
+    );
+    expect(mockRecordArtistOfferStage).toHaveBeenCalledWith(
+      '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+      'claim-link-open'
     );
     expect(mockSetLeadAttributionCookieFromToken).toHaveBeenCalledWith(
       'valid-token'
@@ -139,6 +163,7 @@ describe('Claim token route', () => {
       leadId: 'lead_1',
       expectedSpotifyArtistId: 'spotify_123',
     });
+    expect(response.cookies.get('jovie_pending_claim')?.value).toBe('attached');
   });
 
   it('admits the dedicated fixture only after token verification', async () => {
@@ -158,6 +183,16 @@ describe('Claim token route', () => {
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
       'http://localhost/e2eclaimartist?claim=1'
+    );
+
+    const loopbackResponse = await GET(
+      new NextRequest('http://127.0.0.1:3100/claim/fixture-token', {
+        headers: { host: '127.0.0.1:3100' },
+      }),
+      { params: Promise.resolve({ token: 'fixture-token' }) }
+    );
+    expect(loopbackResponse.headers.get('location')).toBe(
+      'http://127.0.0.1:3100/e2eclaimartist?claim=1'
     );
     expect(mockIsClaimTokenValid).toHaveBeenCalledWith(
       'e2eclaimartist',

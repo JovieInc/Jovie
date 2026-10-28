@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/components/features/dashboard/organisms/AnalyticsSidebar.test.tsx
+
 import { Globe, Link2, MapPin } from 'lucide-react';
 import { type ComponentType, useState } from 'react';
 import {
@@ -151,7 +153,7 @@ function FunnelCard({
 
   return (
     <DrawerSurfaceCard
-      variant='flat'
+      variant='card'
       data-right-rail-section='status'
       className='divide-y divide-subtle overflow-hidden py-1'
     >
@@ -201,7 +203,7 @@ function RankedList({
         {[1, 2, 3, 4, 5].map(i => (
           <li
             key={i}
-            className='flex h-9 items-center justify-between rounded-lg px-2.5'
+            className='flex h-8 items-center justify-between rounded-lg px-2.5'
           >
             <div className='flex items-center gap-2'>
               <LoadingSkeleton height='h-3' width='w-3' rounded='sm' />
@@ -228,7 +230,7 @@ function RankedList({
       {items.map((item, index) => (
         <li
           key={item.key}
-          className='group flex h-9 items-center justify-between rounded-lg px-2.5 transition-colors hover:bg-surface-1'
+          className='group flex h-8 items-center justify-between rounded-lg px-2.5 transition-colors hover:bg-surface-1'
         >
           <div className='flex min-w-0 flex-1 items-center gap-1.5'>
             <span className='w-3 text-2xs font-caption text-tertiary-token tabular-nums'>
@@ -307,6 +309,7 @@ export function AnalyticsSidebarView({
       tabsAriaLabel='Analytics data tabs'
       tabDistribution='fill'
       tabbedCardTestId={tabbedCardTestId}
+      tabbedSurfaceVariant='card'
       sectionKind='details'
       contentClassName='pt-2'
       entityHeader={

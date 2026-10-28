@@ -10,12 +10,19 @@ vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
     main,
     rightPanel,
+    flushContent,
   }: {
     readonly main: ReactNode;
     readonly rightPanel?: ReactNode;
+    readonly flushContent?: boolean;
   }) => (
     <>
-      <div data-testid='onboarding-shell-main'>{main}</div>
+      <div
+        data-testid='onboarding-shell-main'
+        data-flush-content={flushContent ? 'true' : 'false'}
+      >
+        {main}
+      </div>
       <div data-testid='onboarding-shell-overlay'>{rightPanel}</div>
     </>
   ),
@@ -101,7 +108,27 @@ vi.mock('@/components/features/onboarding/useOnboardingClaim', () => ({
   },
 }));
 
+const STARTED_CONVERSATION = [
+  {
+    id: 'm1',
+    role: 'user' as const,
+    parts: [{ type: 'text' as const, text: 'I make music' }],
+  },
+];
+
 describe('OnboardingShell status', () => {
+  it('does not offer Start Over on a first visit with nothing to discard', () => {
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        isSignedIn={false}
+        onRestart={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('button', { name: 'Start Over' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Sign in' })).toBeTruthy();
+  });
+
   it('keeps explicit restart/logout visible and prevents them during a pending turn', () => {
     const restart = vi.fn();
     const logout = vi.fn();
@@ -109,9 +136,14 @@ describe('OnboardingShell status', () => {
       <OnboardingShell
         sessionLabel='pending'
         isSignedIn
+        initialMessages={STARTED_CONVERSATION}
         onRestart={restart}
         onLogout={logout}
       />
+    );
+    expect(screen.getByTestId('onboarding-shell-main')).toHaveAttribute(
+      'data-flush-content',
+      'true'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Start Over' }));
     fireEvent.click(screen.getByRole('button', { name: 'Log Out' }));
@@ -121,6 +153,7 @@ describe('OnboardingShell status', () => {
       <OnboardingShell
         sessionLabel='pending'
         isSignedIn
+        initialMessages={STARTED_CONVERSATION}
         onRestart={restart}
         onLogout={logout}
         controlsDisabled

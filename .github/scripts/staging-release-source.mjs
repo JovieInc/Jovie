@@ -242,8 +242,17 @@ export function resolveStagingReleaseSource({
   return {
     ci,
     eligible: completion.outcome !== 'superseded',
+    outcome: completion.outcome,
+    sha: completion.sha,
     stagingArtifactId,
   };
+}
+
+export function describeReleaseSource(result, trigger) {
+  const source = `staging run ${trigger.id} attempt ${trigger.run_attempt}, CI run ${result.ci.id} attempt ${result.ci.run_attempt}`;
+  return result.eligible
+    ? `Staging generation ${result.sha} finished as ${result.outcome} (${source}); production release is eligible.`
+    : `Staging generation ${result.sha} finished as ${result.outcome} (${source}); production release skipped: a newer staging generation replaces it.`;
 }
 
 function defaultSleep(ms) {
@@ -319,6 +328,17 @@ export function runStagingReleaseSource(env = process.env) {
       env.GITHUB_OUTPUT,
       `ci=${JSON.stringify(result.ci)}\neligible=${result.eligible}\nstaging_artifact_id=${result.stagingArtifactId}\n`
     );
+    // Every later controller job keys on `eligible`; say why, so a skipped
+    // release is never silent (2026-10-20: superseded staging generations
+    // skipped production with no logged reason).
+    const decision = describeReleaseSource(result, event.workflow_run);
+    console.log(`::notice::${decision}`);
+    if (env.GITHUB_STEP_SUMMARY) {
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        `### Staging release source\n\n${decision}\n`
+      );
+    }
     return result;
   } finally {
     rmSync(directory, { recursive: true, force: true });

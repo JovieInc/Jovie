@@ -373,11 +373,15 @@ describe('POST /api/chat guard wiring', () => {
   }, 120_000);
 
   beforeEach(() => {
+    // Existing OV tests exercise the Eve conversation; the fast path has its own tests.
+    vi.stubEnv('OVIE_SUMMER_FAST_CHAT', '0');
     vi.clearAllMocks();
     vi.stubEnv(
       'OVIE_SUMMER_FOUNDER_APP_USER_ID',
       '00000000-0000-4000-8000-000000000123'
     );
+    vi.stubEnv('AI_GATEWAY_API_KEY', 'test-gateway-key');
+    vi.stubEnv('VERCEL', '');
     hoisted.tryHandleAnonymousOnboardingChatMock.mockResolvedValue(null);
     hoisted.getOptionalAuthMock.mockResolvedValue({
       userId: '00000000-0000-4000-8000-000000000123',

@@ -33,6 +33,7 @@ import {
   type SpotifyLeadEnrichment,
   spotifyEnrichLead,
 } from '@/lib/leads/spotify-enrich-lead';
+import { cleanScrapedDisplayName } from '@/lib/profile/scraped-display-name';
 
 export {
   getPublicDspSignals,
@@ -122,7 +123,8 @@ function buildLeadUpdate(input: {
     spotifyEnrichmentStatus: input.spotify.status,
   };
   const update: PublicLeadUpdate = {
-    displayName: input.qualification.displayName,
+    // Page titles are not names; store the cleaned name (JOV-7753).
+    displayName: cleanScrapedDisplayName(input.qualification.displayName),
     bio: input.qualification.bio,
     avatarUrl: input.qualification.avatarUrl,
     hasPaidTier: input.qualification.hasPaidTier,

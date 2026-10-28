@@ -465,6 +465,247 @@ test('an UNKNOWN merge state after main moves is re-read instead of dropping the
   assert.deepEqual(settled.reads, [1]);
 });
 
+const greenCommit = (state = 'SUCCESS') => ({
+  nodes: [
+    {
+      commit: {
+        committedDate: '2026-10-02T12:00:00Z',
+        statusCheckRollup: { state },
+      },
+    },
+  ],
+});
+const blockedGreen = (extra = {}) => ({
+  1: { mergeStateStatus: 'BLOCKED', commits: greenCommit(), ...extra },
+});
+const requiredGreenWake = {
+  eventName: 'workflow_run',
+  payload: {
+    workflow_run: {
+      event: 'pull_request',
+      conclusion: 'success',
+      head_sha: sha,
+      head_branch: 'codex/jov-8817',
+      pull_requests: [{ number: 1 }],
+    },
+  },
+};
+async function withFetch(run) {
+  const previous = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (...args) => {
+    calls.push(args);
+    return new Response(null, { status: 204 });
+  };
+  try {
+    return { result: await run(), calls };
+  } finally {
+    globalThis.fetch = previous;
+  }
+}
+
+test('a required-green BLOCKED head is re-read and, if it stays BLOCKED, dispatched once', async () => {
+  // 2026-10-22: enroll 39795233391 skipped #22618 BLOCKED at 14:23Z, nine
+  // minutes after PR Ready. The rollup was already SUCCESS. The state later
+  // flipped to CLEAN with no check, label, or push to wake admission.
+  const settles = await withFetch(() =>
+    fixture({
+      ...requiredGreenWake,
+      env: { RECHECK_TOKEN: 'ghs_test' },
+      readCurrentSnapshot: (number, readCount) => ({
+        ...current(number),
+        mergeStateStatus: readCount < 2 ? 'BLOCKED' : 'CLEAN',
+        commits: greenCommit(),
+      }),
+    })
+  );
+  assert.deepEqual(settles.result.reads, [1, 1]);
+  assert.deepEqual(settles.result.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(settles.calls, []);
+  const third = await withFetch(() =>
+    fixture({
+      ...requiredGreenWake,
+      env: { RECHECK_TOKEN: 'ghs_test' },
+      readCurrentSnapshot: (number, readCount) => ({
+        ...current(number),
+        mergeStateStatus: readCount < 3 ? 'BLOCKED' : 'CLEAN',
+        commits: greenCommit(),
+      }),
+    })
+  );
+  assert.deepEqual(third.result.reads, [1, 1, 1]);
+  assert.deepEqual(third.result.mutations, [{ id: 'PR_1', oid: sha }]);
+  assert.deepEqual(third.calls, []);
+  const stays = await withFetch(() =>
+    fixture({
+      ...requiredGreenWake,
+      env: { RECHECK_TOKEN: 'ghs_test' },
+      overrides: blockedGreen(),
+    })
+  );
+  assert.deepEqual(stays.result.reads, [1, 1, 1]);
+  assert.deepEqual(stays.result.mutations, []);
+  assert.equal(stays.calls.length, 1);
+  const [url, init] = stays.calls[0];
+  assert.equal(
+    url,
+    'https://api.github.com/repos/JovieInc/Jovie/actions/workflows/merge-queue-green-enroll.yml/dispatches'
+  );
+  assert.equal(init.method, 'POST');
+  assert.equal(init.headers.Authorization, 'Bearer ghs_test');
+  assert.deepEqual(JSON.parse(init.body), {
+    ref: 'main',
+    inputs: { dry_run: 'false', pr_number: '1', blocked_recheck: '1' },
+  });
+  const followUp = await withFetch(() =>
+    fixture({
+      eventName: 'workflow_dispatch',
+      env: {
+        DISPATCH_PR_NUMBER: '1',
+        BLOCKED_RECHECK: '2',
+        RECHECK_TOKEN: 'ghs_test',
+      },
+      overrides: blockedGreen(),
+    })
+  );
+  assert.equal(followUp.calls.length, 1);
+  assert.equal(
+    JSON.parse(followUp.calls[0][1].body).inputs.blocked_recheck,
+    '3'
+  );
+  assert.deepEqual(followUp.result.mutations, []);
+});
+
+test('a BLOCKED head is not rechecked unless its check rollup is already green', async () => {
+  const pending = await withFetch(() =>
+    fixture({
+      ...requiredGreenWake,
+      env: { RECHECK_TOKEN: 'ghs_test' },
+      overrides: {
+        1: { mergeStateStatus: 'BLOCKED', commits: greenCommit('PENDING') },
+      },
+    })
+  );
+  assert.deepEqual(pending.result.reads, [1]);
+  assert.deepEqual(pending.result.mutations, []);
+  assert.deepEqual(pending.calls, []);
+  const missing = await withFetch(() =>
+    fixture({
+      ...requiredGreenWake,
+      env: { RECHECK_TOKEN: 'ghs_test' },
+      overrides: { 1: { mergeStateStatus: 'BLOCKED' } },
+    })
+  );
+  assert.deepEqual(missing.result.reads, [1]);
+  assert.deepEqual(missing.calls, []);
+  const dirty = await withFetch(() =>
+    fixture({
+      ...requiredGreenWake,
+      env: { RECHECK_TOKEN: 'ghs_test' },
+      overrides: {
+        1: { mergeStateStatus: 'DIRTY', commits: greenCommit() },
+      },
+    })
+  );
+  assert.deepEqual(dirty.result.reads, [1]);
+  assert.deepEqual(dirty.calls, []);
+});
+
+test('a required-green BLOCKED recheck stops at four follow-ups and ignores drafts, holds, and sweeps', async () => {
+  const exhausted = await withFetch(() =>
+    fixture({
+      eventName: 'workflow_dispatch',
+      env: {
+        DISPATCH_PR_NUMBER: '1',
+        BLOCKED_RECHECK: '4',
+        RECHECK_TOKEN: 'ghs_test',
+      },
+      overrides: blockedGreen(),
+    })
+  );
+  assert.deepEqual(exhausted.calls, []);
+  assert.deepEqual(exhausted.result.mutations, []);
+  assert.ok(
+    exhausted.result.warnings.some(
+      warning =>
+        warning.includes('stayed BLOCKED') && warning.includes('exhausted')
+    )
+  );
+  const drafted = await withFetch(() =>
+    fixture({
+      ...requiredGreenWake,
+      env: { RECHECK_TOKEN: 'ghs_test' },
+      overrides: blockedGreen({ isDraft: true }),
+    })
+  );
+  assert.deepEqual(drafted.result.reads, [1]);
+  assert.deepEqual(drafted.calls, []);
+  const held = await withFetch(() =>
+    fixture({
+      ...requiredGreenWake,
+      env: { RECHECK_TOKEN: 'ghs_test' },
+      overrides: blockedGreen({
+        labels: {
+          pageInfo: { hasNextPage: false },
+          nodes: [{ name: 'lane-fix-red' }],
+        },
+      }),
+    })
+  );
+  assert.deepEqual(held.result.reads, [1]);
+  assert.deepEqual(held.calls, []);
+  const started = Date.now();
+  const sweep = await withFetch(() =>
+    fixture({
+      eventName: 'push',
+      env: { MERGE_STATE_RETRY_MS: '5000', RECHECK_TOKEN: 'ghs_test' },
+      overrides: blockedGreen(),
+    })
+  );
+  assert.ok(Date.now() - started < 1000, 'a sweep must not sleep on BLOCKED');
+  assert.deepEqual(sweep.result.reads, [1]);
+  assert.deepEqual(sweep.result.mutations, []);
+  assert.deepEqual(sweep.calls, []);
+});
+
+test('the BLOCKED follow-up uses the job token, not the Jovie Bot app token', () => {
+  const enroll = workflow.jobs.enroll;
+  assert.equal(enroll.permissions.actions, 'write');
+  assert.equal(enroll.permissions.contents, 'read');
+  assert.equal(
+    workflow.on.workflow_dispatch.inputs.blocked_recheck.default,
+    '0'
+  );
+  const wait = enroll.steps.find(
+    step => step.name === 'Wait for a stale BLOCKED merge state to settle'
+  );
+  assert.match(String(wait.if), /workflow_dispatch/);
+  assert.match(String(wait.if), /blocked_recheck == '1'/);
+  assert.match(wait.run, /1\) sleep 60/);
+  assert.match(wait.run, /2\) sleep 120/);
+  assert.match(wait.run, /3\|4\) sleep 180/);
+  assert.equal(wait.env.BLOCKED_RECHECK, '${{ inputs.blocked_recheck }}');
+  const step = enroll.steps.find(item => item.with?.script);
+  assert.equal(
+    step.env.BLOCKED_RECHECK,
+    "${{ inputs.blocked_recheck || '0' }}"
+  );
+  assert.equal(step.env.RECHECK_TOKEN, '${{ github.token }}');
+  assert.equal(
+    step.with['github-token'],
+    '${{ steps.app-token.outputs.token }}'
+  );
+  const token = enroll.steps.find(item => item.id === 'app-token');
+  assert.equal(token.with['permission-actions'], undefined);
+  assert.equal(token.with['permission-workflows'], 'write');
+  assert.equal(script.includes('actions.createWorkflowDispatch'), false);
+  assert.equal(script.includes('blocked-recheck-exhausted'), true);
+  const uses = enroll.steps.filter(item =>
+    String(item.uses ?? '').includes('actions/github-script@')
+  );
+  assert.equal(uses.length, 1);
+});
+
 test('a 70-PR sweep with UNKNOWN entries reads in parallel, never sleeps, and stays inside its budget', async () => {
   // 2026-10-12 22:31Z onward: every push-to-main sweep (45-70 PRs, ~3 s per
   // read, 3 s + 6 s UNKNOWN re-read sleeps) was cancelled at the 5-minute
@@ -778,6 +1019,27 @@ test('does not remove lane-fix-red and does not enroll while the label remains',
   }
 });
 
+test('a skip behind a blocking label names the label, not the CLEAN merge state', async () => {
+  const labeled = {
+    pageInfo: { hasNextPage: false },
+    nodes: [{ name: 'lane-fix-red' }],
+  };
+  const result = await fixture({
+    roster: [{ ...candidate(1), labels: [] }],
+    readCurrentSnapshot: () => ({ ...current(1), labels: labeled }),
+  });
+  assert.deepEqual(result.mutations, []);
+  const stale = await fixture({
+    roster: [candidate(1)],
+    readCurrentSnapshot: () => ({ ...current(1), headRefOid: 'b'.repeat(40) }),
+  });
+  assert.deepEqual(stale.mutations, []);
+  assert.ok(script.includes('blocking-label:'));
+  assert.ok(script.includes('head-moved:'));
+  assert.ok(script.includes('merge-state-not-admissible:'));
+  assert.ok(!script.includes('`mergeStateStatus=${pr.mergeStateStatus}`'));
+});
+
 test('enrolls a required-green head once lane-fix-red is gone', async () => {
   const result = await fixture({
     roster: [{ ...candidate(1), labels: [] }],
@@ -900,7 +1162,7 @@ test('read failures abort without enqueue and a raced mutation does not stop the
   assert.equal(result.warnings.length, 2);
 });
 
-test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant', () => {
+test('failure-hold dequeue uses the CI lane app token without a merge-queue grant', () => {
   const hold = workflow.jobs['hold-failed-revision'];
   const token = hold.steps.find(step => step.id === 'app-token');
   const persist = hold.steps.find(step => step.id === 'failure-hold');
@@ -908,7 +1170,7 @@ test('failure-hold dequeue uses the Jovie Bot token without a merge-queue grant'
     String(token.uses).startsWith('actions/create-github-app-token@'),
     true
   );
-  assert.equal(token.with['app-id'], '${{ vars.JOVIE_BOT_APP_ID }}');
+  assert.equal(token.with['app-id'], '${{ vars.CI_APP_ID }}');
   assert.equal(token.with['permission-actions'], 'read');
   assert.equal(token.with['permission-contents'], 'write');
   assert.equal(token.with['permission-pull-requests'], 'write');
@@ -955,8 +1217,8 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
     'unlabeled',
     'reopened',
     'ready_for_review',
-    'synchronize',
   ]);
+  assert.ok(!workflow.on.pull_request_target.types.includes('synchronize'));
   // A label is never an enroll wake; only a blocking one dequeues its PR.
   assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
   // Leaving draft is the only wake for an already-green head (JOV-INV-029);
@@ -1699,8 +1961,20 @@ async function dequeueFixture({
   const warnings = [];
   /** @type {string[]} */
   const notices = [];
+  /** @type {{ issue_number: number, body: string }[]} */
+  const comments = [];
   await runDequeue(
     {
+      rest: {
+        issues: {
+          createComment: async (
+            /** @type {{ issue_number: number, body: string }} */ args
+          ) => {
+            comments.push(args);
+            return {};
+          },
+        },
+      },
       graphql: async (
         /** @type {string} */ query,
         /** @type {Record<string, unknown>} */ variables
@@ -1726,14 +2000,17 @@ async function dequeueFixture({
         return { repository: { pullRequest: currentPR } };
       },
     },
-    { repo: { owner: 'JovieInc', repo: 'Jovie' }, payload },
+    {
+      repo: { owner: 'JovieInc', repo: 'Jovie' },
+      payload: { sender: { login: 'some-agent' }, ...payload },
+    },
     {
       info() {},
       notice: (/** @type {string} */ message) => notices.push(message),
       warning: (/** @type {string} */ message) => warnings.push(message),
     }
   );
-  return { reads, mutations, warnings, notices };
+  return { reads, mutations, warnings, notices, comments };
 }
 
 for (const label of [
@@ -1757,6 +2034,14 @@ for (const label of [
     assert.deepEqual(result.notices, [
       `DEQUEUED #7: labeled ${label} while queued`,
     ]);
+    // The queue timeline only says "manual"; the reason is recorded on the PR.
+    assert.equal(result.comments.length, 1);
+    assert.equal(result.comments[0].issue_number, 7);
+    assert.match(
+      result.comments[0].body,
+      new RegExp(`\\\`${label}\\\` was added by @some-agent`)
+    );
+    assert.match(result.comments[0].body, /<!-- queue-dequeue \{"code":"hold"/);
   });
 }
 
@@ -1896,7 +2181,6 @@ test('a deferred current-state read cannot dequeue a repaired head after its hol
 test('a landing on main reconciles the full roster and the hold contract without a timer', async () => {
   // Tim 2026-10-12: no time-based loops. The push wake replaces the */15 sweep.
   assert.deepEqual(workflow.on.push, { branches: ['main'] });
-  assert.ok(workflow.on.pull_request_target.types.includes('synchronize'));
   assert.match(workflow.concurrency.group, /'push'/);
   assert.equal(
     concurrencyGroup({ event_name: 'push', event: {}, run_id: 1 }),
@@ -1977,4 +2261,152 @@ test('QUEUE_FREEZE gates every job that can enqueue or arm, and nothing else', (
     'merge-queue-green-enroll.yml#enroll',
     'merge-queue-green-enroll.yml#rearm-green-victims',
   ]);
+});
+
+// JOV-6620 replay of #22280 (2026-10-20): the merge group failed at the source
+// head (run 39455689721, retryable-product: UnifiedTable rendered 10,000 rows).
+// The old one-retry allowance re-enqueued that head on the next push sweep
+// (run 39458246113) after Tim had dequeued it, and jovie-bot then lifted the
+// queue-poison label he added. A failed head waits for a new head or a person.
+const failedHoldStatus = classification => ({
+  context: 'jovie-queue-failure-hold/v1',
+  state: 'success',
+  creator: { type: 'Bot', login: 'jovie-bot[bot]' },
+  description: `class=${classification};n=1;run=39455689721;try=1`,
+  target_url: 'https://github.com/JovieInc/Jovie/actions/runs/39455689721',
+});
+const ejected = (actor = undefined, reason = 'failed_checks') => ({
+  1: {
+    commits: { nodes: [{ commit: { committedDate: '2026-10-20T11:18:16Z' } }] },
+    timelineItems: {
+      nodes: [{ createdAt: '2026-10-20T16:27:33Z', reason, actor }],
+    },
+  },
+});
+const unlabeledBy = (sender, label = 'queue-poison') => ({
+  action: 'unlabeled',
+  label: { name: label },
+  sender,
+  pull_request: {
+    number: 1,
+    state: 'open',
+    draft: false,
+    head: { sha },
+    updated_at: '2026-10-20T16:39:08Z',
+  },
+});
+
+test('a merge-group failure at a head blocks every automatic re-enrollment of that head (#22280)', async () => {
+  const statuses = [failedHoldStatus('retryable-product')];
+  for (const run of [
+    { eventName: 'push' },
+    { eventName: 'workflow_dispatch' },
+    // jovie-bot (lanes) lifting queue-poison is not a release.
+    {
+      eventName: 'pull_request_target',
+      payload: unlabeledBy({ login: 'jovie-bot[bot]', type: 'Bot' }),
+    },
+  ]) {
+    const result = await fixture({ statuses, overrides: ejected(), ...run });
+    assert.deepEqual(result.mutations, [], run.eventName);
+    assert.deepEqual(result.statusWrites, [], run.eventName);
+  }
+  // The failure-hold job's own receipt blocks the same head immediately.
+  const direct = await fixture({
+    eventName: 'workflow_dispatch',
+    overrides: ejected(),
+    failureReceipt: JSON.stringify({
+      schema: 'jovie-merge-group-failure-hold/v1',
+      repository: 'JovieInc/Jovie',
+      prNumber: 1,
+      sourceHeadSha: sha,
+      classification: 'retryable-product',
+      failureNumber: 1,
+      workflowRunId: 39455689721,
+      workflowRunAttempt: 1,
+      retryDisposition: 'blocked-until-new-source-head',
+    }),
+  });
+  assert.deepEqual(direct.mutations, []);
+});
+
+test('a person removing queue-poison or hold releases the failed head exactly once (#22280)', async () => {
+  const statuses = [failedHoldStatus('retryable-product')];
+  for (const label of ['queue-poison', 'hold']) {
+    const released = await fixture({
+      statuses,
+      overrides: ejected(
+        { __typename: 'User', login: 'itstimwhite' },
+        'manual'
+      ),
+      eventName: 'pull_request_target',
+      payload: unlabeledBy({ login: 'itstimwhite', type: 'User' }, label),
+    });
+    assert.deepEqual(released.mutations, [{ id: 'PR_1', oid: sha }], label);
+    assert.deepEqual(
+      released.statusWrites.map(status => status.description),
+      ['spent:run=39455689721;try=1'],
+      label
+    );
+  }
+  // A release names its exact head; a moved head is a new revision instead.
+  const stale = await fixture({
+    statuses,
+    overrides: ejected(),
+    eventName: 'pull_request_target',
+    payload: {
+      ...unlabeledBy({ login: 'itstimwhite', type: 'User' }),
+      pull_request: {
+        ...unlabeledBy({}).pull_request,
+        head: { sha: 'f'.repeat(40) },
+      },
+    },
+  });
+  assert.deepEqual(stale.mutations, []);
+});
+
+test('a person dequeuing a head withdraws its automatic infrastructure retry', async () => {
+  const statuses = [failedHoldStatus('transient-infrastructure')];
+  // Without a manual removal the one infrastructure retry still runs.
+  const retried = await fixture({
+    statuses,
+    overrides: ejected(),
+    eventName: 'push',
+  });
+  assert.deepEqual(retried.mutations, [{ id: 'PR_1', oid: sha }]);
+  const human = await fixture({
+    statuses,
+    overrides: ejected({ __typename: 'User', login: 'itstimwhite' }, 'manual'),
+    eventName: 'push',
+  });
+  assert.deepEqual(human.mutations, []);
+  // jovie-bot's own dequeue during a failure hold is not a human withdrawal.
+  const bot = await fixture({
+    statuses,
+    overrides: ejected({ __typename: 'Bot', login: 'jovie-bot' }, 'manual'),
+    eventName: 'push',
+  });
+  assert.deepEqual(bot.mutations, [{ id: 'PR_1', oid: sha }]);
+});
+
+test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', () => {
+  const script = workflow.jobs.enroll.steps.find(
+    step => step.name === 'Enqueue green PRs'
+  ).with.script;
+  for (const decision of [
+    "receipt(pr, 'skip', why)",
+    "receipt(pr, 'skip', 'blocked-recheck-exhausted')",
+    "receipt(pr, 'recheck', `blocked-recheck=",
+    "receipt(pr, 'held', failure.reason)",
+    "receipt(pr, 'skip', `head-unchanged-since-removal:",
+    "receipt(pr, 'enqueued',",
+    "receipt(pr, 'error',",
+  ])
+    assert.ok(script.includes(decision), decision);
+  assert.ok(
+    script.includes('core.info(`enroll-receipts ${JSON.stringify(receipts)}`)')
+  );
+  assert.ok(script.includes("addHeading('Enroll decisions', 3)"));
+  // The receipt script carries no expressions, so it never counts toward the 21k expression budget.
+  assert.ok(!script.includes('${{'));
 });

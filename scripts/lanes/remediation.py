@@ -16,6 +16,8 @@ import os
 import re
 from datetime import datetime, timezone
 
+import machine_gap
+
 SCHEMA = "jovie.remediation-event/v1"
 CLASSES = (
     "ready",
@@ -84,6 +86,12 @@ STRATEGY_TEXT = re.compile(
     r"canon/strategy|founder strategy|pricing|taste\b|credential",
     re.IGNORECASE,
 )
+# A test path is not a founder decision. PR #22426 exhausted because a
+# style-guard filename contained "pricing" while the change was front-door copy.
+_TEST_PATH = re.compile(
+    r"(?:^|/)(?:__tests__|tests?)/|\.(?:test|spec)\.[^/]+$",
+    re.IGNORECASE,
+)
 # An ordinary engineering repair frequently states what it did NOT touch
 # ("No credentials or permissions are changed"); a negated credential/secret
 # mention is assurance, not a founder decision surface (JOV-8495 re-review).
@@ -103,6 +111,42 @@ _BARE_LIST_CREDENTIAL = re.compile(
 _NON_CREDENTIAL_STRATEGY = re.compile(
     r"canon/strategy|founder strategy|pricing|taste\b",
     re.IGNORECASE,
+)
+# Match only the stated assurance, capturing its credential mention. Never
+# erase another mention in the same sentence: it may request a real action.
+# JOV-8810: a model-route repair also says a check could not be verified,
+# that child-environment credentials were stripped, or names screenshot/credential
+# tests. Each alternative captures only that word. A rotate, a vault strip,
+# "credential for tests", and a credential path stay gated.
+_CREDENTIAL_ASSURANCE = re.compile(
+    r"\b(?P<passive>credentials?)(?:,\s*(?:and\s+)?OTPs?)?\s+"
+    r"(?:are|is|were|was)\s+(?:(?:excluded|omitted|redacted|hashed|stripped|dropped|withheld)"
+    r"|not\s+(?:recorded|stored|logged|included|emitted|printed|persisted))\b"
+    r"|\bcannot\s+(?:attest|isolate)(?:\s+or\s+(?:attest|isolate))?\s+"
+    r"(?:child\s+tools,\s*)?(?P<boundary>credentials?)\b"
+    r"|\bstrip(?:ped|ping)?\s+(?:(?:raw|metered)\s+)?(?:api\s+)?(?P<removed>credentials?)\s+"
+    r"(?:from|in)\s+(?:child\s+)?environments?\b"
+    r"|\b(?:could\s+not|cannot|can\s+not)\s+be\s+(?:verified|certified)\s+"
+    r"(?:with\s+the\s+available|without)\s+(?P<unavailable>credentials?)\b"
+    r"|\bscreenshot/(?P<testref>credentials?)\s+tests?\b",
+    re.IGNORECASE,
+)
+# URL validation rejects embedded authentication; it does not request access to
+# a provider credential. Recognize only a URL-property rejection list, and only
+# remove its credential item. A following rotation/copy request stays visible.
+_URL_CREDENTIAL_REJECTION = re.compile(
+    r"\b(?:reject(?:s|ed|ing)?|block(?:s|ed|ing)?|disallow(?:s|ed|ing)?)\s+"
+    r"(?:(?:(?:unsupported|unapproved)\s+hosts?|https?|non-?default\s+ports?)\s*,\s*)+"
+    r"(?P<credential>credentials?)"
+    r"(?=\s*(?:$|[,;]|and\s+non-?default\s+ports?\b))",
+    re.IGNORECASE,
+)
+# PRs document an already-made design choice under this evidence heading. The
+# heading alone is not a founder ask; every word in the section remains input,
+# as do headings such as "Taste approval needed" and all protected paths.
+_TASTE_EVIDENCE_HEADING = re.compile(
+    r"^(#{1,6}[ \t]+)taste(?=[ \t]*(?:\(risk[ \t]+x[ \t]+confidence\)[ \t]*)?#*[ \t]*\r?$)",
+    re.IGNORECASE | re.MULTILINE,
 )
 ACTIONABLE_FIX = re.compile(
     r"computeRatePercent|use `|replace `|change `|fix:|add (?:the |a )?(?:story|test|colocated)|"
@@ -240,6 +284,7 @@ def _actionable(text: str) -> bool:
 
 def _strip_negated_policy(text: str) -> str:
     """Remove assurance-only credential mentions, one sentence at a time."""
+    text = _TASTE_EVIDENCE_HEADING.sub(r"\1", text)
     pieces = re.split(r"([.!\n])", text)
     stripped = []
     for index, piece in enumerate(pieces):
@@ -249,14 +294,25 @@ def _strip_negated_policy(text: str) -> str:
         piece = NEGATED_POLICY_TEXT.sub("", piece)
         if _NO_NEW_ASSURANCE.search(piece) and not _NON_CREDENTIAL_STRATEGY.search(piece):
             piece = _BARE_LIST_CREDENTIAL.sub("", piece)
+        piece = _CREDENTIAL_ASSURANCE.sub(
+            lambda match: match[0].replace(match[match.lastgroup], "", 1), piece)
+        piece = _URL_CREDENTIAL_REJECTION.sub(
+            lambda match: match[0][:match.start("credential") - match.start()], piece)
         stripped.append(piece)
     return "".join(stripped)
+
+
+def _strategy_path(path: str) -> bool:
+    text = str(path)
+    if _TEST_PATH.search(text):
+        return False
+    return bool(STRATEGY_TEXT.search(text))
 
 
 def _strategy(pr: dict) -> bool:
     files = pr.get("files") or pr.get("paths") or pr.get("conflictFiles") or []
     # Protected paths are independent evidence; prose assurances cannot negate them.
-    if any(STRATEGY_TEXT.search(str(path)) for path in files):
+    if any(_strategy_path(path) for path in files):
         return True
     # Remove only the negated credential mention. A pricing/taste/strategy ask
     # in the same sentence or a separate title still requires authority.
@@ -351,6 +407,24 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
     # detector the labeled-event path uses names it, so the ask surfaces as
     # tim-decides instead of being routed as prescribed implementation.
     thread_ask = review_authority_ask(pr)
+    if thread_ask:
+        return blocker("needs-human-decision", "changes-requested",
+                       ["current human review requires authority",
+                        f"review evidence carries a {thread_ask} decision"],
+                       "tim-decides")
+
+    if held_here and not _actionable(note):
+        return blocker("needs-human-decision", "hold",
+                       [note[:240] or "human hold without a fix"], "tim-decides")
+    if pr.get("codeownersBlocked") or "codeowners" in labels:
+        return blocker("needs-human-decision", "codeowners",
+                       ["missing required human approval"], "tim-decides")
+
+    # GitHub computes mergeability asynchronously. UNKNOWN is missing evidence,
+    # not a failed repair or a human decision; the next pass reads it again.
+    if merge == "UNKNOWN":
+        return blocker("ready", "awaiting", ["mergeStateStatus=UNKNOWN"], "wait")
+
     if human_review and not held_here and not stop_labels and not thread_ask \
             and not (pr.get("codeownersBlocked") or "codeowners" in labels):
         # Tim 2026-10-15: ordinary requested changes ship through the automated
@@ -367,19 +441,6 @@ def classify_blocker(pr: dict, held: dict | None = None, attempts: dict | None =
                            evidence, "apply-prescribed-fix")
         return blocker("fixable-by-model", "review",
                        evidence, "escalate")
-    if thread_ask:
-        return blocker("needs-human-decision", "changes-requested",
-                       ["current human review requires authority",
-                        f"review evidence carries a {thread_ask} decision"],
-                       "tim-decides")
-
-    if held_here and not _actionable(note):
-        return blocker("needs-human-decision", "hold",
-                       [note[:240] or "human hold without a fix"], "tim-decides")
-    if pr.get("codeownersBlocked") or "codeowners" in labels:
-        return blocker("needs-human-decision", "codeowners",
-                       ["missing required human approval"], "tim-decides")
-
     if held_here and _actionable(note):
         return blocker("fixable-by-model", "human-hold",
                        [f"{author}: {note[:400]}".strip(": ")], "apply-prescribed-fix")
@@ -643,9 +704,12 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
     candidates = []
     for row in qualified:
         seen = availability(row["lane"], row) or {}
-        pressure = max(0.0, float(seen.get("pressure") or 0.0))
+        pace = float(seen.get("paceAdjust") or 0.0)
+        # Quota pressure is never negative; the registry's pace adjustment may discount a lane that is
+        # behind pace on use-or-lose quota (floor: a tenth of its cost), never below that.
+        pressure = max(-0.9, max(0.0, float(seen.get("pressure") or 0.0)) + pace)
         candidates.append({**row, "available": bool(seen.get("ok")), "why": seen.get("why") or "ok",
-                           "pressure": round(pressure, 3),
+                           "pressure": round(pressure, 3), "paceAdjust": round(pace, 3),
                            "effectiveCost": round(row["cost"] * (1 + pressure), 3)})
     candidates.sort(key=lambda row: (row["effectiveCost"], row["tier"], row["index"], row["order"]))
     chosen = next((row for row in candidates if row["available"]), None)
@@ -666,9 +730,9 @@ def route_issue(issue: dict, providers: dict, policy: dict, availability, *, onl
             "reasons": need["reasons"], "notes": notes,
             "chosen": None if chosen is None else {key: chosen[key] for key in
                                                    ("lane", "model", "alias", "capability", "costClass",
-                                                    "cost", "pressure", "effectiveCost")},
+                                                    "cost", "pressure", "paceAdjust", "effectiveCost")},
             "candidates": [{key: row[key] for key in ("lane", "model", "capability", "cost", "pressure",
-                                                      "effectiveCost", "available", "why")}
+                                                      "effectiveCost", "paceAdjust", "available", "why")}
                            for row in candidates],
             "rationale": rationale}
 
@@ -817,6 +881,7 @@ def dossier(pr: dict, classified: dict, record: dict | None = None) -> str:
     if linked.get("identifier") or pr.get("issue"):
         lines.append(f"Linked issue: {linked.get('identifier') or pr.get('issue')}")
     lines.append("Do not reset attempt history. Push to this branch. Do not open a new PR.")
+    lines.append("Never rebase, squash, reset or force-push this branch; merge origin/main and fast-forward push only.")
     return "\n".join(lines)
 
 
@@ -929,12 +994,16 @@ def remediation_summary(snapshot: dict | None, receipts: list[dict] | None, now:
     return report
 
 
-def alert_reason(report: dict) -> str | None:
-    surfaced = report.get("surfaced") or []
+def alert_reason(report: dict, open_prs: set[int] | None = None) -> str | None:
+    """Surfaced PRs that are still open, for the lanes repair owner (Tim's rule: never a
+    human by default). `surfaced` is append-only, so on Gem 2026-10-20 the alert listed 12
+    PRs that had all merged or closed by 10-13; with the open set known, those drop out."""
+    surfaced = [row for row in report.get("surfaced") or []
+                if open_prs is None or row.get("pr") in open_prs]
     if not surfaced:
         return None
     listed = ", ".join(f"#{row.get('pr')} {row.get('cls')}" for row in surfaced[:12])
-    return f"needs a human decision: {listed}"
+    return f"surfaced PRs need a repair-owner decision: {listed}"
 
 
 def intake_labels(ws: str) -> list[str]:
@@ -1568,6 +1637,12 @@ def plan_labeled_events(issues: list, recorded: dict | None, providers: dict, no
         row["cls"] = classified["cls"]
         row["subtype"] = classified.get("subtype")
         row["dossier"] = event_dossier(classified, canonical.get("title") or "", canonical.get("identifier") or "")
+        # A recurring event is a machine-builder task: the third occurrence in 14 days stops fixing the instance.
+        recent = sum(1 for item in (history if escalation_enabled() else []) if now - (iso_epoch(item.get("updatedAt")) or 0) < 14 * 86400)
+        row["recurrence14d"] = recent
+        row["machineBuilder"] = recent + 1 >= 3
+        if row["machineBuilder"]:
+            row["dossier"] = machine_gap.builder_dossier(fingerprint, recent + 1) + "\n" + row["dossier"]
         if classified["subtype"] == "musicfetch-cutover":
             row["route"] = MUSICFETCH_CUTOVER
         if classified["cls"] == "human-only":

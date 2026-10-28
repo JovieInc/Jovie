@@ -43,11 +43,8 @@ describe('isInternalOrTestAccountEmail', () => {
     ['browse+clerk_test@jov.ie', 'clerk test tag'],
     ['someone+clerk_test@gmail.com', 'clerk test tag on external domain'],
     ['e2e-42@jov.ie', 'e2e prefix'],
-    ['e2e@anything.dev', 'bare e2e local part'],
     ['browse-admin+clerk_test@jov.ie', 'browse prefix with tag'],
     ['auth-qa-1@jov.ie', 'auth-qa prefix'],
-    ['smoke-run@qa.vendor.io', 'smoke prefix on any domain'],
-    ['staging-check@corp.net', 'staging prefix'],
     ['test-signup@example.org', 'test prefix + reserved domain'],
     ['demo@jov.ie', 'demo local part'],
     ['dualipa-public@jov.ie', 'demo placeholder suffix'],
@@ -55,7 +52,6 @@ describe('isInternalOrTestAccountEmail', () => {
     ['auth-surface-qa+clerk_test@test.jovie.com', 'dogfood QA domain'],
     ['money-referrer-123@test.jovie.com', 'e2e dogfood email'],
     ['anyone@staging.test.jovie.com', 'dogfood subdomain'],
-    ['dogfood-tim@gmail.com', 'dogfood local part on external domain'],
     ['canary+synthetic-grokbot@mail.example', 'synthetic principal tag'],
     ['ops+synthetic-muse-run7@gmail.com', 'synthetic tag on external domain'],
   ])('excludes %s (%s)', email => {
@@ -64,6 +60,12 @@ describe('isInternalOrTestAccountEmail', () => {
 
   it.each([
     ['artist@band.com'],
+    ['demo@label.com'],
+    ['artist-public@label.com'],
+    ['e2e@anything.dev'],
+    ['smoke-run@qa.vendor.io'],
+    ['staging-check@corp.net'],
+    ['dogfood-tim@gmail.com'],
     ['fan.name@gmail.com'],
     ['latest.music@outlook.com'],
     ['synthetic-fan@gmail.com'],
@@ -88,7 +90,6 @@ describe('isInternalOrTestAccountEmail', () => {
     ['money-referrer-123@test.jovie.com'],
     ['anyone@staging.test.jovie.com'],
     ['e2e-42@jov.ie'],
-    ['dogfood-tim@gmail.com'],
     ['dualipa-public@jov.ie'],
     ['seeded@data.test'],
     ['canary+synthetic-grokbot@mail.example'],
@@ -99,6 +100,12 @@ describe('isInternalOrTestAccountEmail', () => {
 
   it.each([
     ['artist@band.com'],
+    ['demo@label.com'],
+    ['artist-public@label.com'],
+    ['e2e@anything.dev'],
+    ['smoke-run@qa.vendor.io'],
+    ['staging-check@corp.net'],
+    ['dogfood-tim@gmail.com'],
     ['fan.name@gmail.com'],
     ['quality@band.com'],
     ['synthetic-fan@gmail.com'],

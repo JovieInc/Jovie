@@ -188,6 +188,49 @@ export function affectsWebTestTypecheck(file) {
   return /\.(?:js|jsx|mjs|cjs)$/i.test(normalized);
 }
 
+/**
+ * Repo files the Guardrails step reads at runtime that classifyChangedFile does
+ * NOT route to the Jovie product lane (docs map to no lane, .claude/rules/* to
+ * Symphony only). A diff touching any of them must still run the guardrail
+ * checks that read them, without waking the full product CI. Keep this the one
+ * explicit list; scripts/lib/__tests__/guardrail-inputs.test.mjs fails when a
+ * guardrail test or guard script reads a repo file that is neither here nor
+ * product-lane. Not listed on purpose: .claude/rules/release.md (only read by
+ * version-fanout-guard, which runs in the cross-product lane).
+ */
+export const GUARDRAIL_INPUT_FILES = Object.freeze([
+  'AGENTS.md',
+  'CHANGELOG.md', // scripts/version-stamp.test.mjs copies and stamps the real file
+  'CLAUDE.md',
+  'CODEX.md',
+  'DESIGN.md',
+  'docs/llms-design-manifest.txt',
+  'docs/marketing/AGENT_GUIDE.md',
+  '.claude/rules/gstack.md',
+  '.claude/rules/ios.md',
+  '.claude/rules/testing.md',
+  '.claude/rules/ui.md',
+]);
+
+/** Directory trees read wholesale (skill catalog/governance guards). */
+export const GUARDRAIL_INPUT_DIR_PREFIXES = Object.freeze([
+  '.agents/skills/',
+  '.claude/skills/',
+  'docs/agent-context/',
+  'docs/vendor/vercel-labs/',
+]);
+
+export function isGuardrailInput(file) {
+  const normalized = normalizeFile(file);
+  if (!normalized) return false;
+  if (GUARDRAIL_INPUT_FILES.includes(normalized)) return true;
+  // Any file type under these trees: the skill/governance guards walk whole
+  // directories, so yaml/json/lock files there are inputs too.
+  return GUARDRAIL_INPUT_DIR_PREFIXES.some(prefix =>
+    normalized.startsWith(prefix)
+  );
+}
+
 function normalizeFile(file) {
   return String(file || '')
     .trim()
@@ -234,6 +277,9 @@ export function classifyChangedFile(file) {
   ) {
     return [CI_LANES.SYMPHONY_CONTROL];
   }
+  if (/^docs\/playbooks\/[^/]+\.playbook\.md$/.test(normalized)) {
+    return [CI_LANES.JOVIE_PRODUCT];
+  }
   if (DOC_FILE.test(normalized) && !normalized.startsWith('.github/')) {
     return [];
   }
@@ -254,6 +300,7 @@ export function classifyCiRepoLanes(files) {
     runJovieTypecheck:
       lanes.has(CI_LANES.JOVIE_PRODUCT) &&
       changed.some(file => affectsWebTestTypecheck(file)),
+    runGuardrailInputs: changed.some(file => isGuardrailInput(file)),
     runSymphonyControl: lanes.has(CI_LANES.SYMPHONY_CONTROL),
     runSummerOps: lanes.has(CI_LANES.SUMMER_OPS),
   };

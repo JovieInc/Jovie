@@ -176,6 +176,54 @@ class WorktreeTest(unittest.TestCase):
                 self.assertTrue(any("preserved busy" in a for a in report["actions"]))
 
 
+class CwdHolderTest(unittest.TestCase):
+    """Gem 2026-10-20: Docker overlay/nsfs lsof warnings made every lane-end cleanup
+    preserve its worktree, and reparented dev servers kept checkouts busy."""
+    OVERLAY = ("lsof: WARNING: can't stat() overlay file system /var/lib/docker/overlay2/abc/merged\n"
+               "      Output information may be incomplete.\n"
+               "lsof: WARNING: can't stat() nsfs file system /run/docker/netns/def\n"
+               "      Output information may be incomplete.\n")
+
+    def lsof(self, stdout="", stderr="", code=0):
+        return lambda args, **kw: SimpleNamespace(returncode=code, stdout=stdout, stderr=stderr)
+
+    def test_unrelated_mount_warnings_do_not_hide_idleness_or_activity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp).resolve()
+            self.assertIsNone(guard.busy_reason(path, self.lsof(stderr=self.OVERLAY)))
+            self.assertEqual(guard.busy_reason(path, self.lsof(f"p42\nfcwd\nn{path}/apps/web\n", self.OVERLAY)),
+                             "process-still-running")
+
+    def test_other_or_enclosing_warnings_still_fail_closed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp).resolve()
+            for stderr in ("WARNING: cannot stat mount",
+                           f"lsof: WARNING: can't stat() overlay file system {path.parent}\n",
+                           "lsof: no pwd entry for UID 1000\n"):
+                with self.subTest(stderr=stderr):
+                    self.assertEqual(guard.busy_reason(path, self.lsof(stderr=stderr)), "process-state-unavailable")
+            self.assertEqual(guard.busy_reason(path, self.lsof(code=2)), "process-state-unavailable")
+
+    def test_reap_stops_only_processes_working_in_the_run_checkout(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp).resolve()
+            alive = {101, 102, 103}
+            listing = lambda: "".join(f"p{pid}\nfcwd\nn{path if pid != 103 else '/elsewhere'}\n"
+                                      for pid in sorted(alive))
+            kills = []
+            def kill(pid, sig):
+                kills.append((pid, sig))
+                if pid == 101 or sig == 9:
+                    alive.discard(pid)  # 101 honours SIGTERM; 102 needs SIGKILL
+            run = lambda args, **kw: SimpleNamespace(returncode=0, stdout=listing(), stderr="")
+            self.assertEqual(guard.reap_cwd_holders(path, run, kill, sleep=lambda s: None), [101, 102])
+            self.assertEqual(kills, [(101, 15), (102, 15), (102, 9)])
+            self.assertIn(103, alive)
+            self.assertIsNone(guard.busy_reason(path, run))
+            # An unreadable inventory reaps nothing.
+            self.assertEqual(guard.reap_cwd_holders(path, self.lsof(code=2), kill), [])
+
+
 class CheckTest(unittest.TestCase):
     def setUp(self):
         # These tests model disk pressure, not the operator's actual cleanup scope.
@@ -184,6 +232,7 @@ class CheckTest(unittest.TestCase):
         scratch = Path(self.cleanup.name)
         derived = guard.sweep_derived_data
         isolated = [
+            patch.object(Path, "home", return_value=scratch),
             patch.object(guard, "runner_roots", return_value=[]),
             patch.object(guard, "retired_workspace_roots", return_value=[]),
             patch.object(guard, "log_dirs", side_effect=lambda host: [host.state / "runs"]),
@@ -402,7 +451,21 @@ class CheckTest(unittest.TestCase):
             root = Path(tmp) / "symphony-elixir-workspaces"
             self.assertFalse(guard.reclaimable(None, roots=[root]))
             (root / "JOV-1").mkdir(parents=True)
-            self.assertTrue(guard.reclaimable(None, roots=[root]))
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=set()):
+                self.assertTrue(guard.reclaimable(None, roots=[root]))
+            # 2026-10-25: a bind-mounted child (skipped whole by the sweep) or one on a roomy
+            # volume is not reclaimable; counting it held capacity at "disk-reclamation-pending".
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value={(root / "JOV-1").resolve()}):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT + 20), \
+                    patch.object(guard, "mount_points", return_value=set()):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
+            # An unreadable mount table fails closed: this feeds a deletion decision.
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=None):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
 
     def test_cleanup_lock_serializes_workers_and_recovers_after_release(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
@@ -430,12 +493,113 @@ class CheckTest(unittest.TestCase):
 
 
 
+def probe_check_fixture():
+    """Audit only cleanup execution; import source before denying host access."""
+    import worktree_sweep  # noqa: F401 (load lazy dependencies before the audit)
+    case = CheckTest("test_healthy_disk_sweeps_nothing")
+    case.setUp()
+    root = Path(case.cleanup.name)
+    violations = []
+    active = True
+
+    def inside(path, dir_fd=None):
+        if isinstance(path, int) or path is None:
+            return
+        path = os.fsdecode(path)
+        if not os.path.isabs(path) and dir_fd is not None and dir_fd != -1:
+            path = os.path.join(os.readlink(f"/proc/self/fd/{dir_fd}"), path)
+        absolute = Path(os.path.realpath(path))
+        if not absolute.is_relative_to(root):
+            violations.append(f"outside fixture: {absolute}")
+            raise PermissionError(violations[-1])
+
+    def audit(event, args):
+        if not active:
+            return
+        if event.startswith(("subprocess.", "socket.")) or event in ("os.system", "os.posix_spawn", "os.exec"):
+            violations.append(f"forbidden launch/network: {event}")
+            raise PermissionError(violations[-1])
+        if event in ("open", "os.listdir", "os.scandir", "os.chdir", "os.remove",
+                     "os.rmdir", "os.mkdir", "shutil.rmtree", "pathlib.Path.glob", "pathlib.Path.rglob"):
+            dir_fd = args[1] if event in ("os.remove", "os.rmdir", "shutil.rmtree") else None
+            if event == "os.mkdir":
+                dir_fd = args[2]
+            inside(args[0], dir_fd)
+        if event in ("os.rename", "os.link", "os.symlink"):
+            inside(args[0])
+            inside(args[1])
+
+    # stat/lstat do not emit Python audit events. Observe those paths too.
+    stat, lstat = Path.stat, Path.lstat
+    def checked_stat(path, *args, **kwargs):
+        inside(path)
+        return stat(path, *args, **kwargs)
+    def checked_lstat(path, *args, **kwargs):
+        inside(path)
+        return lstat(path, *args, **kwargs)
+
+    commands = []
+    def run(args, **kwargs):
+        case.assertIsNotNone(kwargs.get("cwd"))
+        inside(kwargs["cwd"])
+        if args not in (["git", "worktree", "list", "--porcelain"],
+                        ["xcrun", "simctl", "delete", "unavailable"]):
+            violations.append(f"unexpected command: {args}")
+            raise PermissionError(violations[-1])
+        commands.append(args)
+        return ok(args)
+
+    sys.addaudithook(audit)
+    try:
+        with patch.object(Path, "stat", checked_stat), patch.object(Path, "lstat", checked_lstat), \
+                patch.object(guard, "free_pct", return_value=10.0):
+            derived = make_tree(root / "DerivedData/old", ["build.log"], age_s=6 * 3600)
+            logs = make_tree(root / "runs", ["old.log"], age_s=15 * 86400)
+            report = guard.check(case.host(root), run=run, now=NOW, sweep=True)
+            case.assertEqual(report["errors"], [])
+            case.assertFalse(derived.exists())
+            case.assertFalse((logs / "old.log").exists())
+            case.assertEqual(guard.runner_roots(), [])
+            case.assertEqual(guard.retired_workspace_roots(), [])
+            # Deliberate tool coverage still uses the fixture's own home.
+            with patch.object(guard.shutil, "which", return_value="/fixture/xcrun"):
+                guard.sweep_host_tools(run, report)
+            case.assertIn(["xcrun", "simctl", "delete", "unavailable"], commands)
+            case.assertEqual(violations, [], "caught sweep errors must also fail the probe")
+            # Prove launch/path refusal before any effect; these two are deliberate reds.
+            with case.assertRaises(PermissionError):
+                subprocess.run(["git", "push", "https://invalid.example/fixture"], cwd=root)
+            with case.assertRaises(PermissionError):
+                (root.parent / "outside-fixture").read_text()
+            case.assertEqual(len(violations), 2)
+    finally:
+        active = False
+        case.doCleanups()
+
+
+class FixtureIsolationTest(unittest.TestCase):
+    def test_check_fixture_paths_and_subprocesses_fail_closed(self):
+        # Audit hooks are irreversible: contain them in a fresh interpreter.
+        code = ("import importlib.util,sys; "
+                "s=importlib.util.spec_from_file_location('disk_fixture_probe', sys.argv[1]); "
+                "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); "
+                "m.probe_check_fixture()")
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", code, str(Path(__file__).resolve())],
+                                capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+
 class RetiredHostLoopTest(unittest.TestCase):
     """Runner _work, retired Symphony workspaces and old logs: the gem-disk-reclaim duties."""
 
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        import worktree_sweep
+        scan = patch.object(worktree_sweep, "scan_snapshot", return_value=None)  # scanners: own tests
+        scan.start()
+        self.addCleanup(scan.stop)
         self.root = Path(self.tmp.name).resolve()
         self.env = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
         self.env.update(GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@example.com",
@@ -558,10 +722,14 @@ class RetiredHostLoopTest(unittest.TestCase):
             guard.sweep_retired_workspaces(SimpleNamespace(state=self.root), self.run_cmd, NOW, report, roots=[root])
         self.assertFalse(clean.exists())
         self.assertFalse(dirty.exists())
-        backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
+        branches = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/heads/backup"],
+                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
+        self.assertEqual(branches, [], "a retired-workspace snapshot is never a branch")
+        backups = subprocess.run(["git", "for-each-ref", "--format=%(refname)", "refs/jovie-preserved/sweep/"],
                                  cwd=origin, env=self.env, capture_output=True, text=True).stdout.split()
         self.assertEqual(len(backups), 1, report)
-        self.assertTrue(backups[0].endswith("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d")))
+        self.assertIn("/JOV-2-" + guard.datetime.fromtimestamp(NOW, guard.timezone.utc).strftime("%Y%m%d") + "-",
+                      backups[0])
         shown = subprocess.run(["git", "show", f"{backups[0]}:wip.txt"], cwd=origin, env=self.env,
                                capture_output=True, text=True).stdout
         self.assertEqual(shown, "unsaved")

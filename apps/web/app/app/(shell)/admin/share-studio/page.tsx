@@ -12,6 +12,7 @@ import {
   buildDisplayUrl,
   buildMailtoHref,
   buildTrackedShareUrl,
+  shareStoryPreviewSrc,
 } from '@/lib/share/copy';
 import type { ShareContext } from '@/lib/share/types';
 import {
@@ -189,7 +190,7 @@ function PayloadCard(
         <div className='grid gap-4 lg:grid-cols-[320px_1fr]'>
           <div className='space-y-3'>
             <Image
-              src={props.context.asset.url}
+              src={shareStoryPreviewSrc(props.context.asset.url)}
               alt={`${props.context.title} story preview`}
               className='aspect-[9/16] w-full rounded-xl border border-subtle object-cover'
               width={1080}

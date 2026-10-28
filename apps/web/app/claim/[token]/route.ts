@@ -1,5 +1,10 @@
 import { type NextRequest, NextResponse } from 'next/server';
-import { writePendingClaimContext } from '@/lib/claim/context';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import {
+  applyPendingClaimCookie,
+  writePendingClaimContext,
+} from '@/lib/claim/context';
+import { buildClaimRedirectUrl } from '@/lib/claim/redirect-origin';
 import {
   clearLeadAttributionCookie,
   lookupLeadByClaimToken,
@@ -19,13 +24,14 @@ import {
   isClaimTokenValid,
   lookupUsernameByClaimToken,
 } from '@/lib/services/profile/queries';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 
 interface ClaimTokenRouteContext {
   readonly params: Promise<{ readonly token: string }>;
 }
 
 function buildAbsoluteUrl(request: NextRequest, pathname: string): URL {
-  return new URL(pathname, request.url);
+  return buildClaimRedirectUrl(request, pathname);
 }
 
 export async function GET(
@@ -77,9 +83,14 @@ export async function GET(
   const lead = await lookupLeadByClaimToken(token);
   const claimTokenHash = await hashClaimToken(token);
 
+  // Golden-path entry cohort. Consent-gated: no journey id, nothing recorded.
+  await recordArtistOfferStage(
+    request.cookies.get(ACQUISITION_COOKIE_NAME)?.value,
+    'claim-link-open'
+  );
   await setLeadAttributionCookieFromToken(token);
   await markLeadClaimPageViewedFromToken(token);
-  await writePendingClaimContext({
+  const context = await writePendingClaimContext({
     mode: 'token_backed',
     creatorProfileId: profile.id,
     username: profile.usernameNormalized,
@@ -88,10 +99,13 @@ export async function GET(
     expectedSpotifyArtistId: profile.spotifyId ?? null,
   });
 
-  return NextResponse.redirect(
-    buildAbsoluteUrl(
-      request,
-      `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
-    )
+  return applyPendingClaimCookie(
+    NextResponse.redirect(
+      buildAbsoluteUrl(
+        request,
+        `/${encodeURIComponent(profile.usernameNormalized)}?claim=1`
+      )
+    ),
+    context
   );
 }

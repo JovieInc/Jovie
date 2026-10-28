@@ -123,6 +123,22 @@ is owned by the lanes fix loop, not this monitor.
 
 The `synthetic-monitoring.yml` workflow runs production canaries against jov.ie at `17 */6 * * *` UTC plus manual dispatch.
 
+JOV-6813's dead-man check runs in the existing Automation Liveness backstop
+(about every 25 minutes, driven by Production Continuity Guard; no new cron).
+It reads scheduled `main` runs and the **Production Synthetic Tests** job for
+the current attempt. A missed heartbeat after seven hours (six-hour interval
+plus one hour of queue grace), skipped/failed/cancelled job, missing completed
+job, or run stuck for over one hour sends the same failure Slack action,
+webhook and `#alerts-production` channel as the canary, then fails the observer.
+Unreadable evidence also alerts. Daily AI-only and manual runs cannot refresh
+the heartbeat; run names identify the two schedules, with job-based fallback
+for older runs. The same synthetic Linear intake reopens the stable remediation
+issue on an alarm, respecting its existing intake policy. Alerts repeat on each
+unhealthy observation until recovery.
+The observer needs only its existing `actions: read` permission and Slack
+secret. Healthy checks use two GitHub reads, occasionally a third for an
+in-flight/legacy daily run (bounded to 11 reads per pass).
+
 ## Neon Database
 
 - **Ephemeral branches** - Created only by manual dispatch or scheduled evidence lanes (never automatically per PR) as explicit, expiring exceptions carrying the `jovie-preview-env-admission/v1` contract (JOV-5941; registry: `.github/preview-env-registry.json`)
@@ -159,7 +175,7 @@ Generated from `.github/ci-harness/manifest.json`. Do not hand-edit this block; 
 
 | Stage | Exact responsibility |
 | --- | --- |
-| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
+| Source PR | Deterministic path + brand classification, risk classification, `ci-fast`, exact-head coverage, unit tests the exact diff can affect (`--changed` against the merge base, aggregated into `PR Ready`), diff secret scan, and `Golden Path Lock`. `Migration Guard`, `Fork PR Gate`, and `PR Size Guard` remain separate required contexts. |
 | Native merge queue | Re-run deterministic gates plus exact-head coverage on the exact `merge_group` head, then require only path-selected Web unit/build, Mac test/package, iOS Xcode, shared-contract integration, and model-free semantic evidence. |
 | Queue-proven main | Reuse the exact successful merge-group `PR Ready` proof and skip duplicate fallback work. |
 | Direct/admin main | Fail closed through path/risk/fast/secret/migration plus every product lane selected by the exact push diff; skipped selected lanes and executed unselected lanes are invalid. |
@@ -202,7 +218,7 @@ Source `PR Ready` may require only `source-pr`/`both` jobs below. Merge-group `P
 | `Ovie Typecheck (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/ovie typecheck` |
 | `Storybook Surface Matrix (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/web exec playwright test tests/e2e/storybook-elevation.spec.ts tests/e2e/storybook-input.spec.ts --config=playwright.config.storybook.ts --project=chromium` |
 | `iOS Fast Unit + Coverage (combined)` | merge-group | combined-integration | `pnpm run ios:lint && bash apps/ios/scripts/run-unit-tests.sh && bash apps/ios/scripts/check_coverage.sh` |
-| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test && pnpm --filter @jovie/desktop run package:staging` |
+| `Mac Build + Test (combined)` | merge-group | combined-integration | `pnpm run macos:test && pnpm run macos:build && pnpm --filter @jovie/desktop run typecheck && pnpm --filter @jovie/desktop run test` |
 | `Cross-Product Integration (combined)` | merge-group | combined-integration | `pnpm --filter @jovie/auth-routing test && pnpm --filter @jovie/action-contracts test && pnpm --filter @jovie/audio-contracts test && pnpm --filter @jovie/release-channel-contracts test` |
 | `Promptfoo Evals (deterministic)` | merge-group | combined-integration | `pnpm run evals` |
 | `Golden Eval Set (deterministic)` | merge-group | combined-integration | `pnpm run evals:golden` |

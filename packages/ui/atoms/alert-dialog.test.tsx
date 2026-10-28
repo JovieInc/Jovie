@@ -236,8 +236,8 @@ describe('AlertDialog', () => {
     it('supports variant prop', () => {
       render(<TestAlertDialog open={true} actionVariant='destructive' />);
       const action = screen.getByTestId('alert-dialog-action');
-      expect(action.className).toContain('bg-error');
-      expect(action.className).toContain('text-error-foreground');
+      expect(action.className).toContain('bg-btn-destructive');
+      expect(action.className).toContain('text-btn-destructive-foreground');
     });
   });
 

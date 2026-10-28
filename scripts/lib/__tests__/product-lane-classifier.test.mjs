@@ -16,6 +16,7 @@ import {
   evaluateProductLaneResults,
   formatGitHubSummary,
   macLockfileGraph,
+  macNativeRequired,
   ProductLaneClassificationError,
   runProductLaneClassifier,
 } from '../product-lane-classifier.mjs';
@@ -32,6 +33,16 @@ const pkg = (before, after, desktop = {}) =>
   });
 
 describe('product lane classifier', () => {
+  it('routes native playbook-only changes through web checks', () => {
+    expect(
+      classifyProductLanes([
+        'docs/playbooks/growth-presence-repair-offer.playbook.md',
+      ]).selectedLanes
+    ).toEqual(['web']);
+    expect(
+      classifyProductLanes(['docs/playbooks/TEMPLATE.md']).selectedLanes
+    ).toEqual(['operations']);
+  });
   it('routes the published CLI skill artifacts through the CLI web gate and rejects unknown skill paths', () => {
     const receipt = classifyProductLanes([
       'skills/jovie/SKILL.md',
@@ -188,6 +199,36 @@ describe('product lane classifier', () => {
     expect(
       receipt.classifications.every(
         item => item.rule === 'shared-release-communications'
+      )
+    ).toBe(true);
+  });
+
+  it('classifies the research router package as operations tooling', () => {
+    const receipt = classifyProductLanes([
+      'packages/research/router.ts',
+      'packages/research/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(
+      receipt.classifications.every(
+        item =>
+          item.rule === 'operations-research' &&
+          item.category === 'operations-tooling'
+      )
+    ).toBe(true);
+  });
+
+  it('classifies the shared API client package as operations tooling', () => {
+    const receipt = classifyProductLanes([
+      'packages/api-client/client.ts',
+      'packages/api-client/package.json',
+    ]);
+    expect(receipt.selectedLanes).toEqual(['operations']);
+    expect(
+      receipt.classifications.every(
+        item =>
+          item.rule === 'operations-api-client' &&
+          item.category === 'operations-tooling'
       )
     ).toBe(true);
   });
@@ -995,6 +1036,28 @@ describe('product lane classifier', () => {
       expect(readFileSync(outputs, 'utf8')).toContain('run_web=true');
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+  it('keeps the Mac lane on macOS only when a native input changed', () => {
+    const nodeOnly = [
+      'apps/web/components/organisms/CmdKPalette.tsx',
+      'apps/web/components/features/dashboard/dashboard-nav/config.ts',
+    ];
+    expect(macNativeRequired(classifyProductLanes(nodeOnly))).toBe(false);
+    for (const path of nodeOnly) {
+      expect(classifyProductLanes([path]).selectedLanes).toContain('mac');
+    }
+    for (const native of [
+      'apps/macos/MenuMonitor/Package.swift',
+      'apps/desktop/package.json',
+      'apps/web/lib/brand/tokens.ts',
+      'apps/web/scripts/generate-brand-assets.ts',
+      'packages/ui/brand/geometry.gen.ts',
+    ]) {
+      expect(
+        macNativeRequired(classifyProductLanes([...nodeOnly, native])),
+        native
+      ).toBe(true);
     }
   });
 });

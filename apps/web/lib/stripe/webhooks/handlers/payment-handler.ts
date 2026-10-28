@@ -39,6 +39,10 @@ import {
 import { logger } from '@/lib/utils/logger';
 
 import { BaseSubscriptionHandler } from '../base-handler';
+import {
+  isStripeReconciliationRequiredError,
+  StripeReconciliationRequiredError,
+} from '../reconciliation';
 import type {
   HandlerResult,
   SupportedEventType,
@@ -224,11 +228,20 @@ export class PaymentHandler extends BaseSubscriptionHandler {
       );
 
       if (!userId) {
-        return {
-          success: true,
-          skipped: true,
-          reason: 'cannot_identify_user_for_payment_success',
-        };
+        // A subscription invoice was paid but no Jovie user owns it. Never
+        // ack and forget it: the route durably marks the stored event
+        // needs_reconciliation (unprocessed, so billing replay re-drives it
+        // once ownership is fixed) and alerts before any 2xx.
+        throw new StripeReconciliationRequiredError(
+          'invoice_unattributed',
+          'Paid subscription invoice has no attributable user',
+          {
+            invoiceId: invoice.id ?? null,
+            subscriptionId,
+            customerId: getCustomerId(subscription.customer),
+            livemode: invoice.livemode ?? null,
+          }
+        );
       }
 
       const result = await this.processSubscription({
@@ -280,6 +293,8 @@ export class PaymentHandler extends BaseSubscriptionHandler {
 
       return result;
     } catch (error) {
+      // The route records and alerts reconciliation cases itself.
+      if (isStripeReconciliationRequiredError(error)) throw error;
       await captureCriticalError(
         'Error handling payment success webhook',
         error,

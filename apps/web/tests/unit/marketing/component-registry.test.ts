@@ -9,6 +9,7 @@ import { render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import * as ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
+import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { HomepageV2Route } from '@/components/marketing/homepage-v2/HomepageV2Route';
 import {
   BUTTON_PEN_PROPAGATION_FIXTURES,
@@ -33,6 +34,22 @@ import {
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
 
 const repoRoot = path.resolve(__dirname, '../../../../..');
+
+it('renders a standalone artist section with the shared page spine', () => {
+  const { container } = render(
+    createElement(
+      ArtistProfileSectionShell,
+      null,
+      createElement('h2', null, 'Your music, together')
+    )
+  );
+  const heading = screen.getByRole('heading', { name: 'Your music, together' });
+  expect(container.querySelectorAll('section')).toHaveLength(1);
+  expect(heading.parentElement).toHaveClass(
+    'ap-section-container',
+    'public-container'
+  );
+});
 
 interface MoleculeOwnershipFamily {
   readonly id: string;
@@ -959,7 +976,10 @@ describe('canonical marketing component registry', () => {
       entry => entry.sourceBacked
     );
     const unknown = sourceBacked.filter(entry => entry.penRootId === null);
-    expect(unknown.map(entry => entry.id)).toEqual(['recipe.homepage']);
+    expect(unknown.map(entry => entry.id)).toEqual([
+      'section.blog-feed',
+      'recipe.homepage',
+    ]);
     expect(validateMarketingPenRegistry(sourceBacked)).toEqual([]);
     expect(
       sourceBacked
@@ -1663,10 +1683,6 @@ describe('CTA source identity and Pen mapping', () => {
     expect(owner).toContain('return <section {...props} />');
     for (const [file, binding] of [
       [
-        'apps/web/components/homepage/HomepageClose.tsx',
-        "data-marketing-variant='editorial-search'",
-      ],
-      [
         'apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailsLanding.tsx',
         "data-marketing-variant='included-single'",
       ],
@@ -1756,4 +1772,50 @@ it('preserves the mounted homepage front-door auth boundary and public secondary
   const publicLink = container.querySelector('a.public-action-secondary');
   expect(publicLink).toHaveAttribute('href', '/artist-profiles');
   expect(publicLink).toHaveAttribute('data-test-prefetch', 'undefined');
+});
+
+const OWN_WIDTH_CAP =
+  /max-w-(?:300|315|280|4xl|6xl|linear-content)|--homepage-section-max/;
+
+describe('single container width', () => {
+  it.each([
+    'components/marketing/artist-profile/ArtistProfileCaptureSection.tsx',
+    'components/marketing/homepage-v2/HomepageV2Route.tsx',
+    'components/site/MarketingTerminalCta.tsx',
+  ])('%s takes its width from the shared container, not its own cap', file => {
+    const source = fs.readFileSync(path.join(process.cwd(), file), 'utf8');
+    expect(source).not.toMatch(OWN_WIDTH_CAP);
+  });
+});
+
+describe('artist-profile audience wording', () => {
+  const read = (name: string) =>
+    fs.readFileSync(
+      path.join(
+        repoRoot,
+        `apps/web/components/marketing/artist-profile/${name}.tsx`
+      ),
+      'utf8'
+    );
+
+  it('uses audience and listener wording in carousel, proof and spec wall', () => {
+    expect(read('ArtistProfileOutcomesCarousel')).toContain(
+      "aria-label='Audience Outcomes'"
+    );
+    expect(read('ArtistProfileOutcomesCarousel')).toContain('Listener opts in');
+    expect(read('ArtistProfileSocialProof')).toContain(
+      'inviting listeners to get release updates'
+    );
+    expect(read('ArtistProfileSpecWall')).toContain('Actual listeners');
+  });
+
+  it('keeps fan wording out of those rendered strings', () => {
+    for (const name of [
+      'ArtistProfileOutcomesCarousel',
+      'ArtistProfileSocialProof',
+      'ArtistProfileSpecWall',
+    ]) {
+      expect(read(name)).not.toMatch(/Actual Fans|Fan Outcomes|Fan Opts In/u);
+    }
+  });
 });

@@ -104,6 +104,7 @@ export async function recoverOrphanedApprovedAction(input: {
     }
     if (
       dispatch.mode === 'workflow-capture' ||
+      dispatch.mode === 'profile-consent' ||
       dispatch.mode === 'next-step-only'
     ) {
       return 'non-executable';

@@ -9,7 +9,7 @@ import {
   GOOGLE_CONNECTOR_PROVIDERS,
 } from '@/lib/connectors/registry';
 import { db } from '@/lib/db';
-import { users } from '@/lib/db/schema/auth';
+import { getUserByIdentity } from '@/lib/db/queries/shared';
 import { connectorAccounts } from '@/lib/db/schema/connectors';
 import { captureError } from '@/lib/error-tracking';
 import { logger } from '@/lib/utils/logger';
@@ -34,8 +34,8 @@ const bodySchema = z.object({
  */
 export async function POST(request: Request) {
   try {
-    const { userId: clerkId } = await getCachedAuth();
-    if (!clerkId) {
+    const { userId } = await getCachedAuth();
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -45,11 +45,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 
-    const [dbUser] = await db
-      .select({ id: users.id })
-      .from(users)
-      .where(eq(users.clerkId, clerkId))
-      .limit(1);
+    // Session ids are `users.id` after the Better Auth cutover (clerkId is
+    // null on those rows); legacy Clerk ids still resolve the same way.
+    const dbUser = await getUserByIdentity(db, userId);
 
     if (!dbUser) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

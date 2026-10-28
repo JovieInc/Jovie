@@ -1,4 +1,9 @@
 import { createHash } from 'node:crypto';
+import {
+  growthPreparationFingerprint,
+  type LaunchGrowthPreparation,
+  LaunchGrowthPreparationSchema,
+} from './growth-preparation';
 
 export const LAUNCH_READ_MODEL_VERSION = 'launch-read-model/v1' as const;
 
@@ -158,6 +163,8 @@ export interface LaunchRecord {
   readonly statusNote: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
+  /** Optional evidence only; ordinary launches acquire no new gate. */
+  readonly growthPreparation?: LaunchGrowthPreparation;
 }
 
 export interface LaunchDecisionInput {
@@ -301,6 +308,50 @@ export class InMemoryLaunchRegistry {
 
   async get(launchId: string): Promise<LaunchRecord | null> {
     return this.launches.get(launchId) ?? null;
+  }
+
+  /**
+   * Enrich an existing canary without commissioning another experiment. The
+   * caller supplies the existing owner's identity binding; this read model
+   * does not authenticate a caller or authorize publication/delivery.
+   */
+  async attachGrowthPreparation(
+    launchId: string,
+    input: LaunchGrowthPreparation,
+    owner: { readonly tenantId: string; readonly representedIdentityId: string }
+  ): Promise<LaunchRecord> {
+    const plan = LaunchGrowthPreparationSchema.parse(input);
+    const launch = this.require(launchId);
+    if (
+      plan.tenantId !== owner.tenantId ||
+      plan.representedIdentityId !== owner.representedIdentityId
+    ) {
+      throw new Error('growth preparation identity mismatch');
+    }
+    if (
+      plan.sourceRevision !== launch.source.revision ||
+      plan.destinationRef !== launch.destination?.canonicalRef
+    ) {
+      throw new Error('growth preparation source or destination mismatch');
+    }
+    if (launch.status === 'withdrawn' || launch.status === 'retracted') {
+      throw new Error('growth preparation cannot attach to an inactive launch');
+    }
+    if (launch.growthPreparation) {
+      if (
+        growthPreparationFingerprint(launch.growthPreparation) !==
+        growthPreparationFingerprint(plan)
+      ) {
+        throw new Error(
+          'growth preparation changed; reconcile through the launch owner'
+        );
+      }
+      return launch;
+    }
+    return this.update(launchId, current => ({
+      ...current,
+      growthPreparation: plan,
+    }));
   }
 
   /**

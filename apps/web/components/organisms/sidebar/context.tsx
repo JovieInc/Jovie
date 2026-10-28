@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import React from 'react';
+import { SHELL_RAIL_PREVIEW_INTENT_MS } from '@/components/shell/rail-motion';
 import {
   SidebarContext,
   type SidebarContextValue,
@@ -51,11 +52,14 @@ export const SidebarProvider = React.forwardRef<
       onOpenChange: setOpenProp,
     });
 
+    // Transient peek: hover (after intent dwell) or focus on the collapsed
+    // rail floats the full menu over content. It never writes the pin bit.
     const { isPreview, isFloating, dismissPreview } = useRailPreview({
       side: 'left',
       pinned: open,
       enabled: !isMobile,
       resetKey: pathname,
+      enterIntentMs: SHELL_RAIL_PREVIEW_INTENT_MS,
     });
 
     useRailToggleFocusContinuity('left', open);
@@ -74,6 +78,9 @@ export const SidebarProvider = React.forwardRef<
 
     useSidebarKeyboardShortcut(toggleSidebar, SIDEBAR_KEYBOARD_SHORTCUT);
 
+    // Peek reads as open for layout and labels, but only the pin (setOpen)
+    // is persisted. The in-content toggle opts out of peek triggers so the
+    // pointer never lands on a control the flyout is about to cover.
     const state = open || isPreview ? 'open' : 'closed';
 
     const contextValue = React.useMemo<SidebarContextValue>(

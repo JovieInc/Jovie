@@ -67,9 +67,33 @@ describe('creator finance release gate (JOV-4621)', () => {
     mockGetAppFlagValue.mockResolvedValue(false);
     const { assertCreatorFinanceEnabled, FinanceFeatureDisabledError } =
       await import('@/lib/finance/flags');
+    const error = await assertCreatorFinanceEnabled(OWNER_ID).catch(
+      (e: unknown) => e
+    );
+    expect(error).toBeInstanceOf(FinanceFeatureDisabledError);
+    expect(error).toMatchObject({
+      name: 'FinanceFeatureDisabledError',
+      message: 'Creator finance is disabled',
+    });
+  });
+
+  it('assertCreatorFinanceEnabled throws when the kill switch is engaged', async () => {
+    process.env.FINANCE_DISABLE = '1';
+    mockGetAppFlagValue.mockResolvedValue(true);
+    const { assertCreatorFinanceEnabled, FinanceFeatureDisabledError } =
+      await import('@/lib/finance/flags');
     await expect(assertCreatorFinanceEnabled(OWNER_ID)).rejects.toBeInstanceOf(
       FinanceFeatureDisabledError
     );
+  });
+
+  it('passes a null user id through to flag evaluation', async () => {
+    mockGetAppFlagValue.mockResolvedValue(false);
+    const { isCreatorFinanceEnabled } = await import('@/lib/finance/flags');
+    await expect(isCreatorFinanceEnabled(null)).resolves.toBe(false);
+    expect(mockGetAppFlagValue).toHaveBeenCalledWith('CREATOR_FINANCE', {
+      userId: null,
+    });
   });
 
   it('assertCreatorFinanceEnabled resolves when on', async () => {

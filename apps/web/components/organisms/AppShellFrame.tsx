@@ -11,9 +11,11 @@ import {
   SHELL_RAIL_FRAME_GAP,
   SHELL_RAIL_MAIN_PLANE,
 } from '@/components/shell/rail-motion';
+import type { BrandVariant } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 export interface AppShellFrameProps {
+  readonly brandVariant?: BrandVariant;
   readonly sidebar: ReactNode;
   readonly header?: ReactNode;
   readonly main: ReactNode;
@@ -36,6 +38,11 @@ export interface AppShellFrameProps {
    * attribute, or a still-mounted fallback collides with the resolved shell.
    */
   readonly placeholder?: boolean;
+  /**
+   * Drop the route inset. Onboarding measures the chat panel against
+   * `#main-content`; the 8px inset on each side is a 16px width gap.
+   */
+  readonly flushContent?: boolean;
 }
 
 /**
@@ -56,6 +63,7 @@ export const CHAT_AMBIENT_GRADIENT_IMAGE =
  * unmounting the frame itself.
  */
 export const AppShellFrame = memo(function AppShellFrame({
+  brandVariant = 'jovie',
   sidebar,
   header,
   main,
@@ -67,10 +75,12 @@ export const AppShellFrame = memo(function AppShellFrame({
   composerFocusActive = false,
   chatAmbientGradient = false,
   placeholder = false,
+  flushContent = false,
 }: Readonly<AppShellFrameProps>) {
   return (
     <div
       data-app-shell-frame={placeholder ? undefined : 'true'}
+      data-app-shell-workspace={brandVariant === 'ov' ? 'ov' : undefined}
       data-app-shell-placeholder={placeholder ? 'true' : undefined}
       data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(
@@ -170,7 +180,10 @@ export const AppShellFrame = memo(function AppShellFrame({
                 >
                   <div
                     data-app-shell-content-inset='true'
-                    className='flex min-h-0 min-w-0 flex-1 overflow-hidden p-(--app-shell-content-inset)'
+                    className={cn(
+                      'flex min-h-0 min-w-0 flex-1 overflow-hidden',
+                      flushContent ? null : 'p-(--app-shell-content-inset)'
+                    )}
                   >
                     <div
                       data-testid='app-shell-scroll'

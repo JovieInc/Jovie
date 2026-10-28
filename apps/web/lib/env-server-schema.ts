@@ -115,8 +115,10 @@ export const ServerEnvSchema = z.object({
     .string()
     .regex(/^(?:[1-9]|1\d|20)$/)
     .optional(),
-  /** Opt-in pool-level PostgreSQL statement_timeout in milliseconds. */
+  /** Pool-level PostgreSQL statement_timeout in milliseconds (enforced by default; clamped in code, JOV-8527). */
   DB_STATEMENT_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
+  /** Pool-level acquisition deadline in milliseconds for pool.connect(); clamped in code (JOV-8527). */
+  DB_ACQUISITION_TIMEOUT_MS: z.string().regex(/^\d+$/).optional(),
 
   // Server or build-time envs (may be undefined locally)
   SPOTIFY_CLIENT_ID: z.string().optional(),
@@ -302,6 +304,11 @@ export const ServerEnvSchema = z.object({
    * returns 403 TURNSTILE_REQUIRED. Inert on Vercel production/preview.
    */
   E2E_REQUIRE_TURNSTILE_GATE: z.string().optional(),
+  /**
+   * JOV-9627 kill switch: 'off' sends every onboarding chat turn back through
+   * the LLM. Unset (the default) leaves the system-1 reply engine on.
+   */
+  ONBOARDING_SYSTEM1_ENGINE: z.string().optional(),
 
   // Analytics
   ANALYTICS_RETENTION_DAYS: z.string().optional(),
@@ -557,6 +564,7 @@ export const ENV_KEYS = [
   'DATABASE_URL',
   'DB_POOL_MAX',
   'DB_STATEMENT_TIMEOUT_MS',
+  'DB_ACQUISITION_TIMEOUT_MS',
   'SPOTIFY_CLIENT_ID',
   'SPOTIFY_CLIENT_SECRET',
   'JOVIE_SYSTEM_CLERK_USER_ID',
@@ -651,6 +659,7 @@ export const ENV_KEYS = [
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
   'E2E_REQUIRE_TURNSTILE_GATE',
+  'ONBOARDING_SYSTEM1_ENGINE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
   'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
   'E2E_PROD_SIGNUP_PASSWORD',

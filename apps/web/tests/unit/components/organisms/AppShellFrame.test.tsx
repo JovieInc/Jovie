@@ -3,8 +3,60 @@ import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
+import { AppShellSkeleton } from '@/components/organisms/AppShellSkeleton';
 
 describe('AppShellFrame', () => {
+  it.each([false, true])(
+    'keeps Ovie paint ownership stable while loading: %s',
+    loading => {
+      const { container } = render(
+        loading ? (
+          <AppShellSkeleton brandVariant='ov' />
+        ) : (
+          <AppShellFrame
+            brandVariant='ov'
+            sidebar={null}
+            main={<div>Home</div>}
+          />
+        )
+      );
+      expect(
+        container.querySelector('[data-app-shell-workspace="ov"]')
+      ).toBeInTheDocument();
+    }
+  );
+
+  it('keeps the Electron-only flush rule out of browser shell layout', () => {
+    const globalsSource = readFileSync(
+      resolve(process.cwd(), 'app/globals.css'),
+      'utf8'
+    );
+
+    expect(globalsSource).toMatch(
+      /html\[data-desktop-runtime="electron"\][\s\S]*?\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\][\s\S]*?padding-right:\s*0;[\s\S]*?padding-bottom:\s*0;/
+    );
+    expect(globalsSource).toMatch(
+      /html\[data-desktop-runtime="electron"\][\s\S]*?\[data-app-shell-main-column="true"\][\s\S]*?> #main-content[\s\S]*?border-radius:\s*var\(--app-shell-radius\) 0 0 0;/
+    );
+  });
+
+  // JOV-8974: the Electron shell keeps one gutter on every window edge. The
+  // body's top padding and the titlebar band's top offset must both come from
+  // the shell gap token, never a flush 0 or an invented px literal.
+  it('gives the Electron shell a top gutter equal to the side gutters', () => {
+    const globalsSource = readFileSync(
+      resolve(process.cwd(), 'app/globals.css'),
+      'utf8'
+    );
+
+    expect(globalsSource).toMatch(
+      /\[data-app-shell-body="true"\]\[data-electron-top-gap-owner="titlebar"\] \{[^}]*padding-top:\s*var\(--app-shell-gap\);/s
+    );
+    expect(globalsSource).toMatch(
+      /\[data-electron-titlebar="true"\] \{[^}]*top:\s*var\(--app-shell-gap\);/s
+    );
+  });
+
   it('renders the canonical shell design', () => {
     render(
       <AppShellFrame
@@ -66,6 +118,21 @@ describe('AppShellFrame', () => {
     const headers = screen.getAllByText('Header');
     expect(headers).toHaveLength(1);
     expect(mainContent).toContainElement(headers[0] as HTMLElement);
+  });
+
+  it('drops the route inset when content is flush', () => {
+    render(
+      <AppShellFrame
+        sidebar={<aside>Sidebar</aside>}
+        main={<div>Main Content</div>}
+        flushContent
+      />
+    );
+
+    const mainContent = screen.getByRole('main');
+    expect(
+      mainContent.querySelector('[data-app-shell-content-inset]')
+    ).not.toHaveClass('p-(--app-shell-content-inset)');
   });
 
   it('keeps the header and route on the same token-owned paint plane', () => {

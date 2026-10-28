@@ -23,6 +23,7 @@ const parsedCi = parseYaml(ci) as {
   jobs: Record<
     string,
     {
+      if?: string;
       'timeout-minutes'?: number;
       outputs?: { journey_outcome?: string; certification_outcome?: string };
       steps?: readonly {
@@ -43,6 +44,7 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
     expect(command).toContain('golden-path-home-welcome.spec.ts');
     expect(command).toContain('golden-path.spec.ts');
     expect(command).toContain('start-entry-continuity.spec.ts');
+    expect(command).toContain('entry-first-html-visual.spec.ts');
     expect(command).toContain('GOLDEN_PATH_REQUIRED=1');
     expect(command).not.toContain('money-path-persistence.spec.ts');
     expect(ci).toContain('Seed required premade profile claim fixture');
@@ -95,6 +97,7 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
     expect(ci).toContain('id: canonical_waitlist');
     expect(ci).toContain('id: canonical_revenue');
     expect(ci).toContain('id: canonical_profile');
+    expect(ci).toContain('id: canonical_navigation');
     expect(ci).toContain('scripts/m2-revenue-path-canary.ts');
     expect(ci).toContain('scripts/certify-artist-profile.ts');
     expect(ci).toContain('scripts/certify-canonical-artist-site.ts');
@@ -110,6 +113,20 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
     expect(ci).toContain('tests/unit/lib/auth/access-route-matrix.test.ts');
     expect(ci).toContain('--source-revision "${{ github.sha }}"');
     expect(ci).toContain('--waitlist-status "$WAITLIST_STATUS"');
+    expect(ci).toContain('--navigation-status "$NAVIGATION_STATUS"');
+    const navigation = parsedCi.jobs['ci-golden-path']?.steps?.find(
+      step => step.id === 'canonical_navigation'
+    );
+    expect(navigation?.run).toContain(
+      'tests/e2e/canonical-artist-navigation.spec.ts'
+    );
+    expect(navigation?.run).toContain("--grep 'canonical artist navigation'");
+    expect(navigation?.run).toContain('--retries=0');
+    expect(navigation?.run).toContain(
+      'guard-playwright-artifacts.mjs --run --'
+    );
+    expect(navigation?.['continue-on-error']).toBe(true);
+    expect(ci).toContain("steps.canonical_navigation.outcome || 'skipped'");
     const certify = ci.slice(
       ci.indexOf('id: canonical_certification'),
       ci.indexOf('Upload canonical artist-site certification')
@@ -169,6 +186,29 @@ node -e 'process.stdout.write(process.env.URL_ENCRYPTION_KEY)'`,
     expect(step('canonical_certification')?.['continue-on-error']).toBeFalsy();
     expect(step('canonical_certification')?.if).toBe(
       '${{ always() && !cancelled() }}'
+    );
+  });
+
+  it('still certifies when the shared database lane fails (JOV-8614)', () => {
+    const gate = parsedCi.jobs['ci-golden-path']?.if ?? '';
+    expect(gate).toContain('always()');
+    expect(gate).toContain('!cancelled()');
+    expect(gate).toContain("github.event_name == 'workflow_dispatch'");
+    expect(gate).toContain(
+      "github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    );
+    expect(gate).toContain("needs.neon-db.result == 'success'");
+    expect(gate).toContain("needs.neon-db.result == 'failure'");
+    expect(gate).not.toContain("'merge_group'");
+    const report = ci.slice(
+      ci.indexOf('  ci-golden-path-report:'),
+      ci.indexOf('  ci-admin-smoke:')
+    );
+    expect(report).toContain(
+      'PRODUCER_RESULT: ${{ needs.ci-golden-path.result }}'
+    );
+    expect(report).toContain(
+      'PRODUCER_RESULT="$PRODUCER_RESULT" node scripts/canonical-artist-site-intake.mjs'
     );
   });
 });

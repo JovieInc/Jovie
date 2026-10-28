@@ -20,7 +20,7 @@ The customer Mac app is **Electron wrapping the hosted web app**. It is not a na
 
 | Surface | Runtime | Role |
 |---|---|---|
-| Packaged `Jovie.app` / Jovie Local / Jovie Staging | Electron 43 (`apps/desktop`), `BrowserWindow` + preload, `webviewTag: false` | Product shell. Loads hosted Next (`APP_URL`). Local userData = `Jovie-Local`. Default entry `/app/chat`. |
+| Packaged `Jovie.app` / Jovie Local | Electron (`apps/desktop`), `BrowserWindow` + preload, `webviewTag: false` | Product shell. Loads hosted Next (`APP_URL`). Local userData = `Jovie-Local`. Default entry `/app/chat`. |
 | Packaged Ovie | Same Electron process | Menu opens `/hud?ovie=mac` (`apps/desktop/src/ovie-door.ts`). One heads-up. |
 | Electron tray | Same Electron process (`apps/desktop/src/tray.ts`) | Chat / new-message / preferences. |
 | `apps/macos/MenuMonitor` | Native SwiftUI `MenuBarExtra` | Operator shipping-count menu. Not the product app. |
@@ -63,7 +63,7 @@ These are Electron/hosted-load problems. A Swift rewrite does not remove them, a
 5. **merged ≠ live for Ovie.** #16414 changed hosted `/hud?ovie=mac`. Packaged `Jovie.app` pointed at production does not show it until that web SHA is deployed **and** the app reloads. Summer already named this `ops/reviewed-invariants/mac-ovie-empty-hud-is-red-v1`.
 6. **Two menu-bar owners.** Electron tray (product) and MenuMonitor (ops). Do not add a third Swift menu as a HUD.
 
-Electron startup/memory evidence is still “required” in `PERFORMANCE.md` (JOV-2712). Target on paper: start < 3s, stable RSS, no renderer crashes.
+Electron startup/memory evidence is still “required” in `docs/hardening/PERFORMANCE.md` (JOV-2712). Target on paper: start < 3s, stable RSS, no renderer crashes.
 
 ---
 

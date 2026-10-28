@@ -267,6 +267,54 @@ describe('sentry autofix recurrence runner', () => {
     }
   });
 
+  it('propagates a pending-artifact deferral as a non-failing deferred run', async () => {
+    const deferred = {
+      reason: 'verified_production_artifact_pending',
+      sha: '2'.repeat(40),
+      retry: 'next sentry-autofix-recurrence clock tick re-dispatches',
+    };
+    vi.resetModules();
+    vi.doMock('../../lib/sentry-validation-observation.mjs', () => ({
+      runSentryValidationObservations: vi.fn(async () => ({
+        ok: true,
+        results: [],
+        deferred,
+      })),
+    }));
+    try {
+      const { runSentryAutofixRecurrence } = await import(
+        '../../sentry-autofix-recurrence.mjs'
+      );
+      const fetchImpl = vi.fn(async url => {
+        if (String(url).includes('/commits/main'))
+          return jsonResponse(200, { sha: MAIN_SHA });
+        if (String(url).includes('/search/issues'))
+          return jsonResponse(200, { items: [] });
+        return jsonResponse(404, {});
+      });
+      expect(
+        await runSentryAutofixRecurrence({
+          githubToken: 'gh',
+          sentryToken: 'sentry',
+          linearApiKey: 'linear',
+          observationsOnly: true,
+          fetchImpl,
+        })
+      ).toMatchObject({ ok: true, results: [], deferred });
+      expect(
+        await runSentryAutofixRecurrence({
+          githubToken: 'gh',
+          sentryToken: 'sentry',
+          linearApiKey: 'linear',
+          fetchImpl,
+        })
+      ).toMatchObject({ ok: true, currentMainSha: MAIN_SHA, deferred });
+    } finally {
+      vi.doUnmock('../../lib/sentry-validation-observation.mjs');
+      vi.resetModules();
+    }
+  });
+
   it('fails closed without tokens and on a malformed search payload', async () => {
     await expect(
       runSentryAutofixRecurrence({ githubToken: '' })

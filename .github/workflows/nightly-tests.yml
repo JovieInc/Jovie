@@ -81,7 +81,7 @@ jobs:
       github.event_name == 'push' ||
       github.event.inputs.suite == 'all' ||
       github.event.inputs.suite == 'unit'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The unsharded suite was still making steady progress when the 30m cap
     # cancelled it repeatedly (Jul 15-20, JOV-4326). The suite grew ~11.5m on
     # Oct 8 (15 new test files in ~50 commits) and the 17:19Z run was cancelled
@@ -126,7 +126,7 @@ jobs:
       github.event.inputs.suite == 'e2e' ||
       github.event.inputs.suite == 'design-v1'
     environment: Preview – jovie
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:

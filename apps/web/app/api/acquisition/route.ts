@@ -1,21 +1,31 @@
 import { sql as drizzleSql } from 'drizzle-orm';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { stageForFunnelPath } from '@/lib/acquisition/artist-offer-funnel';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import {
   FIRST_TOUCH_COOKIE,
   openFirstTouchEnvelope,
 } from '@/lib/acquisition/first-touch-envelope';
 import { toReceiptFirstTouch } from '@/lib/acquisition/first-touch-receipt';
+import { upsertAndLinkJourney } from '@/lib/acquisition/journey-link';
+import { isSyntheticTraffic } from '@/lib/acquisition/synthetic-traffic';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { db } from '@/lib/db';
+import { runAtomicDbOperation } from '@/lib/db/legacy-transaction';
 import { isVisualCaptureSyntheticAuthEnabled } from '@/lib/e2e/runtime';
 
 export const runtime = 'nodejs';
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const captureSchema = z.object({
   action: z.literal('capture').optional(),
   acquisitionId: z.string().uuid(),
   capturedAt: z.string().datetime(),
+  /** Current pathname; a funnel page view (e.g. /pricing) records its stage. */
+  currentPath: z.string().max(2000).optional(),
   firstTouch: z
     .object({
       source: z.string().max(200).optional(),
@@ -37,6 +47,8 @@ const revokeSchema = z.object({
   acquisitionId: z.string().uuid(),
 });
 const requestSchema = z.union([captureSchema, revokeSchema]);
+
+const ANONYMOUS_ACTOR_ID = 'system:acquisition-capture';
 
 /**
  * Persist first touch and, when authenticated, link exactly that browser
@@ -74,62 +86,46 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ recorded: true, linked: false });
   }
 
+  // `getCachedAuth().userId` is the app `users.id` UUID, not the Better Auth
+  // id. Matching it against `users.better_auth_user_id` linked 0 of 28,156
+  // production journeys in 30 days, so the sign-in stage always read 0.
   const { userId: authUserId } = await getCachedAuth();
+  const appUserId =
+    typeof authUserId === 'string' && UUID_PATTERN.test(authUserId)
+      ? authUserId
+      : null;
   // Agent fields never come from a request body or unsigned query parameters.
   const acquisitionId = signed?.id ?? parsed.data.acquisitionId;
   const capturedAt = signed
     ? new Date(signed.iat).toISOString()
     : parsed.data.capturedAt;
-  const firstTouchJson = JSON.stringify(
-    signed ? toReceiptFirstTouch(signed) : parsed.data.firstTouch
+  const firstTouchJson = JSON.stringify({
+    ...(signed ? toReceiptFirstTouch(signed) : parsed.data.firstTouch),
+    ...(isSyntheticTraffic(request.headers) ? { synthetic: true } : {}),
+  });
+
+  // One transaction: the upsert and the user link must both commit (they are
+  // separate statements; see lib/acquisition/journey-link.ts).
+  const linked = await runAtomicDbOperation(
+    tx =>
+      upsertAndLinkJourney(tx, {
+        acquisitionId,
+        firstTouchJson,
+        capturedAt: new Date(capturedAt),
+        appUserId,
+      }),
+    // Never a request-derived value (legacy-transaction.ts actor contract).
+    { actorId: ANONYMOUS_ACTOR_ID, system: true, retry: 'never' }
   );
 
-  await db.execute(drizzleSql`
-    WITH app_user AS (
-      SELECT id FROM users
-      WHERE better_auth_user_id = ${authUserId ?? ''}
-      LIMIT 1
-    ), upserted AS (
-      INSERT INTO acquisition_journeys (
-        id, first_touch, consent_state, captured_at, updated_at
-      ) VALUES (
-        ${acquisitionId}::uuid,
-        ${firstTouchJson}::jsonb,
-        'analytics_allowed',
-        ${new Date(capturedAt)},
-        now()
-      )
-      ON CONFLICT (id) DO UPDATE SET
-        first_touch = CASE
-          WHEN acquisition_journeys.first_touch = '{}'::jsonb
-            THEN EXCLUDED.first_touch
-          ELSE acquisition_journeys.first_touch
-        END,
-        updated_at = now()
-      RETURNING id
-    ), claimed AS (
-      UPDATE acquisition_journeys AS journey
-      SET user_id = app_user.id, linked_at = now(), updated_at = now()
-      FROM app_user, upserted
-      WHERE journey.id = upserted.id
-        AND (journey.user_id IS NULL OR journey.user_id = app_user.id)
-        AND NOT EXISTS (
-          SELECT 1 FROM acquisition_journeys existing
-          WHERE existing.user_id = app_user.id
-            AND existing.id <> journey.id
-        )
-      RETURNING journey.id, journey.user_id
-    )
-    UPDATE pixel_events AS pe
-    SET user_id = claimed.user_id
-    FROM claimed
-    WHERE pe.acquisition_id = claimed.id
-      AND pe.user_id IS NULL
-  `);
+  const funnelStage = stageForFunnelPath(parsed.data.currentPath);
+  if (funnelStage) {
+    await recordArtistOfferStage(acquisitionId, funnelStage);
+  }
 
   return NextResponse.json({
     recorded: true,
-    linked: Boolean(authUserId),
+    linked,
     acquisitionId,
   });
 }
