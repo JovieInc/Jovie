@@ -1755,13 +1755,12 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         self.assertTrue(
             MODULE.product_intake_allowed(jovie_empty_red, "logyourbody")
         )
-        self.assertTrue(MODULE.product_intake_allowed(jovie_unmergeable_red, "ovie"))
+        self.assertTrue(MODULE.product_intake_allowed(jovie_unmergeable_red, "logyourbody"))
         self.assertTrue(MODULE.product_intake_allowed(jovie_empty_red, "jovie"))
 
         products = MODULE.build_product_closure_health(jovie_empty_red)
         self.assertTrue(products["jovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["newIssueIntakeAllowed"])
-        self.assertTrue(products["ovie"]["newIssueIntakeAllowed"])
         self.assertTrue(products["logyourbody"]["remediationContinues"])
 
         systems_down = {
@@ -1772,7 +1771,7 @@ class ClosureHealthEvaluationTests(unittest.TestCase):
         }
         self.assertFalse(MODULE.product_intake_allowed(systems_down, "logyourbody"))
         self.assertFalse(
-            MODULE.build_product_closure_health(systems_down)["ovie"]["newIssueIntakeAllowed"]
+            MODULE.build_product_closure_health(systems_down)["logyourbody"]["newIssueIntakeAllowed"]
         )
 
     def test_previous_closure_history_is_scoped_to_repository(self):

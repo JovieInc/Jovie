@@ -214,6 +214,23 @@ possible in terms of DS and IA."
   One-click answers execute immediately with a five-second undo. Ovie Home is
   dashboard-dense on a MacBook Pro.
 
+### One Ovie: web, shared shell, no native Ovie (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: "The native Ovie Mac app shouldn't exist. That
+was a failure of agents creating multiple versions of Ovie. Just as Jovie runs
+my closed-loop creator career, Ovie should run my closed-loop company, with
+Jovie also run from Ovie, with as much parity as possible."
+
+- Exactly one Ovie exists: the web Ovie in the Jovie monorepo at `/app/ov`, on
+  the shared Jovie/Ovie shell. Packaged doors (Electron) and the office wall
+  (a Chrome kiosk window) only load that URL.
+- No native Ovie: no Swift, SwiftUI, AppKit or separate-repo Ovie. The
+  `JovieInc/ovie` repository is archived and removed from the Symphony and
+  gem registries. Unique capabilities move into web Ovie via issues, never a
+  second implementation.
+- Guard: `canon/product-surfaces.json` and `pnpm run surfaces:check` (see
+  `canon/ENGINEERING.md`, "One surface per product").
+
 ### Dogfood Jovie with the founder's own careers (founder decision, 2026-10-28)
 
 **EVENT:** Tim White, 2026-10-28: Ovie is the closed-loop company OS and Jovie is
