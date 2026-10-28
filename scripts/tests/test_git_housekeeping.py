@@ -96,7 +96,16 @@ class MountedTreeRefusalTest(unittest.TestCase):
             self.assertTrue((root / "keep.txt").exists())
 
     def test_actual_root_mount_is_refused_without_deleting_anything(self):
-        self.assertEqual(git_housekeeping.mounted_inside(Path("/")), Path("/"))
+        # mounted_inside returns the FIRST mount at or beneath the path, so the answer depends on the
+        # host's mountinfo order: Gem lists /sys first, which refused every release self-test from
+        # 2026-10-28 (AssertionError: PosixPath('/sys') != PosixPath('/')). Any hit refuses the delete.
+        found = git_housekeeping.mounted_inside(Path("/"))
+        self.assertIsNotNone(found)
+        self.assertTrue(found == Path("/") or Path("/") in found.parents)
+        table = Path(tempfile.mkdtemp()) / "mountinfo"
+        self.addCleanup(shutil.rmtree, table.parent, True)
+        table.write_text("1 0 0:1 / /sys rw - sysfs sysfs rw\n2 0 0:2 / / rw - ext4 /dev/x rw\n")
+        self.assertEqual(git_housekeeping.mounted_inside(Path("/"), table), Path("/sys"))
 
 
 class DarwinMountSnapshotTest(unittest.TestCase):
