@@ -6,6 +6,7 @@ import {
 } from '@/components/atoms/ArtworkFrame';
 import { Icon } from '@/components/atoms/Icon';
 import { APP_ROUTES } from '@/constants/routes';
+import { viaJovieHref } from '@/lib/growth/loop-links';
 import { cn } from '@/lib/utils';
 
 interface SmartLinkAmbientGlowProps {
@@ -119,7 +120,7 @@ export function SmartLinkPoweredByFooter({
     <footer className='shrink-0 pb-5 pt-3 text-center'>
       <div className='inline-flex items-center gap-2'>
         <Link
-          href='/'
+          href={viaJovieHref('footer')}
           className={`smart-link-powered-by gap-1 ${FOOTER_LINK_CLASSES}`}
         >
           <span>Powered by</span>
