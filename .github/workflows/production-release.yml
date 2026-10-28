@@ -1327,6 +1327,17 @@ jobs:
             --route-id public-profile-releases; then
             fail_performance_gate "Exact staged-build public-profile alias budgets failed."
           fi
+
+          # Throttled-mobile LCP for the artist entry routes (/start, /claim and
+          # the claim-link landing). The Playwright guard above is unthrottled
+          # and warm, so it passed /start at 1.3s while Lighthouse mobile read
+          # 8.4s on production (2026-10-25). Budgets: apps/web/
+          # performance-entry-budgets.json. Blocking; ratchet down, never up.
+          if ! CI=true pnpm exec tsx scripts/lighthouse-entry-gate.ts \
+            --base-url "$deployment_url" \
+            --runs 3; then
+            fail_performance_gate "Throttled-mobile entry-route LCP budgets failed on the exact staged build."
+          fi
           echo "performance_status=passed" >> "$GITHUB_OUTPUT"
 
       - name: Recheck main immediately before production promotion

@@ -440,7 +440,7 @@ async function readUnshippedRange(url, { client, fetchImpl, token }) {
  * as old as the oldest missing commit has been on main. Unreadable is unknown
  * (red), never healthy.
  */
-export async function observeProductionFreshness(
+async function observeProductionFreshnessProof(
   receipt,
   { fetchImpl, token, nowMs, githubClient, apiUrl = GITHUB_API, lsRemote }
 ) {
@@ -499,6 +499,30 @@ export async function observeProductionFreshness(
     lastProofAt: landedAt,
     reason: `${compare.body.ahead_by}-commits-unshipped`,
   };
+}
+
+const FEED_BUDGET_MIN_MINUTES = 60;
+const FEED_BUDGET_MAX_MINUTES = 24 * 60;
+
+/**
+ * Production promotion heartbeat with ONE source of truth for its silence budget: the measured p95 of normal
+ * merge-to-production lag, recomputed weekly by the lanes doctor and published in the lanes feed
+ * (`deployHealth.limits[repo].ageS`). Bounded to 1 to 24 hours; an unreadable or out-of-bounds feed falls back to
+ * the receipt's own `fallbackBudgetMinutes` (246, the p95 measured 2026-10-25), never a separate static budget.
+ */
+export async function observeProductionFreshness(receipt, context) {
+  const proof = await observeProductionFreshnessProof(receipt, context);
+  if (!proof.ok || !receipt.limitsUrl) return proof;
+  const feed = await readJson(context.fetchImpl, receipt.limitsUrl);
+  const ageS = feed.ok
+    ? feed.body?.deployHealth?.limits?.[receipt.repo]?.ageS
+    : undefined;
+  const minutes = Number.isFinite(ageS) ? Math.ceil(ageS / 60) : NaN;
+  const budgetMinutes =
+    minutes >= FEED_BUDGET_MIN_MINUTES && minutes <= FEED_BUDGET_MAX_MINUTES
+      ? minutes
+      : receipt.fallbackBudgetMinutes;
+  return { ...proof, budgetMinutes };
 }
 
 /**
@@ -975,13 +999,19 @@ export async function main({
   if (env.GITHUB_STEP_SUMMARY)
     appendFileSync(env.GITHUB_STEP_SUMMARY, summary(report));
 
-  const state = { ...previous };
-  for (const row of report.results) {
-    if (row.critical)
-      state[livenessFingerprint(row.id)] =
-        row.status === 'fresh' ? 'green' : 'red';
-  }
+  // Alert state only moves when the decisions are actually applied
+  // (JOV-8843). A diagnostic run (no --file) or a disabled-intake run
+  // (REMEDIATION_INTAKE_DISABLED=1) observes and reports but must preserve
+  // the persisted state: otherwise a run that never filed could still flip a
+  // fingerprint green, silently dropping a red->green resolution the next
+  // filing run would have delivered (an open alert stuck unresolved).
   if (args.file && env.REMEDIATION_INTAKE_DISABLED !== '1') {
+    const state = { ...previous };
+    for (const row of report.results) {
+      if (row.critical)
+        state[livenessFingerprint(row.id)] =
+          row.status === 'fresh' ? 'green' : 'red';
+    }
     const { applyRemediationDecisionWithRetry } = await import(
       './lib/remediation-signal.mjs'
     );
@@ -1001,9 +1031,9 @@ export async function main({
         state[decision.fingerprint] =
           previous[decision.fingerprint] ?? 'unknown';
     }
+    if (args.previous)
+      writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   }
-  if (args.previous)
-    writeFileSync(args.previous, `${JSON.stringify(state, null, 2)}\n`);
   process.stdout.write(
     `${JSON.stringify({ status: report.status, red: report.results.filter(row => row.status !== 'fresh').map(row => row.id) })}\n`
   );

@@ -965,7 +965,7 @@ export function ProfilePacCard({
                     fill
                     priority={artPriority}
                     loading={artPriority ? undefined : 'eager'}
-                    sizes='104px'
+                    sizes='(min-width: 1024px) 400px, 104px'
                     className={
                       isReleaseArtwork
                         ? ARTWORK_FIT_CLASSNAME

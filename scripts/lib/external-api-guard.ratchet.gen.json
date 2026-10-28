@@ -133,7 +133,7 @@
       "gh-shell": 4
     },
     ".github/workflows/desktop-release.yml": {
-      "gh-shell": 25
+      "gh-shell": 22
     },
     ".github/workflows/fork-pr-gate.yml": {
       "gh-shell": 7
