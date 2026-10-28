@@ -107,6 +107,10 @@ Follow [the Ovie guardrail](docs/design-system/DETAILS.md#ovie-ops-cockpit-guard
 
 Read [the subtraction principle reference](docs/design-system/DETAILS.md#subtraction-principle) when changing this area.
 
+## No Dead Ends (JOV-INV-046)
+
+Every rendered control has a working path in the current runtime. Capability-gate it: if it cannot work here (desktop vs web vs iOS, browser support, entitlement), do not render it. Never explain its absence ("not available", "coming soon", "use X instead"), never ship a disabled control with no actionable reason, a no-op handler, `href="#"`, or a link to an unbuilt route. Allowed: a permission or entitlement prompt that leads to a working path, and a transient error with retry. Enforced by `pnpm design:no-dead-ends:check` (`packages/copy/dead-ends.ts`, shrink-only baseline). See `.claude/rules/ui.md`.
+
 ## Use Tokens, Not Raw Colors
 
 Raw Tailwind color utilities (`text-black`, `bg-white`, `text-[#fff]`) are the root cause of black-on-black / white-on-white contrast failures when the app renders across light and dark themes. **Always use System B semantic tokens** so values adapt automatically.
