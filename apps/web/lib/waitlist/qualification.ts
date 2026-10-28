@@ -6,6 +6,7 @@ export type QualificationReasonCode =
   | 'qualified_open_signup'
   | 'qualified_auto_accept'
   | 'qualified_interview_signal'
+  | 'qualified_golden_path_resolved_artist'
   | 'waitlist_gate_enabled'
   | 'waitlist_capacity_full'
   | 'hard_closed'
@@ -14,6 +15,15 @@ export type QualificationReasonCode =
 
 export interface QualificationConfig {
   readonly mode: WaitlistMode;
+  /**
+   * Golden-path admission outcome after capacity was reserved. `admit: true`
+   * approves a gate-on signup; `admit: false` carries the hold reason so the
+   * decision is recorded on the entry either way.
+   */
+  readonly goldenPath?: {
+    readonly admit: boolean;
+    readonly reason: string;
+  };
   readonly autoAcceptReserved?: boolean;
   readonly blockedEmailDomains?: readonly string[];
   /**
@@ -110,6 +120,18 @@ export function evaluateWaitlistQualification(params: {
     };
   }
 
+  if (params.config.goldenPath?.admit) {
+    return {
+      qualified: true,
+      status: 'approved',
+      reasonCode: 'qualified_golden_path_resolved_artist',
+      details: {
+        mode: params.config.mode,
+        goldenPath: params.config.goldenPath.reason,
+      },
+    };
+  }
+
   if (params.config.autoAcceptReserved) {
     return {
       qualified: true,
@@ -123,9 +145,15 @@ export function evaluateWaitlistQualification(params: {
     qualified: true,
     status: 'waitlisted',
     reasonCode:
-      params.config.autoAcceptReserved === false
+      params.config.autoAcceptReserved === false ||
+      params.config.goldenPath?.reason === 'hold_capacity_full'
         ? 'waitlist_capacity_full'
         : 'waitlist_gate_enabled',
-    details: { mode: params.config.mode },
+    details: {
+      mode: params.config.mode,
+      ...(params.config.goldenPath
+        ? { goldenPathHold: params.config.goldenPath.reason }
+        : {}),
+    },
   };
 }

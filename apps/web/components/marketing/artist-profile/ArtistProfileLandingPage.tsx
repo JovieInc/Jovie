@@ -33,7 +33,7 @@ const DEFAULT_CALLOUTS = [
   {
     id: 'release',
     title: 'What Is Current',
-    body: 'The newest release leads without asking fans to search for it.',
+    body: 'The newest release leads without asking listeners to search for it.',
   },
   {
     id: 'action',
