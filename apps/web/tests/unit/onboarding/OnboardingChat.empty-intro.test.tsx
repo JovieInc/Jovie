@@ -113,10 +113,16 @@ vi.mock('@/components/jovie/components', () => ({
   ),
   ChatInput: ({
     pickerPlacement,
+    placeholder,
   }: {
     readonly pickerPlacement?: 'flow' | 'overlay';
+    readonly placeholder?: string;
   }) => (
-    <div data-testid='chat-input' data-picker-placement={pickerPlacement} />
+    <textarea
+      data-testid='chat-input'
+      data-picker-placement={pickerPlacement}
+      placeholder={placeholder}
+    />
   ),
   ChatMessage: ({
     parts,
@@ -126,6 +132,57 @@ vi.mock('@/components/jovie/components', () => ({
 }));
 
 describe('OnboardingChat empty intro', () => {
+  it('restores the confirmed handle over stale proposals without reopening composer intent', () => {
+    const onProfileBuilderChange = vi.fn();
+    const initialMessages: UIMessage[] = [
+      {
+        id: 'confirmation',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'checkHandle',
+            toolCallId: 'confirmation',
+            state: 'output-available',
+            input: { handle: 'confirmedartist' },
+            output: { action: 'handle_confirmed', handle: 'confirmedartist' },
+          },
+        ],
+      },
+      {
+        id: 'stale-proposal',
+        role: 'assistant',
+        parts: [
+          {
+            type: 'dynamic-tool',
+            toolName: 'checkHandle',
+            toolCallId: 'stale-proposal',
+            state: 'output-available',
+            input: { handle: 'staleartist' },
+            output: { action: 'check_handle', handle: 'staleartist' },
+          },
+        ],
+      },
+    ];
+    render(
+      <OnboardingChat
+        conversationId='saved-conversation'
+        initialMessages={initialMessages}
+        turnstileToken='token'
+        turnstileStatus='verified'
+        onProfileBuilderChange={onProfileBuilderChange}
+      />
+    );
+    expect(screen.getByTestId('chat-input')).toHaveAttribute(
+      'placeholder',
+      'Reply to Jovie…'
+    );
+    expect(onProfileBuilderChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ handle: 'confirmedartist' })
+    );
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('renders persisted progress without auto-submitting a starter or re-triggering claim activity', async () => {
     const initialMessages: UIMessage[] = [
       {
@@ -269,6 +326,18 @@ describe('OnboardingChat empty intro', () => {
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('holds no banner space when no starter banner ever painted', () => {
+    render(
+      <OnboardingChat
+        starterHandoff={{ kind: 'prompt', prompt: 'Claim my page' }}
+        turnstileToken={null}
+        turnstileHasSiteKey={false}
+        turnstilePanel={<span hidden />}
+      />
+    );
+    expect(screen.queryByTestId('onboarding-starter-banner-space')).toBeNull();
+  });
+
   it('keeps a handle entry on its value screen and never auto-sends the claim draft (JOV-7753)', async () => {
     render(
       <OnboardingChat
@@ -283,6 +352,32 @@ describe('OnboardingChat empty intro', () => {
     });
     expect(screen.queryByTestId('onboarding-start-ambient-mark')).toBeNull();
     expect(screen.queryByText(ONBOARDING_ENTRY_TITLE)).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('shows a taken handle instead of the starter prompt and never sends it (JOV-9624)', async () => {
+    render(
+      <OnboardingChat
+        starterHandoff={{ kind: 'prompt', prompt: 'I want my own jov.ie.' }}
+        entryProfile={{
+          status: 'claimed',
+          handle: 'tim',
+          displayName: 'Tim White',
+          avatarUrl: null,
+        }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('This page is taken')).toBeTruthy();
+    });
+    expect(screen.getByText(/already claimed/)).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: 'Your first message' })
+    ).toBeNull();
+    expect(screen.queryByDisplayValue('I want my own jov.ie.')).toBeNull();
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
