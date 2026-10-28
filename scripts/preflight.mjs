@@ -36,15 +36,34 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
 } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const WORKFLOW_PATH = '.github/workflows/source-validation.yml';
 export const JOB_ID = 'deterministic';
+
+/** Keep hook-local Git routing out of gates that create fixture repositories. */
+export function buildPreflightEnv(source = process.env, cwd = ROOT) {
+  const result = spawnSync('git', ['rev-parse', '--local-env-vars'], {
+    cwd,
+    env: source,
+    encoding: 'utf8',
+  });
+  const names = result.stdout?.trim().split('\n') ?? [];
+  if (result.status !== 0 || !names.includes('GIT_DIR')) {
+    throw new Error(
+      'Could not identify Git repository-local environment variables'
+    );
+  }
+  const env = { ...source };
+  for (const name of names) delete env[name];
+  return env;
+}
 
 /** Steps with no local meaning. Everything not listed here is derived. */
 export const SKIPPED_BY_NAME = Object.freeze({
@@ -222,17 +241,30 @@ function runProgram(program, cwd, env, onResult) {
   });
 }
 
-function git(args) {
-  const r = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+function git(args, { cwd = ROOT, env = process.env } = {}) {
+  const r = spawnSync('git', args, {
+    cwd,
+    env: buildPreflightEnv(env, cwd),
+    encoding: 'utf8',
+  });
   return r.status === 0 ? r.stdout.trim() : '';
 }
 
 /** Fleet Rules lint of a PR body against the files this branch changes. */
-export async function lintBody({ bodyFile, title, base }) {
+export async function lintBody({
+  bodyFile,
+  title,
+  base,
+  cwd = ROOT,
+  env = process.env,
+}) {
   const { evaluateFleetRules } = await import('./pr-fleet-rules.mjs');
   const body = readFileSync(bodyFile, 'utf8');
-  const mergeBase = git(['merge-base', `origin/${base}`, 'HEAD']);
-  const status = git(['diff', '--name-status', mergeBase, 'HEAD']);
+  const mergeBase = git(['merge-base', `origin/${base}`, 'HEAD'], { cwd, env });
+  const status = git(['diff', '--name-status', mergeBase, 'HEAD'], {
+    cwd,
+    env,
+  });
   const files = status
     .split('\n')
     .filter(Boolean)
@@ -299,19 +331,66 @@ export async function main({
     log('[preflight] skipped (JOVIE_PREFLIGHT=0)');
     return 0;
   }
+  const childEnv = buildPreflightEnv(env, cwd);
   const workflowFile = path.resolve(cwd, args.workflow ?? WORKFLOW_PATH);
+  // A branch behind base fails CI on files it never saw (#23313: a missing
+  // scripts/anti-slop/run.mjs). Bring base in first; the hook only reports.
+  if (!args.list) {
+    spawnSync('git', ['fetch', '--no-tags', '-q', 'origin', args.base], {
+      cwd,
+      env: childEnv,
+    });
+    const hasBase =
+      spawnSync('git', ['rev-parse', '--verify', '-q', `origin/${args.base}`], {
+        cwd,
+        env: childEnv,
+      }).status === 0;
+    const behind =
+      hasBase &&
+      spawnSync(
+        'git',
+        ['merge-base', '--is-ancestor', `origin/${args.base}`, 'HEAD'],
+        { cwd, env: childEnv }
+      ).status !== 0;
+    if (behind && args.hook) {
+      log(
+        `[preflight] branch is behind origin/${args.base}; merge it, then push.`
+      );
+      return 1;
+    }
+    if (behind) {
+      log(`[preflight] merging origin/${args.base} into the branch first`);
+      const merged = spawnSync(
+        'git',
+        ['merge', '--no-edit', `origin/${args.base}`],
+        { cwd, env: childEnv }
+      );
+      if (merged.status !== 0) {
+        spawnSync('git', ['merge', '--abort'], { cwd, env: childEnv });
+        log(
+          `[preflight] merge of origin/${args.base} conflicts; resolve it, then rerun.`
+        );
+        return 1;
+      }
+    }
+  }
   const steps = deriveSteps(readFileSync(workflowFile, 'utf8'));
   // Gates refuse the ambient Node when it violates engines (gem ships 22).
   const pinned = spawnSync('bash', ['scripts/hooks/resolve-repo-node.sh'], {
     cwd,
+    env: childEnv,
     encoding: 'utf8',
   });
   const pinnedBin = pinned.status === 0 ? pinned.stdout.trim() : '';
   const procEnv = pinnedBin
-    ? { ...env, PATH: `${pinnedBin}:${env.PATH}` }
-    : env;
-  const runnerTemp = mkdtempSync(path.join(tmpdir(), 'preflight-'));
-  const headSha = git(['rev-parse', 'HEAD']);
+    ? { ...childEnv, PATH: `${pinnedBin}:${childEnv.PATH}` }
+    : childEnv;
+  // Copied guards compare their module URL to argv[1]; /var -> /private/var
+  // aliases must not turn their actual checks into successful no-ops.
+  const runnerTemp = realpathSync(
+    mkdtempSync(path.join(tmpdir(), 'preflight-'))
+  );
+  const headSha = git(['rev-parse', 'HEAD'], { cwd, env: childEnv });
   const values = expressionValues({
     base: args.base,
     headSha,
@@ -321,7 +400,7 @@ export async function main({
   const flockPath = (() => {
     if (
       !existsSync('/usr/bin/flock') &&
-      spawnSync('which', ['flock']).status !== 0
+      spawnSync('which', ['flock'], { cwd, env: childEnv }).status !== 0
     )
       return '';
     return path.join(homedir(), '.cache', 'gem-typecheck.lock');
@@ -353,6 +432,7 @@ export async function main({
 
   const started = Date.now();
   const failures = [];
+  const timings = [];
   const skipped = [];
   let passed = 0;
   for (const step of plan) {
@@ -374,16 +454,25 @@ export async function main({
       { flockPath }
     );
     const seen = new Set();
+    let mark = Date.now();
     const t0 = Date.now();
     await runProgram(program, cwd, procEnv, ({ index, code, output }) => {
       seen.add(index);
+      const took = Date.now() - mark;
+      mark = Date.now();
+      timings.push({
+        step: step.name,
+        label: labelFor(statements[index]),
+        ms: took,
+      });
       const label = labelFor(statements[index]);
       if (code !== 0) {
         failures.push({ step: step.name, label, code, output });
-        log(`  FAIL (${code})  ${label}`);
+        log(`  FAIL (${code})  ${label} (${(took / 1000).toFixed(1)}s)`);
       } else {
         passed += 1;
-        if (!PLUMBING.test(label)) log(`  ok  ${label}`);
+        if (!PLUMBING.test(label))
+          log(`  ok  ${label} (${(took / 1000).toFixed(1)}s)`);
       }
     });
     statements.forEach((statement, index) => {
@@ -406,6 +495,8 @@ export async function main({
       bodyFile: args.bodyFile,
       title: args.title,
       base: args.base,
+      cwd,
+      env: childEnv,
     });
     for (const message of bodyIssues.errors) {
       failures.push({ step: 'PR body', label: message, code: 1, output: [] });
@@ -436,11 +527,16 @@ export async function main({
       head: headSha,
       durationMs: Date.now() - started,
       red: failures.map(f => `${f.step}: ${f.label}`),
+      timings: timings.filter(t => t.ms >= 1000),
     },
     env
   );
   return failures.length ? 1 : 0;
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+if (
+  process.argv[1] &&
+  existsSync(process.argv[1]) &&
+  realpathSync(fileURLToPath(import.meta.url)) === realpathSync(process.argv[1])
+)
   process.exitCode = await main();

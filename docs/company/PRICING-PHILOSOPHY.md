@@ -37,7 +37,7 @@ Move from work-based to outcome-based only when the attribution loop is closed (
 
 Upgrade conversion follows visibility. The artist's audience (fans, bookers, curators) is the secondary customer — anything they can see drives the primary customer to upgrade.
 
-- **Strong upgrade levers:** verification badges, fan-facing analytics, white-label / branding removal, premium domain, public artist OS surfaces.
+- **Strong upgrade levers:** verification badges, fan-facing analytics, premium domain, public artist OS surfaces.
 - **Weak upgrade levers in isolation:** faster model, larger context window, more advanced AI — invisible to the audience, so the artist has to take them on faith.
 - **Implication:** when packaging features into tiers, lead with what the audience sees. Hide the invisible-but-real value (better AI, deeper analytics) as supporting bullets, not headline reasons to upgrade.
 

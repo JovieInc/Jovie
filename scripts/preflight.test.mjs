@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import {
+  copyFileSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import {
+  buildPreflightEnv,
   deriveSteps,
   JOB_ID,
   main,
@@ -120,4 +132,285 @@ test('the real Source Validation workflow yields the gates workers keep missing'
     'pnpm typecheck',
   ])
     assert.ok(runnable.includes(gate), `${gate} missing from derived plan`);
+});
+
+test('no derived step writes a fixed shared /tmp path', () => {
+  const steps = deriveSteps(
+    readFileSync(path.join(ROOT, WORKFLOW_PATH), 'utf8')
+  );
+  for (const step of steps)
+    assert.doesNotMatch(
+      step.run,
+      /(?<![\w$}/])\/tmp\/[\w.-]/,
+      `${step.name} uses a fixed /tmp path; use mktemp or RUNNER_TEMP`
+    );
+});
+
+test('pre-push Git environment cannot redirect fixture writes into its linked worktree', () => {
+  // Fixture setup must be isolated even when this test itself runs in a hook.
+  const localNames = spawnSync('git', ['rev-parse', '--local-env-vars'], {
+    encoding: 'utf8',
+  });
+  assert.equal(localNames.status, 0, localNames.stderr);
+  const fixtureEnv = { ...process.env };
+  for (const name of localNames.stdout.trim().split('\n'))
+    delete fixtureEnv[name];
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'pf-git-env-')));
+  const parent = path.join(root, 'parent');
+  const linked = path.join(root, 'linked');
+  const fixtures = path.join(root, 'fixtures');
+  const git = (cwd, ...args) => {
+    const result = spawnSync('git', args, {
+      cwd,
+      env: fixtureEnv,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
+    return result.stdout.trim();
+  };
+  try {
+    git(root, 'init', '-q', '-b', 'main', parent);
+    git(parent, 'config', 'user.name', 'Preflight parent owner');
+    git(parent, 'config', 'user.email', 'parent@example.com');
+    mkdirSync(path.join(parent, 'scripts'), { recursive: true });
+    mkdirSync(path.join(parent, '.github', 'workflows'), { recursive: true });
+    copyFileSync(
+      path.join(ROOT, 'scripts/preflight.mjs'),
+      path.join(parent, 'scripts/preflight.mjs')
+    );
+    writeFileSync(path.join(parent, 'tracked.txt'), 'parent content\n');
+    writeFileSync(
+      path.join(parent, WORKFLOW_PATH),
+      `
+jobs:
+  ${JOB_ID}:
+    steps:
+      - name: Isolated repository fixtures
+        run: |
+          test "$PREFLIGHT_KEEP" = "retained"
+          test "$GIT_TRACE" = "0"
+          mkdir -p "$PREFLIGHT_FIXTURES/bare.git" "$PREFLIGHT_FIXTURES/child"
+          git init -q --bare "$PREFLIGHT_FIXTURES/bare.git"
+          git -C "$PREFLIGHT_FIXTURES/bare.git" config user.name "Child fixture"
+          git init -q "$PREFLIGHT_FIXTURES/child"
+          printf 'child content\\n' > "$PREFLIGHT_FIXTURES/child/child.txt"
+          git -C "$PREFLIGHT_FIXTURES/child" add -A
+          git -C "$PREFLIGHT_FIXTURES/child" -c commit.gpgsign=false -c user.name=Child -c user.email=child@example.com commit -qm fixture
+          git -C "$PREFLIGHT_FIXTURES/child" rev-parse --absolute-git-dir > "$PREFLIGHT_FIXTURES/child-git-dir"
+`
+    );
+    git(parent, 'add', '.');
+    git(parent, '-c', 'commit.gpgsign=false', 'commit', '-qm', 'initial');
+    git(parent, 'worktree', 'add', '-q', '-b', 'hook-worktree', linked);
+    symlinkSync(
+      path.join(ROOT, 'node_modules'),
+      path.join(linked, 'node_modules'),
+      'dir'
+    );
+    writeFileSync(path.join(linked, 'staged.txt'), 'keep this staging\n');
+    git(linked, 'add', 'staged.txt');
+    writeFileSync(
+      path.join(linked, 'tracked.txt'),
+      'keep this unstaged edit\n'
+    );
+    const linkedGitDir = git(linked, 'rev-parse', '--absolute-git-dir');
+    const commonConfig = path.join(parent, '.git', 'config');
+    const hashFile = filename =>
+      createHash('sha256').update(readFileSync(filename)).digest('hex');
+    const snapshot = () => ({
+      config: readFileSync(commonConfig, 'utf8'),
+      parentHead: readFileSync(
+        path.join(parent, '.git', 'refs', 'heads', 'main'),
+        'utf8'
+      ),
+      linkedHead: readFileSync(
+        path.join(parent, '.git', 'refs', 'heads', 'hook-worktree'),
+        'utf8'
+      ),
+      parentIndex: hashFile(path.join(parent, '.git', 'index')),
+      linkedIndex: hashFile(path.join(linkedGitDir, 'index')),
+      worktreeContent: readFileSync(path.join(linked, 'tracked.txt'), 'utf8'),
+    });
+    const before = snapshot();
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/preflight.mjs', '--hook'],
+      {
+        cwd: linked,
+        env: {
+          ...fixtureEnv,
+          GIT_DIR: linkedGitDir,
+          GIT_COMMON_DIR: path.join(parent, '.git'),
+          GIT_WORK_TREE: linked,
+          GIT_INDEX_FILE: path.join(linkedGitDir, 'index'),
+          GIT_TRACE: '0',
+          PREFLIGHT_KEEP: 'retained',
+          PREFLIGHT_FIXTURES: fixtures,
+          JOVIE_PREFLIGHT_LEDGER: 'off',
+          JOVIE_PREFLIGHT: '1',
+        },
+        encoding: 'utf8',
+        timeout: 30000,
+      }
+    );
+    assert.deepEqual(
+      snapshot(),
+      before,
+      'preflight changed its caller repository'
+    );
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /== Isolated repository fixtures/);
+    assert.equal(git(parent, 'rev-parse', '--is-bare-repository'), 'false');
+    assert.equal(
+      git(path.join(fixtures, 'bare.git'), 'rev-parse', '--is-bare-repository'),
+      'true'
+    );
+    assert.equal(
+      git(path.join(fixtures, 'bare.git'), 'config', 'user.name'),
+      'Child fixture'
+    );
+    assert.equal(
+      readFileSync(path.join(fixtures, 'child-git-dir'), 'utf8').trim(),
+      path.join(fixtures, 'child', '.git')
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('child environment removes only Git-local variables and does not mutate its caller', () => {
+  const source = {
+    PATH: process.env.PATH,
+    GIT_DIR: '/not-the-fixture',
+    GIT_WORK_TREE: '/not-the-fixture',
+    GIT_INDEX_FILE: '/not-the-fixture/index',
+    GIT_COMMON_DIR: '/not-the-fixture/common',
+    GIT_CONFIG_COUNT: '0',
+    GIT_PREFIX: 'hook/',
+    GIT_TRACE: '0',
+    GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
+    GIT_AUTHOR_NAME: 'Original author',
+    PREFLIGHT_KEEP: 'retained',
+  };
+  const before = { ...source };
+  assert.deepEqual(buildPreflightEnv(source), {
+    PATH: source.PATH,
+    GIT_TRACE: '0',
+    GIT_SSH_COMMAND: 'ssh -o BatchMode=yes',
+    GIT_AUTHOR_NAME: 'Original author',
+    PREFLIGHT_KEEP: 'retained',
+  });
+  assert.deepEqual(source, before);
+});
+
+test('preflight fails closed when Git cannot identify its local environment', () => {
+  assert.throws(
+    () => buildPreflightEnv({ PATH: '/preflight-fixture-without-git' }),
+    /Could not identify Git repository-local environment variables/
+  );
+});
+
+function copiedCliFixture() {
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'pf-entry-')));
+  const real = path.join(root, 'real');
+  const alias = path.join(root, 'alias');
+  mkdirSync(path.join(real, 'scripts'), { recursive: true });
+  copyFileSync(
+    path.join(ROOT, 'scripts/preflight.mjs'),
+    path.join(real, 'scripts/preflight.mjs')
+  );
+  symlinkSync(
+    path.join(ROOT, 'node_modules'),
+    path.join(real, 'node_modules'),
+    'dir'
+  );
+  symlinkSync(real, alias, 'dir');
+  return { root, real, alias };
+}
+
+test('a symlinked preflight entrypoint still runs a nonzero gate', () => {
+  const { root, real, alias } = copiedCliFixture();
+  try {
+    writeFileSync(
+      path.join(real, 'fixture.yml'),
+      `
+jobs:
+  ${JOB_ID}:
+    steps:
+      - name: Deliberate failing gate
+        run: node -e 'process.exit(23)'
+`
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(alias, 'scripts/preflight.mjs'),
+        '--workflow',
+        path.join(alias, 'fixture.yml'),
+      ],
+      {
+        cwd: alias,
+        env: { ...process.env, JOVIE_PREFLIGHT_LEDGER: 'off' },
+        encoding: 'utf8',
+        timeout: 30000,
+      }
+    );
+    assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+    assert.match(result.stdout, /FAIL \(23\)/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('a trusted helper copied below a symlinked temp parent still enforces its gate', () => {
+  const { root, real } = copiedCliFixture();
+  const tempReal = path.join(root, 'temp-real');
+  const tempAlias = path.join(root, 'temp-alias');
+  mkdirSync(tempReal);
+  symlinkSync(tempReal, tempAlias, 'dir');
+  try {
+    writeFileSync(
+      path.join(real, 'fixture.yml'),
+      `
+jobs:
+  ${JOB_ID}:
+    steps:
+      - name: Trusted product-lane guard
+        run: |
+          cp "$PREFLIGHT_CLASSIFIER" "$RUNNER_TEMP/product-lane-classifier.mjs"
+          printf 'apps/web/app/page.tsx\\n' > "$RUNNER_TEMP/changed.txt"
+          node "$RUNNER_TEMP/product-lane-classifier.mjs" --files-from "$RUNNER_TEMP/changed.txt" --qualification-profile deliberate-invalid-profile
+`
+    );
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(real, 'scripts/preflight.mjs'),
+        '--workflow',
+        path.join(real, 'fixture.yml'),
+      ],
+      {
+        cwd: real,
+        env: {
+          ...process.env,
+          TMPDIR: tempAlias,
+          PREFLIGHT_CLASSIFIER: path.join(
+            ROOT,
+            'scripts/lib/product-lane-classifier.mjs'
+          ),
+          JOVIE_PREFLIGHT_LEDGER: 'off',
+        },
+        encoding: 'utf8',
+        timeout: 30000,
+      }
+    );
+    assert.equal(result.status, 1, `${result.stdout}\n${result.stderr}`);
+    assert.match(
+      result.stdout,
+      /Product lane classification failed: Unknown qualification profile: deliberate-invalid-profile/
+    );
+    assert.match(result.stdout, /FAIL \(1\)/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
