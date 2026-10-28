@@ -26,6 +26,13 @@ READ_PORCELAIN = {"list", "view", "checks", "status", "diff"}
 
 def gh_shape(args) -> dict:
     """Which bucket a gh invocation draws on, and whether it mutates."""
+    log_args = args[:2] + args[4:] if (len(args) == 9 and args[2] == "--repo"
+                                     and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", args[3])) else args
+    if (len(log_args) == 7 and log_args[:3] == ["run", "view", "--job"]
+            and re.fullmatch(r"[1-9][0-9]*", log_args[3]) and log_args[4] == "--attempt"
+            and re.fullmatch(r"[1-9][0-9]*", log_args[5]) and log_args[6] == "--log"):
+        # gh 2.102 cold cache: job, attempt, workflow, ZIP, per-job fallback.
+        return {"resource": "core", "write": False, "idempotent": True, "cost": 5}
     if args and args[0] == "api":
         target = next((a for i, a in enumerate(args) if i > 0 and not a.startswith("-")
                        and args[i - 1] not in WRITE_FLAGS), "")
@@ -61,9 +68,13 @@ def split_included(stdout: str):
     return headers, stdout[match.end():]
 
 
-def default_run(args, env) -> tuple:
+def default_run(args, env, *, timeout=None, execute: Optional[Callable] = None) -> tuple:
+    """Canonical argv construction; callers may retain their lifecycle runner/time bound."""
+    options = {"env": env, "capture_output": True, "text": True}
+    if timeout is not None:
+        options["timeout"] = timeout
     try:
-        proc = subprocess.run(["gh", *args], env=env, capture_output=True, text=True)
+        proc = (execute or subprocess.run)(["gh", *args], **options)
     except OSError as error:
         return 127, "", str(error)
     return proc.returncode, proc.stdout, proc.stderr
@@ -109,7 +120,7 @@ def run_gh(args, priority: str = "default", credential: Optional[str] = None, st
     attempt = 0
     while True:
         def admit(s, at):
-            d = decide(s, priority, {shape["resource"]: 1}, at, write=shape["write"],
+            d = decide(s, priority, {shape["resource"]: shape.get("cost", 1)}, at, write=shape["write"],
                        min_write_interval_ms=spec.get("minWriteIntervalMs"))
             if d["action"] != "go":
                 bump(s, priority, "shed" if d["action"] == "shed" else "waited", at)

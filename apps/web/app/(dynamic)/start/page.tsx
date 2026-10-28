@@ -75,12 +75,17 @@ export default async function StartPage(
 
   // JOV-7753: a handle-only entry (outreach, claim redirect) shows the
   // visitor's real page first. Explicit prompts and intents keep their flow.
-  const [authResult, entryProfile] = await Promise.all([
+  // A taken handle is the exception: it must say so even when a starter prompt
+  // rides along (JOV-9624), otherwise the visitor chats toward a name that is
+  // not theirs to claim.
+  const [authResult, resolvedEntryProfile] = await Promise.all([
     resolveUserState({ createDbUserIfMissing: false }),
-    starterHandoff || intentId
-      ? Promise.resolve(null)
-      : resolveStartEntryProfile(params),
+    intentId ? Promise.resolve(null) : resolveStartEntryProfile(params),
   ]);
+  const entryProfile =
+    starterHandoff && resolvedEntryProfile?.status !== 'claimed'
+      ? null
+      : resolvedEntryProfile;
   const startRedirect = getStartRouteRedirect(authResult.state);
   if (startRedirect) {
     redirect(startRedirect);

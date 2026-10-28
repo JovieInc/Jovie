@@ -103,4 +103,16 @@ describe('BillingActionsSection', () => {
     fireEvent.click(confirm);
     expect(handleCancelSubscription).not.toHaveBeenCalled();
   });
+
+  it('never lists branding removal among what cancelling takes away', () => {
+    render(
+      <BillingActionsSection
+        cancelDialogOpen
+        setCancelDialogOpen={vi.fn()}
+        handleCancelSubscription={vi.fn()}
+        cancelMutationPending={false}
+      />
+    );
+    expect(document.body.textContent ?? '').not.toMatch(/branding/i);
+  });
 });

@@ -7,7 +7,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "43e227649b57a96160f38afb85023e0bdefde8e551f69235e49765ae80fa052d"
+    "bodySha256": "4a7155851f35a74b98c58dff79391b949cec590b8c8ae0be609407b7103f5bb7"
   },
   {
     "file": ".claude/rules/code-style.md",
@@ -18,6 +18,11 @@
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
     "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
+  },
+  {
+    "file": ".claude/rules/domain-writes.md",
+    "paths": ["apps/web/**"],
+    "bodySha256": "95d9db99d51c78dd7d07d0836f4692415ef8c2180896e9ed820fae44c99601c4"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -41,7 +46,7 @@
       "canon/automation-registry.jsonl",
       "docs/metrics/**"
     ],
-    "bodySha256": "231c6da1fc81dee71971f0fbb887af84a64e3ca878746b78036c5e72d539006a"
+    "bodySha256": "20b2194cdea5e41ae73fa440530de8bbb766af2fba4b168365bd2ce6d44b825f"
   },
   {
     "file": ".claude/rules/external-apis.md",
@@ -135,7 +140,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "58152f4ec8c78b5f966f72df3eba353992a1d6bfd2f853220634c3406a59e90b"
+    "bodySha256": "7dee862a9ed0c472a84092c02648891b2cb8790fcbbf26e894ea5997e5799ad7"
   },
   {
     "file": ".claude/rules/security.md",
@@ -166,7 +171,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "a3607894c34105c8152b296e3a26cfbdd01d8d9b4db61841119849217ba3ef9c"
+    "bodySha256": "7cf119f5b7f3df3983b22e6eb33ffbd8b67f96dd9d73696ac10481bc6574e59c"
   },
   {
     "file": ".claude/rules/ui.md",
@@ -177,6 +182,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "a2c3fbe214bcac24e34f4ce3e79dfb24751646821780531f3e654e115f93df7b"
+    "bodySha256": "09c791e90bb8d3b89d72a2d24ae7c7fd6edb1097c2f2f204f4372006f549911c"
   }
 ]
