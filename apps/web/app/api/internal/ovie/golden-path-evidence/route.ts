@@ -23,7 +23,6 @@ import { logger } from '@/lib/utils/logger';
  */
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const ROUTE = '/api/internal/ovie/golden-path-evidence';
 const MAX_BODY_BYTES = 256 * 1024;
