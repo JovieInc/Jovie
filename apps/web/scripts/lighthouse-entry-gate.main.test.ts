@@ -608,6 +608,25 @@ describe('lighthouse entry gate main', () => {
     expect(state.calls).toHaveLength(2);
   });
 
+  it('ratchet: JOV-9611 - --lcp-report-only never fails promotion on LCP alone', async () => {
+    state.lcp = 9000;
+    const args = [
+      '--base-url',
+      'https://x.test',
+      '--route-id',
+      'start',
+      '--runs',
+      '1',
+      '--warmups',
+      '0',
+      '--lcp-report-only',
+    ];
+    expect(await main(args)).toBe(0);
+    state.lcp = 2000;
+    state.cls = 0.5;
+    expect(await main(args)).toBe(1);
+  });
+
   it('fails (exit 1) when LCP exceeds the budget', async () => {
     state.lcp = 9000;
     const code = await main([
