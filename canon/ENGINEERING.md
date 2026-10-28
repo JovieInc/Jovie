@@ -241,6 +241,15 @@ Agents should not:
 - Bypass checks for speed.
 - Create bot-to-bot chatter or routine progress noise.
 
+### Content and config are data
+
+Content, config, and choices among existing components ship as validated data
+through the one versioned content mechanism (publish, audit, rollback,
+experiment variants), not as code and not through a vendor CMS. Behavior, new
+components, and auth stay code. Pricing and legal text are data with a single
+source, an approval card, and an audit log. Operational rule:
+`.claude/rules/data-vs-code.md`.
+
 ---
 
 ## Relationship to Operational Rules
@@ -253,5 +262,6 @@ Concrete implementation lives in `../CLAUDE.md`, `../CODEX.md`, `.claude/rules/*
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-28 | Content and config are data; strict data-vs-code rule and warn-first scan. | opus/data-vs-code-rule-1028 |
 | 2026-10-23 | Blocking pull-request dependency review and Squawk on changed migration SQL. | grok/extra-guards |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |
