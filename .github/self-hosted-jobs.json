@@ -1,0 +1,61 @@
+{
+  "schema": "jovie-self-hosted-jobs/v1",
+  "policy": "GitHub-hosted is the default for every Jovie CI job (public repo, free, ~120 concurrent). A job may run self-hosted only with a reason tied to host-local state or to testing the runners.",
+  "jobs": [
+    {
+      "workflow": "ci.yml",
+      "job": "runner-image-canary",
+      "reason": "workflow_dispatch-only canary that validates the gem runner image's warm paths; meaningless on hosted"
+    },
+    {
+      "workflow": "deepsec-native.yml",
+      "job": "*",
+      "reason": "needs the host's native subscription login (jovie-native-subscription label)"
+    },
+    {
+      "workflow": "delivery-control-receipts.yml",
+      "job": "receipt",
+      "reason": "durable delivery-state-machine writer lock and receipts live on the gem host"
+    },
+    {
+      "workflow": "fixed-runner-canary.yml",
+      "job": "*",
+      "reason": "exists to prove the fixed runners themselves"
+    },
+    {
+      "workflow": "fleet-gate-refresh.yml",
+      "job": "refresh",
+      "reason": "the canonical fleet-gate receipt lives on the gem host; reads env files under $HOME/.config"
+    },
+    {
+      "workflow": "fleet-gate-refresh.yml",
+      "job": "assess",
+      "reason": "rereads Linear on gem with $HOME/.config env files and wakes the lanes picker"
+    },
+    {
+      "workflow": "hermes-cli-worker.yml",
+      "job": "*",
+      "reason": "runs the Hermes CLI installed on the gem host"
+    },
+    {
+      "workflow": "production-continuity.yml",
+      "job": "agent-ingress",
+      "reason": "admits a Summer provider-recovery task into host-local ingress state (reason not re-verified 2026-10-26; revisit)"
+    },
+    {
+      "workflow": "production-controller.yml",
+      "job": "fleet-promotion",
+      "reason": "authorizes fleet deployment state against the host delivery state machine (reason not re-verified 2026-10-26; revisit)"
+    },
+    {
+      "workflow": "runner-autoscaler-canary.yml",
+      "job": "*",
+      "reason": "exists to prove the ephemeral runner autoscaler"
+    },
+    {
+      "workflow": "runner-heartbeat.yml",
+      "job": "heartbeat",
+      "reason": "the heartbeat proves the self-hosted pool itself"
+    }
+  ]
+}
