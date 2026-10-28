@@ -26,6 +26,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import {
+  appendFileSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -61,6 +62,8 @@ export interface EntryRouteVerdict {
   readonly clsBudget: number;
   readonly pass: boolean;
   readonly failures: readonly string[];
+  readonly warnings: readonly string[];
+  readonly lcpSamples: readonly number[];
 }
 
 export function median(values: readonly number[]): number {
@@ -79,15 +82,19 @@ export function resolveRoutePath(template: string, handle: string): string {
 /** Pure verdict: a route with no samples fails closed. */
 export function evaluateEntryRoute(
   budget: EntryRouteBudget,
-  result: EntryRouteResult
+  result: EntryRouteResult,
+  options: { lcpReportOnly?: boolean } = {}
 ): EntryRouteVerdict {
   const lcpMedianMs = median(result.lcpSamples);
   const clsMedian = median(result.clsSamples);
   const failures: string[] = [];
+  const warnings: string[] = [];
   if (!Number.isFinite(lcpMedianMs)) {
     failures.push('no LCP samples were collected');
   } else if (lcpMedianMs > budget.lcpMs) {
-    failures.push(
+    // ratchet: JOV-9611 - report-only LCP: a noisy over-budget median warns
+    // (never fails) so quality-only gates cannot stall promotion.
+    (options.lcpReportOnly ? warnings : failures).push(
       `LCP median ${Math.round(lcpMedianMs)}ms > ${budget.lcpMs}ms budget`
     );
   }
@@ -105,7 +112,25 @@ export function evaluateEntryRoute(
     clsBudget: budget.cls,
     pass: failures.length === 0,
     failures,
+    warnings,
+    lcpSamples: [...result.lcpSamples],
   };
+}
+
+function writeLcpSummary(
+  verdicts: readonly EntryRouteVerdict[],
+  lcpReportOnly: boolean
+): void {
+  const file = process.env.GITHUB_STEP_SUMMARY;
+  if (!file) return;
+  const rows = verdicts.map(
+    v =>
+      `| ${v.id} | ${v.lcpSamples.map(x => Math.round(x)).join(' / ')} | ${Math.round(v.lcpMedianMs)} | ${v.lcpBudgetMs} | ${v.warnings.length ? 'WARN (report-only)' : v.pass ? 'pass' : 'FAIL'} |`
+  );
+  appendFileSync(
+    file,
+    `### Entry-route LCP (${lcpReportOnly ? 'report-only, ratchet JOV-9611' : 'blocking'})\n| route | samples ms | median | budget | result |\n|---|---|---|---|---|\n${rows.join('\n')}\n`
+  );
 }
 
 export function parseBudgets(raw: unknown): EntryRouteBudget[] {
@@ -569,6 +594,7 @@ export async function main(argv: readonly string[]): Promise<number> {
   if (!baseUrl) throw new Error('--base-url is required');
   const handle = argValue(argv, '--handle') ?? 'tim';
   const runs = Number(argValue(argv, '--runs') ?? '3');
+  const lcpReportOnly = argv.includes('--lcp-report-only');
   const warmups = Number(argValue(argv, '--warmups') ?? '1');
   if (!Number.isInteger(warmups) || warmups < 0) {
     throw new Error('--warmups must be a non-negative integer');
@@ -642,12 +668,11 @@ export async function main(argv: readonly string[]): Promise<number> {
         );
       }
       verdicts.push(
-        evaluateEntryRoute(budget, {
-          id: budget.id,
-          url,
-          lcpSamples,
-          clsSamples,
-        })
+        evaluateEntryRoute(
+          budget,
+          { id: budget.id, url, lcpSamples, clsSamples },
+          { lcpReportOnly }
+        )
       );
     }
   } finally {
@@ -658,7 +683,12 @@ export async function main(argv: readonly string[]): Promise<number> {
       `${verdict.pass ? 'PASS' : 'FAIL'} ${verdict.id}: LCP ${Math.round(verdict.lcpMedianMs)}ms / ${verdict.lcpBudgetMs}ms, CLS ${verdict.clsMedian.toFixed(3)} / ${verdict.clsBudget}`
     );
     for (const failure of verdict.failures) console.log(`  ${failure}`);
+    for (const warning of verdict.warnings)
+      console.log(
+        `::warning::${verdict.id}: ${warning} (report-only, JOV-9611)`
+      );
   }
+  writeLcpSummary(verdicts, lcpReportOnly);
   return verdicts.every(verdict => verdict.pass) ? 0 : 1;
 }
 
