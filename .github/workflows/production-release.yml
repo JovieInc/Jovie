@@ -574,7 +574,7 @@ jobs:
     name: Alias verified preview to staging.jov.ie
     needs: [deploy-staging, canary-health-gate, staging-head]
     if: ${{ always() && inputs.release_mode == 'staging' && needs.deploy-staging.result == 'success' && needs.canary-health-gate.result == 'success' && needs.staging-head.result == 'success' && needs.staging-head.outputs.is_current == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -832,7 +832,7 @@ jobs:
     name: Promote to Production
     needs: [production-head, migrate-production]
     if: ${{ always() && inputs.release_mode == 'production' && inputs.staging_verified && needs.production-head.result == 'success' && needs.production-head.outputs.is_current == 'true' && ((inputs.full_runtime_proof && needs.migrate-production.result == 'success') || (!inputs.full_runtime_proof && needs.migrate-production.result == 'skipped')) }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
       contents: read
@@ -1797,7 +1797,7 @@ jobs:
     name: Production public-profile alias usable-result gate
     needs: [promote-production]
     if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -1877,7 +1877,7 @@ jobs:
     name: Production OAuth Gate (observational)
     needs: [promote-production]
     if: ${{ always() && inputs.full_runtime_proof && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       contents: read
