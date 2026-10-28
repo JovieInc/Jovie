@@ -41,6 +41,7 @@ import {
   buildSurvivorIssue,
   emptyState,
   extractSurvivors,
+  moduleKey,
   normalizeState,
   partitionEquivalents,
   pickBatch,
@@ -185,6 +186,13 @@ const testStems = new Set(
         .replace(/\.test\.tsx?$/u, '')
     )
 );
+/** @type {Map<string, string[]>} test stem -> blobs of its test files */
+const testBlobsByStem = new Map();
+for (const [path, blob] of blobs) {
+  const m = /([^/]+)\.test\.tsx?$/u.exec(path);
+  if (!m) continue;
+  testBlobsByStem.set(m[1], [...(testBlobsByStem.get(m[1]) ?? []), blob]);
+}
 const GENERIC_STEMS = new Set([
   'route',
   'index',
@@ -204,7 +212,10 @@ for (const file of sources) {
     .replace(/\.tsx?$/u, '');
   candidates.push({
     file,
-    blob: blobs.get(`${WEB_ROOT}/${file}`) ?? '',
+    blob: moduleKey(
+      blobs.get(`${WEB_ROOT}/${file}`) ?? '',
+      testBlobsByStem.get(stem) ?? []
+    ),
     testCount: !GENERIC_STEMS.has(stem) && testStems.has(stem) ? 1 : 0,
   });
 }

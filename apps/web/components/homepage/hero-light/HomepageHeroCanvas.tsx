@@ -51,7 +51,11 @@ export function HomepageHeroCanvas({
   subhead: HomepageCopy['hero']['subhead'];
   claim: HomepageCopy['hero']['claim'];
   supportNote: HomepageCopy['hero']['supportNote'];
-  profile: HomepageCopy['hero']['profile'];
+  /**
+   * Optional proof capture. The homepage passes none: no real person's face
+   * on `/` (Tim, 2026-10-26). A template capture can be passed here later.
+   */
+  profile?: HomepageCopy['hero']['profile'];
   sectionOwner: string;
   /**
    * Registry identity for the section.hero occurrence this canvas renders.
@@ -118,18 +122,20 @@ export function HomepageHeroCanvas({
               <p className='homepage-hero-canvas__support'>{supportNote}</p>
             </div>
           </div>
-          <div className='homepage-hero-canvas__proof'>
-            <ArtistProfilePhoneFrame className='homepage-artist-hero__phone'>
-              <MarketingPhoneImage
-                scenarioId={profile.scenarioId}
-                altOverride={profile.alt}
-                fill
-                priority
-                sizes='(min-width: 1024px) 21.25rem, (min-width: 768px) 18rem, 72vw'
-                className='object-cover object-top'
-              />
-            </ArtistProfilePhoneFrame>
-          </div>
+          {profile ? (
+            <div className='homepage-hero-canvas__proof'>
+              <ArtistProfilePhoneFrame className='homepage-artist-hero__phone'>
+                <MarketingPhoneImage
+                  scenarioId={profile.scenarioId}
+                  altOverride={profile.alt}
+                  fill
+                  priority
+                  sizes='(min-width: 1024px) 21.25rem, (min-width: 768px) 18rem, 72vw'
+                  className='object-cover object-top'
+                />
+              </ArtistProfilePhoneFrame>
+            </div>
+          ) : null}
         </div>
       </div>
     </section>
