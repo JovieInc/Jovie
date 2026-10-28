@@ -19,7 +19,7 @@ concurrency:
 jobs:
   deterministic:
     name: Source Validation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       actions: read
@@ -778,7 +778,7 @@ jobs:
   # differed from the PR head for 92 of 103 sampled merges.
   unit:
     name: Affected Unit Tests (${{ matrix.shard }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       actions: read
@@ -860,7 +860,7 @@ jobs:
         run: pnpm --filter @jovie/ovie test
   a11y:
     name: A11y (UI paths)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       actions: read
