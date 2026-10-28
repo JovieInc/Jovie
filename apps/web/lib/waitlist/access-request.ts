@@ -756,6 +756,7 @@ export async function submitWaitlistAccessRequest(
     await recordWaitlistJoin({
       entryId: result.entryId,
       acquisitionId: input.acquisitionId,
+      appUserId: input.appUserId,
       admitted:
         result.outcome === 'accepted' || result.outcome === 'already_accepted',
     });

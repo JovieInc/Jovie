@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 # Decide whether EXPECTED_SHA is still on main (exact, or an ancestor).
 #
+# Main is allowed to keep advancing while a controller run is in flight (a run
+# takes ~45 minutes, merges land every few minutes). A candidate that is an
+# ancestor of the current main tip is promoted as-is: production moves
+# strictly forward and stays strictly behind main, and the next queued
+# controller run catches up the rest. Main moving DURING this proof is the same
+# case, so the proof re-judges against the newer tip as long as the tip still
+# descends from the main SHA first read (a rewind or rewrite fails closed).
+#
+# Optional LIVE_PRODUCTION_SHA: the SHA production serves now. A candidate that
+# does not descend from it (older than live, or off live's history) yields with
+# is_current=false and refusal_reason=older_than_live so promotion can never
+# roll production back by accident. Unset skips the check.
+#
 # REST compare is exact, but this read runs after the rest of the release has
 # already spent the shared GitHub App installation quota. A primary 403
 # ("API rate limit exceeded for installation") does not recover inside the
@@ -20,6 +33,15 @@ hold_script="${GH_API_HOLD_SCRIPT:-$(cd "$(dirname "$0")" && pwd)/gh-api-hold.sh
 # quota cannot block promotion. git still fails closed when ancestry is
 # unproven. It never treats a missing read as current.
 transport="${MAIN_LINEAGE_TRANSPORT:-rest}"
+live="${LIVE_PRODUCTION_SHA:-}"
+# LIVE_PRODUCTION_BUILD_INFO_URL: resolve the live SHA from build-info. An
+# unreadable live SHA leaves the check off here; the journey gate fails closed
+# on the same unreadable build-info before any promotion.
+if [ -z "$live" ] && [ -n "${LIVE_PRODUCTION_BUILD_INFO_URL:-}" ]; then
+  live="$(curl --fail --silent --connect-timeout 5 --max-time 15 --retry 2 --retry-all-errors \
+    "$LIVE_PRODUCTION_BUILD_INFO_URL" 2>/dev/null | jq -r '.commitSha // empty' 2>/dev/null || true)"
+  [[ "$live" =~ ^[0-9a-f]{40}$ ]] || live=""
+fi
 if [ "$transport" != "rest" ] && [ "$transport" != "git" ]; then
   echo "::error::MAIN_LINEAGE_TRANSPORT must be rest or git." >&2
   exit 1
@@ -29,6 +51,10 @@ fi
   echo "::error::expected_sha must be a full commit SHA." >&2
   exit 1
 }
+if [ -n "$live" ] && ! [[ "$live" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "::error::LIVE_PRODUCTION_SHA must be a full commit SHA when set." >&2
+  exit 1
+fi
 [[ "$repository" =~ ^[^/]+/[^/]+$ ]] || {
   echo "::error::GITHUB_REPOSITORY must be owner/name." >&2
   exit 1
@@ -118,19 +144,44 @@ git_lineage() {
     git init -q "$work"
 
     judged() {
-      local tip ancestor_status
+      local tip ancestor_status live_status shallow
       tip="$(git -C "$work" rev-parse refs/remotes/origin/main)"
+      shallow="$(git -C "$work" rev-parse --is-shallow-repository)"
       if [ "$tip" != "$current" ]; then
-        echo "::error::main moved from ${current} to ${tip} while proving lineage ${context}." >&2
-        exit 1
+        # Main advanced between the ls-remote read and the fetch. Main is
+        # fast-forward only, so the tip must descend from the SHA first read.
+        # Anything else is a rewind or rewrite and fails closed.
+        if git_main -C "$work" merge-base --is-ancestor "$current" "$tip" 2>/dev/null; then
+          echo "::notice::main advanced from ${current} to ${tip} while proving lineage ${context}; judging ${expected} against the newer tip." >&2
+        else
+          ancestor_status=$?
+          if [ "$shallow" = "true" ] && { [ "$ancestor_status" -eq 1 ] || [ "$ancestor_status" -eq 128 ]; }; then
+            return 1
+          fi
+          echo "::error::main moved from ${current} to ${tip} and ${tip} does not descend from ${current} while proving lineage ${context}." >&2
+          exit 1
+        fi
       fi
       if git_main -C "$work" merge-base --is-ancestor "$expected" "$tip" 2>/dev/null; then
+        if [ -n "$live" ]; then
+          if git_main -C "$work" merge-base --is-ancestor "$live" "$expected" 2>/dev/null; then
+            printf 'ahead\n'
+            exit 0
+          else
+            live_status=$?
+          fi
+          if [ "$shallow" = "true" ] && [ "$live_status" -ne 0 ]; then
+            return 1
+          fi
+          printf 'older_than_live\n'
+          exit 0
+        fi
         printf 'ahead\n'
         exit 0
       else
         ancestor_status=$?
       fi
-      if [ "$(git -C "$work" rev-parse --is-shallow-repository)" != "true" ]; then
+      if [ "$shallow" != "true" ]; then
         printf 'diverged\n'
         exit 0
       fi
@@ -159,11 +210,11 @@ git_lineage() {
 
 compare_status() {
   local current="$1" status api_status
-  if [ "$current" = "$expected" ]; then
+  if [ "$current" = "$expected" ] && [ -z "$live" ]; then
     printf 'identical\n'
     return 0
   fi
-  if [ "$transport" = "git" ]; then
+  if [ "$transport" = "git" ] || [ -n "$live" ]; then
     git_lineage "$current"
     return
   fi
@@ -186,6 +237,12 @@ current="$(read_main_sha)" || exit 1
 }
 
 lineage="$(compare_status "$current")" || exit 1
+if [ "$lineage" = "older_than_live" ]; then
+  echo "::notice::Release ${expected} is not newer than live production ${live}; refusing to promote (no rollback) ${context}."
+  emit refusal_reason older_than_live
+  emit is_current false
+  exit 0
+fi
 if [ "$lineage" != "identical" ] && [ "$lineage" != "ahead" ]; then
   echo "::notice::Release ${expected} left main's lineage (main is ${current}) ${context}."
   emit superseded_sha "$current"

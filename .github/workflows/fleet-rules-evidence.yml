@@ -23,6 +23,9 @@ run-name: "${{ github.event_name == 'pull_request_target' && format('fleet-rules
 # skipped.
 on:
   pull_request_target:
+    # Base filter, not a job `if`: stacked PRs (non-main base) never reach PR Ready
+    # (wrong-base blocker), and ~235 all-skipped runs/day came from them.
+    branches: [main]
     types: [opened, edited, synchronize, labeled, unlabeled, reopened]
   # A verdict can land before Source Validation finishes (PR Ready then reads
   # "missing") or after it (PR Ready already red). Either way the failed jobs

@@ -141,6 +141,16 @@ runs:
             "${{ steps.runner-prereqs.outputs.installed_tree_archive_sha256 }}"
         else
           pnpm install --frozen-lockfile
+          # A restored tree can survive the frozen install still linking an
+          # unpatched copy of a patchedDependencies entry (run 40345264860:
+          # prebuild-install, DEP0176). Rebuild from scratch instead of
+          # running on, or saving, that tree.
+          if ! node scripts/lib/verify-patched-dependencies.mjs; then
+            echo "::warning::Restored node_modules held stale patched dependencies; reinstalling from scratch."
+            rm -rf node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules
+            pnpm install --frozen-lockfile
+            node scripts/lib/verify-patched-dependencies.mjs
+          fi
         fi
 
     # The repo's Actions cache runs over its 10 GB cap on dependabot days (12.3 GB

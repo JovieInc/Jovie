@@ -2243,7 +2243,9 @@ describe('source-read guard selection', () => {
         ? ['ui-story-coverage-allowlist']
         : []),
       'merged-with-base-invariants',
-      ...(/^scripts\/(?:lanes\/|tests\/test_)/u.test(path)
+      ...(/^(?:scripts\/|packages\/|ops\/registry\/|\.nvmrc$|pnpm-lock\.yaml$)/u.test(
+        path
+      )
         ? ['lanes-selftest-changed-tests']
         : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
