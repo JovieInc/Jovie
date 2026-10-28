@@ -37,6 +37,9 @@ vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({
   db: { select: mocks.select, update: mocks.update },
 }));
+vi.mock('@/lib/db/schema/auth', () => ({
+  users: { id: 'users.id', email: 'users.email' },
+}));
 vi.mock('@/lib/db/schema/profiles', () => ({
   creatorProfiles: {
     id: 'id',

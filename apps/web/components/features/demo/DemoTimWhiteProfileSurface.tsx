@@ -795,7 +795,11 @@ export function DemoTimWhiteProfileSurface() {
     <DemoClientProviders>
       <div data-testid='demo-showcase-tim-white-profile'>
         <StaticArtistPage
-          presentation='full-public'
+          presentation={
+            searchParams.get('presentation') === 'compact-preview'
+              ? 'compact-preview'
+              : 'full-public'
+          }
           mode={mode}
           artist={fixture.artist}
           subtitle='Official artist profile'
