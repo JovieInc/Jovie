@@ -144,6 +144,14 @@
     "tier": 4,
     "model": "grok-4.7",
     "slots": 1,
+    "routes": [
+      {
+        "model": "grok-4.7",
+        "capability": "standard",
+        "costClass": "subscription",
+        "cost": 2
+      }
+    ],
     "health": ["grok", "models"],
     "healthy": "logged in",
     "cmd": [
