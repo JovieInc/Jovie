@@ -80,6 +80,10 @@ CLOCKS = (
     Clock("loopHealthEmailDeliverability", "loop-health-email-deliverability.yml",
           "clock_loop_health_email_deliverability", 6 * 3600,
           "loop-health-email-deliverability-clock.json", github_cron=False),
+    # Closed-loop health (gap 2): failed payments, dunning recovery, stalled dunning.
+    Clock("loopHealthBillingHealth", "loop-health-billing-health.yml",
+          "clock_loop_health_billing_health", 6 * 3600,
+          "loop-health-billing-health-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 
