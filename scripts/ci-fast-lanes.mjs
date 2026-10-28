@@ -161,6 +161,14 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    id: 'synthetic-canary-liveness',
+    command:
+      'pnpm exec vitest --root scripts --config vitest.config.mts run --coverage --coverage.include=synthetic-canary-liveness.mjs --coverage.reporter=text --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-synthetic-canary-coverage" --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=90 lib/__tests__/synthetic-canary-liveness.test.mjs',
+    inputs:
+      /^(?:\.github\/workflows\/(?:automation-liveness|synthetic-monitoring)\.yml|scripts\/synthetic-canary-liveness\.mjs|scripts\/lib\/__tests__\/synthetic-canary-liveness\.test\.mjs|scripts\/ci-fast-lanes\.mjs)$/u,
+    prOnly: false,
+  }),
+  Object.freeze({
     id: 'node-environment-files',
     command:
       'pnpm --filter @jovie/web exec vitest run --config=vitest.config.ci-contracts.mts tests/unit/ci/node-environment-files.test.ts',
@@ -221,6 +229,39 @@ export const SOURCE_GUARDS = Object.freeze([
     prOnly: false,
   }),
   Object.freeze({
+    // Marketing images and cards use a radius token. Zero exceptions.
+    id: 'marketing-rounded-media',
+    command: 'node --test scripts/invariants/art-direction/rounded.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage|features\/(?:home|pricing|visibility-audit))\/|apps\/web\/components\/organisms\/(?:AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|apps\/web\/components\/site\/Marketing|apps\/web\/tests\/unit\/marketing\/art-direction\/rounded|scripts\/invariants\/art-direction\/rounded)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    // Marketing and public pages use one boxed width and one full-bleed
+    // override. New hits fail against origin/main. See MKT-D18.
+    id: 'marketing-container-width',
+    command:
+      'node --test scripts/invariants/art-direction/container-width.test.mjs',
+    inputs:
+      /^(?:apps\/web\/app\/\((?:marketing|home)\)\/|apps\/web\/components\/(?:marketing|homepage|site|features\/(?:home|pay|pricing|visibility-audit))\/|apps\/web\/components\/organisms\/(?:HeaderNav|AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|apps\/web\/styles\/design-system\.css$|scripts\/invariants\/art-direction\/container-width)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    // Breaking changes to the public OpenAPI contract (ARTIST_OPENAPI_DOCUMENT,
+    // served at /api/v1/openapi.json and /openapi.json) fail closed unless the
+    // PR body carries an auditable `api-breaking: <reason>` marker line. The
+    // spec is rendered from source at the head and the merge base and diffed
+    // with a pinned, sha-verified oasdiff binary the guard downloads itself.
+    // prOnly: the marker lives in the pull_request body, which merge-group
+    // and main events cannot present, so those events skip this guard.
+    id: 'oasdiff-breaking-change',
+    command:
+      'node scripts/invariants/oasdiff-breaking-change.mjs && node --test --test-isolation=none scripts/invariants/oasdiff-breaking-change.test.mjs',
+    inputs:
+      /^(?:apps\/web\/(?:lib\/api\/(?:v1\/|public-agent-openapi\.ts$)|lib\/music-resolver\/public-schemas\.ts$|app\/api\/v1\/openapi\.json\/route\.ts$|app\/openapi\.json\/route\.ts$|scripts\/render-public-openapi\.ts$)|scripts\/invariants\/oasdiff-breaking-change(?:\.test)?\.mjs$|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: true,
+  }),
+  Object.freeze({
     // Third-party API calls go through packages/api-client / scripts/apiclient
     // (.claude/rules/external-apis.md). A new provider host, SDK client or gh
     // call in any scanned source fails here; grandfathered sites only shrink.
@@ -263,6 +304,27 @@ export const SOURCE_GUARDS = Object.freeze([
     command: `node ${JSON.stringify(
       fileURLToPath(
         new URL('./lib/script-contract-affected.mjs', import.meta.url)
+      )
+    )}`,
+    inputs: /./u,
+    prOnly: true,
+  }),
+  Object.freeze({
+    id: 'copy-leak',
+    // Trusted-base scanner/policy, checked against the PR checkout. PR Ready
+    // inherits Source Validation failures; merge groups and main also run it.
+    command: `node ${shellQuote(fileURLToPath(new URL('./invariants/copy-leak/check.mjs', import.meta.url)))} && node --test --test-isolation=none --experimental-test-coverage ${shellQuote(`--test-coverage-include=${fileURLToPath(new URL('./invariants/copy-leak/check.mjs', import.meta.url))}`)} --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=85 ${shellQuote(fileURLToPath(new URL('./invariants/copy-leak/copy-leak.test.mjs', import.meta.url)))}`,
+    inputs:
+      /^(?:apps\/web\/|scripts\/invariants\/copy-leak\/|scripts\/ci-fast-lanes\.mjs$)/u,
+    prOnly: false,
+  }),
+  Object.freeze({
+    // JOV-INV-045. Trusted-base copy scans the pull request diff and fails
+    // when the diff loosens a blocking gate. Pull requests only.
+    id: 'gate-weakening-detector',
+    command: `node ${shellQuote(
+      fileURLToPath(
+        new URL('./invariants/gate-weakening-detector.mjs', import.meta.url)
       )
     )}`,
     inputs: /./u,
@@ -353,6 +415,9 @@ export const NODE_RUNTIME_CONTRACT_PATHS = Object.freeze([
 export const BILLING_COVERAGE_COMMAND = Object.freeze(
   `${BILLING_PROVENANCE_COVERAGE_COMMAND} && ${FAN_SEND_SAFETY_COVERAGE_COMMAND}`
 );
+export const DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND =
+  'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-installed-apps-audit.mjs --test-coverage-lines=70 --test-coverage-branches=80 --test-coverage-functions=65 scripts/desktop-installed-apps-audit.test.mjs';
+
 export const DESKTOP_RELEASE_COVERAGE_COMMAND =
   'node --test --experimental-test-coverage --test-coverage-include=scripts/desktop-release-assets.mjs --test-coverage-lines=75 --test-coverage-branches=88 --test-coverage-functions=65 scripts/desktop-release-guard.test.mjs scripts/desktop-release-publisher.test.mjs && node --test --experimental-test-coverage --test-coverage-include=apps/desktop/scripts/notarize-release-dmg.cjs --test-coverage-lines=75 --test-coverage-branches=100 --test-coverage-functions=50 scripts/desktop-release-guard.test.mjs';
 // apps/web/tests/unit/ci reads .github/**, scripts/**, and other non-web
@@ -500,7 +565,7 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
 export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
+  'scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
     ' '
   )
 );
@@ -554,9 +619,29 @@ export const LANES_PYTEST_SHARDS = Object.freeze([
   },
 ]);
 
+/**
+ * Retry a lanes pytest shard's failed nodes once, only when one to three
+ * nodes failed (a wider failure is a real regression, never retried).
+ * Merge-group ejections of unrelated product PRs came from timing-sensitive
+ * lanes tests: test_update_installs_tested_release_and_only_moves_the_symlink
+ * ejected 7 distinct PRs in 17h, each discarding the groups queued behind it.
+ * A deterministic failure fails twice and still fails the shard; a pass on the
+ * retry is surfaced as a ::warning naming the node so the flake stays visible.
+ * POSIX sh: the shard output goes through a log file because sh has no
+ * pipefail. Coverage from the retry appends to the shard's data file.
+ */
+export const LANES_RETRY_FUNCTION =
+  'lanes_retry() { lr_id="$1"; lr_rc="$2"; lr_log="$3"; ' +
+  'if [ "$lr_rc" -eq 0 ] || [ "$lr_rc" -eq 5 ]; then return "$lr_rc"; fi; ' +
+  'lr_nodes="$(sed -n \'s/^FAILED \\(scripts\\/[^ ]*\\).*/\\1/p\' "$lr_log" | sort -u)"; ' +
+  'lr_n="$(printf \'%s\\n\' "$lr_nodes" | grep -c .)"; ' +
+  'if [ "$lr_n" -lt 1 ] || [ "$lr_n" -gt 3 ]; then return "$lr_rc"; fi; ' +
+  'echo "::warning title=lanes pytest retry::shard $lr_id retried $lr_n failed node(s) once: $(printf \'%s \' $lr_nodes)"; ' +
+  'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes-$lr_id.coverage" python3 -m coverage run -a --branch -m pytest $lr_nodes -q -p no:cacheprovider --basetemp="${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-$lr_id-retry"; }; ';
+
 /** @param {{ id: string, files: readonly string[], keyword?: string }} shard */
 const lanesCoverageShard = ({ id, files, keyword }) =>
-  `COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.coverage" python3 -m coverage run --branch -m pytest ${files.join(' ')} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${id}"${keyword ? ` -k "${keyword}"` : ''}`;
+  `{ lanes_log="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.log"; PYTEST_ADDOPTS=-rf COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes-${id}.coverage" python3 -m coverage run --branch -m pytest ${files.join(' ')} -q -p no:cacheprovider --basetemp="\${RUNNER_TEMP:-/tmp}/jovie-lanes-pytest-${id}"${keyword ? ` -k "${keyword}"` : ''} > "$lanes_log" 2>&1; lanes_rc=$?; cat "$lanes_log"; lanes_retry ${id} "$lanes_rc" "$lanes_log"; }`;
 
 const [LANES_LAST_SHARD] = LANES_PYTEST_SHARDS.slice(-1);
 const LANES_BACKGROUND_SHARDS = LANES_PYTEST_SHARDS.slice(0, -1);
@@ -564,7 +649,7 @@ const LANES_BACKGROUND_SHARDS = LANES_PYTEST_SHARDS.slice(0, -1);
 // the command. The first non-zero shard status is the command's status (the
 // qualifiers in automation-verify read pytest/coverage exit codes), and it
 // fails the command before coverage is combined.
-const LANES_COVERAGE_RUN = `{ ${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(LANES_LAST_SHARD)}; lanes_status=$?; ${LANES_BACKGROUND_SHARDS.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine ${LANES_PYTEST_SHARDS.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
+const LANES_COVERAGE_RUN = `{ ${LANES_RETRY_FUNCTION}${LANES_BACKGROUND_SHARDS.map(shard => `${lanesCoverageShard(shard)} & lanes_${shard.id}=$!;`).join(' ')} ${lanesCoverageShard(LANES_LAST_SHARD)}; lanes_status=$?; ${LANES_BACKGROUND_SHARDS.map(shard => `wait "$lanes_${shard.id}"; lanes_shard=$?; [ "$lanes_status" -ne 0 ] || lanes_status=$lanes_shard;`).join(' ')} (exit "$lanes_status"); } && COVERAGE_FILE="\${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage combine ${LANES_PYTEST_SHARDS.map(shard => `"\${RUNNER_TEMP:-/tmp}/jovie-lanes-${shard.id}.coverage"`).join(' ')}`;
 
 /**
  * Structural Python regressions, split so the pool can overlap them. Each
@@ -590,6 +675,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/capacity_limit.py" --fail-under=90',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/qualification_guard.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hyperagent_lane.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/devin_free_policy.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/claude_lane.py" --fail-under=95',
@@ -610,6 +696,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 ]);
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
+  'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.claude/hooks/post-task-validate.test.mjs',
@@ -639,6 +726,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/capability-benchmark/computer-use-decision.test.mjs',
   'scripts/capability-benchmark/capability-reconciliation.test.mjs',
   'scripts/ci-cache-policy.test.mjs',
+  'scripts/db/lint-changed-migrations.test.mjs',
   'scripts/ci-release-incident-contract.test.mjs',
   'scripts/company-assets/company-assets.test.mjs',
   'scripts/deprecation-intake.test.mjs',
@@ -663,6 +751,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/assurance-matrix.test.mjs',
   'scripts/invariants/browser-owned-input.test.mjs',
   'scripts/invariants/founder-calibration.test.mjs',
+  'scripts/invariants/gate-weakening-detector.test.mjs',
   'scripts/invariants/jev-revision-report.test.mjs',
   'scripts/invariants/jev-writing-readiness.test.mjs',
   'scripts/time-bomb/scan.test.mjs',
@@ -670,6 +759,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/invariants/pr-lifecycle-contract.test.mjs',
   'scripts/invariants/quality-saturation.test.mjs',
   'scripts/invariants/screen-audit.test.mjs',
+  'scripts/invariants/oasdiff-breaking-change.test.mjs',
   'scripts/invariants/ui-escape-holdout.test.mjs',
   'scripts/invariants/virtual-models.test.mjs',
   'scripts/invariants/writing-surfaces.test.mjs',
@@ -747,10 +837,15 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/stryker-babel-compatibility.test.mjs',
   'scripts/lib/__tests__/mutation-diff.test.mjs',
   'scripts/lib/__tests__/mutation-score-floor.test.mjs',
+  'scripts/lib/__tests__/mutation-floor-intake.test.mjs',
+  'scripts/lib/__tests__/mutation-diff-workflow.test.mjs',
+  'scripts/lib/__tests__/mutation-sweep.test.mjs',
+  'scripts/lib/__tests__/mutation-sweep-file-issues.test.mjs',
   'scripts/lib/__tests__/knip-web-tooling.test.mjs',
   'scripts/lib/__tests__/actions-cache-supersede.test.mjs',
   'scripts/lib/__tests__/ci-dependency-workspace.test.mjs',
   'scripts/lib/__tests__/agent-branch-pattern.test.mjs',
+  'scripts/lib/__tests__/authenticated-performance-graduation.test.mjs',
   'scripts/lib/__tests__/auto-ready-green-drafts.test.mjs',
   'scripts/lib/__tests__/workflow-expression-budget.test.mjs',
   'scripts/lib/__tests__/stale-branch-sweep.test.mjs',
@@ -760,9 +855,11 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/brand-construction.test.mjs',
   'scripts/lib/__tests__/changelog-parser.test.mjs',
   'scripts/lib/__tests__/ci-script-test-inventory.test.mjs',
+  'scripts/lib/__tests__/guardrail-inputs.test.mjs',
   'scripts/lib/__tests__/vitest-orphan-inventory.test.mjs',
   'scripts/lib/__tests__/gate-config-consistency.test.mjs',
   'scripts/lib/__tests__/claim-dogfood-report.test.mjs',
+  'scripts/lib/__tests__/claim-test-environment.test.mjs',
   'scripts/lib/__tests__/codeowners-drift.test.mjs',
   'scripts/lib/__tests__/component-comparative-quality-bar.test.mjs',
   'scripts/lib/__tests__/component-rendered-certification.test.mjs',
@@ -817,6 +914,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/domain-expiry.test.mjs',
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
+  'scripts/lib/__tests__/capacity-registry.test.mjs',
   'scripts/lib/__tests__/remediation-sweep.test.mjs',
   'scripts/lib/__tests__/remediation-sweep-workflow-contract.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
@@ -1919,12 +2017,43 @@ function runScriptsTypecheck() {
   return shell('pnpm run typecheck:scripts');
 }
 
+/** Operations-lane node:test files run by Guardrails (single source of truth). */
+export const GUARDRAIL_OPERATIONS_TESTS = Object.freeze([
+  'scripts/cleanup-stale-dev.test.mjs',
+  'scripts/desktop-release-guard.test.mjs',
+  'scripts/desktop-installed-apps-audit.test.mjs',
+  'scripts/dev-web-fast.test.mjs',
+  'scripts/ios-guardrail-rollout-audit.test.mjs',
+  'scripts/version-fanout-guard.test.mjs',
+  'scripts/version-stamp.test.mjs',
+  'scripts/agent/preflight.test.mjs',
+  'scripts/agent/pen-save-receipt.test.mjs',
+  'scripts/agent/pen-live-canvas-persist.test.mjs',
+  'scripts/agent/pen-cold-readback.test.mjs',
+  'scripts/agent/pen-par/pen-par.test.mjs',
+  'scripts/skill-governance-guard.test.mjs',
+  'scripts/skill-catalog.test.mjs',
+  'scripts/agent-web-contract.test.mjs',
+  'scripts/dev-loop-contract.test.mjs',
+]);
+
+/**
+ * Guardrails mode for a diff: "full" (product lane on), "inputs" (only repo
+ * files the guardrail checks read changed, so run the operations checks), or
+ * "skip" (JOV-5288: Symphony/Summer-exclusive or unrelated diffs).
+ */
+export function guardrailsMode({ event = '', lanes }) {
+  if (event === 'workflow_dispatch' || lanes.runJovieProduct) return 'full';
+  return lanes.runGuardrailInputs ? 'inputs' : 'skip';
+}
+
 function runGuardrails() {
   // Exclusive Symphony/Summer diffs must not wait on Jovie product guardrails
   // (JOV-5288). Product-lane selection still slices remaining work when the
   // product lane is on.
   const event = process.env.GITHUB_EVENT_NAME || '';
-  if (event !== 'workflow_dispatch' && !repoLanes().runJovieProduct) {
+  const mode = guardrailsMode({ event, lanes: repoLanes() });
+  if (mode === 'skip') {
     return {
       code: 0,
       output: 'Guardrails skipped (no Jovie product files changed)\n',
@@ -1934,6 +2063,9 @@ function runGuardrails() {
   const base = process.env.GITHUB_BASE_REF || 'main';
   const originBase = `origin/${base}`;
   const selected = selectedProductLanes();
+  // Input-only diffs (docs/rules the checks read) run just the operations
+  // checks that read them; every input flows through that lane.
+  if (mode === 'inputs') selected.add('operations');
   const parts = [
     ...(selected.has('mac')
       ? [
@@ -1953,7 +2085,7 @@ function runGuardrails() {
           // Exercise retention executables and subprocess coverage before other guards.
           'node --test --test-timeout=45000 --experimental-test-coverage --test-coverage-include="scripts/*retention.mjs" --test-coverage-lines=75 --test-coverage-functions=70 --test-coverage-branches=75 scripts/local-runtime-retention.test.mjs scripts/generated-artifact-retention.test.mjs scripts/cleanup-safety.test.mjs scripts/setup-cache-cleanup.test.mjs',
           'pnpm design:logo-assets:check',
-          'node --test scripts/cleanup-stale-dev.test.mjs scripts/desktop-release-guard.test.mjs scripts/desktop-installed-apps-audit.test.mjs scripts/dev-web-fast.test.mjs scripts/ios-guardrail-rollout-audit.test.mjs scripts/version-fanout-guard.test.mjs scripts/version-stamp.test.mjs scripts/agent/preflight.test.mjs scripts/agent/pen-save-receipt.test.mjs scripts/agent/pen-live-canvas-persist.test.mjs scripts/agent/pen-cold-readback.test.mjs scripts/agent/pen-par/pen-par.test.mjs scripts/skill-governance-guard.test.mjs scripts/skill-catalog.test.mjs scripts/agent-web-contract.test.mjs scripts/dev-loop-contract.test.mjs',
+          `node --test ${GUARDRAIL_OPERATIONS_TESTS.join(' ')}`,
         ]
       : []),
     ...(selected.has('web')
@@ -2618,7 +2750,10 @@ export async function runStructural(opts = {}) {
     'pnpm --filter @jovie/web run test:reliability-detectors',
     // Merge-group-only unit guards run in their own web lane (merge-group-guards).
   ];
-  const macParts = [DESKTOP_RELEASE_COVERAGE_COMMAND];
+  const macParts = [
+    DESKTOP_INSTALLED_IDENTITY_COVERAGE_COMMAND,
+    DESKTOP_RELEASE_COVERAGE_COMMAND,
+  ];
   // Script contracts run with the operations lane, but they also read web and
   // docs sources. Without operations, run the ones whose derived imports/reads
   // the diff touches (#20922 reddened main through rubric.test.mjs).

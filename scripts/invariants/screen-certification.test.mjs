@@ -3715,6 +3715,20 @@ if (p.endsWith('/zip')) {
     );
   });
 
+  it('registers the YouTube thumbnails billing screens independently', () => {
+    assert.equal(
+      classifyScreenPath('apps/web/app/billing/youtube-thumbnails/page.tsx')
+        .entry?.id,
+      'web.billing-youtube-thumbnails'
+    );
+    assert.equal(
+      classifyScreenPath(
+        'apps/web/app/billing/youtube-thumbnails/success/page.tsx'
+      ).entry?.id,
+      'web.billing-youtube-thumbnails-success'
+    );
+  });
+
   it('registers the waitlist error boundary with the waitlist screen', () => {
     const result = evaluateChangedScreens({
       changedFiles: [{ path: 'apps/web/app/waitlist/error.tsx', status: 'M' }],
@@ -4007,6 +4021,7 @@ if (p.endsWith('/zip')) {
   it('registers the marketing pricing page for changed-surface certification', () => {
     const source = 'apps/web/app/(marketing)/pricing/page.tsx';
     const layoutSource = 'apps/web/app/(marketing)/pricing/layout.tsx';
+    const loadingSource = 'apps/web/app/(marketing)/pricing/loading.tsx';
     const screen = SCREEN_REGISTRY.find(
       entry => entry.id === 'web.marketing-pricing'
     );
@@ -4015,9 +4030,15 @@ if (p.endsWith('/zip')) {
       id: 'web.marketing-pricing',
       platform: 'web',
       owner: 'marketing-pricing',
-      sources: [source, layoutSource],
+      sources: [source, layoutSource, loadingSource],
       viewports: ['desktop', 'mobile'],
     });
+
+    const loadingResult = evaluateChangedScreens({
+      changedFiles: [{ path: loadingSource, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(loadingResult.issues, []);
 
     const result = evaluateChangedScreens({
       changedFiles: [{ path: source, status: 'M' }],
@@ -4219,6 +4240,34 @@ if (p.endsWith('/zip')) {
     assert.deepEqual(result.issues, []);
     assert.deepEqual(result.changedScreens, [
       { id: 'web.marketing-shell', verdict: 'evidence-required', findings: [] },
+    ]);
+  });
+
+  it('registers the app shell root loading boundary for changed-surface certification', () => {
+    const source = 'apps/web/app/app/loading.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.app-loading'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.app-loading',
+      platform: 'web',
+      owner: 'app-shell',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.app-loading',
+        verdict: 'evidence-required',
+        findings: [],
+      },
     ]);
   });
 

@@ -90,8 +90,8 @@ export const metadata: Metadata = {
     title: APP_NAME,
     description: COMPANY_IDENTITY.seoDescription,
     images: [`${BASE_URL}/og/default.png`],
-    creator: '@jovieapp',
-    site: '@jovieapp',
+    creator: COMPANY_IDENTITY.xHandle,
+    site: COMPANY_IDENTITY.xHandle,
   },
   robots: {
     index: true,

@@ -9,6 +9,8 @@ const earliest = list =>
 const latest = list =>
   list.filter(Boolean).sort((a, b) => ms(b) - ms(a))[0] ?? null;
 const stamp = (stage, at, sourceReceipt) => ({ stage, at, sourceReceipt });
+const isOutcomeReceipt = event =>
+  event.entityType === 'shipping' && event.stage === 'outcome-receipt';
 /** JOV-123 from the branch first (lanes branches carry it), then the title. */
 export function linearIdFor(pr) {
   const match =
@@ -60,6 +62,9 @@ function feedStampsFor(feedStamps, keys) {
 export function indexFeedEvents(events) {
   const out = new Map();
   for (const event of events ?? []) {
+    // Outcome receipts retain their issue ID, duration and verdict independently
+    // of PR timelines, including later PRs for a reworked issue.
+    if (isOutcomeReceipt(event)) continue;
     const key = `${event.entityType}\u0000${event.entityId}`;
     if (!out.has(key)) out.set(key, []);
     out.get(key).push({
@@ -105,6 +110,22 @@ export function deriveShippingEvents(
       stamps.push(stamp('verified', verified.verifiedAt, verified.runUrl));
     const linearId = linearIdFor(pr);
     const issue = linearId ? linearIssues[linearId] : null;
+    // closed: the Linear issue reached Done after production verification, so
+    // verified -> closed measures closure lag and a verified-but-open issue
+    // shows as an open verified stage.
+    if (issue && verified?.verifiedAt) {
+      const doneAt = earliest(
+        (issue.history ?? [])
+          .filter(
+            h => h.toType === 'completed' && ms(h.at) >= ms(verified.verifiedAt)
+          )
+          .map(h => h.at)
+      );
+      if (doneAt)
+        stamps.push(
+          stamp('closed', doneAt, `https://linear.app/jovie/issue/${linearId}`)
+        );
+    }
     if (issue?.createdAt) {
       const url = `https://linear.app/jovie/issue/${linearId}`;
       const toType = type =>
@@ -133,7 +154,7 @@ export function deriveShippingEvents(
     const kept = stamps.filter(
       s =>
         s.at &&
-        (['deployed', 'verified'].includes(s.stage) ||
+        (['deployed', 'verified', 'closed'].includes(s.stage) ||
           ms(s.at) <= ms(pr.mergedAt))
     );
     events.push(
@@ -289,6 +310,8 @@ export function deriveStageEvents(raw, manifest) {
     ...deriveRemediationEvents({ prs: raw?.prs, feed }, manifest),
     ...deriveReleaseEvents({ controllers: raw?.controllers }, manifest),
     ...deriveIosReleaseEvents({ lyb: raw?.lyb, feed }, manifest),
-    ...feedEvents.filter(event => !derived.has(event.entityType)),
+    ...feedEvents.filter(
+      event => !derived.has(event.entityType) || isOutcomeReceipt(event)
+    ),
   ];
 }

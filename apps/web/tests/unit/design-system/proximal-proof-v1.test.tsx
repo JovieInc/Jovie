@@ -3,11 +3,9 @@
 // "Claims need proximal, route-specific proof. Proof should support the
 // promise being made on that route, not generic proof inserted mechanically."
 //
-// The artist-profile homepage (EVENT 2026-10-20) proves its claim with the
-// real product: a registry capture of a live Jovie artist profile, in the
-// same hero as the jov.ie/ claim. The proof must stay proximal, keep the
-// actual /start handoff, and be labeled as the founder's real profile rather
-// than implying the visitor already owns it.
+// The shipped homepage hero keeps the jov.ie/ claim and the founder's live
+// profile capture in the same section. The handoff stays /start. The capture
+// is labeled as that real profile rather than implying the visitor owns it.
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { HomepageArtistHero } from '@/components/homepage/HomepageArtistProfile';
@@ -47,34 +45,32 @@ describe('JOV-INV-038 proximal-proof evaluator (homepage hero)', () => {
 
     const hero = screen.getByTestId('marketing-section-hero');
     const claim = screen.getByRole('heading', { level: 1 });
-    const form = screen.getByTestId('homepage-claim-form');
-    const proof = within(hero).getByRole('img');
+    const form = within(hero).getByTestId('homepage-claim-form');
+    const proof = within(hero).getByRole('img', {
+      name: HOMEPAGE_COPY.hero.profile.alt,
+    });
 
-    // Proximal: the product proof lives in the same hero section as the
-    // promise and the claim, with zero navigation or scroll to reach it.
     expect(hero.contains(claim)).toBe(true);
     expect(hero.contains(form)).toBe(true);
     expect(proof).toHaveAttribute(
       'src',
       getMarketingExportImage(HOMEPAGE_COPY.hero.profile.scenarioId).publicUrl
     );
-    // Always visible with the claim; never gated behind hover or drill-down.
     expect(proof).not.toHaveAttribute('hidden');
     expect(proof).toHaveAttribute('data-priority', 'true');
   });
 
-  it('binds the proof to the real claim handoff and labels whose profile it is', () => {
+  it('binds the claim to /start and labels whose profile it is', () => {
     render(<HomepageArtistHero />);
-    const form = screen.getByTestId('homepage-claim-form');
-    const proof = screen.getByRole('img');
     const { claim, profile } = HOMEPAGE_COPY.hero;
+    const form = screen.getByTestId('homepage-claim-form');
+    const proof = screen.getByRole('img', { name: profile.alt });
 
     expect(form).toHaveAttribute('action', '/start');
     expect(within(form).getByRole('textbox')).toHaveAttribute(
       'placeholder',
       claim.placeholder
     );
-    // The capture is a named, real profile, not a visitor or customer stand-in.
     expect(proof).toHaveAttribute('alt', profile.alt);
     expect(profile.alt).toMatch(/Tim White's Jovie artist profile/);
     expect(

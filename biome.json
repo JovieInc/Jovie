@@ -147,6 +147,13 @@
   "overrides": [
     {
       "includes": [
+        "scripts/invariants/copy-leak/config.json",
+        "scripts/invariants/copy-leak/positive-fixtures.json"
+      ],
+      "json": { "formatter": { "expand": "never", "lineWidth": 320 } }
+    },
+    {
+      "includes": [
         "**/*.test.ts",
         "**/*.test.tsx",
         "**/*.spec.ts",

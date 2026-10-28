@@ -97,7 +97,8 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     // actually rendered — tailwind-merge collapses them into one conflict
     // group and keeps only the last, and outline-width without
     // outline-style paints nothing regardless. focus-ring-themed is the
-    // shared box-shadow-based ring the rest of the app uses.
+    // shared box-shadow-based ring the rest of the app uses, and the locked
+    // route-quality focus check reads the focused input's own styles.
     const input = within(screen.getByTestId('product-claim-card')).getByRole(
       'textbox',
       { name: 'Choose Your Handle' }

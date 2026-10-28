@@ -1,6 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
+
+const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
+
 import {
   AnalyticsSidebar,
   AnalyticsSidebarView,
@@ -287,6 +293,23 @@ describe('FunnelStage (regression: JOV-4158 / #13819 skeleton layout parity)', (
     );
     expect(withRate.firstElementChild?.firstElementChild?.className).toBe(
       FUNNEL_STAGE_METRIC_ROW_CLASS
+    );
+  });
+});
+
+describe('AnalyticsSidebar ranked-list density (JOV densify pass)', () => {
+  it('keeps the desktop ranked rows and their loading shell on the 32px scale', () => {
+    const source = readFileSync(
+      resolve(
+        webRoot,
+        'components/features/dashboard/organisms/AnalyticsSidebar.tsx'
+      ),
+      'utf8'
+    );
+
+    expect(source).not.toContain('flex h-9 items-center justify-between');
+    expect(source).toContain(
+      'flex h-8 items-center justify-between rounded-lg px-2.5'
     );
   });
 });

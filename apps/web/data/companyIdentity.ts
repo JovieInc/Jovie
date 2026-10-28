@@ -6,8 +6,10 @@
  * as a nav/taxonomy registry (JOV-4491) or a homepage taste rewrite (JOV-5861).
  *
  * The homepage page body sells the artist profile (EVENT 2026-10-20) from
- * `homepageCopy.ts`; its metadata description and structured data still read
- * this general identity. `homepageHeadline` is the auth brand-panel line.
+ * `homepageCopy.ts`; the homepage WebSite and SoftwareApplication JSON-LD
+ * speak with the approved artist-profile launch (JOV-8565). Its page
+ * metadata description and the Organization schema still read this general
+ * identity. `homepageHeadline` is the auth brand-panel line.
  * General copy stays generic (Tim, 2026-10-22): do not put a segment list back
  * into support, definition, audiences, or knowsAbout.
  */
@@ -21,6 +23,10 @@ export const COMPANY_IDENTITY = {
   seoDescription:
     'Claim your name. Jovie makes you easy to reach, for people and for agents.',
   homepageHeadline: 'Be found. Be understood.',
+  /** Canonical public X handle. Retired `@jovieapp` must not return. */
+  xHandle: '@meetjovie',
+  /** Homepage WebSite schema names. Do not add a product-category alias. */
+  schemaAlternateNames: ['Jovie', 'jov.ie'],
   audiences: ['creators'] as const,
   outcomes: ['presence', 'relationships', 'growth'] as const,
   knowsAbout: [

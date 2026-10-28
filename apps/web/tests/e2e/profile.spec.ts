@@ -47,6 +47,23 @@ async function interceptAnalytics(page: Page) {
   await page.route('**/api/track', (r: Route) =>
     r.fulfill({ status: 200, body: '{}' })
   );
+  // The claimed fixtures mount fan capture, whose admission GET draws on
+  // the shared per-IP capture-dismissal limiter (20/min) in this shard's
+  // single server process. Mocking keeps the fan-capture CTA mounted and
+  // asserted while unmocked admission specs (public-profile-smoke) keep
+  // their real budget. Same response shape as public-surface-helpers.
+  await page.route('**/api/profile/capture-dismissal**', (r: Route) =>
+    r.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        success: true,
+        suppressed: r.request().method() === 'POST',
+        sessionCount: 0,
+        nextEligibleAt: null,
+      }),
+    })
+  );
 }
 
 function isUnavailablePage(text: string): boolean {
@@ -136,11 +153,9 @@ describeProfile('Profile - Core Rendering', () => {
     await expect(anyLink).toBeVisible();
   });
 
-  // JOV-8777: free public profiles currently render no Jovie branding at all
-  // (hideJovieBranding is accepted but unused since #14559), while SmartLinks
-  // still show "Powered by Jovie". Where free-tier profile branding lives is a
-  // product/taste call; re-enable and repoint once JOV-8777 ships.
-  test.fixme('has Jovie footer branding', async ({ page }) => {
+  // JOV-8777: free public profiles render the Jovie footer branding; the
+  // paid-tier removal path is the hideJovieBranding opt-out the surfaces honor.
+  test('has Jovie footer branding', async ({ page }) => {
     const footerLink = page.getByRole('link', { name: /Jovie home/i });
     await expect(footerLink.first()).toBeVisible({ timeout: 10000 });
   });

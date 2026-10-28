@@ -34,7 +34,7 @@ const NEARBY = 4;
 const TRAILING_COMMENT = /(^|[^:])\/\/.*$/;
 
 /**
- * @typedef {{ id: string, severity: 'error' | 'warning', rule: string, test: (line: string, nearby: string) => boolean }} Rule
+ * @typedef {{ id: string, severity: 'error' | 'warning', rule: string, test: (line: string, nearby: string, file?: string) => boolean }} Rule
  * @typedef {{ id: string, severity: string, rule: string, file: string, line: number, text: string }} Finding
  */
 
@@ -110,6 +110,29 @@ export const RULES = [
     rule: 'Native <select> cannot certify a selection design; prefer the canonical select owner',
     test: line => /<select[\s>]/.test(line),
   },
+  {
+    id: 'FS-009',
+    severity: 'error',
+    rule: 'Marketing images and cards use a radius token. Square corners and raw lengths fail. Full-bleed hero start, logos, icons, and round avatars are exempt.',
+    test: (line, nearby = '', file = '') => {
+      const marketing =
+        /apps\/web\/(?:app\/\((?:marketing|home)\)\/|components\/(?:marketing|homepage|features\/(?:home|pricing|visibility-audit)\/)|components\/organisms\/(?:AboutPage|Blog|ComparisonPage|PricingRecipe|SupportPage|VoicePage)|components\/site\/Marketing)/;
+      if (!marketing.test(file)) return false;
+      const bleed =
+        /homepage-editorial-hero|marketing-editorial-hero-photo|marketing-hero-photo|marketing-hero-dock|marketing-route-hero__media|official-iphone-frame__bezel/;
+      if (bleed.test(`${line}\n${nearby}`)) return false;
+      if (/\brounded-none\b/.test(line)) return true;
+      if (/border-radius\s*:\s*0(?:px|rem|em|%)?\b/.test(line)) return true;
+      if (/rounded-\[[^\]]*?\d(?:\.\d+)?(?:px|rem|em)\b/.test(line)) {
+        return true;
+      }
+      return (
+        /border-radius\s*:\s*(?!var\()[^;{]*\d+(?:\.\d+)?(?:px|rem|em)\b/.test(
+          line
+        ) && !/(?:50%|100%|999px|9999px)/.test(line)
+      );
+    },
+  },
 ];
 
 /**
@@ -132,7 +155,7 @@ export function checkLine(file, lineNumber, text, nearby = '') {
   const allowed = new Set([...text.matchAll(ALLOW)].map(match => match[1]));
   const code = text.replace(TRAILING_COMMENT, '$1');
   return RULES.filter(
-    rule => !allowed.has(rule.id) && rule.test(code, nearby)
+    rule => !allowed.has(rule.id) && rule.test(code, nearby, file)
   ).map(rule => ({
     id: rule.id,
     severity: rule.severity,

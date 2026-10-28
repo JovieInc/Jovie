@@ -1749,6 +1749,10 @@ describe('TasksPageClient', () => {
     openTask(mockHelperTask);
 
     expect(screen.getByTestId('task-description-helper')).toBeInTheDocument();
+    expect(screen.getByLabelText('Task Title')).toHaveAttribute(
+      'placeholder',
+      'Task'
+    );
     expect(screen.getByLabelText('Task Description')).not.toHaveAttribute(
       'placeholder'
     );

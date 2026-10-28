@@ -204,9 +204,6 @@
     ".github/workflows/security-suppression-audit.yml": {
       "gh-shell": 1
     },
-    ".github/workflows/security.yml": {
-      "gh-shell": 1
-    },
     ".github/workflows/sentry-autofix.yml": {
       "gh-shell": 3
     },

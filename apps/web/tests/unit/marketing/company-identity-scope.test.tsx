@@ -20,6 +20,7 @@ import {
   requiresSpotifyCatalogOrFollowers,
   SPECIALIST_API_IDENTITY_SURFACES,
 } from '@/lib/marketing/company-identity-policy';
+import { applyRootTitleTemplate } from '@/lib/seo/document-title';
 
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
@@ -83,8 +84,10 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
   });
 
   it('keeps homepage metadata general while the page body sells the artist profile', () => {
-    // EVENT 2026-10-20: the visible homepage sells the artist profile, but
-    // metadata and structured data stay on the general company identity.
+    // EVENT 2026-10-20: the visible homepage sells the artist profile.
+    // JOV-8565: the homepage WebSite/SoftwareApplication JSON-LD speaks with
+    // the approved artist-profile launch, while page metadata and the
+    // Organization schema stay on the general company identity.
     const page = readWebSource('app/(home)/page.tsx');
     expect(page).toContain('COMPANY_IDENTITY.seoDescription');
     expect(page).toContain('description: COMPANY_IDENTITY.seoDescription');
@@ -123,7 +126,7 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     const { metadata } = await import('../../../app/(marketing)/about/page');
     const expectedTitle = `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
 
-    expect(metadata.title).toBe(expectedTitle);
+    expect(applyRootTitleTemplate(metadata.title)).toBe(expectedTitle);
     expect(String(metadata.description)).toContain(COMPANY_IDENTITY.definition);
     expect(isArtistOnlyCompanyDefinition(String(metadata.description))).toBe(
       false

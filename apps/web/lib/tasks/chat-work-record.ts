@@ -9,6 +9,7 @@
  */
 
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
+import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import { sanitizeConversationTitle } from '@/lib/chat/title';
 import { db } from '@/lib/db';
 import { chatConversations } from '@/lib/db/schema/chat';
@@ -83,7 +84,9 @@ export async function ensureChatWorkRecord(options: {
       taskNumber,
       creatorProfileId,
       conversationId,
-      title: sanitizeConversationTitle(conversation.title) ?? 'Untitled chat',
+      title:
+        sanitizeConversationTitle(conversation.title) ??
+        COPY_FALLBACKS.conversation,
       status: 'todo',
       priority: 'medium',
       assigneeKind: 'jovie',
