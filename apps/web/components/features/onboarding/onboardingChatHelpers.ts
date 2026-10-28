@@ -15,6 +15,7 @@ import {
   type OnboardingWidgetEventType,
   parseWidgetEventFromMetadata,
 } from '@/lib/chat/onboarding-script/widget-events';
+import { extractSpotifyArtistId } from '@/lib/spotify/artist-id';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
 import type {
@@ -337,4 +338,28 @@ export function deriveProfileBuilderState({
       (handleDraft == null ? handle : cleanHandle(handleDraft)),
     socialLinks,
   };
+}
+
+const SPOTIFY_ARTIST_URL_IN_TEXT =
+  /https?:\/\/open\.spotify\.com\/(?:intl-[a-z-]+\/)?artist\/[0-9A-Za-z]{22}/i;
+
+/**
+ * A pasted canonical Spotify artist link is exact identity: the visitor already
+ * told us which artist, so the picker would ask for something we can prove.
+ * Returns the id only for one unambiguous artist link; the server still
+ * verifies it against Spotify and the ownership check before using it.
+ */
+export function spotifyArtistIdFromPastedText(text: string): string | null {
+  const ids = new Set<string>();
+  for (const token of text.split(/\s+/)) {
+    const match = SPOTIFY_ARTIST_URL_IN_TEXT.exec(token);
+    if (!match) continue;
+    // intl-xx path segments are accepted on the wire but not by the shared
+    // extractor, so normalise to the canonical artist URL first.
+    const id = /artist\/([0-9A-Za-z]{22})/i.exec(match[0])?.[1];
+    const canonical = id ? `https://open.spotify.com/artist/${id}` : null;
+    const resolved = canonical ? extractSpotifyArtistId(canonical) : null;
+    if (resolved) ids.add(resolved);
+  }
+  return ids.size === 1 ? [...ids][0]! : null;
 }

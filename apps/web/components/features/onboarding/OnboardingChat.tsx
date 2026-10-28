@@ -87,6 +87,7 @@ import {
   isHandleCheckOutput,
   isNextStepPayload,
   isSocialLinkOutput,
+  spotifyArtistIdFromPastedText,
   THINKING_PLACEHOLDER_ID,
   type ToolPart,
 } from './onboardingChatHelpers';
@@ -941,7 +942,18 @@ export function OnboardingChat({
           surface: 'start_chat',
         });
       }
-      sendMessage({ text, ...(metadata ? { metadata } : {}) });
+      // Pasted Spotify artist link = exact identity: confirm it server-side
+      // instead of opening the picker. An explicit pick keeps its own metadata.
+      const pastedArtistId = metadata?.spotifyArtistId
+        ? null
+        : spotifyArtistIdFromPastedText(text);
+      const sendMetadata = pastedArtistId
+        ? { ...metadata, spotifyArtistId: pastedArtistId }
+        : metadata;
+      sendMessage({
+        text,
+        ...(sendMetadata ? { metadata: sendMetadata } : {}),
+      });
       chipTray.clear();
       setHasSentFirst(true);
       setComposerInput('');
