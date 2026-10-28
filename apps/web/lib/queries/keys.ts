@@ -188,6 +188,12 @@ export const queryKeys = {
       [...queryKeys.suggestions.all, 'list', profileId] as const,
   },
 
+  // YouTube channel verification (onboarding candidate)
+  youtubeVerification: {
+    profile: (profileId: string) =>
+      ['youtube-verification', profileId] as const,
+  },
+
   // DSP enrichment queries
   dspEnrichment: {
     all: ['dsp-enrichment'] as const,

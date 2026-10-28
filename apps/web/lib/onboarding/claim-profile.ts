@@ -142,6 +142,11 @@ function buildOnboardingSettings(
       selectedSpotifyArtistName: state.artist?.name ?? null,
       socialLinks: [...state.socialLinks],
       interviewSignalCount: state.interviewSignals.length,
+      // Unverified until OAuth ownership is confirmed; verification state is
+      // derived from connector accounts, never stored here.
+      ...(state.youtubeCandidate
+        ? { youtubeCandidate: state.youtubeCandidate }
+        : {}),
     },
   };
 }

@@ -4,6 +4,7 @@ import {
   decideOnboardingAccess,
   evaluateAccessSignal,
   MAX_INTERVIEW_TURNS_BEFORE_FORCE,
+  promoteVerifiedYouTubeDecision,
 } from './onboarding-access-eval';
 
 const EMPTY_SIGNAL = {};
@@ -219,4 +220,56 @@ it('admits the verified YouTube ICP even while other segments are gated', () => 
       youtubeQualified: true,
     }).kind
   ).toBe('instant_access');
+});
+
+describe('promoteVerifiedYouTubeDecision', () => {
+  const CHANNEL = 'UCabcdefghijklmnopqrstuv';
+  const waitlisted = {
+    kind: 'waitlist' as const,
+    rationale: 'youtube_artist_icp_required',
+    score: 30,
+    youtubeCandidate: {
+      channelId: CHANNEL,
+      title: 'Lena Hart',
+      url: `https://www.youtube.com/channel/${CHANNEL}`,
+      cadenceQualified: true as const,
+    },
+  };
+
+  it('promotes only when OAuth proved the candidate channel', () => {
+    expect(promoteVerifiedYouTubeDecision(waitlisted, [CHANNEL])).toMatchObject(
+      {
+        kind: 'instant_access',
+        rationale: 'regularly_uploading_youtube_music_artist',
+      }
+    );
+  });
+
+  it.each([
+    ['no verified channels', []],
+    ['a different verified channel', ['UCsomeoneelse000000000000']],
+  ])('stays waitlisted with %s', (_label, ids) => {
+    expect(promoteVerifiedYouTubeDecision(waitlisted, ids).kind).toBe(
+      'waitlist'
+    );
+  });
+
+  it('never promotes a decision without a candidate or a disqualified one', () => {
+    const { youtubeCandidate: _omit, ...noCandidate } = waitlisted;
+    expect(promoteVerifiedYouTubeDecision(noCandidate, [CHANNEL]).kind).toBe(
+      'waitlist'
+    );
+    expect(
+      promoteVerifiedYouTubeDecision(
+        { ...waitlisted, rationale: 'disqualified_wrong_audience' },
+        [CHANNEL]
+      ).kind
+    ).toBe('waitlist');
+    expect(
+      promoteVerifiedYouTubeDecision(
+        { ...waitlisted, kind: 'needs_more_info' },
+        [CHANNEL]
+      ).kind
+    ).toBe('needs_more_info');
+  });
 });

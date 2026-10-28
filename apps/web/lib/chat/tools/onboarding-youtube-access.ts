@@ -10,6 +10,7 @@ import {
 import {
   decideOnboardingAccess,
   type OnboardingAccessInput,
+  YOUTUBE_ICP_REQUIRED_RATIONALE,
 } from './onboarding-access-eval';
 import { collapseInterviewSignals } from './onboarding-signals';
 
@@ -61,10 +62,21 @@ export async function decideYouTubeOnboardingAccess(
     const cadence = qualifyRegularlyUploadingChannel({ videos });
     if (!verifiedOwnedChannelIds.includes(channel.channelId)) {
       // Unverified claim: cadence is only a review hint, never admission.
-      if (cadence.qualified) {
-        logger.info('[onboarding] YouTube channel passes cadence, unverified');
-      }
-      return preliminary;
+      if (!cadence.qualified) return preliminary;
+      logger.info('[onboarding] YouTube channel passes cadence, unverified');
+      // Surface it as an UNVERIFIED candidate only: `kind` is untouched, so
+      // there is still no admission, approval, or checkout unlock.
+      return preliminary.rationale === YOUTUBE_ICP_REQUIRED_RATIONALE
+        ? {
+            ...preliminary,
+            youtubeCandidate: {
+              channelId: channel.channelId,
+              title: channel.title,
+              url: `https://www.youtube.com/channel/${channel.channelId}`,
+              cadenceQualified: true as const,
+            },
+          }
+        : preliminary;
     }
     return decideOnboardingAccess({
       ...effectiveInput,

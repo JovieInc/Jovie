@@ -58,6 +58,7 @@ import {
 import { type CategoryOption, ProfileLinkList } from './ProfileLinkList';
 import { SidebarLinkInput } from './SidebarLinkInput';
 import { SuggestedDspMatches } from './SuggestedDspMatches';
+import { YouTubeVerifyCard } from './YouTubeVerifyCard';
 
 /** Map a platform's category to a sidebar tab, returning null if no switch is needed. */
 function computeTargetCategory(
@@ -1375,6 +1376,10 @@ export function ProfileContactSidebar() {
                 />
               </div>
             )}
+
+            {resolvedCategory === 'social' && selectedProfile?.id ? (
+              <YouTubeVerifyCard profileId={selectedProfile.id} />
+            ) : null}
 
             {resolvedCategory === 'dsp' && selectedProfile?.id ? (
               <SuggestedDspMatches profileId={selectedProfile.id} />

@@ -4,7 +4,10 @@ import { getCachedAuth, getCachedCurrentUser } from '@/lib/auth/cached';
 import { isWaitlistApprovedUserStatus } from '@/lib/auth/canonical-user-state';
 import { getDbUser } from '@/lib/auth/session';
 import { decodeToolEvents } from '@/lib/chat/tool-events';
-import { YOUTUBE_ARTIST_ACCESS_RATIONALE } from '@/lib/chat/tools/onboarding-access-eval';
+import {
+  promoteVerifiedYouTubeDecision,
+  YOUTUBE_ARTIST_ACCESS_RATIONALE,
+} from '@/lib/chat/tools/onboarding-access-eval';
 import { db } from '@/lib/db';
 import {
   chatAuditLog,
@@ -19,6 +22,8 @@ import {
   clearOnboardingSessionCookie,
   getCurrentOnboardingSessionId,
 } from '@/lib/onboarding/session';
+import { parseYouTubeCandidate } from '@/lib/onboarding/youtube-verification';
+import { getVerifiedOwnedYouTubeChannelIds } from '@/lib/onboarding/youtube-verified-channels';
 import { SpotifyProfileIdentityConflictError } from '@/lib/profile/spotify-profile-identity';
 import { normalizeEmail } from '@/lib/utils/email';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
@@ -96,7 +101,9 @@ function hasDurablePublicArtistIdentity(
  * the latest succeeded decision must be `instant_access` or `waitlist`.
  */
 function deriveTerminalDecisionKind(
-  rows: readonly { toolCalls: unknown }[]
+  rows: readonly { toolCalls: unknown }[],
+  /** OAuth-proven channel ids for the signed-in user; empty fails closed. */
+  verifiedOwnedChannelIds: readonly string[] = []
 ): 'instant_access' | 'waitlist' | null {
   const events = rows.flatMap(row => decodeToolEvents(row.toolCalls).events);
   for (const event of events.toReversed()) {
@@ -106,11 +113,26 @@ function deriveTerminalDecisionKind(
     const output = isRecord(event.output) ? event.output : null;
     if (output?.action !== 'propose_next_step') continue;
     const decision = isRecord(output.decision) ? output.decision : null;
-    return decision?.kind === 'instant_access' || decision?.kind === 'waitlist'
-      ? decision.kind === 'instant_access' &&
-        decision.rationale !== YOUTUBE_ARTIST_ACCESS_RATIONALE
+    if (decision?.kind === 'waitlist') {
+      // A cadence-qualified channel the visitor named becomes an admission
+      // only after OAuth proved they own it (see youtube-verification).
+      const candidate = parseYouTubeCandidate(decision.youtubeCandidate);
+      const promoted = promoteVerifiedYouTubeDecision(
+        {
+          kind: 'waitlist',
+          rationale:
+            typeof decision.rationale === 'string' ? decision.rationale : '',
+          score: 0,
+          ...(candidate ? { youtubeCandidate: candidate } : {}),
+        },
+        verifiedOwnedChannelIds
+      );
+      return promoted.kind === 'instant_access' ? 'instant_access' : 'waitlist';
+    }
+    return decision?.kind === 'instant_access'
+      ? decision.rationale !== YOUTUBE_ARTIST_ACCESS_RATIONALE
         ? 'waitlist'
-        : decision.kind
+        : 'instant_access'
       : null;
   }
   return null;
@@ -418,7 +440,10 @@ export async function POST(req: Request) {
         const messageRows = await loadConversationMessageRows(
           alreadyClaimed.id
         );
-        const terminalKind = deriveTerminalDecisionKind(messageRows);
+        const terminalKind = deriveTerminalDecisionKind(
+          messageRows,
+          await getVerifiedOwnedYouTubeChannelIds(userId)
+        );
         const mustWaitlist =
           !alreadyApproved &&
           (terminalKind === 'waitlist' ||
@@ -469,7 +494,10 @@ export async function POST(req: Request) {
 
     try {
       const messageRows = await loadConversationMessageRows(primary.id);
-      const terminalKind = deriveTerminalDecisionKind(messageRows);
+      const terminalKind = deriveTerminalDecisionKind(
+        messageRows,
+        await getVerifiedOwnedYouTubeChannelIds(userId)
+      );
       const mustWaitlist =
         !alreadyApproved &&
         (terminalKind === 'waitlist' ||
