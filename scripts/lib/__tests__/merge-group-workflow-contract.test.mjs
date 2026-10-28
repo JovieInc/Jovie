@@ -226,6 +226,7 @@ const BLOBLESS_BASE_FETCH_JOBS = new Set([
   'ci-exact-head-coverage-shard',
   'ci-exact-head-coverage',
   'ci-profile-admission-browser',
+  'ci-fast-remaining',
 ]);
 
 // Jobs whose full base fetch runs in the background during dependency
@@ -1295,12 +1296,22 @@ describe('merge_group workflow contract', () => {
     expect(setupAt).toBeGreaterThan(startAt);
     expect(waitAt).toBeGreaterThan(setupAt);
     expect(firstConsumer).toBeGreaterThan(waitAt);
-    // Guards here read historical blobs, so the fetch must stay full.
-    expect(start).not.toContain('--filter=blob:none');
+    // Blobless (186 MB / 11 s versus 2 GB / 259 s full, which stalled past
+    // the 540 s await deadline and ejected PRs from the merge queue). Guards
+    // that read historical blobs lazily fetch them with the job token
+    // exported via GIT_CONFIG_* (not persisted), and a stalled attempt is
+    // bounded and retried.
+    expect(start).toContain('--unshallow --filter=blob:none');
+    expect(start).toContain('timeout 150 git');
+    expect(start).toContain('for attempt in 1 2 3; do');
+    expect(start).toContain(
+      'GIT_CONFIG_KEY_0=http.https://github.com/.extraheader'
+    );
+    expect(start).toContain('>> "$GITHUB_ENV"');
     expect(start).toContain('set -euo pipefail');
     // The exit status is published atomically only after git fetch returns.
     expect(start).toMatch(
-      /echo "\$\?" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
+      /echo "\$fetch_rc" > "\$BASE_FETCH_DIR\/status\.tmp"\n\s*mv "\$BASE_FETCH_DIR\/status\.tmp" "\$BASE_FETCH_DIR\/status"/
     );
     expect(start).toContain('< /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &');
     // The awaiting step holds no token and fails closed on every failure mode.
