@@ -37,6 +37,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 JOB_SCHEMA = "summer.reasoning-job/v1"
 RESULT_SCHEMA = "summer.reasoning-result/v1"
 PRIOR_ART_SCHEMA = "summer.business-prior-art/v1"
@@ -595,7 +598,7 @@ def spend_budget(state: Path, research: bool, day: str | None = None) -> None:
     if research:
         today["research"] = today.get("research", 0) + 1
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({day: today}))  # only today matters; older days drop
+    atomic_write_text(path, json.dumps({day: today}))  # only today matters; older days drop
 
 
 def cooled(state: Path, name: str, now: float | None = None) -> bool:
@@ -608,7 +611,7 @@ def cooled(state: Path, name: str, now: float | None = None) -> bool:
 def cool(state: Path, name: str, seconds: int) -> None:
     path = state / "cooldown" / f"reason-{name}"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(time.time() + seconds))
+    atomic_write_text(path, str(time.time() + seconds))
 
 
 # ---------------------------------------------------------------- output
@@ -852,7 +855,7 @@ def record_failure(state: Path, identifier: str, count: int) -> None:
     except (OSError, ValueError):
         data = {}
     data[identifier] = count
-    path.write_text(json.dumps(data))
+    atomic_write_text(path, json.dumps(data))
 
 
 def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:

@@ -80,6 +80,34 @@
       "fg": "--system-b-entity-chip-on-light-text",
       "bg": "--system-b-chat-user-bubble-bg",
       "minRatio": 4.5
+    },
+    {
+      "name": "primary text on glass over base",
+      "fg": "--color-text-primary-token",
+      "bg": "--color-glass-surface",
+      "underlay": "--color-bg-base",
+      "minRatio": 4.5
+    },
+    {
+      "name": "primary text on glass over paper",
+      "fg": "--color-text-primary-token",
+      "bg": "--color-glass-surface",
+      "underlay": "--color-bg-paper",
+      "minRatio": 4.5
+    },
+    {
+      "name": "secondary text on glass over base",
+      "fg": "--color-text-secondary-token",
+      "bg": "--color-glass-surface",
+      "underlay": "--color-bg-base",
+      "minRatio": 4.5
+    },
+    {
+      "name": "secondary text on glass over paper",
+      "fg": "--color-text-secondary-token",
+      "bg": "--color-glass-surface",
+      "underlay": "--color-bg-paper",
+      "minRatio": 4.5
     }
   ]
 }

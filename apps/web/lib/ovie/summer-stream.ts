@@ -4,6 +4,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { createUIMessageStream, createUIMessageStreamResponse } from 'ai';
+import { captureError } from '@/lib/error-tracking';
 import { isSummerOpsCard } from '@/lib/ovie/ops-card';
 import {
   type SummerFailureHop,
@@ -48,6 +49,19 @@ export async function createSummerAssistantStreamResponse(input: {
         if (event.type === 'text-delta' && event.text) {
           hasVisibleContent ||= event.text.trim().length > 0;
           writeDelta(event.text);
+          continue;
+        }
+        if (event.type === 'progress') {
+          // Transient: shown while it happens, never part of the saved message.
+          writer.write({
+            type: 'data-summer-progress',
+            data: event.progress,
+            transient: true,
+          });
+          continue;
+        }
+        if (event.type === 'ack') {
+          metadata = { ...metadata, summerAck: event.ack };
           continue;
         }
         if (event.type === 'notice') {
@@ -124,6 +138,20 @@ export async function createSummerAssistantStreamResponse(input: {
           ...metadata,
           summerFailure: { hop, retry: summerRetryMode(hop, terminalState) },
         };
+        // A founder turn that fails must never be silent: the 2026-10-25 P0
+        // (first Home message failed) left no Sentry event to find. Alerts key
+        // on this stable message + hop tag.
+        void captureError(
+          'Summer founder turn failed',
+          new Error(`summer_turn_failed:${hop}`),
+          {
+            feature: 'ovie-summer',
+            hop,
+            state: failureState.state,
+            requestId: String(metadata.requestId ?? ''),
+            hasVisibleContent,
+          }
+        ).catch(() => undefined);
         if (!hasVisibleContent) {
           // Surface a real stream error, not a fake assistant reply: the chat
           // client restores the composer text and offers Retry, and no

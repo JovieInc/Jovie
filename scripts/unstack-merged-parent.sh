@@ -37,28 +37,77 @@ DRY_RUN="${DRY_RUN:-0}"
 GIT_REMOTE="${GIT_REMOTE:-origin}"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 MARKER="unstack-merged-parent"
-HOLD_RE='^(hold|gated|incident|do-not-merge|tim-hold|tim:hold|hold:tim)$'
 
 if [[ ! "$CHILD_PR" =~ ^[1-9][0-9]*$ ]]; then
   echo "!! CHILD_PR must be a positive integer"
   exit 2
 fi
 
+# Rebase checks out child source below. Keep the policy and its canonical API
+# client from the trusted committed workflow checkout, never the child's tree.
+POLICY_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+POLICY_REF="$(git -C "$POLICY_ROOT" rev-parse HEAD)"
+POLICY_DIR="$(mktemp -d)"
+trap 'rm -rf "$POLICY_DIR"' EXIT
+git -C "$POLICY_ROOT" archive "$POLICY_REF" scripts/lanes scripts/apiclient \
+  packages/api-client/providers.json scripts/lib/upsert-pr-comment.sh \
+  | tar -x -C "$POLICY_DIR"
+
+custody_read() {  # custody_read state <num> | claims <num> <expected-head>
+  GITHUB_REPOSITORY="$REPO" PYTHONDONTWRITEBYTECODE=1 python3 - "$POLICY_DIR" "$@" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(sys.argv[1]) / "scripts/lanes"))
+import pr_events
+
+try:
+    mode, number = sys.argv[2], int(sys.argv[3])
+    if mode == "claims":
+        if pr_events.claim_active(number, sys.argv[4], sh=pr_events.machine_hold_gh,
+                                  kind=("fix", "gate", "adopt"), exclude_host=None):
+            raise ValueError("active or unreadable claim")
+    elif mode == "state":
+        result = pr_events.api_gh(["pr", "view", str(number), "--repo", pr_events.REPO,
+                                  "--json", "number,state,isCrossRepository,headRefName,headRefOid,baseRefName,labels"])
+        if result.returncode != 0:
+            raise ValueError("PR state unavailable")
+        pr = json.loads(result.stdout)
+        if not isinstance(pr, dict) or pr.get("number") != number \
+                or pr.get("state") not in {"OPEN", "CLOSED", "MERGED"} \
+                or type(pr.get("isCrossRepository")) is not bool \
+                or not isinstance(pr.get("headRefOid"), str) \
+                or not re.fullmatch(r"[0-9a-fA-F]{40}", pr["headRefOid"]) \
+                or not all(isinstance(pr.get(key), str) and pr[key] for key in ("headRefName", "baseRefName")) \
+                or not isinstance(pr.get("labels"), list) \
+                or not all(isinstance(label, dict) and isinstance(label.get("name"), str) and label["name"]
+                           for label in pr["labels"]):
+            raise ValueError("incomplete PR state")
+        print(json.dumps({"n": number, "state": pr["state"], "cross": pr["isCrossRepository"],
+                          "head": pr["headRefName"], "sha": pr["headRefOid"].lower(),
+                          "base": pr["baseRefName"],
+                          "held": bool({name.lower() for name in pr_events.label_names(pr)} & pr_events.HOLD_LABELS)}))
+    else:
+        raise ValueError("unsupported custody read")
+except Exception:
+    print("Unstack custody is held, claimed, or unreadable; no publication authorized.", file=sys.stderr)
+    sys.exit(2)
+PY
+}
+
 comment() {  # comment <num> <body>
   if [[ "$DRY_RUN" == "1" ]]; then
     echo "    [dry-run] would comment on #$1"
     return 0
   fi
-  GITHUB_REPOSITORY="$REPO" bash "$SCRIPT_DIR/lib/upsert-pr-comment.sh" "$1" "$MARKER" "$2" \
+  GITHUB_REPOSITORY="$REPO" bash "$POLICY_DIR/scripts/lib/upsert-pr-comment.sh" "$1" "$MARKER" "$2" \
     || echo "    !! failed to comment on #$1"
 }
 
 pr_state() {  # pr_state <num>
-  gh_retry pr view "$1" -R "$REPO" \
-    --json number,state,isDraft,isCrossRepository,headRefName,headRefOid,baseRefName,labels \
-    --jq '{n: .number, state, cross: .isCrossRepository, head: .headRefName,
-           sha: (.headRefOid | ascii_downcase), base: .baseRefName,
-           held: ([.labels[].name | select(test("'"$HOLD_RE"'"; "i"))] | length > 0)}'
+  custody_read state "$1"
 }
 
 merged_parent() {  # merged_parent <branch> -> "<number> <head-sha>" or empty
@@ -68,10 +117,11 @@ merged_parent() {  # merged_parent <branch> -> "<number> <head-sha>" or empty
           | if . == null then empty else "\(.number) \(.head.sha | ascii_downcase)" end'
 }
 
-# rebase_branch <branch> <old-upstream-sha> <onto-ref> <expected-head-sha>
-# Prints the new head SHA. Returns 1 on conflict/empty (branch left untouched).
+# rebase_branch <num> <branch> <old-upstream-sha> <onto-ref> <expected-head-sha> <expected-base>
+# Prints the new head SHA. Returns 1 on conflict/empty, 2 on custody refusal.
 rebase_branch() {
-  local branch="$1" upstream="$2" onto="$3" expected="$4" new_head
+  local number="$1" branch="$2" upstream="$3" onto="$4" expected="$5" base="$6" new_head live
+  custody_read claims "$number" "$expected" || return 2
   git fetch -q "$GIT_REMOTE" "+refs/heads/${branch}:refs/remotes/${GIT_REMOTE}/${branch}"
   if [[ "$(git rev-parse "${GIT_REMOTE}/${branch}")" != "$expected" ]]; then
     echo "    ~ ${branch} moved since it was read; leaving it" >&2
@@ -87,6 +137,16 @@ rebase_branch() {
   if [[ "$(git rev-list --count "${onto}..${new_head}")" -eq 0 ]]; then
     echo "    ~ ${branch} has no commits left after dropping its parent" >&2
     return 1
+  fi
+  # Claims are checked for the still-published head. Read PR metadata last so a
+  # hold, closure, or retarget during the rebase cannot authorize this push.
+  custody_read claims "$number" "$expected" || return 2
+  live="$(pr_state "$number")" || return 2
+  if ! jq -e --arg branch "$branch" --arg sha "$expected" --arg base "$base" \
+      '.state == "OPEN" and .cross == false and .held == false and .head == $branch and .sha == $sha and .base == $base' \
+      <<<"$live" >/dev/null; then
+    echo "    ~ #${number} custody changed during rebase; leaving its branch" >&2
+    return 2
   fi
   if [[ "$DRY_RUN" != "1" ]]; then
     git push -q --force-with-lease="refs/heads/${branch}:${expected}" \
@@ -132,7 +192,11 @@ if ! git merge-base --is-ancestor "$parent_sha" "$child_sha" 2>/dev/null; then
   echo "  ~ #$CHILD_PR no longer carries parent #$parent_pr; already unstacked"
   exit 0
 fi
-if ! new_child="$(rebase_branch "$child_branch" "$parent_sha" "$onto" "$child_sha")"; then
+if new_child="$(rebase_branch "$CHILD_PR" "$child_branch" "$parent_sha" "$onto" "$child_sha" "$child_base")"; then
+  :
+else
+  refused=$?
+  [[ "$refused" != 2 ]] || exit 0
   comment "$CHILD_PR" "🤖 Unstack: parent #${parent_pr} merged, but rebasing \`${child_branch}\` onto \`main\` without the parent's commits did not apply cleanly. The branch is unchanged; the conflict lane owns it next. _(at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
   exit 0
 fi
@@ -157,11 +221,13 @@ while [[ "${#queue[@]}" -gt 0 ]]; do
     fi
     gc_branch="$(jq -r .head <<<"$gc")"
     gc_sha="$(jq -r .sha <<<"$gc")"
-    if gc_new="$(rebase_branch "$gc_branch" "$old_tip" "$new_tip" "$gc_sha")"; then
+    if gc_new="$(rebase_branch "$grandchild" "$gc_branch" "$old_tip" "$new_tip" "$gc_sha" "$branch")"; then
       echo "  ✓ restacked #$grandchild on ${branch}: ${gc_sha:0:12} -> ${gc_new:0:12}"
       comment "$grandchild" "🤖 Unstack: its parent \`${branch}\` was rebased onto \`main\` after #${parent_pr} merged, so this PR was restacked on the new parent tip with only its own commits (\`${gc_sha:0:12}\` → \`${gc_new:0:12}\`). _(at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
       queue+=("${gc_branch} ${gc_sha} ${gc_new}")
     else
+      refused=$?
+      [[ "$refused" != 2 ]] || continue
       comment "$grandchild" "🤖 Unstack: its parent \`${branch}\` was rebased onto \`main\` after #${parent_pr} merged, but restacking this PR on the new parent tip conflicted. The branch is unchanged. _(at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
     fi
   done < <(gh_retry pr list -R "$REPO" --state open --base "$branch" --limit 50 --json number --jq '.[].number')

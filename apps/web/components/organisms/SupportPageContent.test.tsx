@@ -17,7 +17,7 @@ describe('SupportPageContent', () => {
 
     const heading = screen.getByRole('heading', {
       level: 1,
-      name: "We're Here To Help.",
+      name: "We're here to help.",
     });
     expect(heading).toBeVisible();
     // Compact route title owner ("type 28/620"): one shared class, no
@@ -45,7 +45,7 @@ describe('SupportPageContent', () => {
       .filter((heading): heading is string => heading !== undefined);
 
     expect(sectionHeadings).toEqual([
-      "We're Here To Help.",
+      "We're here to help.",
       'How Can We Help?',
       'Still Need Help?',
     ]);

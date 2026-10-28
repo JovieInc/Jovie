@@ -120,9 +120,9 @@ describe('buildEmailSignature', () => {
 
   it('includes branding UTM params on the footer link', () => {
     const { html } = buildEmailSignature({ name: 'A', handle: 'a' });
-    expect(html).toContain('utm_source=email_signature');
-    expect(html).toContain('utm_medium=referral');
-    expect(html).toContain('utm_campaign=branding');
+    expect(html).toContain('utm_source=via_jovie');
+    expect(html).toContain('utm_medium=email_signature');
+    expect(html).toContain('utm_campaign=via-jovie-footer');
   });
 
   it('renders a latest release row when https URL is provided', () => {
