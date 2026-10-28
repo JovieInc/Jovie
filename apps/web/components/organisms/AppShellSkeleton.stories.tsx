@@ -21,6 +21,12 @@ export const OvBrand: Story = {
   },
 };
 
+export const CollapsedSidebar: Story = {
+  args: {
+    sidebarCollapsed: true,
+  },
+};
+
 export const NoSidebar: Story = {
   args: {
     sidebar: null,

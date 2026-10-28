@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "caseId": "esc-ui-homepage-wide-profile-sparse-1440",
+  "scope": "This desktop composition only: profile mockup balance within the wide section and sparse full-page narrative. Not a ban on portraits, whitespace, features or Pen content.",
+  "authority": {
+    "sourceThreadId": "01a15732-b864-72b9-89a0-50396f62c02e",
+    "deliveryMessageId": "Sentinel_7982f0510980819194d7c49fdf1a319f",
+    "deliveredAt": "2026-10-22T14:39:35Z",
+    "caption": "Here’s the latest reviewed desktop and mobile checkpoint. This is the local preview, not production.",
+    "rejectedAtMinuteUtc": "2026-10-22T14:40Z",
+    "messages": [
+      {
+        "id": "Sentinel_ea9a39a789b4819190cca1ee01b5970f",
+        "text": "ok the profile mock up sucks. that layotu sucks for the aspect. the product should either be inside a phone or a simpler callout or interactive mockup. you need to seriously balance it. and this landing page is too sparse what other sections are needede? why did you not make naymore progress?"
+      },
+      {
+        "id": "Sentinel_5f3f0c0e76fc81919ce7ba5b90bbd331",
+        "text": "honestly it looks worse then the pen file in many places"
+      },
+      {
+        "id": "Sentinel_e8d18814c77c8191b5cca6bb3f8b05d7",
+        "text": "and push that back into the ststem so this is not something we keep fucking up"
+      }
+    ]
+  },
+  "negativeCapture": {
+    "file": "esc-ui-homepage-wide-profile-sparse-1440.png",
+    "libraryFileId": "libfile_d25051e0eca481919874b19a13d7b934",
+    "fileId": "file_000000006c5481fdb9c44be1c27c8654",
+    "sha256": "16fb86ba6ae8e191130120511704376ce12b17f9c23ad687998473a029900d93",
+    "width": 1440,
+    "height": 3050,
+    "humanLabel": "fail",
+    "mustReject": true,
+    "reasons": ["wide-section-mockup-balance", "sparse-full-page-narrative"]
+  },
+  "companionCapture": {
+    "libraryFileId": "libfile_9cc6e77b56ac819194d668b778403ed9",
+    "fileId": "file_000000002d28820e9ea3fa52e602e562",
+    "sha256": "44f0583d3af36f5e691b6ad9e7f6b3c028176d896b5f20c6073ba314cb4ed46a",
+    "width": 390,
+    "height": 3576,
+    "role": "Reviewed checkpoint context; no new binary label assigned."
+  },
+  "source": {
+    "head": "58c32ad8321262e2d2f13ecbb03df5b796ac86db",
+    "dirtyFingerprint": "f04c15fa28a64c5827332096415956ad40de2536cb626352e20af035bbb6edbb",
+    "buildKind": "local preview; not production"
+  },
+  "priorVisualHold": {
+    "status": "superseded for this exact checkpoint by the later founder rejection",
+    "functionalReceipts": "Retained within their original tested scope; not visual approval."
+  },
+  "observedGeometry": {
+    "profileFrameWidth": 340,
+    "profileFrameHeight": 739.203125,
+    "desktopViewportWidth": 1440,
+    "overflow": 0,
+    "role": "Observed facts only; no universal taste thresholds."
+  },
+  "referenceComparison": "Founder comparative observation retained. No independent pixel parity with an identified Pen frame is claimed by this fixture.",
+  "calibrationBoundary": "Fixed-label regression tests prove false-approval handling and asset binding, not live vision accuracy or a replacement design."
+}

@@ -44,10 +44,17 @@ vi.mock('@/lib/agent-acquisition/draft-capability', () => ({
 vi.mock('@/lib/flags/server', () => ({ getAppFlagValue: mocks.flag }));
 
 import { DELETE, GET, POST } from '@/app/api/music/mcp/route';
+import { POST as resolveRest } from '@/app/api/v1/music/resolve/route';
 import { BASE_URL } from '@/constants/app';
 import timArtist from '@/lib/dsp-enrichment/providers/fixtures/tim-white-musicbrainz.json';
 import timUrl from '@/lib/dsp-enrichment/providers/fixtures/tim-white-musicbrainz-url.json';
-import { musicResolveSchema } from '@/lib/music-resolver/public-read';
+import {
+  musicResolveSchema,
+  resolvePublicMusic,
+} from '@/lib/music-resolver/public-read';
+import { expectPublicOpenApiResponse } from '@/tests/utils/public-openapi';
+import { runCli } from '../../../../packages/jovie-cli/src/cli';
+import { resolveMusicV1 } from '../../scripts/examples/music-resolve';
 import { MUSIC_READ_TIMEOUT_MS } from './music-mcp';
 import { musicFetchSchema, musicSearchSchema } from './music-read';
 
@@ -111,6 +118,123 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
       attributes: { name: 'Radiohead', genreNames: ['Alternative'] },
     });
     mocks.appleSearch.mockResolvedValue([]);
+  });
+
+  async function acrossTransports(input: string) {
+    const restResponse = await resolveRest(
+      new Request(`${BASE_URL}/api/v1/music/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ input }),
+      })
+    );
+    await expectPublicOpenApiResponse(
+      '/api/v1/music/resolve',
+      'post',
+      restResponse
+    );
+    expect(restResponse.status).toBe(200);
+    const rest = await restResponse.json();
+    const domain = await resolvePublicMusic(
+      musicResolveSchema.parse({ input })
+    );
+    expect(rest).toEqual(domain);
+    const typescript = await resolveMusicV1(
+      { input },
+      BASE_URL,
+      async (endpoint, init) => resolveRest(new Request(endpoint, init))
+    );
+    expect(typescript).toEqual(rest);
+
+    let stdout = '';
+    const exit = await runCli(['music', 'resolve', input, '--json'], {
+      fetchImpl: async (endpoint, init) => POST(new Request(endpoint, init)),
+      stdout: {
+        write: chunk => {
+          stdout += chunk;
+        },
+      },
+      stderr: {
+        write: chunk => {
+          throw new Error(chunk);
+        },
+      },
+    });
+    expect(exit).toBe(0);
+    expect(JSON.parse(stdout)).toEqual(rest);
+
+    const client = new Client({ name: 'parity-client', version: '1.0.0' });
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(url), {
+        fetch: async (endpoint, init) => {
+          const req = new Request(endpoint, init);
+          return req.method === 'GET' ? GET(req) : POST(req);
+        },
+      })
+    );
+    try {
+      const result = await client.callTool({
+        name: 'resolve',
+        arguments: { input },
+      });
+      expect(result.isError).toBe(false);
+      expect(result.structuredContent).toEqual(rest);
+    } finally {
+      await client.close();
+    }
+    expect(mocks.writeLimit).not.toHaveBeenCalled();
+    expect(mocks.draft).not.toHaveBeenCalled();
+    return rest;
+  }
+
+  it('returns identical real resolver facts through REST, CLI and a clean official MCP client', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async input =>
+        Response.json(String(input).includes('/ws/2/url?') ? timUrl : timArtist)
+      )
+    );
+    const result = await acrossTransports(
+      'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm'
+    );
+    expect(result).toMatchObject({
+      status: 'resolved',
+      mbid: '51972833-bb04-46b7-9401-45a5ab449ebd',
+      artistMetadata: {
+        isnis: ['0000000427529721'],
+        wikidataIds: ['Q16762431'],
+      },
+    });
+  });
+
+  it('preserves ambiguity and resolves an explicit candidate choice across all clients', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async input =>
+        Response.json(
+          new URL(String(input)).searchParams.has('query')
+            ? {
+                artists: [
+                  { id: timArtist.id, name: 'Tim White' },
+                  {
+                    id: '8ac57f9f-0188-450a-b177-db336e5c2870',
+                    name: 'Tim White',
+                  },
+                ],
+              }
+            : timArtist
+        )
+      )
+    );
+    const ambiguous = await acrossTransports('Tim White');
+    expect(ambiguous).toMatchObject({
+      status: 'ambiguous',
+      mbid: null,
+      links: [],
+    });
+    expect(ambiguous.candidates).toHaveLength(2);
+    const chosen = await acrossTransports(ambiguous.candidates[0].url);
+    expect(chosen).toMatchObject({ status: 'resolved', mbid: timArtist.id });
   });
 
   it('clean official client initializes, discovers generated strict schemas and calls search then fetch', async () => {
@@ -213,6 +337,95 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
       await client.close();
     }
   });
+
+  it.each<[string, Record<string, string>]>([
+    ['anonymous', {}],
+    ['session cookie', { Cookie: 'session=caller-asserted' }],
+    [
+      'claimed paid data key',
+      {
+        Authorization: 'Bearer caller-asserted-data-key',
+        'X-Jovie-Plan': 'max',
+      },
+    ],
+  ])(
+    'keeps raw HTTP and CLI core-only for %s; official MCP agrees',
+    async (_caller, headers) => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async input =>
+          Response.json(
+            String(input).includes('/ws/2/url?')
+              ? timUrl
+              : {
+                  ...timArtist,
+                  relations: [
+                    ...timArtist.relations,
+                    {
+                      type: 'social network',
+                      url: { resource: 'https://instagram.com/private-graph' },
+                    },
+                  ],
+                  access_token: 'private-source-token',
+                }
+          )
+        )
+      );
+      const input = 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm';
+      const raw = await POST(
+        request(
+          rpc('tools/call', { name: 'resolve', arguments: { input } }),
+          headers
+        )
+      );
+      const body = await raw.json();
+      expect(body.result.isError).toBe(false);
+      const core = body.result.structuredContent;
+      expect(core).toMatchObject({ status: 'resolved', mbid: timArtist.id });
+      expect(core.artistMetadata).not.toHaveProperty('externalLinks');
+      expect(core.artistMetadata).not.toHaveProperty('releaseGroups');
+      expect(JSON.parse(body.result.content[0].text)).toEqual(core);
+      expect(JSON.stringify(body)).not.toMatch(
+        /instagram|private-|releaseGroups|externalLinks|access_token/
+      );
+
+      let stdout = '';
+      const exit = await runCli(['music', 'resolve', input, '--json'], {
+        fetchImpl: async (endpoint, init) => POST(new Request(endpoint, init)),
+        stdout: {
+          write: chunk => {
+            stdout += chunk;
+          },
+        },
+        stderr: {
+          write: chunk => {
+            throw new Error(chunk);
+          },
+        },
+      });
+      expect(exit).toBe(0);
+      expect(JSON.parse(stdout)).toEqual(core);
+
+      const client = new Client({ name: 'core-only-client', version: '1.0.0' });
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(url), {
+          fetch: async (endpoint, init) => POST(new Request(endpoint, init)),
+        })
+      );
+      try {
+        const result = await client.callTool({
+          name: 'resolve',
+          arguments: { input },
+        });
+        expect(result.isError).toBe(false);
+        expect(result.structuredContent).toEqual(core);
+      } finally {
+        await client.close();
+      }
+      expect(mocks.draft).not.toHaveBeenCalled();
+      expect(mocks.writeLimit).not.toHaveBeenCalled();
+    }
+  );
 
   it.each([
     `spotify:${ID}`,
@@ -336,6 +549,10 @@ describe('public music identity MCP, real SDK and canonical resolver', () => {
     ['fetch', { id: `spotify:${ID}`, full: true }],
     ['fetch', { id: null }],
     ['fetch', {}],
+    ['resolve', { input: 'Tim White', fields: ['socials'] }],
+    ['resolve', { input: 'Tim White', expand: ['releaseGroups'] }],
+    ['resolve', { input: 'Tim White', tier: 'paid' }],
+    ['resolve', { input: 'Tim White', maxCharge: 1 }],
     ['work.claim', { id: 'worker' }],
   ])('rejects invalid %s before any provider call', async (name, args) => {
     const { body } = await call(name as string, args);

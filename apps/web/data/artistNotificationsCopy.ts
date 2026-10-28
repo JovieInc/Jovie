@@ -4,7 +4,8 @@ import type {
   ArtistProfileLandingCopy,
 } from './artistProfileCopy';
 
-const PRO_SIGNUP_HREF = `${APP_ROUTES.SIGNUP}?plan=pro`;
+/** One door: every marketing CTA claims a page; the trial is in-app only. */
+const CLAIM_HREF = APP_ROUTES.START;
 
 export interface ArtistNotificationsLandingCopy {
   readonly seo: {
@@ -43,15 +44,15 @@ export interface ArtistNotificationsLandingCopy {
 
 export const ARTIST_NOTIFICATIONS_COPY = {
   seo: {
-    title: 'Automatic Artist Notifications',
+    title: 'Automatic artist notifications',
     description:
       'Turn new music and nearby shows into repeat visits without writing campaigns.',
   },
   hero: {
-    headline: 'Reach Every Fan. On Autopilot.',
-    headlineLines: ['Reach Every Fan.', 'On Autopilot.'],
-    primaryCtaLabel: 'Start Artist Presence Trial',
-    primaryCtaHref: PRO_SIGNUP_HREF,
+    headline: 'Reach listeners. On autopilot.',
+    headlineLines: ['Reach listeners.', 'On autopilot.'],
+    primaryCtaLabel: 'Claim your page',
+    primaryCtaHref: CLAIM_HREF,
     floatingCards: [
       {
         id: 'capture',
@@ -62,7 +63,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
         id: 'subscribe',
         kind: 'subscribe',
         title: 'Enable notifications',
-        detail: 'alex@example.com',
+        detail: 'you@email.com',
       },
       {
         id: 'email',
@@ -82,9 +83,9 @@ export const ARTIST_NOTIFICATIONS_COPY = {
     ],
   },
   capture: {
-    headline: 'Capture every fan.',
+    headline: 'Capture every listener.',
     subhead:
-      'Turn streams, show traffic, QR scans, and support moments into a fan list Jovie can bring back.',
+      'Turn streams, show traffic, QR scans, and support moments into an audience list Jovie can bring back.',
     body: 'Notifications only work because capture happens first. Every visit, scan, and support moment can become a reachable audience instead of a dead-end click.',
     action: {
       title: 'Get updates',
@@ -168,23 +169,23 @@ export const ARTIST_NOTIFICATIONS_COPY = {
     ],
   },
   reactivation: {
-    headline: 'Notify every fan automatically.',
+    headline: 'Notify listeners for you.',
     subhead:
-      'When new music drops or a nearby show is coming up, Jovie brings the right fans back.',
+      'When new music drops or a nearby show is coming up, Jovie brings the right listeners back.',
     workflow: {
       columns: ['Trigger', 'Audience', 'Message', 'Destination'],
       rows: [
         {
           id: 'release',
           trigger: 'New release',
-          audience: 'Fans who asked for music',
+          audience: 'Listeners who asked for music',
           message: 'New release alert',
           destination: 'Latest release page',
         },
         {
           id: 'tour',
           trigger: 'Nearby show',
-          audience: 'Fans near the venue',
+          audience: 'Listeners near the venue',
           message: 'Nearby show alert',
           destination: 'Ticket page',
         },
@@ -207,7 +208,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
       },
       {
         id: 'thank-you',
-        label: 'Bring fans back',
+        label: 'Bring listeners back',
         title: 'Every send creates a real reason to return.',
         detail: 'No campaign writing. Just a clean next tap.',
         destination: 'Repeat visit -> artist profile',
@@ -215,7 +216,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
     ],
   },
   benefits: {
-    headline: 'Bring fans back when it matters.',
+    headline: 'Bring listeners back when it matters.',
     body: 'Notifications work when they create a second chance to stream or buy tickets without turning you into a campaign manager.',
     items: [
       {
@@ -224,7 +225,7 @@ export const ARTIST_NOTIFICATIONS_COPY = {
       },
       {
         title: 'Nearby shows get another ticket window.',
-        body: 'Fans close enough to act see the show while the date is still relevant.',
+        body: 'Listeners close enough to act see the show while the date is still relevant.',
       },
       {
         title: 'You stay close without writing blasts.',
@@ -235,20 +236,20 @@ export const ARTIST_NOTIFICATIONS_COPY = {
   specWall: {
     headline: 'The details that make notifications convert.',
     subhead:
-      'Capture, timing, and routing all matter if you want alerts to bring fans back.',
+      'Capture, timing, and routing all matter if you want alerts to bring listeners back.',
   },
   faq: {
     headline: 'Frequently Asked Questions',
     items: [
       {
-        question: 'How does Jovie bring fans back?',
+        question: 'How does Jovie bring listeners back?',
         answer:
           'Jovie turns captured audience into repeat visits. When new music drops or a nearby show matters, subscribers get a clean notification that sends them back to the right release or ticket page.',
       },
       {
         question: 'What kinds of moments can Jovie turn into notifications?',
         answer:
-          'Jovie focuses on the two artist moments most likely to drive action: new music and nearby shows. That keeps the product tuned to the moments fans are most likely to tap.',
+          'Jovie focuses on the two artist moments most likely to drive action: new music and nearby shows. That keeps the product tuned to the moments listeners are most likely to tap.',
       },
       {
         question: 'Why use Jovie instead of writing newsletters?',
@@ -256,23 +257,23 @@ export const ARTIST_NOTIFICATIONS_COPY = {
           'Because most artists do not want to become campaign operators. Jovie handles the send automatically so you can keep building the audience without writing blasts, formatting newsletters, or timing manual sends.',
       },
       {
-        question: 'Where do fans land after they click?',
+        question: 'Where do listeners land after they click?',
         answer:
           'Clicks go to the destination that fits the moment: the latest release when new music is live, or the relevant ticket page when a nearby show is worth acting on.',
       },
       {
         question: 'When does it make sense to turn on Artist Presence?',
         answer:
-          'Use free to capture demand first. Turn on Artist Presence when you want Jovie to start bringing those fans back automatically when music or show moments happen.',
+          'Use free to capture demand first. Turn on Artist Presence when you want Jovie to start bringing those listeners back automatically when music or show moments happen.',
       },
     ],
   },
   finalCta: {
-    headline: 'Ready to Amplify?',
+    headline: 'Ready to reach your audience?',
     subhead:
       'Capture demand on free. Turn on automatic artist notifications with Artist Presence.',
-    ctaLabel: 'Start Artist Presence Trial',
+    ctaLabel: 'Claim your page',
     signature: 'jov.ie/you',
-    ctaHref: PRO_SIGNUP_HREF,
+    ctaHref: CLAIM_HREF,
   },
 } as const satisfies ArtistNotificationsLandingCopy;

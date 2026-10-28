@@ -62,7 +62,7 @@ if (pr) {
   });
   if (!verdict.passed)
     throw new Error(
-      `Customer outcome decision missing or invalid (${verdict.reason}). See docs/CHANGELOG_PUBLICATION.md; use explicit releaseWorthy:false for internal work.`
+      `Customer outcome decision missing or invalid (${verdict.reason}). This PR changes customer-facing code (apps/web/{app,components/features,lib}, apps/ios Swift, apps/desktop/src), so its body needs one marker. Internal work: add the line <!-- customer-changelog/v1 {"releaseWorthy":false} --> to the PR body (the PR template already has it). Customer-visible work: see docs/CHANGELOG_PUBLICATION.md for the releaseWorthy:true form with availability.`
     );
   process.stdout.write(`${JSON.stringify(verdict)}\n`);
 }
