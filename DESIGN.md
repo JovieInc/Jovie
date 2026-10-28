@@ -8,8 +8,7 @@
 Read this execution contract before UI work. Load only the relevant section of
 [design details](docs/design-system/DETAILS.md) for the component or surface being changed.
 Token values come from the source registries below. Historical decisions describe
-past state; the newest founder-locked decision governs. For instruction-only edits,
-verify policy preservation and links; screenshots apply when rendered UI changes.
+past state; the newest founder-locked decision governs.
 
 Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
@@ -109,7 +108,7 @@ Read [the subtraction principle reference](docs/design-system/DETAILS.md#subtrac
 
 ## No Dead Ends (JOV-INV-046)
 
-Every rendered control has a working path in the current runtime. Capability-gate it: if it cannot work here (desktop vs web vs iOS, browser support, entitlement), do not render it. Never explain its absence ("not available", "coming soon", "use X instead"), never ship a disabled control with no actionable reason, a no-op handler, `href="#"`, or a link to an unbuilt route. Allowed: a permission or entitlement prompt that leads to a working path, and a transient error with retry. Enforced by `pnpm design:no-dead-ends:check` (`packages/copy/dead-ends.ts`, shrink-only baseline). See `.claude/rules/ui.md`.
+Read [no dead ends](docs/design-system/DETAILS.md#no-dead-ends) before UI work.
 
 ## Use Tokens, Not Raw Colors
 
