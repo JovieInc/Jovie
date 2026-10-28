@@ -24,7 +24,7 @@ describe('SupportPage', () => {
 
     const heading = screen.getByRole('heading', { level: 1 });
     expect(heading).toBeInTheDocument();
-    expect(heading).toHaveTextContent("We're Here To Help.");
+    expect(heading).toHaveTextContent("We're here to help.");
   });
 
   it('renders the contact support button as a Help Center escalation link', () => {

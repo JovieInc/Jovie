@@ -10,7 +10,7 @@ name: Automation Liveness
 # lanes tick fires every 5 minutes and GitHub's cron backstops when Gem is down.
 # Runner Health Monitor is a telemetry node, and the workflow topology contract
 # forbids workflow_run edges out of telemetry (observer recursion). The job runs
-# on every fifth guard run (about 25 minutes) to keep its ~40 GitHub API reads
+# when no check ran in the last 20 minutes (a time gate, see the gate job) to keep its ~40 GitHub API reads
 # per run inside the shared GITHUB_TOKEN budget; the lanes doctor alerts when no
 # run lands for 60 minutes.
 
@@ -35,12 +35,59 @@ permissions:
   actions: read
 
 jobs:
+  # 2026-10-26: the old gate ran the check on guard run numbers ending in 0 or 5, which assumed the lanes tick
+  # fires the guard every 5 minutes. With the tick slow, guard runs arrived every 10-20 minutes and the check
+  # ran once in 70 minutes, so a stale lanes status went unreported. The gate is now time based: the check is
+  # due when no check ran in the last 20 minutes (a few cheap reads), however irregular the guard runs are.
+  gate:
+    name: Liveness check due
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+    outputs:
+      due: ${{ steps.due.outputs.due }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          sparse-checkout: |
+            packages/api-client
+            .nvmrc
+          persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # github-token-budget: 7 calls/run - time-gate reads up to 6 recent runs of this workflow (one run list plus per-run views)
+      - id: due
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -uo pipefail
+          if [ "$EVENT" = workflow_dispatch ]; then echo "due=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          now=$(date -u +%s)
+          due=true
+          for id in $(node packages/api-client/cli.ts gh --priority poll -- run list --repo "$GITHUB_REPOSITORY" --workflow automation-liveness.yml --limit 6 \
+              --json databaseId --jq '.[].databaseId' 2>/dev/null); do
+            [ "$id" = "$GITHUB_RUN_ID" ] && continue
+            at=$(node packages/api-client/cli.ts gh --priority poll -- api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+              --jq '.jobs[] | select(.name == "Check automation heartbeats" and .conclusion == "success") | .completed_at' 2>/dev/null | head -1)
+            if [ -n "$at" ]; then
+              age=$(( now - $(date -u -d "$at" +%s) ))
+              [ "$age" -lt 1200 ] && due=false
+              break
+            fi
+          done
+          echo "due=$due" >> "$GITHUB_OUTPUT"
+
   liveness:
     name: Check automation heartbeats
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      endsWith(format('{0}', github.event.workflow_run.run_number), '0') ||
-      endsWith(format('{0}', github.event.workflow_run.run_number), '5')
+    needs: gate
+    if: needs.gate.outputs.due == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -49,6 +96,9 @@ jobs:
           ref: main
           persist-credentials: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
