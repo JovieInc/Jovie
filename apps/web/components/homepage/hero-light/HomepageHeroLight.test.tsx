@@ -146,8 +146,7 @@ describe('HomepageArtistHero', () => {
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light.querySelector('canvas')).toBeNull();
-    expect(
-      document.querySelector('.homepage-artist-hero__phone')
-    ).not.toBeNull();
+    // No real person's face on the homepage (Tim, 2026-10-26).
+    expect(document.querySelector('.homepage-artist-hero__phone')).toBeNull();
   });
 });

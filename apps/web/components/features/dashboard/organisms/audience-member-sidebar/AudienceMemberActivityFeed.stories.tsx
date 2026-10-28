@@ -33,6 +33,7 @@ const audienceMember = {
   utmParams: {},
   email: 'avery@example.com',
   phone: null,
+  emailVisibleToArtist: true,
   spotifyConnected: true,
   purchaseCount: 1,
   tipAmountTotalCents: 500,
