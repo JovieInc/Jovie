@@ -14,6 +14,7 @@ import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
   captureKeyframe,
   inspectEssentialViewport,
+  waitForStableGeometry,
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
 import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
@@ -148,6 +149,9 @@ async function verifyHomeWelcome(page: Page) {
       };
     });
   const assertGeometry = async () => {
+    // Clearing the starter shrinks the composer through a Motion size layout
+    // transition; audit the settled box, not a mid-tween frame.
+    await waitForStableGeometry(page, '[data-testid="chat-composer-surface"]');
     const selectors = [
       '[data-testid="chat-empty-state-next-step"] button, [data-testid="chat-empty-state-next-step"] a',
     ];
