@@ -60,7 +60,8 @@ const signOutMock = vi.hoisted(() => vi.fn());
 const userButtonPropsMock = vi.hoisted(() => vi.fn());
 const nowPlayingBridgePropsMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/desktop/electron-bridge', () => ({
+vi.mock('@/lib/desktop/electron-bridge', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/desktop/electron-bridge')>()),
   isElectronRuntime: () =>
     document.documentElement.dataset.desktopRuntime === 'electron' ||
     electronRuntimeMock.isElectronRuntime,
@@ -644,6 +645,27 @@ describe('UnifiedSidebar library route', () => {
     expect(marks).toHaveLength(1);
     expect(marks[0]).toHaveAttribute('data-brand-mark-size', '16');
     expect(marks[0]?.closest('[data-sidebar="header"]')).not.toBeNull();
+  });
+
+  it('prefetches Shipping on hover and keyboard focus without duplicate requests', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(() => new Promise(() => {}));
+    renderUnifiedSidebar({
+      pathname: APP_ROUTES.ADMIN_OPS,
+      section: 'ov',
+      variant: 'ov',
+    });
+    const nav = screen.getByRole('navigation', { name: 'OV Navigation' });
+    const link = within(nav).getByRole('link', { name: 'Shipping' });
+    fireEvent.mouseOver(link);
+    fireEvent.focus(link);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/hud/shipping-state',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    fetchMock.mockRestore();
   });
 
   it('renders dedicated operator navigation without the customer dashboard nav', () => {

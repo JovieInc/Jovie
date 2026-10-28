@@ -88,6 +88,13 @@ measured score and can only move up. Files without a floor stay advisory.
 The job also fails when Stryker itself breaks. It is not a merge-queue
 required check, because it runs after merge rather than on pull requests.
 
+A scored floor breach also files one deduped Linear issue per file
+(fingerprint `mutation-score-floor:<file>`), so a later red run updates the
+same issue instead of filing another. Filing needs `LINEAR_API_KEY` in the
+workflow env and honors the `REMEDIATION_TRIGGERS_DISABLED` kill switch; a
+missing key or transport failure is logged and never changes the job's exit
+code, which stays driven by the floor failures themselves.
+
 Before landing a change to one of those files, run it locally:
 
 ```bash
