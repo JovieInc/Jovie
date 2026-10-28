@@ -34,7 +34,7 @@ jobs:
   visual-regression:
     name: Visual Regression (baseline refresh)
     environment: Preview – jovie
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       actions: read
