@@ -5,7 +5,7 @@ name: Source Validation
 # removal-trigger: Remove the lookup when body-dependent decisions leave Source Validation or GitHub stops re-running pull_request workflows on metadata-only edits.
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
     branches: [main, 'integration/**']
 permissions:
   contents: read
@@ -19,13 +19,44 @@ concurrency:
 jobs:
   deterministic:
     name: Source Validation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       actions: read
       contents: read
       pull-requests: read
     steps:
+      # The preflight runs before the source checkout and dependency install.
+      # Bootstrap only the existing, dependency-free client from the trusted base.
+      - &quota-client
+        name: Checkout the trusted quota client
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: .source-validation-client
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            packages/api-client
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+      # Edited-event jobs ran setup-node unprimed in all 8 jobs of a run
+      # (run 40176111773, 2026-10-25): one REST manifest call each.
+      - &quota-prime
+        name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base && hashFiles('.source-validation-client/.github/actions/prime-node-toolcache/action.yml') != '' }}
+        # A run step, not `uses:`: the client checkout path does not exist when
+        # workflow references are validated, so a local action there is rejected.
+        env:
+          NODE_VERSION_FILE: .source-validation-client/.nvmrc
+        run: bash .source-validation-client/.github/actions/prime-node-toolcache/prime.sh
+      - &quota-runtime
+        name: Setup the quota client runtime
+        if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .source-validation-client/.nvmrc
       # A PR body/title edit re-runs this workflow at an unchanged head and
       # base. 262 of 303 same-head reruns on 2026-10-03 were body edits. When
       # the newest completed earlier run for this exact head and branch
@@ -44,8 +75,16 @@ jobs:
           RUN_ID: ${{ github.run_id }}
         run: |
           set -uo pipefail
-          reuse=false proof=''
-          if [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
+          reuse=false proof='' lookup=true
+          # Low quota skips proof reuse and runs full validation immediately.
+          # Never hold a hosted runner waiting for GitHub's hourly reset.
+          if quota="$(node .source-validation-client/packages/api-client/cli.ts gh --priority default -- api rate_limit --jq '.resources.core.remaining' 2>/dev/null)" &&
+            [[ "$quota" =~ ^[0-9]+$ ]] && (( 10#$quota < 50 )); then
+            lookup=false
+            echo "::warning::GitHub rate limited (core remaining=$quota). Skipping proof reuse; running full validation."
+            echo "GitHub rate limited: proof reuse skipped, full validation runs." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ "$lookup" == true && "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] &&
             runs="$(gh api "repos/$REPOSITORY/actions/workflows/source-validation.yml/runs?head_sha=$HEAD_SHA&event=pull_request&status=completed&per_page=100")"; then
             proof="$(jq -r --arg sha "$HEAD_SHA" --arg ref "$HEAD_REF" --argjson run "$RUN_ID" '
               [.workflow_runs[]
@@ -67,10 +106,24 @@ jobs:
           # step (p50 47s, p90 57s). Blobless history is ~34 MB for main;
           # the head's blobs arrive with the checkout and the few trusted-base
           # blobs a guard reads are fetched on demand from the public origin.
-          fetch-depth: 0
+          fetch-depth: 1
           filter: blob:none
           persist-credentials: false
+      # actions/checkout with fetch-depth 0 pulls every branch and tag (1,800+
+      # heads, mostly backup/codex branches: ~12s, 58 MB). Guards only need the
+      # head and the single base ref, blobless, for merge bases.
+      - name: Fetch head and base history only
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
       - uses: ./.github/actions/setup-node-pnpm
+      # Body/label-dependent policy always runs, including exact-head proof reuse.
+      # PR fleet rules are decided by the Fleet Rules Evidence workflow (base code
+      # only, dedicated CI App budget); PR Ready reads its status below.
       - name: Validate performance policy source bindings
         run: node scripts/invariants/performance-factory.mjs
       - name: Measure actual installed source dependency graph
@@ -108,32 +161,170 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      # Source guards inspect the merged tree. Its dependency/runtime generation
+      # must travel with it; the later source-head steps keep their original proof.
+      - name: Prepare merged source guard generation
+        id: source_guard_merge
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo 'restore_head=false' >> "$GITHUB_OUTPUT"
+          # A local dirty checkout is not owned by this transaction.
+          if ! git diff --quiet HEAD; then
+            echo 'prepared=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          helper_root="$(mktemp -d "$RUNNER_TEMP/source-dependency-guard.XXXXXX")"
+          printf 'trusted_ref=%s\nhelper_root=%s\n' "$trusted_ref" "$helper_root" >> "$GITHUB_OUTPUT"
+          git archive "$trusted_ref" scripts/lib/ci-dependency-workspace.mjs | tar -x -C "$helper_root"
+          export SOURCE_DEPENDENCY_HELPER="$helper_root/scripts/lib/ci-dependency-workspace.mjs"
+          node "$SOURCE_DEPENDENCY_HELPER" validate
+          dependency_digest() {
+            node --input-type=module -e 'import { pathToFileURL } from "node:url"; const helper = await import(pathToFileURL(process.env.SOURCE_DEPENDENCY_HELPER)); console.log(helper.dependencyInputDigest(process.cwd()));'
+          }
+          head_digest="$(dependency_digest)"
+          printf 'head_digest=%s\nrestore_head=true\n' "$head_digest" >> "$GITHUB_OUTPUT"
+          if ! git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref"; then
+            conflicts="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"
+            echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base} in: ${conflicts:-unknown files}. Resolve the conflict (lane-fix-conflict)."
+            exit 1
+          fi
+          changed=false
+          [ "$(dependency_digest)" = "$head_digest" ] || changed=true
+          printf 'dependency_changed=%s\nprepared=true\n' "$changed" >> "$GITHUB_OUTPUT"
+          # A baked browser path belongs to the prior installed generation.
+          [ "$changed" != true ] || echo 'PLAYWRIGHT_BROWSERS_PATH=' >> "$GITHUB_ENV"
+      # Local post actions reload their metadata after source restoration.
+      # Retain only this generation's action closure until job cleanup.
+      - name: Preserve merged action generation
+        id: source_guard_actions
+        if: steps.source_guard_merge.outputs.dependency_changed == 'true'
+        run: node scripts/lib/source-guard-action-snapshot.mjs
+      - name: Setup merged source dependencies
+        id: source_merge_dependencies
+        if: steps.source_guard_merge.outputs.dependency_changed == 'true'
+        uses: ./tmp/source-guard-actions/setup-node-pnpm
+      - name: Setup merged source browsers
+        id: source_merge_browsers
+        if: steps.source_guard_merge.outputs.dependency_changed == 'true'
+        uses: ./tmp/source-guard-actions/setup-playwright
       - name: Validate disk-read source contracts from trusted base
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          SOURCE_GUARD_PREPARED: ${{ steps.source_guard_merge.outputs.prepared }}
+          SOURCE_GUARD_TRUSTED_REF: ${{ steps.source_guard_merge.outputs.trusted_ref }}
+          SOURCE_DEPENDENCY_HELPER: ${{ steps.source_guard_merge.outputs.helper_root }}/scripts/lib/ci-dependency-workspace.mjs
+          # Source guards that read GitHub (gh-api-hold) ran unauthenticated and
+          # hit the per-IP limit ("outside the 30s budget", 2026-10-21).
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          if [ "${SOURCE_GUARD_PREPARED:-false}" = true ]; then
+            trusted_ref="${SOURCE_GUARD_TRUSTED_REF:?prepared source guard reference missing}"
+            git cat-file -e "$trusted_ref^{commit}"
+            node "$SOURCE_DEPENDENCY_HELPER" validate
+          else
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          fi
           guard_root="$(mktemp -d "$RUNNER_TEMP/source-read-guard.XXXXXX")"
-          trap 'rm -rf "$guard_root"' EXIT
+          merging=false
+          # Standalone runs restore here. The prepared transaction restores both
+          # source and dependencies in its unconditional workflow cleanup steps.
+          trap '[ "$merging" != true ] || git reset --hard --quiet "$EXPECTED_HEAD"; rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
+          # Guard code and the guard list come from the trusted base (above); the
+          # files they read must be the ones this PR would land: base plus head.
+          # Run against the head alone, a PR behind the base fails every guard
+          # that reads a file the base added after the PR branched (#23313,
+          # #23336: domain-write-guard ENOENT on write-registry.json). The merge
+          # is uncommitted, so HEAD and the changed-file list stay the PR's. A
+          # dirty tree (a local run) is never reset: it keeps the head-only run.
+          clean=true
+          if [ "${SOURCE_GUARD_PREPARED:-false}" = true ]; then
+            # The earlier transaction owns this merge and its installed tree.
+            clean=false
+          else
+            git diff --quiet HEAD 2>/dev/null || clean=false
+            [ "$clean" = true ] || echo "::notice::working tree has local changes; source guards run on the head alone"
+          fi
+          [ "$clean" != true ] || merging=true
+          merge_ok=true
+          [ "$merging" != true ] || git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1 || merge_ok=false
+          [ "$merge_ok" = true ] || { conflicts="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"; echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base} in: ${conflicts:-unknown files}. Resolve the conflict (lane-fix-conflict); source guards judge the merged tree and cannot run on a conflicted one."; echo "merge conflict with ${GITHUB_BASE_REF:-base}: ${conflicts:-unknown files}"; exit 1; }
           export SOURCE_GUARD_MODULE="$guard_root/scripts/ci-fast-lanes.mjs"
           node --input-type=module -e '
             import { spawnSync } from "node:child_process";
+            import { randomUUID } from "node:crypto";
             const { selectSourceGuards, listAllChangedFiles } = await import(process.env.SOURCE_GUARD_MODULE);
             const guards = selectSourceGuards(process.env.GITHUB_EVENT_NAME, listAllChangedFiles(process.cwd()));
             let exitCode = 0;
             for (const guard of guards) {
+              // Guard tests print mocked `::error::` / `::warning::` lines (a fake
+              // rate-limit reset misled three workers on 2026-10-25). Stop workflow
+              // commands for the guard, then resume; a failing guard gets one real
+              // annotation from this loop instead.
+              const token = randomUUID();
+              console.log(`::stop-commands::${token}`);
               const result = spawnSync(guard.command, { shell: true, cwd: process.cwd(), stdio: "inherit" });
+              console.log(`::${token}::`);
               const code = result.status ?? 1;
               console.log(`[source-guards] ${guard.id}: exit ${code}`);
+              if (code !== 0) console.log(`::error title=source guard ${guard.id}::${guard.id} failed (exit ${code}); read its output above.`);
               if (code !== 0 && exitCode === 0) exitCode = code;
             }
             process.exitCode = exitCode;
           '
+      - name: Restore exact source head after merged guards
+        id: source_guard_restore
+        if: always() && steps.source_guard_merge.outputs.restore_head == 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          SOURCE_DEPENDENCY_CHANGED: ${{ steps.source_guard_merge.outputs.dependency_changed }}
+        run: |
+          set -euo pipefail
+          git reset --hard --quiet "$EXPECTED_HEAD"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo 'restored=true' >> "$GITHUB_OUTPUT"
+          [ "$SOURCE_DEPENDENCY_CHANGED" != true ] || echo 'PLAYWRIGHT_BROWSERS_PATH=' >> "$GITHUB_ENV"
+      - name: Restore source head dependencies
+        id: source_head_dependencies
+        if: always() && steps.source_guard_merge.outputs.dependency_changed == 'true' && steps.source_merge_dependencies.outcome != 'skipped' && steps.source_guard_restore.outputs.restored == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Restore source head browsers
+        id: source_head_browsers
+        if: always() && steps.source_guard_merge.outputs.dependency_changed == 'true' && steps.source_head_dependencies.outcome == 'success'
+        uses: ./.github/actions/setup-playwright
+      - name: Restore exact source dependency proof
+        id: source_guard_proof
+        if: always() && steps.source_guard_merge.outputs.helper_root != ''
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          SOURCE_DEPENDENCY_ROOT: ${{ steps.source_guard_merge.outputs.helper_root }}
+          SOURCE_HEAD_DIGEST: ${{ steps.source_guard_merge.outputs.head_digest }}
+          SOURCE_RESTORE_REQUIRED: ${{ steps.source_guard_merge.outputs.restore_head }}
+          SOURCE_RESTORED: ${{ steps.source_guard_restore.outputs.restored }}
+        run: |
+          set -euo pipefail
+          trap 'rm -rf "$SOURCE_DEPENDENCY_ROOT"' EXIT
+          if [ "$SOURCE_RESTORE_REQUIRED" = true ]; then
+            test "$SOURCE_RESTORED" = true
+            test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+            export SOURCE_DEPENDENCY_HELPER="$SOURCE_DEPENDENCY_ROOT/scripts/lib/ci-dependency-workspace.mjs"
+            restored_digest="$(node --input-type=module -e 'import { pathToFileURL } from "node:url"; const helper = await import(pathToFileURL(process.env.SOURCE_DEPENDENCY_HELPER)); console.log(helper.dependencyInputDigest(process.cwd()));')"
+            test "$restored_digest" = "$SOURCE_HEAD_DIGEST"
+            node "$SOURCE_DEPENDENCY_HELPER" validate
+          fi
       - name: Check agent-context size after merge onto base
         shell: bash
         env:
@@ -204,6 +395,49 @@ jobs:
           # The classifier only runs when invoked as its own entry point; a
           # missing receipt means it never ran, which must not read as a pass.
           test -s "$lane_dir/receipt.json"
+      # actionlint also runs in the merge group (ci-fast), but a workflow edit
+      # that fails it there ejects the whole group (#23060: an unquoted
+      # run-name with " #" was read as a YAML comment). Lint at PR time so
+      # the author sees it before enqueue. Same checksum-pinned toolchain.
+      - name: Lint changed workflows and actions (actionlint)
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          BASE_BRANCH: ${{ github.base_ref }}
+          SHELLCHECK_OPTS: >-
+            --exclude=SC2001,SC2016,SC2028,SC2034,SC2086,SC2126,SC2129,SC2329
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "$BASE_BRANCH"
+          base_sha="$(git merge-base "origin/$BASE_BRANCH" HEAD)"
+          if [ -z "$(git diff --name-only "$base_sha" HEAD -- .github/workflows .github/actions)" ]; then
+            echo "No workflow or action changes; actionlint not applicable."
+            exit 0
+          fi
+          bash .github/scripts/run-actionlint.sh
+      # Read-only restore of the web tsc incremental state that
+      # tsc-cache-warm.yml writes on main. A pull_request can read that
+      # default-branch cache; merge_group already restores it in ci-fast.
+      # This job does not save: a PR-scoped entry is invisible to merge_group
+      # and competes for the 10 GB Actions cache cap. tsc re-hashes every
+      # input, so an older buildinfo cannot replay a passing typecheck.
+      # pnpm typecheck and the ci-fast --force gate are unchanged.
+      - name: Resolve tsc cache hour
+        id: tsc-cache-hour
+        if: steps.reuse.outputs.reuse != 'true'
+        run: echo "hour=$(date -u +%Y%m%d%H)" >> "$GITHUB_OUTPUT"
+      - name: Restore web tsc incremental state
+        id: web-tsbuildinfo
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: apps/web/.cache/tsbuildinfo*
+          key: jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-h${{ steps.tsc-cache-hour.outputs.hour }}
+          restore-keys: |
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig.json', 'apps/web/tsconfig.json', 'apps/web/tsconfig.typecheck.json', 'apps/web/tsconfig.test.json', 'apps/web/tsconfig.stories.json') }}-
+            jovie-web-tsbuildinfo-v2-${{ runner.os }}-
       - name: Run deterministic source contract
         if: steps.reuse.outputs.reuse != 'true'
         env:
@@ -222,6 +456,7 @@ jobs:
           node --test scripts/workflow-token-scope.test.mjs
           node scripts/lockfile-specifier-preflight.mjs
           node scripts/ci-release-incident-contract.mjs
+          node apps/web/scripts/a11y-wcag-standard-check.cjs
           pnpm ci:harness:check
           # The web test and story tsc programs (100s + 66s) ran after the
           # workspace typecheck (112s), serially, in this step (PR p50 7.6m).
@@ -248,6 +483,32 @@ jobs:
           pnpm screen-registration-gate
           pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts
           pnpm ci:control:test
+      # A PR that removes a data-pen-contract node a required layout spec still
+      # locates only failed in the merge group (#23332: FAQ removed from /about,
+      # three ejections). Fail it on its own PR instead.
+      - name: Check layout-guard pen contracts are still rendered
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f scripts/layout-guard-pen-contracts.mjs ]; then
+            node scripts/layout-guard-pen-contracts.mjs
+            exit 0
+          fi
+          # This workflow runs from the merge ref but the checkout is the PR
+          # head: a branch cut before the guard landed has no script
+          # (Cannot find module, 5 of 83 sampled failures). Judge the merged
+          # tree in a throwaway worktree instead of failing a stale branch.
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          merged="$(mktemp -d "$RUNNER_TEMP/pen-contracts-merged.XXXXXX")"
+          trap 'git worktree remove --force "$merged" >/dev/null 2>&1 || true' EXIT
+          git worktree add --detach --quiet "$merged" HEAD
+          if ! git -C "$merged" -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1; then
+            echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base}; resolve the conflict (lane-fix-conflict) so the pen-contract guard can judge the merged tree."
+            exit 1
+          fi
+          node "$merged/scripts/layout-guard-pen-contracts.mjs"
       # The merge group's ci-fast runs the same path-aware shadcn baseline
       # probe; Source Validation previously skipped it, so a restyle that fit
       # a PR's diff still ejected the whole merge group (group 36902907269,
@@ -301,6 +562,9 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-prime
+      - *quota-runtime
       - *proof-reuse
       # TruffleHog reads the object store directly and cannot use a partial
       # clone (#13994), so this job keeps the full-blob history fetch.
@@ -326,6 +590,24 @@ jobs:
           node scripts/golden-path-lock.mjs merge-gate
           git diff --name-only "$base_sha" HEAD > "$RUNNER_TEMP/security-gate-files.txt"
           node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
+      # Hosted GITHUB_TOKEN compare returns 403 on this public repository.
+      # A contents:read Jovie Bot installation token returns 200. Severity
+      # and the GPL/AGPL denylist stay blocking. The minted token is
+      # contents:read only; an empty key fails the mint closed.
+      - name: Mint dependency review read token
+        id: dependency-review-token
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: read
+      - name: Review added and upgraded dependencies
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          repo-token: ${{ steps.dependency-review-token.outputs.token }}
+          config-file: ./.github/dependency-review-config.yml
   migration:
     name: Migration Guard
     runs-on: ubuntu-latest
@@ -334,15 +616,28 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-prime
+      - *quota-runtime
       - *proof-reuse
       - &reused-checkout
         if: steps.reuse.outputs.reuse != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           filter: blob:none
           persist-credentials: false
+      - &base-history
+        name: Fetch head and base history only
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
       - *reused-setup
       - name: Validate changed migration surfaces
         if: steps.reuse.outputs.reuse != 'true'
@@ -362,6 +657,13 @@ jobs:
           ./scripts/check-migrations.sh
           ./scripts/validate-migrations.sh
           pnpm exec tsx scripts/online-index-migrate.ts --validate-only
+      - name: Lint added or changed migration SQL
+        if: steps.reuse.outputs.reuse != 'true'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          node scripts/db/lint-changed-migrations.mjs --base "$base_sha"
   coverage:
     name: Exact-head Coverage
     runs-on: ubuntu-latest
@@ -370,8 +672,12 @@ jobs:
       actions: read
       contents: read
     steps:
+      - *quota-client
+      - *quota-prime
+      - *quota-runtime
       - *proof-reuse
       - *reused-checkout
+      - *base-history
       - *reused-setup
       - name: Run changed-behavior coverage ratchet
         if: steps.reuse.outputs.reuse != 'true'
@@ -472,7 +778,7 @@ jobs:
   # differed from the PR head for 92 of 103 sampled merges.
   unit:
     name: Affected Unit Tests (${{ matrix.shard }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       actions: read
@@ -483,8 +789,12 @@ jobs:
       matrix:
         shard: ['1/4', '2/4', '3/4', '4/4']
     steps:
+      - *quota-client
+      - *quota-prime
+      - *quota-runtime
       - *proof-reuse
       - *reused-checkout
+      - *base-history
       - name: Select unit-affecting diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
@@ -548,13 +858,132 @@ jobs:
       - name: Run Ovie route and private-boundary coverage
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ovie == 'true' && matrix.shard == '2/4'
         run: pnpm --filter @jovie/ovie test
+  a11y:
+    name: A11y (UI paths)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - *quota-client
+      - *quota-prime
+      - *quota-runtime
+      - *proof-reuse
+      - *reused-checkout
+      - *base-history
+      - name: Select UI accessibility diff
+        id: scope
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          if git diff --quiet "$base_sha" HEAD -- \
+            apps/web/app \
+            apps/web/components \
+            apps/web/styles \
+            apps/web/.storybook \
+            apps/web/lib/a11y-gates \
+            apps/web/tests/a11y \
+            apps/web/tests/e2e \
+            apps/web/tests/product-screenshots \
+            apps/web/tests/visual-qa \
+            apps/web/playwright.a11y-gate.config.ts \
+            apps/web/scripts/lint-touch-target.ts \
+            apps/web/scripts/a11y-wcag-standard-check.cjs \
+            packages/ui \
+            scripts/component-rendered-evaluator.mjs \
+            .github/workflows/source-validation.yml \
+            docs/ACCESSIBILITY.md; then
+            echo 'No UI paths changed; non-applicable receipt recorded.'
+            echo 'ui=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ui=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Setup Node.js and pnpm
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Setup Playwright (Chromium)
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        uses: ./.github/actions/setup-playwright
+      - name: Run rendered WCAG 2.2 AA gate
+        if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.ui == 'true'
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter @jovie/web exec playwright test --config=playwright.a11y-gate.config.ts
   ready:
     name: PR Ready
     if: ${{ always() }}
-    needs: [deterministic, security, migration, coverage, unit]
+    needs: [deterministic, security, migration, coverage, unit, a11y]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Require every source proof
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
-        run: test "$RESULTS" = 'success,success,success,success,success'
+        run: test "$RESULTS" = 'success,success,success,success,success,success'
+      # Fleet-rule evidence is read by .github/workflows/fleet-rules-evidence.yml
+      # (pull_request_target: base-branch code only, so no PR branch can reach
+      # the CI App key) on the dedicated CI App installation budget. This step
+      # trusts that workflow's RUNS, never a commit status: any branch can post
+      # a status named anything, but only main's copy of the workflow can
+      # produce a pull_request_target run of fleet-rules-evidence.yml. The
+      # newest run for this head must have completed after this PR event
+      # (stale pre-edit verdicts read as missing). Missing, in-flight or
+      # deferred evidence exits 75 with github-quota-deferred; the evidence
+      # workflow re-runs this job when it finishes, so nothing polls.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            packages/api-client
+            .github/workflows/fleet-rules-evidence.yml
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+          sparse-checkout-cone-mode: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ (always() && github.event_name == 'pull_request') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        with:
+          node-version-file: .nvmrc
+      - name: Require fleet-rule evidence
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.base.ref == 'main' }}
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPO_ID: ${{ github.event.pull_request.head.repo.id }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          EVENT_UPDATED_AT: ${{ github.event.pull_request.updated_at }}
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo '::error::Fleet rule evidence needs an exact head sha'; exit 1; }
+          # Bootstrap: pull_request_target runs the evidence workflow from main, so
+          # until it exists on main no PR can have a run. main's checkout (above)
+          # decides this, never the PR's tree. Once the file lands this branch is dead.
+          if [ ! -f .github/workflows/fleet-rules-evidence.yml ]; then
+            echo '::notice::fleet-rules-evidence.yml is not on main yet; PR Fleet Rules still enforces this PR. Bootstrap window closes when it lands.'
+            exit 0
+          fi
+          floor="$(date -u -d "$EVENT_UPDATED_AT" +%s)"
+          runs="$(node packages/api-client/cli.ts gh --priority default -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&per_page=20")" || runs='{"workflow_runs":[]}'
+          row="$(jq -r --argjson floor "$floor" --arg title "fleet-rules #$PR_NUMBER base=main" --arg ref "$HEAD_REF" --argjson repo "$HEAD_REPO_ID" '[.workflow_runs[] | select(.path == ".github/workflows/fleet-rules-evidence.yml" and .display_title == $title and .head_branch == $ref and .head_repository.id == $repo and (.created_at | fromdateiso8601) >= ($floor - 10) and .conclusion != "cancelled")] | sort_by([.created_at, .id]) | last // {status: "missing"} | "\(.status)\t\(.conclusion // "")\t\(.html_url // "")"' <<<"$runs" 2>/dev/null || echo 'missing')"
+          IFS=$'\t' read -r status conclusion url <<<"$row"
+          case "$status/$conclusion" in
+            completed/success) echo "Fleet rules passed: $url" ;;
+            completed/failure) echo "::error::Fleet rules did not pass or were deferred (read the Fleet Rules Evidence run: $url)"; exit 1 ;;
+            *) echo "::error::Fleet rule evidence is ${status:-missing} (github-quota-deferred or not yet complete); not a verdict on this PR. It re-runs automatically when the evidence run finishes."; exit 75 ;;
+          esac

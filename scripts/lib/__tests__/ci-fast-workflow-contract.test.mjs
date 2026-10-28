@@ -35,6 +35,7 @@ import {
   NODE_RUNTIME_CONTRACT_COMMAND,
   NODE_RUNTIME_CONTRACT_PATHS,
   OFFLINE_FAILURE_COVERAGE_COMMAND,
+  PEN_TOKEN_PARITY_COMMAND,
   runBiome,
   runCopyGate,
   runEslintServerBoundaries,
@@ -53,6 +54,7 @@ import {
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
+import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
@@ -112,6 +114,68 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('selects both critical and interaction files for non-main manual units', () => {
+    const unitJob = jobBlock('ci-unit-tests', 'ci-exact-head-coverage-shard');
+    const command = unitJob
+      .split('\n')
+      .find(
+        line =>
+          line.includes('pnpm turbo test:fast --affected --') &&
+          line.includes('--passWithNoTests')
+      );
+    const selectors = command?.match(
+      /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
+    )?.[1];
+    expect(selectors, 'manual unit filename selectors').toBeTruthy();
+    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${selectors}`], {
+      encoding: 'utf8',
+      timeout: 1000,
+    });
+    expect(parsed.status, parsed.stderr).toBe(0);
+    const [, ...runnerArgs] = buildWebVitestFastArgs(
+      parsed.stdout.split('\0').filter(Boolean)
+    );
+    const webRoot = resolve(REPO_ROOT, 'apps/web');
+    const outputDir = mkdtempSync(join(tmpdir(), 'manual-unit-selection-'));
+    try {
+      const report = join(outputDir, 'files.json');
+      // --filesOnly uses the real config/project selection without importing
+      // or executing test bodies. One unsharded list checks the intended union.
+      const selected = spawnSync(
+        process.execPath,
+        [
+          resolve(webRoot, 'node_modules/vitest/vitest.mjs'),
+          'list',
+          ...runnerArgs,
+          '--filesOnly',
+          `--json=${report}`,
+        ],
+        {
+          cwd: webRoot,
+          encoding: 'utf8',
+          env: { ...process.env, CI: 'true' },
+          timeout: 20_000,
+        }
+      );
+      expect(selected.error).toBeUndefined();
+      expect(selected.status, selected.stdout + selected.stderr).toBe(0);
+      const files = JSON.parse(readFileSync(report, 'utf8')).map(
+        entry => entry.file
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/lib/auth/gate.critical.test.ts')
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/chat/ChatInput.interaction.test.tsx')
+      );
+      expect(files).not.toContain(
+        resolve(webRoot, 'tests/unit/utils/capitalizeFirst.test.ts')
+      );
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
   it('discovers assurance behavior tests and executes them once with structural coverage', async () => {
     const test = 'scripts/invariants/assurance-matrix.test.mjs';
     expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(test);
@@ -279,6 +343,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // select the identical files with complementary -k expressions so every
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/prod-errors/test_prod_errors.py',
       'scripts/tests/test_gh_retry.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',
@@ -352,8 +417,14 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(28);
+    expect(LANES_PYTEST_FILES).toHaveLength(32);
+    expect(whole).toContain('scripts/tests/test_factory_signals.py');
+    expect(whole).toContain('scripts/tests/test_factory_intake.py');
+    expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
+    expect(command).toContain(
+      'coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90'
+    );
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
@@ -362,6 +433,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
       combine
+    );
+    expect(command).toContain(
+      'python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90'
     );
   });
 
@@ -402,6 +476,69 @@ describe('ci-fast bounded parallel workflow', () => {
         rmSync(root, { recursive: true, force: true });
       }
     }
+  });
+
+  describe('lanes pytest retry-once', () => {
+    // Timing-sensitive lanes tests ejected unrelated product PRs from merge
+    // groups (test_update_installs_tested_release_and_only_moves_the_symlink,
+    // 7 distinct PRs). A deterministic failure must still fail the shard.
+    const run = ({ failedLines, retryRc }) => {
+      const root = mkdtempSync(join(tmpdir(), 'lanes-retry-'));
+      try {
+        const bin = join(root, 'bin');
+        mkdirSync(bin);
+        const failures = failedLines
+          .map(line => `echo "FAILED ${line} - boom"`)
+          .join('\n');
+        writeFileSync(
+          join(bin, 'python3'),
+          `#!/bin/sh\necho "$COVERAGE_FILE $*" >> "${root}/calls.log"\ncase "$*" in *"coverage run -a --branch"*) exit ${retryRc} ;; esac\ncase "$COVERAGE_FILE" in *jovie-lanes-a.coverage) ${failures || ':'}; [ -n "${failedLines.length}" ] && [ "${failedLines.length}" != 0 ] && exit 1 ;; esac\nexit 0\n`,
+          { mode: 0o755 }
+        );
+        const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
+        const result = spawnSync('sh', ['-c', command], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            RUNNER_TEMP: root,
+          },
+        });
+        return { result, calls: readFileSync(join(root, 'calls.log'), 'utf8') };
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    };
+    it('passes the shard when its one failed node passes on retry, and says so', () => {
+      const { result, calls } = run({
+        failedLines: ['scripts/tests/test_x.py::T::flaky'],
+        retryRc: 0,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(
+        '::warning title=lanes pytest retry::shard a retried 1 failed node(s) once: scripts/tests/test_x.py::T::flaky'
+      );
+      expect(calls).toContain(
+        'coverage run -a --branch -m pytest scripts/tests/test_x.py::T::flaky'
+      );
+      expect(calls).toContain('-m coverage combine');
+    });
+    it('still fails when the retry fails too (deterministic regression)', () => {
+      const { result, calls } = run({
+        failedLines: ['scripts/tests/test_x.py::T::real'],
+        retryRc: 4,
+      });
+      expect(result.status).toBe(4);
+      expect(calls).not.toContain('-m coverage report');
+    });
+    it('never retries a wide failure', () => {
+      const { result, calls } = run({
+        failedLines: [1, 2, 3, 4].map(n => `scripts/tests/test_x.py::T::t${n}`),
+        retryRc: 0,
+      });
+      expect(result.status).toBe(1);
+      expect(calls).not.toContain('coverage run -a');
+    });
   });
 
   it('runs the scanner-heavy invariant suites outside the V8-coverage node --test batch', () => {
@@ -458,7 +595,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/desktop-release-guard.test.mjs',
       'scripts/desktop-release-publisher.test.mjs',
       'apps/desktop/electron-builder.yml',
-      'apps/desktop/electron-builder.staging.yml',
       'apps/desktop/scripts/notarize-release-dmg.cjs',
     ]) {
       expect(
@@ -1061,6 +1197,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'ios-fast',
       'merge-group-guards',
       'node-runtime-contracts',
+      'pen-token-parity',
       'profile-admission',
       'scripts-typecheck',
       'shadcn-lint-contracts',
@@ -1501,6 +1638,36 @@ describe('ci-fast bounded parallel workflow', () => {
     ].map(marker => warm.indexOf(marker));
     expect(order.every((at, i) => at > (order[i - 1] ?? 0))).toBe(true);
 
+    // Source Validation typechecks the same three web programs but previously
+    // started cold. It may only restore the main-scoped buildinfo (same
+    // fallbacks as tsc-cache-warm). It must not save: PR caches are invisible
+    // to merge_group and fill the Actions cache cap.
+    const sourceValidation = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/source-validation.yml'),
+      'utf8'
+    );
+    const svRestoreStart = sourceValidation.indexOf(
+      '- name: Restore web tsc incremental state'
+    );
+    const svContract = sourceValidation.indexOf(
+      '- name: Run deterministic source contract'
+    );
+    expect(svRestoreStart).toBeGreaterThan(-1);
+    expect(svRestoreStart).toBeLessThan(svContract);
+    const svRestore = sourceValidation.slice(svRestoreStart, svContract);
+    expect(svRestore).toContain(`uses: actions/cache/restore@${cacheSha}`);
+    expect(svRestore).toContain('path: apps/web/.cache/tsbuildinfo*\n');
+    expect(svRestore).toContain('id: web-tsbuildinfo');
+    expect(svRestore).not.toContain('actions/cache/save');
+    const [svKey, ...svFallbacks] = keys(svRestore).map(line => line.trim());
+    expect(svFallbacks).toEqual(warmFallbacks);
+    expect(
+      svKey.replace(/h\$\{\{ steps\.tsc-cache-hour\.outputs\.hour }}$/, '')
+    ).toBe(ciKey.replace('${{ github.sha }}', ''));
+    expect(
+      sourceValidation.match(/uses: actions\/cache\/save@/g) ?? []
+    ).toHaveLength(0);
+
     // The gate itself is unchanged: turbo never replays a cached verdict.
     expect(CI_FAST_SOURCE).toContain('pnpm turbo typecheck --affected --force');
   });
@@ -1595,6 +1762,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet',
       'design-exception-registry',
       'design-governance-enforcement',
+      'pen-token-parity',
       'design-conformance',
       'ios-fast',
       'profile-admission',
@@ -1643,6 +1811,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'copy-gate': COPY_GATE_COMMAND,
       'source-guards': SOURCE_GUARDS_COMMAND,
       'node-runtime-contracts': NODE_RUNTIME_CONTRACT_COMMAND,
+      'pen-token-parity': PEN_TOKEN_PARITY_COMMAND,
       structural:
         'pnpm invariants:check && pnpm ci:harness:check && pnpm ci:control:test && pnpm ci:merge-queue:check && pnpm next:proxy-guard && pnpm tailwind:check && pnpm --filter=@jovie/web run lint:no-native-dialogs && pnpm --filter=@jovie/web run lint:seo && pnpm --filter=@jovie/web run lint:contrast-ratchet && pnpm design:shared-ui-visual-arbitrary:check && pnpm component-ship-gate && pnpm screen-registration-gate && pnpm doc:freshness:check && pnpm test:reliability-detectors' +
         ' && ' +
@@ -1863,7 +2032,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/tests/',
       'apps/web/styles/',
       'packages/ui/',
-      'chromatic\\.config\\.json$',
       'package\\.json$',
       'DESIGN\\.md$',
       'design\\.tokens\\.json$',
@@ -2730,7 +2898,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'apps/web/.storybook/main.ts',
       'apps/web/.storybook/preview.tsx',
       'apps/web/.storybook/stories/elevation-matrix.stories.tsx',
-      'chromatic.config.json',
     ]) {
       expect(selectsStructural.test(storybookHarnessPath)).toBe(true);
     }
@@ -2772,7 +2939,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(selectsStructural.test('.claude/rules/auth.md')).toBe(false);
   });
 
-  it('runs hosted structural CI for Storybook, Chromatic, and token-guard inputs', () => {
+  it('runs hosted structural CI for Storybook and token-guard inputs', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
       'ci-profile-admission-browser'
@@ -2804,7 +2971,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(
       uiRe.test('apps/web/.storybook/stories/elevation-matrix.stories.tsx')
     ).toBe(true);
-    expect(uiRe.test('chromatic.config.json')).toBe(true);
+    expect(uiRe.test('chromatic.config.json')).toBe(false);
     expect(uiRe.test('scripts/shared-ui-visual-arbitrary-audit.mjs')).toBe(
       true
     );

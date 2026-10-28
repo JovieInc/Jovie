@@ -13,11 +13,12 @@ ownership/cleanup lifecycle. It opts into these four stories only; they are
 outside the normal catalog. There is no alternate Vitest config or injected
 preview-annotation override. No hosted CI job or policy is added.
 
-The expected **raw** Vitest result is **3 passes / 1 failure**, exit 1: healthy
-buttons pass with real addon reports, the default empty button reports the
-existing `button-name` warning, and the explicit-error empty button fails that
-rule. Only the fixture declares `a11y.test: 'error'`. Global modes, WCAG tags,
-rules, manual-axe and live-cert behavior stay unchanged.
+The expected **raw** Vitest result is **2 passes / 2 failures**, exit 1: healthy
+buttons pass with real addon reports, and both empty buttons fail `button-name`
+because preview `a11y.test` is `'error'`. A warning-only result is a regression.
+This fixture is not full-catalog certification. Global tags include `wcag22aa`
+and enable `target-size`; these controls are 48px so the diagnostic stays on
+`button-name`.
 
 The diagnostic exits zero only when those actual reports and the expected
 failing assertion are present. All-green with missing hooks, missing controls,

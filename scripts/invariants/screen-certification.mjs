@@ -51,6 +51,12 @@ export const SCREEN_MARKETING_ROUTES = Object.freeze({
   'web.marketing-download': '/download',
   'web.marketing-pay': '/pay',
   'web.marketing-product': '/product',
+  'web.marketing-command-palette': '/product/command-palette',
+  'web.marketing-release-scheduling': '/product/release-scheduling',
+  'web.marketing-dsp-links': '/product/dsp-links',
+  'web.marketing-isrc': '/product/isrc',
+  'web.marketing-pre-save': '/product/pre-save',
+  'web.marketing-link-analytics': '/product/link-analytics',
   'web.marketing-card': '/card',
   'web.marketing-smart-links': '/smart-links',
   'web.marketing-launch': '/launch',
@@ -236,14 +242,21 @@ web.blog|web|blog|apps/web/app/(marketing)/blog/|desktop,mobile
 web.marketing-ai|web|marketing-ai|apps/web/app/(marketing)/ai/page.tsx|desktop,mobile
 web.marketing-alternatives|web|marketing-alternatives|apps/web/app/(marketing)/alternatives/|desktop,mobile
 web.marketing-card|web|marketing-card|apps/web/app/(marketing)/card/page.tsx|desktop,mobile
-web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx|desktop,mobile
+web.marketing-compare|web|marketing-compare|apps/web/app/(marketing)/compare/page.tsx,apps/web/app/(marketing)/compare/[slug]/page.tsx|desktop,mobile
 web.marketing-download|web|marketing-download|apps/web/app/(marketing)/download/page.tsx|desktop,mobile
 web.investor-portal|web|investor-portal|apps/web/app/investor-portal/|desktop,mobile
 web.marketing-launch|web|marketing-launch|apps/web/app/(marketing)/launch/page.tsx|desktop,mobile
 web.marketing-product|web|marketing-product|apps/web/app/(marketing)/product/page.tsx|desktop,mobile
+web.marketing-command-palette|web|marketing-command-palette|apps/web/app/(marketing)/product/command-palette/page.tsx|desktop,mobile
+web.marketing-release-scheduling|web|marketing-release-scheduling|apps/web/app/(marketing)/product/release-scheduling/page.tsx|desktop,mobile
+web.marketing-dsp-links|web|marketing-dsp-links|apps/web/app/(marketing)/product/dsp-links/page.tsx|desktop,mobile
+web.marketing-product-utm-links|web|marketing-product-utm-links|apps/web/app/(marketing)/product/utm-links/page.tsx|desktop,mobile
+web.marketing-isrc|web|marketing-isrc|apps/web/app/(marketing)/product/isrc/page.tsx|desktop,mobile
+web.marketing-pre-save|web|marketing-pre-save|apps/web/app/(marketing)/product/pre-save/page.tsx|desktop,mobile
+web.marketing-link-analytics|web|marketing-link-analytics|apps/web/app/(marketing)/product/link-analytics/page.tsx|desktop,mobile
 web.marketing-smart-links|web|marketing-smart-links|apps/web/app/(marketing)/smart-links/page.tsx|desktop,mobile
 web.marketing-pay|web|marketing-pay|apps/web/app/(marketing)/pay/page.tsx|desktop,mobile
-web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx|desktop,mobile
+web.marketing-pricing|web|marketing-pricing|apps/web/app/(marketing)/pricing/page.tsx,apps/web/app/(marketing)/pricing/layout.tsx,apps/web/app/(marketing)/pricing/loading.tsx|desktop,mobile
 web.marketing-new|web|marketing-new|apps/web/app/(marketing)/new/page.tsx|desktop,mobile
 web.marketing-not-found|web|marketing-not-found|apps/web/app/(marketing)/not-found.tsx|desktop,mobile
 web.root-not-found|web|root-not-found|apps/web/app/not-found.tsx|desktop,mobile
@@ -270,6 +283,7 @@ web.playlists-index|web|public-playlists|apps/web/app/(dynamic)/playlists/page.t
 web.brand|web|marketing-brand|apps/web/app/brand/page.tsx,apps/web/app/brand/layout.tsx|desktop,mobile
 web.marketing-renders|web|marketing-renders|apps/web/app/(marketing)/renders/|desktop,mobile
 web.profile-admission|web|profile-admission|apps/web/app/(profile-admission)/renders/profile-admission/page.tsx|desktop,mobile
+web.app-loading|web|app-shell|apps/web/app/app/loading.tsx|desktop,mobile
 web.app-not-found|web|app-shell-not-found|apps/web/app/app/not-found.tsx|desktop,mobile
 web.app-shell|web|app-shell|apps/web/app/app/(shell)/layout.tsx|desktop,mobile
 web.money|web|screen.money|apps/web/app/app/money/page.tsx,apps/web/app/app/money/layout.tsx|desktop,mobile
@@ -281,7 +295,8 @@ web.auth|web|browser-input-assurance|apps/web/app/(auth)/,apps/web/app/@auth/,ap
 web.artist-pay|web|artist-pay|apps/web/app/[username]/pay/page.tsx|desktop,mobile
 web.profile-mode-render|web|profile-mode-render|apps/web/app/[username]/profile-mode-render/|desktop,mobile
 web.release-landing|web|release-landing|apps/web/app/r/[slug]/page.tsx,apps/web/app/r/[slug]/ReleaseLandingPage.tsx|desktop,mobile
-web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx|desktop,mobile
+web.smartlink-release|web|release-landing|apps/web/app/[username]/[...slug]/page.tsx,apps/web/app/[username]/[slug]/page.tsx,apps/web/app/[username]/[slug]/not-found.tsx|desktop,mobile
+web.smartlink-sounds|web|release-landing|apps/web/app/[username]/[slug]/sounds/page.tsx|desktop,mobile
 web.smartlink-track|web|release-landing|apps/web/app/[username]/[slug]/[trackSlug]/page.tsx|desktop,mobile
 web.out-link|web|wrapped-link-interstitial|apps/web/app/out/[id]/page.tsx|desktop,mobile
 web.report|web|abuse-report-intake|apps/web/app/report/page.tsx|desktop,mobile
@@ -310,6 +325,7 @@ web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat
 web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
 web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
+web.admin-capacity|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/capacity/page.tsx|desktop,mobile
 web.admin-features|web|admin-features|apps/web/app/app/(shell)/admin/features/page.tsx|desktop,mobile
 web.admin-feature-registry|web|admin-feature-registry|apps/web/app/app/(shell)/admin/feature-registry/page.tsx|desktop,mobile
 web.admin-platform-connections|web|admin-platform-connections|apps/web/app/app/(shell)/admin/platform-connections/|desktop,mobile
@@ -328,15 +344,18 @@ web.hud-tv|web|ovie-ops-isolated|apps/web/app/hud-tv/page.tsx|desktop,mobile
 web.hud-wiki|web|admin-wiki|apps/web/app/hud/wiki/|desktop,mobile
 web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(shell)/youtube/page.tsx|desktop,mobile
 web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
-web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx,apps/web/app/(dynamic)/start/loading.tsx|desktop,mobile
+web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
 web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
+web.settings-data-privacy|web|screen.settings.data-privacy|apps/web/app/app/(shell)/settings/data-privacy/page.tsx|desktop,mobile
 web.settings-connectors|web|settings-connectors|apps/web/app/app/(shell)/settings/connectors/|desktop,mobile
 web.settings|web|screen.settings|apps/web/app/app/(shell)/settings/layout.tsx|desktop,mobile
 web.onboarding-checkout|web|onboarding-checkout|apps/web/app/onboarding/checkout/page.tsx,apps/web/app/onboarding/checkout/loading.tsx|desktop,mobile
 web.billing-success|web|billing-success|apps/web/app/billing/success/page.tsx|desktop,mobile
+web.billing-youtube-thumbnails|web|billing-youtube-thumbnails|apps/web/app/billing/youtube-thumbnails/page.tsx|desktop,mobile
+web.billing-youtube-thumbnails-success|web|billing-youtube-thumbnails-success|apps/web/app/billing/youtube-thumbnails/success/page.tsx|desktop,mobile
 web.billing-shell|web|billing-shell|apps/web/app/billing/layout.tsx|desktop,mobile
 web.claim|web|artist-claim-checkout|apps/web/app/claim/page.tsx,apps/web/app/claim/ClaimArtistSearch.tsx|desktop,mobile
 web.account-shell|web|account-shell|apps/web/app/account/layout.tsx|desktop,mobile

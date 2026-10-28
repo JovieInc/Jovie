@@ -37,14 +37,22 @@ name: Merge Queue Green Enroll
 # manual dispatch scan the complete roster.
 
 on:
+  # Fork PR Gate is not subscribed: Source Validation completed last on 84 of 85
+  # PR heads measured 2026-10-25, and a straggler is re-armed by the main-push
+  # sweep (guard: scripts/lib/__tests__/wake-fanout-contract.test.mjs).
   workflow_run:
-    workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
+    workflows: ['Source Validation', 'CI', 'PR Size Guard']
     types: [completed]
   # ready_for_review: leaving draft emits no check completion (JOV-INV-029:
   # an unchanged head never earns a second CI flight), so this is the wake
   # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]
+    # `synchronize` is deliberately absent (JOV-INV-029 coalescing): a new head
+    # has no green verdict yet, so the push cannot change the enroll decision.
+    # Its Source Validation completion (PR Ready) is the wake that can. Over 24h
+    # synchronize was the bulk of ~560 pull_request_target runs, nearly all
+    # no-ops. Head-change hold release rides the next label event or landing on main.
+    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
@@ -110,13 +118,20 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -134,8 +149,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-actions: read
           permission-contents: write
           permission-pull-requests: write
@@ -202,7 +217,9 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
+            scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
@@ -214,8 +231,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
           permission-statuses: write
@@ -453,7 +470,7 @@ jobs:
             // Every decision on an open, ready, unqueued PR leaves a receipt (pr, head, reason) in the
             // job summary and one machine line, so a non-enroll is never silent (event-driven dwell).
             const receipts = [];
-            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason });
+            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason, at: new Date().toISOString() });
             for (const [index, candidate] of prs.entries()) {
               if (overBudget()) {
                 core.warning(`sweep budget spent after ${index}/${prs.length} PRs; the rest wait for their own events or the next sweep`);
@@ -543,8 +560,16 @@ jobs:
               }
               if (!eligible(pr)) {
                 if (pr && pr.state === 'OPEN' && !pr.isDraft && !pr.isInMergeQueue) {
-                  core.info(`skip #${candidate.number}: mergeStateStatus=${pr.mergeStateStatus}`);
-                  receipt(pr, 'skip', `mergeStateStatus=${pr.mergeStateStatus}`);
+                  // Name the real cause: a blocking label or a moved head is not a merge
+                  // state, and a CLEAN reason beside a skip hid the stale lane-fix-red.
+                  const blockers = pr.labels.nodes.filter(l => BLOCKING.has(l.name.toLowerCase())).map(l => l.name);
+                  const why = pr.headRefOid !== candidate.head.sha ? `head-moved:${String(candidate.head.sha).slice(0, 12)}`
+                    : pr.isCrossRepository ? 'cross-repository'
+                    : blockers.length > 0 ? `blocking-label:${blockers.join(',')}`
+                    : pr.labels.pageInfo.hasNextPage ? 'labels-truncated'
+                    : `merge-state-not-admissible:${pr.mergeStateStatus}`;
+                  core.info(`skip #${candidate.number}: ${why}`);
+                  receipt(pr, 'skip', why);
                 }
                 continue;
               }
@@ -826,8 +851,13 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -837,8 +867,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
 
@@ -855,10 +885,11 @@ jobs:
           })));
           NODE
 
-  # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): every stop label
-  # (hold, gated, incident, do-not-merge, tim-hold variants) needs a receipt
-  # comment naming an owner plus an expiry or a head-change release.
-  # Ownerless holds past their grace period and expired or released receipts
+  # Human-owned tim-hold variants and do-not-merge require authorized
+  # disposition; this sweep never expires them or their coexisting stops.
+  # Other stop labels use the hold contract (scripts/hold-contract.mjs,
+  # jovie-hold/v1): a receipt names an owner and an expiry or head-change release.
+  # Ownerless machine holds past their grace period and expired receipts
   # are removed with one comment. The Jovie Bot unlabel event then wakes the
   # enroll job above; required checks still gate admission. Expiry is checked
   # on the next event after it lapses: a landing on main, a merge-group CI
@@ -884,8 +915,13 @@ jobs:
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -925,8 +961,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
 
@@ -968,6 +1004,18 @@ jobs:
                 { id: pr.id }
               );
               core.notice(`DEQUEUED #${number}: labeled ${context.payload.label.name} while queued`);
+              // The queue timeline records only "manual" for this removal, so say why on the PR
+              // (24h to 2026-10-26: 14 bot dequeues with no recorded reason). The marker is
+              // machine-readable; scripts/queue-dequeue.mjs writes the same shape for agents.
+              const record = { code: 'hold', by: 'merge-queue-green-enroll/dequeue-held', label: context.payload.label.name, labeledBy: context.payload.sender?.login ?? null };
+              try {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: number,
+                  body: `Dequeued from the merge queue (hold): \`${context.payload.label.name}\` was added by @${context.payload.sender?.login ?? 'unknown'} while it was queued. Remove the label to re-enroll once CLEAN.\n<!-- queue-dequeue ${JSON.stringify(record)} -->`,
+                });
+              } catch (commentError) {
+                core.warning(`could not record the dequeue reason on #${number}: ${commentError.message}`);
+              }
             } catch (error) {
               // A denied dequeue leaves today's behaviour: its merge group fails the gate.
               core.warning(`dequeue of held #${number} failed: ${error.message}`);
@@ -1005,8 +1053,13 @@ jobs:
             scripts/merge-group-victim-rearm.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -1016,8 +1069,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
           permission-actions: read
           # enqueuePullRequest needs the same contents grant as the enroll job.
           permission-contents: write

@@ -47,6 +47,30 @@ const OUTPUT_ACCENTS = {
 
 type WorkflowTone = 'audience' | 'default' | 'destination' | 'message';
 
+/**
+ * Visible marker for illustrative content (named people, sample activity).
+ * Any marketing element that shows invented activity must carry one; the
+ * marketing-example-labels guard test enforces it.
+ */
+const EXAMPLE_ACTIVITY_LABEL = 'Example activity, not real people';
+
+export function ExampleLabel({
+  className,
+  children = 'Example',
+}: Readonly<{ className?: string; children?: string }>) {
+  return (
+    <span
+      data-example-label='true'
+      className={cn(
+        'inline-block text-3xs font-medium text-tertiary-token',
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 export type ArtistNotificationFloatingCard =
   ArtistNotificationsLandingCopy['hero']['floatingCards'][number];
 
@@ -63,10 +87,11 @@ export function ArtistNotificationFloatingCardView({
     return (
       <div
         className={cn(
-          'rounded-[1.1rem] bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]',
+          'rounded-xl bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]',
           className
         )}
       >
+        <ExampleLabel className='mb-2 pl-3' />
         <div className='flex items-center gap-2 rounded-full bg-black/34 py-1 pl-3 pr-1'>
           <Mail
             className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -86,7 +111,7 @@ export function ArtistNotificationFloatingCardView({
   return (
     <article
       className={cn(
-        'rounded-[1.1rem] bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]',
+        'rounded-xl bg-white/[0.028] p-3.5 shadow-[0_18px_40px_rgba(0,0,0,0.26)]',
         className
       )}
     >
@@ -95,6 +120,7 @@ export function ArtistNotificationFloatingCardView({
           <Icon className='h-4 w-4' strokeWidth={1.9} />
         </span>
         <div className='min-w-0 flex-1'>
+          <ExampleLabel className='mb-1' />
           <p className='text-sm font-semibold leading-[1.35] tracking-tighter text-primary-token'>
             {card.title}
           </p>
@@ -197,6 +223,7 @@ export function ArtistProfileCaptureVisual({
       </div>
 
       <div className='mt-14 space-y-3'>
+        <ExampleLabel>{EXAMPLE_ACTIVITY_LABEL}</ExampleLabel>
         {capture.audienceRails.map((rail, railIndex) => (
           <AudienceRail
             key={rail.map(({ id }) => id).join('|')}
@@ -221,8 +248,8 @@ export function ArtistProfileReactivationVisual({
 }>) {
   return (
     <div className={cn('mx-auto max-w-[27rem]', className)}>
-      <div className='rounded-[1.5rem] bg-white/[0.02] p-2.5 shadow-[0_24px_64px_rgba(0,0,0,0.22)]'>
-        <div className='rounded-[1.25rem] bg-(--color-bg-base) px-4 py-4'>
+      <div className='rounded-3xl bg-white/[0.02] p-2.5 shadow-[0_24px_64px_rgba(0,0,0,0.22)]'>
+        <div className='rounded-2xl bg-(--color-bg-base) px-4 py-4'>
           <div className='flex items-start gap-3'>
             <span className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-black dark:bg-white dark:text-black'>
               <BellRing className='h-4 w-4' strokeWidth={1.9} />
@@ -248,7 +275,7 @@ export function ArtistProfileReactivationVisual({
           {reactivation.workflow.rows.map(row => (
             <article
               key={row.id}
-              className='rounded-[1.35rem] bg-white/[0.024] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
+              className='rounded-3xl bg-white/[0.024] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]'
             >
               <div className='flex flex-wrap items-center gap-2.5'>
                 <WorkflowBeat value={row.trigger} />
@@ -282,7 +309,7 @@ export function ArtistProfileReactivationVisual({
               return (
                 <article
                   key={output.id}
-                  className='rounded-[1.25rem] bg-white/[0.028] p-4'
+                  className='rounded-2xl bg-white/[0.028] p-4'
                 >
                   <div className='flex items-center justify-between gap-3'>
                     <Icon

@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import Link from 'next/link';
 import { beforeEach, expect, it } from 'vitest';
 import { SidebarProvider } from './context';
@@ -38,4 +39,26 @@ it('keeps compact icon navigation reachable without pinning the rail', () => {
   expect(rail).toHaveStyle({ width: '52px' });
   expect(rail).toHaveClass('transition-shell-rail-allocation');
   expect(rail).not.toHaveClass('transition-[width]');
+});
+
+it('roams navigation rows with the arrow keys inside the rail', async () => {
+  const user = userEvent.setup();
+  render(
+    <SidebarProvider defaultOpen>
+      <Sidebar collapsible='icon'>
+        <nav aria-label='Primary'>
+          <Link href='/app'>Home</Link>
+          <Link href='/app/library'>Library</Link>
+          <Link href='/app/audience'>Audience</Link>
+        </nav>
+      </Sidebar>
+    </SidebarProvider>
+  );
+  screen.getByRole('link', { name: 'Home' }).focus();
+  await user.keyboard('{ArrowDown}');
+  expect(screen.getByRole('link', { name: 'Library' })).toHaveFocus();
+  await user.keyboard('{End}');
+  expect(screen.getByRole('link', { name: 'Audience' })).toHaveFocus();
+  await user.keyboard('{ArrowUp}{Home}');
+  expect(screen.getByRole('link', { name: 'Home' })).toHaveFocus();
 });

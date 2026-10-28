@@ -27,11 +27,15 @@ name: Auto-Ready Agent Drafts
 
 # Wake only on the workflows that publish the required source contexts
 # (Source Validation: PR Ready + Migration Guard; Fork PR Gate; PR Size Guard).
+# Only Source Validation is subscribed: it completed last on 84 of 85 PR heads
+# measured 2026-10-25, so the other two were duplicate wakes. A head where PR
+# Size Guard finishes last waits for the next Source Validation completion or
+# the lanes' ready flip (guard: scripts/lib/__tests__/wake-fanout-contract.test.mjs).
 # CI runs only on merge_group/push and check_suite fired for every workflow on
 # every head, so both were pure duplicate wakes (~20% of runs, all no-ops).
 on:
   workflow_run:
-    workflows: ['Source Validation', 'Fork PR Gate', 'PR Size Guard']
+    workflows: ['Source Validation']
     types: [completed]
   workflow_dispatch:
     inputs:
@@ -76,8 +80,8 @@ jobs:
           # Use the installation identity for the paired PR mutations.
           # Installation permissions stay unbounded here so commit and
           # Rolling CI Dispatch run provenance can be read.
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
 
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -139,8 +143,8 @@ jobs:
         id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
-          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
 
       - name: Checkout main policy code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

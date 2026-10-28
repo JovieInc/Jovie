@@ -117,6 +117,30 @@ describe('correction pyramid guards', () => {
     ).toBe(liveGrandfather);
   });
 
+  it('bans fan, white-label, remove-branding, revolutionary and all-in-one', () => {
+    const planted = findBannedPhrases(
+      [
+        "const a = 'Reach every fan';",
+        "const b = 'A white-label, all-in-one tool';",
+        "const c = 'Remove branding with Pro';",
+        "const d = 'A revolutionary link';",
+        "const id = 'capture-the-fan';",
+        '// fan in a comment',
+      ].join('\n'),
+      'apps/web/data/sample.ts'
+    );
+    expect(planted.map(hit => hit.rule).sort()).toEqual([
+      'all-in-one',
+      'banned-fan',
+      'remove-branding',
+      'revolutionary',
+      'white-label',
+    ]);
+    expect(
+      findBannedPhrases('Fans buy tickets', 'apps/web/content/blog/post.md')
+    ).toEqual([]);
+  });
+
   it('keeps raw marketing JSX copy on the warn baseline', () => {
     const source = [
       '<h1>{copy.headline}</h1>',
@@ -134,7 +158,8 @@ describe('correction pyramid guards', () => {
 
   it('locks the homepage H1 to the homepage copy module', () => {
     expect(HOMEPAGE_COPY.hero.headline).toBe(LOCKED_HOMEPAGE_H1);
-    expect(LOCKED_HOMEPAGE_H1).toBe('One profile. For every fan.');
+    expect(LOCKED_HOMEPAGE_H1).toBe('Be found. Be understood.');
+    expect(HOMEPAGE_COPY.seo.title).toBe('Jovie | Be found. Be understood.');
     const hero = readFileSync(
       path.join(webRoot, 'components/homepage/HomepageArtistProfile.tsx'),
       'utf8'

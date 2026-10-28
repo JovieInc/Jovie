@@ -22,6 +22,20 @@ import { fileURLToPath } from 'node:url';
 import { createApiClient } from '../../packages/api-client/client.ts';
 import { providerSpec } from '../../packages/api-client/contract.ts';
 import { hashCredential } from '../../packages/api-client/store.ts';
+import {
+  resolveCaptureColorScheme,
+  resolveCaptureViewport,
+  withCaptureBrowser,
+} from './clef-screenshot-capture.mjs';
+
+export {
+  CAPTURE_COLOR_SCHEME_DEFAULT,
+  CAPTURE_VIEWPORTS,
+  captureSurfacePng,
+  resolveCaptureColorScheme,
+  resolveCaptureViewport,
+  withCaptureBrowser,
+} from './clef-screenshot-capture.mjs';
 
 export const SCREENSHOT_EVAL_SCHEMA = 'clef-screenshot-eval/v1';
 export const DEFAULT_ACCOUNT_ID = 'fd8a6fcfa0ff0b708dbae942af18c49b';
@@ -543,9 +557,10 @@ export async function runRevisionLoop({
 /**
  * Builds views with Playwright (already a root dependency): either from image
  * files (overview + full-resolution tiles) or by capturing a URL full-page at
- * desktop (1440x900) and mobile (390x844, 2x DPR).
+ * desktop (1440x900) and mobile (390x844, 2x DPR). Dark unless `colorScheme`
+ * is `light`. Viewport and browser setup live in clef-screenshot-capture.mjs.
  *
- * @param {{files?: string[], url?: string, viewports?: string[], click?: string, wait?: number}} [options]
+ * @param {{files?: string[], url?: string, viewports?: string[], click?: string, wait?: number, colorScheme?: string}} [options]
  */
 export async function captureViews({
   files = [],
@@ -553,28 +568,22 @@ export async function captureViews({
   viewports = ['desktop', 'mobile'],
   click,
   wait = 1500,
+  colorScheme,
 } = {}) {
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch();
-  try {
+  return withCaptureBrowser(async browser => {
     /** @type {Array<{label: string, png: Buffer}>} */
     const sources = files.map(f => ({
       label: f.split('/').pop(),
       png: readFileSync(f),
     }));
     if (url) {
-      const sizes = {
-        desktop: [{ width: 1440, height: 900 }, 1, false],
-        mobile: [{ width: 390, height: 844 }, 2, true],
-      };
       for (const vp of viewports) {
-        const [viewport, deviceScaleFactor, isMobile] =
-          sizes[vp] ?? sizes.desktop;
+        const target = resolveCaptureViewport(vp);
         const page = await browser.newPage({
-          viewport,
-          deviceScaleFactor,
-          isMobile,
-          colorScheme: 'dark',
+          viewport: { width: target.width, height: target.height },
+          deviceScaleFactor: target.deviceScaleFactor,
+          isMobile: target.isMobile,
+          colorScheme: resolveCaptureColorScheme(colorScheme),
         });
         await page.goto(url, { waitUntil: 'networkidle', timeout: 60_000 });
         if (click) await page.click(click, { timeout: 5_000 }).catch(() => {});
@@ -590,9 +599,7 @@ export async function captureViews({
     for (const src of sources)
       views.push({ label: src.label, ...(await tileImage(browser, src.png)) });
     return views;
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 async function tileImage(browser, png) {

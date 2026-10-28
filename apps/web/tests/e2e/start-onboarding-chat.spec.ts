@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { Locator, Page } from '@playwright/test';
 import { expect, test } from './setup';
 import { waitForHydration } from './utils/smoke-test-utils';
@@ -9,8 +10,10 @@ type StreamChunk = Record<string, unknown>;
 const CHAT_PANEL = '[data-testid="onboarding-chat"]';
 const COMPOSER_SURFACE = '[data-testid="chat-composer-surface"]';
 const COMPOSER_TEXTAREA = '[aria-label="Chat message input" i]';
-const TEST_AVATAR_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAeElEQVR4nO3PQQ3AIADAQMD+/5w9QnJ4QKZsZu2cJwAAAAAAAAAAAAAAANxq7g7wG7iBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9iBuIEdiBvYgbiBHYgb2IG4gR2IG9gB9bYCfQMD+LwAAAAASUVORK5CYII=';
+const TEST_AVATAR_PNG_PATH = join(
+  __dirname,
+  '../../public/avatars/default-user.png'
+);
 const IGNORABLE_CONSOLE_ERRORS = [
   /favicon/i,
   /ResizeObserver loop/i,
@@ -215,7 +218,7 @@ async function mockOnboardingChat(
     await route.fulfill({
       status: 200,
       contentType: 'image/png',
-      body: Buffer.from(TEST_AVATAR_PNG_BASE64, 'base64'),
+      path: TEST_AVATAR_PNG_PATH,
     });
   });
   await page.route('**/_next/image?**', async route => {
@@ -224,7 +227,7 @@ async function mockOnboardingChat(
       await route.fulfill({
         status: 200,
         contentType: 'image/png',
-        body: Buffer.from(TEST_AVATAR_PNG_BASE64, 'base64'),
+        path: TEST_AVATAR_PNG_PATH,
       });
       return;
     }

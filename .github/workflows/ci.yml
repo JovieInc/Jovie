@@ -493,6 +493,9 @@ jobs:
       # Both checks are dependency-free (node: built-ins only) and read the
       # checked-out manifests/lockfile directly; the full dependency install only
       # added ~40s of setup before the actual check ran.
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: '.nvmrc'
@@ -521,7 +524,7 @@ jobs:
       )
     # Hosted-only root of the PR DAG. Self-hosted cancel/hang here cascades into
     # SKIPPED risk/ci-fast/unit leaves and a red PR Ready (JOV-3464 drain).
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       run_build: ${{ steps.detect.outputs.run_build || 'false' }}
@@ -547,6 +550,10 @@ jobs:
       run_neon: ${{ steps.detect.outputs.run_neon || 'false' }}
       run_ios: ${{ steps.detect.outputs.run_ios || 'false' }}
       run_macos: ${{ steps.detect.outputs.run_macos || 'false' }}
+      # 'false' only when the Mac lane is selected solely by node-only inputs
+      # (MAC_NODE_ONLY_RULES): the lane then runs on ubuntu. Absent from an older
+      # trusted classifier, so it defaults to the macOS lane.
+      run_macos_native: ${{ steps.detect.outputs.run_macos_native || 'true' }}
       # 'mac' when a self-hosted Mac runner heartbeat is fresh, else 'hosted'.
       # Hosted macOS is one small org-wide pool; LogYourBody's queue filled it
       # on 2026-10-10 and Jovie's Mac job waited the full 60-minute budget.
@@ -1612,7 +1619,7 @@ jobs:
         (needs.ci-path-changes.outputs.run_homepage_visual == 'true' ||
         needs.ci-path-changes.outputs.run_marketing_dom == 'true'))
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -1795,6 +1802,62 @@ jobs:
           NEXT_PUBLIC_CLERK_MOCK: '1'
           NEXT_PUBLIC_E2E_MODE: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
+      # The exact-route capture (console errors, axe quality checks, HTTP
+      # failures per registered marketing route) used to run only on main push
+      # in screenshots.yml, so a route that failed it merged untested and
+      # re-reddened main. Run the same spec, config and flags here, on the
+      # build above, for every PR and merge-group head that selects marketing
+      # inputs. No route or axe check is skipped; the spec is unchanged.
+      - name: Capture exact marketing routes (marketing-routes.spec.ts)
+        if: needs.ci-path-changes.outputs.run_marketing_dom == 'true'
+        run: |
+          set -euo pipefail
+          # Exact-head provenance (screenshots.yml, JOV-4731) refuses a dirty
+          # tree, and the build can dirty tracked files. Restore source
+          # cleanliness without touching ignored build output or test results.
+          git checkout -- .
+          git clean -fd -e apps/web/test-results
+          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+            echo "::error::Source tree is dirty after restore; exact-route capture requires a clean checkout."
+            git status --porcelain --untracked-files=all
+            exit 1
+          fi
+          cd apps/web
+          cleanup() {
+            kill "$SERVER_PID" 2>/dev/null || true
+            wait "$SERVER_PID" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          if [ ! -f .next/standalone/apps/web/server.js ]; then
+            echo "::error::Standalone server not found; exact marketing route capture cannot start."
+            exit 1
+          fi
+          export HOSTNAME=localhost
+          PORT=3230 node .next/standalone/apps/web/server.js > "$RUNNER_TEMP/marketing-routes-server.log" 2>&1 &
+          SERVER_PID=$!
+          for _attempt in $(seq 1 30); do
+            curl -sf http://localhost:3230 > /dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://localhost:3230 > /dev/null || { cat "$RUNNER_TEMP/marketing-routes-server.log"; exit 1; }
+          node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+            pnpm exec playwright test tests/product-screenshots/marketing-routes.spec.ts \
+              --config=playwright.config.screenshots.ts --project=screenshots \
+              --workers=4 --retries=0 --reporter=line
+        env:
+          BASE_URL: http://localhost:3230
+          CI: 'true'
+          SCREENSHOT_BUILD_MODE: pr-premerge
+          DATABASE_URL: postgresql://localhost/noop
+          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
+          NEXT_PUBLIC_APP_URL: http://localhost:3230
+          NEXT_PUBLIC_BETTER_AUTH_URL: http://localhost:3230
+          CLERK_SECRET_KEY: sk_test_mock
+          NEXT_DISABLE_TOOLBAR: '1'
+          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
+          NEXT_PUBLIC_CLERK_MOCK: '1'
+          NEXT_PUBLIC_E2E_MODE: '1'
+          E2E_USE_TEST_AUTH_BYPASS: '1'
       - name: Upload homepage visual failure evidence
         if: ${{ failure() && (needs.ci-path-changes.outputs.run_homepage_visual == 'true' || needs.ci-path-changes.outputs.run_marketing_dom == 'true') && hashFiles('apps/web/test-results/**') != '' }}
         uses: ./.github/actions/upload-safe-playwright-artifact
@@ -1928,7 +1991,7 @@ jobs:
     # JOV-5454: live Storybook certification needs Chromium plus bounded
     # build/serve budget inside the structural lane.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -1964,11 +2027,17 @@ jobs:
         # event.before, and guardrail merge-base with origin/<base>.
         # A full-depth checkout also fetched every branch and tag (~4k ref
         # lines of log noise before any work). --unshallow deepens HEAD fully.
-        # Guards in this job read historical blobs (git show <merge-base>:path,
-        # rename-detecting diffs), so the fetch stays full, not blobless. It
-        # runs in the background while dependencies install instead of
-        # serially before them; "Fetch base-branch history" below waits for
-        # it and fails closed before any history consumer runs.
+        # Commits and trees only (--filter=blob:none): the full-blob fetch was
+        # 2.0 GB / 259 s against real origin versus 186 MB / 11 s blobless, and
+        # on shared runners it stalled past the 540 s await deadline (runs
+        # 40743490765, 40739458941), ejecting the PR from the merge queue.
+        # Guards here still read historical blobs (git show <merge-base>:path);
+        # each such read lazily fetches just that blob, so the job token is
+        # exported through GIT_CONFIG_* (never written to .git/config) for the
+        # promisor remote. A stalled attempt is aborted and retried instead of
+        # hanging to the deadline. The fetch runs in the background while
+        # dependencies install; "Fetch base-branch history" below waits for it
+        # and fails closed before any history consumer runs.
         shell: bash
         env: &base-fetch-start-env
           GH_TOKEN: ${{ github.token }}
@@ -1979,10 +2048,20 @@ jobs:
           AUTH_HEADER="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
           mkdir -p "$BASE_FETCH_DIR"
           rm -f "$BASE_FETCH_DIR/status" "$BASE_FETCH_DIR/status.tmp"
+          {
+            echo "GIT_CONFIG_COUNT=1"
+            echo "GIT_CONFIG_KEY_0=http.https://github.com/.extraheader"
+            echo "GIT_CONFIG_VALUE_0=$AUTH_HEADER"
+          } >> "$GITHUB_ENV"
           (
             set +e
-            git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
-            echo "$?" > "$BASE_FETCH_DIR/status.tmp"
+            for attempt in 1 2 3; do
+              timeout 150 git -c maintenance.auto=false -c gc.auto=0 -c "http.https://github.com/.extraheader=$AUTH_HEADER" fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_BRANCH}:refs/remotes/origin/${BASE_BRANCH}"
+              fetch_rc=$?
+              [[ "$fetch_rc" == 0 ]] && break
+              echo "base-branch fetch attempt $attempt exited $fetch_rc"
+            done
+            echo "$fetch_rc" > "$BASE_FETCH_DIR/status.tmp"
             mv "$BASE_FETCH_DIR/status.tmp" "$BASE_FETCH_DIR/status"
           ) < /dev/null > "$BASE_FETCH_DIR/fetch.log" 2>&1 &
           echo "Base-branch history fetch started in the background (pid $!)."
@@ -2129,10 +2208,10 @@ jobs:
           # invariants' own scan roots; a node failure fails this step closed.
           STRUCTURAL_CONTROL_PATTERN+="|$(node scripts/invariants/scanned-paths.mjs --ere)"
 
-          # Component receipts are executable test evidence; Storybook/Chromatic
-          # config and the shared-UI token audit feed structural component proof.
-          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|chromatic\.config\.json$|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
-          STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder(\.staging)?\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
+          # Component receipts are executable test evidence; Storybook config and
+          # the shared-UI token audit feed structural component proof.
+          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
+          STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
           # A new scripts test must prove it is wired into a lane (inventory guard)
           # before the queue; #18714 was ejected for an unwired one.
           NEW_SCRIPT_TESTS=$(git diff --diff-filter=AR --name-only "origin/${{ github.base_ref }}" HEAD | grep -E '^scripts/.*\.test\.(mjs|ts)$' || true)
@@ -2375,7 +2454,7 @@ jobs:
     # runtime behavior. The aggregate makes this required on PR and merge-group
     # heads whenever the bounded profile surface selector matches.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -2679,7 +2758,7 @@ jobs:
     # CPU-bound structural sum) off remaining's pool. Chromium serves the
     # tests/unit/ci Playwright contracts; no Python/Elixir command runs here.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -3179,7 +3258,7 @@ jobs:
           needs.ci-path-changes.outputs.run_web == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -3474,7 +3553,7 @@ jobs:
           needs.ci-path-changes.outputs.run_web == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -3551,6 +3630,7 @@ jobs:
                 pnpm exec playwright test \
                   tests/e2e/storybook-agent-status.spec.ts \
                   tests/e2e/storybook-destructive-button.spec.ts \
+                  tests/e2e/storybook-download-visual.spec.ts \
                   tests/e2e/storybook-elevation.spec.ts \
                   tests/e2e/storybook-input.spec.ts \
                   tests/e2e/storybook-marketing-faq.spec.ts \
@@ -3666,6 +3746,7 @@ jobs:
     uses: ./.github/workflows/macos-ci.yml
     with:
       mac-first: true
+      native: ${{ needs.ci-path-changes.outputs.run_macos_native != 'false' }}
       supersede-key: ${{ github.event_name == 'merge_group' && needs.ci-merge-group-admission.outputs.pr_number != '' && format('pr-{0}', needs.ci-merge-group-admission.outputs.pr_number) || '' }}
 
   ci-cross-product-integration:
@@ -3939,7 +4020,7 @@ jobs:
     needs: [ci-path-changes, ci-build-public]
     # Manual hosted evidence using the shared deep-lane build artifact.
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -4061,7 +4142,7 @@ jobs:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
@@ -4276,7 +4357,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     # Manual hosted evidence only; never starts from a source PR event.
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
     strategy:
@@ -4555,7 +4636,7 @@ jobs:
           needs.ci-path-changes.outputs.run_golden_path == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -4741,7 +4822,7 @@ jobs:
           needs.ci-path-changes.outputs.run_golden_path == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -4880,7 +4961,7 @@ jobs:
     # Reuse the shared neon-db artifact when run_neon=true; non-DB admin PRs read DATABASE_URL_MAIN.
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -5014,7 +5095,7 @@ jobs:
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -5357,7 +5438,7 @@ jobs:
     # Phase 0: quarantine generic fixed-runner routing until all five named
     # services have immutable warm-canary receipts. Combined heads use explicit
     # hosted capacity, so this change's own merge group gets the safe fast path.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -5501,7 +5582,7 @@ jobs:
             # Non-main manual dispatches have no base_ref. Run the critical and
             # interaction suites; main dispatches take the full-suite branch above.
             # --passWithNoTests: some shards may have no files matching the filter
-            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} "critical|interaction" $OUTPUT_FLAG
+            pnpm turbo test:fast --affected -- $VITEST_CI_FLAGS $RETRY_FLAG --passWithNoTests --shard=${{ matrix.shard }} ${{ steps.quarantine.outputs.unit_excludes }} critical interaction $OUTPUT_FLAG
           fi
       - name: Run quarantined unit tests (retries)
         # Unsharded: one shard runs it, not every shard (~12s each). Its cost is
@@ -5851,6 +5932,9 @@ jobs:
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
           git cat-file -e "${COVERAGE_BASE}^{commit}"
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ (needs.ci-path-changes.outputs.has_web_coverage_changes == 'true') && hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Setup Node for the changed-behavior ratchet
         if: needs.ci-path-changes.outputs.has_web_coverage_changes == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -5918,7 +6002,7 @@ jobs:
     # Manual hosted axe-core WCAG 2.1 AA evidence using the shared build artifact.
     needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
@@ -6086,7 +6170,7 @@ jobs:
     # Manual hosted evidence only (when the build artifact is present).
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -6235,7 +6319,7 @@ jobs:
     # The shared manual Neon producer is mandatory; no fallback branch can race it.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ always() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
@@ -6440,13 +6524,19 @@ jobs:
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     continue-on-error: ${{ github.event_name == 'push' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     outputs:
       journey_outcome: ${{ steps.canonical_journey.outcome }}
       certification_outcome: ${{ steps.canonical_certification.outcome }}
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # Retried-and-passed tests (start-entry-continuity retries twice) and any
+      # failed attempt leave Playwright's error-context.md. Without this the
+      # guard blocks it as an unknown binary and turns a passed-on-retry flake
+      # into a red job (runs 40548451564, 40643816453). It is not a secret
+      # finding: markdown is still redacted and credential-scanned.
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
       # Preview – jovie secret STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY is
       # the active test-mode USD 1200/month price. The assertion stays
       # fail-closed; true reports a contract breach instead of a missing secret.
@@ -6630,29 +6720,6 @@ jobs:
 
           cd "$GITHUB_WORKSPACE"
           BASE_URL=http://localhost:3250 E2E_SKIP_WEB_SERVER=1 node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- pnpm --filter @jovie/web run test:e2e:golden-path:ci
-
-          # JOV-5489: recorded visual review of the golden-path keyframes. A
-          # suspected blocker is re-reviewed once; only a reproduced blocker fails.
-          # The gateway key is mapped in for the reviewer only, never the server.
-          KEYFRAMES="$GITHUB_WORKSPACE/apps/web/test-results/golden-path-keyframes"
-          # The review runs as its own guarded producer scoped to the keyframes
-          # only, so the staged evidence includes verdict.json and only these
-          # journey keyframes are declared public (failure captures never are).
-          review() {
-            AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
-              PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
-              PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
-              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
-              pnpm --filter @jovie/web exec tsx scripts/golden-path-visual-review.ts "$@"
-          }
-          review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/verdict.json"
-          if [ "$(jq '.suspected | length' "$KEYFRAMES/first/verdict.json")" -gt 0 ]; then
-            echo "::warning::Golden path visual review suspects a blocker; re-reviewing to confirm."
-            # ponytail: independent second review of the same keyframes, not a
-            # journey replay: the journey claims a protected fixture once per DB.
-            # Ceiling: a capture-timing flake is judged twice on one frame.
-            review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/confirm.json" --confirm-against "$KEYFRAMES/first/verdict.json"
-          fi
         env:
           # JOV-5489: deterministic keyframes (PNG evidence; video is refused by
           # the artifact secret guard) and a reviewer-only gateway key
@@ -6680,6 +6747,40 @@ jobs:
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
           STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY }}
           STRIPE_TEST_ACCOUNT_ID: acct_1T1DV0ASl9B9udHv
+
+      # Visual review is its own gate with its own verdict. It must never change
+      # the auth/billing journey evidence, which is built from the journey step.
+      - name: Review golden-path keyframes (visual verdict)
+        id: visual_review
+        if: ${{ !cancelled() && steps.canonical_journey.outcome == 'success' }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          # JOV-5489: recorded visual review of the golden-path keyframes. A
+          # suspected blocker is re-reviewed once; only a reproduced blocker fails.
+          # The gateway key is mapped in for the reviewer only, never the server.
+          KEYFRAMES="$GITHUB_WORKSPACE/apps/web/test-results/golden-path-keyframes"
+          # The review runs as its own guarded producer scoped to the keyframes
+          # only, so the staged evidence includes verdict.json and only these
+          # journey keyframes are declared public (failure captures never are).
+          review() {
+            AI_GATEWAY_API_KEY="$GOLDEN_PATH_REVIEW_GATEWAY_KEY" \
+              PLAYWRIGHT_ARTIFACT_PATHS=apps/web/test-results/golden-path-keyframes \
+              PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES=true \
+              node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
+              pnpm --filter @jovie/web exec tsx scripts/golden-path-visual-review.ts "$@"
+          }
+          review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/verdict.json"
+          if [ "$(jq '.suspected | length' "$KEYFRAMES/first/verdict.json")" -gt 0 ]; then
+            echo "::warning::Golden path visual review suspects a blocker; re-reviewing to confirm."
+            # ponytail: independent second review of the same keyframes, not a
+            # journey replay: the journey claims a protected fixture once per DB.
+            # Ceiling: a capture-timing flake is judged twice on one frame.
+            review --dir "$KEYFRAMES/first" --out "$KEYFRAMES/first/confirm.json" --confirm-against "$KEYFRAMES/first/verdict.json"
+          fi
+        env:
+          GOLDEN_PATH_REVIEW_GATEWAY_KEY: ${{ secrets.GOLDEN_PATH_REVIEW_GATEWAY_KEY }}
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          VISUAL_REVIEW_BASE_URL: ${{ vars.VISUAL_REVIEW_BASE_URL }}
 
       # Evidence for the pre-promotion gate (promotion-journey-gate.mjs). Built
       # from the Playwright report of THIS run, so a skipped, mocked or red
@@ -6733,6 +6834,25 @@ jobs:
           PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
         run: mkdir -p "$(dirname "$PROFILE_RESULT")" && pnpm --filter=@jovie/web exec tsx scripts/certify-artist-profile.ts --output "$PROFILE_CERT_DIR" > "$PROFILE_RESULT" && cat "$PROFILE_RESULT"
 
+      - name: Verify live canonical profile navigation
+        id: canonical_navigation
+        continue-on-error: true
+        env:
+          BASE_URL: https://jov.ie
+          CANONICAL_CANDIDATE_ID: acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}
+          CANONICAL_PROFILE_RESULT: ${{ runner.temp }}/canonical-artist-site/profile-result.json
+          CANONICAL_RUN_ID: ${{ github.run_id }}-${{ github.run_attempt }}
+          E2E_SKIP_WEB_SERVER: '1'
+          PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_PATHS: apps/web/test-results/canonical-navigation
+        run: >-
+          node .github/scripts/guard-playwright-artifacts.mjs --run --
+          pnpm --filter=@jovie/web exec playwright test tests/e2e/canonical-artist-navigation.spec.ts
+          --config=playwright.config.noauth.ts --project=chromium
+          --grep 'canonical artist navigation' --workers=1 --retries=0
+          --output=test-results/canonical-navigation --reporter=line
+
       - name: Certify canonical outbound artist journey
         id: canonical_certification
         if: ${{ always() && !cancelled() }}
@@ -6742,6 +6862,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           JOURNEY_STATUS: ${{ steps.canonical_journey.outcome || 'skipped' }}
           M2_STATUS: ${{ steps.canonical_revenue.outcome || 'skipped' }}
+          NAVIGATION_STATUS: ${{ steps.canonical_navigation.outcome || 'skipped' }}
           PROFILE_STATUS: ${{ steps.canonical_profile.outcome || 'skipped' }}
           WAITLIST_STATUS: ${{ steps.canonical_waitlist.outcome || 'skipped' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -6760,7 +6881,7 @@ jobs:
           if [ "$failed" -ne 0 ]; then
             : > "$HISTORY"
           fi
-          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --profile-result "$CERT_DIR/profile-result.json" --source-history "$CERT_DIR/source-history.txt" --output "$CERT_DIR/certificate.json"
+          pnpm --filter=@jovie/web exec tsx scripts/certify-canonical-artist-site.ts --candidate-id "acquisition:premade-artist-profile:tim-white:${{ github.run_id }}-${{ github.run_attempt }}" --run-id "${{ github.run_id }}-${{ github.run_attempt }}" --source-revision "${{ github.sha }}" --run-url "$RUN_URL" --golden-path-status "$JOURNEY_STATUS" --claim-contract-status "$CLAIM_CONTRACT_STATUS" --waitlist-status "$WAITLIST_STATUS" --m2-status "$M2_STATUS" --m2-receipt "$CERT_DIR/m2-receipt.json" --profile-status "$PROFILE_STATUS" --navigation-status "$NAVIGATION_STATUS" --profile-result "$CERT_DIR/profile-result.json" --source-history "$CERT_DIR/source-history.txt" --output "$CERT_DIR/certificate.json"
 
       - name: Upload canonical artist-site certification
         if: ${{ always() }}
@@ -6769,6 +6890,16 @@ jobs:
           name: canonical-artist-site-certification-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/canonical-artist-site
           if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload canonical navigation evidence
+        if: ${{ always() && hashFiles('apps/web/test-results/canonical-navigation/**') != '' }}
+        uses: ./.github/actions/upload-safe-playwright-artifact
+        with:
+          name: canonical-artist-site-navigation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: apps/web/test-results/canonical-navigation/
+          allow-images: 'true'
+          public-images: 'true'
           retention-days: 30
 
       - name: Upload Playwright Artifacts on Failure
@@ -6852,7 +6983,7 @@ jobs:
     # Removed push-to-main trigger — merge queue validates PRs before merge.
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
@@ -7063,7 +7194,7 @@ jobs:
     # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
     needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-migrate]
     if: ${{ needs.ci-path-changes.result == 'success' && needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
@@ -8179,7 +8310,7 @@ jobs:
     name: Extended Smoke (manual)
     needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-tests]
     if: ${{ needs.ci-path-changes.result == 'success' && always() && github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: Preview – jovie
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }

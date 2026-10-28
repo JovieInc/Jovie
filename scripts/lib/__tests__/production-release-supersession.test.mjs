@@ -32,6 +32,7 @@ import {
   runWithRealGh,
   storedZip,
 } from '../real-gh-harness.mjs';
+import { assertReviewDeadline } from '../review-deadline.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   const actual = /** @type {typeof import('node:child_process')} */ (
@@ -137,7 +138,12 @@ describe('public-profile alias graduation policy', () => {
     const measuredAt = Date.parse(receipt.measuredAt);
     const nextReviewAt = Date.parse(policy.nextReviewAt);
     expect(nextReviewAt).toBeGreaterThan(measuredAt);
-    expect(nextReviewAt).toBeGreaterThan(Date.now());
+    // A missed review warns for 72h (naming JOV-8338), then fails merge groups.
+    assertReviewDeadline({
+      label: 'public-profile alias graduation',
+      deadline: policy.nextReviewAt,
+      trackingIssue: policy.trackingIssue,
+    });
     expect(nextReviewAt - measuredAt).toBeLessThanOrEqual(
       7 * 24 * 60 * 60 * 1000
     );
@@ -360,7 +366,9 @@ describe('public-profile alias graduation policy', () => {
         stubCommand(
           fixture.bin,
           'pnpm',
-          '#!/bin/sh\nprintf "%s\\n" "$@" > "$ALIAS_GUARD_ARGUMENTS"\nexit "$ALIAS_GUARD_EXIT"\n'
+          // Record every invocation (the script runs other pnpm commands around the guard) and
+          // fail only the performance-budgets guard, so the assertions read that guard's own arguments.
+          '#!/bin/sh\nprintf "%s\\n" "$@" >> "$ALIAS_GUARD_ARGUMENTS"\nprintf -- "--invocation-end--\\n" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
         );
         const result = runScript(script, fixture, {
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),
@@ -380,7 +388,18 @@ describe('public-profile alias graduation policy', () => {
             failure_subtype: 'exact_build_performance_failed',
           });
         else expect(outputs.performance_status).toBe('warn');
-        const args = readFileSync(join(fixture.root, 'arguments'), 'utf8');
+        const calls = readFileSync(join(fixture.root, 'arguments'), 'utf8')
+          .split('--invocation-end--\n')
+          .filter(Boolean);
+        const guardCalls = calls.filter(call =>
+          call.includes('performance-budgets-guard')
+        );
+        expect(guardCalls.length).toBeGreaterThan(0);
+        // The public-profile alias guard is the one carrying the alias routes.
+        const args =
+          guardCalls.find(call =>
+            call.includes('--route-id\n' + ALIAS_ROUTES[0])
+          ) ?? guardCalls.at(-1);
         expect(args).toContain(
           `--base-url\n${staging ? DEPLOYMENT_URL : 'https://jov.ie'}`
         );
@@ -2190,6 +2209,120 @@ exit 9
     expect(run.outputs.decision).toBe('proceed');
     expect(run.outputs.wait_seconds).toBe('0');
     expect(run.result.stderr).not.toContain('unexpected merge-queue read');
+  });
+
+  it.each([
+    {
+      label: 'unknown lineage',
+      gateDecision: 'error',
+      gateStatus: 1,
+      expectedDecision: 'error',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'nonzero lineage error',
+      gateDecision: 'error',
+      gateStatus: 7,
+      expectedDecision: 'error',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'successful yield',
+      gateDecision: 'yield',
+      gateStatus: 0,
+      expectedDecision: 'superseded',
+      expectedCurrent: 'false',
+    },
+    {
+      label: 'successful proceed',
+      gateDecision: 'proceed',
+      gateStatus: 0,
+      expectedDecision: 'proceed',
+      expectedCurrent: 'true',
+    },
+  ])(
+    'handles lineage result before evaluation: $label',
+    ({ gateDecision, gateStatus, expectedDecision, expectedCurrent }) => {
+      const fixture = makeFixture('coalesce-unreadable-');
+      stubCommand(
+        fixture.bin,
+        'bash',
+        `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) printf 'decision=${gateDecision}\\n'; exit ${gateStatus} ;;
+  -c) exec /bin/bash "$@" ;;
+  *) echo "unexpected bash: $*" >&2; exit 2 ;;
+esac
+`
+      );
+      const script = getStepRunScript(
+        getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+        'Evaluate event-driven supersession'
+      );
+      const result = runScript(script, fixture, {
+        EXPECTED_SHA,
+        FIXED_WINDOW_SECONDS_REPLACED: '60',
+        GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+        PRODUCTION_STARVATION_SECONDS: '5400',
+        REPOSITORY: 'JovieInc/Jovie',
+        RESOLVE_MAIN_BUDGET_SECONDS: '5',
+        RESOLVE_MAIN_RETRY_SECONDS: '0',
+      });
+      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(
+        gateStatus
+      );
+      const outputs = parseOutputs(fixture.output);
+      expect(outputs.is_current).toBe(expectedCurrent);
+      expect(outputs.decision ?? null).toBe(expectedDecision);
+      const receipt = join(fixture.root, 'release-lineage-receipt.json');
+      if (gateStatus !== 0) {
+        expect(result.stdout).toContain(
+          `Release lineage gate failed before evaluation (exit=${gateStatus}).`
+        );
+        expect(existsSync(receipt)).toBe(false);
+      } else {
+        expect(JSON.parse(readFileSync(receipt, 'utf8'))).toMatchObject({
+          decision: expectedDecision,
+          replacementSha: gateDecision === 'yield' ? NEWER_SHA : EXPECTED_SHA,
+        });
+      }
+      expect(result.stdout).not.toContain('mutation-authorized');
+    }
+  );
+
+  it('still fails the wave when the pre-mutation gate crashes without a decision', () => {
+    const fixture = makeFixture('coalesce-crash-');
+    stubCommand(
+      fixture.bin,
+      'bash',
+      `#!/bin/sh
+case "$1" in
+  *resolve-main-sha.sh) printf '%s\\n' '${NEWER_SHA}' ;;
+  *release-lineage-gate.sh) echo 'boom' >&2; exit 1 ;;
+  -c) exec /bin/bash "$@" ;;
+  *) echo "unexpected bash: $*" >&2; exit 2 ;;
+esac
+`
+    );
+    const script = getStepRunScript(
+      getJobBlock(CONTROLLER_WORKFLOW, 'coalesce-production'),
+      'Evaluate event-driven supersession'
+    );
+    const result = runScript(script, fixture, {
+      EXPECTED_SHA,
+      FIXED_WINDOW_SECONDS_REPLACED: '60',
+      GITHUB_STEP_SUMMARY: join(fixture.root, 'step-summary'),
+      PRODUCTION_STARVATION_SECONDS: '5400',
+      REPOSITORY: 'JovieInc/Jovie',
+      RESOLVE_MAIN_BUDGET_SECONDS: '5',
+      RESOLVE_MAIN_RETRY_SECONDS: '0',
+    });
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain(
+      'Release lineage gate failed before evaluation (exit=1).'
+    );
+    expect(result.stdout).not.toContain('yielding without mutation');
   });
 
   it('still fails closed when main stays unreadable', () => {

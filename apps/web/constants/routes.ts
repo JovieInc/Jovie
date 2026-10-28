@@ -146,6 +146,8 @@ export const APP_ROUTES = {
   ADMIN_AGENT_RUN: '/app/ov/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/ov/agent-runs/[id]',
   ADMIN_COSTS: '/app/ov/costs',
+  /** Agent capacity registry: plan, cost, quota, pace and policy per provider. */
+  ADMIN_CAPACITY: '/app/ov/capacity',
   /** VC/ops revenue-lift dashboard (IRPAA North Star + KPI tree). */
   ADMIN_REVENUE_LIFT: '/app/ov/revenue-lift',
   ADMIN_SYSTEM: '/app/ov/system',
@@ -206,6 +208,20 @@ export const APP_ROUTES = {
   PAY: '/pay',
   /** Live DESIGN_READY marketing page — never 410 / reserved-gone. */
   PRODUCT: '/product',
+  /** Cmd+K command palette. Live feature page. */
+  PRODUCT_COMMAND_PALETTE: '/product/command-palette',
+  /** Release date and reveal date fields. Nested under /product so it is not a profile handle. */
+  PRODUCT_RELEASE_SCHEDULING: '/product/release-scheduling',
+  /** Per-service DSP links. Nested under /product so it is not a profile handle. */
+  PRODUCT_DSP_LINKS: '/product/dsp-links',
+  /** Tracked-link builder. Nested under /product so it is not a profile handle. */
+  PRODUCT_UTM_LINKS: '/product/utm-links',
+  /** ISRC field. Nested under /product so it is not a profile handle. */
+  PRODUCT_ISRC: '/product/isrc',
+  /** Pre-save countdown. Nested under /product so it is not a profile handle. */
+  PRODUCT_PRE_SAVE: '/product/pre-save',
+  /** Smart-link click analytics. Live feature page. */
+  PRODUCT_LINK_ANALYTICS: '/product/link-analytics',
   /** Artist solution page (artist-lp recipe). /artists stays the directory. */
   SOLUTIONS_ARTISTS: '/solutions/artists',
   INSTANT_MERCH: '/instant-merch',

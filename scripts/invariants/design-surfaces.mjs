@@ -468,6 +468,13 @@ const TOOLING_ROUTES = new Set(['CLI', 'DEVELOPERS', 'DOCS']);
  */
 export const NAV_LABEL_DESTINATIONS = Object.freeze({
   Product: ['PRODUCT'],
+  'Command palette': ['PRODUCT_COMMAND_PALETTE'],
+  'Release scheduling': ['PRODUCT_RELEASE_SCHEDULING'],
+  'DSP Links': ['PRODUCT_DSP_LINKS'],
+  'UTM Links': ['PRODUCT_UTM_LINKS'],
+  ISRC: ['PRODUCT_ISRC'],
+  'Pre-save': ['PRODUCT_PRE_SAVE'],
+  'Link analytics': ['PRODUCT_LINK_ANALYTICS'],
   Pricing: ['PRICING'],
   'Log in': ['SIGNIN'],
   'Find yourself': ['START'],
@@ -487,6 +494,10 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   Pay: ['PAY'],
   'Fan Capture': ['ARTIST_PROFILES'],
   'Fan Reactivation': ['ARTIST_PROFILES'],
+  // Phase-1 truth pass: audience wording replaces fan wording in the nav.
+  'Audience notifications': ['ARTIST_NOTIFICATIONS'],
+  'Audience capture': ['ARTIST_PROFILES'],
+  'Audience reactivation': ['ARTIST_PROFILES'],
   'Product Demo': ['DEMO_VIDEO'],
   'Release System': ['LAUNCH'],
   'Artist Directory': ['ARTISTS'],

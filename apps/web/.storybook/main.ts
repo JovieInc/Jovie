@@ -18,7 +18,7 @@ const FULL_CATALOG_STORIES = [
   // matrix, JOV-2156) that are not tied to a single component directory.
   './stories/**/*.stories.@(js|jsx|ts|tsx|mdx)',
   '../components/**/*.stories.@(js|jsx|ts|tsx|mdx)',
-  // packages/ui atoms — highest-reuse surface; must enter Chromatic/Storybook
+  // packages/ui atoms — highest-reuse surface; must enter Storybook
   // (Phase 2 visual-testing coverage; see docs/VISUAL_TESTING_POLICY.md).
   '../../../packages/ui/**/*.stories.@(js|jsx|ts|tsx|mdx)',
 ] as const;
@@ -28,7 +28,7 @@ export function storybookAddonsForEnvironment(
   hasManualAxeSuite = process.env.JOVIE_STORYBOOK_MANUAL_AXE === '1'
 ) {
   // The live certificate reads the preview iframe directly and injects its
-  // own pinned Axe bundle. Loading docs, Vitest, Chromatic, and MCP here adds
+  // own pinned Axe bundle. Loading docs, Vitest, and MCP here adds
   // an unrelated production build graph that can exhaust the source-gate
   // runner before any canonical story is measured.
   if (isLiveStorybookCert) return [];
@@ -41,7 +41,6 @@ export function storybookAddonsForEnvironment(
     // two axe runs cannot race.
     ...(hasManualAxeSuite ? [] : ['@storybook/addon-a11y']),
     '@storybook/addon-vitest',
-    '@chromatic-com/storybook',
     '@storybook/addon-mcp',
   ];
 }

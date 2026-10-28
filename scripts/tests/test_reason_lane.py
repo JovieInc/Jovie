@@ -6,6 +6,7 @@ Run with:
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 import os
 import re
@@ -931,3 +932,651 @@ class CatalogTransportTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+OUTCOME_SPEC = importlib.util.spec_from_file_location("outcome_lane", ROOT / "scripts/lanes/outcome_lane.py")
+outcome = importlib.util.module_from_spec(OUTCOME_SPEC)
+OUTCOME_SPEC.loader.exec_module(outcome)
+SHA = "381a4282e16abd02365dd7f2328c9e65d56ab70e"
+
+
+def lifecycle_comment(next_missing="outcome", verified=True, issue="JOV-7771", extra_manifest=None):
+    manifest = {"schema": "jovie.validation-manifest/v1", "issue": issue,
+                "bindingPull": "https://github.com/JovieInc/Jovie/pull/21778",
+                "mergedPulls": ["https://github.com/JovieInc/Jovie/pull/21778"], **(extra_manifest or {})}
+    lines = ["Validation lifecycle kept JOV-7771 in Validating.",
+             "Binding merge: https://github.com/JovieInc/Jovie/pull/21778 (48075f7f9589).",
+             *([f"Verified production generation: {SHA}."] if verified else []),
+             f"Next missing receipt: {next_missing}.",
+             f"- {next_missing}: no current receipt (acceptance section names evidence a deploy cannot prove)",
+             "", "<!-- validation-manifest:v1", json.dumps(manifest), "-->",
+             "<!-- validation-lifecycle:v1 8051ff027979ff0f -->"]
+    return {"body": "\n".join(lines), "createdAt": "2026-10-21T11:27:54Z"}
+
+
+def outcome_issue(*comments):
+    return {"id": "uuid-7771", "identifier": "JOV-7771", "title": "Golden path", "url": "https://linear.app/x",
+            "description": "**Acceptance**\n* Sentence case for every /start title", "comments": {"nodes": list(comments)}}
+
+
+class OutcomeLaneTest(unittest.TestCase):
+    """The outcome lane verifies Validating issues owing `outcome` and records the receipt (2026-10-21)."""
+
+    def test_only_a_deployed_issue_that_owes_outcome_is_asked(self):
+        ask = outcome.lifecycle_ask(outcome_issue(lifecycle_comment()))
+        self.assertEqual((ask["sha"], ask["digest"]), (SHA, "8051ff027979ff0f"))
+        self.assertIsNone(outcome.lifecycle_ask(outcome_issue(lifecycle_comment(verified=False))))
+        self.assertIsNone(outcome.lifecycle_ask(outcome_issue(lifecycle_comment(next_missing="screen-audit"))))
+        self.assertIsNone(outcome.lifecycle_ask(outcome_issue(lifecycle_comment(issue="JOV-1"))))
+        older = {**lifecycle_comment(), "createdAt": "2026-10-20T00:00:00Z"}
+        newer = {**lifecycle_comment(verified=False), "createdAt": "2026-10-21T12:00:00Z"}
+        self.assertIsNone(outcome.lifecycle_ask(outcome_issue(older, newer)), "the newest lifecycle comment rules")
+
+    def test_the_lane_not_the_model_decides_and_any_doubt_fails(self):
+        item = lambda status, evidence="apps/web/app/start/page.tsx:42 renders 'Getting this ready'": {
+            "criterion": "Sentence case titles", "status": status, "evidence": evidence}
+        verdict = lambda *items, **kw: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA,
+                                        "items": list(items), **kw}
+        self.assertEqual(outcome.judge(verdict(item("pass"), item("pass")), "JOV-7771", SHA)["status"], "pass")
+        self.assertEqual(outcome.judge(verdict(item("pass"), item("fail")), "JOV-7771", SHA)["status"], "fail")
+        held = outcome.judge(verdict(item("pass"), item("needs-authority", "founder taste on the build")),
+                             "JOV-7771", SHA)
+        self.assertEqual(held["status"], "fail")
+        self.assertIn("needs authority: Sentence case titles: founder taste", outcome.receipt_note(held))
+        self.assertEqual(outcome.judge(verdict(item("pass", "ok")), "JOV-7771", SHA)["status"], "fail",
+                         "a pass without concrete evidence is not a pass")
+        for broken in (None, {}, verdict(), verdict(item("maybe")), {**verdict(item("pass")), "sha": "0" * 40},
+                       {**verdict(item("pass")), "issue": "JOV-1"}):
+            self.assertEqual(outcome.judge(broken, "JOV-7771", SHA)["status"], "fail")
+        long = outcome.judge(verdict(*[item("fail", "x" * 500) for _ in range(10)]), "JOV-7771", SHA)
+        self.assertLessEqual(len(outcome.receipt_note(long)), outcome.NOTE_LIMIT)
+
+    def test_unobservable_items_are_residual_not_failures_but_need_a_proven_majority(self):
+        item = lambda status, criterion="c", evidence="apps/web/x.ts:1 shows the fix in place": {
+            "criterion": criterion, "status": status, "evidence": evidence}
+        verdict = lambda *items: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": list(items)}
+        escalated = lambda **kw: {**item("unverifiable", "signed-in page", "redirects to /signin"), "attempts": [
+            {"step": "tools", "result": "playwright: /signin"}, {"step": "telemetry", "result": "not cheap: needs auth fixture"},
+            {"step": "agent-help", "result": "linear-comment delivered=True"}], **kw}
+        mixed = outcome.judge(verdict(item("pass"), item("pass"), escalated()), "JOV-7771", SHA)
+        self.assertEqual((mixed["status"], mixed["reason"]), ("pass", "verified-with-residual"))
+        note = outcome.receipt_note(mixed)
+        self.assertIn("2 of 3 acceptance items verified", note)
+        self.assertIn("residual (unverifiable): signed-in page", note)
+        taste = outcome.judge(verdict(item("pass"), item("pass"), item("needs-authority", "Founder accepts the casing taste", "Tim decides")),
+                              "JOV-7771", SHA)
+        self.assertEqual(taste["status"], "pass", "taste is covered by the founder-taste receipt")
+        outbound = outcome.judge(verdict(item("pass"), item("pass"), item("needs-authority", "Send the announcement email", "outbound")),
+                                 "JOV-7771", SHA)
+        self.assertEqual(outbound["status"], "fail", "a human or outbound action is still a failed acceptance")
+        thin = outcome.judge(verdict(item("pass"), escalated(criterion="a"), escalated(criterion="b")), "JOV-7771", SHA)
+        self.assertEqual((thin["status"], thin["reason"]), ("fail", "too-little-verified"))
+        contradicted = outcome.judge(verdict(item("pass"), item("pass"), item("fail")), "JOV-7771", SHA)
+        self.assertEqual(contradicted["status"], "fail")
+
+    def test_unverifiable_without_escalation_is_a_failure_and_judgement_needs_a_second_model(self):
+        base = {"criterion": "signed-in page", "status": "unverifiable", "evidence": "redirects to /signin"}
+        verdict = lambda *items: {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": list(items) + [
+            {"criterion": "p%d" % n, "status": "pass", "evidence": "apps/web/x.ts:1 shows the fix in place"} for n in range(3)]}
+        shrug = outcome.judge(verdict(base), "JOV-7771", SHA)
+        self.assertEqual(shrug["status"], "fail")
+        self.assertIn("not attempted: tools, telemetry, agent-help", shrug["items"][0]["evidence"])
+        done = [{"step": "tools", "result": "x"}, {"step": "telemetry", "result": "y"}, {"step": "agent-help", "result": "z"}]
+        self.assertEqual(outcome.judge(verdict({**base, "attempts": done}), "JOV-7771", SHA)["status"], "pass")
+        taste = outcome.judge(verdict({**base, "kind": "judgement", "attempts": done}), "JOV-7771", SHA)
+        self.assertEqual(taste["status"], "fail")
+        self.assertIn("adversarial", taste["items"][0]["evidence"])
+        self.assertEqual(outcome.judge(verdict({**base, "kind": "judgement", "attempts": done + [
+            {"step": "adversarial", "result": "unavailable: no second-model reviewer configured"}]}), "JOV-7771", SHA)["status"], "pass")
+
+    def test_an_unloadable_page_gets_a_browser_vision_and_agent_help_attempt_then_a_routed_gap(self):
+        esc = outcome.esc
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        tree, out, state = Path(tmp.name) / "tree", Path(tmp.name) / "out", Path(tmp.name) / "state"
+        (tree / "apps/web").mkdir(parents=True)
+        out.mkdir()
+        state.mkdir()
+        calls, comments = [], []
+        probe = {"url": "https://jov.ie/app/tasks", "ok": True, "status": 200, "finalUrl": "https://jov.ie/signin?redirect_url=%2Fapp%2Ftasks",
+                 "title": "Sign in", "text": "Log in to Jovie Send sign-in code", "screenshot": str(out / "shot.png")}
+
+        def run(args, **kw):
+            calls.append((list(args), kw))
+            joined = " ".join(map(str, args))
+            if ".outcome-probe.mjs" in joined:
+                (out / "shot.png").write_bytes(b"png")
+                return subprocess.CompletedProcess(args, 0, json.dumps(probe) + "\n", "")
+            if "codex_lane.py" in joined and "vision.prompt.md" in joined:
+                (out / "vision.txt").write_text("A sign-in form with an email field")
+            return subprocess.CompletedProcess(args, 0, "", "")
+
+        class Linear:
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        issue = {"id": "u1", "identifier": "JOV-7771"}
+        item = {"criterion": "Task due chips render at mobile and desktop", "status": "unverifiable", "kind": "observable",
+                "capability": "signed-in-browser", "evidence": "GET https://jov.ie/app/tasks redirects to /signin",
+                "attempts": [{"step": "telemetry", "result": "not cheap: needs an auth fixture"}]}
+        done = esc.escalate([item], tree=tree, out_dir=out, run=run, env={}, codex_cmd=["python3", "codex_lane.py", "run"],
+                            linear=Linear(), issue=issue)
+        steps = {a["step"]: a["result"] for a in done[0]["attempts"]}
+        self.assertEqual(done[0]["status"], "unverifiable")
+        self.assertIn("playwright+vision", steps["tools"])
+        self.assertIn("sign-in form", steps["tools"])
+        self.assertIn("linear-comment delivered=True", steps["agent-help"])
+        self.assertIn("telemetry", steps)
+        self.assertTrue(any(".outcome-probe.mjs" in " ".join(map(str, a)) for a, _ in calls), "Playwright probe ran")
+        self.assertTrue(any("vision.prompt.md" in " ".join(map(str, a)) for a, _ in calls), "vision read ran")
+        self.assertIn(esc.HELP_MARKER, comments[0])
+        self.assertIn("https://jov.ie/app/tasks", comments[0])
+        self.assertEqual(esc.missing_steps(done[0]), [])
+        gaps = esc.route_gaps(state, Linear(), issue, done, 1.0)
+        self.assertEqual((gaps[0]["capability"], gaps[0]["owner"]), ("signed-in-browser", "golden-path (authqaprod fixture)"))
+        self.assertIn(esc.GAP_MARKER, comments[-1])
+        self.assertIn("JOV-7771", json.loads((state / esc.GAP_FILE).read_text()))
+        # Reachability alone does not prove this criterion in either direction.
+        probe.update(finalUrl="https://jov.ie/app/tasks", text="Tasks due today 3")
+        flipped = esc.escalate([item], tree=tree, out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        self.assertEqual(flipped[0]["status"], "unverifiable")
+        self.assertEqual(flipped[0]["evidence"], item["evidence"])
+        # Judgement items also ask a second model; without one configured the gap is recorded as such.
+        with patch.object(esc, "gateway_key", return_value=None):
+            judgement = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
+                                     out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        with patch.object(esc, "gateway_key", return_value=None):
+            unconfigured = esc.escalate([{**item, "kind": "judgement", "capability": "taste", "evidence": "taste, no url"}], tree=tree,
+                                        out_dir=out, run=run, env={}, codex_cmd=["x"], linear=Linear(), issue=issue)
+        self.assertIn("no AI Gateway key", {a["step"]: a["result"] for a in unconfigured[0]["attempts"]}["adversarial"])
+
+    def outcome_probe_fixture(self, **changes):
+        item = {"criterion": "Mac disk health stays below the pressure threshold", "status": "unverifiable",
+                "kind": "observable", "capability": "device",
+                "evidence": "Device observation unavailable; build binding only: https://jov.ie/api/version",
+                "attempts": [{"step": "telemetry", "result": "Needs a device observation, not public build metadata"}]}
+        return {**item, **changes}
+
+    def escalate_with_public_probe(self, items, issue=None, **kwargs):
+        esc = outcome.esc
+        probe = {"url": "https://jov.ie/api/version", "ok": True, "status": 200,
+                 "finalUrl": "https://jov.ie/api/version", "text": '{"buildId":"abc1234"}'}
+        with patch.object(esc, "browser_probe", return_value=probe), patch.object(esc, "request_agent_help", return_value={
+                "channel": "none", "delivered": False, "note": "fixture has no authenticated agent"}):
+            return esc.escalate(items, tree=ROOT, out_dir=Path("unused"), run=None, env={}, codex_cmd=[], linear=None,
+                                issue=issue or {"id": "u1", "identifier": "JOV-7771"}, sha=SHA, **kwargs)
+
+    def test_unrelated_successful_probe_preserves_each_criterion_and_its_evidence(self):
+        for criterion, capability in (("Mac disk pressure stays below threshold", "device"),
+                                      ("Installed protocol rollout is complete", "process-record"),
+                                      ("Authenticated chat replies stream", "signed-in-browser")):
+            with self.subTest(criterion=criterion):
+                item = self.outcome_probe_fixture(criterion=criterion, capability=capability)
+                original = json.loads(json.dumps(item))
+                row, = self.escalate_with_public_probe([item])
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertEqual(item, original, "escalation must not mutate the verifier's original evidence")
+                self.assertEqual(outcome.esc.missing_steps(row), [])
+                self.assertIn("https://jov.ie/api/version -> 200", row["attempts"][1]["result"])
+                self.assertEqual(outcome.esc.gap_for("JOV-7771", row)["capability"], capability)
+
+    def test_relevant_help_evidence_still_decides_despite_an_unrelated_successful_probe(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Task due chips render", capability="signed-in-browser")
+        corr = esc.correlation_id("u1", item, SHA)
+        for verdict, status, observation in (("contradicted", "fail", "Signed in on the verified build: due chips are missing"),
+                                              ("supported", "pass", "Signed in on the verified build: 3 due chips are visible"),
+                                              ("insufficient", "unverifiable", "I have not opened this build")):
+            with self.subTest(verdict=verdict), patch.object(esc, "evaluate_reply", return_value={
+                    "ran": True, "verdict": verdict, "result": observation}) as evaluate:
+                issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr, observation)}}
+                row, = self.escalate_with_public_probe([item], issue)
+                self.assertEqual(row["status"], status)
+                evaluate.assert_called_once()
+                self.assertEqual(evaluate.call_args.args[0]["criterion"], item["criterion"])
+                self.assertEqual(evaluate.call_args.args[1], observation)
+                self.assertIn(observation if verdict != "insufficient" else item["evidence"], row["evidence"])
+
+    def test_mixed_criteria_retain_true_failures_passes_and_residuals(self):
+        passed = {"criterion": "Build contains the binding merge", "status": "pass", "evidence": "git merge-base confirmed the binding SHA"}
+        failed = {"criterion": "Chat streams a reply", "status": "fail", "evidence": "Authenticated observation: stream closes with HTTP 500"}
+        unknown = self.outcome_probe_fixture()
+        rows = self.escalate_with_public_probe([passed, failed, unknown])
+        self.assertEqual(rows[:2], [passed, failed])
+        self.assertEqual([r["status"] for r in rows], ["pass", "fail", "unverifiable"])
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": rows}
+        self.assertEqual(outcome.judge(verdict, "JOV-7771", SHA)["status"], "fail", "a real contradiction still fails")
+        verdict["items"] = self.escalate_with_public_probe([passed, {**passed, "criterion": "Tests pass"}, unknown])
+        decision = outcome.judge(verdict, "JOV-7771", SHA)
+        self.assertEqual((decision["status"], decision["reason"]), ("pass", "verified-with-residual"))
+        self.assertEqual(decision["items"][-1]["status"], "unverifiable", "the aggregate policy never turns the unknown into a pass")
+
+    def test_unavailable_authentication_is_unknown_even_when_another_probe_loads(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Authenticated chat replies stream", capability="signed-in-browser",
+                                          urls=["https://jov.ie/app/chat"],
+                                          evidence="No authenticated fixture; build binding only: https://jov.ie/api/version")
+        for final_url, text, status in (("https://jov.ie/signin", "Log in to Jovie", 200),
+                                        ("https://jov.ie/app/chat", "Unauthorized", 401),
+                                        ("https://jov.ie/app/chat", "Public application shell", 200)):
+            with self.subTest(final_url=final_url, status=status):
+                def probe(tree, url, *args):
+                    return {"ok": True, "status": status if url.endswith("/chat") else 200,
+                            "finalUrl": final_url if url.endswith("/chat") else url, "text": text}
+                with patch.object(esc, "browser_probe", side_effect=probe), patch.object(esc, "request_agent_help", return_value={
+                        "channel": "none", "delivered": False, "note": "authentication unavailable"}):
+                    row, = esc.escalate([item], tree=ROOT, out_dir=Path("unused"), run=None, env={}, codex_cmd=[], linear=None,
+                                        issue={"id": "u1", "identifier": "JOV-7771"}, sha=SHA)
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertEqual(esc.missing_steps(row), [])
+
+    def test_verify_routes_sanitized_gap_correlation_so_later_help_replies_are_evaluated(self):
+        esc = outcome.esc
+        unknown = self.outcome_probe_fixture(criterion="Authenticated chat replies stream", capability="signed-in-browser",
+                                             helpCorr="oh-0000000000")
+        proved = {"criterion": "Build contains the binding merge", "status": "pass", "evidence": "git merge-base confirmed the binding SHA"}
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA,
+                   "items": [proved, {**proved, "criterion": "Related tests pass"}, unknown]}
+        corr = esc.correlation_id("uuid-7771", unknown, SHA)
+        self.assertNotEqual(corr, unknown["helpCorr"], "the lane replaces model-supplied correlation metadata")
+        for reply_verdict in ("supported", "contradicted"):
+            with self.subTest(reply_verdict=reply_verdict):
+                with patch.object(esc, "browser_probe", return_value={"ok": True, "status": 200,
+                        "finalUrl": "https://jov.ie/api/version", "text": '{"buildId":"abc1234"}'}):
+                    # Exercise the real verify -> escalate -> judge -> route_gaps path, with only I/O faked.
+                    result, calls, comments, state = self.drain(verdict, manifest_extra={"receiptNotBefore": "2026-10-20T00:00:00Z"})
+                queries, resolutions = [], []
+                thread = self.help_thread(corr, "Signed in on this build: observed chat response state")
+
+                class ReplyLinear:
+                    def gql(self, query, variables):
+                        queries.append((query, variables))
+                        return {"issue": {"id": "uuid-7771", "identifier": "JOV-7771", "state": {"name": "Validating"},
+                                          "comments": {"nodes": thread}}}
+                    def comment(self, issue_id, body):
+                        resolutions.append(body)
+
+                with patch.object(esc, "evaluate_reply", return_value={"ran": True, "verdict": reply_verdict,
+                        "result": "criterion-specific fixture observation"}) as evaluate:
+                    resolved = esc.followup_replies(state, ReplyLinear(), 5.0)
+                    self.assertEqual(len(queries), 1, "a sanitized gap must retain the correlation needed to query its issue")
+                    evaluate.assert_called_once()
+                    self.assertEqual(esc.followup_replies(state, ReplyLinear(), 6.0), [], "a resolved gap is not evaluated twice")
+                self.assertEqual(result["done"][0]["decision"], "pass", "the existing proven-majority policy is unchanged")
+                self.assertEqual((resolved[0]["verdict"], resolved[0]["sha"], resolved[0]["episode"]),
+                                 (reply_verdict, SHA, "2026-10-20T00:00:00Z"))
+                stored = json.loads((state / esc.GAP_FILE).read_text())["JOV-7771"]["gaps"][0]
+                self.assertEqual((stored["helpCorr"], stored["evidence"]), (corr, unknown["evidence"]))
+                self.assertEqual(stored["resolved"]["verdict"], reply_verdict)
+                self.assertEqual(evaluate.call_args.args[0]["criterion"], unknown["criterion"])
+                self.assertIn(esc.RESOLUTION_MARKER, resolutions[0])
+                self.assertTrue(any(f"corr={corr}" in body for _, body in comments), "the original help request uses the stored correlation")
+
+    def test_judge_preserves_only_well_formed_help_correlation_metadata(self):
+        attempts = [{"step": step, "result": "fixture attempted"} for step in ("tools", "telemetry", "agent-help")]
+        for corr in ("oh-0123456789", None, 123, {}, [], "", "oh-012345678", "oh-01234567890",
+                     "oh-012345678g", "oh-ABCDEF0123", "oh-0123456789\n", "prefix-oh-0123456789"):
+            with self.subTest(corr=corr):
+                item = self.outcome_probe_fixture(helpCorr=corr, attempts=attempts, unexpectedMetadata={"keep": "no"})
+                decision = outcome.judge({"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA,
+                                          "items": [item]}, "JOV-7771", SHA)
+                row = decision["items"][0]
+                self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+                self.assertNotIn("unexpectedMetadata", row)
+                if corr == "oh-0123456789":
+                    self.assertEqual(row.get("helpCorr"), corr)
+                else:
+                    self.assertNotIn("helpCorr", row)
+
+    def test_stale_help_evidence_for_another_build_cannot_decide_a_current_unknown(self):
+        esc = outcome.esc
+        item = self.outcome_probe_fixture(criterion="Installed protocol rollout is complete", capability="process-record")
+        stale_corr = esc.correlation_id("u1", item, "0" * 40)
+        issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(
+            stale_corr, "Previous build: protocol installed and verified")}}
+        with patch.object(esc, "evaluate_reply") as evaluate:
+            row, = self.escalate_with_public_probe([item], issue)
+        evaluate.assert_not_called()
+        self.assertNotEqual(row["helpCorr"], stale_corr)
+        self.assertEqual((row["status"], row["evidence"]), ("unverifiable", item["evidence"]))
+        self.assertEqual(esc.missing_steps(row), [])
+
+    def gateway(self, verdict, reason="because", prompt_tokens=1000, completion_tokens=100, calls=None):
+        def urlopen(request, timeout=0):
+            if calls is not None:
+                calls.append(json.loads(request.data))
+            body = {"choices": [{"message": {"content": json.dumps({"verdict": verdict, "reason": reason})}}],
+                    "usage": {"prompt_tokens": prompt_tokens, "completion_tokens": completion_tokens}}
+            return io.BytesIO(json.dumps(body).encode())
+        return urlopen
+
+    def test_adversarial_reviewer_defaults_on_through_the_gateway_with_a_different_family(self):
+        esc = outcome.esc
+        self.assertEqual(esc.DEFAULT_ADVERSARIAL_MODEL, "openai/gpt-6.1-sol")
+        calls = []
+        with patch.object(esc, "gateway_key", return_value="k"), patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("LANES_OUTCOME_ADVERSARIAL_MODEL", None)
+            review = esc.adversarial_review({"criterion": "c", "evidence": "e"}, urlopen=self.gateway("contradicted", calls=calls))
+            self.assertEqual((review["ran"], review["verdict"], calls[0]["model"]), (True, "contradicted", "openai/gpt-6.1-sol"))
+            self.assertIn("$0.0030", review["result"])
+            with patch.dict(os.environ, {"LANES_OUTCOME_ADVERSARIAL_MODEL": "off"}):
+                self.assertIn("disabled", esc.adversarial_review({"criterion": "c"})["result"])
+            bad = esc.gateway_judge("q", "openai/gpt-6.1-sol", urlopen=self.gateway("maybe"))
+            self.assertFalse(bad["ran"])
+        with patch.object(esc, "gateway_key", return_value=None):
+            self.assertIn("no AI Gateway key", esc.adversarial_review({"criterion": "c"})["result"])
+
+    def test_the_default_gateway_read_goes_through_the_shared_client_with_the_contract_host(self):
+        esc = outcome.esc
+        seen = {}
+        class Response:
+            status = 200
+            def json(self):
+                return {"choices": [{"message": {"content": json.dumps({"verdict": "supported", "reason": "r"})}}], "usage": {}}
+        class Client:
+            def __init__(self, provider, credential, authorize=None, **kw):
+                seen["provider"] = provider
+                headers = {}
+                authorize(headers)
+                seen["auth"] = headers["Authorization"]
+            def request(self, url, **kw):
+                seen["url"] = url
+                seen["priority"] = kw.get("priority")
+                return Response()
+        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+        import apiclient
+        with patch.object(esc, "gateway_key", return_value="k"), patch.object(apiclient, "ApiClient", Client):
+            verdict = esc.gateway_judge("q", "openai/gpt-6.1-sol")
+        self.assertEqual(verdict["verdict"], "supported")
+        self.assertEqual((seen["provider"], seen["auth"], seen["priority"]), ("ai-gateway", "Bearer k", "report"))
+        self.assertEqual(seen["url"], "https://ai-gateway.vercel.sh/v1/chat/completions")
+
+    def help_thread(self, corr, reply_body=None, *, child=True):
+        request = {"id": "c-req", "createdAt": "2026-10-25T01:00:00Z", "body": f"<!-- outcome-help-request:v1 corr={corr} -->\nplease look"}
+        nodes = [request]
+        if reply_body is not None:
+            nodes.append({"id": "c-rep", "createdAt": "2026-10-25T02:00:00Z", "user": {"name": "Instinct"},
+                          "body": reply_body if child else f"corr:{corr} {reply_body}", "parent": {"id": "c-req"} if child else None})
+        return nodes
+
+    def test_a_reply_to_the_help_request_re_evaluates_the_item_on_the_next_run(self):
+        esc = outcome.esc
+        item = {"criterion": "Task due chips render", "status": "unverifiable", "kind": "observable", "capability": "signed-in-browser",
+                "evidence": "redirects to /signin", "attempts": [{"step": "telemetry", "result": "not cheap"}]}
+        corr = esc.correlation_id("u1", item, SHA)
+        comments = []
+
+        class Linear:
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        probe_run = lambda args, **kw: subprocess.CompletedProcess(args, 1, "", "no browser")
+        base = dict(tree=Path(tmp.name), out_dir=Path(tmp.name) / "o", run=probe_run, env={}, codex_cmd=["x"], linear=Linear(), sha=SHA)
+        for child in (True, False):
+            issue = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr, "Signed in as the fixture: 3 chips visible, due Today/Tomorrow", child=child)}}
+            with patch.object(esc, "gateway_key", return_value="k"):
+                done = esc.escalate([item], issue=issue, urlopen=self.gateway("supported"), **base)
+            self.assertEqual(done[0]["status"], "pass", f"child={child}")
+            self.assertIn("observed by Instinct", done[0]["evidence"])
+            steps = {a["step"]: a["result"] for a in done[0]["attempts"]}
+            self.assertIn(f"reply from Instinct to {corr}", steps["agent-help"])
+            self.assertFalse(comments, "no second help request is posted once a reply exists")
+            with patch.object(esc, "gateway_key", return_value="k"):
+                contradicted = esc.escalate([item], issue=issue, urlopen=self.gateway("contradicted"), **base)
+            self.assertEqual(contradicted[0]["status"], "fail")
+            with patch.object(esc, "gateway_key", return_value="k"):
+                vague = esc.escalate([item], issue=issue, urlopen=self.gateway("insufficient"), **base)
+            self.assertEqual(vague[0]["status"], "unverifiable")
+        pending = {"id": "u1", "identifier": "JOV-7771", "comments": {"nodes": self.help_thread(corr)}}
+        waiting = esc.escalate([item], issue=pending, **base)
+        self.assertIn("no reply yet, not re-posted", {a["step"]: a["result"] for a in waiting[0]["attempts"]}["agent-help"])
+        self.assertFalse(comments)
+
+    def test_followup_closes_the_loop_between_verifications_and_fails_a_contradicted_validating_issue(self):
+        esc = outcome.esc
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        item = {"criterion": "Task due chips render", "evidence": "redirects to /signin"}
+        corr = esc.correlation_id("u1", item, SHA)
+        (state / esc.GAP_FILE).write_text(json.dumps({"JOV-7771": {"sha": SHA, "episode": None, "gaps": [
+            {"criterion": item["criterion"], "evidence": item["evidence"], "helpCorr": corr, "capability": "signed-in-browser"},
+            {"criterion": "other", "helpCorr": None}]}}))
+        thread = self.help_thread(corr, "Signed in: the chips are missing on mobile")
+        comments = []
+
+        class Linear:
+            def gql(self, query, variables):
+                return {"issue": {"id": "u1", "identifier": variables["id"], "state": {"name": "Validating"},
+                                  "comments": {"nodes": thread}}}
+            def comment(self, issue_id, body):
+                comments.append(body)
+
+        with patch.object(esc, "gateway_key", return_value="k"):
+            resolved = esc.followup_replies(state, Linear(), 5.0, urlopen=self.gateway("contradicted"))
+        self.assertEqual([(r["issue"], r["verdict"], r["state"]) for r in resolved], [("JOV-7771", "contradicted", "Validating")])
+        self.assertIn(esc.RESOLUTION_MARKER, comments[0])
+        stored = json.loads((state / esc.GAP_FILE).read_text())["JOV-7771"]["gaps"][0]
+        self.assertEqual(stored["resolved"]["verdict"], "contradicted")
+        with patch.object(esc, "gateway_key", return_value="k"):
+            self.assertEqual(esc.followup_replies(state, Linear(), 6.0, urlopen=self.gateway("supported")), [], "resolved once")
+        # The lane records a failing outcome receipt for a contradicted issue still in Validating.
+        calls = []
+        host = SimpleNamespace(state=state, repo=state / "repo")
+        with patch.object(outcome, "app_authorization", return_value="Bearer app"), \
+                patch.object(outcome.esc, "followup_replies", return_value=resolved):
+            outcome.help_followups(host, Linear(), 7.0, run=lambda a, **k: calls.append(a) or subprocess.CompletedProcess(a, 0, "", ""))
+        receipt = next(a for a in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a)))
+        self.assertEqual(receipt[receipt.index("--status") + 1], "fail")
+
+    def test_verifier_gets_node24_dependencies_and_the_binding_rules(self):
+        with tempfile.TemporaryDirectory() as home, patch.object(outcome.Path, "home", return_value=Path(home)):
+            for version in ("v22.23.2", "v24.15.0", "v24.22.1", "v24.9.0"):
+                (Path(home) / ".nvm/versions/node" / version / "bin").mkdir(parents=True)
+            self.assertTrue(outcome.node24_path().endswith("v24.22.1/bin"))
+            seen = []
+            def run(args, **kw):
+                seen.append((args, kw))
+                return subprocess.CompletedProcess(args, 0, "", "")
+            self.assertIsNone(outcome.prepare_tree(Path(home), run=run))
+            self.assertEqual(seen[0][0][:3], ["pnpm", "install", "--frozen-lockfile"])
+            self.assertTrue(seen[0][1]["env"]["PATH"].startswith(outcome.node24_path()))
+            failing = lambda args, **kw: subprocess.CompletedProcess(args, 1, "", "ERR_PNPM_NO_OFFLINE_TARBALL")
+            self.assertIn("ERR_PNPM_NO_OFFLINE_TARBALL", outcome.prepare_tree(Path(home), run=failing))
+        text = outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}})
+        for needle in ("is an ancestor of that build", "counts as those tests having run", "`unverifiable` is never a shrug",
+                       "Node 24 is first on PATH"):
+            self.assertIn(needle, text)
+        self.assertIn("NOT installed (boom)", outcome.prompt(outcome_issue(), {"sha": SHA, "manifest": {}}, "NOT installed (boom)"))
+
+    def test_complete_verification_retires_old_gaps_before_later_correlated_replies(self):
+        esc = outcome.esc
+        episode = "2026-10-20T00:00:00Z"
+        old = self.outcome_probe_fixture(helpCorr="oh-0123456789")
+        book = {"JOV-7771": {"at": 1, "sha": SHA, "episode": episode, "gaps": [esc.gap_for("JOV-7771", old)]},
+                "JOV-7772": {"sha": SHA, "episode": episode, "gaps": [{"criterion": "Other issue", "helpCorr": None}]}}
+        for status in ("pass", "fail"):
+            with self.subTest(status=status):
+                verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [
+                    {"criterion": old["criterion"], "status": status, "evidence": "Current device observation establishes this result"}]}
+                result, calls, comments, state = self.drain(verdict, seed_gaps=book,
+                                                            manifest_extra={"receiptNotBefore": episode})
+                self.assertEqual((result["done"][0]["result"], result["done"][0]["decision"]), ("recorded", status))
+                receipt = next(a for a, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a)))
+                self.assertEqual(receipt[receipt.index("--status") + 1], status, "a fresh true failure is still recorded")
+                stored = esc.read_gaps(state)
+                self.assertEqual(stored["JOV-7771"]["gaps"], [])
+                self.assertEqual((stored["JOV-7771"]["sha"], stored["JOV-7771"]["episode"]), (SHA, episode))
+                self.assertEqual(stored["JOV-7772"], book["JOV-7772"])
+                self.assertFalse(any(esc.GAP_MARKER in body for _, body in comments), "retiring gaps needs no gap comment")
+                queries = []
+                linear = SimpleNamespace(gql=lambda q, v: queries.append(v) or {"issue": {
+                    "id": "uuid-7771", "state": {"name": "Validating"}, "comments": {"nodes": self.help_thread(
+                        old["helpCorr"], "Earlier device observation contradicted the criterion")}}})
+                with patch.object(esc, "evaluate_reply") as evaluate, patch.object(outcome, "record_receipt") as write:
+                    self.assertEqual(outcome.help_followups(SimpleNamespace(state=state), linear, time.time()), [])
+                self.assertFalse(queries)
+                evaluate.assert_not_called()
+                write.assert_not_called()
+
+    def test_empty_malformed_and_partial_verdicts_do_not_supersede_existing_gaps(self):
+        esc = outcome.esc
+        old = self.outcome_probe_fixture(helpCorr="oh-0123456789")
+        book = {"JOV-7771": {"at": 1, "sha": SHA, "episode": None, "gaps": [esc.gap_for("JOV-7771", old)]}}
+        proved = {"criterion": "Current build responds", "status": "pass", "evidence": "GET version returned the bound build"}
+        unknown = self.outcome_probe_fixture(criterion="A different unknown", evidence="Authentication unavailable")
+        base = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [proved]}
+        cases = [None, {}, {**base, "sha": "0" * 40}, {**base, "items": []},
+                 {**base, "items": [proved, None]}, {**base, "items": [proved, {}]},
+                 {**base, "items": [unknown, {}]}]
+        cases += [{**base, "items": [proved] * 40 + [tail]} for tail in (None, {}, unknown)]
+        for verdict in cases:
+            with self.subTest(verdict=verdict):
+                _, _, _, state = self.drain(verdict, seed_gaps=book)
+                self.assertEqual(esc.read_gaps(state), book)
+        result, _, _, state = self.drain({**base, "items": [unknown] + [proved] * 39 + [None]}, seed_gaps=book)
+        self.assertEqual(result["done"][0]["decision"], "pass", "existing escalation and first-40 judgment stay unchanged")
+        self.assertEqual(esc.read_gaps(state), book, "a truncated judgment is not a complete gap replacement")
+        # An empty direct call also cannot erase a previously recorded observation gap.
+        with tempfile.TemporaryDirectory() as tmp:
+            state = Path(tmp)
+            (state / esc.GAP_FILE).write_text(json.dumps(book))
+            esc.route_gaps(state, SimpleNamespace(), {"id": "uuid-7771", "identifier": "JOV-7771"}, [], 2, sha=SHA)
+            self.assertEqual(esc.read_gaps(state), book)
+
+    def test_followup_query_failure_preserves_other_progress_and_delivers_true_failure_receipt(self):
+        esc = outcome.esc
+        corr, episode = "oh-0123456789", "2026-10-20T00:00:00Z"
+        for error_type in (RuntimeError, OSError, ValueError, KeyError):
+            with self.subTest(error_type=error_type.__name__), tempfile.TemporaryDirectory() as tmp:
+                state = Path(tmp)
+                book = {ident: {"sha": SHA, "episode": episode, "gaps": [{"criterion": ident,
+                        "evidence": "Authentication unavailable", "helpCorr": corr}]} for ident in ("JOV-0001", "JOV-0002", "JOV-0003")}
+                (state / esc.GAP_FILE).write_text(json.dumps(book))
+                queries, comments, failing = [], [], [True]
+                thread = self.help_thread(corr, "A direct authenticated observation of this criterion")
+
+                class Linear:
+                    def gql(self, query, variables):
+                        ident = variables["id"]
+                        queries.append(ident)
+                        if ident == "JOV-0002" and failing[0]:
+                            raise error_type("fixture query failure")
+                        return {"issue": {"id": ident, "state": {"name": "Validating"}, "comments": {"nodes": thread}}}
+                    def comment(self, ident, body):
+                        comments.append((ident, body))
+
+                host = SimpleNamespace(state=state, repo=state / "repo")
+                def evaluate(item, reply, **kwargs):
+                    return {"verdict": "supported" if item["criterion"] == "JOV-0003" else "contradicted",
+                            "result": "Concrete observation for " + item["criterion"]}
+                with patch.object(esc, "evaluate_reply", side_effect=evaluate) as judged, \
+                        patch.object(outcome, "app_authorization", return_value="Bearer fixture"), \
+                        patch.object(outcome, "checkout", return_value=state / "tree"), \
+                        patch.object(outcome, "drop_checkout"), patch.object(outcome, "record_receipt", return_value=True) as write:
+                    result = outcome.help_followups(host, Linear(), 2)
+                    self.assertEqual(result, [{"issue": "JOV-0001", "verdict": "contradicted"},
+                        {"issue": "JOV-0002", "error": error_type.__name__}, {"issue": "JOV-0003", "verdict": "supported"}])
+                    stored = esc.read_gaps(state)
+                    self.assertEqual(stored["JOV-0001"]["gaps"][0]["resolved"]["verdict"], "contradicted")
+                    self.assertEqual(stored["JOV-0002"], book["JOV-0002"], "failed queries remain retryable")
+                    self.assertEqual(stored["JOV-0003"]["gaps"][0]["resolved"]["verdict"], "supported")
+                    write.assert_called_once()
+                    self.assertEqual(write.call_args.args[1:3], ("JOV-0001", SHA))
+                    self.assertEqual(write.call_args.args[3]["status"], "fail")
+                    self.assertEqual(write.call_args.args[5], {"receiptNotBefore": episode})
+                    self.assertEqual(outcome.help_followups(host, Linear(), 3), [{"issue": "JOV-0002", "error": error_type.__name__}])
+                    self.assertEqual((judged.call_count, write.call_count, len(comments)), (2, 1, 2), "no replay of completed effects")
+                    failing[0] = False
+                    self.assertEqual(outcome.help_followups(host, Linear(), 4), [{"issue": "JOV-0002", "verdict": "contradicted"}])
+                    self.assertEqual(write.call_count, 2, "the recovered query's contradiction reaches the receipt writer")
+                    self.assertEqual(queries, ["JOV-0001", "JOV-0002", "JOV-0003", "JOV-0002", "JOV-0002"])
+
+    def drain(self, verdict, *, authorization="Bearer app", receipt_rc=0, manifest_extra=None, per_day=None, seed_gaps=None):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state = Path(tmp.name)
+        calls, comments = [], []
+        if seed_gaps is not None:
+            (state / outcome.esc.GAP_FILE).write_text(json.dumps(seed_gaps))
+
+        class Locked:
+            def __init__(self, path, blocking=False):
+                self.held = True
+            def release(self):
+                pass
+
+        issue = outcome_issue(lifecycle_comment(extra_manifest=manifest_extra))
+
+        class Linear:
+            def __init__(self, env):
+                pass
+            def gql(self, query, variables):
+                return {"issues": {"nodes": [issue], "pageInfo": {"hasNextPage": False, "endCursor": None}}}
+            def comment(self, issue_id, body):
+                comments.append((issue_id, body))
+
+        lane = SimpleNamespace(Locked=Locked, Linear=Linear, LinearRateLimited=RuntimeError)
+        host = SimpleNamespace(state=state, repo=state / "repo", linear_env=None)
+
+        def run(args, **kwargs):
+            calls.append((list(args), kwargs))
+            if args[:4] == ["git", "-C", str(host.repo), "worktree"] and "add" in args:
+                Path(args[-2]).mkdir(parents=True)
+            if "codex_lane.py" in " ".join(map(str, args)):
+                cwd = Path(args[args.index("--cwd") + 1])
+                if verdict is not None:
+                    (cwd / outcome.VERDICT_FILE).write_text(json.dumps(verdict))
+            rc = receipt_rc if "linear-sync-on-merge.mjs" in " ".join(map(str, args)) else 0
+            return subprocess.CompletedProcess(args, rc, "", "")
+
+        patches = [patch.object(outcome, "app_authorization", return_value=authorization)]
+        if per_day is not None:
+            patches.append(patch.object(outcome, "PER_DAY", per_day))
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        result = outcome.drain(host, lane, run=run, now=time.time())
+        return result, calls, comments, state
+
+    def test_a_verified_issue_gets_an_itemized_comment_and_a_pass_receipt(self):
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [
+            {"criterion": "Sentence case titles", "status": "pass",
+             "evidence": "apps/web/app/start/copy.ts:12 'Getting this ready'; curl jov.ie/start shows it"}]}
+        result, calls, comments, state = self.drain(verdict, manifest_extra={"receiptNotBefore": "2026-10-20T00:00:00Z"})
+        self.assertEqual(result["done"][0]["result"], "recorded")
+        receipt = next(args for args, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, args)))
+        self.assertEqual(receipt[receipt.index("--status") + 1], "pass")
+        self.assertEqual(receipt[receipt.index("--sha") + 1], SHA)
+        self.assertEqual(receipt[receipt.index("--episode-started-at") + 1], "2026-10-20T00:00:00Z")
+        env = next(kw["env"] for args, kw in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, args)))
+        self.assertEqual(env["LINEAR_API_KEY"], "Bearer app")
+        self.assertIn(outcome.COMMENT_MARKER, comments[0][1])
+        self.assertTrue(any("worktree" in args and "remove" in args for args, _ in calls), "checkout is dropped")
+        rows = [json.loads(line) for line in (state / "runs/ledger.jsonl").read_text().splitlines()]
+        self.assertEqual((rows[-1]["kind"], rows[-1]["decision"]), ("outcome-verify", "pass"))
+        # The same lifecycle ask is not verified twice.
+        self.assertEqual(outcome.candidates(SimpleNamespace(gql=lambda q, v: {"issues": {
+            "nodes": [outcome_issue(lifecycle_comment())], "pageInfo": {"hasNextPage": False}}}),
+            state, time.time()), [])
+
+    def test_no_verdict_no_app_credential_or_budget_means_no_receipt(self):
+        result, calls, comments, _ = self.drain(None)
+        self.assertEqual(result["done"][0]["result"], "verifier-failed")
+        self.assertFalse(comments, "a missing verdict is a verifier malfunction, never a fail receipt")
+        self.assertFalse([a for a, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a))])
+        verdict = {"schema": outcome.VERDICT_SCHEMA, "issue": "JOV-7771", "sha": SHA, "items": [
+            {"criterion": "x", "status": "pass", "evidence": "file.ts:1 shows the fix in place"}]}
+        result, calls, comments, _ = self.drain(verdict, authorization=None)
+        self.assertEqual(result["done"][0]["result"], "linear-app-unavailable")
+        self.assertFalse(comments)
+        self.assertFalse([a for a, _ in calls if "linear-sync-on-merge.mjs" in " ".join(map(str, a))])
+        result, calls, _, _ = self.drain(verdict, per_day=0)
+        self.assertEqual(result["status"], "disabled")
+        self.assertFalse(calls)
+
+    def test_tick_never_runs_in_a_selftest(self):
+        with patch.dict(os.environ, {"LANES_SELFTEST": "1"}):
+            self.assertEqual(outcome.tick(SimpleNamespace(), SimpleNamespace())["status"], "selftest-skipped")

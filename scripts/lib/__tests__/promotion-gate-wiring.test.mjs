@@ -16,6 +16,7 @@ import {
   buildJourneyEvidence,
   stripeModeFromKey,
 } from '../journey-evidence-builder.mjs';
+import { evaluatePromotion } from '../promotion-journey-evidence.mjs';
 
 const root = resolve(import.meta.dirname, '../../..');
 const yaml = f =>
@@ -38,7 +39,22 @@ const report = statuses => ({
     {
       specs: statuses.map(status => ({
         file: 'tests/e2e/golden-path.spec.ts',
-        tests: [{ status }],
+        tests: [
+          {
+            status,
+            expectedStatus: status === 'skipped' ? 'skipped' : 'passed',
+            results: [
+              {
+                status:
+                  status === 'expected'
+                    ? 'passed'
+                    : status === 'skipped'
+                      ? 'skipped'
+                      : 'failed',
+              },
+            ],
+          },
+        ],
       })),
     },
   ],
@@ -185,6 +201,59 @@ describe('workflow wiring', () => {
     expect(tooling.with['sparse-checkout-cone-mode']).toBe(false);
     expect(tooling.with.ref).not.toContain('expected_sha');
   });
+  it('visual review is a separate verdict that cannot rewrite journey evidence', () => {
+    const steps = yaml('ci.yml').jobs['ci-golden-path'].steps;
+    const idx = id => steps.findIndex(s => s.id === id);
+    const journey = steps[idx('canonical_journey')];
+    const visual = steps[idx('visual_review')];
+    const emit = steps.find(s => s.name?.startsWith('Emit journey evidence'));
+    const upload = steps.find(s => s.name === 'Upload journey evidence');
+    // The journey step (whose outcome becomes auth/billing evidence) never runs the reviewer.
+    expect(journey.run).not.toContain('golden-path-visual-review');
+    expect(visual.run).toContain('golden-path-visual-review');
+    // A failing visual step fails the job directly, with no advisory interval.
+    expect(visual['continue-on-error']).toBeUndefined();
+    expect(visual.if).toContain("steps.canonical_journey.outcome == 'success'");
+    expect(idx('visual_review')).toBeGreaterThan(idx('canonical_journey'));
+    expect(emit.env.JOURNEY_OUTCOME).toContain('canonical_journey');
+    expect(JSON.stringify(emit)).not.toContain('visual_review');
+    // Evidence is still emitted and uploaded after the visual step fails.
+    expect(emit.if).toBe('${{ always() }}');
+    expect(upload.if).toBe('${{ always() }}');
+  });
+
+  it('journeys that pass with a failing visual review emit success evidence', () => {
+    const docs = buildJourneyEvidence({
+      report: {
+        suites: [
+          {
+            specs: [
+              {
+                file: 'golden-path.spec.ts',
+                tests: [
+                  {
+                    status: 'expected',
+                    expectedStatus: 'passed',
+                    results: [{ status: 'passed' }],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      candidateSha: 'a'.repeat(40),
+      runId: '1',
+      runUrl: 'https://example.test/run/1',
+      stepOutcome: 'success',
+      stripeMode: 'test',
+    });
+    expect(docs.map(d => [d.journey, d.conclusion])).toEqual([
+      ['auth', 'success'],
+      ['billing', 'success'],
+    ]);
+  });
+
   it('Golden Path lane uploads exact-SHA evidence on every outcome', () => {
     const golden = yaml('ci.yml').jobs['ci-golden-path'];
     const steps = golden.steps;
@@ -453,4 +522,122 @@ describe('trusted gate tooling grades older and current candidates', () => {
       }
     }
   );
+});
+
+// Every report/identity below is a synthetic fixture;
+// no auth, database, Stripe, hosted job, deployment or artifact is exercised.
+const reportRange = {
+  schema: 'jovie.release-range-risk/v1',
+  baseDeployedSha: 'b'.repeat(40),
+  candidateSha: SHA,
+  unknown: false,
+  affects: { auth: true, billing: true },
+};
+
+function promotionFromReport({
+  file = 'tests/e2e/golden-path.spec.ts',
+  status = 'expected',
+  expectedStatus = 'passed',
+  actualStatus = 'passed',
+  testOverride = {},
+  stepOutcome = 'success',
+} = {}) {
+  const evidence = buildJourneyEvidence({
+    report: {
+      stats: { startTime: new Date(NOW.getTime() - 60_000).toISOString() },
+      suites: [
+        {
+          specs: [
+            {
+              file,
+              tests: [
+                {
+                  status,
+                  expectedStatus,
+                  results: [{ status: actualStatus }],
+                  ...testOverride,
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    candidateSha: SHA,
+    runId: '99',
+    runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/99',
+    stepOutcome,
+    stripeMode: 'test',
+    completedAt: NOW,
+  });
+  return evaluatePromotion({ range: reportRange, evidence, now: NOW });
+}
+
+describe('journey report proves the canonical executed journey', () => {
+  it.each([
+    'tests/e2e/golden-path.spec.ts',
+    '/workspace/apps/web/tests/e2e/golden-path.spec.ts',
+    'C:\\workspace\\apps\\web\\tests\\e2e\\golden-path.spec.ts',
+  ])('preserves a truly passing canonical report: %s', file => {
+    expect(promotionFromReport({ file }).decision).toBe('pass');
+  });
+
+  it.each([
+    'tests/e2e/synthetic-golden-path.spec.ts',
+    'tests/e2e/responsive-golden-path.spec.ts',
+    'tests/e2e/profile-fan-capture-golden-path.spec.ts',
+  ])('blocks another spec whose name only shares a suffix: %s', file => {
+    expect(promotionFromReport({ file }).decision).toBe('blocked');
+  });
+
+  it('blocks a canonical assertion that failed as expected (test.fail)', () => {
+    expect(
+      promotionFromReport({
+        status: 'expected',
+        expectedStatus: 'failed',
+        actualStatus: 'failed',
+      }).decision
+    ).toBe('blocked');
+  });
+
+  it('keeps skipped canonical journeys blocked', () => {
+    expect(
+      promotionFromReport({
+        status: 'skipped',
+        expectedStatus: 'skipped',
+        actualStatus: 'skipped',
+      }).decision
+    ).toBe('blocked');
+  });
+
+  it('keeps flaky canonical journeys blocked', () => {
+    expect(promotionFromReport({ status: 'flaky' }).decision).toBe('blocked');
+  });
+
+  it.each([
+    ['missing expectation', { expectedStatus: undefined }],
+    ['missing results', { results: undefined }],
+    ['empty results', { results: [] }],
+    ['malformed results', { results: {} }],
+    ['missing result status', { results: [{}] }],
+    ['null result', { results: [null] }],
+    ['failed execution', { results: [{ status: 'failed' }] }],
+    ['timed out execution', { results: [{ status: 'timedOut' }] }],
+    ['interrupted execution', { results: [{ status: 'interrupted' }] }],
+    [
+      'failed retry before pass',
+      { results: [{ status: 'failed' }, { status: 'passed' }] },
+    ],
+  ])(
+    'blocks incomplete or non-passing execution: %s',
+    (_label, testOverride) => {
+      expect(promotionFromReport({ testOverride }).decision).toBe('blocked');
+    }
+  );
+
+  it('preserves a negative step outcome even when the canonical test passed', () => {
+    expect(promotionFromReport({ stepOutcome: 'failure' }).decision).toBe(
+      'blocked'
+    );
+  });
 });

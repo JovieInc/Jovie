@@ -12,6 +12,7 @@
     "includes": [
       "**/*",
       "!!.claude",
+      "!.github/actions/vendor/**",
       "!apps/web/drizzle/migrations/**",
       "!**/.context/**",
       "!.agents/skills/gstack/**",
@@ -35,7 +36,9 @@
       "!canon/ownership.json",
       "!packages/action-contracts/generated/**",
       "!**/*.a11y-red.tsx",
-      "!scripts/invariants/fixtures/done-sprint-invariants/**"
+      "!scripts/invariants/fixtures/done-sprint-invariants/**",
+      "!scripts/invariants/icp-language/baseline.json",
+      "!scripts/invariants/icp-language/config.json"
     ]
   },
   "formatter": {
@@ -143,6 +146,27 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["scripts/agent/pen-instance-drift.js"],
+      "javascript": {
+        "globals": [
+          "Get",
+          "Print",
+          "Replace",
+          "Insert",
+          "Move",
+          "Delete",
+          "__penDrift"
+        ]
+      }
+    },
+    {
+      "includes": [
+        "scripts/invariants/copy-leak/config.json",
+        "scripts/invariants/copy-leak/positive-fixtures.json"
+      ],
+      "json": { "formatter": { "expand": "never", "lineWidth": 320 } }
+    },
     {
       "includes": [
         "**/*.test.ts",

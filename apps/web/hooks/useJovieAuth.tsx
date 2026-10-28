@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { clearLegacyClerkSessionMarker } from '@/lib/auth/auth-session-cookies';
 import { authClient } from '@/lib/auth/client';
 import {
@@ -62,6 +69,8 @@ export interface UseAuthSafeReturn {
   readonly isSignedIn: boolean;
   readonly userId: string | null;
   readonly sessionId: string | null;
+  /** Trusted server seed only, until the first live session result settles. */
+  readonly bootstrapSessionPending?: boolean;
   readonly getToken: () => Promise<string | null>;
   readonly signOut: (options?: JovieSignOutOptions) => Promise<void>;
 }
@@ -162,6 +171,15 @@ export function JovieAuthValuesProvider({
   readonly initialUser?: BetterAuthSessionUser | null;
 }) {
   const { data, isPending } = authClient.useSession();
+  const [sessionSettled, setSessionSettled] = useState(
+    () => !isPending || Boolean(data?.session)
+  );
+  useIsomorphicLayoutEffect(() => {
+    if (!isPending || data?.session) setSessionSettled(true);
+  }, [isPending, data?.session]);
+  const bootstrapSessionPending = Boolean(
+    initialUser && isPending && !sessionSettled && !data?.user
+  );
 
   const value = useMemo<JovieAuthContextValue>(() => {
     // Clerk's isLoaded meant "Clerk JS finished booting"; the Better Auth
@@ -182,6 +200,7 @@ export function JovieAuthValuesProvider({
         isSignedIn,
         userId: user?.id ?? null,
         sessionId: data?.session?.id ?? null,
+        bootstrapSessionPending,
         getToken,
         signOut,
       },
@@ -194,7 +213,7 @@ export function JovieAuthValuesProvider({
       },
       canRenderAuthUi: true,
     };
-  }, [data, initialUser, isPending]);
+  }, [data, initialUser, isPending, bootstrapSessionPending]);
 
   return (
     <JovieAuthContext.Provider value={value}>
@@ -211,13 +230,18 @@ export function JovieAuthValuesProvider({
  */
 export function JovieAuthDefaultsProvider({
   children,
+  fixtureUser = null,
 }: {
   readonly children: ReactNode;
+  /** Local demo identity only. Never creates a session or enables auth UI. */
+  readonly fixtureUser?: JovieUser | null;
 }) {
   return (
     <JovieAuthContext.Provider
       value={{
-        user: DEFAULT_USER_RETURN,
+        user: fixtureUser
+          ? { isLoaded: true, isSignedIn: false, user: fixtureUser }
+          : DEFAULT_USER_RETURN,
         auth: DEFAULT_AUTH_RETURN,
         session: DEFAULT_SESSION_RETURN,
         canRenderAuthUi: false,
