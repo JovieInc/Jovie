@@ -28,6 +28,7 @@ import { DashboardDataContext } from '@/app/app/(shell)/dashboard/DashboardDataC
 import type { PaletteSection } from '@/components/organisms/SharedCommandPalette';
 import { APP_ROUTES } from '@/constants/routes';
 import {
+  type HeaderSearchAdapter,
   useHeaderActions,
   useOptionalHeaderActions,
 } from '@/contexts/HeaderActionsContext';
@@ -104,8 +105,12 @@ export function CommandPalette() {
  */
 export function CommandPaletteMainSurface() {
   const dashboardData = useContext(DashboardDataContext);
-  const { closeCommandPalette, isCommandPaletteOpen, setCommandPaletteHeader } =
-    useHeaderActions();
+  const {
+    closeCommandPalette,
+    headerSearchAdapter,
+    isCommandPaletteOpen,
+    setCommandPaletteHeader,
+  } = useHeaderActions();
   if (!dashboardData || !isCommandPaletteOpen) return null;
   return (
     <CommandPaletteInner
@@ -117,6 +122,7 @@ export function CommandPaletteMainSurface() {
       }}
       presentation='main'
       onHeaderChange={setCommandPaletteHeader}
+      filterAdapter={headerSearchAdapter}
     />
   );
 }
@@ -128,6 +134,8 @@ interface CommandPaletteInnerProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly presentation: 'main' | 'dialog';
   readonly onHeaderChange?: (header: ReactNode | null) => void;
+  /** Per-view filter adapter registered by the active route (JOV-8792). */
+  readonly filterAdapter?: HeaderSearchAdapter | null;
 }
 
 function CommandPaletteController() {
@@ -206,6 +214,7 @@ function CommandPaletteInner({
   onOpenChange,
   presentation,
   onHeaderChange,
+  filterAdapter = null,
 }: CommandPaletteInnerProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -304,6 +313,7 @@ function CommandPaletteInner({
       onAdditionalSelect={handleAdditionalSelect}
       presentation={presentation}
       onHeaderChange={onHeaderChange}
+      filterAdapter={filterAdapter}
     />
   );
 }

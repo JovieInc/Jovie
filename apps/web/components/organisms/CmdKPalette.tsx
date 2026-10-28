@@ -15,7 +15,7 @@
 
 import { Button, Dialog, DialogContent } from '@jovie/ui';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { Search } from 'lucide-react';
+import { Search, SlidersHorizontal } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import {
   type ReactNode,
@@ -28,6 +28,7 @@ import {
   useState,
 } from 'react';
 import { APP_ROUTES } from '@/constants/routes';
+import { type HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import { filterSkillsHidingBrokenAlbumArt } from '@/lib/chat/album-art-capability';
 import { type EntityRef } from '@/lib/commands/entities';
 import { resolveEntityHref } from '@/lib/commands/entity-routing';
@@ -50,12 +51,14 @@ import {
   releaseRowToEntityRef,
 } from '../jovie/components/entity-mappers';
 import { pickerItemKey } from '../jovie/components/picker-rows';
+import { PillSearch } from '../shell/PillSearch';
 import { CmdKMainPlaneSearchInput } from './CmdKMainPlaneSearchInput';
 import {
   applyPaletteDefaultLimits,
   buildRegistrySections,
   filterAdditionalSections,
   flattenSections,
+  fuzzyMatch,
   hasHiddenPaletteDefaults,
   PaletteList,
   type PaletteSection,
@@ -77,6 +80,12 @@ interface CmdKPaletteProps {
   readonly presentation?: 'dialog' | 'main';
   /** Supplies the live query field to the breadcrumb/header seam in main mode. */
   readonly onHeaderChange?: (header: ReactNode | null) => void;
+  /**
+   * Per-view filter adapter registered by the active route (JOV-8792).
+   * When present, the palette surfaces a "Filter current view" entry that
+   * swaps the command input for the route's pill filter surface.
+   */
+  readonly filterAdapter?: HeaderSearchAdapter | null;
 }
 
 function useCmdkData(profileId: string, query: string, open: boolean) {
@@ -177,10 +186,12 @@ export function CmdKPalette({
   onAdditionalSelect,
   presentation = 'dialog',
   onHeaderChange,
+  filterAdapter = null,
 }: CmdKPaletteProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [filterMode, setFilterMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const generatedListId = useId();
   const paletteDescriptionId = `${generatedListId}-description`;
@@ -190,8 +201,15 @@ export function CmdKPalette({
     if (!open) {
       setQuery('');
       setSelectedIndex(0);
+      setFilterMode(false);
     }
   }, [open]);
+
+  // A route that unregisters its adapter (navigation) cannot keep the palette
+  // stuck in the per-view filter mode.
+  useEffect(() => {
+    if (!filterAdapter) setFilterMode(false);
+  }, [filterAdapter]);
 
   useLayoutEffect(() => {
     if (presentation === 'dialog' && open) inputRef.current?.focus();
@@ -205,13 +223,37 @@ export function CmdKPalette({
   } = useCmdkData(profileId, query, open);
   const pendingMessage =
     query.trim().length > 0 ? 'Searching…' : 'Loading results…';
+  const filterSections = useMemo<PaletteSection[]>(() => {
+    if (!filterAdapter || filterMode) return [];
+    const label = filterAdapter.triggerLabel;
+    const description = 'Filter the current view';
+    if (!fuzzyMatch(`${label} ${description}`, query)) return [];
+    return [
+      {
+        id: 'filter-current-view',
+        label: 'Current view',
+        items: [
+          {
+            kind: 'action' as const,
+            action: {
+              id: 'filter-current-view',
+              label,
+              description,
+              icon: SlidersHorizontal,
+              onSelect: () => setFilterMode(true),
+            },
+          },
+        ],
+      },
+    ];
+  }, [filterAdapter, filterMode, query]);
   const filteredAdditional = useMemo(
     () => filterAdditionalSections(query, additionalSectionsAfter),
     [query, additionalSectionsAfter]
   );
   const unboundedSections = useMemo<PaletteSection[]>(
-    () => [...registrySections, ...filteredAdditional],
-    [registrySections, filteredAdditional]
+    () => [...filterSections, ...registrySections, ...filteredAdditional],
+    [filterSections, registrySections, filteredAdditional]
   );
   const allSections = useMemo<PaletteSection[]>(
     () => applyPaletteDefaultLimits(query, unboundedSections),
@@ -278,6 +320,13 @@ export function CmdKPalette({
     (idx: number) => {
       const item = flatItems[idx];
       if (!item) return;
+
+      // The per-view filter entry keeps the palette open: committing it
+      // swaps the command input for the route's filter surface (JOV-8792).
+      if (item.kind === 'action' && item.action.id === 'filter-current-view') {
+        setFilterMode(true);
+        return;
+      }
 
       const key = pickerItemKey(item);
       if (additionalIds.has(key)) {
@@ -373,10 +422,20 @@ export function CmdKPalette({
         if (index !== null) commitIndex(index);
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        handleClose();
+        // Escape backs out of the per-view filter mode before it closes the
+        // palette, mirroring the pill surface's own Esc-on-empty behavior.
+        if (filterMode) setFilterMode(false);
+        else handleClose();
       }
     },
-    [activeIndex, commitIndex, flatItems.length, focusSearchInput, handleClose]
+    [
+      activeIndex,
+      commitIndex,
+      filterMode,
+      flatItems.length,
+      focusSearchInput,
+      handleClose,
+    ]
   );
   const handleKeyboardCommandRef = useRef(handleKeyboardCommand);
   useEffect(() => {
@@ -420,7 +479,31 @@ export function CmdKPalette({
     return () => globalThis.removeEventListener('keydown', onKeyDown);
   }, [flatItems, generatedListId, handleKeyboardCommand, open]);
 
-  const dialogInput = (
+  const filterSurface = useMemo(
+    () =>
+      filterMode && filterAdapter ? (
+        <PillSearch
+          active
+          pills={filterAdapter.pills}
+          onPillsChange={filterAdapter.onPillsChange}
+          artistOptions={filterAdapter.artistOptions}
+          titleOptions={filterAdapter.titleOptions}
+          albumOptions={filterAdapter.albumOptions}
+          statusOptions={filterAdapter.statusOptions}
+          approvalOptions={filterAdapter.approvalOptions}
+          hasOptions={filterAdapter.hasOptions}
+          ariaLabel={
+            filterAdapter.ariaLabel ?? `Filter ${filterAdapter.triggerLabel}`
+          }
+          placeholder={filterAdapter.placeholder ?? 'Type to filter'}
+          allowedFields={filterAdapter.allowedFields}
+          onClose={() => setFilterMode(false)}
+        />
+      ) : null,
+    [filterAdapter, filterMode]
+  );
+
+  const dialogInput = filterSurface ?? (
     <div className='flex h-full min-w-0 flex-1 items-center gap-2'>
       <Search
         className='size-4 shrink-0 text-tertiary-token'
@@ -458,6 +541,10 @@ export function CmdKPalette({
       onHeaderChange?.(null);
       return undefined;
     }
+    if (filterSurface) {
+      onHeaderChange?.(filterSurface);
+      return () => onHeaderChange?.(null);
+    }
     onHeaderChange?.(
       <CmdKMainPlaneSearchInput
         value={query}
@@ -478,6 +565,7 @@ export function CmdKPalette({
     return () => onHeaderChange?.(null);
   }, [
     activeRowId,
+    filterSurface,
     generatedListId,
     onHeaderChange,
     open,
@@ -550,7 +638,9 @@ export function CmdKPalette({
         data-testid='cmdk-main-plane'
         data-surface='cmdk'
       >
-        {results}
+        {/* In per-view filter mode the header seam owns the pill input; the
+            palette list stays hidden so the filter dropdown is the only list. */}
+        {filterSurface ? null : results}
       </section>
     ) : null;
   }
@@ -572,7 +662,7 @@ export function CmdKPalette({
           <div className='flex shrink-0 items-center border-b border-(--app-shell-frame-seam) px-3.5 py-2.5'>
             {dialogInput}
           </div>
-          {results}
+          {filterSurface ? null : results}
         </div>
       </DialogContent>
     </Dialog>

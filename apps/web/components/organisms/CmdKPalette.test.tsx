@@ -14,6 +14,7 @@ import {
 } from '@/components/jovie/chat-composer-copy';
 import type { PickerActionItem } from '@/components/jovie/components/picker-rows';
 import { APP_ROUTES } from '@/constants/routes';
+import type { HeaderSearchAdapter } from '@/contexts/HeaderActionsContext';
 import { PRODUCT_ONTOLOGY } from '@/data/productOntology';
 import { AppFlagProvider } from '@/lib/flags/client';
 import { APP_FLAG_DEFAULTS } from '@/lib/flags/contracts';
@@ -107,12 +108,14 @@ function MainPlaneHarness({
   onOpenChange = vi.fn(),
   additionalSectionsAfter,
   onAdditionalSelect,
+  filterAdapter,
 }: {
   onOpenChange?: (open: boolean) => void;
   additionalSectionsAfter?: ComponentProps<
     typeof CmdKPalette
   >['additionalSectionsAfter'];
   onAdditionalSelect?: (id: string) => void;
+  filterAdapter?: ComponentProps<typeof CmdKPalette>['filterAdapter'];
 }) {
   const [header, setHeader] = useState<ReactNode>(null);
 
@@ -127,9 +130,30 @@ function MainPlaneHarness({
         onHeaderChange={setHeader}
         additionalSectionsAfter={additionalSectionsAfter}
         onAdditionalSelect={onAdditionalSelect}
+        filterAdapter={filterAdapter}
       />
     </>
   );
+}
+
+function buildTaskFilterAdapter(
+  overrides: Partial<HeaderSearchAdapter> = {}
+): HeaderSearchAdapter {
+  return {
+    key: 'tasks',
+    pills: [],
+    onPillsChange: vi.fn(),
+    artistOptions: [],
+    titleOptions: ['Tonight'],
+    albumOptions: [],
+    totalCount: 3,
+    visibleCount: 3,
+    triggerLabel: 'Filter Tasks',
+    ariaLabel: 'Filter Tasks',
+    placeholder: 'Search tasks',
+    allowedFields: ['title'] as const,
+    ...overrides,
+  } satisfies HeaderSearchAdapter;
 }
 
 function MainPlaneReopenHarness() {
@@ -677,5 +701,160 @@ describe('CmdKPalette', () => {
     expect(onAdditionalSelect).toHaveBeenCalledWith('attach-files');
     expect(onOpenChange).toHaveBeenCalledWith(false);
     expect(pushMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('CmdKPalette per-view filter mode (JOV-8792)', () => {
+  it('surfaces the registered adapter as a Filter current view entry', () => {
+    render(<MainPlaneHarness filterAdapter={buildTaskFilterAdapter()} />);
+
+    const entry = screen.getByRole('option', {
+      name: /Filter Tasks/,
+    });
+    expect(entry).toHaveAttribute('aria-selected', 'true');
+    expect(
+      screen
+        .getByTestId('cmdk-main-plane')
+        .querySelector('[data-palette-section="filter-current-view"]')
+    ).not.toBeNull();
+  });
+
+  it('shows no filter entry without a registered adapter', () => {
+    render(<MainPlaneHarness />);
+
+    expect(
+      screen.queryByRole('option', { name: /Filter the current view/ })
+    ).toBeNull();
+  });
+
+  it('narrows the filter entry with the active query', () => {
+    render(<MainPlaneHarness filterAdapter={buildTaskFilterAdapter()} />);
+
+    fireEvent.change(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { target: { value: 'zzz-no-match' } }
+    );
+
+    expect(screen.queryByRole('option', { name: /Filter Tasks/ })).toBeNull();
+  });
+
+  it('enters filter mode from a row commit and keeps the palette open', async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <MainPlaneHarness
+        onOpenChange={onOpenChange}
+        filterAdapter={buildTaskFilterAdapter()}
+      />
+    );
+
+    fireEvent.mouseDown(screen.getByRole('option', { name: /Filter Tasks/ }));
+
+    const filterInput = await screen.findByRole('combobox', {
+      name: 'Filter Tasks',
+    });
+    expect(filterInput).toBeInTheDocument();
+    // PillSearch focuses its input on a requestAnimationFrame tick.
+    await waitFor(() => expect(filterInput).toHaveFocus());
+    // The palette list stays hidden so the pill surface owns the only list.
+    expect(screen.queryByRole('option', { name: /Home/ })).toBeNull();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it('commits pills from the filter mode to the view adapter', async () => {
+    const onPillsChange = vi.fn();
+    render(
+      <MainPlaneHarness
+        filterAdapter={buildTaskFilterAdapter({ onPillsChange })}
+      />
+    );
+
+    fireEvent.keyDown(
+      screen.getByRole('combobox', { name: 'Command Palette Search' }),
+      { key: 'Enter' }
+    );
+
+    const filterInput = await screen.findByRole('combobox', {
+      name: 'Filter Tasks',
+    });
+    fireEvent.change(filterInput, { target: { value: 'Tonight' } });
+
+    const suggestion = await screen.findByRole('option', {
+      name: /Tonight/,
+    });
+    fireEvent.mouseDown(suggestion);
+
+    expect(onPillsChange).toHaveBeenCalledWith([
+      expect.objectContaining({
+        field: 'title',
+        op: 'is',
+        values: ['Tonight'],
+      }),
+    ]);
+    expect(filterInput).toHaveValue('');
+  });
+
+  it('Escape backs out of filter mode without closing the palette', async () => {
+    const onOpenChange = vi.fn();
+    render(
+      <MainPlaneHarness
+        onOpenChange={onOpenChange}
+        filterAdapter={buildTaskFilterAdapter()}
+      />
+    );
+
+    fireEvent.mouseDown(screen.getByRole('option', { name: /Filter Tasks/ }));
+
+    const filterInput = await screen.findByRole('combobox', {
+      name: 'Filter Tasks',
+    });
+    fireEvent.keyDown(filterInput, { key: 'Escape' });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('combobox', { name: 'Command Palette Search' })
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('combobox', { name: 'Filter Tasks' })).toBeNull();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it('exits filter mode when the route unregisters its adapter', async () => {
+    const adapter = buildTaskFilterAdapter();
+    const view = render(<MainPlaneHarness filterAdapter={adapter} />);
+
+    fireEvent.mouseDown(screen.getByRole('option', { name: /Filter Tasks/ }));
+    await screen.findByRole('combobox', { name: 'Filter Tasks' });
+
+    view.rerender(<MainPlaneHarness filterAdapter={null} />);
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('combobox', { name: 'Filter Tasks' })
+      ).toBeNull();
+    });
+    expect(
+      screen.getByRole('combobox', { name: 'Command Palette Search' })
+    ).toBeInTheDocument();
+  });
+
+  it('swaps the dialog input row for the per-view filter surface', async () => {
+    render(
+      <CmdKPalette
+        profileId='profile-1'
+        open
+        onOpenChange={vi.fn()}
+        filterAdapter={buildTaskFilterAdapter()}
+      />
+    );
+
+    fireEvent.mouseDown(screen.getByRole('option', { name: /Filter Tasks/ }));
+
+    const filterInput = await screen.findByRole('combobox', {
+      name: 'Filter Tasks',
+    });
+    expect(filterInput).toBeInTheDocument();
+    expect(
+      screen.queryByRole('combobox', { name: 'Command Palette Search' })
+    ).toBeNull();
   });
 });
