@@ -6,6 +6,8 @@ import {
   type DeliveryLanes,
   type DeliveryMergedPullRequest,
   type DeliveryMergeRepo,
+  type DeployHealth,
+  type DeployHealthRepo,
   isExactSha,
   LANE_BRANCH_PREFIXES,
   LANE_BRANCH_RE,
@@ -951,6 +953,36 @@ export function parseLaneFlow(
   };
 }
 
+/** The lanes feed's `jovie-deploy-health/v1` block; anything malformed is treated as not published. */
+export function parseDeployHealth(value: unknown): DeployHealth | null {
+  if (!isRecord(value) || value.schema !== 'jovie-deploy-health/v1')
+    return null;
+  if (typeof value.healthy !== 'boolean' || !isRecord(value.repos)) return null;
+  const nullableInt = (raw: unknown) =>
+    Number.isSafeInteger(raw) && Number(raw) >= 0 ? Number(raw) : null;
+  const repos: DeployHealthRepo[] = [];
+  for (const [name, row] of Object.entries(value.repos).slice(0, 8)) {
+    const repo = /^[\w.-]{1,48}\/[\w.-]{1,48}$/.test(name) ? name : null;
+    if (!repo || !isRecord(row)) return null;
+    repos.push({
+      repo,
+      status:
+        row.status === 'ok' || row.status === 'failing'
+          ? row.status
+          : 'unknown',
+      failedStreak: nullableInt(row.failedStreak) ?? 0,
+      behindMain: nullableInt(row.behindMain),
+      oldestUnshippedAgeSeconds: nullableInt(row.oldestUnshippedAge),
+      lastSuccessAt: parseTimestamp(row.lastSuccessAt),
+    });
+  }
+  return {
+    observedAt: parseTimestamp(value.observedAt),
+    healthy: value.healthy,
+    repos,
+  };
+}
+
 /** Validate a `symphony-lanes-status/v1` document into the lanes block. */
 export function parseLanesStatus(
   payload: Record<string, unknown>
@@ -1003,6 +1035,7 @@ export function parseLanesStatus(
     heldByReason: countRecord(payload.held_by_reason),
     failedByReason: countRecord(payload.failed_by_reason),
     capacity: parseCapacityHorizon(payload.capacity),
+    deployHealth: parseDeployHealth(payload.deployHealth),
     stageSummary: isRecord(payload.slo)
       ? parseStageSummary(payload.slo.stages)
       : null,

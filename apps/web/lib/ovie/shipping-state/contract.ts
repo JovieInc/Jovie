@@ -427,6 +427,22 @@ export type DeliveryMergedPullRequest = {
   readonly mergedAt: string;
 };
 
+/** One repo's production deploy health from the lanes feed's `deployHealth` block (scripts/lanes/deploy_health.py). */
+export type DeployHealthRepo = {
+  readonly repo: string;
+  readonly status: 'ok' | 'failing' | 'unknown';
+  readonly failedStreak: number;
+  readonly behindMain: number | null;
+  readonly oldestUnshippedAgeSeconds: number | null;
+  readonly lastSuccessAt: string | null;
+};
+
+export type DeployHealth = {
+  readonly observedAt: string | null;
+  readonly healthy: boolean;
+  readonly repos: readonly DeployHealthRepo[];
+};
+
 export type DeliveryLanes = {
   readonly running: CountMeasurement;
   readonly slots: CountMeasurement;
@@ -446,6 +462,8 @@ export type DeliveryLanes = {
    */
   readonly stageSummary?: StageSummary | null;
   readonly flow?: DeliveryFlow | null;
+  /** Production deploy failure and lag per repo (Jovie, LogYourBody). Null when the feed does not publish it. */
+  readonly deployHealth?: DeployHealth | null;
   readonly publishedAt: string | null;
   /** The feed's own `at` is older than the lanes semantic window. */
   readonly stale: boolean;
@@ -614,6 +632,7 @@ export function emptyDeliverySummary(): DeliverySummary {
       failedByReason: {},
       capacity: null,
       stageSummary: null,
+      deployHealth: null,
       publishedAt: null,
       stale: false,
     },

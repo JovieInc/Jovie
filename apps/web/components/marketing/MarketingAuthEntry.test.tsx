@@ -54,10 +54,10 @@ describe('marketing auth entry waits for intent', () => {
     const hero = ARTIST_NOTIFICATIONS_COPY.hero;
     const view = render(<ArtistNotificationsHero hero={hero} />);
     const link = screen.getByRole('link', { name: hero.primaryCtaLabel });
-    expectIntentOnly(link, '/signup?plan=pro');
+    expectIntentOnly(link, '/start');
     fireEvent.focus(link);
     fireEvent.mouseEnter(link);
-    expectIntentOnly(link, '/signup?plan=pro');
+    expectIntentOnly(link, '/start');
     view.rerender(
       <ArtistNotificationsHero hero={{ ...hero, primaryCtaHref: '/pricing' }} />
     );

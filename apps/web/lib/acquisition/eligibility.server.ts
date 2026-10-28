@@ -548,6 +548,24 @@ function isCachedReport(value: unknown): value is AcquisitionEligibilityReport {
 }
 
 /**
+ * Cache-only read for request paths that must never trigger the GitHub and
+ * canary recompute (anonymous chat turns). A miss, an outage or a malformed
+ * entry is null, which callers treat as "not green".
+ */
+export async function readCachedAcquisitionEligibility(): Promise<AcquisitionEligibilityReport | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    const cached = await redis.get<unknown>(CACHE_KEY);
+    const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
+    return isCachedReport(parsed) ? parsed : null;
+  } catch (error) {
+    logger.warn('[acquisition/eligibility] cache-only read failed', error);
+    return null;
+  }
+}
+
+/**
  * Cached read for planners and dispatchers. The cache only bounds probe cost;
  * a cache miss or Redis failure recomputes from live evidence, and nothing
  * here can mark the cone eligible without current receipts.

@@ -974,7 +974,7 @@ export function HudDashboardClient({
                       data={hudUrl ?? ''}
                       size={196}
                       label='HUD Link'
-                      className='rounded-lg bg-white dark:bg-white'
+                      className='rounded-lg bg-surface-1'
                     />
                   </div>
                 </div>
