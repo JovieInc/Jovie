@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import {
   applyPendingClaimCookie,
   writePendingClaimContext,
@@ -23,6 +24,7 @@ import {
   isClaimTokenValid,
   lookupUsernameByClaimToken,
 } from '@/lib/services/profile/queries';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 
 interface ClaimTokenRouteContext {
   readonly params: Promise<{ readonly token: string }>;
@@ -81,6 +83,11 @@ export async function GET(
   const lead = await lookupLeadByClaimToken(token);
   const claimTokenHash = await hashClaimToken(token);
 
+  // Golden-path entry cohort. Consent-gated: no journey id, nothing recorded.
+  await recordArtistOfferStage(
+    request.cookies.get(ACQUISITION_COOKIE_NAME)?.value,
+    'claim-link-open'
+  );
   await setLeadAttributionCookieFromToken(token);
   await markLeadClaimPageViewedFromToken(token);
   const context = await writePendingClaimContext({
