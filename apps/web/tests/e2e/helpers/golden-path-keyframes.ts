@@ -48,13 +48,59 @@ export interface EssentialViewportAudit {
   }[];
 }
 
-/** State-specific actions only: transcript/list items may legitimately scroll. */
+/**
+ * Wait until the element's rect and every ancestor's client box stop moving.
+ * The composer surface uses Motion layout="size", so a draft change (for
+ * example clearing a multi-line starter) tweens its height; auditing mid-tween
+ * reads a fractional, clipped box that is not a layout defect. This waits for
+ * the motion to finish and never relaxes the geometry assertion itself.
+ */
+export async function waitForStableGeometry(
+  page: Page,
+  selector: string,
+  { frames = 12, timeout = 5_000 } = {}
+): Promise<void> {
+  await page.waitForFunction(
+    ({ selector, frames }) => {
+      const el = document.querySelector(selector);
+      if (!el) return false;
+      const w = window as unknown as {
+        __geometryStable?: { key: string; count: number; seen: boolean };
+      };
+      const parts: string[] = [];
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        const r = node.getBoundingClientRect();
+        parts.push(
+          [r.left, r.top, r.width, r.height, node.clientHeight]
+            .map(n => n.toFixed(2))
+            .join(',')
+        );
+      }
+      const key = parts.join('|');
+      const state = w.__geometryStable;
+      if (!state || state.key !== key) {
+        w.__geometryStable = { key, count: 0, seen: true };
+        return false;
+      }
+      state.count += 1;
+      return state.count >= frames;
+    },
+    { selector, frames },
+    { polling: 'raf', timeout }
+  );
+}
+
+/**
+ * State-specific actions only: transcript/list items may legitimately scroll.
+ * Optional states are selected and audited in the same browser snapshot.
+ */
 export async function inspectEssentialViewport(
   page: Page,
-  selectors: readonly string[]
+  selectors: readonly string[],
+  optionalSelectors: readonly string[] = []
 ): Promise<EssentialViewportAudit> {
   // Plain JS avoids transpiler helpers in serialized browser functions.
-  return page.evaluate(`((selectors) => {
+  return page.evaluate(`((selectors, optionalSelectors) => {
     const viewport = window.visualViewport;
     if (!viewport) return { supported: false, findings: [] };
     const findings = [];
@@ -66,8 +112,19 @@ export async function inspectEssentialViewport(
       }
       return true;
     };
-    for (const selector of selectors) {
-      const matches = Array.from(document.querySelectorAll(selector)).filter(visible);
+    // Preserve locator.isVisible() selection: opacity zero still has a layout
+    // box, so it must reach the strict painted-visibility audit and fail below.
+    const rendered = el => {
+      if (!el.getClientRects().length) return false;
+      if (el.checkVisibility && !el.checkVisibility()) return false;
+      if (getComputedStyle(el).visibility !== 'visible') return false;
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
+    for (const selector of new Set([...selectors, ...optionalSelectors])) {
+      const candidates = Array.from(document.querySelectorAll(selector));
+      if (!selectors.includes(selector) && !candidates.some(rendered)) continue;
+      const matches = candidates.filter(visible);
       if (matches.length !== 1) {
         findings.push({ selector, reason: matches.length ? 'duplicate' : 'missing' });
         continue;
@@ -117,11 +174,39 @@ export async function inspectEssentialViewport(
       if (points.some(([px,py]) => occludedAt(px, py))) findings.push({ selector, reason: 'occluded', box });
     }
     return { supported: true, findings };
-  })(${JSON.stringify(selectors)})`);
+  })(${JSON.stringify(selectors)}, ${JSON.stringify(optionalSelectors)})`);
 }
 
 const pageErrors = new WeakMap<Page, string[]>();
 let sequence = 0;
+
+// Attribute only inspected static API routes. Unknown paths can contain
+// credentials or account identifiers, even after removing query and fragment.
+const KEYFRAME_RESOURCE_PATHS = new Set([
+  '/api/analytics/navigation',
+  '/api/chat/usage',
+  '/api/billing/status',
+  '/api/onboarding/conversation',
+  '/api/spotify/search',
+]);
+
+function keyframeResourcePath(
+  resourceUrl: string,
+  pageUrl: string
+): string | null {
+  try {
+    // No base URL: relative and malformed locations must fail closed.
+    const resource = new URL(resourceUrl);
+    const page = new URL(pageUrl);
+    return (resource.protocol === 'http:' || resource.protocol === 'https:') &&
+      resource.origin === page.origin &&
+      KEYFRAME_RESOURCE_PATHS.has(resource.pathname)
+      ? resource.pathname
+      : null;
+  } catch {
+    return null;
+  }
+}
 
 function trackErrors(page: Page): string[] {
   let errors = pageErrors.get(page);
@@ -131,7 +216,10 @@ function trackErrors(page: Page): string[] {
     const list = errors;
     page.on('pageerror', error => list.push(`pageerror: ${error.message}`));
     page.on('console', message => {
-      if (message.type() === 'error') list.push(message.text().slice(0, 300));
+      if (message.type() !== 'error') return;
+      const text = message.text().slice(0, 300);
+      const resource = keyframeResourcePath(message.location().url, page.url());
+      list.push(resource ? `${text} [resource: ${resource}]` : text);
     });
   }
   return errors;

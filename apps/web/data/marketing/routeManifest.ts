@@ -2019,6 +2019,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/engineering/preview',
+    // Production-blocked (lib/security/production-blocked-routes.ts): renders
+    // only under explicit development, so it is never a certified public page.
+    healthCheck: {
+      path: '/engineering/preview',
+      expected: 'not-found',
+    },
     noindex: true,
   },
   {
@@ -2040,9 +2046,10 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     status: 'active',
     specVersion: '1.0.0',
     url: '/engineering/preview/*',
+    // Production-blocked like the index above.
     healthCheck: {
       path: '/engineering/preview/verified-changelog',
-      expected: 'page',
+      expected: 'not-found',
     },
     noindex: true,
   },
