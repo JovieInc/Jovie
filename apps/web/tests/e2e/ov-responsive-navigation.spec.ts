@@ -30,12 +30,14 @@ async function enterPersona(
   await expect(page.locator('#main-content')).toBeVisible({ timeout: 60_000 });
 }
 
-/** Tools stays collapsed until the viewer opens it (Tim 2026-10-21). */
+/** Business and Tools stay collapsed until the viewer opens them (Tim 2026-10-21). */
 async function expandOperatorTools(navigation: Locator) {
-  const tools = navigation.getByRole('button', { name: 'Tools', exact: true });
-  if ((await tools.count()) === 0) return;
-  if ((await tools.getAttribute('aria-expanded')) !== 'true') {
-    await tools.click();
+  for (const name of ['Business', 'Tools']) {
+    const group = navigation.getByRole('button', { name, exact: true });
+    if ((await group.count()) === 0) continue;
+    if ((await group.getAttribute('aria-expanded')) !== 'true') {
+      await group.click();
+    }
   }
 }
 

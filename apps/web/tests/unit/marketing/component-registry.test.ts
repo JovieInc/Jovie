@@ -1803,3 +1803,35 @@ describe('single container width', () => {
     expect(source).not.toMatch(OWN_WIDTH_CAP);
   });
 });
+
+describe('artist-profile audience wording', () => {
+  const read = (name: string) =>
+    fs.readFileSync(
+      path.join(
+        repoRoot,
+        `apps/web/components/marketing/artist-profile/${name}.tsx`
+      ),
+      'utf8'
+    );
+
+  it('uses audience and listener wording in carousel, proof and spec wall', () => {
+    expect(read('ArtistProfileOutcomesCarousel')).toContain(
+      "aria-label='Audience Outcomes'"
+    );
+    expect(read('ArtistProfileOutcomesCarousel')).toContain('Listener opts in');
+    expect(read('ArtistProfileSocialProof')).toContain(
+      'inviting listeners to get release updates'
+    );
+    expect(read('ArtistProfileSpecWall')).toContain('Actual listeners');
+  });
+
+  it('keeps fan wording out of those rendered strings', () => {
+    for (const name of [
+      'ArtistProfileOutcomesCarousel',
+      'ArtistProfileSocialProof',
+      'ArtistProfileSpecWall',
+    ]) {
+      expect(read(name)).not.toMatch(/Actual Fans|Fan Outcomes|Fan Opts In/u);
+    }
+  });
+});

@@ -70,7 +70,27 @@ export function ghShape(args: readonly string[]): {
   resource: string;
   write: boolean;
   idempotent: boolean;
+  cost?: number;
 } {
+  const logArgs =
+    args.length === 9 &&
+    args[2] === '--repo' &&
+    /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(args[3] ?? '')
+      ? [...args.slice(0, 2), ...args.slice(4)]
+      : args;
+  if (
+    logArgs.length === 7 &&
+    logArgs[0] === 'run' &&
+    logArgs[1] === 'view' &&
+    logArgs[2] === '--job' &&
+    /^[1-9][0-9]*$/.test(logArgs[3] ?? '') &&
+    logArgs[4] === '--attempt' &&
+    /^[1-9][0-9]*$/.test(logArgs[5] ?? '') &&
+    logArgs[6] === '--log'
+  ) {
+    // gh 2.102 cold cache: job, attempt, workflow, ZIP, per-job fallback.
+    return { resource: 'core', write: false, idempotent: true, cost: 5 };
+  }
   if (args[0] === 'api') {
     const target =
       args.find(
@@ -203,7 +223,7 @@ export async function runGh(
         s,
         {
           priority,
-          costs: { [shape.resource]: 1 },
+          costs: { [shape.resource]: shape.cost ?? 1 },
           write: shape.write,
           minWriteIntervalMs: spec.minWriteIntervalMs,
         },

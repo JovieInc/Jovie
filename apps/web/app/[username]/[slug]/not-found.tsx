@@ -2,7 +2,7 @@ import Link from 'next/link';
 
 export default function SmartLinkNotFound() {
   return (
-    <div
+    <main
       data-testid='not-found'
       className='bg-base text-foreground flex min-h-dvh flex-col items-center justify-center px-4'
     >
@@ -27,13 +27,13 @@ export default function SmartLinkNotFound() {
           <div className='mt-6 flex items-center justify-center gap-3'>
             <Link
               href='/'
-              className='text-sm text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground'
+              className='inline-flex min-h-11 min-w-11 items-center justify-center px-3 text-sm text-neutral-700 hover:text-neutral-950 dark:text-muted-foreground dark:hover:text-foreground'
             >
               Go Home
             </Link>
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

@@ -1171,6 +1171,7 @@ jobs:
             EXPECTED_VERCEL_ENVIRONMENT=production \
             VERCEL_PROBE_COOKIE_JAR="$staged_cookie_jar" \
             VERCEL_VERIFY_PUBLIC_SURFACES=true \
+            VERCEL_VERIFY_LINKED_RELEASES=tim \
             VERCEL_PROBE_TIMEOUT_MS=180000 \
             node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar; then
             fail_stage "Staged protected-origin exact build or semantic public-surface verification failed." staged_production_canary_failed
@@ -1288,6 +1289,10 @@ jobs:
               fail_performance_gate "Authenticated exact-build browser state was not persisted."
             fi
 
+            # JOV-8557: authenticated six-route budgets graduated independently
+            # at 14/14 on 2026-10-23. Receipt and native job/log identities:
+            # docs/performance/authenticated-performance-graduation.json.
+            # Neither staging.jov.ie nor public-profile alias results count.
             if ! CI=true pnpm exec tsx scripts/performance-budgets-guard.ts \
               --base-url "$deployment_url" \
               --auth-path "$auth_state" \
@@ -1298,8 +1303,7 @@ jobs:
               --route-id creator-contacts \
               --route-id creator-calendar \
               --route-id creator-tasks; then
-              echo "::warning::Canonical six-route browser budgets failed on the exact staged build."
-              echo "authenticated_performance_status=warn" >> "$GITHUB_OUTPUT"
+              fail_performance_gate "Canonical six-route browser budgets failed on the exact staged build (JOV-8557)."
             else
               echo "authenticated_performance_status=passed" >> "$GITHUB_OUTPUT"
             fi
@@ -1323,6 +1327,21 @@ jobs:
             --route-id public-profile-releases; then
             fail_performance_gate "Exact staged-build public-profile alias budgets failed."
           fi
+
+          # Throttled-mobile LCP for the artist entry routes (/start, /claim and
+          # the claim-link landing). The Playwright guard above is unthrottled
+          # and warm, so it passed /start at 1.3s while Lighthouse mobile read
+          # 8.4s on production (2026-10-25). Budgets: apps/web/
+          # performance-entry-budgets.json. ratchet: JOV-9611 - LCP is
+          # report-only for promotion (same-build samples vary ~4x; Tim
+          # 2026-10-28): per-route samples go to the job summary and an
+          # over-budget median warns. CLS and measurement errors still fail.
+          if ! CI=true pnpm exec tsx scripts/lighthouse-entry-gate.ts \
+            --base-url "$deployment_url" \
+            --runs 3 \
+            --lcp-report-only; then
+            fail_performance_gate "Throttled-mobile entry-route CLS or measurement failed on the exact staged build."
+          fi
           echo "performance_status=passed" >> "$GITHUB_OUTPUT"
 
       - name: Recheck main immediately before production promotion
@@ -1332,7 +1351,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MAIN_LINEAGE_TRANSPORT: git
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
+          LIVE_PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         run: |
+          # Main may have advanced during this run; an ancestor candidate still
+          # promotes (production stays strictly behind main and the next queued
+          # controller catches up). The guard also refuses a candidate that is
+          # not newer than what production serves now (no accidental rollback).
           bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"
 
       - name: Security gate before production promotion
