@@ -422,6 +422,10 @@ describe('production freshness', () => {
     assert.equal(fresh.healthy, true);
     assert.equal(fresh.incidentClass, null);
     assert.match(fresh.reason, /^unshipped-for-2292s-within-14760s$/);
+    assert.equal(fresh.catchingUp, true);
+    assert.equal(fresh.summary, 'behind by 4, catching up');
+    assert.equal(stale.catchingUp, false);
+    assert.equal(stale.summary, 'behind by 4, stale');
   });
 
   it('treats the measured p95 (246 minutes) as the freshness bound by default as the production freshness bound', async () => {
