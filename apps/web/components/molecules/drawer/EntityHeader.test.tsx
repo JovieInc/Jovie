@@ -204,6 +204,32 @@ describe('EntityHeaderThumbnail', () => {
     expect(image).toHaveClass('object-contain');
   });
 
+  it('requests the rendered size by default and honors a responsive sizes override', () => {
+    const { container, rerender } = render(
+      <EntityHeaderThumbnail
+        variant='person'
+        name='Tim White'
+        src='https://example.com/tim.jpg'
+        size={80}
+      />
+    );
+    expect(container.querySelector('img')).toHaveAttribute('sizes', '80px');
+
+    rerender(
+      <EntityHeaderThumbnail
+        variant='person'
+        name='Tim White'
+        src='https://example.com/tim.jpg'
+        size={80}
+        sizes='(min-width: 1024px) 320px, 80px'
+      />
+    );
+    expect(container.querySelector('img')).toHaveAttribute(
+      'sizes',
+      '(min-width: 1024px) 320px, 80px'
+    );
+  });
+
   it('renders a provider glyph on a subtle tint for connections', () => {
     render(
       <EntityHeaderThumbnail

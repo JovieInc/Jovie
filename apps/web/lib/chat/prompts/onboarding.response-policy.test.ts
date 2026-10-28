@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
+import {
+  ARTIST_VISIBILITY_OFFER,
+  formatPublicPriceDisplay,
+  formatUsdAmount,
+  getPublicPriceClaim,
+  PRO_TRIAL_DURATION_DAYS,
+  PRO_TRIAL_TRUTH,
+} from '@/lib/billing/offer-truth';
 import { lintVoice } from '@/lib/chat/voice-lint';
+import { PLAN_PRICES } from '@/lib/config/plan-prices';
 import {
   ONBOARDING_CALIBRATION_EXAMPLES,
+  ONBOARDING_PRICING_TRUTH,
   ONBOARDING_SYSTEM_PROMPT,
 } from './onboarding';
 import { resolveChatPromptRegistryEntry } from './registry';
@@ -110,9 +120,46 @@ describe('onboarding compact response policy', () => {
     expect(ONBOARDING_SYSTEM_PROMPT).toContain('without a CTA');
   });
 
+  it('describes the free trial and the paid upgrade as two different things', () => {
+    // The trial is an entitlement with no card that ends into Free; upgrading
+    // is a card-taking subscription. The chat must never join them into an
+    // automatic charge after the trial.
+    expect(ONBOARDING_SYSTEM_PROMPT).toContain(PRO_TRIAL_TRUTH);
+    expect(ONBOARDING_SYSTEM_PROMPT).toContain(
+      'Never say the trial turns into an automatic charge'
+    );
+    const closer = ONBOARDING_CALIBRATION_EXAMPLES.checkoutCloser;
+    expect(closer).toContain(
+      `${PRO_TRIAL_DURATION_DAYS} days free and no card`
+    );
+    expect(closer).toContain('unless you upgrade');
+    expect(closer).toContain('Upgrading takes a card');
+    for (const text of [closer, ONBOARDING_PRICING_TRUTH]) {
+      expect(text).not.toMatch(
+        /after (the|a|your) (\d+-day )?trial,? (you|we)['’]?(ll| will)? (be )?charge|automatically (charged|billed)|then (you['’]re|you are) charged/i
+      );
+    }
+  });
+
+  it('quotes the same monthly price as billing config, offer truth and the checkout closer', () => {
+    const configured = formatUsdAmount(PLAN_PRICES.pro.monthly);
+    expect(ARTIST_VISIBILITY_OFFER.pro.monthlyUsd).toBe(
+      PLAN_PRICES.pro.monthly
+    );
+    expect(formatPublicPriceDisplay(getPublicPriceClaim('pro'))).toBe(
+      `${configured}/mo`
+    );
+    expect(ONBOARDING_CALIBRATION_EXAMPLES.checkoutCloser).toContain(
+      `${configured}/mo`
+    );
+    expect(ONBOARDING_PRICING_TRUTH).toContain(`${configured}/mo`);
+    const quoted = ONBOARDING_SYSTEM_PROMPT.match(/\$\d[\d,.]*/g) ?? [];
+    expect(new Set(quoted)).toEqual(new Set([configured]));
+  });
+
   it('versions the changed onboarding prompt without changing its stable trace identity', () => {
     expect(resolveChatPromptRegistryEntry('onboarding')).toMatchObject({
-      version: 4,
+      version: 5,
       versionId: 'jovie-chat-onboarding-system:v1',
     });
     expect(resolveChatPromptRegistryEntry('app').version).toBe(1);
