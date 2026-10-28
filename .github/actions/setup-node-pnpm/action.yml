@@ -60,7 +60,7 @@ runs:
     # re-download costs seconds. The package store stays shared and safe.
     - name: Setup pnpm
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true'
-      uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      uses: ./.github/actions/vendor/pnpm-action-setup # pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 v6.1.0 (vendored, JOV-8754)
       with:
         dest: ${{ runner.temp }}/setup-pnpm
 
@@ -83,7 +83,7 @@ runs:
     - name: Restore installed node_modules (GitHub-hosted)
       id: node-modules-cache
       if: steps.runner-prereqs.outputs.dependencies_warm != 'true' && runner.environment == 'github-hosted' && inputs.package_cache == 'true'
-      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      uses: ./.github/actions/vendor/actions-cache/restore # actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
       with:
         path: |
           node_modules
@@ -141,6 +141,16 @@ runs:
             "${{ steps.runner-prereqs.outputs.installed_tree_archive_sha256 }}"
         else
           pnpm install --frozen-lockfile
+          # A restored tree can survive the frozen install still linking an
+          # unpatched copy of a patchedDependencies entry (run 40345264860:
+          # prebuild-install, DEP0176). Rebuild from scratch instead of
+          # running on, or saving, that tree.
+          if ! node scripts/lib/verify-patched-dependencies.mjs; then
+            echo "::warning::Restored node_modules held stale patched dependencies; reinstalling from scratch."
+            rm -rf node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules
+            pnpm install --frozen-lockfile
+            node scripts/lib/verify-patched-dependencies.mjs
+          fi
         fi
 
     # The repo's Actions cache runs over its 10 GB cap on dependabot days (12.3 GB
@@ -215,7 +225,7 @@ runs:
         (github.event_name == 'merge_group' && inputs.save_merge_group_workspace == 'true') ||
         (github.event_name == 'pull_request' &&
         github.event.pull_request.head.repo.full_name == github.repository))
-      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      uses: ./.github/actions/vendor/actions-cache/save # actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 v6.1.0 (vendored, JOV-8754)
       with:
         path: |
           node_modules

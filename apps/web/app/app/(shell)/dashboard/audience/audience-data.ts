@@ -766,26 +766,10 @@ async function _fetchSubscribersData(
     };
   });
 
-  const shareKeys = await loadSharedContactKeys(
-    tx,
-    selectedProfileId,
-    normalizedRows
-  );
-  // Names are gated with the contact: Level-1 people show only a generic label.
-  const gatedRows = applyShareGate(normalizedRows, shareKeys).map(row =>
-    row.emailVisibleToArtist
-      ? row
-      : {
-          ...row,
-          displayName:
-            row.type === 'email' ? 'Email Subscriber' : 'SMS Subscriber',
-          birthday: null,
-        }
-  );
-
   return {
     mode: 'subscribers',
-    rows: gatedRows,
+    // Raw (cached); the share gate runs per request in getAudienceServerData.
+    rows: normalizedRows,
     total: null,
     page: safe.page,
     pageSize: safe.pageSize,
@@ -950,9 +934,8 @@ export async function getAudienceServerData(params: {
     }
   )();
 
-  // Level-2 gate, evaluated fresh on every request (never cached): only people
-  // who currently share with this artist keep email/phone.
-  if (cached.mode !== 'members') return cached;
+  // Level-2 gate for BOTH modes, evaluated fresh on every request after the
+  // cache (never cached), so a revoked share disappears immediately.
   const gatedRows = await withDbSessionTx(
     async tx => {
       const keys = await loadSharedContactKeys(
@@ -960,7 +943,19 @@ export async function getAudienceServerData(params: {
         selectedProfileId,
         cached.rows
       );
-      return applyShareGate(cached.rows, keys);
+      const gated = applyShareGate(cached.rows, keys);
+      if (cached.mode !== 'subscribers') return gated;
+      // Names and birthdays are gated with the contact for subscribers.
+      return gated.map(row =>
+        row.emailVisibleToArtist
+          ? row
+          : {
+              ...row,
+              displayName:
+                row.type === 'email' ? 'Email Subscriber' : 'SMS Subscriber',
+              birthday: null,
+            }
+      );
     },
     { clerkUserId: userId }
   );

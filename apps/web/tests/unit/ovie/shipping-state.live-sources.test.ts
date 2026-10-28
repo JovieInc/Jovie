@@ -119,6 +119,50 @@ afterEach(() => {
   resetShippingStatePublisher();
 });
 
+describe('lanes-status deployHealth block', () => {
+  const block = {
+    schema: 'jovie-deploy-health/v1',
+    observedAt: '2026-10-25T06:40:00Z',
+    healthy: false,
+    repos: {
+      'JovieInc/LogYourBody': {
+        status: 'failing',
+        failedStreak: 15,
+        failingSince: '2026-10-23T16:14:55Z',
+        lastSuccessAt: '2026-10-23T16:03:00Z',
+        behindMain: 54,
+        oldestUnshippedAge: 140083,
+      },
+    },
+  };
+
+  it('parses the per-repo production state and rejects a malformed block', async () => {
+    const read = await readLanesStatus(
+      io(async () => json({ ...LANES_FEED, deployHealth: block }))
+    );
+    expect(read.delivery?.lanes?.deployHealth).toEqual({
+      observedAt: '2026-10-25T06:40:00.000Z',
+      healthy: false,
+      repos: [
+        {
+          repo: 'JovieInc/LogYourBody',
+          status: 'failing',
+          failedStreak: 15,
+          behindMain: 54,
+          oldestUnshippedAgeSeconds: 140083,
+          lastSuccessAt: '2026-10-23T16:03:00.000Z',
+        },
+      ],
+    });
+    const bad = await readLanesStatus(
+      io(async () =>
+        json({ ...LANES_FEED, deployHealth: { ...block, schema: 'x' } })
+      )
+    );
+    expect(bad.delivery?.lanes?.deployHealth).toBeNull();
+  });
+});
+
 describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
   it('reads running / slots / pool / alerts from the published feed', async () => {
     const live = io(async () => json(LANES_FEED));

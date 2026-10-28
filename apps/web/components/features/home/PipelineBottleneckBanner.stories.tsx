@@ -9,7 +9,7 @@ import {
 import { queryKeys } from '@/lib/queries/keys';
 import { PipelineBottleneckBanner } from './PipelineBottleneckBanner';
 
-type State = 'agentic' | 'needs-you' | 'clear' | 'missing' | 'stale';
+type State = 'agentic' | 'needs-you' | 'held' | 'clear' | 'missing' | 'stale';
 function createStoryClient(state: State) {
   const cache = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -28,6 +28,15 @@ function createStoryClient(state: State) {
               }
             : {}),
           ...(state === 'clear' ? { status: 'clear', rank1: null } : {}),
+          ...(state === 'held'
+            ? {
+                status: 'needs-you',
+                rank1: null,
+                dispatchRef: null,
+                statusLink: undefined,
+                metric: undefined,
+              }
+            : {}),
           ...(state === 'stale' ? { observedAt: '2020-01-01T00:00:00Z' } : {}),
         });
   cache.setQueryData(queryKeys.hud.pipelineBottleneck(), data);
@@ -99,6 +108,22 @@ export const Clear: Story = {
     ).toBeVisible();
   },
 };
+export const HeldEvidence: Story = {
+  parameters: { bottleneckState: 'held' },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Needs you')).toBeVisible();
+    await expect(
+      canvas.getByText('Bottleneck evidence unavailable')
+    ).toBeVisible();
+    await expect(canvas.getByText('Cost unavailable')).toBeVisible();
+    await expect(canvas.getByText('Impact unavailable')).toBeVisible();
+    await expect(
+      canvas.queryByText('No current bottleneck')
+    ).not.toBeInTheDocument();
+    await expect(canvas.queryByText('Agents on it')).not.toBeInTheDocument();
+  },
+};
 export const Missing: Story = {
   parameters: { bottleneckState: 'missing' },
   play: async ({ canvasElement }) => {
@@ -128,6 +153,12 @@ export const StateTransitions: Story = {
     });
     for (const data of [
       needsYou,
+      {
+        ...active,
+        status: 'needs-you' as const,
+        rank1: null,
+        dispatchRef: null,
+      },
       { ...active, status: 'clear' as const, rank1: null },
       null,
       active,

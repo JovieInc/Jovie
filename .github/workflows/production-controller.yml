@@ -40,6 +40,14 @@ jobs:
       eligible: ${{ steps.source.outputs.eligible }}
       staging_artifact_id: ${{ steps.source.outputs.staging_artifact_id }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -49,7 +57,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with: {node-version: 24.22.1}
       - id: source
-        env: {GH_TOKEN: "${{ github.token }}"}
+        env: {GH_TOKEN: "${{ steps.read-token.outputs.token }}"}
         run: node .github/scripts/staging-release-source.mjs
   # Event-driven supersession, with no wait: main itself is the
   # release-lineage event log. This generation proceeds the moment its exact
@@ -80,6 +88,14 @@ jobs:
     outputs:
       is_current: ${{ steps.coalesce.outputs.is_current }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
@@ -91,7 +107,7 @@ jobs:
       - name: Evaluate event-driven supersession
         id: coalesce
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           # Starvation bound for the forward-only lineage gate: once main has
@@ -313,6 +329,14 @@ jobs:
       release_certification_required: ${{ steps.authorize.outputs.release_certification_required }}
       release_requires_smoke: ${{ steps.authorize.outputs.release_requires_smoke }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
@@ -376,7 +400,7 @@ jobs:
       - name: Cross-prove exact successful push CI
         id: authorize
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ fromJSON(needs.release-source.outputs.ci).head_sha }}
           REPOSITORY: ${{ github.repository }}
           EXACT_STAGING_ARTIFACT_ID: ${{ needs.release-source.outputs.staging_artifact_id }}
@@ -1157,6 +1181,14 @@ jobs:
     outputs:
       verified: ${{ steps.finalize.outputs.verified || 'false' }}
     steps:
+      - name: Mint read-only Jovie Bot token for release reads
+        id: read-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-actions: read
+          permission-contents: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1169,7 +1201,7 @@ jobs:
       - name: Resolve current main before final verification
         id: current
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
           RUN_WEB: ${{ needs.authorize-production.outputs.run_web }}
@@ -1211,7 +1243,7 @@ jobs:
         if: ${{ (steps.current.outputs.is_current == 'true' || steps.current.outputs.superseded_before_marker == 'true') && needs.authorize-production.outputs.release_lane != 'not_applicable' && needs.authorize-production.outputs.release_unattended_allowed == 'true' }}
         shell: bash
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_COMMIT_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           EXPECTED_PRODUCTION_DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
           PRODUCTION_DEPLOYMENT_URL_B64: ${{ needs.production-release.outputs.production_deployment_url_b64 }}
@@ -1316,7 +1348,7 @@ jobs:
         id: finalize
         if: ${{ always() && needs.production-release.outputs.superseded_before_promotion != 'true' && (steps.current.outputs.is_current == 'true' || steps.verify.outputs.canonical_verified == 'true') }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           EXPECTED_SHA: ${{ needs.authorize-production.outputs.expected_sha }}
           DEPLOYMENT_ID: ${{ needs.production-release.outputs.production_deployment_id }}
           AUTH_SMOKE_STATUS: ${{ needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status }}
