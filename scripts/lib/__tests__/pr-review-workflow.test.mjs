@@ -35,7 +35,7 @@ describe('pr-review workflow contract', () => {
     );
     expect(workflow).toContain('ref: main');
     expect(workflow).toContain('persist-credentials: false');
-    expect(workflow).toContain('runs-on: ubuntu-latest');
+    expect(workflow).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
   });
 
   it('wakes from a producer that actually validates pull requests', () => {

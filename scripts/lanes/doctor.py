@@ -19,6 +19,7 @@ import shutil
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 from collections import Counter
 from datetime import datetime, timezone
@@ -73,6 +74,12 @@ NO_WORK_REPAIR_VERDICTS = frozenset({"recovery-handoff", "reconcile-unavailable"
 NO_WORK_REPAIR_ALERT = 6
 DISK_MIN_PCT = 10
 DISK_CRIT_PCT = 5
+# Autoscale blocks growth (capacity held below base, blocker "disk-low") at or below
+# autoscale.DISK_INCREASE_MIN free. Held that long with no alarm let merges collapse unseen
+# on 2026-10-25, so a sustained hold raises its own incident naming the top consumers.
+DISK_HELD_S = 30 * 60
+DISK_TOP_REFRESH_S = 10 * 60
+DISK_TOP_BUDGET_S = 45
 GITHUB_MIN_REMAINING = gh_app_token.FLOOR
 # An open PR older than this is a governor signal (JOV-7079): the cockpit names it and its
 # disposition instead of letting it age silently.
@@ -80,6 +87,10 @@ AGED_PR_S = 7 * 24 * 3600
 MERGE_THROUGHPUT_REFRESH_S = 5 * 60
 MERGE_THROUGHPUT_CACHE_S = 10 * 60
 PROMOTION_SCRIPT = Path(__file__).resolve().parents[1] / "promotion-loss-metrics.mjs"
+QUOTA_DEFERRED_SCRIPT = Path(__file__).resolve().parents[1] / "quota-deferred-heads.mjs"
+QUOTA_DEFERRED_REFRESH_S = 15 * 60  # about 100 REST reads per refresh; the lanes clock calls often
+QUOTA_DRAIN_SCRIPT = Path(__file__).resolve().parents[1] / "lib" / "api-quota-report.mjs"
+QUOTA_DRAIN_REFRESH_S = 15 * 60  # about 40 REST reads per refresh (one Enroll job list per run)
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OPS_REPORT_SCRIPT = Path(__file__).resolve().with_name("ops-report.mjs")
 
@@ -243,6 +254,26 @@ def automation_registry(repo: Path, run=subprocess.run) -> list[dict] | None:
     return rows
 
 
+TEAM_RECEIPT = re.compile(r"^[A-Z][A-Z0-9]*$")
+
+
+def _newest_receipt_mtime(path: Path) -> float:
+    """mtime of a receipt. A `<TEAM>` path component is a per-team template (refill/<TEAM>.json): the newest
+    receipt of any team counts. The watcher used to stat the literal `<TEAM>.json`, so gem:backlog-refill and
+    gem:backlog-decompose read `missing` while their receipts were minutes old (2026-10-25)."""
+    if "<TEAM>" not in path.name:
+        return path.stat().st_mtime
+    stem_prefix, _, suffix = path.name.partition("<TEAM>")
+    found = []
+    for candidate in path.parent.glob(f"{stem_prefix}*{suffix}"):
+        team = candidate.name[len(stem_prefix):len(candidate.name) - len(suffix) if suffix else None]
+        if TEAM_RECEIPT.fullmatch(team):
+            found.append(candidate.stat().st_mtime)
+    if not found:
+        raise FileNotFoundError(str(path))
+    return max(found)
+
+
 def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: Path | None = None) -> dict:
     """Host-local receipts of this host's live automations: missing or older than
     maxStalenessMinutes is silence. The hosted automation-liveness check watches Gem."""
@@ -260,7 +291,7 @@ def automation_watch(rows: list[dict] | None, host_name: str, now: float, home: 
         path = Path(location.split(":", 1)[1].replace("~", str(home), 1))
         limit = float(row.get("maxStalenessMinutes") or 0) * 60
         try:
-            age = now - path.stat().st_mtime
+            age = now - _newest_receipt_mtime(path)
         except OSError:
             silent[row["id"]] = {"location": location, "ageS": None}
             continue
@@ -461,6 +492,12 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
             merge_throughput, merge_throughput_error = sample_merge_throughput(state, now)
         except (OSError, ValueError, KeyError, RuntimeError, subprocess.SubprocessError) as error:
             merge_throughput_error = f"{type(error).__name__}: {error}"[:200]
+    quota_deferred, quota_deferred_error = None, None
+    if not os.environ.get("LANES_SELFTEST"):
+        quota_deferred, quota_deferred_error = sample_quota_deferred_heads(state, now)
+    quota_drain, quota_drain_error = None, None
+    if not os.environ.get("LANES_SELFTEST"):
+        quota_drain, quota_drain_error = sample_quota_drain(state, now)
     held = read_json(state / "held.json", {})
     failures = read_json(state / "failures.json", {})
     idle_exit = read_json(state / "worker-idle.json", {})
@@ -539,6 +576,8 @@ def observe(host, lane, codex, now: float | None = None) -> dict:
         "hudExpected": (state / "hud.expected").exists(), "hudBeatAge": hud_beat,
         "heldByReason": pr_events.by_reason(held, open_numbers),
         "reconcile": read_json(state / "reconcile.json", {}),
+        "quotaDeferredHeads": quota_deferred, "quotaDeferredHeadsError": quota_deferred_error,
+        "quotaDrain": quota_drain, "quotaDrainError": quota_drain_error,
         "redDispatch": red_dispatch_summary(state, now),
         "failedByReason": failed_by_reason(failures),
         "escalation": remediation.escalation_summary(read_json(state / "escalation.json", {}), all_receipts, now),
@@ -649,6 +688,64 @@ def sample_merge_throughput(state: Path, now: float, run=lifecycle.run) -> tuple
                 and 0 <= now - observed <= MERGE_THROUGHPUT_CACHE_S:
             return cached, f"{type(error).__name__}: {error}"[:200]
         return None, f"{type(error).__name__}: {error}"[:200]
+
+
+def sample_quota_deferred_heads(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
+    """Open PR heads whose Fleet Rules verdict stayed quota-deferred past an hour (a deferred
+    result is infrastructure, never a verdict, and must have been re-run). Refreshed at most
+    every QUOTA_DEFERRED_REFRESH_S; the script exits 1 when there are any, so both codes parse."""
+    path = Path(state) / "quota-deferred-heads.json"
+    cached = read_json(path, {})
+    observed = cached.get("observedAt")
+    if isinstance(observed, (int, float)) and not isinstance(observed, bool) \
+            and 0 <= now - observed < QUOTA_DEFERRED_REFRESH_S:
+        return cached, None
+    try:
+        result = run(["node", str(QUOTA_DEFERRED_SCRIPT)], capture_output=True, text=True, timeout=240)
+        if result.returncode not in (0, 1):
+            raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+        metric = json.loads(result.stdout)
+        if metric.get("metric") != "quota_deferred_heads_older_than_1h" \
+                or isinstance(metric.get("value"), bool) or not isinstance(metric.get("value"), int):
+            raise ValueError("quota-deferred-heads output missing the metric")
+        signal = {"schema": "jovie-quota-deferred-heads/v1", "observedAt": now,
+                  "value": metric["value"], "heads": (metric.get("heads") or [])[:20]}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached if cached.get("schema") else None), f"{type(error).__name__}: {error}"[:200]
+
+
+def sample_quota_drain(state: Path, now: float, run=lifecycle.run) -> tuple[dict | None, str | None]:
+    """Buckets of the repo's GitHub installation projected to run dry before their hourly reset,
+    from `api-quota-report.mjs drain --json` (exit 3 when there are any, so 0 and 3 both parse).
+    Refreshed at most every QUOTA_DRAIN_REFRESH_S; a failed read keeps the last good signal."""
+    path = Path(state) / "quota-drain.json"
+    cached = read_json(path, {})
+    observed = cached.get("observedAt")
+    if isinstance(observed, (int, float)) and not isinstance(observed, bool) \
+            and 0 <= now - observed < QUOTA_DRAIN_REFRESH_S:
+        return cached, None
+    try:
+        result = run(["node", str(QUOTA_DRAIN_SCRIPT), "drain", "--json", "--hours", "1"],
+                     capture_output=True, text=True, timeout=240)
+        if result.returncode not in (0, 3):
+            raise RuntimeError((result.stderr or result.stdout or f"exit {result.returncode}").strip()[-160:])
+        line = next((row for row in (result.stdout or "").splitlines() if row.startswith("{")), "")
+        report = json.loads(line)
+        if report.get("schema") != "jovie-actions-quota-drain/v1" or not isinstance(report.get("alerts"), list):
+            raise ValueError("quota drain output missing the schema")
+        signal = {"schema": "jovie-quota-drain/v1", "observedAt": now, "alerts": report["alerts"][:8]}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, indent=1, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached if cached.get("schema") else None), f"{type(error).__name__}: {error}"[:200]
 
 
 def failed_by_reason(failures: dict) -> dict[str, int]:
@@ -780,6 +877,30 @@ def provider_idle_with_qualified_work(obs: dict, provider: str) -> bool:
     vacant = (type(slots) is int and type(running) is int and 0 <= running < slots)
     return bool(pool and account_ready and vacant
                 and provider in (tick.get("spawned") or []) and provider not in (tick.get("unhealthy") or []))
+
+
+def disk_held(obs: dict) -> bool:
+    free = obs.get("diskFreePct")
+    return free is not None and free <= autoscale.DISK_INCREASE_MIN
+
+
+def top_disk_consumers(state: Path, budget_s: float = DISK_TOP_BUDGET_S, run=subprocess.run) -> list[dict]:
+    """Largest of the usual suspects, measured with a shared time budget (du over a full
+    worktree tree can take minutes on a loaded host; whatever finishes is reported)."""
+    home = Path.home()
+    roots = [state / "worktrees", state / "runs", home / "codex-worktrees", home / "grok-wt", home / "gem-workspace",
+             home / ".cache", home / ".npm", home / "symphony-elixir-workspaces", Path("/tmp")]
+    deadline, rows = time.monotonic() + budget_s, []
+    for root in roots:
+        left = deadline - time.monotonic()
+        if left <= 1 or not root.exists():
+            continue
+        try:
+            out = run(["du", "-xsk", str(root)], capture_output=True, text=True, timeout=left).stdout.split()
+            rows.append({"path": str(root), "gib": round(int(out[0]) / 1048576, 1)})
+        except (OSError, subprocess.SubprocessError, ValueError, IndexError):
+            continue
+    return sorted(rows, key=lambda row: -row["gib"])[:5]
 
 
 def provider_idle_since(obs: dict, previous: dict) -> dict[str, float]:
@@ -958,12 +1079,22 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
             alerts[f"pr-inventory-unavailable:{name}"] = (
                 f"{name} new-issue PR budget unknown: {budget.get('error') or 'incomplete read'}; new claims deferred")
     alerts.update(linear_sync.alerts(obs.get("linearSync") or {}))
+    gaps = alert_issue_gaps(dict(alerts), ((previous or {}).get("issues") or {}), time.time())
+    if gaps:
+        shown = "; ".join(f"{key} ({why[:80]})" for key, why in list(gaps.items())[:4])
+        alerts["alert-issue-missing"] = (f"{len(gaps)} active doctor alert(s) older than {ALERT_ISSUE_GRACE_S // 60} min "
+                                         f"have no Linear issue: {shown}")
     feed_size = obs.get("publicFeed") or {}
     if isinstance(feed_size.get("ratio"), (int, float)) and feed_size["ratio"] >= PUBLIC_FEED_WARN_RATIO:
         top = ", ".join(f"{name} {size // 1024}K" for name, size in list((feed_size.get("sections") or {}).items())[:3])
         alerts["public-feed-near-limit"] = (f"public lanes status feed is {feed_size['bytes']} bytes, "
                                             f"{round(feed_size['ratio'] * 100)}% of the {feed_size['maxBytes']} byte cap "
                                             f"(largest: {top}); past the cap every HUD tile and dead-man check reads unavailable")
+    ttl = feed_size.get("secondsToCap")
+    if isinstance(ttl, (int, float)) and 0 <= ttl < FEED_GROWTH_ALERT_S and "public-feed-near-limit" not in alerts:
+        alerts["public-feed-growth"] = (f"public lanes status feed grows {feed_size.get('growthBytesPerHour')} bytes/h "
+                                        f"and reaches the {feed_size.get('maxBytes')} byte cap in about {round(ttl / 3600, 1)}h "
+                                        f"(now {feed_size.get('bytes')}, {round((feed_size.get('ratio') or 0) * 100)}%)")
     lag = obs.get("installLag") or {}
     if isinstance(lag.get("behindS"), (int, float)) and lag["behindS"] > INSTALL_LAG_ALERT_S:
         alerts["install-lag"] = (f"main's lane bundle {str(lag.get('behindCommit'))[:8]} is {round(lag['behindS'] / 60)}m "
@@ -1114,6 +1245,13 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                  f"guard swept; ENOSPC imminent — Summer: reclaim space on this host now")
     elif obs.get("diskFreePct") is not None and obs["diskFreePct"] < DISK_MIN_PCT:
         alerts["disk-low"] = f"root disk {obs['diskFreePct']}% free; worktrees and installs will start failing"
+    held_since = (previous or {}).get("diskHeldSince")
+    if disk_held(obs) and isinstance(held_since, (int, float)) and obs["now"] - held_since >= DISK_HELD_S:
+        top = obs.get("diskTop") or (previous or {}).get("diskTop") or []
+        named = ", ".join(f"{row['path']} {row['gib']} GiB" for row in top) or "consumers not yet measured"
+        alerts["disk-capacity-held"] = (
+            f"root disk {obs['diskFreePct']}% free (growth floor {autoscale.DISK_INCREASE_MIN}%) for "
+            f"{int((obs['now'] - held_since) // 60)}m: lane capacity is held below base. Top consumers: {named}")
     if github_reads_held:
         alerts["github-quota"] = (f"GitHub GraphQL budget {obs['githubRemaining']} left this hour; read-only polling "
                                   f"held below the {GITHUB_MIN_REMAINING}-point floor to preserve writes")
@@ -1159,6 +1297,17 @@ def judge(obs: dict, previous: dict | None = None) -> dict[str, str]:
                                + (f" ({row['reason']})" if row.get("reason") else "")
                                for row in aged[:8])
             alerts["aged-prs"] = (f"{len(aged)} open PRs are older than {AGED_PR_S // 86400}d: {listed}")
+    deferred = obs.get("quotaDeferredHeads") or {}
+    if deferred.get("value"):
+        listed = ", ".join(f"#{row.get('number')} {row.get('ageMinutes')}m" for row in (deferred.get("heads") or [])[:8])
+        alerts["quota-deferred-heads"] = (f"{deferred['value']} open PR heads sit on a quota-deferred Fleet Rules "
+                                          f"verdict past 1h (never a verdict; the re-run loop is broken): {listed}")
+    drain = (obs.get("quotaDrain") or {}).get("alerts") or []
+    if drain:
+        listed = "; ".join(f"{row.get('bucket')} has {row.get('remaining')} left at ~{row.get('ratePerMinute')}/min, empty "
+                           f"{row.get('minutesEarly')} min before its reset ({row.get('emptyAt')})" for row in drain[:4])
+        alerts["quota-drain"] = (f"GitHub API budget is projected to run dry before it resets: {listed}. Pause bulk reruns "
+                                 f"and bulk gh work until the reset.")
     if obs.get("hudExpected") and (obs.get("hudBeatAge") is None or obs["hudBeatAge"] > HUD_STALE_S):
         beat = "never" if obs.get("hudBeatAge") is None else f"{int(obs['hudBeatAge'])}s ago"
         alerts["hud-stale"] = f"tty1 HUD heartbeat {beat}; the console is not showing current truth"
@@ -1177,9 +1326,12 @@ def condition_receipts(alerts: dict[str, str], previous: dict, obs: dict, host_n
         "spawn-exit": "dispatch-provider-workers",
         "hud-stale": "restart-hud-service",
         "orphan-prs": "reconcile-pr-ownership",
+        "quota-deferred-heads": "rerun-quota-deferred-fleet-evidence",
+        "quota-drain": "pause-bulk-reruns-and-bulk-api-work-until-the-reset",
         "bottleneck:merge-queue": "reduce-lane-slots-and-reconcile-merge-queue",
         "workers-without-completions": "verify-process-and-fenced-repair-ownership",
         "admission-repair-needed": "repair-existing-pr-inventory-before-new-intake",
+        "disk-capacity-held": "reclaim-top-disk-consumers-then-restore-lane-seats",
         "delivery-stalled": "investigate-repair-and-verify-native-delivery",
         "remediation-delivery": "repair-and-read-back-existing-event-delivery",
     }
@@ -1407,6 +1559,7 @@ class Tracker:
         self.linear, self.host = linear, host_name
         self._team_node = None
         self.last_writing_report = None
+        self.last_error = None  # why the last open() returned no issue id (never swallowed silently)
 
     def title(self, key: str) -> str:
         if key == "bottleneck:merge-queue":
@@ -1498,15 +1651,20 @@ class Tracker:
                 'state:{type:{nin:["completed","canceled"]}}}){nodes{id}}}', {"t": self.title(key)})
             nodes = data["issues"]["nodes"]
             return nodes[0]["id"] if nodes else None
-        except Exception:
+        except Exception as error:
+            self.existing_error = f"{type(error).__name__}: {str(error)[:160]}"
             return None
 
     def open(self, key: str, text: str, condition: dict | None = None) -> str | None:
         self.last_writing_report = None
+        self.last_error = None
+        self.existing_error = None
         found = self.existing(key)
         if found:
             self.apply_alert_label(found, key)
             return found
+        if found is None and getattr(self, "existing_error", None):
+            self.last_error = f"lookup-failed:{self.existing_error}"
         try:
             priority = 1 if key.startswith(("provider-idle:", "provider-down:", "pr-inventory-unavailable:", "production-deploy:")) or key in (
                 "linear-down", "spawn-exit", "tick-error", "delivery-stalled") else 2
@@ -1534,7 +1692,8 @@ class Tracker:
                        "title": self.title(key),
                        "description": description}})
             return data["issueCreate"]["issue"]["id"]
-        except Exception:
+        except Exception as error:
+            self.last_error = f"create-failed:{type(error).__name__}: {str(error)[:160]}"
             return None
 
     def contradict_invariant(self, event: dict) -> None:
@@ -1597,6 +1756,26 @@ class Tracker:
         return True
 
 
+ALERT_ISSUE_GRACE_S = 15 * 60
+
+
+def alert_issue_gaps(alerts: dict, issues: dict, now: float, grace_s: int = ALERT_ISSUE_GRACE_S) -> dict[str, str]:
+    """Invariant: no active alert older than 15 min without a Linear issue id or a logged reason.
+    Returns key -> why for every violation or visible gap: an alert with no id past the grace (the reason
+    when one is recorded, `untracked` when none is, which is itself a bug)."""
+    gaps = {}
+    for key in alerts:
+        entry = issues.get(key) or {}
+        if entry.get("id"):
+            continue
+        since = entry.get("since")
+        if not isinstance(since, (int, float)):
+            continue  # first sighting this tick: reconcile records it with a reason
+        if now - since >= grace_s:
+            gaps[key] = entry.get("reason") or "untracked"
+    return gaps
+
+
 def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, now: float,
               conditions: dict[str, dict] | None = None) -> dict:
     """Carry issue ids across ticks; acknowledge remote transitions before advancing receipts."""
@@ -1624,7 +1803,14 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
                 "writingReview": writing_report["review"],
                 "writingDecision": writing_report["decision"],
             }
-        issues[key] = {"id": issue_id, "closedAt": None}  # retry a failed open
+        if issue_id:
+            issues[key] = {"id": issue_id, "closedAt": None}
+        else:
+            # retry a failed open next tick, but never silently: keep when it started failing and why.
+            reason = (getattr(tracker, "last_error", None) if tracker else None) or ("no-tracker" if tracker is None else "open-returned-no-id")
+            issues[key] = {"id": None, "closedAt": None, "reason": reason,
+                           "since": (entry or {}).get("since") or now}
+            print(f"doctor: no Linear issue for alert {key}: {reason}", file=sys.stderr)
         if tracker and issue_id and conditions and key in conditions:
             contradict = getattr(tracker, "contradict_invariant", None)
             if contradict:
@@ -1805,6 +1991,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "escalation": obs.get("escalation") or remediation.empty_escalation(),
             "remediation": obs.get("remediation") or remediation.empty_remediation(),
             "autoscale": _autoscale_block(host),
+            "machine": _machine_block(host),
             # Real-limit record (jovie.capacity-limit): which measured limit holds lanes back.
             "capacityLimit": _capacity_limit_block(host)}
 
@@ -1813,6 +2000,28 @@ def _capacity_limit_block(host) -> dict | None:
     try:
         import capacity_limit
         return capacity_limit.read_record(host.state)
+    except Exception:  # the feed never fails on an optional record
+        return None
+
+
+def _machine_block(host) -> dict | None:
+    """Machine metrics (machine-made share of merges, 3+ repeat fingerprints, cost per merged PR by class, days
+    from 3rd repeat to machine) plus any lane whose slots the merged-per-dollar gate is holding down. Small fields
+    only: the public feed has a byte cap."""
+    state = getattr(host, "state", None)
+    if state is None:
+        return None
+    try:
+        import machine_metrics
+        import slot_yield
+        block = machine_metrics.public_block(machine_metrics.refresh(state))
+        gated = {}
+        for lane_name in ("hyperagent", "claude", "devin", "kimi"):
+            slots, why = slot_yield.ceiling(state, lane_name, 10)
+            if why.get("gated"):
+                gated[lane_name] = {"slots": slots, "mergedPerUsd": why.get("mergedPerUsd"), "referencePerUsd": why.get("referencePerUsd")}
+        block["slotGate"] = gated
+        return block
     except Exception:  # the feed never fails on an optional record
         return None
 
@@ -1863,6 +2072,44 @@ def _compact_overlap(public: dict) -> None:
     }
 
 
+# Conditions grew 54 KB -> 69 KB in about an hour (2026-10-25): 33 of 52 receipts were `resolved`, kept
+# forever locally (generation numbers must survive for idempotency keys), each carrying its writing-review
+# bindings (~1.5 KB). The public feed keeps every active condition and recent resolutions without the heavy
+# review/evidence blobs, plus a count summary; the complete receipts stay in lanes-status-details.json.
+PUBLIC_CONDITION_RESOLVED_KEEP_S = 6 * 3600
+PUBLIC_CONDITION_DROP = ("writingReview", "writingDecision", "recoveryEvidence")  # heavy; full copy in the details file
+
+
+def _compact_conditions(public: dict, now: float | None = None) -> None:
+    conditions = public.get("conditions")
+    if not isinstance(conditions, dict):
+        return
+    now = time.time() if now is None else now
+    kept, omitted = {}, 0
+    for key, event in conditions.items():
+        if not isinstance(event, dict):
+            kept[key] = event
+            continue
+        resolved = event.get("state") == "resolved"
+        if resolved:
+            stamp = event.get("resolvedAt")
+            try:
+                age = now - datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+            except (TypeError, ValueError):
+                age = None
+            if age is None or age > PUBLIC_CONDITION_RESOLVED_KEEP_S:
+                omitted += 1
+                continue
+        row = {name: value for name, value in event.items() if name not in PUBLIC_CONDITION_DROP}
+        kept[key] = row
+    states = Counter(str(event.get("state")) for event in conditions.values() if isinstance(event, dict))
+    public["conditions"] = kept
+    public["conditionsSummary"] = {
+        "total": len(conditions), "byState": dict(states), "resolvedOmitted": omitted,
+        "resolvedKeptForS": PUBLIC_CONDITION_RESOLVED_KEEP_S,
+        "ref": {"recordCount": len(conditions), "jsonPointer": "/conditions"}}
+
+
 def _compact_remediation(public: dict) -> None:
     remediation_block = public.get("remediation")
     rows = remediation_block.get("byFingerprint") if isinstance(remediation_block, dict) else None
@@ -1873,6 +2120,25 @@ def _compact_remediation(public: dict) -> None:
         for key, row in rows.items()}
     remediation_block["byFingerprintRef"] = {"recordCount": len(rows), "jsonPointer": "/remediation/byFingerprint",
                                              "omitted": "ask, recurrence and history text"}
+
+
+FEED_SAMPLE_WINDOW_S = 6 * 3600
+FEED_SAMPLE_MIN_SPAN_S = 20 * 60
+FEED_GROWTH_ALERT_S = 6 * 3600  # alert when the projected time to the cap is under 6 hours
+
+
+def feed_growth(samples: list, now: float, total: int, cap: int = PUBLIC_FEED_MAX_BYTES) -> dict:
+    """Bytes/hour over the retained samples and the projected seconds until the cap. Needs >=3 samples
+    spanning >=20 min; a shrinking or flat feed projects nothing."""
+    window = [row for row in (samples or []) if isinstance(row, list) and len(row) == 2
+              and 0 <= now - row[0] <= FEED_SAMPLE_WINDOW_S]
+    window.append([now, total])
+    span = window[-1][0] - window[0][0]
+    if len(window) < 3 or span < FEED_SAMPLE_MIN_SPAN_S:
+        return {"samples": window, "growthBytesPerHour": None, "secondsToCap": None}
+    rate = (window[-1][1] - window[0][1]) / span  # bytes per second
+    return {"samples": window[-72:], "growthBytesPerHour": round(rate * 3600),
+            "secondsToCap": round((cap - total) / rate) if rate > 0 else None}
 
 
 def feed_section_sizes(text: str) -> dict:
@@ -1913,6 +2179,7 @@ def public_status_projection(feed: dict, full_text: str) -> str:
                 }
     _compact_overlap(public)
     _compact_remediation(public)
+    _compact_conditions(public)
     public["publicProjection"] = {
         "schema": "symphony-lanes-public-projection/v1", "fullEvidence": evidence,
     }
@@ -1929,13 +2196,97 @@ def public_status_projection(feed: dict, full_text: str) -> str:
     }, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
 
 
+def _status_gist_raw_readback(stored: dict, name: str, expected: str, deadline: float) -> None:
+    """Read only this API snapshot's immutable file, through the shared budget client."""
+    scripts = str(Path(__file__).resolve().parents[1])
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient import ApiClient, ApiError
+
+    actual = stored["files"][name]
+    owner = (stored.get("owner") or {}).get("login")
+    raw_url = actual.get("raw_url")
+    expected_bytes = expected.encode("utf-8")
+    if (name not in ("lanes-status.json", STATUS_DETAIL_NAME) or
+            not isinstance(owner, str) or not re.fullmatch(r"[A-Za-z0-9-]{1,39}", owner) or
+            not isinstance(raw_url, str) or not re.fullmatch(
+                rf"https://gist\.githubusercontent\.com/{re.escape(owner)}/{re.escape(stored['id'])}"
+                rf"/raw/[a-f0-9]{{40}}/{re.escape(name)}", raw_url) or
+            type(actual.get("size")) is not int or actual["size"] != len(expected_bytes)):
+        raise ValueError("untrusted or incomplete gist raw evidence")
+
+    def transport(method, url, headers, body, timeout_s):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError("gist raw deadline exceeded")
+        version = lifecycle.run(["curl", "--disable", "--version"],
+                                capture_output=True, text=True, timeout=remaining)
+        match = re.match(r"curl (\d+)\.(\d+)\.(\d+)\b", version.stdout)
+        if version.returncode != 0 or not match or tuple(map(int, match.groups())) < (8, 4, 0):
+            raise ValueError("gist raw transfer requires curl 8.4 or newer")
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ValueError("gist raw deadline exceeded")
+        # curl has a whole-transfer deadline, unlike a per-socket idle timeout.
+        # No redirects, curlrc, credentials or arbitrary URL input. The expected
+        # length is also the download ceiling, including for chunked responses.
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "raw"
+            try:
+                result = lifecycle.run([
+                    "curl", "--disable", "--silent", "--show-error", "--proto", "=https",
+                    "--max-redirs", "0", "--max-time", str(remaining),
+                    "--max-filesize", str(len(expected_bytes)), "--output", str(output),
+                    "--write-out", "%{http_code}", "--url", raw_url,
+                ], capture_output=True, text=True, timeout=remaining)
+            except subprocess.TimeoutExpired:
+                raise OSError("gist raw transfer timed out") from None
+            if result.returncode != 0 or not re.fullmatch(r"[1-5][0-9]{2}", result.stdout):
+                raise OSError("gist raw transfer unconfirmed")
+            if result.stdout != "200":
+                # Let the shared client account for rate limits and server failures.
+                return int(result.stdout), {}, ""
+            with output.open("rb") as handle:
+                content = handle.read(len(expected_bytes) + 1)
+        if (time.monotonic() >= deadline or len(content) != len(expected_bytes) or
+                content != expected_bytes or hashlib.sha256(content).digest() !=
+                hashlib.sha256(expected_bytes).digest()):
+            raise ValueError("incomplete or changed gist raw evidence")
+        return 200, {}, content.decode("utf-8")
+
+    remaining_ms = int((deadline - time.monotonic()) * 1000)
+    if remaining_ms <= 0:
+        raise ValueError("gist raw deadline exceeded")
+    # Raw gist reads are anonymous; never forward the API's bearer credential.
+    try:
+        response = ApiClient("github", "anonymous-gist-raw", transport=transport).request(
+            raw_url, priority="report", max_attempts=1, max_wait_ms=0,
+            timeout_ms=remaining_ms, conditional=False)
+        if response.status != 200:
+            raise ValueError("gist raw transfer unconfirmed")
+    except ApiError:
+        raise ValueError("gist raw readback unavailable") from None
+
+
 def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> str | None:
     """Publish one bounded status view plus complete evidence in the existing gist."""
     if not PRIMARY_FLAG.exists():
         return None
+    # A readback belongs to one publisher generation, including its final local
+    # receipt. Never let a second tick change the packet between check and write.
+    with (host.state / "status-gist-publish.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise RuntimeError("status-gist-publish-in-progress") from None
+        return _publish_status(host, lane, feed, tracking_issue)
+
+
+def _publish_status(host, lane, feed: dict, tracking_issue: str) -> str:
     deadline = time.monotonic() + 60
     path = host.state / "status-gist.json"
-    record = json.loads(path.read_text()) if path.exists() else {}
+    record_generation = path.read_bytes() if path.exists() else b"{}"
+    record = json.loads(record_generation)
     if not isinstance(record, dict):
         raise RuntimeError("status-gist-record-unavailable")
     full_text = json.dumps(feed, indent=1, ensure_ascii=False, allow_nan=False)
@@ -1946,6 +2297,8 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
     public_text = public_status_projection(feed, full_text)
     try:
         sizes = feed_section_sizes(public_text)
+        previous_sizes = read_json(host.state / "public-feed-sizes.json", {})
+        sizes.update(feed_growth(previous_sizes.get("samples") or [], time.time(), sizes["bytes"]))
         atomic_write_text(host.state / "public-feed-sizes.json", json.dumps({"at": now_iso(), **sizes}))
     except (OSError, ValueError):
         pass  # a metric never blocks the publish
@@ -1999,6 +2352,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
             raise RuntimeError("status-gist-create-unconfirmed") from None
         # Retain the known identity even if subsequent readback is unavailable.
         atomic_write_text(path, json.dumps(record), encoding="utf-8")
+        record_generation = json.dumps(record).encode("utf-8")
     else:
         api(f"gists/{record['id']}", "PATCH", packet_path)
 
@@ -2008,6 +2362,7 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         files = stored.get("files")
         if stored.get("id") != record["id"] or not isinstance(files, dict):
             raise ValueError("gist identity mismatch")
+        raw_readback = False
         for name, expected in packet["files"].items():
             actual = files.get(name)
             if not isinstance(actual, dict):
@@ -2016,9 +2371,14 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
                 # The API truncates files over 1 MB; the full size is the readback there.
                 if actual.get("size") != len(expected["content"].encode("utf-8")):
                     raise ValueError("incomplete or changed gist evidence")
+            elif actual.get("truncated") is True:
+                _status_gist_raw_readback(stored, name, expected["content"], deadline)
+                raw_readback = True
             elif actual.get("truncated") is not False or actual.get("content") != expected["content"]:
                 raise ValueError("incomplete or changed gist evidence")
-    except (ValueError, AttributeError):
+        if raw_readback and json.loads(api(f"gists/{record['id']}", "GET").stdout) != stored:
+            raise ValueError("gist generation changed during raw readback")
+    except (ValueError, AttributeError, OSError, subprocess.TimeoutExpired):
         raise RuntimeError("status-gist-readback-unconfirmed") from None
     record.update({
         "verifiedAt": now_iso(),
@@ -2026,6 +2386,10 @@ def publish_status(host, lane, feed: dict, tracking_issue: str = "JOV-6637") -> 
         "publicFeedSha256": hashlib.sha256(public_text.encode("utf-8")).hexdigest(),
         **({"stageEventsSha256": stage_digest} if STAGE_EVENTS_NAME in packet["files"] else {}),
     })
+    if (time.monotonic() >= deadline or path.read_bytes() != record_generation or
+            body.read_bytes() != full_text.encode("utf-8") or
+            packet_path.read_bytes() != packet_text.encode("utf-8")):
+        raise RuntimeError("status-gist-readback-unconfirmed")
     atomic_write_text(path, json.dumps(record), encoding="utf-8")
     if created_now:
         try:
@@ -2097,6 +2461,15 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         previous["admissionRepairSince"] = previous.get("admissionRepairSince") or obs["now"]
     elif repair_holds is not None or not (previous.get("alerts") or {}).get("admission-repair-needed"):
         previous["admissionRepairSince"] = None
+    if disk_held(obs):
+        previous["diskHeldSince"] = previous.get("diskHeldSince") or obs["now"]
+        top_at = previous.get("diskTopAt")
+        if obs["now"] - previous["diskHeldSince"] >= DISK_HELD_S and not os.environ.get("LANES_SELFTEST") \
+                and not (isinstance(top_at, (int, float)) and obs["now"] - top_at < DISK_TOP_REFRESH_S):
+            previous["diskTop"], previous["diskTopAt"] = top_disk_consumers(host.state), obs["now"]
+    else:
+        previous["diskHeldSince"] = previous["diskTop"] = previous["diskTopAt"] = None
+    obs["diskTop"] = previous.get("diskTop")
     previous["providerIdleSince"] = provider_idle_since(obs, previous)
     previous["codexIdleSince"] = previous["providerIdleSince"].get("codex")  # old readers
     obs["delivery"] = delivery_evidence(obs, previous)
@@ -2120,6 +2493,8 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
         result["factoryIntake"] = factory_intake.run_pass(host.state, tracker.linear)
     result["poolEmptySince"] = previous["poolEmptySince"]
     result["admissionRepairSince"] = previous.get("admissionRepairSince")
+    for key in ("diskHeldSince", "diskTop", "diskTopAt"):
+        result[key] = previous.get(key)
     result["deliveryDemandSince"] = previous.get("deliveryDemandSince")
     result["codexIdleSince"] = previous["codexIdleSince"]
     result["providerIdleSince"] = previous["providerIdleSince"]

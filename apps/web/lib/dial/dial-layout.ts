@@ -27,9 +27,10 @@ export function rowLayout(distance: number): RowLayout {
       ? abs * ROW_STEP_PX
       : ROW_STEP_PX + (Math.min(abs, 3) - 1) * OUTER_STEP_PX;
   let opacity = 0;
-  if (abs < 1) opacity = lerp(0, 0.55, abs);
-  else if (abs < 2) opacity = lerp(0.55, 0.2, abs - 1);
-  else if (abs < 3) opacity = lerp(0.2, 0, abs - 2);
+  // 0.8 and 0.5 keep the row labels at WCAG AA on the dark surface.
+  if (abs < 1) opacity = lerp(0, 0.8, abs);
+  else if (abs < 2) opacity = lerp(0.8, 0.5, abs - 1);
+  else if (abs < 3) opacity = lerp(0.5, 0, abs - 2);
   const scale = abs <= 1 ? 1 : lerp(1, 0.86, Math.min(abs - 1, 1));
   return { y: sign * y, scale, opacity };
 }

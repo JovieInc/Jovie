@@ -2,7 +2,7 @@
 
 Status: Canon
 Inherits: [`OPERATING_SYSTEM.md`](./OPERATING_SYSTEM.md)
-Last updated: 2026-07-17
+Last updated: 2026-10-23
 
 Design exists to increase customer throughput: make the next correct action obvious, trustworthy, and valuable.
 
@@ -15,6 +15,13 @@ Reduce friction between customer intent and customer value.
 Primary design question:
 
 > What is the smallest design change that helps more customers reach the next value moment?
+
+Art-directed marketing surfaces — the homepage and other public marketing
+routes — follow the
+[art-directed marketing brief](./MARKETING.md#art-directed-marketing-surfaces).
+On those surfaces, use the composition, mockup proportion, material, and
+narrative that brief requires. Product UI (app shell, auth, settings) still
+answers the question above.
 
 ---
 
@@ -45,6 +52,9 @@ Design work is justified when evidence shows one of these is limiting throughput
 ## Principles
 
 - Clarity beats novelty.
+- On art-directed marketing surfaces, the
+  [marketing brief](./MARKETING.md#art-directed-marketing-surfaces) governs
+  composition. Product UI still prefers clarity over novelty.
 - Conversion-critical paths outrank decorative polish.
 - Polish is required when lack of polish blocks trust or activation.
 - Layout stability is part of correctness.
@@ -68,6 +78,9 @@ Do not spend design effort on:
   [`packages/ui/theme/motion-policy.ts`](../packages/ui/theme/motion-policy.ts).
 - Component churn without product bottleneck evidence.
 
+The marketing brief covers public marketing routes only. It leaves product UI
+on the rules above.
+
 ---
 
 ## Relationship to Root Design System
@@ -82,5 +95,6 @@ UI judge calibration set: [`docs/screenshots/ui-escape-holdout/holdout.json`](..
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-23 | Scoped an art-directed marketing exception to smallest-change guidance. Product UI rules are unchanged. | Homepage art-direction brief; founder wording review |
 | 2026-08-21 | Canonized scene-first color harmony for Jovie-owned generated brand imagery. | Tim White approval |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

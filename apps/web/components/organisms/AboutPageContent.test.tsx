@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { COMPANY_IDENTITY } from '@/data/companyIdentity';
+import { ABOUT_COPY, ABOUT_DEFINITION } from '@/data/aboutCopy';
 import { ABOUT_FAQ_ITEMS, AboutPageContent } from './AboutPageContent';
 import { ABOUT_STORY_RECEIPT } from './AboutPageContent.stories';
 
@@ -13,142 +13,101 @@ vi.mock('@/lib/analytics', () => ({
 }));
 
 describe('AboutPageContent', () => {
-  it('answers what Jovie does and whom it serves before the founder story', () => {
+  it('opens with one plain H1 and defines Jovie in one sentence', () => {
     render(<AboutPageContent />);
-    const heading = screen.getByRole('heading', {
-      level: 1,
-      name: 'Presence, relationships, and growth.',
-    });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    expect(heading).toBeVisible();
-    const opening = heading.nextElementSibling;
-    expect(opening).toHaveTextContent(COMPANY_IDENTITY.definition);
-    expect(opening).toHaveTextContent(COMPANY_IDENTITY.seoDescription);
-    expect(opening?.textContent).not.toMatch(/#1|number one|guaranteed/i);
-  });
-
-  it('lets readers inspect product details and the founder without JavaScript actions', () => {
-    render(<AboutPageContent />);
-    for (const [name, href] of [
-      ['Living Profile', '/product'],
-      ['Relationships', '/product'],
-      ['Audience', '/product'],
-      ['Adaptive', '/product'],
-      ['For Artists', '/artist-profiles'],
-      ['Payments', '/pay'],
-      ['Tim White, Founder', '/tim/about'],
-    ]) {
-      expect(screen.getByRole('link', { name })).toHaveAttribute('href', href);
-    }
-  });
-
-  it('renders the exact shipped body in hero, story, features, FAQ order', () => {
-    const { container } = render(<AboutPageContent />);
-
     expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: 'Presence, relationships, and growth.',
-      })
+      screen.getByRole('heading', { level: 1, name: ABOUT_COPY.headline })
     ).toBeVisible();
-    expect(screen.queryByTestId('about-page-refresh')).toBeNull();
-    const sectionHeadings = Array.from(container.querySelectorAll('section'))
-      .map(section => section.querySelector('h2')?.textContent?.trim())
-      .filter((heading): heading is string => heading !== undefined);
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'What Jovie is' })
+    ).toBeVisible();
+    expect(screen.getByText(ABOUT_DEFINITION)).toBeVisible();
+  });
 
-    expect(sectionHeadings).toEqual([
-      'Why Jovie Exists',
-      'What Jovie Does',
-      'Frequently Asked Questions',
-      'Ready to build your Jovie profile?',
+  it('renders what, why, who, contact, then questions, in that order', () => {
+    const { container } = render(<AboutPageContent />);
+    const headings = Array.from(container.querySelectorAll('h2')).map(h =>
+      h.textContent?.trim()
+    );
+    expect(headings.slice(0, 6)).toEqual([
+      'What Jovie is',
+      'Why it exists',
+      'Who makes it',
+      'Contact',
+      'Related',
+      'Questions',
     ]);
     expect(screen.getByTestId('marketing-section-hero')).toHaveAttribute(
       'data-marketing-variant',
       'left-none'
     );
-    expect(
-      screen.getByTestId('marketing-section-content-prose')
-    ).toHaveAttribute('data-marketing-variant', 'article-body');
-    expect(
-      screen.getByTestId('marketing-section-feature-grid')
-    ).toHaveAttribute('data-marketing-variant', 'two-column-text');
-    expect(screen.getByTestId('marketing-section-faq')).toHaveAttribute(
-      'data-marketing-variant',
-      'objection-handler'
-    );
-    expect(screen.getByTestId('marketing-section-cta')).toHaveAttribute(
-      'data-marketing-variant',
-      'final-single-claim'
-    );
-    expect(screen.getByText('Tim White, Founder')).toBeVisible();
-    expect(
-      screen.getByRole('img', { name: 'Tim White, founder of Jovie' })
-    ).toBeVisible();
-    const originSection = screen
-      .getByRole('heading', { level: 2, name: 'Why Jovie Exists' })
-      .closest('section');
-    expect(originSection?.className).toContain('lg:flex-row');
-    expect(originSection?.className).not.toContain('grid-cols-[');
-    for (const feature of [
-      'Living Profile',
-      'Relationships',
-      'Audience',
-      'Adaptive',
-      'For Artists',
-      'Payments',
-    ]) {
-      expect(
-        screen.getByRole('heading', { level: 3, name: feature })
-      ).toBeVisible();
-    }
+    expect(screen.getByTestId('marketing-section-faq')).toBeVisible();
+    expect(screen.queryByTestId('about-page-refresh')).toBeNull();
   });
 
-  it('keeps the six production FAQ items and copy deterministic', () => {
-    expect(ABOUT_FAQ_ITEMS).toEqual([
-      {
-        question: 'What is Jovie?',
-        answer:
-          'Jovie is one product for presence, relationships, and growth. It helps any creator control how they are found and turn attention into relationships. Jovie is available at jov.ie.',
-      },
-      {
-        question: 'Is Jovie related to Jovie childcare or babysitting?',
-        answer:
-          'No. Jovie at jov.ie and Jovie the childcare franchise (jovie.com) are completely separate, unrelated companies in different industries. Jovie at jov.ie is operated by Jovie Technology Inc. The childcare franchise is operated by Bright Horizons Family Solutions.',
-      },
-      {
-        question: 'Who founded Jovie?',
-        answer:
-          'Jovie was founded by Tim White, an artist, producer, and engineer with 15+ years in music: 500+ live shows, five singles signed to Armada Music, songwriting and production for We Are Loud, Justin Prime, and Orjan Nilsen, engineering for Lauryn Hill, and a Clio Award for Hulu Pride Fest 2020.',
-      },
-      {
-        question: 'What does Jovie do?',
-        answer:
-          'Jovie gives you a living profile for your work, links, and story, plus a way to turn attention into a next step. That includes smart links, audience intelligence, release notifications, and AI that uses your actual career data.',
-      },
-      {
-        question: 'Is Jovie free?',
-        answer:
-          'Yes, Jovie offers a free tier that lets you create a profile and start with your name. Paid plans add advanced analytics, notifications, and contact export.',
-      },
-      {
-        question: 'How is Jovie different from Linktree?',
-        answer:
-          'Linktree is a general-purpose link list. Jovie keeps your work, links, and a clear next step in one living profile, including smart links and notifications when something new is ready.',
-      },
-    ]);
-
+  it('names the founder and operator without a biography', () => {
     render(<AboutPageContent />);
-    for (const { question } of ABOUT_FAQ_ITEMS) {
-      expect(screen.getByRole('button', { name: question })).toBeVisible();
+    expect(
+      screen.getByText(/Founded by Tim White\. Jovie is operated by/)
+    ).toBeVisible();
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByRole('link', { name: /Tim White/ })).toBeNull();
+  });
+
+  it('links the support email and support page', () => {
+    render(<AboutPageContent />);
+    expect(
+      screen.getByRole('link', { name: ABOUT_COPY.contact.email })
+    ).toHaveAttribute('href', `mailto:${ABOUT_COPY.contact.email}`);
+    expect(
+      screen.getByRole('link', { name: ABOUT_COPY.contact.supportLabel })
+    ).toHaveAttribute('href', '/support');
+  });
+
+  it('links three to five related pages from the body for the GEO sibling-link check', () => {
+    render(<AboutPageContent />);
+    const hrefs = ABOUT_COPY.related.links.map(link => link.href);
+    expect(hrefs).toEqual(['/product', '/pricing', '/changelog']);
+    for (const link of ABOUT_COPY.related.links) {
+      expect(screen.getByRole('link', { name: link.label })).toHaveAttribute(
+        'href',
+        link.href
+      );
+    }
+    expect(hrefs.length + 1).toBeGreaterThanOrEqual(3);
+    expect(hrefs.length + 1).toBeLessThanOrEqual(5);
+  });
+
+  it('shows every question and answer as visible text for answer engines', () => {
+    render(<AboutPageContent />);
+    expect(ABOUT_FAQ_ITEMS.map(item => item.question)).toEqual([
+      'What is Jovie?',
+      'Who founded Jovie?',
+      'Where is Jovie based?',
+      'How do I contact Jovie?',
+      'Is Jovie free?',
+      'Is Jovie related to Jovie childcare?',
+    ]);
+    for (const { question, answer } of ABOUT_FAQ_ITEMS) {
+      expect(screen.getByText(question)).toBeVisible();
+      expect(screen.getByText(answer)).toBeVisible();
     }
   });
 
-  it('does not name unverified artists in founder copy', () => {
-    const founderAnswer = ABOUT_FAQ_ITEMS.find(
-      item => item.question === 'Who founded Jovie?'
-    )?.answer;
-    expect(founderAnswer).toBeDefined();
-    expect(founderAnswer).not.toMatch(/artists like /);
+  it('carries no founder biography, resume claims, or segment language', () => {
+    const strings: string[] = [];
+    JSON.stringify([ABOUT_COPY, ABOUT_FAQ_ITEMS], (_key, value) => {
+      if (typeof value === 'string') strings.push(value);
+      return value;
+    });
+    const copy = strings.join('\n');
+    expect(copy).not.toMatch(
+      /Armada|Clio|Hulu|NFL|NBA|Google|Netflix|Lauryn|Cosmic Gate|500|15\+|years/i
+    );
+    expect(copy).not.toMatch(/music|artist|musician|\bfans?\b|producer|label/i);
+    expect(copy).not.toMatch(/[–—]/);
+    expect(copy).not.toMatch(/#1|number one|guaranteed|best in/i);
   });
 
   it('keeps metadata and schema ownership in the route and binds the exact story', () => {
@@ -169,7 +128,7 @@ describe('AboutPageContent', () => {
     expect(routeSource).toContain('buildFaqSchema([...ABOUT_FAQ_ITEMS])');
     expect(routeSource).toContain('buildOrganizationSchema');
     expect(routeSource).toContain('buildBreadcrumbSchema');
-    expect(routeSource.match(/type='application\/ld\+json'/g)).toHaveLength(3);
+    expect(routeSource.match(/type='application\/ld\+json'/g)).toHaveLength(5);
     expect(routeSource).toContain('<AboutPageContent />');
     expect(routeSource).not.toContain('<MarketingHero');
     expect(routeSource).not.toContain('<MarketingContainer');
