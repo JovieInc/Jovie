@@ -316,6 +316,12 @@ export async function observeProductionFreshness({
     unshippedCommits,
     oldestUnshippedAt,
     unshippedAgeSeconds,
+    // Production serves an ancestor of main and is within its freshness bound:
+    // the release FIFO is catching up, not stalled.
+    catchingUp: !stale,
+    summary: stale
+      ? `behind by ${unshippedCommits}, stale`
+      : `behind by ${unshippedCommits}, catching up`,
   };
 }
 
