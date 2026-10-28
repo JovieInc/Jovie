@@ -29,6 +29,10 @@ TICK_STALE_S = 10 * 60
 # more in one bounded selector retry. Do not interrupt that legitimate service
 # run; after this grace, an active service with no tick is itself hung.
 ACTIVE_TICK_GRACE_S = 22 * 60
+# A tick that keeps starting subprocesses (lifecycle.beat touches tick-heartbeat) is working, however long it
+# takes; only silence for HEARTBEAT_ALIVE_S, or a tick older than TICK_HARD_CAP_S, is hung.
+HEARTBEAT_ALIVE_S = 3 * 60
+TICK_HARD_CAP_S = 3 * 3600
 ZERO_WORKER_S = 5 * 60
 ATTEMPT_COOLDOWN_S = 2 * 60
 MAX_RECOVERY_ATTEMPTS = 3
@@ -127,6 +131,13 @@ def journal(state: Path, event: dict) -> None:
         os.fsync(handle.fileno())
 
 
+def heartbeat_age(state: Path, now: float) -> int | None:
+    try:
+        return int(now - (state / "tick-heartbeat").stat().st_mtime)
+    except OSError:
+        return None
+
+
 def snapshot(state: Path, now: float) -> dict:
     """Small local-only factory observation; no API call or credential read."""
     tick = read_json(state / "tick.json", {})
@@ -161,6 +172,7 @@ def snapshot(state: Path, now: float) -> dict:
         "doctorEpoch": doctor_epoch,
         "doctorAgeSeconds": None if doctor_epoch is None else int(now - doctor_epoch),
         "service": service,
+        "heartbeatAgeSeconds": heartbeat_age(state, now),
         "tickError": tick.get("error"),
         "admissionDenied": tick.get("admissionDenied"),
         "enabledProviders": enabled,
@@ -186,8 +198,11 @@ def assess(observation: dict) -> dict:
     if not isinstance(tick_age, (int, float)) or tick_age < -30 or tick_age > TICK_STALE_S:
         service = observation.get("service") if isinstance(observation.get("service"), dict) else {}
         service_age = service.get("ageSeconds")
+        beat = observation.get("heartbeatAgeSeconds")
+        working = isinstance(beat, (int, float)) and -30 <= beat <= HEARTBEAT_ALIVE_S \
+            and isinstance(service_age, (int, float)) and 0 <= service_age <= TICK_HARD_CAP_S
         if service.get("active") is True and isinstance(service_age, (int, float)) \
-                and 0 <= service_age <= ACTIVE_TICK_GRACE_S:
+                and (0 <= service_age <= ACTIVE_TICK_GRACE_S or working):
             reasons.append("factory-tick-in-progress")
             waiting = True
         else:
