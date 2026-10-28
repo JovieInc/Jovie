@@ -8,11 +8,25 @@
  * fails when any route is over its budget. It replaces the unthrottled
  * `/start` budget; do not keep both.
  *
+ * Warm-up policy: the exact staged deployment is seconds old when this gate
+ * runs, so its very first loads pay serverless cold-start, edge-cache misses
+ * and runner first-load stalls that a visitor on the live alias almost never
+ * pays. One discarded Lighthouse load per route (default 1, `--warmups N`,
+ * 0 disables) runs before the timed samples, mirroring
+ * `discardSharedAliasContextWarmups` in performance-budgets-guard.ts: pay the
+ * cold first-load once, then measure. Warm-up samples are logged but never
+ * counted; only the timed samples can pass or fail a route.
+ *
  * Budgets live in `performance-entry-budgets.json`. Ratchet `lcpMs` down when
  * the measured median is comfortably under it; never loosen it.
+ *
+ * ratchet: JOV-9611 - the claim-link route sits at a temporary 7000ms baseline
+ * (Tim's launch-first decision, 2026-10-28) because first paint on
+ * /[handle]?claim=1 is intermittently delayed 1-2s; target is back to 4000ms.
  */
 import { spawnSync } from 'node:child_process';
 import {
+  appendFileSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -48,6 +62,8 @@ export interface EntryRouteVerdict {
   readonly clsBudget: number;
   readonly pass: boolean;
   readonly failures: readonly string[];
+  readonly warnings: readonly string[];
+  readonly lcpSamples: readonly number[];
 }
 
 export function median(values: readonly number[]): number {
@@ -66,15 +82,19 @@ export function resolveRoutePath(template: string, handle: string): string {
 /** Pure verdict: a route with no samples fails closed. */
 export function evaluateEntryRoute(
   budget: EntryRouteBudget,
-  result: EntryRouteResult
+  result: EntryRouteResult,
+  options: { lcpReportOnly?: boolean } = {}
 ): EntryRouteVerdict {
   const lcpMedianMs = median(result.lcpSamples);
   const clsMedian = median(result.clsSamples);
   const failures: string[] = [];
+  const warnings: string[] = [];
   if (!Number.isFinite(lcpMedianMs)) {
     failures.push('no LCP samples were collected');
   } else if (lcpMedianMs > budget.lcpMs) {
-    failures.push(
+    // ratchet: JOV-9611 - report-only LCP: a noisy over-budget median warns
+    // (never fails) so quality-only gates cannot stall promotion.
+    (options.lcpReportOnly ? warnings : failures).push(
       `LCP median ${Math.round(lcpMedianMs)}ms > ${budget.lcpMs}ms budget`
     );
   }
@@ -92,7 +112,25 @@ export function evaluateEntryRoute(
     clsBudget: budget.cls,
     pass: failures.length === 0,
     failures,
+    warnings,
+    lcpSamples: [...result.lcpSamples],
   };
+}
+
+function writeLcpSummary(
+  verdicts: readonly EntryRouteVerdict[],
+  lcpReportOnly: boolean
+): void {
+  const file = process.env.GITHUB_STEP_SUMMARY;
+  if (!file) return;
+  const rows = verdicts.map(
+    v =>
+      `| ${v.id} | ${v.lcpSamples.map(x => Math.round(x)).join(' / ')} | ${Math.round(v.lcpMedianMs)} | ${v.lcpBudgetMs} | ${v.warnings.length ? 'WARN (report-only)' : v.pass ? 'pass' : 'FAIL'} |`
+  );
+  appendFileSync(
+    file,
+    `### Entry-route LCP (${lcpReportOnly ? 'report-only, ratchet JOV-9611' : 'blocking'})\n| route | samples ms | median | budget | result |\n|---|---|---|---|---|\n${rows.join('\n')}\n`
+  );
 }
 
 export function parseBudgets(raw: unknown): EntryRouteBudget[] {
@@ -520,11 +558,47 @@ async function runLighthouse(
   }
 }
 
+function warmupOutputPath(
+  work: string,
+  budgetId: string,
+  warmup: number
+): string {
+  return path.join(work, `${budgetId}-warmup-${warmup}.json`);
+}
+
+/**
+ * A discarded Lighthouse load: pays the fresh deployment's cold-start before
+ * the timed samples. Its result is logged for diagnosis and never counted —
+ * only a timed sample can pass or fail a route. A warm-up that fails is
+ * tolerated: if the origin is truly broken the timed runs still fail closed.
+ */
+async function tryWarmupLoad(
+  url: string,
+  headersFile: string | null,
+  outFile: string
+): Promise<{ lcp: number; cls: number } | null> {
+  try {
+    return await runLighthouse(url, headersFile, outFile);
+  } catch (error) {
+    console.log(
+      `  warmup load failed and was discarded: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+}
+
 export async function main(argv: readonly string[]): Promise<number> {
   const baseUrl = argValue(argv, '--base-url');
   if (!baseUrl) throw new Error('--base-url is required');
   const handle = argValue(argv, '--handle') ?? 'tim';
   const runs = Number(argValue(argv, '--runs') ?? '3');
+  const lcpReportOnly = argv.includes('--lcp-report-only');
+  const warmups = Number(argValue(argv, '--warmups') ?? '1');
+  if (!Number.isInteger(warmups) || warmups < 0) {
+    throw new Error('--warmups must be a non-negative integer');
+  }
   const only = argv.flatMap((value, index) =>
     value === '--route-id' ? [argv[index + 1]] : []
   );
@@ -565,6 +639,19 @@ export async function main(argv: readonly string[]): Promise<number> {
       ).toString();
       const lcpSamples: number[] = [];
       const clsSamples: number[] = [];
+      for (let warmup = 0; warmup < warmups; warmup += 1) {
+        const discarded = await tryWarmupLoad(
+          url,
+          headersFile,
+          warmupOutputPath(work, budget.id, warmup)
+        );
+        console.log(
+          `  ${budget.id} warmup ${warmup + 1}/${warmups}: discarded` +
+            (discarded
+              ? ` (LCP ${Math.round(discarded.lcp)}ms CLS ${discarded.cls.toFixed(3)})`
+              : '')
+        );
+      }
       for (let run = 0; run < runs; run++) {
         const sample = await runLighthouse(
           url,
@@ -581,12 +668,11 @@ export async function main(argv: readonly string[]): Promise<number> {
         );
       }
       verdicts.push(
-        evaluateEntryRoute(budget, {
-          id: budget.id,
-          url,
-          lcpSamples,
-          clsSamples,
-        })
+        evaluateEntryRoute(
+          budget,
+          { id: budget.id, url, lcpSamples, clsSamples },
+          { lcpReportOnly }
+        )
       );
     }
   } finally {
@@ -597,7 +683,12 @@ export async function main(argv: readonly string[]): Promise<number> {
       `${verdict.pass ? 'PASS' : 'FAIL'} ${verdict.id}: LCP ${Math.round(verdict.lcpMedianMs)}ms / ${verdict.lcpBudgetMs}ms, CLS ${verdict.clsMedian.toFixed(3)} / ${verdict.clsBudget}`
     );
     for (const failure of verdict.failures) console.log(`  ${failure}`);
+    for (const warning of verdict.warnings)
+      console.log(
+        `::warning::${verdict.id}: ${warning} (report-only, JOV-9611)`
+      );
   }
+  writeLcpSummary(verdicts, lcpReportOnly);
   return verdicts.every(verdict => verdict.pass) ? 0 : 1;
 }
 

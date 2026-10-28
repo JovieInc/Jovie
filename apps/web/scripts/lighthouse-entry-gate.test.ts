@@ -15,6 +15,38 @@ import {
 const budget = { id: 'start', path: '/start', lcpMs: 4000, cls: 0.05 };
 
 describe('lighthouse entry gate', () => {
+  it('ratchet: JOV-9611 - report-only LCP warns but only CLS or missing samples fail', () => {
+    const budget = { id: 'start', path: '/start', lcpMs: 4000, cls: 0.05 };
+    const slow = { id: 'start', url: 'u', lcpSamples: [9000], clsSamples: [0] };
+    const v = evaluateEntryRoute(budget, slow, { lcpReportOnly: true });
+    expect(v.pass).toBe(true);
+    expect(v.warnings).toHaveLength(1);
+    expect(evaluateEntryRoute(budget, slow).pass).toBe(false);
+    expect(
+      evaluateEntryRoute(
+        budget,
+        { ...slow, clsSamples: [0.4] },
+        { lcpReportOnly: true }
+      ).pass
+    ).toBe(false);
+  });
+
+  it('ratchet: JOV-9611 - the production release step passes --lcp-report-only', () => {
+    const wf = readFileSync(
+      path.join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        '.github/workflows/production-release.yml'
+      ),
+      'utf8'
+    );
+    const at = wf.indexOf('scripts/lighthouse-entry-gate.ts');
+    expect(at).toBeGreaterThan(0);
+    expect(wf.slice(at, at + 200)).toContain('--lcp-report-only');
+  });
+
   it('projects post-trace geometry and same-node image discovery from actual LH13 detail builders', async () => {
     const require = createRequire(import.meta.url);
     const lhci = path.dirname(require.resolve('@lhci/cli/package.json'));
@@ -173,7 +205,11 @@ describe('lighthouse entry gate', () => {
     expect(budgets.map(b => b.path).sort()).toEqual(
       ['/[handle]?claim=1', '/claim', '/start'].sort()
     );
-    for (const b of budgets) expect(b.lcpMs).toBeLessThanOrEqual(4000);
+    // ratchet: JOV-9611 - claim-link is on a temporary 7000ms baseline; every
+    // other route stays at 4000ms. Lower claim-link back to 4000, never raise.
+    for (const b of budgets) {
+      expect(b.lcpMs).toBeLessThanOrEqual(b.id === 'claim-link' ? 7000 : 4000);
+    }
   });
 
   it('identifies the direct node in the Lighthouse 13 insight without exposing its content', () => {

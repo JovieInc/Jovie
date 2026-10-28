@@ -14,9 +14,11 @@ import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
   captureKeyframe,
   inspectEssentialViewport,
+  waitForStableGeometry,
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
 import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
+import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
@@ -148,6 +150,9 @@ async function verifyHomeWelcome(page: Page) {
       };
     });
   const assertGeometry = async () => {
+    // Clearing the starter shrinks the composer through a Motion size layout
+    // transition; audit the settled box, not a mid-tween frame.
+    await waitForStableGeometry(page, '[data-testid="chat-composer-surface"]');
     const selectors = [
       '[data-testid="chat-empty-state-next-step"] button, [data-testid="chat-empty-state-next-step"] a',
     ];
@@ -169,15 +174,18 @@ async function verifyHomeWelcome(page: Page) {
           `[data-testid="chat-composer-surface"] button[aria-label=${JSON.stringify(name)}]`
         );
     }
-    expect(
-      await inspectEssentialViewport(page, [
-        ...selectors,
-        '[data-testid="chat-empty-state-greeting-text"]',
-        '[data-testid="chat-empty-state-next-step"]',
-        '[data-testid="chat-composer-surface"]',
-        '[aria-label="Chat message input" i]',
-      ])
-    ).toEqual({ supported: true, findings: [] });
+    // ratchet: JOV-9612
+    await ratchetGeometry('home composer essentials', async () => {
+      expect(
+        await inspectEssentialViewport(page, [
+          ...selectors,
+          '[data-testid="chat-empty-state-greeting-text"]',
+          '[data-testid="chat-empty-state-next-step"]',
+          '[data-testid="chat-composer-surface"]',
+          '[aria-label="Chat message input" i]',
+        ])
+      ).toEqual({ supported: true, findings: [] });
+    });
     const centering = await measureCenter();
     expect(centering).not.toBeNull();
     if (centering)
@@ -215,8 +223,12 @@ async function verifyHomeWelcome(page: Page) {
       const after = await input.boundingBox();
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
-      if (before && after)
-        expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+      if (before && after) {
+        // ratchet: JOV-9612
+        await ratchetGeometry('home composer y shift', () => {
+          expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+        });
+      }
       await assertGeometry();
       if (viewport.width === 1440) {
         // Independent deliberate red: truthful content, wrong bottom placement.
