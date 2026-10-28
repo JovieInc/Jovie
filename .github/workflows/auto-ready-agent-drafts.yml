@@ -27,11 +27,15 @@ name: Auto-Ready Agent Drafts
 
 # Wake only on the workflows that publish the required source contexts
 # (Source Validation: PR Ready + Migration Guard; Fork PR Gate; PR Size Guard).
+# Only Source Validation is subscribed: it completed last on 84 of 85 PR heads
+# measured 2026-10-25, so the other two were duplicate wakes. A head where PR
+# Size Guard finishes last waits for the next Source Validation completion or
+# the lanes' ready flip (guard: scripts/lib/__tests__/wake-fanout-contract.test.mjs).
 # CI runs only on merge_group/push and check_suite fired for every workflow on
 # every head, so both were pure duplicate wakes (~20% of runs, all no-ops).
 on:
   workflow_run:
-    workflows: ['Source Validation', 'Fork PR Gate', 'PR Size Guard']
+    workflows: ['Source Validation']
     types: [completed]
   workflow_dispatch:
     inputs:

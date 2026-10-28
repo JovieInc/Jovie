@@ -16,7 +16,6 @@
     "docs/WEBHOOK_MAP.md",
     "docs/TESTING_STRATEGY.md",
     "docs/PR_WORKFLOW_GUIDE.md",
-    "docs/company/CAPITAL-STRATEGY.md",
     "docs/marketing/*.md"
   ],
   "gardeningScopes": ["docs/doc-gardening/**/*.md"],

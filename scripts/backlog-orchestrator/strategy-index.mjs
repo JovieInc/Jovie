@@ -1,15 +1,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 export const STRATEGY_INDEX_SCHEMA = 'jovie-strategy-theses/v1';
 export const STRATEGY_INDEX_PATH = 'canon/strategy/theses.jsonl';
-
-const REPO_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..'
-);
 
 /**
  * Topics that make a lease strategy-sensitive. Deliberately phrase-level so
@@ -121,7 +114,22 @@ function parseRegistryLine(line) {
 
 const indexCache = new Map();
 
-export function loadStrategyIndex(root = REPO_ROOT) {
+/**
+ * The thesis index is private (JovieInc/Ops jovie-private/). Resolution order:
+ * explicit root, then JOVIE_PRIVATE_DIR, then ~/Ops/jovie-private. The repo
+ * root is not searched; a missing index throws, and the context gate fails
+ * closed with a strategy miss for strategy-sensitive issues.
+ */
+export function resolveStrategyRoot(root) {
+  if (root) return root;
+  return (
+    process.env.JOVIE_PRIVATE_DIR ||
+    path.join(process.env.HOME || '', 'Ops', 'jovie-private')
+  );
+}
+
+export function loadStrategyIndex(root) {
+  root = resolveStrategyRoot(root);
   const cached = indexCache.get(root);
   if (cached) return cached;
   const raw = readFileSync(path.join(root, STRATEGY_INDEX_PATH), 'utf8');

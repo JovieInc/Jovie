@@ -23,7 +23,7 @@ concurrency:
 jobs:
   measure:
     name: Interaction latency audit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
