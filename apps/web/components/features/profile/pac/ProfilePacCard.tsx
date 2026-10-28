@@ -964,6 +964,7 @@ export function ProfilePacCard({
                     alt={artImageAlt}
                     fill
                     priority={artPriority}
+                    fetchPriority={isInteractive ? 'high' : undefined}
                     loading={artPriority ? undefined : 'eager'}
                     sizes='(min-width: 1024px) 400px, 104px'
                     className={

@@ -1230,6 +1230,23 @@ def failed_step_text(log: str) -> str:
     return "\n".join(lines[start:end + 1])
 
 
+def quota_log_gh(args, timeout=60):
+    """Safe log read through canonical admission, with the relay's token and time bound."""
+    scripts = str(HERE.parent)
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient.gh import default_run, run_gh
+    env = dict(os.environ)
+    if env.get(READ_TOKEN_ENV):
+        env["GH_TOKEN"] = env[READ_TOKEN_ENV]
+
+    def execute(argv, read_env):
+        return default_run(argv, read_env, timeout=timeout, execute=lifecycle.run)
+
+    done = run_gh(args[1:], priority="repair", env=env, run=execute, max_attempts=1, max_wait_ms=0)
+    return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
+
+
 def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
     """The GitHub failure kind when every failed job of this run failed only on a GitHub
     quota/abuse limit or a transient 5xx (2026-10-11 20:07Z: PR Size Guard and Source
@@ -1237,9 +1254,10 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
     Any real error line, an unreadable log or a missing classifier keeps the red signal."""
     classify = classify or classify_github_failure
     run_id = workflow_run.get("id")
-    if not isinstance(run_id, int) or run_id <= 0:
+    attempt = workflow_run.get("run_attempt")
+    if type(run_id) is not int or run_id <= 0 or type(attempt) is not int or attempt <= 0:
         return None
-    jobs = sh(["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100",
+    jobs = sh(["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100",
                "--jq", '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out") | .id]'])
     if jobs.returncode != 0:
         # The relay's own read hitting the exhausted quota is the same outage.
@@ -1249,11 +1267,18 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
         ids = json.loads(jobs.stdout or "[]")
     except ValueError:
         return None
-    if not isinstance(ids, list) or not ids or len(ids) > 3:
+    if not isinstance(ids, list) or not ids or len(ids) > 3 \
+            or any(type(job_id) is not int or job_id <= 0 for job_id in ids):
         return None
     kinds = set()
     for job_id in ids:
-        log = sh(["gh", "api", f"repos/{REPO}/actions/jobs/{int(job_id)}/logs"], timeout=60)
+        # gh 2.102 rejects ANSI-bearing raw API bodies even into a pipe. The
+        # existing run-view reader sanitizes logs before stdout; never disable
+        # terminal safety. Bind both discovery and this read to the event attempt.
+        # Cold-cache ZIP fallback costs <=5 reads/job, bounded by the 3-job cap.
+        log_reader = quota_log_gh if sh is run else sh
+        log = log_reader(["gh", "run", "view", "--repo", REPO, "--job", str(job_id),
+                          "--attempt", str(attempt), "--log"], timeout=60)
         if log.returncode != 0:
             return None
         step = failed_step_text(log.stdout or "")
