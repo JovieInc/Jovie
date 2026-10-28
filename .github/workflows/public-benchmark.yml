@@ -45,7 +45,7 @@ permissions:
 jobs:
   benchmark:
     name: Measure and gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       RUNS: ${{ github.event.inputs.runs || '5' }}
