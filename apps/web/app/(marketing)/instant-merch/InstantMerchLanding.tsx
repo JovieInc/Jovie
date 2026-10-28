@@ -92,6 +92,7 @@ export function InstantMerchLanding() {
         title={copy.hero.title}
         body={copy.hero.body}
         media={<MerchFlowPreview />}
+        mediaClassName='w-full min-w-0 lg:self-stretch lg:content-center'
         photo={{
           src: '/images/marketing-hero/instant-merch.webp',
           width: 1600,

@@ -8,7 +8,7 @@ describe('AlternativesIndexPage', () => {
     render(<AlternativesIndexPage />);
 
     expect(
-      screen.getByRole('heading', { name: 'Alternatives For Musicians' })
+      screen.getByRole('heading', { name: 'Alternatives for artists' })
     ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Linktree' })).toHaveAttribute(
       'href',
