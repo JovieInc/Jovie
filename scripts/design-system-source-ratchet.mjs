@@ -269,13 +269,31 @@ function readAllowlist(filePath) {
 
 export function writeIdentityBaseline(options = {}) {
   const repoRoot = options.repoRoot ?? REPO_ROOT;
-  const identities = uniqueSorted(
+  let identities = uniqueSorted(
     options.identities ?? collectDesignSystemIdentities({ repoRoot })
   );
   const outPath = join(
     repoRoot,
     options.relativePath ?? IDENTITY_BASELINE_RELATIVE
   );
+  // After taking main's generated copy during a merge, retain only surviving
+  // grandfathered identities. Never turn new debt or allowlist escapes into
+  // baseline entries just because a generated file conflicted.
+  if (options.prune) {
+    const baseline = new Set(readIdentityList(outPath, 'identity baseline'));
+    const allowlist = new Set(
+      readAllowlist(join(repoRoot, IDENTITY_ALLOWLIST_RELATIVE))
+    );
+    const added = identities.filter(
+      key => !baseline.has(key) && !allowlist.has(key)
+    );
+    if (added.length) {
+      throw new Error(
+        `Cannot prune baseline: ${added.length} new identities:\n${added.join('\n')}`
+      );
+    }
+    identities = identities.filter(key => baseline.has(key));
+  }
   mkdirSync(dirname(outPath), { recursive: true });
   // Compact JSON on purpose: a pretty-printed identity list is thousands of
   // lines and trips the source-PR size cap. Biome excludes this generated
@@ -377,8 +395,9 @@ export function evaluateDesignSystemSourceRatchet(options = {}) {
 
 function main() {
   const writeBaseline = process.argv.includes('--write-baseline');
-  if (writeBaseline) {
-    const written = writeIdentityBaseline();
+  const pruneBaseline = process.argv.includes('--prune-baseline');
+  if (writeBaseline || pruneBaseline) {
+    const written = writeIdentityBaseline({ prune: pruneBaseline });
     console.log(
       `[design-system-source-ratchet] wrote ${written.count} identities to ${written.path}`
     );
