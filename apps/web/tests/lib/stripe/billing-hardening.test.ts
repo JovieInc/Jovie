@@ -112,6 +112,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       const result = await updateUserBillingStatus({
         clerkUserId: '6ba7b810-9dad-11d1-80b4-00c04fd430c8',
         isPro: true,
+        plan: 'pro',
         stripeSubscriptionId: 'sub_ba',
         eventType: 'subscription_created',
       });
@@ -226,6 +227,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       const result = await updateUserBillingStatus({
         clerkUserId: 'user_test123',
         isPro: true,
+        plan: 'pro',
         stripeCustomerId: 'cus_new',
         stripeSubscriptionId: 'sub_new',
         stripeEventId: 'evt_first',
@@ -268,6 +270,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         updateUserBillingStatus({
           clerkUserId: 'user_test123',
           isPro: true,
+          plan: 'pro',
           stripeEventId: 'evt_existing',
           stripeEventTimestamp: new Date('2024-01-15T12:00:00Z'),
           eventType: 'payment_succeeded',
@@ -325,6 +328,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         const resultPromise = updateUserBillingStatus({
           clerkUserId: 'user_test123',
           isPro: true,
+          plan: 'pro',
           stripeCustomerId: 'cus_new',
           stripeSubscriptionId: 'sub_new',
           stripeEventId: 'evt_test',
@@ -371,6 +375,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
         const resultPromise = updateUserBillingStatus({
           clerkUserId: 'user_test123',
           isPro: true,
+          plan: 'pro',
           stripeEventId: 'evt_test',
           eventType: 'subscription_created',
         });
@@ -413,6 +418,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       await updateUserBillingStatus({
         clerkUserId: 'user_test123',
         isPro: true,
+        plan: 'pro',
         stripeCustomerId: 'cus_new',
         stripeSubscriptionId: 'sub_new',
         stripeEventId: 'evt_test123',
@@ -472,6 +478,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       await updateUserBillingStatus({
         clerkUserId: 'user_test123',
         isPro: true,
+        plan: 'pro',
         eventType: 'subscription_created',
       });
 
@@ -513,6 +520,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       const result = await updateUserBillingStatus({
         clerkUserId: 'uuid-audit-failure',
         isPro: true,
+        plan: 'pro',
         stripeEventId: 'evt_audit_failure',
         eventType: 'subscription_created',
       });
@@ -542,6 +550,7 @@ describe('Billing Hardening - updateUserBillingStatus', () => {
       const result = await updateUserBillingStatus({
         clerkUserId: 'user_nonexistent',
         isPro: true,
+        plan: 'pro',
         eventType: 'subscription_created',
       });
 
