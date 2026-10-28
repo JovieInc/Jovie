@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -156,8 +158,11 @@ describe('StartPage', () => {
     expect(result.props.entryProfile).toEqual(entry);
   });
 
-  it('skips the handle lookup when an explicit starter prompt drives the chat', async () => {
-    mocks.resolveStartEntryProfile.mockClear();
+  it('keeps an explicit starter prompt in charge of an open or claimable handle', async () => {
+    mocks.resolveStartEntryProfile.mockResolvedValueOnce({
+      status: 'available',
+      handle: 'megaran',
+    });
 
     const result = await StartPage({
       searchParams: Promise.resolve({
@@ -166,8 +171,27 @@ describe('StartPage', () => {
       }),
     });
 
-    expect(mocks.resolveStartEntryProfile).not.toHaveBeenCalled();
     expect(result.props.entryProfile).toBeNull();
+    expect(result.props.starterHandoff).toMatchObject({ kind: 'prompt' });
+  });
+
+  it('still reports a taken handle when a starter prompt rides along (JOV-9624)', async () => {
+    const entry = {
+      status: 'claimed',
+      handle: 'tim',
+      displayName: 'Tim',
+      avatarUrl: null,
+    } as const;
+    mocks.resolveStartEntryProfile.mockResolvedValueOnce(entry);
+
+    const result = await StartPage({
+      searchParams: Promise.resolve({
+        handle: 'tim',
+        starter_prompt: 'I want my own jov.ie.',
+      }),
+    });
+
+    expect(result.props.entryProfile).toEqual(entry);
   });
 
   it('lets a pending account resume without an advisory waitlist read', async () => {
@@ -290,5 +314,14 @@ describe('StartPage', () => {
       expect(result.props.entryProfile).toEqual(entry);
       expect(result.props.turnstileTestMode).toBe(true);
     });
+  });
+
+  // LCP guard: a loading.tsx makes Next stream the real page behind a Suspense
+  // boundary that React reveals from a throttled inline script, so the visible
+  // heading painted 2.3s+ late and read 7.9s in the throttled-mobile entry gate
+  // (apps/web/performance-entry-budgets.json, budget 4000ms). Keep the heading
+  // in the first HTML instead.
+  it('has no loading.tsx, so the LCP heading is in the first HTML', () => {
+    expect(existsSync(path.join(__dirname, 'loading.tsx'))).toBe(false);
   });
 });

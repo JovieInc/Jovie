@@ -102,7 +102,6 @@ test('2: fixes and CI repair labels need a command and pre-fix red evidence', ()
     pr({ title: 'fix: repair' }),
     pr({ title: 'fix(auth)!: repair' }),
     pr({ labels: [{ name: 'bug' }] }),
-    pr({ labels: [{ name: 'lane-fix-red' }] }),
     pr({ labels: [{ name: 'ws:ci' }] }),
     pr({ body: '- [x] Bug fix' }),
   ]) {
@@ -110,6 +109,8 @@ test('2: fixes and CI repair labels need a command and pre-fix red evidence', ()
     assert.deepEqual(check({ ...pull, body: `${red}\n${proof}` }).errors, []);
   }
   assert.deepEqual(check(pr()).errors, []);
+  for (const name of ['lane-fix-red', 'lane-fix-dequeued'])
+    assert.deepEqual(check(pr({ labels: [{ name }] })).errors, []);
   assert.ok(
     check(
       pr({
@@ -458,7 +459,14 @@ test('contract: Fleet Rules Evidence is base-branch code only and never hands th
     'pull_request_target',
     'workflow_run',
   ]);
-  assert.equal((text.match(/secrets\./g) ?? []).length, 1);
+  // Two mints, both read-only and both in base-branch jobs: the evidence job and the
+  // workflow_run re-run hop (its lookups moved off github.token, 2026-10-26).
+  assert.equal((text.match(/secrets\./g) ?? []).length, 2);
+  assert.equal(
+    (text.match(/private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/g) ?? [])
+      .length,
+    2
+  );
   assert.match(text, /private-key: \$\{\{ secrets\.CI_APP_PRIVATE_KEY \}\}/);
   assert.match(
     text,
@@ -483,10 +491,15 @@ test('contract: Fleet Rules Evidence is base-branch code only and never hands th
     text.indexOf('- name: Read evidence')
   );
   assert.doesNotMatch(setupNode, /token:|fleet-token/);
-  // The minted token is only passed to the evidence script, as FLEET_TOKEN.
-  assert.equal(
-    (text.match(/steps\.fleet-token\.outputs\.token/g) ?? []).length,
-    1
+  // The minted token is passed only to the evidence script (FLEET_TOKEN) and to the
+  // re-run hop's read lookups (GH_READ_TOKEN); never anywhere else.
+  assert.deepEqual(
+    [
+      ...text.matchAll(
+        /(\w+): \$\{\{ steps\.fleet-token\.outputs\.token \}\}/g
+      ),
+    ].map(match => match[1]),
+    ['FLEET_TOKEN', 'GH_READ_TOKEN']
   );
 });
 
@@ -917,4 +930,22 @@ test('missing test patches and placeholder decision references cannot bypass blo
     ).errors,
     []
   );
+});
+
+test('section keeps a "# " line inside a code fence in the section', async () => {
+  const { section } = await import('./pr-fleet-rules.mjs');
+  const body = [
+    '## Red-before-green',
+    'Failing command: `x`',
+    '```text',
+    '# comment line in the failing output',
+    'FAIL expected 1',
+    '```',
+    '## Next',
+    'other',
+  ].join('\n');
+  const out = section(body, 'Red-before-green');
+  assert.match(out, /# comment line/);
+  assert.match(out, /FAIL expected 1/);
+  assert.doesNotMatch(out, /other/);
 });

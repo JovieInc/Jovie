@@ -31,7 +31,7 @@ test('the red-before-green block the lanes write satisfies the Fleet Rules parse
     ],
     { cwd: root, encoding: 'utf8' }
   );
-  const labels = ['lane-fix-red'];
+  const labels = ['ci-fix'];
   const bare = evaluateFleetRules({
     pr: { title: 'feat(x): y', body: '## Summary\nx', labels },
     files: [],

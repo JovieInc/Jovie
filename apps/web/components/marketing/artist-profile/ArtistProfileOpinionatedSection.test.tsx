@@ -58,6 +58,17 @@ describe('ArtistProfileOpinionatedSection', () => {
       ARTIST_PROFILE_COPY.opinionated.principle
     );
   });
+  it('describes the default profile with listener wording, never fan wording', () => {
+    const { container } = render(
+      <ArtistProfileOpinionatedSection
+        opinionated={ARTIST_PROFILE_COPY.opinionated}
+      />
+    );
+    const caption = container.querySelector('figcaption');
+    expect(caption?.textContent ?? '').not.toMatch(/\bfans?\b/iu);
+    expect(container.textContent ?? '').not.toMatch(/leads fans/iu);
+  });
+
   it('keeps the opinionated profile source contract bounded and accessible', () => {
     const source = readFileSync(
       resolve(

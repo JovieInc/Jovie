@@ -115,7 +115,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:liveness
-    jobCount: 1
+    jobCount: 2
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -350,7 +350,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-production-publish
@@ -438,9 +437,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Auto-Ready Agent Drafts
       - Lane Fix Relay
-      - Merge Queue Green Enroll
     triggeringStateTransition:
       - pull_request
       - pull_request_review
@@ -495,6 +492,18 @@ nodes:
       - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:worker
+    jobCount: 1
+  - name: Interaction latency audit
+    path: .github/workflows/interaction-latency-audit.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:measure
     jobCount: 1
   - name: Internal PR Review (advisory)
     path: .github/workflows/internal-review.yml
@@ -955,7 +964,6 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
@@ -985,6 +993,18 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:capture
+    jobCount: 1
+  - name: Private Data Guard
+    path: .github/workflows/private-data-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:guard
     jobCount: 1
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml
@@ -1554,9 +1574,6 @@ edges:
     to: Merge Queue Green Enroll
     type: workflow_run
   - from: CI
-    to: Merge Queue Green Enroll
-    type: workflow_run
-  - from: Fork PR Gate
     to: Merge Queue Green Enroll
     type: workflow_run
   - from: PR Size Guard
