@@ -44,6 +44,11 @@ run_affected() {
   # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
   echo "[pre-push-gate] running component-ship-gate"
   pnpm component-ship-gate
+  # One pass over every changed-file step Source Validation runs, listing all
+  # failures (derived from the workflow, so it cannot drift). JOVIE_PREFLIGHT=0
+  # skips it; JOVIE_SKIP_PRE_PUSH_GATE is the only other escape hatch.
+  echo "[pre-push-gate] running preflight"
+  node scripts/preflight.mjs --hook
   bash scripts/automation-verify.sh affected
 }
 
