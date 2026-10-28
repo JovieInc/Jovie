@@ -2,6 +2,7 @@ import 'server-only';
 
 import { eq } from 'drizzle-orm';
 import { getCachedAuth } from '@/lib/auth/cached';
+import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import {
   applyRlsSessionUser,
   applyRlsTransactionUser,
@@ -264,6 +265,7 @@ export interface ProfileContext {
   isPublic: boolean | null;
   isClaimed: boolean | null;
   onboardingCompletedAt: Date | null;
+  proofPending?: boolean;
 }
 
 /**
@@ -315,7 +317,7 @@ export async function getDbUser(
 export async function getProfileByDbUserId(
   dbUserId: string
 ): Promise<ProfileContext | null> {
-  const [profile] = await db
+  const [row] = await db
     .select({
       id: creatorProfiles.id,
       userId: creatorProfiles.userId,
@@ -326,13 +328,19 @@ export async function getProfileByDbUserId(
       isPublic: creatorProfiles.isPublic,
       isClaimed: creatorProfiles.isClaimed,
       onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      settings: creatorProfiles.settings,
     })
     .from(users)
     .innerJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
     .where(eq(users.id, dbUserId))
     .limit(1);
 
-  return profile ?? null;
+  if (!row) return null;
+  const { settings, ...profile } = row;
+  return {
+    ...profile,
+    ...(isProofBlockingPublication(settings) ? { proofPending: true } : {}),
+  };
 }
 
 /**
@@ -384,6 +392,7 @@ export async function getSessionContext(options?: {
       profileAvatarUrl: creatorProfiles.avatarUrl,
       profileIsPublic: creatorProfiles.isPublic,
       profileOnboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
+      profileSettings: creatorProfiles.settings,
     })
     .from(users)
     .leftJoin(creatorProfiles, eq(creatorProfiles.id, users.activeProfileId))
@@ -440,6 +449,9 @@ export async function getSessionContext(options?: {
         isPublic: result.profileIsPublic,
         isClaimed: true, // joined via activeProfileId = claimed
         onboardingCompletedAt: result.profileOnboardingCompletedAt,
+        ...(isProofBlockingPublication(result.profileSettings)
+          ? { proofPending: true }
+          : {}),
       }
     : null;
 

@@ -10,6 +10,7 @@ import {
   storedZip,
 } from '../../scripts/lib/real-gh-harness.mjs';
 import {
+  annotationSink,
   command,
   comparisonReady,
   evidenceFailureKind,
@@ -17,6 +18,10 @@ import {
   readEvidence,
   validateLease,
 } from './testflight-release-lease.mjs';
+
+// Mocked rate-limit refusals print `::error::` lines; swallow them so the runner's
+// log parser never turns a fixture into an annotation (2026-10-25).
+annotationSink.emit = () => {};
 
 const SOURCE = 'a'.repeat(40);
 const CONTROLLER_HEAD = 'b'.repeat(40);
@@ -450,6 +455,9 @@ printf '%s\\n' '{"ok":true}'
         assert.match(error.message, /; rate limited: /);
         assert.match(error.message, /outside the 30s budget/);
         assert.match(error.message, /Not passing/);
+        // Mocked resets are labelled so they cannot pass for a live refusal.
+        assert.match(error.message, /\[fixture\] GitHub rate limit resets at/);
+        assert.match(error.message, /\(resource=core\)/);
         assert.doesNotMatch(error.message, /rewound or diverged/);
         assert.doesNotMatch(
           error.message,

@@ -6,6 +6,7 @@ import {
   summarizeTerritories,
 } from './constants';
 import { encodeContactPayload } from './obfuscation';
+import { isPlaceholderValue, realValueOrUndefined } from './placeholder';
 
 export function toPublicContacts(
   contacts: CreatorContact[],
@@ -20,7 +21,7 @@ export function toPublicContacts(
     .map(contact => {
       const channels: PublicContact['channels'] = [];
 
-      if (contact.email) {
+      if (!isPlaceholderValue(contact.email) && contact.email) {
         channels.push({
           type: 'email',
           encoded: encodeContactPayload({
@@ -33,7 +34,7 @@ export function toPublicContacts(
         });
       }
 
-      if (contact.phone) {
+      if (!isPlaceholderValue(contact.phone) && contact.phone) {
         const encodedPhone = encodeContactPayload({
           type: 'phone',
           value: contact.phone,
@@ -68,6 +69,8 @@ export function toPublicContacts(
       const territories = (contact.territories ?? []).filter(Boolean);
       const { summary, count } = summarizeTerritories(territories);
       const roleLabel = getContactRoleLabel(contact.role, contact.customLabel);
+      const companyName = realValueOrUndefined(contact.companyName);
+      const personName = realValueOrUndefined(contact.personName);
 
       return {
         id: contact.id,
@@ -76,10 +79,10 @@ export function toPublicContacts(
         territorySummary: summary,
         territoryCount: count,
         territories,
-        companyLabel: contact.companyName ?? undefined,
-        contactName: contact.personName ?? undefined,
-        secondaryLabel: contact.companyName ?? undefined,
-        primaryContactLabel: contact.personName ?? undefined,
+        companyLabel: companyName,
+        contactName: personName,
+        secondaryLabel: companyName,
+        primaryContactLabel: personName,
         channels,
       };
     })

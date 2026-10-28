@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { type FormEvent, forwardRef, type ReactNode } from 'react';
+import { act, render, screen } from '@testing-library/react';
+import { type FormEvent, forwardRef, type ReactNode, useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { OnboardingChat } from '@/components/features/onboarding/OnboardingChat';
 
@@ -21,6 +21,9 @@ interface MockMessage {
 
 const chatMocks = vi.hoisted(() => ({
   messages: [] as MockMessage[],
+  onHandleCandidateChange: undefined as
+    | undefined
+    | ((handle: string | null) => void),
   sendMessage: vi.fn(),
   setMessages: vi.fn(),
   status: 'ready' as 'ready' | 'submitted' | 'streaming',
@@ -67,14 +70,16 @@ vi.mock('@/components/jovie/components', () => ({
       readonly onChange?: (value: string) => void;
       readonly onSubmit?: (event?: FormEvent) => void;
       readonly value?: string;
+      readonly placeholder?: string;
     }
-  >(function MockChatInput({ onChange, onSubmit, value }, ref) {
+  >(function MockChatInput({ onChange, onSubmit, value, placeholder }, ref) {
     return (
       <form onSubmit={onSubmit}>
         <textarea
           ref={ref}
           aria-label='Chat Message Input'
           value={value}
+          placeholder={placeholder}
           onChange={event => onChange?.(event.currentTarget.value)}
         />
       </form>
@@ -125,9 +130,18 @@ vi.mock('@/components/features/onboarding/OnboardingToolArtifacts', () => ({
   OnboardingArtistConfirmedCard: () => null,
   OnboardingHandleCheckCard: ({
     output,
+    onHandleCandidateChange,
   }: {
     readonly output?: { action?: string; handle?: string } | null;
-  }) => <div data-testid='handle-card'>{output?.action}</div>,
+    readonly onHandleCandidateChange: (handle: string | null) => void;
+  }) => {
+    // Retain the real card's draft callback, including confirmed status cards.
+    useEffect(() => {
+      chatMocks.onHandleCandidateChange = onHandleCandidateChange;
+      onHandleCandidateChange(output?.handle ?? null);
+    }, [output?.handle, onHandleCandidateChange]);
+    return <div data-testid='handle-card'>{output?.action}</div>;
+  },
   OnboardingSocialLinkCard: ({
     output,
   }: {
@@ -141,6 +155,27 @@ vi.mock('@/components/features/onboarding/OnboardingProfileRail', () => ({
   OnboardingProfileRail: () => null,
 }));
 
+function handleMessage(
+  id: string,
+  action: 'check_handle' | 'handle_confirmed',
+  handle: string
+) {
+  return {
+    id,
+    role: 'assistant' as const,
+    parts: [
+      {
+        type: 'dynamic-tool' as const,
+        toolName: 'checkHandle',
+        toolCallId: id,
+        state: 'output-available' as const,
+        input: { handle },
+        output: { action, handle },
+      },
+    ],
+  };
+}
+
 function renderChat() {
   return render(
     <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
@@ -151,6 +186,7 @@ describe('OnboardingChat completed guarded steps (JOV-7078)', () => {
   beforeEach(() => {
     chatMocks.messages = [];
     chatMocks.status = 'ready';
+    chatMocks.onHandleCandidateChange = undefined;
     chatMocks.sendMessage.mockClear();
   });
 
@@ -205,6 +241,68 @@ describe('OnboardingChat completed guarded steps (JOV-7078)', () => {
     expect(handleCards[0]?.textContent).toBe('handle_confirmed');
     // Social step is not complete yet — its card stays interactive.
     expect(screen.getAllByTestId('social-card')).toHaveLength(1);
+  });
+
+  it('advances composer intent only after server confirmation and preserves the confirmed preview', () => {
+    const onProfileBuilderChange = vi.fn();
+    chatMocks.messages = [
+      handleMessage('proposal', 'check_handle', 'draftartist'),
+    ];
+    const view = render(
+      <OnboardingChat
+        turnstileToken='token'
+        turnstileStatus='verified'
+        onProfileBuilderChange={onProfileBuilderChange}
+      />
+    );
+    const input = screen.getByRole('textbox', { name: 'Chat Message Input' });
+    expect(input).toHaveAttribute(
+      'placeholder',
+      'Confirm handle or type a different one…'
+    );
+
+    chatMocks.messages = [
+      ...chatMocks.messages,
+      {
+        id: 'confirm-request',
+        role: 'user',
+        parts: [{ type: 'text', text: 'Confirmed handle @draftartist' }],
+        metadata: {
+          onboardingEvent: 'handle_confirmed',
+          handle: 'draftartist',
+        },
+      },
+    ];
+    view.rerender(
+      <OnboardingChat
+        turnstileToken='token'
+        turnstileStatus='verified'
+        onProfileBuilderChange={onProfileBuilderChange}
+      />
+    );
+    // A submitted or rejected request must not invent server completion.
+    expect(input).toHaveAttribute(
+      'placeholder',
+      'Confirm handle or type a different one…'
+    );
+
+    chatMocks.messages = [
+      ...chatMocks.messages,
+      handleMessage('confirmation', 'handle_confirmed', 'confirmedartist'),
+    ];
+    view.rerender(
+      <OnboardingChat
+        turnstileToken='token'
+        turnstileStatus='verified'
+        onProfileBuilderChange={onProfileBuilderChange}
+      />
+    );
+    expect(input).toHaveAttribute('placeholder', 'Reply to Jovie…');
+    act(() => chatMocks.onHandleCandidateChange?.('staleartist'));
+    expect(input).toHaveAttribute('placeholder', 'Reply to Jovie…');
+    expect(onProfileBuilderChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ handle: 'confirmedartist' })
+    );
   });
 
   it('collapses stale propose_social_link parts once social is attached', () => {
