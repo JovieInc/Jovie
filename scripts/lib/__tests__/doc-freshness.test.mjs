@@ -3,6 +3,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   copyFileSync,
+  cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -502,7 +504,89 @@ describe('Markdown examples are not top-map links', () => {
 
 const sourceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
-it('gardening commits and pushes with no runner Git identity, without changing local configuration', () => {
+const pendingGardeningPr = {
+  number: 123,
+  state: 'open',
+  title: 'docs: refresh doc-gardening seed freshness marker',
+  user: { login: 'jovie-bot[bot]' },
+  head: {
+    ref: 'codex/doc-gardening-1792991782253',
+    repo: { full_name: 'JovieInc/Jovie' },
+  },
+};
+
+it.each([
+  {
+    name: 'creates one repair with no runner identity',
+    pages: [[]],
+    creates: true,
+  },
+  {
+    name: 'preserves a pending repair discovered on a later page',
+    pages: [[], [pendingGardeningPr]],
+  },
+  {
+    name: 'does not adopt a foreign fork branch',
+    pages: [
+      [
+        {
+          ...pendingGardeningPr,
+          head: {
+            ...pendingGardeningPr.head,
+            repo: { full_name: 'outsider/Jovie' },
+          },
+        },
+      ],
+    ],
+    creates: true,
+  },
+  {
+    name: 'does not adopt a human branch',
+    pages: [[{ ...pendingGardeningPr, user: { login: 'another-user' } }]],
+    creates: true,
+  },
+  {
+    name: 'fails closed when the roster cannot be read',
+    pages: [[]],
+    lookupExit: 1,
+    fails: true,
+  },
+  {
+    name: 'fails closed on a malformed roster',
+    pages: { error: 'not an inventory' },
+    fails: true,
+  },
+  {
+    name: 'fails closed on incomplete PR metadata',
+    pages: [[{ ...pendingGardeningPr, head: null }]],
+    fails: true,
+  },
+  {
+    name: 'fails closed on missing candidate repository identity',
+    pages: [
+      [
+        {
+          ...pendingGardeningPr,
+          head: { ...pendingGardeningPr.head, repo: null },
+        },
+      ],
+    ],
+    fails: true,
+  },
+  {
+    name: 'keeps local fixes independent of GitHub',
+    pages: [[]],
+    lookupExit: 1,
+    args: ['--no-pr'],
+    local: true,
+  },
+  {
+    name: 'keeps dry runs read-only',
+    pages: [[]],
+    lookupExit: 1,
+    args: ['--dry-run'],
+  },
+])('gardening $name without changing local Git configuration', scenario => {
   const temporary = mkdtempSync(join(tmpdir(), 'jovie-gardening-identity-'));
   try {
     const root = join(temporary, 'repo');
@@ -519,6 +603,11 @@ it('gardening commits and pushes with no runner Git identity, without changing l
     ]) {
       copyFileSync(join(sourceRoot, path), join(root, path));
     }
+    cpSync(
+      join(sourceRoot, 'packages/api-client'),
+      join(root, 'packages/api-client'),
+      { recursive: true }
+    );
     writeFileSync(join(root, 'CLAUDE.md'), '# Fixture\n');
     writeFileSync(join(root, '.claude/rules/one.md'), '# Rule\n');
     writeFileSync(
@@ -546,7 +635,7 @@ it('gardening commits and pushes with no runner Git identity, without changing l
     // Only GitHub is an inert recorder. Commit and push use real Git and a local bare remote.
     writeFileSync(
       join(bin, 'gh'),
-      '#!/bin/sh\ncase "$1 $2" in\n  "auth status") exit 0 ;;\n  "pr create") printf "%s\\n" "$@" > "$GARDENING_PR_ARGS"; printf "https://example.invalid/local-gardening-proof\\n" ;;\n  *) exit 1 ;;\nesac\n'
+      '#!/bin/sh\ncase "$1 $2" in\n  "auth status") exit 0 ;;\n  "api "*) printf "%s\\n" "$@" >> "$GARDENING_READ_ARGS"; cat "$GARDENING_ROSTER"; exit "$GARDENING_LOOKUP_EXIT" ;;\n  "pr create") printf "%s\\n" "$@" > "$GARDENING_PR_ARGS"; printf "https://example.invalid/local-gardening-proof\\n" ;;\n  *) exit 1 ;;\nesac\n'
     );
     chmodSync(join(bin, 'gh'), 0o755);
     const env = {
@@ -557,7 +646,13 @@ it('gardening commits and pushes with no runner Git identity, without changing l
       GIT_CONFIG_KEY_0: 'user.useConfigOnly',
       GIT_CONFIG_VALUE_0: 'true',
       GARDENING_PR_ARGS: join(temporary, 'pr-args'),
+      GARDENING_READ_ARGS: join(temporary, 'read-args'),
+      GARDENING_ROSTER: join(temporary, 'roster.json'),
+      GARDENING_LOOKUP_EXIT: String(scenario.lookupExit ?? 0),
+      GITHUB_REPOSITORY: 'JovieInc/Jovie',
+      JOVIE_API_STATE_DIR: join(temporary, 'api-state'),
     };
+    writeFileSync(env.GARDENING_ROSTER, JSON.stringify(scenario.pages));
     const git = (...args) =>
       execFileSync('git', args, {
         cwd: root,
@@ -579,12 +674,49 @@ it('gardening commits and pushes with no runner Git identity, without changing l
       'fixture'
     );
     const beforeConfig = git('config', '--local', '--list');
+    const beforeHead = git('rev-parse', 'HEAD');
     const result = spawnSync(
       process.execPath,
-      [join(root, 'scripts/doc-gardening-agent.mjs')],
+      [join(root, 'scripts/doc-gardening-agent.mjs'), ...(scenario.args ?? [])],
       { cwd: root, env, encoding: 'utf8' }
     );
-    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.equal(
+      result.status,
+      scenario.fails ? 1 : 0,
+      result.stdout + result.stderr
+    );
+    if (!scenario.args) {
+      const readArgs = readFileSync(env.GARDENING_READ_ARGS, 'utf8');
+      assert.match(
+        readArgs,
+        /repos\/JovieInc\/Jovie\/pulls\?state=open&base=main&per_page=100\n/
+      );
+      assert.match(readArgs, /--paginate\n/);
+      assert.match(readArgs, /--slurp\n/);
+    } else {
+      assert.equal(existsSync(env.GARDENING_READ_ARGS), false);
+    }
+    if (!scenario.creates) {
+      assert.equal(git('rev-parse', 'HEAD'), beforeHead);
+      assert.equal(git('branch', '--show-current'), 'main');
+      assert.equal(git('config', '--local', '--list'), beforeConfig);
+      assert.equal(
+        execFileSync(
+          'git',
+          ['--git-dir', remote, 'for-each-ref', '--format=%(refname)'],
+          { env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+        ).trim(),
+        ''
+      );
+      assert.equal(
+        readFileSync(join(root, 'docs/doc-gardening/SEED-STALE.md'), 'utf8'),
+        `<!-- doc-freshness:rules:${scenario.local ? 1 : 0} -->\n`
+      );
+      assert.equal(existsSync(env.GARDENING_PR_ARGS), false);
+      if (!scenario.args && !scenario.fails)
+        assert.match(result.stdout, /pending.*#123/);
+      return;
+    }
     assert.equal(
       git('show', 'HEAD:docs/doc-gardening/SEED-STALE.md'),
       '<!-- doc-freshness:rules:1 -->'

@@ -22,7 +22,9 @@ describe('getArtistOfferFunnelReport diagnostics', () => {
           { stage: 'claim-start', journeys: 1 },
           { stage: 'not-a-stage', journeys: 9 },
         ],
-      });
+      })
+      // Last: consented journeys first seen in the trailing 7 days.
+      .mockResolvedValueOnce({ rows: [{ visits: 40 }] });
 
     const report = await getArtistOfferFunnelReport({
       start: new Date('2026-10-21T00:00:00Z'),
@@ -35,7 +37,8 @@ describe('getArtistOfferFunnelReport diagnostics', () => {
       visitsByLanding: { offer: 7, other: 93 },
       stageEventsInWindow: { pricing: 4, 'claim-start': 1 },
     });
-    expect(execute).toHaveBeenCalledTimes(4);
+    expect(execute).toHaveBeenCalledTimes(5);
+    expect(report.goldenPath?.stalledStages).toContain('start');
   });
 
   it('reads zero diagnostics from empty results', async () => {

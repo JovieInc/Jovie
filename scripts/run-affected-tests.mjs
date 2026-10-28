@@ -85,6 +85,31 @@ const KNOWN_VITEST_FIXTURE_TESTS = new Map([
     'apps/web/lib/notifications/campaign-scheduling.ts',
     ['apps/web/lib/notifications/campaign-scheduling.test.ts'],
   ],
+  [
+    'apps/web/components/features/onboarding/onboardingChatHelpers.ts',
+    [
+      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
+      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
+    ],
+  ],
+  [
+    'apps/web/tests/e2e/utils/start-entry-layout.ts',
+    [
+      'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+      'apps/web/tests/unit/e2e/start-entry-layout.test.ts',
+    ],
+  ],
+  [
+    'apps/web/tests/e2e/helpers/golden-path-keyframes.ts',
+    [
+      'apps/web/tests/unit/e2e/golden-path-keyframes-errors.test.ts',
+      'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+    ],
+  ],
+  [
+    'apps/web/tests/e2e/helpers/golden-path-tracking.ts',
+    ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
+  ],
 ]);
 // Any web source that uses TanStack Virtual must stay out of React Compiler
 // memoization (JOV-6702); the invariant has no import edge to such files.
@@ -1140,6 +1165,11 @@ export function classifyBlogContentForAffectedTests(base, head, options) {
 }
 
 const LANE_PYTHON_COVERAGE_INPUTS = new Set([
+  'scripts/hyperagent/hyperagent.py',
+  'scripts/hyperagent/install.py',
+  'scripts/hyperagent/models.json',
+  'scripts/lanes/reason.json',
+  'scripts/tests/test_hyperagent_cli.py',
   ...[
     'backlog_admission',
     'backlog_writer_guard',
