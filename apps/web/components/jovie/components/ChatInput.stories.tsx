@@ -54,8 +54,6 @@ const meta = {
         'event',
         'isDictationSupported',
         'isListening',
-        'dictationUnavailableHint',
-        'handleMicUnavailable',
         'handleMicPushStart',
         'handleMicPushEnd',
         'handleMicToggle',

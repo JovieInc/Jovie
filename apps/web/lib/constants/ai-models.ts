@@ -33,6 +33,15 @@ export const GATEWAY_ALLOWED_IMAGE_MODELS: readonly string[] = [
 ];
 
 /**
+ * Gateway transcription-model allowlist (JOV-9665): `gateway.transcription()`
+ * is fail-closed like text and image. Dictation fallback for runtimes without
+ * Web Speech (Electron desktop, Firefox) is the only caller.
+ */
+export const GATEWAY_ALLOWED_TRANSCRIPTION_MODELS: readonly string[] = [
+  'fish-audio/transcribe-1',
+];
+
+/**
  * Providers banned on the Vercel AI Gateway (Tim directive 2026-09-28,
  * JOV-7119): per-token API billing for OpenAI or Anthropic is not allowed under
  * any path. GPT-6-class usage is permitted only on founder-owned subscriptions
@@ -79,6 +88,20 @@ export function assertGatewayImageModelAllowed(modelId: string): void {
   if (!GATEWAY_ALLOWED_IMAGE_MODELS.includes(modelId)) {
     throw new Error(
       `AI Gateway image model "${modelId}" is not on the image allowlist (${GATEWAY_ALLOWED_IMAGE_MODELS.join(', ')}) — the gateway is fail-closed (JOV-8109).`
+    );
+  }
+}
+
+/** Throws when a gateway transcription model is not on the allowlist. */
+export function assertGatewayTranscriptionModelAllowed(modelId: string): void {
+  if (isGatewayBannedModel(modelId)) {
+    throw new Error(
+      `AI Gateway transcription model "${modelId}" uses a banned provider (${GATEWAY_BANNED_PROVIDERS.join('/')}) (JOV-7119).`
+    );
+  }
+  if (!GATEWAY_ALLOWED_TRANSCRIPTION_MODELS.includes(modelId)) {
+    throw new Error(
+      `AI Gateway transcription model "${modelId}" is not on the transcription allowlist (${GATEWAY_ALLOWED_TRANSCRIPTION_MODELS.join(', ')}) — the gateway is fail-closed (JOV-9665).`
     );
   }
 }

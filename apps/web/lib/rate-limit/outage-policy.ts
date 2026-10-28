@@ -102,6 +102,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   aiChat: advisoryAllow,
   avatarUpload: advisoryDeny,
   artworkUpload: advisoryDeny,
+  chatTranscribe: advisoryDeny,
   api: advisoryDenyFixed,
   handleCheck: advisoryDenyFixed,
   dashboardLinks: advisoryDenyFixed,

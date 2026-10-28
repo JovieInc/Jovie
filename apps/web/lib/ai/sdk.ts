@@ -5,6 +5,7 @@ import * as ai from 'ai';
 import {
   assertGatewayImageModelAllowed,
   assertGatewayModelAllowed,
+  assertGatewayTranscriptionModelAllowed,
 } from '@/lib/constants/ai-models';
 import { env } from '@/lib/env-server';
 import {
@@ -216,4 +217,15 @@ gatewaySelector.image = ((
   return getGatewayProvider().image(modelId);
 }) as GatewayModelSelector['image'];
 
+gatewaySelector.transcription = ((
+  modelId: Parameters<GatewayModelSelector['transcription']>[0]
+) => {
+  assertGatewayTranscriptionModelAllowed(modelId);
+  return getGatewayProvider().transcription(modelId);
+}) as GatewayModelSelector['transcription'];
+
 export const gateway: GatewayModelSelector = gatewaySelector;
+
+/** Speech-to-text through the allowlisted gateway transcription model. */
+export const transcribe: typeof ai.experimental_transcribe = (...args) =>
+  getWrapped().experimental_transcribe(...args);

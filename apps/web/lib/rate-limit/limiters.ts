@@ -28,6 +28,11 @@ export const avatarUploadLimiter = createRateLimiter(
   RATE_LIMITERS.avatarUpload
 );
 
+/** Dictation transcription fallback: 30 clips per minute per user */
+export const chatTranscribeLimiter = createRateLimiter(
+  RATE_LIMITERS.chatTranscribe
+);
+
 /**
  * Rate limiter for artwork uploads
  * Limit: 5 uploads per minute per user
