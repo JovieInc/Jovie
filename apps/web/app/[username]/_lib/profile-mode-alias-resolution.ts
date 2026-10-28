@@ -45,6 +45,7 @@ async function getAliasCollisionState(
   const load = () =>
     Promise.all([
       findRedirectByOldSlug(creatorProfileId, aliasSlug, {
+        includeSuperseded: false,
         onError: 'throw',
       }),
       getUnpublishedReleasePresence(creatorProfileId, aliasSlug, {

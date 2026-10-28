@@ -257,12 +257,22 @@ def _load_ratio(sample: dict) -> float | None:
     load, cpu = _num(sample.get("load1")), _int(sample.get("cpuCount")); return None if load is None or cpu is None or cpu <= 0 else load / cpu
 def _psi_known(psi) -> bool:
     return isinstance(psi, dict) and all(_num(psi.get(key)) is not None for key in _PSI)
+def _remote_names(config: dict) -> frozenset:
+    return frozenset(str(n) for n in (config.get("remote") or ()))
+_REMOTE_HOST = {"cpuCount": 1, "load1": 0.0, "memAvailableBytes": None, "psi": None}
+def _remote_obs(obs: dict) -> dict:
+    """Remote lanes (Hyperagent) execute off gem: gem's disk, memory, load and PSI are not their limits.
+    Provider limits (rate bank, cooldown, GitHub budget, health, demand) still apply."""
+    return {**obs, "disk": {"admitted": True, "freePct": 100}}
 def _lane_ceiling(name: str, base: int, running, obs: dict, config: dict, host_cap: int) -> int:
     # Tim 2026-10-11: lanes are capped by compute and credits only. A lane may grow to the host's
     # compute cap; credit limits (codex leases, provider cooldowns) and host pressure still apply.
     if base <= 0:
         return 0
     named = _int(_obj(config.get("max")).get(name)); cap = named if named is not None and named > 0 else host_cap
+    if name in _remote_names(config) and not (named is not None and named > 0):
+        # No gem-derived cap: a remote lane is bounded by its provider's limits and by demand.
+        cap = max(base, max(0, running or 0) + (_demand(name, obs) or 0))
     if name == "codex":
         unleased = _count(obs.get("codexUnleasedAvailable"))
         cap = min(cap, base) if unleased is None or running is None else min(cap, max(0, running) + max(0, unleased))
@@ -426,7 +436,9 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             # (Gem 21:11Z: devin 1 seat busy, census 6 at 21:06:57). A recent positive census
             # stands as the lower bound while the lane stays saturated.
             demand = _count(_obj(obs.get("recentPositiveDemandByProvider")).get(name)) or None
-        multi, additive = _multi_reason(name, obs, sample, now, changed), _additive_reason(obs, sample)
+        remote = name in _remote_names(config)
+        lane_obs, lane_sample = (_remote_obs(obs), _REMOTE_HOST) if remote else (obs, sample)
+        multi, additive = _multi_reason(name, lane_obs, lane_sample, now, changed), _additive_reason(lane_obs, lane_sample)
         effective, reason, blockers, step_to = current, "hold:steady", [], None
         if multi:
             effective, reason, blockers = max(0 if current == 0 else MIN_SLOTS, math.ceil(current / 2)), multi, [multi]
@@ -444,7 +456,9 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
             else:
                 reason, blockers = "hold:zero-demand", ["zero-demand"]
         else:
-            blockers = _increase_blockers(name, obs, sample, now, running, demand)
+            blockers = _increase_blockers(name, lane_obs, lane_sample, now, running, demand)
+            if remote:
+                blockers = [b for b in blockers if b not in ("high-load", "low-mem", "psi-high", "disk-low")]
             if running is not None and running < current and "unknown-running" not in blockers:
                 blockers = ["not-saturated", *blockers]
             wanted = None if demand is None or running is None else max(0, running) + demand
@@ -468,16 +482,17 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
         if step_to is not None:
             pending.append((demand or 0, order, name, current, step_to))
     unhealthy = set(obs.get("unhealthy") or [])
-    _limit_host(rows, host_cap, exclude=unhealthy)
+    remote_lanes = _remote_names(config)
+    _limit_host(rows, host_cap, exclude=unhealthy | remote_lanes)
     if pending:
-        used = sum(row["effective"] for name, row in rows.items() if name not in unhealthy)
+        used = sum(row["effective"] for name, row in rows.items() if name not in unhealthy and name not in remote_lanes)
         # Every lane with demand may grow in the same tick while host headroom lasts.
         for _demand_value, _order, chosen, current, step_to in sorted(pending, key=lambda item: (item[0] / max(1, item[3]), -item[1]), reverse=True):
             row = rows[chosen]
-            grow = min(step_to - current, host_cap - used)
+            grow = step_to - current if chosen in remote_lanes else min(step_to - current, host_cap - used)
             if row["effective"] == current and grow >= 1:
                 row.update(effective=current + grow, target=current + grow, lastReason="sustained-demand", blockers=[])
-                used += grow
+                used += 0 if chosen in remote_lanes else grow
     for name, row in rows.items():
         base = row["base"]
         if base > 0 and row["effective"] > base and unknown:
