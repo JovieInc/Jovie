@@ -89,10 +89,14 @@ export function createServerTranscriber(
   };
 
   const upload = async (blob: Blob): Promise<string> => {
+    const durationMs = Math.max(0, Date.now() - startedAt);
     const doFetch = options.fetchImpl ?? globalThis.fetch;
     const response = await doFetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': blob.type || 'audio/webm' },
+      headers: {
+        'Content-Type': blob.type || 'audio/webm',
+        'x-audio-duration-ms': String(durationMs),
+      },
       body: blob,
     });
     if (!response.ok) throw new Error(`transcribe ${response.status}`);

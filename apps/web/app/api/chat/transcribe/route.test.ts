@@ -10,9 +10,9 @@ vi.mock('@/lib/auth/require-auth', () => ({ requireAuth: mocks.requireAuth }));
 vi.mock('@/lib/rate-limit/limiters', () => ({
   chatTranscribeLimiter: { limit: mocks.limit },
 }));
-vi.mock('@/lib/ai/sdk', () => ({
-  transcribe: mocks.transcribe,
-  gateway: { transcription: (id: string) => ({ id }) },
+vi.mock('@/lib/dictation/stt', () => ({
+  transcribeDictationClip: mocks.transcribe,
+  estimateDurationMs: () => 1000,
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: vi.fn() }));
 
@@ -33,14 +33,12 @@ describe('POST /api/chat/transcribe', () => {
     mocks.limit.mockResolvedValue({ success: true });
   });
 
-  it('returns the transcript through the gateway model', async () => {
-    mocks.transcribe.mockResolvedValue({ text: ' hello ' });
+  it('returns the transcript', async () => {
+    mocks.transcribe.mockResolvedValue('hello');
     const res = await POST(req(new Uint8Array(2048)));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ text: 'hello' });
-    expect(mocks.transcribe.mock.calls[0][0].model).toEqual({
-      id: 'fish-audio/transcribe-1',
-    });
+    expect(mocks.transcribe.mock.calls[0][0].mimeType).toBe('audio/webm');
   });
 
   it('rejects unauthenticated callers', async () => {

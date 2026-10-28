@@ -157,6 +157,14 @@
       "primaryText": [],
       "secondaryText": []
     },
+    "elevenlabs": {
+      "hosts": ["api.elevenlabs.io"],
+      "pricing": { "dailyCapUsd": 25 },
+      "defaultResource": "requests",
+      "budgetHeaders": [],
+      "primaryText": ["too_many_concurrent_requests", "rate limit"],
+      "secondaryText": []
+    },
     "exa": {
       "hosts": ["api.exa.ai"],
       "defaultResource": "requests",

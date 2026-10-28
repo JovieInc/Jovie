@@ -2,14 +2,16 @@
  * Chat dictation transcription fallback (JOV-9665).
  *
  * Runtimes without Web Speech (Electron desktop, Firefox) record with
- * MediaRecorder and POST the clip here. Speech-to-text runs through the
- * allowlisted AI Gateway transcription model, never a provider SDK.
+ * MediaRecorder and POST the clip here. Speech-to-text goes through the STT provider
+ * adapter (lib/dictation/stt): Workers AI first, ElevenLabs fallback.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { gateway, transcribe } from '@/lib/ai/sdk';
 import { requireAuth } from '@/lib/auth/require-auth';
-import { DICTATION_TRANSCRIPTION_MODEL } from '@/lib/chat/dictation-server';
+import {
+  estimateDurationMs,
+  transcribeDictationClip,
+} from '@/lib/dictation/stt';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { chatTranscribeLimiter } from '@/lib/rate-limit/limiters';
@@ -48,14 +50,14 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await transcribe({
-      model: gateway.transcription(DICTATION_TRANSCRIPTION_MODEL),
+    const text = await transcribeDictationClip({
       audio,
+      mimeType: contentType,
+      durationMs:
+        Number(request.headers.get('x-audio-duration-ms')) ||
+        estimateDurationMs(audio.byteLength),
     });
-    return NextResponse.json(
-      { text: result.text.trim() },
-      { headers: NO_STORE_HEADERS }
-    );
+    return NextResponse.json({ text }, { headers: NO_STORE_HEADERS });
   } catch (err) {
     captureError('Chat dictation transcription failed', err);
     return NextResponse.json(

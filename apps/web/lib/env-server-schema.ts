@@ -438,6 +438,12 @@ export const ServerEnvSchema = z.object({
   // Cloudflare zone analytics (AI crawler intelligence — GH-12748)
   CLOUDFLARE_ZONE_ID: z.string().optional(),
 
+  // Dictation speech-to-text (JOV-9665): Workers AI first, ElevenLabs fallback.
+  CLOUDFLARE_ACCOUNT_ID: z.string().optional(),
+  CLOUDFLARE_WORKERS_AI_TOKEN: z.string().optional(),
+  /** Comma-separated provider order, e.g. "cloudflare,elevenlabs". */
+  DICTATION_STT_PROVIDERS: z.string().optional(),
+
   // Development tools
   JOVIE_DEV_MEMORY_MONITOR: z.string().optional(),
   JOVIE_PROMPTFOO_EXPECT_MODEL_KEYS_DISABLED: z.string().optional(),
@@ -702,6 +708,7 @@ export const ENV_KEYS = [
   'HUD_AGENT_RUNS_FIXTURES',
   'OPENAI_API_KEY',
   'ELEVENLABS_API_KEY',
+  'CLOUDFLARE_WORKERS_AI_TOKEN',
   'ELEVENLABS_WEBHOOK_SECRET',
   'JOVIE_ENABLE_LOCAL_SENTRY',
   'AGNOST_ORG_ID',
