@@ -33,6 +33,19 @@ const {
   mockDeriveClaimedOnboardingStateFromMessageRows: vi.fn(),
 }));
 
+const mockRecordArtistOfferStage = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: mockRecordArtistOfferStage,
+}));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === 'jv_acquisition_id'
+        ? { value: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f' }
+        : undefined,
+  }),
+}));
+
 vi.mock('@/lib/analytics/signup-funnel.server', () => ({
   recordFunnelStep: mockRecordFunnelStep,
 }));
@@ -458,6 +471,11 @@ describe('materializeClaimedOnboardingProfile', () => {
         step: 'claim_complete',
         cohort,
       });
+      // Golden-path "page claimed" is keyed to the consented journey cookie.
+      expect(mockRecordArtistOfferStage).toHaveBeenCalledWith(
+        '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+        'claimed'
+      );
     }
   );
 
@@ -867,6 +885,59 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
 
     expect(setSpy).toHaveBeenCalledWith(
       expect.objectContaining({ isPublic: true, isClaimed: true })
+    );
+  });
+});
+
+describe('materializeClaimedOnboardingProfile — unproven admission (private until proof)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIdentityConflict.mockReset();
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: '4Uwpa6zW3zzCSQvooQNksm',
+        name: 'Mid Artist',
+        url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+        imageUrl: null,
+        genres: [],
+        followers: 3_200,
+        popularity: 30,
+      },
+      handle: 'midartist',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    mockReserveOnboardingHandle.mockResolvedValue('midartist');
+    mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
+  });
+
+  it('creates a claimed but private profile, holds the Spotify identity and opens a proof request', async () => {
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    const [insertValues] = queueProfileInsert({ id: 'profile_unproven' });
+    queuePostPersistWrites();
+
+    await materializeClaimedOnboardingProfile({
+      userId: 'user_1',
+      conversationId: 'conv_1',
+      ipAddress: null,
+      userAgent: null,
+      visibility: 'unproven',
+    });
+
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ isPublic: false, isClaimed: true })
+    );
+    const inserted = insertValues.mock.calls[0]?.[0] as Record<string, unknown>;
+    // No catalog or identity is attributed to the requester before proof.
+    expect(inserted.spotifyId).toBeUndefined();
+    expect(claimVerification.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+        reach: 3_200,
+        paid: false,
+        proofOnly: true,
+      })
     );
   });
 });
