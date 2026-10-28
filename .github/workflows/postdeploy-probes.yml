@@ -434,6 +434,7 @@ jobs:
     outputs:
       credentials_configured: ${{ steps.check-creds.outputs.credentials_configured }}
       auth_smoke_status: ${{ steps.auth-result.outputs.auth_smoke_status || steps.check-creds.outputs.auth_smoke_status }}
+      cert_steps_uploaded: ${{ steps.upload-cert-steps.outcome == 'success' }}
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -514,6 +515,7 @@ jobs:
       # Step names, timestamps and one-line summaries only; no cookies, codes
       # or addresses (the step helper never records them).
       - name: Upload golden-path certification steps
+        id: upload-cert-steps
         if: ${{ always() && steps.check-creds.outputs.skip != 'true' && hashFiles(format('{0}/prod-cert-steps.jsonl', runner.temp)) != '' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -644,8 +646,7 @@ jobs:
       - uses: ./.github/actions/setup-doppler
 
       - name: Download golden-path certification steps
-        if: ${{ needs.auth-smoke.outputs.credentials_configured == 'true' }}
-        continue-on-error: true
+        if: ${{ needs.auth-smoke.outputs.cert_steps_uploaded == 'true' }}
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: prod-cert-steps-${{ github.run_id }}
