@@ -56,7 +56,8 @@ export default function AlternativesIndexPage() {
       <MarketingHero variant='left'>
         <p className='text-sm font-medium text-tertiary-token'>Alternatives</p>
         <h1 className='system-b-marketing-route-title mt-6 max-w-3xl text-primary-token line-clamp-2'>
-          Alternatives For Musicians
+          {/* ui-casing-allow: sentence-case headings per marketing plan phase 1 */}
+          Alternatives for artists
         </h1>
         <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
           Jovie is a musician-first alternative to generic link-in-bio tools.
