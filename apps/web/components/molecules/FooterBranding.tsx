@@ -64,6 +64,13 @@ function renderLogoMark(
   );
 }
 
+/**
+ * 44x44pt minimum hit area for the logo link. Negative margins hand the extra
+ * box back to layout so the visible mark and its spacing do not move.
+ */
+const LOGO_HIT_AREA_CLASS =
+  'inline-flex min-h-11 min-w-11 items-center justify-center -mx-3 -my-2';
+
 function getLogoLinkClass(mark: string, isLinear: boolean): string {
   if (mark === 'brand') {
     // Same brand line as the smart-link footer: 14px medium, quiet token
@@ -71,12 +78,18 @@ function getLogoLinkClass(mark: string, isLinear: boolean): string {
     return "relative inline-flex items-center gap-2 rounded-md text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']";
   }
   if (mark === 'text') {
-    return 'inline-flex items-center gap-1 rounded-md px-2 py-1 -mx-2 -my-1 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
+    return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
   }
   if (isLinear) {
-    return 'rounded-md p-1 -m-1 focus-ring-themed transition-opacity duration-subtle ease-out hover:opacity-80';
+    return cn(
+      LOGO_HIT_AREA_CLASS,
+      'rounded-md focus-ring-themed transition-opacity duration-subtle ease-out hover:opacity-80'
+    );
   }
-  return 'rounded-md p-1 -m-1 focus-ring-themed transition-colors duration-subtle ease-out hover:bg-surface-1';
+  return cn(
+    LOGO_HIT_AREA_CLASS,
+    'rounded-md focus-ring-themed transition-colors duration-subtle ease-out hover:bg-surface-1'
+  );
 }
 
 export function FooterBranding({

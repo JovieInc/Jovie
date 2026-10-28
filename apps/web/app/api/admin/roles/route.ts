@@ -6,6 +6,7 @@ import { db } from '@/lib/db';
 import { getUserByClerkId } from '@/lib/db/queries/shared';
 import { users } from '@/lib/db/schema/auth';
 import { captureCriticalError } from '@/lib/error-tracking';
+import { updateUserBillingStatus } from '@/lib/stripe/customer-sync';
 import { logger } from '@/lib/utils/logger';
 import { grantRoleSchema, revokeRoleSchema } from '@/lib/validation/schemas';
 
@@ -40,17 +41,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Update user's admin status
+    // Grant Max first, through the shared billing writer (billingVersion bump
+    // and audit row in one transaction). Only then set the admin flag, so a
+    // failed billing write never leaves a half-applied grant.
+    const billing = await updateUserBillingStatus({
+      clerkUserId: user.id,
+      isPro: true,
+      plan: 'max',
+      eventType: 'admin_override',
+      source: 'manual',
+      metadata: { reason: 'admin_role_granted', targetUserId },
+    });
+    if (!billing.success) {
+      return NextResponse.json(
+        { error: billing.error ?? 'Failed to grant admin plan' },
+        { status: 500 }
+      );
+    }
+
     const now = new Date();
     await db
       .update(users)
-      .set({
-        isAdmin: true,
-        isPro: true,
-        plan: 'max',
-        billingUpdatedAt: now,
-        updatedAt: now,
-      })
+      .set({ isAdmin: true, updatedAt: now })
       .where(eq(users.id, user.id));
 
     const updatedUser = { id: user.id, clerkId: user.clerkId };
