@@ -4,21 +4,24 @@
  *   jovie-research ask "<question>" [--fresh week] [--mode quick|standard|deep] [--social] [--local] [--json]
  *   jovie-research stats [--days 7] [--json]
  *   jovie-research sources
+ *   jovie-research mcp
  */
 import { parseArgs } from 'node:util';
 
 import { createProviderClients } from './credentials.ts';
+import { serveMcp } from './mcp.ts';
 import { renderResult, sourcesTable } from './report.ts';
 import { last30daysScript } from './sources-web.ts';
 import { summarize } from './state.ts';
 import type { Freshness, Mode } from './types.ts';
 import { createDefaultWiring } from './wiring.ts';
 
-export const USAGE = `usage: jovie-research <ask|stats|sources> ...
+export const USAGE = `usage: jovie-research <ask|stats|sources|mcp> ...
   ask "<question>" [--fresh live|day|week|month|evergreen] [--mode quick|standard|deep]
                    [--social] [--local] [--max-tier 0|1|2] [--refresh] [--no-persist] [--json] [--caller name]
   stats [--days N] [--json]
-  sources`;
+  sources
+  mcp`;
 
 const FRESH = new Set(['live', 'day', 'week', 'month', 'evergreen']);
 const MODES = new Set(['quick', 'standard', 'deep']);
@@ -109,6 +112,10 @@ export async function main(
         jev: clients.gateway() !== null,
       })
     );
+    return 0;
+  }
+  if (command === 'mcp') {
+    await serveMcp(wiring);
     return 0;
   }
   throw new UsageError(`unknown command ${command}`);
