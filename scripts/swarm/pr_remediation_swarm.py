@@ -416,36 +416,71 @@ def walk_cost(node, acc: dict) -> None:
 
 
 def cmd_agent(a) -> int:
+    """Run opencode with no shell, no key in its env (provider key is read from a file outside the
+    checkout), and a hard stop when the running cost passes the per-attempt cap."""
     plan = json.loads(Path(a.plan).read_text())
     base = os.environ.get("SWARM_BASE_URL", "https://ai-gateway.vercel.sh/v1")
-    key = os.environ["SWARM_API_KEY"]
+    key_file = Path(a.key_file)
+    key = key_file.read_text().strip()
     cands = [m.strip() for m in os.environ.get("SWARM_MODELS", "zai/glm-5.3-flash,deepseek/deepseek-v4-flash,zai/glm-5.2").split(",")]
+    cap = float(os.environ.get("SWARM_ATTEMPT_USD_CAP", "0.10"))
     model, p_in, p_out = pick_model(base, key, cands)
     config = {"$schema": "https://opencode.ai/config.json", "autoupdate": False, "share": "disabled",
               "provider": {"swarm": {"npm": "@ai-sdk/openai-compatible", "name": "swarm",
-                                      "options": {"baseURL": base, "apiKey": "{env:SWARM_API_KEY}"},
+                                      "options": {"baseURL": base, "apiKey": "{file:" + str(key_file) + "}"},
                                       "models": {model: {"name": model}}}},
-              "permission": {"edit": "allow", "bash": "allow", "webfetch": "deny"},
+              # No shell at all: the push gate's preflight is the only executor, in a step with no secrets.
+              "permission": {"edit": "allow", "bash": "deny", "webfetch": "deny", "external_directory": "deny"},
               "agent": {"build": {"steps": a.max_steps}}}
-    env = dict(os.environ, OPENCODE_CONFIG_CONTENT=json.dumps(config))
+    env = {k: v for k, v in os.environ.items() if k not in {"SWARM_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"}}
+    env["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
     prompt = PROMPT.format(checks=", ".join(plan.get("checks", [])), cls=plan.get("cls"), log=a.log)
     started = now()
-    try:
-        res = subprocess.run(["npx", "--yes", "opencode-ai@1.19.5", "run", "--format", "json", "-m", f"swarm/{model}", prompt],
-                             cwd=a.cwd, env=env, capture_output=True, text=True, timeout=a.timeout)
-        text = res.stdout
-    except subprocess.TimeoutExpired as exc:
-        text = (exc.stdout or b"").decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
     acc = {"in": 0, "out": 0}
-    for line in text.splitlines():
-        try:
-            walk_cost(json.loads(line), acc)
-        except ValueError:
-            continue
-    cost = acc["in"] * p_in + acc["out"] * p_out
-    Path(a.meta).write_text(json.dumps({"model": model, "costUsd": round(cost, 5), "tokens": acc,
-                                        "agentSeconds": int(now() - started)}))
+    reported = 0.0
+    aborted = None
+    proc = subprocess.Popen(["npx", "--yes", "opencode-ai@1.19.5", "run", "--format", "json", "-m", f"swarm/{model}", prompt],
+                            cwd=a.cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+    try:
+        for line in proc.stdout:
+            try:
+                ev = json.loads(line)
+            except ValueError:
+                continue
+            step = {"in": 0, "out": 0}
+            walk_cost(ev, step)
+            acc["in"] += step["in"]; acc["out"] += step["out"]
+            reported += sum_reported_cost(ev)
+            spent = max(acc["in"] * p_in + acc["out"] * p_out, reported)
+            if spent > cap:
+                aborted = f"attempt-cap ${spent:.4f}>${cap}"
+                break
+            if now() - started > a.timeout:
+                aborted = "timeout"
+                break
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        key_file.unlink(missing_ok=True)
+    cost = max(acc["in"] * p_in + acc["out"] * p_out, reported)
+    meta = {"model": model, "costUsd": round(cost, 5), "tokens": acc, "agentSeconds": int(now() - started)}
+    if aborted:
+        meta["aborted"] = aborted
+        plan.update(reason="agent-" + aborted.split(" ")[0])
+        sh(["git", "checkout", "--", "."], a.cwd)
+        sh(["git", "clean", "-fdq"], a.cwd)
+        Path(a.plan).write_text(json.dumps(plan))
+    Path(a.meta).write_text(json.dumps(meta))
     return 0
+
+
+def sum_reported_cost(node) -> float:
+    if isinstance(node, dict):
+        own = node.get("cost")
+        return (float(own) if isinstance(own, (int, float)) else 0.0) + sum(sum_reported_cost(v) for v in node.values())
+    if isinstance(node, list):
+        return sum(sum_reported_cost(v) for v in node)
+    return 0.0
 
 
 # ---------------------------------------------------------------- summarize
@@ -476,7 +511,7 @@ def main() -> int:
     for name in ("fix", "guard"):
         x = sub.add_parser(name); x.add_argument("--plan", required=True); x.add_argument("--cwd", required=True)
     g = sub.add_parser("agent"); g.add_argument("--plan", required=True); g.add_argument("--cwd", required=True)
-    g.add_argument("--log", required=True); g.add_argument("--meta", required=True)
+    g.add_argument("--log", required=True); g.add_argument("--meta", required=True); g.add_argument("--key-file", required=True)
     g.add_argument("--max-steps", type=int, default=25); g.add_argument("--timeout", type=int, default=600)
     f = sub.add_parser("finalize"); f.add_argument("--plan", required=True); f.add_argument("--cwd", required=True)
     f.add_argument("--guard", default="fail"); f.add_argument("--repro", default="n/a"); f.add_argument("--agent-meta", default="")

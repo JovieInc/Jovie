@@ -146,13 +146,23 @@ jobs:
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      - name: Cheap agent (gateway key only; no GitHub token in env)
+      - name: Stage provider key outside the checkout (no repo code runs here)
         if: steps.prep.outputs.action == 'agent'
         env:
           SWARM_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+        run: |
+          umask 077
+          printf '%s' "$SWARM_API_KEY" > "$RUNNER_TEMP/swarm-key"
+      - name: Cheap agent (no shell, no key or GitHub token in env, hard cost stop)
+        if: steps.prep.outputs.action == 'agent'
+        env:
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL || 'https://ai-gateway.vercel.sh/v1' }}
           SWARM_MODELS: ${{ vars.SWARM_MODELS || 'zai/glm-5.3-flash,deepseek/deepseek-v4-flash,zai/glm-5.2' }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py agent --plan "$PLAN" --cwd pr --log "$LOG" --meta "$META" --max-steps 25 --timeout 600
+          SWARM_ATTEMPT_USD_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
+        run: python3 scripts/swarm/pr_remediation_swarm.py agent --plan "$PLAN" --cwd pr --log "$LOG" --meta "$META" --key-file "$RUNNER_TEMP/swarm-key" --max-steps 25 --timeout 600
+      - name: Remove staged key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/swarm-key"
       - name: Diff guard
         id: guard
         if: steps.prep.outputs.action != 'none'
