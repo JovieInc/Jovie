@@ -202,4 +202,53 @@ describe('DashboardAudienceTableUnified', () => {
     expect(bulkBar()).toHaveAttribute('data-state', 'visible');
     expect(row).toHaveAttribute('aria-selected', 'true');
   });
+
+  it('never renders contact details for a member who has not shared with the artist', () => {
+    const member = {
+      id: 'm2',
+      type: 'email',
+      displayName: 'Level One',
+      locationLabel: '',
+      geoCity: null,
+      geoCountry: null,
+      visits: 1,
+      engagementScore: 10,
+      intentLevel: 'low',
+      latestActions: [],
+      referrerHistory: [],
+      utmParams: {},
+      // Server redaction already nulls these; a stray value must still not render.
+      email: 'level1@example.com',
+      emailVisibleToArtist: false,
+      phone: '+15550000001',
+      spotifyConnected: false,
+      purchaseCount: 0,
+      tipAmountTotalCents: 0,
+      tipCount: 0,
+      tags: [],
+      deviceType: null,
+      lastSeenAt: null,
+    } as AudienceMember;
+    renderWithProviders(
+      <DashboardAudienceTableUnified
+        mode='members'
+        view='all'
+        rows={[member]}
+        total={1}
+        sort='lastSeen'
+        direction='desc'
+        onSortChange={() => undefined}
+        onViewChange={() => undefined}
+        onFiltersChange={() => undefined}
+        filters={DEFAULT_AUDIENCE_FILTERS}
+        subscriberCount={0}
+      />
+    );
+
+    const text = document.body.textContent ?? '';
+    expect(text).toContain('Level One');
+    expect(text).not.toContain('level1@example.com');
+    expect(text).not.toContain('+15550000001');
+    expect(text).not.toContain('••• 0001');
+  });
 });

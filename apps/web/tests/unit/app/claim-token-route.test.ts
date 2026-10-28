@@ -27,6 +27,11 @@ const {
   mockGetClientIP: vi.fn(),
 }));
 
+const mockRecordArtistOfferStage = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: mockRecordArtistOfferStage,
+}));
+
 vi.mock('@/lib/rate-limit', () => ({
   claimTokenAccessLimiter: { limit: mockClaimLimit },
   getClientIP: mockGetClientIP,
@@ -116,6 +121,8 @@ describe('Claim token route', () => {
     );
     expect(mockClearLeadAttributionCookie).toHaveBeenCalledTimes(1);
     expect(mockWritePendingClaimContext).not.toHaveBeenCalled();
+    // An invalid token is not a claim-link open.
+    expect(mockRecordArtistOfferStage).not.toHaveBeenCalled();
   });
 
   it('stores claim context and redirects valid tokens to the public profile preview', async () => {
@@ -124,7 +131,11 @@ describe('Claim token route', () => {
     mockLookupLeadByClaimToken.mockResolvedValue({ id: 'lead_1' });
 
     const response = await GET(
-      new NextRequest('http://localhost/claim/valid-token'),
+      new NextRequest('http://localhost/claim/valid-token', {
+        headers: {
+          cookie: 'jv_acquisition_id=9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+        },
+      }),
       {
         params: Promise.resolve({ token: 'valid-token' }),
       }
@@ -133,6 +144,10 @@ describe('Claim token route', () => {
     expect(response.status).toBe(307);
     expect(response.headers.get('location')).toBe(
       'http://localhost/claimableartist?claim=1'
+    );
+    expect(mockRecordArtistOfferStage).toHaveBeenCalledWith(
+      '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+      'claim-link-open'
     );
     expect(mockSetLeadAttributionCookieFromToken).toHaveBeenCalledWith(
       'valid-token'
