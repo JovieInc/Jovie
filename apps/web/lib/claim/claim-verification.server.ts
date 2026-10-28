@@ -2,7 +2,9 @@ import 'server-only';
 
 import { desc, eq } from 'drizzle-orm';
 import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import { generateProofCode } from '@/lib/claim/proof-code';
 import { db } from '@/lib/db';
+import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { isSpotifyAvailable, spotifyClient } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
@@ -84,6 +86,27 @@ export async function getClaimVerificationReach(
   return requiresClaimVerification(followers) ? followers : null;
 }
 
+/** The operator matches the support email to the request by this address. */
+async function readRequesterEmail(profileId: string): Promise<string | null> {
+  try {
+    const [profile] = await db
+      .select({ userId: creatorProfiles.userId })
+      .from(creatorProfiles)
+      .where(eq(creatorProfiles.id, profileId))
+      .limit(1);
+    if (!profile?.userId) return null;
+    const [owner] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.id, profile.userId))
+      .limit(1);
+    return owner?.email ?? null;
+  } catch {
+    // The card is still filed without it; the operator can look it up.
+    return null;
+  }
+}
+
 /**
  * Store a verification request on the requester's own profile instead of
  * attaching the artist identity. Idempotent for the same artist: an existing
@@ -95,6 +118,8 @@ export async function requestClaimVerification(input: {
   readonly artistName: string | null;
   readonly reach: number;
   readonly paid: boolean;
+  /** Admission proof request: open for review now, private page, no payment. */
+  readonly proofOnly?: boolean;
   /** Consented journey id; records `pending-verification` when paid. */
   readonly acquisitionId?: string | null;
   readonly now?: Date;
@@ -111,11 +136,64 @@ export async function requestClaimVerification(input: {
   if (!row) throw new Error('Profile not found');
 
   const existing = readClaimVerification(row.settings);
+  // A different artist never overwrites a request that is open or paid: that
+  // would wipe a payment timestamp and its refund path.
+  if (
+    existing &&
+    existing.spotifyArtistId !== input.spotifyArtistId &&
+    (existing.paidAt !== null ||
+      existing.status === 'pending_verification' ||
+      existing.status === 'awaiting_payment')
+  ) {
+    return existing;
+  }
+  // A free admission for the same artist as an unpaid awaiting request becomes
+  // proof-only: private until verified, open for review now.
+  if (
+    existing &&
+    existing.spotifyArtistId === input.spotifyArtistId &&
+    existing.status === 'awaiting_payment' &&
+    input.proofOnly &&
+    !existing.proofOnly
+  ) {
+    const merged: ClaimVerificationRecord = {
+      ...existing,
+      status: 'pending_verification',
+      proofOnly: true,
+      proofCode: generateProofCode(),
+    };
+    await db
+      .update(creatorProfiles)
+      .set({
+        settings: withClaimVerification(row.settings, merged),
+        updatedAt: new Date(),
+      })
+      .where(eq(creatorProfiles.id, input.profileId));
+    await fileClaimVerificationCard({
+      profileId: input.profileId,
+      handle: row.handle,
+      record: merged,
+      requesterEmail: await readRequesterEmail(input.profileId),
+    });
+    return merged;
+  }
   if (existing && existing.spotifyArtistId === input.spotifyArtistId) {
     const paid = input.paid
       ? markClaimVerificationPaid(existing, now, input.acquisitionId)
       : null;
-    if (!paid) return existing;
+    if (!paid) {
+      // A card that failed to file on the first pass must not leave an
+      // invisible request: filing is idempotent, so retry it while pending.
+      if (existing.status === 'pending_verification') {
+        await fileClaimVerificationCard({
+          profileId: input.profileId,
+          handle: row.handle,
+          record: existing,
+          requesterEmail: await readRequesterEmail(input.profileId),
+        });
+      }
+      return existing;
+    }
     await db
       .update(creatorProfiles)
       .set({
@@ -142,6 +220,8 @@ export async function requestClaimVerification(input: {
       artistName: input.artistName,
       reach: input.reach,
       paid: input.paid,
+      proofOnly: input.proofOnly,
+      proofCode: input.proofOnly ? generateProofCode() : undefined,
       now,
     }),
     acquisitionId: input.acquisitionId ?? null,
@@ -163,6 +243,7 @@ export async function requestClaimVerification(input: {
       profileId: input.profileId,
       handle: row.handle,
       record,
+      requesterEmail: await readRequesterEmail(input.profileId),
     });
   }
   return record;

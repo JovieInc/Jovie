@@ -253,7 +253,7 @@ describe('source PR path-output reachability contract', () => {
     const buildLayout = getJobBlock(workflow, 'ci-build-layout');
 
     expect(provenanceHeader).not.toMatch(/^    if:/m);
-    expect(provenanceHeader).toContain('runs-on: ubuntu-latest');
+    expect(provenanceHeader).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(neutralProvenance).toContain(
       "github.event_name != 'push' || github.ref != 'refs/heads/main'"
     );
@@ -663,7 +663,7 @@ describe('deploy workflow Vercel env resolution', () => {
     const buildJob = getJobBlock(workflow, 'ci-build-layout');
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
-    expect(buildJob).toContain('runs-on: ubuntu-latest');
+    expect(buildJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(buildJob).toContain('Build exact combined head');
     expect(buildJob).toContain('Run deterministic layout behavior guard');
     expect(buildJob).not.toContain('actions/upload-artifact');
@@ -683,10 +683,12 @@ describe('deploy workflow Vercel env resolution', () => {
       'promote-production',
       'release-result',
     ]) {
-      expect(getJobBlock(workflow, job)).toContain('runs-on: ubuntu-latest');
+      expect(getJobBlock(workflow, job)).toMatch(
+        /runs-on: ubuntu-(?:latest|24\.04)/
+      );
     }
-    expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
-      'runs-on: ubuntu-latest'
+    expect(readFileSync(canaryWorkflowPath, 'utf8')).toMatch(
+      /runs-on: ubuntu-(?:latest|24\.04)/
     );
   });
 
@@ -1654,6 +1656,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
     expect(stageStep).toContain('bootstrap-cookie-jar');
     expect(stageStep).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
     expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(stageStep).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
     expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).not.toContain('STAGED_RESPONSE');
@@ -1753,7 +1756,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'lighthouse-ci',
     ]) {
       const block = getJobBlock(workflow, job);
-      expect(block).toContain('runs-on: ubuntu-latest');
+      expect(block).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
       expect(block).not.toContain('continue-on-error: true');
       expect(block).toContain(
         'needs.production-release.outputs.production_deployment_url_b64'
@@ -1818,6 +1821,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
 
     expect(publicSmoke).toContain('bootstrap-cookie-jar');
     expect(publicSmoke).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(publicSmoke).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(publicSmoke).toContain('EXPECTED_VERCEL_ENVIRONMENT=production');
     expect(publicSmoke).toContain('VERCEL_PROBE_TIMEOUT_MS=180000');
     expect(publicSmoke).not.toContain('x-vercel-protection-bypass');
@@ -2014,7 +2018,7 @@ describe('unit-test runner capacity', () => {
     const routeJob = getJobBlock(workflow, 'ci-unit-runner-route');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
 
-    expect(routeJob).toContain('runs-on: ubuntu-latest');
+    expect(routeJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(routeJob).toContain('ref: main');
     expect(routeJob).toContain('continue-on-error: true');
     expect(routeJob).toContain("runner_class='hosted'");
@@ -2023,7 +2027,7 @@ describe('unit-test runner capacity', () => {
     expect(routeJob).toContain('fixed|hosted');
     expect(routeJob).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(routeJob).not.toContain('secrets.');
-    expect(unitJob).toContain('runs-on: ubuntu-latest');
+    expect(unitJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(unitJob).not.toContain('runs-on: jovie-runner');
     expect(unitJob).not.toContain('ci-unit-runner-route');
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
@@ -2128,7 +2132,7 @@ describe('informational CI tail capacity', () => {
 
     expect(summaryJob).toContain('name: Manual Evidence Summary');
     expect(summaryJob).toContain("github.event_name == 'workflow_dispatch'");
-    expect(summaryJob).toContain('runs-on: ubuntu-latest');
+    expect(summaryJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(summaryJob).not.toContain('runs-on: ${{ vars.CI_FAST_RUNNER }}');
   });
 });
@@ -4203,6 +4207,7 @@ describe('production promotion exact-artifact contract', () => {
       '[ "$production_deploy_target" != "production" ]'
     );
     expect(stageStep).toContain('VERCEL_VERIFY_PUBLIC_SURFACES=true');
+    expect(stageStep).toContain('VERCEL_VERIFY_LINKED_RELEASES=tim');
     expect(stageStep).not.toContain('fetch_staged');
     expect(stageStep).toContain('production_deployment_url_b64=');
     expect(stageStep).not.toContain(
@@ -4773,7 +4778,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain('echo "gate_status=error"');
     expect(sentryAction).toContain('refusing automatic rollback');
 
-    expect(sentryJob).toContain('runs-on: ubuntu-latest');
+    expect(sentryJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(sentryJob).toContain('name: Production – jovie');
     expect(sentryJob).toContain('ref: ${{ inputs.expected_sha }}');
     expect(sentryJob).toContain('uses: ./.github/actions/sentry-error-gate');

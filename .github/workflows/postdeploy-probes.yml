@@ -406,6 +406,7 @@ jobs:
           EXPECTED_VERCEL_ENVIRONMENT=production \
           VERCEL_PROBE_COOKIE_JAR="$COOKIE_JAR" \
           VERCEL_VERIFY_PUBLIC_SURFACES=true \
+          VERCEL_VERIFY_LINKED_RELEASES=tim \
           VERCEL_PROBE_TIMEOUT_MS=180000 \
             node apps/web/scripts/vercel-protected-origin.cjs bootstrap-cookie-jar
 
@@ -426,7 +427,7 @@ jobs:
     name: Post-Deploy Auth Smoke (Landed Production)
     needs: [resolve-target]
     if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_probe == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
@@ -522,7 +523,7 @@ jobs:
     name: Lighthouse CI (Landed Production)
     needs: [resolve-target]
     if: ${{ always() && needs.resolve-target.result == 'success' && needs.resolve-target.outputs.should_probe == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read

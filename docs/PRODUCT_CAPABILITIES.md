@@ -196,14 +196,8 @@ Plan tiers: **Free** ($0/mo), **Founding Member** ($12/mo, locked in for life), 
 - **Dashboard route:** /app/settings/billing (upgrade to unlock)
 - **Docs page:** /docs/build-your-presence/profile-and-identity
 
-### Remove Jovie Branding
-- **One-line:** Remove the "Powered by Jovie" footer from public pages for a fully white-labeled experience.
-- **Plan:** Pro+
-- **Problem it solves:** Artists with established brands want their profile to look fully their own.
-- **How it works:** Toggle in dashboard settings removes the Jovie branding footer from all public-facing pages.
-- **Key benefits:** White-labeled appearance, professional brand presentation
-- **Dashboard route:** /app/settings/artist-profile
-- **Docs page:** /docs/build-your-presence/profile-and-identity
+### Jovie Branding
+- **Decision (Tim, 2026-10-25):** Jovie branding stays on every public profile, including Pro. There is no branding-removal feature and no copy may promise one.
 
 ---
 

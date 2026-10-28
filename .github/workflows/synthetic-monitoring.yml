@@ -26,7 +26,7 @@ jobs:
   synthetic-test:
     name: Production Synthetic Tests
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.schedule == '17 */6 * * *' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       contents: read

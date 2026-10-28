@@ -7,6 +7,7 @@ import { auth } from '@/lib/auth/better-auth';
 import { CanonicalUserState } from '@/lib/auth/canonical-user-state';
 import { resolveUserState } from '@/lib/auth/gate';
 import { captureWarning } from '@/lib/error-tracking';
+import { getCurrentOnboardingSessionId } from '@/lib/onboarding/session';
 import { resolveStartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import { resolveStartEntryProfile } from '@/lib/onboarding/start-entry-profile.server';
 import { documentTitle } from '@/lib/seo/document-title';
@@ -74,12 +75,17 @@ export default async function StartPage(
 
   // JOV-7753: a handle-only entry (outreach, claim redirect) shows the
   // visitor's real page first. Explicit prompts and intents keep their flow.
-  const [authResult, entryProfile] = await Promise.all([
+  // A taken handle is the exception: it must say so even when a starter prompt
+  // rides along (JOV-9624), otherwise the visitor chats toward a name that is
+  // not theirs to claim.
+  const [authResult, resolvedEntryProfile] = await Promise.all([
     resolveUserState({ createDbUserIfMissing: false }),
-    starterHandoff || intentId
-      ? Promise.resolve(null)
-      : resolveStartEntryProfile(params),
+    intentId ? Promise.resolve(null) : resolveStartEntryProfile(params),
   ]);
+  const entryProfile =
+    starterHandoff && resolvedEntryProfile?.status !== 'claimed'
+      ? null
+      : resolvedEntryProfile;
   const startRedirect = getStartRouteRedirect(authResult.state);
   if (startRedirect) {
     redirect(startRedirect);
@@ -87,6 +93,10 @@ export default async function StartPage(
 
   const isSignedIn = authResult.state !== CanonicalUserState.UNAUTHENTICATED;
   const turnstileTestMode = await resolveSyntheticTurnstileTestMode(isSignedIn);
+  // No account and no onboarding cookie: there is nothing to restore, so the
+  // client does not need to fetch an empty snapshot before showing the chat.
+  const freshAnonymous =
+    !isSignedIn && (await getCurrentOnboardingSessionId()) === null;
 
   return (
     <OnboardingSessionBoundary
@@ -96,6 +106,16 @@ export default async function StartPage(
       sessionLabel='pending'
       starterHandoff={starterHandoff}
       entryProfile={entryProfile}
+      initialSnapshot={
+        freshAnonymous
+          ? {
+              identityId: null,
+              conversationId: null,
+              owned: false,
+              messages: [],
+            }
+          : undefined
+      }
     />
   );
 }
