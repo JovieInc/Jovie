@@ -64,16 +64,6 @@ export function BillingActionsSection({
                   billing period. After that, you&apos;ll lose access to:
                 </p>
                 <ul className='space-y-2'>
-                  <li className='flex items-start gap-2 text-app'>
-                    <XCircle
-                      className='mt-0.5 h-4 w-4 shrink-0 text-error'
-                      aria-hidden='true'
-                    />
-                    <span>
-                      <strong>Branding removal</strong> - Jovie branding will
-                      reappear on your profile
-                    </span>
-                  </li>
                   <li className='flex items-start gap-2'>
                     <XCircle
                       className='mt-0.5 h-4 w-4 shrink-0 text-error'
