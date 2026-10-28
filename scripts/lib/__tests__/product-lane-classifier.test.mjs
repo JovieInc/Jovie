@@ -16,6 +16,7 @@ import {
   evaluateProductLaneResults,
   formatGitHubSummary,
   macLockfileGraph,
+  macNativeRequired,
   ProductLaneClassificationError,
   runProductLaneClassifier,
 } from '../product-lane-classifier.mjs';
@@ -1035,6 +1036,28 @@ describe('product lane classifier', () => {
       expect(readFileSync(outputs, 'utf8')).toContain('run_web=true');
     } finally {
       rmSync(root, { recursive: true, force: true });
+    }
+  });
+  it('keeps the Mac lane on macOS only when a native input changed', () => {
+    const nodeOnly = [
+      'apps/web/components/organisms/CmdKPalette.tsx',
+      'apps/web/components/features/dashboard/dashboard-nav/config.ts',
+    ];
+    expect(macNativeRequired(classifyProductLanes(nodeOnly))).toBe(false);
+    for (const path of nodeOnly) {
+      expect(classifyProductLanes([path]).selectedLanes).toContain('mac');
+    }
+    for (const native of [
+      'apps/macos/MenuMonitor/Package.swift',
+      'apps/desktop/package.json',
+      'apps/web/lib/brand/tokens.ts',
+      'apps/web/scripts/generate-brand-assets.ts',
+      'packages/ui/brand/geometry.gen.ts',
+    ]) {
+      expect(
+        macNativeRequired(classifyProductLanes([...nodeOnly, native])),
+        native
+      ).toBe(true);
     }
   });
 });
