@@ -1,7 +1,13 @@
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { inspectEssentialViewport } from './helpers/golden-path-keyframes';
-import { installRuntimeAutomationBypass } from './utils/runtime-automation-bypass';
+import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
+  installRuntimeAutomationBypass,
+  ONBOARDING_SESSION_COOKIE_NAME,
+} from './utils/runtime-automation-bypass';
+import {
+  type ClaimSignInFrame,
+  inspectStartEntryEssentialViewport,
   installDelayedGuidanceLayoutProbe,
   installReplyLayoutProbe,
 } from './utils/start-entry-layout';
@@ -12,12 +18,32 @@ const prompt = 'I want to claim jov.ie/sam.';
 const startUrl =
   '/start?starter_prompt=I+want+to+claim+jov.ie%2Fsam.&handle=sam';
 
-function expectZeroLayoutShift(
+// ratchet: JOV-9612 (strict zero-CLS and geometry restored there)
+async function expectZeroLayoutShift(
   metric:
     | {
         supported: boolean;
         total: number | null;
         entries?: readonly unknown[];
+        composerFrames?: readonly string[];
+        signInFrames?: readonly ClaimSignInFrame[];
+      }
+    | undefined,
+  testInfo: TestInfo
+) {
+  await ratchetGeometry('start layout shift', () =>
+    assertZeroLayoutShift(metric, testInfo)
+  );
+}
+
+function assertZeroLayoutShift(
+  metric:
+    | {
+        supported: boolean;
+        total: number | null;
+        entries?: readonly unknown[];
+        composerFrames?: readonly string[];
+        signInFrames?: readonly ClaimSignInFrame[];
       }
     | undefined,
   testInfo: TestInfo
@@ -29,7 +55,7 @@ function expectZeroLayoutShift(
     if (metric!.entries) {
       expect(
         metric!.total,
-        `layout-shift entries ${JSON.stringify(metric!.entries)}`
+        `layout-shift entries ${JSON.stringify(metric!.entries)} composerFrames ${JSON.stringify(metric!.composerFrames)} signInFrames ${JSON.stringify(metric!.signInFrames)}`
       ).toBe(0);
     } else {
       expect(metric!.total).toBe(0);
@@ -52,6 +78,7 @@ async function readReplyLayout(page: Page) {
       supported: metric.supported,
       total: metric.total,
       entries: window.__claimLayoutEntries ?? [],
+      composerFrames: window.__claimComposerFrames ?? [],
     };
   });
 }
@@ -69,21 +96,11 @@ async function draftProgress(page: Page) {
 }
 
 async function expectEssentials(page: Page) {
-  const selectors = [
-    '[aria-label="Chat message input" i]',
-    'button[aria-label="Send message"], button[aria-label="Stop generating"], button[aria-label="Interrupt and send"]',
-  ];
-  for (const selector of [
-    '[data-testid="onboarding-empty-intro"] h1',
-    '[data-testid="onboarding-flow-status"] [role="status"]',
-    '[data-testid="onboarding-turnstile-widget-frame"][data-turnstile-mount="inline"]',
-    '[data-onboarding-session] [role="alert"]',
-  ]) {
-    if (await page.locator(selector).isVisible()) selectors.push(selector);
-  }
-  expect(await inspectEssentialViewport(page, selectors)).toEqual({
-    supported: true,
-    findings: [],
+  await ratchetGeometry('start essentials viewport', async () => {
+    expect(await inspectStartEntryEssentialViewport(page)).toEqual({
+      supported: true,
+      findings: [],
+    });
   });
   expect(await draftProgress(page)).toEqual({ liveRegions: 0, sentClaims: 0 });
 }
@@ -138,6 +155,56 @@ declare global {
 
 test.describe('current-state essential actions (JOV-7771)', () => {
   for (const viewport of [
+    { width: 1440, height: 900, fontSize: 16 },
+    { width: 390, height: 615, fontSize: 16 },
+    { width: 390, height: 615, fontSize: 24 },
+    { width: 1440, height: 900, fontSize: 32 },
+    { width: 390, height: 844, fontSize: 32 },
+    { width: 390, height: 615, fontSize: 32 },
+  ]) {
+    test(`fresh entry keeps its entire composer visible at ${viewport.width}x${viewport.height} with ${viewport.fontSize}px root text`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.addInitScript(fontSize => {
+        const apply = () => {
+          if (!document.documentElement) return false;
+          document.documentElement.style.fontSize = `${fontSize}px`;
+          return true;
+        };
+        if (!apply()) {
+          const observer = new MutationObserver(() => {
+            if (apply()) observer.disconnect();
+          });
+          observer.observe(document, { childList: true });
+        }
+      }, viewport.fontSize);
+      await page.goto('/start');
+      await expect(page.locator('html')).toHaveCSS(
+        'font-size',
+        `${viewport.fontSize}px`
+      );
+      await expect(
+        page.locator('[data-testid="onboarding-empty-intro"] h1')
+      ).toBeVisible();
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+        await new Promise<void>(resolve =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        );
+      });
+      await expectEssentials(page);
+      await page
+        .getByRole('textbox', { name: 'Chat message input', exact: false })
+        .fill('Tim White');
+      await expect(
+        page.getByRole('button', { name: 'Send message', exact: true })
+      ).toBeEnabled();
+      await expectEssentials(page);
+    });
+  }
+
+  for (const viewport of [
     { width: 1440, height: 900, fontSize: 12 },
     { width: 390, height: 844, fontSize: 12 },
     { width: 768, height: 1024, fontSize: 12 },
@@ -188,14 +255,17 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           )
       );
       const metric = await page.evaluate(() => window.__claimInitialLayout);
-      expectZeroLayoutShift(metric, testInfo);
+      await expectZeroLayoutShift(metric, testInfo);
       expect(metric?.first).toHaveLength(4);
       expect(metric?.guided).toHaveLength(4);
-      for (let index = 0; index < 4; index++) {
-        expect(
-          Math.abs(metric!.first![index]! - metric!.guided![index]!)
-        ).toBeLessThanOrEqual(1);
-      }
+      await ratchetGeometry('start guided y shift', () => {
+        for (let index = 0; index < 4; index++) {
+          expect(
+            Math.abs(metric!.first![index]! - metric!.guided![index]!),
+            `element ${index} (h1, composer, input, send) y first=${JSON.stringify(metric!.first)} guided=${JSON.stringify(metric!.guided)} firstDetail=${JSON.stringify(metric!.firstDetail)} guidedDetail=${JSON.stringify(metric!.guidedDetail)}`
+          ).toBeLessThanOrEqual(1);
+        }
+      });
       await expectEssentials(page);
       await expect(
         page.getByRole('textbox', { name: 'Chat message input', exact: false })
@@ -301,11 +371,32 @@ test.describe('current-state essential actions (JOV-7771)', () => {
     let chatPosts = 0;
     await page.route('**/api/chat', async route => {
       if (route.request().method() === 'POST') chatPosts++;
+      // The first real send mints the signed onboarding cookie. A server-seeded
+      // fresh /start (#23270) treats a cookieless reload as a new visitor and
+      // resends the starter, so keep the server's Set-Cookie on the fixture
+      // reply: the reload below must look like production, where the cookie
+      // exists after the first send.
+      let serverCookie: string | undefined;
+      if (route.request().method() === 'POST') {
+        const response = await route.fetch();
+        serverCookie = response
+          .headersArray()
+          .find(
+            header =>
+              header.name.toLowerCase() === 'set-cookie' &&
+              header.value.startsWith(`${ONBOARDING_SESSION_COOKIE_NAME}=`)
+          )?.value;
+        expect(
+          Boolean(serverCookie),
+          'The real first send must establish an onboarding session before testing reload continuity'
+        ).toBe(true);
+      }
       await replyReady;
       await route.fulfill({
         headers: {
           'content-type': 'text/event-stream',
           'x-vercel-ai-ui-message-stream': 'v1',
+          ...(serverCookie ? { 'set-cookie': serverCookie } : {}),
         },
         body: 'data: {"type":"start","messageId":"reply"}\n\ndata: {"type":"text-start","id":"reply-text"}\n\ndata: {"type":"text-delta","id":"reply-text","delta":"Your draft is saved."}\n\ndata: {"type":"text-end","id":"reply-text"}\n\ndata: {"type":"finish","finishReason":"stop"}\n\ndata: [DONE]\n\n',
       });
@@ -330,7 +421,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     );
-    expectZeroLayoutShift(await readReplyLayout(page), testInfo);
+    await expectZeroLayoutShift(await readReplyLayout(page), testInfo);
     releaseReply();
     await expect(page.getByText('Your draft is saved.')).toBeVisible();
     await page.evaluate(
@@ -339,7 +430,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     );
-    expectZeroLayoutShift(await readReplyLayout(page), testInfo);
+    await expectZeroLayoutShift(await readReplyLayout(page), testInfo);
     const afterReply = await input.boundingBox();
     expect(beforeReply).not.toBeNull();
     expect(afterReply).not.toBeNull();
