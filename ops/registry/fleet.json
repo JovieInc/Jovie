@@ -1,0 +1,667 @@
+{
+  "schema": "jovie.fleet-registry/v1",
+  "description": "Who every external or off-box agent is, how Summer reaches it, what it is for, and whether its terms allow automated use. Static facts only: runtime state (current assignment, last heartbeat, busy-time share) is derived by Summer from the mesh heartbeat and the dispatch ledger and is never hand-edited here. Joins by id: agents[].identityId -> canon/agent-identities.json, agents[].capacityProviderId -> ops/registry/capacity.json providers (plan, price, quota policy live there, not here). Metadata only: no tokens, no addresses. Anything not read from a primary source is verified.level=unverified.",
+  "updatedAt": "2026-10-28",
+  "thresholds": {
+    "idleAlarmMinutes": 10,
+    "utilizationWindowHours": 24,
+    "meshHeartbeatStaleMinutes": 180,
+    "perTaskDefaultMaxMinutes": 90
+  },
+  "tosVerdicts": {
+    "allowed": "The vendor documents this route for this use (primary source cited in tos.basis).",
+    "allowed-by-design": "We assign tasks through the agent's own interface or our own protocol the way the product is meant to be used; vendor terms were not read for automated use.",
+    "conditional": "Permitted only under the stated condition; Summer must satisfy it before dispatch.",
+    "restricted": "Driving it works but may breach consumer terms (UI automation of a consumer app). Do not add new dependence; move to a supported route.",
+    "forbidden": "Terms forbid this server automation. Never dispatch.",
+    "unverified": "No terms were read. Treated as not dispatchable until a verdict is recorded."
+  },
+  "workloads": [
+    {
+      "id": "dogfood-golden-path",
+      "label": "Dogfood the golden path",
+      "mission": "Walk signup, claim and first value on the Launch project's certified path with the canary accounts; report every dead end, console error, wrong copy or layout shift with exact repro steps and a screenshot reference.",
+      "needs": ["browser", "dogfood"],
+      "maxMinutes": 90,
+      "draftOnly": false,
+      "outbound": false,
+      "result": "findings"
+    },
+    {
+      "id": "qa-sweep",
+      "label": "QA sweep beyond the tests",
+      "mission": "Exploratory QA of the most recently merged user-facing changes on staging; find bugs the test suite misses and report repro steps.",
+      "needs": ["browser", "qa"],
+      "maxMinutes": 90,
+      "draftOnly": false,
+      "outbound": false,
+      "result": "findings"
+    },
+    {
+      "id": "pr-review",
+      "label": "Independent PR review",
+      "mission": "Review the named open pull requests read-only for correctness, security and regressions. Return a verdict and findings per PR with file and line. Do not push, comment or merge.",
+      "needs": ["code-review"],
+      "maxMinutes": 60,
+      "draftOnly": false,
+      "outbound": false,
+      "result": "review"
+    },
+    {
+      "id": "prospect-research-outreach",
+      "label": "Prospect research and outreach drafts",
+      "mission": "Find qualified prospects for the Launch project's ICP, with source links, and write DRAFT outreach per prospect. Drafts only: nothing is sent, posted or messaged to a real person.",
+      "needs": ["research", "writing"],
+      "maxMinutes": 90,
+      "draftOnly": true,
+      "outbound": true,
+      "result": "drafts"
+    },
+    {
+      "id": "backlog-dedupe-reorder",
+      "label": "Backlog dedupe and reorder proposals",
+      "mission": "Read the agent-ready backlog; propose duplicate sets, stale items to close and a re-ordering by value per hour. Proposals only: no issue is changed.",
+      "needs": ["analysis"],
+      "maxMinutes": 60,
+      "draftOnly": true,
+      "outbound": false,
+      "result": "proposals"
+    },
+    {
+      "id": "research-brief",
+      "label": "Research brief",
+      "mission": "Answer the named question with sources and a recommendation. Use the research router; do not call paid search providers directly.",
+      "needs": ["research"],
+      "maxMinutes": 45,
+      "draftOnly": false,
+      "outbound": false,
+      "result": "brief"
+    },
+    {
+      "id": "strategy-review",
+      "label": "Strategy review",
+      "mission": "Challenge the current Launch plan against YC activation-first doctrine; return the three highest-leverage changes with evidence.",
+      "needs": ["strategy"],
+      "maxMinutes": 45,
+      "draftOnly": true,
+      "outbound": false,
+      "result": "brief"
+    }
+  ],
+  "unresolved": [
+    {
+      "name": "Groxy",
+      "note": "Named in the 2026-10-28 brief but defined in no registry, canon file, memory note or gbrain page. Not registered. Tim to say what it is (or confirm it is Grokbot's mesh or Grok account)."
+    }
+  ],
+  "agents": [
+    {
+      "id": "instinct",
+      "identityId": "instinct",
+      "capacityProviderId": "instinct",
+      "label": "Instinct",
+      "kind": "external-agent",
+      "status": "active",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "instinct",
+        "note": "Summer mesh mailbox (summer.jov.ie/summer/v1/mesh). Instinct polls its own mailbox with its own token; results return as a mesh message to summer carrying the FLT ref."
+      },
+      "capabilities": [
+        "dogfood",
+        "qa",
+        "browser",
+        "research",
+        "writing",
+        "code-review",
+        "prospecting"
+      ],
+      "capabilitySource": "Tim, 2026-10-28 (prospect finding, outreach drafts, dogfooding, finding bugs tests miss; could review every PR)",
+      "limits": {
+        "usage": "uncapped-own-model",
+        "note": "No usage cap on its own model (Tim 2026-10-25). Delegating to Codex draws the shared Codex pool."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Plan and price not recorded."
+      },
+      "box": {
+        "has": true,
+        "notes": "Own Linux box with CLI installs, deterministic 24/7 code, its own IP, Exa and Firecrawl access (Tim, 2026-10-28; not independently observed)."
+      },
+      "tos": {
+        "verdict": "allowed-by-design",
+        "basis": "Tasks are assigned through Jovie's own mesh protocol that Instinct itself polls; no consumer subscription CLI is driven. Vendor terms not read.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "unverified",
+        "asOf": "2026-10-28",
+        "evidence": "Mesh sender kind is registered in canon/agent-identities.json; no live round trip recorded yet."
+      },
+      "standingWorkloads": [
+        "dogfood-golden-path",
+        "qa-sweep",
+        "pr-review",
+        "prospect-research-outreach"
+      ]
+    },
+    {
+      "id": "dots",
+      "identityId": "dots",
+      "capacityProviderId": "dots",
+      "label": "Dots",
+      "kind": "external-agent",
+      "status": "unregistered",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "dots",
+        "note": "Mesh kind exists in Summer's schema; not yet registered in identities, so not dispatchable."
+      },
+      "capabilities": [],
+      "capabilitySource": "No capability list recorded. Only the capacity fact: no usage cap on its own model (Tim, 2026-10-25).",
+      "limits": {
+        "usage": "uncapped-own-model",
+        "note": "Delegating to Codex draws the shared Codex pool."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Plan and price not recorded."
+      },
+      "box": { "has": "unknown", "notes": "Not recorded." },
+      "tos": {
+        "verdict": "unverified",
+        "basis": "Nothing recorded about what Dots is or how it is run.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "unverified",
+        "asOf": "2026-10-28",
+        "evidence": "Identity is marked unregistered."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "grokbot",
+      "identityId": "grokbot",
+      "capacityProviderId": "xai-grok",
+      "label": "Grokbot",
+      "kind": "external-agent",
+      "status": "dormant",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "grokbot",
+        "note": "Registered mesh kind, dormant. A channel on the Grok account quota (assumed; unverified)."
+      },
+      "capabilities": ["research", "writing", "analysis", "strategy"],
+      "capabilitySource": "Inferred from the model family and the weekly-quota policy; Tim gave no capability list. Treat as a hypothesis until a task is observed.",
+      "limits": {
+        "usage": "capped-quota",
+        "note": "Weekly Grok limit; use the whole quota every week while the promo lasts (capacity registry)."
+      },
+      "cost": {
+        "listUsdMonthly": 300,
+        "billedUsdMonthly": 99,
+        "note": "Promo until about 2026-12-01 (capacity registry)."
+      },
+      "box": { "has": "unknown", "notes": "Not recorded." },
+      "tos": {
+        "verdict": "unverified",
+        "basis": "xAI terms for automated use of the consumer Grok plan not read. Only mesh-delivered tasks that Grokbot itself picks up are in scope; never script the Grok consumer UI.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "unverified",
+        "asOf": "2026-10-28",
+        "evidence": "Dormant in identities."
+      },
+      "standingWorkloads": ["research-brief", "strategy-review"]
+    },
+    {
+      "id": "lane-grok",
+      "identityId": "lane-grok",
+      "capacityProviderId": "xai-grok",
+      "label": "Gem lane: grok",
+      "kind": "provider-lane",
+      "status": "active",
+      "route": {
+        "kind": "gem-lanes",
+        "note": "Work enters through the agent-ready Linear pool that Gem's guarded writer admits. Summer does not dispatch to a lane directly."
+      },
+      "capabilities": ["code"],
+      "capabilitySource": "canon/agent-identities.json",
+      "limits": {
+        "usage": "capped-quota",
+        "note": "Same Grok quota as grokbot."
+      },
+      "cost": {
+        "listUsdMonthly": 300,
+        "billedUsdMonthly": 99,
+        "note": "See xai-grok."
+      },
+      "box": { "has": true, "notes": "Runs on the Gem host." },
+      "tos": {
+        "verdict": "unverified",
+        "basis": "Terms for unattended use of the Grok plan from a server not read.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Active lane in canon/agent-identities.json and the capacity registry."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "muse",
+      "identityId": "muse",
+      "capacityProviderId": "muse",
+      "label": "Muse (Meta)",
+      "kind": "external-agent",
+      "status": "dormant",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "muse",
+        "note": "Registered mesh kind, dormant."
+      },
+      "capabilities": ["research", "code-review", "analysis"],
+      "capabilitySource": "Inferred; Meta describes Muse Spark 1.1 as a multimodal reasoning model for agentic, tool and coding tasks (gbrain signals/changelog/meta-ai-blog/f3757a5a40fd). No Jovie-specific capability observed.",
+      "limits": {
+        "usage": "capped-quota",
+        "note": "Capped; burn the quota before each reset. Reset cadence and remaining quota are not recorded or readable."
+      },
+      "cost": { "listUsdMonthly": null, "note": "Plan not recorded." },
+      "box": { "has": "unknown", "notes": "Not recorded." },
+      "tos": {
+        "verdict": "unverified",
+        "basis": "Meta terms for automated use of the Muse agent not read.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "unverified",
+        "asOf": "2026-10-28",
+        "evidence": "Dormant in identities."
+      },
+      "standingWorkloads": ["pr-review", "research-brief"]
+    },
+    {
+      "id": "hyperagent",
+      "identityId": "hyperagent",
+      "capacityProviderId": "hyperagent",
+      "label": "Hyperagent",
+      "kind": "provider-pool",
+      "status": "active",
+      "route": {
+        "kind": "hyperagent-mcp",
+        "endpoint": "https://hyperagent.com/api/mcp",
+        "note": "Account-level OAuth MCP: start a thread on a personal, shared or team agent, follow the run, read results (skills/hyperagent/SKILL.md). Webhook triggers exist per hosted agent for internal briefs."
+      },
+      "capabilities": [
+        "research",
+        "code-review",
+        "analysis",
+        "strategy",
+        "writing",
+        "multi-model"
+      ],
+      "capabilitySource": "skills/hyperagent/SKILL.md and the capacity registry (many models on credits).",
+      "limits": {
+        "usage": "credits",
+        "perRunCapUsd": 10,
+        "softRunsPerDay": 24,
+        "note": "Spend the credits before they expire; pace by balance over days left (capacity registry)."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Founding 500, $200/year; credits given, not bought, expire 2027-06-01."
+      },
+      "box": {
+        "has": "unknown",
+        "notes": "Hosted agent sandboxes; per-agent machine access not recorded."
+      },
+      "tos": {
+        "verdict": "allowed",
+        "basis": "Hyperagent publishes the MCP server as the inbound route for starting and following agent threads (hyperagent.com docs, mcp-server page, cited in skills/hyperagent/SKILL.md).",
+        "checkedAt": "2026-10-28"
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Endpoint answers 401 with an OAuth resource_metadata challenge and scopes threads:read threads:write approvals:read approvals:write."
+      },
+      "standingWorkloads": [
+        "pr-review",
+        "research-brief",
+        "strategy-review",
+        "backlog-dedupe-reorder"
+      ]
+    },
+    {
+      "id": "eve-hyperagent",
+      "identityId": "eve-hyperagent",
+      "capacityProviderId": "hyperagent",
+      "label": "Eve (Hyperagent planner)",
+      "kind": "agent",
+      "status": "dormant",
+      "route": {
+        "kind": "hyperagent-mcp",
+        "endpoint": "https://hyperagent.com/api/mcp",
+        "note": "A hosted agent inside the Hyperagent account."
+      },
+      "capabilities": ["planning"],
+      "capabilitySource": "canon/agent-identities.json",
+      "limits": {
+        "usage": "credits",
+        "note": "Shares the Hyperagent credits."
+      },
+      "cost": { "listUsdMonthly": null, "note": "See hyperagent." },
+      "box": { "has": "unknown", "notes": "Not recorded." },
+      "tos": {
+        "verdict": "allowed",
+        "basis": "Same documented MCP route as hyperagent.",
+        "checkedAt": "2026-10-28"
+      },
+      "verified": {
+        "level": "unverified",
+        "asOf": "2026-10-28",
+        "evidence": "Dormant in identities."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "lane-codex",
+      "identityId": "lane-codex",
+      "capacityProviderId": "openai-codex",
+      "label": "Gem lane: codex (Codex seats)",
+      "kind": "provider-lane",
+      "status": "active",
+      "route": {
+        "kind": "gem-lanes",
+        "note": "Seats are leased per run by Gem's lanes; Summer admits work through the agent-ready pool. Off-Gem `codex cloud exec` has no environment recorded."
+      },
+      "capabilities": ["code", "code-review"],
+      "capabilitySource": "canon/agent-identities.json and the capacity registry offGem note.",
+      "limits": {
+        "usage": "subscription-pool",
+        "note": "Shared weekly window across ChatGPT Pro accounts; preserve the pool; unused quota is lost at reset (capacity registry)."
+      },
+      "cost": { "listUsdMonthly": 200, "note": "ChatGPT Pro per account." },
+      "box": { "has": true, "notes": "Runs on the Gem host." },
+      "tos": {
+        "verdict": "conditional",
+        "basis": "Codex CLI is a first-party tool and `codex exec` is its documented non-interactive mode. Whether unattended server use of a ChatGPT-plan login, and one login leased across runs, is covered by the plan terms is not verified here.",
+        "condition": "Keep to the trusted Gem host, one account per run, no resale or sharing with people outside the company; record a verdict from the OpenAI terms before adding any new unattended Codex route.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Active lane; capacity registry records 3 or more Pro accounts."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "codex-session",
+      "identityId": "codex-session",
+      "capacityProviderId": "openai-codex",
+      "label": "Codex sessions",
+      "kind": "session",
+      "status": "active",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "codex",
+        "note": "Interactive sessions that poll the mesh when open; not always on."
+      },
+      "capabilities": ["code", "code-review"],
+      "capabilitySource": "canon/agent-identities.json",
+      "limits": {
+        "usage": "subscription-pool",
+        "note": "Draws the same shared Codex window."
+      },
+      "cost": { "listUsdMonthly": 200, "note": "ChatGPT Pro per account." },
+      "box": { "has": "unknown", "notes": "Wherever the session runs." },
+      "tos": {
+        "verdict": "allowed-by-design",
+        "basis": "A person-run interactive session using the product as designed; Summer only leaves messages in a mailbox the session reads.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Registered mesh kind."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "claude-code-session",
+      "identityId": "claude-code-session",
+      "capacityProviderId": "anthropic-claude",
+      "label": "Claude Code sessions",
+      "kind": "session",
+      "status": "active",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "claude",
+        "note": "Interactive sessions that poll the mesh when open."
+      },
+      "capabilities": ["code", "code-review"],
+      "capabilitySource": "canon/agent-identities.json",
+      "limits": {
+        "usage": "subscription-pool",
+        "note": "Frontier work only (capacity registry)."
+      },
+      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
+      "box": { "has": "unknown", "notes": "Wherever the session runs." },
+      "tos": {
+        "verdict": "allowed-by-design",
+        "basis": "Person-run interactive sessions. This verdict does not cover server automation on the subscription; see lane-claude.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Registered mesh kind."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "lane-claude",
+      "identityId": "lane-claude",
+      "capacityProviderId": "anthropic-claude",
+      "label": "Gem lane: claude",
+      "kind": "provider-lane",
+      "status": "disabled",
+      "route": { "kind": "none", "note": "Disabled." },
+      "capabilities": [],
+      "capabilitySource": "canon/agent-identities.json",
+      "limits": { "usage": "subscription-pool", "note": "Not routable." },
+      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
+      "box": { "has": true, "notes": "Gem host." },
+      "tos": {
+        "verdict": "forbidden",
+        "basis": "Anthropic requires an API key for Agent SDK and server use; the Claude subscription is not a legitimate route for server automation (Tim, 2026-10-28). Anything that still runs `claude -p` on the subscription (scripts/lanes/reason_lane.py) is being moved to Hyperagent or the Gateway.",
+        "checkedAt": "2026-10-28"
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Lane disabled in canon/agent-identities.json."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "cursor",
+      "identityId": "cursor",
+      "capacityProviderId": null,
+      "label": "Cursor (golden-path prod autofix)",
+      "kind": "bot",
+      "status": "active",
+      "route": {
+        "kind": "none",
+        "note": "Triggered by the golden-path production alert flow, not dispatchable by Summer. How it is wired is not recorded here."
+      },
+      "capabilities": ["code"],
+      "capabilitySource": "canon/agent-identities.json (name and owner only)",
+      "limits": { "usage": "unknown", "note": "Not recorded." },
+      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
+      "box": {
+        "has": "unknown",
+        "notes": "Cursor cloud agent environment; not recorded."
+      },
+      "tos": {
+        "verdict": "unverified",
+        "basis": "Cursor terms not read.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "unverified",
+        "asOf": "2026-10-28",
+        "evidence": "Identity exists, owner gem-ci-repair."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "chloe",
+      "identityId": "chloe",
+      "capacityProviderId": null,
+      "label": "Chloe (ChatGPT/Codex orchestrator window)",
+      "kind": "agent",
+      "status": "dormant",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "chloe",
+        "note": "Registered mesh kind. Earlier coordination typed into the ChatGPT app window with cua-driver; that is the restricted route."
+      },
+      "capabilities": ["planning", "orchestration"],
+      "capabilitySource": "Tim, 2026-10-28 (release-to-launch plan of record)",
+      "limits": { "usage": "unknown", "note": "Not recorded." },
+      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
+      "box": { "has": false, "notes": "A desktop app window." },
+      "tos": {
+        "verdict": "restricted",
+        "basis": "Typing into the ChatGPT consumer app with a UI driver is UI automation of a consumer product; terms not read. Use the mesh, where Chloe consumes her own mailbox.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "unverified",
+        "asOf": "2026-10-28",
+        "evidence": "Registered mesh kind; dormant."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "aeon",
+      "identityId": "aeon",
+      "capacityProviderId": null,
+      "label": "Aeon (office Mac HUD and Summer chat tester)",
+      "kind": "agent",
+      "status": "active",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "aeon",
+        "note": "Registered mesh kind. Drives the office ultra-wide Ovie HUD."
+      },
+      "capabilities": ["dogfood", "browser"],
+      "capabilitySource": "memory project_office_hud_aeon (tests the HUD and Summer chat)",
+      "limits": { "usage": "unknown", "note": "Not recorded." },
+      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
+      "box": { "has": true, "notes": "Office MacBook Air." },
+      "tos": {
+        "verdict": "allowed-by-design",
+        "basis": "Receives tasks over our own mesh.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Active, registered mesh kind."
+      },
+      "standingWorkloads": ["dogfood-golden-path"]
+    },
+    {
+      "id": "stella",
+      "identityId": "stella",
+      "capacityProviderId": null,
+      "label": "Stella",
+      "kind": "agent",
+      "status": "dormant",
+      "route": {
+        "kind": "mesh",
+        "senderKind": "stella",
+        "note": "Registered mesh kind, dormant."
+      },
+      "capabilities": [],
+      "capabilitySource": "No capability list recorded.",
+      "limits": { "usage": "unknown", "note": "Not recorded." },
+      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
+      "box": { "has": "unknown", "notes": "Not recorded." },
+      "tos": {
+        "verdict": "unverified",
+        "basis": "Nothing recorded.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "unverified",
+        "asOf": "2026-10-28",
+        "evidence": "Dormant in identities."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "devin-mesh",
+      "identityId": "devin-mesh",
+      "capacityProviderId": "devin",
+      "label": "Devin (mesh peer)",
+      "kind": "agent",
+      "status": "dormant",
+      "route": {
+        "kind": "none",
+        "note": "Free SWE-2 plan is lapsed or unverified; lane disabled."
+      },
+      "capabilities": ["code"],
+      "capabilitySource": "capacity registry",
+      "limits": { "usage": "free", "note": "Not routable." },
+      "cost": { "listUsdMonthly": 0, "note": "Free plan, disabled." },
+      "box": { "has": "unknown", "notes": "Not recorded." },
+      "tos": {
+        "verdict": "unverified",
+        "basis": "Not read; unavailable anyway.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Capacity registry marks it unavailable."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "lane-kimi",
+      "identityId": "lane-kimi",
+      "capacityProviderId": "kimi",
+      "label": "Gem lane: kimi",
+      "kind": "provider-lane",
+      "status": "disabled",
+      "route": { "kind": "none", "note": "Disabled; plan unverified." },
+      "capabilities": [],
+      "capabilitySource": "capacity registry",
+      "limits": { "usage": "capped-quota", "note": "Not routable." },
+      "cost": {
+        "listUsdMonthly": 200,
+        "note": "Verify the plan is still paid before counting it."
+      },
+      "box": { "has": true, "notes": "Gem host." },
+      "tos": {
+        "verdict": "unverified",
+        "basis": "Not read; unavailable anyway.",
+        "checkedAt": null
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Disabled in identities."
+      },
+      "standingWorkloads": []
+    }
+  ]
+}
