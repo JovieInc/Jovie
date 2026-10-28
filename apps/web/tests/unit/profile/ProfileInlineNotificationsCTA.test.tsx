@@ -206,9 +206,9 @@ describe('ProfileInlineNotificationsCTA', () => {
     expect(formState.handleChannelChange).toHaveBeenCalledWith('email');
     expect(formState.openSubscription).toHaveBeenCalled();
     expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    expect(screen.getByText('Get Updates')).toBeInTheDocument();
+    expect(screen.getByText('Get New Music')).toBeInTheDocument();
     expect(screen.getByTestId('mobile-email-input')).toBeInTheDocument();
-    expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Optional')).not.toBeInTheDocument();
   }, 10_000);
 
   it('prompts for email immediately for an unsubscribed fan', async () => {
@@ -218,7 +218,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /get alerts/i }));
 
-    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
+    expect(await screen.findByText('Get New Music')).toBeInTheDocument();
   });
 
   it('closes immediately when dismissal persistence is rate-limited', async () => {
@@ -303,6 +303,7 @@ describe('ProfileInlineNotificationsCTA', () => {
     );
     view.rerender(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist({ id: 'artist-2', name: 'Second Artist' })}
         autoOpen
       />
@@ -330,6 +331,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         onManageNotifications={onManageNotifications}
       />
@@ -363,6 +365,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -370,9 +373,9 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     expect(await screen.findByText('Alerts')).toBeInTheDocument();
     expect(screen.getByText('Sent from Jovie')).toBeInTheDocument();
-    expect(screen.getByText('Sent by Test Artist')).toBeInTheDocument();
+    expect(screen.getByText('Optional')).toBeInTheDocument();
     expect(
-      screen.getByRole('switch', { name: /artist emails/i })
+      screen.getByRole('switch', { name: /share my email with/i })
     ).toBeChecked();
   });
 
@@ -382,6 +385,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     const view = render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -408,6 +412,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     view.rerender(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -424,7 +429,7 @@ describe('ProfileInlineNotificationsCTA', () => {
       <ProfileInlineNotificationsCTA artist={makeArtist()} autoOpen />
     );
 
-    expect(await screen.findByText('Get Updates')).toBeInTheDocument();
+    expect(await screen.findByText('Get New Music')).toBeInTheDocument();
 
     mockUseProfileNotifications.mockReturnValue(
       buildProfileNotifications({
@@ -589,6 +594,7 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist({
           settings: { notifications: { artistEmailReady: false } },
         })}
@@ -598,7 +604,9 @@ describe('ProfileInlineNotificationsCTA', () => {
 
     await screen.findByText('Alerts');
 
-    fireEvent.click(screen.getByRole('switch', { name: /artist emails/i }));
+    fireEvent.click(
+      screen.getByRole('switch', { name: /share my email with/i })
+    );
     fireEvent.click(screen.getByRole('button', { name: /save & finish/i }));
 
     await waitFor(() => {

@@ -115,7 +115,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:liveness
-    jobCount: 1
+    jobCount: 2
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -350,7 +350,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-production-publish
@@ -495,6 +494,18 @@ nodes:
       - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:worker
+    jobCount: 1
+  - name: Interaction latency audit
+    path: .github/workflows/interaction-latency-audit.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:measure
     jobCount: 1
   - name: Internal PR Review (advisory)
     path: .github/workflows/internal-review.yml
@@ -896,7 +907,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -1511,6 +1523,9 @@ edges:
     to: Lane Fix Relay
     type: workflow_run
   - from: PR Size Guard
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: PR Fleet Rules
     to: Lane Fix Relay
     type: workflow_run
   - from: CI
