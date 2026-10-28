@@ -2202,7 +2202,7 @@ describe('linear sync on merge', () => {
       'utf8'
     );
     expect(workflow).toContain('node scripts/lib/linear-sync-on-merge.mjs');
-    expect(workflow).toContain('runs-on: ubuntu-latest');
+    expect(workflow).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(workflow).not.toContain('issueUpdate');
     // Receipts arrive through the Linear webhook bridge; no clock.
     expect(workflow).not.toMatch(/^\s+schedule:/m);

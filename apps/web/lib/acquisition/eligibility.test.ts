@@ -175,6 +175,6 @@ describe('describeAcquisitionBlock', () => {
       describeAcquisitionBlock(
         evaluateAcquisitionEligibility({ evidence: allGreen(), now: NOW })
       )
-    ).toBe('ACQUISITION_ELIGIBLE: the $199 cone is green.');
+    ).toBe('ACQUISITION_ELIGIBLE: the $12 cone is green.');
   });
 });

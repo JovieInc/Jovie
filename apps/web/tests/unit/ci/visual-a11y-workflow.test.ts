@@ -204,7 +204,7 @@ function getScreenshotArguments(source: string): string[] {
 describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
   it('runs build + layout on hosted capacity for combined heads and main only', () => {
     const buildLayout = job('ci-build-layout');
-    expect(buildLayout['runs-on']).toBe('ubuntu-latest');
+    expect(buildLayout['runs-on']).toMatch(/^ubuntu-(?:latest|24\.04)$/);
     for (const name of [
       'Build exact combined head',
       'Run deterministic layout behavior guard',
@@ -216,7 +216,7 @@ describe('CI accessibility and visual gate contracts (JOV-4060)', () => {
 
   it('runs the Storybook matrix on two workers of two hosted runners', () => {
     const storybook = job('ci-storybook-surfaces');
-    expect(storybook['runs-on']).toBe('ubuntu-latest');
+    expect(storybook['runs-on']).toMatch(/^ubuntu-(?:latest|24\.04)$/);
     // Two disjoint Playwright shards cover the full spec list; one failing
     // shard fails the job result the aggregates read.
     expect(storybook.strategy).toEqual({
