@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Hold contract (jovie-hold/v1).
 //
-// A stop label (`hold`, `gated`, `incident`, `do-not-merge`, `queue-deferred`,
-// or a `tim-hold` variant; scripts/lib/admission-hold-labels.mjs) pauses admission. It may not
-// pause it forever on prose alone. Whoever applies one posts a receipt comment
-// on the PR:
+// Stop labels pause admission. The human-owned `tim-hold` variants and
+// `do-not-merge` require an authorized disposition; age, machine receipts,
+// and head changes never release them or their coexisting stops here.
+// Other stop labels (scripts/lib/admission-hold-labels.mjs) use a receipt
+// naming an owner and a machine-checkable release:
 //
 //   <!-- jovie-hold/v1 {"owner":"agent:<task>","until":"2026-10-12T18:00:00Z","reason":"..."} -->
 //   <!-- jovie-hold/v1 {"owner":"gem-lanes","head":"<40-hex sha>","reason":"waiting for a fix push"} -->
@@ -22,6 +23,15 @@ import { extractReceiptFromComment } from './lib/queue-deferral-receipt.mjs';
 
 export const HOLD_LABEL = 'hold';
 export const CONTRACT_LABELS = STOP_HOLD_LABELS;
+// Same dedicated human family as scripts/lanes/pr_events.py. Machine false
+// holds have a separate proof-bound reconciliation path; this expiry sweep
+// cannot establish permission to release a human-owned hold.
+const HUMAN_HOLD_LABELS = new Set([
+  'tim-hold',
+  'tim:hold',
+  'hold:tim',
+  'do-not-merge',
+]);
 export const HOLD_RECEIPT_SCHEMA = 'jovie-hold/v1';
 export const OWNERLESS_GRACE_MS = 24 * 3600 * 1000;
 export const MAX_HOLD_MS = 7 * 24 * 3600 * 1000;
@@ -138,15 +148,21 @@ function gh(args) {
 }
 
 export function sweepHolds({ now, dryRun, io }) {
+  /** @type {Array<ReturnType<typeof evaluateHold> & { number: number, label: string }>} */
   const results = [];
   for (const number of io.listHeld()) {
     const pr = io.read(number);
     if (pr?.state !== 'OPEN') continue;
     const present = new Set((pr.labels?.nodes ?? []).map(l => l?.name));
+    const humanHeld = [...present].some(label => HUMAN_HOLD_LABELS.has(label));
     // Each stop label is its own hold with its own labeled time; one receipt
     // on the PR covers every label applied within its window.
     for (const label of CONTRACT_LABELS) {
       if (!present.has(label)) continue;
+      if (humanHeld) {
+        results.push({ number, label, action: 'keep', reason: 'human-hold' });
+        continue;
+      }
       const labeledAt = (pr.timelineItems?.nodes ?? [])
         .filter(event => event?.label?.name === label)
         .map(event => event.createdAt)

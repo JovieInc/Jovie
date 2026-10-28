@@ -31,7 +31,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -87,6 +87,16 @@ export function classifyFailure(logTexts = []) {
     }
   }
   return [...kinds].sort();
+}
+
+/** Classify this observer's failed read separately from the controller's logs. */
+export function classifyObservationFailure(error) {
+  const text = `${error?.stderr ?? ''}\n${error?.message ?? error ?? ''}`;
+  const known = classifyFailure([text]);
+  if (known.includes('quota')) return 'quota';
+  if (/\bHTTP 5\d\d\b/.test(text)) return 'upstream-5xx';
+  if (/\bHTTP (401|403)\b/.test(text)) return 'permission-denied';
+  return known[0] ?? 'unknown';
 }
 
 /**
@@ -246,11 +256,13 @@ export function buildStageEvents({
     exitedAt: decidedAt,
     actor: 'controller-quota-replay',
     outcome:
-      decision.replay && replayedAt
-        ? 'advanced'
-        : decision.replay
-          ? 'failed'
-          : decision.outcome,
+      decision.requestOutcome === 'pending'
+        ? 'open'
+        : decision.replay && replayedAt
+          ? 'advanced'
+          : decision.replay
+            ? 'failed'
+            : decision.outcome,
     sourceReceipt,
   };
   if (!decision.replay || !replayedAt) return [blocked];
@@ -330,20 +342,13 @@ function failedJobLogs({ gh, repository, jobs, options }) {
     .filter(job => ['failure', 'timed_out'].includes(job.conclusion))
     .slice(0, options.maxLogJobs);
   return failed.map(job => {
-    try {
-      // gh 2.103 refuses job logs that contain ANSI sequences unless this
-      // flag is set, and that refusal text is not a transient signature.
-      // 2026-10-23: both ancestry failures were therefore abandoned after
-      // the quota wait (runs 39897328472 and 39897478370).
-      return gh([
-        'api',
-        '--allow-escape-sequences',
-        `repos/${repository}/actions/jobs/${job.id}/logs`,
-      ]);
-    } catch (error) {
-      // An unreadable log counts as transient only if gh's own error says so.
-      return String(error?.stderr ?? error?.message ?? '');
-    }
+    // A failed read is unknown source evidence, never a controller log.
+    // Let runCli retain the observation failure before any replay request.
+    return gh([
+      'api',
+      '--allow-escape-sequences',
+      `repos/${repository}/actions/jobs/${job.id}/logs`,
+    ]);
   });
 }
 
@@ -358,6 +363,7 @@ export async function runReplay({
   sleep = defaultSleep,
   now = () => Date.now(),
   liveSha = () => defaultLiveSha('https://jov.ie/api/health/build-info'),
+  recordDecision = () => {},
   options = DEFAULTS,
 }) {
   const run = event.workflow_run;
@@ -462,11 +468,31 @@ export async function runReplay({
     };
   }
   let replayedAt = null;
+  // A durable pending request must precede the sole mutation. A failed write
+  // throws before gh runs, and an uncertain response is never replayed here.
+  decision.requestOutcome = 'pending';
+  decision.outcome = 'open';
+  await recordDecision({
+    decision: { ...decision },
+    events: buildStageEvents({
+      workflow: workflowFile,
+      run,
+      decision,
+      decidedAt: null,
+    }),
+  });
   try {
     gh(['run', 'rerun', String(source.ciRunId), '--repo', repository]);
+    decision.requestOutcome = 'accepted';
+    decision.outcome = 'advanced';
     replayedAt = iso(now());
   } catch (error) {
-    decision.reason = `rerun request failed: ${String(error?.message ?? error).slice(0, 200)}`;
+    decision.requestOutcome =
+      classifyObservationFailure(error) === 'permission-denied'
+        ? 'rejected'
+        : 'unknown';
+    decision.outcome = 'failed';
+    decision.reason = `rerun request failed; outcome ${decision.requestOutcome}: ${String(error?.message ?? error).slice(0, 200)}`;
   }
   return {
     decision,
@@ -480,12 +506,20 @@ export async function runReplay({
   };
 }
 
+function replayDisposition(decision) {
+  if (decision.requestOutcome === 'accepted') return 'replayed';
+  if (decision.requestOutcome === 'rejected') return 'replay rejected';
+  if (decision.requestOutcome === 'unknown') return 'replay outcome unknown';
+  if (decision.requestOutcome === 'pending') return 'replay requested';
+  return 'not replayed';
+}
+
 export function renderSummary({ run, decision }) {
   return [
     '### Controller replay',
     '',
     `Run [${run.path} ${run.id} attempt ${run.run_attempt}](${run.html_url ?? ''}) concluded \`${run.conclusion}\`.`,
-    `Decision: **${decision.replay ? 'replayed' : 'not replayed'}** (${decision.reason}).`,
+    `Decision: **${replayDisposition(decision)}** (${decision.reason}).`,
     decision.waitedSeconds
       ? `Waited ${decision.waitedSeconds}s for backoff/quota reset.`
       : '',
@@ -497,28 +531,85 @@ export async function runCli({ env = process.env, deps = {} } = {}) {
   const { readFileSync } = await import('node:fs');
   const event = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'));
   const repository = env.GITHUB_REPOSITORY;
-  const result = await runReplay({ event, repository, ...deps });
   const outPath =
     env.REPLAY_EVENTS_PATH || 'release-replay-receipts/stage-events.ndjson';
   mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(
-    outPath,
-    result.events.map(e => JSON.stringify(e)).join('\n') +
-      (result.events.length ? '\n' : '')
-  );
-  writeFileSync(
-    `${dirname(outPath)}/decision.json`,
-    JSON.stringify(
-      {
-        schema: DECISION_SCHEMA,
-        runId: event.workflow_run.id,
-        attempt: event.workflow_run.run_attempt,
-        ...result.decision,
-      },
-      null,
-      2
-    ) + '\n'
-  );
+  const writeReceipt = (path, contents) => {
+    writeFileSync(`${path}.tmp`, contents);
+    renameSync(`${path}.tmp`, path);
+  };
+  const persist = result => {
+    writeReceipt(
+      outPath,
+      result.events.map(e => JSON.stringify(e)).join('\n') +
+        (result.events.length ? '\n' : '')
+    );
+    writeReceipt(
+      `${dirname(outPath)}/decision.json`,
+      JSON.stringify(
+        {
+          schema: DECISION_SCHEMA,
+          runId: event.workflow_run.id,
+          attempt: event.workflow_run.run_attempt,
+          ...result.decision,
+        },
+        null,
+        2
+      ) + '\n'
+    );
+  };
+  const run = event.workflow_run;
+  const workflow = CONTROLLER_WORKFLOWS[run.path];
+  const pending = {
+    replay: false,
+    outcome: 'open',
+    requestOutcome: 'not-attempted',
+    reason: 'source observation pending',
+  };
+  // Even the first quota read can fail. Preserve an open observation before
+  // any remote work so the existing always-upload artifact has a receipt.
+  persist({
+    decision: pending,
+    events: workflow
+      ? buildStageEvents({
+          workflow,
+          run,
+          decision: pending,
+          decidedAt: null,
+        })
+      : [],
+  });
+  let result;
+  try {
+    result = await runReplay({
+      event,
+      repository,
+      ...deps,
+      recordDecision: persist,
+    });
+  } catch (error) {
+    const failureKind = classifyObservationFailure(error);
+    const decision = {
+      replay: false,
+      outcome: 'failed',
+      requestOutcome: 'not-attempted',
+      failureKind,
+      reason: `source observation failed (${failureKind}); replay not attempted`,
+    };
+    persist({
+      decision,
+      events: workflow
+        ? buildStageEvents({
+            workflow,
+            run,
+            decision,
+            decidedAt: new Date((deps.now ?? Date.now)()).toISOString(),
+          })
+        : [],
+    });
+    throw error;
+  }
+  persist(result);
   if (env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       env.GITHUB_STEP_SUMMARY,
@@ -526,8 +617,11 @@ export async function runCli({ env = process.env, deps = {} } = {}) {
     );
   }
   console.log(
-    `controller-quota-replay: ${result.decision.replay ? 'replayed' : 'skipped'} (${result.decision.reason})`
+    `controller-quota-replay: ${replayDisposition(result.decision)} (${result.decision.reason})`
   );
+  if (['rejected', 'unknown'].includes(result.decision.requestOutcome)) {
+    throw new Error(result.decision.reason);
+  }
   return result;
 }
 
