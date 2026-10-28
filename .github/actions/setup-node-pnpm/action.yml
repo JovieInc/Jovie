@@ -27,6 +27,7 @@ runs:
         CF_TURBO_URL: ${{ env.CF_TURBO_URL }}
         CF_TURBO_TOKEN: ${{ env.CF_TURBO_TOKEN }}
         CF_TURBO_ROLE: ${{ env.CF_TURBO_ROLE }}
+        CF_TURBO_SIGNATURE_KEY: ${{ env.CF_TURBO_SIGNATURE_KEY }}
       run: |
         if [ -z "${CF_TURBO_URL:-}" ] || [ -z "${CF_TURBO_TOKEN:-}" ]; then
           echo "turbo-cache: backend=legacy (no Cloudflare credentials)"
@@ -40,17 +41,32 @@ runs:
           echo "turbo-cache: backend=legacy (probe ${code:-none})"
           exit 0
         fi
+        # Signing: artifacts are HMAC-signed with a key every reader and writer
+        # holds; unsigned or wrongly-signed artifacts are rejected. Without a
+        # key nothing may write (unsigned writes could be forged).
+        role="$CF_TURBO_ROLE"
+        signed_json=""
+        if [ -n "${CF_TURBO_SIGNATURE_KEY:-}" ]; then
+          signed_json="${RUNNER_TEMP}/turbo.signed.json"
+          perl -0pe 's/\{/{\n  "remoteCache": { "signature": true },/' turbo.json > "$signed_json"
+        else
+          role="ro"
+        fi
         {
           echo "TURBO_API=${CF_TURBO_URL%/}"
           echo "TURBO_TOKEN=${CF_TURBO_TOKEN}"
           echo "TURBO_TEAM=jovie"
-          if [ "$CF_TURBO_ROLE" = "rw" ]; then
+          if [ -n "$signed_json" ]; then
+            echo "TURBO_ROOT_TURBO_JSON=${signed_json}"
+            echo "TURBO_REMOTE_CACHE_SIGNATURE_KEY=${CF_TURBO_SIGNATURE_KEY}"
+          fi
+          if [ "$role" = "rw" ]; then
             echo "TURBO_CACHE=local:rw,remote:rw"
           else
             echo "TURBO_CACHE=local:rw,remote:r"
           fi
         } >> "$GITHUB_ENV"
-        echo "turbo-cache: backend=cloudflare-r2 role=${CF_TURBO_ROLE}"
+        echo "turbo-cache: backend=cloudflare-r2 role=${role} signed=$([ -n "$signed_json" ] && echo yes || echo no)"
 
     # Self-hosted runners reuse a workspace whose owner can differ from the job
     # user, tripping git's dubious-ownership guard. That makes turbo's SCM probe
