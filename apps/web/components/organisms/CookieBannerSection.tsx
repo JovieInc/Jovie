@@ -34,7 +34,15 @@ function isBannerRequiredFromCookie(): boolean {
 
 export function CookieBannerSection({
   testOnlyPathname,
-}: Readonly<{ testOnlyPathname?: string }>) {
+  initialVisible = false,
+}: Readonly<{
+  testOnlyPathname?: string;
+  /**
+   * Server-resolved visibility so the card paints with the HTML (LCP). The
+   * layout effect below still reconciles against localStorage and the cookie.
+   */
+  initialVisible?: boolean;
+}>) {
   const pathname = usePathname();
   const effectivePathname =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' && testOnlyPathname
@@ -49,7 +57,7 @@ export function CookieBannerSection({
   const lastPageFocus = useRef<HTMLElement | null>(null);
   const savingFocus = useRef<HTMLElement | null>(null);
 
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(initialVisible);
   const [customize, setCustomize] = useState(false);
   const [_isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isSavingConsent, setIsSavingConsent] = useState(false);
@@ -194,7 +202,31 @@ export function CookieBannerSection({
 
     if (shouldClearProfileDock) {
       root.style.removeProperty('--cookie-banner-h');
-      return;
+
+      // Tablet/narrow-desktop profiles are a centered card whose avatar sits
+      // under any top-anchored consent card. Anchor the card just above the
+      // dock instead, like phones, so identity stays uncovered. The dock top
+      // is not derivable in CSS (card height and viewport clamp vary).
+      const publishDockClearance = () => {
+        const dock = document.querySelector<HTMLElement>(
+          '[data-testid="profile-tab-bar"]'
+        );
+        if (!dock) {
+          root.style.removeProperty('--cookie-banner-dock-clearance');
+          return;
+        }
+        const gap = 8;
+        root.style.setProperty(
+          '--cookie-banner-dock-clearance',
+          `${Math.max(gap, globalThis.innerHeight - dock.getBoundingClientRect().top + gap)}px`
+        );
+      };
+      publishDockClearance();
+      globalThis.addEventListener('resize', publishDockClearance);
+      return () => {
+        globalThis.removeEventListener('resize', publishDockClearance);
+        root.style.removeProperty('--cookie-banner-dock-clearance');
+      };
     }
 
     const banner = document.querySelector<HTMLElement>(

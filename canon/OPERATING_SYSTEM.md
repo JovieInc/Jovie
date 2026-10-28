@@ -138,6 +138,16 @@ And naturally deprioritizes:
 
 Over thousands of agent-hours, this becomes a coherent operating system rather than a collection of isolated automations.
 
+### Default priority (EVENT 2026-10-28, Tim)
+
+Pre-launch, working and shipped beats polished and stalled. Apply without being told:
+
+1. **Most effort goes to the current constraint:** the blocker to shipping (red queue, stale production, failing release gate) or the biggest drop in activation (landing → signup → claim → checkout → paid). Everything else is secondary.
+2. **Rank surfaces by importance and traffic.** The golden path and the highest-traffic pages come first; low-traffic surfaces wait.
+3. **Quality gates never stall shipping.** When a quality-only gate (perf/LCP budget, layout shift or geometry, visual polish) blocks the queue or a release, set it to the measured baseline or report-only, add a `ratchet: JOV-xxxx` marker plus an issue to tighten it, ship, then fix. A green golden path today beats a fast one next week.
+4. **Correctness gates still block:** signup, auth and billing actually working; security; secrets; data integrity.
+5. **Process is a cost.** A CI job, check, controller or gate that doesn't catch real defects gets deleted. A slow or polling one gets refactored to run fast and on events. Deleting is preferred to adding.
+
 ---
 
 ## Decision Framework
@@ -192,7 +202,7 @@ Investor calls are allowed whenever they have a credible path to capital. We eli
 
 Investor confusion is not customer evidence. Never pivot toward a market merely because its investors are easier to talk to, and never reject useful capital merely because an investor does not live the customer's problem.
 
-The operational contract, qualification gate, and metrics live in [`../docs/company/CAPITAL-STRATEGY.md`](../docs/company/CAPITAL-STRATEGY.md).
+The operational contract, qualification gate, and metrics live in the private `JovieInc/Ops` repo at `jovie-private/docs/company/CAPITAL-STRATEGY.md` (see [strategy canon](./strategy/README.md) for how to read it).
 
 ---
 

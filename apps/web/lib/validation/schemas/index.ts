@@ -94,7 +94,6 @@ export {
   type SortDirection,
   type SourceType,
   type SubscriberSort,
-  type SubscribersQueryParams,
   // Profile schemas
   settingsSchema,
   socialLinkInputSchema,
@@ -105,7 +104,6 @@ export {
   subscriberSortSchema,
   // Subscribers schemas
   subscriberSortValues,
-  subscribersQuerySchema,
   type ThemePreference,
   themeSchema,
   type UpdateLinkStatePayload,
