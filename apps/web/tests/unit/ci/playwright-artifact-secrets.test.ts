@@ -66,7 +66,7 @@ function isPlaywrightConfigModule(
   );
 }
 const localTrace = Object.fromEntries(
-  'playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
+  'playwright.config.chat-comparison.ts=off|playwright.config.docs-guides.ts=off|playwright.config.dropdown.ts=retain-on-failure|playwright.config.screenshots.ts=off|playwright.config.visual-qa.ts=off|playwright.synthetic.config.ts=retain-on-failure'
     .split('|')
     .map(value => value.split('='))
 );
@@ -155,6 +155,7 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-e2e-smoke',
   'ci.yml:ci-e2e-tests',
   'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',

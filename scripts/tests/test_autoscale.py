@@ -415,5 +415,19 @@ class AutoscaleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); (root / "meminfo").write_text("MemTotal: 100 kB\nMemAvailable: 2048 kB\n"); (root / "pressure").mkdir(); (root / "pressure" / "cpu").write_text("some avg10=1.50 avg60=1.00\n"); (root / "pressure" / "memory").write_text("full avg10=0.25\n"); (root / "pressure" / "io").write_text("full avg10=2.00\n"); probed = A.sample_host(root); self.assertEqual((probed["memAvailableBytes"], probed["psi"]["cpuSomeAvg10"], probed["psi"]["memoryFullAvg10"]), (2048 * 1024, 1.5, 0.25))
             self.assertIsNone(A.sample_host(root / "missing")["psi"]); self.assertIsNone(A.sample_host(root / "missing")["memAvailableBytes"])
+    def test_remote_lane_ignores_gem_host_pressure_but_local_lane_does_not(self):
+        # Hyperagent runs off gem: gem disk, memory, load and PSI are not its limits; provider limits still are.
+        hot = sample(load1=30.0, memAvailableBytes=1 * GIB, psi={"cpuSomeAvg10": 90.0, "memoryFullAvg10": 50.0, "ioFullAvg10": 90.0})
+        seen = obs(eligiblePoolByProvider={"devin": 8, "codex": 6, "hyperagent": 20}, maintenanceQueueByProvider={"devin": 0, "codex": 0, "hyperagent": 0},
+                   newIssueBudgetByProvider={"devin": {"reason": "within-budget"}, "codex": {"reason": "within-budget"}, "hyperagent": {"reason": "within-budget"}},
+                   runningByProvider={"devin": 4, "codex": 3, "hyperagent": 10}, disk={"admitted": False, "freePct": 2})
+        bases = {"codex": 3, "hyperagent": 10}
+        state = decide(None, seen, hot, bases, cfg(remote=["hyperagent"]), NOW)
+        self.assertGreaterEqual(self.lane(state, "hyperagent")["effective"], 10); self.assertNotIn("host-pressure", self.lane(state, "hyperagent")["blockers"])
+        self.assertIn("host-pressure", self.lane(state, "codex")["blockers"]); self.assertLess(self.lane(state, "codex")["effective"], 3)
+        local = decide(None, seen, hot, bases, cfg(), NOW)
+        self.assertLess(self.lane(local, "hyperagent")["effective"], 10)
+        rate = decide(None, obs(rateBankAt={"hyperagent": NOW - 10}, eligiblePoolByProvider={"hyperagent": 20}, newIssueBudgetByProvider={"hyperagent": {"reason": "within-budget"}}, maintenanceQueueByProvider={"hyperagent": 0}, runningByProvider={"hyperagent": 10}), hot, {"hyperagent": 10}, cfg(remote=["hyperagent"]), NOW)
+        self.assertEqual(self.lane(rate, "hyperagent")["effective"], 5)
 if __name__ == "__main__":
     unittest.main()

@@ -20,7 +20,8 @@ export type FallbackReason =
   | 'llm_error'
   | 'kill_switch'
   | 'injected'
-  | 'ownership_conflict';
+  | 'ownership_conflict'
+  | 'system1';
 
 export interface ScriptedFallbackResponseInput {
   readonly turn: FallbackTurn;

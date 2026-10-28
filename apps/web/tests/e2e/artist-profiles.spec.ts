@@ -265,7 +265,7 @@ test.describe('Artist Profiles Landing', () => {
       {
         label: 'Out now',
         headline:
-          'When the song is live, fans go straight to the right service.',
+          'When the song is live, listeners go straight to the right service.',
         screenshotAlt:
           'Jovie artist profile showing a release-day listen view.',
       },
@@ -533,7 +533,7 @@ test.describe('Artist Profiles Landing', () => {
       specWallSection.getByTestId('artist-profile-related-feature')
     ).toHaveCount(4);
     await expect(
-      specWallSection.getByRole('link', { name: /See Fan Notifications/i })
+      specWallSection.getByRole('link', { name: /See audience notifications/i })
     ).toHaveAttribute('href', '/artist-notifications');
     await expect(
       specWallSection.getByRole('link', { name: /See Instant Merch/i })

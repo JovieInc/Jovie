@@ -48,7 +48,7 @@ jobs:
        (github.event.workflow_run.name == 'Golden Path Nightly' ||
         github.event.workflow_run.conclusion == 'success'))
     environment: Preview – jovie
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'

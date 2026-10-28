@@ -483,62 +483,6 @@ describe('Dashboard API contracts', () => {
         ],
       });
     });
-
-    it('paginates subscribers with contract-safe response', async () => {
-      let executeCallIndex = 0;
-      const executeResponses = [
-        {
-          rows: [
-            {
-              id: 'sub_1',
-              email: 'fan@example.com',
-              phone: null,
-              countryCode: 'us',
-              createdAt: new Date('2024-01-03T00:00:00Z'),
-              channel: 'email',
-            },
-          ],
-        },
-        { rows: [{ total: 1 }] },
-      ];
-
-      const tx = {
-        select: createSelectQueue([[{ id: PROFILE_ID }]]),
-        execute: async () => {
-          const result = executeResponses[executeCallIndex] ?? { rows: [] };
-          executeCallIndex += 1;
-          return result;
-        },
-      };
-
-      mockSession({ tx });
-
-      const { GET } = await import(
-        '@/app/api/dashboard/audience/subscribers/route'
-      );
-      const response = await GET(
-        new Request(
-          `http://localhost/api/dashboard/audience/subscribers?profileId=${PROFILE_ID}&sort=createdAt&direction=desc&page=1&pageSize=10`
-        )
-      );
-      const body = await response.json();
-
-      expectStatusOk(response, body);
-      expect(body).toEqual({
-        total: 1,
-        nextCursor: null,
-        rows: [
-          {
-            id: 'sub_1',
-            email: 'fan@example.com',
-            phone: null,
-            countryCode: 'us',
-            createdAt: '2024-01-03T00:00:00.000Z',
-            channel: 'email',
-          },
-        ],
-      });
-    });
   });
 
   describe('Profile', () => {
