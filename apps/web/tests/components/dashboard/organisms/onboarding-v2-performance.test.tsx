@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react';
 import type { ElementType, ReactNode } from 'react';
@@ -704,11 +705,102 @@ describe('Onboarding screen performance budgets', () => {
     );
 
     await screen.findByRole('heading', { name: 'Your release preview' });
-    expect(screen.getByRole('button', { name: /^Continue$/i })).toBeEnabled();
+    // Continue stays disabled until the discovery snapshot resolves (readiness
+    // pending by design); the heading paints first, so wait for that state
+    // instead of racing the mocked fetch under CPU contention.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /^Continue$/i })).toBeEnabled()
+    );
     expect(
       screen.getByText(
         'Your first releases have not landed yet. This is taking longer than usual.'
       )
     ).toBeInTheDocument();
+  });
+
+  describe('discovery snapshot failure on the release preview', () => {
+    const renderReleases = () =>
+      render(
+        <OnboardingV2Form
+          initialDisplayName='Perf Budget'
+          initialHandle='perf-budget'
+          initialProfileId='profile-performance'
+          initialResumeStep='releases'
+          isHydrated
+          userEmail='perf@example.com'
+          userId='user-performance'
+        />
+      );
+
+    it('shows the error and a Refresh retry when the snapshot request fails, then recovers', async () => {
+      let attempts = 0;
+      const ready = createDiscoverySnapshot({
+        readiness: {
+          blockingReason: null,
+          canProceedToDashboard: true,
+          phase: 'ready',
+        },
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(async () => {
+          attempts += 1;
+          if (attempts <= 2) {
+            return new Response(JSON.stringify({ error: 'Upstream down' }), {
+              headers: { 'Content-Type': 'application/json' },
+              status: 500,
+            });
+          }
+          return new Response(
+            JSON.stringify({ snapshot: ready, success: true }),
+            {
+              headers: { 'Content-Type': 'application/json' },
+              status: 200,
+            }
+          );
+        })
+      );
+      renderReleases();
+      expect(await screen.findByText('Upstream down')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Refresh/i })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: /Refresh/i }));
+      await waitFor(
+        () =>
+          expect(
+            screen.getByRole('button', { name: /^Continue$/i })
+          ).toBeEnabled(),
+        { timeout: 5000 }
+      );
+      expect(screen.queryByText('Upstream down')).toBeNull();
+    });
+
+    it('turns a hung snapshot request into a visible, retryable error within 10 seconds', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(
+            (_input: RequestInfo | URL, init?: RequestInit) =>
+              new Promise<Response>((_resolve, reject) => {
+                init?.signal?.addEventListener('abort', () =>
+                  reject(new DOMException('aborted', 'AbortError'))
+                );
+              })
+          )
+        );
+        renderReleases();
+        await screen.findByRole('heading', { name: 'Your release preview' });
+        expect(
+          screen.getByRole('button', { name: /^Continue$/i })
+        ).toBeDisabled();
+        await vi.advanceTimersByTimeAsync(10_500);
+        expect(
+          await screen.findByText(/taking longer than expected/i)
+        ).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Refresh/i })).toBeEnabled();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
