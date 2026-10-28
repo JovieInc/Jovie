@@ -9,6 +9,31 @@ describe('AppShellSkeleton', () => {
     expect(container.querySelector('.skeleton')).toBeTruthy();
   });
 
+  it.each(['jovie', 'ov'] as const)(
+    'reserves the live icon rail width for collapsed %s shells',
+    brandVariant => {
+      const { container } = render(
+        <AppShellSkeleton sidebarCollapsed brandVariant={brandVariant} />
+      );
+      const sidebar = container.querySelector('.bg-sidebar');
+      expect(sidebar).toHaveStyle({ width: '52px' });
+      expect(sidebar?.querySelector('[style*="width:"]')).toBeNull();
+      expect(
+        container.querySelector('[data-app-shell-content-column]')
+      ).toBeTruthy();
+      expect(
+        container.querySelector('[data-app-shell-main-plane]')
+      ).toBeTruthy();
+    }
+  );
+
+  it('reserves the expanded sidebar token by default', () => {
+    const { container } = render(<AppShellSkeleton />);
+    expect(container.querySelector('.bg-sidebar')).toHaveStyle({
+      width: 'var(--app-shell-sidebar-width)',
+    });
+  });
+
   it('uses the single unified header-height token for the sidebar and header skeletons (founder lock 2026-09-25)', () => {
     const { container } = render(<AppShellSkeleton />);
 

@@ -1,0 +1,157 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Gem
+# necessary-trust-boundary: Fleet-rule evidence (PR body/labels/files) is read on the dedicated CI App installation budget by base-branch code only, then this job's result, which the required PR Ready aggregate reads.
+# removal-trigger: Remove when the repo-wide GITHUB_TOKEN bucket no longer starves PR evidence reads, or GitHub offers per-workflow API budgets.
+name: Fleet Rules Evidence
+# The title binds a run to one PR and base so PR Ready can reject a run that merely
+# shares a head sha (a fork or integration-branch PR for the same commit).
+run-name: "${{ github.event_name == 'pull_request_target' && format('fleet-rules #{0} base={1}', github.event.pull_request.number, github.event.pull_request.base.ref) || format('fleet-rules rerun {0}', github.event.workflow_run.id) }}"
+
+# 2026-10-24: pr-fleet-rules.mjs read PR evidence on the repo-wide GITHUB_TOKEN
+# bucket every workflow shares, so quota exhaustion turned PR Fleet Rules,
+# Source Validation and PR Ready red on a dozen PRs. It now reads on the
+# dedicated CI App installation's own budget.
+#
+# SECURITY: pull_request_target runs this workflow from the BASE branch, so a
+# PR branch can never edit it, and the only checkout is main's policy script and
+# api-client (sparse, persist-credentials: false). No PR code, no PR-controlled
+# value is interpolated into a shell, and the CI App key is never present in any
+# pull_request-triggered workflow (see scripts/pr-fleet-rules.test.mjs). The
+# minted token is read-only (contents, pull-requests); the verdict is this job's
+# own result (no commit status is posted: it was informational and its github.token
+# POST turned a read verdict into a quota deferral). A failed mint falls back to github.token, so evidence is never
+# skipped.
+on:
+  pull_request_target:
+    types: [opened, edited, synchronize, labeled, unlabeled, reopened]
+  # A verdict can land before Source Validation finishes (PR Ready then reads
+  # "missing") or after it (PR Ready already red). Either way the failed jobs
+  # are re-run once the status exists, so there is no polling.
+  workflow_run:
+    workflows: [Source Validation]
+    types: [completed]
+
+permissions: {}
+
+concurrency:
+  # One group per PR across every pull_request_target type: the newest read
+  # cancels an older one, so a slower older run can never post a stale verdict
+  # last. workflow_run re-run hops get their own group.
+  group: ${{ github.event_name == 'workflow_run' && format('fleet-rules-rerun-{0}', github.event.workflow_run.id) || format('fleet-rules-evidence-{0}', github.event.pull_request.number) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
+
+jobs:
+  evidence:
+    name: Fleet Rules Evidence
+    if: github.event_name == 'pull_request_target' && github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Mint CI App read token for fleet evidence
+        id: fleet-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            scripts/pr-fleet-rules.mjs
+            packages/api-client
+            .github/scripts/fleet-rules-verdict.sh
+            .github/scripts/fleet-rules-rerun.sh
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+          sparse-checkout-cone-mode: false
+      # No token input: setup-node keeps its default github.token, never the CI App token.
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Read evidence and fail or defer the job as the verdict
+        env:
+          FLEET_TOKEN: ${{ steps.fleet-token.outputs.token }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: bash .github/scripts/fleet-rules-verdict.sh
+
+  rerun:
+    name: Re-run Source Validation after a verdict
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'pull_request' && github.event.workflow_run.path == '.github/workflows/source-validation.yml' && github.event.workflow_run.conclusion == 'failure' && github.event.workflow_run.run_attempt < 4
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          persist-credentials: false
+          sparse-checkout: |
+            .nvmrc
+            packages/api-client
+            .github/scripts/fleet-rules-rerun.sh
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
+          sparse-checkout-cone-mode: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - name: Re-run PR Ready when a passing verdict exists for this exact head
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+        run: |
+          set -euo pipefail
+          [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 0
+          # A quota deferral (exit 75, "until <ISO reset>") used to end this hop
+          # red and leave PR Ready red until the next event. A reset inside the
+          # job budget (75s of the 2 minute timeout; the gate-weakening detector
+          # forbids raising it) holds with no API calls and retries once. A longer
+          # wait or a second deferral still fails, never a pass.
+          ghx() {
+            local err rc until_ts wait_s
+            err="$(mktemp)"
+            for attempt in 1 2; do
+              rc=0
+              node packages/api-client/cli.ts gh --priority repair -- "$@" 2>"$err" || rc=$?
+              if [ "$rc" -ne 75 ]; then cat "$err" >&2; rm -f "$err"; return "$rc"; fi
+              until_ts="$(grep -o 'until [0-9T:.Z-]*' "$err" | head -n1 | cut -d' ' -f2)"
+              wait_s=$(( $(date -u -d "${until_ts:-1970-01-01}" +%s) - $(date -u +%s) + 5 ))
+              if [ "$attempt" = 2 ] || [ "$wait_s" -le 0 ] || [ "$wait_s" -gt 75 ]; then cat "$err" >&2; rm -f "$err"; return 75; fi
+              echo "::notice::github-quota-deferred; holding ${wait_s}s for the reset, then retrying once."
+              sleep "$wait_s"
+            done
+          }
+          latest="$(ghx api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&status=completed&per_page=10" \
+            --jq '[.workflow_runs[]] | sort_by(.created_at) | last | "\(.id // "")\t\(.conclusion // "missing")\t\(.run_attempt // 0)"')"
+          IFS=$'\t' read -r ev_id concl attempt <<<"$latest"
+          if [ "$concl" = success ]; then
+            bash .github/scripts/fleet-rules-rerun.sh "$RUN_ID"
+          elif [ "$concl" = failure ] && [[ "$ev_id" =~ ^[1-9][0-9]*$ ]] && [ "$attempt" -lt 3 ]; then
+            ghx api -X POST "repos/$REPOSITORY/actions/runs/$ev_id/rerun-failed-jobs" >/dev/null \
+              && echo "Re-ran fleet evidence run $ev_id (attempt $attempt)."
+          else
+            echo "Fleet evidence for $HEAD_SHA is $concl (attempt ${attempt:-0}); nothing to re-run."
+          fi
