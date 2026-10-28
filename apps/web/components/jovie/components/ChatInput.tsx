@@ -1323,7 +1323,7 @@ function InputRow({
           // inset — replaces ad-hoc compact padding from JOV-3531.
           useHeroPill
             ? 'flex min-h-13 items-center gap-2 px-4 py-2 sm:min-h-14'
-            : 'grid content-start gap-2 grid-rows-[auto_36px] px-4 py-2'
+            : 'grid content-start gap-2 px-4 py-2'
         )}
       >
         <div ref={hiddenDivRef} style={HIDDEN_DIV_STYLES} aria-hidden />
