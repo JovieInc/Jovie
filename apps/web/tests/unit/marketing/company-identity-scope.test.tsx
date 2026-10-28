@@ -9,6 +9,7 @@ import {
   ABOUT_FAQ_ITEMS,
   AboutPageContent,
 } from '@/components/organisms/AboutPageContent';
+import { ABOUT_COPY, ABOUT_DEFINITION } from '@/data/aboutCopy';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { buildOrganizationSchema } from '@/lib/constants/schemas';
@@ -97,37 +98,27 @@ describe('company identity route scope (JOV-6261 / JOV-6216 / JOV-6223)', () => 
     );
   });
 
-  it('renders About as a general company definition with a labeled artist example', () => {
+  it('renders About as a general company page with no segment example', () => {
     render(<AboutPageContent />);
 
     expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: COMPANY_IDENTITY.headline,
-      })
+      screen.getByRole('heading', { level: 1, name: ABOUT_COPY.headline })
     ).toBeVisible();
-    expect(
-      screen.getByRole('heading', {
-        level: 1,
-        name: COMPANY_IDENTITY.headline,
-      }).nextElementSibling
-    ).toHaveTextContent(COMPANY_IDENTITY.definition);
-    expect(
-      screen.getByRole('heading', { level: 3, name: 'For Artists' })
-    ).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'For Artists' })).toBeNull();
     expect(
       isArtistOnlyCompanyDefinition(
-        `${COMPANY_IDENTITY.headline} ${COMPANY_IDENTITY.support} ${ABOUT_FAQ_ITEMS[0]?.answer}`
+        `${ABOUT_COPY.headline} ${ABOUT_DEFINITION} ${ABOUT_FAQ_ITEMS[0]?.answer}`
       )
     ).toBe(false);
   });
 
   it('uses general metadata, Open Graph, and Organization schema on /about', async () => {
     const { metadata } = await import('../../../app/(marketing)/about/page');
-    const expectedTitle = `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`;
 
-    expect(applyRootTitleTemplate(metadata.title)).toBe(expectedTitle);
-    expect(String(metadata.description)).toContain(COMPANY_IDENTITY.definition);
+    expect(applyRootTitleTemplate(metadata.title)).toBe(
+      ABOUT_COPY.metadataTitle
+    );
+    expect(String(metadata.description)).toBe(ABOUT_COPY.metadataDescription);
     expect(isArtistOnlyCompanyDefinition(String(metadata.description))).toBe(
       false
     );

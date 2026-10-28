@@ -231,6 +231,19 @@ describe('AuthShell — Better Auth SSO + email-code contract', () => {
     expect(divider?.textContent).toBe('or use email');
   });
 
+  it('renders the page-surface headline at the quiet Pen scale (glm/auth-focal-polish)', () => {
+    const { container } = render(<AuthShell mode='sign-in' />);
+    const heading = container.querySelector(
+      '[data-auth-shell-identity] h1'
+    ) as HTMLElement | null;
+    expect(heading).not.toBeNull();
+    expect(heading?.textContent).toBe('Log in to Jovie');
+    expect(heading?.className).toContain('text-app');
+    expect(heading?.className).toContain('font-medium');
+    expect(heading?.className).not.toContain('text-xl');
+    expect(heading?.className).not.toContain('font-semibold');
+  });
+
   it('keeps intercepted modal and marketing captures centered without the card', () => {
     const { container } = render(<AuthShell mode='sign-in' compact />);
     const modalCard = container.querySelector('[data-auth-surface-card]');
