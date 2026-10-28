@@ -46,7 +46,7 @@ runs:
       run: pnpm --filter=@jovie/web exec playwright install chromium
 
     - name: Name the runner image when Playwright cannot install
-      if: failure() && steps.runner-prereqs.outputs.playwright_warm != 'true'
+      if: failure()
       shell: bash
       run: |
         os_name="$(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME" || uname -sr)"
