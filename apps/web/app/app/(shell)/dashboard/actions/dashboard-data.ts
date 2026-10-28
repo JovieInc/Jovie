@@ -17,6 +17,7 @@ import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { resolveUserState } from '@/lib/auth/gate';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { CACHE_TAGS, CACHE_TTL } from '@/lib/cache/tags';
+import { isProofBlockingPublication } from '@/lib/claim/claim-verification';
 import { isMissingConnectorSchemaError } from '@/lib/connectors/schema-errors';
 import type { DbOrTransaction } from '@/lib/db';
 import { DB_CONFIG, isRetryableError } from '@/lib/db/client/retry';
@@ -490,7 +491,10 @@ function buildProfileCompletion(
     completion.hasName &&
     completion.hasAvatar &&
     hasText(selectedProfile.username) &&
-    hasMusicPresence;
+    hasMusicPresence &&
+    // A private page waiting for ownership proof is set up, not public.
+    (selectedProfile.isPublic !== false ||
+      isProofBlockingPublication(selectedProfile.settings));
 
   return {
     percentage: completion.percentage,

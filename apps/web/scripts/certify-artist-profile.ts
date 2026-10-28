@@ -1,10 +1,15 @@
 #!/usr/bin/env tsx
-/** Read-only founder certification. Run from repo root with pnpm --filter @jovie/web exec tsx scripts/certify-artist-profile.ts --output <directory> [--baseline <snapshot.json>]. */
+/** Read-only founder certification. Run from repo root with pnpm --filter @jovie/web exec tsx scripts/certify-artist-profile.ts --output <directory> [--baseline <snapshot.json>] [--agent-surfaces]. */
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { JSDOM } from 'jsdom';
+import {
+  discoveryApiSchema,
+  inspectDiscoveryGuide,
+  inspectPublicItem,
+} from '@/lib/canaries/artist-discovery-proof';
 import {
   artistProfileSnapshotSchema,
   compareArtistProfileSnapshots,
@@ -101,6 +106,163 @@ async function deployedCommitSha(
       : null;
   } catch {
     return null;
+  }
+}
+
+/** Opt-in expands this existing certification run, never a new scheduler/cohort. */
+async function certifyDiscovery(
+  profileHtml: string,
+  output: string,
+  id: string,
+  fetcher: typeof fetch,
+  profileReleaseSha: string | null
+) {
+  const profileUrl = TIM_WHITE_PROFILE.publicProfileUrl;
+  const origin = new URL(profileUrl).origin;
+  const handle = new URL(profileUrl).pathname.slice(1);
+  const evidence: {
+    url: string;
+    method: string;
+    status: number | null;
+    sha256: string;
+    file: string;
+  }[] = [];
+  const read = async (url: string, resource?: string) => {
+    // A corrupt catalog may not redirect the collector onto an external host.
+    if (new URL(url).origin !== origin)
+      throw new Error('Off-origin discovery destination');
+    const response = await fetcher(url, {
+      method: resource ? 'POST' : 'GET',
+      ...(resource
+        ? {
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: resource,
+              method: 'resources/read',
+              params: { uri: `artist://${handle}/${resource}` },
+            }),
+          }
+        : {}),
+      signal: AbortSignal.timeout(15_000),
+      cache: 'no-store',
+      redirect: 'manual',
+    });
+    const text = await response.text();
+    const file = `${id}.discovery-${evidence.length}.txt`;
+    evidence.push({
+      url,
+      method: resource ? 'POST' : 'GET',
+      status: response.status,
+      sha256: createHash('sha256').update(text).digest('hex'),
+      file,
+    });
+    await writeFile(join(output, file), text, { flag: 'wx' });
+    if (response.status !== 200)
+      throw new Error(`Discovery HTTP ${response.status}`);
+    return text;
+  };
+  try {
+    const before = JSON.parse(await read(`${origin}/api/health/build-info`));
+    const rawApi = JSON.parse(await read(`${origin}/api/v1/${handle}`));
+    const api = discoveryApiSchema.parse(rawApi);
+    const guide = await read(`${profileUrl}/llms.txt`);
+    const dom = new JSDOM(profileHtml, { url: profileUrl });
+    const guideChecks = inspectDiscoveryGuide({
+      document: dom.window.document,
+      guide,
+      api,
+      profileUrl,
+      artistName: TIM_WHITE_PROFILE.name,
+    });
+    dom.window.close();
+    const mcp: Record<string, unknown> = {};
+    for (const resource of ['bio', 'releases', 'merch']) {
+      const body = JSON.parse(
+        await read(`${origin}/api/mcp/${handle}`, resource)
+      );
+      mcp[resource] = JSON.parse(body.result.contents[0].text);
+    }
+    const bio = mcp.bio as Record<string, unknown>;
+    const mcpMatches =
+      ['username', 'name', 'profileUrl', 'isClaimed', 'isVerified'].every(
+        key => bio[key] === rawApi.artist[key]
+      ) &&
+      ['releases', 'merch'].every(
+        key => JSON.stringify(mcp[key]) === JSON.stringify(rawApi[key])
+      );
+    const items = [];
+    for (const [kind, catalog] of [
+      ['release', api.releases],
+      ['merch', api.merch],
+    ] as const) {
+      for (const item of catalog) {
+        // An item must be a single release segment or an exact product segment.
+        const path = new URL(item.url);
+        const segments = path.pathname
+          .slice(new URL(profileUrl).pathname.length + 1)
+          .split('/');
+        const exactPath =
+          path.origin === origin &&
+          path.pathname.startsWith(`${new URL(profileUrl).pathname}/`) &&
+          !path.search &&
+          !path.hash &&
+          (kind === 'release'
+            ? segments.length === 1 &&
+              !REDIRECT_SINK_ROUTE_KEYS.some(
+                key =>
+                  PROFILE_ROUTE_CONFIG[key].buildPath(handle) === path.pathname
+              )
+            : segments.length === 2 &&
+              segments[0] === 'merch' &&
+              segments[1] === item.id);
+        if (!exactPath) {
+          items.push({
+            url: item.url,
+            passed: false,
+            reason: 'collection_or_unsupported_item_url',
+          });
+          continue;
+        }
+        const html = await read(item.url);
+        const page = new JSDOM(html, { url: item.url });
+        items.push({
+          url: item.url,
+          ...inspectPublicItem(page.window.document, item, kind),
+        });
+        page.window.close();
+      }
+    }
+    const after = JSON.parse(await read(`${origin}/api/health/build-info`));
+    const stableBuild =
+      typeof before.commitSha === 'string' &&
+      /^[a-f0-9]{40}$/.test(before.commitSha) &&
+      before.commitSha === after.commitSha &&
+      before.commitSha === profileReleaseSha &&
+      before.buildId === after.buildId &&
+      before.deploymentId === after.deploymentId;
+    return {
+      evidence,
+      releaseSha: before.commitSha ?? null,
+      stableBuild,
+      guideChecks,
+      mcpMatches,
+      items,
+      failed:
+        !stableBuild ||
+        !guideChecks.identity ||
+        guideChecks.missingLinks.length > 0 ||
+        !guideChecks.latestMatches ||
+        !mcpMatches ||
+        items.some(item => !item.passed),
+    };
+  } catch (error) {
+    return {
+      evidence,
+      failed: true,
+      error:
+        error instanceof Error ? error.message : 'Discovery proof unavailable',
+    };
   }
 }
 
@@ -235,6 +397,10 @@ export async function certifyArtistProfile(
       ))
     );
   }
+  await mkdir(output, { recursive: true });
+  const discovery = args.includes('--agent-surfaces')
+    ? await certifyDiscovery(html, output, id, fetcher, snapshot.releaseSha)
+    : null;
   const baseline = args.includes('--baseline')
     ? JSON.parse(await readFile(resolve(option('--baseline')), 'utf8'))
     : null;
@@ -250,6 +416,7 @@ export async function certifyArtistProfile(
       location: response.headers.get('location'),
     },
     comparison,
+    discovery,
     linkChecks,
     elapsedMs: Date.now() - started,
     publicationApproved: false,
@@ -280,6 +447,7 @@ export async function certifyArtistProfile(
     reportPath: join(output, `${id}.report.json`),
     snapshotPath: join(output, `${id}.snapshot.json`),
     checks: snapshot.checks,
+    discovery,
     comparison,
     brokenInternalLinks: linkChecks.filter(
       check => check.status === 404 || check.status === 410
@@ -290,6 +458,7 @@ export async function certifyArtistProfile(
     exposedDeferredSurfaces: [...deferredSurfaceIds].sort(),
     elapsedMs: report.elapsedMs,
     failed:
+      discovery?.failed === true ||
       snapshot.checks.some(check => check.status !== 'pass') ||
       linkChecks.some(
         check => check.status !== 200 && check.finalStatus !== 200

@@ -12,6 +12,7 @@
     "includes": [
       "**/*",
       "!!.claude",
+      "!.github/actions/vendor/**",
       "!apps/web/drizzle/migrations/**",
       "!**/.context/**",
       "!.agents/skills/gstack/**",
@@ -145,6 +146,20 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["scripts/agent/pen-instance-drift.js"],
+      "javascript": {
+        "globals": [
+          "Get",
+          "Print",
+          "Replace",
+          "Insert",
+          "Move",
+          "Delete",
+          "__penDrift"
+        ]
+      }
+    },
     {
       "includes": [
         "scripts/invariants/copy-leak/config.json",
