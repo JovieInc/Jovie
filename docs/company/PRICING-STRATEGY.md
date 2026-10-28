@@ -59,10 +59,10 @@ the subscription schema nor creates a second SKU. The
 [self-serve PM brief](../product/api-agentic-self-serve.md) owns the account,
 payment, caching, and verification contracts.
 
-The later [API priority lock](../../canon/strategy/theses/2026-09-03-apis-mcps-core-not-first.md)
+The later API priority lock (private thesis `2026-09-03-apis-mcps-core-not-first`, see [strategy canon](../../canon/strategy/README.md))
 keeps API/MCP/CLI access on the existing artist workflow, behind the YouTube
 artist loop in priority. The
-[bounded-subsidy thesis](../../canon/strategy/theses/2026-10-02-sell-outcomes-replaceable-substrate.md)
+bounded-subsidy thesis (private thesis `2026-10-02-sell-outcomes-replaceable-substrate`, see [strategy canon](../../canon/strategy/README.md))
 requires an explicit cost ceiling and exit. API access is a way to deliver the
 artist outcome, not a standalone platform expansion.
 
