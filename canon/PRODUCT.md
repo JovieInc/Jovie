@@ -192,6 +192,74 @@ creator users. JOV-7205 owns implementation and regression evidence; JOV-6506
 owns the native sweep and exact delivered-runtime retest. These are requirements,
 not a claim that the current distributed app satisfies them.
 
+### Jovie and Ovie mirror one shell (founder decision, 2026-10-20)
+
+**EVENT:** Tim White, 2026-10-20: "jovie and ovie same app shell, same nav,
+same sidebar, same presence system, same chat composer and ui. when we improve
+we improve both. just different content/user. but jovie is to run closed loop
+creator career, ovie is to run closed loop company, you can launch creative
+releases on jovie and company release on ovie. they should be mirrors, where
+possible in terms of DS and IA."
+
+- One shared shell owns layout, navigation, sidebar, presence, composer, the
+  living canvas, and the card renderer. It is parameterized by persona and
+  content source. There is no Ovie-only shell; an improvement to a shared owner
+  lands in both apps.
+- The IA mirrors: Home shows what matters, then what is blocked on the user,
+  what is in flight, what is done today, and releases. Jovie fills it with the
+  creator's career loop and creative releases; Ovie fills it with the company
+  loop and company releases (ship and deploy).
+- Ovie's Home is a living canvas: one composer, with generated UI that updates
+  Home sections in place, a restorable history, and layout-stable card swaps.
+  One-click answers execute immediately with a five-second undo. Ovie Home is
+  dashboard-dense on a MacBook Pro.
+
+### Dogfood Jovie with the founder's own careers (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: Ovie is the closed-loop company OS and Jovie is
+the closed-loop creator OS. Tim runs his own music, YouTube, acting/modeling and
+fitness channels from Jovie, so running the company also means dogfooding the
+real product.
+
+- Tim's creator accounts are permanent Jovie dogfood. Product gaps they hit
+  become product issues; there are no private workarounds.
+- Onboarding, chat and Home empty states in both apps use the same shared shell
+  and realtime generated UI, picking the best layout for the moment. The visual
+  reference is the new Shopify admin: full-bleed and editorial.
+
+### Jovie runs the artist's growth loop (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: Jovie drives the same goals for each artist
+that Summer drives for the company. It finds the artist's highest-ROI moves,
+executes the ones the artist approves, and takes as much work off the artist as
+possible.
+
+- Abstract the work, not the decision. The artist approves outcomes; Jovie does
+  the steps. Where no native integration exists, Jovie may use concierge work
+  (a human behind the curtain) or a user-controlled cloud browser session (e.g.
+  Cloudflare Browser Rendering) that the artist logs into themselves.
+- Jovie never stores third-party passwords. Browser sessions are scoped to the
+  artist, revocable, and recorded. Unsupported-site automation follows each
+  site's terms.
+- Every executed move carries the optimization contract above: a metric, a
+  read-out date, and keep/iterate/kill.
+
+### Ovie is one Home (founder decision, 2026-10-21)
+
+**EVENT:** Tim White, 2026-10-21: "Move the shipping dashboard into Ovie, and
+consolidate Ovie into ONE minimal set of screens with all the data he needs and
+NO scrolling. Full screen must look right on a Retina MacBook Pro and a 27\"
+ultrawide."
+
+- Ovie's navigation is Home plus one collapsed Tools group. Home carries the
+  shipping pulse, asks for the founder, in-flight work by stage, done today and
+  stage timings; lists show "+N more" instead of scrolling.
+- Needs You folds into Home's asks. Every other operator screen stays reachable
+  from Tools, the command palette, or a "+N more" drilldown.
+
+Canon boundaries still hold: Ovie is presentation, not an agent; Summer and
+Jovie remain the two agents. JOV-5959 owns the Ovie Home implementation.
+
 ---
 
 ## Anti-Goals
@@ -219,6 +287,8 @@ Do not optimize for:
 
 | Date | Change | Source |
 |---|---|---|
+| 2026-10-21 | Ovie is one no-scroll Home plus a collapsed Tools group. | Tim White |
+| 2026-10-20 | Jovie and Ovie mirror one shell and IA; Ovie Home is a living canvas. | Tim White |
 | 2026-10-15 | Recorded September 3 lock: YouTube artist loop first; APIs/MCPs are a core line on the same contract and workstream. | Tim White / JOV-5891 |
 | 2026-09-26 | "Opinions: outcomes over knobs" rules and capability classification (table-stakes / outcome-deepening / configurability held / taste). | Tim White |
 | 2026-08-28 | Continuous-optimization doctrine, learning hierarchy, safe transfer, and objective hierarchy. | Tim White / JOV-4045 |

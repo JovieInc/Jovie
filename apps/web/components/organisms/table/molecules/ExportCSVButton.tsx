@@ -13,7 +13,13 @@ import {
   TooltipShortcut,
 } from '@jovie/ui';
 import { Download, Loader2 } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import {
+  type MouseEvent,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { APP_CONTROL_BUTTON_CLASS } from '@/components/atoms/AppIconButton';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { cn } from '@/lib/utils';
@@ -34,6 +40,8 @@ export interface ExportCSVButtonProps<T extends object> {
    * Can be async for lazy loading from an API.
    */
   readonly getData: () => T[] | Promise<T[]>;
+  /** Recheck current authority/consent after confirmation for protected exports. */
+  readonly revalidateBeforeDownload?: boolean;
   /**
    * Column configuration for CSV generation.
    * If not provided, all object keys will be used as columns.
@@ -92,6 +100,7 @@ export interface ExportCSVButtonProps<T extends object> {
 
 export function ExportCSVButton<T extends object>({
   getData,
+  revalidateBeforeDownload = false,
   columns,
   filename = 'export',
   disabled = false,
@@ -107,15 +116,31 @@ export function ExportCSVButton<T extends object>({
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [pendingData, setPendingData] = useState<T[] | null>(null);
+  const generation = useRef(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isDialogOpen && isExporting) {
+      dialogRef.current?.focus({ preventScroll: true });
+    }
+  }, [isDialogOpen, isExporting]);
+  useEffect(
+    () => () => {
+      generation.current += 1;
+    },
+    []
+  );
   const { error: showError, success: showSuccess } = useNotifications();
 
   const handleOpenConfirmation = useCallback(async () => {
     if (isExporting || disabled) return;
 
     setIsExporting(true);
+    const requestGeneration = generation.current;
 
     try {
       const data = await Promise.resolve(getData());
+      if (generation.current !== requestGeneration) return;
 
       if (!data || data.length === 0) {
         showError('No data available to export');
@@ -125,46 +150,65 @@ export function ExportCSVButton<T extends object>({
       setPendingData(data);
       setIsDialogOpen(true);
     } catch (err) {
+      if (generation.current !== requestGeneration) return;
       const message =
         err instanceof Error ? err.message : 'Failed to prepare CSV export';
       showError(message);
     } finally {
-      setIsExporting(false);
+      if (generation.current === requestGeneration) setIsExporting(false);
     }
   }, [disabled, getData, isExporting, showError]);
 
-  const handleConfirmExport = useCallback(async () => {
-    if (isExporting || disabled || !pendingData) return;
+  const handleConfirmExport = useCallback(
+    async (event: MouseEvent<HTMLButtonElement>) => {
+      // The controlled dialog owns closing after the authority check completes.
+      event.preventDefault();
+      if (isExporting || disabled || !pendingData) return;
 
-    setIsExporting(true);
+      setIsExporting(true);
+      const requestGeneration = generation.current;
 
-    try {
-      const blob = toCSVBlob(pendingData, { columns });
-      const timestampedFilename = generateTimestampedFilename(filename, 'csv');
+      try {
+        const data = revalidateBeforeDownload
+          ? await Promise.resolve(getData())
+          : pendingData;
+        if (generation.current !== requestGeneration) return;
+        if (!data || data.length === 0) {
+          showError('No data available to export');
+          return;
+        }
+        const blob = toCSVBlob(data, { columns });
+        const timestampedFilename = generateTimestampedFilename(
+          filename,
+          'csv'
+        );
 
-      downloadCSVBlob(blob, timestampedFilename);
-      showSuccess(
-        `Exported ${pendingData.length} rows to ${timestampedFilename}`
-      );
+        downloadCSVBlob(blob, timestampedFilename);
+        showSuccess(`Exported ${data.length} rows to ${timestampedFilename}`);
 
-      setIsDialogOpen(false);
-      setPendingData(null);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Failed to export CSV';
-      showError(message);
-    } finally {
-      setIsExporting(false);
-    }
-  }, [
-    columns,
-    disabled,
-    filename,
-    isExporting,
-    pendingData,
-    showError,
-    showSuccess,
-  ]);
+        setIsDialogOpen(false);
+        setPendingData(null);
+      } catch (err) {
+        if (generation.current !== requestGeneration) return;
+        const message =
+          err instanceof Error ? err.message : 'Failed to export CSV';
+        showError(message);
+      } finally {
+        if (generation.current === requestGeneration) setIsExporting(false);
+      }
+    },
+    [
+      columns,
+      getData,
+      revalidateBeforeDownload,
+      disabled,
+      filename,
+      isExporting,
+      pendingData,
+      showError,
+      showSuccess,
+    ]
+  );
 
   const handleOpenChange = useCallback((open: boolean) => {
     setIsDialogOpen(open);
@@ -173,12 +217,21 @@ export function ExportCSVButton<T extends object>({
     }
   }, []);
 
+  const handleCloseAutoFocus = useCallback((event: Event) => {
+    // Preparation opens this controlled dialog without a Radix trigger.
+    const trigger = triggerRef.current;
+    if (!trigger?.isConnected || trigger.disabled) return;
+    event.preventDefault();
+    trigger.focus({ preventScroll: true });
+  }, []);
+
   const columnCount =
     columns?.length ??
     (pendingData?.[0] ? Object.keys(pendingData[0]).length : 0);
 
   const button = (
     <Button
+      ref={triggerRef}
       variant={variant}
       size={size}
       onClick={handleOpenConfirmation}
@@ -228,7 +281,13 @@ export function ExportCSVButton<T extends object>({
       )}
 
       <AlertDialog open={isDialogOpen} onOpenChange={handleOpenChange}>
-        <AlertDialogContent>
+        <AlertDialogContent
+          ref={dialogRef}
+          onCloseAutoFocus={handleCloseAutoFocus}
+          onEscapeKeyDown={event => {
+            if (isExporting) event.preventDefault();
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm CSV export</AlertDialogTitle>
             <AlertDialogDescription>

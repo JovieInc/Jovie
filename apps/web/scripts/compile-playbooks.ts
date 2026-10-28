@@ -20,6 +20,7 @@ import { join, relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { resolveMonorepoRoot } from '../lib/filesystem-paths';
 import { compilePlaybookToSkill } from '../lib/playbooks/compile';
+import { assertPlaybookRegistrationAllowed } from '../lib/playbooks/growth-governance';
 import { validatePlaybookSource } from '../lib/playbooks/schema';
 
 const PLAYBOOK_FILE_SUFFIX = '.playbook.md';
@@ -83,7 +84,9 @@ export async function compileAllPlaybooks(): Promise<{
       continue;
     }
 
-    const compiledResult = compilePlaybookToSkill(validated.definition);
+    const compiledResult = compilePlaybookToSkill(validated.definition, {
+      source: raw,
+    });
     if (!compiledResult.ok) {
       failures += 1;
       console.error(`✗ ${displayPath} (compile)`);
@@ -100,8 +103,10 @@ export async function compileAllPlaybooks(): Promise<{
       `✓ ${displayPath} → skill ${skill.id}@${skill.version} lifecycle=${skill.lifecycle}`
     );
 
-    if (registerCompiledSkill) {
+    if (shouldRegister) {
       try {
+        assertPlaybookRegistrationAllowed(skill);
+        if (!registerCompiledSkill) continue;
         const reg = await registerCompiledSkill(skill);
         console.log(
           `  registered (${reg.action}) active lifecycle=${reg.lifecycle}`

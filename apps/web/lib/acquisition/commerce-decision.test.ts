@@ -211,7 +211,7 @@ describe('commerce decision projection', () => {
       ...canonicalPrice,
       priceId: 'price_different_fixture',
     };
-    expect(canonicalPrice.amountCents).toBe(19900);
+    expect(canonicalPrice.amountCents).toBe(1200);
     expect(wrongPrice.amountCents).toBe(canonicalPrice.amountCents);
     const snapshot = {
       matrixDigest: hash('matrix-r7'),

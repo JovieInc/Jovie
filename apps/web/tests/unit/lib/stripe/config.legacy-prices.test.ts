@@ -57,7 +57,7 @@ describe('stripe config legacy price mappings', () => {
     expect(getAvailablePricing()).toEqual([
       expect.objectContaining({
         priceId: 'price_visibility',
-        amount: 19900,
+        amount: 1200,
         interval: 'month',
       }),
     ]);
@@ -67,6 +67,30 @@ describe('stripe config legacy price mappings', () => {
       legacy: true,
     });
     expect(getPlanFromPriceId('price_old_max')).toBe('max');
+  });
+
+  it('keeps the retired $199 Artist Presence prices resolving to pro, never checkout', async () => {
+    vi.stubEnv('STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY', 'price_artist_12');
+    const { getActivePriceIds, getPlanFromPriceId, getPriceMappingDetails } =
+      await import('@/lib/stripe/config');
+
+    for (const retired of [
+      'price_1UFL1xAAI1NrDqJS0eIWHFMn',
+      'price_1UEyImASl9B9udHv1kDNLG8C',
+    ]) {
+      expect(getPlanFromPriceId(retired)).toBe('pro');
+      expect(getPriceMappingDetails(retired)).toMatchObject({
+        amount: 19900,
+        legacy: true,
+      });
+      expect(getActivePriceIds()).not.toContain(retired);
+    }
+    expect(getActivePriceIds()).toEqual(['price_artist_12']);
+    expect(getPriceMappingDetails('price_artist_12')).toMatchObject({
+      plan: 'pro',
+      amount: 1200,
+      interval: 'month',
+    });
   });
 
   it('prefers STRIPE_PRICE_FOUNDING_MONTHLY env over hardcoded fallback', async () => {

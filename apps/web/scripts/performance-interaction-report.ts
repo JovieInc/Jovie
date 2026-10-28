@@ -1,5 +1,6 @@
 import {
   getInteractionHotPathById,
+  INTERACTION_HOT_PATHS,
   type InteractionScenarioDefinition,
   type RootCauseBucket,
 } from './performance-interaction-manifest';
@@ -154,28 +155,6 @@ function summarizeScenario(
   scenario: InteractionScenarioDefinition,
   samples: readonly InteractionLatencySample[]
 ): InteractionScenarioSummary {
-  for (const sample of samples) {
-    assertFiniteSampleValue(sample.firstFeedbackMs, 'firstFeedbackMs');
-    if (sample.nextPaintMs !== undefined) {
-      assertFiniteSampleValue(sample.nextPaintMs, 'nextPaintMs');
-    }
-    if (sample.usableStateMs !== undefined) {
-      assertFiniteSampleValue(sample.usableStateMs, 'usableStateMs');
-    }
-    if (sample.dataReadyMs !== undefined) {
-      assertFiniteSampleValue(sample.dataReadyMs, 'dataReadyMs');
-    }
-    if (sample.renderToInteractiveMs !== undefined) {
-      assertFiniteSampleValue(
-        sample.renderToInteractiveMs,
-        'renderToInteractiveMs'
-      );
-    }
-    if (sample.droppedFrameCount !== undefined) {
-      assertFiniteSampleValue(sample.droppedFrameCount, 'droppedFrameCount');
-    }
-  }
-
   const firstFeedbackValues = samples.map(sample => sample.firstFeedbackMs);
   const nextPaintValues = compactNumbers(
     samples.map(sample => sample.nextPaintMs)
@@ -200,10 +179,12 @@ function summarizeScenario(
   const maxDroppedFrameCount = percentile(droppedFrameValues, 100);
   const targetP95Ms =
     scenario.budget.usableStateP95Ms ?? scenario.budget.firstFeedbackP95Ms;
-  const measuredP95 =
-    scenario.budget.usableStateP95Ms === undefined
-      ? p95FirstFeedbackMs
-      : p95UsableStateMs;
+  // Chat targets are strict (<); existing non-chat budgets remain inclusive.
+  const withinTimingBudget = (value: number | null, limit: number) =>
+    value !== null &&
+    (scenario.budget.timingBoundary === 'exclusive'
+      ? value < limit
+      : value <= limit);
   const hasSamples = samples.length > 0;
   const requiredMetricsPresent =
     (scenario.budget.usableStateP95Ms === undefined ||
@@ -218,15 +199,27 @@ function summarizeScenario(
     ? null
     : samples.length >= (scenario.budget.minimumSampleCount ?? 1) &&
       requiredMetricsPresent &&
-      measuredP95 !== null &&
-      measuredP95 <= targetP95Ms &&
+      withinTimingBudget(
+        p95FirstFeedbackMs,
+        scenario.budget.firstFeedbackP95Ms
+      ) &&
+      (scenario.budget.usableStateP95Ms === undefined ||
+        withinTimingBudget(
+          p95UsableStateMs,
+          scenario.budget.usableStateP95Ms
+        )) &&
+      (scenario.budget.dataReadyP95Ms === undefined ||
+        withinTimingBudget(p95DataReadyMs, scenario.budget.dataReadyP95Ms)) &&
       (scenario.budget.firstFeedbackP50Ms === undefined ||
-        (p50FirstFeedbackMs !== null &&
-          p50FirstFeedbackMs <= scenario.budget.firstFeedbackP50Ms)) &&
+        withinTimingBudget(
+          p50FirstFeedbackMs,
+          scenario.budget.firstFeedbackP50Ms
+        )) &&
       (scenario.budget.renderToInteractiveP95Ms === undefined ||
-        (p95RenderToInteractiveMs !== null &&
-          p95RenderToInteractiveMs <=
-            scenario.budget.renderToInteractiveP95Ms)) &&
+        withinTimingBudget(
+          p95RenderToInteractiveMs,
+          scenario.budget.renderToInteractiveP95Ms
+        )) &&
       (scenario.budget.maxDroppedFrames === undefined ||
         (maxDroppedFrameCount !== null &&
           maxDroppedFrameCount <= scenario.budget.maxDroppedFrames));
@@ -301,41 +294,64 @@ function rankSummary(summary: InteractionScenarioSummary) {
   );
 }
 
-function resolveScenariosFromSamples(
-  samples: readonly InteractionLatencySample[]
-) {
-  const scenarioIds = [...new Set(samples.map(sample => sample.scenarioId))];
-  const scenarios: InteractionScenarioDefinition[] = [];
-  const unknownScenarioIds: string[] = [];
-
-  for (const scenarioId of scenarioIds) {
-    const scenario = getInteractionHotPathById(scenarioId);
-
-    if (!scenario) {
-      unknownScenarioIds.push(scenarioId);
-      continue;
+function validateSamples(samples: readonly InteractionLatencySample[]) {
+  const identities = new Set<string>();
+  for (const sample of samples) {
+    if (!getInteractionHotPathById(sample.scenarioId)) {
+      throw new TypeError(
+        `Unknown scenarioId in samples: ${sample.scenarioId}`
+      );
     }
-
-    scenarios.push(scenario);
+    if (!Number.isSafeInteger(sample.runIndex) || sample.runIndex < 0) {
+      throw new TypeError('Expected non-negative safe integer runIndex');
+    }
+    const identity = JSON.stringify([sample.scenarioId, sample.runIndex]);
+    if (identities.has(identity)) {
+      throw new TypeError(`Duplicate sample identity: ${identity}`);
+    }
+    identities.add(identity);
+    assertFiniteSampleValue(sample.firstFeedbackMs, 'firstFeedbackMs');
+    for (const metric of [
+      'nextPaintMs',
+      'usableStateMs',
+      'dataReadyMs',
+      'renderToInteractiveMs',
+      'reactCommitMs',
+    ] as const) {
+      if (sample[metric] !== undefined) {
+        assertFiniteSampleValue(sample[metric], metric);
+      }
+    }
+    for (const metric of [
+      'droppedFrameCount',
+      'longTaskCount',
+      'networkRequestCount',
+      'requestWaterfallCount',
+    ] as const) {
+      const value = sample[metric];
+      if (value !== undefined) {
+        assertFiniteSampleValue(value, metric);
+        if (!Number.isSafeInteger(value)) {
+          throw new TypeError(`Expected safe integer ${metric}`);
+        }
+      }
+    }
   }
-
-  if (unknownScenarioIds.length > 0) {
-    throw new TypeError(
-      `Unknown scenarioId in samples: ${unknownScenarioIds.join(', ')}`
-    );
-  }
-
-  return scenarios;
 }
 
 export function buildInteractionLatencyReport(options: {
   readonly generatedAt?: string;
   readonly metadata?: InteractionRunMetadata;
   readonly samples: readonly InteractionLatencySample[];
+  /** Required scope, chosen before sampling. Defaults to the full manifest. */
   readonly scenarios?: readonly InteractionScenarioDefinition[];
 }): InteractionLatencyReport {
-  const scenarios =
-    options.scenarios ?? resolveScenariosFromSamples(options.samples);
+  validateSamples(options.samples);
+  const scenarios = options.scenarios ?? INTERACTION_HOT_PATHS;
+  const scenarioIds = scenarios.map(scenario => scenario.id);
+  if (new Set(scenarioIds).size !== scenarioIds.length) {
+    throw new TypeError('Duplicate required scenario id');
+  }
 
   const summaries = scenarios
     .map(scenario =>
@@ -349,9 +365,8 @@ export function buildInteractionLatencyReport(options: {
   const measuredSummaries = summaries.filter(
     summary => summary.passed !== null
   );
-  const hasFailure = measuredSummaries.some(
-    summary => summary.passed === false
-  );
+  // A skipped/omitted required scenario cannot disappear behind passing rows.
+  const hasFailure = summaries.some(summary => summary.passed !== true);
 
   return {
     generatedAt: options.generatedAt ?? new Date().toISOString(),

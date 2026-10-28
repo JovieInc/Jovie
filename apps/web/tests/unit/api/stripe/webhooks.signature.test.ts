@@ -4,6 +4,12 @@
 import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 import {
   mockCaptureCriticalError,
   mockConstructEvent,
@@ -62,6 +68,11 @@ describe('/api/stripe/webhooks - Signature Verification', () => {
     expect(response.status).toBe(400);
     const data = await response.json();
     expect(data.error).toBe('Invalid signature');
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'webhook',
+      failureCode: 'invalid_signature',
+      severity: 'unknown',
+    });
     expect(mockCaptureCriticalError).toHaveBeenCalledWith(
       'Invalid Stripe webhook signature',
       expect.any(Error),

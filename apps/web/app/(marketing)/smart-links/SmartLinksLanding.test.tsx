@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SmartLinksLanding } from './SmartLinksLanding';
 
 vi.mock('next/image', () => ({
@@ -9,6 +9,15 @@ vi.mock('next/image', () => ({
 }));
 
 describe('SmartLinksLanding', () => {
+  beforeEach(() => {
+    // Reduced motion snaps the dial instantly, so these flows are deterministic.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+  });
+
   it('presents the real link, the three-step journey, and a choice that follows the next release', () => {
     render(<SmartLinksLanding />);
     expect(
@@ -17,6 +26,19 @@ describe('SmartLinksLanding', () => {
         name: 'Share your work with one link.',
       })
     ).toBeInTheDocument();
+    const demo = screen.getByTestId('smart-links-demo');
+    expect(demo.parentElement).toHaveClass('items-start');
+    expect(demo.parentElement).not.toHaveClass('items-center');
+    const art = screen.getByRole('img', { name: 'Never Say A Word cover art' });
+    expect(art.parentElement).toHaveClass(
+      'relative',
+      'aspect-square',
+      'max-w-62',
+      'overflow-hidden'
+    );
+    expect(screen.getByTestId('action-dial').querySelector('div')).toHaveClass(
+      'min-h-53'
+    );
     expect(
       screen.getByRole('link', { name: 'Open the live example' })
     ).toHaveAttribute('href', '/tim/never-say-a-word?noredirect=1');
@@ -24,7 +46,7 @@ describe('SmartLinksLanding', () => {
       screen.getByRole('heading', { name: 'Choose an app once' })
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select Apple Music' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Apple Music' }));
     expect(
       screen.getByRole('link', {
         name: 'Open live Smart Link with Apple Music',

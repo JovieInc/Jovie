@@ -1,4 +1,5 @@
 import type { TrackSidebarData } from '@/components/organisms/release-sidebar';
+import type { TableRowMode } from '@/components/organisms/table/table.styles';
 import type {
   ProviderKey,
   ReleaseViewModel,
@@ -35,6 +36,11 @@ export interface ReleaseTableProps {
   ) => void;
   readonly columnVisibility?: Record<string, boolean>;
   readonly rowHeight?: number;
+  /**
+   * Named desktop density. When set, it owns row and cell height together
+   * and replaces a raw pixel `rowHeight`.
+   */
+  readonly rowMode?: TableRowMode;
   readonly onFocusedRowChange?: (release: ReleaseViewModel) => void;
   readonly showTracks?: boolean;
   readonly groupByYear?: boolean;

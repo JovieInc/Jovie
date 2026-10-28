@@ -151,6 +151,21 @@ class GithubEnvTest(unittest.TestCase):
                                     capture_output=True, text=True, check=True)
             self.assertEqual(result.stdout, "test-bot-token")
             self.assertEqual(marker.read_text().splitlines()[-3:], ["--guard", "pr", "list"])
+            # Gem 2026-10-20: the status publisher's `gh api gists/<id>` got the installation
+            # token and a 403, freezing the public feed. Gist REST calls keep the host login.
+            marker.unlink()
+            for args in (["api", "gists"], ["api", "gists/07ec4609", "--method", "PATCH"]):
+                result = subprocess.run([str(root / "shim" / "gh"), *args],
+                                        env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}",
+                                             "GH_HOST": "github.com", "GH_TOKEN": "test-caller-token"},
+                                        capture_output=True, text=True, check=True)
+                self.assertEqual(result.stdout, "test-caller-token", args)
+                self.assertFalse(marker.exists())
+            result = subprocess.run([str(root / "shim" / "gh"), "api", "repos/JovieInc/Jovie/gists-like"],
+                                    env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}",
+                                         "GH_HOST": "github.com", "GH_TOKEN": "test-caller-token"},
+                                    capture_output=True, text=True, check=True)
+            self.assertEqual(result.stdout, "test-bot-token")
 
 
 if __name__ == "__main__":

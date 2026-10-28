@@ -29,7 +29,6 @@ import {
   type OpportunityInboxTourDateItem,
 } from '@/lib/connectors/opportunity-inbox-types';
 import type { AvailableDSP } from '@/lib/dsp';
-import { useAppFlag } from '@/lib/flags/client';
 import { useOpportunityInboxMutations } from '@/lib/queries/useOpportunityInboxMutations';
 import { useTourDateReviewMutations } from '@/lib/queries/useTourDateReviewMutations';
 import { cn } from '@/lib/utils';
@@ -117,12 +116,14 @@ export function OpportunityInboxPageClient({
   initialLinks = [],
 }: OpportunityInboxPageClientProps) {
   const [inboxView, setInboxView] = useState(initialView);
+  const [notes, setNotes] = useState('');
+  const [notesOpen, setNotesOpen] = useState(false);
+  const notesButtonRef = useRef<HTMLButtonElement>(null);
   useEffect(() => setInboxView(initialView), [initialView]);
   const runtimeUpdate = useRuntimeUpdate();
   const inboxPageRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
-  const inboxHomeEnabled = useAppFlag('INBOX_HOME');
   const [cards, setCards] = useState(inbox.cards);
   const [isRefreshing, startRefresh] = useTransition();
   const retryFocusRecoveryRef = useRef(false);
@@ -495,7 +496,7 @@ export function OpportunityInboxPageClient({
           data-testid='opportunity-inbox-content'
         >
           <div
-            className='mb-4 flex min-h-7 items-center gap-1'
+            className='mb-4 flex min-h-7 items-center justify-center gap-1'
             role='toolbar'
             aria-label='Inbox View'
           >
@@ -517,17 +518,42 @@ export function OpportunityInboxPageClient({
             </Button>
           </div>
           <div className='mb-4' data-testid='opportunity-inbox-notes'>
-            <label
-              htmlFor='opportunity-inbox-notes-field'
-              className='mb-1 block text-xs font-medium text-secondary-token'
+            {notes.length === 0 ? (
+              <Button
+                ref={notesButtonRef}
+                size='sm'
+                variant='ghost'
+                aria-expanded={notesOpen}
+                aria-controls='opportunity-inbox-notes-panel'
+                onClick={() => setNotesOpen(open => !open)}
+              >
+                {notesOpen ? 'Hide Notes' : 'Add Notes'}
+              </Button>
+            ) : null}
+            <div
+              id='opportunity-inbox-notes-panel'
+              hidden={!notesOpen && !notes}
             >
-              Notes
-            </label>
-            <textarea
-              id='opportunity-inbox-notes-field'
-              rows={3}
-              className='system-b-opportunity-inbox-comment-input'
-            />
+              <label
+                htmlFor='opportunity-inbox-notes-field'
+                className='mb-1 block text-xs font-medium text-secondary-token'
+              >
+                Notes
+              </label>
+              <textarea
+                id='opportunity-inbox-notes-field'
+                rows={3}
+                value={notes}
+                onChange={event => setNotes(event.target.value)}
+                onKeyDown={event => {
+                  if (event.key === 'Escape' && !notes) {
+                    setNotesOpen(false);
+                    notesButtonRef.current?.focus();
+                  }
+                }}
+                className='system-b-opportunity-inbox-comment-input'
+              />
+            </div>
           </div>
           {inboxView === 'done' ? (
             profileId ? (
@@ -625,7 +651,6 @@ export function OpportunityInboxPageClient({
                   pendingFeedbackId={pendingFeedbackId}
                   pendingReviseId={pendingReviseId}
                   pendingNextStepId={pendingNextStepId}
-                  enableStackInteractions={inboxHomeEnabled}
                   stackKeyboardControlRef={stackKeyboardControlRef}
                   onStackActionInitiated={beginStackAction}
                   onStackNextStep={handleStackNextStep}

@@ -10,6 +10,7 @@ import {
   storedZip,
 } from '../../scripts/lib/real-gh-harness.mjs';
 import {
+  annotationSink,
   command,
   comparisonReady,
   evidenceFailureKind,
@@ -18,6 +19,10 @@ import {
   validateLease,
 } from './testflight-release-lease.mjs';
 
+// Mocked rate-limit refusals print `::error::` lines; swallow them so the runner's
+// log parser never turns a fixture into an annotation (2026-10-25).
+annotationSink.emit = () => {};
+
 const SOURCE = 'a'.repeat(40);
 const CONTROLLER_HEAD = 'b'.repeat(40);
 const TRANSPORT = 'c'.repeat(40);
@@ -25,6 +30,11 @@ const MAIN = 'd'.repeat(40);
 const NEXT = 'e'.repeat(40);
 const REPOSITORY = 'JovieInc/Jovie';
 const NOW = Date.parse('2026-10-16T08:00:00Z');
+
+// Shell date and the isolated CLI do not inherit the parent Node clock shim.
+function subprocessNow() {
+  return Number(execFileSync('date', ['+%s'], { encoding: 'utf8' })) * 1000;
+}
 
 function fixture() {
   const policy = JSON.parse(
@@ -431,7 +441,7 @@ printf '%s\\n' '{"ok":true}'
   try {
     const within = command(['gh', 'api', 'repos/JovieInc/Jovie/commits/main'], {
       route: 'repos/JovieInc/Jovie/commits/main',
-      env: envFor(Math.floor(Date.now() / 1000) - 5),
+      env: envFor(Math.floor(subprocessNow() / 1000) - 5),
     });
     assert.equal(within.trim(), '{"ok":true}');
     rmSync(state, { force: true });
@@ -439,12 +449,15 @@ printf '%s\\n' '{"ok":true}'
       () =>
         command(['gh', 'api', 'repos/JovieInc/Jovie/commits/main'], {
           route: 'repos/JovieInc/Jovie/commits/main',
-          env: envFor(Math.floor(Date.now() / 1000) + 10000),
+          env: envFor(Math.floor(subprocessNow() / 1000) + 10000),
         }),
       error => {
         assert.match(error.message, /; rate limited: /);
         assert.match(error.message, /outside the 30s budget/);
         assert.match(error.message, /Not passing/);
+        // Mocked resets are labelled so they cannot pass for a live refusal.
+        assert.match(error.message, /\[fixture\] GitHub rate limit resets at/);
+        assert.match(error.message, /\(resource=core\)/);
         assert.doesNotMatch(error.message, /rewound or diverged/);
         assert.doesNotMatch(
           error.message,
@@ -947,7 +960,7 @@ test('shipped CLI uses real gh and unzip for admission and the final actual Git 
       encoding: 'utf8',
     }).trim();
     const f = fixture();
-    f.jobs[0].completed_at = new Date(Date.now() - 60000).toISOString();
+    f.jobs[0].completed_at = new Date(subprocessNow() - 60000).toISOString();
     const remap = value =>
       JSON.parse(
         JSON.stringify(value)

@@ -37,6 +37,9 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import lifecycle  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 JOB_SCHEMA = "summer.reasoning-job/v1"
 RESULT_SCHEMA = "summer.reasoning-result/v1"
 PRIOR_ART_SCHEMA = "summer.business-prior-art/v1"
@@ -595,7 +598,7 @@ def spend_budget(state: Path, research: bool, day: str | None = None) -> None:
     if research:
         today["research"] = today.get("research", 0) + 1
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({day: today}))  # only today matters; older days drop
+    atomic_write_text(path, json.dumps({day: today}))  # only today matters; older days drop
 
 
 def cooled(state: Path, name: str, now: float | None = None) -> bool:
@@ -608,7 +611,7 @@ def cooled(state: Path, name: str, now: float | None = None) -> bool:
 def cool(state: Path, name: str, seconds: int) -> None:
     path = state / "cooldown" / f"reason-{name}"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(time.time() + seconds))
+    atomic_write_text(path, str(time.time() + seconds))
 
 
 # ---------------------------------------------------------------- output
@@ -852,7 +855,7 @@ def record_failure(state: Path, identifier: str, count: int) -> None:
     except (OSError, ValueError):
         data = {}
     data[identifier] = count
-    path.write_text(json.dumps(data))
+    atomic_write_text(path, json.dumps(data))
 
 
 def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
@@ -887,16 +890,27 @@ def drain(host, lane, config: dict | None = None, run=lifecycle.run) -> dict:
                 if linear.state_of(issue["id"]) != "Todo":
                     attempted.add(issue["identifier"])
                     continue  # another host took it; a cached queue must not spin on it
-                linear.move(issue["id"], "In Progress")
+                # The run lease is this process's live ownership of the started issue.
+                lease = _ownership().acquire_run_lease(host.state, issue["id"], issue["identifier"], "reason")
+                linear.move(issue["id"], "In Progress", owner="reason-run-lease")
             finally:
                 claim.release()
             attempted.add(issue["identifier"])  # a retried job waits for the next drain
-            record = one_job(linear, issue, config, host.state, run=run)
+            try:
+                record = one_job(linear, issue, config, host.state, run=run)
+            finally:
+                if lease is not None:
+                    lease.close()
             done.append({"job": issue["identifier"], "confidence": record["confidence"]})
     except lane.LinearRateLimited as error:
         return {"status": "linear-rate-limited", "resetAt": error.reset_at, "done": done}
     finally:
         lock.release()
+
+
+def _ownership():
+    import ownership  # sibling module of the release; imported late for fixture lanes
+    return ownership
 
 
 def tick(host, lane, linear_factory, config: dict | None = None, spawn=subprocess.Popen) -> dict:
@@ -937,8 +951,13 @@ def guarded_main(argv: list[str] | None = None) -> int:
     team, number = args.identifier.upper().split("-")
     node = linear.gql('query($t:String!,$n:Float!){issues(first:1,filter:{team:{key:{eq:$t}},number:{eq:$n}})'
                       '{nodes{id identifier title description}}}', {"t": team, "n": float(number)})["issues"]["nodes"][0]
-    linear.move(node["id"], "In Progress")
-    print(json.dumps(one_job(linear, node, config, host.state), indent=1))
+    lease = _ownership().acquire_run_lease(host.state, node["id"], node["identifier"], "reason")
+    linear.move(node["id"], "In Progress", owner="reason-run-lease")
+    try:
+        print(json.dumps(one_job(linear, node, config, host.state), indent=1))
+    finally:
+        if lease is not None:
+            lease.close()
     return 0
 
 

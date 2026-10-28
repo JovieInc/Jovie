@@ -118,7 +118,7 @@ describe('ci-harness manifest', () => {
     const nonGates = (manifest.jobs ?? []).filter(job => !job.mergeGate);
     expect(nonGates.map(job => job.name)).toEqual([
       'Component Ship Gate (via ci-fast structural)',
-      'UI Story Coverage Audit (shadow)',
+      'UI Story Coverage Audit',
       'Lighthouse (public routes manual)',
       'Lighthouse (admin manual)',
       'Lighthouse (chat manual)',
@@ -393,7 +393,7 @@ describe('ci-harness manifest', () => {
     expect(sentryGate).not.toContain(
       'uses: ./.github/workflows/sentry-error-gate.yml'
     );
-    expect(sentryGate).toContain('runs-on: ubuntu-latest');
+    expect(sentryGate).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(sentryGate).toContain('name: Production – jovie');
     expect(sentryGate).toContain('uses: ./.github/actions/sentry-error-gate');
     expect(sentryGate).toContain(
@@ -602,7 +602,7 @@ describe('ci-harness manifest', () => {
     );
     const unitTests = extractWorkflowJobBlock(workflow, 'ci-unit-tests');
 
-    expect(buildLayout).toContain('runs-on: ubuntu-latest');
+    expect(buildLayout).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(buildLayout).toContain('Build exact combined head');
     expect(buildLayout).toContain('Run deterministic layout behavior guard');
     expect(buildLayout).not.toContain('actions/upload-artifact');

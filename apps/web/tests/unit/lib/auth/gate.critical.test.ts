@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const mockRevenueFailure = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/observability/revenue-spine', () => ({
+  captureRevenueSpineFailure: mockRevenueFailure,
+}));
+
 /**
  * Better Auth critical gate coverage.
  * Replaces the Clerk-era suite: identity comes from auth.api.getSession /
@@ -494,17 +499,38 @@ describe('@critical gate.ts (Better Auth)', () => {
     });
   });
 
+  it('reports blocked returning access when its database read fails', async () => {
+    mockGetSession.mockResolvedValue({
+      user: { id: 'ba_live', email: 'live@example.com' },
+      session: { id: 'sess_live' },
+    });
+    const error = new Error('database unavailable');
+    mockDbSelect.mockReturnValue(chainLimitRejecting(error));
+    await expect(resolveUserState()).rejects.toBe(error);
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'returning_access',
+      severity: 'blocked',
+      userId: undefined,
+      error,
+    });
+  });
+
   it('still fails closed when waitlist gate lookup throws outside E2E fallback', async () => {
     mockGetSession.mockResolvedValue({
       user: { id: 'ba_live', email: 'live@example.com' },
       session: { id: 'sess_live' },
     });
-    mockIsWaitlistGateEnabled.mockRejectedValue(
-      new Error('database unavailable')
-    );
+    const error = new Error('database unavailable');
+    mockIsWaitlistGateEnabled.mockRejectedValue(error);
     mockDbSelect.mockReturnValue(chainLimit([activeDbUser()]));
 
     await expect(resolveUserState()).rejects.toThrow('database unavailable');
+    expect(mockRevenueFailure).toHaveBeenCalledExactlyOnceWith({
+      stage: 'returning_access',
+      severity: 'blocked',
+      userId: undefined,
+      error,
+    });
   });
 
   it('creates a DB user when waitlist gate is disabled and no waitlist entry exists', async () => {

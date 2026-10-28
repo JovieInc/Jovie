@@ -18,9 +18,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import {
-  assertCommitDescendantCompare,
-  assertMainlineAncestorCompare,
-  assertStagingVersionTransition,
   expectedDesktopAssetNames,
   fetchRecoverableProductionDraft,
   fetchRecoverableStagingDraft,
@@ -47,10 +44,6 @@ const { notarizeReleaseDmg } = desktopRequire(
 );
 const desktopProductionBuilder = readFileSync(
   new URL('../apps/desktop/electron-builder.yml', import.meta.url),
-  'utf8'
-);
-const desktopStagingBuilder = readFileSync(
-  new URL('../apps/desktop/electron-builder.staging.yml', import.meta.url),
   'utf8'
 );
 const desktopWorkflow = readFileSync(
@@ -1491,6 +1484,10 @@ fi
     new URL('../.github/scripts/resolve-main-sha.sh', import.meta.url),
     join(root, '.github/scripts/resolve-main-sha.sh')
   );
+  await copyFile(
+    new URL('../.github/scripts/desktop-quota-defer-exit.sh', import.meta.url),
+    join(root, '.github/scripts/desktop-quota-defer-exit.sh')
+  );
   await writeFile(
     join(mockBin, 'git'),
     `#!/usr/bin/env bash
@@ -1565,7 +1562,10 @@ globalThis.setTimeout = (callback, ms) => {
   await published();
   assert.equal((await readFile(join(root, 'attempts'), 'utf8')).trim(), '2');
   const wait = Number((await readFile(join(root, 'sleeps'), 'utf8')).trim());
-  assert.ok(wait >= 90_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
+  // The mock stamps the reset with `date +%s` (whole seconds) and the
+  // publisher waits reset + 1s from a later Date.now(), so a slow runner
+  // that crosses a second boundary lands just under 90s (seen: 89_999).
+  assert.ok(wait >= 85_000 && wait <= 91_000, `Unexpected wait: ${wait}`);
   for (const overrides of [
     { MOCK_FAIL_ENDPOINT: 'compare/', MOCK_RESET_SECONDS: '3600' },
     { MOCK_FAIL_ENDPOINT: 'compare/', MOCK_FAILURES: '4' },
@@ -1753,91 +1753,6 @@ test('desktop authorizer accepts an exact successful recovered production marker
     /\.recoveredFromControllerRun/,
     /\.recoveredFromControllerAttempt/,
   ]);
-});
-
-test('scheduled staging defers while exact push CI is still running', async t => {
-  const root = await mkdtemp(join(tmpdir(), 'jovie-staging-ci-defer-'));
-  t.after(() => rm(root, { force: true, recursive: true }));
-  const repository = 'JovieInc/Jovie';
-  const releaseSha = 'a'.repeat(40);
-  const workflowId = 707;
-
-  const mockBin = join(root, 'bin');
-  await mkdir(mockBin);
-  const mockGh = join(mockBin, 'gh');
-  await writeFile(
-    mockGh,
-    `#!/usr/bin/env bash
-set -euo pipefail
-endpoint="\${!#}"
-case "$endpoint" in
-  *"actions/workflows/ci.yml") printf '%s' "$MOCK_CI_WORKFLOW_JSON" ;;
-  *"actions/workflows/"*"/runs"*) printf '%s' "$MOCK_CI_RUNS_JSON" ;;
-  *) printf 'unexpected gh endpoint: %s\\n' "$endpoint" >&2; exit 64 ;;
-esac
-`
-  );
-  await chmod(mockGh, 0o755);
-
-  const proof = shellStepBody(
-    desktopWorkflow,
-    'Cross-prove exact production evidence'
-  );
-  const stagingStart = proof.indexOf('if [ "$environment" = "staging" ]; then');
-  const stagingEnd = proof.indexOf('prove_existing_production_marker() {');
-  assert.ok(
-    stagingStart >= 0 && stagingEnd > stagingStart,
-    'missing staging exact-CI gate block'
-  );
-  const stagingGate = `set -euo pipefail\n${proof.slice(stagingStart, stagingEnd)}\necho fell-through\n`;
-
-  const ciRun = overrides => ({
-    head_sha: releaseSha,
-    head_branch: 'main',
-    head_repository: { full_name: repository },
-    event: 'push',
-    path: '.github/workflows/ci.yml',
-    ...overrides,
-  });
-  const run = runsJson =>
-    spawnSync('bash', ['-c', stagingGate], {
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        GITHUB_OUTPUT: join(root, 'output.txt'),
-        MOCK_CI_RUNS_JSON: JSON.stringify({ workflow_runs: runsJson }),
-        MOCK_CI_WORKFLOW_JSON: JSON.stringify({
-          id: workflowId,
-          name: 'CI',
-          path: '.github/workflows/ci.yml',
-        }),
-        PATH: `${mockBin}:${process.env.PATH}`,
-        REPOSITORY: repository,
-        environment: 'staging',
-        release_sha: releaseSha,
-      },
-    });
-
-  const inFlight = run([ciRun({ status: 'in_progress' })]);
-  assert.equal(inFlight.status, 0, inFlight.stderr);
-  assert.match(inFlight.stdout, /still running; deferring staging publication/);
-  assert.doesNotMatch(inFlight.stdout, /fell-through/);
-
-  const queued = run([ciRun({ status: 'queued' })]);
-  assert.equal(queued.status, 0, queued.stderr);
-  assert.match(queued.stdout, /still running; deferring staging publication/);
-
-  const green = run([ciRun({ status: 'completed', conclusion: 'success' })]);
-  assert.equal(green.status, 0, green.stderr);
-  const authorized = await readFile(join(root, 'output.txt'), 'utf8');
-  assert.match(authorized, /^authorized=true$/m);
-
-  const failed = run([ciRun({ status: 'completed', conclusion: 'failure' })]);
-  assert.equal(failed.status, 1);
-  assert.match(
-    failed.stdout,
-    /lacks an exact successful CI run for staging publication/
-  );
 });
 
 test('desktop dedup cross-proves an actual-publish-only marker', () => {
@@ -2032,6 +1947,11 @@ esac
                     status: 'completed',
                     conclusion: 'success',
                   },
+                  {
+                    name: 'Capture production publisher identity',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
                 ],
               },
             ],
@@ -2149,16 +2069,6 @@ test('desktop reconciliation continues to baseline proof and fails closed withou
     },
   });
   assert.equal(forced, '');
-  const staging = execFileSync('bash', ['-c', gateScript], {
-    encoding: 'utf8',
-    env: {
-      ...process.env,
-      EVENT_NAME: 'workflow_dispatch',
-      MANUAL_FORCE_REBUILD: 'false',
-      environment: 'staging',
-    },
-  });
-  assert.equal(staging, '');
   const workflowRun = execFileSync('bash', ['-c', gateScript], {
     encoding: 'utf8',
     env: {
@@ -2377,11 +2287,7 @@ test('automatic desktop publishing stamps production-impacting source before rel
   assert.doesNotMatch(stamp, /gh pr edit [^\n]*--add-label "merge-queue"/);
 });
 
-test('desktop staging publishes an exact signed prerelease and production stays separately proven', () => {
-  const authorize = step(
-    job(desktopWorkflow, 'authorize-release'),
-    'Cross-prove exact production evidence'
-  );
+test('production desktop publication remains independently proven', () => {
   const build = job(desktopWorkflow, 'build');
   const productionPackage = step(build, 'Package production desktop app');
   const productionVerify = step(
@@ -2389,41 +2295,20 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     'Verify production desktop artifact set'
   );
   const publish = step(build, 'Publish production desktop release');
-  const stagingPackage = step(build, 'Package staging desktop app');
-  const stagingPublish = step(build, 'Publish staging desktop prerelease');
-  const stagingVerify = step(build, 'Verify staging desktop artifact set');
-  const stagingUpload = step(build, 'Upload staging desktop package');
   const marker = job(desktopWorkflow, 'record-production-publish');
 
-  assertPatterns(authorize, [
-    /actions\/workflows\/ci\.yml/,
-    /\.name == "CI"/,
-    /\.path == "\.github\/workflows\/ci\.yml"/,
-    /\.head_sha == \$sha/,
-    /\.conclusion == "success"/,
-  ]);
   assertPatterns(build, [
     /needs: \[authorize-release\]/,
     /ref: \$\{\{ needs\.authorize-release\.outputs\.release_sha \}\}/,
-    /package:staging/,
-    /JOVIE_RELEASE_DMG: 'true'/,
     /package:production/,
-    /sync-version\.mjs[\s\S]*--staging-version/,
-    /Validate rolling staging prerelease/,
-    /Require staging signing and notarization credentials/,
-    /JOVIE_MAC_SIGNING_IDENTITY=/,
+    /JOVIE_RELEASE_DMG: 'true'/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /dist\/latest-mac\.yml/,
-    /dist\/staging-mac\.yml/,
   ]);
   assertPatterns(publish, [
     /\.github\/scripts\/resolve-main-sha\.sh/,
     /desktop-release-assets\.mjs upload-and-publish/,
     /--dist "apps\/desktop\/dist"/,
-  ]);
-  assertPatterns(stagingPackage, [
-    /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
-    /JOVIE_RELEASE_DMG: 'true'/,
   ]);
   assertPatterns(productionPackage, [
     /JOVIE_DESKTOP_SOURCE_REVISION: \$\{\{ env\.RELEASE_SHA \}\}/,
@@ -2431,7 +2316,7 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /package:production/,
   ]);
   assertPatterns(productionVerify, [
-    /if: env\.ENVIRONMENT == 'production'/,
+    /if:.*env\.ENVIRONMENT == 'production'/,
     /codesign --verify --deep --strict "\$production_app"/,
     /spctl --assess --type execute --verbose=2 "\$production_app"/,
     /xcrun stapler validate "\$production_app"/,
@@ -2439,16 +2324,6 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /xcrun stapler validate "\$production_dmg"/,
     /spctl --assess --type open --context context:primary-signature/,
   ]);
-  assertPatterns(stagingUpload, [
-    /if: env\.ENVIRONMENT == 'staging'/,
-    /desktop-staging-/,
-    /staging-mac\.yml/,
-    /retention-days: 7/,
-  ]);
-  assert.match(
-    desktopStagingBuilder,
-    /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
-  );
   assert.match(
     desktopProductionBuilder,
     /^artifactBuildCompleted: scripts\/notarize-release-dmg\.cjs$/m
@@ -2457,29 +2332,6 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     build,
     /- name: Notarize and staple staging desktop image/
   );
-  assertPatterns(stagingPublish, [
-    /compare\/\$RELEASE_SHA\.\.\.\$current_main_sha/,
-    /\.merge_base_commit\.sha == \$release/,
-    /\.commits[\s\S]*\.\[-1\]\.sha == \$current/,
-    /\.behind_by == 0/,
-    /desktop-release-assets\.mjs upload-and-publish/,
-    /--environment staging/,
-    /--version="\$\{\{ steps\.staging-version\.outputs\.version \}\}"/,
-  ]);
-  assert.doesNotMatch(stagingPublish, /--version "/);
-  assertPatterns(stagingVerify, [
-    /codesign --verify --deep --strict/,
-    /spctl --assess --type execute/,
-    /xcrun stapler validate/,
-    /build-identity\.json/,
-    /record\.sourceRevision === sha/,
-    /--print-build-identity/,
-    /app-update\.yml/,
-    /provider:\[\[:space:\]\]\*generic/,
-    /releases\/download\/desktop-staging/,
-    /channel:\[\[:space:\]\]\*staging/,
-  ]);
-  assert.doesNotMatch(stagingUpload, /desktop-production-published|GH_TOKEN/);
   assert.ok(
     publish.indexOf('resolve-main-sha.sh') <
       publish.indexOf('desktop-release-assets.mjs upload-and-publish')
@@ -2496,13 +2348,9 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     build.indexOf('- name: Verify production desktop artifact set') <
       build.indexOf('- name: Publish production desktop release')
   );
-  assert.ok(
-    build.indexOf('Validate rolling staging prerelease') <
-      build.indexOf('Package staging desktop app')
-  );
   assert.doesNotMatch(build, /Upload production desktop publish marker/);
   assertPatterns(marker, [
-    /needs: \[authorize-release, build\]/,
+    /needs: \[authorize-release, build, wait-for-deferred-desktop-quota, rebuild-deferred-desktop\]/,
     /runs-on: ubuntu-latest/,
     /actions: read/,
     /contents: read/,
@@ -2524,6 +2372,149 @@ test('desktop staging publishes an exact signed prerelease and production stays 
     /electron-builder publish|--publish always/
   );
   assert.match(desktopReleaseAssets, /releases\?per_page=100/);
+});
+
+test('desktop installation quota defer is visible and retried once', async t => {
+  const build = job(desktopWorkflow, 'build');
+  const retry = job(desktopWorkflow, 'rebuild-deferred-desktop');
+  const waiter = job(desktopWorkflow, 'wait-for-deferred-desktop-quota');
+  const marker = job(desktopWorkflow, 'record-production-publish');
+  const stepsOf = source => {
+    const start = source.indexOf('\n    steps:\n');
+    assert.ok(start >= 0);
+    return source.slice(start);
+  };
+  assert.equal(stepsOf(build), stepsOf(retry));
+  assert.match(build, /needs: \[authorize-release\]\n/);
+  assert.doesNotMatch(build, /DESKTOP_QUOTA_RETRY/);
+  assert.match(retry, /DESKTOP_QUOTA_RETRY: '1'/);
+  assert.match(
+    retry,
+    /needs: \[authorize-release, wait-for-deferred-desktop-quota\]/
+  );
+  assert.match(waiter, /quota_deferred == 'true'/);
+  assert.match(waiter, /wait_for" -gt 3900/);
+  assert.match(waiter, /outside the 3900s retry cap/);
+  assert.doesNotMatch(waiter, /gh api|actions: write/);
+  assert.match(marker, /always\(\)/);
+  assert.match(marker, /quota_deferred != 'true'/);
+  assert.equal(RELEASE_ASSET_READ_ATTEMPTS, 4);
+  assert.equal(RELEASE_ASSET_READ_MAX_WAIT_MS, 600_000);
+  assert.match(build, /--max-wait-seconds 600 --attempts 4/);
+  assert.match(build, /GH_API_HOLD_BUDGET_SECONDS: '600'/);
+  for (const stepName of [
+    'Prepare private production draft',
+    'Publish production desktop release',
+  ]) {
+    assert.match(
+      step(build, stepName),
+      /desktop-quota-defer-exit\.sh "\$status"/
+    );
+  }
+  assert.match(
+    step(build, 'Capture production publisher identity'),
+    /quota_deferred != 'true'/
+  );
+
+  const root = await mkdtemp(join(tmpdir(), 'jovie-desktop-quota-exit-'));
+  t.after(() => rm(root, { force: true, recursive: true }));
+  const script = new URL(
+    '../.github/scripts/desktop-quota-defer-exit.sh',
+    import.meta.url
+  );
+  const runExit = (status, env = {}) =>
+    spawnSync('bash', [script.pathname, String(status)], {
+      cwd: root,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_OUTPUT: join(root, 'output.txt'),
+        RELEASE_SHA: 'a'.repeat(40),
+        RUNNER_TEMP: root,
+        ...env,
+      },
+    });
+  await writeFile(join(root, 'output.txt'), '');
+  const passed = runExit(0);
+  assert.equal(passed.status, 0, passed.stderr);
+  assert.equal(await readFile(join(root, 'output.txt'), 'utf8'), '');
+
+  await writeFile(join(root, 'desktop-publish-quota-defer'), '1700003600\n');
+  const deferred = runExit(75);
+  assert.equal(deferred.status, 0, deferred.stderr);
+  assert.match(
+    await readFile(join(root, 'output.txt'), 'utf8'),
+    /quota_deferred=true\nquota_reset_epoch=1700003600\n/
+  );
+
+  const missingSentinel = runExit(75, { RUNNER_TEMP: join(root, 'absent') });
+  assert.equal(missingSentinel.status, 75);
+  assert.match(
+    missingSentinel.stderr,
+    /without an installation-quota defer sentinel/
+  );
+
+  const retried = runExit(75, { DESKTOP_QUOTA_RETRY: '1' });
+  assert.equal(retried.status, 75);
+  assert.match(retried.stderr, /after the quota retry\. Not passing/);
+
+  const waiterRoot = await mkdtemp(join(tmpdir(), 'jovie-desktop-quota-wait-'));
+  t.after(() => rm(waiterRoot, { force: true, recursive: true }));
+  const mockBin = join(waiterRoot, 'bin');
+  await mkdir(mockBin);
+  const sleepLog = join(waiterRoot, 'sleep.log');
+  // Exercise the workflow with the common GNU/BSD date interface only.
+  await writeFile(
+    join(mockBin, 'date'),
+    `#!/usr/bin/env bash
+if [ "$#" -ne 1 ] || [ "$1" != '+%s' ]; then
+  echo "date: unsupported option (GNU-only date formatting is unavailable)" >&2
+  exit 1
+fi
+node -e 'console.log(Math.floor(Date.now() / 1000))'
+`,
+    { mode: 0o755 }
+  );
+  await writeFile(
+    join(mockBin, 'sleep'),
+    `#!/usr/bin/env bash
+printf '%s\\n' "$1" > "${sleepLog}"
+`,
+    { mode: 0o755 }
+  );
+  const waiterBody = shellStepBody(
+    desktopWorkflow,
+    'Sleep until the known installation reset'
+  );
+  const releaseSha = 'b'.repeat(40);
+  const runWaiter = resetEpoch =>
+    spawnSync('bash', ['-c', waiterBody], {
+      cwd: waiterRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        GITHUB_STEP_SUMMARY: join(waiterRoot, 'summary.md'),
+        PATH: `${mockBin}:${process.env.PATH}`,
+        QUOTA_RESET_EPOCH: String(resetEpoch),
+        RELEASE_SHA: releaseSha,
+      },
+    });
+  const now = Math.floor(Date.now() / 1000);
+  const held = runWaiter(now + 30);
+  assert.equal(held.status, 0, held.stderr);
+  assert.match(
+    held.stdout,
+    new RegExp(
+      `Reattempting desktop publication of ${releaseSha} after the installation quota reset at ${new Date((now + 30) * 1000).toISOString().replace(/\.\d{3}Z$/, 'Z')}`
+    )
+  );
+  const slept = Number((await readFile(sleepLog, 'utf8')).trim());
+  assert.ok(slept >= 30 && slept <= 40, `Unexpected waiter sleep: ${slept}`);
+  await rm(sleepLog);
+  const tooFar = runWaiter(now + 4000);
+  assert.notEqual(tooFar.status, 0);
+  assert.match(tooFar.stderr, /outside the 3900s retry cap/);
+  await assert.rejects(readFile(sleepLog), { code: 'ENOENT' });
 });
 
 test('production publish proof separates the released generation from its workflow transport', async t => {
@@ -2586,6 +2577,30 @@ esac
                     status: 'completed',
                     conclusion: 'success',
                   },
+                  {
+                    name: 'Capture production publisher identity',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
+                ],
+              },
+              {
+                id: publisherJobId + 1,
+                name: 'Publish production desktop release',
+                head_sha: workflowSha,
+                status: 'completed',
+                conclusion: 'success',
+                steps: [
+                  {
+                    name: 'Publish production desktop release',
+                    status: 'completed',
+                    conclusion: 'success',
+                  },
+                  {
+                    name: 'Capture production publisher identity',
+                    status: 'completed',
+                    conclusion: 'skipped',
+                  },
                 ],
               },
             ],
@@ -2636,101 +2651,6 @@ esac
   );
 });
 
-test('scheduled staging reconciliation publishes only unpublished desktop changes', async () => {
-  assert.match(desktopWorkflow, /schedule:\n\s+- cron: '17 10 \* \* \*'/);
-  const selector = shellStepBody(
-    job(desktopWorkflow, 'authorize-release'),
-    'Select desktop-relevant production generation'
-  );
-  const root = await mkdtemp(join(tmpdir(), 'jovie-staging-reconcile-'));
-  const git = (...args) =>
-    execFileSync('git', args, {
-      cwd: root,
-      encoding: 'utf8',
-      env: {
-        ...process.env,
-        GIT_CONFIG_COUNT: '2',
-        GIT_CONFIG_KEY_0: 'maintenance.auto',
-        GIT_CONFIG_VALUE_0: 'false',
-        GIT_CONFIG_KEY_1: 'gc.auto',
-        GIT_CONFIG_VALUE_1: '0',
-      },
-    }).trim();
-  try {
-    git('init', '-q');
-    git('config', 'user.email', 'test@jovie.test');
-    git('config', 'user.name', 'Test');
-    await mkdir(join(root, 'apps/desktop/src'), { recursive: true });
-    await writeFile(
-      join(root, 'apps/desktop/src/main.ts'),
-      'export const shell = 1;\n'
-    );
-    git('add', '.');
-    git('commit', '-qm', 'baseline');
-    const baseline = git('rev-parse', 'HEAD');
-
-    await writeFile(join(root, 'README.md'), 'unrelated change\n');
-    git('add', '.');
-    git('commit', '-qm', 'docs');
-    const docsOnly = git('rev-parse', 'HEAD');
-
-    await writeFile(
-      join(root, 'apps/desktop/src/main.ts'),
-      'export const shell = 2;\n'
-    );
-    git('add', '.');
-    git('commit', '-qm', 'desktop repair');
-    const desktopChange = git('rev-parse', 'HEAD');
-
-    const runSelector = async (source, releasedSource = baseline) => {
-      const output = join(root, 'selection-output');
-      await writeFile(output, '');
-      const result = spawnSync('bash', ['-c', selector], {
-        cwd: root,
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          AUTHORIZED: 'true',
-          ALREADY_RELEASED: 'false',
-          MANUAL: 'false',
-          STAGING_AUTO: 'true',
-          RELEASE_SHA: source,
-          BASELINE_SHA: '',
-          GITHUB_OUTPUT: output,
-          REPOSITORY: 'JovieInc/Jovie',
-          PATH: `${root}/bin:${process.env.PATH}`,
-          STAGING_RELEASE_JSON: JSON.stringify({
-            tag_name: 'desktop-staging',
-            target_commitish: releasedSource,
-          }),
-        },
-      });
-      return { ...result, outputs: await readFile(output, 'utf8') };
-    };
-    await mkdir(join(root, 'bin'));
-    await writeFile(
-      join(root, 'bin/gh'),
-      '#!/bin/sh\n[ "$1" = api ] && [ "$2" = repos/JovieInc/Jovie/releases/tags/desktop-staging ] || exit 3\nprintf %s "$STAGING_RELEASE_JSON"\n',
-      { mode: 0o755 }
-    );
-
-    const unchanged = await runSelector(baseline);
-    assert.equal(unchanged.status, 0);
-    assert.doesNotMatch(unchanged.outputs, /^should_release=true$/m);
-    const unrelated = await runSelector(docsOnly);
-    assert.equal(unrelated.status, 0);
-    assert.doesNotMatch(unrelated.outputs, /^should_release=true$/m);
-    const changed = await runSelector(desktopChange);
-    assert.equal(changed.status, 0);
-    assert.match(changed.outputs, /^should_release=true$/m);
-    const untrusted = await runSelector(baseline, desktopChange);
-    assert.equal(untrusted.status, 1);
-    assert.doesNotMatch(untrusted.outputs, /^should_release=true$/m);
-  } finally {
-    await rm(root, { recursive: true, force: true });
-  }
-});
-
 test('desktop release proof rejects zero-asset and mismatched-digest releases', () => {
   const valid = desktopReleaseFixture();
   assert.doesNotThrow(() => validateReleaseAssets({ ...valid, draft: true }));
@@ -2753,155 +2673,6 @@ test('desktop release proof rejects zero-asset and mismatched-digest releases', 
   assert.throws(
     () => validateReleaseAssets({ ...wrongTarget, draft: true }),
     /authorized commit/
-  );
-});
-
-test('staging release proof binds prerelease assets and channel metadata', () => {
-  const valid = desktopReleaseFixture('staging');
-  assert.doesNotThrow(() => validateReleaseAssets({ ...valid, draft: true }));
-
-  const stableEnvelope = desktopReleaseFixture('staging');
-  stableEnvelope.release.prerelease = false;
-  assert.throws(
-    () => validateReleaseAssets({ ...stableEnvelope, draft: true }),
-    /prerelease state/
-  );
-
-  const wrongChannel = desktopReleaseFixture('staging');
-  const manifest = wrongChannel.buffers.get('staging-mac.yml');
-  wrongChannel.buffers.delete('staging-mac.yml');
-  wrongChannel.buffers.set('latest-mac.yml', manifest);
-  assert.throws(
-    () => validateReleaseAssets({ ...wrongChannel, draft: true }),
-    /Artifact bytes are missing for staging-mac\.yml/
-  );
-});
-
-test('staging release versions advance beyond installed and current-feed versions', () => {
-  const valid = {
-    installedVersion: '26.8.1',
-    version: '26.8.2-staging.17823456790.1',
-  };
-  assert.doesNotThrow(() => assertStagingVersionTransition(valid));
-  assert.doesNotThrow(() =>
-    assertStagingVersionTransition({
-      ...valid,
-      currentFeedVersion: '26.8.2-staging.17823456789.1',
-    })
-  );
-  for (const { input, message } of [
-    {
-      input: {
-        ...valid,
-        currentFeedVersion: '26.8.2-staging.17823456790.1',
-        version: '26.8.2-staging.17823456789.1',
-      },
-      message: /not newer than current feed/,
-    },
-    {
-      input: { ...valid, version: '26.8.1-staging.17823456791.1' },
-      message: /next-patch/,
-    },
-    {
-      input: { ...valid, version: '26.8.1+staging.17823456791.1' },
-      message: /valid prerelease/,
-    },
-  ]) {
-    assert.throws(() => assertStagingVersionTransition(input), message);
-  }
-});
-
-test('staging mainline proof permits main advancement but rejects stale or diverged source', () => {
-  const releaseSha = 'a'.repeat(40);
-  const currentSha = 'b'.repeat(40);
-  const mainline = {
-    status: 'ahead',
-    ahead_by: 4,
-    behind_by: 0,
-    base_commit: { sha: releaseSha },
-    commits: [{ sha: 'c'.repeat(40) }, { sha: currentSha }],
-    merge_base_commit: { sha: releaseSha },
-  };
-
-  assert.doesNotThrow(() =>
-    assertMainlineAncestorCompare({
-      comparison: mainline,
-      currentMainSha: currentSha,
-      releaseSha,
-    })
-  );
-  assert.doesNotThrow(() =>
-    assertMainlineAncestorCompare({
-      comparison: {
-        ...mainline,
-        status: 'identical',
-        ahead_by: 0,
-        commits: [],
-      },
-      currentMainSha: releaseSha,
-      releaseSha,
-    })
-  );
-
-  assert.throws(
-    () =>
-      assertMainlineAncestorCompare({
-        comparison: mainline,
-        currentMainSha: currentSha,
-        releaseSha: 'short',
-      }),
-    /Release SHA is malformed/
-  );
-  assert.throws(
-    () =>
-      assertMainlineAncestorCompare({
-        comparison: mainline,
-        currentMainSha: 'short',
-        releaseSha,
-      }),
-    /Current main SHA is malformed/
-  );
-
-  for (const comparison of [
-    { ...mainline, status: 'behind', behind_by: 1 },
-    {
-      ...mainline,
-      status: 'diverged',
-      merge_base_commit: { sha: 'c'.repeat(40) },
-    },
-    { ...mainline, base_commit: { sha: 'c'.repeat(40) } },
-    { ...mainline, commits: [{ sha: 'c'.repeat(40) }] },
-  ]) {
-    assert.throws(
-      () =>
-        assertMainlineAncestorCompare({
-          comparison,
-          currentMainSha: currentSha,
-          releaseSha,
-        }),
-      /not a trusted ancestor/
-    );
-  }
-});
-
-test('staging publication proof rejects a candidate behind the published source', () => {
-  const publishedSha = 'b'.repeat(40);
-  const candidateSha = 'a'.repeat(40);
-  assert.throws(
-    () =>
-      assertCommitDescendantCompare({
-        ancestorSha: publishedSha,
-        comparison: {
-          status: 'behind',
-          ahead_by: 0,
-          behind_by: 1,
-          base_commit: { sha: candidateSha },
-          commits: [],
-          merge_base_commit: { sha: candidateSha },
-        },
-        descendantSha: candidateSha,
-      }),
-    /move backward or leave its published lineage/
   );
 });
 
@@ -3002,7 +2773,7 @@ exec ${JSON.stringify(realGit)} "$@"
     'Cross-prove exact production evidence'
   );
   const lineageStart = proof.indexOf('echo "environment=$environment"');
-  const lineageEnd = proof.indexOf('# Staging publishes an immutable');
+  const lineageEnd = proof.indexOf('prove_existing_production_marker()');
   assert.ok(lineageStart >= 0 && lineageEnd > lineageStart);
   const lineage = `set -euo pipefail\nrelease_sha="${releaseSha}"\n${proof.slice(
     lineageStart,

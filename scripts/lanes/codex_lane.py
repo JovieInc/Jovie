@@ -45,6 +45,10 @@ LEASE_WAIT_S = int(os.environ.get("CODEX_LEASE_WAIT_S", 1800))
 LEASE_POLL_S = float(os.environ.get("CODEX_LEASE_POLL_S", 15))
 LEDGER_SCHEMA = "jovie.capacity-lease/v1"
 LEDGER_CADENCE_S = 3600
+# Subscription-pool identity evidence is refreshed this long before it lapses; a failed
+# refresh is retried after SUBSCRIPTION_RETRY_S (inside one 5-minute tick), never hot-looped.
+SUBSCRIPTION_REFRESH_LEAD_S = 900
+SUBSCRIPTION_RETRY_S = 240
 EVIDENCE_MAX_AGE_S = 2 * 3600
 AUTH = re.compile(r"not logged in|login required|unauthori[sz]ed|invalid.*(token|credential)|\b401\b", re.I)
 # "Try again at 3:15 PM", "try again in 2 hours 5 minutes", "resets at 2026-09-27T01:00:00Z"
@@ -67,15 +71,21 @@ def subscription_pool_mode() -> bool:
 
 
 def subscription_profiles() -> dict:
-    """Explicit, identity-bound two-account configuration; never discover credentials."""
+    """Explicit, identity-bound multi-account configuration; never discover credentials.
+
+    Tim 2026-10-24: no arbitrary caps. The pool was fixed at exactly two accounts with one seat on the
+    second, so a third paid subscription could not be added. An account is bound to its home AND its
+    verified email hash. A seat count is a host-side bound (a seat is one local codex exec on this
+    machine, so it cannot exceed the CPU count); the provider limit is the account's usage window,
+    which the capacity ledger measures per account."""
     if not subscription_pool_mode():
         return {}
     try:
         profiles = json.loads(os.environ.get("CODEX_LANE_SUBSCRIPTION_PROFILES", ""))
     except (ValueError, TypeError):
         raise ValueError("subscription profiles malformed") from None
-    if not isinstance(profiles, dict) or len(profiles) != 2 or CURRENT_LOGIN not in profiles:
-        raise ValueError("subscription pool requires current-login and one additional profile")
+    if not isinstance(profiles, dict) or len(profiles) < 2 or CURRENT_LOGIN not in profiles:
+        raise ValueError("subscription pool requires current-login and at least one additional profile")
     primary_limit = os.cpu_count()
     if type(primary_limit) is not int or primary_limit <= 0:
         raise ValueError("subscription compute capacity unavailable")
@@ -92,7 +102,7 @@ def subscription_profiles() -> dict:
         home = str(Path(home).resolve())
         if not Path(home).is_dir():
             raise ValueError("subscription home unavailable")
-        if type(slots) is not int or not 1 <= slots <= (primary_limit if name == CURRENT_LOGIN else 1):
+        if type(slots) is not int or not 1 <= slots <= primary_limit:
             raise ValueError("subscription slot limit invalid")
         if not isinstance(identity, str) or not re.fullmatch(r"[0-9a-f]{64}", identity):
             raise ValueError("subscription identity binding invalid")
@@ -672,9 +682,27 @@ CURRENT_METADATA_CALLS = [("account/read", {"refreshToken": False}),
                           ("model/list", {"limit": 100, "includeHidden": False})]
 
 
-def current_subscription_snapshot(name: str, *, lease_handle=None) -> dict:
-    account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS, lease_handle=lease_handle)
-    return {"account": account, "rateLimits": rates, "models": models}
+# Gem 2026-10-23: the 15s app-server budget timed out under host load (load ~14),
+# leaving the hourly identity proof to lapse. Give the read-only metadata session
+# a longer budget and retry transient timeouts with backoff; a final failure still
+# keeps the previous observation (never certifies new capacity).
+CURRENT_METADATA_TIMEOUT_S = float(os.environ.get("CODEX_METADATA_TIMEOUT_S", "45"))
+CURRENT_METADATA_ATTEMPTS = 3
+CURRENT_METADATA_BACKOFF_S = (2.0, 6.0)
+
+
+def current_subscription_snapshot(name: str, *, lease_handle=None, sleep=time.sleep) -> dict:
+    for attempt in range(CURRENT_METADATA_ATTEMPTS):
+        try:
+            account, rates, models = app_server_calls(name, CURRENT_METADATA_CALLS,
+                                                      timeout=CURRENT_METADATA_TIMEOUT_S,
+                                                      lease_handle=lease_handle)
+            return {"account": account, "rateLimits": rates, "models": models}
+        except TimeoutError:
+            if attempt + 1 >= CURRENT_METADATA_ATTEMPTS:
+                raise
+            sleep(CURRENT_METADATA_BACKOFF_S[min(attempt, len(CURRENT_METADATA_BACKOFF_S) - 1)])
+    raise TimeoutError("unreachable")
 
 
 def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> dict:
@@ -694,6 +722,15 @@ def reconcile_current_subscription(now, if_due, fetch, name=CURRENT_LOGIN) -> di
             # the reset, retaining the normal failure throttle on later calls.
             if any(type(row.get("resetsAt")) in (int, float) and last < row["resetsAt"] <= now
                    for row in capacity.values()):
+                return True
+            # available() trusts identity evidence for LEDGER_CADENCE_S. Refresh it
+            # before it lapses, and retry a failed refresh on the short interval, so
+            # one metadata timeout cannot hold a healthy account unavailable for a
+            # whole cadence (Gem 2026-10-20: both accounts lapsed, codex idled).
+            verified = (state.get(name) or {}).get("subscriptionIdentityVerifiedAt")
+            if (if_due and now - last >= SUBSCRIPTION_RETRY_S
+                    and (type(verified) not in (int, float)
+                         or now - verified >= LEDGER_CADENCE_S - SUBSCRIPTION_REFRESH_LEAD_S)):
                 return True
         return not (ledger.get("authMode") == os.environ.get("CODEX_LANE_AUTH_MODE") and if_due
                     and type(last) in (int, float) and 0 <= now - last < if_due)
@@ -1005,12 +1042,30 @@ def reverify_auth_bank(state: dict, now: float) -> dict:
     return read_state()
 
 
-def pick(state: dict, now: float, names: list[str] | None = None):
-    """Least-recently-used available account that nobody else has leased right now."""
+def pace_deltas(now: float) -> dict:
+    """{account: used-minus-elapsed points} from the capacity registry's live overlay; {} when unread."""
+    try:
+        import capacity_registry
+        return capacity_registry.live_deltas(capacity_registry.load(), STATE.parent, "openai-codex", now)
+    except Exception:
+        return {}
+
+
+def pick(state: dict, now: float, names: list[str] | None = None, deltas: dict | None = None):
+    """Available account that nobody else has leased right now: accounts behind their weekly pace
+    first, ahead-of-pace accounts last (they will run dry before reset), least-recently-used within
+    each group. Without a fresh live reading every account is level and this is plain LRU."""
     state = reverify_auth_bank(state, now)
     names = accounts() if names is None else names
+    deltas = pace_deltas(now) if deltas is None else deltas
+    band = 10.0
+
+    def group(n: str) -> int:
+        d = deltas.get(n)
+        return 0 if d is None else (-1 if d < -band else 1 if d > band else 0)
+
     order = sorted((n for n in names if available(n, state, now)),
-                   key=lambda n: float(state.get(n, {}).get("lastUsed") or 0))
+                   key=lambda n: (group(n), float(state.get(n, {}).get("lastUsed") or 0)))
     for name in order:
         handle = lease(name)
         if handle is not None:

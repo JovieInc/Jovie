@@ -19,15 +19,14 @@
     "/app/earnings",
     "/app/feature-flags",
     "/app/jovie-work",
-    "/app/ov",
     "/app/ov/algorithm-health",
     "/app/ov/campaigns",
     "/app/ov/creators",
     "/app/ov/feedback",
     "/app/ov/growth/yc-metrics",
+    "/app/ov/hud",
     "/app/ov/ingest",
     "/app/ov/leads",
-    "/app/ov/ops",
     "/app/ov/outreach",
     "/app/ov/outreach/dm",
     "/app/ov/outreach/email",
@@ -35,8 +34,8 @@
     "/app/ov/releases",
     "/app/ov/users",
     "/app/ov/waitlist",
-    "/app/profiles",
     "/app/profile",
+    "/app/profiles",
     "/app/releases",
     "/app/settings",
     "/app/settings/admin",
@@ -46,5 +45,5 @@
     "/app/tipping",
     "/app/tracks"
   ],
-  "note": "Existing compatibility redirects at JOV-3772. This allowlist may shrink but no new page-level redirect stub may be added. Exception: /app/tracks (JOV-4846) folds the retired Tracks surface into Library with table mode + audio tab preselected, mirroring the /app/dashboard/library fold-in. Exception: /app/ov and /app/ov/ops fold Overview and the duplicate Ops HUD into /hud. Exception: /app/jovie-work (JOV-3767) retires the duplicate autonomous work history surface into the accepted Inbox Done for you view at /app?view=done. Its permanent destination is covered by the real Next.js redirect test. Canonical routes render their page in the unified shell."
+  "note": "Existing compatibility redirects at JOV-3772. This allowlist may shrink but no new page-level redirect stub may be added. Exception: /app/tracks (JOV-4846) folds the retired Tracks surface into Library with table mode + audio tab preselected, mirroring the /app/dashboard/library fold-in. Exception: /app/ov/hud folds the default /hud rewrite into Ovie Home at /app/ov (founder decision 2026-10-20); /app/ov and /app/ov/ops now render Home and the Ops dashboard. Exception: /app/jovie-work (JOV-3767) retires the duplicate autonomous work history surface into the accepted Inbox Done for you view at /app?view=done. Its permanent destination is covered by the real Next.js redirect test. Canonical routes render their page in the unified shell."
 }

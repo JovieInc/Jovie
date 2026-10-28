@@ -25,7 +25,8 @@ test('the clock shim moves new Date, Date() and Date.now but not explicit dates'
   );
   assert.equal(probe.status, 0, probe.stderr);
   const [now, constructed, called, epoch, isDate] = JSON.parse(probe.stdout);
-  const ahead = now - Date.now();
+  // The child shift is absolute; remove any scanner-applied parent shift.
+  const ahead = now - Date.now() + (globalThis.__jovieClockShift ?? 0);
   assert.ok(ahead > 7 * 86_400_000 - 60_000 && ahead < 7 * 86_400_000 + 60_000);
   assert.ok(Math.abs(constructed - now) < 60_000);
   assert.ok(Math.abs(Date.parse(called) - now) < 60_000);

@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DashboardShellPrivacyBoundary } from '@/app/app/(shell)/DashboardShellPrivacyBoundary';
 import type { DashboardData } from '@/app/app/(shell)/dashboard/actions/dashboard-data';
 import { DashboardDataProvider } from '@/app/app/(shell)/dashboard/DashboardDataContext';
+import { APP_ROUTES } from '@/constants/routes';
 import { useHeaderActions } from '@/contexts/HeaderActionsContext';
 import { useKeyboardShortcuts } from '@/contexts/KeyboardShortcutsContext';
 import { AuthShellWrapper } from './AuthShellWrapper';
@@ -28,8 +29,15 @@ const {
   lifecycle: vi.fn(),
   routeEscape: vi.fn(),
   privacyState: vi.fn(),
-  routeConfig: { isChatRoute: false, isProfileSettings: false },
-  railScope: { current: undefined as string | undefined },
+  routeConfig: {
+    section: 'dashboard',
+    isChatRoute: false,
+    isProfileSettings: false,
+  },
+  railScope: {
+    current: undefined as string | undefined,
+    defaultOpen: undefined as boolean | undefined,
+  },
   shortcutsRender: vi.fn(),
 }));
 vi.mock('@jovie/ui', async importOriginal => {
@@ -43,7 +51,7 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/hooks/useAuthRouteConfig', () => ({
   useAuthRouteConfig: () => ({
-    section: 'dashboard',
+    section: routeConfig.section,
     breadcrumbs: [],
     showMobileTabs: false,
     isTableRoute: true,
@@ -80,11 +88,14 @@ vi.mock('@/app/app/(shell)/dashboard/PreviewPanelContext', () => ({
   PreviewPanelProvider: ({
     children,
     scope,
+    defaultOpen,
   }: {
     children: ReactNode;
     scope?: string;
+    defaultOpen?: boolean;
   }) => {
     railScope.current = scope;
+    railScope.defaultOpen = defaultOpen;
     return children;
   },
 }));
@@ -258,9 +269,11 @@ function OpenShortcutHelp() {
 
 beforeEach(() => {
   route.pathname = '/app/tasks';
+  routeConfig.section = 'dashboard';
   routeConfig.isChatRoute = false;
   routeConfig.isProfileSettings = false;
   railScope.current = undefined;
+  railScope.defaultOpen = undefined;
   lifecycle.mockClear();
   shortcutsRender.mockClear();
   routeEscape.mockClear();
@@ -428,12 +441,13 @@ describe('main-plane Search route recovery', () => {
     routeConfig.isChatRoute = true;
     render(
       <DashboardDataProvider value={dashboard}>
-        <AuthShellWrapper mode='customer'>
+        <AuthShellWrapper mode='customer' previewPanelDefaultOpen>
           <RouteDocument />
         </AuthShellWrapper>
       </DashboardDataProvider>
     );
     expect(railScope.current).toBe('chat');
+    expect(railScope.defaultOpen).toBe(false);
   });
 
   it('keeps the app-shell rail scope on ordinary routes', () => {
@@ -447,17 +461,53 @@ describe('main-plane Search route recovery', () => {
     expect(railScope.current).toBe('app-shell');
   });
 
-  it('keeps the artist-profile-settings rail scope on profile settings', () => {
+  it('restores the profile rail default after returning from Account', () => {
+    route.pathname = APP_ROUTES.SETTINGS_PROFILE;
+    routeConfig.section = 'settings';
     routeConfig.isProfileSettings = true;
-    render(
+    const shell = () => (
       <DashboardDataProvider value={dashboard}>
-        <AuthShellWrapper mode='customer'>
+        <AuthShellWrapper mode='customer' previewPanelDefaultOpen>
           <RouteDocument />
         </AuthShellWrapper>
       </DashboardDataProvider>
     );
+    const view = render(shell());
     expect(railScope.current).toBe('artist-profile-settings');
+    expect(railScope.defaultOpen).toBe(true);
+
+    route.pathname = APP_ROUTES.SETTINGS_ACCOUNT;
+    routeConfig.isProfileSettings = false;
+    view.rerender(shell());
+    expect(railScope.current).toBe('app-shell');
+    expect(railScope.defaultOpen).toBe(false);
+
+    route.pathname = APP_ROUTES.SETTINGS_PROFILE;
+    routeConfig.isProfileSettings = true;
+    view.rerender(shell());
+    expect(railScope.current).toBe('artist-profile-settings');
+    expect(railScope.defaultOpen).toBe(true);
   });
+
+  it.each([false, undefined])(
+    'keeps the profile rail closed when the saved default is %s',
+    previewPanelDefaultOpen => {
+      routeConfig.section = 'settings';
+      routeConfig.isProfileSettings = true;
+      render(
+        <DashboardDataProvider value={dashboard}>
+          <AuthShellWrapper
+            mode='customer'
+            previewPanelDefaultOpen={previewPanelDefaultOpen}
+          >
+            <RouteDocument />
+          </AuthShellWrapper>
+        </DashboardDataProvider>
+      );
+      expect(railScope.current).toBe('artist-profile-settings');
+      expect(railScope.defaultOpen).toBe(false);
+    }
+  );
 
   it('never mounts private content or Search when the actual C boundary starts locked', () => {
     render(

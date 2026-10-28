@@ -80,4 +80,15 @@ export const authClient = createAuthClient({
   ],
 });
 
+// Nanostores unmounts the session atom one second after the last listener
+// drops. Vitest then deletes the jsdom `window`, and Better Auth's broadcast
+// cleanup throws. Test setup reads this symbol and flushes the idle atom
+// while `window` still exists. The write stays inline so product code does
+// not import the tests/ helper.
+if (process.env.VITEST === 'true') {
+  (globalThis as Record<symbol, unknown>)[
+    Symbol.for('jovie.vitest.authClient')
+  ] = authClient;
+}
+
 export type AuthClient = typeof authClient;

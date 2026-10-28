@@ -1,0 +1,17 @@
+{
+  "$comment": "EVENT 2026-10-20: Vercel on-demand concurrency for jovie prod/staging, Standard machine, hard cap $10/mo (cutoff at $8), authorized by Tim. vercel-on-demand-ledger.mjs is the only writer of the jovie project's elasticConcurrencyEnabled; set enabled=false to turn it off.",
+  "schema": "jovie-vercel-on-demand-policy/v1",
+  "enabled": true,
+  "projectName": "jovie",
+  "projectId": "prj_HPZm5iGtARQ2qef6g2xtjgFIGDVY",
+  "buildQueueConfiguration": "WAIT_FOR_NAMESPACE_QUEUE",
+  "buildMachineType": "standard",
+  "buildMachineSelection": "fixed",
+  "vcpu": 4,
+  "usdPerCpuMinute": 0.0035,
+  "enabledAt": "2026-10-20T19:00:00Z",
+  "hardCapUsd": 10,
+  "cutoffUsd": 8,
+  "alertUsd": 5,
+  "projectionWindowDays": 7
+}

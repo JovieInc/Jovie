@@ -301,6 +301,7 @@ function deliveryReview(report, message, detail) {
     evidenceFingerprint: report.evidenceFingerprint,
     policyVersion: report.policyVersion,
     resolvedModel: detail.resolvedModel,
+    outcome: detail.outcome,
   });
   return Object.freeze({
     schema: OPS_REPORT_REVIEW_SCHEMA,
@@ -509,6 +510,7 @@ export function verifyOpsReportDelivery(preparedReport, currentInput, options) {
     policyVersion: current.policyVersion,
     resolvedModel:
       review.outcome === 'observed' ? JEV_ROUTE.model : NOT_APPLICABLE,
+    outcome: review.outcome,
   };
   if (
     fingerprint(actual) !== review.reviewDigest ||

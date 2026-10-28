@@ -8,6 +8,8 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+# The release self-test uses unittest without pytest's conftest path setup.
+sys.path.insert(0, str(ROOT / "scripts/lanes"))
 os.environ.setdefault("LANES_EXECUTION_BACKEND", "local-test")
 
 
@@ -50,6 +52,23 @@ def providers():
 
 
 class ClassifierFixtureTest(unittest.TestCase):
+    def test_unknown_merge_state_waits_without_spending_or_surfacing(self):
+        for rollup in (checks(), checks(conclusion="FAILURE"),
+                       checks(status="IN_PROGRESS", conclusion=""), []):
+            for review in (None, "CHANGES_REQUESTED"):
+                with self.subTest(checks=rollup, review=review):
+                    target = pr(mergeStateStatus="UNKNOWN", statusCheckRollup=rollup,
+                                reviewDecision=review)
+                    record = {"sha": HEAD, "count": 2, "lane": "devin"}
+                    classified = remediation.classify_blocker(target, attempts=record)
+                    self.assertEqual((classified["cls"], classified["subtype"]),
+                                     ("ready", "awaiting"))
+                    self.assertIn("mergeStateStatus=UNKNOWN", classified["evidence"])
+                    plan = remediation.plan_ladder(classified, record, providers(), NOW, HEAD,
+                        healthy=lambda *_: self.fail("unknown merge state queried a model provider"))
+                    self.assertEqual((plan["action"], plan["reason"]), ("wait", "awaiting"))
+                    self.assertEqual(record, {"sha": HEAD, "count": 2, "lane": "devin"})
+
     def test_stuck_pr_fixtures(self):
         ready = pr(number=20079, statusCheckRollup=checks(39))
         self.assertEqual(remediation.classify_blocker(ready, {"sha": "ed4d35e", "reason": "fix-exhausted"})["cls"], "ready")
@@ -325,6 +344,31 @@ class RouterLadderTest(unittest.TestCase):
                 result = remediation.classify_blocker(subject)
                 self.assertEqual(result["cls"], "fixable-by-model")
 
+    def test_pricing_test_path_is_not_a_founder_gate(self):
+        """PR #22426 exhausted on a style-guard filename that contained
+        "pricing". A test path is not a founder decision. A production
+        pricing or strategy path still is."""
+        red = {"statusCheckRollup": [
+            {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+        copy_fix = pr(
+            number=22426,
+            title="fix(marketing): retire the limited-access front-door copy",
+            body="Refs JOV-8811. Waitlist-on headers use the claim label.",
+            files=[
+                "apps/web/components/organisms/HeaderNav.tsx",
+                "apps/web/tests/unit/home/mounted-home-pricing-system-b-style-guard.test.ts",
+            ],
+            mergeStateStatus="BLOCKED",
+            **red,
+        )
+        classified = remediation.classify_blocker(copy_fix)
+        self.assertEqual(classified["cls"], "fixable-by-model")
+        self.assertNotIn(
+            "strategy/pricing/credential/taste content", classified["evidence"])
+        production = pr(files=["apps/web/app/(marketing)/pricing/page.tsx"], **red)
+        self.assertEqual(
+            remediation.classify_blocker(production)["cls"], "needs-human-decision")
+
     def test_negated_credentials_do_not_mask_positive_strategy_or_paths(self):
         for extra in (
             {"title": "Update pricing", "body": "No new credentials or permissions are changed."},
@@ -363,6 +407,93 @@ class RouterLadderTest(unittest.TestCase):
                     remediation.classify_blocker(pr(number=21810, body=body, **red))["cls"],
                     "needs-human-decision")
 
+    def test_excluded_credentials_are_assurance_not_a_human_gate(self):
+        assurance = (
+            "Ordinary runs remain report-only. The current CLI boundary cannot "
+            "attest or isolate child tools, credentials, and egress. Raw arguments, "
+            "prompts, executable paths, headers, environment values, credentials, "
+            "and OTPs are excluded from route receipts; dispatch references are hashed."
+        )
+        red = {"statusCheckRollup": [
+            {"name": "Source Validation", "status": "COMPLETED", "conclusion": "FAILURE"}]}
+        classified = remediation.classify_blocker(pr(
+            number=21903, body=assurance, mergeStateStatus="BLOCKED", **red),
+            {"sha": HEAD, "reason": "diff-too-large"})
+        self.assertEqual((classified["cls"], classified["subtype"]),
+                         ("fixable-by-model", "check"))
+        for extra in ({"title": "Update pricing"},
+                      {"files": ["canon/strategy/pricing.md"]},
+                      {"files": ["scripts/credential-store.py"]}):
+            with self.subTest(extra=extra):
+                self.assertEqual(remediation.classify_blocker(
+                    pr(body=assurance, **red, **extra))["cls"], "needs-human-decision")
+
+    def test_assurance_removal_preserves_each_independent_credential_mention(self):
+        # PR #22238 removed every mention in a sentence after matching one
+        # assurance. Unknown verbs must remain protected too, without a verb list.
+        assurances = (
+            "Credentials are excluded from receipts",
+            "Credentials, and OTPs are excluded from receipts",
+            "The CLI cannot attest or isolate child tools, credentials, and egress",
+        )
+        actions = (
+            "copy credentials to a new provider",
+            "upload credentials to the service",
+            "share credentials with the provider",
+            "print credentials in the logs",
+            "rotate the credential before launch",
+            "synchronize credentials with the provider",
+            "credentials need rotation",
+        )
+        for assurance in assurances:
+            self.assertEqual(remediation.classify_blocker(pr(body=assurance))["cls"], "ready")
+            for action in actions:
+                for body in (f"{assurance} and {action}", f"{action} and {assurance}"):
+                    with self.subTest(body=body):
+                        self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                                         "needs-human-decision")
+        for body in ("Copy credentials to the provider and logs are excluded",
+                     "Credentials need rotation and headers are excluded",
+                     "We cannot rotate the credential"):
+            with self.subTest(body=body):
+                self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"],
+                                 "needs-human-decision")
+
+    def test_engineering_credential_removal_is_not_a_founder_gate(self):
+        """PR #22473 (JOV-8810) exhausted on model-route hygiene. Stripping API
+        credentials from a child environment, naming credential tests, and
+        recording that verification had no credentials is engineering evidence.
+        A rotate, pricing, or credential-path change in the same text still gates."""
+        phrases = (
+            "Cursor's successor could not be verified with the available credentials.",
+            "strip raw API credentials from child environments.",
+            "The same new screenshot/credential tests on isolated copies.",
+            "strip metered credentials in child environments.",
+            "Live quality cannot be certified without credentials.",
+        )
+        body = " ".join(phrases)
+        red = {"statusCheckRollup": [
+            {"name": "Design gate", "status": "COMPLETED", "conclusion": "FAILURE",
+             "excerpt": "API rate limit exceeded"}]}
+        classified = remediation.classify_blocker(pr(
+            number=22473, isDraft=True, mergeStateStatus="UNSTABLE", body=body,
+            labels=[{"name": "lane-fix-green"}, {"name": "lane-fix-exhausted"}], **red))
+        self.assertEqual(classified["cls"], "fixable-by-model")
+        self.assertNotIn("strategy/pricing/credential/taste content", classified["evidence"])
+        green = remediation.classify_blocker(pr(
+            number=22473, isDraft=True, mergeStateStatus="UNSTABLE", body=body))
+        self.assertEqual((green["cls"], green["subtype"]), ("ready", "draft"))
+        for extra in (
+            {"body": body + " Rotate the production credential."},
+            {"body": body + " Please update pricing."},
+            {"body": "strip raw API credentials from child environments and update pricing."},
+            {"body": body, "files": ["scripts/credential-store.py"]},
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(
+                    remediation.classify_blocker(pr(number=22473, **red, **extra))["cls"],
+                    "needs-human-decision")
+
     def test_direct_permission_asks_cover_github_token_and_app_scopes(self):
         for text in (
             "Please add contents:write permission to GITHUB_TOKEN.",
@@ -386,6 +517,51 @@ class RouterLadderTest(unittest.TestCase):
                 {"author": {"type": "User", "login": "reviewer"}, "body": body,
                  "state": "CHANGES_REQUESTED", "reviewedHead": HEAD}])
             self.assertEqual(remediation.classify_blocker(subject)["cls"], "needs-human-decision", body)
+
+    def test_url_rejection_evidence_does_not_block_engineering_repairs(self):
+        assurance = ("Media uses the canonical image-host policy, rejecting unsupported hosts, "
+                     "HTTP, credentials and nondefault ports before rendering.")
+        red = {"statusCheckRollup": checks(conclusion="FAILURE")}
+        subject = pr(number=23005, title="feat(inbox): use shared entity display", body=assurance, **red)
+        self.assertEqual(remediation.classify_blocker(subject)["cls"], "fixable-by-model")
+        self.assertEqual(remediation.classify_blocker({**subject, "mergeStateStatus": "DIRTY"})["cls"],
+                         "needs-rebase")
+        for body in (assurance + " Rotate the production credential.",
+                     assurance + " Please update pricing.",
+                     "Reject HTTP, credentials; rotate the production credential.",
+                     "Reject HTTP, credentials, then copy credentials to another provider.",
+                     "Reject unsupported hosts and copy credentials to another provider.",
+                     "Reject HTTP, credentials need rotation."):
+            with self.subTest(body=body):
+                self.assertEqual(remediation.classify_blocker(pr(body=body, **red))["cls"],
+                                 "needs-human-decision")
+        self.assertEqual(remediation.classify_blocker(
+            pr(body=assurance, files=["scripts/credential-store.py"], **red))["cls"],
+            "needs-human-decision")
+
+    def test_taste_evidence_heading_is_not_a_request_for_a_founder_decision(self):
+        for heading in ("## Taste", "## Taste (risk x confidence)"):
+            for newline in ("\n", "\r\n"):
+                body = heading + newline + "Tile order and names ship. Default is cut, revert is one component."
+                subject = pr(number=23155, title="feat(ovie): make Home a company HUD", body=body,
+                             statusCheckRollup=checks(conclusion="FAILURE"))
+                self.assertEqual(remediation.classify_blocker(subject)["cls"], "fixable-by-model")
+                for extra in ({"body": body + newline + "Tim must decide the taste direction."},
+                              {"body": body + newline + "Please update pricing."},
+                              {"labels": ["tim-hold"]},
+                              {"files": ["canon/strategy/theses.md"]}):
+                    with self.subTest(heading=heading, newline=repr(newline), extra=extra):
+                        self.assertEqual(remediation.classify_blocker({**subject, **extra})["cls"],
+                                         "needs-human-decision")
+        self.assertEqual(remediation.classify_blocker(pr(body="## Taste approval needed"))["cls"],
+                         "needs-human-decision")
+        self.assertEqual(remediation.classify_blocker(
+            pr(body="## Taste (risk x confidence) Tim must approve the direction."))["cls"],
+            "needs-human-decision")
+        for body in ("## Taste approval needed\r\n",
+                     "## Taste (risk x confidence) Tim must approve the direction.\r\n"):
+            with self.subTest(body=body):
+                self.assertEqual(remediation.classify_blocker(pr(body=body))["cls"], "needs-human-decision")
 
     def test_review_assurances_and_examples_preserve_independent_positive_asks(self):
         ordinary = (

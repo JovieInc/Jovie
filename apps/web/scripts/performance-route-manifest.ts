@@ -620,7 +620,7 @@ const PUBLIC_PROFILE_CORE_ROUTES = [
     warmupStrategy: 'public-route',
     measureMode: 'page-load',
     readySelectors: {
-      content: ['[data-testid="profile-intent-page-body"]'],
+      content: ['[data-testid="profile-mode-drawer-contact"]'],
     },
     timings: [
       { metric: 'first-contentful-paint', budget: 2800 },
@@ -1320,11 +1320,11 @@ const CREATOR_SHELL_ROUTES = [
       shell: ['[data-app-shell-frame="true"]'],
       content: ['[data-testid="opportunity-inbox-page"]'],
       loading: ['[data-testid="dashboard-segment-skeleton"]'],
-      navTrigger: [
-        `a[href="${APP_ROUTES.DASHBOARD}"]:has-text("Home")`,
-        `a[href="${APP_ROUTES.DASHBOARD}"]`,
-        `a[href^="${APP_ROUTES.DASHBOARD}?"]`,
-      ],
+      // The rail destination and the header bell both point at /app. The
+      // bell is `data-navigation-item-id="inbox"` and is first in DOM order,
+      // so an href selector clicks the wrong control and the probe rejects
+      // the identity. Measure the rail item whose id is `home`.
+      navTrigger: ['[data-navigation-item-id="home"]'],
     },
     timings: [
       { metric: 'warm-shell-response', budget: 100 },
@@ -2100,6 +2100,11 @@ const ACCOUNT_BILLING_ROUTES = [
 
 const ONBOARDING_ROUTES = [
   {
+    // Entry route. First/largest paint is NOT budgeted here: the unthrottled,
+    // warm Playwright run passed LCP at 1.3s while Lighthouse mobile measured
+    // 8.4s on production (2026-10-25). LCP is gated by the throttled-mobile
+    // Lighthouse check (performance-entry-budgets.json); this entry keeps the
+    // layout, interaction, TTFB and size budgets and the screenshot plumbing.
     id: 'onboarding',
     group: 'onboarding',
     surface: 'onboarding',
@@ -2115,8 +2120,6 @@ const ONBOARDING_ROUTES = [
       ],
     },
     timings: [
-      { metric: 'first-contentful-paint', budget: 900 },
-      { metric: 'largest-contentful-paint', budget: 1300 },
       { metric: 'cumulative-layout-shift', budget: 0.02 },
       { metric: 'first-input-delay', budget: 100 },
       { metric: 'time-to-first-byte', budget: 1000 },

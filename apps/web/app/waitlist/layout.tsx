@@ -8,6 +8,8 @@ export const dynamic = 'force-dynamic';
 // Gated access-state pages (like /signup): named in the tab, never indexed.
 export const metadata: Metadata = {
   title: 'Join the waitlist',
+  description:
+    'Reserve your handle and get access to Jovie when your invite is ready.',
   robots: NOINDEX_ROBOTS,
 };
 
@@ -24,7 +26,9 @@ export default async function WaitlistLayout({
 }>) {
   return (
     <ResolvedClientProviders>
-      <main id='main-content'>{children}</main>
+      <main id='main-content' className='min-h-svh'>
+        {children}
+      </main>
     </ResolvedClientProviders>
   );
 }

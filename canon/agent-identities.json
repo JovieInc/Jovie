@@ -1,0 +1,1082 @@
+{
+ "schema": "jovie-agent-identity-registry/v1",
+ "updated": "2026-10-20",
+ "policy": "PUBLIC REDACTED STUB. The full registry (principals, credential names, boundaries, audit trails, mesh bindings) lives in the private JovieInc/Ops repo at jovie-private/canon/agent-identities.json. This stub keeps only identity ids, names, kinds, status, owner and sharing fix refs so public validators (scripts/ownership-registry.mjs, scripts/capacity-registry.mjs) keep working. Set JOVIE_PRIVATE_DIR to a local Ops jovie-private folder for full-fidelity local runs.",
+ "identities": {
+  "summer": {
+   "name": "Summer",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer-improvement-loop",
+   "status": "active",
+   "mesh": {
+    "registered": true,
+    "senderKind": "summer"
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "JOV-8588"
+   }
+  },
+  "ovie": {
+   "name": "Ovie (founder door)",
+   "kind": "door",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "by-design"
+   }
+  },
+  "jovie-eve": {
+   "name": "Jovie (public Eve agent)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "pilot",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "instinct": {
+   "name": "Instinct (dogfood / QA)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "active",
+   "mesh": {
+    "registered": true,
+    "senderKind": "instinct"
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "JOV-8684"
+   }
+  },
+  "boardy": {
+   "name": "Boardy (boardy.ai)",
+   "kind": "external-agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "summer-improvement-loop": {
+   "name": "Summer improvement loop (Managed Agents)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "JOV-8678"
+   }
+  },
+  "gem-lanes": {
+   "name": "Gem lanes harness (Symphony)",
+   "kind": "host-agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-lanes",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "JOV-8676"
+   }
+  },
+  "lane-codex": {
+   "name": "Gem lane: codex",
+   "kind": "provider-lane",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-lanes",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8677"
+   }
+  },
+  "lane-grok": {
+   "name": "Gem lane: grok",
+   "kind": "provider-lane",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-lanes",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8677"
+   }
+  },
+  "lane-claude": {
+   "name": "Gem lane: claude",
+   "kind": "provider-lane",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-lanes",
+   "status": "disabled",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8677"
+   }
+  },
+  "lane-devin": {
+   "name": "Gem lane: devin",
+   "kind": "provider-lane",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-lanes",
+   "status": "disabled",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8677"
+   }
+  },
+  "lane-kimi": {
+   "name": "Gem lane: kimi",
+   "kind": "provider-lane",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-lanes",
+   "status": "disabled",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8677"
+   }
+  },
+  "hyperagent": {
+   "name": "HyperAgent provider pool",
+   "kind": "provider-pool",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-lanes",
+   "status": "disabled",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8677"
+   }
+  },
+  "eve-hyperagent": {
+   "name": "Eve (HyperAgent planner)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "dormant",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8675"
+   }
+  },
+  "claude-code-session": {
+   "name": "Claude Code sessions",
+   "kind": "session",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-ci-repair",
+   "status": "active",
+   "mesh": {
+    "registered": true,
+    "senderKind": "claude"
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "JOV-8679"
+   }
+  },
+  "codex-session": {
+   "name": "Codex sessions",
+   "kind": "session",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-ci-repair",
+   "status": "active",
+   "mesh": {
+    "registered": true,
+    "senderKind": "codex"
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "JOV-8679"
+   }
+  },
+  "devin-mesh": {
+   "name": "Devin (mesh peer)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-lanes",
+   "status": "dormant",
+   "mesh": {
+    "registered": true,
+    "senderKind": "devin"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "muse": {
+   "name": "Muse (mesh peer)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "dormant",
+   "mesh": {
+    "registered": true,
+    "senderKind": "muse"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "grokbot": {
+   "name": "Grok Bot",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "dormant",
+   "mesh": {
+    "registered": true,
+    "senderKind": "grokbot"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "chloe": {
+   "name": "Chloe",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "dormant",
+   "mesh": {
+    "registered": true,
+    "senderKind": "chloe"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "stella": {
+   "name": "Stella",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "dormant",
+   "mesh": {
+    "registered": true,
+    "senderKind": "stella"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "aeon": {
+   "name": "Aeon",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "active",
+   "mesh": {
+    "registered": true,
+    "senderKind": "aeon"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "dots": {
+   "name": "Dots",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "unregistered",
+   "mesh": {
+    "registered": false,
+    "senderKind": "dots"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "lola": {
+   "name": "Lola",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "unregistered",
+   "mesh": {
+    "registered": false,
+    "senderKind": "lola"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "jovie-bot": {
+   "name": "Jovie Bot (GitHub App)",
+   "kind": "bot",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "symphony-release",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8677"
+   }
+  },
+  "dependabot": {
+   "name": "Dependabot",
+   "kind": "bot",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-ci-repair",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "github-actions": {
+   "name": "github-actions[bot]",
+   "kind": "bot",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-ci-repair",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "sentry-review": {
+   "name": "Sentry Autofix / Sentry review",
+   "kind": "bot",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-ci-repair",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "JOV-8680"
+   }
+  },
+  "cursor": {
+   "name": "Cursor (golden-path prod autofix)",
+   "kind": "bot",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-ci-repair",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "jev": {
+   "name": "Jev evaluator (typesafe-ai/jev)",
+   "kind": "evaluator",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-ci-repair",
+   "status": "shadow",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "clef": {
+   "name": "Clef screenshot evaluator (Cloudflare)",
+   "kind": "evaluator",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-ci-repair",
+   "status": "pilot",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "hermes": {
+   "name": "Hermes (retired runtime)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-hostops",
+   "status": "retired",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "shared",
+    "fix": "JOV-8675"
+   }
+  },
+  "zoe": {
+   "name": "Zoe (OpenClaw, personal)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "zoe",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "JOV-8683"
+   }
+  },
+  "web-walker": {
+   "name": "Web walker",
+   "kind": "role",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "unstaffed",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "vercel-cron": {
+   "name": "Vercel Cron (jovie-web)",
+   "kind": "bot",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "symphony-release",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
+  "ops-mac-host": {
+   "name": "Ops Mac host jobs (Tim's MacBook Pro)",
+   "kind": "host-agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "gem-hostops",
+   "status": "active",
+   "mesh": {
+    "registered": false
+   },
+   "sharing": {
+    "status": "borrowed",
+    "fix": "by-design"
+   }
+  }
+ }
+}

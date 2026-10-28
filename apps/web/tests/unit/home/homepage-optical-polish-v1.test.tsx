@@ -71,10 +71,6 @@ describe('homepage-optical-polish-v1', () => {
       'rotate-[442deg]'
     );
 
-    const close = read('components/homepage/HomepageClose.tsx');
-    expect(close).not.toContain('HeroSpotifySearch');
-    expect(close).toContain("getElementById('homepage-claim-handle')");
-    expect(close).toContain('?.focus()');
     expect(
       findChromeOverrideViolations(
         'apps/web/app/(home)/home.css',
@@ -124,13 +120,11 @@ describe('homepage-optical-polish-v1', () => {
 
   it('keeps landed visual chapters on product rhythm and preserves close spacing', () => {
     const sections = read('components/homepage/HomepageCertifiedSections.tsx');
-    const close = read('components/homepage/HomepageClose.tsx');
     const certifiedCss = readCertifiedCss();
 
     expect(sections).not.toContain("data-rhythm='proof'");
     expect(sections).toContain("rhythm='product'");
     expect(sections).not.toContain("rhythm='text'");
-    expect(close).toContain("data-rhythm='close'");
     expect(certifiedCss).toContain('--homepage-rhythm-proof:');
     expect(certifiedCss).toContain('--homepage-rhythm-text:');
     expect(certifiedCss).toContain('--homepage-rhythm-product:');

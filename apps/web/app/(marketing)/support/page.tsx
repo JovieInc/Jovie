@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { SupportPageContent } from '@/components/organisms/SupportPageContent';
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import { SUPPORT_SEO_COPY } from '@/data/supportCopy';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 
@@ -16,6 +17,11 @@ export const metadata: Metadata = {
     description: SUPPORT_SEO_COPY.description,
     url: `${BASE_URL}/support`,
     type: 'website',
+    images: [marketingOgImage('support')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('support').url],
   },
 };
 

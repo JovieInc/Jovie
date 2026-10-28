@@ -56,7 +56,7 @@ inactiveWorkflows:
   - Rolling CI Dispatch
   - Stuck Draft Auto-Close
 generatedAt: deterministic
-normalPrCheckRecords: 22
+normalPrCheckRecords: 25
 nodes:
   - name: Workflow Lint
     path: .github/workflows/actionlint.yml
@@ -103,6 +103,18 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:green-source
+    jobCount: 2
+  - name: Automation Liveness
+    path: .github/workflows/automation-liveness.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:liveness
     jobCount: 2
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
@@ -151,6 +163,7 @@ nodes:
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Merge Queue Green Enroll
+      - Mutation Diff
       - PR Conflict Handler
       - Rolling CI Dispatch
       - Staging Controller
@@ -161,6 +174,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:main-release-ready
     jobCount: 64
+  - name: Claim Checkout Dogfood
+    path: .github/workflows/claim-checkout-dogfood.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:dogfood
+    jobCount: 1
   - name: CLI Chaos Nightly
     path: .github/workflows/cli-chaos-nightly.yml
     active: true
@@ -208,6 +233,17 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:analyze
+    jobCount: 1
+  - name: Controller Quota Replay
+    path: .github/workflows/controller-quota-replay.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_run
+    terminalReceipt: job:replay
     jobCount: 1
   - name: Cost Anomaly Gate
     path: .github/workflows/cost-anomaly-gate.yml
@@ -314,11 +350,10 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-production-publish
-    jobCount: 4
+    jobCount: 6
   - name: Doc Gardening Agent
     path: .github/workflows/doc-gardening-agent.yml
     active: true
@@ -383,6 +418,18 @@ nodes:
       - workflow_run
     terminalReceipt: job:assess
     jobCount: 2
+  - name: Fleet Rules Evidence
+    path: .github/workflows/fleet-rules-evidence.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_run
+    terminalReceipt: job:rerun
+    jobCount: 2
   - name: Fork PR Gate
     path: .github/workflows/fork-pr-gate.yml
     active: true
@@ -390,9 +437,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Auto-Ready Agent Drafts
       - Lane Fix Relay
-      - Merge Queue Green Enroll
     triggeringStateTransition:
       - pull_request
       - pull_request_review
@@ -406,6 +451,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
+      - Claim Checkout Dogfood
       - Lane Fix Relay
     triggeringStateTransition:
       - schedule
@@ -446,6 +492,18 @@ nodes:
       - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:worker
+    jobCount: 1
+  - name: Interaction latency audit
+    path: .github/workflows/interaction-latency-audit.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:measure
     jobCount: 1
   - name: Internal PR Review (advisory)
     path: .github/workflows/internal-review.yml
@@ -667,8 +725,9 @@ nodes:
     triggeringStateTransition:
       - push
       - workflow_dispatch
-    terminalReceipt: job:mutate
-    jobCount: 1
+      - workflow_run
+    terminalReceipt: job:sweep
+    jobCount: 2
   - name: Neon Ephemeral Branch Cleanup
     path: .github/workflows/neon-ephemeral-branch-cleanup.yml
     active: true
@@ -777,6 +836,43 @@ nodes:
       - repository_dispatch
     terminalReceipt: job:sync-issue
     jobCount: 1
+  - name: Ovie Summer Canary
+    path: .github/workflows/ovie-summer-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:canary
+    jobCount: 1
+  - name: Pen still diff (advisory)
+    path: .github/workflows/pen-still-diff.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - workflow_dispatch
+    terminalReceipt: job:comment
+    jobCount: 2
+  - name: Pen token parity
+    path: .github/workflows/pen-token-parity.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:parity
+    jobCount: 1
   - name: Post-Deploy Probes
     path: .github/workflows/postdeploy-probes.yml
     active: true
@@ -803,6 +899,19 @@ nodes:
       - workflow_run
     terminalReceipt: job:deliver
     jobCount: 5
+  - name: PR Fleet Rules
+    path: .github/workflows/pr-fleet-rules.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers:
+      - Lane Fix Relay
+    triggeringStateTransition:
+      - merge_group
+      - pull_request
+    terminalReceipt: job:fleet
+    jobCount: 1
   - name: PR Preparation Canary
     path: .github/workflows/pr-preparation-canary.yml
     active: true
@@ -855,14 +964,13 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
       - merge_group
       - pull_request
     terminalReceipt: job:size
-    jobCount: 3
+    jobCount: 4
   - name: PR targets main
     path: .github/workflows/pr-targets-main.yml
     active: true
@@ -886,13 +994,26 @@ nodes:
       - pull_request
     terminalReceipt: job:capture
     jobCount: 1
+  - name: Private Data Guard
+    path: .github/workflows/private-data-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:guard
+    jobCount: 1
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml
     active: true
     category: production-verification
     authoritativeProducer: Production Controller
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Automation Liveness
     triggeringStateTransition:
       - repository_dispatch
       - schedule
@@ -920,6 +1041,7 @@ nodes:
       - release-orchestration
       - production-verification
     allowedConsumers:
+      - Controller Quota Replay
       - Delivery Control Receipts
       - desktop-release
       - iOS TestFlight
@@ -1182,13 +1304,14 @@ nodes:
     allowedConsumers:
       - Auto-Ready Agent Drafts
       - Dependabot Pin Sync
+      - Fleet Rules Evidence
       - Lane Fix Relay
       - Merge Queue Green Enroll
       - PR Review (shadow)
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
-    jobCount: 5
+    jobCount: 7
   - name: Staging Controller
     path: .github/workflows/staging-controller.yml
     active: true
@@ -1196,12 +1319,26 @@ nodes:
     authoritativeProducer: Production Controller
     authoritativeFor: []
     allowedConsumers:
+      - Claim Checkout Dogfood
+      - Controller Quota Replay
       - Production Controller
       - Production Release
     triggeringStateTransition:
       - workflow_run
     terminalReceipt: job:staging-result
     jobCount: 3
+  - name: Stale Branch Sweep
+    path: .github/workflows/stale-branch-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
   - name: Summer Eve identity check
     path: .github/workflows/summer-eve-pin.yml
     active: true
@@ -1337,15 +1474,30 @@ nodes:
     terminalReceipt: job:mine
     jobCount: 1
 edges:
+  - from: Production Continuity Guard
+    to: Automation Liveness
+    type: workflow_run
   - from: CI
     to: iOS CI
     type: workflow_call
   - from: CI
     to: Mac CI
     type: workflow_call
+  - from: Staging Controller
+    to: Claim Checkout Dogfood
+    type: workflow_run
+  - from: Golden Path Nightly
+    to: Claim Checkout Dogfood
+    type: workflow_run
   - from: CLI Chaos
     to: Mac Lane Route
     type: workflow_call
+  - from: Staging Controller
+    to: Controller Quota Replay
+    type: workflow_run
+  - from: Production Controller
+    to: Controller Quota Replay
+    type: workflow_run
   - from: Production Controller
     to: Delivery Control Receipts
     type: workflow_run
@@ -1357,6 +1509,9 @@ edges:
     type: workflow_run
   - from: CI
     to: Fleet Gate Refresh
+    type: workflow_run
+  - from: Source Validation
+    to: Fleet Rules Evidence
     type: workflow_run
   - from: iOS CI
     to: Mac Lane Route
@@ -1377,6 +1532,9 @@ edges:
     to: Lane Fix Relay
     type: workflow_run
   - from: PR Size Guard
+    to: Lane Fix Relay
+    type: workflow_run
+  - from: PR Fleet Rules
     to: Lane Fix Relay
     type: workflow_run
   - from: CI
@@ -1418,11 +1576,11 @@ edges:
   - from: CI
     to: Merge Queue Green Enroll
     type: workflow_run
-  - from: Fork PR Gate
-    to: Merge Queue Green Enroll
-    type: workflow_run
   - from: PR Size Guard
     to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: CI
+    to: Mutation Diff
     type: workflow_run
   - from: Publish @jovie/cli to npm
     to: CLI Chaos

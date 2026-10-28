@@ -27,9 +27,6 @@ const MOTION_TOKENS = [
 ] as const;
 
 const CONSUMER_PATHS = [
-  'components/features/home/SeeItInActionCarousel.tsx',
-  'components/features/home/ReleasePhoneContent.tsx',
-  'components/features/home/AutomaticReleaseSmartlinksSection.tsx',
   'components/features/profile/StaticListenInterface.tsx',
   'app/r/[slug]/ReleaseLandingPage.tsx',
   'app/[username]/[slug]/sounds/SoundsLandingPage.tsx',

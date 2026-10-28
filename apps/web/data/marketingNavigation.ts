@@ -81,8 +81,8 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = eligibleLinks([
   },
   {
     href: APP_ROUTES.ARTIST_NOTIFICATIONS,
-    label: 'Fan Notifications',
-    description: 'Collect opt-ins once and bring fans back automatically.',
+    label: 'Audience notifications',
+    description: 'Collect opt-ins once and bring listeners back automatically.',
   },
   {
     href: APP_ROUTES.INSTANT_MERCH,
@@ -119,6 +119,16 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     title: 'Product',
     links: [
       { href: APP_ROUTES.PRODUCT, label: 'Product' },
+      { href: APP_ROUTES.PRODUCT_COMMAND_PALETTE, label: 'Command palette' },
+      {
+        href: APP_ROUTES.PRODUCT_RELEASE_SCHEDULING,
+        label: 'Release scheduling',
+      },
+      { href: APP_ROUTES.PRODUCT_DSP_LINKS, label: 'DSP Links' },
+      { href: APP_ROUTES.PRODUCT_UTM_LINKS, label: 'UTM Links' },
+      { href: APP_ROUTES.PRODUCT_ISRC, label: 'ISRC' },
+      { href: APP_ROUTES.PRODUCT_PRE_SAVE, label: 'Pre-save' },
+      { href: APP_ROUTES.PRODUCT_LINK_ANALYTICS, label: 'Link analytics' },
       { href: APP_ROUTES.CARD, label: 'Jovie Card' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
@@ -132,11 +142,11 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.PAY, label: 'Pay' },
       {
         href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
-        label: 'Fan Capture',
+        label: 'Audience capture',
       },
       {
         href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
-        label: 'Fan Reactivation',
+        label: 'Audience reactivation',
       },
       { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
       { href: APP_ROUTES.LAUNCH, label: 'Release System' },

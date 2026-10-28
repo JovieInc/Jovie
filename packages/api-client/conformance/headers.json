@@ -1,0 +1,240 @@
+{
+  "schema": "jovie-api-conformance/v1",
+  "note": "Executed by both packages/api-client and scripts/apiclient tests; both languages must agree.",
+  "parse": [
+    {
+      "name": "github core headers",
+      "provider": "github",
+      "at": 1792000000000,
+      "headers": {
+        "x-ratelimit-limit": "5000",
+        "x-ratelimit-remaining": "4911",
+        "x-ratelimit-reset": "1792002874",
+        "x-ratelimit-resource": "core"
+      },
+      "expect": [
+        {
+          "resource": "core",
+          "limit": 5000,
+          "remaining": 4911,
+          "resetAt": 1792002874000
+        }
+      ]
+    },
+    {
+      "name": "linear requests and complexity",
+      "provider": "linear",
+      "at": 1792000000000,
+      "headers": {
+        "X-RateLimit-Requests-Limit": "5000",
+        "X-RateLimit-Requests-Remaining": "4998",
+        "X-RateLimit-Requests-Reset": "1792003472322",
+        "X-RateLimit-Complexity-Limit": "2000000",
+        "X-RateLimit-Complexity-Remaining": "1994495",
+        "X-RateLimit-Complexity-Reset": "1792003472322"
+      },
+      "expect": [
+        {
+          "resource": "requests",
+          "limit": 5000,
+          "remaining": 4998,
+          "resetAt": 1792003472322
+        },
+        {
+          "resource": "complexity",
+          "limit": 2000000,
+          "remaining": 1994495,
+          "resetAt": 1792003472322
+        }
+      ]
+    },
+    {
+      "name": "openai duration reset",
+      "provider": "openai",
+      "at": 1792000000000,
+      "headers": {
+        "x-ratelimit-limit-requests": "500",
+        "x-ratelimit-remaining-requests": "12",
+        "x-ratelimit-reset-requests": "1m30.5s"
+      },
+      "expect": [
+        {
+          "resource": "requests",
+          "limit": 500,
+          "remaining": 12,
+          "resetAt": 1792000090500
+        }
+      ]
+    },
+    {
+      "name": "anthropic rfc3339 reset",
+      "provider": "anthropic",
+      "at": 1792000000000,
+      "headers": {
+        "anthropic-ratelimit-requests-limit": "50",
+        "anthropic-ratelimit-requests-remaining": "0",
+        "anthropic-ratelimit-requests-reset": "2026-10-16T19:33:40Z"
+      },
+      "expect": [
+        {
+          "resource": "requests",
+          "limit": 50,
+          "remaining": 0,
+          "resetAt": 1792179220000
+        }
+      ]
+    }
+  ],
+  "classify": [
+    {
+      "name": "github installation quota text",
+      "provider": "github",
+      "status": 403,
+      "at": 1792000000000,
+      "headers": {
+        "x-ratelimit-remaining": "0",
+        "x-ratelimit-reset": "1792000600"
+      },
+      "text": "API rate limit exceeded for installation ID 112037986.",
+      "expect": {
+        "kind": "primary",
+        "retryAtMs": 1792000600000
+      }
+    },
+    {
+      "name": "github actions site id quota",
+      "provider": "github",
+      "status": 403,
+      "at": 1792000000000,
+      "headers": {},
+      "text": "API rate limit already exceeded for site ID installation",
+      "expect": {
+        "kind": "primary",
+        "retryAtMs": null
+      }
+    },
+    {
+      "name": "github secondary limit with retry-after",
+      "provider": "github",
+      "status": 403,
+      "at": 1792000000000,
+      "headers": {
+        "retry-after": "60",
+        "x-ratelimit-remaining": "4000"
+      },
+      "text": "You have exceeded a secondary rate limit",
+      "expect": {
+        "kind": "secondary",
+        "retryAtMs": 1792000060000
+      }
+    },
+    {
+      "name": "github graphql RATE_LIMITED in a 200",
+      "provider": "github",
+      "status": 200,
+      "at": 1792000000000,
+      "headers": {},
+      "body": {
+        "errors": [
+          {
+            "type": "RATE_LIMITED",
+            "message": "API rate limit exceeded"
+          }
+        ]
+      },
+      "expect": {
+        "kind": "primary",
+        "retryAtMs": null
+      }
+    },
+    {
+      "name": "github permission 403 is a real answer",
+      "provider": "github",
+      "status": 403,
+      "at": 1792000000000,
+      "headers": {
+        "x-ratelimit-remaining": "4000"
+      },
+      "text": "Resource not accessible by integration",
+      "expect": {
+        "kind": "client",
+        "retryAtMs": null
+      }
+    },
+    {
+      "name": "linear RATELIMITED as HTTP 400",
+      "provider": "linear",
+      "status": 400,
+      "at": 1792000000000,
+      "headers": {
+        "X-RateLimit-Requests-Remaining": "0",
+        "X-RateLimit-Requests-Reset": "1792003600000"
+      },
+      "body": {
+        "errors": [
+          {
+            "message": "Rate limit exceeded",
+            "extensions": {
+              "code": "RATELIMITED"
+            }
+          }
+        ]
+      },
+      "expect": {
+        "kind": "primary",
+        "retryAtMs": 1792003600000
+      }
+    },
+    {
+      "name": "generic 429 is secondary",
+      "provider": "vercel",
+      "status": 429,
+      "at": 1792000000000,
+      "headers": {
+        "retry-after": "5"
+      },
+      "text": "",
+      "expect": {
+        "kind": "secondary",
+        "retryAtMs": 1792000005000
+      }
+    },
+    {
+      "name": "502 is transient",
+      "provider": "github",
+      "status": 502,
+      "at": 1792000000000,
+      "headers": {},
+      "text": "Bad Gateway",
+      "expect": {
+        "kind": "transient",
+        "retryAtMs": null
+      }
+    },
+    {
+      "name": "network error is transient",
+      "provider": "linear",
+      "status": null,
+      "networkError": true,
+      "at": 1792000000000,
+      "headers": {},
+      "text": "",
+      "expect": {
+        "kind": "transient",
+        "retryAtMs": null
+      }
+    },
+    {
+      "name": "404 is client",
+      "provider": "vercel",
+      "status": 404,
+      "at": 1792000000000,
+      "headers": {},
+      "text": "not found",
+      "expect": {
+        "kind": "client",
+        "retryAtMs": null
+      }
+    }
+  ]
+}

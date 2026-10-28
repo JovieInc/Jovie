@@ -309,6 +309,7 @@ export function SidebarDock({
           >
             <Link
               href={APP_ROUTES.CHANGELOG}
+              prefetch={false}
               onClick={markSeen}
               className='min-w-0 flex-1 rounded-sm text-xs text-primary-token focus-ring-themed'
             >

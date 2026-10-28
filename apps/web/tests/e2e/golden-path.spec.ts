@@ -14,8 +14,11 @@ import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
   captureKeyframe,
   inspectEssentialViewport,
+  waitForStableGeometry,
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
+import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
+import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
@@ -147,6 +150,9 @@ async function verifyHomeWelcome(page: Page) {
       };
     });
   const assertGeometry = async () => {
+    // Clearing the starter shrinks the composer through a Motion size layout
+    // transition; audit the settled box, not a mid-tween frame.
+    await waitForStableGeometry(page, '[data-testid="chat-composer-surface"]');
     const selectors = [
       '[data-testid="chat-empty-state-next-step"] button, [data-testid="chat-empty-state-next-step"] a',
     ];
@@ -168,15 +174,18 @@ async function verifyHomeWelcome(page: Page) {
           `[data-testid="chat-composer-surface"] button[aria-label=${JSON.stringify(name)}]`
         );
     }
-    expect(
-      await inspectEssentialViewport(page, [
-        ...selectors,
-        '[data-testid="chat-empty-state-greeting-text"]',
-        '[data-testid="chat-empty-state-next-step"]',
-        '[data-testid="chat-composer-surface"]',
-        '[aria-label="Chat message input" i]',
-      ])
-    ).toEqual({ supported: true, findings: [] });
+    // ratchet: JOV-9612
+    await ratchetGeometry('home composer essentials', async () => {
+      expect(
+        await inspectEssentialViewport(page, [
+          ...selectors,
+          '[data-testid="chat-empty-state-greeting-text"]',
+          '[data-testid="chat-empty-state-next-step"]',
+          '[data-testid="chat-composer-surface"]',
+          '[aria-label="Chat message input" i]',
+        ])
+      ).toEqual({ supported: true, findings: [] });
+    });
     const centering = await measureCenter();
     expect(centering).not.toBeNull();
     if (centering)
@@ -214,8 +223,12 @@ async function verifyHomeWelcome(page: Page) {
       const after = await input.boundingBox();
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
-      if (before && after)
-        expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+      if (before && after) {
+        // ratchet: JOV-9612
+        await ratchetGeometry('home composer y shift', () => {
+          expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+        });
+      }
       await assertGeometry();
       if (viewport.width === 1440) {
         // Independent deliberate red: truthful content, wrong bottom placement.
@@ -249,7 +262,9 @@ async function verifyHomeWelcome(page: Page) {
       await assertGeometry();
       expect(chatPosts).toBe(0);
       if (process.env.GOLDEN_PATH_KEYFRAME_DIR)
-        await captureKeyframe(page, `home-welcome-${viewport.width}`);
+        await captureKeyframe(page, `home-welcome-${viewport.width}`, {
+          expectedArtistName: TEST_SPOTIFY_ARTIST.name,
+        });
     }
     for (const state of ['empty', 'error'] as const) {
       mode = state;
@@ -349,17 +364,6 @@ async function ensureDbUser(betterAuthUserId: string) {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
-
-/** Block fire-and-forget tracking calls that trigger slow Turbopack cascades. */
-async function interceptTrackingCalls(page: Page) {
-  await page.route('**/api/profile/view', r =>
-    r.fulfill({ status: 200, body: '{}' })
-  );
-  await page.route('**/api/audience/visit', r =>
-    r.fulfill({ status: 200, body: '{}' })
-  );
-  await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
-}
 
 /** Exercise the Google handoff and its denied-provider recovery UI. */
 async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
@@ -712,6 +716,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
       timeout: 30_000,
     })
     .toBe(handle);
+  await expect(input).toHaveAttribute('placeholder', 'Reply to Jovie…');
 
   return conversationId;
 }
@@ -754,13 +759,61 @@ async function createFreshUser(page: import('@playwright/test').Page) {
 /*  Test suite                                                          */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Records an operator approval for a fresh golden-path user as the admin
+ * approval path does: an approved waitlist entry linked to the user plus an
+ * `admin` audit row. Without it a claim is private until proof, which is the
+ * product contract this fixture must not paper over.
+ */
+async function recordOperatorApproval(
+  sql: ReturnType<typeof neon>,
+  betterAuthUserId: string,
+  email: string
+) {
+  const [user] = (await sql`
+    SELECT id, waitlist_entry_id AS "waitlistEntryId"
+    FROM users
+    WHERE better_auth_user_id = ${betterAuthUserId}
+  `) as unknown as { id: string; waitlistEntryId: string | null }[];
+  expect(user, 'Golden Path user must exist before approval').toBeTruthy();
+  const normalized = email.trim().toLowerCase();
+  let entryId = user.waitlistEntryId;
+  if (!entryId) {
+    const [existing] = (await sql`
+      SELECT id FROM waitlist_entries
+      WHERE email_normalized = ${normalized} AND canonical = true
+      LIMIT 1
+    `) as unknown as { id: string }[];
+    entryId = existing?.id ?? null;
+  }
+  if (entryId) {
+    await sql`
+      UPDATE waitlist_entries
+      SET status = 'approved', approved_at = now(), updated_at = now()
+      WHERE id = ${entryId}
+    `;
+  } else {
+    const [created] = (await sql`
+      INSERT INTO waitlist_entries (email, email_normalized, status, source, approved_at)
+      VALUES (${email}, ${normalized}, 'approved', 'golden_path_operator_approval', now())
+      RETURNING id
+    `) as unknown as { id: string }[];
+    entryId = created.id;
+  }
+  await sql`
+    INSERT INTO waitlist_audit_logs (waitlist_entry_id, actor_type, to_status, reason)
+    VALUES (${entryId}, 'admin', 'approved', 'golden-path operator approval fixture')
+  `;
+  await sql`UPDATE users SET waitlist_entry_id = ${entryId} WHERE id = ${user.id}`;
+}
+
 test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () => {
   test.describe.configure({ mode: 'serial', retries: 0 });
 
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(() => {
     if (IS_LOCAL_AUTH_BYPASS) {
       if (IS_REQUIRED_GOLDEN_PATH) {
         throw new Error(
@@ -783,8 +836,6 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     if (IS_REQUIRED_GOLDEN_PATH && process.env.E2E_TEST_MODE !== '1') {
       throw new Error('Required Golden Path is missing deterministic OTP mode');
     }
-
-    await interceptTrackingCalls(page);
   });
 
   test('completes one identity from provider recovery through revoked return', async ({
@@ -792,6 +843,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     browser,
   }) => {
     test.setTimeout(900_000);
+    const trackingFixture = await interceptGoldenPathTrackingCalls(page);
     // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
     watchKeyframeErrors(page);
 
@@ -869,6 +921,12 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       conversationId,
     });
     expect(claimPayload).not.toHaveProperty('readyForCheckout');
+
+    // Private-until-proof (#23277): only an operator approval (an admin audit
+    // row) or a verified claim record publishes a claimed page and attaches
+    // its Spotify identity. This journey certifies the operator-approved
+    // artist, so the approval is recorded the way the admin path records it.
+    await recordOperatorApproval(sql, betterAuthUserId, email);
 
     // Finish the interview as the now-signed-in user. Meaningful free text
     // after the social card is the access-decision turn: the scripted engine
@@ -1104,7 +1162,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
       try {
         await ensureSignedInUser(adminPage, getAdminCredentials());
 
-        await adminPage.goto(APP_ROUTES.HUD, {
+        await adminPage.goto(APP_ROUTES.ADMIN_OPS, {
           waitUntil: 'domcontentloaded',
           timeout: 30_000,
         });
@@ -1154,7 +1212,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     });
     const fanPage = await fanContext.newPage();
     watchKeyframeErrors(fanPage);
-    await interceptTrackingCalls(fanPage);
+    await interceptGoldenPathTrackingCalls(fanPage);
 
     try {
       await expect(async () => {
@@ -1248,6 +1306,19 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     // Use this admitted identity for the actual Home shell. Controlled Insight
     // presentation does not certify Pro entitlement or a verified success claim.
     await verifyHomeWelcome(page);
+    await expect
+      .poll(trackingFixture.getAcceptedNavigationPostCount, {
+        message:
+          'Golden Path did not exercise its validated navigation telemetry sink',
+        timeout: 5_000,
+      })
+      .toBeGreaterThan(0);
+    await test.info().attach('golden-path-navigation-telemetry', {
+      contentType: 'application/json',
+      body: JSON.stringify({
+        acceptedPosts: trackingFixture.getAcceptedNavigationPostCount(),
+      }),
+    });
 
     // STEP 9: Reuse this exact identity and context for the post-activation
     // checkout, webhook, fresh-browser return, refund, and revoked-cookie proof.

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { linearRequest } from './linear-cooldown.mjs';
 
 export const JOVIE_TEAM_ID = 'bdc09edc-f91c-4a06-b308-74b4fcf093f8';
@@ -79,6 +80,33 @@ export async function addLinearIssueComment({
   return { ok: true, id: result.data.commentCreate.comment?.id ?? null };
 }
 
+/** Reopen a measurement finding in its owning team's triage state. */
+export async function reopenLinearIssue({
+  issueId,
+  stateId,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  if (!issueId || !stateId)
+    return { ok: false, reason: 'missing_reopen_routing' };
+  const result = await linearGraphql(
+    {
+      query: `mutation ReopenLinearIssue($id: String!, $input: IssueUpdateInput!) {
+      issueUpdate(id: $id, input: $input) { success }
+    }`,
+      variables: { id: issueId, input: { stateId } },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_reopen'
+  );
+  if (!result.ok) return result;
+  return result.data?.issueUpdate?.success
+    ? { ok: true }
+    : { ok: false, reason: 'linear_reopen_unsuccessful' };
+}
+
 /** List comments on a Linear issue (body + createdAt, oldest first). */
 export async function listLinearIssueComments({
   issueId,
@@ -119,10 +147,24 @@ export async function listLinearIssueComments({
 const REMEDIATION_KEY_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const labelCache = new Map();
 
-/** Router intake label. Do not double-prefix fingerprints that already start with it. */
+// Linear rejects issue-label names longer than 80 characters with a GraphQL
+// error. Every existing remediation label is at most 80; the time-bomb label
+// for apps/web/tests/unit/agent-os/visual-qa/diff-artifacts.test.ts is 83, so
+// the filing run failed on every schedule (JOV-8235).
+export const LINEAR_LABEL_NAME_MAX = 80;
+
+/**
+ * Router intake label. Do not double-prefix fingerprints that already start
+ * with it. Names over Linear's limit keep a readable prefix plus a stable
+ * 8-hex digest of the full name, so one fingerprint always maps to one label
+ * and the result is idempotent.
+ */
 export function remediationKey(fingerprint) {
-  const name = String(fingerprint ?? '').trim();
-  return name.startsWith('remediation:') ? name : `remediation:${name}`;
+  const raw = String(fingerprint ?? '').trim();
+  const name = raw.startsWith('remediation:') ? raw : `remediation:${raw}`;
+  if (name.length <= LINEAR_LABEL_NAME_MAX) return name;
+  const digest = createHash('sha256').update(name).digest('hex').slice(0, 8);
+  return `${name.slice(0, LINEAR_LABEL_NAME_MAX - digest.length - 1)}~${digest}`;
 }
 
 export function bareRemediationKey(value) {
@@ -725,6 +767,75 @@ export async function closeLinearIssueByFingerprint({
   };
 }
 /** Resolve the open issue when its description names this source workflow. */
+/**
+ * Attach one signal's evidence to the OPEN issue that owns a shared incident.
+ * Idempotent per `evidenceMarker`: a repeat of the same evidence is a no-op, so
+ * a monitor that re-fires every few minutes does not spam the thread.
+ * Returns action `none` when no open issue exists (caller files or reopens).
+ */
+export async function attachEvidenceToOpenIssue({
+  fingerprint,
+  evidenceMarker,
+  body,
+  apiKey = process.env.LINEAR_API_KEY,
+  fetchImpl = fetch,
+}) {
+  if (!apiKey) return { ok: false, reason: 'missing_linear_api_key' };
+  const found = await linearGraphql(
+    {
+      query: `
+        query FindIncidentOwner($teamFilterId: ID!, $labelName: String!) {
+          issues(
+            filter: {
+              team: { id: { eq: $teamFilterId } }
+              labels: { some: { name: { eq: $labelName } } }
+            }
+            first: 25
+          ) { nodes { ${ISSUE_FIELDS} } }
+        }
+      `,
+      variables: {
+        teamFilterId: JOVIE_TEAM_ID,
+        labelName: remediationKey(fingerprint),
+      },
+      apiKey,
+      fetchImpl,
+    },
+    'linear_label_search'
+  );
+  if (!found.ok) return found;
+  const match = resolveLinearIssueByFingerprint(
+    found.data?.issues?.nodes,
+    fingerprint
+  );
+  if (!match || ['completed', 'canceled'].includes(match.state?.type)) {
+    return { ok: true, action: 'none' };
+  }
+  const listed = await listLinearIssueComments({
+    issueId: match.id,
+    apiKey,
+    fetchImpl,
+  });
+  if (!listed.ok) return listed;
+  if (listed.comments.some(c => c.body.includes(evidenceMarker))) {
+    return { ok: true, action: 'unchanged', id: match.id };
+  }
+  const posted = await addLinearIssueComment({
+    issueId: match.id,
+    body,
+    apiKey,
+    fetchImpl,
+  });
+  if (!posted.ok) return posted;
+  return {
+    ok: true,
+    action: 'commented',
+    id: match.id,
+    identifier: match.identifier ?? null,
+    url: match.url ?? null,
+  };
+}
+
 export async function noteFingerprintedIssueGreen({
   fingerprint,
   source,

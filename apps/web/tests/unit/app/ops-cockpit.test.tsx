@@ -7,9 +7,13 @@ import { HudShippingStrip } from '@/components/features/admin/hud/HudShippingStr
 import { cockpitMetrics, cockpitShipping } from '@/tests/fixtures/hud-cockpit';
 
 beforeEach(() => {
-  vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-09-28T12:00:00.000Z'));
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-09-28T12:00:00.000Z'));
 });
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe('Ops cockpit sections', () => {
   it('renders the four compact company metric cards', () => {
@@ -38,6 +42,45 @@ describe('Ops cockpit sections', () => {
     expect(
       screen.getByRole('link', { name: /open shipping/i })
     ).toHaveAttribute('href', expect.stringContaining('shipping'));
+  });
+
+  it('shows LogYourBody production as failing and how far behind main it is', () => {
+    const view = {
+      ...cockpitShipping,
+      delivery: {
+        ...cockpitShipping.delivery,
+        lanes: {
+          ...cockpitShipping.delivery.lanes,
+          deployHealth: {
+            observedAt: '2026-10-25T06:40:00.000Z',
+            healthy: false,
+            repos: [
+              {
+                repo: 'JovieInc/LogYourBody',
+                status: 'failing' as const,
+                failedStreak: 15,
+                behindMain: 54,
+                oldestUnshippedAgeSeconds: 140083,
+                lastSuccessAt: '2026-10-23T16:03:00.000Z',
+              },
+            ],
+          },
+        },
+      },
+    };
+    render(<HudShippingStrip view={view} />);
+
+    expect(
+      screen.getByTestId('hud-shipping-chip-lyb-behind')
+    ).toHaveTextContent('Failing, 54 behind');
+  });
+
+  it('shows LogYourBody behind main as not measured until the feed publishes it', () => {
+    render(<HudShippingStrip view={cockpitShipping} />);
+
+    expect(
+      screen.getByTestId('hud-shipping-chip-lyb-behind')
+    ).toHaveTextContent('—');
   });
 
   it('renders a nominal exceptions strip when nothing needs attention', () => {

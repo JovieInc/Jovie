@@ -8,7 +8,7 @@ import * as deterministicGates from '../deterministic-gates.mjs';
 import * as planGate from '../plan-gate.mjs';
 import { withPreLeaseReceipts } from './pre-lease.mjs';
 
-const NOW = new Date().toISOString();
+const NOW = '2026-08-22T12:00:00.000Z';
 
 function issue(overrides = {}) {
   return {
@@ -86,7 +86,7 @@ describe('deterministic no-model gates', () => {
   beforeEach(context => {
     // Use the existing pre-lease receipt date, independently of wall-clock time.
     assert.ok('mock' in context, 'fixture clock needs a test context');
-    context.mock.timers.enable({ apis: ['Date'], now: new Date('2026-08-22T12:00:00.000Z') });
+    context.mock.timers.enable({ apis: ['Date'], now: new Date(NOW) });
   });
 
   it('builds complete bounded plan evidence only from an allowlisted issue', () => {

@@ -31,12 +31,19 @@ import { stripeWebhookEvents } from '@/lib/db/schema/billing';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
+import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
 import { stripe } from '@/lib/stripe/client';
 import {
   getStripeObjectId,
   stripeTimestampToDate,
 } from '@/lib/stripe/webhooks';
 import { processStripeWebhookEvent } from '@/lib/stripe/webhooks/process-event';
+import {
+  isStripeReconciliationRequiredError,
+  markStripeEventNeedsReconciliation,
+  reconciledAtOnSuccess,
+  reconciledStatusOnSuccess,
+} from '@/lib/stripe/webhooks/reconciliation';
 import { logger } from '@/lib/utils/logger';
 
 // Force Node.js runtime for Stripe SDK compatibility
@@ -101,6 +108,11 @@ function buildSignatureFailureContext(
 export async function POST(request: NextRequest) {
   const webhookSecret = env.STRIPE_WEBHOOK_SECRET?.trim();
   if (!webhookSecret) {
+    captureRevenueSpineFailure({
+      stage: 'webhook',
+      failureCode: 'configuration_missing',
+      severity: 'blocked',
+    });
     Sentry.addBreadcrumb({
       category: 'billing',
       message:
@@ -138,6 +150,11 @@ export async function POST(request: NextRequest) {
     try {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (error) {
+      captureRevenueSpineFailure({
+        stage: 'webhook',
+        failureCode: 'invalid_signature',
+        severity: 'unknown',
+      });
       await captureCriticalError(
         'Invalid Stripe webhook signature',
         error,
@@ -257,11 +274,17 @@ export async function POST(request: NextRequest) {
       // Process the event (handlers throw on failure)
       await processStripeWebhookEvent(event, stripeCreatedAt);
 
-      // Mark event as processed
+      // Mark event as processed (and reconciled, if it was flagged earlier)
+      const processedAt = new Date();
       const [processedRecord] = await withSystemIngestionSession(tx =>
         tx
           .update(stripeWebhookEvents)
-          .set({ processedAt: new Date(), processingStartedAt: null })
+          .set({
+            processedAt,
+            processingStartedAt: null,
+            reconciliationStatus: reconciledStatusOnSuccess,
+            reconciledAt: reconciledAtOnSuccess(processedAt),
+          })
           .where(
             and(
               eq(stripeWebhookEvents.id, claimedWebhookRecordId),
@@ -281,6 +304,40 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (processingError) {
+      // A verified event that cannot be applied yet (unmapped price) may be
+      // acknowledged only once it is durably marked for reconciliation. If
+      // that write fails, fall through to the 5xx path so Stripe retries.
+      if (
+        isStripeReconciliationRequiredError(processingError) &&
+        leaseClaimed &&
+        leaseStartedAt &&
+        webhookRecordId
+      ) {
+        try {
+          await markStripeEventNeedsReconciliation({
+            webhookRecordId,
+            stripeEventId: event.id,
+            eventType: event.type,
+            route: '/api/stripe/webhooks',
+            error: processingError,
+            leaseStartedAt,
+          });
+          return NextResponse.json(
+            { received: true, reconciliation: 'needs_reconciliation' },
+            { headers: NO_STORE_HEADERS }
+          );
+        } catch (captureError) {
+          logger.warn('Stripe webhook reconciliation capture failed', {
+            eventId: event.id,
+            error: captureError,
+          });
+        }
+      }
+      captureRevenueSpineFailure({
+        stage: 'webhook',
+        severity: 'blocked',
+        error: processingError,
+      });
       // Release the lease on handled failures so Stripe retries immediately;
       // an abrupt process exit still self-heals when the lease expires.
       if (leaseClaimed && leaseStartedAt && webhookRecordId) {
@@ -326,6 +383,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true }, { headers: NO_STORE_HEADERS });
   } catch (error) {
+    captureRevenueSpineFailure({
+      stage: 'webhook',
+      severity: 'blocked',
+      error,
+    });
     await captureCriticalError('Stripe webhook processing failed', error, {
       route: '/api/stripe/webhooks',
     });

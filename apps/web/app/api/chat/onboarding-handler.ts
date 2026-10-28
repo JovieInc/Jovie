@@ -9,6 +9,7 @@ import {
 import { and, asc, desc, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { isAiGatewayAvailable } from '@/lib/ai/gateway-availability';
 import {
   classifyGatewayAlert,
   isGatewayBudgetExceededError,
@@ -28,10 +29,15 @@ import {
   buildScriptedFallbackResponse,
   type FallbackReason,
 } from '@/lib/chat/onboarding-script/respond';
+import { routeOnboardingTurn } from '@/lib/chat/onboarding-script/route';
 import {
   OWNERSHIP_CONFLICT_LINE,
   STREAM_ERROR_LINE,
 } from '@/lib/chat/onboarding-script/script';
+import {
+  decisionKindOf,
+  recordOnboardingReply,
+} from '@/lib/chat/onboarding-script/telemetry.server';
 import {
   type PersistedOnboardingMessage,
   resumeOnboardingTranscript,
@@ -79,6 +85,7 @@ import {
 } from '@/lib/turnstile/verify';
 import { extractClientIPFromRequest } from '@/lib/utils/ip-extraction';
 import { logger } from '@/lib/utils/logger';
+import { readGoldenPathTurnContext } from '@/lib/waitlist/golden-path-admission.server';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 
 /** Existing Statsig kill switch for all `/api/chat` traffic. */
@@ -281,6 +288,7 @@ export async function tryHandleAnonymousOnboardingChat(
   req: Request,
   requestId: string
 ): Promise<Response | null> {
+  const enteredAt = performance.now();
   const peeked = await peekOnboardingMode(req);
   if (!peeked) return null;
 
@@ -654,10 +662,17 @@ export async function tryHandleAnonymousOnboardingChat(
     latestClientMessageId: latestUserMessage.clientMessageId,
   });
   const turnCount = uiMessages.filter(m => m.role === 'user').length;
+  // Read once per turn, only while the controlled-access gate is on. Null
+  // (unreadable, not green, or no spare capacity) holds the artist.
+  const goldenPath = accessControlled
+    ? await readGoldenPathTurnContext()
+    : { verdict: null, holdReason: null };
   const onboardingState = createOnboardingTurnState({
     sessionId,
     turnCount,
     accessControlled,
+    goldenPathVerdict: goldenPath.verdict,
+    goldenPathHold: goldenPath.holdReason,
     messages: serverToolHistory,
   });
   const tools = buildOnboardingTools(onboardingState);
@@ -731,6 +746,8 @@ export async function tryHandleAnonymousOnboardingChat(
       sessionId,
       turnCount,
       accessControlled,
+      goldenPathVerdict: goldenPath.verdict,
+      goldenPathHold: goldenPath.holdReason,
       messages: serverToolHistory,
     });
     const turn: FallbackTurn = await decideFallbackTurn({
@@ -755,6 +772,49 @@ export async function tryHandleAnonymousOnboardingChat(
       message: 'scripted_fallback_dispatch',
       level: 'warning',
       data: { reason, lineKey: turn.line.key, turnCount },
+    });
+    return built.response;
+  };
+
+  // System-1 reply engine (JOV-9627): deterministic answer sets and the rail,
+  // chosen by the intent classifier. The model is reached only when the
+  // classifier cannot read a message twice in a row (artist step) or on a
+  // later step with no confident read. `ONBOARDING_SYSTEM1_ENGINE=off` is the
+  // kill switch.
+  const serveSystem1Turn = async (
+    routed: Extract<
+      Awaited<ReturnType<typeof routeOnboardingTurn>>,
+      { kind: 'script' }
+    >
+  ): Promise<Response> => {
+    const { turn } = routed;
+    const buildMs = performance.now() - enteredAt;
+    const built = buildScriptedFallbackResponse({
+      turn,
+      reason: 'system1',
+      headers: {
+        ...responseHeaders,
+        'x-onboarding-engine': 'system1',
+        'server-timing': `reply;dur=${Math.round(buildMs)}`,
+      },
+    });
+    await persistAnonymousAssistantRecord({
+      conversationId,
+      latestUserClientMessageId: latestUserMessage.clientMessageId,
+      content: turn.text,
+      toolCalls: built.persistedToolEvents,
+      assistantSource: 'script',
+      scriptLineKey: turn.line.key,
+    });
+    recordOnboardingReply({
+      sessionId,
+      engine: 'system1',
+      guardedStep: routed.guardedStep,
+      turnIndex: turnCount,
+      serverMs: performance.now() - enteredAt,
+      classification: routed.classification,
+      lineKey: turn.line.key,
+      decisionKind: decisionKindOf(turn.toolEvents),
     });
     return built.response;
   };
@@ -850,6 +910,33 @@ export async function tryHandleAnonymousOnboardingChat(
       return await serveScriptedFallback(forcedFallbackReason);
     }
 
+    let llmClassification:
+      | Awaited<ReturnType<typeof routeOnboardingTurn>>['classification']
+      | null = null;
+    let llmGuardedStep = 'unknown';
+    if (env.ONBOARDING_SYSTEM1_ENGINE !== 'off') {
+      const routed = await routeOnboardingTurn({
+        uiMessages,
+        state: onboardingState,
+        artistConfirmation: serverArtistConfirmation,
+      });
+      if (routed.kind === 'script') return await serveSystem1Turn(routed);
+      llmClassification = routed.classification;
+      llmGuardedStep = routed.guardedStep;
+    }
+
+    // Matrix and other keyless runtimes have no Gateway credential and no
+    // Vercel OIDC. `executeChatTurn` hangs there instead of throwing, so the
+    // catch below never serves the script. Answer from the script first.
+    if (
+      !isAiGatewayAvailable({
+        apiKey: env.AI_GATEWAY_API_KEY,
+        vercel: process.env.VERCEL,
+      })
+    ) {
+      return await serveScriptedFallback('llm_error');
+    }
+
     let streamFailed = false;
     const turn = await executeChatTurn({
       uiMessages: modelUiMessages,
@@ -872,6 +959,15 @@ export async function tryHandleAnonymousOnboardingChat(
       onStreamError: async () => {
         streamFailed = true;
       },
+    });
+
+    recordOnboardingReply({
+      sessionId,
+      engine: 'llm',
+      guardedStep: llmGuardedStep,
+      turnIndex: turnCount,
+      serverMs: performance.now() - enteredAt,
+      classification: llmClassification,
     });
 
     Sentry.addBreadcrumb({

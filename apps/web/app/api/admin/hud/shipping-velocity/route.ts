@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server';
 import { isAdmin as checkAdminRole } from '@/lib/admin/roles';
 import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
-import { serverFetch } from '@/lib/http/server-fetch';
+import { ServerFetchTimeoutError, serverFetch } from '@/lib/http/server-fetch';
 import { medianNumber } from '@/lib/hud/number-series';
 import type { HudObservationState } from '@/lib/hud/observation';
 import { observationFromShippingVelocityBuckets } from '@/lib/hud/shipping-velocity-observation';
@@ -18,7 +18,12 @@ export const maxDuration = 60;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 const VELOCITY_CACHE_MAX_AGE_MS = 2 * 60 * 1000;
 const VELOCITY_CACHE_STALE_MAX_AGE_MS = 10 * 60 * 1000;
+const VELOCITY_REFRESH_COOLDOWN_MS = VELOCITY_CACHE_STALE_MAX_AGE_MS;
 const velocityInFlight = new Map<string, Promise<ShippingVelocityResponse>>();
+const velocityRefreshCooldowns = new Map<
+  string,
+  { untilMs: number; message: string }
+>();
 
 type ValidRange = '7d' | '30d' | '1y';
 
@@ -100,6 +105,40 @@ class GitHubRateLimitError extends Error {
   }
 }
 
+/** A complete scan did not fit the request budget; partial counts are unusable. */
+class GitHubScanBudgetError extends Error {
+  constructor(resource: 'page' | 'node') {
+    super(`GitHub GraphQL ${resource} budget exceeded`);
+    this.name = 'GitHubScanBudgetError';
+  }
+}
+
+/**
+ * Expected refresh failures (scan exhaustion, rate limit, timeout) cannot
+ * succeed again until GitHub's data or limits move. Re-running a scan that
+ * cannot fit its page budget on every expired-cache poll burns the shared
+ * GitHub GraphQL budget (JOV-8743), so record a cooldown: serve the degraded
+ * observation immediately and re-attempt at most once per window.
+ */
+function recordRefreshCooldown(cacheKey: string, message: string): void {
+  velocityRefreshCooldowns.set(cacheKey, {
+    untilMs: Date.now() + VELOCITY_REFRESH_COOLDOWN_MS,
+    message,
+  });
+}
+
+function activeRefreshCooldown(
+  cacheKey: string
+): { readonly message: string } | null {
+  const cooldown = velocityRefreshCooldowns.get(cacheKey);
+  if (!cooldown) return null;
+  if (cooldown.untilMs <= Date.now()) {
+    velocityRefreshCooldowns.delete(cacheKey);
+    return null;
+  }
+  return cooldown;
+}
+
 function rateLimitResetAtIso(response: Response): string | null {
   const resetHeader = response.headers.get('x-ratelimit-reset');
   if (!resetHeader) return null;
@@ -112,6 +151,18 @@ function rateLimitRetryMessage(error: GitHubRateLimitError): string {
   return error.resetAtIso
     ? `GitHub rate limit exceeded; shipping velocity refreshes after ${error.resetAtIso}.`
     : 'GitHub rate limit exceeded; try again shortly.';
+}
+
+function expectedRefreshErrorMessage(error: unknown): string | null {
+  if (error instanceof ServerFetchTimeoutError) {
+    return 'Shipping velocity refresh timed out; try again shortly.';
+  }
+  if (error instanceof GitHubRateLimitError)
+    return rateLimitRetryMessage(error);
+  if (error instanceof GitHubScanBudgetError) {
+    return 'Shipping velocity scan limit reached for this range.';
+  }
+  return null;
 }
 
 const SHIPPING_VELOCITY_QUERY = `query ShippingVelocity($owner: String!, $name: String!, $cursor: String) {
@@ -248,7 +299,7 @@ async function fetchBucketsFromGitHub(
   for (;;) {
     pageCount += 1;
     if (pageCount > budget.maxPages) {
-      throw new Error('GitHub GraphQL page budget exceeded');
+      throw new GitHubScanBudgetError('page');
     }
     const payload = await fetchGraphQLPage(token, owner, repo, cursor, signal);
 
@@ -272,7 +323,7 @@ async function fetchBucketsFromGitHub(
       }
       nodeCount += 1;
       if (nodeCount > maxNodes) {
-        throw new Error('GitHub GraphQL node budget exceeded');
+        throw new GitHubScanBudgetError('node');
       }
       incrementBucket(buckets, toDateString(node.createdAt), 'opened');
       countMergedPr(node, buckets, mergeHoursByDate);
@@ -528,6 +579,30 @@ export async function GET(request: Request): Promise<Response> {
 
     let computation = velocityInFlight.get(cacheKey);
     if (!computation) {
+      const cooldown = activeRefreshCooldown(cacheKey);
+      if (cooldown) {
+        if (cached && cached.response.observation !== 'not_configured') {
+          return NextResponse.json(
+            normalizeVelocityResponse({
+              ...cached.response,
+              observation: 'stale',
+              errorMessage: cooldown.message,
+            }),
+            { status: 200, headers: NO_STORE_HEADERS }
+          );
+        }
+        const unavailable: ShippingVelocityResponse = {
+          data: [],
+          range,
+          cachedAt: new Date().toISOString(),
+          observation: 'unavailable',
+          errorMessage: cooldown.message,
+        };
+        return NextResponse.json(unavailable, {
+          status: 200,
+          headers: NO_STORE_HEADERS,
+        });
+      }
       computation = computeVelocity(
         token,
         owner,
@@ -549,18 +624,21 @@ export async function GET(request: Request): Promise<Response> {
     try {
       result = await computation;
     } catch (error) {
-      const isRateLimited = error instanceof GitHubRateLimitError;
+      const expectedErrorMessage = expectedRefreshErrorMessage(error);
+      if (expectedErrorMessage) {
+        recordRefreshCooldown(cacheKey, expectedErrorMessage);
+      }
       if (cached?.response.observation !== undefined) {
         const stale = normalizeVelocityResponse({
           ...cached.response,
           observation: 'stale',
-          errorMessage: isRateLimited
-            ? rateLimitRetryMessage(error)
-            : 'Refresh unavailable; showing last verified shipping velocity.',
+          errorMessage:
+            expectedErrorMessage ??
+            'Refresh unavailable; showing last verified shipping velocity.',
         });
-        if (isRateLimited) {
+        if (expectedErrorMessage) {
           logger.warn(
-            '[hud/shipping-velocity] GitHub rate limit exceeded; serving stale cache',
+            `[hud/shipping-velocity] ${expectedErrorMessage} Serving stale cache`,
             error
           );
         } else {
@@ -579,9 +657,9 @@ export async function GET(request: Request): Promise<Response> {
           headers: NO_STORE_HEADERS,
         });
       }
-      if (isRateLimited) {
+      if (expectedErrorMessage) {
         logger.warn(
-          '[hud/shipping-velocity] GitHub rate limit exceeded; no cache available',
+          `[hud/shipping-velocity] ${expectedErrorMessage} No cache available`,
           error
         );
         const unavailable: ShippingVelocityResponse = {
@@ -589,7 +667,7 @@ export async function GET(request: Request): Promise<Response> {
           range,
           cachedAt: new Date().toISOString(),
           observation: 'unavailable',
-          errorMessage: rateLimitRetryMessage(error),
+          errorMessage: expectedErrorMessage,
         };
         return NextResponse.json(unavailable, {
           status: 200,

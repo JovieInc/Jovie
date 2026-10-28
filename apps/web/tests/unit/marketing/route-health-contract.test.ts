@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   getMarketingRouteHealthTarget,
@@ -10,6 +12,20 @@ import {
   MARKETING_ROUTE_HEALTH_TARGETS,
   MARKETING_ROUTE_MANIFEST,
 } from '@/data/marketing';
+import { isProductionBlockedDebugPath } from '@/lib/security/production-blocked-routes';
+
+const PRODUCT_UPDATE_OWNER =
+  'apps/web/app/(marketing)/changelog/ChangelogEmailSignup.tsx';
+
+function signupPages(): readonly string[] {
+  const source = readFileSync(
+    resolve(process.cwd(), 'components/marketing/MarketingEmailSignup.tsx'),
+    'utf8'
+  );
+  const block = source.match(/const SIGNUP_PAGES = new Set\(\[([\s\S]*?)\]\)/);
+  if (!block?.[1]) throw new Error('SIGNUP_PAGES is missing');
+  return [...block[1].matchAll(/'([^']+)'/g)].map(match => match[1] ?? '');
+}
 
 describe('marketing route health contract', () => {
   it('registers the generated integrations directory as a sanctioned reference route', () => {
@@ -218,6 +234,27 @@ describe('marketing route health contract', () => {
     ]);
   });
 
+  it('records the shared product-update section on censused signup pages', () => {
+    const missing: string[] = [];
+    for (const url of signupPages()) {
+      const entry = MARKETING_ROUTE_MANIFEST.find(item => item.url === url);
+      expect(entry, url).toBeDefined();
+      if (!entry) continue;
+      const target = getMarketingRouteHealthTarget(entry);
+      if (target.expected !== 'page') continue;
+      if (entry.exempt && entry.renderedSections.length === 0) continue;
+      const last = entry.renderedSections.at(-1);
+      const recorded =
+        last?.kind === 'approved-section' &&
+        last.sectionId === 'capture' &&
+        last.variantId === 'email-only' &&
+        last.occurrenceId === 'product-updates' &&
+        last.componentPath === PRODUCT_UPDATE_OWNER;
+      if (!recorded) missing.push(url);
+    }
+    expect(missing).toEqual([]);
+  });
+
   it('generates one disposition inventory from the canonical route manifest', () => {
     expect(MARKETING_ROUTE_DISPOSITION_LEDGER).toHaveLength(
       MARKETING_ROUTE_MANIFEST.length
@@ -249,15 +286,18 @@ describe('marketing route health contract', () => {
     // JOV-6859: an active route must never silently 404 — its resolved health
     // target cannot be declared not-found. Wildcard routes keep their explicit
     // fixture probes (e.g. the unpublished engineering article check).
+    // Development-only routes that the proxy blocks in production are the
+    // one exception: they must declare not-found (never a certified page).
     for (const entry of MARKETING_ROUTE_MANIFEST) {
       const target = getMarketingRouteHealthTarget(entry);
+      const productionBlocked = isProductionBlockedDebugPath(target.path);
       if (entry.status === 'active' && !entry.url.includes('*')) {
         expect(
           target.expected,
           `${entry.glob} is active but declares ${target.expected}`
-        ).toBe('page');
+        ).toBe(productionBlocked ? 'not-found' : 'page');
       }
-      if (target.expected === 'not-found') {
+      if (target.expected === 'not-found' && !productionBlocked) {
         expect(
           entry.url,
           `${entry.glob} declares a not-found probe on a concrete route`

@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { formatDeprecationObservation } from '../deprecation-observation.mjs';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
+  conflictRemediationResolved,
   extractMergeIssueRef,
   failureDisposition,
   installationQuotaClassifierReady,
@@ -832,6 +833,20 @@ describe('linear sync on merge', () => {
     }
   );
 
+  // Linear's Duplicate state type is closed work: a duplicate child must not
+  // hold its parent open (72 parents waited on sub-issues on 2026-10-21).
+  it('treats a Duplicate-state child as closed for the parent gate', async () => {
+    const { world, fetchImpl } = createWorld();
+    const issue = world.issues['JOV-1'];
+    issue.state = 'In Progress';
+    issue.children = [['JOV-2', 'duplicate', '2026-10-03T12:00:00Z']];
+    issue.attachments = [];
+    issue.comments.push(receiptComment('JOV-1', {}, '2026-10-03T13:00:00Z'));
+    await sweep(fetchImpl);
+    await sweep(fetchImpl);
+    expect(issue.state).toBe('Done');
+  });
+
   it('retains a parent without its own outcome, then closes from fresh verified proof without inventing a parent PR', async () => {
     const { world, fetchImpl } = createWorld();
     const issue = world.issues['JOV-1'];
@@ -1330,6 +1345,32 @@ describe('linear sync on merge', () => {
           body: 'See JOV-6586 for context.',
           headRef: 'codex/jov-65860-other',
         },
+        issue
+      )
+    ).toBe(false);
+  });
+
+  it('matches explicit PR identifiers exactly when deciding closure holds', () => {
+    const issue = { identifier: 'JOV-8616', issueId: 'uuid-8616' };
+    const pull = { title: 'lifecycle repair', headRef: 'feature/no-ticket' };
+    expect(
+      pullRequestLinksIssue(
+        {
+          ...pull,
+          body: '<!-- linear-issue-identifier:JOV-86160 -->\n<!-- linear-issue-identifier:jov-8616 -->',
+        },
+        issue
+      )
+    ).toBe(true);
+    expect(
+      pullRequestLinksIssue(
+        { ...pull, body: '<!-- linear-issue-identifier:JOV-86160 -->' },
+        issue
+      )
+    ).toBe(false);
+    expect(
+      pullRequestLinksIssue(
+        { ...pull, body: '<!-- linear-issue-id:uuid-unrelated -->' },
         issue
       )
     ).toBe(false);
@@ -2159,7 +2200,7 @@ describe('linear sync on merge', () => {
       'utf8'
     );
     expect(workflow).toContain('node scripts/lib/linear-sync-on-merge.mjs');
-    expect(workflow).toContain('runs-on: ubuntu-latest');
+    expect(workflow).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(workflow).not.toContain('issueUpdate');
     // Receipts arrive through the Linear webhook bridge; no clock.
     expect(workflow).not.toMatch(/^\s+schedule:/m);
@@ -2324,4 +2365,33 @@ it('a recurring warning retains the remediation hold after a previous green obse
     'Fingerprinted remediation issues stay open'
   );
   expect(world.updates).toEqual([]);
+});
+
+describe('conflictRemediationResolved', () => {
+  const issue = { labels: ['remediation:pr-20235-conflict', 'bug'] };
+  it('resolves when a complete open-PR scan no longer lists the pull request', () => {
+    expect(
+      conflictRemediationResolved(issue, {
+        pulls: [{ number: 1 }],
+        complete: true,
+      })
+    ).toBe(true);
+    expect(
+      conflictRemediationResolved(issue, {
+        pulls: [{ number: 20235 }],
+        complete: true,
+      })
+    ).toBe(false);
+  });
+  it('proves nothing from an incomplete scan or an unrelated issue', () => {
+    expect(
+      conflictRemediationResolved(issue, { pulls: [], complete: false })
+    ).toBeNull();
+    expect(
+      conflictRemediationResolved(
+        { labels: ['remediation:screen-audit:web.x'] },
+        { pulls: [], complete: true }
+      )
+    ).toBeNull();
+  });
 });

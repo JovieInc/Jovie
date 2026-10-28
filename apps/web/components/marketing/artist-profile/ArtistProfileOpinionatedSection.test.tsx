@@ -18,6 +18,12 @@ describe('ArtistProfileOpinionatedSection', () => {
     expect(root.tagName).toBe('SECTION');
     expect(root).toHaveAttribute('data-marketing-variant', 'phone-right');
     expect(root).toHaveAttribute('data-marketing-occurrence', 'opinionated');
+    expect(
+      screen.getByTestId('artist-profile-opinionated-profile')
+    ).toHaveClass('marketing-rounded-frame');
+    expect(screen.getByRole('img').closest('figure')).toBe(
+      screen.getByTestId('artist-profile-opinionated-profile')
+    );
   });
 
   it('renders record-owned copy and the selected real capture without borrowed copy', () => {
@@ -52,6 +58,17 @@ describe('ArtistProfileOpinionatedSection', () => {
       ARTIST_PROFILE_COPY.opinionated.principle
     );
   });
+  it('describes the default profile with listener wording, never fan wording', () => {
+    const { container } = render(
+      <ArtistProfileOpinionatedSection
+        opinionated={ARTIST_PROFILE_COPY.opinionated}
+      />
+    );
+    const caption = container.querySelector('figcaption');
+    expect(caption?.textContent ?? '').not.toMatch(/\bfans?\b/iu);
+    expect(container.textContent ?? '').not.toMatch(/leads fans/iu);
+  });
+
   it('keeps the opinionated profile source contract bounded and accessible', () => {
     const source = readFileSync(
       resolve(

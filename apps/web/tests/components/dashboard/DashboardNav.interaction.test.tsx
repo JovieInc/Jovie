@@ -34,7 +34,6 @@ describe('DashboardNav interactions', () => {
   it('exposes an icon and label for each canonical navigation item', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     for (const label of PRIMARY_LABELS) {
@@ -65,15 +64,13 @@ describe('DashboardNav interactions', () => {
     expect(inbox).toHaveAccessibleName('Inbox');
 
     expect(newChat).toHaveClass('size-6', 'rounded-md', 'text-sidebar-muted');
-    expect(newChat.parentElement).toHaveAttribute(
-      'data-sidebar-history-header'
-    );
+    expect(newChat.parentElement).toHaveAttribute('data-sidebar-search-slot');
     expect(newChat).not.toHaveClass('bg-sidebar-accent-active');
     expect(newChat).not.toHaveClass('w-full');
     expect(searchSlot).toHaveClass('h-9', 'shrink-0');
     expect(screen.getAllByRole('button', { name: 'Search' })).toHaveLength(1);
     expect(searchSlot).toContainElement(inbox);
-    expect(searchSlot).not.toContainElement(newChat);
+    expect(searchSlot).toContainElement(newChat);
     expect(
       container.querySelector('[data-nav-section]')?.parentElement
     ).toHaveClass('pt-5');
@@ -122,7 +119,7 @@ describe('DashboardNav interactions', () => {
   it('routes Identity through root navigation without a duplicate avatar button', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
+
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -240,7 +237,7 @@ describe('DashboardNav interactions', () => {
     vi.useFakeTimers();
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
+
       overrides: {
         selectedProfile: {
           id: 'profile_123',
@@ -290,7 +287,6 @@ describe('DashboardNav interactions', () => {
     mockUsePathname.mockReturnValue('/demo/showcase/settings');
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     const identityLink = screen.getByRole('link', { name: 'Identity' });
