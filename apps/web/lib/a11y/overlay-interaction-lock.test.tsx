@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { cleanup, render } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   hasGenuineBlockingOverlay,
   OVERLAY_LOCK_ATTR,
@@ -236,5 +236,232 @@ describe('desktop drag-region contract', () => {
       'html[data-desktop-runtime="electron"] [data-testid="chat-composer-surface"]'
     );
     expect(css).toContain('-webkit-app-region: no-drag');
+  });
+});
+
+describe('hasGenuineBlockingOverlay edge cases', () => {
+  it('detects every genuine overlay selector with the right reason', () => {
+    const cases: Array<[React.ReactElement, string]> = [
+      [<div key='l' role='listbox' />, 'listbox'],
+      [<div key='a' role='alertdialog' aria-modal='true' />, 'dialog'],
+      [<dialog key='d' open />, 'dialog'],
+      [<div key='s' data-slot='sheet-overlay' />, 'overlay'],
+      [<div key='m' role='menu' />, 'menu'],
+    ];
+    for (const [element, reason] of cases) {
+      const { unmount } = render(element);
+      expect(hasGenuineBlockingOverlay()).toBe(reason);
+      unmount();
+    }
+  });
+
+  it('ignores aria-hidden="true" overlays but not aria-hidden="false"', () => {
+    const { unmount } = render(
+      <div role='dialog' aria-modal='true' aria-hidden='true' />
+    );
+    expect(hasGenuineBlockingOverlay()).toBeNull();
+    unmount();
+    render(<div role='dialog' aria-modal='true' aria-hidden='false' />);
+    expect(hasGenuineBlockingOverlay()).toBe('dialog');
+  });
+
+  it('ignores overlays hidden by display:none or visibility:hidden individually', () => {
+    const { unmount } = render(<div role='menu' style={{ display: 'none' }} />);
+    expect(hasGenuineBlockingOverlay()).toBeNull();
+    unmount();
+    const second = render(<div role='menu' style={{ visibility: 'hidden' }} />);
+    expect(hasGenuineBlockingOverlay()).toBeNull();
+    second.unmount();
+    render(
+      <div role='menu' style={{ display: 'block', visibility: 'visible' }} />
+    );
+    expect(hasGenuineBlockingOverlay()).toBe('menu');
+  });
+
+  it('ignores a data-state=closed dialog', () => {
+    render(<div role='dialog' aria-modal='true' data-state='closed' />);
+    expect(hasGenuineBlockingOverlay()).toBeNull();
+  });
+});
+
+describe('restoreLeakedOverlayLocks edge cases', () => {
+  it('does not claim to restore a body pointer-events value other than none', () => {
+    document.body.style.pointerEvents = 'auto';
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).toEqual([]);
+    expect(document.body.style.pointerEvents).toBe('auto');
+  });
+
+  it('skips closed overlays that are already inert', () => {
+    const { container } = render(
+      <div data-slot='sheet-overlay' data-state='closed' inert />
+    );
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).not.toContain('closed-overlay');
+    expect(container.firstElementChild).not.toHaveAttribute('aria-hidden');
+  });
+
+  it('removes the lock attribute when no overlay is open', () => {
+    document.documentElement.setAttribute(OVERLAY_LOCK_ATTR, 'dialog');
+    restoreLeakedOverlayLocks();
+    expect(document.documentElement).not.toHaveAttribute(OVERLAY_LOCK_ATTR);
+  });
+
+  it('keeps shell elements nested in the right rail inert', () => {
+    const { container } = render(
+      <div data-app-shell-frame='true'>
+        <div data-testid='app-shell-right-rail'>
+          <aside>
+            <div data-app-shell-scroll inert aria-hidden='true' />
+          </aside>
+        </div>
+      </div>
+    );
+    const nested = container.querySelector(
+      '[data-app-shell-scroll]'
+    ) as HTMLElement;
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).not.toContain('shell-inert');
+    expect(nested).toHaveAttribute('inert');
+    expect(nested).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('leaves healthy shell elements alone', () => {
+    const { container } = render(<div data-app-shell-frame='true' />);
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).toEqual([]);
+    expect(container.firstElementChild).not.toHaveAttribute('inert');
+  });
+
+  it('clears aria-hidden on a shell element that is not inert', () => {
+    const { container } = render(
+      <div data-app-shell-frame='true' aria-hidden='true' />
+    );
+    const frame = container.firstElementChild as HTMLElement;
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).toContain('shell-inert');
+    expect(frame).not.toHaveAttribute('aria-hidden');
+  });
+
+  it('keeps a non-true aria-hidden value on a leaked inert shell element', () => {
+    const { container } = render(
+      <div data-app-shell-frame='true' inert aria-hidden='false' />
+    );
+    const frame = container.firstElementChild as HTMLElement;
+    restoreLeakedOverlayLocks();
+    expect(frame).not.toHaveAttribute('inert');
+    expect(frame).toHaveAttribute('aria-hidden', 'false');
+  });
+
+  it('does not move focus when the active element is healthy', () => {
+    document.body.style.pointerEvents = 'none';
+    const { container } = render(
+      <div>
+        <textarea aria-label='Chat Message Input' />
+        <button type='button'>Healthy</button>
+      </div>
+    );
+    const healthy = container.querySelector('button') as HTMLButtonElement;
+    healthy.focus();
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).toEqual(['body-pointer-events']);
+    expect(document.activeElement).toBe(healthy);
+  });
+
+  it('refocuses when the active element sits inside an inert ancestor', () => {
+    const { container } = render(
+      <div>
+        <div inert>
+          <button type='button'>Nested</button>
+        </div>
+        <textarea aria-label='Chat Message Input' />
+      </div>
+    );
+    const nested = container.querySelector('button') as HTMLButtonElement;
+    const composer = container.querySelector('textarea') as HTMLTextAreaElement;
+    nested.focus();
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).toEqual([]);
+    expect(document.activeElement).toBe(nested);
+
+    document.body.style.pointerEvents = 'none';
+    const second = restoreLeakedOverlayLocks();
+    expect(second.restored).toContain('focus');
+    expect(document.activeElement).toBe(composer);
+  });
+
+  it('focuses the composer without scrolling', () => {
+    document.body.style.pointerEvents = 'none';
+    const { container } = render(
+      <div>
+        <textarea aria-label='Chat Message Input' />
+        <button type='button' inert>
+          Stuck
+        </button>
+      </div>
+    );
+    const composer = container.querySelector('textarea') as HTMLTextAreaElement;
+    const focus = vi.spyOn(composer, 'focus');
+    (container.querySelector('button') as HTMLButtonElement).focus();
+    restoreLeakedOverlayLocks();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
+  it('does not refocus when no composer exists and main is inside an inert ancestor', () => {
+    document.body.style.pointerEvents = 'none';
+    const { container } = render(
+      <div>
+        <div inert>
+          <div id='main-content' />
+        </div>
+        <button type='button' inert>
+          Stuck
+        </button>
+      </div>
+    );
+    (container.querySelector('button') as HTMLButtonElement).focus();
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).toEqual(['body-pointer-events']);
+  });
+
+  it('does not throw or refocus when neither composer nor main exist', () => {
+    document.body.style.pointerEvents = 'none';
+    const { container } = render(
+      <button type='button' inert>
+        Stuck
+      </button>
+    );
+    (container.querySelector('button') as HTMLButtonElement).focus();
+    const result = restoreLeakedOverlayLocks();
+    expect(result.restored).toEqual(['body-pointer-events']);
+  });
+
+  it('does not attempt focus recovery when nothing was restored', () => {
+    const { container } = render(
+      <div>
+        <textarea aria-label='Chat Message Input' />
+        <button type='button' inert>
+          Stuck
+        </button>
+      </div>
+    );
+    const stuck = container.querySelector('button') as HTMLButtonElement;
+    stuck.focus();
+    const result = restoreLeakedOverlayLocks();
+    expect(result).toEqual({ restored: [], blocked: false, reason: null });
+    expect(document.activeElement).toBe(stuck);
+  });
+
+  it('returns an empty inert result when there is no document', () => {
+    vi.stubGlobal('document', undefined);
+    try {
+      expect(restoreLeakedOverlayLocks()).toEqual({
+        restored: [],
+        blocked: false,
+        reason: null,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

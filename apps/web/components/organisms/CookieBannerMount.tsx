@@ -92,6 +92,10 @@ export function CookieBannerMount() {
   }, [openPreferences]);
 
   useEffect(() => {
+    // A page that server-renders the card (see
+    // resolveInitialCookieBannerVisible) already owns it; mounting a second
+    // one would double the dialog.
+    if (document.querySelector('[data-testid="cookie-banner"]')) return;
     if (shouldMountCookieBanner(globalThis.location.pathname)) {
       void import('@/components/organisms/CookieBannerSection').then(mod => {
         setBanner(() => mod.CookieBannerSection);

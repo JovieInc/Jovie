@@ -89,9 +89,7 @@
       }
     ],
     "quota": {
-      "source": "claude-lane",
-      "windowS": 18000,
-      "softRuns": 12
+      "source": "claude-lane"
     },
     "health": ["python3", "{here}/claude_lane.py", "health"],
     "healthy": "available: true",
@@ -127,9 +125,7 @@
       }
     ],
     "quota": {
-      "source": "ledger",
-      "windowS": 86400,
-      "softRuns": 24
+      "source": "ledger"
     },
     "health": ["python3", "{here}/hyperagent_lane.py", "health"],
     "healthy": "available: true",
@@ -148,6 +144,14 @@
     "tier": 4,
     "model": "grok-4.7",
     "slots": 1,
+    "routes": [
+      {
+        "model": "grok-4.7",
+        "capability": "standard",
+        "costClass": "subscription",
+        "cost": 2
+      }
+    ],
     "health": ["grok", "models"],
     "healthy": "logged in",
     "cmd": [
