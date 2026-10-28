@@ -107,6 +107,25 @@ describe('DemoTimWhiteProfileSurface', () => {
     SLOW_DEMO_SURFACE_TIMEOUT_MS
   );
 
+  it('keeps a local portrait in the explicitly selected compact preview', async () => {
+    const props = await renderSurface('presentation=compact-preview');
+
+    expect(props).toMatchObject({
+      presentation: 'compact-preview',
+      mode: 'profile',
+      artist: expect.objectContaining({
+        name: TIM_WHITE_PROFILE.name,
+        image_url: TIM_WHITE_PROFILE.avatarSrc,
+      }),
+    });
+  });
+
+  it('retains the public presentation for unsupported presentation values', async () => {
+    const props = await renderSurface('presentation=embedded');
+
+    expect(props?.presentation).toBe('full-public');
+  });
+
   it('provides executable coverage-via evidence for the demo surface', () => {
     const source = readFileSync(
       'components/features/demo/DemoTimWhiteProfileSurface.tsx',

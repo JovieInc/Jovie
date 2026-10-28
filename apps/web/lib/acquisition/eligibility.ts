@@ -1,6 +1,6 @@
 /**
  * ACQUISITION_ELIGIBLE (JOV-7696): a derived, fail-closed predicate over the
- * $199 artist revenue cone.
+ * $12 artist revenue cone.
  *
  * It composes receipts that existing owners already produce (the M2
  * revenue-path canary, the auth/signup and public-profile canaries, the
@@ -31,7 +31,7 @@ export interface ConeRequirement {
 
 /**
  * Ordered along the customer journey: stranger → entry → signup/claim →
- * profile truth → $199 offer/checkout → activation → verified payment and
+ * profile truth → $12 offer/checkout → activation → verified payment and
  * entitlement, plus the instrumentation that measures it. The first
  * non-green requirement in this order is the binding constraint.
  */
@@ -52,7 +52,7 @@ export const REVENUE_CONE_REQUIREMENTS = [
   },
   {
     id: 'claim',
-    label: 'Claim and $199 Pro signup surfaces are truthful',
+    label: 'Claim and $12 Pro signup surfaces are truthful',
     owner: 'engineering (M2 revenue-path canary, JOV-6439)',
     nextAction:
       'Repair the pricing or Pro signup surface, then rerun the M2 revenue-path canary.',
@@ -74,10 +74,10 @@ export const REVENUE_CONE_REQUIREMENTS = [
   },
   {
     id: 'offer_checkout',
-    label: 'The $199 Pro offer is current and checkout is gated correctly',
+    label: 'The $12 Pro offer is current and checkout is gated correctly',
     owner: 'billing (M2 revenue-path canary, JOV-6439)',
     nextAction:
-      'Repair the $199 price option or checkout gate, then rerun the M2 revenue-path canary.',
+      'Repair the $12 price option or checkout gate, then rerun the M2 revenue-path canary.',
   },
   {
     id: 'jov6258_preflight',
@@ -173,6 +173,7 @@ export interface ConeRequirementResult {
 
 export interface AcquisitionEligibility {
   readonly contract: typeof ACQUISITION_ELIGIBILITY_CONTRACT;
+  // Receipt-continuity id: the cone keeps its historical name; the offer is $12/mo.
   readonly cone: '$199-artist-pro';
   readonly evaluatedAt: string;
   /** True only when every requirement is currently green. */
@@ -231,7 +232,7 @@ function explain(
 
 function policyInstruction(firstBlocker: ConeRequirementResult | null) {
   if (!firstBlocker) {
-    return 'The $199 cone is green: outbound acquisition may be recommended, sized from current funnel conversion.';
+    return 'The $12 cone is green: outbound acquisition may be recommended, sized from current funnel conversion.';
   }
   return `Do not recommend outbound acquisition or more traffic. Work the first blocking receipt instead: ${firstBlocker.label} (${firstBlocker.status}). Owner: ${firstBlocker.owner}. Next: ${firstBlocker.nextAction}`;
 }
@@ -310,6 +311,6 @@ export function describeAcquisitionBlock(
   eligibility: Pick<AcquisitionEligibility, 'verdict' | 'firstBlocker'>
 ): string {
   const blocker = eligibility.firstBlocker;
-  if (!blocker) return 'ACQUISITION_ELIGIBLE: the $199 cone is green.';
+  if (!blocker) return 'ACQUISITION_ELIGIBLE: the $12 cone is green.';
   return `ACQUISITION_ELIGIBLE is false (${eligibility.verdict}): first blocker ${blocker.id} is ${blocker.status}. ${blocker.nextAction}`;
 }
