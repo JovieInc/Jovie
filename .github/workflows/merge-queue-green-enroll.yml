@@ -885,10 +885,10 @@ jobs:
           })));
           NODE
 
-  # Human-owned tim-hold variants and do-not-merge require authorized
-  # disposition; this sweep never expires them or their coexisting stops.
-  # Other stop labels use the hold contract (scripts/hold-contract.mjs,
-  # jovie-hold/v1): a receipt names an owner and an expiry or head-change release.
+  # No stop label is human-owned (tim-hold, tim:hold, hold:tim and do-not-merge
+  # are retired, 2026-10-28). Every stop label uses the hold contract
+  # (scripts/hold-contract.mjs, jovie-hold/v1): a receipt names an owner and an
+  # expiry or head-change release.
   # Ownerless machine holds past their grace period and expired receipts
   # are removed with one comment. The Jovie Bot unlabel event then wakes the
   # enroll job above; required checks still gate admission. Expiry is checked
@@ -952,7 +952,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
@@ -976,7 +976,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');
