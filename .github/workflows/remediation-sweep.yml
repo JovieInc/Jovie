@@ -105,6 +105,7 @@ jobs:
             run_mode vercel
             run_mode domains
             run_mode credentials
+            run_mode ops-health
           fi
 
       # Measure-everything: each credentials/spend run's stage timestamps.

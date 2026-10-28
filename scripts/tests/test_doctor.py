@@ -322,6 +322,30 @@ def realistic_feed():
             "alerts": {"a": "x" * 200}}
 
 
+class OpsHealthEnvelopeTest(unittest.TestCase):
+    """ops.health/v1 (canon/OPS_HEALTH.md) nested under `ops` in the lanes status feed."""
+
+    def test_known_release_reports_full_commit_and_never_hides_a_degraded_dependency(self):
+        sha = "a" * 40
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / ".release.json").write_text(json.dumps({"sourceCommit": sha}))
+            ok = doctor.ops_health_envelope({"githubRemaining": 4000}, Path(tmp))
+            degraded = doctor.ops_health_envelope({"githubRemaining": 4000, "linearError": "timeout"}, Path(tmp))
+        self.assertEqual((ok["schema"], ok["service"], ok["commitSha"], ok["status"]), ("ops.health/v1", "gem-lanes-host", sha, "up"))
+        self.assertRegex(ok["deployedAt"], r"^\d{4}-\d{2}-\d{2}T")
+        self.assertEqual(degraded["status"], "degraded")
+
+    def test_unreadable_release_is_unknown_not_up(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            body = doctor.ops_health_envelope({"githubRemaining": 4000}, Path(tmp))
+        self.assertIsNone(body["commitSha"])
+        self.assertIsNone(body["deployedAt"])
+        self.assertEqual(body["status"], "unknown")
+
+    def test_exhausted_github_budget_is_down(self):
+        self.assertEqual(doctor.ops_health_envelope({"githubRemaining": 0}, Path("/nonexistent"))["status"], "down")
+
+
 class PublicFeedSizeTest(unittest.TestCase):
     def test_realistic_feed_stays_under_seventy_percent_of_the_cap_and_keeps_operational_identity(self):
         feed = realistic_feed()

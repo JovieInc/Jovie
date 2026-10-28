@@ -14,7 +14,8 @@ export interface DeployedBuildInfo {
   readonly commitSha: string | undefined;
   readonly deploymentId: string | undefined;
   readonly environment: string | undefined;
-  readonly deployedAt: string | number;
+  /** ISO-8601 instant the running build was produced, or null when unknown. */
+  readonly deployedAt: string | null;
 }
 
 let _cachedBuildId: Promise<string> | undefined;
@@ -68,6 +69,18 @@ export async function getDeployedBuildInfo(): Promise<DeployedBuildInfo> {
     commitSha: resolveCommitSha(),
     deploymentId: env.VERCEL_DEPLOYMENT_ID,
     environment: env.VERCEL_ENV,
-    deployedAt: env.VERCEL_DEPLOYMENT_TIME || Date.now(),
+    deployedAt: resolveDeployedAt(),
   };
+}
+
+/**
+ * Real build instant or null. This used to fall back to Date.now(), which made
+ * every request look like a fresh deploy (a false proof). OPS_BUILD_TIME is
+ * stamped by next.config.js when the build runs; unknown stays null.
+ */
+export function resolveDeployedAt(): string | null {
+  const raw = env.VERCEL_DEPLOYMENT_TIME?.trim() || process.env.OPS_BUILD_TIME;
+  if (!raw) return null;
+  const ms = /^\d+$/.test(raw) ? Number(raw) : Date.parse(raw);
+  return Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null;
 }

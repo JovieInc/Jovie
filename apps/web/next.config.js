@@ -737,6 +737,8 @@ const nextConfig = {
       process.env.NEXT_PUBLIC_BUILD_SHA ||
       '',
     NEXT_PUBLIC_CI: process.env.CI === 'true' ? 'true' : 'false',
+    // ops.health/v1 deployedAt: the instant this build ran (canon/OPS_HEALTH.md).
+    OPS_BUILD_TIME: process.env.OPS_BUILD_TIME || new Date().toISOString(),
   },
   // Keep @statsig/statsig-node-core external so Next.js does not webpack-bundle
   // the NAPI package. When bundled, the hash-prefixed import path that Next.js

@@ -202,7 +202,7 @@ no literal `fetch` call for their paths.
 |----------|--------|------|---------|
 | `/api/health` | GET | Public liveness; failure detail is admin session or `Authorization: Bearer $CRON_SECRET` | Success `{status:"ok"}`. Failure `{healthy:false,timestamp}` |
 | `/api/health/auth` | GET | Public liveness outside production; detail is admin session or `CRON_SECRET` | Production 403 for every caller. Anonymous callers do not read the session |
-| `/api/health/build-info` | GET | Public | Build metadata |
+| `/api/health/build-info` | GET | Public | `ops.health/v1` envelope (service, environment, full `commitSha`, ISO `deployedAt`, status) plus legacy `buildId`, `deploymentId`; see `canon/OPS_HEALTH.md` |
 | `/api/health/comprehensive` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous body is `{healthy:true,timestamp}` and skips DB/vendor checks |
 | `/api/health/db` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy,timestamp}` after connectivity. No pool or config |
 | `/api/health/db/performance` | GET | Public liveness; detail is admin session or `CRON_SECRET` | Anonymous `{healthy:true,timestamp}` does not run query timings |

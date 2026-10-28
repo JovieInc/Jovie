@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://jov.ie/schemas/ops-health.v1.schema.json",
+  "title": "ops.health/v1",
+  "description": "One health/status envelope for every internal service. Cross-field rules (status up hides no unknown/down dependency, up dependencies need a fresh observedAt, up needs a known commitSha) are enforced by scripts/lib/ops-health.mjs, the single validator.",
+  "type": "object",
+  "required": [
+    "schema",
+    "service",
+    "environment",
+    "commitSha",
+    "deployedAt",
+    "version",
+    "status",
+    "checkedAt",
+    "dependencies"
+  ],
+  "properties": {
+    "schema": { "const": "ops.health/v1" },
+    "service": { "type": "string", "minLength": 1 },
+    "environment": { "type": "string", "minLength": 1 },
+    "commitSha": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+    "deployedAt": { "type": ["string", "null"], "format": "date-time" },
+    "version": { "type": ["string", "null"] },
+    "status": { "enum": ["up", "degraded", "down", "unknown"] },
+    "checkedAt": { "type": "string", "format": "date-time" },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "status", "observedAt", "latencyMs"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["up", "degraded", "down", "unknown"] },
+          "observedAt": { "type": ["string", "null"], "format": "date-time" },
+          "latencyMs": { "type": ["number", "null"], "minimum": 0 },
+          "detail": { "type": "string" }
+        }
+      }
+    },
+    "links": { "type": "object", "additionalProperties": { "type": "string" } }
+  },
+  "additionalProperties": true
+}

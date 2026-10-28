@@ -1,0 +1,55 @@
+{
+  "schema": "jovie.health-endpoints/v1",
+  "description": "Where every internal service answers 'what is running, which commit, is it fresh, is it healthy' (ops.health/v1, canon/OPS_HEALTH.md). Owners are NOT repeated here: ownerRef points at the canon/ownership.json asset id. Checked by scripts/ops-health-conformance.mjs; the daily Remediation Sweep runs it in mode ops-health.",
+  "expectedSha": {
+    "jovie": "JovieInc/Jovie@main",
+    "summer-config": "JovieInc/summer-config@main"
+  },
+  "endpoints": [
+    {
+      "id": "jovie-web:production",
+      "ownerRef": "service:app:web",
+      "url": "https://jov.ie/api/health/build-info",
+      "expectedSha": "jovie",
+      "conformance": "pending",
+      "trackedBy": "this PR; flipped to enforced once the deploy serves ops.health/v1"
+    },
+    {
+      "id": "jovie-web:staging",
+      "ownerRef": "service:app:web",
+      "url": "https://staging.jov.ie/api/health/build-info",
+      "expectedSha": "jovie",
+      "conformance": "pending",
+      "trackedBy": "this PR; flipped to enforced once the deploy serves ops.health/v1"
+    },
+    {
+      "id": "summer:production",
+      "ownerRef": "service:summer",
+      "url": "https://summer.jov.ie/runtime/v1/health",
+      "expectedSha": "summer-config",
+      "conformance": "pending",
+      "trackedBy": "JovieInc/summer-config#327"
+    },
+    {
+      "id": "lanes:status-feed",
+      "ownerRef": "service:gem-lanes-host",
+      "url": "https://gist.githubusercontent.com/itstimwhite/07ec460956451da7632fe852934f21c5/raw/lanes-status.json",
+      "expectedSha": "jovie",
+      "conformance": "pending",
+      "trackedBy": "this PR (doctor.py ops_health_envelope); flip after the gem host installs the release",
+      "envelopePath": "ops"
+    },
+    {
+      "id": "logyourbody:production",
+      "ownerRef": "repo:JovieInc/LogYourBody",
+      "url": "https://www.logyourbody.com/api/health/build-info",
+      "expectedSha": null,
+      "conformance": "pending",
+      "trackedBy": "JovieInc/LogYourBody build-info route"
+    }
+  ],
+  "notes": {
+    "ovie": "Ovie has no separate deployment: apps/ovie routes re-export apps/web (jovie-web). One endpoint covers both; certification and shipping-state routes are data APIs, not health.",
+    "pending": "A pending endpoint that already conforms FAILS the check, so the flip to enforced cannot be forgotten."
+  }
+}

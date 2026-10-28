@@ -1,5 +1,6 @@
 import { planDomainExpiry } from './domain-expiry.mjs';
 import { HOLD_LABELS } from './merge-group-member-policy.mjs';
+import { loadEndpointRegistry } from './ops-health-conformance.mjs';
 
 export const DRAFT_ROLLUP_MIN = 20;
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -15,7 +16,10 @@ export const SUMMER_PROVIDER_RECEIPTS = Object.freeze([
 ]);
 export const EXHAUSTED_LABEL = 'lane-fix-exhausted';
 export const SUMMER_CONFIG_REPO = 'JovieInc/summer-config';
-export const SUMMER_HEALTH_URL = 'https://summer.jov.ie/runtime/v1/health';
+// One source for service health URLs: ops/registry/health-endpoints.json.
+export const SUMMER_HEALTH_URL = loadEndpointRegistry().endpoints.find(
+  endpoint => endpoint.id === 'summer:production'
+).url;
 export const VERCEL_TEAM_ID = 'team_bpNDbti6srVLYPKdmQLu4UgT';
 export const VERCEL_PROJECTS = Object.freeze(['jovie-docs', 'jovie-web']);
 export const VERCEL_READONLY_TOKEN_ENVS = Object.freeze([
@@ -32,6 +36,7 @@ const MODES = new Set([
   'drafts',
   'exhausted',
   'holds',
+  'ops-health',
   'summer',
   'summer-config',
   'vercel',
@@ -404,6 +409,38 @@ export function planSummerReceipts(health, nowMs) {
   });
 }
 
+/** One fingerprinted issue per ops.health/v1 endpoint that fails, or passes while still pending. */
+export function planOpsHealth(report) {
+  return report.results
+    .filter(r => r.verdict === 'fail' || r.verdict === 'pending-conforms')
+    .map(r => {
+      const fingerprint = `remediation:ops-health:${r.id}`;
+      const failing = r.verdict === 'fail';
+      return issue({
+        fingerprint,
+        summary: failing
+          ? `ops.health/v1 drift on ${r.id}`
+          : `${r.id} now conforms to ops.health/v1: flip it to enforced`,
+        priority: failing ? 2 : 3,
+        reason: failing
+          ? r.errors.join('; ')
+          : 'pending endpoint passes validation',
+        description: note(
+          fingerprint,
+          [
+            failing
+              ? `${r.url} no longer answers ops.health/v1 correctly (canon/OPS_HEALTH.md).`
+              : `${r.url} validates; set conformance to "enforced" in ops/registry/health-endpoints.json.`,
+            ...r.errors.map(e => `- ${e}`),
+            `commitSha=${r.commitSha ?? 'unknown'} status=${r.status ?? 'n/a'} lag=${r.lag?.state ?? 'n/a'}`,
+            'Reproduce: node scripts/ops-health-conformance.mjs --service ' +
+              r.id,
+          ].join('\n')
+        ),
+      });
+    });
+}
+
 export function deploymentState(deployment) {
   return String(
     deployment?.readyState ?? deployment?.state ?? ''
@@ -475,6 +512,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<any>} [options.loadDeployments]
  * @param {() => Promise<any[]>} [options.loadDomains]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
+ * @param {() => Promise<any[]>} [options.loadOpsHealth]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -489,6 +527,7 @@ export async function runRemediationSweep({
   loadDeployments,
   loadDomains,
   loadCredentials,
+  loadOpsHealth,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -553,6 +592,15 @@ export async function runRemediationSweep({
     for (const record of records) {
       const plan = planDomainExpiry(record, nowMs);
       if (plan) plans.push(plan);
+    }
+  }
+  if (includesMode(mode, 'ops-health')) {
+    // ops.health/v1 conformance (canon/OPS_HEALTH.md): drift, a wrong deployed
+    // commit, or a pending endpoint that now conforms and must be flipped.
+    if (!loadOpsHealth) {
+      warnings.push('ops.health/v1 conformance loader not wired; not judged');
+    } else {
+      plans.push(...(await loadOpsHealth()));
     }
   }
   if (includesMode(mode, 'credentials')) {

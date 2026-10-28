@@ -21,5 +21,7 @@ Read in this order:
 11. [`CAPACITY.md`](./CAPACITY.md) — generated agent capacity: plan, price, remaining
    quota or credits, policy and delegation cost per provider. Source of truth is
    `ops/registry/capacity.json`; every agent reads it before routing or delegating.
+12. [`OPS_HEALTH.md`](./OPS_HEALTH.md) — `ops.health/v1`, the one health/status envelope every
+   internal service exposes, its validator, endpoint registry and conformance check.
 
 Operational files (`CLAUDE.md`, `.claude/rules/*`, `docs/*`, skills, scripts, workflows) implement this canon. If they conflict, update the lower-level file or escalate to Tim.
