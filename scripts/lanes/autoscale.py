@@ -23,6 +23,8 @@ _ATTEMPTED = _CONVERTED | frozenset({"failed", "fix-no-change", "provider-error"
 # WIP cap (2026-10-28): finish before starting. Above this many open PRs, new-issue intake stops; fix-red,
 # conflict and other remediation seats keep running, so inventory converges instead of piling up.
 WIP_MAX_DEFAULT, SWARM_CLAIM_STALE_S = 80, 1800
+# Hosted-runner backlog (throughput_sentinel release-flow.json): push admission pauses, remediation does not.
+CI_QUEUED_RUNS_BRAKE, CI_QUEUED_OLDEST_BRAKE_MIN, CI_SIGNAL_STALE_S = 400, 15, 900
 # A census is stamped with its source rows' age (up to 3 x 60 s cache TTLs), read on the next minute tick.
 MAINTENANCE_DEMAND_STALE_S = 240
 # A saturated lane keeps its last positive census this long (one lane agent timeout, 5400 s).
@@ -291,10 +293,13 @@ def collect(state_dir: Path, tick: dict, now: float, wip_max: int = WIP_MAX_DEFA
                        if (at := _num(_obj(row).get("observedAt"))) is not None and 0 <= now - at <= MAINTENANCE_DEMAND_STALE_S}
     merge = _obj(observed.get("mergeThroughput")); merge_at = _num(merge.get("observedAt"))
     yields, swarm = provider_yield(root, now), swarm_claims(root, now)
+    flow = _obj(_read_json(root / "release-flow.json", max_bytes=65536)); flow_at = _num(flow.get("observedAt"))
+    ci_fresh = flow_at is not None and 0 <= now - flow_at <= CI_SIGNAL_STALE_S
     quota = observed.get("quotaDeferredHeads"); quota = quota.get("value") if isinstance(quota, dict) else quota
     return {"doctorFresh": stamp is not None and 0 <= now - stamp <= STALE_S,
             "yieldByProvider": yields, "swarmClaims": swarm, "openPRCount": _count(observed.get("openPRCount")),
             "quotaDeferredHeads": _count(quota), "wipMax": wip_max,
+            "ciQueue": {"queuedRuns": _count(flow.get("queuedRuns")), "oldestMin": _num(flow.get("queuedOldestMin")), "fresh": ci_fresh},
             "flowMetrics": flow_metrics(observed, yields, swarm, wip_max, now),
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
             "newIssueBudgetByProvider": _obj(observed.get("newIssueBudgetByProvider")),
@@ -404,6 +409,9 @@ def _intake_gates(obs: dict, brake: dict) -> list[str]:
         gates.append("wip-cap")
     if "queue-wait" in (brake.get("reasons") or []):
         gates.append("ci-queue-wait")
+    ci = _obj(obs.get("ciQueue"))
+    if ci.get("fresh") and ((_count(ci.get("queuedRuns")) or 0) >= CI_QUEUED_RUNS_BRAKE or (_num(ci.get("oldestMin")) or 0) >= CI_QUEUED_OLDEST_BRAKE_MIN):
+        gates.append("ci-runner-backlog")
     if (_count(obs.get("quotaDeferredHeads")) or 0) > 0:
         gates.append("github-quota-deferred")
     return gates
