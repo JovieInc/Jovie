@@ -140,15 +140,16 @@ failed, pre-fix; fixed in summer-config #270).
 Live emitter: `.github/scripts/controller-quota-replay.mjs` (workflow
 `controller-quota-replay.yml`, on Staging/Production Controller completion).
 It replays only transient failures (GitHub quota, 5xx, network, runner loss)
-of the newest run of that controller while production lags main, up to
-controller attempt 3, after waiting for the token's quota reset or
-2^(attempt-1) x 120s. Rows go to the artifact
+of controller attempt 1 for the generation at current main, before any
+Production Release job started, by rerunning the exact source CI run (a
+controller rerun is refused at authorization), up to CI attempt 3, after
+waiting for the token's quota reset or 2^(attempt-1) x 120s. Rows go to the artifact
 `release-replay-receipts/stage-events.ndjson`, next to `decision.json`.
 
 | Stage | Timestamp |
 | --- | --- |
-| `release-replay:blocked` | the failed attempt's `updated_at`; exits at the decision. `outcome` `advanced` (replayed), `abandoned` (not transient, superseded, or prod already on main) or `failed` (attempt/wait cap, rejected rerun) |
-| `release-replay:replayed` | the accepted `gh run rerun --failed` request |
+| `release-replay:blocked` | the failed attempt's `updated_at`; exits at the decision. `outcome` `advanced` (replayed), `abandoned` (not transient, manual rerun, post-mutation, superseded, or prod already on main) or `failed` (CI attempt/wait cap, rejected rerun) |
+| `release-replay:replayed` | the accepted `gh run rerun` request for the source CI run |
 
 `entityId` = `<workflow file>#<run id>@<attempt>`. The source is an artifact
 (see "Where events live").
