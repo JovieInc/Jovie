@@ -19,12 +19,17 @@ import { logger } from '@/lib/utils/logger';
 import { detectPlatformFromUrl } from '@/lib/utils/social-platform';
 import type { WaitlistRequestPayload } from '@/lib/validation/schemas';
 import {
+  type AdmissionScore,
+  isOutrankedByQueue,
+} from '@/lib/waitlist/admission-score';
+import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
   type WaitlistApprovalResult,
 } from '@/lib/waitlist/approval';
 import { insertWaitlistAuditLog } from '@/lib/waitlist/audit';
 import { enqueueWaitlistEmailJob } from '@/lib/waitlist/email-jobs';
+import type { GoldenPathAdmissionDecision } from '@/lib/waitlist/golden-path-admission';
 import {
   type InterviewResponses,
   scoreOnboardingInterview,
@@ -33,7 +38,11 @@ import {
   evaluateWaitlistQualification,
   type QualificationDecision,
 } from '@/lib/waitlist/qualification';
-import { getWaitlistSettings } from '@/lib/waitlist/settings';
+import {
+  getWaitlistSettings,
+  releaseAutoAcceptSlot,
+  tryReserveAutoAcceptSlot,
+} from '@/lib/waitlist/settings';
 import {
   hashEmailForWaitlist,
   isUnqualifiedSignupEntry,
@@ -72,6 +81,13 @@ export interface WaitlistAccessRequestInput {
    * signup (`qualified_interview_signal`).
    */
   readonly interviewResponses?: InterviewResponses;
+  /**
+   * Server-derived golden-path decision (identity resolved, not high-profile,
+   * golden path green). Capacity is reserved here, in the transaction.
+   */
+  readonly goldenPathAdmission?: GoldenPathAdmissionDecision;
+  /** Ranking score and its inputs, stored on the entry for every decision. */
+  readonly admissionScore?: AdmissionScore;
   /** Validated by the authenticated intake route for the exact canary email. */
   readonly syntheticRunId?: string;
 }
@@ -117,6 +133,7 @@ function buildEntryValues(params: {
   readonly email: string;
   readonly fullName: string;
   readonly source: string;
+  readonly admissionScore?: AdmissionScore;
 }) {
   const { data, email, fullName, source } = params;
   const { platform, normalizedUrl } = detectPlatformFromUrl(
@@ -142,7 +159,12 @@ function buildEntryValues(params: {
     selectedPlan: data.selectedPlan ?? null,
     source,
     canonical: true,
-    qualificationInputs: buildQualificationInputs(data),
+    qualificationInputs: {
+      ...buildQualificationInputs(data),
+      ...(params.admissionScore
+        ? { admissionScore: params.admissionScore }
+        : {}),
+    },
     updatedAt: new Date(),
     // Store a useful fallback in existing fields without inventing launch scoring.
     primarySocialFollowerCount: null,
@@ -254,6 +276,35 @@ async function tryApproveEntry(
   return approvalResult;
 }
 
+/** Scores of waitlisted entrants, best first, capped at `limit` rows. */
+async function listPendingScoresDesc(
+  tx: DbOrTransaction,
+  limit: number,
+  afterDays: number
+): Promise<number[]> {
+  if (limit <= 0) return [];
+  const result = await tx.execute(drizzleSql`
+    SELECT CASE WHEN (qualification_inputs -> 'admissionScore' ->> 'score') ~ '^[0-9]+(\\.[0-9]+)?$'
+                THEN (qualification_inputs -> 'admissionScore' ->> 'score')::numeric END AS score
+    FROM waitlist_entries
+    WHERE canonical = true
+      AND status = 'waitlisted'
+      -- The same filter the ranked drain uses, so entrants it would not admit
+      -- today cannot crowd out someone who can be admitted now.
+      AND spotify_url IS NOT NULL
+      AND waitlisted_at <= now() - make_interval(days => ${afterDays}::int)
+      AND (qualification_inputs -> 'admissionScore' ->> 'score') ~ '^[0-9]+(\\.[0-9]+)?$'
+    ORDER BY score DESC
+    LIMIT ${limit}
+  `);
+  const rows = Array.isArray(result)
+    ? result
+    : ((result as { rows?: unknown[] } | null | undefined)?.rows ?? []);
+  return (rows as { score: string | number }[])
+    .map(row => Number(row.score))
+    .filter(Number.isFinite);
+}
+
 async function decideAccess(params: {
   readonly tx: DbOrTransaction;
   readonly entryId: string;
@@ -262,6 +313,8 @@ async function decideAccess(params: {
   readonly email: string;
   readonly data: WaitlistRequestPayload;
   readonly interviewResponses?: InterviewResponses;
+  readonly goldenPathAdmission?: GoldenPathAdmissionDecision;
+  readonly admissionScore?: AdmissionScore;
 }): Promise<{
   readonly outcome: WaitlistAccessOutcome;
   readonly approval: WaitlistApprovalResult | null;
@@ -284,11 +337,67 @@ async function decideAccess(params: {
         responses: params.interviewResponses,
       })
     : null;
-  const qualification = evaluateWaitlistQualification({
+  let goldenPathDecision =
+    mode === 'waitlist_enabled' ? params.goldenPathAdmission : undefined;
+  // Best leads first: with N slots left today, admit now only if fewer than N
+  // pending entrants outrank this one; the rest wait for the ranked drain.
+  if (goldenPathDecision?.admit && params.admissionScore) {
+    const remaining = Math.max(
+      0,
+      settings.autoAcceptDailyLimit - settings.autoAcceptedToday
+    );
+    const pending = await listPendingScoresDesc(
+      params.tx,
+      remaining,
+      Math.max(1, Math.trunc(settings.autoAcceptAfterDays))
+    );
+    if (
+      isOutrankedByQueue({
+        candidateScore: params.admissionScore.score,
+        pendingScoresDesc: pending,
+        remainingSlots: remaining,
+      })
+    ) {
+      goldenPathDecision = { admit: false, reason: 'hold_outranked' };
+    }
+  }
+  let qualification = evaluateWaitlistQualification({
     email: params.email,
     payload: params.data,
-    config: { mode, interview },
+    config: {
+      mode,
+      interview,
+      goldenPath: goldenPathDecision,
+    },
   });
+
+  // A golden-path admit only becomes real once the existing daily auto-accept
+  // slot is reserved. Reserve after qualification says approved (so a held or
+  // invalid request never consumes a slot) and refund it if approval fails.
+  // Admission state only: nothing here emails or invites anyone.
+  let reservedGoldenPathSlot = false;
+  if (qualification.reasonCode === 'qualified_golden_path_resolved_artist') {
+    const reservation = await tryReserveAutoAcceptSlot(params.tx);
+    if (reservation.shouldAutoAccept) {
+      reservedGoldenPathSlot = true;
+    } else {
+      qualification = evaluateWaitlistQualification({
+        email: params.email,
+        payload: params.data,
+        config: {
+          mode,
+          interview: null,
+          goldenPath: {
+            admit: false,
+            reason:
+              reservation.reason === 'auto_accept_disabled'
+                ? 'hold_auto_accept_disabled'
+                : 'hold_capacity_full',
+          },
+        },
+      });
+    }
+  }
 
   if (qualification.status === 'blocked') {
     return {
@@ -315,6 +424,7 @@ async function decideAccess(params: {
     qualification.reasonCode
   );
   if (!approval) {
+    if (reservedGoldenPathSlot) await releaseAutoAcceptSlot(params.tx);
     const failedQualification: QualificationDecision = {
       ...qualification,
       status: 'waitlisted',
@@ -459,6 +569,7 @@ export async function submitWaitlistAccessRequest(
           email: normalizedEmail,
           fullName: input.fullName,
           source: input.source ?? 'waitlist_form',
+          admissionScore: input.admissionScore,
         });
 
         if (existing && !isUnqualifiedSignupEntry(existing)) {
@@ -525,6 +636,8 @@ export async function submitWaitlistAccessRequest(
           email: normalizedEmail,
           data: input.data,
           interviewResponses: input.interviewResponses,
+          goldenPathAdmission: input.goldenPathAdmission,
+          admissionScore: input.admissionScore,
         });
 
         const nextStatus = decision.qualification.status;

@@ -51,7 +51,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       { mode: 0o755 }
     );
     // This fixture has no launch, profile, art-direction, ICP-language, copy, or
-    // oasdiff inventory. Isolate those unrelated checkers, as pnpm above
+    // oasdiff inventory, nor apps/web/lib/domain/write-registry.json. Isolate those unrelated checkers, as pnpm above
     // isolates the other guards, while checking its cwd. The older head
     // deletes scripts/, so the real art-direction, ICP-language, and oasdiff
     // runners are not on that checkout.
@@ -59,7 +59,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       join(bin, 'node'),
       `#!/bin/sh
 case "$*" in
-  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*)
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*|*scripts/domain-write-guard.mjs*)
     [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
     exit 0 ;;
 esac
@@ -1220,7 +1220,7 @@ test('a red, foreign, or unreadable predecessor runs the full source contract', 
 test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
   const workflow = sourceValidationWorkflow();
   const gate = "steps.reuse.outputs.reuse != 'true'";
-  const [client, runtime, reuseStep] = workflow.jobs.deterministic.steps;
+  const [client, prime, runtime, reuseStep] = workflow.jobs.deterministic.steps;
   assert.equal(client.with.ref, '${{ github.event.pull_request.base.sha }}');
   assert.equal(client.with['persist-credentials'], false);
   assert.match(client.with['sparse-checkout'], /packages\/api-client/);
@@ -1228,7 +1228,16 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     runtime.with['node-version-file'],
     '.source-validation-client/.nvmrc'
   );
+  // The quota-client runtime is primed from nodejs.org so a metadata edit does
+  // not spend a GITHUB_TOKEN manifest call in each of the jobs (2026-10-25).
+  assert.match(prime.run, /prime-node-toolcache\/prime\.sh/);
+  assert.equal(prime.env.NODE_VERSION_FILE, '.source-validation-client/.nvmrc');
+  assert.match(
+    client.with['sparse-checkout'],
+    /prime-node-toolcache\/prime\.sh/
+  );
   assert.equal(client.if, reuseStep.if);
+  assert.match(prime.if, /github\.event\.action == 'edited'/);
   assert.equal(runtime.if, reuseStep.if);
   assert.equal(reuseStep.id, 'reuse');
   // Base retargets change the compared tree, so they never reuse a proof.
@@ -1237,8 +1246,10 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     "${{ github.event.action == 'edited' && !github.event.changes.base }}"
   );
   for (const job of ['security', 'migration', 'coverage', 'unit']) {
-    const [jobClient, jobRuntime, first, ...rest] = workflow.jobs[job].steps;
+    const [jobClient, jobPrime, jobRuntime, first, ...rest] =
+      workflow.jobs[job].steps;
     assert.deepEqual(jobClient, client, job);
+    assert.deepEqual(jobPrime, prime, job);
     assert.deepEqual(jobRuntime, runtime, job);
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
@@ -1257,12 +1268,18 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     // The disk-read guards run on every edit and can launch Chromium, so
     // their browser setup must run whenever they do (#21956, 2026-10-20).
     'Setup Playwright (Chromium)',
-    'Enforce PR fleet rules',
     'Validate disk-read source contracts from trusted base',
     'Validate customer changelog decision from trusted base',
     'Measure actual installed source dependency graph',
     'Preserve exact source dependency evidence',
   ];
+  // Fleet evidence is a status read in `ready`, produced by the base-branch
+  // Fleet Rules Evidence workflow; it never depends on proof reuse.
+  assert.ok(
+    workflow.jobs.ready.steps.some(
+      step => step.name === 'Require fleet-rule evidence'
+    )
+  );
   const deterministic = workflow.jobs.deterministic.steps;
   for (const name of always) {
     const step = deterministic.find(candidate => candidate.name === name);
