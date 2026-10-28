@@ -50,3 +50,5 @@ This repo (`JovieInc/Jovie`, public) contains `docs/company/CAPITAL-STRATEGY.md`
 and `docs/company/PRICING-STRATEGY.md` — strategy/pricing docs that are already
 world-readable. Worth a separate decision on whether they belong in a public
 tree.
+
+> Update 2026-10-28: `CAPITAL-STRATEGY.md` and other investor, fundraising and strategy material moved to the private `JovieInc/Ops` repo (`jovie-private/`).
