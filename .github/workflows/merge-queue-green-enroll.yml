@@ -116,8 +116,13 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -455,7 +460,7 @@ jobs:
             // Every decision on an open, ready, unqueued PR leaves a receipt (pr, head, reason) in the
             // job summary and one machine line, so a non-enroll is never silent (event-driven dwell).
             const receipts = [];
-            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason });
+            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason, at: new Date().toISOString() });
             for (const [index, candidate] of prs.entries()) {
               if (overBudget()) {
                 core.warning(`sweep budget spent after ${index}/${prs.length} PRs; the rest wait for their own events or the next sweep`);
@@ -545,8 +550,16 @@ jobs:
               }
               if (!eligible(pr)) {
                 if (pr && pr.state === 'OPEN' && !pr.isDraft && !pr.isInMergeQueue) {
-                  core.info(`skip #${candidate.number}: mergeStateStatus=${pr.mergeStateStatus}`);
-                  receipt(pr, 'skip', `mergeStateStatus=${pr.mergeStateStatus}`);
+                  // Name the real cause: a blocking label or a moved head is not a merge
+                  // state, and a CLEAN reason beside a skip hid the stale lane-fix-red.
+                  const blockers = pr.labels.nodes.filter(l => BLOCKING.has(l.name.toLowerCase())).map(l => l.name);
+                  const why = pr.headRefOid !== candidate.head.sha ? `head-moved:${String(candidate.head.sha).slice(0, 12)}`
+                    : pr.isCrossRepository ? 'cross-repository'
+                    : blockers.length > 0 ? `blocking-label:${blockers.join(',')}`
+                    : pr.labels.pageInfo.hasNextPage ? 'labels-truncated'
+                    : `merge-state-not-admissible:${pr.mergeStateStatus}`;
+                  core.info(`skip #${candidate.number}: ${why}`);
+                  receipt(pr, 'skip', why);
                 }
                 continue;
               }
@@ -828,8 +841,13 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -886,8 +904,13 @@ jobs:
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -1007,8 +1030,13 @@ jobs:
             scripts/merge-group-victim-rearm.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

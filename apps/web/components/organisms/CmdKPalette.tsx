@@ -35,7 +35,6 @@ import { rankPaletteReleases } from '@/lib/commands/palette-ranking';
 import {
   type Command,
   commandsForSurface,
-  isCommandVisible,
   type NavCommand,
   type SkillCommand,
 } from '@/lib/commands/registry';
@@ -93,16 +92,9 @@ function useCmdkData(
 ) {
   const youtubeWorkspaceNav = useAppFlag('YOUTUBE_WORKSPACE_NAV');
   const jovieWorkNav = useAppFlag('JOVIE_WORK_NAV');
-  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const commands = useMemo<readonly Command[]>(
-    () =>
-      commandsForSurface('cmdk', { youtubeWorkspaceNav, jovieWorkNav }).filter(
-        command =>
-          isCommandVisible(command, {
-            PROFILES_WORKSPACE: profilesWorkspaceEnabled,
-          })
-      ),
-    [youtubeWorkspaceNav, jovieWorkNav, profilesWorkspaceEnabled]
+    () => commandsForSurface('cmdk', { youtubeWorkspaceNav, jovieWorkNav }),
+    [youtubeWorkspaceNav, jovieWorkNav]
   );
   const { data: chatCapabilities } = useChatCapabilitiesQuery({
     profileId,

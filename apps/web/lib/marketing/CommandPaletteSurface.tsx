@@ -12,7 +12,6 @@ import {
 } from '@/components/organisms/SharedCommandPalette';
 import {
   commandsForSurface,
-  isCommandVisible,
   type NavCommand,
   type SkillCommand,
 } from '@/lib/commands/registry';
@@ -39,7 +38,7 @@ export function CommandPaletteSurface() {
   const commands = commandsForSurface('cmdk', {
     youtubeWorkspaceNav: false,
     jovieWorkNav: false,
-  }).filter(command => isCommandVisible(command, {}));
+  });
   const skills = commands.filter(
     (command): command is SkillCommand => command.kind === 'skill'
   );
