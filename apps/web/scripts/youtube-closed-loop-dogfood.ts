@@ -1,6 +1,6 @@
 #!/usr/bin/env tsx
 /**
- * JOV-5883 — automated dogfood of the YouTube closed loop on Tim's channel.
+ * JOV-5883 — preview and link inspection of the YouTube loop on Tim's channel.
  * Run from repo root:
  *
  *   pnpm --filter @jovie/web dogfood:youtube --channel <@handle|url|UCid> --output <dir>
@@ -8,11 +8,15 @@
  * Reads the golden path through the deployed paste-preview surface
  * (`--base-url`, default https://jov.ie). Optional env:
  *   YOUTUBE_ACCESS_TOKEN  — Connect-granted token for Tim's channel; enables
- *                           the videos.update link-apply stage (verified via
- *                           the official oauth2 tokeninfo scope readback).
+ *                           description reads only (scopes verified through
+ *                           the official oauth2 tokeninfo readback).
  *   YOUTUBE_DATA_API_KEY  — public Data API key; enriches the receipt with
  *                           upload dates for ICP qualification.
- * Official API only; thumbnails.set is never called; send stays human.
+ * No YouTube writes. The paste-preview POST can consume a free generation
+ * allowance and generate images when its feature flag is enabled. This is not
+ * a side-effect-free access probe. A blocked receipt exits 0 because inspection
+ * completed, not because optimization succeeded; inspect receipt.outcome.
+ * Live apply requires review through Jovie's existing approved link workflow.
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
@@ -139,15 +143,16 @@ export async function dogfoodYoutubeClosedLoop(args: string[]) {
   const auth: YoutubeClosedLoopDogfoodDeps['auth'] = accessToken
     ? { state: 'ok', scopes: await grantedScopes(accessToken) }
     : { state: 'missing' };
-  const writer = accessToken
-    ? createYouTubeSnippetWriter({ accessToken })
+  // Narrow the provider to reads before injection; token presence is not approval.
+  const reader: YoutubeClosedLoopDogfoodDeps['reader'] = accessToken
+    ? { getVideo: createYouTubeSnippetWriter({ accessToken }).getVideo }
     : undefined;
 
   const deps: YoutubeClosedLoopDogfoodDeps = {
     pasteChannelPreview: channel =>
       pasteOnly(channel).then(preview => enrichPublishedAt(preview, channel)),
     auth,
-    ...(writer ? { writer } : {}),
+    ...(reader ? { reader } : {}),
   };
 
   const receipt = await runYoutubeClosedLoopDogfood({
@@ -157,18 +162,24 @@ export async function dogfoodYoutubeClosedLoop(args: string[]) {
     correlationId: `jov-5883:tim-channel:${new Date().toISOString()}`,
   });
 
-  await mkdir(output, { recursive: true });
+  await mkdir(output, { recursive: true, mode: 0o700 });
   const file = join(
     output,
     `youtube-closed-loop-dogfood-${receipt.observedAt.replaceAll(/[:.]/g, '-')}.json`
   );
-  await writeFile(file, `${JSON.stringify(receipt, null, 2)}\n`);
+  await writeFile(file, `${JSON.stringify(receipt, null, 2)}\n`, {
+    mode: 0o600,
+    flag: 'wx',
+  });
 
   console.log(`schema: ${YOUTUBE_CLOSED_LOOP_DOGFOOD_SCHEMA}`);
   for (const stage of receipt.stages) {
     console.log(`[${stage.status}] ${stage.stage}: ${stage.summary}`);
   }
   console.log(`outcome: ${receipt.outcome}`);
+  console.log(
+    'Live apply not attempted. Review exact proposals through Jovie before applying.'
+  );
   console.log(`receipt: ${file}`);
   return receipt.outcome === 'fail' ? 1 : 0;
 }

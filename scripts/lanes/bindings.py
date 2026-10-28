@@ -41,6 +41,9 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 POLICY = Path(__file__).resolve().parent / "routing.json"
 REPAIR_STATES = frozenset({"BEHIND", "DIRTY"})
@@ -91,6 +94,12 @@ class Binding:
     install: tuple[str, ...] = ()
     review_state: str = "In Review"
     reserved_seats: int = 0       # guaranteed seats outside the provider census (isolation from Jovie)
+    min_todo: int = 0             # Todo depth to hold regardless of seats (Backlog refill floor)
+    # Jovie PR repair outranks this binding's NEW work while Jovie has repairable PRs (the
+    # binding's own repairs and its reserved seats still run). 2026-10-25: this pass runs
+    # before the Jovie path, so a busy LYB backlog took every seat and 119 red Jovie PRs
+    # got no lane for 6h.
+    yield_to_jovie_repair: bool = False
 
     def branch_pattern(self) -> re.Pattern:
         return re.compile(rf"^(?P<lane>[a-z0-9-]+)/(?P<issue>{self.key.lower()}-\d+)-\d{{8}}")
@@ -135,7 +144,9 @@ def extra_bindings(lane, policy: dict | None = None, env=None, hostname: str | N
             None if row.get("concurrency") is None else max(1, int(row["concurrency"])),
             tuple(row.get("providers") or ()),
             tuple(row.get("install") or ()), str(row.get("reviewState") or "In Review"),
-            max(0, min(RESERVED_SEATS_MAX, _int_or_zero(row.get("reservedSeats"))))))
+            max(0, min(RESERVED_SEATS_MAX, _int_or_zero(row.get("reservedSeats")))),
+            max(0, int(row.get("minTodo") or 0)),
+            row.get("yieldToJovieRepair") is True))
     return active
 
 
@@ -527,7 +538,7 @@ def reserve(lane, host, name: str, spec: dict, *, bindings: list[Binding] | None
 
 
 def work(lane, host, name: str, spec: dict, *, maintenance_only: bool = False,
-         bindings: list[Binding] | None = None) -> str | None:
+         bindings: list[Binding] | None = None, jovie_repair_pending: bool = False) -> str | None:
     """Repair, else claim, one unit of bound work in this worker's held provider seat.
 
     Returns the run verdict, or None when no binding had work for this lane."""
@@ -541,7 +552,8 @@ def work(lane, host, name: str, spec: dict, *, maintenance_only: bool = False,
         if seat is None:
             continue  # the binding's own concurrency is in use; the last pass's status stands
         try:
-            verdict = _work_one(lane, host, binding, name, spec, maintenance_only)
+            verdict = _work_one(lane, host, binding, name, spec,
+                                maintenance_only or (jovie_repair_pending and binding.yield_to_jovie_repair))
         except lane.LinearRateLimited:
             record_status(lane, host, binding, worker=name, outcome="linear-rate-limited")
             return None
@@ -701,7 +713,7 @@ def merge_group_evidence(lane, binding: Binding, pr: dict) -> str:
 
 
 def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context: str = "",
-                  goal: list[str] | tuple = ()) -> str:
+                  goal: list[str] | tuple = (), machine: list[str] | tuple = ()) -> str:
     common = [
         f"- Repo {binding.slug}. Read AGENTS.md / CLAUDE.md and the rules they route to before editing.",
         "- Make the smallest correct change. Do not weaken CI, delete tests or skip gates.",
@@ -737,6 +749,7 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
             f"Branch `{branch}` at {pr['headRefOid']} is checked out. Merge state: "
             f"{pr.get('mergeStateStatus') or 'unknown'}. Failing checks: {', '.join(failing) or 'none'}. "
             f"Repair reasons: {', '.join(reasons) or 'red or behind'}.", "",
+            *machine, "",
             "## Contract",
             "- Merge origin/main into this branch first (no rebase), resolving conflicts.",
             "- Then fix what the failing checks report. Read their logs with `gh run view --log-failed`.",
@@ -749,6 +762,7 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
         "## Company context (GBrain; verify against source)",
         context or "(GBrain unavailable for this run; rely on repo docs.)", "",
         *goal,
+        *machine, "",
         "## Contract",
         f"- Work on branch `{branch}` from origin/main.",
         *common])
@@ -795,9 +809,15 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
                                    context=lane.context_pack(issue) if issue is not None else
                                    merge_group_evidence(lane, binding, pr)
                                    if "merge-group-failed" in (pr.get("repairReasons") or []) else "",
-                                   goal=lane.goal_contract(issue) if issue is not None else ())
+                                   goal=lane.goal_contract(issue) if issue is not None else (),
+                                   machine=lane.machine_gate(
+                                       host, subject, issue.title if issue is not None else "",
+                                       issue.labels if issue is not None else (),
+                                       (issue.description or "") if issue is not None else "", name,
+                                       fp=None if issue is not None else lane.machine_gap.check_fingerprint(pr),
+                                       receipt=receipt))
             prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
+            atomic_write_text(prompt_file, prompt)
             started = time.time()
             receipt["agentStarted"] = True
             agent = lane.run_agent(lane.template(spec["cmd"], {
@@ -863,7 +883,8 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
     created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
                        "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                        "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
-                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n"
+                                 '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n\n'
                                  f"Lane implementation (binding {binding.key}); {binding.slug} required checks "
                                  "gate merge."])
     url = (created.stdout or "").strip().splitlines()[-1:] if created.returncode == 0 else []
@@ -931,7 +952,7 @@ def finish_issue(lane, host, binding: Binding, name: str, linear, issue, receipt
         count = lane.failure_record(failures.get(issue.identifier))["count"] + 1
         failures[issue.identifier] = {"count": count, "at": time.time(), "release": lane.release_generation(),
                                       **lane.pr_events.failure_reason(receipt, count >= lane.MAX_FAILURES)}
-        lane.failures_path(host).write_text(json.dumps(failures))
+        atomic_write_text(lane.failures_path(host), json.dumps(failures))
     finally:
         claim.release()
     exhausted = count >= lane.MAX_FAILURES

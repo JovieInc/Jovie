@@ -1,0 +1,23 @@
+name: Prime Node toolcache
+description: >-
+  Put the exact Node release from .nvmrc into the runner toolcache straight
+  from nodejs.org so actions/setup-node finds it ("Found in cache") instead of
+  fetching the node-versions manifest through the GitHub REST API. That fetch
+  spends the repo-wide GITHUB_TOKEN quota (about 1,000 calls/hour, shared by
+  every workflow) once per setup-node, three times over when the quota is dry.
+  Never fails the job: on any problem setup-node resolves Node as before.
+
+inputs:
+  node-version-file:
+    description: File holding one exact Node version (for example 24.22.1)
+    required: false
+    default: .nvmrc
+
+runs:
+  using: composite
+  steps:
+    - name: Prime Node toolcache from nodejs.org
+      shell: bash
+      env:
+        NODE_VERSION_FILE: ${{ inputs.node-version-file }}
+      run: bash "$GITHUB_ACTION_PATH/prime.sh"

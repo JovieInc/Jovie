@@ -1,6 +1,8 @@
 import 'server-only';
 
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
+import { cookies } from 'next/headers';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
 import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { withDbSessionTx } from '@/lib/auth/session';
 import { requiresClaimVerification } from '@/lib/claim/claim-verification';
@@ -41,6 +43,7 @@ import {
   SpotifyProfileIdentityConflictError,
 } from '@/lib/profile/spotify-profile-identity';
 import { ensureChatWorkRecord } from '@/lib/tasks/chat-work-record';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import {
   type AccountMetricCohort,
   getAccountMetricCohort,
@@ -62,7 +65,7 @@ export interface MaterializeClaimedOnboardingProfileInput {
    * handle on a hidden, unclaimed profile so a pending waitlist decision still
    * protects jov.ie/<handle> until approval flips it public.
    */
-  readonly visibility?: 'public' | 'reserved';
+  readonly visibility?: 'public' | 'reserved' | 'unproven';
   /** Durable waitlist receipt this reservation belongs to (reserved mode). */
   readonly waitlistEntryId?: string | null;
 }
@@ -155,7 +158,8 @@ interface HeldClaimVerification {
  * artist becomes a verification request (lib/claim/claim-verification.ts).
  */
 async function holdHighReachArtistForVerification(
-  state: ClaimedOnboardingState
+  state: ClaimedOnboardingState,
+  options: { readonly forceHold?: boolean } = {}
 ): Promise<{
   readonly state: ClaimedOnboardingState;
   readonly verification: HeldClaimVerification | null;
@@ -164,7 +168,10 @@ async function holdHighReachArtistForVerification(
   if (!artist) return { state, verification: null };
   const reach = requiresClaimVerification(artist.followers)
     ? artist.followers
-    : await getClaimVerificationReach(artist.id);
+    : options.forceHold
+      ? // Unknown reach still holds the identity (fail closed).
+        (artist.followers ?? 0)
+      : await getClaimVerificationReach(artist.id);
   if (reach === null) return { state, verification: null };
   return {
     state: { ...state, artist: null },
@@ -271,6 +278,8 @@ interface PersistClaimedProfileInput {
   readonly now: Date;
   readonly spotifyFields: Record<string, unknown>;
   readonly reserved: boolean;
+  /** Admitted but unproven: claimed and managed by the owner, never public. */
+  readonly unproven: boolean;
   readonly waitlistEntryId: string | null;
 }
 
@@ -284,6 +293,7 @@ async function persistClaimedProfileRow({
   now,
   spotifyFields,
   reserved,
+  unproven,
   waitlistEntryId,
 }: PersistClaimedProfileInput): Promise<{
   profileId: string;
@@ -304,7 +314,9 @@ async function persistClaimedProfileRow({
         ...(reserved
           ? {}
           : {
-              isPublic: true,
+              // Unproven never publishes; it also never un-publishes a page
+              // that proof already made public.
+              ...(unproven ? {} : { isPublic: true }),
               isClaimed: true,
               claimedAt: existingProfile.claimedAt ?? now,
               onboardingCompletedAt:
@@ -339,7 +351,7 @@ async function persistClaimedProfileRow({
       username: handle,
       usernameNormalized: handle,
       displayName,
-      isPublic: !reserved,
+      isPublic: !reserved && !unproven,
       isClaimed: !reserved,
       claimedAt: reserved ? null : now,
       onboardingCompletedAt: reserved ? null : now,
@@ -364,6 +376,7 @@ async function persistClaimedProfileWithHandleRetry({
   now,
   musicFetch,
   reserved,
+  unproven,
   waitlistEntryId,
 }: {
   readonly userId: string;
@@ -372,6 +385,7 @@ async function persistClaimedProfileWithHandleRetry({
   readonly now: Date;
   readonly musicFetch: MusicFetchArtistResult | null;
   readonly reserved: boolean;
+  readonly unproven: boolean;
   readonly waitlistEntryId: string | null;
 }): Promise<{
   profileId: string;
@@ -443,6 +457,7 @@ async function persistClaimedProfileWithHandleRetry({
               musicFetch,
             }),
             reserved,
+            unproven,
             waitlistEntryId,
           });
         },
@@ -495,6 +510,7 @@ async function materializeProfile({
   waitlistEntryId = null,
 }: MaterializeClaimedOnboardingProfileInput): Promise<MaterializeClaimedOnboardingProfileResult> {
   const reserved = visibility === 'reserved';
+  const requestedUnproven = visibility === 'unproven';
   // Auth first (no DB): refuse anonymous materialize / reserve success.
   const { userId: authenticatedUserId } = requireVerifiedOwnerForReservation({
     userId,
@@ -524,8 +540,12 @@ async function materializeProfile({
     .orderBy(chatMessages.createdAt);
 
   const { state, verification } = await holdHighReachArtistForVerification(
-    deriveClaimedOnboardingStateFromMessageRows(messageRows)
+    deriveClaimedOnboardingStateFromMessageRows(messageRows),
+    { forceHold: requestedUnproven }
   );
+  // Proof is about an artist identity. With none to hold, there is nothing
+  // to prove and the page is ordinary (never private with no way out).
+  const unproven = requestedUnproven && verification !== null;
   if (!hasMaterializableState(state)) {
     return { profileId: null, handle: null, status: 'skipped' };
   }
@@ -540,6 +560,7 @@ async function materializeProfile({
       now,
       musicFetch,
       reserved,
+      unproven,
       waitlistEntryId,
     });
 
@@ -550,6 +571,7 @@ async function materializeProfile({
       artistName: verification.artistName,
       reach: verification.reach,
       paid: false,
+      proofOnly: unproven,
       now,
     });
   }
@@ -624,7 +646,7 @@ async function materializeProfile({
     metadata: {
       handle,
       status,
-      visibility: reserved ? 'reserved' : 'public',
+      visibility: reserved ? 'reserved' : unproven ? 'unproven' : 'public',
       waitlistEntryId,
       spotifyArtistId: state.artist?.id ?? null,
       spotifyArtistName: state.artist?.name ?? null,
@@ -641,7 +663,21 @@ async function materializeProfile({
       step: 'claim_complete',
       cohort: claimCohort,
     });
+    await recordClaimedStage();
   }
 
   return { profileId, handle, status };
+}
+
+/** Journey-keyed golden-path stage. Never throws; no consent cookie, no row. */
+async function recordClaimedStage(): Promise<void> {
+  try {
+    const cookieStore = await cookies();
+    await recordArtistOfferStage(
+      cookieStore.get(ACQUISITION_COOKIE_NAME)?.value,
+      'claimed'
+    );
+  } catch {
+    // Measurement only: a request without a cookie store records nothing.
+  }
 }

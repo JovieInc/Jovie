@@ -44,6 +44,9 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(HERE))
 import yc_corpus  # noqa: E402  (gbrain put + read-back contract, self-test refusal, state writes)
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 STATE_SCHEMA = "jovie.model-radar/v1"
 REGISTRY_SCHEMA = "jovie-model-task-registry/v1"
@@ -440,7 +443,7 @@ def record_decision(d: dict, *, run=default_run, put=yc_corpus.gbrain_put, today
     if shutil.which("jovie-research"):
         tmp = DEFAULT_STATE.parent / "decision.json"
         tmp.parent.mkdir(parents=True, exist_ok=True)
-        tmp.write_text(json.dumps({**d, "area": d.get("area", "models"), "slug": slug}))
+        atomic_write_text(tmp, json.dumps({**d, "area": d.get("area", "models"), "slug": slug}))
         proc = run(["jovie-research", "decision", "record", "--file", str(tmp)])
         if proc.returncode == 0:
             return True, slug
