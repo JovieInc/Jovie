@@ -18,6 +18,40 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # Cloudflare R2 Turbo cache with automatic fallback. Runs only when the
+    # caller exported CF_TURBO_* (ci.yml); a failed probe leaves the legacy
+    # TURBO_* values untouched. Roles: rw (trusted push) or ro (PR/merge group).
+    - name: Select Turbo remote cache
+      shell: bash
+      env:
+        CF_TURBO_URL: ${{ env.CF_TURBO_URL }}
+        CF_TURBO_TOKEN: ${{ env.CF_TURBO_TOKEN }}
+        CF_TURBO_ROLE: ${{ env.CF_TURBO_ROLE }}
+      run: |
+        if [ -z "${CF_TURBO_URL:-}" ] || [ -z "${CF_TURBO_TOKEN:-}" ]; then
+          echo "turbo-cache: backend=legacy (no Cloudflare credentials)"
+          exit 0
+        fi
+        code=$(curl -s -o /dev/null -m 5 -w '%{http_code}' \
+          -H "Authorization: Bearer ${CF_TURBO_TOKEN}" \
+          "${CF_TURBO_URL%/}/v8/artifacts/status" || true)
+        if [ "$code" != "200" ]; then
+          echo "::warning::Cloudflare Turbo cache probe returned ${code:-none}; using legacy cache."
+          echo "turbo-cache: backend=legacy (probe ${code:-none})"
+          exit 0
+        fi
+        {
+          echo "TURBO_API=${CF_TURBO_URL%/}"
+          echo "TURBO_TOKEN=${CF_TURBO_TOKEN}"
+          echo "TURBO_TEAM=jovie"
+          if [ "$CF_TURBO_ROLE" = "rw" ]; then
+            echo "TURBO_CACHE=local:rw,remote:rw"
+          else
+            echo "TURBO_CACHE=local:rw,remote:r"
+          fi
+        } >> "$GITHUB_ENV"
+        echo "turbo-cache: backend=cloudflare-r2 role=${CF_TURBO_ROLE}"
+
     # Self-hosted runners reuse a workspace whose owner can differ from the job
     # user, tripping git's dubious-ownership guard. That makes turbo's SCM probe
     # report the checkout as "not part of a Git repository" and breaks
@@ -233,37 +267,3 @@ runs:
           packages/*/node_modules
           workers/*/node_modules
         key: ${{ steps.node-modules-cache.outputs.cache-primary-key }}
-
-    # Cloudflare R2 Turbo cache with automatic fallback. Runs only when the
-    # caller exported CF_TURBO_* (ci.yml); a failed probe leaves the legacy
-    # TURBO_* values untouched. Roles: rw (trusted push) or ro (PR/merge group).
-    - name: Select Turbo remote cache
-      shell: bash
-      env:
-        CF_TURBO_URL: ${{ env.CF_TURBO_URL }}
-        CF_TURBO_TOKEN: ${{ env.CF_TURBO_TOKEN }}
-        CF_TURBO_ROLE: ${{ env.CF_TURBO_ROLE }}
-      run: |
-        if [ -z "${CF_TURBO_URL:-}" ] || [ -z "${CF_TURBO_TOKEN:-}" ]; then
-          echo "turbo-cache: backend=legacy (no Cloudflare credentials)"
-          exit 0
-        fi
-        code=$(curl -s -o /dev/null -m 5 -w '%{http_code}' \
-          -H "Authorization: Bearer ${CF_TURBO_TOKEN}" \
-          "${CF_TURBO_URL%/}/v8/artifacts/status" || true)
-        if [ "$code" != "200" ]; then
-          echo "::warning::Cloudflare Turbo cache probe returned ${code:-none}; using legacy cache."
-          echo "turbo-cache: backend=legacy (probe ${code:-none})"
-          exit 0
-        fi
-        {
-          echo "TURBO_API=${CF_TURBO_URL%/}"
-          echo "TURBO_TOKEN=${CF_TURBO_TOKEN}"
-          echo "TURBO_TEAM=jovie"
-          if [ "$CF_TURBO_ROLE" = "rw" ]; then
-            echo "TURBO_CACHE=local:rw,remote:rw"
-          else
-            echo "TURBO_CACHE=local:rw,remote:r"
-          fi
-        } >> "$GITHUB_ENV"
-        echo "turbo-cache: backend=cloudflare-r2 role=${CF_TURBO_ROLE}"
