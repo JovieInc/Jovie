@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   sampleModes: [] as number[],
   previousSampleExists: [] as boolean[],
   childOutput: [] as unknown[],
+  warmupStatus: 0,
   calls: [] as string[][],
 }));
 
@@ -54,7 +55,9 @@ vi.mock('node:child_process', () => ({
         truncateSync(`${prefix}-0.trace.json`, 64 * 1024 * 1024 + 1);
     }
     if (state.childThrows) throw new Error('synthetic-private-child-error');
-    if (out && state.status === 0) {
+    const isWarmup = out?.includes('warmup') ?? false;
+    const status = isWarmup ? state.warmupStatus : state.status;
+    if (out && status === 0) {
       writeFileSync(
         out.slice('--output-path='.length),
         state.rawReport ??
@@ -68,7 +71,7 @@ vi.mock('node:child_process', () => ({
           )
       );
     }
-    return { status: state.status };
+    return { status };
   },
 }));
 
@@ -240,6 +243,7 @@ describe('lighthouse entry gate main', () => {
     state.sampleModes = [];
     state.previousSampleExists = [];
     state.childOutput = [];
+    state.warmupStatus = 0;
     state.calls = [];
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     delete process.env.PLAYWRIGHT_VERCEL_BYPASS_SECRET;
@@ -480,6 +484,8 @@ describe('lighthouse entry gate main', () => {
       'claim-link',
       '--runs',
       '3',
+      '--warmups',
+      '0',
     ]);
     expect(code).toBe(1);
     expect(state.calls).toHaveLength(3);
@@ -524,12 +530,82 @@ describe('lighthouse entry gate main', () => {
       'start',
       '--runs',
       '3',
+      '--warmups',
+      '0',
     ]);
     expect(code).toBe(0);
     expect(state.calls).toHaveLength(3);
     expect(state.calls[0].some(a => a.startsWith('--extra-headers'))).toBe(
       false
     );
+  });
+
+  it('discards one warmup load per route before the timed samples', async () => {
+    const code = await main([
+      '--base-url',
+      'https://x.test',
+      '--route-id',
+      'start',
+      '--runs',
+      '2',
+    ]);
+    expect(code).toBe(0);
+    expect(state.calls).toHaveLength(3);
+    const outputPaths = state.calls.map(args =>
+      args.find(arg => arg.startsWith('--output-path='))
+    );
+    expect(outputPaths[0]).toContain('warmup');
+    for (const timed of outputPaths.slice(1)) {
+      expect(timed).not.toContain('warmup');
+    }
+  });
+
+  it('skips warmups entirely with --warmups 0', async () => {
+    const code = await main([
+      '--base-url',
+      'https://x.test',
+      '--route-id',
+      'start',
+      '--runs',
+      '2',
+      '--warmups',
+      '0',
+    ]);
+    expect(code).toBe(0);
+    expect(state.calls).toHaveLength(2);
+    for (const args of state.calls) {
+      expect(args.find(arg => arg.startsWith('--output-path='))).not.toContain(
+        'warmup'
+      );
+    }
+  });
+
+  it('rejects a malformed --warmups value', async () => {
+    await expect(
+      main([
+        '--base-url',
+        'https://x.test',
+        '--route-id',
+        'start',
+        '--warmups',
+        '-1',
+      ])
+    ).rejects.toThrow('--warmups must be a non-negative integer');
+    expect(state.calls).toHaveLength(0);
+  });
+
+  it('tolerates a failing warmup load; the timed samples still decide', async () => {
+    state.warmupStatus = 1;
+    const code = await main([
+      '--base-url',
+      'https://x.test',
+      '--route-id',
+      'start',
+      '--runs',
+      '1',
+    ]);
+    expect(code).toBe(0);
+    expect(state.calls).toHaveLength(2);
   });
 
   it('fails (exit 1) when LCP exceeds the budget', async () => {
@@ -593,6 +669,8 @@ describe('lighthouse entry gate main', () => {
       'claim-link',
       '--runs',
       '3',
+      '--warmups',
+      '0',
     ]);
     expect(code).toBe(1);
     expect(state.calls).toHaveLength(3);
