@@ -153,7 +153,7 @@ describe('gateSteadyGreen', () => {
 
   it('fails closed on red when Linear has no key', async () => {
     const result = await applyRemediationDecision(
-      { action: 'red', fingerprint: 'production-monitor-continuity' },
+      { action: 'red', fingerprint: 'production-monitor-vercel-deploy' },
       { source: 'production-continuity.yml', apiKey: '' }
     );
     expect('reason' in result && result.reason).toBe('missing_linear_api_key');
@@ -186,7 +186,7 @@ function linearStub(issueNodes) {
             nodes: [
               {
                 id: 'lbl-key',
-                name: 'remediation:production-monitor-continuity',
+                name: 'remediation:production-monitor-vercel-deploy',
               },
               {
                 id: 'lbl-prod',
@@ -227,7 +227,10 @@ function linearStub(issueNodes) {
 }
 
 describe('red remediation is agent-ready', () => {
-  const red = { action: 'red', fingerprint: 'production-monitor-continuity' };
+  const red = {
+    action: 'red',
+    fingerprint: 'production-monitor-vercel-deploy',
+  };
   const context = run => ({
     source: 'production-continuity.yml',
     runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
@@ -258,13 +261,13 @@ describe('red remediation is agent-ready', () => {
         identifier: 'JOV-2',
         url: 'u',
         title:
-          'P0: production-monitor-continuity is red (production-monitor-continuity)',
+          'P0: production-monitor-vercel-deploy is red (production-monitor-vercel-deploy)',
         state: { id: 'st-done', name: 'Done', type: 'completed' },
         labels: {
           nodes: [
             {
               id: 'lbl-key',
-              name: 'remediation:production-monitor-continuity',
+              name: 'remediation:production-monitor-vercel-deploy',
             },
           ],
         },
@@ -288,7 +291,10 @@ describe('red remediation is agent-ready', () => {
 });
 
 describe('applyRemediationDecisionWithRetry', () => {
-  const red = { action: 'red', fingerprint: 'production-monitor-continuity' };
+  const red = {
+    action: 'red',
+    fingerprint: 'production-monitor-vercel-deploy',
+  };
   const context = fetchImpl => ({
     source: 'production-continuity.yml',
     runUrl: 'https://github.com/JovieInc/Jovie/actions/runs/1',
@@ -464,7 +470,7 @@ describe('real monitor intake preserves quota canary identity', () => {
     expect(
       decideMonitorSignal({
         conclusion: 'success',
-        fingerprint: 'production-monitor-continuity',
+        fingerprint: 'production-monitor-vercel-deploy',
       }).fingerprints
     ).toBeUndefined();
   });
@@ -473,7 +479,7 @@ describe('real monitor intake preserves quota canary identity', () => {
     clearRemediationLabelCache();
     const run = linearStub([]);
     await applyRemediationDecision(
-      { action: 'red', fingerprint: 'production-monitor-continuity' },
+      { action: 'red', fingerprint: 'production-monitor-vercel-deploy' },
       {
         source: 'production-continuity.yml',
         runUrl: 'https://example.invalid/run',
@@ -508,7 +514,7 @@ describe('continuity intake treats unknown freshness as neither green nor silent
       LINEAR_API_KEY: 'lin_test',
       REMEDIATION_MODE: 'monitor',
       REMEDIATION_CONCLUSION: conclusion,
-      REMEDIATION_FINGERPRINT: 'production-monitor-continuity',
+      REMEDIATION_FINGERPRINT: 'production-monitor-vercel-deploy',
       REMEDIATION_SOURCE: 'production-continuity.yml',
       REMEDIATION_RUN_URL:
         'https://github.com/JovieInc/Jovie/actions/runs/40070879025',
@@ -589,7 +595,7 @@ describe('continuity intake treats unknown freshness as neither green nor silent
       previous: 'red',
     });
     expect(out.logs.join('\n')).toMatch(
-      /::warning title=Remediation held::production-monitor-continuity not resolved: unknown_evidence \(previous state: red\)/
+      /::warning title=Remediation held::production-monitor-vercel-deploy not resolved: unknown_evidence \(previous state: red\)/
     );
   });
 

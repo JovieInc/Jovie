@@ -308,7 +308,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-free-v1',
         controlHeadline: 'Free plan',
         headline: 'Free',
-        body: 'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.',
+        body: 'Your Jovie profile stays free forever and keeps audience capture.',
         supportingText: [
           'Free forever',
           '$0',

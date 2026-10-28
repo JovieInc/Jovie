@@ -1,7 +1,3 @@
-import {
-  APP_ROUTES,
-  buildSpotifyCatalogConnectionRoute,
-} from '@/constants/routes';
 import { COPY_FALLBACKS } from '@/data/copyFallbacks';
 import {
   rankSocialInboxDrafts,
@@ -37,7 +33,6 @@ import type {
   OpportunityInboxCardCategory,
   OpportunityInboxCardViewModel,
   OpportunityInboxData,
-  OpportunityInboxEmptyActionCard,
   OpportunityInboxTourDates,
 } from './opportunity-inbox-types';
 import { parseYouTubeThumbnailCandidate } from './youtube-thumbnail-candidate';
@@ -262,24 +257,6 @@ export function mapSuggestedActionToInboxCard(
   };
 }
 
-export const DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS: readonly OpportunityInboxEmptyActionCard[] =
-  [
-    {
-      id: 'connect-spotify',
-      title: 'Connect Spotify',
-      body: 'Link your catalog so Jovie can spot releases, audience spikes, and pitch windows.',
-      actionLabel: 'Connect Spotify',
-      href: buildSpotifyCatalogConnectionRoute(),
-    },
-    {
-      id: 'add-tour-dates',
-      title: 'Add tour dates',
-      body: 'Keep dates current so booking suggestions stay aligned with your calendar.',
-      actionLabel: 'Add dates',
-      href: APP_ROUTES.TOUR_DATES,
-    },
-  ] as const;
-
 export function buildOpportunityInboxData(
   rows: readonly SuggestedActionRow[],
   tourDates?: OpportunityInboxTourDates,
@@ -366,7 +343,9 @@ export function buildOpportunityInboxData(
         ? (tourDates.availability ?? 'unknown')
         : 'not_requested',
     },
-    emptyActionCards: DEFAULT_OPPORTUNITY_INBOX_EMPTY_ACTION_CARDS,
+    // JOV-8967: the empty Inbox stays quiet — no setup CTAs here. Setup steps
+    // live on Home and render there only while setup is incomplete.
+    emptyActionCards: [],
     ...(tourDates ? { tourDates } : {}),
   };
 }
