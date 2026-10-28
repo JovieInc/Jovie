@@ -1,12 +1,11 @@
 'use client';
 
-import { Copy, ExternalLink, ShieldCheck, ShieldOff } from 'lucide-react';
+import { Copy, ShieldCheck, ShieldOff } from 'lucide-react';
 import type { ContextMenuItemType } from '@/components/organisms/table';
 import type { AdminUserRow } from '@/lib/admin/types';
 
 // Module-level icon constants — allocated once, reused across all rows and renders.
 const ICON_COPY = <Copy className='h-3.5 w-3.5' />;
-const ICON_EXTERNAL = <ExternalLink className='h-3.5 w-3.5' />;
 const ICON_SUSPEND = <ShieldOff className='h-3.5 w-3.5' />;
 const ICON_RESTORE = <ShieldCheck className='h-3.5 w-3.5' />;
 
@@ -14,7 +13,6 @@ export interface BuildAdminUserActionsCallbacks {
   readonly onCopyClerkId: (user: AdminUserRow) => void;
   readonly onCopyEmail: (user: AdminUserRow) => void;
   readonly onCopyUserId: (user: AdminUserRow) => void;
-  readonly onOpenInClerk: (user: AdminUserRow) => void;
   readonly onBanUser: (user: AdminUserRow) => void;
   readonly onUnbanUser: (user: AdminUserRow) => void;
 }
@@ -53,19 +51,6 @@ export function buildAdminUserActions(
       onClick: () => callbacks.onCopyUserId(user),
     },
   ];
-
-  // ── External links group ──
-  if (user.clerkId && user.clerkId.length > 0) {
-    items.push(
-      { type: 'separator' as const },
-      {
-        id: 'open-in-clerk',
-        label: 'Open In Clerk',
-        icon: ICON_EXTERNAL,
-        onClick: () => callbacks.onOpenInClerk(user),
-      }
-    );
-  }
 
   // ── Moderation group ──
   const isBanned =

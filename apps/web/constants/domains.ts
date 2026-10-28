@@ -116,15 +116,3 @@ export const ABUSE_EMAIL = `abuse@${HOSTNAME}`;
 // ============================================================================
 
 export const INGESTION_USER_AGENT = `jovie-link-ingestion/1.0 (+${BASE_URL})`;
-
-// ============================================================================
-// Clerk Configuration
-// ============================================================================
-
-/**
- * Clerk FAPI URL — the actual Clerk frontend API endpoint.
- * Both staging and production use the same instance.
- * Proxied via /__clerk/* path (vercel.json rewrites).
- * Do NOT use clerk.jov.ie — that domain is dead.
- */
-export const CLERK_FAPI_URL = 'https://distinct-giraffe-5.clerk.accounts.dev';

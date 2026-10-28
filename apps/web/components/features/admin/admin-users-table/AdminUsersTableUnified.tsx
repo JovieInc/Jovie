@@ -349,11 +349,6 @@ export function AdminUsersTableUnified(props: Readonly<AdminUsersTableProps>) {
           }
         });
       },
-      onOpenInClerk: (u: AdminUserRow) => {
-        if (!u.clerkId) return;
-        const clerkConsoleUrl = `https://dashboard.clerk.com/apps/users/user_${encodeURIComponent(u.clerkId)}`;
-        globalThis.open(clerkConsoleUrl, '_blank', 'noopener,noreferrer');
-      },
       onBanUser: (u: AdminUserRow) => {
         setBanTarget(u);
         setBanReason('');

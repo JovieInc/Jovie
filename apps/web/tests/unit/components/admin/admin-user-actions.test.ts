@@ -35,14 +35,13 @@ function makeCallbacks(): BuildAdminUserActionsCallbacks {
     onCopyClerkId: vi.fn(),
     onCopyEmail: vi.fn(),
     onCopyUserId: vi.fn(),
-    onOpenInClerk: vi.fn(),
     onBanUser: vi.fn(),
     onUnbanUser: vi.fn(),
   };
 }
 
 describe('buildAdminUserActions', () => {
-  it('returns copy actions, external link, and moderation for active user', () => {
+  it('returns copy actions and moderation for active user', () => {
     const user = makeUser();
     const callbacks = makeCallbacks();
     const items = buildAdminUserActions(user, callbacks);
@@ -54,9 +53,63 @@ describe('buildAdminUserActions', () => {
       'copy-clerk-id',
       'copy-email',
       'copy-user-id',
-      'open-in-clerk',
       'suspend-user',
     ]);
+  });
+
+  it('shows restore action for banned user', () => {
+    const user = makeUser({ userStatus: 'banned' });
+    const callbacks = makeCallbacks();
+    const items = buildAdminUserActions(user, callbacks);
+
+    const actionItems = items.filter(
+      item => 'id' in item && item.id !== undefined
+    );
+    expect(actionItems.map(i => ('id' in i ? i.id : null))).toContain(
+      'restore-user'
+    );
+    expect(actionItems.map(i => ('id' in i ? i.id : null))).not.toContain(
+      'suspend-user'
+    );
+  });
+
+  it('shows restore action for suspended user', () => {
+    const user = makeUser({ userStatus: 'suspended' });
+    const callbacks = makeCallbacks();
+    const items = buildAdminUserActions(user, callbacks);
+
+    const actionItems = items.filter(
+      item => 'id' in item && item.id !== undefined
+    );
+    expect(actionItems.map(i => ('id' in i ? i.id : null))).toContain(
+      'restore-user'
+    );
+  });
+
+  it('disables copy email when user has no email', () => {
+    const user = makeUser({ email: null });
+    const callbacks = makeCallbacks();
+    const items = buildAdminUserActions(user, callbacks);
+
+    const copyEmail = items.find(
+      item => 'id' in item && item.id === 'copy-email'
+    );
+    expect(copyEmail).toBeDefined();
+    expect('disabled' in copyEmail! && copyEmail.disabled).toBe(true);
+  });
+
+  it('has a single separator before the moderation group', () => {
+    const items = buildAdminUserActions(
+      makeUser({ clerkId: '' }),
+      makeCallbacks()
+    );
+
+    expect(
+      items.filter(item => 'type' in item && item.type === 'separator')
+    ).toHaveLength(1);
+    expect(
+      items.some(item => 'id' in item && item.id === 'open-in-clerk')
+    ).toBe(false);
   });
 
   it('shows restore action for banned user', () => {
@@ -117,17 +170,6 @@ describe('buildAdminUserActions', () => {
     expect(separators).toHaveLength(1);
   });
 
-  it('includes two separators when clerkId is present', () => {
-    const user = makeUser({ clerkId: 'clerk_abc' });
-    const callbacks = makeCallbacks();
-    const items = buildAdminUserActions(user, callbacks);
-
-    const separators = items.filter(
-      item => 'type' in item && item.type === 'separator'
-    );
-    expect(separators).toHaveLength(2);
-  });
-
   it('invokes the correct callback when onClick is called', () => {
     const user = makeUser();
     const callbacks = makeCallbacks();
@@ -150,15 +192,6 @@ describe('buildAdminUserActions', () => {
       copyUserId.onClick?.();
     }
     expect(callbacks.onCopyUserId).toHaveBeenCalledWith(user);
-
-    // Find and invoke open-in-clerk
-    const openInClerk = items.find(
-      item => 'id' in item && item.id === 'open-in-clerk'
-    );
-    if (openInClerk && 'onClick' in openInClerk) {
-      openInClerk.onClick?.();
-    }
-    expect(callbacks.onOpenInClerk).toHaveBeenCalledWith(user);
 
     // Find and invoke suspend-user
     const suspendUser = items.find(
