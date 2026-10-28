@@ -1,6 +1,6 @@
 {
   "schema": "jovie-stage-timings-compact/v1",
-  "generatedAt": "2026-10-25T12:52:43.709Z",
+  "generatedAt": "2026-10-28T14:19:21.207Z",
   "unit": "seconds",
   "windows": ["24h", "7d", "28d"],
   "entities": {
@@ -35,134 +35,134 @@
       "stages": {
         "issue": {
           "status": "derived",
-          "24h": [2, 0, 2500.983],
-          "7d": [156, 25131.622, 1778110.715],
-          "28d": [1519, 360.907, 2793147.737],
-          "regression": [false, 0.59, 1778110.715, 3023845.484, 156, 1363]
+          "24h": [0, null, null],
+          "7d": [122, 36983.622, 1796922.213],
+          "28d": [1197, 810.728, 3356986.516],
+          "regression": [false, 0.49, 1796922.213, 3643622.025, 122, 1075]
         },
         "eligible": {
           "status": "derived",
-          "24h": [4, 204479.172, 1485921.083],
-          "7d": [76, 9485.902, 1467934.443],
-          "28d": [777, 16814.013, 2427275.918],
-          "regression": [false, 0.55, 1467934.443, 2662760.727, 76, 701]
+          "24h": [0, null, null],
+          "7d": [35, 1115.479, 789483.184],
+          "28d": [574, 21236.476, 2769783.132],
+          "regression": [false, 0.28, 789483.184, 2824128.057, 35, 539]
         },
         "admitted": {
           "status": "derived",
-          "24h": [9, 0, 900273.024],
-          "7d": [165, 0, 1118448.962],
-          "28d": [1478, 496.044, 513132.073],
-          "regression": [true, 2.46, 1118448.962, 454093.788, 165, 1313]
+          "24h": [0, null, null],
+          "7d": [125, 21.443, 525020.484],
+          "28d": [1101, 488.999, 762000.368],
+          "regression": [false, 0.68, 525020.484, 767199.368, 125, 976]
         },
         "worker-start": {
           "status": "spec",
-          "24h": [10, 1256, 4412],
-          "7d": [161, 755, 363932],
-          "28d": [996, 693, 104784],
-          "regression": [true, 3.55, 363932, 102628, 161, 835]
+          "24h": [0, null, null],
+          "7d": [98, 902, 475700],
+          "28d": [863, 676, 104999],
+          "regression": [true, 4.54, 475700, 104784, 98, 765]
         },
         "pr-open": {
           "status": "derived",
-          "24h": [97, 0, 350134],
-          "7d": [669, 0, 264815],
-          "28d": [3246, 334, 69593],
-          "regression": [true, 5.31, 264815, 49917, 669, 2577]
+          "24h": [5, 28617, 206327],
+          "7d": [664, 0, 259537],
+          "28d": [2788, 372, 85652],
+          "regression": [true, 3.94, 259537, 65867, 664, 2124]
         },
         "gate-seat": {
           "status": "spec",
-          "24h": [0, null, null],
-          "7d": [81, 36, 7740],
-          "28d": [1056, 40, 5792],
-          "regression": [true, 1.56, 7740, 4948, 81, 975]
+          "24h": [1, 0, 0],
+          "7d": [38, 0, 12205],
+          "28d": [932, 35, 3090],
+          "regression": [true, 4.25, 12205, 2870, 38, 894]
         },
         "gate": {
           "status": "spec",
-          "24h": [2, 172914, 265995],
-          "7d": [40, 201, 172914],
-          "28d": [849, 42, 7753],
-          "regression": [true, 34.95, 172914, 4948, 40, 809]
+          "24h": [1, 188, 188],
+          "7d": [32, 417, 172914],
+          "28d": [832, 41, 7914],
+          "regression": [true, 30.93, 172914, 5591, 32, 800]
         },
         "ready": {
           "status": "derived",
-          "24h": [106, 456, 69954],
-          "7d": [675, 1299, 29568],
-          "28d": [3289, 393, 45377],
-          "regression": [false, 0.54, 29568, 54700, 675, 2614]
+          "24h": [5, 17, 19],
+          "7d": [672, 1347, 56373],
+          "28d": [2788, 418, 43655],
+          "regression": [true, 1.34, 56373, 41989, 672, 2116]
         },
         "queued": {
           "status": "derived",
-          "24h": [110, 2155, 6590],
-          "7d": [659, 1070, 12591],
-          "28d": [3225, 920, 9176],
-          "regression": [true, 1.65, 12591, 7643, 659, 2566]
+          "24h": [6, 518, 784],
+          "7d": [662, 933, 12223],
+          "28d": [2729, 948, 10488],
+          "regression": [true, 1.33, 12223, 9214, 662, 2067]
         },
         "merged": {
           "status": "derived",
-          "24h": [105, 4273, 9438],
-          "7d": [672, 4172, 17287],
-          "28d": [3305, 4611, 49736],
-          "regression": [false, 0.31, 17287, 55506, 672, 2633]
+          "24h": [0, null, null],
+          "7d": [557, 4631, 18264],
+          "28d": [2687, 4293, 55253],
+          "regression": [false, 0.29, 18264, 62244, 557, 2130]
         },
         "deployed": {
           "status": "derived",
-          "24h": [105, 630, 790],
-          "7d": [672, 566, 790],
-          "28d": [3305, 619, 1003],
-          "regression": [false, 0.78, 790, 1008, 672, 2633]
+          "24h": [0, null, null],
+          "7d": [557, 624, 831],
+          "28d": [2687, 565, 990],
+          "regression": [false, 0.84, 831, 990, 557, 2130]
         },
         "outcome-receipt": {
           "status": "spec",
-          "24h": [30, 24008, 1142346],
-          "7d": [90, 665125, 1247922],
-          "28d": [90, 665125, 1247922],
-          "regression": [false, null, 1247922, null, 90, 0]
+          "24h": [25, 283120, 1569833],
+          "7d": [175, 555290, 1224277],
+          "28d": [175, 555290, 1224277],
+          "regression": [false, null, 1224277, null, 175, 0]
         },
         "verified": {
           "status": "derived",
-          "24h": [21, 341427.188, 1819919.172],
-          "7d": [126, 338655.188, 1759858.947],
-          "28d": [414, 71715.947, 1419233.414],
-          "regression": [true, 2.06, 1759858.947, 855235.633, 126, 288]
+          "24h": [8, 424581.771, 1952204.409],
+          "7d": [137, 338655.188, 1830240.636],
+          "28d": [400, 86984.654, 1482413.29],
+          "regression": [true, 1.68, 1830240.636, 1087325.254, 137, 263]
         },
         "closed": {
           "status": "derived",
           "terminal": true,
-          "24h": [21, null, null, 0, 0],
-          "7d": [126, null, null, 0, 0],
-          "28d": [414, null, null, 0, 0],
+          "24h": [8, null, null, 0, 0],
+          "7d": [137, null, null, 0, 0],
+          "28d": [400, null, null, 0, 0],
           "regression": null
         }
       },
       "endToEnd": {
         "issue->verified": {
-          "24h": [31, 727470.433, 3708412.516],
-          "7d": [206, 221187.257, 2418210.571],
-          "28d": [1693, 122001.051, 4294913],
-          "regression": [false, 0.51, 2418210.571, 4780102.098, 206, 1487]
+          "24h": [0, null, null],
+          "7d": [164, 223913.383, 2702831.777],
+          "28d": [1292, 138157.69, 4564828.872],
+          "regression": [false, 0.52, 2702831.777, 5180316, 164, 1128]
         },
         "pr-open->merged": {
-          "24h": [110, 14285, 364648],
-          "7d": [677, 6735, 314236],
-          "28d": [3304, 4224, 175268],
-          "regression": [true, 2.19, 314236, 143524, 677, 2627]
+          "24h": [6, 29074, 207303],
+          "7d": [673, 6446, 277419],
+          "28d": [2801, 4691, 194611],
+          "regression": [true, 1.6, 277419, 172943, 673, 2128]
         },
         "merged->verified": {
-          "24h": [105, 4888, 10070],
-          "7d": [672, 4506, 17980],
-          "28d": [3305, 4830, 50668],
-          "regression": [false, 0.32, 17980, 56514, 672, 2633]
+          "24h": [0, null, null],
+          "7d": [557, 5133, 18832],
+          "28d": [2687, 4295, 56185],
+          "regression": [false, 0.3, 18832, 63176, 557, 2130]
         },
         "verified->closed": {
-          "24h": [21, 341427.188, 1819919.172],
-          "7d": [126, 338655.188, 1759858.947],
-          "28d": [414, 71715.947, 1419233.414],
-          "regression": [true, 2.06, 1759858.947, 855235.633, 126, 288]
+          "24h": [8, 424581.771, 1952204.409],
+          "7d": [137, 338655.188, 1830240.636],
+          "28d": [400, 86984.654, 1482413.29],
+          "regression": [true, 1.68, 1830240.636, 1087325.254, 137, 263]
         },
         "merged->closed": {
-          "24h": [21, 343212.188, 1876104.172],
-          "7d": [126, 343124.188, 1763238.947],
-          "28d": [414, 85506.331, 1475785.996],
-          "regression": [true, 2.05, 1763238.947, 858436.633, 126, 288]
+          "24h": [8, 428466.771, 1984838.409],
+          "7d": [137, 343124.188, 1838357.636],
+          "28d": [400, 95781.693, 1485183.29],
+          "regression": [true, 1.69, 1838357.636, 1089489.254, 137, 263]
         }
       }
     },
@@ -170,40 +170,40 @@
       "stages": {
         "red": {
           "status": "derived",
-          "24h": [34, 779, 232490],
-          "7d": [247, 201, 27466],
-          "28d": [893, 125, 35770],
-          "regression": [false, 0.7, 27466, 39157, 247, 646]
+          "24h": [0, null, null],
+          "7d": [280, 230, 16931],
+          "28d": [763, 185, 50973],
+          "regression": [false, 0.18, 16931, 96458, 280, 483]
         },
         "classified": {
           "status": "derived",
-          "24h": [30, 19269, 163995],
-          "7d": [189, 2029, 33182],
-          "28d": [714, 1579, 64661],
-          "regression": [false, 0.51, 33182, 64906, 189, 525]
+          "24h": [0, null, null],
+          "7d": [224, 4090, 146671],
+          "28d": [572, 1666, 66652],
+          "regression": [true, 10.67, 146671, 13745, 224, 348]
         },
         "repair-start": {
           "status": "spec",
-          "24h": [6, 1728, 183970],
-          "7d": [133, 3567, 174442],
-          "28d": [912, 944, 22698],
-          "regression": [true, 8.07, 174442, 21629, 133, 779]
+          "24h": [0, null, null],
+          "7d": [105, 3625, 153120],
+          "28d": [815, 755, 43943],
+          "regression": [true, 6.94, 153120, 22053, 105, 710]
         },
         "green": {
           "status": "derived",
           "terminal": true,
-          "24h": [42, null, null, 0, 0],
-          "7d": [250, null, null, 0, 0],
-          "28d": [933, null, null, 0, 0],
+          "24h": [0, null, null, 0, null],
+          "7d": [287, null, null, 0, 0],
+          "28d": [763, null, null, 0, 0],
           "regression": null
         }
       },
       "endToEnd": {
         "red->green": {
-          "24h": [42, 21575, 217764],
-          "7d": [250, 6568, 199463],
-          "28d": [933, 4985, 164773],
-          "regression": [true, 1.43, 199463, 139430, 250, 683]
+          "24h": [0, null, null],
+          "7d": [287, 7085, 174731],
+          "28d": [763, 5685, 187494],
+          "regression": [false, 0.67, 174731, 259911, 287, 476]
         }
       }
     },
@@ -211,40 +211,40 @@
       "stages": {
         "staging": {
           "status": "derived",
-          "24h": [24, 446, 2181],
-          "7d": [158, 457, 1802],
-          "28d": [492, 424, 1379],
-          "regression": [true, 1.47, 1802, 1230, 158, 334]
+          "24h": [0, null, null],
+          "7d": [123, 478, 1792],
+          "28d": [505, 424, 1385],
+          "regression": [true, 1.42, 1792, 1260, 123, 382]
         },
         "canary": {
           "status": "derived",
-          "24h": [15, 709, 2761],
-          "7d": [112, 975, 2606],
-          "28d": [346, 625, 1946],
-          "regression": [true, 1.92, 2606, 1356, 112, 234]
+          "24h": [0, null, null],
+          "7d": [95, 1075, 2606],
+          "28d": [352, 625, 1955],
+          "regression": [true, 1.73, 2606, 1506, 95, 257]
         },
         "prod": {
           "status": "derived",
-          "24h": [23, 1592, 1766],
-          "7d": [147, 1283, 1730],
-          "28d": [522, 1368, 2240],
-          "regression": [false, 0.76, 1730, 2264, 147, 375]
+          "24h": [0, null, null],
+          "7d": [113, 1451, 1794],
+          "28d": [474, 1295, 2219],
+          "regression": [false, 0.81, 1794, 2224, 113, 361]
         },
         "verified": {
           "status": "derived",
           "terminal": true,
-          "24h": [24, null, null, 0, 0],
-          "7d": [158, null, null, 0, 0],
-          "28d": [624, null, null, 0, 0],
+          "24h": [0, null, null, 0, null],
+          "7d": [123, null, null, 0, 0],
+          "28d": [577, null, null, 0, 0],
           "regression": null
         }
       },
       "endToEnd": {
         "staging->verified": {
-          "24h": [24, 2644, 4903],
-          "7d": [158, 2592, 4903],
-          "28d": [492, 2166, 4283],
-          "regression": [true, 1.3, 4903, 3779, 158, 334]
+          "24h": [0, null, null],
+          "7d": [123, 2830, 4903],
+          "28d": [505, 2176, 4283],
+          "regression": [true, 1.36, 4903, 3594, 123, 382]
         }
       }
     },
@@ -252,10 +252,10 @@
       "stages": {
         "blocked": {
           "status": "pushed",
-          "24h": [1, 2022, 2022],
-          "7d": [13, 141, 2022],
-          "28d": [13, 141, 2022],
-          "regression": [false, null, 2022, null, 13, 0]
+          "24h": [2, 143, 144],
+          "7d": [16, 141, 1589],
+          "28d": [16, 141, 1589],
+          "regression": [false, null, 1589, null, 16, 0]
         },
         "replayed": {
           "status": "pushed",
@@ -279,10 +279,10 @@
       "stages": {
         "merge": {
           "status": "derived",
-          "24h": [1, 11753, 11753],
-          "7d": [15, 2142, 11753],
-          "28d": [89, 2285, 8083],
-          "regression": [true, 1.45, 11753, 8083, 15, 74]
+          "24h": [0, null, null],
+          "7d": [21, 2285, 10706],
+          "28d": [91, 2294, 9544],
+          "regression": [true, 1.32, 10706, 8083, 21, 70]
         },
         "testflight": {
           "status": "derived",
@@ -309,10 +309,10 @@
       },
       "endToEnd": {
         "merge->testflight": {
-          "24h": [1, 11753, 11753],
-          "7d": [15, 2142, 11753],
-          "28d": [89, 2285, 8083],
-          "regression": [true, 1.45, 11753, 8083, 15, 74]
+          "24h": [0, null, null],
+          "7d": [21, 2285, 10706],
+          "28d": [91, 2294, 9544],
+          "regression": [true, 1.32, 10706, 8083, 21, 70]
         },
         "merge->released": {
           "24h": [0, null, null],
@@ -401,26 +401,26 @@
       "stages": {
         "started": {
           "status": "pushed",
-          "24h": [66, 32, 303],
-          "7d": [334, 35, 434],
-          "28d": [336, 35, 434],
-          "regression": [false, 2.4, 434, 181, 334, 2]
+          "24h": [63, 37, 297],
+          "7d": [365, 39, 520],
+          "28d": [380, 38.806, 557],
+          "regression": [false, 0.12, 520, 4264, 365, 15]
         },
         "finished": {
           "status": "pushed",
           "terminal": true,
-          "24h": [66, null, null, 2, 0.03],
-          "7d": [334, null, null, 10, 0.03],
-          "28d": [336, null, null, 10, 0.03],
+          "24h": [63, null, null, 6, 0.095],
+          "7d": [365, null, null, 15, 0.041],
+          "28d": [380, null, null, 15, 0.039],
           "regression": null
         }
       },
       "endToEnd": {
         "started->finished": {
-          "24h": [66, 32, 303],
-          "7d": [334, 35, 434],
-          "28d": [336, 35, 434],
-          "regression": [false, 2.4, 434, 181, 334, 2]
+          "24h": [63, 37, 297],
+          "7d": [365, 39, 520],
+          "28d": [380, 38.806, 557],
+          "regression": [false, 0.12, 520, 4264, 365, 15]
         }
       }
     },
@@ -428,26 +428,26 @@
       "stages": {
         "triage": {
           "status": "spec",
-          "24h": [75, 43.955, 88805.183],
-          "7d": [172, 59.57, 174205.854],
-          "28d": [172, 59.57, 174205.854],
-          "regression": [false, null, 174205.854, null, 172, 0]
+          "24h": [117, 46.105, 116.988],
+          "7d": [532, 48.107, 87978.38],
+          "28d": [532, 48.107, 87978.38],
+          "regression": [false, null, 87978.38, null, 532, 0]
         },
         "classified": {
           "status": "spec",
           "terminal": true,
-          "24h": [75, null, null, 0, 0],
-          "7d": [172, null, null, 4, 0.023],
-          "28d": [172, null, null, 4, 0.023],
+          "24h": [117, null, null, 2, 0.017],
+          "7d": [532, null, null, 9, 0.017],
+          "28d": [532, null, null, 9, 0.017],
           "regression": null
         }
       },
       "endToEnd": {
         "triage->classified": {
-          "24h": [75, 43.955, 88805.183],
-          "7d": [172, 59.57, 174205.854],
-          "28d": [172, 59.57, 174205.854],
-          "regression": [false, null, 174205.854, null, 172, 0]
+          "24h": [117, 46.105, 116.988],
+          "7d": [532, 48.107, 87978.38],
+          "28d": [532, 48.107, 87978.38],
+          "regression": [false, null, 87978.38, null, 532, 0]
         }
       }
     },
@@ -455,46 +455,46 @@
       "stages": {
         "event": {
           "status": "spec",
-          "24h": [133, 0, 1],
-          "7d": [331, 0, 1],
-          "28d": [331, 0, 1],
-          "regression": [false, null, 1, null, 331, 0]
+          "24h": [182, 0, 1],
+          "7d": [810, 0, 1],
+          "28d": [819, 0, 1],
+          "regression": [false, null, 1, 0, 810, 9]
         },
         "model-turn": {
           "status": "pushed",
-          "24h": [133, 5, 18],
-          "7d": [353, 5, 18],
-          "28d": [353, 5, 18],
-          "regression": [false, null, 18, null, 353, 0]
+          "24h": [182, 5, 22],
+          "7d": [810, 5, 17],
+          "28d": [841, 5, 18],
+          "regression": [false, 0.38, 17, 45, 810, 31]
         },
         "action": {
           "status": "pushed",
-          "24h": [93, 32, 60],
-          "7d": [277, 36, 124],
-          "28d": [277, 36, 124],
-          "regression": [false, null, 124, null, 277, 0]
+          "24h": [181, 35, 104],
+          "7d": [729, 34, 105],
+          "28d": [753, 34, 104],
+          "regression": [false, 1.94, 105, 54, 729, 24]
         },
         "outcome": {
           "status": "pushed",
           "terminal": true,
-          "24h": [133, null, null, 0, 0],
-          "7d": [353, null, null, 25, 0.071],
-          "28d": [353, null, null, 25, 0.071],
+          "24h": [182, null, null, 6, 0.033],
+          "7d": [810, null, null, 28, 0.035],
+          "28d": [841, null, null, 43, 0.051],
           "regression": null
         }
       },
       "endToEnd": {
         "event->outcome": {
-          "24h": [133, 33, 64],
-          "7d": [331, 37, 125],
-          "28d": [331, 37, 125],
-          "regression": [false, null, 125, null, 331, 0]
+          "24h": [182, 40, 118],
+          "7d": [810, 38, 113],
+          "28d": [819, 38, 113],
+          "regression": [false, 2.31, 113, 49, 810, 9]
         },
         "model-turn->outcome": {
-          "24h": [133, 33, 64],
-          "7d": [353, 37, 125],
-          "28d": [353, 37, 125],
-          "regression": [false, null, 125, null, 353, 0]
+          "24h": [182, 40, 118],
+          "7d": [810, 38, 113],
+          "28d": [841, 38, 111],
+          "regression": [false, 1.92, 113, 59, 810, 31]
         }
       }
     },
@@ -502,26 +502,26 @@
       "stages": {
         "waiting": {
           "status": "spec",
-          "24h": [2, 53038, 53144],
-          "7d": [2, 53038, 53144],
-          "28d": [2, 53038, 53144],
-          "regression": [false, null, 53144, null, 2, 0]
+          "24h": [0, null, null],
+          "7d": [39, 790933, 995090],
+          "28d": [39, 790933, 995090],
+          "regression": [false, null, 995090, null, 39, 0]
         },
         "decided": {
           "status": "spec",
           "terminal": true,
-          "24h": [2, null, null, 0, 0],
-          "7d": [2, null, null, 0, 0],
-          "28d": [2, null, null, 0, 0],
+          "24h": [0, null, null, 0, null],
+          "7d": [39, null, null, 0, 0],
+          "28d": [39, null, null, 0, 0],
           "regression": null
         }
       },
       "endToEnd": {
         "waiting->decided": {
-          "24h": [1, 53038, 53038],
-          "7d": [1, 53038, 53038],
-          "28d": [1, 53038, 53038],
-          "regression": [false, null, 53038, null, 1, 0]
+          "24h": [0, null, null],
+          "7d": [14, 370643, 995085],
+          "28d": [14, 370643, 995085],
+          "regression": [false, null, 995085, null, 14, 0]
         }
       }
     },
@@ -529,33 +529,33 @@
       "stages": {
         "wait": {
           "status": "pushed",
-          "24h": [3, 119, 148],
-          "7d": [14, 20, 315],
-          "28d": [14, 20, 315],
-          "regression": [false, null, 315, null, 14, 0]
+          "24h": [1, 13, 13],
+          "7d": [17, 17, 313],
+          "28d": [17, 17, 313],
+          "regression": [false, null, 313, null, 17, 0]
         },
         "setup": {
           "status": "pushed",
-          "24h": [3, 229, 263],
-          "7d": [14, 251, 557],
-          "28d": [14, 251, 557],
-          "regression": [false, null, 557, null, 14, 0]
+          "24h": [1, 246, 246],
+          "7d": [17, 258, 288],
+          "28d": [17, 258, 288],
+          "regression": [false, null, 288, null, 17, 0]
         },
         "journey": {
           "status": "pushed",
           "terminal": true,
-          "24h": [3, null, null, 0, 0],
-          "7d": [14, null, null, 1, 0.071],
-          "28d": [14, null, null, 1, 0.071],
+          "24h": [1, null, null, 0, 0],
+          "7d": [17, null, null, 0, 0],
+          "28d": [17, null, null, 0, 0],
           "regression": null
         }
       },
       "endToEnd": {
         "wait->journey": {
-          "24h": [3, 354, 382],
-          "7d": [14, 354, 570],
-          "28d": [14, 354, 570],
-          "regression": [false, null, 570, null, 14, 0]
+          "24h": [1, 259, 259],
+          "7d": [17, 276, 577],
+          "28d": [17, 276, 577],
+          "regression": [false, null, 577, null, 17, 0]
         }
       }
     },
@@ -588,18 +588,18 @@
     }
   },
   "regressions": [
-    "shipping:admitted.p95",
     "shipping:worker-start.p95",
     "shipping:pr-open.p95",
     "shipping:gate-seat.p95",
     "shipping:gate.p95",
+    "shipping:ready.p95",
     "shipping:queued.p95",
     "shipping:verified.p95",
     "shipping:pr-open->merged.p95",
     "shipping:verified->closed.p95",
     "shipping:merged->closed.p95",
+    "remediation:classified.p95",
     "remediation:repair-start.p95",
-    "remediation:red->green.p95",
     "release:staging.p95",
     "release:canary.p95",
     "release:staging->verified.p95",
@@ -609,18 +609,18 @@
   "coverage": {
     "stagesTotal": 54,
     "stagesWithData": 37,
-    "events": 38607
+    "events": 35740
   },
   "sources": {
     "github-pr": {
       "ok": true,
-      "n": 3732,
+      "n": 3129,
       "partial": [
-        "pr #18998 commits truncated",
-        "pr #18962 commits truncated",
-        "pr #18938 timeline truncated",
-        "pr #18938 commits truncated",
-        "pr #18913 timeline truncated"
+        "pr #19617 timeline truncated",
+        "pr #19555 timeline truncated",
+        "pr #19514 timeline truncated",
+        "pr #19514 commits truncated",
+        "pr #19503 commits truncated"
       ]
     },
     "github-controller": {
@@ -640,7 +640,7 @@
     },
     "linear-history": {
       "ok": true,
-      "n": 1381
+      "n": 1084
     },
     "chat-comparison-receipts": {
       "ok": false,
@@ -649,7 +649,7 @@
     },
     "lanes-stage-feed": {
       "ok": true,
-      "n": 13943,
+      "n": 16156,
       "rejected": 0
     },
     "lyb-stage-feed": {
@@ -659,41 +659,41 @@
     },
     "automation-liveness-receipts": {
       "ok": true,
-      "n": 672,
+      "n": 762,
       "rejected": 0,
       "artifacts": {
-        "listed": 203,
+        "listed": 354,
         "sampled": 60,
-        "read": 15
+        "read": 16
       },
       "partial": [
-        "12595334813: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12592972953: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12590290061: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12585283104: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12578316828: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts "
+        "12811495943: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12802442222: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12795336509: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12783361950: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12772064302: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts "
       ]
     },
     "release-replay-receipts": {
       "ok": true,
-      "n": 13,
+      "n": 16,
       "rejected": 0,
       "artifacts": {
-        "listed": 53,
-        "sampled": 53,
-        "read": 13
+        "listed": 92,
+        "sampled": 60,
+        "read": 17
       },
       "partial": [
-        "12523523433: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12519852182: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12513362601: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12513645787: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12499912812: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts "
+        "12757191538: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12752255166: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12745775448: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12734194286: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12716661346: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts "
       ]
     },
     "summer-stage-feed": {
       "ok": true,
-      "n": 1658,
+      "n": 4318,
       "rejected": 0
     },
     "revenue-funnel-timings": {
@@ -703,19 +703,19 @@
     },
     "claim-dogfood-receipts": {
       "ok": true,
-      "n": 42,
+      "n": 51,
       "rejected": 0,
       "artifacts": {
-        "listed": 280,
+        "listed": 373,
         "sampled": 60,
-        "read": 14
+        "read": 17
       },
       "partial": [
-        "12596977250: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12593803606: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12591949909: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12585023842: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
-        "12584088693: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts "
+        "12743028254: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12711663839: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12709435745: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12699003515: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts ",
+        "12640914447: Command failed: /opt/hostedtoolcache/node/24.22.1/x64/bin/node /home/runner/work/Jovie/Jovie/packages/api-client/cli.ts "
       ]
     },
     "signal-watch-feed": {
