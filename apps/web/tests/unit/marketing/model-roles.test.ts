@@ -99,6 +99,16 @@ describe('marketing model roles (model-registry.json projection)', () => {
 });
 
 describe('selectMarketingModelCandidate from the registry', () => {
+  it('chooses current Sonnet on subscription for layout decisions', () => {
+    const { candidate } = selectMarketingModelWithReceipt({
+      role: 'section-designer',
+    });
+    expect(candidate).toMatchObject({
+      id: 'anthropic/claude-sonnet-5.5',
+      channel: 'subscription',
+    });
+  });
+
   it('prefers a subscription candidate and records the choice', () => {
     const { candidate, receipt } = selectMarketingModelWithReceipt({
       role: 'copy-compiler',

@@ -87,7 +87,12 @@ function buildJudgeTest(golden: GoldenCase): PromptfooTest {
     },
     providerOutput: { text: vars.mock },
     options: {
-      provider: 'openai:gpt-4o-mini',
+      provider: {
+        id: 'vercel:zai/glm-5.3-flash',
+        config: {
+          apiKeyEnvar: 'AI_GATEWAY_API_KEY',
+        },
+      },
     },
     assert: [
       {

@@ -267,10 +267,13 @@ const CODEX_BIN =
 /**
  * Subscription-lane vision transport. anthropic/* runs on the Claude Code CLI
  * (the judge reads the image paths with Read); openai/* runs on Codex exec
- * with `-i` image attachments. There is no API-key path: any other family or
- * a supplied apiKey throws.
+ * with `-i` image attachments. Other families are rejected and metered API
+ * credentials are removed from the child environment.
  */
-export function subscriptionVisionTransport({ spawnImpl = spawnSync } = {}) {
+export function subscriptionVisionTransport({
+  spawnImpl = spawnSync,
+  env = process.env,
+} = {}) {
   const run = (bin, args, input, cwd = tmpdir()) => {
     const result = spawnImpl(bin, args, {
       input,
@@ -278,7 +281,14 @@ export function subscriptionVisionTransport({ spawnImpl = spawnSync } = {}) {
       encoding: 'utf8',
       timeout: 240_000,
       maxBuffer: 8 << 20,
-      env: { ...process.env, AI_GATEWAY_API_KEY: undefined },
+      env: {
+        ...env,
+        AI_GATEWAY_API_KEY: undefined,
+        ANTHROPIC_API_KEY: undefined,
+        ANTHROPIC_AUTH_TOKEN: undefined,
+        CODEX_API_KEY: undefined,
+        OPENAI_API_KEY: undefined,
+      },
     });
     if (result.status !== 0)
       throw new Error(

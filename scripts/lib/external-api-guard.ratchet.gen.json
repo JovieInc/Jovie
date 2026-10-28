@@ -631,9 +631,6 @@
     "scripts/remediation-sweep.mjs": {
       "provider-host": 1
     },
-    "scripts/screenshot-loop/screenshot-bug-loop.mjs": {
-      "provider-host": 2
-    },
     "scripts/security/deepsec-native-controller.mjs": {
       "provider-host": 1
     },

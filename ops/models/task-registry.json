@@ -1,7 +1,7 @@
 {
   "schema": "jovie-model-task-registry/v1",
   "_comment": "Every AI loop/task: type, current model, where it is configured (sourcePath must contain sourceMatch; the radar test fails CI on drift), buying channel, cost per run, quality metric and eval set. Screened by scripts/lanes/model_radar.py. automation = ops/automation/registry.json id.",
-  "updatedAt": "2026-10-20",
+  "updatedAt": "2026-10-21",
   "channels": {
     "subscription-claude": "Claude Code subscription (claude CLI). Marginal $0 inside the pool.",
     "subscription-codex": "ChatGPT/Codex subscription (codex CLI). Marginal $0 inside the pool.",
@@ -155,10 +155,10 @@
       "id": "remediation-route-chain",
       "taskType": "agentic-coding",
       "automation": "github:jovie:remediation-sweep",
-      "currentModel": "grok-4.6",
+      "currentModel": "grok-4.7",
       "channel": "subscription-grok",
       "sourcePath": "scripts/backlog-orchestrator/config/model-registry.json",
-      "sourceMatch": "\"model\": \"grok-4.6\"",
+      "sourceMatch": "\"model\": \"grok-4.7\"",
       "costUsd": 0,
       "costBasis": "subscription head of route_chains.remediation; list $2/$6 per M if metered",
       "qualityMetric": "remediation PR merged; failure fingerprint does not recur",
@@ -166,7 +166,7 @@
       "evalRef": "scripts/backlog-orchestrator/config/model-registry.json#min_samples",
       "evalSize": 5,
       "screens": ["same-family-successor"],
-      "notes": "lanes providers.json already runs grok-4.7; this chain still names grok-4.6."
+      "notes": "Grok subscription chains match the active grok-4.7 lane (JOV-8702). Retired the Cursor Grok 4.6 route; its provider-specific successor could not be verified."
     },
     {
       "id": "reason-lane-proposer",
@@ -201,6 +201,22 @@
       "evalSize": 0,
       "screens": ["same-family-successor"],
       "notes": "Routed to the allowlisted zai/glm-5.3 (JOV-8702, #22393)."
+    },
+    {
+      "id": "golden-promptfoo-judge",
+      "taskType": "review-judge",
+      "automation": null,
+      "currentModel": "zai/glm-5.3-flash",
+      "channel": "gateway-allowlist",
+      "sourcePath": "apps/web/promptfooconfig.judge.yaml",
+      "sourceMatch": "id: vercel:zai/glm-5.3-flash",
+      "costUsd": null,
+      "costBasis": "Optional live rubric lane on AI_GATEWAY_API_KEY; not measured.",
+      "qualityMetric": "Rubric agreement with the golden ground truth; deterministic lane remains model-free.",
+      "evalStatus": "partial",
+      "evalRef": "apps/web/tests/eval/golden/promptfoo-cases-generator.ci.test.ts",
+      "evalGap": "Routing regression coverage only; live rubric quality requires Gateway credentials.",
+      "screens": ["same-family-successor", "gateway-allowlisted"]
     },
     {
       "id": "pr-conflict-resolution",
@@ -343,7 +359,7 @@
       "sourcePath": "packages/copy/judge.ts",
       "sourceMatch": "flagship: ['anthropic/claude-opus-5.5'",
       "alsoRoutes": [
-        "anthropic/claude-sonnet-5",
+        "anthropic/claude-sonnet-5.5",
         "openai/gpt-5.5",
         "zai/glm-5.3",
         "zai/glm-5.3-flash"
@@ -359,10 +375,10 @@
       "id": "marketing-layout-chooser",
       "taskType": "structured-decision",
       "automation": null,
-      "currentModel": "anthropic/claude-sonnet-5",
+      "currentModel": "anthropic/claude-sonnet-5.5",
       "channel": "subscription-claude",
       "sourcePath": "apps/web/data/marketing/modelRoles.ts",
-      "sourceMatch": "id: 'anthropic/claude-sonnet-5'",
+      "sourceMatch": "id: 'anthropic/claude-sonnet-5.5'",
       "costUsd": 0,
       "costBasis": "subscription",
       "qualityMetric": "chosen registered variant passes marketing certification first try",
@@ -471,19 +487,20 @@
       "id": "screenshot-bug-loop",
       "taskType": "visual-judgment",
       "automation": null,
-      "currentModel": "claude-haiku-4-5",
-      "channel": "vendor-api",
+      "currentModel": "anthropic/claude-sonnet-5.5",
+      "channel": "subscription-claude",
       "sourcePath": "scripts/screenshot-loop/screenshot-bug-loop.mjs",
-      "sourceMatch": "claude-haiku-4-5",
-      "alsoRoutes": ["openai/gpt-5-mini"],
-      "costUsd": 0.0045,
-      "costBasis": "estimate: 2k input + 0.5k output at Haiku 4.5 $1/$5 per M",
+      "sourceMatch": "model: 'anthropic/claude-sonnet-5.5'",
+      "alsoRoutes": ["openai/gpt-5.6-luna"],
+      "costUsd": 0,
+      "costBasis": "Claude Code subscription; Codex subscription fallback. No metered provider.",
       "qualityMetric": "filed screenshot bugs that are real (not closed as noise)",
-      "evalStatus": "missing",
-      "evalRef": null,
-      "evalSize": 0,
+      "evalStatus": "partial",
+      "evalRef": "scripts/screenshot-loop/screenshot-bug-loop.test.mjs",
+      "evalSize": 2,
       "screens": ["same-family-successor", "workers-ai-decision"],
-      "notes": "Metered ANTHROPIC_API_KEY and openai/* Gateway fallback both conflict with JOV-7119."
+      "notes": "JOV-8702 reuses subscriptionVisionTransport. Clef (#22339) returns typed decision probabilities, not the free-text bug description this loop requires.",
+      "evalGap": "Deterministic product/personal replay only; live model quality is not certified by transport tests."
     },
     {
       "id": "test-generation",

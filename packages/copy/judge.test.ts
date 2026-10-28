@@ -38,6 +38,19 @@ const judgeReturning =
   };
 
 describe('tiered judge panel', () => {
+  it('sends standard-tier judgments to the current subscription Sonnet', async () => {
+    const transport = vi.fn(judgeReturning({ anthropic: 9 }));
+    const result = await gateCopy(
+      'One profile link works across every platform.',
+      { ...brief, tier: 'standard', generatorModel: 'zai/glm-5.3-flash' },
+      transport
+    );
+    expect(result.status).toBe('pass');
+    expect(transport).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'anthropic/claude-sonnet-5.5' })
+    );
+  });
+
   it('never lets the generator family judge itself', () => {
     expect(
       selectJudges('flagship', 'anthropic/claude-opus-5.5')
