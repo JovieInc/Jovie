@@ -146,7 +146,7 @@ runs:
           # prebuild-install, DEP0176). Rebuild from scratch instead of
           # running on, or saving, that tree.
           if ! node scripts/lib/verify-patched-dependencies.mjs; then
-            echo "::warning::Restored node_modules held stale patched dependencies (cache ${{ steps.node-modules-cache.outputs.cache-matched-key }}); reinstalling from scratch."
+            echo "::warning::Restored node_modules held stale patched dependencies; reinstalling from scratch."
             rm -rf node_modules apps/*/node_modules packages/*/node_modules workers/*/node_modules
             pnpm install --frozen-lockfile
             node scripts/lib/verify-patched-dependencies.mjs
