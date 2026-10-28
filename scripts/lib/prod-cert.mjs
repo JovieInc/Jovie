@@ -46,6 +46,9 @@ export function statusFromChecks(checks) {
   return 'passed';
 }
 
+/**
+ * @param {{ surface: string, checks: any[], sha: any, deploymentId?: any, runUrl?: any, startedAt: any, endedAt: any, identity?: any, observations?: any[] }} input
+ */
 export function buildReceipt({
   surface,
   checks,
@@ -149,7 +152,10 @@ async function ogImageCheck(origin, html, fetchImpl, what) {
   return `og:image ${type}`;
 }
 
-/** Anonymous HTTP checks per surface, in launch order. */
+/**
+ * Anonymous HTTP checks per surface, in launch order.
+ * @param {{ origin: string, fetchImpl?: typeof fetch, now?: any, profileHandle?: string, env?: Record<string, string | undefined> }} options
+ */
 export function anonymousChecks({
   origin,
   fetchImpl = fetch,
@@ -342,6 +348,7 @@ export async function readServedBuild(origin, fetchImpl = fetch) {
   const response = await fetchImpl(new URL('/api/health/build-info', origin));
   if (response.status !== 200)
     throw new Error(`build-info HTTP ${response.status}`);
+  /** @type {any} */
   const json = await response.json();
   if (!/^[0-9a-f]{40}$/.test(json.commitSha ?? ''))
     throw new Error('build-info has no commit sha');

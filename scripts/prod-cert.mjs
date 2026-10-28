@@ -25,6 +25,10 @@ export function surfaceFingerprint(surface) {
   return `prod-cert-${surface}`;
 }
 
+/**
+ * @param {any[]} receipts
+ * @param {{ runUrl?: string, deps?: { upsert?: Function, close?: Function } }} [options]
+ */
 export async function fileSurfaceIssues(receipts, { runUrl, deps = {} } = {}) {
   const upsert = deps.upsert ?? upsertLinearIssueByTitleFingerprint;
   const close = deps.close ?? closeLinearIssueByFingerprint;

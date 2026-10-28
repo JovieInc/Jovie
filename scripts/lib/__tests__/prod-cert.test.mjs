@@ -18,6 +18,7 @@ const check = (status, id = 'c') => ({
   summary: 's',
 });
 
+/** @param {{ failPath?: string, sha?: string }} [options] */
 function fakeFetch({ failPath, sha = SHA } = {}) {
   return async url => {
     const u = new URL(url);
@@ -179,8 +180,8 @@ describe('runProductionCertification', () => {
 
 describe('fileSurfaceIssues', () => {
   it('upserts one fingerprinted issue per failed surface and closes passed ones', async () => {
-    const upsert = vi.fn(async () => ({ ok: true }));
-    const close = vi.fn(async () => ({ ok: true }));
+    const upsert = vi.fn(async (/** @type {any} */ _issue) => ({ ok: true }));
+    const close = vi.fn(async (/** @type {any} */ _issue) => ({ ok: true }));
     const { receipts } = await runProductionCertification({
       fetchImpl: fakeFetch({ failPath: '/claim' }),
     });
