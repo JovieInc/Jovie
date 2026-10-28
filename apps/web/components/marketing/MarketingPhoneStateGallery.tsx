@@ -5,9 +5,12 @@ import './MarketingProductStates.css';
 
 export interface MarketingPhoneState {
   readonly id: string;
-  /** Screenshot-registry scenario (lib/screenshots/registry.ts). */
-  readonly scenarioId: string;
-  readonly alt: string;
+  /**
+   * Screenshot-registry scenario (lib/screenshots/registry.ts). Omit both to
+   * render a caption-only state (the homepage shows no real person).
+   */
+  readonly scenarioId?: string;
+  readonly alt?: string;
   readonly title: string;
   readonly body: string;
 }
@@ -46,15 +49,17 @@ export function MarketingPhoneStateGallery({
         {states.map(state => (
           <li key={state.id} className='marketing-phone-gallery__item'>
             <figure className='marketing-phone-gallery__figure'>
-              <ArtistProfilePhoneFrame className='marketing-phone-gallery__phone'>
-                <MarketingPhoneImage
-                  scenarioId={state.scenarioId}
-                  altOverride={state.alt}
-                  fill
-                  sizes='(min-width: 1024px) 21.25rem, (min-width: 768px) 30vw, 72vw'
-                  className='object-cover object-top'
-                />
-              </ArtistProfilePhoneFrame>
+              {state.scenarioId ? (
+                <ArtistProfilePhoneFrame className='marketing-phone-gallery__phone'>
+                  <MarketingPhoneImage
+                    scenarioId={state.scenarioId}
+                    altOverride={state.alt}
+                    fill
+                    sizes='(min-width: 1024px) 21.25rem, (min-width: 768px) 30vw, 72vw'
+                    className='object-cover object-top'
+                  />
+                </ArtistProfilePhoneFrame>
+              ) : null}
               <figcaption className='marketing-phone-gallery__caption'>
                 <span className='marketing-phone-gallery__title'>
                   {state.title}
