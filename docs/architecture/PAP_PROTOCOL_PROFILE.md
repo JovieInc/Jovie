@@ -26,7 +26,7 @@ public contracts; PAP grants no route to privileged Summer/Ovie tools. No new
 registry, marketplace, orchestrator, identity provider or product pivot. LYB is
 outside this delivery. Use bounded, non-preempting capacity at the existing issue
 priority. APIs/MCP remain a core access path under the
-[current product priority](../../canon/strategy/theses/2026-09-03-apis-mcps-core-not-first.md).
+current product priority (private thesis `2026-09-03-apis-mcps-core-not-first`, see [strategy canon](../../canon/strategy/README.md)).
 
 Anonymous public lookup and allowed unclaimed drafts remain available before
 signup under their existing limits. Private access, ownership, publication,
