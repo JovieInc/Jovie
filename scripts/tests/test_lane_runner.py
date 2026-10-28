@@ -1487,6 +1487,7 @@ class VerifyAndLandTest(unittest.TestCase):
         self.assertTrue(body.startswith("Refs JOV-1.\n"))
         self.assertIn("<!-- linear-issue-id:id-JOV-1 -->", body)
         self.assertIn("<!-- linear-issue-identifier:JOV-1 -->", body)
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', body)
         self.assertNotIn("Closes", body)
 
     def test_unavailable_or_malformed_inventory_is_not_empty(self):

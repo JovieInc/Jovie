@@ -355,6 +355,32 @@ describe('OnboardingChat empty intro', () => {
     expect(chatMocks.sendMessage).not.toHaveBeenCalled();
   });
 
+  it('shows a taken handle instead of the starter prompt and never sends it (JOV-9624)', async () => {
+    render(
+      <OnboardingChat
+        starterHandoff={{ kind: 'prompt', prompt: 'I want my own jov.ie.' }}
+        entryProfile={{
+          status: 'claimed',
+          handle: 'tim',
+          displayName: 'Tim White',
+          avatarUrl: null,
+        }}
+        turnstileToken='token'
+        turnstileStatus='verified'
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('This page is taken')).toBeTruthy();
+    });
+    expect(screen.getByText(/already claimed/)).toBeTruthy();
+    expect(
+      screen.queryByRole('heading', { name: 'Your first message' })
+    ).toBeNull();
+    expect(screen.queryByDisplayValue('I want my own jov.ie.')).toBeNull();
+    expect(chatMocks.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('falls back to blank entry when a stored intent is missing', async () => {
     render(
       <OnboardingChat
