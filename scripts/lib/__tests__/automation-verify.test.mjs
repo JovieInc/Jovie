@@ -3717,17 +3717,141 @@ describe('automation-verify affected scope', () => {
         bindingTests[0],
       ],
       [source, 'apps/web/tests/setup.ts'],
-      [
-        source,
-        'scripts/run-affected-tests.mjs',
-        'scripts/lib/__tests__/automation-verify.test.mjs',
-      ],
     ])(
       'preserves full fallback for unknown, global or mixed inputs %j',
       (...files) => {
         expect(buildAffectedTestPlan(files).mode).toBe('full');
       }
     );
+
+    it('runs the selector proof when the complete selector pair accompanies a covered source', () => {
+      const plan = buildAffectedTestPlan([
+        source,
+        'scripts/run-affected-tests.mjs',
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(bindingTests);
+      expect(plan.scriptVitestTests).toEqual([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ]);
+      expect(
+        JSON.stringify(buildSelectedTestCommands(plan, '2'))
+      ).not.toContain('--shard');
+    });
+
+    it('fails closed when only one selector file accompanies a covered source', () => {
+      expect(
+        buildAffectedTestPlan([source, 'scripts/run-affected-tests.mjs']).mode
+      ).toBe('full');
+    });
+
+    it('fails closed when the complete selector pair mixes with another manifest member', () => {
+      expect(
+        buildAffectedTestPlan([
+          source,
+          'scripts/run-affected-tests.mjs',
+          'scripts/lib/__tests__/automation-verify.test.mjs',
+          '.github/workflows/ci.yml',
+        ]).mode
+      ).toBe('full');
+    });
+  });
+
+  describe('homepage front-door copy bindings', () => {
+    const frontDoor = 'apps/web/data/homepageFrontDoorCta.ts';
+    const homepageCopy = 'apps/web/data/homepageV2Copy.ts';
+    const ctaIntents = 'apps/web/data/marketingCtaIntents.ts';
+    const frontDoorTests = [
+      'apps/web/components/features/waitlist/WaitlistPublicLanding.test.tsx',
+      'apps/web/data/canonicalPublicShellOptimization.test.ts',
+      'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
+      'apps/web/tests/unit/marketing/marketing-cta-intents.test.ts',
+      'apps/web/tests/unit/marketing/marketing-header-cta-consistency.test.ts',
+    ];
+    const homepageCopyTests = [
+      'apps/web/tests/unit/marketing/feature-tile-accent-uniqueness.test.ts',
+    ];
+    const ctaIntentTests = [
+      'apps/web/app/(marketing)/product/ProductLanding.test.tsx',
+      'apps/web/tests/unit/app/auth-front-door-contract.test.ts',
+      'apps/web/tests/unit/marketing/marketing-bounded-revenue-path.test.ts',
+      'apps/web/tests/unit/marketing/marketing-cta-intents.test.ts',
+      'apps/web/tests/unit/marketing/marketing-header-cta-consistency.test.ts',
+    ];
+    const selectorPair = [
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+
+    it.each([
+      [frontDoor, frontDoorTests],
+      [homepageCopy, homepageCopyTests],
+      [ctaIntents, ctaIntentTests],
+    ])('binds %s to the unit tests that import it', (source, bindingTests) => {
+      const plan = buildAffectedTestPlan([source]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(bindingTests);
+      expect(plan.selectedTests).toEqual(bindingTests);
+      expect(plan.fallbackReason).toBeUndefined();
+    });
+
+    it.each([frontDoor, homepageCopy, ctaIntents])(
+      'fails closed when a binding test for %s is missing',
+      source => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => !file.endsWith('.test.ts'),
+        });
+
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+
+    it('keeps an unknown data neighbor on the full suite', () => {
+      expect(
+        buildAffectedTestPlan([
+          frontDoor,
+          'apps/web/data/homepageFrontDoorCta-neighbor.ts',
+        ]).mode
+      ).toBe('full');
+    });
+
+    it('stays selected for front-door copy plus remediation when the selector pair is complete', () => {
+      const plan = buildAffectedTestPlan([
+        frontDoor,
+        homepageCopy,
+        ctaIntents,
+        'scripts/lanes/remediation.py',
+        'scripts/tests/test_remediation.py',
+        'scripts/lib/golden-path-lock.mjs',
+        'scripts/lib/__tests__/golden-path-lock.test.mjs',
+        ...selectorPair,
+      ]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.lanePythonCoverage).toBe(true);
+      expect(plan.fallbackReason).toBeUndefined();
+      expect(plan.scriptVitestTests).toEqual([
+        'scripts/lib/__tests__/automation-verify.test.mjs',
+      ]);
+      expect(
+        JSON.stringify(buildSelectedTestCommands(plan, '2'))
+      ).not.toContain('--shard');
+    });
+
+    it('fails closed when the selector pair accompanying front-door copy is partial', () => {
+      expect(
+        buildAffectedTestPlan([
+          frontDoor,
+          homepageCopy,
+          ctaIntents,
+          selectorPair[0],
+        ]).mode
+      ).toBe('full');
+    });
   });
 
   it('fails closed when an unknown source is mixed with a direct test', () => {
