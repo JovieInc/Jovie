@@ -76,3 +76,26 @@ export function certStepBlocked(
     summary,
   });
 }
+
+/**
+ * A measured quality-contract observation (canon/quality-contracts.jsonl),
+ * recorded from the authenticated browser run. Folded into the surface receipt.
+ */
+export function recordCertObservation(observation: {
+  readonly surface: string;
+  readonly contractId: string;
+  readonly dimension: string;
+  readonly value: number;
+  readonly unit: string;
+}): void {
+  const file = process.env.PROD_CERT_STEPS_FILE;
+  if (!file || !Number.isFinite(observation.value)) return;
+  try {
+    appendFileSync(
+      file,
+      `${JSON.stringify({ kind: 'observation', sampleSize: 1, ...observation })}\n`
+    );
+  } catch {
+    // Best-effort evidence.
+  }
+}
