@@ -374,6 +374,35 @@ describe('decideFallbackTurn', () => {
     );
   });
 
+  it('admits a resolved artist under the controlled gate with checkout and the go-live terms', async () => {
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Handle locked.', [HANDLE_CONFIRMED, SOCIAL_ATTACHED]),
+      user('around 20k on instagram'),
+    ];
+    const state = createOnboardingTurnState({
+      sessionId: SESSION,
+      turnCount: messages.filter(m => m.role === 'user').length,
+      accessControlled: true,
+      goldenPathVerdict: 'ELIGIBLE',
+      messages,
+    });
+    const turn = await decideFallbackTurn({ uiMessages: messages, state });
+
+    expect(turn.line.stepId).toBe('golden_path_admitted');
+    expect(turn.text).toContain('goes live once we confirm it is you');
+    // Gate publishing, not paying: checkout is offered right after the decision.
+    expect(turn.toolEvents.map(event => event.toolName)).toContain(
+      'proposeCheckout'
+    );
+    const next = turn.toolEvents.find(
+      event => event.output.action === 'propose_next_step'
+    );
+    expect(next?.output).toMatchObject({
+      decision: { kind: 'instant_access', proofRequired: true },
+    });
+  });
+
   it('waitlists only with meaningful signal after turn cap', async () => {
     const lowSignal = {
       ...CONFIRMED_OUTPUT,
