@@ -304,7 +304,7 @@ test('a real enqueue call outside green enroll is still a writer', () => {
 test('green enroll wakes on ready_for_review but never runs enroll for a draft event', () => {
   const enroll = readWorkflow('merge-queue-green-enroll.yml');
   assert.ok(enroll.on.pull_request_target.types.includes('ready_for_review'));
-  assert.ok(enroll.on.pull_request_target.types.includes('synchronize'));
+  assert.ok(!enroll.on.pull_request_target.types.includes('synchronize'));
   assert.match(
     enroll.jobs.enroll.if,
     /github\.event_name != 'pull_request_target' \|\| github\.event\.pull_request\.draft == false/

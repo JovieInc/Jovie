@@ -23,11 +23,11 @@ describe('ArtistNotificationsHero', () => {
     const hero = ARTIST_NOTIFICATIONS_COPY.hero;
     const view = render(<ArtistNotificationsHero hero={hero} />);
     const trial = screen.getByRole('link', { name: hero.primaryCtaLabel });
-    expect(trial).toHaveAttribute('href', '/signup?plan=pro');
+    expect(trial).toHaveAttribute('href', '/start');
     expect(trial).toHaveAttribute('data-test-prefetch', 'false');
     fireEvent.focus(trial);
     fireEvent.mouseEnter(trial);
-    expect(trial).toHaveAttribute('href', '/signup?plan=pro');
+    expect(trial).toHaveAttribute('href', '/start');
     expect(trial).toHaveAttribute('data-test-prefetch', 'false');
 
     view.rerender(
@@ -45,13 +45,22 @@ describe('ArtistNotificationsHero', () => {
     expect(publicAction).toHaveAttribute('data-test-prefetch', 'undefined');
   });
 
+  it('insets the hero dock so the section reads as a contained surface', () => {
+    const { container } = render(
+      <ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />
+    );
+    const dock = container.querySelector('.marketing-hero-dock');
+    expect(dock).not.toBeNull();
+    expect(dock).toHaveClass('marketing-hero-dock--inset');
+  });
+
   it('renders the canonical notification hero with bounded headline and CTA', () => {
     render(<ArtistNotificationsHero hero={ARTIST_NOTIFICATIONS_COPY.hero} />);
 
     expect(
       screen.getByRole('heading', {
         level: 1,
-        name: segmentedAccessibleName('Reach Every Fan.', 'On Autopilot.'),
+        name: segmentedAccessibleName('Reach listeners.', 'On autopilot.'),
       })
     ).not.toHaveClass('line-clamp-2');
     expect(

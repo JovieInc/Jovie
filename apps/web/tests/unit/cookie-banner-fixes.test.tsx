@@ -94,6 +94,51 @@ describe('CookieBannerSection consent sync', () => {
     expect(phoneRule).toContain('bottom: var(--profile-bottom-nav-height);');
   });
 
+  it('publishes dock clearance from the real profile dock rect and removes it on dismissal', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_MODE', '1');
+    const mod = await import('@/components/organisms/CookieBannerSection');
+    setCookie('jv_cc_required=1');
+    const dock = document.createElement('div');
+    dock.dataset.testid = 'profile-tab-bar';
+    dock.getBoundingClientRect = () => ({ top: 800 }) as DOMRect;
+    document.body.append(dock);
+    vi.spyOn(globalThis, 'innerHeight', 'get').mockReturnValue(1024);
+
+    const { unmount } = render(
+      <mod.CookieBannerSection testOnlyPathname='/profile-admission-fixture' />
+    );
+
+    // 1024 - 800 + 8px gap: the card sits exactly above the dock.
+    expect(
+      document.documentElement.style.getPropertyValue(
+        '--cookie-banner-dock-clearance'
+      )
+    ).toBe('232px');
+
+    unmount();
+    expect(
+      document.documentElement.style.getPropertyValue(
+        '--cookie-banner-dock-clearance'
+      )
+    ).toBe('');
+    dock.remove();
+  });
+
+  it('anchors the tablet profile consent card above the dock, not over the avatar', () => {
+    const css = readFileSync(
+      resolve(process.cwd(), 'styles/design-system.css'),
+      'utf8'
+    );
+    const tabletRule =
+      /@media \(min-width: 768px\) and \(max-width: 1179px\)[\s\S]*?\.cookie-banner-card--above-public-profile-dock \{([^}]*)\}/.exec(
+        css
+      )?.[1];
+
+    expect(tabletRule).toContain('top: auto;');
+    expect(tabletRule).toContain('--cookie-banner-dock-clearance');
+    expect(tabletRule).not.toMatch(/top: var\(--page-pad\)/);
+  });
+
   it('calls setConsentState accepted on acceptAll', async () => {
     const { setConsentState } = await import('@/lib/tracking/consent');
     const mod = await import('@/components/organisms/CookieBannerSection');
@@ -693,6 +738,43 @@ describe('CookieBannerMount global preferences controller', () => {
       expect(mockSaveConsent).toHaveBeenCalledTimes(1);
       expect(setConsentState).toHaveBeenCalledWith('rejected');
       expect(localStorage.getItem('jv_cc')).toContain('"essential":true');
+    });
+  });
+
+  it('does not mount a second card when the page already server-rendered one', async () => {
+    setCookie('jv_cc_required=1');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+    const { CookieBannerSection } = await import(
+      '@/components/organisms/CookieBannerSection'
+    );
+
+    render(
+      <>
+        <CookieBannerSection initialVisible />
+        <CookieBannerMount />
+      </>
+    );
+
+    await vi.waitFor(() => {
+      expect(globalThis.JVConsent).toBeDefined();
+    });
+    // Give the lazy Section import a chance to (wrongly) resolve.
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.getAllByTestId('cookie-banner')).toHaveLength(1);
+  });
+
+  it('still mounts the lazy card when the page did not server-render one', async () => {
+    setCookie('jv_cc_required=1');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+
+    render(<CookieBannerMount />);
+
+    await vi.waitFor(() => {
+      expect(screen.getAllByTestId('cookie-banner')).toHaveLength(1);
     });
   });
 });

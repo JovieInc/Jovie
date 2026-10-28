@@ -14,6 +14,25 @@ function count(value: number | null): string {
   return value === null ? NOT_MEASURED : value.toLocaleString('en-US');
 }
 
+const LYB_REPO = 'JovieInc/LogYourBody';
+
+/** LogYourBody production: commits behind main, or Failing when its deploys are red (deploy-health feed block). */
+function lybBehind(view: ShippingStateView): {
+  readonly value: string;
+  readonly tone: 'neutral' | 'bad';
+} {
+  const lyb = view.delivery.lanes.deployHealth?.repos.find(
+    repo => repo.repo === LYB_REPO
+  );
+  if (!lyb) return { value: NOT_MEASURED, tone: 'neutral' };
+  if (lyb.status === 'failing')
+    return {
+      value: `Failing, ${count(lyb.behindMain)} behind`,
+      tone: 'bad',
+    };
+  return { value: count(lyb.behindMain), tone: 'neutral' };
+}
+
 function ciLabel(view: ShippingStateView): string {
   if (view.ciGreen.value === null) return NOT_MEASURED;
   return view.ciGreen.value ? 'Green' : 'Failing';
@@ -94,6 +113,11 @@ export function HudShippingStrip({
         <Chip
           label='Behind Main'
           value={count(delivery.production.behindMain.value)}
+        />
+        <Chip
+          label='LYB Behind'
+          value={lybBehind(view).value}
+          tone={lybBehind(view).tone}
         />
         <a
           href={APP_ROUTES.ADMIN_SHIPPING}
