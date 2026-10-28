@@ -15,6 +15,18 @@
     "bodySha256": "d5f52bdb4af7fb39e6cf4eef8aaade5edbd285d900a3d13f9bf55f57f315d182"
   },
   {
+    "file": ".claude/rules/data-vs-code.md",
+    "paths": [
+      "apps/web/app/**",
+      "apps/web/components/**",
+      "apps/web/lib/**",
+      "apps/web/constants/**",
+      "apps/web/data/**",
+      "packages/copy/**"
+    ],
+    "bodySha256": "a4b7c9ebb89acc86eb5ca8eb1217f8c67e377756fe039a9c095b3b697a181de3"
+  },
+  {
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
     "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
