@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { CookieBannerSection } from '@/components/organisms/CookieBannerSection';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_NAME } from '@/constants/app';
 import { SUPPORT_EMAIL } from '@/constants/domains';
@@ -16,6 +17,8 @@ import {
   type ClaimPageState,
   parseClaimPageState,
 } from '@/lib/claim/artist-offer-claim';
+import { resolveInitialCookieBannerVisible } from '@/lib/cookies/banner-initial-visibility.server';
+import { getRootLayoutChromeState } from '@/lib/demo-recording';
 import { ClaimArtistSearch } from './ClaimArtistSearch';
 
 const PRO_CLAIM = getPublicPriceClaim('pro');
@@ -70,9 +73,17 @@ export default async function ClaimPage({
 }>) {
   const state = parseClaimPageState((await searchParams).state);
   const stateCopy = state ? STATE_COPY[state] : null;
+  // Paint the consent card with the HTML: on this thin page it is the largest
+  // text, so mounting it after hydration made it the LCP element (~4.5s on the
+  // throttled-mobile entry gate, budget 4000ms).
+  const showCookieBanner =
+    getRootLayoutChromeState({
+      devEnv: process.env.VERCEL_ENV ?? process.env.NODE_ENV ?? 'development',
+    }).shouldRenderCookieBanner && (await resolveInitialCookieBannerVisible());
 
   return (
     <StandaloneProductPage width='sm' centered>
+      {showCookieBanner ? <CookieBannerSection initialVisible /> : null}
       <div className='space-y-4' data-testid='claim-page'>
         {stateCopy ? (
           <ContentSurfaceCard data-testid={`claim-state-${state}`}>

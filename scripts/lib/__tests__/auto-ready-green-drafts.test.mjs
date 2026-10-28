@@ -353,9 +353,9 @@ describe('green-source controller contract', () => {
   it('keeps writer-proof recovery manual-only and wakes green-source from CI events', () => {
     const on = workflowTriggers(workflow);
     expect(triggerNames(on)).toEqual(['workflow_dispatch', 'workflow_run']);
+    // Source Validation completed last on 84 of 85 measured PR heads, so it is
+    // the only wake (scripts/lib/__tests__/wake-fanout-contract.test.mjs).
     expect(filterList(on.workflow_run.workflows)).toEqual([
-      'Fork PR Gate',
-      'PR Size Guard',
       'Source Validation',
     ]);
     expect(filterList(on.workflow_run.types)).toEqual(['completed']);
