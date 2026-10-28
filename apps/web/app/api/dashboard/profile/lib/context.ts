@@ -8,7 +8,6 @@ import type { ProfileUpdateInput } from './validation';
 
 export interface ProfileUpdateContext {
   dbProfileUpdates: Record<string, unknown>;
-  displayNameForUserUpdate: string | undefined;
   avatarUrl: string | undefined;
   usernameUpdate: string | undefined;
 }
@@ -48,11 +47,6 @@ export function buildProfileUpdateContext(
     dbProfileUpdates.settings = normalizedSettings;
   }
 
-  const displayNameForUserUpdate =
-    typeof profileUpdates.displayName === 'string'
-      ? profileUpdates.displayName.trim()
-      : undefined;
-
   const avatarUrl =
     typeof profileUpdates.avatarUrl === 'string'
       ? profileUpdates.avatarUrl
@@ -63,7 +57,6 @@ export function buildProfileUpdateContext(
 
   return {
     dbProfileUpdates,
-    displayNameForUserUpdate,
     avatarUrl,
     usernameUpdate,
   };

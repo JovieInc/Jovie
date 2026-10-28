@@ -1044,6 +1044,13 @@
       "when": 1792951740328,
       "tag": "0148_proof_before_public",
       "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "7",
+      "when": 1792968409894,
+      "tag": "0149_canonical_profile_write_access",
+      "breakpoints": true
     }
   ]
 }

@@ -45,28 +45,6 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-vi.mock('@/lib/db/schema/auth', () => ({
-  users: {
-    id: 'id',
-    clerkId: 'clerkId',
-  },
-}));
-
-vi.mock('@/lib/db/schema/profiles', () => ({
-  creatorProfiles: {
-    id: 'id',
-    userId: 'userId',
-    settings: 'settings',
-    usernameNormalized: 'usernameNormalized',
-    updatedAt: 'updatedAt',
-  },
-}));
-
-vi.mock('drizzle-orm', () => ({
-  and: vi.fn((...values: unknown[]) => values),
-  eq: vi.fn((a: unknown, b: unknown) => ({ a, b })),
-}));
-
 describe('creator-profile actions auth errors', () => {
   beforeEach(() => {
     vi.resetAllMocks();
