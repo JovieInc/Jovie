@@ -21,7 +21,10 @@ import {
   prepareProductionAuthEmailForm,
   waitForProductionDashboardContent,
 } from './utils/production-auth-interaction';
-import { waitForProductionAuthOtp } from './utils/production-auth-otp';
+import {
+  newProdcertUserEmail,
+  waitForProductionAuthOtp,
+} from './utils/production-auth-otp';
 import { SMOKE_TIMEOUTS, waitForHydration } from './utils/smoke-test-utils';
 
 /**
@@ -732,5 +735,62 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     if (performanceAuthStatePath) {
       await page.context().storageState({ path: performanceAuthStatePath });
     }
+  });
+  // JOV-9625: a brand-new user signs up with a fresh email OTP. The address is
+  // the tagged prodcert canary (+synthetic-, excluded from customer metrics);
+  // it is a different identity from creator-ready, so the OTPs cannot race.
+  test('new user signs up with an email code', async ({ page }, testInfo) => {
+    const expectedOrigin = exactOriginForTest(testInfo);
+    const email = newProdcertUserEmail(
+      process.env.GITHUB_RUN_ID
+        ? `${process.env.GITHUB_RUN_ID}${process.env.GITHUB_RUN_ATTEMPT ?? '1'}`
+        : `local${Date.now().toString(36)}`
+    );
+    recordPlaywrightSensitiveValues([email]);
+
+    await certStep(
+      'signup-signin',
+      'new-user-email-otp',
+      async () => {
+        await page.goto(APP_ROUTES.SIGNIN, {
+          waitUntil: 'domcontentloaded',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        assertExactNavigationUrl(
+          page.url(),
+          expectedOrigin,
+          'Signup navigation'
+        );
+        const { submitButton } = await prepareProductionAuthEmailForm(
+          page,
+          email
+        );
+        const requestedAtMs = Date.now();
+        await submitButton.click();
+        const codeInput = page
+          .locator(
+            'form[data-auth-email-code-step="code"] input[name="code"], form[data-auth-email-code-step="code"] input[autocomplete="one-time-code"], form[data-auth-email-code-step="code"] input[inputmode="numeric"], [data-testid="otp-autofill-input"]'
+          )
+          .first();
+        await expect(codeInput).toBeVisible({ timeout: 15_000 });
+        const code = await waitForProductionAuthOtp({
+          email,
+          startedAtMs: requestedAtMs,
+        });
+        await codeInput.fill(code);
+        await page.waitForURL(
+          url =>
+            url.origin === expectedOrigin &&
+            !url.pathname.startsWith(APP_ROUTES.SIGNIN),
+          { timeout: 30_000 }
+        );
+        assertExactNavigationUrl(page.url(), expectedOrigin, 'Signup landing');
+        const text = (await page.locator('body').innerText()).toLowerCase();
+        expect(text).not.toMatch(/application error|something went wrong/);
+        return new URL(page.url()).pathname;
+      },
+      pathname =>
+        `new synthetic user verified an email OTP and landed on ${pathname}`
+    );
   });
 });
