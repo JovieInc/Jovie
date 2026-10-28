@@ -713,7 +713,7 @@ def merge_group_evidence(lane, binding: Binding, pr: dict) -> str:
 
 
 def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context: str = "",
-                  goal: list[str] | tuple = ()) -> str:
+                  goal: list[str] | tuple = (), machine: list[str] | tuple = ()) -> str:
     common = [
         f"- Repo {binding.slug}. Read AGENTS.md / CLAUDE.md and the rules they route to before editing.",
         "- Make the smallest correct change. Do not weaken CI, delete tests or skip gates.",
@@ -749,6 +749,7 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
             f"Branch `{branch}` at {pr['headRefOid']} is checked out. Merge state: "
             f"{pr.get('mergeStateStatus') or 'unknown'}. Failing checks: {', '.join(failing) or 'none'}. "
             f"Repair reasons: {', '.join(reasons) or 'red or behind'}.", "",
+            *machine, "",
             "## Contract",
             "- Merge origin/main into this branch first (no rebase), resolving conflicts.",
             "- Then fix what the failing checks report. Read their logs with `gh run view --log-failed`.",
@@ -761,6 +762,7 @@ def render_prompt(binding: Binding, branch: str, *, issue=None, pr=None, context
         "## Company context (GBrain; verify against source)",
         context or "(GBrain unavailable for this run; rely on repo docs.)", "",
         *goal,
+        *machine, "",
         "## Contract",
         f"- Work on branch `{branch}` from origin/main.",
         *common])
@@ -807,7 +809,13 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
                                    context=lane.context_pack(issue) if issue is not None else
                                    merge_group_evidence(lane, binding, pr)
                                    if "merge-group-failed" in (pr.get("repairReasons") or []) else "",
-                                   goal=lane.goal_contract(issue) if issue is not None else ())
+                                   goal=lane.goal_contract(issue) if issue is not None else (),
+                                   machine=lane.machine_gate(
+                                       host, subject, issue.title if issue is not None else "",
+                                       issue.labels if issue is not None else (),
+                                       (issue.description or "") if issue is not None else "", name,
+                                       fp=None if issue is not None else lane.machine_gap.check_fingerprint(pr),
+                                       receipt=receipt))
             prompt_file = runs / f"{run_id}.prompt.md"
             atomic_write_text(prompt_file, prompt)
             started = time.time()
@@ -875,7 +883,8 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
     created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
                        "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                        "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
-                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n"
+                                 '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n\n'
                                  f"Lane implementation (binding {binding.key}); {binding.slug} required checks "
                                  "gate merge."])
     url = (created.stdout or "").strip().splitlines()[-1:] if created.returncode == 0 else []

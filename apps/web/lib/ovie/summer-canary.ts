@@ -33,6 +33,8 @@ export type SummerCanaryResult =
       readonly totalMs: number;
       readonly model: string | null;
       readonly server: SummerServerTiming | null;
+      /** Summer's full hop trace as sent (provider guard, ledger admission, reasoning start...). */
+      readonly trace: Record<string, unknown> | null;
       readonly withinTarget: { readonly p50: boolean };
     }
   | { readonly ok: false; readonly code: string };
@@ -114,6 +116,10 @@ export async function runSummerCanary(input: {
       headersMs: headersAt - startedAt,
       totalMs: finishedAt - startedAt,
       model,
+      trace:
+        timing && typeof timing === 'object'
+          ? (timing as Record<string, unknown>)
+          : null,
       server: timing
         ? {
             authMs: num(timing.authMs),

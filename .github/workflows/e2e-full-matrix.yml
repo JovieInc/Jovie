@@ -84,7 +84,7 @@ jobs:
       always() && (needs.build-web.result == 'success' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.test_filter != ''))
     environment: Preview – jovie
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Shard 1 was cancelled at 60 minutes. The auth modal waited on homepage
     # controls that the conversion lock removed, and the serial contrast
     # inventory never started. Locators now match the live entry points;
