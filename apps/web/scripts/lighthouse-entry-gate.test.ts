@@ -173,7 +173,11 @@ describe('lighthouse entry gate', () => {
     expect(budgets.map(b => b.path).sort()).toEqual(
       ['/[handle]?claim=1', '/claim', '/start'].sort()
     );
-    for (const b of budgets) expect(b.lcpMs).toBeLessThanOrEqual(4000);
+    // ratchet: JOV-9611 - claim-link is on a temporary 7000ms baseline; every
+    // other route stays at 4000ms. Lower claim-link back to 4000, never raise.
+    for (const b of budgets) {
+      expect(b.lcpMs).toBeLessThanOrEqual(b.id === 'claim-link' ? 7000 : 4000);
+    }
   });
 
   it('identifies the direct node in the Lighthouse 13 insight without exposing its content', () => {

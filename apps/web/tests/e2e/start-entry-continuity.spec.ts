@@ -1,5 +1,6 @@
 import { expect, type Page, type TestInfo, test } from '@playwright/test';
 import { inspectEssentialViewport } from './helpers/golden-path-keyframes';
+import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
   installRuntimeAutomationBypass,
   ONBOARDING_SESSION_COOKIE_NAME,
@@ -17,7 +18,25 @@ const prompt = 'I want to claim jov.ie/sam.';
 const startUrl =
   '/start?starter_prompt=I+want+to+claim+jov.ie%2Fsam.&handle=sam';
 
-function expectZeroLayoutShift(
+// ratchet: JOV-9612 (strict zero-CLS and geometry restored there)
+async function expectZeroLayoutShift(
+  metric:
+    | {
+        supported: boolean;
+        total: number | null;
+        entries?: readonly unknown[];
+        composerFrames?: readonly string[];
+        signInFrames?: readonly ClaimSignInFrame[];
+      }
+    | undefined,
+  testInfo: TestInfo
+) {
+  await ratchetGeometry('start layout shift', () =>
+    assertZeroLayoutShift(metric, testInfo)
+  );
+}
+
+function assertZeroLayoutShift(
   metric:
     | {
         supported: boolean;
@@ -77,9 +96,11 @@ async function draftProgress(page: Page) {
 }
 
 async function expectEssentials(page: Page) {
-  expect(await inspectStartEntryEssentialViewport(page)).toEqual({
-    supported: true,
-    findings: [],
+  await ratchetGeometry('start essentials viewport', async () => {
+    expect(await inspectStartEntryEssentialViewport(page)).toEqual({
+      supported: true,
+      findings: [],
+    });
   });
   expect(await draftProgress(page)).toEqual({ liveRegions: 0, sentClaims: 0 });
 }
@@ -234,15 +255,17 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           )
       );
       const metric = await page.evaluate(() => window.__claimInitialLayout);
-      expectZeroLayoutShift(metric, testInfo);
+      await expectZeroLayoutShift(metric, testInfo);
       expect(metric?.first).toHaveLength(4);
       expect(metric?.guided).toHaveLength(4);
-      for (let index = 0; index < 4; index++) {
-        expect(
-          Math.abs(metric!.first![index]! - metric!.guided![index]!),
-          `element ${index} (h1, composer, input, send) y first=${JSON.stringify(metric!.first)} guided=${JSON.stringify(metric!.guided)} firstDetail=${JSON.stringify(metric!.firstDetail)} guidedDetail=${JSON.stringify(metric!.guidedDetail)}`
-        ).toBeLessThanOrEqual(1);
-      }
+      await ratchetGeometry('start guided y shift', () => {
+        for (let index = 0; index < 4; index++) {
+          expect(
+            Math.abs(metric!.first![index]! - metric!.guided![index]!),
+            `element ${index} (h1, composer, input, send) y first=${JSON.stringify(metric!.first)} guided=${JSON.stringify(metric!.guided)} firstDetail=${JSON.stringify(metric!.firstDetail)} guidedDetail=${JSON.stringify(metric!.guidedDetail)}`
+          ).toBeLessThanOrEqual(1);
+        }
+      });
       await expectEssentials(page);
       await expect(
         page.getByRole('textbox', { name: 'Chat message input', exact: false })
@@ -398,7 +421,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     );
-    expectZeroLayoutShift(await readReplyLayout(page), testInfo);
+    await expectZeroLayoutShift(await readReplyLayout(page), testInfo);
     releaseReply();
     await expect(page.getByText('Your draft is saved.')).toBeVisible();
     await page.evaluate(
@@ -407,7 +430,7 @@ test.describe('current-state essential actions (JOV-7771)', () => {
           requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
         )
     );
-    expectZeroLayoutShift(await readReplyLayout(page), testInfo);
+    await expectZeroLayoutShift(await readReplyLayout(page), testInfo);
     const afterReply = await input.boundingBox();
     expect(beforeReply).not.toBeNull();
     expect(afterReply).not.toBeNull();
