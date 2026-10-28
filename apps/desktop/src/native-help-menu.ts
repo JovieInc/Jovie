@@ -47,8 +47,8 @@ export function buildNativeHelpMenu(
     submenu: [
       browserLink('Jovie Support', 'https://jov.ie/support'),
       browserLink('Help Center', 'https://docs.jov.ie'),
-      // JOV-8645: enable after the canonical status page recovers from its 404.
-      browserLink('System Status', 'https://status.jov.ie', false),
+      // No status link until a real status page exists; the status-page loop
+      // (scripts/loops/status-page.mjs) watches status.jov.ie (JOV-8645).
       browserLink("What's New", 'https://jov.ie/changelog'),
       { type: 'separator' },
       // JOV-8644: enable after ContactSupport recovers from its production 500.
