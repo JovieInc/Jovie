@@ -28,12 +28,10 @@ export {
   membersQuerySchema,
   type SortDirection,
   type SubscriberSort,
-  type SubscribersQueryParams,
   sortDirectionSchema,
   sortDirectionValues,
   subscriberSortSchema,
   subscriberSortValues,
-  subscribersQuerySchema,
 } from './audience';
 // Jovie work feed schemas
 export {
