@@ -19,7 +19,7 @@ concurrency:
 jobs:
   deterministic:
     name: Source Validation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     permissions:
       actions: read
@@ -106,9 +106,20 @@ jobs:
           # step (p50 47s, p90 57s). Blobless history is ~34 MB for main;
           # the head's blobs arrive with the checkout and the few trusted-base
           # blobs a guard reads are fetched on demand from the public origin.
-          fetch-depth: 0
+          fetch-depth: 1
           filter: blob:none
           persist-credentials: false
+      # actions/checkout with fetch-depth 0 pulls every branch and tag (1,800+
+      # heads, mostly backup/codex branches: ~12s, 58 MB). Guards only need the
+      # head and the single base ref, blobless, for merge bases.
+      - name: Fetch head and base history only
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
       - uses: ./.github/actions/setup-node-pnpm
       # Body/label-dependent policy always runs, including exact-head proof reuse.
       # PR fleet rules are decided by the Fleet Rules Evidence workflow (base code
@@ -150,21 +161,84 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           node "$guard_root/scripts/changelog-source-guard.mjs"
+      # Source guards inspect the merged tree. Its dependency/runtime generation
+      # must travel with it; the later source-head steps keep their original proof.
+      - name: Prepare merged source guard generation
+        id: source_guard_merge
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo 'restore_head=false' >> "$GITHUB_OUTPUT"
+          # A local dirty checkout is not owned by this transaction.
+          if ! git diff --quiet HEAD; then
+            echo 'prepared=false' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          helper_root="$(mktemp -d "$RUNNER_TEMP/source-dependency-guard.XXXXXX")"
+          printf 'trusted_ref=%s\nhelper_root=%s\n' "$trusted_ref" "$helper_root" >> "$GITHUB_OUTPUT"
+          git archive "$trusted_ref" scripts/lib/ci-dependency-workspace.mjs | tar -x -C "$helper_root"
+          export SOURCE_DEPENDENCY_HELPER="$helper_root/scripts/lib/ci-dependency-workspace.mjs"
+          node "$SOURCE_DEPENDENCY_HELPER" validate
+          dependency_digest() {
+            node --input-type=module -e 'import { pathToFileURL } from "node:url"; const helper = await import(pathToFileURL(process.env.SOURCE_DEPENDENCY_HELPER)); console.log(helper.dependencyInputDigest(process.cwd()));'
+          }
+          head_digest="$(dependency_digest)"
+          printf 'head_digest=%s\nrestore_head=true\n' "$head_digest" >> "$GITHUB_OUTPUT"
+          if ! git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref"; then
+            conflicts="$(git diff --name-only --diff-filter=U | tr '\n' ' ')"
+            echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base} in: ${conflicts:-unknown files}. Resolve the conflict (lane-fix-conflict)."
+            exit 1
+          fi
+          changed=false
+          [ "$(dependency_digest)" = "$head_digest" ] || changed=true
+          printf 'dependency_changed=%s\nprepared=true\n' "$changed" >> "$GITHUB_OUTPUT"
+          # A baked browser path belongs to the prior installed generation.
+          [ "$changed" != true ] || echo 'PLAYWRIGHT_BROWSERS_PATH=' >> "$GITHUB_ENV"
+      # Local post actions reload their metadata after source restoration.
+      # Retain only this generation's action closure until job cleanup.
+      - name: Preserve merged action generation
+        id: source_guard_actions
+        if: steps.source_guard_merge.outputs.dependency_changed == 'true'
+        run: node scripts/lib/source-guard-action-snapshot.mjs
+      - name: Setup merged source dependencies
+        id: source_merge_dependencies
+        if: steps.source_guard_merge.outputs.dependency_changed == 'true'
+        uses: ./tmp/source-guard-actions/setup-node-pnpm
+      - name: Setup merged source browsers
+        id: source_merge_browsers
+        if: steps.source_guard_merge.outputs.dependency_changed == 'true'
+        uses: ./tmp/source-guard-actions/setup-playwright
       - name: Validate disk-read source contracts from trusted base
         shell: bash
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          SOURCE_GUARD_PREPARED: ${{ steps.source_guard_merge.outputs.prepared }}
+          SOURCE_GUARD_TRUSTED_REF: ${{ steps.source_guard_merge.outputs.trusted_ref }}
+          SOURCE_DEPENDENCY_HELPER: ${{ steps.source_guard_merge.outputs.helper_root }}/scripts/lib/ci-dependency-workspace.mjs
           # Source guards that read GitHub (gh-api-hold) ran unauthenticated and
           # hit the per-IP limit ("outside the 30s budget", 2026-10-21).
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          if [ "${SOURCE_GUARD_PREPARED:-false}" = true ]; then
+            trusted_ref="${SOURCE_GUARD_TRUSTED_REF:?prepared source guard reference missing}"
+            git cat-file -e "$trusted_ref^{commit}"
+            node "$SOURCE_DEPENDENCY_HELPER" validate
+          else
+            git fetch --no-tags origin "${{ github.base_ref }}"
+            trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          fi
           guard_root="$(mktemp -d "$RUNNER_TEMP/source-read-guard.XXXXXX")"
           merging=false
-          # Restore the PR head checkout for every later step, however this one ends.
+          # Standalone runs restore here. The prepared transaction restores both
+          # source and dependencies in its unconditional workflow cleanup steps.
           trap '[ "$merging" != true ] || git reset --hard --quiet "$EXPECTED_HEAD"; rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts | tar -x -C "$guard_root"
           # Guard code and the guard list come from the trusted base (above); the
@@ -175,8 +249,13 @@ jobs:
           # is uncommitted, so HEAD and the changed-file list stay the PR's. A
           # dirty tree (a local run) is never reset: it keeps the head-only run.
           clean=true
-          git diff --quiet HEAD 2>/dev/null || clean=false
-          [ "$clean" = true ] || echo "::notice::working tree has local changes; source guards run on the head alone"
+          if [ "${SOURCE_GUARD_PREPARED:-false}" = true ]; then
+            # The earlier transaction owns this merge and its installed tree.
+            clean=false
+          else
+            git diff --quiet HEAD 2>/dev/null || clean=false
+            [ "$clean" = true ] || echo "::notice::working tree has local changes; source guards run on the head alone"
+          fi
           [ "$clean" != true ] || merging=true
           merge_ok=true
           [ "$merging" != true ] || git -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1 || merge_ok=false
@@ -204,6 +283,48 @@ jobs:
             }
             process.exitCode = exitCode;
           '
+      - name: Restore exact source head after merged guards
+        id: source_guard_restore
+        if: always() && steps.source_guard_merge.outputs.restore_head == 'true'
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          SOURCE_DEPENDENCY_CHANGED: ${{ steps.source_guard_merge.outputs.dependency_changed }}
+        run: |
+          set -euo pipefail
+          git reset --hard --quiet "$EXPECTED_HEAD"
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          echo 'restored=true' >> "$GITHUB_OUTPUT"
+          [ "$SOURCE_DEPENDENCY_CHANGED" != true ] || echo 'PLAYWRIGHT_BROWSERS_PATH=' >> "$GITHUB_ENV"
+      - name: Restore source head dependencies
+        id: source_head_dependencies
+        if: always() && steps.source_guard_merge.outputs.dependency_changed == 'true' && steps.source_merge_dependencies.outcome != 'skipped' && steps.source_guard_restore.outputs.restored == 'true'
+        uses: ./.github/actions/setup-node-pnpm
+      - name: Restore source head browsers
+        id: source_head_browsers
+        if: always() && steps.source_guard_merge.outputs.dependency_changed == 'true' && steps.source_head_dependencies.outcome == 'success'
+        uses: ./.github/actions/setup-playwright
+      - name: Restore exact source dependency proof
+        id: source_guard_proof
+        if: always() && steps.source_guard_merge.outputs.helper_root != ''
+        shell: bash
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+          SOURCE_DEPENDENCY_ROOT: ${{ steps.source_guard_merge.outputs.helper_root }}
+          SOURCE_HEAD_DIGEST: ${{ steps.source_guard_merge.outputs.head_digest }}
+          SOURCE_RESTORE_REQUIRED: ${{ steps.source_guard_merge.outputs.restore_head }}
+          SOURCE_RESTORED: ${{ steps.source_guard_restore.outputs.restored }}
+        run: |
+          set -euo pipefail
+          trap 'rm -rf "$SOURCE_DEPENDENCY_ROOT"' EXIT
+          if [ "$SOURCE_RESTORE_REQUIRED" = true ]; then
+            test "$SOURCE_RESTORED" = true
+            test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+            export SOURCE_DEPENDENCY_HELPER="$SOURCE_DEPENDENCY_ROOT/scripts/lib/ci-dependency-workspace.mjs"
+            restored_digest="$(node --input-type=module -e 'import { pathToFileURL } from "node:url"; const helper = await import(pathToFileURL(process.env.SOURCE_DEPENDENCY_HELPER)); console.log(helper.dependencyInputDigest(process.cwd()));')"
+            test "$restored_digest" = "$SOURCE_HEAD_DIGEST"
+            node "$SOURCE_DEPENDENCY_HELPER" validate
+          fi
       - name: Check agent-context size after merge onto base
         shell: bash
         env:
@@ -367,7 +488,27 @@ jobs:
       # three ejections). Fail it on its own PR instead.
       - name: Check layout-guard pen contracts are still rendered
         if: steps.reuse.outputs.reuse != 'true'
-        run: node scripts/layout-guard-pen-contracts.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f scripts/layout-guard-pen-contracts.mjs ]; then
+            node scripts/layout-guard-pen-contracts.mjs
+            exit 0
+          fi
+          # This workflow runs from the merge ref but the checkout is the PR
+          # head: a branch cut before the guard landed has no script
+          # (Cannot find module, 5 of 83 sampled failures). Judge the merged
+          # tree in a throwaway worktree instead of failing a stale branch.
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          trusted_ref="$(git rev-parse 'origin/${{ github.base_ref }}^{commit}')"
+          merged="$(mktemp -d "$RUNNER_TEMP/pen-contracts-merged.XXXXXX")"
+          trap 'git worktree remove --force "$merged" >/dev/null 2>&1 || true' EXIT
+          git worktree add --detach --quiet "$merged" HEAD
+          if ! git -C "$merged" -c user.name=source-validation -c user.email=source-validation@invalid merge --no-commit --no-ff --quiet "$trusted_ref" >/dev/null 2>&1; then
+            echo "::error title=merge conflict with ${GITHUB_BASE_REF:-base}::This PR conflicts with ${GITHUB_BASE_REF:-base}; resolve the conflict (lane-fix-conflict) so the pen-contract guard can judge the merged tree."
+            exit 1
+          fi
+          node "$merged/scripts/layout-guard-pen-contracts.mjs"
       # The merge group's ci-fast runs the same path-aware shadcn baseline
       # probe; Source Validation previously skipped it, so a restyle that fit
       # a PR's diff still ejected the whole merge group (group 36902907269,
@@ -484,9 +625,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           filter: blob:none
           persist-credentials: false
+      - &base-history
+        name: Fetch head and base history only
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
       - *reused-setup
       - name: Validate changed migration surfaces
         if: steps.reuse.outputs.reuse != 'true'
@@ -526,6 +677,7 @@ jobs:
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
+      - *base-history
       - *reused-setup
       - name: Run changed-behavior coverage ratchet
         if: steps.reuse.outputs.reuse != 'true'
@@ -626,7 +778,7 @@ jobs:
   # differed from the PR head for 92 of 103 sampled merges.
   unit:
     name: Affected Unit Tests (${{ matrix.shard }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
       actions: read
@@ -642,6 +794,7 @@ jobs:
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
+      - *base-history
       - name: Select unit-affecting diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
@@ -707,7 +860,7 @@ jobs:
         run: pnpm --filter @jovie/ovie test
   a11y:
     name: A11y (UI paths)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
       actions: read
@@ -718,6 +871,7 @@ jobs:
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
+      - *base-history
       - name: Select UI accessibility diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
