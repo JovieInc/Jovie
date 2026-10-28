@@ -165,7 +165,9 @@ no numbers here and does not claim that async metadata changes crawler/bot wait.
 Canvas, WebGL, and video on marketing pages are not a second Lighthouse budget
 and do not add a row here. `scripts/invariants/art-direction/surface-media.mjs`
 allows them only inside a named scope that keeps a non-WebGL fallback and
-`prefers-reduced-motion`. The homepage hero
+`prefers-reduced-motion`. Scopes are registered in
+`docs/design-system/motion-effects.json` (ASR-039), which also carries each
+effect's gzip, frame-rate and offscreen-pause budget. The homepage hero
 (`apps/web/components/homepage/hero-light/`) is that approved scope and ships
 with no feature flag. The ambient field stays in scope because it already
 keeps a CSS poster and declines WebGL under reduced motion. Every other hit

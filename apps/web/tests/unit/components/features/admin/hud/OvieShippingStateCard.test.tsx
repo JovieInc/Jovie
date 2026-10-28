@@ -267,6 +267,7 @@ const LABELS = [
   'Staging',
   'Production',
   'Behind Main',
+  'LYB Deploy',
   'CI Green',
   'Summer',
 ] as const;
@@ -317,6 +318,7 @@ describe('OvieShippingStateCard', () => {
     expect(metricValue('Staging')).toBe('26.9.16 a1b2c3d');
     expect(metricValue('Production')).toBe('26.9.15 ee7401f');
     expect(metricValue('Behind Main')).toBe('54');
+    expect(metricValue('LYB Deploy')).toBe('n/a');
     expect(metricValue('CI Green')).toBe('Yes');
     expect(metricValue('Summer')).toBe('Up');
     expect(
@@ -329,6 +331,43 @@ describe('OvieShippingStateCard', () => {
     for (const label of LABELS) {
       expect(screen.getByText(label)).toBeTruthy();
     }
+  });
+
+  it('shows LogYourBody production as failing with the commits it is behind main', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, {
+        ...projection,
+        delivery: {
+          ...delivery,
+          lanes: {
+            ...delivery.lanes,
+            deployHealth: {
+              observedAt: new Date(NOW - 60_000).toISOString(),
+              healthy: false,
+              repos: [
+                {
+                  repo: 'JovieInc/LogYourBody',
+                  status: 'failing',
+                  failedStreak: 15,
+                  behindMain: 54,
+                  oldestUnshippedAgeSeconds: 140083,
+                  lastSuccessAt: '2026-10-23T16:03:00.000Z',
+                },
+              ],
+            },
+          },
+        },
+      })
+    );
+    render(
+      <QueryClientProvider client={createQueryClient()}>
+        <OvieShippingStateCard />
+      </QueryClientProvider>
+    );
+
+    await waitFor(() => {
+      expect(metricValue('LYB Deploy')).toBe('Failing x15, 54 behind');
+    });
   });
 
   it('fails soft per metric: a missing source reads n/a without blanking the card', async () => {
