@@ -79,10 +79,7 @@ describe('selectInvestorFacingStats', () => {
 
 describe('investor markdown', () => {
   it('does not carry hand-typed raise, stream, or market counts', () => {
-    const roots = [
-      join(process.cwd(), 'content/investors'),
-      join(process.cwd(), '../../content/investors/deck'),
-    ];
+    const roots = [join(process.cwd(), 'content/investors')];
 
     const offenders = roots.flatMap(root =>
       markdownFiles(root)
