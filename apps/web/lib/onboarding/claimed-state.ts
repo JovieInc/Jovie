@@ -5,6 +5,10 @@ import {
   type InterviewSignal,
   interviewSignalSchema,
 } from '@/lib/chat/tools/onboarding-signals';
+import {
+  type OnboardingProfileDraft,
+  readOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
 
 export interface ClaimedOnboardingArtist {
@@ -18,6 +22,7 @@ export interface ClaimedOnboardingArtist {
 }
 
 export interface ClaimedOnboardingState {
+  readonly profileDraft?: OnboardingProfileDraft | null;
   readonly artist: ClaimedOnboardingArtist | null;
   readonly handle: string | null;
   readonly socialLinks: readonly string[];
@@ -115,11 +120,13 @@ export function deriveClaimedOnboardingStateFromToolEvents(
   let handle: string | null = null;
   const socialLinks: string[] = [];
   const interviewSignals: InterviewSignal[] = [];
+  let profileDraft: OnboardingProfileDraft | null = null;
 
   for (const event of events) {
     const output = isRecord(event.output) ? event.output : null;
 
     if (output) {
+      profileDraft = readOnboardingProfileDraft(output) ?? profileDraft;
       artist = readArtist(output) ?? artist;
 
       if (
@@ -140,9 +147,17 @@ export function deriveClaimedOnboardingStateFromToolEvents(
   }
 
   return {
+    ...(profileDraft ? { profileDraft } : {}),
     artist,
     handle,
-    socialLinks: Array.from(new Set(socialLinks)),
+    socialLinks: Array.from(
+      new Set([
+        ...socialLinks,
+        ...(profileDraft?.selectedSource
+          ? [profileDraft.selectedSource.url]
+          : []),
+      ])
+    ),
     interviewSignals,
   };
 }
