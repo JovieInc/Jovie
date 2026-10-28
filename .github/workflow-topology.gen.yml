@@ -994,6 +994,18 @@ nodes:
       - pull_request
     terminalReceipt: job:capture
     jobCount: 1
+  - name: Private Data Guard
+    path: .github/workflows/private-data-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:guard
+    jobCount: 1
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml
     active: true
