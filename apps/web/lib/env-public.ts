@@ -10,16 +10,13 @@ function getRuntimeHtmlDatasetValue(
 
 function readAuthMockFlag(): string | undefined {
   return (
-    process.env.NEXT_PUBLIC_AUTH_MOCK ||
-    process.env.NEXT_PUBLIC_CLERK_MOCK ||
-    getRuntimeHtmlDatasetValue('authMock')
+    process.env.NEXT_PUBLIC_AUTH_MOCK || getRuntimeHtmlDatasetValue('authMock')
   );
 }
 
 function readAuthProxyDisabledFlag(): string | undefined {
   return (
     process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED ||
-    process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED ||
     getRuntimeHtmlDatasetValue('authProxyDisabled')
   );
 }

@@ -173,8 +173,8 @@ function createRuntime(serverPort: string): AdminGreenRuntime {
     E2E_SKIP_WEB_SERVER: '1',
     E2E_USE_TEST_AUTH_BYPASS: '1',
     E2E_TEST_AUTH_PERSONA: 'admin',
-    NEXT_PUBLIC_CLERK_MOCK: '1',
-    NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+    NEXT_PUBLIC_AUTH_MOCK: '1',
+    NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1',
   } satisfies NodeJS.ProcessEnv;
 
   return {
@@ -403,9 +403,9 @@ async function writeReport(
       baseUrl: runtime.serverBaseUrl,
       E2E_USE_TEST_AUTH_BYPASS: runtime.sharedEnv.E2E_USE_TEST_AUTH_BYPASS,
       E2E_TEST_AUTH_PERSONA: runtime.sharedEnv.E2E_TEST_AUTH_PERSONA,
-      NEXT_PUBLIC_CLERK_MOCK: runtime.sharedEnv.NEXT_PUBLIC_CLERK_MOCK,
-      NEXT_PUBLIC_CLERK_PROXY_DISABLED:
-        runtime.sharedEnv.NEXT_PUBLIC_CLERK_PROXY_DISABLED,
+      NEXT_PUBLIC_AUTH_MOCK: runtime.sharedEnv.NEXT_PUBLIC_AUTH_MOCK,
+      NEXT_PUBLIC_AUTH_PROXY_DISABLED:
+        runtime.sharedEnv.NEXT_PUBLIC_AUTH_PROXY_DISABLED,
     },
     manifest: {
       renderCount: ADMIN_RENDER_SURFACES.length,

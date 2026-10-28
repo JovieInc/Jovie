@@ -105,7 +105,6 @@ jobs:
       - name: Build app (public routes)
         run: pnpm turbo build --filter=@jovie/web
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           NEXT_IGNORE_ESLINT: '1'
           NEXT_IGNORE_TYPECHECK: '1'
           NEXT_PRIVATE_SKIP_SIZE_CHECK: 'true'
@@ -228,7 +227,6 @@ jobs:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_TEST_AUTH_PERSONA: admin
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
           URL_ENCRYPTION_KEY: visual-regression-ci-url-encryption-key
           AI_GATEWAY_API_KEY: visual-regression-ci
 

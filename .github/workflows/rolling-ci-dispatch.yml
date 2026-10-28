@@ -655,8 +655,6 @@ jobs:
       - name: Run exact-head changed-line coverage when applicable
         working-directory: candidate
         env:
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk
-          CLERK_SECRET_KEY: sk_test_dummy_secret_for_coverage_run_only
         run: |
           set -euo pipefail
           unset GH_TOKEN GITHUB_TOKEN STATUS_TOKEN AI_GATEWAY_API_KEY CURSOR_API_KEY

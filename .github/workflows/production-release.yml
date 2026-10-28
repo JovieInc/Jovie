@@ -297,8 +297,6 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
           VERCEL_GIT_COMMIT_SHA: ${{ inputs.expected_sha }}
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
       - name: Hash fixed staging build subject for isolated attestation
         id: build-subject
         run: |
@@ -418,8 +416,6 @@ jobs:
           # The in-job prebuilt artifact is the thing canary verifies. A source
           # fallback would silently discard it and repeat the slow server build.
           VERCEL_ENABLE_SOURCE_FALLBACK: 'false'
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}
-          CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}
 
       - name: Wait for staging deployment readiness
         id: inspect-deployment
