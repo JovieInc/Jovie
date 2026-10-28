@@ -16,6 +16,10 @@ export const SHELL_RAIL_MOTION_MS = 420;
 /** Pointer bridge grace shared by both transient desktop rails. */
 export const SHELL_RAIL_PREVIEW_GRACE_MS = 180;
 
+/** Hover-intent dwell before a pointer opens the left flyout. Long enough
+ *  that crossing the rail on the way elsewhere does not flicker it open. */
+export const SHELL_RAIL_PREVIEW_INTENT_MS = 120;
+
 /** Shared rail lifecycle. Rails are interruptible: a new input re-aims the
  *  phase at the latest requested geometry instead of queueing or snapping. */
 export type RailMotionPhase = 'closed' | 'opening' | 'open' | 'closing';

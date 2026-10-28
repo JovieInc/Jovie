@@ -110,7 +110,13 @@ export function DesktopUpdateModalView({
       {state.state === 'available' ? (
         <DialogBody
           data-testid='desktop-update-notes'
-          className='h-48 overflow-y-auto'
+          // JOV-9023: settled content sizes the body; only the loading
+          // skeleton reserves the fixed scroll region so the modal does not
+          // resize while notes arrive. A fixed height on settled content is
+          // what left a ~250px empty body under the fallback link.
+          className={
+            loading ? 'h-48 overflow-y-auto' : 'max-h-48 overflow-y-auto'
+          }
         >
           {loading ? (
             // The same scroll region bounds loading, notes and fallback content.
