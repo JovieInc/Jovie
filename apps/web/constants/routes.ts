@@ -146,6 +146,8 @@ export const APP_ROUTES = {
   ADMIN_AGENT_RUN: '/app/ov/agent-runs',
   ADMIN_AGENT_RUN_DETAIL: '/app/ov/agent-runs/[id]',
   ADMIN_COSTS: '/app/ov/costs',
+  /** Agent capacity registry: plan, cost, quota, pace and policy per provider. */
+  ADMIN_CAPACITY: '/app/ov/capacity',
   /** VC/ops revenue-lift dashboard (IRPAA North Star + KPI tree). */
   ADMIN_REVENUE_LIFT: '/app/ov/revenue-lift',
   ADMIN_SYSTEM: '/app/ov/system',

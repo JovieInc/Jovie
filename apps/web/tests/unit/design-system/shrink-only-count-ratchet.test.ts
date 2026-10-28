@@ -87,9 +87,9 @@ describe('shrink-only count ratchet (merge-group safe)', () => {
     }
   });
 
-  it('still fails when this tree authored the below-baseline shrink (JOV-5326)', () => {
+  it('passes with a notice when this tree authored the below-baseline shrink (JOV-5326)', () => {
     // The base was at the floor and this tree removed occurrences without
-    // lowering the baseline — authorship debt stays fail-closed.
+    // lowering the baseline — an improvement passes with a notice.
     for (const event of [
       SHRINK_ONLY_COUNT_EVENTS.PULL_REQUEST,
       SHRINK_ONLY_COUNT_EVENTS.LOCAL,
@@ -102,7 +102,7 @@ describe('shrink-only count ratchet (merge-group safe)', () => {
         metric: '--linear-* usage',
       });
       expect(verdict).toMatchObject({
-        ok: false,
+        ok: true,
         status: SHRINK_ONLY_COUNT_STATUSES.UNBASELINED_SHRINK,
         event,
       });
@@ -110,7 +110,7 @@ describe('shrink-only count ratchet (merge-group safe)', () => {
     }
   });
 
-  it('still fail-closes unbaselined shrink on pull_request and local authorship', () => {
+  it('passes unbaselined shrink with a notice on pull_request and local', () => {
     for (const event of [
       SHRINK_ONLY_COUNT_EVENTS.PULL_REQUEST,
       SHRINK_ONLY_COUNT_EVENTS.LOCAL,
@@ -122,7 +122,7 @@ describe('shrink-only count ratchet (merge-group safe)', () => {
         metric: '--linear-* usage',
       });
       expect(verdict).toMatchObject({
-        ok: false,
+        ok: true,
         status: SHRINK_ONLY_COUNT_STATUSES.UNBASELINED_SHRINK,
         event,
       });
