@@ -3691,7 +3691,8 @@ def verify_and_land(host: Host, issue: Issue, branch: str, worktree: Path, log, 
                 "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                 "--body", f"Refs {issue.identifier}.\n\n"
                 f"<!-- linear-issue-id:{issue.id} -->\n"
-                f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                f"<!-- linear-issue-identifier:{issue.identifier} -->\n"
+                '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n\n'
                 "Lane implementation; verification by the lane gate. "
                 "Runtime and commissioning acceptance remain with the issue owner."], cwd=worktree, log=log)
         except (subprocess.TimeoutExpired, OSError):
