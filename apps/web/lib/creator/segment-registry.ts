@@ -330,7 +330,7 @@ export function buildSegmentPromptSection(segment: ResolvedSegment): string {
       ? 'The creator type is unknown.'
       : `The creator is a ${segment.replace('_', ' / ')}.`;
   const lines = playbookTextForSegment(segment)
-    .map(text => `- ${text}`)
+    .map(text => `Playbook: ${text}`)
     .join('\n');
   return `## Creator Segment
 ${identity} Give advice, features and vocabulary that fit only this segment. Never offer another creator type's advice, or any feature not listed for them.
