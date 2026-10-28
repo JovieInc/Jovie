@@ -106,9 +106,20 @@ jobs:
           # step (p50 47s, p90 57s). Blobless history is ~34 MB for main;
           # the head's blobs arrive with the checkout and the few trusted-base
           # blobs a guard reads are fetched on demand from the public origin.
-          fetch-depth: 0
+          fetch-depth: 1
           filter: blob:none
           persist-credentials: false
+      # actions/checkout with fetch-depth 0 pulls every branch and tag (1,800+
+      # heads, mostly backup/codex branches: ~12s, 58 MB). Guards only need the
+      # head and the single base ref, blobless, for merge bases.
+      - name: Fetch head and base history only
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
       - uses: ./.github/actions/setup-node-pnpm
       # Body/label-dependent policy always runs, including exact-head proof reuse.
       # PR fleet rules are decided by the Fleet Rules Evidence workflow (base code
@@ -614,9 +625,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
+          fetch-depth: 1
           filter: blob:none
           persist-credentials: false
+      - &base-history
+        name: Fetch head and base history only
+        if: steps.reuse.outputs.reuse != 'true'
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
       - *reused-setup
       - name: Validate changed migration surfaces
         if: steps.reuse.outputs.reuse != 'true'
@@ -656,6 +677,7 @@ jobs:
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
+      - *base-history
       - *reused-setup
       - name: Run changed-behavior coverage ratchet
         if: steps.reuse.outputs.reuse != 'true'
@@ -772,6 +794,7 @@ jobs:
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
+      - *base-history
       - name: Select unit-affecting diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
@@ -848,6 +871,7 @@ jobs:
       - *quota-runtime
       - *proof-reuse
       - *reused-checkout
+      - *base-history
       - name: Select UI accessibility diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
