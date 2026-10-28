@@ -113,6 +113,10 @@ if (process.argv[2] === '--version') {
   write('patches/fixture.patch', 'original patch\n');
   write('shared.txt', 'fork\n');
   write(helper, readFileSync(helper));
+  write(
+    'scripts/lib/verify-patched-dependencies.mjs',
+    readFileSync('scripts/lib/verify-patched-dependencies.mjs')
+  );
   write(actionHelper, readFileSync(actionHelper));
   write(
     'scripts/lib/source-action-contract.mjs',
