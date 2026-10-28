@@ -37,14 +37,22 @@ name: Merge Queue Green Enroll
 # manual dispatch scan the complete roster.
 
 on:
+  # Fork PR Gate is not subscribed: Source Validation completed last on 84 of 85
+  # PR heads measured 2026-10-25, and a straggler is re-armed by the main-push
+  # sweep (guard: scripts/lib/__tests__/wake-fanout-contract.test.mjs).
   workflow_run:
-    workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
+    workflows: ['Source Validation', 'CI', 'PR Size Guard']
     types: [completed]
   # ready_for_review: leaving draft emits no check completion (JOV-INV-029:
   # an unchanged head never earns a second CI flight), so this is the wake
   # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]
+    # `synchronize` is deliberately absent (JOV-INV-029 coalescing): a new head
+    # has no green verdict yet, so the push cannot change the enroll decision.
+    # Its Source Validation completion (PR Ready) is the wake that can. Over 24h
+    # synchronize was the bulk of ~560 pull_request_target runs, nearly all
+    # no-ops. Head-change hold release rides the next label event or landing on main.
+    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
@@ -110,6 +118,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
@@ -208,6 +217,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
@@ -875,10 +885,11 @@ jobs:
           })));
           NODE
 
-  # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): every stop label
-  # (hold, gated, incident, do-not-merge, tim-hold variants) needs a receipt
-  # comment naming an owner plus an expiry or a head-change release.
-  # Ownerless holds past their grace period and expired or released receipts
+  # Human-owned tim-hold variants and do-not-merge require authorized
+  # disposition; this sweep never expires them or their coexisting stops.
+  # Other stop labels use the hold contract (scripts/hold-contract.mjs,
+  # jovie-hold/v1): a receipt names an owner and an expiry or head-change release.
+  # Ownerless machine holds past their grace period and expired receipts
   # are removed with one comment. The Jovie Bot unlabel event then wakes the
   # enroll job above; required checks still gate admission. Expiry is checked
   # on the next event after it lapses: a landing on main, a merge-group CI

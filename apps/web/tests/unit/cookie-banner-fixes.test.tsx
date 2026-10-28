@@ -740,4 +740,41 @@ describe('CookieBannerMount global preferences controller', () => {
       expect(localStorage.getItem('jv_cc')).toContain('"essential":true');
     });
   });
+
+  it('does not mount a second card when the page already server-rendered one', async () => {
+    setCookie('jv_cc_required=1');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+    const { CookieBannerSection } = await import(
+      '@/components/organisms/CookieBannerSection'
+    );
+
+    render(
+      <>
+        <CookieBannerSection initialVisible />
+        <CookieBannerMount />
+      </>
+    );
+
+    await vi.waitFor(() => {
+      expect(globalThis.JVConsent).toBeDefined();
+    });
+    // Give the lazy Section import a chance to (wrongly) resolve.
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.getAllByTestId('cookie-banner')).toHaveLength(1);
+  });
+
+  it('still mounts the lazy card when the page did not server-render one', async () => {
+    setCookie('jv_cc_required=1');
+    const { CookieBannerMount } = await import(
+      '@/components/organisms/CookieBannerMount'
+    );
+
+    render(<CookieBannerMount />);
+
+    await vi.waitFor(() => {
+      expect(screen.getAllByTestId('cookie-banner')).toHaveLength(1);
+    });
+  });
 });
