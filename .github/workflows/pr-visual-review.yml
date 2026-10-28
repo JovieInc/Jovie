@@ -45,7 +45,7 @@ jobs:
   capture:
     # Capture evidence remains fail-closed (JOV-5459).
     name: Capture changed UI (desktop + mobile)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -225,6 +225,10 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:3100
           SCREENSHOT_BUILD_MODE: pr-premerge
+          # A failing test writes Playwright's error-context.md; without this the
+          # guard files it as unknown-binary and adds a second, misleading red.
+          # The guard still redacts it and fails if a secret survives.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           set -euo pipefail
           marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|lib/agent-os/visual-qa/|tests/product-screenshots/(marketing-routes|helpers|source-provenance)|tests/visual-qa/)|packages/ui/|\.github/workflows/pr-visual-review\.yml)'
@@ -245,7 +249,8 @@ jobs:
           fi
           cd apps/web
           # Same Playwright artifact guard as every other producer step, so
-          # no reviewed exemption is needed for this step.
+          # no reviewed exemption is needed for this step. Markdown evidence is
+          # allowed (scanned and redacted) via the step env above.
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
             pnpm exec playwright test \
               tests/product-screenshots/marketing-routes.spec.ts \

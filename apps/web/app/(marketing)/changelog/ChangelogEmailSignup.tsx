@@ -56,13 +56,24 @@ export function ChangelogEmailSignup({
   initialEmail = '',
   copy = DEFAULT_COPY,
   marketingSection = false,
+  deferSecurityCheck = false,
 }: {
   readonly source?: string;
   readonly initialEmail?: string;
   readonly copy?: ChangelogEmailSignupCopy;
   readonly marketingSection?: boolean;
+  /**
+   * Load the Cloudflare check only after the visitor touches the form.
+   * Footer signups sit on pages whose job is something else (pricing, claim
+   * funnel); loading a vendor iframe that polls forever on every view costs
+   * LCP/INP and keeps the page from ever reaching network idle.
+   */
+  readonly deferSecurityCheck?: boolean;
 }) {
   const formId = useId();
+  const [securityCheckArmed, setSecurityCheckArmed] = useState(
+    !deferSecurityCheck
+  );
   const statusRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState(initialEmail);
   const [submittedEmail, setSubmittedEmail] = useState('');
@@ -351,6 +362,8 @@ export function ChangelogEmailSignup({
       <div className='mt-4 grid'>
         <form
           onSubmit={handleSubmit}
+          onFocusCapture={() => setSecurityCheckArmed(true)}
+          onPointerDownCapture={() => setSecurityCheckArmed(true)}
           data-testid='changelog-subscribe-form'
           aria-hidden={settled || undefined}
           inert={settled}
@@ -407,7 +420,7 @@ export function ChangelogEmailSignup({
               {copy.buttonLabel}
             </Button>
           </div>
-          {status === 'subscribed' ? null : (
+          {status === 'subscribed' || !securityCheckArmed ? null : (
             <InvisibleTurnstile
               onToken={setTurnstileToken}
               onStateChange={handleTurnstileStateChange}

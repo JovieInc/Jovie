@@ -69,9 +69,13 @@ export async function auditPublicProfileLayout(page: Page) {
       for (const compact of compactSurfaces) {
         if (isPhoneColumn(compact)) {
           const rect = compact.getBoundingClientRect();
+          // >= 1024px the flag-off profile is the two-column desktop
+          // composition; below it the phone column.
           const maxWidth = Number.parseFloat(
             getComputedStyle(document.documentElement).getPropertyValue(
-              '--profile-shell-max-width'
+              window.innerWidth >= 1024
+                ? '--profile-desktop-max-width'
+                : '--profile-shell-max-width'
             )
           );
           const viewportWidth = document.documentElement.clientWidth;
