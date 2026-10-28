@@ -18,5 +18,8 @@ Read in this order:
 10. [`RELEASE_CHANNELS.md`](./RELEASE_CHANNELS.md) — canonical release-channel
    vocabulary (Stable / Beta / Nightly), platform mappings, and Settings IA;
    machine-readable contract in `packages/release-channel-contracts`.
+11. [`CAPACITY.md`](./CAPACITY.md) — generated agent capacity: plan, price, remaining
+   quota or credits, policy and delegation cost per provider. Source of truth is
+   `ops/registry/capacity.json`; every agent reads it before routing or delegating.
 
 Operational files (`CLAUDE.md`, `.claude/rules/*`, `docs/*`, skills, scripts, workflows) implement this canon. If they conflict, update the lower-level file or escalate to Tim.
