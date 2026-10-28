@@ -10,6 +10,10 @@
  *
  * Budgets live in `performance-entry-budgets.json`. Ratchet `lcpMs` down when
  * the measured median is comfortably under it; never loosen it.
+ *
+ * ratchet: JOV-9611 - the claim-link route sits at a temporary 7000ms baseline
+ * (Tim's launch-first decision, 2026-10-28) because first paint on
+ * /[handle]?claim=1 is intermittently delayed 1-2s; target is back to 4000ms.
  */
 import { spawnSync } from 'node:child_process';
 import {
