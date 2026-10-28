@@ -1,0 +1,81 @@
+{
+  "schema": "jovie.approved-people/v1",
+  "people": [
+    {
+      "id": "tim-white",
+      "name": "Tim White",
+      "consent": "self",
+      "provenance": "Tim White own photographs, supplied by him for Jovie use",
+      "source": "own-photo"
+    }
+  ],
+  "images": [
+    {
+      "path": "apps/web/public/images/avatars/tim-white.jpg",
+      "person": "tim-white",
+      "routes": [
+        "/artist-profiles",
+        "/product",
+        "/about",
+        "/smart-links",
+        "/pricing"
+      ]
+    },
+    {
+      "path": "apps/web/public/images/avatars/tim-white-founder.jpg",
+      "person": "tim-white",
+      "routes": [
+        "/artist-profiles",
+        "/product",
+        "/about",
+        "/smart-links",
+        "/pricing"
+      ]
+    },
+    {
+      "path": "apps/web/public/images/avatars/tim-white.svg",
+      "person": "tim-white",
+      "routes": [
+        "/artist-profiles",
+        "/product",
+        "/about",
+        "/smart-links",
+        "/pricing"
+      ]
+    },
+    {
+      "path": "apps/web/public/images/hero/tim-profile.avif",
+      "person": "tim-white",
+      "routes": [
+        "/artist-profiles",
+        "/product",
+        "/about",
+        "/smart-links",
+        "/pricing"
+      ]
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/tim-white-dont-look-down-card.jpg",
+      "person": "tim-white",
+      "routes": [
+        "/artist-profiles",
+        "/product",
+        "/about",
+        "/smart-links",
+        "/pricing"
+      ]
+    },
+    {
+      "path": "apps/web/public/images/mock-profile/tim-white-dont-look-down-hero.jpg",
+      "person": "tim-white",
+      "routes": [
+        "/artist-profiles",
+        "/product",
+        "/about",
+        "/smart-links",
+        "/pricing"
+      ]
+    }
+  ],
+  "routeRule": "An image may render only on the routes listed for it. / is never listed: no real person on the homepage (Tim, 2026-10-26)."
+}

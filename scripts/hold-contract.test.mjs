@@ -236,19 +236,143 @@ test('the enroll workflow runs the trusted hold contract with a Jovie Bot token'
   );
 });
 
-test('every stop label is held to the contract, each on its own labeled time', () => {
+function runHoldSweep(pr, now) {
+  const writes = [];
+  const log = console.log;
+  console.log = () => {};
+  try {
+    const results = sweepHolds({
+      now,
+      dryRun: false,
+      io: {
+        listHeld: () => [pr.number ?? 9],
+        read: () => pr,
+        comment: (...args) => writes.push(['comment', ...args]),
+        unlabel: (...args) => writes.push(['unlabel', ...args]),
+      },
+    });
+    return { results, writes };
+  } finally {
+    console.log = log;
+  }
+}
+
+/** @type {Array<[number, string, string, string]>} */
+const historicalHumanHolds = [
+  [
+    22407,
+    '2026-10-24T22:03:14Z',
+    '2026-10-24T22:03:51Z',
+    '2026-10-25T22:05:26Z',
+  ],
+  [
+    22444,
+    '2026-10-24T22:03:18Z',
+    '2026-10-24T22:03:57Z',
+    '2026-10-25T22:05:23Z',
+  ],
+];
+for (const [
+  number,
+  labeledAt,
+  commentedAt,
+  removedAt,
+] of historicalHumanHolds) {
+  test(`preserves the explicit human disposition recorded on #${number}`, () => {
+    // Complete GitHub histories show itstimwhite applying tim-hold, then
+    // jovie-bot removing it after 24h despite this unexpired instruction.
+    const pr = {
+      number,
+      state: 'OPEN',
+      headRefOid: HEAD,
+      labels: { nodes: [{ name: 'tim-hold' }] },
+      timelineItems: {
+        nodes: [
+          {
+            createdAt: labeledAt,
+            actor: { login: 'itstimwhite' },
+            label: { name: 'tim-hold' },
+          },
+        ],
+      },
+      comments: {
+        nodes: [
+          {
+            createdAt: commentedAt,
+            author: { login: 'itstimwhite' },
+            body: 'Preserve this hold until its authorized disposition is explicitly resolved.',
+          },
+        ],
+      },
+    };
+    const { results, writes } = runHoldSweep(pr, Date.parse(removedAt));
+    assert.deepEqual(writes, []);
+    assert.deepEqual(
+      results.map(row => [row.label, row.action]),
+      [['tim-hold', 'keep']]
+    );
+  });
+}
+
+for (const label of ['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge']) {
+  for (const mode of ['ownerless', 'expired', 'head-changed']) {
+    test(`${label} remains human-owned after ${mode} machine release conditions`, () => {
+      const pr = {
+        state: 'OPEN',
+        headRefOid: mode === 'head-changed' ? 'b'.repeat(40) : HEAD,
+        labels: { nodes: [{ name: label }] },
+        timelineItems: {
+          nodes: [{ createdAt: LABELED, label: { name: label } }],
+        },
+        comments: {
+          nodes:
+            mode === 'ownerless' ? [] : [comment({ owner: 'gem', head: HEAD })],
+        },
+      };
+      const now =
+        T0 + (mode === 'head-changed' ? 2 * HOUR : MAX_HOLD_MS + HOUR);
+      const { results, writes } = runHoldSweep(pr, now);
+      assert.deepEqual(writes, []);
+      assert.equal(results[0].action, 'keep');
+    });
+  }
+}
+
+test('a human hold preserves coexisting stops even when its timeline evidence is missing', () => {
+  const labels = ['hold', 'gated', 'incident', 'tim-hold', 'queue-deferred'];
+  const pr = {
+    state: 'OPEN',
+    headRefOid: 'b'.repeat(40),
+    labels: { nodes: labels.map(name => ({ name })) },
+    timelineItems: {
+      nodes: labels
+        .filter(name => name !== 'tim-hold')
+        .map(name => ({ createdAt: LABELED, label: { name } })),
+    },
+    comments: { nodes: [comment({ owner: 'gem', head: HEAD })] },
+  };
+  const { results, writes } = runHoldSweep(pr, T0 + MAX_HOLD_MS + HOUR);
+  assert.deepEqual(writes, []);
+  assert.equal(results.length, labels.length);
+  assert.ok(results.every(row => row.action === 'keep'));
+});
+
+test('machine stop labels follow their own labeled time', () => {
   // #21014 / #20953: `gated` applied 2026-10-08 with no owner or expiry sat
   // outside the contract and blocked admission indefinitely.
   const pr = {
     state: 'OPEN',
     headRefOid: HEAD,
     labels: {
-      nodes: [{ name: 'gated' }, { name: 'tim:hold' }, { name: 'ui' }],
+      nodes: [{ name: 'gated' }, { name: 'queue-deferred' }, { name: 'ui' }],
     },
     timelineItems: {
       nodes: [
         { createdAt: LABELED, label: { name: 'gated' } },
-        { createdAt: '2026-10-09T10:00:00Z', label: { name: 'tim:hold' } },
+        {
+          createdAt: '2026-10-09T10:00:00Z',
+          label: { name: 'queue-deferred' },
+        },
       ],
     },
     comments: { nodes: [] },
@@ -271,7 +395,7 @@ test('every stop label is held to the contract, each on its own labeled time', (
       results.map(r => [r.label, r.action, r.reason]),
       [
         ['gated', 'release', 'ownerless'],
-        ['tim:hold', 'keep', 'ownerless-grace'],
+        ['queue-deferred', 'keep', 'ownerless-grace'],
       ]
     );
   } finally {

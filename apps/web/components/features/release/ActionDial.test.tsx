@@ -1,8 +1,17 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import { useState } from 'react';
-import { renderToString } from 'react-dom/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ActionDial, type ActionDialOption } from './ActionDial';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  ActionDial,
+  type ActionDialOption,
+  DIAL_HINT_SEEN_KEY,
+} from './ActionDial';
 
 const OPTIONS: ActionDialOption[] = [
   {
@@ -25,38 +34,69 @@ const OPTIONS: ActionDialOption[] = [
   },
 ];
 
-function dispatchTouchPointer(
-  target: HTMLElement,
+const MANY: ActionDialOption[] = Array.from({ length: 100 }, (_, i) => ({
+  id: `d${i + 1}`,
+  label: `Dest ${String(i + 1).padStart(3, '0')}`,
+  href: `https://example.com/${i + 1}`,
+  icon: <span>icon {i + 1}</span>,
+}));
+
+function touch(
+  target: Element,
   type: string,
-  clientY: number
+  clientY: number,
+  timeStamp: number
 ) {
   const event = new MouseEvent(type, { bubbles: true, clientY });
   Object.defineProperties(event, {
     pointerId: { value: 1 },
     pointerType: { value: 'touch' },
+    // React treats a 0 timeStamp as missing, so offset the fake clock.
+    timeStamp: { value: timeStamp + 1000 },
   });
   fireEvent(target, event);
 }
 
 function Fixture({
+  options = OPTIONS,
   onSelect = vi.fn(),
+  onActivate,
 }: {
+  readonly options?: ActionDialOption[];
   readonly onSelect?: (id: string) => void;
+  readonly onActivate?: (id: string) => void;
 }) {
-  const [selectedId, setSelectedId] = useState('spotify');
+  const [selectedId, setSelectedId] = useState(options[0]!.id);
   return (
     <ActionDial
-      options={OPTIONS}
+      options={options}
       selectedId={selectedId}
       onSelect={id => {
         setSelectedId(id);
         onSelect(id);
       }}
+      onActivate={onActivate}
       actionLabel='Stream Now'
       groupLabel='Choose a streaming service'
     />
   );
 }
+
+function mockMotion(reduced: boolean) {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockImplementation((query: string) => ({
+      matches: reduced && query.includes('reduce'),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }))
+  );
+}
+
+beforeEach(() => {
+  localStorage.clear();
+});
 
 afterEach(() => {
   vi.useRealTimers();
@@ -64,370 +104,334 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('ActionDial', () => {
-  it('brings the other icon from above for a downward two-provider swipe', () => {
-    render(
-      <ActionDial
-        options={OPTIONS.slice(0, 2)}
-        selectedId='spotify'
-        onSelect={vi.fn()}
-        actionLabel='Stream Now'
-        groupLabel='Choose a streaming service'
-      />
-    );
-    const dial = screen.getByRole('group', {
+const status = () => screen.getByRole('status').textContent;
+const link = () => screen.getByRole('link', { name: /^Stream Now with/ });
+
+describe('ActionDial semantics', () => {
+  it('is a labelled listbox with positional options and an activedescendant', () => {
+    render(<Fixture options={MANY} />);
+    const listbox = screen.getByRole('listbox', {
       name: 'Choose a streaming service',
     });
-    expect(dial.querySelector('div')).toHaveClass('h-53', 'min-h-53');
-    dispatchTouchPointer(dial, 'pointerdown', 120);
-    dispatchTouchPointer(dial, 'pointermove', 154);
-    expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
-      transform: 'translateY(-50%)',
-    });
-  });
-  it('settles the adjacent icon shown during a long swipe', () => {
-    vi.useFakeTimers();
-    const onSelect = vi.fn();
-    render(<Fixture onSelect={onSelect} />);
-    const dial = screen.getByRole('group', {
-      name: 'Choose a streaming service',
-    });
-    dispatchTouchPointer(dial, 'pointerdown', 220);
-    dispatchTouchPointer(dial, 'pointermove', 80);
-    dispatchTouchPointer(dial, 'pointerup', 80);
-    act(() => vi.advanceTimersByTime(180));
-    expect(onSelect).toHaveBeenCalledWith('apple');
-  });
-  it('keeps a lone provider icon fixed and omits an iconless active slot', () => {
-    const view = render(
-      <ActionDial
-        options={OPTIONS.slice(0, 1)}
-        selectedId='spotify'
-        onSelect={vi.fn()}
-        actionLabel='Stream Now'
-        groupLabel='Choose a streaming service'
-      />
-    );
+    const selected = screen.getByRole('option', { selected: true });
+    expect(selected).toHaveAttribute('aria-posinset', '1');
+    expect(selected).toHaveAttribute('aria-setsize', '100');
+    expect(listbox).toHaveAttribute('aria-activedescendant', selected.id);
+    expect(listbox).toHaveAttribute('tabindex', '0');
     expect(
-      screen.queryByTestId('action-dial-icon-track')
-    ).not.toBeInTheDocument();
-    view.rerender(
-      <ActionDial
-        options={[OPTIONS[0]!, { id: 'audius', label: 'Audius' }]}
-        selectedId='audius'
-        onSelect={vi.fn()}
-        actionLabel='Stream Now'
-        groupLabel='Choose a streaming service'
-      />
-    );
+      screen.getByRole('group', { name: 'Choose a streaming service' })
+    ).toBeInTheDocument();
+  });
+  it('windows 100 options to a handful of rows', () => {
+    render(<Fixture options={MANY} />);
+    const rows = screen.getAllByRole('option');
+    expect(rows.length).toBeLessThanOrEqual(11);
+    expect(rows.length).toBeGreaterThanOrEqual(6);
+    expect(screen.getByTestId('action-dial-icon-d1')).toBeInTheDocument();
     expect(
-      screen.queryByTestId('action-dial-icon-track')
+      screen.queryByTestId('action-dial-icon-d50')
     ).not.toBeInTheDocument();
   });
-  it('keeps a fixed action while an adjacent tap settles the chosen service', () => {
-    vi.useFakeTimers();
-    const onSelect = vi.fn();
-    render(<Fixture onSelect={onSelect} />);
-
-    expect(
-      screen.getByRole('link', { name: 'Stream Now with Spotify' })
-    ).toHaveAttribute('href', 'https://open.spotify.com/song');
-    fireEvent.click(screen.getByRole('button', { name: 'Select Apple Music' }));
-    expect(onSelect).not.toHaveBeenCalled();
-    act(() => vi.advanceTimersByTime(180));
-
-    expect(onSelect).toHaveBeenCalledWith('apple');
-    expect(
-      screen.getByRole('link', { name: 'Stream Now with Apple Music' })
-    ).toHaveAttribute('href', 'https://music.apple.com/song');
+  it('announces the settled selection politely', async () => {
+    mockMotion(true);
+    render(<Fixture />);
+    expect(status()).toBe('Spotify selected');
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' });
+    await waitFor(() => expect(status()).toBe('Apple Music selected'));
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
   });
+  it('keeps the Stream Now link on the centered service', async () => {
+    mockMotion(true);
+    render(<Fixture />);
+    expect(link()).toHaveAttribute('href', 'https://open.spotify.com/song');
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'End' });
+    await waitFor(() =>
+      expect(link()).toHaveAttribute('href', 'https://deezer.com/song')
+    );
+    expect(link()).toHaveAttribute('aria-label', 'Stream Now with Deezer');
+  });
+});
 
-  it('supports keyboard choice and triggers selection haptic on the user gesture', () => {
-    vi.useFakeTimers();
+describe('ActionDial keyboard', () => {
+  it('moves with arrows, Home, End and paging, clamped at the ends', async () => {
+    mockMotion(true);
+    const onSelect = vi.fn();
+    render(<Fixture options={MANY} onSelect={onSelect} />);
+    const listbox = screen.getByRole('listbox');
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' });
+    expect(onSelect).toHaveBeenLastCalledWith('d2');
+    fireEvent.keyDown(listbox, { key: 'ArrowUp' });
+    expect(onSelect).toHaveBeenLastCalledWith('d1');
+    fireEvent.keyDown(listbox, { key: 'ArrowUp' });
+    expect(link()).toHaveAttribute('href', 'https://example.com/1');
+    fireEvent.keyDown(listbox, { key: 'PageDown' });
+    expect(onSelect).toHaveBeenLastCalledWith('d6');
+    fireEvent.keyDown(listbox, { key: 'PageUp' });
+    expect(onSelect).toHaveBeenLastCalledWith('d1');
+    fireEvent.keyDown(listbox, { key: 'End' });
+    expect(onSelect).toHaveBeenLastCalledWith('d100');
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' });
+    expect(onSelect).toHaveBeenLastCalledWith('d100');
+    fireEvent.keyDown(listbox, { key: 'Home' });
+    expect(onSelect).toHaveBeenLastCalledWith('d1');
+  });
+  it('ticks the selection haptic for each item crossed', async () => {
+    mockMotion(true);
     const vibrate = vi.fn();
     Object.defineProperty(navigator, 'vibrate', {
       configurable: true,
       value: vibrate,
     });
-    const onSelect = vi.fn();
-    render(<Fixture onSelect={onSelect} />);
-
-    fireEvent.keyDown(
-      screen.getByRole('group', { name: 'Choose a streaming service' }),
-      {
-        key: 'ArrowDown',
-      }
-    );
+    render(<Fixture />);
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' });
     expect(vibrate).toHaveBeenCalledWith([5]);
-    act(() => vi.advanceTimersByTime(180));
-    expect(onSelect).toHaveBeenCalledWith('apple');
   });
+});
 
-  it('swipes upward to the next service without activating the outgoing link', () => {
-    vi.useFakeTimers();
-    const onSelect = vi.fn();
-    render(<Fixture onSelect={onSelect} />);
-    const dial = screen.getByRole('group', {
-      name: 'Choose a streaming service',
-    });
-    dispatchTouchPointer(dial, 'pointerdown', 120);
-    dispatchTouchPointer(dial, 'pointermove', 60);
-    dispatchTouchPointer(dial, 'pointerup', 60);
-    act(() => vi.advanceTimersByTime(180));
-    expect(onSelect).toHaveBeenCalledWith('apple');
-  });
-
-  it('couples both CTA icons to touch drag progress and reverses without desync', () => {
-    render(<Fixture />);
-    const dial = screen.getByRole('group', {
-      name: 'Choose a streaming service',
-    });
-    const spotify = screen.getByTestId('action-dial-icon-spotify');
-    const apple = screen.getByTestId('action-dial-icon-apple');
-
-    dispatchTouchPointer(dial, 'pointerdown', 120);
-    dispatchTouchPointer(dial, 'pointermove', 86);
-    expect(spotify).toHaveStyle({ transform: 'translateY(-50%)' });
-    expect(apple).toHaveStyle({ transform: 'translateY(50%)' });
-
-    dispatchTouchPointer(dial, 'pointermove', 103);
-    expect(spotify).toHaveStyle({ transform: 'translateY(-25%)' });
-    expect(apple).toHaveStyle({ transform: 'translateY(75%)' });
-
-    dispatchTouchPointer(dial, 'pointerup', 120);
-    expect(spotify).toHaveStyle({ transform: 'translateY(0%)' });
-    expect(apple).toHaveStyle({ transform: 'translateY(100%)' });
-  });
-
-  it('settles a successful drag from its current CTA icon positions', () => {
-    vi.useFakeTimers();
-    render(<Fixture />);
-    const dial = screen.getByRole('group', {
-      name: 'Choose a streaming service',
-    });
-
-    dispatchTouchPointer(dial, 'pointerdown', 120);
-    dispatchTouchPointer(dial, 'pointermove', 60);
-    const progress = (id: string) =>
-      Number(
-        screen
-          .getByTestId(`action-dial-icon-${id}`)
-          .style.transform.match(/translateY\(([-\d.]+)%\)/)?.[1]
-      );
-    expect(progress('spotify')).toBeCloseTo(-88.23529411764706, 10);
-    expect(progress('apple')).toBeCloseTo(11.764705882352942, 10);
-
-    dispatchTouchPointer(dial, 'pointerup', 60);
-    expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
-      transform: 'translateY(-100%)',
-    });
-    expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
-      transform: 'translateY(0%)',
-    });
-  });
-
-  it.each([103, 120])(
-    'returns a partial row drag ending at %i without selecting the tapped row',
-    endY => {
-      vi.useFakeTimers();
-      const onSelect = vi.fn();
-      render(<Fixture onSelect={onSelect} />);
-      const row = screen.getByRole('button', { name: 'Select Apple Music' });
-      dispatchTouchPointer(row, 'pointerdown', 120);
-      dispatchTouchPointer(row, 'pointermove', 103);
-      dispatchTouchPointer(row, 'pointermove', endY);
-      dispatchTouchPointer(row, 'pointerup', endY);
-      expect(screen.getByTestId('action-dial-icon-spotify')).not.toHaveClass(
-        'transition-none'
-      );
-      expect(screen.getByTestId('action-dial-icon-apple')).not.toHaveClass(
-        'transition-none'
-      );
-      fireEvent.click(row);
-      act(() => vi.advanceTimersByTime(180));
-
-      expect(onSelect).not.toHaveBeenCalled();
-      expect(
-        screen.getByRole('link', { name: 'Stream Now with Spotify' })
-      ).toBeInTheDocument();
-      expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
-        transform: 'translateY(0%)',
-      });
-    }
-  );
-
-  it('returns a reversed two-provider row drag on its incoming side', () => {
-    vi.useFakeTimers();
-    const onSelect = vi.fn();
-    render(
-      <ActionDial
-        options={OPTIONS.slice(0, 2)}
-        selectedId='spotify'
-        onSelect={onSelect}
-        actionLabel='Stream Now'
-        groupLabel='Choose a streaming service'
-      />
-    );
-    const row = screen.getByRole('button', { name: 'Select Apple Music' });
-    dispatchTouchPointer(row, 'pointerdown', 120);
-    dispatchTouchPointer(row, 'pointermove', 137);
-    expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
-      transform: 'translateY(-75%)',
-    });
-    // A release can return to the origin without delivering another move.
-    dispatchTouchPointer(row, 'pointerup', 120);
-    expect(screen.getByTestId('action-dial-icon-apple')).toHaveStyle({
-      transform: 'translateY(-100%)',
-    });
-    fireEvent.click(row);
-    act(() => vi.advanceTimersByTime(180));
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole('link', { name: 'Stream Now with Spotify' })
-    ).toBeInTheDocument();
-  });
-
-  it('rebases the hidden third icon without sweeping it through the CTA', () => {
-    render(<Fixture />);
-    const dial = screen.getByTestId('action-dial');
-    dispatchTouchPointer(dial, 'pointerdown', 120);
-    dispatchTouchPointer(dial, 'pointermove', 86);
-    dispatchTouchPointer(dial, 'pointerup', 86);
-
-    expect(screen.getByTestId('action-dial-icon-deezer')).toHaveClass(
-      'transition-none'
-    );
-    expect(screen.getByTestId('action-dial-icon-spotify')).not.toHaveClass(
-      'transition-none'
-    );
-    expect(screen.getByTestId('action-dial-icon-apple')).not.toHaveClass(
-      'transition-none'
-    );
-  });
-
-  it('returns a canceled row drag without persisting a new provider', () => {
-    vi.useFakeTimers();
-    const onSelect = vi.fn();
-    render(<Fixture onSelect={onSelect} />);
-    const row = screen.getByRole('button', { name: 'Select Apple Music' });
-    dispatchTouchPointer(row, 'pointerdown', 120);
-    dispatchTouchPointer(row, 'pointermove', 86);
-    dispatchTouchPointer(row, 'pointercancel', 86);
-    act(() => vi.advanceTimersByTime(180));
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
-      transform: 'translateY(0%)',
-    });
-  });
-
-  it('keeps the final provider when a reverse swipe interrupts settling', () => {
-    vi.useFakeTimers();
+describe('ActionDial touch', () => {
+  it('follows a slow drag and settles on the nearest item', async () => {
+    mockMotion(true);
     const onSelect = vi.fn();
     render(<Fixture onSelect={onSelect} />);
     const dial = screen.getByTestId('action-dial');
-    dispatchTouchPointer(dial, 'pointerdown', 120);
-    dispatchTouchPointer(dial, 'pointermove', 86);
-    dispatchTouchPointer(dial, 'pointerup', 86);
-    act(() => vi.advanceTimersByTime(30));
-    dispatchTouchPointer(dial, 'pointerdown', 120);
-    dispatchTouchPointer(dial, 'pointermove', 154);
-    dispatchTouchPointer(dial, 'pointerup', 154);
-    act(() => vi.advanceTimersByTime(180));
-
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(screen.getByTestId('action-dial-icon-spotify')).toHaveStyle({
-      transform: 'translateY(0%)',
-    });
-    expect(
-      screen.getByRole('link', { name: 'Stream Now with Spotify' })
-    ).toBeInTheDocument();
+    touch(dial, 'pointerdown', 200, 0);
+    touch(dial, 'pointermove', 170, 100);
+    touch(dial, 'pointermove', 140, 200);
+    expect(Number(dial.getAttribute('data-position'))).toBeCloseTo(60 / 56, 2);
+    touch(dial, 'pointermove', 138, 500);
+    touch(dial, 'pointerup', 138, 600);
+    expect(onSelect).toHaveBeenCalledWith('apple');
+    expect(dial.getAttribute('data-position')).toBe('1');
   });
-
-  it('keeps reduced-motion icon changes discrete', () => {
-    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
+  it('flings far through a long list', () => {
+    mockMotion(true);
+    const onSelect = vi.fn();
+    render(<Fixture options={MANY} onSelect={onSelect} />);
+    const dial = screen.getByTestId('action-dial');
+    touch(dial, 'pointerdown', 200, 0);
+    for (let i = 1; i <= 8; i++)
+      touch(dial, 'pointermove', 200 - i * 20, i * 10);
+    touch(dial, 'pointerup', 40, 82);
+    const id = onSelect.mock.calls.at(-1)?.[0] as string;
+    expect(Number(id.slice(1))).toBeGreaterThan(10);
+  });
+  it('rubber-bands past the first item and returns', () => {
+    mockMotion(true);
     const onSelect = vi.fn();
     render(<Fixture onSelect={onSelect} />);
+    const dial = screen.getByTestId('action-dial');
+    touch(dial, 'pointerdown', 100, 0);
+    touch(dial, 'pointermove', 300, 100);
+    const shown = Number(dial.getAttribute('data-position'));
+    expect(shown).toBeLessThan(0);
+    expect(shown).toBeGreaterThan(-2);
+    touch(dial, 'pointermove', 300, 400);
+    touch(dial, 'pointerup', 300, 500);
+    expect(dial.getAttribute('data-position')).toBe('0');
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+  it('stops momentum on touch and does not activate what it lands on', async () => {
+    const onActivate = vi.fn();
+    mockMotion(false);
+    render(<Fixture options={MANY} onActivate={onActivate} />);
+    const dial = screen.getByTestId('action-dial');
+    touch(dial, 'pointerdown', 200, 0);
+    for (let i = 1; i <= 8; i++)
+      touch(dial, 'pointermove', 200 - i * 20, i * 10);
+    touch(dial, 'pointerup', 40, 82);
+    await waitFor(() =>
+      expect(dial.getAttribute('data-state')).toBe('release')
+    );
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 120));
+    });
+    touch(dial, 'pointerdown', 150, performance.now() - 1000);
+    const frozen = dial.getAttribute('data-position');
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 150));
+    });
+    expect(dial.getAttribute('data-position')).toBe(frozen);
+    expect(dial.getAttribute('data-state')).toBe('drag');
+    touch(dial, 'pointerup', 150, performance.now() - 1000);
+    fireEvent.click(link());
+    expect(onActivate).not.toHaveBeenCalled();
+  });
+  it('selects an adjacent row on tap', async () => {
+    mockMotion(true);
+    const onSelect = vi.fn();
+    render(<Fixture onSelect={onSelect} />);
+    fireEvent.click(screen.getByRole('option', { name: 'Apple Music' }));
+    expect(onSelect).toHaveBeenCalledWith('apple');
+  });
+  it('activates the centered service from the Stream Now link', () => {
+    mockMotion(true);
+    const onActivate = vi.fn();
+    render(<Fixture onActivate={onActivate} />);
+    fireEvent.click(link());
+    expect(onActivate).toHaveBeenCalledWith('spotify');
+  });
+  it('lets a drag begin on the Stream Now link without activating it', () => {
+    mockMotion(true);
+    const onActivate = vi.fn();
+    render(<Fixture onActivate={onActivate} />);
+    const dial = screen.getByTestId('action-dial');
+    touch(link(), 'pointerdown', 110, 0);
+    touch(link(), 'pointermove', 50, 100);
+    touch(link(), 'pointerup', 50, 200);
+    fireEvent.click(link());
+    expect(onActivate).not.toHaveBeenCalled();
+    expect(dial.getAttribute('data-position')).not.toBe('0');
+  });
+});
 
+describe('ActionDial wheel', () => {
+  it('registers a non-passive wheel listener and steps one item per notch', () => {
+    mockMotion(true);
+    const add = vi.spyOn(HTMLElement.prototype, 'addEventListener');
+    const onSelect = vi.fn();
+    render(<Fixture options={MANY} onSelect={onSelect} />);
+    const calls = add.mock.calls.filter(([type]) => type === 'wheel');
+    expect(
+      calls.some(
+        call =>
+          (call[2] as AddEventListenerOptions | undefined)?.passive === false
+      )
+    ).toBe(true);
+    const dial = screen.getByTestId('action-dial');
+    const notch = new WheelEvent('wheel', {
+      deltaY: 100,
+      bubbles: true,
+      cancelable: true,
+    });
+    dial.dispatchEvent(notch);
+    expect(notch.defaultPrevented).toBe(true);
+    expect(onSelect).toHaveBeenLastCalledWith('d2');
+  });
+});
+
+describe('ActionDial first-use hint', () => {
+  const hint = () => screen.getByTestId('action-dial-hint');
+
+  it('shows on first visit with a screen-reader description', async () => {
+    mockMotion(true);
+    render(<Fixture />);
+    await waitFor(() => expect(hint()).toHaveAttribute('data-visible', 'true'));
+    expect(screen.getByRole('listbox')).toHaveAccessibleDescription(
+      /Swipe to switch/
+    );
+    expect(hint()).toHaveAttribute('aria-hidden', 'true');
+  });
+  it('hides after keyboard use and stays hidden on a fresh mount', async () => {
+    mockMotion(true);
+    const first = render(<Fixture />);
+    await waitFor(() => expect(hint()).toHaveAttribute('data-visible', 'true'));
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' });
+    expect(hint()).toHaveAttribute('data-visible', 'false');
+    expect(localStorage.getItem(DIAL_HINT_SEEN_KEY)).toBe('1');
+    first.unmount();
+    render(<Fixture />);
+    await act(async () => {});
+    expect(hint()).toHaveAttribute('data-visible', 'false');
+    expect(screen.getByRole('listbox')).toHaveAccessibleDescription(
+      /Swipe to switch/
+    );
+  });
+  it('hides after a swipe', async () => {
+    mockMotion(true);
+    render(<Fixture />);
+    await waitFor(() => expect(hint()).toHaveAttribute('data-visible', 'true'));
+    const dial = screen.getByTestId('action-dial');
+    touch(dial, 'pointerdown', 200, 0);
+    touch(dial, 'pointermove', 190, 50);
+    expect(hint()).toHaveAttribute('data-visible', 'false');
+  });
+  it('is not retired by a plain tap on Stream Now', async () => {
+    mockMotion(true);
+    render(<Fixture />);
+    await waitFor(() => expect(hint()).toHaveAttribute('data-visible', 'true'));
+    fireEvent.click(link());
+    expect(hint()).toHaveAttribute('data-visible', 'true');
+  });
+  it('survives blocked storage', async () => {
+    mockMotion(true);
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    render(<Fixture />);
+    await waitFor(() => expect(hint()).toHaveAttribute('data-visible', 'true'));
+    fireEvent.keyDown(screen.getByRole('listbox'), { key: 'ArrowDown' });
+    expect(hint()).toHaveAttribute('data-visible', 'false');
+  });
+  it('plays one nudge on first view, none under reduced motion', async () => {
+    mockMotion(false);
+    const animate = vi.fn();
+    HTMLElement.prototype.animate = animate;
+    const first = render(<Fixture />);
+    await waitFor(() => expect(animate).toHaveBeenCalledTimes(1));
+    cleanupAnimate();
+    first.unmount();
+    localStorage.clear();
+    mockMotion(true);
+    const none = vi.fn();
+    HTMLElement.prototype.animate = none;
+    render(<Fixture />);
+    await waitFor(() => expect(hint()).toHaveAttribute('data-visible', 'true'));
+    expect(none).not.toHaveBeenCalled();
+    cleanupAnimate();
+  });
+});
+
+function cleanupAnimate() {
+  // @ts-expect-error jsdom has no Element.animate; restore that.
+  delete HTMLElement.prototype.animate;
+}
+
+describe('ActionDial edge cases', () => {
+  it('shows a lone service without a reel or listbox', () => {
+    render(<Fixture options={OPTIONS.slice(0, 1)} />);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('action-dial-icon-track')
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Spotify icon')).toBeInTheDocument();
-    const dial = screen.getByTestId('action-dial');
-    dispatchTouchPointer(dial, 'pointerdown', 120);
-    dispatchTouchPointer(dial, 'pointermove', 86);
-    expect(screen.getByText('Spotify icon')).toBeInTheDocument();
-    expect(onSelect).not.toHaveBeenCalled();
-    dispatchTouchPointer(dial, 'pointerup', 86);
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith('apple');
-    expect(screen.getByText('Apple icon')).toBeInTheDocument();
-  });
-
-  it('keeps server markup compatible with reduced-motion hydration', () => {
-    const markup = renderToString(<Fixture />);
-
-    expect(markup).not.toContain('action-dial-icon-track');
-    expect(markup).toContain('Spotify icon');
-  });
-
-  it('selects an adjacent row on a captured pointer tap', () => {
-    vi.useFakeTimers();
-    const onSelect = vi.fn();
-    render(<Fixture onSelect={onSelect} />);
-    const row = screen.getByRole('button', { name: 'Select Apple Music' });
-    const dispatchPointer = (type: string) => {
-      const event = new MouseEvent(type, { bubbles: true, clientY: 120 });
-      Object.defineProperties(event, {
-        pointerId: { value: 1 },
-        pointerType: { value: 'touch' },
-      });
-      fireEvent(row, event);
-    };
-    dispatchPointer('pointerdown');
-    dispatchPointer('pointerup');
-    act(() => vi.advanceTimersByTime(180));
-    expect(onSelect).toHaveBeenCalledWith('apple');
-  });
-
-  it('uses the compact frame for one method and disables Pay while it is unavailable', () => {
-    render(
-      <ActionDial
-        options={[{ id: 'stripe', label: 'Apple Pay / Card' }]}
-        selectedId='stripe'
-        onSelect={vi.fn()}
-        onActivate={vi.fn()}
-        actionLabel='Pay $5'
-        groupLabel='Choose a payment method'
-        disabled
-      />
-    );
-
-    const action = screen.getByRole('button', {
-      name: 'Pay $5 with Apple Pay / Card',
-    });
-    expect(action).toBeDisabled();
-    expect(action.className).toContain('top-3');
-    expect(action.className).not.toContain('top-20');
-    expect(action.parentElement).toHaveClass('h-19', 'min-h-19');
-    expect(action.parentElement?.className).not.toContain('h-53');
-  });
-
-  it('keeps the hint text on a token that clears image-contrast (JOV-INV-019)', () => {
-    render(
-      <ActionDial
-        options={[{ id: 'venmo', label: 'Venmo' }]}
-        selectedId='venmo'
-        onSelect={vi.fn()}
-        actionLabel='Continue'
-        groupLabel='Choose a payment method'
-        hint='Enter the amount in Venmo before sending.'
-      />
-    );
-
-    // text-muted-foreground (= text-secondary-token) measured 4.48:1 against
-    // a real photo background on the Pay drawer; text-primary-token clears
-    // it with margin.
+    expect(link()).toHaveAttribute('href', 'https://open.spotify.com/song');
     expect(
-      screen.getByText('Enter the amount in Venmo before sending.')
-    ).toHaveClass('text-primary-token');
+      screen.getByText('Swipe to switch. Your choice is remembered.')
+    ).toBeInTheDocument();
+  });
+  it('follows an externally changed selection without a haptic', async () => {
+    mockMotion(true);
+    const vibrate = vi.fn();
+    Object.defineProperty(navigator, 'vibrate', {
+      configurable: true,
+      value: vibrate,
+    });
+    const view = render(
+      <ActionDial
+        options={OPTIONS}
+        selectedId='spotify'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='G'
+      />
+    );
+    view.rerender(
+      <ActionDial
+        options={OPTIONS}
+        selectedId='deezer'
+        onSelect={vi.fn()}
+        actionLabel='Stream Now'
+        groupLabel='G'
+      />
+    );
+    await waitFor(() =>
+      expect(link()).toHaveAttribute('aria-label', 'Stream Now with Deezer')
+    );
+    expect(vibrate).not.toHaveBeenCalled();
+    expect(
+      screen.getByTestId('action-dial').getAttribute('data-position')
+    ).toBe('2');
   });
 });
