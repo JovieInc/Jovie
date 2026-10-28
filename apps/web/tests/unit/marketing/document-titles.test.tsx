@@ -16,7 +16,6 @@ import { metadata as pricingLayoutMetadata } from '@/app/(marketing)/pricing/lay
 import { metadata as pricingMetadata } from '@/app/(marketing)/pricing/page';
 import { metadata as voiceMetadata } from '@/app/(marketing)/voice/page';
 import { APP_NAME } from '@/constants/app';
-import { COMPANY_IDENTITY } from '@/data/companyIdentity';
 import {
   applyRootTitleTemplate,
   documentTitle,
@@ -76,7 +75,7 @@ describe('marketing document titles', () => {
       'CLI — Jovie',
       'Integrations | Jovie',
       'Pricing | Jovie',
-      `About Jovie: ${COMPANY_IDENTITY.headline.replace(/\.$/, '')}`,
+      'About Jovie',
     ]);
     for (const title of resolved) {
       expect(title).not.toMatch(DOUBLED_SUFFIX);

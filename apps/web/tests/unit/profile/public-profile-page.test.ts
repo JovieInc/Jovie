@@ -208,38 +208,38 @@ describe('Public Profile Page Logic', () => {
   );
 
   describe('public profile ISR boundary', () => {
-    sourceTest('scopes streamed loading to the base profile page', () => {
-      expect(
-        existsSync(path.join(WEB_ROOT, 'app/[username]/loading.tsx'))
-      ).toBe(false);
-      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-        '<Suspense fallback={<ProfileLoading />}>'
-      );
-    });
-
     sourceTest(
-      'resolves missing profiles before the streamed page boundary',
+      'renders the profile in the first HTML, with no streamed loading shell',
       () => {
-        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-          "import { notFound, permanentRedirect } from 'next/navigation'"
-        );
-        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-          'const profileResult = await getProfileAndLinks(username)'
-        );
-        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
-          "profileResult.status === 'not_found'"
-        );
-        expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
+        // A Suspense fallback buried the LCP artwork in a hidden segment that
+        // React reveals from a throttled script (claim-link LCP 1.7s-6.0s on
+        // the throttled-mobile entry gate, budget 4000ms).
         expect(
-          PUBLIC_PROFILE_PAGE_SOURCE.indexOf("status === 'not_found'")
-        ).toBeLessThan(
-          PUBLIC_PROFILE_PAGE_SOURCE.indexOf(
-            '<Suspense fallback={<ProfileLoading />}>'
-          )
-        );
-        expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+          existsSync(path.join(WEB_ROOT, 'app/[username]/loading.tsx'))
+        ).toBe(false);
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('<Suspense');
+        expect(PUBLIC_PROFILE_PAGE_SOURCE).not.toContain('ProfileLoading');
       }
     );
+
+    sourceTest('resolves missing profiles before rendering the page', () => {
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        "import { notFound, permanentRedirect } from 'next/navigation'"
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        'const profileResult = await getProfileAndLinks(username)'
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain(
+        "profileResult.status === 'not_found'"
+      );
+      expect(PUBLIC_PROFILE_PAGE_SOURCE).toContain('notFound()');
+      expect(
+        PUBLIC_PROFILE_PAGE_SOURCE.indexOf("status === 'not_found'")
+      ).toBeLessThan(
+        PUBLIC_PROFILE_PAGE_SOURCE.lastIndexOf('<ArtistPageContent')
+      );
+      expect(PUBLIC_PROFILE_LAYOUT_SOURCE).not.toContain('notFound()');
+    });
 
     sourceTest(
       'redirects or 404s opaque internal-ID profile URLs before rendering junk',

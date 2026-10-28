@@ -50,7 +50,13 @@ function commitFile(cwd, file, content, message) {
  * child (PR 11): P2 -> C1           (stacked on parent)
  * grandchild (PR 12): C1 -> G1      (stacked on child)
  */
-function fixture({ childConflicts = false, parentMerged = true } = {}) {
+function fixture({
+  childConflicts = false,
+  parentMerged = true,
+  activeClaim = '',
+  policyCheckout = false,
+  commentOverride = false,
+} = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'unstack-'));
   dirs.push(dir);
   const remote = join(dir, 'remote.git');
@@ -58,6 +64,27 @@ function fixture({ childConflicts = false, parentMerged = true } = {}) {
   git(dir, 'init', '-q', '--bare', '-b', 'main', remote);
   git(dir, 'clone', '-q', remote, work);
   git(work, 'checkout', '-q', '-b', 'main');
+  if (policyCheckout) {
+    const archive = execFileSync(
+      'git',
+      [
+        'archive',
+        'HEAD',
+        'scripts/lanes',
+        'scripts/apiclient',
+        'packages/api-client/providers.json',
+        'scripts/lib/gh-retry.sh',
+        'scripts/lib/upsert-pr-comment.sh',
+      ],
+      { cwd: repoRoot, maxBuffer: 8 * 1024 * 1024 }
+    );
+    execFileSync('tar', ['-x', '-C', work], { input: archive });
+    writeFileSync(
+      join(work, 'scripts/unstack-merged-parent.sh'),
+      readFileSync(script)
+    );
+    git(work, 'add', 'scripts', 'packages');
+  }
   commitFile(work, 'base.txt', 'base\n', 'base');
   git(work, 'push', '-q', 'origin', 'main');
 
@@ -66,7 +93,23 @@ function fixture({ childConflicts = false, parentMerged = true } = {}) {
   const parentTip = commitFile(work, 'parent.txt', 'p1\np2\n', 'P2');
   git(work, 'checkout', '-q', '-b', 'child');
   const childFile = childConflicts ? 'parent.txt' : 'child.txt';
-  const childSha = commitFile(work, childFile, 'child\n', 'C1');
+  let childSha = commitFile(work, childFile, 'child\n', 'C1');
+  if (policyCheckout) {
+    childSha = commitFile(
+      work,
+      'scripts/lanes/pr_events.py',
+      `from pathlib import Path\nPath(${JSON.stringify(join(dir, 'child-policy-executed'))}).write_text('unsafe')\nraise RuntimeError('child policy executed')\n`,
+      'child policy override'
+    );
+  }
+  if (commentOverride) {
+    childSha = commitFile(
+      work,
+      'scripts/lib/upsert-pr-comment.sh',
+      `#!/usr/bin/env bash\nprintf unsafe > '${join(dir, 'child-comment-executed')}'\n`,
+      'child comment override'
+    );
+  }
   git(work, 'checkout', '-q', '-b', 'grandchild');
   const grandSha = commitFile(work, 'grand.txt', 'g\n', 'G1');
 
@@ -101,6 +144,14 @@ function fixture({ childConflicts = false, parentMerged = true } = {}) {
       headRefOid: childSha,
       baseRefName: 'parent',
       labels: [],
+      comments: activeClaim
+        ? [
+            {
+              body: `🤖 lane claim kind=${activeClaim} sha=${childSha} host=gem at=${new Date().toISOString()}`,
+              user: { login: 'jovie-bot[bot]', type: 'Bot' },
+            },
+          ]
+        : [],
     },
     12: {
       number: 12,
@@ -139,6 +190,7 @@ for ((i=0; i<\${#args[@]}; i++)); do
 done
 emit() { if [[ -n "$jq_expr" ]]; then jq -r "$jq_expr"; else cat; fi; }
 if [[ "$1 $2" == "pr view" ]]; then
+  if [[ -f "$D/state-fault" ]]; then cat "$D/state-fault"; exit 0; fi
   jq -c --arg n "$3" '.[$n]' "$D/prs.json" | emit
 elif [[ "$1 $2" == "pr list" ]]; then
   base=""
@@ -149,15 +201,33 @@ elif [[ "$1 $2" == "pr list" ]]; then
 elif [[ "$1" == "api" && "$2" == *"pulls?state=closed"* ]]; then
   head="\${2#*head=}"; head="\${head#*:}"; head="\${head%%&*}"
   jq -c --arg h "$head" '.[$h] // []' "$D/closed.json" | emit
+elif [[ "$1" == "api" && "$*" == *"/comments"* ]]; then
+  if [[ -f "$D/claim-fault" ]]; then exit "$(cat "$D/claim-fault")"; fi
+  number=""
+  for arg in "$@"; do
+    if [[ "$arg" == *"/issues/"*"/comments"* ]]; then number="\${arg#*/issues/}"; number="\${number%%/*}"; fi
+    if [[ "$arg" == -i || "$arg" == --include ]]; then printf 'HTTP/2 200\\ncontent-type: application/json\\n\\n'; fi
+  done
+  jq -c --arg n "$number" '.[$n].comments // []' "$D/prs.json" | emit
 fi
 `
   );
   chmodSync(join(dir, 'gh'), 0o755);
-  return { dir, remote, work, parentTip, childSha, grandSha };
+  return {
+    dir,
+    remote,
+    work,
+    parentTip,
+    childSha,
+    grandSha,
+    script: policyCheckout
+      ? join(work, 'scripts/unstack-merged-parent.sh')
+      : script,
+  };
 }
 
 function run(fx, env = {}) {
-  return spawnSync('bash', [script], {
+  return spawnSync('bash', [fx.script], {
     cwd: fx.work,
     encoding: 'utf8',
     env: {
@@ -166,6 +236,10 @@ function run(fx, env = {}) {
       REPO: 'JovieInc/Jovie',
       CHILD_PR: '11',
       GH_RETRY_ATTEMPTS: '1',
+      GH_TOKEN: 'unstack-fixture-token',
+      GITHUB_TOKEN: '',
+      LANES_STATE: join(fx.dir, 'state'),
+      JOVIE_API_STATE_DIR: join(fx.dir, 'state'),
       GIT_AUTHOR_NAME: 't',
       GIT_AUTHOR_EMAIL: 't@example.com',
       GIT_COMMITTER_NAME: 't',
@@ -179,6 +253,22 @@ function remoteLog(fx, range) {
   return git(fx.remote, 'log', '--format=%s', range)
     .split('\n')
     .filter(Boolean);
+}
+
+function afterRebase(fx, body) {
+  const hook = join(fx.work, '.git/hooks/post-rewrite');
+  writeFileSync(
+    hook,
+    `#!/usr/bin/env bash\nset -euo pipefail\n[[ "$1" == rebase ]] || exit 0\n${body}\n`
+  );
+  chmodSync(hook, 0o755);
+}
+
+function changePrAfterRebase(fx, expression) {
+  afterRebase(
+    fx,
+    `jq '${expression}' '${fx.dir}/prs.json' > '${fx.dir}/next.json'\nmv '${fx.dir}/next.json' '${fx.dir}/prs.json'`
+  );
 }
 
 describe('unstack-merged-parent.sh', () => {
@@ -195,6 +285,16 @@ describe('unstack-merged-parent.sh', () => {
     expect(calls).toContain('pr edit 11 -R JovieInc/Jovie --base main');
     expect(calls).not.toContain('pr edit 12');
     expect(calls).not.toMatch(/merge .*--auto|pr close|pr ready/);
+    for (const number of [11, 12]) {
+      expect(
+        calls.split('\n').filter(line => line.startsWith(`pr view ${number} `))
+      ).toHaveLength(2);
+      expect(
+        calls
+          .split('\n')
+          .filter(line => line.includes(`/issues/${number}/comments?`))
+      ).toHaveLength(2);
+    }
   });
 
   it('leaves the stack alone when the parent closed without merging', () => {
@@ -212,6 +312,142 @@ describe('unstack-merged-parent.sh', () => {
     expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
     const calls = readFileSync(join(fx.dir, 'calls.log'), 'utf8');
     expect(calls).not.toContain('pr edit');
+  });
+
+  it.each(['fix', 'gate', 'adopt'])(
+    'leaves an exact-head %s claim with its incumbent writer',
+    kind => {
+      const fx = fixture({ activeClaim: kind });
+      const result = run(fx);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+      expect(git(fx.remote, 'rev-parse', 'grandchild')).toBe(fx.grandSha);
+      expect(readFileSync(join(fx.dir, 'calls.log'), 'utf8')).not.toContain(
+        'pr edit'
+      );
+    }
+  );
+
+  it.each(['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge'])(
+    'preserves %s applied after rebase but before publication',
+    label => {
+      const fx = fixture();
+      changePrAfterRebase(fx, `.["11"].labels = [{"name":"${label}"}]`);
+      const result = run(fx);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      const live = JSON.parse(readFileSync(join(fx.dir, 'prs.json'), 'utf8'));
+      expect(live[11].labels).toEqual([{ name: label }]);
+      expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+      expect(git(fx.remote, 'rev-parse', 'grandchild')).toBe(fx.grandSha);
+      expect(readFileSync(join(fx.dir, 'calls.log'), 'utf8')).not.toContain(
+        'pr edit'
+      );
+    }
+  );
+
+  it('refuses a new exact-head claim acquired during the local rebase', () => {
+    const fx = fixture();
+    const body = `🤖 lane claim kind=fix sha=${fx.childSha} host=gem at=${new Date().toISOString()}`;
+    changePrAfterRebase(
+      fx,
+      `.["11"].comments = [{"body":${JSON.stringify(body)}}]`
+    );
+    const result = run(fx);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+    expect(git(fx.remote, 'rev-parse', 'grandchild')).toBe(fx.grandSha);
+  });
+
+  it('does not treat another head or expired canonical claim as current custody', () => {
+    const fx = fixture();
+    const path = join(fx.dir, 'prs.json');
+    const prs = JSON.parse(readFileSync(path, 'utf8'));
+    prs[11].comments = [
+      {
+        body: `🤖 lane claim kind=fix sha=${'0'.repeat(40)} host=gem at=${new Date().toISOString()}`,
+      },
+      {
+        body: `🤖 lane claim kind=fix sha=${fx.childSha} host=gem at=2000-01-01T00:00:00Z`,
+      },
+    ];
+    writeFileSync(path, JSON.stringify(prs));
+    const result = run(fx);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(remoteLog(fx, 'main..child')).toEqual(['C1']);
+    expect(remoteLog(fx, 'child..grandchild')).toEqual(['G1']);
+  });
+
+  it('uses trusted committed policy after checking out child policy overrides', () => {
+    const fx = fixture({ policyCheckout: true });
+    changePrAfterRebase(fx, '.["11"].labels = [{"name":"hold:tim"}]');
+    const result = run(fx);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+    expect(() => readFileSync(join(fx.dir, 'child-policy-executed'))).toThrow(
+      /ENOENT/
+    );
+    expect(
+      readFileSync(join(fx.work, 'scripts/lanes/pr_events.py'), 'utf8')
+    ).toContain('child policy executed');
+  });
+
+  it.each([false, true])(
+    'uses the trusted comment helper after child checkout (conflict=%s)',
+    childConflicts => {
+      const fx = fixture({
+        policyCheckout: true,
+        commentOverride: true,
+        childConflicts,
+      });
+      const result = run(fx);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(() =>
+        readFileSync(join(fx.dir, 'child-comment-executed'))
+      ).toThrow(/ENOENT/);
+      expect(readFileSync(join(fx.dir, 'calls.log'), 'utf8')).toContain(
+        'pr comment 11 --body'
+      );
+      expect(git(fx.remote, 'rev-parse', 'child') === fx.childSha).toBe(
+        childConflicts
+      );
+    }
+  );
+
+  it.each([1, 75])(
+    'refuses unreadable or deferred claim evidence (exit %s)',
+    code => {
+      const fx = fixture();
+      writeFileSync(join(fx.dir, 'claim-fault'), String(code));
+      const result = run(fx);
+      expect(result.status, result.stdout + result.stderr).toBe(0);
+      expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+      expect(git(fx.remote, 'rev-parse', 'grandchild')).toBe(fx.grandSha);
+      expect(readFileSync(join(fx.dir, 'calls.log'), 'utf8')).not.toContain(
+        'pr edit'
+      );
+    }
+  );
+
+  it.each([
+    '.["11"].headRefOid = "0000000000000000000000000000000000000000"',
+    '.["11"].baseRefName = "new-parent"',
+    '.["11"].headRefName = "new-branch"',
+    'del(.["11"].labels)',
+  ])('refuses changed or incomplete publication identity: %s', expression => {
+    const fx = fixture();
+    changePrAfterRebase(fx, expression);
+    const result = run(fx);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+    expect(git(fx.remote, 'rev-parse', 'grandchild')).toBe(fx.grandSha);
+  });
+
+  it('fails closed when the final metadata response is unreadable', () => {
+    const fx = fixture();
+    afterRebase(fx, `printf 'not JSON' > '${fx.dir}/state-fault'`);
+    const result = run(fx);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
   });
 
   it('is idempotent: the retarget wake after a successful unstack is a no-op', () => {

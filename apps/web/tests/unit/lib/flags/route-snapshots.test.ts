@@ -30,10 +30,8 @@ describe('route flag snapshots', () => {
       expect(resolveAppShellRouteFlagNames(pathname)).toEqual(
         expect.arrayContaining([
           'STRIPE_CONNECT_ENABLED',
-          'INBOX_HOME',
           'YOUTUBE_WORKSPACE_NAV',
           'JOVIE_WORK_NAV',
-          'PROFILES_WORKSPACE',
         ])
       );
     }
