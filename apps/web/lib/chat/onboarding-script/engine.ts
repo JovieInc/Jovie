@@ -14,6 +14,7 @@ import {
   buildConfirmSpotifyArtistOutput,
   type OnboardingTurnState,
 } from '@/lib/chat/tools/onboarding-tool-impls';
+import { inferSegment } from '@/lib/creator/segments';
 import { loadScriptBank, pickFromBank } from './line-source';
 import { renderLine, type ScriptLine, type ScriptStepId } from './script';
 import {
@@ -483,8 +484,16 @@ export async function decideFallbackTurn(
   const sessionId = state.sessionId;
   // Seeds merged with nightly-promoted lines (DB failure degrades to seeds).
   const bank = await loadScriptBank();
+  // Segment from what the visitor has said so far (JOV-9679). Unknown stays
+  // unresolved and keeps the legacy copy until a signal arrives.
+  const segment = inferSegment({
+    onboardingAnswer: uiMessages
+      .filter(message => message.role === 'user')
+      .map(message => messageText(message))
+      .join(' '),
+  }).segment;
   const pick = (stepId: ScriptStepId): ScriptLine =>
-    pickFromBank(bank, stepId, sessionId);
+    pickFromBank(bank, stepId, sessionId, segment);
   const latest = lastUserMessage(uiMessages);
   const selectedArtistId = parseArtistSelection(latest);
   const latestEvent = latest

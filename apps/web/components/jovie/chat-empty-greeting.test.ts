@@ -178,3 +178,24 @@ describe('resolveChatEmptyStateInsight', () => {
     expect(action?.suggestion).not.toContain('gap');
   });
 });
+
+describe('resolveChatEmptyStateInsight segment gate (JOV-9679)', () => {
+  const insight = {
+    id: 'i1',
+    title: 'Release momentum',
+    insightType: 'release_momentum',
+    status: 'active',
+    actionSuggestion: 'Post an update',
+    expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+  } as unknown as Parameters<typeof resolveChatEmptyStateInsight>[0][number];
+
+  it('offers the release update to a musician and not to a comedian', () => {
+    expect(
+      resolveChatEmptyStateInsight([insight], Date.now(), 'musician')
+        ?.suggestion
+    ).toBe('Draft a release update');
+    expect(
+      resolveChatEmptyStateInsight([insight], Date.now(), 'comedian')
+    ).toBeNull();
+  });
+});

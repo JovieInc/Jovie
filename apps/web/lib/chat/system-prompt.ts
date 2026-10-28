@@ -1,4 +1,6 @@
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
+import { buildSegmentPromptSection } from '@/lib/creator/segment-registry';
+import { inferSegment, type ResolvedSegment } from '@/lib/creator/segments';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
 import { formatAmount } from '@/lib/utils/format-number';
@@ -127,8 +129,20 @@ export function buildSystemPromptParts(
       readonly label: string;
       readonly planRequired: string;
     }[];
+    /**
+     * Resolved creator segment (JOV-9679). Omitted: inferred from the bio,
+     * releases and music links already in this context.
+     */
+    segment?: ResolvedSegment;
   }
 ): SystemPromptParts {
+  const segment =
+    options?.segment ??
+    inferSegment({
+      bio: context.bio,
+      hasMusicCatalog: releases.length > 0 || context.hasMusicLinks,
+      platforms: context.hasMusicLinks ? ['spotify'] : [],
+    }).segment;
   const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
 ${buildPromptSecuritySection()}
 ## About This Artist
@@ -148,6 +162,8 @@ ${buildPromptSecuritySection()}
 ## Discography Context
 - **Total Releases:** ${releases.length}
 ${buildDiscographySection(releases)}
+
+${buildSegmentPromptSection(segment)}
 
 ## Tipping & Monetization
 - **Tip Link Clicks:** ${context.tippingStats.tipClicks}
