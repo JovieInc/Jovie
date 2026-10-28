@@ -20,6 +20,9 @@ import sys
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 SCHEMA = "jovie-factory-signal/v1"
 RECUR_DAYS = 3
@@ -49,7 +52,7 @@ def sentinel_signals(state: Path, now: datetime | None = None) -> list[dict]:
         if day not in days:
             days.append(day)
         del days[:-14]
-    path.write_text(json.dumps(seen))
+    atomic_write_text(path, json.dumps(seen))
     out = []
     for key, days in sorted(seen.items()):
         if key in alerts and key.split(":")[0] not in IGNORED_ALERTS and len(days) >= RECUR_DAYS:
@@ -158,7 +161,7 @@ def write(state: Path, signals: list[dict]) -> dict:
         path = directory / f"{signal['fingerprint']}.json"
         (kept if path.exists() else written).append(signal["fingerprint"])
         if not path.exists():
-            path.write_text(json.dumps(signal, indent=1))
+            atomic_write_text(path, json.dumps(signal, indent=1))
     return {"written": written, "alreadyPresent": kept}
 
 

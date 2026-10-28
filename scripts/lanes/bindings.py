@@ -41,6 +41,9 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 POLICY = Path(__file__).resolve().parent / "routing.json"
 REPAIR_STATES = frozenset({"BEHIND", "DIRTY"})
@@ -92,6 +95,11 @@ class Binding:
     review_state: str = "In Review"
     reserved_seats: int = 0       # guaranteed seats outside the provider census (isolation from Jovie)
     min_todo: int = 0             # Todo depth to hold regardless of seats (Backlog refill floor)
+    # Jovie PR repair outranks this binding's NEW work while Jovie has repairable PRs (the
+    # binding's own repairs and its reserved seats still run). 2026-10-25: this pass runs
+    # before the Jovie path, so a busy LYB backlog took every seat and 119 red Jovie PRs
+    # got no lane for 6h.
+    yield_to_jovie_repair: bool = False
 
     def branch_pattern(self) -> re.Pattern:
         return re.compile(rf"^(?P<lane>[a-z0-9-]+)/(?P<issue>{self.key.lower()}-\d+)-\d{{8}}")
@@ -137,7 +145,8 @@ def extra_bindings(lane, policy: dict | None = None, env=None, hostname: str | N
             tuple(row.get("providers") or ()),
             tuple(row.get("install") or ()), str(row.get("reviewState") or "In Review"),
             max(0, min(RESERVED_SEATS_MAX, _int_or_zero(row.get("reservedSeats")))),
-            max(0, int(row.get("minTodo") or 0))))
+            max(0, int(row.get("minTodo") or 0)),
+            row.get("yieldToJovieRepair") is True))
     return active
 
 
@@ -529,7 +538,7 @@ def reserve(lane, host, name: str, spec: dict, *, bindings: list[Binding] | None
 
 
 def work(lane, host, name: str, spec: dict, *, maintenance_only: bool = False,
-         bindings: list[Binding] | None = None) -> str | None:
+         bindings: list[Binding] | None = None, jovie_repair_pending: bool = False) -> str | None:
     """Repair, else claim, one unit of bound work in this worker's held provider seat.
 
     Returns the run verdict, or None when no binding had work for this lane."""
@@ -543,7 +552,8 @@ def work(lane, host, name: str, spec: dict, *, maintenance_only: bool = False,
         if seat is None:
             continue  # the binding's own concurrency is in use; the last pass's status stands
         try:
-            verdict = _work_one(lane, host, binding, name, spec, maintenance_only)
+            verdict = _work_one(lane, host, binding, name, spec,
+                                maintenance_only or (jovie_repair_pending and binding.yield_to_jovie_repair))
         except lane.LinearRateLimited:
             record_status(lane, host, binding, worker=name, outcome="linear-rate-limited")
             return None
@@ -799,7 +809,7 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
                                    if "merge-group-failed" in (pr.get("repairReasons") or []) else "",
                                    goal=lane.goal_contract(issue) if issue is not None else ())
             prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
+            atomic_write_text(prompt_file, prompt)
             started = time.time()
             receipt["agentStarted"] = True
             agent = lane.run_agent(lane.template(spec["cmd"], {
@@ -933,7 +943,7 @@ def finish_issue(lane, host, binding: Binding, name: str, linear, issue, receipt
         count = lane.failure_record(failures.get(issue.identifier))["count"] + 1
         failures[issue.identifier] = {"count": count, "at": time.time(), "release": lane.release_generation(),
                                       **lane.pr_events.failure_reason(receipt, count >= lane.MAX_FAILURES)}
-        lane.failures_path(host).write_text(json.dumps(failures))
+        atomic_write_text(lane.failures_path(host), json.dumps(failures))
     finally:
         claim.release()
     exhausted = count >= lane.MAX_FAILURES

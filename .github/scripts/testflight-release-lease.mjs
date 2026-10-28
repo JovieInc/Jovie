@@ -503,6 +503,16 @@ export function validateLease({
   return lease;
 }
 
+/**
+ * Where annotation lines from a child's stderr are re-emitted. Production
+ * surfaces them as workflow annotations; tests replace `emit` so a mocked
+ * refusal (a fake rate-limit reset) never reaches the runner's log parser.
+ */
+export const annotationSink = {
+  /** @param {string} line */
+  emit: line => console.error(line),
+};
+
 export function command(args, options = {}) {
   const { label = args[0], route = '', ...spawnOptions } = options;
   const budget = Number(
@@ -526,7 +536,7 @@ export function command(args, options = {}) {
   const stderr = textOf(result.stderr);
   for (const line of stderr.split('\n')) {
     if (line.startsWith('::error::') || line.startsWith('::warning::'))
-      console.error(line);
+      annotationSink.emit(line);
   }
   // No raw provider output: it can include sensitive request headers.
   const kind =
@@ -535,7 +545,7 @@ export function command(args, options = {}) {
       : evidenceFailureKind(result.stderr, result.stdout, route);
   const annotation = stderr
     .split('\n')
-    .find(line => line.startsWith('::error::GitHub rate limit'));
+    .find(line => /^::error::(?:\[fixture\] )?GitHub rate limit/.test(line));
   const detail = annotation ? `: ${annotation.slice('::error::'.length)}` : '';
   assert(
     result.status === 0,

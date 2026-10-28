@@ -33,6 +33,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import autoscale  # noqa: E402  (sibling module of the release)
 import worktree_pool  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 # One threshold (Gem 2026-10-12 04:12Z): autoscale stops growth at or below this free %, so the
 # sweep must already run there. At exactly 15% growth was blocked and nothing was reclaimed
@@ -294,10 +297,27 @@ def retired_workspace_roots() -> list[Path]:
 
 
 def reclaimable(host, roots=None) -> bool:
-    """Cheap: a retired Symphony workspace root still holds a directory the sweep can remove."""
+    """Cheap: a retired Symphony workspace root still holds a directory the sweep can remove.
+
+    Only what sweep_retired_workspaces would act on counts: a bind-mounted child (it is skipped
+    whole) or one on a filesystem above LOW_PCT free never frees the state disk. Counting them
+    held "disk-reclamation-pending" with nothing reclaimable for hours on 2026-10-25."""
+    mounts = False  # read lazily: most hosts have no candidate at all
     for root in retired_workspace_roots() if roots is None else roots:
         try:
-            if root.is_dir() and not root.is_symlink() and any(child.is_dir() for child in root.iterdir()):
+            if not root.is_dir() or root.is_symlink():
+                continue
+            for child in root.iterdir():
+                if child.is_symlink() or not child.is_dir():
+                    continue
+                pct = free_pct(child)
+                if pct is not None and pct > LOW_PCT:
+                    continue
+                mounts = mount_points() if mounts is False else mounts
+                if mounts is not None:
+                    resolved = child.resolve()
+                    if any(mount == resolved or resolved in mount.parents for mount in mounts):
+                        continue
                 return True
         except OSError:
             continue
@@ -440,7 +460,7 @@ def maybe_sweep(host, free: float | None, *, now: float | None = None,
     if now - last < SWEEP_INTERVAL_S:
         return "not-due"
     host.state.mkdir(parents=True, exist_ok=True)
-    stamp.write_text(json.dumps({"startedAt": now}))
+    atomic_write_text(stamp, json.dumps({"startedAt": now}))
     popen([sys.executable, str(Path(__file__).resolve()), "--state", str(host.state),
            "--repo", str(host.repo)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
           stderr=subprocess.DEVNULL, start_new_session=True)
@@ -516,7 +536,7 @@ def check(host, *, run=subprocess.run, now: float | None = None, sweep: bool = F
     report["reason"] = "disk-unobservable" if pct is None else "disk-critical" if report["critical"] else "disk-available"
     try:
         host.state.mkdir(parents=True, exist_ok=True)
-        (host.state / "disk-pressure.json").write_text(json.dumps(report, indent=1))
+        atomic_write_text(host.state / "disk-pressure.json", json.dumps(report, indent=1))
     except OSError:
         pass
     return report
