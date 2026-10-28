@@ -1,0 +1,13 @@
+name: Private data guard
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main, master]
+permissions:
+  contents: read
+jobs:
+  guard:
+    uses: JovieInc/ci/.github/workflows/private-data-guard.yml@315c327e822e328e01c0e8f50d4e6b14db86af2c
+    permissions:
+      contents: read
