@@ -201,6 +201,6 @@ describe('freshness green may resolve the shared incident', () => {
         fingerprint: 'production-monitor-continuity',
       }
     );
-    expect(result.results[0].action).toBe('resolved');
+    expect(/** @type {any} */ (result.results[0]).action).toBe('resolved');
   });
 });
