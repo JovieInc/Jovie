@@ -49,6 +49,48 @@ export interface EssentialViewportAudit {
 }
 
 /**
+ * Wait until the element's rect and every ancestor's client box stop moving.
+ * The composer surface uses Motion layout="size", so a draft change (for
+ * example clearing a multi-line starter) tweens its height; auditing mid-tween
+ * reads a fractional, clipped box that is not a layout defect. This waits for
+ * the motion to finish and never relaxes the geometry assertion itself.
+ */
+export async function waitForStableGeometry(
+  page: Page,
+  selector: string,
+  { frames = 12, timeout = 5_000 } = {}
+): Promise<void> {
+  await page.waitForFunction(
+    ({ selector, frames }) => {
+      const el = document.querySelector(selector);
+      if (!el) return false;
+      const w = window as unknown as {
+        __geometryStable?: { key: string; count: number; seen: boolean };
+      };
+      const parts: string[] = [];
+      for (let node: Element | null = el; node; node = node.parentElement) {
+        const r = node.getBoundingClientRect();
+        parts.push(
+          [r.left, r.top, r.width, r.height, node.clientHeight]
+            .map(n => n.toFixed(2))
+            .join(',')
+        );
+      }
+      const key = parts.join('|');
+      const state = w.__geometryStable;
+      if (!state || state.key !== key) {
+        w.__geometryStable = { key, count: 0, seen: true };
+        return false;
+      }
+      state.count += 1;
+      return state.count >= frames;
+    },
+    { selector, frames },
+    { polling: 'raf', timeout }
+  );
+}
+
+/**
  * State-specific actions only: transcript/list items may legitimately scroll.
  * Optional states are selected and audited in the same browser snapshot.
  */

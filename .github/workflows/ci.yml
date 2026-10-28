@@ -6515,6 +6515,12 @@ jobs:
       certification_outcome: ${{ steps.canonical_certification.outcome }}
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
+      # Retried-and-passed tests (start-entry-continuity retries twice) and any
+      # failed attempt leave Playwright's error-context.md. Without this the
+      # guard blocks it as an unknown binary and turns a passed-on-retry flake
+      # into a red job (runs 40548451564, 40643816453). It is not a secret
+      # finding: markdown is still redacted and credential-scanned.
+      PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
       # Preview – jovie secret STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY is
       # the active test-mode USD 1200/month price. The assertion stays
       # fail-closed; true reports a contract breach instead of a missing secret.
