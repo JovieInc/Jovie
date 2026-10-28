@@ -275,6 +275,25 @@ export const SERVER_ANALYTICS_EVENTS = {
       'entry_ms',
     ],
   },
+  // JOV-9627: one row per onboarding chat reply. `session_id` is the signed
+  // onboarding session, which chat_conversations carries and claim attaches to
+  // a user, so a row joins to later billing and retention.
+  onboarding_reply: {
+    category: 'funnel',
+    properties: [
+      'session_id',
+      'engine',
+      'guarded_step',
+      'reply_intent',
+      'classifier',
+      'line_key',
+      'decision_kind',
+      'confidence',
+      'server_ms',
+      'turn_index',
+      'fallback',
+    ],
+  },
   asset_page_viewed: limitedDropEvent,
   drop_countdown_viewed: limitedDropEvent,
   drop_capture_started: limitedDropEvent,
@@ -438,6 +457,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['funnel_step'],
   },
   {
+    path: 'lib/chat/onboarding-script/telemetry.server.ts',
+    invocations: 1,
+    events: ['onboarding_reply'],
+  },
+  {
     path: 'lib/analytics/limited-drop-funnel.server.ts',
     invocations: 1,
     events: LIMITED_DROP_EVENT_NAMES,
@@ -464,6 +488,13 @@ const UUID_PROPERTY_NAMES = new Set([
 const SAFE_TOKEN_PROPERTY_NAMES = new Set([
   'billingReason',
   'campaign_id',
+  'classifier',
+  'decision_kind',
+  'engine',
+  'fallback',
+  'guarded_step',
+  'line_key',
+  'reply_intent',
   'checkoutSessionId',
   'code',
   'error_type',

@@ -1,6 +1,7 @@
 """Recover missing production workflow invocations without duplicate or false health receipts."""
 import fcntl
 import json
+import os
 import re
 import subprocess
 import sys
@@ -15,8 +16,34 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "scripts/lanes"))
 import continuity_clock as clock
 import credentials_spend
+import redact as redact_mod
 
 NOW = 1790860000.0
+
+
+# Hermetic by construction: these tests run on the lanes host, which has real
+# credentials in its environment and may own the credentials-spend job. Scrub every
+# secret-named variable for the whole module and refuse any unmocked spawn of that job,
+# so a failing assertion can never print a real value or reach a real provider.
+_ENV_PATCH = None
+_REAL_POPEN = subprocess.Popen
+
+
+def _guarded_popen(args, *a, **kw):
+    if "credentials-spend-check" in " ".join(map(str, args)):
+        raise AssertionError("test spawned the real credentials-spend job")
+    return _REAL_POPEN(args, *a, **kw)
+
+
+def setUpModule():
+    global _ENV_PATCH
+    scrubbed = {k: v for k, v in os.environ.items() if not redact_mod.SECRET_NAME.search(k)}
+    _ENV_PATCH = patch.dict(os.environ, scrubbed, clear=True)
+    _ENV_PATCH.start()
+    patcher = patch.object(subprocess, "Popen", _guarded_popen)
+    patcher.start()
+    unittest.addModuleCleanup(patcher.stop)
+    unittest.addModuleCleanup(_ENV_PATCH.stop)
 
 
 def run_row(age=3600, **fields):
@@ -162,6 +189,7 @@ class ClockTest(unittest.TestCase):
         import lane_runner as lane
         with patch.object(lane.disk_guard, "check", return_value={"admitted": False}), \
              patch.object(lane.continuity_clock, "tick", return_value={"status": "current"}) as probe, \
+             patch.object(lane.credentials_spend, "tick", return_value={"status": "selftest-skipped"}), \
              patch.object(lane.doctor, "run"), patch.object(lane.subprocess, "Popen") as spawn:
             host = lane.Host(state=self.path, repo=self.path)
             self.assertEqual(lane.dispatch(host), 1)
@@ -267,8 +295,6 @@ class CadenceClocksTest(unittest.TestCase):
         self.assertEqual(self.calls, [])
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class CredentialsSpendTickTest(unittest.TestCase):
@@ -350,3 +376,57 @@ class CredentialsSpendTickTest(unittest.TestCase):
             self.assertEqual(credentials_spend.tick(self.state, self.release, run=self.run_check(), now=NOW,
                                                     home=self.home)["status"], "selftest-skipped")
         self.assertEqual(self.calls, [])
+
+
+FAKE_SECRET = "zz-fake-secret-value-0123456789"
+
+
+class SecretHygieneTest(unittest.TestCase):
+    """Deliberate-red guards: a secret-named env value must never reach captured output."""
+
+    def test_module_environment_is_scrubbed_of_secret_names(self):
+        self.assertEqual([k for k in os.environ if redact_mod.SECRET_NAME.search(k)], [])
+
+    def test_redact_replaces_secret_named_values_only(self):
+        env = {"LINEAR_ACCESS_TOKEN": FAKE_SECRET, "DOPPLER_TOKEN": "dp.st.abcdef123", "PATH": "/usr/bin/local-bin"}
+        out = redact_mod.redact(f"a {FAKE_SECRET} b dp.st.abcdef123 c /usr/bin/local-bin", env)
+        self.assertNotIn(FAKE_SECRET, out)
+        self.assertNotIn("dp.st.abcdef123", out)
+        self.assertIn("/usr/bin/local-bin", out)
+        self.assertIn("[REDACTED:LINEAR_ACCESS_TOKEN]", out)
+
+    def test_child_output_echoing_a_secret_env_value_never_survives_the_job_runner(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        state, release = Path(tmp.name) / "state", Path(tmp.name) / "release"
+        (release / "scripts").mkdir(parents=True)
+        state.mkdir()
+        (release / credentials_spend.SCRIPT).write_text("")
+        captured = {}
+
+        def run(args, **kw):
+            captured["env"] = kw["env"]
+            # A hostile/buggy child that dumps its environment to stdout and stderr.
+            dump = json.dumps({"findings": [], "env": kw["env"].get("LINEAR_ACCESS_TOKEN")})
+            captured["done"] = SimpleNamespace(returncode=0, stdout=dump, stderr=dump)
+            return captured["done"]
+
+        with patch.dict(os.environ, {"LINEAR_API_KEY": FAKE_SECRET}):
+            # The release self-test runs this file with LANES_SELFTEST set, where tick() returns
+            # "selftest-skipped" before running the job (merge group 40193646918, 12:42Z).
+            os.environ.pop("LANES_SELFTEST", None)
+            os.environ.pop("LANES_EXECUTION_BACKEND", None)
+            result = credentials_spend.tick(state, release, run=run, now=NOW, linear_token=lambda _s: FAKE_SECRET)
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(captured["env"]["LINEAR_ACCESS_TOKEN"], FAKE_SECRET)  # the child did get it
+        for path in state.rglob("*"):
+            if path.is_file():
+                self.assertNotIn(FAKE_SECRET, path.read_text(), f"{path.name} leaked a secret-named value")
+        self.assertNotIn(FAKE_SECRET, json.dumps(result))
+        # Captured child output is redacted before anything can log or raise it.
+        self.assertNotIn(FAKE_SECRET, captured["done"].stdout)
+        self.assertNotIn(FAKE_SECRET, captured["done"].stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

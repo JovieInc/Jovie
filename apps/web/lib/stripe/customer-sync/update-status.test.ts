@@ -19,7 +19,11 @@ vi.mock('@/lib/error-tracking', () => ({
 vi.mock('./queries', () => ({ fetchUserBillingDataByIdentity: mocks.fetch }));
 
 const USER_ID = '11111111-1111-4111-8111-111111111111';
-const options = { clerkUserId: 'user_legacy_provider_id', isPro: true };
+const options = {
+  clerkUserId: 'user_legacy_provider_id',
+  isPro: true,
+  plan: 'pro',
+} as const;
 const user = {
   id: USER_ID,
   billingVersion: 1,
