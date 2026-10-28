@@ -40,6 +40,7 @@ afterEach(() => {
  * Builds main = c1 <- c2 <- c3 plus a side commit `side` branching from c1.
  * `racer` runs once, right after the gate's first ls-remote, to move main.
  */
+/** @param {{ candidate: string, live?: string, racer?: string }} options */
 function run({ candidate, live, racer }) {
   const root = mkdtempSync(join(tmpdir(), 'lineage-advancing-'));
   roots.push(root);
@@ -61,6 +62,7 @@ function run({ candidate, live, racer }) {
   git(work, 'checkout', '-q', 'main');
   git(root, 'clone', '-q', '--bare', work, bare);
   git(bare, 'fetch', '-q', work, 'side:refs/heads/side');
+  /** @type {Record<string, string>} */
   const shas = { c1, c2, c3, side };
 
   const racerScript = join(root, 'racer.sh');
@@ -156,10 +158,12 @@ describe('recheck-main-lineage while main keeps advancing', () => {
 });
 
 describe('production-release workflow contract', () => {
-  const workflow = load(
-    readFileSync(
-      join(repoRoot, '.github/workflows/production-release.yml'),
-      'utf8'
+  const workflow = /** @type {any} */ (
+    load(
+      readFileSync(
+        join(repoRoot, '.github/workflows/production-release.yml'),
+        'utf8'
+      )
     )
   );
   const step = workflow.jobs['promote-production'].steps.find(
