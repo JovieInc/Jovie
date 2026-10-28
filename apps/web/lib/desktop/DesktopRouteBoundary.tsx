@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { logger } from '@/lib/utils/logger';
 import routes from '../../../desktop/src/application-routes.json';
 import { isAllowedPublicProfilePath } from '../../../desktop/src/navigation';
 import {
@@ -79,7 +80,7 @@ export function DesktopRouteBoundary({
           })
         )
         .catch(error => {
-          console.error('Could not load desktop navigation feedback.', error);
+          logger.error('Could not load desktop navigation feedback.', error);
         });
     };
     const handoff = async (url: string) => {
