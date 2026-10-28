@@ -66,15 +66,22 @@ const ALIASES = Object.freeze([
  * Pick the changed files this lane mutates.
  * @param {string[]} changedPaths repo-relative paths
  * @param {(path: string) => string | null} [readModule] apps/web-relative reader
+ * @param {{ prefixes?: readonly string[] | null }} [options] `prefixes: null`
+ *   widens selection from the high-risk prefixes to every apps/web source
+ *   (the rolling sweep; see scripts/mutation-sweep.mjs).
  * @returns {string[]} apps/web-relative source paths
  */
-export function selectHighRiskSources(changedPaths, readModule) {
+export function selectHighRiskSources(
+  changedPaths,
+  readModule,
+  { prefixes = HIGH_RISK_PREFIXES } = {}
+) {
   const selected = new Set();
   for (const path of changedPaths) {
     if (!path.startsWith(`${WEB_ROOT}/`)) continue;
     const webPath = path.slice(WEB_ROOT.length + 1);
     if (!SOURCE_EXTENSION.test(webPath) || NON_SOURCE.test(webPath)) continue;
-    if (HIGH_RISK_PREFIXES.some(prefix => webPath.startsWith(prefix))) {
+    if (!prefixes || prefixes.some(prefix => webPath.startsWith(prefix))) {
       const contents = readModule?.(webPath);
       if (typeof contents === 'string' && !hasRuntimeSource(webPath, contents))
         continue;
@@ -471,7 +478,7 @@ export function readTestSources(webRoot) {
  *   targetExecution?: ReturnType<typeof readTargetExecution> }} FileResult
  */
 
-/** @param {Mutant[]} mutants */
+/** @param {{ status: string }[]} mutants */
 export function scoreMutants(mutants) {
   /** @type {Record<string, number>} */
   const counts = {};

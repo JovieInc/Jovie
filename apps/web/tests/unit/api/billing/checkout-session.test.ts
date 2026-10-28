@@ -4,7 +4,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   userId: 'app-user-1' as string | null,
   session: {} as Record<string, unknown>,
-  profileRows: [] as Array<{ isClaimed: boolean | null }>,
+  profileRows: [] as Array<{
+    isClaimed: boolean | null;
+    isPublic?: boolean | null;
+  }>,
+  proofPending: false,
+  recordedStages: [] as string[],
+}));
+vi.mock('@/lib/waitlist/golden-path-admission.server', () => ({
+  hasProofPendingProfile: async () => mocks.proofPending,
+}));
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: async (_id: unknown, stage: string) => {
+    mocks.recordedStages.push(stage);
+    return true;
+  },
 }));
 
 vi.mock('@/lib/auth/cached', () => ({
@@ -46,7 +60,9 @@ describe('GET /api/billing/checkout-session', () => {
       metadata: { clerk_user_id: 'app-user-1', plan: 'pro' },
       line_items: { data: [{ price: { id: 'price_pro' } }] },
     };
-    mocks.profileRows = [{ isClaimed: true }];
+    mocks.profileRows = [{ isClaimed: true, isPublic: true }];
+    mocks.proofPending = false;
+    mocks.recordedStages = [];
   });
 
   it('marks a paid buyer without a claimed profile as needing one', async () => {
@@ -58,6 +74,7 @@ describe('GET /api/billing/checkout-session', () => {
       plan: 'pro',
       priceId: 'price_pro',
       needsProfile: true,
+      proofPending: false,
     });
   });
 
@@ -77,5 +94,38 @@ describe('GET /api/billing/checkout-session', () => {
 
     const response = await GET(request());
     expect(response.status).toBe(404);
+  });
+
+  it('reports a private page waiting for proof and never records profile-live for it', async () => {
+    mocks.proofPending = true;
+    mocks.profileRows = [{ isClaimed: true, isPublic: false }];
+    mocks.session = {
+      ...mocks.session,
+      metadata: {
+        clerk_user_id: 'app-user-1',
+        plan: 'pro',
+        acquisition_id: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+      },
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+
+    const body = await (await GET(request())).json();
+    expect(body.proofPending).toBe(true);
+    // Paying never publishes: the "profile live" stage must not be recorded.
+    expect(mocks.recordedStages).not.toContain('profile-live');
+  });
+
+  it('records profile-live for a public, proven page', async () => {
+    mocks.session = {
+      ...mocks.session,
+      metadata: {
+        clerk_user_id: 'app-user-1',
+        plan: 'pro',
+        acquisition_id: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+      },
+    };
+    const { GET } = await import('@/app/api/billing/checkout-session/route');
+    await GET(request());
+    expect(mocks.recordedStages).toContain('profile-live');
   });
 });
