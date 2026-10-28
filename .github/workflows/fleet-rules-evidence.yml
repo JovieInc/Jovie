@@ -1,6 +1,6 @@
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Fleet-rule evidence (PR body/labels/files) is read on the dedicated CI App installation budget by base-branch code only, then published as a commit status the required PR Ready aggregate reads.
+# necessary-trust-boundary: Fleet-rule evidence (PR body/labels/files) is read on the dedicated CI App installation budget by base-branch code only, then this job's result, which the required PR Ready aggregate reads.
 # removal-trigger: Remove when the repo-wide GITHUB_TOKEN bucket no longer starves PR evidence reads, or GitHub offers per-workflow API budgets.
 name: Fleet Rules Evidence
 # The title binds a run to one PR and base so PR Ready can reject a run that merely
@@ -17,11 +17,15 @@ run-name: "${{ github.event_name == 'pull_request_target' && format('fleet-rules
 # api-client (sparse, persist-credentials: false). No PR code, no PR-controlled
 # value is interpolated into a shell, and the CI App key is never present in any
 # pull_request-triggered workflow (see scripts/pr-fleet-rules.test.mjs). The
-# minted token is read-only (contents, pull-requests); the verdict is posted with
-# github.token. A failed mint falls back to github.token, so evidence is never
+# minted token is read-only (contents, pull-requests); the verdict is this job's
+# own result (no commit status is posted: it was informational and its github.token
+# POST turned a read verdict into a quota deferral). A failed mint falls back to github.token, so evidence is never
 # skipped.
 on:
   pull_request_target:
+    # Base filter, not a job `if`: stacked PRs (non-main base) never reach PR Ready
+    # (wrong-base blocker), and ~235 all-skipped runs/day came from them.
+    branches: [main]
     types: [opened, edited, synchronize, labeled, unlabeled, reopened]
   # A verdict can land before Source Validation finishes (PR Ready then reads
   # "missing") or after it (PR Ready already red). Either way the failed jobs
@@ -33,10 +37,13 @@ on:
 permissions: {}
 
 concurrency:
-  # One group per PR across every pull_request_target type: the newest read
-  # cancels an older one, so a slower older run can never post a stale verdict
-  # last. workflow_run re-run hops get their own group.
-  group: ${{ github.event_name == 'workflow_run' && format('fleet-rules-rerun-{0}', github.event.workflow_run.id) || format('fleet-rules-evidence-{0}', github.event.pull_request.number) }}
+  # One group per PR *and head*: a newer event for the same head cancels an
+  # older one, but events for different heads never touch each other. With the
+  # PR number alone, the older head's run could start last and cancel the
+  # current head's run, leaving PR Ready with no evidence (#23270, 2026-10-25).
+  # PR Ready reads the run by head sha, so a superseded head's run is harmless.
+  # workflow_run re-run hops get their own group.
+  group: ${{ github.event_name == 'workflow_run' && format('fleet-rules-rerun-{0}', github.event.workflow_run.id) || format('fleet-rules-evidence-{0}-{1}', github.event.pull_request.number, github.event.pull_request.head.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
 
 jobs:
@@ -47,7 +54,6 @@ jobs:
     timeout-minutes: 6
     permissions:
       contents: read
-      statuses: write
       actions: write
     steps:
       - name: Mint CI App read token for fleet evidence
@@ -57,6 +63,7 @@ jobs:
         with:
           app-id: ${{ vars.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-actions: read
           permission-contents: read
           permission-pull-requests: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -80,7 +87,7 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-      - name: Read evidence and publish the Fleet Rules Evidence status
+      - name: Read evidence and fail or defer the job as the verdict
         env:
           FLEET_TOKEN: ${{ steps.fleet-token.outputs.token }}
           GH_TOKEN: ${{ github.token }}
@@ -98,6 +105,13 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Mint CI App read token for the re-run lookups
+        id: fleet-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-actions: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -118,25 +132,52 @@ jobs:
           node-version-file: .nvmrc
       - name: Re-run PR Ready when a passing verdict exists for this exact head
         env:
+          # Reads run on the CI App installation token, the POSTs (actions:write) on github.token.
           GH_TOKEN: ${{ github.token }}
+          GH_READ_TOKEN: ${{ steps.fleet-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
           [[ "$HEAD_SHA" =~ ^[0-9a-f]{40}$ && "$RUN_ID" =~ ^[1-9][0-9]*$ ]] || exit 0
-          latest="$(node packages/api-client/cli.ts gh --priority repair -- api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&status=completed&per_page=10" \
-            --jq '[.workflow_runs[]] | sort_by(.created_at) | last | "\(.id // "")\t\(.conclusion // "missing")\t\(.run_attempt // 0)"')"
+          # A quota deferral (exit 75, "until <ISO reset>") used to end this hop
+          # red and leave PR Ready red until the next event. A reset inside the
+          # job budget (75s of the 2 minute timeout; the gate-weakening detector
+          # forbids raising it) holds with no API calls and retries once. A longer
+          # wait or a second deferral still fails, never a pass.
+          # Reads never fall back to github.token: no App token means the hop cannot look up.
+          ghr() {
+            if [ -z "${GH_READ_TOKEN:-}" ]; then echo "::error::No CI App read token for the re-run lookups." >&2; return 75; fi
+            GH_TOKEN="$GH_READ_TOKEN" ghx "$@"
+          }
+          ghx() {
+            local err rc until_ts wait_s
+            err="$(mktemp)"
+            for attempt in 1 2; do
+              rc=0
+              node packages/api-client/cli.ts gh --priority repair -- "$@" 2>"$err" || rc=$?
+              if [ "$rc" -ne 75 ]; then cat "$err" >&2; rm -f "$err"; return "$rc"; fi
+              until_ts="$(grep -o 'until [0-9T:.Z-]*' "$err" | head -n1 | cut -d' ' -f2)"
+              wait_s=$(( $(date -u -d "${until_ts:-1970-01-01}" +%s) - $(date -u +%s) + 5 ))
+              if [ "$attempt" = 2 ] || [ "$wait_s" -le 0 ] || [ "$wait_s" -gt 75 ]; then cat "$err" >&2; rm -f "$err"; return 75; fi
+              echo "::notice::github-quota-deferred; holding ${wait_s}s for the reset, then retrying once."
+              sleep "$wait_s"
+            done
+          }
+          latest="$(ghr api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&status=completed&per_page=10" \
+            --jq '[.workflow_runs[]] | sort_by([.created_at, .id]) | last | "\(.id // "")\t\(.conclusion // "missing")\t\(.run_attempt // 0)"')"
           IFS=$'\t' read -r ev_id concl attempt <<<"$latest"
           if [ "$concl" = success ]; then
             bash .github/scripts/fleet-rules-rerun.sh "$RUN_ID"
           elif [ "$concl" = failure ] && [[ "$ev_id" =~ ^[1-9][0-9]*$ ]] && [ "$attempt" -lt 3 ]; then
-            # A deferred read (quota/outage) fails this run too. Re-read once the
-            # budget has had time to recover; the re-read's verdict re-runs
-            # PR Ready. Bounded to two attempts, so a policy red costs at most
-            # two extra reads.
-            node packages/api-client/cli.ts gh --priority repair -- api -X POST "repos/$REPOSITORY/actions/runs/$ev_id/rerun-failed-jobs" >/dev/null \
+            ghx api -X POST "repos/$REPOSITORY/actions/runs/$ev_id/rerun-failed-jobs" >/dev/null \
               && echo "Re-ran fleet evidence run $ev_id (attempt $attempt)."
+          elif [ "$concl" = cancelled ] && [[ "$ev_id" =~ ^[1-9][0-9]*$ ]] && [ "$attempt" -lt 3 ]; then
+            # A cancelled evidence run for this head left PR Ready with no verdict
+            # (#23270). Cancelled jobs are not "failed", so re-run the whole run.
+            ghx api -X POST "repos/$REPOSITORY/actions/runs/$ev_id/rerun" >/dev/null \
+              && echo "Re-ran cancelled fleet evidence run $ev_id (attempt $attempt)."
           else
             echo "Fleet evidence for $HEAD_SHA is $concl (attempt ${attempt:-0}); nothing to re-run."
           fi

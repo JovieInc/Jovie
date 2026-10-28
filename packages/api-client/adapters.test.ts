@@ -10,6 +10,7 @@ import { type GhRunner, ghShape, runGh, splitIncluded } from './gh.ts';
 import { createGitHubClient, pullRequestField } from './github.ts';
 import { githubBudgetHooks } from './legacy.ts';
 import { createLinearClient, issueField, linearScope } from './linear.ts';
+import { credentialState } from './policy.ts';
 import { FileLedgerStore, MemoryLedgerStore } from './store.ts';
 
 const quiet = () => undefined;
@@ -232,6 +233,86 @@ describe('Linear adapter', () => {
 });
 
 describe('gh through the ledger', () => {
+  const logArgs = [
+    'run',
+    'view',
+    '--repo',
+    'o/r',
+    '--job',
+    '12',
+    '--attempt',
+    '2',
+    '--log',
+  ];
+
+  it('costs only the bounded safe job-log shape as five REST reads', () => {
+    const expected = {
+      resource: 'core',
+      write: false,
+      idempotent: true,
+      cost: 5,
+    };
+    expect(ghShape(logArgs)).toEqual(expected);
+    expect(ghShape([...logArgs.slice(0, 2), ...logArgs.slice(4)])).toEqual(
+      expected
+    );
+    for (const args of [
+      logArgs.slice(0, -1),
+      [...logArgs, '--log-failed'],
+      [...logArgs.slice(0, 5), '0', ...logArgs.slice(6)],
+      [...logArgs.slice(0, 7), '-1', '--log'],
+      ['run', 'view', '12', '--log'],
+    ]) {
+      expect(ghShape(args)).not.toHaveProperty('cost');
+    }
+  });
+
+  it.each([
+    [4, 0],
+    [5, 1],
+  ])(
+    'reserves five core reads with remaining=%i before execution',
+    async (remaining, expectedCalls) => {
+      const clock = new FakeClock();
+      const store = new MemoryLedgerStore();
+      const seen: string[][] = [];
+      await store.transact('github', ledger => {
+        credentialState(ledger, 'c', clock.now).buckets.core = {
+          limit: null,
+          remaining,
+          resetAt: clock.now + 60000,
+          observedAt: clock.now,
+        };
+      });
+      const result = await runGh(logArgs, {
+        priority: 'repair',
+        store,
+        credential: 'c',
+        now: clock.read,
+        sleep: clock.sleep,
+        log: quiet,
+        maxAttempts: 1,
+        maxWaitMs: 0,
+        run: async args => {
+          seen.push([...args]);
+          return { code: 0, stdout: 'safe log', stderr: '' };
+        },
+      });
+      expect(seen).toHaveLength(expectedCalls);
+      expect(result.code).toBe(expectedCalls ? 0 : 75);
+      expect(clock.now).toBe(new FakeClock().now);
+      if (seen.length) {
+        expect(seen).toEqual([logArgs]);
+        expect(
+          await store.transact(
+            'github',
+            ledger => ledger.credentials.c?.buckets.core?.remaining
+          )
+        ).toBe(0);
+      }
+    }
+  );
+
   it('classifies gh invocations by bucket and mutation', () => {
     expect(ghShape(['api', 'repos/o/r/pulls'])).toEqual({
       resource: 'core',
