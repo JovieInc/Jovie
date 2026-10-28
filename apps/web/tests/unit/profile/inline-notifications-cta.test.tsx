@@ -217,6 +217,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     const view = render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -232,6 +233,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     view.rerender(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -278,7 +280,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     expect(await screen.findByText('Back to Profile')).toBeInTheDocument();
     expect(screen.queryByText('Sent from Jovie')).not.toBeInTheDocument();
-    expect(screen.queryByText('Sent by Test Artist')).not.toBeInTheDocument();
+    expect(screen.queryByText('Optional')).not.toBeInTheDocument();
   });
 
   it('shows success but never the name or birthday step when sign-up has no mailbox proof', async () => {
@@ -313,6 +315,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         onFlowOpenChange={onFlowOpenChange}
       />
@@ -387,6 +390,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     render(
       <ProfileInlineNotificationsCTA
+        availableContent={['newMusic', 'tourDates', 'merch']}
         artist={makeArtist()}
         presentation='inline'
       />
@@ -394,7 +398,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
     expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText('Loading subscription form')).toBeInTheDocument();
-    expect(screen.queryByText('Get Updates')).not.toBeInTheDocument();
+    expect(screen.queryByText('Get New Music')).not.toBeInTheDocument();
   });
 
   // JOV-1986: alert mode consistency across all three entry points.
@@ -420,7 +424,12 @@ describe('ProfileInlineNotificationsCTA flow', () => {
         })
       );
 
-      render(<ProfileInlineNotificationsCTA artist={makeArtist()} />);
+      render(
+        <ProfileInlineNotificationsCTA
+          availableContent={['newMusic', 'tourDates', 'merch']}
+          artist={makeArtist()}
+        />
+      );
 
       fireEvent.click(screen.getByRole('button', { name: /manage alerts/i }));
 
@@ -455,6 +464,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
       render(
         <ProfileInlineNotificationsCTA
+          availableContent={['newMusic', 'tourDates', 'merch']}
           artist={makeArtist()}
           presentation='inline'
         />
@@ -488,6 +498,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
       const { rerender } = render(
         <ProfileInlineNotificationsCTA
+          availableContent={['newMusic', 'tourDates', 'merch']}
           artist={makeArtist()}
           presentation='inline'
           autoOpen
@@ -509,6 +520,7 @@ describe('ProfileInlineNotificationsCTA flow', () => {
 
       rerender(
         <ProfileInlineNotificationsCTA
+          availableContent={['newMusic', 'tourDates', 'merch']}
           artist={makeArtist()}
           presentation='inline'
           autoOpen

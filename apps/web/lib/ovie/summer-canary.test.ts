@@ -36,6 +36,7 @@ describe('summer canary', () => {
       ok: true,
       model: 'zai/glm-5.3-flash',
       server: { authMs: 40, modelMs: 900, uptimeS: 3.2 },
+      trace: { authMs: 40, modelMs: 900 },
     });
     if (!result.ok) throw new Error('unreachable');
     expect(result.ttftMs).toBeLessThan(result.totalMs);
