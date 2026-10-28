@@ -9,6 +9,21 @@ describe('AppShellSkeleton', () => {
     expect(container.querySelector('.skeleton')).toBeTruthy();
   });
 
+  it('scopes the Ovie canvas to its loading frame when switching workspaces', () => {
+    const { container, rerender } = render(
+      <AppShellSkeleton brandVariant='ov' />
+    );
+    const frame = container.querySelector(
+      '[data-app-shell-placeholder="true"]'
+    );
+
+    expect(frame).toHaveAttribute('data-app-shell-workspace', 'ov');
+
+    rerender(<AppShellSkeleton brandVariant='jovie' />);
+
+    expect(frame).not.toHaveAttribute('data-app-shell-workspace');
+  });
+
   it.each(['jovie', 'ov'] as const)(
     'reserves the live icon rail width for collapsed %s shells',
     brandVariant => {

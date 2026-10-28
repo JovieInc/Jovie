@@ -451,7 +451,21 @@ class CheckTest(unittest.TestCase):
             root = Path(tmp) / "symphony-elixir-workspaces"
             self.assertFalse(guard.reclaimable(None, roots=[root]))
             (root / "JOV-1").mkdir(parents=True)
-            self.assertTrue(guard.reclaimable(None, roots=[root]))
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=set()):
+                self.assertTrue(guard.reclaimable(None, roots=[root]))
+            # 2026-10-25: a bind-mounted child (skipped whole by the sweep) or one on a roomy
+            # volume is not reclaimable; counting it held capacity at "disk-reclamation-pending".
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value={(root / "JOV-1").resolve()}):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT + 20), \
+                    patch.object(guard, "mount_points", return_value=set()):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
+            # An unreadable mount table fails closed: this feeds a deletion decision.
+            with patch.object(guard, "free_pct", return_value=guard.LOW_PCT), \
+                    patch.object(guard, "mount_points", return_value=None):
+                self.assertFalse(guard.reclaimable(None, roots=[root]))
 
     def test_cleanup_lock_serializes_workers_and_recovers_after_release(self):
         with tempfile.TemporaryDirectory() as tmp, patch.object(guard, "free_pct", return_value=10.0), \
