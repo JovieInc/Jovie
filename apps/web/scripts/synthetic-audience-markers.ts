@@ -24,8 +24,22 @@ export type SyntheticAudienceReason =
   | 'demo-fingerprint'
   | 'seed-email'
   | 'demo-email'
+  | 'dogfood-email'
   | 'encoded-geo-city'
   | 'seed-testnet-ip';
+
+/**
+ * Plus-address marker the production dogfood agent puts on every synthetic fan
+ * it subscribes (`<base>+dogfood-<run>@<domain>`, scripts/prod-dogfood and
+ * tests/e2e/prod-dogfood-auth.spec.ts). The product removes the row itself via
+ * its unsubscribe API; this marker lets the audit/cleanup sweep any straggler
+ * and keeps these rows out of audience analytics.
+ */
+export const DOGFOOD_FAN_EMAIL_MARKER = '+dogfood-';
+
+export function isDogfoodFanEmail(email: string | null | undefined): boolean {
+  return Boolean(email?.includes(DOGFOOD_FAN_EMAIL_MARKER));
+}
 
 export function isUrlEncodedGeoCity(
   geoCity: string | null | undefined
@@ -59,6 +73,9 @@ export function classifySyntheticAudienceMember(input: {
   ) {
     reasons.push('demo-email');
   }
+  if (isDogfoodFanEmail(input.email)) {
+    reasons.push('dogfood-email');
+  }
   if (isUrlEncodedGeoCity(input.geoCity)) {
     reasons.push('encoded-geo-city');
   }
@@ -78,6 +95,7 @@ export function syntheticAudienceMemberWhere(profileId?: string): SQL<unknown> {
       OR ${audienceMembers.fingerprint} LIKE ${`${DEMO_FINGERPRINT_PREFIX}%`}
       OR ${audienceMembers.email} LIKE ${'seed.aud.%@example.com'}
       OR ${audienceMembers.email} LIKE ${'demo.aud.%@example.com'}
+      OR ${audienceMembers.email} LIKE ${`%${DOGFOOD_FAN_EMAIL_MARKER}%`}
       OR ${audienceMembers.geoCity} LIKE ${'%\\%%'}
     )
   `;

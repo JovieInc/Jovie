@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   classifySyntheticAudienceMember,
+  isDogfoodFanEmail,
   isUrlEncodedGeoCity,
   SEED_FINGERPRINT_PREFIX,
 } from './synthetic-audience-markers';
@@ -38,6 +39,18 @@ describe('synthetic-audience-markers', () => {
         geoCity: 'San%20Jose',
       })
     ).toEqual(['encoded-geo-city']);
+  });
+
+  it('marks synthetic dogfood fans by their plus-address', () => {
+    expect(isDogfoodFanEmail('canary+dogfood-lq3x9@example.org')).toBe(true);
+    expect(isDogfoodFanEmail('fan@gmail.com')).toBe(false);
+    expect(
+      classifySyntheticAudienceMember({
+        fingerprint: 'fp_realhash',
+        email: 'canary+dogfood-lq3x9@example.org',
+        geoCity: 'Austin',
+      })
+    ).toEqual(['dogfood-email']);
   });
 
   it('returns no reasons for organic-looking members', () => {
