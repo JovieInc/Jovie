@@ -16,6 +16,10 @@ const BUDGETS_GZIP_BYTES = {
   'ambient-field-gl.ts': 3 * 1024,
   // The island that ships with the page: poster markup plus gating.
   'MarketingAmbientField.tsx': 2 * 1024,
+  // Matte motion pair (docs/design-system/motion-effects.json). The field is
+  // the WebGL2 chunk; the hero zoom is CSS transforms only, zero GL.
+  'matte-field-gl.ts': 2 * 1024,
+  'hero-shell-zoom.ts': 1.5 * 1024,
 } as const;
 
 function transpiledGzipBytes(file: string): number {

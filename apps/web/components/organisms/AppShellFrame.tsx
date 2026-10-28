@@ -11,9 +11,11 @@ import {
   SHELL_RAIL_FRAME_GAP,
   SHELL_RAIL_MAIN_PLANE,
 } from '@/components/shell/rail-motion';
+import type { BrandVariant } from '@/lib/brand/tokens';
 import { cn } from '@/lib/utils';
 
 export interface AppShellFrameProps {
+  readonly brandVariant?: BrandVariant;
   readonly sidebar: ReactNode;
   readonly header?: ReactNode;
   readonly main: ReactNode;
@@ -61,6 +63,7 @@ export const CHAT_AMBIENT_GRADIENT_IMAGE =
  * unmounting the frame itself.
  */
 export const AppShellFrame = memo(function AppShellFrame({
+  brandVariant = 'jovie',
   sidebar,
   header,
   main,
@@ -77,6 +80,7 @@ export const AppShellFrame = memo(function AppShellFrame({
   return (
     <div
       data-app-shell-frame={placeholder ? undefined : 'true'}
+      data-app-shell-workspace={brandVariant === 'ov' ? 'ov' : undefined}
       data-app-shell-placeholder={placeholder ? 'true' : undefined}
       data-composer-focus={composerFocusActive ? 'true' : undefined}
       className={cn(

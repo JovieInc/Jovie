@@ -133,7 +133,7 @@
       "gh-shell": 4
     },
     ".github/workflows/desktop-release.yml": {
-      "gh-shell": 25
+      "gh-shell": 22
     },
     ".github/workflows/fork-pr-gate.yml": {
       "gh-shell": 7
@@ -669,7 +669,7 @@
       "gh-subprocess": 2
     },
     "scripts/unstack-merged-parent.sh": {
-      "gh-shell": 4
+      "gh-shell": 3
     },
     "scripts/visual-baseline-adopt.mjs": {
       "gh-subprocess": 1

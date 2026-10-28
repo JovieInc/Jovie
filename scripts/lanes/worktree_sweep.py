@@ -43,6 +43,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from disk_guard import LOW_PCT as DISK_LOW_PCT, ensure_sbin_on_path  # noqa: E402  (sibling module of the release)
 import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import lifecycle  # noqa: E402
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 PRESERVED_REPAIR = ".jovie-preserved-repair.json"
 IDLE_S = 12 * 3600
@@ -434,7 +437,7 @@ def maybe_spawn(state: Path, repo: Path, free_pct: float | None, *, now: float |
     if now - last < interval:
         return "not-due"
     state.mkdir(parents=True, exist_ok=True)
-    stamp.write_text(json.dumps({"startedAt": now}))
+    atomic_write_text(stamp, json.dumps({"startedAt": now}))
     subprocess.Popen([sys.executable, str(Path(__file__).resolve()), "--state", str(state), "--repo", str(repo)],
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True, **lifecycle.spawn_kwargs())
@@ -644,7 +647,7 @@ def publish_headroom(state: Path, current: dict, now: float) -> None:
     except (OSError, ValueError, AttributeError, KeyError, TypeError):
         before = {}
     at = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    path.write_text(json.dumps({"at": at, **current}, indent=1))
+    atomic_write_text(path, json.dumps({"at": at, **current}, indent=1))
     changed = [v for v in current["volumes"] if v["level"] != before.get(v["mount"], "ok")]
     if changed:
         with open(state / "host-alarms.jsonl", "a") as handle:
@@ -681,7 +684,7 @@ def daily_report(home: Path, state: Path, now: float, *, run=lifecycle.run, targ
     before = previous.get("sizes", {})
     growers = sorted(({"path": p, "gib": round(k / 2**20, 2), "deltaGiB": round((k - before.get(p, k)) / 2**20, 2)}
                       for p, k in sizes.items()), key=lambda row: row["deltaGiB"], reverse=True)
-    path.write_text(json.dumps({
+    atomic_write_text(path, json.dumps({
         "at": datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"), "epoch": now,
         "volumes": headroom(volumes(home, state))["volumes"], "sizes": sizes,
         "topGrowers": growers[:10], "largest": sorted(growers, key=lambda r: -r["gib"])[:10]}, indent=1))
@@ -716,7 +719,7 @@ def guarded_main(args) -> int:
         started = json.loads(stamp.read_text()).get("startedAt")
     except (OSError, ValueError, AttributeError):
         started = None
-    stamp.write_text(json.dumps({"startedAt": started or time.time(), **report}, indent=1))
+    atomic_write_text(stamp, json.dumps({"startedAt": started or time.time(), **report}, indent=1))
     return 0
 
 

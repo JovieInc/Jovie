@@ -12,9 +12,8 @@ const REPAIR_LABELS = new Set([
   'ci-fix',
   'ws:ci',
   'remediation',
-  'lane-fix-red',
-  'lane-fix-dequeued',
 ]);
+// lane-fix-* labels are lane bookkeeping applied after any red check; only the PR's own declared intent (fix: title, bug-fix checkbox, repair labels a human/author chose) triggers red-before-green.
 const EXEMPT_LABELS = new Set(['ios-ci', 'visual-regression']);
 const TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)test_[^/]+\.py$)/;
 const ASSERTION = /\b(?:expect\s*\(|assert[.(]|assert\s)/;
@@ -30,18 +29,26 @@ const text = value =>
 
 export function section(body, heading) {
   const lines = stripComments(body).split('\n');
+  // A "# ..." line inside a code fence (shell comment, markdown in a log) is
+  // not a heading, so it must not start or end a section.
+  let fenced = false;
+  const isHeading = lines.map(line => {
+    if (/^\s*(```|~~~)/.test(line)) {
+      fenced = !fenced;
+      return false;
+    }
+    return !fenced && /^#{1,6}\s/.test(line);
+  });
   const start = lines.findIndex(
-    line =>
-      /^#{1,6}\s/.test(line) &&
+    (line, index) =>
+      isHeading[index] &&
       line
         .replace(/^#+\s*/, '')
         .trim()
         .toLowerCase() === heading.toLowerCase()
   );
   if (start < 0) return '';
-  const end = lines.findIndex(
-    (line, index) => index > start && /^#{1,6}\s/.test(line)
-  );
+  const end = isHeading.findIndex((is, index) => index > start && is);
   return lines.slice(start + 1, end < 0 ? undefined : end).join('\n');
 }
 function field(body, label) {
@@ -197,7 +204,15 @@ export function evaluateFleetRules({
     const link = field(red, 'Failing run \\(before fix\\)').replace(/`/g, '');
     if (!text(command) || (!output && !RUN_URL.test(link)))
       errors.push(
-        'red-before-green: include Failing command: plus a red-output fence or Failing run (before fix): <URL>.'
+        `red-before-green: ${
+          red.trim()
+            ? 'the "## Red-before-green" section is present but incomplete'
+            : 'this repair PR has no "## Red-before-green" section'
+        }${text(command) ? '' : '; missing "- Failing command: <cmd>"'}${
+          output || RUN_URL.test(link)
+            ? ''
+            : '; missing "- Failing run (before fix): <https://github.com/JovieInc/Jovie/actions/runs/ID URL>" (or a red-output fence containing FAIL/Error). Exact format: a "## Red-before-green" heading, then the lines "- Failing command: <cmd>" and "- Failing run (before fix): <URL>"'
+        }. Not a repair? Use a non-fix title (chore/ci/docs/refactor) and drop the bug-fix checkbox.`
       );
   }
   if (
@@ -259,9 +274,10 @@ export async function runFleetRules({ event, request }) {
   )
     throw new Error('PR event metadata missing');
   const path = `/repos/${repository}/pulls/${number}`;
-  const pr = await request(path);
-  if (pr.head?.sha !== event.pull_request.head?.sha)
-    throw new Error('PR head changed; fresh event required');
+  // Two reads, not three: the files, then the PR once. The event's own head
+  // sha is the baseline the old first PR read only copied, and one PR read
+  // after the files still proves the head did not move and the file count is
+  // complete. Saves one GITHUB_TOKEN call per PR event (~590 runs/hour).
   const files = [];
   for (let page = 1; page <= 30; page++) {
     const batch = await request(`${path}/files?per_page=100&page=${page}`);
@@ -269,17 +285,14 @@ export async function runFleetRules({ event, request }) {
     files.push(...batch);
     if (batch.length < 100) break;
   }
+  const current = await request(path);
+  if (current.head?.sha !== event.pull_request.head?.sha)
+    throw new Error('PR head changed; fresh event required');
   if (
-    files.length !== pr.changed_files ||
+    files.length !== current.changed_files ||
     files.some(file => typeof file.filename !== 'string')
   )
     throw new Error('incomplete PR file count');
-  const current = await request(path);
-  if (
-    current.head?.sha !== pr.head.sha ||
-    current.changed_files !== files.length
-  )
-    throw new Error('PR head or files changed during read');
   return evaluateFleetRules({ pr: current, files, repository });
 }
 
