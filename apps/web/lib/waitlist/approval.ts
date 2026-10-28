@@ -1,6 +1,14 @@
 import { and, sql as drizzleSql, eq, ne } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import {
+  buildClaimVerificationRequest,
+  type ClaimVerificationRecord,
+  readClaimVerification,
+  withClaimVerification,
+} from '@/lib/claim/claim-verification';
+import { generateProofCode } from '@/lib/claim/proof-code';
 import type { DbOrTransaction } from '@/lib/db';
+import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -21,6 +29,12 @@ export type WaitlistApprovalResult =
       email: string;
       fullName: string | null;
       clerkId: string | null;
+      /** A held profile was marked proof-only; the operator card is filed after commit. */
+      proofRequest?: {
+        readonly profileId: string;
+        readonly handle: string;
+        readonly record: ClaimVerificationRecord;
+      };
     };
 
 export type WaitlistDisapprovalResult =
@@ -87,10 +101,25 @@ export async function approveWaitlistEntryInTx(
   }
 
   const [profile] = await tx
-    .select({ id: creatorProfiles.id })
+    .select({
+      id: creatorProfiles.id,
+      handle: creatorProfiles.usernameNormalized,
+      settings: creatorProfiles.settings,
+      spotifyId: creatorProfiles.spotifyId,
+      displayName: creatorProfiles.displayName,
+      followers: creatorProfiles.spotifyFollowers,
+    })
     .from(creatorProfiles)
     .where(eq(creatorProfiles.waitlistEntryId, entry.id))
     .limit(1);
+
+  let proofRequest:
+    | {
+        profileId: string;
+        handle: string;
+        record: ClaimVerificationRecord;
+      }
+    | undefined;
 
   if (profile) {
     const [existingClaimedProfile] = await tx
@@ -128,6 +157,39 @@ export async function approveWaitlistEntryInTx(
         updatedAt: now,
       })
       .where(eq(creatorProfiles.id, profile.id));
+
+    // One rule for everyone: only an admin approval is operator proof. Any
+    // other approval (the auto-accept drain, the golden path, a job) leaves the
+    // held profile private until ownership is proven. The record is what the
+    // database trigger keys on, so no later writer can publish it.
+    if (
+      (options.actorType ?? 'system') !== 'admin' &&
+      profile.spotifyId &&
+      !readClaimVerification(profile.settings)
+    ) {
+      proofRequest = {
+        profileId: profile.id,
+        handle: profile.handle,
+        record: buildClaimVerificationRequest({
+          spotifyArtistId: profile.spotifyId,
+          artistName: profile.displayName,
+          reach: profile.followers ?? 0,
+          paid: false,
+          proofOnly: true,
+          proofCode: generateProofCode(),
+          now,
+        }),
+      };
+      await tx
+        .update(creatorProfiles)
+        .set({
+          settings: withClaimVerification(
+            profile.settings,
+            proofRequest.record
+          ),
+        })
+        .where(eq(creatorProfiles.id, profile.id));
+    }
   }
 
   const targetStatus = options.targetStatus ?? 'invited';
@@ -172,12 +234,59 @@ export async function approveWaitlistEntryInTx(
     email: entry.email,
     fullName: entry.fullName,
     clerkId: user.clerkId,
+    ...(proofRequest ? { proofRequest } : {}),
   };
+}
+
+/**
+ * Records the acquisition journey on a waitlist entry's qualification inputs.
+ * First write wins, so a later submit never rewrites the journey. The cookie
+ * id is client-supplied, so it is stamped only when the journey is not
+ * revoked and is unlinked or already linked to the joining user. Returns
+ * whether the journey is eligible (caller records funnel stages only then).
+ */
+export async function stampWaitlistAcquisitionId(
+  entryId: string,
+  acquisitionId: string,
+  appUserId: string
+): Promise<boolean> {
+  const result = await db.execute<{ eligible: boolean }>(drizzleSql`
+    WITH eligible AS (
+      SELECT 1 FROM acquisition_journeys
+      WHERE id = ${acquisitionId}::uuid
+        AND consent_revoked_at IS NULL
+        AND (user_id IS NULL OR user_id = ${appUserId}::uuid)
+    ),
+    stamped AS (
+      UPDATE waitlist_entries
+      SET qualification_inputs =
+        COALESCE(qualification_inputs, '{}'::jsonb)
+        || jsonb_build_object('acquisitionId', ${acquisitionId}::text)
+      WHERE id = ${entryId}::uuid
+        AND EXISTS (SELECT 1 FROM eligible)
+        AND NOT (COALESCE(qualification_inputs, '{}'::jsonb) ? 'acquisitionId')
+      RETURNING 1
+    )
+    SELECT EXISTS (SELECT 1 FROM eligible) AS eligible
+  `);
+  return result.rows[0]?.eligible === true;
 }
 
 export async function finalizeWaitlistApproval(result: WaitlistApprovalResult) {
   if (result.outcome === 'approved' && result.clerkId) {
     await invalidateProxyUserStateCache(result.clerkId);
+  }
+  if (result.outcome === 'approved' && result.proofRequest) {
+    // After commit and lazy: the review module pulls in billing and the Ovie
+    // inbox. A card that fails to file is retried by the proof check.
+    try {
+      const review = await import(
+        '@/lib/claim/claim-verification-review.server'
+      );
+      await review.fileClaimVerificationCard(result.proofRequest);
+    } catch {
+      // The record is already durable; the artist-facing flow still works.
+    }
   }
 }
 

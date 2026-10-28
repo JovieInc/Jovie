@@ -10,7 +10,7 @@ Two registries make ownership and identity checkable instead of remembered:
 | Registry | What it holds |
 |---|---|
 | [`ownership.json`](./ownership.json) | Every repo, deployed service, workflow, CI lane, runner pool, Linear team and area, canon doc, data store and control loop, each with one agent owner, a repair route and an escalation chain. Retired services stay listed with when and why. |
-| [`agent-identities.json`](./agent-identities.json) | Every agent, bot, session class and evaluator: principals, credential **names** (never values), allowed actions, boundaries, audit trail, agent owner, mesh binding, and whether the identity is dedicated, shared or borrowed. |
+| [`agent-identities.json`](./agent-identities.json) | Public redacted stub (full registry in `JovieInc/Ops` `jovie-private/canon/agent-identities.json`, read via `$JOVIE_PRIVATE_DIR`). Every agent, bot, session class and evaluator: principals, credential **names** (never values), allowed actions, boundaries, audit trail, agent owner, mesh binding, and whether the identity is dedicated, shared or borrowed. |
 
 ## Rules
 
