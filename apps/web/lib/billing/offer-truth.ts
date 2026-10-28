@@ -42,6 +42,13 @@ export const PRO_TRIAL_TRUTH = `${PRO_TRIAL_DURATION_DAYS}-day ${ARTIST_VISIBILI
 /** EVENT: Tim, 2026-10-20 — Pro is self-serve; "Limited access" is retired. */
 export const PRO_SELF_SERVE_TRUTH = 'Self-serve. Cancel anytime.';
 
+/**
+ * EVENT: Tim, 2026-10-25 — the one public cancellation and refund sentence.
+ * Rendered verbatim in the published terms; tests keep the two in step.
+ */
+export const CANCEL_AND_REFUND_TRUTH =
+  'Cancel anytime, keep Pro to the end of the paid month, no partial refunds.';
+
 export const FREE_PROFILE_TRUTH =
   'Your Jovie profile stays free forever and keeps audience capture.';
 

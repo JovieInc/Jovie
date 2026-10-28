@@ -133,7 +133,7 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     step: 'homepage',
     route: '/',
     source: HOMEPAGE_FAN_STATES_COPY,
-    copy: 'Each visit gets the right next step.',
+    copy: 'Your profile leads with one clear thing.',
     nature: 'capability',
     capabilityIds: ['artist-profiles'],
   },

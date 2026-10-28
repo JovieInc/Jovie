@@ -70,10 +70,19 @@ export type GoldenPathExtraStage =
   | 'claimed'
   | 'upgrade-viewed';
 
+/**
+ * Waitlist stages (growth spine): `waitlist-join` is the intake submit,
+ * `admitted` is the moment the entry is let in (auto, qualified or manual).
+ * They share the journey table so loop -> waitlist -> admit -> paid reads off
+ * one journey id.
+ */
+export type WaitlistGrowthStage = 'waitlist-join' | 'admitted';
+
 type ArtistOfferAnyStage =
   | ArtistOfferFunnelStage
   | ArtistOfferBranchStage
-  | GoldenPathExtraStage;
+  | GoldenPathExtraStage
+  | WaitlistGrowthStage;
 
 /** Stages written by producers; the rest are derived from the journey row. */
 export const RECORDED_ARTIST_OFFER_STAGES = [
@@ -89,6 +98,8 @@ export const RECORDED_ARTIST_OFFER_STAGES = [
   'start',
   'claimed',
   'upgrade-viewed',
+  'waitlist-join',
+  'admitted',
 ] as const satisfies readonly ArtistOfferAnyStage[];
 
 export type RecordedArtistOfferStage =
