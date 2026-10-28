@@ -53,10 +53,11 @@ class SwarmPolicyTest(unittest.TestCase):
 
     def test_day_spend_sums_todays_ledger_comments_once_per_run(self):
         today = swarm.iso()[:10]
-        rows = [{"body": f"🤖 swarm-ledger run=1 cents=7 at={today}T01:00:00Z"},
-                {"body": f"🤖 swarm-ledger run=1 cents=7 at={today}T01:00:01Z"},  # retried write, same run
-                {"body": f"🤖 swarm-ledger run=2 cents=5 at={today}T02:00:00Z"},
-                {"body": "unrelated comment"}]
+        rows = [{"user": {"login": "jovie-bot[bot]"}, "body": f"🤖 swarm-ledger run=1 cents=7 at={today}T01:00:00Z"},
+                {"user": {"login": "jovie-bot[bot]"}, "body": f"🤖 swarm-ledger run=1 cents=7 at={today}T01:00:01Z"},  # retried write, same run
+                {"user": {"login": "jovie-bot[bot]"}, "body": f"🤖 swarm-ledger run=2 cents=5 at={today}T02:00:00Z"},
+                {"user": {"login": "someone"}, "body": f"🤖 swarm-ledger run=3 cents=900 at={today}T03:00:00Z"},
+                {"user": {"login": "jovie-bot[bot]"}, "body": "unrelated comment"}]
         original = swarm.gh_json
         swarm.gh_json = lambda *a, **k: rows
         try:

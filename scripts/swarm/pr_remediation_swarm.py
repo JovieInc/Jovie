@@ -132,6 +132,7 @@ def cmd_select(a) -> int:
     return 0
 
 
+LEDGER_AUTHOR = os.environ.get("SWARM_LEDGER_AUTHOR", "jovie-bot[bot]")
 LEDGER_RE = re.compile(r"^🤖 swarm-ledger run=(\d+) cents=(\d+) at=(\S+)")
 
 
@@ -149,6 +150,8 @@ def day_spend_cents(issue: str) -> int | None:
             rows = gh_json(["api", f"repos/{REPO}/issues/{issue}/comments?per_page=100&page={page}&since={since}"],
                            priority="report")
             for row in rows:
+                if (row.get("user") or {}).get("login") != LEDGER_AUTHOR:
+                    continue  # public repo: only the Jovie Bot app's own comments are spend
                 m = LEDGER_RE.match(row.get("body") or "")
                 if m and m.group(3)[:10] == since[:10] and m.group(1) not in seen:
                     seen.add(m.group(1))
