@@ -8,20 +8,30 @@ const workflow = readFileSync(
   'utf8'
 );
 
-describe('Mutation Diff spare-compute contract', () => {
-  it('runs every job on the gem pool with no hosted fallback', () => {
+describe('Mutation Diff hosted contract', () => {
+  // Policy 2026-10-26 (supersedes the 2026-10-24 gem-only spare-compute rule): the repo is public,
+  // hosted minutes are free, and Stryker on gem held the host at load 25-50 on 16 cores.
+  it('runs every job on GitHub-hosted runners and keeps the sweep state in an Actions cache', () => {
     const runsOn = [...workflow.matchAll(/^\s+runs-on:\s*(.+)$/gmu)].map(
       match => match[1].trim()
     );
     expect(runsOn).toHaveLength(2);
-    for (const value of runsOn) {
-      expect(value).toBe('[self-hosted, Linux, X64, jovie-fixed]');
-    }
-    expect(workflow).not.toMatch(/ubuntu-/u);
+    for (const value of runsOn) expect(value).toBe('ubuntu-latest');
+    expect(workflow).not.toMatch(/self-hosted|jovie-fixed/u);
+    expect(workflow).toMatch(/actions\/cache\/restore@/u);
+    expect(workflow).toMatch(/actions\/cache\/save@/u);
   });
 
-  it('holds no secrets and never runs on pull requests', () => {
-    expect(workflow).not.toMatch(/\$\{\{\s*secrets\./u);
+  it('confines its one secret to the issue-filing step and never runs on pull requests', () => {
+    const secrets = workflow.match(/\$\{\{\s*secrets\.[A-Z_]+/gu) ?? [];
+    expect(secrets).toHaveLength(1);
+    expect(secrets[0]).toMatch(/LINEAR_API_KEY/u);
+    const step = workflow
+      .split('- name: File survivor issues')[1]
+      .split(/\n {6}- name:/u)[0];
+    expect(step).toMatch(/secrets\.LINEAR_API_KEY/u);
+    expect(step).toMatch(/mutation-sweep-file-issues\.mjs/u);
+    expect(step).not.toMatch(/mutation-sweep\.mjs|stryker|vitest/iu);
     expect(workflow).not.toMatch(/pull_request/u);
   });
 
