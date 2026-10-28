@@ -1,0 +1,538 @@
+{
+  "schema": "jovie.capacity-registry/v1",
+  "description": "Agent capacity facts in one place: per provider and account, the plan and price (promo and until when), usage model, last-known remaining quota or credits with source and timestamp, and the policy and delegation cost rules agents follow. Metadata only: accounts are an id plus a 12-hex email hash, never a secret. Joins canon/agent-identities.json (agents) and ops/registry/spend.json (spendIds, credits.spendId). Live overlay: scripts/lanes/capacity_live.py. Generated view: canon/CAPACITY.md.",
+  "updatedAt": "2026-10-25T01:30:00Z",
+  "thresholds": {
+    "liveMaxAgeHours": 24,
+    "manualMaxAgeDays": 8
+  },
+  "policies": {
+    "preserve-shared-pool": {
+      "rule": "Shared pool: lanes lease one account per run. Do not delegate work that can run on an uncapped own model. Below 30% weekly remaining on the pool, send non-lane agents only Codex-free work."
+    },
+    "burn-before-reset": {
+      "rule": "Capped quota: spend it fully before each reset; unused quota at reset is lost. Route eligible work here first while under pace."
+    },
+    "use-full-quota": {
+      "rule": "Promo-priced plan: use the whole quota every week; the discount ends in December 2026."
+    },
+    "uncapped-own-model": {
+      "rule": "No usage cap on the agent's own model; use it first. Delegating to another provider spends that provider's quota."
+    },
+    "spend-credits-before-expiry": {
+      "rule": "Given credits, not bought: spend them before they expire, paced to balance divided by days left, within the per-run and per-turn caps."
+    },
+    "pay-as-you-go": {
+      "rule": "Real cash or prepaid credit: cheapest model that clears the capability floor; honour the caps in the spend registry."
+    },
+    "preserve-frontier": {
+      "rule": "Subscription capacity for frontier work only (money and auth critical); cheaper lanes take the rest."
+    },
+    "unavailable": {
+      "rule": "Not routable: lane disabled, plan lapsed or unverified. Do not route work here."
+    }
+  },
+  "roles": {
+    "planner": {
+      "description": "Strategic planning. Summer defers all strategic planning to the preferred model (Tim, 2026-10-25).",
+      "candidates": [
+        {
+          "model": "moonshotai/kimi-k3.1-pro",
+          "label": "Kimi K3.1 Pro",
+          "pathId": "kimi-k3.1-pro@credits:hyperagent",
+          "preferred": true,
+          "availability": {
+            "status": "watching",
+            "watch": {
+              "hyperagentAgentNamePattern": "kimi.*3\\.1.*pro",
+              "gatewayModelId": "moonshotai/kimi-k3.1-pro"
+            },
+            "note": "Flips to available when the live watcher sees a Hyperagent agent for it (list_agents) or the Gateway catalog lists it. The Hyperagent MCP has no model catalog tool, so an agent named for the model is the signal."
+          }
+        },
+        {
+          "model": "moonshotai/kimi-k3",
+          "label": "Kimi K3",
+          "pathId": "kimi-k3@credits:hyperagent",
+          "preferred": false,
+          "availability": {
+            "status": "available",
+            "note": "In the Hyperagent registry today; planner until K3.1 Pro lands."
+          }
+        }
+      ]
+    }
+  },
+  "pricing": {
+    "listPriceSource": "scripts/backlog-orchestrator/config/model-registry.json (list_price_in and list_price_out, USD per million tokens; no cached-input price is recorded, so cached tokens are priced as input)",
+    "subscriptionFloorFraction": 0.1,
+    "paceBandPercent": 10,
+    "rule": "Price every model by how it is accessed. API and credits paths cost tokens times the provider list price. A subscription path costs the plan's window price times the task's share of the usable quota, about a tenth of that while the account is behind its window pace (use it or lose it), the plain share while on pace, and rising linearly to the API list price as the account runs ahead of pace and nears exhaustion; an exhausted or lapsed account costs the API price and is not routable. The same model on two paths is two rows.",
+    "paths": [
+      {
+        "id": "gpt-5.6-luna@api",
+        "model": "gpt-5.6-luna",
+        "accessPath": "api",
+        "modelRegistryId": "codex-luna",
+        "funding": "cash"
+      },
+      {
+        "id": "gpt-5.6-luna@subscription:openai-codex",
+        "model": "gpt-5.6-luna",
+        "accessPath": "subscription",
+        "modelRegistryId": "codex-luna",
+        "provider": "openai-codex",
+        "accounts": ["current-login", "jovie-pro", "lyb-pro"],
+        "usableQuotaApiUsd": null,
+        "usableQuotaNote": "Unmeasured: the API-equivalent list-priced usage one weekly window allows. Needs per-run token counts joined to the account's used percent; until then USD is unknown and ranking uses the pace rule alone."
+      },
+      {
+        "id": "gpt-5.6-terra@api",
+        "model": "gpt-5.6-terra",
+        "accessPath": "api",
+        "modelRegistryId": "codex-terra",
+        "funding": "cash"
+      },
+      {
+        "id": "gpt-5.6-terra@subscription:openai-codex",
+        "model": "gpt-5.6-terra",
+        "accessPath": "subscription",
+        "modelRegistryId": "codex-terra",
+        "provider": "openai-codex",
+        "accounts": ["current-login", "jovie-pro", "lyb-pro"],
+        "usableQuotaApiUsd": null
+      },
+      {
+        "id": "gpt-5.6-sol@api",
+        "model": "gpt-5.6-sol",
+        "accessPath": "api",
+        "modelRegistryId": "codex-sol",
+        "funding": "cash"
+      },
+      {
+        "id": "gpt-5.6-sol@subscription:openai-codex",
+        "model": "gpt-5.6-sol",
+        "accessPath": "subscription",
+        "modelRegistryId": "codex-sol",
+        "provider": "openai-codex",
+        "accounts": ["current-login", "jovie-pro", "lyb-pro"],
+        "usableQuotaApiUsd": null
+      },
+      {
+        "id": "kimi-k3@credits:hyperagent",
+        "model": "moonshotai/kimi-k3",
+        "accessPath": "credits",
+        "modelRegistryId": "hyperagent-kimi-k3",
+        "provider": "hyperagent",
+        "accounts": ["founding-500"],
+        "funding": "given-credits"
+      },
+      {
+        "id": "kimi-k3.1-pro@credits:hyperagent",
+        "model": "moonshotai/kimi-k3.1-pro",
+        "accessPath": "credits",
+        "modelRegistryId": null,
+        "provider": "hyperagent",
+        "accounts": ["founding-500"],
+        "funding": "given-credits",
+        "priceWhenAvailable": "Gateway catalog per-token price once the model appears; no list price is recorded today"
+      },
+      {
+        "id": "glm-5.3@credits:hyperagent",
+        "model": "glm-5.3",
+        "accessPath": "credits",
+        "modelRegistryId": "hyperagent-glm-5.3",
+        "provider": "hyperagent",
+        "accounts": ["founding-500"],
+        "funding": "given-credits"
+      },
+      {
+        "id": "glm-5.3@api:gateway",
+        "model": "glm-5.3",
+        "accessPath": "api",
+        "modelRegistryId": "gateway-glm-5.3",
+        "provider": "vercel-ai-gateway",
+        "accounts": ["team-jovie-credits"],
+        "funding": "prepaid-cash"
+      }
+    ]
+  },
+  "providers": [
+    {
+      "id": "openai-codex",
+      "label": "OpenAI Codex (Pro)",
+      "vendor": "openai",
+      "lane": "codex",
+      "agents": ["lane-codex", "codex-session"],
+      "usageModel": "subscription-pool",
+      "plan": {
+        "name": "ChatGPT Pro",
+        "listUsdMonthly": 200,
+        "billedUsdMonthly": 200,
+        "billing": "monthly",
+        "source": "Tim, 2026-10-25 (accounts); canon/FLEET.md scoreboard (3x Codex $200)",
+        "asOf": "2026-10-25"
+      },
+      "policy": {
+        "id": "preserve-shared-pool",
+        "delegation": "Dots and Instinct delegating to Codex take a seat lease, log provider=codex with initiator=<agent>, and draw on this pool."
+      },
+      "limits": {
+        "seatsPerAccount": { "current-login": 5, "jovie-pro": 2, "lyb-pro": 1 },
+        "lowPoolPercent": 30
+      },
+      "decision": {
+        "id": "codex-500-tier",
+        "status": "pending-data",
+        "decideBy": "2026-10-29",
+        "option": "One account at a $500/mo tier (+$300/mo over a $200 Pro)",
+        "evidence": "gem ~/capacity-metrics (capacity-sampler.timer): python3 ~/capacity-metrics/analyze.py",
+        "rule": "Upgrade only if quota, not host disk, is the binding limit and projected exhaustion precedes reset."
+      },
+      "accounts": [
+        {
+          "id": "current-login",
+          "aliases": ["timwhite-co"],
+          "emailSha256": "e719592e9055",
+          "seats": 5,
+          "quota": {
+            "cadence": "weekly",
+            "windowMins": 10080,
+            "remainingPercent": 78,
+            "resetsAt": "2026-10-30T17:41:29Z",
+            "observedAt": "2026-10-25T00:38:35Z",
+            "source": "gem codex-accounts.json account/rateLimits/read",
+            "live": "codex-ledger"
+          }
+        },
+        {
+          "id": "jovie-pro",
+          "aliases": ["jovie", "meetjovie"],
+          "emailSha256": "27862a698f12",
+          "seats": 2,
+          "quota": {
+            "cadence": "weekly",
+            "windowMins": 10080,
+            "remainingPercent": 84,
+            "resetsAt": "2026-10-30T17:50:26Z",
+            "observedAt": "2026-10-25T00:38:35Z",
+            "source": "gem codex-accounts.json account/rateLimits/read",
+            "live": "codex-ledger"
+          }
+        },
+        {
+          "id": "lyb-pro",
+          "aliases": ["fourth"],
+          "emailSha256": "7f31f3ffca1c",
+          "seats": 1,
+          "quota": {
+            "cadence": "weekly",
+            "windowMins": 10080,
+            "remainingPercent": 43,
+            "resetsAt": "2026-10-30T17:41:00Z",
+            "observedAt": "2026-10-25T00:38:35Z",
+            "source": "gem codex-accounts.json account/rateLimits/read",
+            "live": "codex-ledger"
+          },
+          "notes": "Address unverified: the hash matches none of the jov.ie, timwhite.co or meetjovie.com logins tried (may be an Apple relay). Verify by login, not by guessing."
+        },
+        {
+          "id": "tim-jov-ie",
+          "aliases": [],
+          "emailSha256": "940376833938",
+          "status": "lapsed",
+          "plan": {
+            "name": "ChatGPT Free (lapsed from Max)",
+            "listUsdMonthly": 0,
+            "billedUsdMonthly": 0,
+            "source": "Tim, 2026-10-25; gem ledger identity read",
+            "asOf": "2026-10-25"
+          },
+          "quota": {
+            "cadence": "weekly",
+            "windowMins": 10080,
+            "usedPercent": 100,
+            "resetsAt": "2026-11-19T16:18:49Z",
+            "observedAt": "2026-10-25T00:00:00Z",
+            "source": "gem codex rateLimits read (free plan, exhausted)",
+            "note": "Tim estimated ~2026-11-22; the ledger reset is 2026-11-19."
+          },
+          "notes": "Hash matches the jov.ie login Tim named: the earlier 'different identity' was this account on a free plan. Excluded from the pool."
+        }
+      ]
+    },
+    {
+      "id": "xai-grok",
+      "label": "xAI Grok (SuperGrok Heavy)",
+      "vendor": "xai",
+      "lane": "grok",
+      "agents": ["lane-grok", "grokbot"],
+      "usageModel": "capped-quota",
+      "plan": {
+        "name": "SuperGrok Heavy",
+        "listUsdMonthly": 300,
+        "billedUsdMonthly": 99,
+        "promoUntil": "2026-12-01T00:00:00Z",
+        "billing": "monthly",
+        "source": "Tim, 2026-10-25 ($300/mo plan billed $99/mo until December 2026; exact end date unconfirmed)",
+        "asOf": "2026-10-25"
+      },
+      "policy": {
+        "id": "use-full-quota",
+        "delegation": "Grokbot is a channel on this quota (assumed; unverified): fail over when the weekly limit is spent."
+      },
+      "limits": { "seats": 1 },
+      "accounts": [
+        {
+          "id": "supergrok-heavy",
+          "quota": {
+            "cadence": "weekly",
+            "windowMins": 10080,
+            "usedPercent": 63,
+            "resetsAt": "2026-10-26T21:01:00Z",
+            "observedAt": "2026-10-25T00:55:00Z",
+            "source": "gem grok TUI /usage, Usage limit tab; the bar is USED percent (rose 62 to 63 after model calls, 2026-10-25)",
+            "live": "grok-usage"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hyperagent",
+      "label": "Hyperagent (Founding 500)",
+      "vendor": "hyperagent",
+      "lane": "hyperagent",
+      "agents": ["hyperagent", "eve-hyperagent"],
+      "spendIds": ["hyperagent-credits"],
+      "usageModel": "credits",
+      "plan": {
+        "name": "Founding 500",
+        "usdYearly": 200,
+        "listUsdMonthly": null,
+        "billing": "yearly",
+        "source": "Tim, 2026-10-25 (Founding 500, $200/year)",
+        "asOf": "2026-10-25"
+      },
+      "policy": {
+        "id": "spend-credits-before-expiry",
+        "delegation": "Per-turn model budget $10; lane cap $10 per run; soft cap 24 runs per day until evidence raises it."
+      },
+      "limits": {
+        "softRuns": 24,
+        "windowS": 86400,
+        "perRunCapUsd": 10,
+        "perTurnBudgetUsd": 10
+      },
+      "accounts": [
+        {
+          "id": "founding-500",
+          "credits": {
+            "spendId": "hyperagent-credits",
+            "balanceUsd": 4674.34,
+            "expiresAt": "2027-06-01T00:00:00Z",
+            "observedAt": "2026-10-25T00:10:00Z",
+            "source": "Tim, 2026-10-25 (Hyperagent web UI)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dots",
+      "label": "Dots",
+      "vendor": "own-model",
+      "agents": ["dots"],
+      "usageModel": "uncapped-own-model",
+      "plan": {
+        "name": "Own model, no usage cap",
+        "listUsdMonthly": null,
+        "source": "Tim, 2026-10-25",
+        "asOf": "2026-10-25"
+      },
+      "policy": {
+        "id": "uncapped-own-model",
+        "delegation": "Delegating to Codex consumes the shared Codex Pro quota (openai-codex)."
+      },
+      "accounts": [
+        {
+          "id": "dots",
+          "notes": "Plan and price not recorded; add when known."
+        }
+      ]
+    },
+    {
+      "id": "instinct",
+      "label": "Instinct",
+      "vendor": "own-model",
+      "agents": ["instinct"],
+      "usageModel": "uncapped-own-model",
+      "plan": {
+        "name": "Own model, no usage cap",
+        "listUsdMonthly": null,
+        "source": "Tim, 2026-10-25",
+        "asOf": "2026-10-25"
+      },
+      "policy": {
+        "id": "uncapped-own-model",
+        "delegation": "Delegating to Codex consumes the shared Codex Pro quota (openai-codex)."
+      },
+      "accounts": [
+        {
+          "id": "instinct",
+          "notes": "Plan and price not recorded; add when known."
+        }
+      ]
+    },
+    {
+      "id": "muse",
+      "label": "Muse",
+      "vendor": "unknown",
+      "agents": ["muse"],
+      "usageModel": "capped-quota",
+      "plan": {
+        "name": "Capped quota (plan not recorded)",
+        "listUsdMonthly": null,
+        "source": "Tim, 2026-10-25",
+        "asOf": "2026-10-25"
+      },
+      "policy": { "id": "burn-before-reset" },
+      "accounts": [
+        {
+          "id": "muse",
+          "notes": "Gap: reset cadence, remaining quota and price are not recorded or readable yet."
+        }
+      ]
+    },
+    {
+      "id": "anthropic-claude",
+      "label": "Anthropic (Opus, Sonnet, Haiku)",
+      "vendor": "anthropic",
+      "lane": "claude",
+      "agents": ["lane-claude", "claude-code-session"],
+      "spendIds": ["anthropic-api-credit", "managed-agents-loop"],
+      "usageModel": "subscription-pool",
+      "plan": {
+        "name": "Claude subscriptions",
+        "listUsdMonthly": null,
+        "source": "Tim, 2026-10-25 (via Claude subscriptions); price not recorded",
+        "asOf": "2026-10-25"
+      },
+      "policy": {
+        "id": "preserve-frontier",
+        "delegation": "Opus only for money and auth critical work; Sonnet and Haiku for the rest."
+      },
+      "limits": { "softRuns": 12, "windowS": 18000 },
+      "accounts": [
+        {
+          "id": "claude-subscriptions",
+          "notes": "Lane disabled in canon/agent-identities.json. No quota read path."
+        }
+      ]
+    },
+    {
+      "id": "vercel-ai-gateway",
+      "label": "Vercel AI Gateway",
+      "vendor": "vercel",
+      "agents": ["summer", "github-actions"],
+      "spendIds": [
+        "vercel-ai-gateway-credits",
+        "summer-gateway-monthly",
+        "gateway-budget-jovie-eve-shadow",
+        "gateway-budget-jovie"
+      ],
+      "usageModel": "pay-per-token",
+      "plan": {
+        "name": "Prepaid credits (AI_GATEWAY_API_KEY, team jovie)",
+        "listUsdMonthly": null,
+        "source": "ops/registry/spend.json; Tim, 2026-10-25 (cheap fixer uses the repo AI_GATEWAY_API_KEY)",
+        "asOf": "2026-10-25"
+      },
+      "policy": {
+        "id": "pay-as-you-go",
+        "delegation": "Shared balance across every key and project including Summer; the cheap fixer draws on it."
+      },
+      "accounts": [
+        {
+          "id": "team-jovie-credits",
+          "credits": {
+            "spendId": "vercel-ai-gateway-credits",
+            "live": "gateway-credits"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cloudflare-credits",
+      "label": "Cloudflare Startup credits",
+      "vendor": "cloudflare",
+      "agents": ["summer"],
+      "spendIds": ["cloudflare-credits", "summer-trial-workers-ai"],
+      "usageModel": "credits",
+      "plan": {
+        "name": "Startup Program credits (given, not bought)",
+        "listUsdMonthly": 0,
+        "source": "ops/registry/spend.json",
+        "asOf": "2026-10-20"
+      },
+      "proposals": [
+        {
+          "id": "workers-ai-token",
+          "status": "proposed-not-authorized",
+          "asOf": "2026-10-25",
+          "account": "the Cloudflare account that holds the Startup Program credits (named in spend.json cloudflare-credits)",
+          "scope": "One account-scoped API token with Workers AI Read and Workers AI Edit only (Cloudflare's REST API doc names both for a custom token; it offers no run-only permission), no zone, R2, Workers or other permission, no user-level scope.",
+          "consumers": ["CI dogfood vision", "gem reviewer", "system-1 router"],
+          "price": "$0.011 per 1,000 neurons after a 10,000 neurons/day free allocation; llama-3.2-11b-vision-instruct $0.049 per M input and $0.676 per M output tokens (cloudflare docs, read 2026-10-25)",
+          "expectedMonthlyCost": "Cash $0 while the Startup credits last ($10,000, expire 2027-06-09, Workers AI sub-cap $50,000, 0% used). Bound: Summer's provider-trial ledger caps Workers AI at $50 per month (0.5% of the credits). Illustration, not a measurement: a vision call of 2k input and 500 output tokens costs about $0.00044, so 1,000 calls a day is about $13 a month. No consumer's call volume is recorded yet.",
+          "authorization": "None. No token creation and no top-up is authorized; this row is facts only."
+        }
+      ],
+      "policy": { "id": "spend-credits-before-expiry" },
+      "accounts": [
+        {
+          "id": "startup-program",
+          "credits": { "spendId": "cloudflare-credits" }
+        }
+      ]
+    },
+    {
+      "id": "devin",
+      "label": "Devin (free SWE-2)",
+      "vendor": "cognition",
+      "lane": "devin",
+      "agents": ["lane-devin", "devin-mesh"],
+      "usageModel": "free",
+      "plan": {
+        "name": "Free (swe-2-medium)",
+        "listUsdMonthly": 0,
+        "billedUsdMonthly": 0,
+        "source": "scripts/lanes/providers.json freeOnly policy",
+        "asOf": "2026-10-25"
+      },
+      "policy": {
+        "id": "unavailable",
+        "delegation": "Lane disabled in canon/agent-identities.json."
+      },
+      "accounts": [{ "id": "free", "status": "disabled" }]
+    },
+    {
+      "id": "kimi",
+      "label": "Kimi",
+      "vendor": "moonshot",
+      "lane": "kimi",
+      "agents": ["lane-kimi"],
+      "usageModel": "capped-quota",
+      "plan": {
+        "name": "Kimi plan",
+        "listUsdMonthly": 200,
+        "billedUsdMonthly": 200,
+        "source": "canon/FLEET.md scoreboard 2026-08-17; current status unverified",
+        "asOf": "2026-08-17"
+      },
+      "policy": {
+        "id": "unavailable",
+        "delegation": "Lane disabled; verify the plan is still paid before counting it."
+      },
+      "accounts": [{ "id": "kimi-plan", "status": "unverified" }]
+    }
+  ]
+}

@@ -22,5 +22,7 @@ export function claimDecisionResponse(
       return json({ error: 'identity_conflict' }, 409);
     case 'no_subscription':
       return json({ error: 'no_subscription' }, 409);
+    case 'in_progress':
+      return json({ error: 'decision_in_progress' }, 409);
   }
 }
