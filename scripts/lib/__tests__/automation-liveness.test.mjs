@@ -1,4 +1,6 @@
-import { dirname, resolve } from 'node:path';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
@@ -6,6 +8,7 @@ import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
 import {
   lsRemoteMain,
   runLiveness as runLivenessImpl,
+  main as runMain,
 } from '../../automation-liveness.mjs';
 import { ADMISSION_BLOCKING_LABELS } from '../admission-hold-labels.mjs';
 import {
@@ -13,9 +16,16 @@ import {
   livenessFingerprint,
   loadRegistry,
 } from '../automation-registry.mjs';
+import { applyRemediationDecisionWithRetry } from '../remediation-signal.mjs';
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const registry = loadRegistry(repoRoot);
+
+// JOV-8843: the filing branch's intake is mocked so state-preservation tests
+// never reach Linear. Restore the mock per test that counts calls.
+vi.mock('../remediation-signal.mjs', () => ({
+  applyRemediationDecisionWithRetry: vi.fn(async () => ({ ok: true })),
+}));
 const NOW = Date.parse('2026-10-20T19:35:00Z');
 const iso = minutesAgo => new Date(NOW - minutesAgo * 60_000).toISOString();
 const MAIN = 'a'.repeat(40);
@@ -284,6 +294,53 @@ describe('dead-man liveness', () => {
     expect(livenessDecisions(report)).toEqual([]);
   });
 
+  describe('promotion silence budget from the lanes feed (one source of truth)', () => {
+    const run = async feed => {
+      const { report } = await runLiveness({
+        registry: only('derived:jovie:production-promotion'),
+        nowMs: NOW,
+        fetchImpl: fakeFetch({
+          'jov.ie/api/health/build-info': { commitSha: LIVE },
+          '/git/ref/heads/main': mainRef(MAIN),
+          [`/compare/${LIVE}...${MAIN}`]: {
+            ahead_by: 1,
+            commits: [{ commit: { committer: { date: iso(200) } } }],
+          },
+          ...(feed ? { 'lanes-status.json': feed } : {}),
+        }),
+      });
+      return rowFor(report, 'derived:jovie:production-promotion');
+    };
+    const limit = ageS => ({
+      deployHealth: { limits: { 'JovieInc/Jovie': { ageS } } },
+    });
+
+    it('uses the measured limit when it is inside the 1 to 24 hour bounds', async () => {
+      expect(await run(limit(9000))).toMatchObject({
+        status: 'stale',
+        budgetMinutes: 150,
+      });
+      expect(await run(limit(30_000))).toMatchObject({
+        status: 'fresh',
+        budgetMinutes: 500,
+      });
+    });
+
+    it('falls back to 246 minutes when the feed is missing, unreadable or out of bounds', async () => {
+      for (const feed of [
+        null,
+        limit(100),
+        limit(999_999),
+        { deployHealth: {} },
+      ]) {
+        expect(await run(feed)).toMatchObject({
+          status: 'fresh',
+          budgetMinutes: 246,
+        });
+      }
+    });
+  });
+
   it('keeps a recent unshipped commit inside the promotion silence budget', async () => {
     const { report } = await runLiveness({
       registry: only('derived:jovie:production-promotion'),
@@ -351,19 +408,19 @@ describe('dead-man liveness', () => {
           commits: [
             {
               sha: MAIN,
-              commit: { committer: { date: iso(141) } },
+              commit: { committer: { date: iso(300) } },
             },
           ],
         },
         'event=push': {
           total_count: 1,
-          workflow_runs: [{ created_at: iso(141), event: 'push' }],
+          workflow_runs: [{ created_at: iso(300), event: 'push' }],
         },
       }),
     });
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'stale',
-      ageMinutes: 141,
+      ageMinutes: 300,
     });
   });
 
@@ -422,7 +479,7 @@ describe('dead-man liveness', () => {
           commits: [
             {
               sha: MAIN,
-              commit: { committer: { date: iso(180) } },
+              commit: { committer: { date: iso(300) } },
             },
           ],
         },
@@ -430,7 +487,7 @@ describe('dead-man liveness', () => {
           String(url).includes('page=2')
             ? {
                 total_count: 101,
-                workflow_runs: [{ created_at: iso(130), event: 'push' }],
+                workflow_runs: [{ created_at: iso(280), event: 'push' }],
               }
             : {
                 total_count: 101,
@@ -440,7 +497,7 @@ describe('dead-man liveness', () => {
     });
     expect(rowFor(report, 'derived:jovie:production-promotion')).toMatchObject({
       status: 'stale',
-      ageMinutes: 130,
+      ageMinutes: 280,
     });
   });
 
@@ -482,7 +539,7 @@ describe('dead-man liveness', () => {
       }
     );
 
-    it.each([30, 180])(
+    it.each([30, 300])(
       'recovers an authenticated range 403 without hiding %i minutes of lag',
       async ageMinutes => {
         const requests = [];
@@ -516,10 +573,10 @@ describe('dead-man liveness', () => {
         expect(
           rowFor(report, 'derived:jovie:production-promotion')
         ).toMatchObject({
-          status: ageMinutes > 120 ? 'stale' : 'fresh',
+          status: ageMinutes > 246 ? 'stale' : 'fresh',
           reason:
-            ageMinutes > 120
-              ? 'silent-for-180m-over-120m'
+            ageMinutes > 246
+              ? 'silent-for-300m-over-246m'
               : '2-commits-unshipped',
           ageMinutes,
         });
@@ -529,7 +586,7 @@ describe('dead-man liveness', () => {
         );
         expect(requests[1].headers.get('authorization')).toBeNull();
         expect(requests.every(r => r.url.endsWith('?per_page=1'))).toBe(true);
-        expect(livenessDecisions(report).length).toBe(ageMinutes > 120 ? 1 : 0);
+        expect(livenessDecisions(report).length).toBe(ageMinutes > 246 ? 1 : 0);
       }
     );
     it('uses the public credential budget when main recovery exhausted the Actions budget', async () => {
@@ -1594,5 +1651,113 @@ describe('liveness run receipts', () => {
       ['started', 'advanced'],
       ['finished', 'failed'],
     ]);
+  });
+});
+
+describe('alert state preservation (JOV-8843)', () => {
+  const FINGERPRINT = livenessFingerprint('summer:model-turns');
+  const failFetch = async () => new Response('{}', { status: 404 });
+  // The JOV-8803 critical loop back fresh: its heartbeat returned while an
+  // alert for it was already filed (persisted red state).
+  const recoveredFetch = fakeFetch({
+    'summer.jov.ie/runtime/v1/health': {
+      receiptFreshness: {
+        modelTurn: {
+          // main() judges against real wall-clock time; a fixed fixture
+          // timestamp would age past the 120-minute silence budget.
+          observedAt: new Date(Date.now() - 10 * 60_000).toISOString(),
+          status: 'verified',
+        },
+      },
+    },
+  });
+  const summerStatus = report =>
+    report.results.find(row => row.id === 'summer:model-turns')?.status;
+
+  function persistState(at) {
+    const dir = mkdtempSync(join(tmpdir(), 'automation-liveness-'));
+    const path = join(dir, 'state.json');
+    writeFileSync(path, `${JSON.stringify(at, null, 2)}\n`);
+    return path;
+  }
+
+  beforeEach(() => {
+    vi.mocked(applyRemediationDecisionWithRetry).mockClear();
+  });
+
+  it('keeps filed alert state on a diagnostic run without --file', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--previous', path],
+      env: {},
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      [FINGERPRINT]: 'red',
+    });
+    expect(applyRemediationDecisionWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('keeps filed alert state when remediation intake is disabled', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--file', '--previous', path],
+      env: { REMEDIATION_INTAKE_DISABLED: '1' },
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))).toEqual({
+      [FINGERPRINT]: 'red',
+    });
+    expect(applyRemediationDecisionWithRetry).not.toHaveBeenCalled();
+  });
+
+  it('still advances state and files decisions when intake is active', async () => {
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    const result = await runMain({
+      argv: ['--file', '--previous', path],
+      env: {},
+      fetchImpl: recoveredFetch,
+    });
+    expect(summerStatus(result)).toBe('fresh');
+    expect(JSON.parse(readFileSync(path, 'utf8'))[FINGERPRINT]).toBe('green');
+    const decisions = vi
+      .mocked(applyRemediationDecisionWithRetry)
+      .mock.calls.map(([decision]) => decision);
+    expect(decisions.find(row => row.fingerprint === FINGERPRINT)?.action).toBe(
+      'green'
+    );
+    // main() also returns the export-automations payload, which has no decisions.
+    if (!('decisions' in result)) {
+      throw new Error('expected a liveness report with decisions');
+    }
+    expect(applyRemediationDecisionWithRetry).toHaveBeenCalledTimes(
+      result.decisions.length
+    );
+  });
+
+  it('keeps the prior state for a fingerprint whose filing failed', async () => {
+    // checkJs accepts only a real applyRemediationDecision return. The intake reads ok.
+    vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
+      ok: false,
+      action: 'green',
+      results: [],
+    });
+    const path = persistState({ [FINGERPRINT]: 'red' });
+    try {
+      const result = await runMain({
+        argv: ['--file', '--previous', path],
+        env: {},
+        fetchImpl: failFetch,
+      });
+      expect(summerStatus(result)).toBe('unknown');
+      expect(JSON.parse(readFileSync(path, 'utf8'))[FINGERPRINT]).toBe('red');
+    } finally {
+      vi.mocked(applyRemediationDecisionWithRetry).mockResolvedValue({
+        ok: true,
+        action: 'skip',
+      });
+    }
   });
 });

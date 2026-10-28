@@ -49,6 +49,7 @@ import {
   upsertRelease,
   upsertReleaseTrack,
 } from './queries';
+import { findExistingRelease } from './release-identity';
 import { classifySpotifyReleaseType } from './release-type';
 import { generateUniqueSlug } from './slug';
 
@@ -130,7 +131,7 @@ function getSpotifyAlbumIdentity(album: SpotifyAlbum): string {
     .sort((left, right) => left.localeCompare(right))
     .join(':');
 
-  return `${normalizeReleaseIdentity(album.name)}:${artists}`;
+  return `${normalizeReleaseIdentity(album.name)}:${artists}:${album.release_date}`;
 }
 
 function getAlbumMetadataScore(
@@ -961,12 +962,29 @@ async function importSingleRelease(
   const normalizedTitle = normalizeReleaseIdentity(metadata.sanitizedTitle);
 
   // Spotify IDs can vary by market/edition. Reuse the existing creator release
-  // by provider ID, UPC, or normalized title so re-imports cannot create a new
-  // row merely because Spotify returned another edition identifier.
-  const [existingRelease] = await db
+  // by provider ID or UPC, or by title only when it is also the same artists on
+  // the same date (a market edition). Title alone never merges releases: a
+  // solo recording and a later collaboration can share a title.
+  const releaseDateForIdentity = parseSpotifyReleaseDate(
+    fullAlbum?.release_date ?? album.release_date,
+    fullAlbum?.release_date_precision ?? album.release_date_precision
+  );
+  const spotifyAlbumLinkExists = drizzleSql<boolean>`EXISTS (
+    SELECT 1 FROM provider_links pl
+    WHERE pl.release_id = ${discogReleases.id}
+      AND pl.owner_type = 'release'
+      AND pl.provider_id = 'spotify'
+      AND pl.url LIKE ${`%/album/${album.id}%`}
+  )`;
+  const candidateReleases = await db
     .select({
       id: discogReleases.id,
       slug: discogReleases.slug,
+      title: discogReleases.title,
+      upc: discogReleases.upc,
+      releaseDate: discogReleases.releaseDate,
+      metadata: discogReleases.metadata,
+      providerLinked: spotifyAlbumLinkExists.as('provider_linked'),
     })
     .from(discogReleases)
     .where(
@@ -974,14 +992,24 @@ async function importSingleRelease(
         eq(discogReleases.creatorProfileId, creatorProfileId),
         or(
           drizzleSql`${discogReleases.metadata} ->> 'spotifyId' = ${album.id}`,
+          spotifyAlbumLinkExists,
           metadata.sanitizedUpc
             ? eq(discogReleases.upc, metadata.sanitizedUpc)
             : undefined,
           drizzleSql`regexp_replace(lower(${discogReleases.title}), '[^a-z0-9]+', '', 'g') = ${normalizedTitle}`
         )
       )
-    )
-    .limit(1);
+    );
+  const existingRelease = findExistingRelease(
+    {
+      providerAlbumId: album.id,
+      upc: metadata.sanitizedUpc,
+      normalizedTitle,
+      artistIds: album.artists.map(a => a.id),
+      releaseDate: releaseDateForIdentity,
+    },
+    candidateReleases
+  );
 
   const effectiveAlbumType = fullAlbum?.album_type ?? album.album_type;
   const effectiveTotalTracks = fullAlbum?.total_tracks ?? album.total_tracks;
