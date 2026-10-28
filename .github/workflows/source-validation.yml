@@ -16,6 +16,13 @@ concurrency:
   group: source-validation-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
   cancel-in-progress: false
   queue: max
+env:
+  # Read-only Cloudflare R2 Turbo cache (infra/turbo-cache). The RO token cannot
+  # write, so PR code can read main's artifacts but never poison them. Fork PRs
+  # receive no secrets and stay local-only. setup-node-pnpm probes the Worker.
+  CF_TURBO_URL: ${{ secrets.CF_TURBO_CACHE_URL }}
+  CF_TURBO_ROLE: ro
+  CF_TURBO_TOKEN: ${{ secrets.CF_TURBO_CACHE_RO_TOKEN }}
 jobs:
   deterministic:
     name: Source Validation
