@@ -168,7 +168,9 @@ RELEASE_EXTRAS = ["scripts/shipping_origin.py", # Shared client layer (budgeted 
                   "packages/api-client/gh.ts", "packages/api-client/client.ts",
                   "packages/api-client/cache.ts", "packages/api-client/contract.ts",
                   "packages/api-client/headers.ts", "packages/api-client/policy.ts",
-                  "packages/api-client/store.ts",
+                  "packages/api-client/store.ts", "packages/api-client/cli.ts",
+                  # Headroom file for Summer/Ovie (credentials_spend.py publishes it).
+                  "scripts/rate-limit-headroom.mjs", "scripts/lib/api-budget.mjs", "ops/registry/rate-limits.json",
                   "scripts/fleet-gate/gem-priority-gate.py", "scripts/fleet-gate/closure_health.py",
                   "scripts/fleet-gate/gem_gate_contract.py", "scripts/fleet-gate/summer_ci_audit.py",
                   "scripts/fleet-gate/symphony_proof_context.py", "scripts/fleet-gate/scoped_admission.py",

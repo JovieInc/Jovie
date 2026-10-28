@@ -58,7 +58,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "46fa336beeef6a6d9bfba990205368a7af77f17a50a405ef4451d303bf706a81"
+    "bodySha256": "fdb4509555b05d0e755129c4468b3d5b86c1fe6a7aade44d5b2bbc96c27cec1e"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -67,7 +67,7 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "e2e36de64b575a72b809b2581fa6bde2ed0e92f53b3a9af4851383228b4b70bd"
+    "bodySha256": "6aa8d09090bdfc17b1ae1ed3c171a498d5088a6c488b546e643ebdb2183d8467"
   },
   {
     "file": ".claude/rules/hermes-air.md",
@@ -130,6 +130,18 @@
     "file": ".claude/rules/pr-stacking.md",
     "paths": [".github/**", "scripts/*pr*", "docs/PR_FLOW.md"],
     "bodySha256": "43c5a50289369ce1152ca8716058e858fac5375a1701ab536b977bcd425840d5"
+  },
+  {
+    "file": ".claude/rules/rate-limits.md",
+    "paths": [
+      "apps/**",
+      "packages/**",
+      "scripts/**",
+      ".github/**",
+      "workers/**",
+      "tools/**"
+    ],
+    "bodySha256": "e6284b5f534708944ad49285fdf6e02e3992001a1f34edfb3fd80eaca1fe60dd"
   },
   {
     "file": ".claude/rules/release.md",

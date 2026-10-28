@@ -39,6 +39,10 @@ The client is the contract. Do not reimplement any of it at a call site:
 - **Blocked providers** (`"status": "blocked"`, e.g. composio) stay registered
   so the guard flags their hosts; the client refuses to call them.
 
+Limits and headroom are a planning input: [rate-limits](rate-limits.md) (registry
+`ops/registry/rate-limits.json`, `node scripts/rate-limit-headroom.mjs`); a new
+consumer declares its calls/hour per limit, enforced by the guard below.
+
 `node packages/api-client/cli.ts status --json` (or `PYTHONPATH=scripts python3
 -m apiclient status --json`) shows per-provider budget, breaker and usage for lanes doctor.
 

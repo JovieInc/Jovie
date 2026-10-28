@@ -72,10 +72,10 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | Skills | [gstack](.claude/rules/gstack.md) |
 
 Other scoped rules: ci-branching, event-driven, infra, linear, motion,
-pr-stacking, swarm, hermes-air.
+pr-stacking, swarm, hermes-air, rate-limits.
 Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:22 -->
+<!-- doc-freshness:scoped-rules-count:23 -->
 
 ## Tools and workflow
 
@@ -102,7 +102,7 @@ present them as live model or UI proof. UI changes require state coverage
 and layout stability; DESIGN.md lists bounded disclosure exceptions.
 
 Run narrow checks first; broaden for changed boundaries, failures, or required CI
-coverage. Skip redundant reruns. Report changes, exact checks, failures, and
+coverage. Report changes, exact checks, failures, and
 limitations. Do not infer local source, hosted CI, native merge queue, deployed
 build, or observed runtime from each other. Preserve the goal and user
 corrections across compaction; resume at the next unfinished step.
