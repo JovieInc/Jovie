@@ -316,3 +316,101 @@ test.describe('Public footer incremental content stability', () => {
     });
   }
 });
+
+test.describe('Instant merch hero media stability', () => {
+  for (const width of [390, 1023, 1024, 1440]) {
+    for (const reducedMotion of ['reduce', 'no-preference'] as const) {
+      test(`preview arrival at ${width}px with ${reducedMotion} motion`, async ({
+        browser,
+        baseURL,
+      }, testInfo) => {
+        // Exercise the real server-rendered preview without hydration replacing
+        // the detached nodes. This is a deterministic sizing dependency probe;
+        // it does not assert what caused the original CI arrival timing.
+        const context = await browser.newContext({
+          baseURL,
+          viewport: { width, height: 900 },
+          javaScriptEnabled: false,
+          reducedMotion,
+        });
+        try {
+          const page = await context.newPage();
+          const response = await page.goto('/instant-merch', {
+            waitUntil: 'load',
+          });
+          expect(response?.status()).toBe(200);
+          await page.evaluate(() => document.fonts.ready);
+          const surface = page.getByTestId('chat-generation-artifact-surface');
+          const media = await surface.locator('..').elementHandle();
+          if (!media) throw new Error('Missing hero media wrapper');
+          const measure = async () => ({
+            media: await media.boundingBox(),
+            heading: await page.getByTestId('hero-heading').boundingBox(),
+            cta: await page
+              .getByTestId('instant-merch-primary-cta')
+              .boundingBox(),
+            following: await page
+              .getByTestId('marketing-section-how-it-works')
+              .boundingBox(),
+          });
+          const complete = await measure();
+          const images = await surface.locator('img').elementHandles();
+          expect(images).toHaveLength(3);
+          for (const image of images) {
+            await image.evaluate(element => {
+              const marker = document.createComment('merch-image');
+              element.before(marker);
+              (element as Element & { restoreMarker?: Comment }).restoreMarker =
+                marker;
+              element.remove();
+            });
+          }
+          expect(
+            await measure(),
+            'image arrival must not change layout'
+          ).toEqual(complete);
+          for (const image of images) {
+            await image.evaluate(element => {
+              const marker = (element as Element & { restoreMarker?: Comment })
+                .restoreMarker;
+              if (!marker) throw new Error('Missing image restore marker');
+              marker.replaceWith(element);
+            });
+          }
+          let partial = complete;
+          if (width >= 1024) {
+            const preview = await surface.elementHandle();
+            if (!preview) throw new Error('Missing merch preview');
+            await preview.evaluate(element => element.remove());
+            partial = await measure();
+            await media.evaluate(
+              (element, child) => element.append(child),
+              preview
+            );
+            expect(partial, 'desktop media must reserve its grid cell').toEqual(
+              complete
+            );
+          }
+          expect(await measure(), 'restored preview geometry').toEqual(
+            complete
+          );
+          expect(
+            await page.evaluate(
+              () => document.documentElement.scrollWidth - innerWidth
+            )
+          ).toBeLessThanOrEqual(1);
+          await testInfo.attach('hero-media-geometry', {
+            body: JSON.stringify({ width, reducedMotion, complete, partial }),
+            contentType: 'application/json',
+          });
+          await testInfo.attach('hero-media-render', {
+            body: await page.screenshot({ animations: 'disabled' }),
+            contentType: 'image/png',
+          });
+        } finally {
+          await context.close();
+        }
+      });
+    }
+  }
+});

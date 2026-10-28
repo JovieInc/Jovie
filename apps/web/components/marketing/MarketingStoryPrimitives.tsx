@@ -47,6 +47,30 @@ const OUTPUT_ACCENTS = {
 
 type WorkflowTone = 'audience' | 'default' | 'destination' | 'message';
 
+/**
+ * Visible marker for illustrative content (named people, sample activity).
+ * Any marketing element that shows invented activity must carry one; the
+ * marketing-example-labels guard test enforces it.
+ */
+const EXAMPLE_ACTIVITY_LABEL = 'Example activity, not real people';
+
+export function ExampleLabel({
+  className,
+  children = 'Example',
+}: Readonly<{ className?: string; children?: string }>) {
+  return (
+    <span
+      data-example-label='true'
+      className={cn(
+        'inline-block text-3xs font-medium text-tertiary-token',
+        className
+      )}
+    >
+      {children}
+    </span>
+  );
+}
+
 export type ArtistNotificationFloatingCard =
   ArtistNotificationsLandingCopy['hero']['floatingCards'][number];
 
@@ -67,6 +91,7 @@ export function ArtistNotificationFloatingCardView({
           className
         )}
       >
+        <ExampleLabel className='mb-2 pl-3' />
         <div className='flex items-center gap-2 rounded-full bg-black/34 py-1 pl-3 pr-1'>
           <Mail
             className='h-3.5 w-3.5 shrink-0 text-tertiary-token'
@@ -95,6 +120,7 @@ export function ArtistNotificationFloatingCardView({
           <Icon className='h-4 w-4' strokeWidth={1.9} />
         </span>
         <div className='min-w-0 flex-1'>
+          <ExampleLabel className='mb-1' />
           <p className='text-sm font-semibold leading-[1.35] tracking-tighter text-primary-token'>
             {card.title}
           </p>
@@ -197,6 +223,7 @@ export function ArtistProfileCaptureVisual({
       </div>
 
       <div className='mt-14 space-y-3'>
+        <ExampleLabel>{EXAMPLE_ACTIVITY_LABEL}</ExampleLabel>
         {capture.audienceRails.map((rail, railIndex) => (
           <AudienceRail
             key={rail.map(({ id }) => id).join('|')}

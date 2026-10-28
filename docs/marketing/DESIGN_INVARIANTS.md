@@ -387,3 +387,26 @@ another task supplies no design requirement or action authority here.
 - **Change/exception:** do not add a width. Use the box or `bleed`. A true
   non-container (a menu flyout, a phone frame) takes a
   `container-width-allow: <reason>` comment on the line or the line above.
+
+## MKT-D19 — One accent per marketing image and section
+
+- **Scope:** marketing page sections, generated and art-directed imagery, and
+  image-generation prompt templates. Real product captures stay unrecolored.
+- **Requirement:** one primary color per image, never mixed. Each page section
+  gets exactly one accent, chosen per section and image from Scene Palette v1:
+  Ion `#3FAFF3`, Ultra `#A789F0`, or Pulse `#EB6AC6`. Never blend those hues in
+  the same image. A gradient's key color is that section's accent hue; other
+  tones are only neutral black falloff. Fades and light reveals are strongly
+  asymmetric: a lit wedge, and the rest to black. Prompt templates name the
+  single hue and forbid secondary hues. The same rule applies inside those
+  prompts. Orange as a scene or cue color, and a literal triad, stay forbidden.
+  Canonical wording is [Imagery and color](../../canon/MARKETING.md#imagery-and-color).
+- **Founder evidence/status:** requirement, 2026-10-23.
+- **Enforcement:** `scripts/invariants/art-direction/accent.mjs` and `hue.mjs`
+  ratchet section-accent and hue source violations. These source checks do not
+  certify generated pixels or prompt compliance. The in-repo
+  frontend contract is [`.claude/rules/ui.md`](../../.claude/rules/ui.md); the
+  prose skill `~/.codex/skills/frontend-skill` is not in this repository.
+- **Change/exception:** truthful skin, identity, and safety color is not a
+  second accent. Real product captures are not recolored. Product UI accent
+  rotation does not license a second hue in a marketing image.

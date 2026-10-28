@@ -301,6 +301,7 @@ export function deriveProfileBuilderState({
   let artist = artistFromSelection(selectedArtist);
   let artistConfirmed = false;
   let handle: string | null = null;
+  let confirmedHandle: string | null = null;
   const socialLinks: string[] = [];
 
   for (const message of messages) {
@@ -316,6 +317,9 @@ export function deriveProfileBuilderState({
 
       if (isHandleCheckOutput(output)) {
         handle = cleanHandle(output.handle) ?? handle;
+        if (output.action === 'handle_confirmed') {
+          confirmedHandle = cleanHandle(output.handle) ?? confirmedHandle;
+        }
       }
 
       if (isSocialLinkOutput(output) && output.url) {
@@ -327,7 +331,10 @@ export function deriveProfileBuilderState({
   return {
     artist,
     artistConfirmed,
-    handle: handleDraft == null ? handle : cleanHandle(handleDraft),
+    // Confirmed server output wins over stale proposal cards and their drafts.
+    handle:
+      confirmedHandle ??
+      (handleDraft == null ? handle : cleanHandle(handleDraft)),
     socialLinks,
   };
 }
