@@ -14,8 +14,11 @@ import { openHomeWelcome } from './helpers/golden-path-home-welcome';
 import {
   captureKeyframe,
   inspectEssentialViewport,
+  waitForStableGeometry,
   watchKeyframeErrors,
 } from './helpers/golden-path-keyframes';
+import { interceptGoldenPathTrackingCalls } from './helpers/golden-path-tracking';
+import { ratchetGeometry } from './utils/ratchet-geometry';
 import {
   installRuntimeAutomationBypass,
   resetAuthStatePreservingOnboardingSession,
@@ -147,6 +150,9 @@ async function verifyHomeWelcome(page: Page) {
       };
     });
   const assertGeometry = async () => {
+    // Clearing the starter shrinks the composer through a Motion size layout
+    // transition; audit the settled box, not a mid-tween frame.
+    await waitForStableGeometry(page, '[data-testid="chat-composer-surface"]');
     const selectors = [
       '[data-testid="chat-empty-state-next-step"] button, [data-testid="chat-empty-state-next-step"] a',
     ];
@@ -168,15 +174,18 @@ async function verifyHomeWelcome(page: Page) {
           `[data-testid="chat-composer-surface"] button[aria-label=${JSON.stringify(name)}]`
         );
     }
-    expect(
-      await inspectEssentialViewport(page, [
-        ...selectors,
-        '[data-testid="chat-empty-state-greeting-text"]',
-        '[data-testid="chat-empty-state-next-step"]',
-        '[data-testid="chat-composer-surface"]',
-        '[aria-label="Chat message input" i]',
-      ])
-    ).toEqual({ supported: true, findings: [] });
+    // ratchet: JOV-9612
+    await ratchetGeometry('home composer essentials', async () => {
+      expect(
+        await inspectEssentialViewport(page, [
+          ...selectors,
+          '[data-testid="chat-empty-state-greeting-text"]',
+          '[data-testid="chat-empty-state-next-step"]',
+          '[data-testid="chat-composer-surface"]',
+          '[aria-label="Chat message input" i]',
+        ])
+      ).toEqual({ supported: true, findings: [] });
+    });
     const centering = await measureCenter();
     expect(centering).not.toBeNull();
     if (centering)
@@ -214,8 +223,12 @@ async function verifyHomeWelcome(page: Page) {
       const after = await input.boundingBox();
       expect(before).not.toBeNull();
       expect(after).not.toBeNull();
-      if (before && after)
-        expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+      if (before && after) {
+        // ratchet: JOV-9612
+        await ratchetGeometry('home composer y shift', () => {
+          expect(Math.abs(before.y - after.y)).toBeLessThanOrEqual(1);
+        });
+      }
       await assertGeometry();
       if (viewport.width === 1440) {
         // Independent deliberate red: truthful content, wrong bottom placement.
@@ -351,17 +364,6 @@ async function ensureDbUser(betterAuthUserId: string) {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
-
-/** Block fire-and-forget tracking calls that trigger slow Turbopack cascades. */
-async function interceptTrackingCalls(page: Page) {
-  await page.route('**/api/profile/view', r =>
-    r.fulfill({ status: 200, body: '{}' })
-  );
-  await page.route('**/api/audience/visit', r =>
-    r.fulfill({ status: 200, body: '{}' })
-  );
-  await page.route('**/api/track', r => r.fulfill({ status: 200, body: '{}' }));
-}
 
 /** Exercise the Google handoff and its denied-provider recovery UI. */
 async function exerciseGoogleProviderRecovery(page: Page): Promise<void> {
@@ -714,6 +716,7 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
       timeout: 30_000,
     })
     .toBe(handle);
+  await expect(input).toHaveAttribute('placeholder', 'Reply to Jovie…');
 
   return conversationId;
 }
@@ -810,7 +813,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
   // Fresh browser — no inherited auth state
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(() => {
     if (IS_LOCAL_AUTH_BYPASS) {
       if (IS_REQUIRED_GOLDEN_PATH) {
         throw new Error(
@@ -833,8 +836,6 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     if (IS_REQUIRED_GOLDEN_PATH && process.env.E2E_TEST_MODE !== '1') {
       throw new Error('Required Golden Path is missing deterministic OTP mode');
     }
-
-    await interceptTrackingCalls(page);
   });
 
   test('completes one identity from provider recovery through revoked return', async ({
@@ -842,6 +843,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     browser,
   }) => {
     test.setTimeout(900_000);
+    const trackingFixture = await interceptGoldenPathTrackingCalls(page);
     // JOV-5489: keyframes for the recorded visual review (no-op unless enabled).
     watchKeyframeErrors(page);
 
@@ -1210,7 +1212,7 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     });
     const fanPage = await fanContext.newPage();
     watchKeyframeErrors(fanPage);
-    await interceptTrackingCalls(fanPage);
+    await interceptGoldenPathTrackingCalls(fanPage);
 
     try {
       await expect(async () => {
@@ -1304,6 +1306,19 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     // Use this admitted identity for the actual Home shell. Controlled Insight
     // presentation does not certify Pro entitlement or a verified success claim.
     await verifyHomeWelcome(page);
+    await expect
+      .poll(trackingFixture.getAcceptedNavigationPostCount, {
+        message:
+          'Golden Path did not exercise its validated navigation telemetry sink',
+        timeout: 5_000,
+      })
+      .toBeGreaterThan(0);
+    await test.info().attach('golden-path-navigation-telemetry', {
+      contentType: 'application/json',
+      body: JSON.stringify({
+        acceptedPosts: trackingFixture.getAcceptedNavigationPostCount(),
+      }),
+    });
 
     // STEP 9: Reuse this exact identity and context for the post-activation
     // checkout, webhook, fresh-browser return, refund, and revoked-cookie proof.
