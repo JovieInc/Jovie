@@ -40,12 +40,18 @@ import {
   generateSubscriptionManagementToken,
   verifySubscriptionManagementToken,
 } from '@/lib/notifications/management-token';
+import {
+  consumeEmailOtp,
+  EMAIL_OTP_MAX_ATTEMPTS,
+  spendEmailOtpAttempt,
+} from '@/lib/notifications/otp-service';
 import { updateNotificationPreferences } from '@/lib/notifications/preferences';
 import {
   buildErrorResponse,
   buildInvalidRequestResponse,
   buildMissingIdentifierResponse,
   buildServerErrorResponse,
+  buildSmsPendingSubscribeResponse,
   buildStatusSuccessResponse,
   buildSubscribeNotFoundError,
   buildSubscribeServerError,
@@ -62,6 +68,7 @@ import {
   type ConsentSnapshot,
   getCurrentConsentSnapshot,
 } from '@/lib/notifications/sms-consent';
+import { isPhoneSmsSuppressed } from '@/lib/notifications/sms-suppression';
 import { isEmailSuppressed } from '@/lib/notifications/suppression';
 import {
   normalizeSubscriptionEmail,
@@ -184,6 +191,29 @@ async function checkEmailSuppression(
   return buildSubscribeValidationError(
     'This email cannot receive notifications. Please try a different email address.'
   );
+}
+
+/**
+ * A number that replied STOP (or was blocked) must never be re-subscribed by a
+ * form post. Only a fresh opt-in on the phone itself (JOIN code or START) lifts
+ * the suppression. Returns true when the subscribe must be dropped.
+ */
+async function isSmsSubscribeSuppressed(
+  channel: NotificationChannel,
+  normalizedPhone: string | null,
+  artist_id: string,
+  source: string | undefined
+): Promise<boolean> {
+  if (channel !== 'sms' || !normalizedPhone) return false;
+  const state = await isPhoneSmsSuppressed(normalizedPhone);
+  if (!state.suppressed) return false;
+  await trackSubscribeError({
+    artist_id,
+    error_type: 'suppressed',
+    validation_errors: [`SMS suppressed: ${state.reason ?? 'unknown'}`],
+    source,
+  });
+  return true;
 }
 
 /**
@@ -753,6 +783,19 @@ export const subscribeToNotificationsDomain = async (
       return suppressionError;
     }
 
+    // STOP and blocked numbers get the same answer as a pending subscribe and
+    // no write, so the response does not reveal suppression state.
+    if (
+      await isSmsSubscribeSuppressed(
+        channel,
+        normalizedPhone,
+        artist_id,
+        source
+      )
+    ) {
+      return buildSmsPendingSubscribeResponse(dynamicEnabled);
+    }
+
     // Default preferences: all content categories enabled
     const defaultPreferences: FanNotificationPreferences = {
       releasePreview: true,
@@ -812,6 +855,12 @@ export const subscribeToNotificationsDomain = async (
       phone: normalizedPhone,
     });
 
+    if (channel === 'sms') {
+      // Double opt-in: the form post only records a pending row. Funnel, CAPI
+      // and subscribe-success events fire when the join text confirms it.
+      return buildSmsPendingSubscribeResponse(dynamicEnabled);
+    }
+
     await trackSubscribeSuccess({
       artist_id,
       channel,
@@ -832,8 +881,8 @@ export const subscribeToNotificationsDomain = async (
       });
     }
 
-    // Fire CAPI Subscribe event for immediately-confirmed subscriptions (SMS, or
-    // email subscribers who are already verified from a previous subscription).
+    // Fire CAPI Subscribe event for immediately-confirmed subscriptions (email
+    // subscribers who are already verified from a previous subscription).
     // Email OTP subscribers fire this event in verifyEmailOtpDomain() instead.
     await firePostSubscribeActions({
       dynamicEnabled,
@@ -915,30 +964,25 @@ export const verifyEmailOtpDomain = async (
     return buildValidationErrorResponse('Code expired. Request a new code.');
   }
 
-  if ((subscription.emailOtpAttempts ?? 0) >= 5) {
-    return buildValidationErrorResponse(
-      'Too many attempts. Request a new code.'
-    );
+  const tooManyAttempts = () =>
+    buildValidationErrorResponse('Too many attempts. Request a new code.');
+  if ((subscription.emailOtpAttempts ?? 0) >= EMAIL_OTP_MAX_ATTEMPTS) {
+    return tooManyAttempts();
   }
 
+  const currentOtp = {
+    id: subscription.id,
+    emailOtpHash: subscription.emailOtpHash,
+  };
+  if (!(await spendEmailOtpAttempt(currentOtp, now))) return tooManyAttempts();
+
   if (hashEmailOtp(parsed.data.otp_code) !== subscription.emailOtpHash) {
-    await db
-      .update(notificationSubscriptions)
-      .set({ emailOtpAttempts: (subscription.emailOtpAttempts ?? 0) + 1 })
-      .where(eq(notificationSubscriptions.id, subscription.id));
     return buildValidationErrorResponse('Invalid verification code');
   }
 
-  await db
-    .update(notificationSubscriptions)
-    .set({
-      confirmedAt: now,
-      confirmationToken: null,
-      emailOtpHash: null,
-      emailOtpExpiresAt: null,
-      emailOtpAttempts: 0,
-    })
-    .where(eq(notificationSubscriptions.id, subscription.id));
+  if (!(await consumeEmailOtp(currentOtp, now))) {
+    return buildValidationErrorResponse('Invalid verification code');
+  }
 
   // Subscribe-time audience upsert is best-effort; ensure a row exists after
   // confirmation so Pro creators see the fan in audience immediately.
