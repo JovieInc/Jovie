@@ -11,6 +11,8 @@
  * saturation ≥ 0.45) fails when it covers ≥ 4% of all pixels.
  *
  * Sidecar `<file>.meta.json` must declare accent `ion` | `ultra` | `pulse`.
+ * A sidecar may also declare `subject` (person | object | ui | abstract); a
+ * person image must be in approved-people.json (see people.mjs).
  * `kind: "generated-ui"` is a hard failure, not a baseline id. Near-neutral
  * plates still name one role; the homepage plates declare ion.
  */
@@ -205,7 +207,7 @@ export async function scanImages(repoRoot = REPO_ROOT) {
   return { ids, hard };
 }
 
-function ancestorIds(repoRoot, relPath) {
+export function ancestorIds(repoRoot, relPath) {
   const rev = spawnSync('git', ['rev-parse', '--verify', 'origin/main'], {
     cwd: repoRoot,
     encoding: 'utf8',
@@ -230,7 +232,7 @@ function ancestorIds(repoRoot, relPath) {
   return { ok: true, ancestor: JSON.parse(show.stdout).ids };
 }
 
-function ratchet(current, recorded, ancestor) {
+export function ratchet(current, recorded, ancestor) {
   const errors = [];
   const known = new Set(recorded);
   const live = new Set(current);

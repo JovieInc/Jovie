@@ -17,6 +17,9 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 GIB = 1 << 30
 WARN_SOME, CRIT_SOME, CRIT_FULL = 10.0, 25.0, 15.0
@@ -72,7 +75,7 @@ def publish(state: Path, psi: dict, avail: int | None, now: float, holders=top_h
     at = datetime.fromtimestamp(now, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     row = {"at": at, "level": lvl, "psi": psi, "memAvailableGiB": None if avail is None else round(avail / GIB, 1)}
     state.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(row, indent=1))
+    atomic_write_text(path, json.dumps(row, indent=1))
     if lvl != before:
         event = {"kind": "host-memory-pressure", **row}
         if lvl != "ok":

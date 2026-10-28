@@ -23,7 +23,13 @@ SYNC_PAGES = 4    # incremental pages per team per tick
 FILL_PAGES = 10   # first-fill pages per team per tick; the fill resumes next tick
 FILL_OVERLAP_S = 300  # the first incremental re-reads this window before the fill began
 STALE_ALERT_S = 6 * 3600
-FLUSH_LIMIT = 10
+OUTBOX_ALERT_S = 3600  # writes are comments and state moves; an hour behind already misleads the board
+# Gem 2026-10-25: 504 pending writes (408 lane comments), none attempted, oldest 164 min, depth growing.
+# Arrivals ran 80-175 per 30 min against a drain of 10 per dispatch tick, with Linear at 4995/5000
+# requests free: the cap, not the API, was the limit. Drain until the quota guard (admit) holds, the
+# wall budget ends, or the safety ceiling is reached.
+FLUSH_LIMIT = 200
+FLUSH_BUDGET_S = 45
 DEAD_AFTER = 8
 CLAIM_KEEP_S = 7 * 86400
 TERMINAL = frozenset({"completed", "canceled"})
@@ -303,6 +309,8 @@ def enqueue(state: Path, op: str, issue_id: str, *, target: str | None = None, b
         key = f"label:{issue_id}:{body}"
     elif op == "comment":
         key = "comment:" + hashlib.sha256(f"{issue_id}\0{body}".encode()).hexdigest()[:24]
+    elif op == "create":  # a child issue under issue_id; body is the JSON payload (title, description, priority, labels)
+        key = "create:" + hashlib.sha256(f"{issue_id}\0{json.loads(body)['title']}".encode()).hexdigest()[:24]
     else:
         raise ValueError(f"unknown outbox op {op}")
     with _mutating(_outbox_path(state), OUTBOX) as data:
@@ -378,6 +386,42 @@ def _deliver_comment(state: Path, linear, entry: dict) -> str:
     return "commented"
 
 
+CHILDREN_QUERY = ('query($id:String!){issue(id:$id){team{id key states{nodes{id name}}} '
+                  'children(first:100){nodes{id identifier title}}}}')
+CREATE_MUTATION = 'mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id identifier title}}}'
+
+
+def _deliver_create(state: Path, linear, entry: dict) -> str:
+    """Create one child issue in Backlog. Idempotent: a child with the same title under the parent is the
+    readback, so a lost response or a retry never makes a duplicate."""
+    payload = json.loads(entry["body"])
+    parent = (linear.gql(CHILDREN_QUERY, {"id": entry["issueId"]}) or {}).get("issue")
+    if not isinstance(parent, dict):
+        return "remote-missing"
+    if any(node.get("title") == payload["title"] for node in (parent.get("children") or {}).get("nodes") or []):
+        return "already"
+    team = parent["team"]
+    backlog = next((n["id"] for n in team["states"]["nodes"] if n["name"] == "Backlog"), None)
+    if not backlog:
+        raise ValueError("team has no Backlog state")
+    label_ids = []
+    for name in payload.get("labels") or []:
+        nodes = ((linear.gql(LABEL_LOOKUP, {"n": name}) or {}).get("issueLabels") or {}).get("nodes") or []
+        found = next((n["id"] for n in nodes if (n.get("team") or {}).get("key") == team["key"]),
+                     next((n["id"] for n in nodes if not n.get("team")), None))
+        if not found:
+            raise ValueError(f"no label {name}")
+        label_ids.append(found)
+    _settle(state, entry["key"], sent=True)
+    result = (linear.gql(CREATE_MUTATION, {"i": {
+        "teamId": team["id"], "stateId": backlog, "parentId": entry["issueId"], "title": payload["title"],
+        "description": payload["description"], "priority": int(payload.get("priority") or 0),
+        "labelIds": label_ids}}) or {}).get("issueCreate") or {}
+    if result.get("success") is not True:
+        raise RuntimeError("create not confirmed")
+    return "created"
+
+
 def _deliver_rank(state: Path, linear, entry: dict) -> str:
     result = (linear.gql(RANK_MUTATION, {"id": entry["issueId"], "o": entry["value"]}) or {}).get("issueUpdate") or {}
     after = result.get("issue") if isinstance(result.get("issue"), dict) else {}
@@ -406,15 +450,20 @@ def _deliver_label(state: Path, linear, entry: dict) -> str:
     return "labelled"
 
 
-def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT) -> dict:
+def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT, budget_s: float = FLUSH_BUDGET_S) -> dict:
     entries = list(_read(_outbox_path(state), OUTBOX).get("entries") or [])
     delivered, outcome = [], "drained"
+    started = time.monotonic()
     for entry in entries[:limit]:
+        if time.monotonic() - started > budget_s:
+            outcome = "partial"
+            break
         if not admit(2):
             outcome = "budget-held"
             break
         try:
-            result = {"move": _deliver_move, "rank": _deliver_rank, "label": _deliver_label}.get(entry["op"], _deliver_comment)(
+            result = {"move": _deliver_move, "rank": _deliver_rank, "label": _deliver_label,
+                  "create": _deliver_create}.get(entry["op"], _deliver_comment)(
                 state, linear, entry)
         except transient:
             outcome = "rate-limited"  # never an attempt: the entry waits for the reset
@@ -489,9 +538,9 @@ def alerts(view: dict) -> dict[str, str]:
             found[f"backlog-ready-idle:{team}"] = (f"{team}: {row.get('ready')} agent-ready in Backlog while Todo is "
                                                    f"{row.get('todo')} of {row.get('target')} since the deficit opened")
     outbox = view.get("outbox") or {}
-    if (outbox.get("oldestAgeS") or 0) > STALE_ALERT_S:
+    if (outbox.get("oldestAgeS") or 0) > OUTBOX_ALERT_S:
         found["linear-outbox-stale"] = (f"Linear outbox: {outbox['depth']} writes waiting, "
-                                        f"oldest {outbox['oldestAgeS'] // 3600}h")
+                                        f"oldest {outbox['oldestAgeS'] // 60}m")
     if outbox.get("dead"):
         found["linear-outbox-dead"] = f"Linear outbox: {outbox['dead']} writes dead-lettered after {DEAD_AFTER} attempts"
     return found

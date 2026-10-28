@@ -173,3 +173,58 @@ describe('evaluateWaitlistQualification', () => {
     });
   });
 });
+
+describe('golden-path admission in qualification', () => {
+  const payload = {
+    primaryGoal: null,
+    primarySocialUrl: 'https://open.spotify.com/artist/abc',
+    spotifyUrl: 'https://open.spotify.com/artist/abc',
+    spotifyArtistName: 'Test Artist',
+    heardAbout: 'onboarding_chat',
+    selectedPlan: null,
+  } as never;
+
+  it('approves a gate-on signup the golden path admitted, recording the reason', () => {
+    const result = evaluateWaitlistQualification({
+      email: 'a@example.com',
+      payload,
+      config: {
+        mode: 'waitlist_enabled',
+        goldenPath: { admit: true, reason: 'admit_resolved_artist' },
+      },
+    });
+    expect(result.status).toBe('approved');
+    expect(result.reasonCode).toBe('qualified_golden_path_resolved_artist');
+    expect(result.details).toMatchObject({
+      goldenPath: 'admit_resolved_artist',
+    });
+  });
+
+  it('records the hold reason on a waitlisted decision', () => {
+    const result = evaluateWaitlistQualification({
+      email: 'a@example.com',
+      payload,
+      config: {
+        mode: 'waitlist_enabled',
+        goldenPath: { admit: false, reason: 'hold_golden_path_not_green' },
+      },
+    });
+    expect(result.status).toBe('waitlisted');
+    expect(result.reasonCode).toBe('waitlist_gate_enabled');
+    expect(result.details).toMatchObject({
+      goldenPathHold: 'hold_golden_path_not_green',
+    });
+  });
+
+  it('reports capacity_full as the capacity reason code', () => {
+    const result = evaluateWaitlistQualification({
+      email: 'a@example.com',
+      payload,
+      config: {
+        mode: 'waitlist_enabled',
+        goldenPath: { admit: false, reason: 'hold_capacity_full' },
+      },
+    });
+    expect(result.reasonCode).toBe('waitlist_capacity_full');
+  });
+});

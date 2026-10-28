@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import {
   chmodSync,
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -338,15 +341,99 @@ test('the pinned oasdiff release is exact and sha-verified', () => {
   assert.match(result.error, /does not match the pinned/);
 });
 
-test('the base worktree render produces the same document as the head render', {
-  skip: !existsSync(join(REPO_ROOT, 'apps/web/node_modules/.bin/tsx')),
-}, () => {
-  const head = renderSpecAt(REPO_ROOT, REPO_ROOT);
-  const base = renderBaseSpec(REPO_ROOT, 'HEAD');
-  assert.equal(head.code, 0, head.error);
-  assert.equal(base.code, 0, base.error);
-  assert.equal(base.document, head.document);
-});
+function specRepository(t) {
+  const root = mkdtempSync(join(tmpdir(), 'jovie-oasdiff-tree-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))
+  );
+  const git = (...args) =>
+    execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
+      cwd: root,
+      env,
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  const spec = join(root, 'apps/web/lib/api/v1/openapi.json');
+  mkdirSync(dirname(spec), { recursive: true });
+  mkdirSync(join(root, 'apps/web/scripts'), { recursive: true });
+  assert.ok(
+    existsSync(join(REPO_ROOT, 'apps/web/node_modules/.bin/tsx')),
+    'the real renderer requires the installed repository tsx'
+  );
+  symlinkSync(
+    join(REPO_ROOT, 'apps/web/node_modules'),
+    join(root, 'apps/web/node_modules'),
+    'dir'
+  );
+  writeFileSync(join(root, '.gitignore'), 'node_modules\n');
+  writeFileSync(join(root, 'package.json'), '{"type":"module"}\n');
+  writeFileSync(
+    join(root, 'apps/web/scripts/render-public-openapi.ts'),
+    'import { readFileSync } from "node:fs";\n' +
+      'process.stdout.write(readFileSync(new URL("../lib/api/v1/openapi.json", import.meta.url), "utf8"));\n'
+  );
+  writeFileSync(spec, BASE_DOCUMENT);
+  git('init', '-q', '-b', 'main');
+  git('config', 'user.name', 'OpenAPI fixture');
+  git('config', 'user.email', 'openapi@example.invalid');
+  git('add', '.');
+  git('commit', '-qm', 'committed public contract');
+  git('switch', '-qc', 'source-head');
+  writeFileSync(join(root, 'feature.txt'), 'source PR\n');
+  git('add', '.');
+  git('commit', '-qm', 'source head');
+  return { root, git, spec, head: git('rev-parse', 'HEAD') };
+}
+
+for (const mode of ['dirty', 'merged']) {
+  test(`base snapshot matches committed source with a ${mode} working tree`, t => {
+    const fixture = specRepository(t);
+    const committed = renderSpecAt(fixture.root, fixture.root);
+    assert.equal(committed.code, 0, committed.error);
+    assert.equal(committed.document, BASE_DOCUMENT);
+    if (mode === 'merged') fixture.git('switch', '-q', 'main');
+    writeFileSync(fixture.spec, breakingDocument());
+    if (mode === 'merged') {
+      fixture.git('add', '.');
+      fixture.git('commit', '-qm', 'main contract advances');
+      fixture.git('switch', '-q', 'source-head');
+      fixture.git('merge', '--no-commit', '--no-ff', 'main');
+    }
+    const status = fixture.git('status', '--porcelain');
+    const working = renderSpecAt(fixture.root, fixture.root);
+    const base = renderBaseSpec(fixture.root, 'HEAD');
+    assert.equal(working.code, 0, working.error);
+    assert.equal(base.code, 0, base.error);
+    // Compare the same immutable source generation. Source guards can leave
+    // a legitimate uncommitted merge here; it is intentionally a different API.
+    assert.equal(base.document, committed.document);
+    assert.equal(working.document, breakingDocument());
+    assert.notEqual(base.document, working.document);
+
+    const result = checkOasdiffBreakingChange({
+      repoRoot: fixture.root,
+      baseRef: 'HEAD',
+      eventName: 'pull_request',
+      body: null,
+      changed: ['apps/web/lib/api/v1/openapi.json'],
+      ensureBinary: () => ({ code: 0, binary: 'fixture-oasdiff' }),
+      diff: (basePath, revisionPath) => {
+        assert.equal(readFileSync(basePath, 'utf8'), BASE_DOCUMENT);
+        assert.equal(readFileSync(revisionPath, 'utf8'), breakingDocument());
+        return { code: 1, stdout: BREAKING_ANNOTATIONS.join('\n'), stderr: '' };
+      },
+      emit: () => {},
+    });
+    assert.equal(result.code, 1);
+    assert.equal(
+      result.reason,
+      'breaking changes without an api-breaking marker'
+    );
+    assert.equal(fixture.git('rev-parse', 'HEAD'), fixture.head);
+    assert.equal(fixture.git('status', '--porcelain'), status);
+  });
+}
 
 test('the renderer produces stable, schema-bearing JSON from the real tree', {
   skip: !existsSync(join(REPO_ROOT, 'apps/web/node_modules/.bin/tsx')),
