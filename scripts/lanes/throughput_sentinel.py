@@ -159,11 +159,21 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         leases = [(now - started) / 60 for row in held.get("workflow_runs") or []
                   if (started := _iso_epoch(row.get("run_started_at"))) is not None]
         runs = [row.get("id") for row in held.get("workflow_runs") or []]
+        # Hosted-runner backlog: queued runs repo-wide and the oldest one's wait. 2026-10-28: 990 queued
+        # runs, oldest 18 min, 64 in progress, so a green head waited on runner concurrency, not on lanes.
+        queued = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1")
+        queued_total = queued.get("total_count") if isinstance(queued.get("total_count"), int) else None
+        oldest_min = None
+        if queued_total:
+            tail = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&page={queued_total}")
+            created = _iso_epoch(((tail.get("workflow_runs") or [{}])[0]).get("created_at"))
+            oldest_min = round((now - created) / 60, 1) if created is not None else None
         signal = {"schema": "symphony-release-flow/v1", "observedAt": now,
                   "mergeGroupRuns": sampled, "mergeGroupJobs": len(waits),
                   "mergeGroupStartP50Min": round(statistics.median(waits), 2) if waits else None,
                   "mergeGroupStartMaxMin": round(max(waits), 2) if waits else None,
-                  "leaseHeldMin": round(max(leases), 1) if leases else 0.0, "leaseRunIds": runs[:3]}
+                  "leaseHeldMin": round(max(leases), 1) if leases else 0.0, "leaseRunIds": runs[:3],
+                  "queuedRuns": queued_total, "queuedOldestMin": oldest_min}
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, sort_keys=True))
         os.replace(tmp, path)

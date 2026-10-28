@@ -139,7 +139,7 @@ class ThroughputSentinelTest(unittest.TestCase):
             self.assertEqual((signal["mergeGroupRuns"], signal["mergeGroupStartP50Min"], signal["leaseHeldMin"]),
                              (3, 10.0, 50.0))  # skipped run ignored, three jobs sampled
             again, _ = ts.sample_release_flow(Path(raw), NOW + 10, run)
-            self.assertEqual(len(calls), 5)  # 1 runs + 3 jobs + 1 lease; cached for five minutes
+            self.assertEqual(len(calls), 6)  # 1 runs + 3 jobs + 1 lease + 1 queued count; cached for five minutes
             self.assertEqual(again["leaseRunIds"], [7])
             failing = lambda args, **kw: SimpleNamespace(returncode=1, stdout="", stderr="boom")
             signal, error = ts.sample_release_flow(Path(raw), NOW + 3600, failing)

@@ -447,7 +447,8 @@ class MarginalYieldAndAdmissionTest(unittest.TestCase):
         base = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
         for extra, token in (({"openPRCount": 315, "wipMax": 80}, "wip-cap"),
                              ({"mergeThroughput": {"queueDepth": 9, "queueWaitP50Minutes": 45, "mergedPerHour": 9, "openedPerHour": 5, "ejectionRate": 0.0}}, "ci-queue-wait"),
-                             ({"quotaDeferredHeads": 2}, "github-quota-deferred")):
+                             ({"quotaDeferredHeads": 2}, "github-quota-deferred"),
+                             ({"ciQueue": {"queuedRuns": 990, "oldestMin": 18.0, "fresh": True}}, "ci-runner-backlog")):
             state = decide(None, {**base, **extra}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
             row = self.lane(state, "codex")
             self.assertIn(token, row["intakeBlockers"])
