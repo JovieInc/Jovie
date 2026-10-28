@@ -6,6 +6,11 @@ must carry to be admitted (none: every Todo issue is eligible), and the gate tha
 Extra bindings come from `bindings` in routing.json (Tim 2026-10-11: one service runs
 everything, so the retired symphony-lyb Elixir service's LYB contract lives here).
 
+A binding with `reservedSeats` also owns that many guaranteed seats outside the provider census
+(`reserve`, reached from lane_runner.worker when the provider has no free seat, a host ceiling
+holds it, or autoscale cut it to 0): a full or throttled Jovie pool, a Jovie claim.lock holder
+and every Jovie-only hold cannot stall it. Its scan takes a binding-scoped claim lock, never the
+global one. Disk-critical still admits nothing (a binding run needs a local checkout).
 Extra bindings share the host's provider seats, state dir and autoscale ceiling: a binding
 run happens inside a seat a provider worker already holds, so the host's autoscaled seats
 (compute and credits) are the only concurrency limit unless a binding sets `concurrency`.
@@ -36,6 +41,9 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
 
 POLICY = Path(__file__).resolve().parent / "routing.json"
 REPAIR_STATES = frozenset({"BEHIND", "DIRTY"})
@@ -68,6 +76,9 @@ DEPENDENCY = re.compile(r"(?i)\b(?:depends on|blocked by|waits? (?:on|for)|stack
 ENQUEUE_MUTATION = ('mutation($id:ID!,$head:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,'
                     'expectedHeadOid:$head}){mergeQueueEntry{position}}}')
 MERGE_GROUP_LOG_CHARS = 6000        # tail of the failed merge-group jobs' log in a repair prompt
+FETCH_ATTEMPTS = 2                  # one lost ref-lock race retries once (JOV-8902/LYB-226); more is a real fault
+CANNOT_LOCK_REF = "cannot lock ref"
+PUSH_ATTEMPTS = 2                   # the pre-push hook's test suite can flake; one retry, never --no-verify
 
 
 @dataclass(frozen=True)
@@ -82,6 +93,8 @@ class Binding:
     providers: tuple[str, ...] = ()
     install: tuple[str, ...] = ()
     review_state: str = "In Review"
+    reserved_seats: int = 0       # guaranteed seats outside the provider census (isolation from Jovie)
+    min_todo: int = 0             # Todo depth to hold regardless of seats (Backlog refill floor)
 
     def branch_pattern(self) -> re.Pattern:
         return re.compile(rf"^(?P<lane>[a-z0-9-]+)/(?P<issue>{self.key.lower()}-\d+)-\d{{8}}")
@@ -125,8 +138,20 @@ def extra_bindings(lane, policy: dict | None = None, env=None, hostname: str | N
             tuple(str(x).lower() for x in row.get("excludedLabels") or ()),
             None if row.get("concurrency") is None else max(1, int(row["concurrency"])),
             tuple(row.get("providers") or ()),
-            tuple(row.get("install") or ()), str(row.get("reviewState") or "In Review")))
+            tuple(row.get("install") or ()), str(row.get("reviewState") or "In Review"),
+            max(0, min(RESERVED_SEATS_MAX, _int_or_zero(row.get("reservedSeats")))),
+            max(0, int(row.get("minTodo") or 0))))
     return active
+
+
+RESERVED_SEATS_MAX = 2
+
+
+def _int_or_zero(value) -> int:
+    try:
+        return int(value) if not isinstance(value, bool) else 0
+    except (TypeError, ValueError):
+        return 0
 
 
 def team_of(identifier: str) -> str:
@@ -462,6 +487,50 @@ def take_seat(lane, host, binding: Binding):
 
 # ---------------------------------------------------------------- the pass
 
+def take_reserved_seat(lane, host, binding: Binding):
+    """One of the binding's guaranteed seats, or None. Outside slots/, so neither the provider
+    census nor autoscale's host-pressure ceiling can take it away, and a Jovie run holding every
+    provider seat cannot starve this repository."""
+    if binding.reserved_seats <= 0:
+        return None
+    root = host.state / "bindings" / binding.key
+    root.mkdir(parents=True, exist_ok=True)
+    for index in range(binding.reserved_seats):
+        seat = lane.Locked(root / f"reserve.{index}.lock", blocking=False)
+        if seat.held:
+            return seat
+        seat.release()
+    return None
+
+
+def reserve(lane, host, name: str, spec: dict, *, bindings: list[Binding] | None = None) -> str | None:
+    """Bound work in a reserved seat when the provider's own seats are all taken or capped.
+
+    Only bindings that declare `reservedSeats` participate; the Jovie path never runs here."""
+    bindings = extra_bindings(lane) if bindings is None else bindings
+    if spec.get("repairs") is False:
+        return None
+    for binding in bindings:
+        if binding.reserved_seats <= 0 or (binding.providers and name not in binding.providers):
+            continue
+        seat = take_reserved_seat(lane, host, binding)
+        if seat is None:
+            continue
+        try:
+            verdict = _work_one(lane, host, binding, name, spec, False)
+        except lane.LinearRateLimited:
+            record_status(lane, host, binding, worker=name, outcome="linear-rate-limited")
+            return None
+        except lane.LaneInventoryUnknown as error:
+            record_status(lane, host, binding, worker=name, outcome=f"{binding.key}:{error}")
+            continue
+        finally:
+            seat.release()
+        if verdict is not None:
+            return verdict
+    return None
+
+
 def work(lane, host, name: str, spec: dict, *, maintenance_only: bool = False,
          bindings: list[Binding] | None = None) -> str | None:
     """Repair, else claim, one unit of bound work in this worker's held provider seat.
@@ -510,7 +579,10 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
         if held is not None:
             leases[candidate["number"]] = held
         return held is None
-    claim = lane.Locked(host.state / "claim.lock", blocking=True)
+    # Binding-scoped: the global claim.lock is the Jovie path's, held across its whole scan, so a
+    # slow or wedged Jovie holder must never queue this repository's scan behind it. The shared
+    # ledgers read below tolerate a torn read (read_json -> {}); linear_sync.claim has its own lock.
+    claim = lane.Locked(host.state / "bindings" / binding.key / "claim.lock", blocking=True)
     try:
         prs = open_prs(lane, binding)
         if prs is None:
@@ -582,6 +654,41 @@ def _work_one(lane, host, binding: Binding, name: str, spec: dict, maintenance_o
 
 
 # ---------------------------------------------------------------- runs
+
+def fetch(lane, host, binding: Binding, log, *refs: str) -> None:
+    """Fetch `refs` from the binding's shared clone, one fetch per repo at a time.
+
+    Seats claimed in the same second race the clone's ref lock and die 'cannot lock ref
+    refs/remotes/origin/main' seconds in (JOV-8902/LYB-226). A per-repo flock serializes
+    them and a lost race retries once. The kernel drops the lock if the holder dies and
+    git's own 600s timeout bounds every hold, so the wait cannot outlive the fetch it
+    serializes; a non-ref-lock fault fails immediately."""
+    lock = lane.Locked(host.state / "bindings" / binding.key / "fetch.lock", blocking=True)
+    try:
+        for attempt in range(FETCH_ATTEMPTS):
+            ran = lane.sh(["git", "fetch", "-q", "origin", *refs], cwd=binding.repo, timeout=600, log=log)
+            if not ran.returncode:
+                return
+            if attempt + 1 < FETCH_ATTEMPTS and CANNOT_LOCK_REF in f"{ran.stdout}{ran.stderr}":
+                continue
+            raise RuntimeError("git-fetch-failed")
+    finally:
+        lock.release()
+
+
+def push_with_retry(git, branch: str, attempts: int = PUSH_ATTEMPTS) -> None:
+    """Push an issue branch, retrying a flaky pre-push hook once. The hook gates every
+    attempt (never --no-verify), so a persistent failure - a real regression, not a flake -
+    still fails the run and charges the issue."""
+    last: BaseException = RuntimeError("git-push-failed")
+    for _ in range(attempts):
+        try:
+            git("push", "-q", "-u", "origin", branch)
+            return
+        except RuntimeError as error:
+            last = error
+    raise last
+
 
 def merge_group_evidence(lane, binding: Binding, pr: dict) -> str:
     """The failed merge-group run for this PR (`gh-readonly-queue/main/pr-<n>-*`) and the tail of
@@ -681,10 +788,10 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
             lane.require_disk(host, "binding-checkout")
             worktree.parent.mkdir(parents=True, exist_ok=True)
             if pr is not None:
-                git("fetch", "-q", "origin", "main", branch, cwd=binding.repo)
+                fetch(lane, host, binding, log, "main", branch)
                 git("worktree", "add", "-q", "--detach", str(worktree), pr["headRefOid"], cwd=binding.repo)
             else:
-                git("fetch", "-q", "origin", "main", cwd=binding.repo)
+                fetch(lane, host, binding, log, "main")
                 git("worktree", "add", "-q", "-b", branch, str(worktree), "origin/main", cwd=binding.repo)
             if binding.install and lane.sh(install_command(binding, pr), cwd=worktree, timeout=1800,
                                            log=log).returncode:
@@ -695,7 +802,7 @@ def run(lane, host, binding: Binding, name: str, spec: dict, *, issue=None, pr=N
                                    if "merge-group-failed" in (pr.get("repairReasons") or []) else "",
                                    goal=lane.goal_contract(issue) if issue is not None else ())
             prompt_file = runs / f"{run_id}.prompt.md"
-            prompt_file.write_text(prompt)
+            atomic_write_text(prompt_file, prompt)
             started = time.time()
             receipt["agentStarted"] = True
             agent = lane.run_agent(lane.template(spec["cmd"], {
@@ -757,7 +864,7 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
         return result
     if git("rev-list", "--count", "origin/main..HEAD") in ("", "0"):
         return {"verdict": "no-change", "reasons": ["no-commits"]}
-    git("push", "-q", "-u", "origin", branch)
+    push_with_retry(git, branch)
     created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
                        "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                        "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
@@ -829,7 +936,7 @@ def finish_issue(lane, host, binding: Binding, name: str, linear, issue, receipt
         count = lane.failure_record(failures.get(issue.identifier))["count"] + 1
         failures[issue.identifier] = {"count": count, "at": time.time(), "release": lane.release_generation(),
                                       **lane.pr_events.failure_reason(receipt, count >= lane.MAX_FAILURES)}
-        lane.failures_path(host).write_text(json.dumps(failures))
+        atomic_write_text(lane.failures_path(host), json.dumps(failures))
     finally:
         claim.release()
     exhausted = count >= lane.MAX_FAILURES

@@ -12,6 +12,7 @@ import {
   readPendingClaimContext,
   writePendingClaimContext,
 } from '@/lib/claim/context';
+import { buildClaimRedirectUrl } from '@/lib/claim/redirect-origin';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import {
@@ -39,7 +40,7 @@ interface ClaimRouteContext {
 }
 
 function buildAbsoluteUrl(request: NextRequest, pathname: string): URL {
-  return new URL(pathname, request.url);
+  return buildClaimRedirectUrl(request, pathname);
 }
 
 function redirectTo(request: NextRequest, pathname: string): NextResponse {

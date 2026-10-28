@@ -1254,6 +1254,7 @@ sourceDescribe('profile mode route redirects', () => {
     ['tour', 'tour'],
     ['shows', 'tour'],
     ['events', 'tour'],
+    ['contact', 'contact'],
   ] as const)('maps the missing %s slug to %s mode', (slug, mode) => {
     expect(
       getLegacyProfileModeRedirectHref('dualipa', slug, { source: 'qr' })

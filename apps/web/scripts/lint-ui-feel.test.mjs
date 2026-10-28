@@ -28,6 +28,7 @@ import {
   main,
   readBaseline,
   regressions,
+  staleBaseline,
   violationsOnAddedLines,
 } from './lint-ui-feel.mjs';
 
@@ -70,6 +71,25 @@ describe('ui-feel ratchet baseline math', () => {
     expect(regressions({ newCheck: 1 }, {})).toEqual([
       { check: 'newCheck', baseline: 0, current: 1 },
     ]);
+  });
+
+  it('staleBaseline reports only checks that shrank below the baseline', () => {
+    const stale = staleBaseline(
+      { headingNeedsBalance: 265, missingTabularNums: 71 },
+      { headingNeedsBalance: 267, missingTabularNums: 71 }
+    );
+    expect(stale).toEqual([
+      { check: 'headingNeedsBalance', baseline: 267, current: 265 },
+    ]);
+  });
+
+  it('staleBaseline is empty when counts equal or exceed the baseline', () => {
+    expect(
+      staleBaseline({ headingNeedsBalance: 5 }, { headingNeedsBalance: 5 })
+    ).toEqual([]);
+    expect(
+      staleBaseline({ headingNeedsBalance: 6 }, { headingNeedsBalance: 5 })
+    ).toEqual([]);
   });
 
   it('countByCheck buckets violations by messageId', () => {
@@ -214,6 +234,45 @@ describe('ui-feel cli gate', () => {
       const text = errors.mock.calls.flat().join('\n');
       expect(text).toContain('regression beyond baseline');
       expect(text).toContain('missingTabularNums: 1 > baseline 0');
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('exits 1 when debt shrank without regenerating the baseline (JOV-8878)', async () => {
+    const baselinePath = tmpBaseline();
+    // Baseline locks in 5 heading violations; the tree now measures 3.
+    await main(['--update'], silent, {
+      loadRule: () => fakeRule,
+      collect: async () => [
+        { file: 'a.tsx', line: 1, messageId: 'headingNeedsBalance' },
+        { file: 'a.tsx', line: 2, messageId: 'headingNeedsBalance' },
+        { file: 'b.tsx', line: 3, messageId: 'headingNeedsBalance' },
+        { file: 'b.tsx', line: 4, messageId: 'headingNeedsBalance' },
+        { file: 'b.tsx', line: 5, messageId: 'headingNeedsBalance' },
+      ],
+      baselinePath,
+    });
+    const shrunk = async () => [
+      { file: 'a.tsx', line: 1, messageId: 'headingNeedsBalance' },
+      { file: 'a.tsx', line: 2, messageId: 'headingNeedsBalance' },
+      { file: 'a.tsx', line: 3, messageId: 'headingNeedsBalance' },
+    ];
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const logs = [];
+    try {
+      const code = await main([], message => logs.push(message), {
+        loadRule: () => fakeRule,
+        collect: shrunk,
+        baselinePath,
+      });
+      expect(code).toBe(1);
+      const text = errors.mock.calls.flat().join('\n');
+      expect(text).toContain('baseline stale');
+      expect(text).toContain('headingNeedsBalance: 3 < baseline 5');
+      expect(text).toContain('--update');
+      // The PR-lane gate must fail closed on headroom, never report ok.
+      expect(logs.join('\n')).not.toContain('ok — counts within baseline');
     } finally {
       errors.mockRestore();
     }

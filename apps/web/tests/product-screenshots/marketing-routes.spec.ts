@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_EXACT_PUBLIC_ROUTE_TARGETS } from '@/data/marketing';
+import { PRE_SAVE_FIXTURE } from '@/data/preSaveCopy';
 import { MARKETING_EXACT_ROUTE_VISUAL_QA_ENTRIES } from '@/lib/agent-os/visual-qa/coverage';
 import { SCREENSHOT_VIEWPORTS } from '@/lib/screenshots/registry';
 import {
@@ -135,6 +138,52 @@ test.describe('Exact marketing route screenshots', () => {
           contentType: 'application/json',
           path: receiptPath,
         });
+      });
+    }
+  }
+});
+
+test.describe('Pre-save countdown contrast', () => {
+  test.describe.configure({ mode: 'parallel', retries: 0 });
+
+  const releaseAt = Date.parse(PRE_SAVE_FIXTURE.releaseAt);
+  const scenarios = [
+    { name: 'multiple years', minutesLeft: 730 * 24 * 60, units: ['YRS'] },
+    { name: 'one year', minutesLeft: 365 * 24 * 60, units: ['YR'] },
+    {
+      name: 'days, hours and minutes',
+      minutesLeft: 2 * 24 * 60 + 3 * 60 + 4,
+      units: ['D', 'H', 'M'],
+    },
+  ];
+
+  for (const viewport of ['desktop', 'mobile'] as const) {
+    for (const scenario of scenarios) {
+      test(`${scenario.name} units stay readable on ${viewport}`, async ({
+        page,
+      }) => {
+        await page.clock.setFixedTime(
+          new Date(releaseAt - scenario.minutesLeft * 60_000)
+        );
+        await page.emulateMedia({ reducedMotion: 'reduce' });
+        await page.setViewportSize(SCREENSHOT_VIEWPORTS[viewport]);
+        await page.goto(APP_ROUTES.PRODUCT_PRE_SAVE);
+        const countdown = page.getByTestId('pre-save-countdown');
+        for (const unit of scenario.units) {
+          await expect(
+            countdown.getByText(unit, { exact: true })
+          ).toBeVisible();
+        }
+
+        const results = await new AxeBuilder({ page })
+          .include('[data-testid="pre-save-countdown"]')
+          .withRules(['color-contrast'])
+          .analyze();
+        expect(results.violations).toEqual([]);
+        expect(results.incomplete).toEqual([]);
+        expect(results.passes.map(result => result.id)).toContain(
+          'color-contrast'
+        );
       });
     }
   }

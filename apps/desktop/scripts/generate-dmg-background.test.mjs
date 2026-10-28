@@ -31,6 +31,9 @@ test('dmg background uses the generated year and installer geometry', () => {
   assert.match(svg, /Jovie Technology Inc\./);
   assert.match(svg, /Built for artists/);
   assert.match(svg, /Drag Jovie to Applications/);
+  assert.match(svg, /id="ion-wash"/);
+  assert.match(svg, /#11AFFF/);
+  assert.doesNotMatch(svg, /jovie-grid|M12 7V17M7 12H17/);
   assert.ok(svg.includes(JOVIE_MARK_PATH));
   assert.doesNotMatch(svg, /href="data:image/);
   assert.doesNotMatch(svg, /M31 10A20 20 0 0 0 11 30/);

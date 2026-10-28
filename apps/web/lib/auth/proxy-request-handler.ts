@@ -300,10 +300,15 @@ export async function handleProxyRequest(
       const aliasUsername = aliasSegments[0];
       const aliasSlug = aliasSegments[1];
       if (aliasUsername && aliasSlug && aliasSegments.length === 2) {
+        // waitUntil lets a cold decision finish and be stored after this
+        // navigation has already fallen through. Aborting that fetch at the
+        // response budget left the CDN empty, so the first alias (/listen)
+        // repeated the slow resolver hop.
         const aliasResponse = await resolveProfileModeAliasAtEdge(
           req,
           aliasUsername,
-          aliasSlug
+          aliasSlug,
+          event ? promise => event.waitUntil(promise) : undefined
         );
         if (aliasResponse) return aliasResponse;
       }

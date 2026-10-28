@@ -3,7 +3,7 @@
  PRODUCTION  ! WARN    serves 060037d · 7 undeployed · oldest 1h41m
  FLOW 24h    prepared ? → queued ? → merged 10 → deployed 3 → verified ?
  WORKERS   ? UNKNOWN 1 running / unknown (codex 1/? · grok 0/?) · gate seats 2
-● codex      PR21774   fix-red gate              3m  title not in current…
+● codex      PR21774   fix-red gate              3m  GitHub read failed:…
 ○ codex      polling ×2 · eligible 1/27 · new issues 1
 ○ grok       polling · eligible 0/27 · new issues 0
  SUPPLY    ✓ OK      Todo 27 → eligible 1 → new issues 1

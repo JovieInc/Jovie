@@ -9,6 +9,21 @@ function read(relativePath: string) {
 }
 
 describe('Library toolbar layout contract', () => {
+  it('keeps filter navigation separate from the legacy releases surface alias', () => {
+    const library = read('app/app/(shell)/library/LibrarySurface.tsx');
+    const handler = library.slice(
+      library.indexOf('const handlePresetChange ='),
+      library.indexOf('const handleStageChange =')
+    );
+
+    // A type filter must never emit the URL that unmounts the toolbar.
+    expect(handler).not.toMatch(/params\.set\('view'/u);
+    expect(handler).toContain("params.set('preset', next)");
+    expect(handler).toContain("params.delete('preset')");
+    expect(handler).toContain("params.delete('view')");
+    expect(handler).toContain('{ scroll: false }');
+  });
+
   it('keeps preset filters in the shared toolbar scroll rail instead of wrapping', () => {
     const toolbar = read(
       'components/organisms/table/molecules/PageToolbar.tsx'

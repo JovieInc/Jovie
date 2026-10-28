@@ -9,19 +9,23 @@
  *      (uses dev auth bypass per .claude/rules/auth.md)
  *   4. Sign-in page axe scan — zero critical violations
  *
- * The public-surface axe audit (full WCAG 2.1 AA) lives in axe-audit.spec.ts.
+ * The public-surface axe audit (WCAG 2.2 AA) lives in axe-audit.spec.ts.
  * This file focuses on keyboard nav patterns and authenticated surfaces.
  *
  * Run (local):
  *   E2E_USE_TEST_AUTH_BYPASS=1 doppler run --project jovie-web --config dev -- \
  *     pnpm --filter web exec playwright test a11y --project=chromium
  *
- * @see apps/web/tests/e2e/axe-audit.spec.ts  — public WCAG 2.1 AA scan
+ * @see apps/web/tests/e2e/axe-audit.spec.ts  — public WCAG 2.2 AA scan
  * @see apps/web/tests/e2e/chat-axe.spec.ts   — chat surface axe audit
  */
 
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import {
+  disabledRuleIds,
+  wcag22AaAxeOptions,
+} from '@/lib/a11y-gates/wcag-standard.cjs';
 import { ensureSignedInUser, hasClerkCredentials } from '../helpers/auth';
 import {
   smokeNavigateWithRetry,
@@ -237,7 +241,7 @@ test.describe('Sign-in page axe', () => {
     await page.waitForTimeout(2_000);
 
     const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+      .options(wcag22AaAxeOptions())
       .analyze();
 
     const summaries = summarizeViolations(results.violations);
@@ -286,9 +290,7 @@ test.describe('Authenticated dashboard axe', () => {
     await waitForHydration(page);
 
     const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      // Exclude frame-tested to avoid false positives from third-party iframes
-      .disableRules(['frame-tested'])
+      .options(wcag22AaAxeOptions(disabledRuleIds('a11y-dashboard')))
       .analyze();
 
     const summaries = summarizeViolations(results.violations);

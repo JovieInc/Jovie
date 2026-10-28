@@ -171,7 +171,7 @@ export function MarketingFooter({
     >
       <div
         className={cn(
-          'mx-auto w-full max-w-public-content px-5 sm:px-6 lg:px-8',
+          'public-container',
           isMinimal
             ? 'pt-[clamp(3rem,5vw,4.5rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
             : shouldShowCta
@@ -179,11 +179,7 @@ export function MarketingFooter({
               : 'pt-[clamp(4rem,6.5vw,6rem)] pb-[clamp(2.5rem,4vw,3.5rem)]'
         )}
       >
-        {shouldShowCta ? (
-          <div className='-mx-[clamp(1.25rem,2.2vw,2rem)]'>
-            <MarketingFooterCta />
-          </div>
-        ) : null}
+        {shouldShowCta ? <MarketingFooterCta /> : null}
 
         {isMinimal ? null : (
           <div className='grid gap-12 md:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)] md:gap-x-16 md:gap-y-14 lg:gap-x-24'>
@@ -206,18 +202,25 @@ export function MarketingFooter({
               )}
               aria-label='Footer'
             >
-              {footerColumns.map(column => (
-                <section key={column.title}>
-                  <h2 className='mf-eyebrow line-clamp-2'>{column.title}</h2>
-                  <ul className='flex list-none flex-col gap-3 p-0'>
-                    {column.links.map(link => (
-                      <li key={`${link.href}-${link.label}`}>
-                        <FooterLink link={link} />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
+              {footerColumns.map(column => {
+                const columnLabelId = `footer-column-${column.title
+                  .toLowerCase()
+                  .replace(/[^a-z0-9]+/g, '-')}`;
+                return (
+                  <section key={column.title} aria-labelledby={columnLabelId}>
+                    <p id={columnLabelId} className='mf-eyebrow line-clamp-2'>
+                      {column.title}
+                    </p>
+                    <ul className='flex list-none flex-col gap-3 p-0'>
+                      {column.links.map(link => (
+                        <li key={`${link.href}-${link.label}`}>
+                          <FooterLink link={link} />
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                );
+              })}
             </nav>
           </div>
         )}

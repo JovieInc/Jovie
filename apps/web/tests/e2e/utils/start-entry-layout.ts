@@ -1,7 +1,29 @@
 /** Browser probes must stay self-contained for Playwright init-script serialization. */
+
+export type ClaimLayoutShiftSource = {
+  node: {
+    nodeName: string;
+    id: string;
+    testId: string;
+    className: string;
+  } | null;
+  previous: { x: number; y: number; width: number; height: number } | null;
+  current: { x: number; y: number; width: number; height: number } | null;
+};
+
+export type ClaimLayoutShiftEntry = {
+  value: number;
+  hadRecentInput: boolean;
+  startTime: number;
+  counted: boolean;
+  sources: ClaimLayoutShiftSource[];
+};
+
 declare global {
   interface Window {
     __claimLayout?: { supported: boolean; total: number | null };
+    __claimLayoutEntries?: ClaimLayoutShiftEntry[];
+    __armClaimLayout?: () => void;
     __claimInitialLayout?: {
       supported: boolean;
       total: number | null;
@@ -90,16 +112,90 @@ export function installReplyLayoutProbe(): void {
     supported,
     total: supported ? 0 : (null as number | null),
   };
+  const entries: ClaimLayoutShiftEntry[] = [];
+  // `since` is the open edge of the measured window. It stays at navigation
+  // until the settled handoff arms the reply window. Entries are kept, and
+  // total is recomputed from startTime, so a late callback cannot add a
+  // pre-window shift back after the window opens.
+  let since = 0;
   window.__claimLayout = metric;
-  if (!metric.supported) return;
+  window.__claimLayoutEntries = entries;
+
+  const recompute = () => {
+    if (!supported) {
+      metric.total = null;
+      return;
+    }
+    let total = 0;
+    let invalid = false;
+    for (const shift of entries) {
+      const inWindow = shift.startTime >= since && !shift.hadRecentInput;
+      if (!inWindow) {
+        shift.counted = false;
+        continue;
+      }
+      if (!Number.isFinite(shift.value)) {
+        shift.counted = false;
+        invalid = true;
+        continue;
+      }
+      shift.counted = true;
+      total += shift.value;
+    }
+    metric.total = invalid ? Number.NaN : total;
+  };
+
+  window.__armClaimLayout = () => {
+    if (!supported) return;
+    since = performance.now();
+    recompute();
+  };
+
+  if (!supported) return;
+
   new PerformanceObserver(list => {
     for (const entry of list.getEntries()) {
       const shift = entry as PerformanceEntry & {
-        hadRecentInput: boolean;
-        value: number;
+        hadRecentInput?: boolean;
+        value?: number;
+        sources?: Array<{
+          node?: Node | null;
+          previousRect?: DOMRectReadOnly;
+          currentRect?: DOMRectReadOnly;
+        }>;
       };
-      if (!shift.hadRecentInput)
-        metric.total = (metric.total ?? 0) + shift.value;
+      const sources = (shift.sources ?? []).map(source => {
+        const node = source.node instanceof Element ? source.node : null;
+        const snapshot = (rect: DOMRectReadOnly | undefined) =>
+          rect && Number.isFinite(rect.width)
+            ? {
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+              }
+            : null;
+        return {
+          node: node
+            ? {
+                nodeName: node.nodeName,
+                id: node.id,
+                testId: node.getAttribute('data-testid') ?? '',
+                className: (node.getAttribute('class') ?? '').slice(0, 160),
+              }
+            : null,
+          previous: snapshot(source.previousRect),
+          current: snapshot(source.currentRect),
+        };
+      });
+      entries.push({
+        value: typeof shift.value === 'number' ? shift.value : Number.NaN,
+        hadRecentInput: Boolean(shift.hadRecentInput),
+        startTime: Number.isFinite(shift.startTime) ? shift.startTime : 0,
+        counted: false,
+        sources,
+      });
     }
+    recompute();
   }).observe({ type: 'layout-shift' });
 }

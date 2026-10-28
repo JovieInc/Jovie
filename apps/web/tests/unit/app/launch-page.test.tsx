@@ -12,7 +12,7 @@ describe('LaunchPage audience surface', () => {
     });
 
     expect(heading).toHaveClass('system-b-launch-hero-title', 'text-balance');
-    expect(heading.className).not.toMatch(/\bline-clamp-\d/);
+    expect(heading).toHaveClass('marketing-h1-max-two-lines');
     expect(screen.getByText('7M')).toHaveClass('tabular-nums');
   });
 

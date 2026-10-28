@@ -228,6 +228,7 @@ test.describe('Homepage', () => {
       { width: 390, height: 844 },
       { width: 720, height: 450 },
       { width: 320, height: 406 },
+      { width: 1440, height: 450 },
     ]) {
       await page.setViewportSize(viewport);
       await gotoHomepage(page);
@@ -238,6 +239,7 @@ test.describe('Homepage', () => {
         page.locator('#homepage-claim-handle'),
         page.getByTestId('homepage-primary-cta'),
       ]) {
+        await expect(locator).toBeInViewport();
         await locator.scrollIntoViewIfNeeded();
         const box = await locator.boundingBox();
         expect(box, 'element renders').not.toBeNull();

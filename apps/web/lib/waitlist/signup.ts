@@ -9,6 +9,10 @@ import { enqueueSignedUpWelcomeEmail } from '@/lib/waitlist/email-jobs';
 import { isWaitlistSignupEligibleStatus } from '@/lib/waitlist/state-machine';
 import { isStatusUpgrade } from '@/lib/waitlist/status-precedence';
 
+/**
+ * `authUserId` is the app `users.id` from `withDbSessionTx`, or a Better Auth
+ * user id. Do not match `users.clerkId`: Better Auth rows leave it null.
+ */
 export async function markWaitlistSignedUpInTx(
   tx: DbOrTransaction,
   authUserId: string
@@ -22,13 +26,7 @@ export async function markWaitlistSignedUpInTx(
       waitlistEntryId: users.waitlistEntryId,
     })
     .from(users)
-    .where(
-      or(
-        eq(users.id, authUserId),
-        eq(users.betterAuthUserId, authUserId),
-        eq(users.clerkId, authUserId)
-      )
-    )
+    .where(or(eq(users.id, authUserId), eq(users.betterAuthUserId, authUserId)))
     .for('update')
     .limit(1);
 
