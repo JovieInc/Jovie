@@ -1,0 +1,382 @@
+{
+  "schema": "jovie-domain-write-ratchet/v1",
+  "entries": {
+    "apps/web/app/[username]/s/[platform]/route.ts": {
+      "socialLinks": 1
+    },
+    "apps/web/app/api/account/delete/route.ts": {
+      "users": 1,
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/account/email/route.ts": {
+      "users": 1
+    },
+    "apps/web/app/api/admin/creator-invite/bulk/route.ts": {
+      "creatorClaimInvites": 1
+    },
+    "apps/web/app/api/admin/creator-invite/route.ts": {
+      "creatorClaimInvites": 1
+    },
+    "apps/web/app/api/admin/creator-social-links/route.ts": {
+      "socialLinks": 2
+    },
+    "apps/web/app/api/admin/roles/route.ts": {
+      "users": 2
+    },
+    "apps/web/app/api/admin/set-plan/route.ts": {
+      "users": 1
+    },
+    "apps/web/app/api/artist/theme/route.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/audience/click/route.ts": {
+      "audienceMembers": 2
+    },
+    "apps/web/app/api/audience/visit/route.ts": {
+      "audienceMembers": 3
+    },
+    "apps/web/app/api/canvas/generate/route.ts": {
+      "discogReleases": 1
+    },
+    "apps/web/app/api/chat/confirm-edit/route.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/chat/confirm-link/route.ts": {
+      "socialLinks": 2
+    },
+    "apps/web/app/api/chat/confirm-remove-link/route.ts": {
+      "socialLinks": 1
+    },
+    "apps/web/app/api/cron/billing-reconciliation/route.ts": {
+      "users": 2
+    },
+    "apps/web/app/api/dashboard/audience/members/route.ts": {
+      "audienceMembers": 1
+    },
+    "apps/web/app/api/dashboard/profile/lib/db-operations.ts": {
+      "creatorProfiles": 1,
+      "users": 1
+    },
+    "apps/web/app/api/dashboard/shop/route.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/dashboard/social-links/route.delete.ts": {
+      "socialLinks": 2
+    },
+    "apps/web/app/api/dashboard/social-links/route.patch.ts": {
+      "socialLinks": 2
+    },
+    "apps/web/app/api/dashboard/social-links/route.post.ts": {
+      "socialLinks": 1
+    },
+    "apps/web/app/api/dashboard/social-links/route.put.ts": {
+      "socialLinks": 3
+    },
+    "apps/web/app/api/dev/test-user/set-plan/route.ts": {
+      "users": 1
+    },
+    "apps/web/app/api/growth-access-request/route.ts": {
+      "users": 1
+    },
+    "apps/web/app/api/images/artwork/upload/route.ts": {
+      "discogReleases": 1
+    },
+    "apps/web/app/api/images/upload/route.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/library/audio/confirm/route.ts": {
+      "discogRecordings": 1
+    },
+    "apps/web/app/api/library/audio/snippet/route.ts": {
+      "discogRecordings": 1
+    },
+    "apps/web/app/api/max-access-request/route.ts": {
+      "users": 1
+    },
+    "apps/web/app/api/notifications/confirm/route.ts": {
+      "notificationSubscriptions": 1
+    },
+    "apps/web/app/api/notifications/unsubscribe/one-click/route.ts": {
+      "notificationSubscriptions": 1
+    },
+    "apps/web/app/api/notifications/update-subscriber-field.ts": {
+      "notificationSubscriptions": 1
+    },
+    "apps/web/app/api/sms-access-request/route.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/stripe-connect/disconnect/route.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/stripe-connect/onboard/route.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/suggestions/avatars/[id]/select/route.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/suggestions/playlist-fallback/_shared.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/api/suggestions/social-links/[id]/approve/route.ts": {
+      "socialLinks": 1
+    },
+    "apps/web/app/api/track/route.ts": {
+      "audienceMembers": 2,
+      "socialLinks": 1
+    },
+    "apps/web/app/api/webhooks/stripe-connect/route.ts": {
+      "creatorProfiles": 2
+    },
+    "apps/web/app/app/(shell)/admin/actions.ts": {
+      "creatorProfiles": 7,
+      "users": 2
+    },
+    "apps/web/app/app/(shell)/admin/waitlist/update-status/route.ts": {
+      "waitlistEntries": 1
+    },
+    "apps/web/app/app/(shell)/dashboard/actions/creator-profile.ts": {
+      "creatorProfiles": 2
+    },
+    "apps/web/app/app/(shell)/dashboard/actions/switch-profile.ts": {
+      "userProfileClaims": 2,
+      "users": 2,
+      "creatorProfiles": 1
+    },
+    "apps/web/app/app/(shell)/dashboard/releases/actions.ts": {
+      "discogReleases": 4,
+      "discogRecordings": 1,
+      "discogTracks": 1,
+      "creatorProfiles": 5
+    },
+    "apps/web/app/app/(shell)/dashboard/releases/catalog-task-actions.ts": {
+      "creatorProfiles": 2,
+      "discogReleases": 1
+    },
+    "apps/web/app/app/(shell)/dashboard/releases/task-actions.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/app/(shell)/dashboard/tour-dates/actions.ts": {
+      "tourDates": 5,
+      "creatorProfiles": 4
+    },
+    "apps/web/app/app/(shell)/dashboard/tour-dates/events-actions.ts": {
+      "tourDates": 2
+    },
+    "apps/web/app/onboarding/actions/activate-trial.ts": {
+      "users": 1
+    },
+    "apps/web/app/onboarding/actions/connect-spotify.ts": {
+      "creatorProfiles": 4
+    },
+    "apps/web/app/onboarding/actions/enrich-profile.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/onboarding/actions/profile-setup.ts": {
+      "creatorProfiles": 3,
+      "users": 2,
+      "userProfileClaims": 1
+    },
+    "apps/web/app/onboarding/actions/update-profile.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/app/s/[code]/route.ts": {
+      "audienceMembers": 2
+    },
+    "apps/web/lib/admin/moderation.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/audience/record-audience-event.ts": {
+      "audienceMembers": 1
+    },
+    "apps/web/lib/auth/gate.ts": {
+      "users": 2
+    },
+    "apps/web/lib/auth/provision.ts": {
+      "users": 2
+    },
+    "apps/web/lib/billing/reconciliation/orphaned-subscription-handler.ts": {
+      "users": 1
+    },
+    "apps/web/lib/chat/route-audio-upload.ts": {
+      "discogRecordings": 1
+    },
+    "apps/web/lib/claim/claim-verification-review.server.ts": {
+      "creatorProfiles": 5
+    },
+    "apps/web/lib/claim/claim-verification.server.ts": {
+      "creatorProfiles": 4
+    },
+    "apps/web/lib/db/batch.ts": {
+      "socialLinks": 1
+    },
+    "apps/web/lib/db/customer-recovery.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/db/rebuild-audience-projections.ts": {
+      "audienceMembers": 1
+    },
+    "apps/web/lib/db/social-links-sync.ts": {
+      "creatorProfiles": 1,
+      "socialLinks": 3
+    },
+    "apps/web/lib/discography/collaborator-profile-reconciliation.ts": {
+      "creatorProfiles": 2,
+      "socialLinks": 1
+    },
+    "apps/web/lib/discography/slug.ts": {
+      "discogReleases": 1,
+      "discogRecordings": 1,
+      "discogTracks": 1
+    },
+    "apps/web/lib/discography/spotify-import.ts": {
+      "creatorProfiles": 1,
+      "discogReleases": 1
+    },
+    "apps/web/lib/discography/unclaimed-artist-enrichment.ts": {
+      "socialLinks": 1
+    },
+    "apps/web/lib/dsp-enrichment/jobs/dsp-artist-discovery.ts": {
+      "creatorProfiles": 3
+    },
+    "apps/web/lib/dsp-enrichment/jobs/musicfetch-enrichment.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/dsp-enrichment/jobs/profile-enrichment.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/email/jobs/send-claim-invite.ts": {
+      "creatorClaimInvites": 7,
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/fit-scoring/service.ts": {
+      "creatorProfiles": 3
+    },
+    "apps/web/lib/fit-scoring/spotify-enrichment.ts": {
+      "creatorProfiles": 2
+    },
+    "apps/web/lib/ingestion/avatar/index.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/ingestion/flows/profile-processing.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/ingestion/flows/reingest-flow.ts": {
+      "creatorProfiles": 2
+    },
+    "apps/web/lib/ingestion/flows/social-platform-flow.ts": {
+      "socialLinks": 1,
+      "creatorProfiles": 2
+    },
+    "apps/web/lib/ingestion/jobs/executor.ts": {
+      "creatorProfiles": 3
+    },
+    "apps/web/lib/ingestion/merge.ts": {
+      "socialLinks": 2
+    },
+    "apps/web/lib/ingestion/profile.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/ingestion/status-manager.ts": {
+      "creatorProfiles": 7
+    },
+    "apps/web/lib/leads/route-lead.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/merch/first-sale-text.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/mobile/complete-profile.ts": {
+      "creatorProfiles": 2,
+      "userProfileClaims": 1,
+      "users": 1
+    },
+    "apps/web/lib/notifications/audience-alert-state.ts": {
+      "audienceMembers": 1
+    },
+    "apps/web/lib/notifications/otp-service.ts": {
+      "notificationSubscriptions": 1,
+      "audienceMembers": 1
+    },
+    "apps/web/lib/notifications/preferences.ts": {
+      "creatorProfiles": 2
+    },
+    "apps/web/lib/notifications/quota.ts": {
+      "users": 1
+    },
+    "apps/web/lib/notifications/sms-suppression.ts": {
+      "notificationSubscriptions": 1
+    },
+    "apps/web/lib/notifications/sms-webhook.ts": {
+      "notificationSubscriptions": 1
+    },
+    "apps/web/lib/onboarding/claim-profile.ts": {
+      "creatorProfiles": 2,
+      "users": 1,
+      "userProfileClaims": 1
+    },
+    "apps/web/lib/profile/featured-playlist-fallback.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/referrals/service.ts": {
+      "users": 1
+    },
+    "apps/web/lib/releases/release-lifecycle.server.ts": {
+      "discogReleases": 1
+    },
+    "apps/web/lib/retargeting/claim-creatives.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/services/album-art/apply.ts": {
+      "discogReleases": 2
+    },
+    "apps/web/lib/stripe/connect-readiness.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/stripe/customer-sync/customer.ts": {
+      "users": 1
+    },
+    "apps/web/lib/tasks/task-reservation.ts": {
+      "creatorProfiles": 2
+    },
+    "apps/web/lib/username/sync.ts": {
+      "creatorProfiles": 1
+    },
+    "apps/web/lib/waitlist/access-request.ts": {
+      "users": 1,
+      "waitlistEntries": 4
+    },
+    "apps/web/lib/waitlist/admission-detector.ts": {
+      "waitlistEntries": 1
+    },
+    "apps/web/lib/waitlist/email-jobs.ts": {
+      "waitlistEntries": 7,
+      "users": 2
+    },
+    "apps/web/lib/waitlist/paid-admission.ts": {
+      "users": 1
+    },
+    "apps/web/lib/waitlist/redeem.ts": {
+      "users": 2,
+      "waitlistEntries": 2
+    },
+    "apps/web/lib/waitlist/signup-entry.ts": {
+      "waitlistEntries": 1
+    },
+    "apps/web/lib/waitlist/signup.ts": {
+      "users": 2,
+      "waitlistEntries": 1
+    }
+  },
+  "sideEffectGaps": {
+    "apps/web/app/api/chat/confirm-link/route.ts": ["socialLinks"],
+    "apps/web/app/api/chat/confirm-remove-link/route.ts": ["socialLinks"],
+    "apps/web/app/api/dashboard/social-links/route.post.ts": ["socialLinks"],
+    "apps/web/app/api/suggestions/social-links/[id]/approve/route.ts": [
+      "socialLinks"
+    ],
+    "apps/web/lib/db/batch.ts": ["socialLinks"],
+    "apps/web/lib/db/social-links-sync.ts": ["socialLinks"],
+    "apps/web/lib/discography/unclaimed-artist-enrichment.ts": ["socialLinks"],
+    "apps/web/lib/ingestion/merge.ts": ["socialLinks"]
+  }
+}

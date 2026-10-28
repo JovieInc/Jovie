@@ -8,6 +8,9 @@
   "pageRoots": ["apps/web/app/(home)", "apps/web/app/(marketing)", "apps/web/app/brand"],
   "seeds": ["apps/web/app/layout.tsx", "apps/web/app/manifest.ts", "apps/web/app/llms.txt/route.ts", "apps/web/app/llms-full.txt/route.ts", "apps/web/data/companyIdentity.ts", "apps/web/data/marketingNavigation.ts", "apps/web/lib/billing/offer-truth.ts", "apps/web/lib/config/plan-prices.ts"],
   "followPrefixes": ["apps/web/app/(home)/", "apps/web/app/(marketing)/", "apps/web/app/brand/", "apps/web/app/layout.tsx", "apps/web/app/manifest.ts", "apps/web/app/llms.txt/", "apps/web/app/llms-full.txt/", "apps/web/components/homepage/", "apps/web/components/marketing/", "apps/web/components/site/", "apps/web/components/organisms/", "apps/web/components/features/home/", "apps/web/data/", "apps/web/content/", "apps/web/lib/billing/offer-truth.ts", "apps/web/lib/config/plan-prices.ts"],
+  "allowedPhrases": [
+    {"phrase": "Artist Presence", "reason": "Plan name from offer truth (plan-prices, offer-truth). A product noun, not audience targeting; the rest of the line is still checked."}
+  ],
   "audienceAllowlist": [
     {"path": "apps/web/app/(marketing)/solutions/", "reason": "solutions/[audience] landing pages"},
     {"path": "apps/web/content/pages/solutions/", "reason": "Factory records rendered only by solutions/[audience]"},

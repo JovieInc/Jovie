@@ -85,7 +85,7 @@ test('stalled launchctl resolves without throwing', async () => {
     packaged: true,
     platform: 'darwin',
     appEnv: 'staging',
-    execPath: '/Applications/Jovie Staging.app/Contents/MacOS/Jovie',
+    execPath: '/Applications/Jovie.app/Contents/MacOS/Jovie',
     homeDirectory: '/Users/tim',
     uid: 501,
     io: {
