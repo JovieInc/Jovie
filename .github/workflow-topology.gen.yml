@@ -437,9 +437,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Auto-Ready Agent Drafts
       - Lane Fix Relay
-      - Merge Queue Green Enroll
     triggeringStateTransition:
       - pull_request
       - pull_request_review
@@ -966,7 +964,6 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
@@ -1565,9 +1562,6 @@ edges:
     to: Merge Queue Green Enroll
     type: workflow_run
   - from: CI
-    to: Merge Queue Green Enroll
-    type: workflow_run
-  - from: Fork PR Gate
     to: Merge Queue Green Enroll
     type: workflow_run
   - from: PR Size Guard
