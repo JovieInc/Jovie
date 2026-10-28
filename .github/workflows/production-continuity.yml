@@ -39,6 +39,7 @@ jobs:
       unknown_targets: ${{ steps.probe.outputs.unknown_targets }}
       unknown_reasons: ${{ steps.probe.outputs.unknown_reasons }}
       requires_agent_ingress: ${{ steps.probe.outputs.requires_agent_ingress }}
+      agent_ingress_failure: ${{ steps.probe.outputs.agent_ingress_failure }}
     steps:
       - name: Checkout policy source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -172,7 +173,7 @@ jobs:
   agent-ingress:
     name: Admit one Summer provider-recovery task
     needs: observe
-    # production-stale is a release-pipeline failure, not a provider outage.
+    # Every unhealthy class is admitted; production-stale routes as production-controller-failed.
     if: ${{ needs.observe.outputs.status == 'unhealthy' && needs.observe.outputs.requires_agent_ingress == 'true' }}
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
@@ -193,6 +194,7 @@ jobs:
           INCIDENT_KEY: ${{ needs.observe.outputs.incident_key }}
           AFFECTED_TARGETS: ${{ needs.observe.outputs.affected_targets }}
           INCIDENT_CLASSES: ${{ needs.observe.outputs.incident_classes }}
+          INGRESS_FAILURE: ${{ needs.observe.outputs.agent_ingress_failure }}
         run: |
           set -euo pipefail
           event_file="$RUNNER_TEMP/production-continuity-event.json"
@@ -200,12 +202,13 @@ jobs:
             --arg key "$INCIDENT_KEY" \
             --arg targets "$AFFECTED_TARGETS" \
             --arg classes "$INCIDENT_CLASSES" \
+            --arg failure "${INGRESS_FAILURE:-provider-unavailable}" \
             '{client_payload: {
               delivery_key: $key,
               repository: "JovieInc/Jovie",
               source: "production-continuity-guard",
               event: "production-continuity-unavailable",
-              failure: "provider-unavailable",
+              failure: $failure,
               evidence: {
                 affectedTargets: ($targets | split(",")),
                 incidentClasses: ($classes | split(",")),

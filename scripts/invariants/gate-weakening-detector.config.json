@@ -6,6 +6,7 @@
     "label": "codeowners-approved"
   },
   "scanExclusions": [],
+  "generatedReports": ["apps/web/reports/test-coverage-snapshot.json"],
   "selfPaths": [
     "scripts/invariants/gate-weakening-detector.mjs",
     "scripts/invariants/gate-weakening-detector.config.json",

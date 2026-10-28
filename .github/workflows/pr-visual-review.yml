@@ -45,7 +45,7 @@ jobs:
   capture:
     # Capture evidence remains fail-closed (JOV-5459).
     name: Capture changed UI (desktop + mobile)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
