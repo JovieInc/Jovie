@@ -288,6 +288,7 @@
   "scripts/ensure-dev-next-cache.test.mjs",
   "scripts/ensure-sharp-runtime-traces.test.mjs",
   "scripts/eval-lanes.test.mjs",
+  "scripts/examples/music-resolve.test.ts",
   "scripts/fetch-sonar-issues.test.mjs",
   "scripts/fix-standalone-loopback-hostname.test.mjs",
   "scripts/generate-product-surface-counts.test.ts",
