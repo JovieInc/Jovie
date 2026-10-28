@@ -54,6 +54,7 @@ import {
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
+import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
@@ -113,6 +114,68 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('selects both critical and interaction files for non-main manual units', () => {
+    const unitJob = jobBlock('ci-unit-tests', 'ci-exact-head-coverage-shard');
+    const command = unitJob
+      .split('\n')
+      .find(
+        line =>
+          line.includes('pnpm turbo test:fast --affected --') &&
+          line.includes('--passWithNoTests')
+      );
+    const selectors = command?.match(
+      /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
+    )?.[1];
+    expect(selectors, 'manual unit filename selectors').toBeTruthy();
+    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${selectors}`], {
+      encoding: 'utf8',
+      timeout: 1000,
+    });
+    expect(parsed.status, parsed.stderr).toBe(0);
+    const [, ...runnerArgs] = buildWebVitestFastArgs(
+      parsed.stdout.split('\0').filter(Boolean)
+    );
+    const webRoot = resolve(REPO_ROOT, 'apps/web');
+    const outputDir = mkdtempSync(join(tmpdir(), 'manual-unit-selection-'));
+    try {
+      const report = join(outputDir, 'files.json');
+      // --filesOnly uses the real config/project selection without importing
+      // or executing test bodies. One unsharded list checks the intended union.
+      const selected = spawnSync(
+        process.execPath,
+        [
+          resolve(webRoot, 'node_modules/vitest/vitest.mjs'),
+          'list',
+          ...runnerArgs,
+          '--filesOnly',
+          `--json=${report}`,
+        ],
+        {
+          cwd: webRoot,
+          encoding: 'utf8',
+          env: { ...process.env, CI: 'true' },
+          timeout: 20_000,
+        }
+      );
+      expect(selected.error).toBeUndefined();
+      expect(selected.status, selected.stdout + selected.stderr).toBe(0);
+      const files = JSON.parse(readFileSync(report, 'utf8')).map(
+        entry => entry.file
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/lib/auth/gate.critical.test.ts')
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/chat/ChatInput.interaction.test.tsx')
+      );
+      expect(files).not.toContain(
+        resolve(webRoot, 'tests/unit/utils/capitalizeFirst.test.ts')
+      );
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
   it('discovers assurance behavior tests and executes them once with structural coverage', async () => {
     const test = 'scripts/invariants/assurance-matrix.test.mjs';
     expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(test);
