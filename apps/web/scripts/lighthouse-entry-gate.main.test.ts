@@ -434,7 +434,7 @@ describe('lighthouse entry gate main', () => {
             : imageAssets();
       state.oversizedAsset = kind === 'oversized';
       state.malformedAsset = kind === 'malformed';
-      state.lcp = 6320;
+      state.lcp = 7320;
       expect(await main(claimArgs)).toBe(1);
       expect(resourceDiagnostics().lcpResource).toEqual({
         status: 'unavailable',
@@ -472,7 +472,7 @@ describe('lighthouse entry gate main', () => {
 
   it('reports the trace-correlated image request without leaking its URL or headers and deletes each sample before the next', async () => {
     state.assets = imageAssets();
-    state.lcp = 6320;
+    state.lcp = 7320;
     const code = await main([
       '--base-url',
       'https://fixture.test',
@@ -559,7 +559,7 @@ describe('lighthouse entry gate main', () => {
         extraHeaders: { authorization: 'header-private-value' },
       },
       audits: {
-        'largest-contentful-paint': { numericValue: 6317 },
+        'largest-contentful-paint': { numericValue: 7317 },
         'cumulative-layout-shift': { numericValue: 0 },
         'lcp-breakdown-insight': {
           details: {
@@ -623,7 +623,7 @@ describe('lighthouse entry gate main', () => {
       lcpResource: { status: 'unavailable', reason: 'asset-read' },
     });
     expect(logs.join('\n')).toContain(
-      'FAIL claim-link: LCP 6317ms / 4000ms, CLS 0.000 / 0.05'
+      'FAIL claim-link: LCP 7317ms / 7000ms, CLS 0.000 / 0.05'
     );
     expect(logs.join('\n')).not.toMatch(/private|<img|authorization/);
     for (const args of state.calls) {
