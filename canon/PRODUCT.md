@@ -227,6 +227,23 @@ real product.
   and realtime generated UI, picking the best layout for the moment. The visual
   reference is the new Shopify admin: full-bleed and editorial.
 
+### Jovie runs the artist's growth loop (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: Jovie drives the same goals for each artist
+that Summer drives for the company. It finds the artist's highest-ROI moves,
+executes the ones the artist approves, and takes as much work off the artist as
+possible.
+
+- Abstract the work, not the decision. The artist approves outcomes; Jovie does
+  the steps. Where no native integration exists, Jovie may use concierge work
+  (a human behind the curtain) or a user-controlled cloud browser session (e.g.
+  Cloudflare Browser Rendering) that the artist logs into themselves.
+- Jovie never stores third-party passwords. Browser sessions are scoped to the
+  artist, revocable, and recorded. Unsupported-site automation follows each
+  site's terms.
+- Every executed move carries the optimization contract above: a metric, a
+  read-out date, and keep/iterate/kill.
+
 ### Ovie is one Home (founder decision, 2026-10-21)
 
 **EVENT:** Tim White, 2026-10-21: "Move the shipping dashboard into Ovie, and
