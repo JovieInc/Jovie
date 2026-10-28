@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import {
   getPublicProfileCandidate,
@@ -11,28 +10,26 @@ import {
 } from '@/lib/seo/sitemap-publication';
 
 describe('/product/dsp-links marketing route', () => {
-  it('ships as a published commercial sitemap hub', () => {
-    expect(APP_ROUTES.PRODUCT_DSP_LINKS).toBe('/product/dsp-links');
-    expect(getExactPublishedMarketingPaths()).toContain('/product/dsp-links');
-    expect(getPublishedCommercialHubPaths()).toContain('/product/dsp-links');
+  it('is redirected out of the sitemap (phase 1 IA)', () => {
+    expect(getExactPublishedMarketingPaths()).not.toContain(
+      '/product/dsp-links'
+    );
+    expect(getPublishedCommercialHubPaths()).not.toContain(
+      '/product/dsp-links'
+    );
 
     const route = MARKETING_ROUTE_MANIFEST.find(
       entry => entry.url === '/product/dsp-links'
     );
     expect(route).toMatchObject({
-      status: 'active',
-      recipeId: 'feature',
-      glob: '(marketing)/product/dsp-links/page.tsx',
+      status: 'deprecated',
+      aliasOf: '/smart-links',
+      noindex: true,
     });
-    expect(route?.noindex).toBeUndefined();
-    expect(route?.aliasOf).toBeUndefined();
     expect(route?.healthCheck).toMatchObject({
       path: '/product/dsp-links',
-      expected: 'page',
-    });
-    expect(route?.productEvidence).toMatchObject({
-      kind: 'interactive-mockup',
-      testId: 'dsp-links',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
     });
   });
 

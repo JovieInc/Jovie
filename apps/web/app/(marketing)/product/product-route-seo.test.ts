@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import {
   getPublicProfileCandidate,
@@ -13,23 +12,22 @@ import {
 import { isReservedUsername } from '@/lib/validation/username-core';
 
 describe('/product live marketing route (DESIGN_READY 2026-09-17)', () => {
-  it('ships as a published commercial sitemap hub, not a gone URL', () => {
-    expect(APP_ROUTES.PRODUCT).toBe('/product');
-    expect(getExactPublishedMarketingPaths()).toContain('/product');
-    expect(getPublishedCommercialHubPaths()).toContain('/product');
+  it('is redirected out of the sitemap (phase 1 IA)', () => {
+    expect(getExactPublishedMarketingPaths()).not.toContain('/product');
+    expect(getPublishedCommercialHubPaths()).not.toContain('/product');
 
     const route = MARKETING_ROUTE_MANIFEST.find(
       entry => entry.url === '/product'
     );
     expect(route).toMatchObject({
-      status: 'active',
-      recipeId: 'feature',
+      status: 'deprecated',
+      aliasOf: '/',
+      noindex: true,
     });
-    expect(route?.noindex).toBeUndefined();
-    expect(route?.aliasOf).toBeUndefined();
     expect(route?.healthCheck).toMatchObject({
       path: '/product',
-      expected: 'page',
+      expected: 'redirect',
+      allowedFinalPaths: ['/'],
     });
   });
 

@@ -3,15 +3,16 @@ import { DOCS_URL } from '@/constants/domains';
 import {
   describeFeatureAccess,
   getRouteCapability,
-  isPublicationPermitted,
   ROUTE_CAPABILITY_BINDINGS,
 } from '@/data/marketing/featureAvailability';
+import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import { AGENT_HANDOFF_DISCOVERY_PATH } from '@/lib/acquisition/agent-intent';
 import { PUBLIC_ARTIST_API_POLICY_URL } from '@/lib/api/v1/contract';
 import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
 } from '@/lib/billing/offer-truth';
+import { resolveMarketingRoutePolicy } from '@/lib/marketing/route-publication-policy';
 import {
   OVIE_MCP_RESOURCE_PATH,
   OVIE_OAUTH_AUTHORIZATION_SERVER_METADATA_PATH,
@@ -22,8 +23,8 @@ import {
 
 /**
  * Feature availability lines projected from the shared publication contract
- * (JOV-6216). Only published capability routes are listed; internal-only or
- * unauthorized-proof surfaces never leak into machine guidance. Proposed
+ * (JOV-6216). Only canonical public capability routes are listed; unlisted,
+ * redirected or unauthorized-proof surfaces stay out of machine guidance. Proposed
  * features are described with their honest access label — interest capture,
  * never a claim of immediate access.
  */
@@ -32,7 +33,13 @@ function buildFeatureAvailabilityLines(): string {
     .sort((a, b) => a.localeCompare(b))
     .map(path => {
       const record = getRouteCapability(path);
-      if (!record || !isPublicationPermitted(record)) return null;
+      const entry = MARKETING_ROUTE_MANIFEST.find(route => route.url === path);
+      if (
+        !record ||
+        !entry ||
+        !resolveMarketingRoutePolicy(entry).agentGuidanceAllowed
+      )
+        return null;
       return `- [${path}](${BASE_URL}${path}) — ${describeFeatureAccess(record)}`;
     })
     .filter((line): line is string => line !== null);

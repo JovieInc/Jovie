@@ -177,7 +177,7 @@ test.describe('Homepage', () => {
     );
     await expect(header.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/product'
+      '/artist-profiles'
     );
     await expect(header.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
@@ -206,7 +206,7 @@ test.describe('Homepage', () => {
     await expect(flyout).toBeVisible();
     await expect(flyout.getByRole('link', { name: 'Artists' })).toHaveAttribute(
       'href',
-      '/solutions/artists'
+      '/artist-profiles'
     );
     await expect(flyout.getByRole('link')).toHaveCount(1);
     await page.keyboard.press('Escape');

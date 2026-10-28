@@ -182,9 +182,9 @@
     "fan-crm": "0ec8cd39d8206d9b",
     "fan-subscriptions": "6b02527074262b63",
     "inbox": "94940bf6591fdcfa",
-    "instant-merch": "4adba3e0721e539c",
-    "jovie-card": "e776eba2c1c02f4c",
-    "pay": "aae7c467b3101462",
+    "instant-merch": "e3d43610709708d0",
+    "jovie-card": "4aa5ff7e03dc0733",
+    "pay": "1113e0483c79fa31",
     "priority-support": "4b7dfca7659937f3",
     "profile-monitoring": "5c40ff043b35292d",
     "public-ask": "d945d6893b629475",
@@ -196,7 +196,7 @@
     "verified-badge": "cc037a5b6f39f0ec",
     "voice": "ca0db92e33019cf8",
     "white-label": "00c51275aaaaa14d",
-    "youtube-thumbnails": "0c5aff13ea7b608c"
+    "youtube-thumbnails": "0fcaf09540a7cf3a"
   },
   "capabilityRoutes": {
     "ab-testing": [],

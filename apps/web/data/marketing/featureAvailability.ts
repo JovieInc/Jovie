@@ -155,7 +155,11 @@ export function isCapabilityIndexable(
   return (
     record !== null &&
     record.publication === 'public' &&
-    record.proofAuthorized === true
+    record.proofAuthorized === true &&
+    // Phase 1 (2026-10-25): only generally available capabilities are
+    // indexable. Beta, limited-testing and proposed pages stay unlisted until
+    // the capability ships; the sitemap reads this, so it cannot drift.
+    record.maturity === 'general_availability'
   );
 }
 
@@ -168,7 +172,7 @@ export function isCapabilityNavigable(
 ): boolean {
   return (
     record !== null &&
-    record.publication !== 'internal_only' &&
+    record.publication === 'public' &&
     record.proofAuthorized === true
   );
 }

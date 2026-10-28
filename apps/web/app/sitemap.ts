@@ -28,6 +28,7 @@ import { env } from '@/lib/env-server';
 import { filterPublicDiscoveryIdentities } from '@/lib/profile/public-profile-indexing-policy';
 import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { isUnclaimedStructuredCreditProfile } from '@/lib/profile/unclaimed-artist-profile';
+import { getSitemapExcludedPublicPaths } from '@/lib/seo/public-url-policy';
 import {
   commercialHubContentRevision,
   getExactPublishedMarketingPaths,
@@ -36,6 +37,7 @@ import {
   latestContentRevision,
   SITEMAP_PUBLISHED_LEGAL_PATHS,
   SITEMAP_PUBLISHED_MACHINE_PATHS,
+  sitemapPathname,
   toContentRevisionDate,
 } from '@/lib/seo/sitemap-publication';
 
@@ -283,8 +285,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const editorialPages: MetadataRoute.Sitemap = [
     sitemapEntry('/blog', blogLastModified),
     sitemapEntry('/changelog', changelogLastModified),
-    sitemapEntry(APP_ROUTES.ENGINEERING, engineeringLastModified),
   ];
+
+  // /engineering is an empty index until a founder-approved story ships
+  // (phase 1, 2026-10-25): list it only once it has something to index.
+  if (engineeringStories.length > 0) {
+    editorialPages.push(
+      sitemapEntry(APP_ROUTES.ENGINEERING, engineeringLastModified)
+    );
+  }
 
   editorialPages.push(
     ...blogPosts
@@ -394,8 +403,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     )
   );
 
+  // Redirected and gone paths (PUBLIC_URL_POLICY) never appear, whichever
+  // generator produced them (the solutions factory still emits /solutions/artists).
+  const excludedPaths = new Set(getSitemapExcludedPublicPaths());
+  const indexableMarketingPages = marketingPages.filter(
+    entry => !excludedPaths.has(sitemapPathname(entry.url))
+  );
+
   return [
-    ...marketingPages,
+    ...indexableMarketingPages,
     ...editorialPages,
     ...profilePages,
     ...releasePages,

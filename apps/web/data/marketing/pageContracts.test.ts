@@ -126,7 +126,7 @@ describe('marketing language context', () => {
       expect(
         getMarketingPageContractForPathname(link.href)?.copyScope,
         `${link.label} -> ${link.href}`
-      ).toBe('shared');
+      ).toBe(link.href === '/artist-profiles' ? 'music' : 'shared');
     }
   });
 

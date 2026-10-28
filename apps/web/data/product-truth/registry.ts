@@ -225,7 +225,7 @@ export type Claim = z.infer<typeof ClaimSchema>;
 export const PRODUCT_CAPABILITIES = {
   'jovie-card': {
     maturity: 'proposed',
-    publication: 'public',
+    publication: 'unlisted',
     access: 'interest_capture',
     entitlementKeys: [],
     evidence: { captureScenarios: [], routes: [] },
@@ -322,7 +322,7 @@ export const PRODUCT_CAPABILITIES = {
   },
   'instant-merch': {
     maturity: 'limited_testing',
-    publication: 'public',
+    publication: 'unlisted',
     access: 'enrolled',
     entitlementKeys: ['canAccessMerchCreation'],
     flagKey: 'MERCH_MVP',
@@ -338,7 +338,7 @@ export const PRODUCT_CAPABILITIES = {
   },
   'youtube-thumbnails': {
     maturity: 'public_beta',
-    publication: 'public',
+    publication: 'unlisted',
     access: 'open',
     entitlementKeys: [],
     evidence: { captureScenarios: [], routes: [] },
@@ -351,7 +351,7 @@ export const PRODUCT_CAPABILITIES = {
   },
   pay: {
     maturity: 'public_beta',
-    publication: 'public',
+    publication: 'unlisted',
     access: 'enrolled',
     entitlementKeys: ['canAccessTipping', 'canAccessStripeConnect'],
     evidence: {

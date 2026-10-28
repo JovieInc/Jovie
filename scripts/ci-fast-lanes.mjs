@@ -188,6 +188,9 @@ export const LANES_SELFTEST_CHANGED_TESTS_SCRIPT = [
     ].join('; ')
   )} "$files")"`,
   'if [ "$release_closure" = 1 ]; then case " $tests " in *" scripts/tests/test_lane_runner.py "*) ;; *) extra="$extra scripts.tests.test_lane_runner.ReleaseImportClosureTest";; esac; fi',
+  // Registry publication changes must refresh the checked-in lane projection
+  // before they can eject unrelated PRs from a combined merge group.
+  'for f in $files; do case "$f" in apps/web/data/product-truth/registry.ts|scripts/lanes/certified-capabilities.gen.json) extra="$extra scripts.tests.test_design_gate.CertifiedSyncTest"; break;; esac; done',
   '[ -n "${tests// /}$extra" ] || { echo "no changed release self-test lanes tests"; exit 0; }',
   'mkdir -p "$t/state/home"',
   'echo "release self-test env (LANES_SELFTEST=1) on:$tests $extra"',
@@ -458,7 +461,7 @@ export const SOURCE_GUARDS = Object.freeze([
     command: `bash -c ${shellQuote(LANES_SELFTEST_CHANGED_TESTS_SCRIPT)}`,
     // Candidate roots only; the command intersects changed paths with RELEASE_EXTRAS.
     inputs:
-      /^(?:scripts\/|packages\/|ops\/registry\/|\.nvmrc$|pnpm-lock\.yaml$)/u,
+      /^(?:scripts\/|packages\/|ops\/registry\/|apps\/web\/data\/product-truth\/registry\.ts$|\.nvmrc$|pnpm-lock\.yaml$)/u,
     prOnly: true,
   }),
   Object.freeze({

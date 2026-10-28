@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { APP_ROUTES } from '@/constants/routes';
 import { MARKETING_ROUTE_MANIFEST } from '@/data/marketing/routeManifest';
 import {
   getPublicProfileCandidate,
@@ -11,12 +10,11 @@ import {
 } from '@/lib/seo/sitemap-publication';
 
 describe('/product/command-palette marketing route', () => {
-  it('ships as a published commercial sitemap hub', () => {
-    expect(APP_ROUTES.PRODUCT_COMMAND_PALETTE).toBe('/product/command-palette');
-    expect(getExactPublishedMarketingPaths()).toContain(
+  it('is redirected out of the sitemap (phase 1 IA)', () => {
+    expect(getExactPublishedMarketingPaths()).not.toContain(
       '/product/command-palette'
     );
-    expect(getPublishedCommercialHubPaths()).toContain(
+    expect(getPublishedCommercialHubPaths()).not.toContain(
       '/product/command-palette'
     );
 
@@ -24,19 +22,14 @@ describe('/product/command-palette marketing route', () => {
       entry => entry.url === '/product/command-palette'
     );
     expect(route).toMatchObject({
-      status: 'active',
-      recipeId: 'feature',
-      glob: '(marketing)/product/command-palette/page.tsx',
+      status: 'deprecated',
+      aliasOf: '/',
+      noindex: true,
     });
-    expect(route?.noindex).toBeUndefined();
-    expect(route?.aliasOf).toBeUndefined();
     expect(route?.healthCheck).toMatchObject({
       path: '/product/command-palette',
-      expected: 'page',
-    });
-    expect(route?.productEvidence).toMatchObject({
-      kind: 'interactive-mockup',
-      testId: 'shared-command-palette',
+      expected: 'redirect',
+      allowedFinalPaths: ['/'],
     });
   });
 

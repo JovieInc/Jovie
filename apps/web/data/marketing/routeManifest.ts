@@ -188,7 +188,8 @@ export function productEvidenceDeclarationIssue(
     }
     const capability = getProductCapability(evidence.capabilityId);
     if (
-      capability?.publication !== 'public' ||
+      (capability?.publication !== 'public' &&
+        capability?.publication !== 'unlisted') ||
       capability.access !== 'interest_capture'
     ) {
       return `${entry.glob} planned description requires a public interest-capture capability`;
@@ -600,7 +601,8 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     url: '/solutions/*',
     healthCheck: {
       path: '/solutions/artists',
-      expected: 'page',
+      expected: 'redirect',
+      allowedFinalPaths: ['/artist-profiles'],
     },
     productEvidence: {
       kind: 'framed-screenshot',
@@ -919,18 +921,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       notes:
         'Split claim-card hero and editorial-search close are the mounted stamps. Live marketing page — index and sitemap; do not 410 or treat as a reserved-gone username. Pen identity is explicitly unknown. No visual admission.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.4.0',
     url: '/product',
-    productEvidence: {
-      kind: 'interactive-mockup',
-      componentPath: 'apps/web/app/(marketing)/product/ProductLanding.tsx',
-      testId: 'product-claim-card',
-    },
+    aliasOf: '/',
+    noindex: true,
     healthCheck: {
       path: '/product',
-      expected: 'page',
-      waitFor: '[data-testid="marketing-section-hero"]',
+      expected: 'redirect',
+      allowedFinalPaths: ['/'],
     },
   },
   {
@@ -949,19 +948,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       notes:
         'Mounted stamp is split-screenshot-right. The hero shows the live smart-link analytics panel. Each click is counted, with the provider that received it and the time of the last click. Pen identity is explicitly unknown. No visual admission.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.4.0',
     url: '/product/link-analytics',
-    productEvidence: {
-      kind: 'interactive-mockup',
-      componentPath:
-        'apps/web/components/features/link-analytics/LinkAnalyticsPanel.tsx',
-      testId: 'release-smart-link-analytics',
-    },
+    aliasOf: '/smart-links',
+    noindex: true,
     healthCheck: {
       path: '/product/link-analytics',
-      expected: 'page',
-      waitFor: '[data-testid="marketing-section-hero"]',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
     },
   },
   {
@@ -980,19 +975,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       notes:
         'Mounted stamp is split-screenshot-right. The hero shows the live UTM builder with a filled tracking link. Pen identity is explicitly unknown. No visual admission.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.4.0',
     url: '/product/utm-links',
-    productEvidence: {
-      kind: 'interactive-mockup',
-      componentPath:
-        'apps/web/components/features/profile/UtmBuilderDialog.tsx',
-      testId: 'utm-builder',
-    },
+    aliasOf: '/smart-links',
+    noindex: true,
     healthCheck: {
       path: '/product/utm-links',
-      expected: 'page',
-      waitFor: '[data-testid="marketing-section-hero"]',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
     },
   },
   {
@@ -1011,19 +1002,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       notes:
         'Mounted stamp is split-screenshot-right. The hero shows the live command palette. Cmd+K filters routes and skills from the workspace registry. An empty query shows five items in each group. Pen identity is explicitly unknown. No visual admission.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.4.0',
     url: '/product/command-palette',
-    productEvidence: {
-      kind: 'interactive-mockup',
-      componentPath:
-        'apps/web/components/features/commands/CommandPalettePanel.tsx',
-      testId: 'shared-command-palette',
-    },
+    aliasOf: '/',
+    noindex: true,
     healthCheck: {
       path: '/product/command-palette',
-      expected: 'page',
-      waitFor: '[data-testid="marketing-section-hero"]',
+      expected: 'redirect',
+      allowedFinalPaths: ['/'],
     },
   },
   {
@@ -1043,18 +1030,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       notes:
         'Mounted stamp is split-screenshot-right. The hero shows the live release date and reveal date fields. A future release date is stored as scheduled. A blank reveal date keeps the page off the public profile until release day. Pen identity is explicitly unknown. No visual admission.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.4.0',
     url: '/product/release-scheduling',
-    productEvidence: {
-      kind: 'interactive-mockup',
-      componentPath: 'apps/web/components/molecules/DatePicker.tsx',
-      testId: 'release-schedule-fields',
-    },
+    aliasOf: '/artist-profiles',
+    noindex: true,
     healthCheck: {
       path: '/product/release-scheduling',
-      expected: 'page',
-      waitFor: '[data-testid="marketing-section-hero"]',
+      expected: 'redirect',
+      allowedFinalPaths: ['/artist-profiles'],
     },
   },
   {
@@ -1073,18 +1057,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       notes:
         'Mounted stamp is split-screenshot-right. The hero shows the live DSP rows: a saved URL opens that service, and a missing service stays on Find. Pen identity is explicitly unknown. No visual admission.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.4.0',
     url: '/product/dsp-links',
-    productEvidence: {
-      kind: 'interactive-mockup',
-      componentPath: 'apps/web/components/molecules/inspector/DspQuietRow.tsx',
-      testId: 'dsp-links',
-    },
+    aliasOf: '/smart-links',
+    noindex: true,
     healthCheck: {
       path: '/product/dsp-links',
-      expected: 'page',
-      waitFor: '[data-testid="marketing-section-hero"]',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
     },
   },
   {
@@ -1103,19 +1084,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       notes:
         'Mounted stamp is split-screenshot-right. The hero shows the live ISRC field with a release code and a track code. Pen identity is explicitly unknown. No visual admission.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.4.0',
     url: '/product/isrc',
-    productEvidence: {
-      kind: 'interactive-mockup',
-      componentPath:
-        'apps/web/components/molecules/drawer/DrawerEditableTextField.tsx',
-      testId: 'isrc-editor',
-    },
+    aliasOf: '/smart-links',
+    noindex: true,
     healthCheck: {
       path: '/product/isrc',
-      expected: 'page',
-      waitFor: '[data-testid="marketing-section-hero"]',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
     },
   },
   {
@@ -1134,19 +1111,15 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       notes:
         'Mounted stamp is split-screenshot-right. The hero shows the live countdown for a dated release. Pen identity is explicitly unknown. No visual admission.',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.4.0',
     url: '/product/pre-save',
-    productEvidence: {
-      kind: 'interactive-mockup',
-      componentPath:
-        'apps/web/components/features/release/ReleaseCountdown.tsx',
-      testId: 'pre-save-countdown',
-    },
+    aliasOf: '/smart-links',
+    noindex: true,
     healthCheck: {
       path: '/product/pre-save',
-      expected: 'page',
-      waitFor: '[data-testid="marketing-section-hero"]',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
     },
   },
   {
@@ -1304,9 +1277,16 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
       source:
         'mounted stamps 2026-10-15: profile-stage hero, platform strip, pillar grid, editorial splits, deeplink grid, three-stat band, dual-path close',
     },
-    status: 'active',
+    status: 'deprecated',
     specVersion: '1.0.0',
     url: '/launch',
+    aliasOf: '/smart-links',
+    noindex: true,
+    healthCheck: {
+      path: '/launch',
+      expected: 'redirect',
+      allowedFinalPaths: ['/smart-links'],
+    },
   },
   {
     glob: '(marketing)/about/page.tsx',

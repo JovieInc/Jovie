@@ -46,7 +46,7 @@ test.describe('/new landing page', () => {
     ).toBeVisible();
     await expect(
       headerNav.getByRole('link', { name: 'Product', exact: true })
-    ).toHaveAttribute('href', APP_ROUTES.PRODUCT);
+    ).toHaveAttribute('href', APP_ROUTES.ARTIST_PROFILES);
     await expect(
       headerNav.getByRole('link', { name: 'Pricing', exact: true })
     ).toHaveAttribute('href', APP_ROUTES.PRICING);

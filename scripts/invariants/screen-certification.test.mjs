@@ -1247,7 +1247,6 @@ if (p.endsWith('/zip')) {
       'web.brand',
       'web.report',
       'web.start',
-      'web.marketing-solutions',
       'web.public-profile-about',
     ];
     const spec = readFileSync(
@@ -1294,6 +1293,37 @@ if (p.endsWith('/zip')) {
           `"${screenId.replace(/\./g, '\\.')}\\|\\$\\{\\{ needs\\.generate\\.outputs\\.${suffix}-artifact-id \\}\\}"`
         ),
         `${screenId} must be certified from its own artifact in the certify job`
+      );
+    }
+  });
+
+  it('keeps redirected solutions sources gated without claiming the destination rendered them', () => {
+    assert.equal(SCREEN_PROOF_ROUTES['web.marketing-solutions'], undefined);
+    assert.equal(
+      SCREEN_MARKETING_ROUTES['web.artist-profiles'],
+      '/artist-profiles'
+    );
+    const path = 'apps/web/app/(marketing)/solutions/[audience]/page.tsx';
+    assert.equal(classifyScreenPath(path).entry?.id, 'web.marketing-solutions');
+    const destination = SCREEN_REGISTRY.find(
+      screen => screen.id === 'web.artist-profiles'
+    );
+    assert.ok(destination);
+    for (const proofs of [[], [validExternalProof(destination)]]) {
+      const result = evaluateChangedScreens({
+        changedFiles: [{ path, status: 'M' }],
+        headSha: HEAD,
+        proofs,
+        requireExternalEvidence: true,
+      });
+      assert.ok(
+        result.issues.includes(
+          'missing exact-head proof for web.marketing-solutions'
+        )
+      );
+      assert.deepEqual(
+        result.changedScreens.map(screen => [screen.id, screen.verdict]),
+        [['web.marketing-solutions', 'block']]
       );
     }
   });
@@ -1345,15 +1375,13 @@ if (p.endsWith('/zip')) {
     const checkoutCapture = workflow.indexOf(
       'Capture onboarding checkout screen proof'
     );
-    const marketingUpload = workflow.indexOf(
-      'Upload marketing-solutions screen proof'
-    );
+    const startUpload = workflow.indexOf('Upload start screen proof');
     const aboutUpload = workflow.indexOf(
       'Upload public-profile-about screen proof'
     );
-    assert.ok(marketingUpload > 0);
+    assert.ok(startUpload > 0);
     assert.ok(aboutUpload > 0);
-    assert.ok(checkoutCapture > marketingUpload);
+    assert.ok(checkoutCapture > startUpload);
     assert.ok(checkoutCapture > aboutUpload);
   });
 

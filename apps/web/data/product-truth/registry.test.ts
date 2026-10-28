@@ -200,7 +200,7 @@ describe('featureAvailability projection', () => {
     expect(card).toMatchObject({
       capabilityId: 'jovie-card',
       maturity: 'proposed',
-      publication: 'public',
+      publication: 'unlisted',
       access: 'interest_capture',
       audience: 'general',
       proofAuthorized: true,

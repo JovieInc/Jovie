@@ -48,7 +48,7 @@ export interface MarketingNavFlyoutMenu {
 
 // Canonical Pen header (2026-09-26): Customers flyout, Product, Pricing.
 export const MARKETING_NAV_LINKS = eligibleLinks([
-  { href: APP_ROUTES.PRODUCT, label: 'Product' },
+  { href: APP_ROUTES.ARTIST_PROFILES, label: 'Product' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
 ] as const satisfies readonly MarketingNavLink[]);
 
@@ -64,7 +64,7 @@ export const MARKETING_CUSTOMERS_FLYOUT = {
   label: 'Customers',
   heading: 'Customers',
   links: eligibleLinks([
-    { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
+    { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artists' },
   ] as const satisfies readonly MarketingNavLink[]),
 } as const satisfies MarketingNavFlyoutMenu;
 
@@ -83,11 +83,6 @@ export const MARKETING_TOOLS_FLYOUT_LINKS = eligibleLinks([
     href: APP_ROUTES.ARTIST_NOTIFICATIONS,
     label: 'Audience notifications',
     description: 'Collect opt-ins once and bring listeners back automatically.',
-  },
-  {
-    href: APP_ROUTES.INSTANT_MERCH,
-    label: 'Instant Merch',
-    description: 'Generate merch concepts from an artist identity.',
   },
   {
     href: APP_ROUTES.CLI,
@@ -118,18 +113,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
   {
     title: 'Product',
     links: [
-      { href: APP_ROUTES.PRODUCT, label: 'Product' },
-      { href: APP_ROUTES.PRODUCT_COMMAND_PALETTE, label: 'Command palette' },
-      {
-        href: APP_ROUTES.PRODUCT_RELEASE_SCHEDULING,
-        label: 'Release scheduling',
-      },
-      { href: APP_ROUTES.PRODUCT_DSP_LINKS, label: 'DSP Links' },
-      { href: APP_ROUTES.PRODUCT_UTM_LINKS, label: 'UTM Links' },
-      { href: APP_ROUTES.PRODUCT_ISRC, label: 'ISRC' },
-      { href: APP_ROUTES.PRODUCT_PRE_SAVE, label: 'Pre-save' },
-      { href: APP_ROUTES.PRODUCT_LINK_ANALYTICS, label: 'Link analytics' },
-      { href: APP_ROUTES.CARD, label: 'Jovie Card' },
+      { href: APP_ROUTES.ARTIST_PROFILES, label: 'Product' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
   },
@@ -139,7 +123,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
       { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
       { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-      { href: APP_ROUTES.PAY, label: 'Pay' },
       {
         href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
         label: 'Audience capture',
@@ -149,7 +132,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
         label: 'Audience reactivation',
       },
       { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
-      { href: APP_ROUTES.LAUNCH, label: 'Release System' },
     ],
   },
   {
@@ -166,8 +148,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
     links: [
       MARKETING_DEVELOPER_LINK,
       MARKETING_CLI_LINK,
-      { href: APP_ROUTES.ENGINEERING, label: 'Engineering' },
-      { href: APP_ROUTES.AI, label: 'AI Operating System' },
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
       { href: APP_ROUTES.COMPARE, label: 'Compare' },
       { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
@@ -198,11 +178,9 @@ export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
  * hrefs with audience wording. Kept literal so every label is validated.
  */
 const RAW_GENERIC_CREATOR_FOOTER_LINKS = [
-  { href: APP_ROUTES.SOLUTIONS_ARTISTS, label: 'Artists' },
   { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
   { href: APP_ROUTES.SMART_LINKS, label: 'Smart Links' },
   { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
-  { href: APP_ROUTES.PAY, label: 'Pay' },
   {
     href: `${APP_ROUTES.ARTIST_PROFILES}#capture-every-fan`,
     label: 'Audience Capture',
@@ -212,7 +190,6 @@ const RAW_GENERIC_CREATOR_FOOTER_LINKS = [
     label: 'Audience Reactivation',
   },
   { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
-  { href: APP_ROUTES.LAUNCH, label: 'Release System' },
 ] as const satisfies readonly MarketingFooterLink[];
 
 /**
@@ -239,11 +216,10 @@ export function getMarketingFooterColumns(
  * Every href is an existing public route. Count stays between 4 and 6.
  */
 const RAW_PUBLIC_COMMERCIAL_FOOTER_LINKS = [
-  { href: APP_ROUTES.PRODUCT, label: 'Product' },
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
   { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
   { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
-  { href: APP_ROUTES.CARD, label: 'Jovie Card' },
+  { href: APP_ROUTES.ARTIST_NOTIFICATIONS, label: 'Notifications' },
 ] as const satisfies readonly MarketingFooterLink[];
 
 export const PUBLIC_COMMERCIAL_FOOTER_LINKS: readonly MarketingFooterLink[] =

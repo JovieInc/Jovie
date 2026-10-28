@@ -14,6 +14,7 @@
  * from the baseline so it cannot silently come back.
  */
 import { createHash } from 'node:crypto';
+import { APP_ROUTES } from '@/constants/routes';
 import { findForbiddenTerms } from '@/data/marketing/factory/pageRecord';
 import {
   getPageRecordContracts,
@@ -59,6 +60,7 @@ import {
   type SeoPageCertification,
   toCertificationReceipts,
 } from '@/lib/seo/page-certification';
+import { getSitemapExcludedPublicPaths } from '@/lib/seo/public-url-policy';
 import { isSitemapIndexableMarketingRoute } from '@/lib/seo/sitemap-publication';
 
 export const SEO_CERTIFY_SITE_ORIGIN = 'https://jov.ie';
@@ -90,9 +92,15 @@ function recordFamilyPrefix(url: string): string | null {
  */
 export function sweepTargets(
   manifest: readonly RouteManifestEntry[] = MARKETING_ROUTE_MANIFEST,
-  recordContracts: readonly PageRecordPageContract[] = getPageRecordContracts()
+  recordContracts: readonly PageRecordPageContract[] = getPageRecordContracts(),
+  options: { readonly publishedEngineeringStories?: number } = {}
 ): SeoSweepTarget[] {
   const targets: SeoSweepTarget[] = [];
+  // Redirected and gone paths stay swept but are off the sitemap, so they owe
+  // no inbound links (geo-orphan only applies to sitemap pages).
+  const redirected = new Set(getSitemapExcludedPublicPaths());
+  // An empty /engineering index is off the sitemap until a story ships.
+  const engineeringListed = (options.publishedEngineeringStories ?? 1) > 0;
   for (const entry of manifest) {
     if (entry.status !== 'active') continue;
     if ((entry.healthCheck?.expected ?? 'page') !== 'page') continue;
@@ -116,7 +124,10 @@ export function sweepTargets(
         pathname,
         manifestUrl: entry.url,
         recipeId: entry.recipeId,
-        inSitemap: isSitemapIndexableMarketingRoute(entry),
+        inSitemap:
+          isSitemapIndexableMarketingRoute(entry) &&
+          !redirected.has(pathname) &&
+          (pathname !== APP_ROUTES.ENGINEERING || engineeringListed),
         family: geoFamilyFor(pathname, entry.recipeId),
         ...(recordContract ? { recordContract } : {}),
       });

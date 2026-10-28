@@ -303,7 +303,7 @@ for (const route of [APP_ROUTES.SIGNIN, APP_ROUTES.SIGNUP]) {
 
 for (const entry of [
   { origin: APP_ROUTES.HOME, route: APP_ROUTES.SIGNIN },
-  { origin: APP_ROUTES.LAUNCH, route: APP_ROUTES.SIGNUP },
+  { origin: APP_ROUTES.ARTIST_PROFILES, route: APP_ROUTES.SIGNUP },
 ]) {
   test(`${entry.route} soft navigation opens a modal and reload opens a full page @auth-certification`, async ({
     page,

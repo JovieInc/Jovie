@@ -32,7 +32,8 @@ describe('/solutions/artists artist solution route (JOV-5861)', () => {
     const artistsLink = MARKETING_CUSTOMERS_FLYOUT.links.find(
       link => link.label === 'Artists'
     );
-    expect(artistsLink?.href).toBe('/solutions/artists');
+    // /solutions/artists now 308s to /artist-profiles (phase 1 IA).
+    expect(artistsLink?.href).toBe('/artist-profiles');
   });
 
   it('does not repurpose the /artists directory as the solution page', () => {
@@ -44,7 +45,7 @@ describe('/solutions/artists artist solution route (JOV-5861)', () => {
 });
 
 describe('bare /solutions root (JOV-7230)', () => {
-  it('redirects /solutions to the shipped /solutions/artists page', async () => {
+  it('redirects /solutions to the artist profile page', async () => {
     const nextConfigModule = await import('../../../next.config.js');
     const nextConfig = nextConfigModule.default ?? nextConfigModule;
     const redirects = (await nextConfig.redirects()) as {
@@ -57,7 +58,7 @@ describe('bare /solutions root (JOV-7230)', () => {
       redirects.find(redirect => redirect.source === '/solutions')
     ).toEqual({
       source: '/solutions',
-      destination: APP_ROUTES.SOLUTIONS_ARTISTS,
+      destination: APP_ROUTES.ARTIST_PROFILES,
       permanent: true,
     });
   });

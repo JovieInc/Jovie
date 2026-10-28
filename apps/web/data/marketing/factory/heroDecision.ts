@@ -255,55 +255,6 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     why: 'paste-first form sits below a copy-only hero',
   },
   {
-    url: '/product',
-    input: { useCase: 'claim-conversion', conversion: 'claim-handle' },
-    why: 'hero renders ProductClaimCard',
-  },
-  {
-    url: '/product/utm-links',
-    input: { useCase: 'aha-capture', captureId: 'utm-links-builder' },
-    why: 'hero mounts the live UTM builder as the aha capture',
-  },
-  {
-    url: '/product/command-palette',
-    input: {
-      useCase: 'aha-capture',
-      captureId: 'shared-command-palette',
-    },
-    why: 'hero mounts the live command palette as the aha capture',
-  },
-  {
-    url: '/product/release-scheduling',
-    input: {
-      useCase: 'aha-capture',
-      captureId: 'release-schedule-fields',
-    },
-    why: 'hero mounts the live release date and reveal date fields as the aha capture',
-  },
-  {
-    url: '/product/dsp-links',
-    input: { useCase: 'aha-capture', captureId: 'dsp-links' },
-    why: 'hero mounts the live DSP rows as the aha capture',
-  },
-  {
-    url: '/product/isrc',
-    input: { useCase: 'aha-capture', captureId: 'isrc-editor' },
-    why: 'hero mounts the live ISRC field as the aha capture',
-  },
-  {
-    url: '/product/link-analytics',
-    input: {
-      useCase: 'aha-capture',
-      captureId: 'release-smart-link-analytics',
-    },
-    why: 'hero mounts the live smart-link analytics panel as the aha capture',
-  },
-  {
-    url: '/product/pre-save',
-    input: { useCase: 'aha-capture', captureId: 'pre-save-countdown' },
-    why: 'hero mounts the live countdown as the aha capture',
-  },
-  {
     url: '/card',
     input: { useCase: 'informational' },
     why: 'planned Card announcement uses text until an approved Wallet capture exists',
@@ -312,11 +263,6 @@ export const HERO_ROUTE_INTENTS: readonly HeroRouteIntent[] = [
     url: '/smart-links',
     input: { useCase: 'aha-capture', captureId: 'smart-links-demo' },
     why: 'hero mounts the live smart-link dial as the aha capture',
-  },
-  {
-    url: '/launch',
-    input: { useCase: 'aha-capture', captureId: 'launch-profile-stage' },
-    why: 'hero mounts the profile mock as the aha capture',
   },
   ...[
     '/about',

@@ -6,6 +6,7 @@ import {
   isDedicatedRootSegment,
   isPublicProfileAudienceBlockCandidate,
 } from '@/lib/routing/proxy-routing';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import {
   getExactPublishedMarketingPaths,
   getPublishedCommercialHubPaths,
@@ -14,10 +15,10 @@ import { isReservedUsername } from '@/lib/validation/username-core';
 import { metadata } from './page';
 
 describe('/card marketing route', () => {
-  it('publishes one canonical feature-page route', () => {
+  it('keeps one canonical route that is unlisted until the pass ships', () => {
     expect(APP_ROUTES.CARD).toBe('/card');
-    expect(getExactPublishedMarketingPaths()).toContain('/card');
-    expect(getPublishedCommercialHubPaths()).toContain('/card');
+    expect(getExactPublishedMarketingPaths()).not.toContain('/card');
+    expect(getPublishedCommercialHubPaths()).not.toContain('/card');
 
     const route = MARKETING_ROUTE_MANIFEST.find(entry => entry.url === '/card');
     expect(route).toMatchObject({
@@ -57,6 +58,6 @@ describe('/card marketing route', () => {
       card: 'summary_large_image',
       description: metadata.description,
     });
-    expect(metadata.robots).toBeUndefined();
+    expect(metadata.robots).toEqual(NOINDEX_ROBOTS);
   });
 });

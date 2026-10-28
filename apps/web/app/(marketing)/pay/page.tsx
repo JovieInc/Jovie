@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { PayLanding } from '@/features/pay/PayLanding';
+import { robotsForRoute } from '@/lib/marketing/route-publication-policy';
 
 export const revalidate = false;
 
@@ -39,10 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       images: ['/og/default.png'],
     },
-    robots: {
-      index: true,
-      follow: true,
-    },
+    robots: robotsForRoute('/pay'),
   };
 }
 

@@ -27,7 +27,7 @@ const capabilityMutations: readonly [
   (value: Capability) => Capability,
 ][] = [
   ['maturity', value => ({ ...value, maturity: 'limited_testing' })],
-  ['publication', value => ({ ...value, publication: 'unlisted' })],
+  ['publication', value => ({ ...value, publication: 'internal_only' })],
   ['access', value => ({ ...value, access: 'open' })],
   [
     'content revision',

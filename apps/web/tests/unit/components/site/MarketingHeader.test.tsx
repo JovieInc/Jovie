@@ -128,7 +128,7 @@ describe('MarketingHeader', () => {
     expect(MARKETING_PEN_CONTRACT_IDS.shell.header).toBe('GTcgO');
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/product'
+      '/artist-profiles'
     );
     expect(screen.getByRole('link', { name: 'Pricing' })).toHaveAttribute(
       'href',
@@ -191,7 +191,7 @@ describe('MarketingHeader', () => {
     const links = within(flyout as HTMLElement).getAllByRole('link');
     expect(
       links.map(link => [link.textContent, link.getAttribute('href')])
-    ).toEqual([['Artists', '/solutions/artists']]);
+    ).toEqual([['Artists', '/artist-profiles']]);
     for (const absent of ['Founders', 'Authors', 'Creators', 'Investors']) {
       expect(within(flyout as HTMLElement).queryByText(absent)).toBeNull();
     }
@@ -257,7 +257,7 @@ describe('MarketingHeader', () => {
     );
     expect(screen.getByRole('link', { name: 'Product' })).toHaveAttribute(
       'href',
-      '/product'
+      '/artist-profiles'
     );
     expect(
       screen.getByRole('link', { name: 'Claim your profile' })
