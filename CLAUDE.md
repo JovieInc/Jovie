@@ -80,7 +80,7 @@ Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 ## Tools and workflow
 
 Use repo-root `pnpm` / `pnpm turbo`; `.nvmrc` and `package.json` pins are
-authoritative. Secret-bound commands use Doppler. Never bypass hooks, weaken correctness
+authoritative. Secret-bound commands use Doppler. Never bypass hooks, weaken
 gates, or use `--no-verify`.
 
 Select skills by intent; load their entry and references. Edit `.tmpl` sources
