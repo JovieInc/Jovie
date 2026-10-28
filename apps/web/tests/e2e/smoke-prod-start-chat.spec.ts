@@ -14,61 +14,61 @@ import { expect, test } from '@playwright/test';
  */
 test.use({ storageState: { cookies: [], origins: [] } });
 
-test('anonymous /start sends the first message and gets a chat response @production-smoke', async ({
-  page,
-}) => {
-  const baseUrl = process.env.BASE_URL;
-  const expectedSha = process.env.EXPECTED_COMMIT_SHA;
-  test.skip(
-    baseUrl !== 'https://jov.ie' || !expectedSha,
-    'Requires an explicit production target and expected commit SHA'
-  );
-  expect(baseUrl).toBe('https://jov.ie');
-  expect(expectedSha).toMatch(/^[0-9a-f]{40}$/);
-  test.setTimeout(120_000);
+const baseUrl = process.env.BASE_URL;
+const expectedSha = process.env.EXPECTED_COMMIT_SHA;
 
-  const buildInfo = await page.request.get('/api/health/build-info', {
-    headers: { 'Cache-Control': 'no-cache' },
-  });
-  expect(buildInfo.status()).toBe(200);
-  expect(((await buildInfo.json()) as { commitSha?: string }).commitSha).toBe(
-    expectedSha
-  );
+// Registered only for an explicit production target + expected commit SHA.
+if (baseUrl === 'https://jov.ie' && expectedSha) {
+  test('anonymous /start sends the first message and gets a chat response @production-smoke', async ({
+    page,
+  }) => {
+    expect(baseUrl).toBe('https://jov.ie');
+    expect(expectedSha).toMatch(/^[0-9a-f]{40}$/);
+    test.setTimeout(120_000);
 
-  const turnstileErrorCodes = new Set<string>();
-  page.on('console', message => {
-    if (!message.text().includes('[Cloudflare Turnstile]')) return;
-    for (const match of message.text().matchAll(/\b\d{6}\b/g)) {
-      turnstileErrorCodes.add(match[0]);
-    }
-  });
-
-  await page.goto('/start', { waitUntil: 'domcontentloaded' });
-  const composer = page.getByRole('textbox').first();
-  await expect(composer).toBeVisible();
-
-  const chatResponse = page.waitForResponse(
-    response =>
-      new URL(response.url()).pathname === '/api/chat' &&
-      response.request().method() === 'POST',
-    { timeout: 60_000 }
-  );
-  await composer.fill('I make music in Austin');
-  await composer.press('Enter');
-
-  const startError = page.getByText("We couldn't start your chat");
-  let response;
-  try {
-    response = await chatResponse;
-  } catch {
-    const banner = (await startError.count()) > 0;
-    throw new Error(
-      `No /api/chat request after send; startErrorBanner=${banner}; turnstileErrorCodes=${[...turnstileErrorCodes].join(',') || 'none'}`
+    const buildInfo = await page.request.get('/api/health/build-info', {
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+    expect(buildInfo.status()).toBe(200);
+    expect(((await buildInfo.json()) as { commitSha?: string }).commitSha).toBe(
+      expectedSha
     );
-  }
-  expect(
-    response.status(),
-    `/api/chat status; turnstileErrorCodes=${[...turnstileErrorCodes].join(',') || 'none'}`
-  ).toBeLessThan(300);
-  await expect(startError).toHaveCount(0);
-});
+
+    const turnstileErrorCodes = new Set<string>();
+    page.on('console', message => {
+      if (!message.text().includes('[Cloudflare Turnstile]')) return;
+      for (const match of message.text().matchAll(/\b\d{6}\b/g)) {
+        turnstileErrorCodes.add(match[0]);
+      }
+    });
+
+    await page.goto('/start', { waitUntil: 'domcontentloaded' });
+    const composer = page.getByRole('textbox').first();
+    await expect(composer).toBeVisible();
+
+    const chatResponse = page.waitForResponse(
+      response =>
+        new URL(response.url()).pathname === '/api/chat' &&
+        response.request().method() === 'POST',
+      { timeout: 60_000 }
+    );
+    await composer.fill('I make music in Austin');
+    await composer.press('Enter');
+
+    const startError = page.getByText("We couldn't start your chat");
+    let response;
+    try {
+      response = await chatResponse;
+    } catch {
+      const banner = (await startError.count()) > 0;
+      throw new Error(
+        `No /api/chat request after send; startErrorBanner=${banner}; turnstileErrorCodes=${[...turnstileErrorCodes].join(',') || 'none'}`
+      );
+    }
+    expect(
+      response.status(),
+      `/api/chat status; turnstileErrorCodes=${[...turnstileErrorCodes].join(',') || 'none'}`
+    ).toBeLessThan(300);
+    await expect(startError).toHaveCount(0);
+  });
+}
