@@ -366,6 +366,8 @@ export const SEGMENT_TERMS: Record<Segment, readonly string[]> = {
     'streams',
   ],
   dj_producer: [
+    'album',
+    'spotify',
     'mixes',
     'residency',
     'gig',
