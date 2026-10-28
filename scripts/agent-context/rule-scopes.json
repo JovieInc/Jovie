@@ -46,7 +46,7 @@
       "canon/automation-registry.jsonl",
       "docs/metrics/**"
     ],
-    "bodySha256": "231c6da1fc81dee71971f0fbb887af84a64e3ca878746b78036c5e72d539006a"
+    "bodySha256": "20b2194cdea5e41ae73fa440530de8bbb766af2fba4b168365bd2ce6d44b825f"
   },
   {
     "file": ".claude/rules/external-apis.md",

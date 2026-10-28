@@ -47,7 +47,12 @@ on:
   # an unchanged head never earns a second CI flight), so this is the wake
   # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]
+    # `synchronize` is deliberately absent (JOV-INV-029 coalescing): a new head
+    # has no green verdict yet, so the push cannot change the enroll decision.
+    # Its Source Validation completion (PR Ready) is the wake that can. Over 24h
+    # synchronize was the bulk of ~560 pull_request_target runs, nearly all
+    # no-ops. Head-change hold release rides the next label event or landing on main.
+    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
