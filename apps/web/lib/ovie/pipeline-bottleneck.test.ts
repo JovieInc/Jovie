@@ -18,17 +18,13 @@ const summer = () => bottleneckFixture({ observedAt: recent });
 const loop = () => contributionFixture({ observedAt: recent });
 
 describe('pipeline bottleneck contract and merge', () => {
-  it('validates the contract, including active rank1 and actionable needs-you', () => {
+  it('validates the contract, including ranked agentic and explicit clear states', () => {
     expect(pipelineBottleneckSchema.safeParse(summer()).success).toBe(true);
     expect(
       pipelineBottleneckSchema.safeParse({ ...summer(), rank1: null }).success
     ).toBe(false);
     expect(
       pipelineBottleneckSchema.safeParse({ ...summer(), status: 'clear' })
-        .success
-    ).toBe(false);
-    expect(
-      pipelineBottleneckSchema.safeParse({ ...summer(), status: 'needs-you' })
         .success
     ).toBe(false);
     expect(
@@ -50,6 +46,36 @@ describe('pipeline bottleneck contract and merge', () => {
       }).success
     ).toBe(false);
   });
+
+  it.each([
+    { rank1: null, cost: null, impact: null },
+    { rank1: summer().rank1, cost: null, impact: 'Restores provider access.' },
+    { rank1: summer().rank1, cost: loop().cost!, impact: null },
+  ])(
+    'preserves held Summer evidence without inventing a clear state: %j',
+    async unknowns => {
+      const held = {
+        ...summer(),
+        status: 'needs-you' as const,
+        dispatchRef: null,
+        ...unknowns,
+      };
+      expect(pipelineBottleneckSchema.safeParse(held).success).toBe(true);
+      expect(
+        await mergePipelineBottleneck(
+          held,
+          { ...loop(), status: undefined },
+          now
+        )
+      ).toMatchObject({
+        status: 'needs-you',
+        owner: 'Summer',
+        dispatchRef: null,
+        ...unknowns,
+        metrics: loop().metrics,
+      });
+    }
+  );
 
   it.each([
     null,
