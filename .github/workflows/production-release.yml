@@ -1351,7 +1351,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MAIN_LINEAGE_TRANSPORT: git
           EXPECTED_MAIN_SHA: ${{ inputs.expected_sha }}
+          LIVE_PRODUCTION_BUILD_INFO_URL: https://jov.ie/api/health/build-info
         run: |
+          # Main may have advanced during this run; an ancestor candidate still
+          # promotes (production stays strictly behind main and the next queued
+          # controller catches up). The guard also refuses a candidate that is
+          # not newer than what production serves now (no accidental rollback).
           bash "$GITHUB_WORKSPACE/.github/scripts/recheck-main-lineage.sh" "before production promotion"
 
       - name: Security gate before production promotion
