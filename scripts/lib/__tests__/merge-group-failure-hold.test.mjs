@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -9,6 +10,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import {
   budgets,
@@ -39,6 +41,7 @@ import {
   PR_SIZE_GUARD_WORKFLOW_ID,
   parseMergeQueueBranch,
   REVISION_FAILED_AT_HEAD,
+  recordDequeueReason,
   reenrollmentDisposition,
   retryReleasedDescription,
   retrySpentDescription,
@@ -49,6 +52,93 @@ import {
 } from '../../merge-group-failure-hold.mjs';
 
 const REPOSITORY = 'JovieInc/Jovie';
+
+it('imports the real failure policy from both workflow sparse checkouts', () => {
+  const root = fileURLToPath(new URL('../../../', import.meta.url));
+  const workflow = readFileSync(
+    join(root, '.github/workflows/merge-queue-green-enroll.yml'),
+    'utf8'
+  );
+  const manifests = [
+    ...workflow.matchAll(/sparse-checkout: \|\n((?: {12}\S[^\n]*\n)+)/g),
+  ]
+    .map(match =>
+      match[1]
+        .trim()
+        .split('\n')
+        .map(line => line.trim())
+    )
+    .filter(paths => paths.includes('scripts/merge-group-failure-hold.mjs'));
+  expect(manifests).toHaveLength(2);
+  for (const paths of manifests) {
+    const dir = mkdtempSync(join(tmpdir(), 'failure-hold-sparse-'));
+    const execute = (command, args, input) => {
+      const result = spawnSync(command, args, {
+        cwd: dir,
+        encoding: 'utf8',
+        input,
+        timeout: 10_000,
+      });
+      expect(result.error, result.stderr).toBeUndefined();
+      expect(result.status, result.stderr).toBe(0);
+      return result;
+    };
+    try {
+      // Seed all real imports, then let Git enforce the workflow's actual
+      // non-cone manifest. Omitting the client or providers.json must fail.
+      for (const path of new Set([...paths, 'packages/api-client'])) {
+        mkdirSync(dirname(join(dir, path)), { recursive: true });
+        cpSync(join(root, path), join(dir, path), { recursive: true });
+      }
+      execute('git', ['init', '-q']);
+      execute('git', ['add', '.']);
+      execute('git', [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.invalid',
+        'commit',
+        '-qm',
+        'fixture',
+      ]);
+      const importArgs = [
+        '--input-type=module',
+        '-e',
+        `await import(${JSON.stringify(pathToFileURL(join(dir, 'scripts/merge-group-failure-hold.mjs')).href)})`,
+      ];
+      for (const extra of [[], ['packages/api-client/*.ts']]) {
+        execute(
+          'git',
+          ['sparse-checkout', 'set', '--no-cone', '--stdin'],
+          [
+            ...paths.filter(path => path !== 'packages/api-client'),
+            ...extra,
+          ].join('\n')
+        );
+        const missing = spawnSync(process.execPath, importArgs, {
+          cwd: dir,
+          encoding: 'utf8',
+          timeout: 10_000,
+        });
+        expect(missing.error).toBeUndefined();
+        expect(missing.status).not.toBe(0);
+        expect(missing.stderr).toContain('ERR_MODULE_NOT_FOUND');
+        expect(missing.stderr).toContain(
+          extra.length ? 'providers.json' : 'gh.ts'
+        );
+      }
+      execute(
+        'git',
+        ['sparse-checkout', 'set', '--no-cone', '--stdin'],
+        paths.join('\n')
+      );
+      execute(process.execPath, importArgs);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }
+});
+
 const SOURCE = 'a'.repeat(40);
 const NEW_SOURCE = 'b'.repeat(40);
 const BASE = 'c'.repeat(40);
@@ -1731,6 +1821,123 @@ describe('terminal failure hold application', () => {
     });
   });
 
+  it('records a machine-readable reason for the dequeue and survives a recorder failure', async () => {
+    const make = (recordDequeue, moveHead = false) => {
+      let state = {
+        id: 'PR_42',
+        state: 'OPEN',
+        headRefOid: SOURCE,
+        isInMergeQueue: true,
+        mergeQueueEntry: { id: 'MQE_42', headCommit: { oid: GROUP } },
+        autoMergeRequest: { enabledAt: '2026-09-30T10:00:00Z' },
+      };
+      return {
+        writeStatus: vi.fn(),
+        readPullRequest: vi.fn(async () => structuredClone(state)),
+        dequeuePullRequest: vi.fn(async () => {
+          state = { ...state, isInMergeQueue: false, mergeQueueEntry: null };
+        }),
+        disableAutoMerge: vi.fn(async () => {
+          state = { ...state, autoMergeRequest: null };
+        }),
+        recordDequeue: async data => {
+          expect(state.isInMergeQueue).toBe(true);
+          await recordDequeue(data);
+          if (moveHead) state.headRefOid = NEW_SOURCE;
+        },
+      };
+    };
+    const record = vi.fn();
+    const ok = await applyMergeGroupFailure(failureInput, make(record));
+    expect(ok.dequeued).toBe(true);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record.mock.calls[0][0]).toMatchObject({
+      number: 42,
+      code: 'poison',
+      head: SOURCE,
+    });
+    expect(record.mock.calls[0][0].reason.length).toBeGreaterThanOrEqual(15);
+    const warning = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failing = await applyMergeGroupFailure(
+      failureInput,
+      make(
+        vi.fn(async () => {
+          throw new Error('comment API down');
+        })
+      )
+    );
+    expect(failing.dequeued).toBe(true);
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '::warning::merge-group-failure-hold could not record'
+      )
+    );
+    warning.mockRestore();
+    const moved = make(vi.fn(), true);
+    const movedResult = await applyMergeGroupFailure(failureInput, moved);
+    expect(movedResult.dequeued).toBe(false);
+    expect(moved.dequeuePullRequest).not.toHaveBeenCalled();
+    expect(moved.disableAutoMerge).not.toHaveBeenCalled();
+  });
+
+  it('records truthful dequeue intent through the shared repair budget', async () => {
+    const run = vi.fn(async (_args, _options) => ({
+      code: 0,
+      stdout: '',
+      stderr: '',
+      deferred: false,
+    }));
+    await recordDequeueReason(
+      {
+        repository: REPOSITORY,
+        number: 42,
+        head: SOURCE,
+        code: 'poison',
+        reason: 'attributable failure on the exact source head',
+      },
+      { run, now: () => '2026-10-27T00:00:00.000Z' }
+    );
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(run.mock.calls[0][1]).toEqual({ priority: 'repair' });
+    const args = run.mock.calls[0][0];
+    expect(args.slice(0, 4)).toEqual([
+      'api',
+      '-X',
+      'POST',
+      'repos/JovieInc/Jovie/issues/42/comments',
+    ]);
+    const body = args.at(-1);
+    const record = JSON.parse(body.match(/<!-- queue-dequeue (.+) -->/)[1]);
+    expect(record).toEqual({
+      code: 'poison',
+      reason: 'attributable failure on the exact source head',
+      actor: 'merge-group-failure-hold',
+      at: '2026-10-27T00:00:00.000Z',
+      head: SOURCE,
+      outcome: 'requested',
+    });
+    expect(body).not.toContain('Dequeued from');
+    await expect(
+      recordDequeueReason(
+        {
+          repository: REPOSITORY,
+          number: 42,
+          head: SOURCE,
+          code: 'poison',
+          reason: 'failure',
+        },
+        {
+          run: async () => ({
+            code: 75,
+            stdout: '',
+            stderr: 'github-quota-deferred',
+            deferred: true,
+          }),
+        }
+      )
+    ).rejects.toThrow('github-quota-deferred');
+  });
+
   it('keeps a second infrastructure failure retryable but blocks a second attributable one', async () => {
     const io = () => ({
       writeStatus: vi.fn(),
@@ -2088,15 +2295,13 @@ describe('terminal failure hold application', () => {
   });
 
   it('treats an already-removed pull request as a logged non-fatal dequeue', async () => {
-    let reads = 0;
+    let queued = true;
     const disableAutoMerge = vi.fn(async () => {
       throw new Error("Can't disable auto-merge for this pull request.");
     });
     const result = await applyMergeGroupFailure(failureInput, {
       writeStatus: vi.fn(),
       readPullRequest: vi.fn(async () => {
-        reads += 1;
-        const queued = reads < 4;
         return {
           id: 'PR_42',
           state: 'OPEN',
@@ -2109,6 +2314,7 @@ describe('terminal failure hold application', () => {
         };
       }),
       dequeuePullRequest: vi.fn(async () => {
+        queued = false;
         throw new Error('The pull request is not in the merge queue');
       }),
       disableAutoMerge,

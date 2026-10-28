@@ -604,7 +604,8 @@ test('chat route stays within the deploy-gating responsiveness budget', async ({
       composer,
       sendButton,
       copy.userText,
-      copy.assistantText
+      copy.assistantText,
+      backend
     );
   }
 

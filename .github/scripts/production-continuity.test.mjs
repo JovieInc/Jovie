@@ -5,6 +5,7 @@ import {
   aggregateContinuity,
   classifyEndpointObservation,
   continuityIncidentKey,
+  DEFAULT_STALE_AFTER_SECONDS,
   FRESHNESS_INCIDENT_CLASS,
   FRESHNESS_TARGET_ID,
   forecastBudgetExhaustion,
@@ -14,6 +15,7 @@ import {
   parseTargets,
   planBudgetContinuityAction,
   remediationConclusion,
+  resolveStaleAfterSeconds,
   runCli,
 } from './production-continuity.mjs';
 
@@ -368,7 +370,7 @@ describe('production freshness', () => {
     liveSha = LIVE,
     mainSha = MAIN,
     aheadBy = 4,
-    oldestAt = '2026-09-13T13:00:00Z',
+    oldestAt = '2026-09-13T10:00:00Z',
     failCompare = false,
   } = {}) => {
     const calls = [];
@@ -407,29 +409,33 @@ describe('production freshness', () => {
     });
 
   it('reports production-stale once main has carried unshipped commits past the bound', async () => {
-    const stale = await observe({ oldestAt: '2026-09-13T13:00:00Z' });
+    const stale = await observe({ oldestAt: '2026-09-13T10:00:00Z' });
     assert.equal(stale.healthy, false);
     assert.equal(stale.incidentClass, FRESHNESS_INCIDENT_CLASS);
     assert.equal(stale.id, FRESHNESS_TARGET_ID);
     assert.equal(stale.unshippedCommits, 4);
-    assert.equal(stale.unshippedAgeSeconds, 9492);
+    assert.equal(stale.unshippedAgeSeconds, 20292);
     assert.equal(stale.liveSha, LIVE);
     assert.equal(stale.mainSha, MAIN);
 
     const fresh = await observe({ oldestAt: '2026-09-13T15:00:00Z' });
     assert.equal(fresh.healthy, true);
     assert.equal(fresh.incidentClass, null);
-    assert.match(fresh.reason, /^unshipped-for-2292s-within-5400s$/);
+    assert.match(fresh.reason, /^unshipped-for-2292s-within-14760s$/);
+    assert.equal(fresh.catchingUp, true);
+    assert.equal(fresh.summary, 'behind by 4, catching up');
+    assert.equal(stale.catchingUp, false);
+    assert.equal(stale.summary, 'behind by 4, stale');
   });
 
-  it('treats 90 minutes as the production freshness bound', async () => {
-    const within = await observe({ oldestAt: '2026-09-13T14:10:00Z' });
+  it('treats the measured p95 (246 minutes) as the freshness bound by default as the production freshness bound', async () => {
+    const within = await observe({ oldestAt: '2026-09-13T11:33:12Z' });
     assert.equal(within.healthy, true);
-    assert.match(within.reason, /^unshipped-for-5292s-within-5400s$/);
-    const over = await observe({ oldestAt: '2026-09-13T14:07:00Z' });
+    assert.match(within.reason, /^unshipped-for-14700s-within-14760s$/);
+    const over = await observe({ oldestAt: '2026-09-13T11:31:12Z' });
     assert.equal(over.healthy, false);
     assert.equal(over.incidentClass, FRESHNESS_INCIDENT_CLASS);
-    assert.equal(over.unshippedAgeSeconds, 5472);
+    assert.equal(over.unshippedAgeSeconds, 14820);
   });
 
   it('is healthy when production already carries main', async () => {
@@ -517,7 +523,8 @@ describe('production freshness', () => {
     assert.equal(staleOnly.status, 'unhealthy');
     assert.deepEqual(staleOnly.incidentClasses, [FRESHNESS_INCIDENT_CLASS]);
     assert.equal(staleOnly.requiresFounderNotification, true);
-    assert.equal(staleOnly.requiresAgentIngress, false);
+    assert.equal(staleOnly.requiresAgentIngress, true);
+    assert.equal(staleOnly.agentIngressFailure, 'production-controller-failed');
 
     const paused = aggregateContinuity(
       [
@@ -530,6 +537,7 @@ describe('production freshness', () => {
       { now: NOW }
     );
     assert.equal(paused.requiresAgentIngress, true);
+    assert.equal(paused.agentIngressFailure, 'provider-unavailable');
   });
 
   it('rolls unknown freshness up as unknown, not healthy, with an explicit unknownTargets list', async () => {
@@ -696,7 +704,7 @@ describe('production freshness', () => {
       return json(compare);
     };
     const commits = [
-      { commit: { committer: { date: '2026-09-13T13:00:00Z' } } },
+      { commit: { committer: { date: '2026-09-13T10:00:00Z' } } },
     ];
     const run = ahead => {
       const compare = { commits };
@@ -752,7 +760,7 @@ describe('production freshness', () => {
     });
     assert.deepEqual(
       [fresh.healthy, fresh.reason],
-      [true, 'unshipped-for-2292s-within-5400s']
+      [true, 'unshipped-for-2292s-within-14760s']
     );
   });
 
@@ -760,7 +768,7 @@ describe('production freshness', () => {
     const make = ({
       live = LIVE,
       main = MAIN,
-      date = '2026-09-13T13:00:00Z',
+      date = '2026-09-13T10:00:00Z',
     }) =>
       observeProductionFreshness({
         fetchImpl: async url => {
@@ -793,7 +801,7 @@ describe('production freshness', () => {
   });
 
   it('includes freshness in the CLI only when a repository is configured', async () => {
-    const { fetchImpl } = freshnessFetch({ oldestAt: '2026-09-13T13:00:00Z' });
+    const { fetchImpl } = freshnessFetch({ oldestAt: '2026-09-13T10:00:00Z' });
     const outputs = [];
     const result = await runCli({
       appendFileImpl: async (_path, text) => outputs.push(text),
@@ -819,7 +827,7 @@ describe('production freshness', () => {
     });
     assert.equal(result.status, 'unhealthy');
     assert.deepEqual(result.affectedTargets, [FRESHNESS_TARGET_ID]);
-    assert.match(outputs.join(''), /requires_agent_ingress=false/);
+    assert.match(outputs.join(''), /requires_agent_ingress=true/);
 
     const without = await runCli({
       appendFileImpl: async () => {},
@@ -838,6 +846,51 @@ describe('production freshness', () => {
     assert.equal(
       without.targets.some(t => t.id === FRESHNESS_TARGET_ID),
       false
+    );
+  });
+});
+
+describe('resolveStaleAfterSeconds (weekly measured limit from the lanes feed)', () => {
+  const feed = ageS => async () => ({
+    ok: true,
+    json: async () => ({
+      deployHealth: { limits: { 'JovieInc/Jovie': { ageS } } },
+    }),
+  });
+  const base = {
+    limitsUrl: 'https://feed.test/lanes.json',
+    repository: 'JovieInc/Jovie',
+  };
+
+  it('uses the feed limit when sane and the fallback otherwise', async () => {
+    assert.equal(
+      await resolveStaleAfterSeconds({ ...base, fetchImpl: feed(9000) }),
+      9000
+    );
+    for (const bad of [10, 999_999, null, 'x'])
+      assert.equal(
+        await resolveStaleAfterSeconds({ ...base, fetchImpl: feed(bad) }),
+        DEFAULT_STALE_AFTER_SECONDS
+      );
+    assert.equal(
+      await resolveStaleAfterSeconds({
+        ...base,
+        fetchImpl: async () => ({ ok: false }),
+      }),
+      DEFAULT_STALE_AFTER_SECONDS
+    );
+    assert.equal(
+      await resolveStaleAfterSeconds({
+        ...base,
+        fetchImpl: async () => {
+          throw new Error('down');
+        },
+      }),
+      DEFAULT_STALE_AFTER_SECONDS
+    );
+    assert.equal(
+      await resolveStaleAfterSeconds({ repository: 'JovieInc/Jovie' }),
+      DEFAULT_STALE_AFTER_SECONDS
     );
   });
 });
