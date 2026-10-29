@@ -1,6 +1,7 @@
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
 import { db, doesTableExist } from '@/lib/db';
 import { type WaitlistEntry, waitlistEntries } from '@/lib/db/schema/waitlist';
+import { organicWaitlistEntrySql } from './organic-waitlist';
 
 export interface WaitlistEntryRow {
   id: string;
@@ -95,7 +96,9 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
         count: drizzleSql<number>`count(*)::int`,
       })
       .from(waitlistEntries)
-      .where(eq(waitlistEntries.canonical, true))
+      .where(
+        and(eq(waitlistEntries.canonical, true), organicWaitlistEntrySql())
+      )
       .groupBy(waitlistEntries.status);
 
     const metrics: WaitlistMetrics = {
@@ -131,6 +134,7 @@ export async function getWaitlistMetrics(): Promise<WaitlistMetrics> {
       .where(
         and(
           eq(waitlistEntries.canonical, true),
+          organicWaitlistEntrySql(),
           drizzleSql`${waitlistEntries.waitlistEmailStatus} = 'error' OR ${waitlistEntries.inviteEmailStatus} = 'error'`
         )
       );

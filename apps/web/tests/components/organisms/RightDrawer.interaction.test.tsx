@@ -8,6 +8,7 @@ import {
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RightDrawer } from '@/components/molecules/drawer/RightDrawer';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const mockUseBreakpointDown = vi.fn();
 
@@ -34,6 +35,30 @@ describe('RightDrawer', () => {
     mockUseBreakpointDown.mockReset();
     mockUseBreakpointDown.mockReturnValue(false);
   });
+
+  it.each([false, true])(
+    'exposes valid accessible drawer semantics (mobile: %s)',
+    async isMobile => {
+      mockUseBreakpointDown.mockReturnValue(isMobile);
+      render(
+        <RightDrawer isOpen width={360} ariaLabel='Accessible details'>
+          <button type='button'>Edit details</button>
+        </RightDrawer>
+      );
+
+      const drawer = screen.getByRole(isMobile ? 'dialog' : 'complementary', {
+        name: 'Accessible details',
+      });
+      expect(drawer).toHaveAttribute('aria-hidden', 'false');
+      expect(
+        screen
+          .getByRole('button', { name: 'Edit details' })
+          .closest('[data-rail-phase]')
+      ).toBe(drawer);
+      if (isMobile) expect(drawer).toHaveAttribute('aria-modal', 'true');
+      await expectNoA11yViolations(drawer);
+    }
+  );
 
   it('updates aria-hidden when toggling open and closed', () => {
     const { rerender } = render(

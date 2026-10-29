@@ -2070,6 +2070,7 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
     if root is None:
         return reset_s
     scope = root / _linear_scope_id(key)
+    staging = None
     try:
         root.mkdir(parents=True, exist_ok=True)
         _chmod_private(root, 0o700)
@@ -2082,16 +2083,29 @@ def publish_linear_cooldown(key: str, headers, now: float | None = None) -> floa
                 if existing is not None and existing > reset_s:
                     reset_s = existing
                 reset_ms = int(reset_s * 1000)
-                record = scope / f"{reset_ms}-{uuid.uuid4()}.json"
-                fd = os.open(record, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                publication_id = uuid.uuid4()
+                record = scope / f"{reset_ms}-{publication_id}.json"
+                staging = scope / f".pending-{publication_id}"
+                fd = os.open(staging, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                with os.fdopen(fd, "w") as pending:
+                    json.dump({"schema": 1, "resetAt": reset_ms}, pending)
+                    pending.flush()
+                    os.fsync(pending.fileno())
+                _chmod_private(staging, 0o600)
+                os.rename(staging, record)
+                directory_fd = os.open(scope, os.O_RDONLY)
                 try:
-                    os.write(fd, json.dumps({"schema": 1, "resetAt": reset_ms}).encode())
+                    os.fsync(directory_fd)
                 finally:
-                    os.close(fd)
-                _chmod_private(record, 0o600)
+                    os.close(directory_fd)
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
     except Exception as error:
+        if staging is not None:
+            try:
+                staging.unlink(missing_ok=True)
+            except OSError:
+                pass  # Leftover staging still fail-closes strict JS readers.
         _cooldown_write_failed(root, scope.name, reset_s, error)
     return reset_s
 
@@ -2569,19 +2583,32 @@ def template(args: list[str], values: dict) -> list[str]:
 
 
 def process_group_alive(group: int) -> bool:
+    permission_error = None
     try:
         os.killpg(group, 0)
-        return True
     except ProcessLookupError:
         return False
-    except PermissionError:
-        # Darwin can report EPERM for an empty group after its leader is reaped.
-        # Verify membership instead of treating a real permission denial as success.
+    except PermissionError as error:
+        permission_error = error
+    # A successful signal probe also sees zombie-only groups on Linux; Darwin
+    # can report EPERM for an empty group. Neither proves a live member remains.
+    try:
         members = subprocess.run(["ps", "-axo", "pgid=,stat="], capture_output=True, text=True, timeout=5)
-        if members.returncode != 0:
-            raise
-        return any(fields[0] == str(group) and not fields[1].startswith("Z")
-                   for line in members.stdout.splitlines() if len(fields := line.split()) == 2)
+    except (OSError, subprocess.SubprocessError):
+        if permission_error is not None:
+            raise permission_error
+        return True  # unreadable membership cannot prove drainage
+    rows = [line.split() for line in (members.stdout or "").splitlines() if line.strip()] if members.returncode == 0 else []
+    # ps includes itself, so an empty or partially parsed table is unknown.
+    # Preserve Linux/BSD state modifiers instead of mistaking them for rows to drop.
+    valid = rows and all(len(fields) == 2 and re.fullmatch(r"[0-9]+", fields[0])
+                         and re.fullmatch(r"[DIRSTUWZXIt][<NLsl+>AEVWXJKCP]*", fields[1]) for fields in rows)
+    if not valid:
+        if permission_error is not None:
+            raise permission_error
+        return True
+    return any(fields[0] == str(group) and not fields[1].startswith("Z")
+               for fields in rows)
 
 
 def process_snapshot() -> dict:
@@ -7249,7 +7276,30 @@ def retire_completed_repair(host: Host, worktree: Path, receipt: dict) -> bool:
     return False
 
 
-def retire_published_preserved(host: Host, number: int) -> list[str]:
+def note_preserved_recovery(observations, phase, reason, *, marker=None, custody=None) -> None:
+    """Safe refusal evidence only; never changes a recovery predicate or grants custody."""
+    reasons = {"worktree-not-idle", "source-not-fully-published", "retire-io-unavailable",
+               "retire-worktree-retained", "archive-too-fresh", "archive-head-unavailable",
+               "archive-index-unavailable", "archive-tree-unavailable", "archive-commit-unavailable",
+               "archive-ref-unavailable", "archive-worktree-retained", "archive-io-unavailable"}
+    if type(observations) is not list or type(phase) is not str or type(reason) is not str \
+            or phase not in {"retire", "archive"} or reason not in reasons:
+        return
+    row = {"schema": "jovie-preserved-recovery-observation/v1", "phase": phase, "reason": reason,
+           "authorizesRecovery": False}
+    if custody is not None:
+        row["custodyReason"] = custody if type(custody) is str and custody in {
+            "git-index-locked", "process-state-unavailable", "process-still-running"} else "unclassified"
+    if type(marker) in (str, bytes):
+        row["markerPreimageSha256"] = hashlib.sha256(marker.encode() if type(marker) is str else marker).hexdigest()
+    try:
+        row["observerSourceSha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    except OSError:
+        pass  # Missing observer identity is not a successful recovery or a custody release.
+    observations.append(row)
+
+
+def retire_published_preserved(host: Host, number: int, *, observations=None) -> list[str]:
     """Under the PR's repair lock: free this PR's preserved checkouts that hold nothing to recover.
 
     A cancelled or unreadable-target run preserves its checkout as evidence. Once that
@@ -7263,7 +7313,8 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
     for marker_path in sorted((host.state / "worktrees").glob(f"*/{disk_guard.PRESERVED_REPAIR}")):
         path = marker_path.parent
         try:
-            marker = json.loads(marker_path.read_text())
+            marker_text = marker_path.read_bytes().decode()  # Preserve line endings for the preimage digest.
+            marker = json.loads(marker_text)
         except (OSError, ValueError):
             continue
         if not isinstance(marker, dict) or marker.get("issue") is not None:
@@ -7273,20 +7324,25 @@ def retire_published_preserved(host: Host, number: int) -> list[str]:
                 marker.get("pr") is None and named and named.group(1) == str(number)):
             continue
         try:
-            if worktree_busy(path):
+            if busy := worktree_busy(path):
+                note_preserved_recovery(observations, "retire", "worktree-not-idle", marker=marker_text, custody=busy)
                 continue
             status = sh(["git", "status", "--porcelain", "--untracked-files=all", *disk_guard.SOURCE_PATHSPEC],
                         cwd=path, timeout=30)
             unpushed = sh(["git", "rev-list", "--count", "HEAD", "--not", "--remotes=origin"],
                           cwd=path, timeout=30)
             if status.returncode or status.stdout.strip() or unpushed.returncode or unpushed.stdout.strip() != "0":
+                note_preserved_recovery(observations, "retire", "source-not-fully-published", marker=marker_text)
                 continue
             marker_path.unlink()
             remove_worktree(host, path)
         except (OSError, subprocess.SubprocessError):
+            note_preserved_recovery(observations, "retire", "retire-io-unavailable", marker=marker_text)
             continue
         if not path.exists():
             retired.append(path.name)
+        else:
+            note_preserved_recovery(observations, "retire", "retire-worktree-retained", marker=marker_text)
     return retired
 
 
@@ -7339,7 +7395,7 @@ def _ended_on_its_own_terms(host: Host, run_id) -> bool:
 NEVER_RESUMED_CANCELS = frozenset({"target-head-superseded", "target-pr-merged", "target-pr-closed"})
 
 
-def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | None:
+def archive_unresumable_preserved(host: Host, path: Path, reason: str, *, observations=None) -> str | None:
     """Keep an unresumable preserved checkout's source as a local ref, then free the PR.
 
     The archive commit is the checkout's HEAD plus every uncommitted source file (a temporary
@@ -7350,8 +7406,9 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | 
     marker_path = path / disk_guard.PRESERVED_REPAIR
     if reason not in UNRESUMABLE_PRESERVED or path.resolve().parent != root or not marker_path.exists():
         return None
+    marker = None
     try:
-        marker = marker_path.read_text()
+        marker = marker_path.read_bytes().decode()  # Digest and restore the exact marker bytes.
         try:
             stamp = datetime.fromisoformat(str(json.loads(marker).get("at")).replace("Z", "+00:00")).timestamp()
         except (ValueError, TypeError, AttributeError):
@@ -7362,31 +7419,43 @@ def archive_unresumable_preserved(host: Host, path: Path, reason: str) -> str | 
             run_id = None
         grace = (0 if reason == "preserved-target-needs-reconciliation" and _ended_on_its_own_terms(host, run_id)
                  else PRESERVED_ARCHIVE_AFTER_S)
-        if time.time() - stamp < grace or worktree_busy(path):
+        if time.time() - stamp < grace:
+            note_preserved_recovery(observations, "archive", "archive-too-fresh", marker=marker)
+            return None
+        if busy := worktree_busy(path):
+            note_preserved_recovery(observations, "archive", "worktree-not-idle", marker=marker, custody=busy)
             return None
         head = sh(["git", "rev-parse", "--verify", "HEAD^{commit}"], cwd=path, timeout=30)
         if head.returncode:
+            note_preserved_recovery(observations, "archive", "archive-head-unavailable", marker=marker)
             return None
         with tempfile.TemporaryDirectory(dir=host.state) as scratch:
             env = {**os.environ, "GIT_INDEX_FILE": str(Path(scratch) / "index")}
             for args in (["git", "read-tree", "HEAD"], ["git", "add", "-A", *disk_guard.SOURCE_PATHSPEC]):
                 if sh(args, cwd=path, env=env, timeout=300).returncode:
+                    note_preserved_recovery(observations, "archive", "archive-index-unavailable", marker=marker)
                     return None
             tree = sh(["git", "write-tree"], cwd=path, env=env, timeout=60)
         if tree.returncode or not tree.stdout.strip():
+            note_preserved_recovery(observations, "archive", "archive-tree-unavailable", marker=marker)
             return None
         commit = sh(["git", "commit-tree", tree.stdout.strip(), "-p", head.stdout.strip(),
                      "-m", f"lanes: archive preserved repair {path.name} ({reason})"], cwd=path, timeout=60)
         ref = PRESERVED_ARCHIVE_REF + path.name
-        if commit.returncode or not commit.stdout.strip() \
-                or sh(["git", "update-ref", ref, commit.stdout.strip()], cwd=path, timeout=30).returncode:
+        if commit.returncode or not commit.stdout.strip():
+            note_preserved_recovery(observations, "archive", "archive-commit-unavailable", marker=marker)
+            return None
+        if sh(["git", "update-ref", ref, commit.stdout.strip()], cwd=path, timeout=30).returncode:
+            note_preserved_recovery(observations, "archive", "archive-ref-unavailable", marker=marker)
             return None
         marker_path.unlink()
         sh(["git", "worktree", "remove", "--force", str(path)], cwd=host.repo, timeout=600)
         if path.exists():
-            marker_path.write_text(marker)  # Not removed: keep it protected; the ref also holds it.
+            marker_path.write_bytes(marker.encode())  # Not removed: keep it protected; the ref also holds it.
+            note_preserved_recovery(observations, "archive", "archive-worktree-retained", marker=marker)
             return None
     except (OSError, subprocess.SubprocessError):
+        note_preserved_recovery(observations, "archive", "archive-io-unavailable", marker=marker)
         return None
     return ref
 
@@ -7497,10 +7566,11 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                                        {"headSha": pr["headRefOid"]})
     coordination = execution_coordination(pr["headRefOid"])
     preserved = None
+    preserved_observations = []
     try:
         if not branch_held:
             raise RecoveryHandoff("repair-owner-active", worktree)
-        if retired := retire_published_preserved(host, pr["number"]):
+        if retired := retire_published_preserved(host, pr["number"], observations=preserved_observations):
             receipt["retiredPreserved"] = retired
         for archive_pass in (True, False):
             try:
@@ -7510,7 +7580,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 break
             except RecoveryHandoff as error:
                 archived = archive_pass and archive_unresumable_preserved(
-                    host, Path(error.evidence["worktree"]), str(error))
+                    host, Path(error.evidence["worktree"]), str(error), observations=preserved_observations)
                 if not archived:
                     raise
                 receipt.setdefault("archivedPreserved", []).append(archived)
@@ -7518,11 +7588,15 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     except RecoveryHandoff as error:
         receipt.update(verdict="recovery-handoff", reasons=[str(error)], recovery=error.evidence,
                        endedAt=now_iso(), result={"verdict": "recovery-handoff", "pr": pr["number"], "commit": None})
+        if preserved_observations:
+            receipt["preservedRecoveryObservations"] = preserved_observations
         if branch_held:
             end_local_fix_attempt(host, pr, receipt)
         with open(runs / "ledger.jsonl", "a") as ledger:
             ledger.write(json.dumps(receipt) + "\n")
         return receipt
+    if preserved_observations:
+        receipt["preservedRecoveryObservations"] = preserved_observations
     try:
         claimed = execution_attempt.claim(runs / "execution-attempts.jsonl", ident,
                                           {"owner": HOST, "runtime": "symphony-lanes", "provider": name,

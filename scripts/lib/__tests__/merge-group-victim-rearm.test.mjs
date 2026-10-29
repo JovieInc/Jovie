@@ -499,10 +499,13 @@ test('rearm enqueues the verified head and does not request a merge strategy', (
     '.github/workflows/merge-queue-green-enroll.yml',
     'utf8'
   );
+  // The enroll mutation may add `jump: true` for compounding PRs; the verified head
+  // is still bound and no merge strategy is ever requested.
   assert.match(
     enroll,
-    /enqueuePullRequest\(input: \{ pullRequestId: \$id, expectedHeadOid: \$oid \}\)/
+    /enqueuePullRequest\(input: \{ pullRequestId: \$id, expectedHeadOid: \$oid(\$\{withJump \? ', jump: true' : ''\})? \}\)/
   );
+  assert.doesNotMatch(enroll, /enablePullRequestAutoMerge\(|mergeMethod:/);
 });
 
 test('a token that cannot enqueue names the PR and fails the step', () => {
