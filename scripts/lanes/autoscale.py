@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Adaptive per-lane slots on the minute dispatch tick. Default mode is apply. Kill switch: SYMPHONY_AUTOSCALE=0. decide() is pure and does no I/O at import."""
 from __future__ import annotations
-import json; import math; import os; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"
+import json; import math; import os; import sys; import stat; import re; import time; from datetime import datetime, timezone; from pathlib import Path; SCHEMA = "symphony-lanes-autoscale/v1"; sys.path.insert(0, str(Path(__file__).resolve().parent)); import stage_timings  # noqa: E402
 # Tim 2026-10-12: no arbitrary timers. Seats follow proven demand every tick; only measured limits
 # (host load/memory/PSI/disk, provider credits and leases, GitHub quota, current failure rate on
 # this release) hold or shrink them. HOST_SETTLE_S is the measurement lag of the signal itself:
@@ -300,6 +300,7 @@ def collect(state_dir: Path, tick: dict, now: float, wip_max: int = WIP_MAX_DEFA
             "yieldByProvider": yields, "swarmClaims": swarm, "openPRCount": _count(observed.get("openPRCount")),
             "quotaDeferredHeads": _count(quota), "wipMax": wip_max,
             "ciQueue": {"queuedRuns": _count(flow.get("queuedRuns")), "oldestMin": _num(flow.get("queuedOldestMin")), "fresh": ci_fresh},
+            "stageTimings": stage_timings.cached(root, now),
             "flowMetrics": flow_metrics(observed, yields, swarm, wip_max, now),
             "eligiblePoolByProvider": _obj(observed.get("eligiblePoolByProvider")),
             "newIssueBudgetByProvider": _obj(observed.get("newIssueBudgetByProvider")),
@@ -598,7 +599,9 @@ def decide(previous: dict | None, obs: dict, host_sample: dict, bases: dict, con
     return {"schema": SCHEMA, "mode": config.get("mode") or "apply", "observedAt": now,
             "host": {"lastChangeAt": host_last, "ceiling": host_cap, "cpuCount": cpu}, "lanes": rows, "hostSample": host_sample,
             "throughputBrake": brake,
-            "metrics": _obj(obs.get("flowMetrics")), "swarm": {"claims": _count(obs.get("swarmClaims")) or 0},
+            "metrics": {**_obj(obs.get("flowMetrics")), "stages": _obj(obs.get("stageTimings")),
+                        "busyTotal": {name: {"busy": row.get("running"), "total": row["effective"]} for name, row in rows.items() if row["base"] > 0}},
+            "swarm": {"claims": _count(obs.get("swarmClaims")) or 0},
             "apiBudget": {"githubRemaining": _int(obs.get("githubRemaining")), "linearRemaining": _int(obs.get("linearRemaining")),
                           "linearLimit": _int(obs.get("linearLimit")), "linearRateLimitedAt": _num(obs.get("linearRateLimitedAt")),
                           "linearBudgetFresh": obs.get("linearBudgetFresh") is True,

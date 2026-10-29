@@ -467,5 +467,25 @@ class MarginalYieldAndAdmissionTest(unittest.TestCase):
         self.assertEqual((m["mergedPerDay"], m["convertedPerAttempt"], m["cycleMinutesP50"], m["burnDownEtaDays"], m["swarmClaims"]), (4, 0.6, 60.0, 10.0, 3))
 
 
+class StageTimingsTest(unittest.TestCase):
+    def test_stage_timings_publish_counts_percentiles_and_busy_total(self):
+        st = load("stage_timings")
+        with tempfile.TemporaryDirectory() as tmp:
+            runs = Path(tmp) / "runs"; runs.mkdir()
+            rows = [{"schema": "jovie-lane-run/v1", "provider": "codex", "kind": "fix-red", "verdict": v,
+                     "startedAt": "2027-01-15T07:59:00Z", "endedAt": ended}
+                    for v, ended in (("fix-pushed", "2027-01-15T08:00:00Z"), ("failed", "2027-01-15T08:01:00Z"), ("skipped", "2027-01-15T08:00:30Z"))]
+            (runs / "ledger.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+            now = st._epoch("2027-01-15T08:05:00Z")
+            out = st.cached(Path(tmp), now)
+            stage = out["stages"]["codex/fix-red"]
+            self.assertEqual((out["schema"], stage["count"], stage["convertedPerAttempt"], stage["p50S"], stage["p95S"]),
+                             ("symphony-lane-stage-timings/v1", 2, 0.5, 120.0, 120.0))
+            self.assertTrue((Path(tmp) / "stage-timings.json").exists())
+        state = decide(None, obs(stageTimings=out), sample(), {"codex": 3}, cfg(), NOW)
+        self.assertEqual(state["metrics"]["stages"]["stages"]["codex/fix-red"]["count"], 2)
+        self.assertIn("codex", state["metrics"]["busyTotal"])
+
+
 if __name__ == "__main__":
     unittest.main()
