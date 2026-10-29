@@ -232,7 +232,7 @@ describe('listing readiness gate', () => {
     expect(reasons).toContain('/legal/terms has no page');
     expect(reasons).toContain('/legal/terms is not linked from the footer');
     expect(reasons).toContain('unpublished drafts');
-    expect(reasons).toContain('7-day draft expiry');
+    expect(reasons).toContain('draft expiry after 7 days');
     expect(reasons).toContain('named assistant as a connector caller: ChatGPT');
     expect(reasons).toContain('named assistant as a connector caller: Claude');
   });

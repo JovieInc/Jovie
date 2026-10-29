@@ -215,7 +215,7 @@ export function legalTopics(listing: Listing) {
       covered: (t: string) => /\battribution\b/iu.test(t),
     },
     {
-      topic: `retention: ${days}-day draft expiry`,
+      topic: `retention: draft expiry after ${days} days`,
       covered: (t: string) =>
         new RegExp(
           `\\bdrafts?\\b[^.\\n]{0,120}\\b(seven|${days})[- ]days?\\b|\\b(seven|${days})[- ]days?\\b[^.\\n]{0,80}\\bdrafts?\\b`,
