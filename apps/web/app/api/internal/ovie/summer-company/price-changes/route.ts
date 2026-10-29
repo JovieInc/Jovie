@@ -5,7 +5,6 @@ import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 /**
  * Read-only price-change notice metrics for Ovie's billing/revenue area:

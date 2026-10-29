@@ -12,7 +12,7 @@ export class MemoryNoticeStore implements NoticeStore {
   readonly notices = new Map<string, NoticeRow>();
 
   private key(changeId: string, subscriptionId: string): string {
-    return `${changeId}::${subscriptionId}`;
+    return JSON.stringify([changeId, subscriptionId]);
   }
 
   private patchNotice(

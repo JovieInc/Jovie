@@ -35,6 +35,21 @@ const CHANGE: ScheduledPriceChange = {
 const DAY = 86_400_000;
 const at = (iso: string) => new Date(iso);
 
+it('keeps distinct change/subscription pairs separate in the test store', async () => {
+  const store = new MemoryNoticeStore();
+  const now = at('2026-12-01T09:00:00.000Z');
+  const target = { customerId: 'cus_1', userId: null };
+
+  expect(
+    await store.queueNotices('a::b', [{ ...target, subscriptionId: 'c' }], now)
+  ).toBe(1);
+  expect(
+    await store.queueNotices('a', [{ ...target, subscriptionId: 'b::c' }], now)
+  ).toBe(1);
+  expect(await store.listNotices('a::b')).toHaveLength(1);
+  expect(await store.listNotices('a')).toHaveLength(1);
+});
+
 function sub(
   id: string,
   extra: Partial<AffectedSubscription> = {}
