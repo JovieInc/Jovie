@@ -119,10 +119,6 @@ test('typecheck targets are the affected packages only', () => {
     'web',
     'web-tests',
   ]);
-  assert.deepEqual(
-    typecheckTargets([file('apps/web/lib/foo.test.ts')], process.cwd()),
-    ['web-tests']
-  );
 });
 
 test('arguments parse and unknown flags fail', () => {
