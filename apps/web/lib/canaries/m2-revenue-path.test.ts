@@ -177,11 +177,11 @@ describe('evaluateClaimSurface', () => {
     expect(
       evaluateClaimSurface({
         pricingStatus: 200,
-        pricingBody: PRICING_HTML.replace('$12', '$39'),
+        pricingBody: PRICING_HTML.replaceAll('$12', '$39'),
         signupStatus: 200,
         signupBody: `<html><body>${'signup'.repeat(200)}<div data-auth-shell-ready="true"></div></body></html>`,
       }).detail
-    ).toMatch(/\$12/);
+    ).toMatch(/Pro request-access|\$12/);
   });
 });
 

@@ -18,7 +18,7 @@ const range = (affects = {}, extra = {}) => ({
   candidateSha: SHA,
   unknown: false,
   paths: [],
-  affects: { auth: false, billing: false, ...affects },
+  affects: { auth: false, billing: false, unknown: false, ...affects },
   ...extra,
 });
 const good = journey => ({
@@ -42,6 +42,7 @@ const set = (mutate = {}) => [
   { ...good('auth'), ...(mutate.auth ?? {}) },
   { ...good('billing'), ...(mutate.billing ?? {}) },
 ];
+/** @param {unknown} [r] Deliberately includes malformed range fixtures. */
 const run = (evidence, r = range({ billing: true }), extra = {}) =>
   evaluatePromotion({ range: r, evidence, now: NOW, ...extra });
 
@@ -53,6 +54,68 @@ describe('promotion journey gate: valid evidence passes', () => {
     const r = run([], range());
     expect(r.decision).toBe('pass');
     expect(r.required).toBe(false);
+  });
+});
+
+describe('current evidence cannot be replaced by an older green receipt', () => {
+  it.each([null, -1, 'unknown', 0.5])(
+    'rejects invalid failed/skipped counters: %s',
+    count => {
+      expect(
+        run(
+          set({
+            auth: {
+              tests: { total: 4, passed: 4, failed: count, skipped: count },
+            },
+          })
+        ).decision
+      ).toBe('blocked');
+    }
+  );
+
+  it.each([
+    { schema: 'jovie.release-range-risk/v1' },
+    range({}, { affects: {} }),
+    range({}, { unknown: null }),
+    range({}, { candidateSha: null }),
+  ])('does not exempt an incomplete range from journey checks', r => {
+    expect(run([], r).decision).toBe('blocked');
+  });
+
+  const later = (extra = {}) => ({
+    ...good('auth'),
+    runId: '124',
+    completedAt: '2026-10-21T11:30:00.000Z',
+    ...extra,
+  });
+  it('blocks a later failed execution in either artifact order', () => {
+    const evidence = [
+      ...set(),
+      later({
+        conclusion: 'failure',
+        tests: { total: 4, passed: 3, failed: 1, skipped: 0 },
+      }),
+    ];
+    expect(run(evidence).decision).toBe('blocked');
+    expect(run([...evidence].reverse()).decision).toBe('blocked');
+  });
+  it('accepts a later successful recovery, not a newer unrelated candidate', () => {
+    expect(
+      run([...set({ auth: { conclusion: 'failure' } }), later()]).decision
+    ).toBe('pass');
+    expect(
+      run([...set(), later({ candidateSha: OTHER, conclusion: 'failure' })])
+        .decision
+    ).toBe('pass');
+  });
+  it('blocks conflicting newest executions with equal or unknown chronology', () => {
+    expect(
+      run([...set(), { ...good('auth'), conclusion: 'failure' }]).decision
+    ).toBe('blocked');
+    expect(
+      run([...set(), later({ completedAt: 'invalid', conclusion: 'failure' })])
+        .decision
+    ).toBe('blocked');
   });
 });
 
@@ -99,6 +162,13 @@ describe('promotion journey gate: deliberate-red failures', () => {
     expect(run([], range({}, { unknown: true })).decision).toBe('blocked');
     expect(run([], range({ auth: true })).decision).toBe('blocked');
   });
+  it.each(['publicUi', 'proxy', 'database'])(
+    'blocks a %s range without exact-SHA journey evidence (golden path is a promotion input)',
+    surface => {
+      expect(run([], range({ [surface]: true })).decision).toBe('blocked');
+      expect(run(set(), range({ [surface]: true })).decision).toBe('pass');
+    }
+  );
   it('blocks a missing or malformed range artifact', () => {
     expect(run(set(), null).decision).toBe('blocked');
   });

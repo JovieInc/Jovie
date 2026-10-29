@@ -117,6 +117,10 @@ export async function preflightLauncherDestinations(
       if (definition.agentCliOnly || !destination) {
         return [definition.id, 'not_configured' as const] as const;
       }
+      // In-app pages need no network preflight.
+      if (definition.kind === 'route') {
+        return [definition.id, 'ready' as const] as const;
+      }
       if (destination.sshHost) {
         const result = await preflightSshDestination(destination.sshHost);
         return [definition.id, result.status] as const;

@@ -1,21 +1,11 @@
 import { Button } from '@jovie/ui';
 import Link from 'next/link';
-import {
-  MarketingContainer,
-  MarketingHeroPhoto,
-  MarketingPageShell,
-} from '@/components/marketing';
+import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { getSmartLinksHeroCopy } from '@/data/smartLinksHeroCopy';
 import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
 import { SmartLinksDemo } from './SmartLinksDemo';
-
-const SMART_LINKS_HERO_PHOTO = {
-  src: '/images/marketing-hero/smart-links.webp',
-  width: 1600,
-  height: 686,
-} as const;
 
 const STEP_BODIES = [
   'Artwork and artist come first. Every available music app lives in one dial.',
@@ -39,7 +29,6 @@ export function SmartLinksLanding() {
         data-marketing-variant='split-screenshot-right'
         data-marketing-owner='apps/web/app/(marketing)/smart-links/SmartLinksLanding.tsx'
       >
-        <MarketingHeroPhoto {...SMART_LINKS_HERO_PHOTO} />
         <MarketingContainer width='page' className='relative z-3'>
           <div className='grid items-start gap-12 lg:grid-cols-2'>
             <div>
