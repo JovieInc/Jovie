@@ -539,11 +539,26 @@ describe('runWaitlistAutoAccept', () => {
       { id: 'certified', email: 'a@example.com', status: 'waitlisted' },
       { id: 'failing', email: 'b@example.com', status: 'waitlisted' },
       { id: 'no-profile', email: 'c@example.com', status: 'waitlisted' },
+      { id: 'recently-failed', email: 'd@example.com', status: 'waitlisted' },
     ];
     mockReadWaitlistInviteGates.mockResolvedValue(
       new Map([
-        ['certified', { profileId: 'p-certified', certified: true }],
-        ['failing', { profileId: 'p-failing', certified: false }],
+        [
+          'certified',
+          { profileId: 'p-certified', certified: true, certifiedAt: null },
+        ],
+        [
+          'failing',
+          { profileId: 'p-failing', certified: false, certifiedAt: null },
+        ],
+        [
+          'recently-failed',
+          {
+            profileId: 'p-recent',
+            certified: false,
+            certifiedAt: '2026-09-28T23:00:00.000Z',
+          },
+        ],
       ])
     );
 
@@ -554,7 +569,7 @@ describe('runWaitlistAutoAccept', () => {
       now: new Date('2026-09-29T00:00:00Z'),
     });
 
-    expect(result).toMatchObject({ approved: 1, uncertified: 2, skipped: 2 });
+    expect(result).toMatchObject({ approved: 1, uncertified: 3, skipped: 3 });
     expect(mockApproveWaitlistEntryInTx).toHaveBeenCalledTimes(1);
     expect(mockApproveWaitlistEntryInTx).toHaveBeenCalledWith(
       expect.anything(),
@@ -565,6 +580,7 @@ describe('runWaitlistAutoAccept', () => {
       profileId: 'p-failing',
       trigger: 'auto_accept',
     });
+    // A receipt from an hour ago already dispatched its own remediation.
     expect(mockScheduleProfileCertification).toHaveBeenCalledTimes(1);
   });
 

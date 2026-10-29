@@ -42,6 +42,10 @@ import {
 
 const AUTO_ACCEPT_ELIGIBLE_STATUSES = ['new', 'waitlisted'] as const;
 
+/** Limits for certifying held candidates from a drain (the event fallback). */
+const AUTO_ACCEPT_RECERTIFY_AFTER_MS = 24 * 60 * 60 * 1000;
+const AUTO_ACCEPT_MAX_RECERTIFY_PER_DRAIN = 10;
+
 export interface WaitlistAutoAcceptResult {
   enabled: boolean;
   scanned: number;
@@ -209,6 +213,7 @@ export async function runWaitlistAutoAccept(
 
   let approved = 0;
   let uncertified = 0;
+  let recertifyScheduled = 0;
   let skipped = 0;
   let failed = 0;
   let pausedReason: WaitlistAutoAcceptResult['pausedReason'];
@@ -238,7 +243,19 @@ export async function runWaitlistAutoAccept(
     // remediation is dispatched; the next drain admits it once it passes.
     const gate = certifiedEntries.get(candidate.id);
     if (!gate?.certified) {
-      if (gate?.profileId) {
+      // A failed receipt already dispatched its remediation, which
+      // re-certifies on its own completion event. Re-certify here only when
+      // there is no receipt or it is stale, and boundedly per drain.
+      const stale =
+        !gate?.certifiedAt ||
+        now.getTime() - Date.parse(gate.certifiedAt) >
+          AUTO_ACCEPT_RECERTIFY_AFTER_MS;
+      if (
+        gate?.profileId &&
+        stale &&
+        recertifyScheduled < AUTO_ACCEPT_MAX_RECERTIFY_PER_DRAIN
+      ) {
+        recertifyScheduled += 1;
         scheduleProfileCertification({
           profileId: gate.profileId,
           trigger: 'auto_accept',

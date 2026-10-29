@@ -418,6 +418,13 @@ export function scheduleProfileCertification(input: {
   });
 }
 
+export interface WaitlistInviteGate {
+  readonly profileId: string;
+  readonly certified: boolean;
+  /** When the latest receipt was written; null when never certified. */
+  readonly certifiedAt: string | null;
+}
+
 /**
  * Waitlist invite gate: entry id -> its profile and whether that profile's
  * latest certification passed. Entries without a profile are absent. An
@@ -448,11 +455,11 @@ export async function readWaitlistInviteGates(
   });
   for (const profile of profiles) {
     if (!profile.entryId) continue;
+    const latest = ledger?.profiles[profile.id]?.latest;
     gates.set(profile.entryId, {
       profileId: profile.id,
-      certified: isProfileCertifiedForInvite(
-        ledger?.profiles[profile.id]?.latest
-      ),
+      certified: isProfileCertifiedForInvite(latest),
+      certifiedAt: latest?.endedAt ?? null,
     });
   }
   return gates;
