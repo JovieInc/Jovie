@@ -720,7 +720,12 @@ test('flake requeue: a green head GitHub just dropped is re-enqueued', () => {
   assert.equal(decision.classification, 'unattributed');
   assert.equal(decision.n, 1);
   assert.match(
-    rearmDescription(decision),
+    rearmDescription({
+      n: Number(decision.n),
+      headSha: String(decision.headSha),
+      runId: Number(decision.runId),
+      classification: decision.classification,
+    }),
     new RegExp(`^n=1;sha=${sha};run=800;why=unattributed$`)
   );
   assert.equal(trustedRearmRecords([]).length, 0);
