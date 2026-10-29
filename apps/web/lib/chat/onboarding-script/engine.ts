@@ -472,6 +472,11 @@ export async function decideFallbackTurn(
   input: Readonly<{
     uiMessages: readonly UIMessage[];
     state: OnboardingTurnState;
+    /**
+     * System-1 hint (JOV-9627): the classifier already read the first message
+     * as an artist name, so skip the greeting and open the picker prefilled.
+     */
+    openPickerQuery?: string;
   }>
 ): Promise<FallbackTurn> {
   const { uiMessages, state } = input;
@@ -540,7 +545,7 @@ export async function decideFallbackTurn(
 
   // No artist yet: greet on the very first turn, otherwise open the picker.
   if (!state.spotifyArtistId) {
-    if (state.turnCount <= 1) {
+    if (state.turnCount <= 1 && input.openPickerQuery === undefined) {
       const line = pick('greet');
       return {
         line,
@@ -550,7 +555,8 @@ export async function decideFallbackTurn(
       };
     }
     // Prefill from prior user message; skip incomplete acks.
-    const rawQuery = latest ? messageText(latest).slice(0, 50) : '';
+    const rawQuery =
+      input.openPickerQuery ?? (latest ? messageText(latest).slice(0, 50) : '');
     const query = isIncompleteAdvanceMessage(rawQuery) ? '' : rawQuery;
     const line = pick('get_artist');
     return {

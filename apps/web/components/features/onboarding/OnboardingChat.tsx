@@ -759,13 +759,19 @@ export function OnboardingChat({
   interactionDisabled = false,
   onBusyChange,
 }: OnboardingChatProps) {
-  const initialStarterPrompt = starterHandoff?.prompt ?? '';
+  // A taken handle wins over a starter prompt: show the taken state, not a
+  // prefilled claim message for a name that is already someone else's.
+  const takenHandleEntry = entryProfile?.status === 'claimed';
+  const initialStarterPrompt = takenHandleEntry
+    ? ''
+    : (starterHandoff?.prompt ?? '');
   const hasInitialStarterPrompt = initialStarterPrompt.length > 0;
   const initialDraft = hasInitialStarterPrompt
     ? initialStarterPrompt
     : (buildStartEntryDraft(entryProfile) ?? '');
   const [input, setInput] = useState(initialDraft);
   const [entryMode, setEntryMode] = useState<OnboardingEntryMode>(() => {
+    if (takenHandleEntry) return 'handle_entry';
     if (starterHandoff?.kind === 'spotify_artist') return 'spotify_handoff';
     if (starterHandoff) return 'prompt_handoff';
     if (intentId) return 'restoring_intent';
