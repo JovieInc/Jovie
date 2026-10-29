@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   getMarketingFooterColumns,
@@ -108,7 +110,7 @@ describe('public marketing navigation', () => {
     expect(
       customers?.links.find(link => link.label === 'Audience Reactivation')
         ?.href
-    ).toBe('/artist-profiles#bring-them-back-automatically');
+    ).toBe('/artist-notifications');
 
     expect(getMarketingToolsFlyoutLinks(true)[0]).toMatchObject({
       href: '/smart-links',
@@ -128,6 +130,27 @@ describe('public marketing navigation', () => {
           link.label === 'Audience reactivation'
       )
     ).toBe(false);
+  });
+
+  it('points every /artist-profiles anchor at a section that exists', () => {
+    // "Audience reactivation" linked #bring-them-back-automatically after the
+    // section was removed, landing visitors mid-page (2026-10-28).
+    const page = readFileSync(
+      path.join(
+        process.cwd(),
+        'components/marketing/artist-profile/ArtistProfileLandingPage.tsx'
+      ),
+      'utf8'
+    );
+    const anchors = [true, false]
+      .flatMap(flag => getMarketingFooterColumns(flag))
+      .flatMap(column => column.links.map(link => link.href))
+      .filter(href => href.startsWith('/artist-profiles#'))
+      .map(href => href.split('#')[1]);
+    expect(anchors.length).toBeGreaterThan(0);
+    for (const id of anchors) {
+      expect(page, `missing #${id}`).toContain(`id='${id}'`);
+    }
   });
 
   it('links the engineering publication from the footer', () => {
