@@ -17,8 +17,11 @@ import { describe, expect, it } from 'vitest';
 // weaken the gate: every guard, budget and run count must still execute, and
 // any lane failing must still block promotion with the exact-build subtype.
 const root = resolve(import.meta.dirname, '../../..');
-const workflow = load(
-  readFileSync(join(root, '.github/workflows/production-release.yml'), 'utf8')
+/** @type {{ jobs: Record<string, { steps: Array<Record<string, any>> }> }} */
+const workflow = /** @type {any} */ (
+  load(
+    readFileSync(join(root, '.github/workflows/production-release.yml'), 'utf8')
+  )
 );
 const gate = workflow.jobs['promote-production'].steps.find(
   item => item.id === 'performance-gate'
