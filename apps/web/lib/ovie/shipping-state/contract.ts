@@ -634,6 +634,7 @@ export function emptyDeliverySummary(): DeliverySummary {
       heldByReason: {},
       failedByReason: {},
       capacity: null,
+      githubHeadroom: null,
       stageSummary: null,
       deployHealth: null,
       publishedAt: null,
