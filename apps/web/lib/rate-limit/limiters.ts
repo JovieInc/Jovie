@@ -143,6 +143,12 @@ export const anonymousOnboardingChatFirstTouchLimiter = createRateLimiter(
   RATE_LIMITERS.anonymousOnboardingChatFirstTouch
 );
 
+/** Canary passage tokens for the /start bot check (JOV-9625). Redis only. */
+export const syntheticPassageTokenLimiter = createRateLimiter(
+  RATE_LIMITERS.syntheticPassageToken,
+  { requireRedis: true }
+);
+
 export interface AnonymousChatLimitInput {
   readonly ip: string;
   readonly sessionId: string;
