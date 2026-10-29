@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { EX_TEMPFAIL, runWithGitHubRetry } from './lib/github-rate-limit.mjs';
 import {
   changelogGroupCollisionDecision,
   frontItemChurnDecision,
@@ -35,26 +35,37 @@ function readRepoFile(relativePath) {
   return readFileSync(resolve(REPO_ROOT, relativePath), 'utf8');
 }
 
-function loadLiveRuleset() {
-  try {
-    const json = execFileSync(
+// The live read draws on the shared installation REST bucket every workflow
+// uses. 2026-10-29 06:15 PT (run 40880300194): the bucket was empty at this
+// read and the raw `gh api` turned the installation 403 into a hard red (plus
+// a Slack drift false alarm) while Automation Liveness deferred cleanly in
+// the same window. The read now retries quota/transient failures within this
+// budget and defers (exit 75, `github-quota-deferred`) when the reset lands
+// past it; a real drift verdict is unchanged.
+const LIVE_RULESET_MAX_WAIT_MS = 120_000;
+
+async function loadLiveRuleset() {
+  const outcome = await runWithGitHubRetry(
+    [
       'gh',
-      ['api', `repos/JovieInc/Jovie/rulesets/${MERGE_QUEUE_POLICY.rulesetId}`],
-      {
-        encoding: 'utf8',
-        env: {
-          ...process.env,
-          GH_FORCE_TTY: '0',
-          NO_COLOR: '1',
-          FORCE_COLOR: '0',
-        },
-      }
-    );
-    return JSON.parse(json);
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : String(error);
-    return { error: reason };
+      'api',
+      `repos/JovieInc/Jovie/rulesets/${MERGE_QUEUE_POLICY.rulesetId}`,
+    ],
+    { attempts: 4, maxWaitMs: LIVE_RULESET_MAX_WAIT_MS }
+  );
+  if (outcome.code === 0) {
+    try {
+      return JSON.parse(outcome.stdout);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return { error: reason };
+    }
   }
+  if (outcome.deferred) {
+    const reason = outcome.stderr.trim() || 'GitHub quota deferral';
+    return { deferred: true, error: reason };
+  }
+  return { error: `${outcome.stderr}\n${outcome.stdout}`.trim() };
 }
 
 function printPolicySummary() {
@@ -64,7 +75,7 @@ function printPolicySummary() {
   }
 }
 
-function runValidate({
+async function runValidate({
   checkLive = false,
   allowUnavailableBypassActors = false,
 } = {}) {
@@ -122,7 +133,14 @@ function runValidate({
     return;
   }
 
-  const live = loadLiveRuleset();
+  const live = await loadLiveRuleset();
+  if (live.deferred) {
+    console.warn(
+      `Live GitHub ruleset verification deferred (${live.error}); not a verdict on ruleset parity. It re-runs at the next schedule or relevant main push.`
+    );
+    process.exitCode = EX_TEMPFAIL;
+    return;
+  }
   if (live.error) {
     console.error(`Live GitHub ruleset verification failed: ${live.error}`);
     process.exitCode = 1;
@@ -158,10 +176,10 @@ async function main() {
 
   switch (command) {
     case 'validate':
-      runValidate({ checkLive: false });
+      await runValidate({ checkLive: false });
       break;
     case 'verify':
-      runValidate({
+      await runValidate({
         checkLive: true,
         allowUnavailableBypassActors: process.argv
           .slice(3)

@@ -114,10 +114,15 @@ gh api repos/JovieInc/Jovie/rulesets/10512119 \
 ```
 
 `ci:merge-queue:check` (repo YAML only) already runs in `ci-fast`.
-`ci:merge-queue:verify` (live ruleset `10512119` via `gh api`) runs in
+`ci:merge-queue:verify` (live ruleset `10512119` via the quota-aware retry
+layer in `scripts/lib/github-rate-limit.mjs`) runs in
 `.github/workflows/merge-queue-ruleset-verify.yml` on a daily schedule, on
 `main` pushes that touch the ruleset/check sources, and on `workflow_dispatch`.
-It is not a source `PR Ready` context. Failures notify Slack. Always inspect
+It is not a source `PR Ready` context. Failures notify Slack. When the shared
+installation REST budget is empty, the read retries within a 120s budget and
+then defers with exit 75 (`github-quota-deferred`) instead of reporting a
+drift verdict; a drift finding or any other real failure still exits 1.
+Always inspect
 differences between checked-in intent and the current live ruleset before any
 policy change; a documentation value is not an apply receipt.
 
