@@ -1110,7 +1110,7 @@ jobs:
     name: Merge Group Admission
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     # Must exceed MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS (66 min) plus the
     # 6-minute check poll plus setup/checkout. The helper sleeps until
     # x-ratelimit-reset inside that window. A hard cancel would eject the
@@ -1224,7 +1224,7 @@ jobs:
   ci-merge-group-supersede:
     name: Merge Group Supersede Older Runs
     if: ${{ github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
     permissions:
       actions: write
@@ -2881,7 +2881,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,development,preview,br-main,br-production'
+          protected_branches: 'main,production,prod,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Determine owned ephemeral branch name
@@ -2940,7 +2940,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
-          PROTECTED_BRANCHES: main,development,preview,br-main,br-production
+          PROTECTED_BRANCHES: main,production,prod,development,preview,br-main,br-production
         run: bash scripts/ci/verify-neon-branch-admission.sh
 
       - name: Resolve certification DATABASE_URL
@@ -4697,7 +4697,7 @@ jobs:
           branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -6600,7 +6600,7 @@ jobs:
           branch_name: golden-path-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production
+          protected_branches: main,production,prod,development,preview,br-main,br-production
 
       - name: Resolve DATABASE_URL (fallback Neon ephemeral)
         if: needs.neon-db.result != 'success'
@@ -7033,7 +7033,7 @@ jobs:
           branch_name: admin-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -7680,7 +7680,7 @@ jobs:
         ci-lighthouse-onboarding-pr,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 2
     steps:
       - name: Evaluate combined-head checks

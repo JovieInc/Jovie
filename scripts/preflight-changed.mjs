@@ -62,8 +62,8 @@ export const HEAVY_GUARDS = new Set([
 export const NARROWED = {
   'merge-group-unit-guards': {
     command:
-      'node scripts/design-system-source-ratchet.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
-    note: 'source identity, metrics-layer and locked chrome; full suite with --thorough',
+      'node scripts/design-system-source-ratchet.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts',
+    note: 'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough',
   },
 };
 

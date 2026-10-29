@@ -220,6 +220,7 @@ describe('ToolPartsRenderer ops data cards', () => {
       'succeeded'
     );
     expect(screen.getByText('Shipping read complete.')).toBeInTheDocument();
+    expect(screen.queryByText(/status unknown|not been confirmed/i)).toBeNull();
   });
 });
 

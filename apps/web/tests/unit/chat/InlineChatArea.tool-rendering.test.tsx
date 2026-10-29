@@ -508,7 +508,7 @@ describe('InlineChatArea tool invocation rendering', () => {
     expect(mockHandleRetry).toHaveBeenCalledTimes(1);
   });
 
-  it('never renders raw tool status for unconfirmed tools', () => {
+  it('never renders raw tool status for an unconfirmed tool in the default view', () => {
     mockMessages = [
       {
         id: 'msg-1',
@@ -534,6 +534,35 @@ describe('InlineChatArea tool invocation rendering', () => {
     expect(screen.queryByTestId('tool-status-row')).toBeNull();
     expect(screen.queryByText(/status unknown/i)).toBeNull();
     expect(screen.queryByText(/not been confirmed/i)).toBeNull();
+  });
+
+  it('keeps raw unknown tool status out of verbose mode', () => {
+    window.localStorage.setItem('jovie:chat-verbose', '1');
+    try {
+      mockMessages = [
+        {
+          id: 'msg-1',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'summarizeAudience',
+              toolCallId: 'tool-5',
+              state: 'output-available',
+              output: { summary: 'Audience summary complete.' },
+            },
+          ],
+        },
+      ];
+      renderInlineChat();
+      expect(screen.queryByTestId('tool-status-row')).toBeNull();
+      expect(screen.queryByText(/status unknown/i)).toBeNull();
+      expect(
+        screen.queryByText(/Completion has not been confirmed/)
+      ).toBeNull();
+    } finally {
+      window.localStorage.removeItem('jovie:chat-verbose');
+    }
   });
 });
 

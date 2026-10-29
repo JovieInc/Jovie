@@ -160,6 +160,7 @@ nodes:
     allowedConsumers:
       - iOS CI
       - Mac CI
+      - Component Certificate
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -233,6 +234,18 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:analyze
+    jobCount: 1
+  - name: Component Certificate
+    path: .github/workflows/component-certificate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:certify
     jobCount: 1
   - name: Controller Quota Replay
     path: .github/workflows/controller-quota-replay.yml
@@ -1519,6 +1532,9 @@ edges:
   - from: CLI Chaos
     to: Mac Lane Route
     type: workflow_call
+  - from: CI
+    to: Component Certificate
+    type: workflow_run
   - from: Staging Controller
     to: Controller Quota Replay
     type: workflow_run

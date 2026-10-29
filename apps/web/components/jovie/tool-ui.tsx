@@ -239,6 +239,24 @@ function getActivityTimelineEdge(
   return 'middle';
 }
 
+/**
+ * A tool whose completion was never confirmed is internal bookkeeping, not
+ * something to show a user ("Merch source: status unknown / Completion has not
+ * been confirmed" was a reported defect). Status unknown stays hidden,
+ * including verbose mode. A pending unconfirmed row stays in verbose mode
+ * and reuses the tool's friendly in-progress copy.
+ */
+export function isUnconfirmedToolStatus(
+  event: PersistedToolEvent,
+  status: OperationStatus
+): boolean {
+  return (
+    !isLockedToolEvent(event) &&
+    (status === 'unknown' ||
+      (event.state === 'succeeded' && status === 'pending'))
+  );
+}
+
 function ToolActivityRow({
   event,
   status,
@@ -254,13 +272,10 @@ function ToolActivityRow({
   count: number;
   feedback?: ChatToolFeedbackContext;
 }>) {
-  const unconfirmed =
-    !isLockedToolEvent(event) &&
-    (status === 'unknown' ||
-      (event.state === 'succeeded' && status === 'pending'));
   // Never render raw tool status ("<tool>: status unknown", "Completion has
   // not been confirmed"). An unconfirmed row reuses the tool's own friendly
-  // in-progress copy; the unknown case is filtered out before render.
+  // in-progress copy; status unknown is omitted before render.
+  const unconfirmed = isUnconfirmedToolStatus(event, status);
   const title = unconfirmed
     ? getToolUiConfig(event.toolName).loadingTitle
     : getToolStatusTitle(event);
@@ -355,13 +370,16 @@ function ToolActivityFeed({
   variant: ToolRendererVariant;
   feedback?: ChatToolFeedbackContext;
 }>) {
-  // Rows whose status was never confirmed carry no user-meaningful state;
-  // render nothing rather than raw tool status.
-  const events = allEvents.filter(
-    event =>
-      isLockedToolEvent(event) ||
-      (statuses.get(event.toolCallId) ?? 'unknown') !== 'unknown'
-  );
+  const showVerbose = isVerboseToolModeEnabled();
+  const events = allEvents.filter(event => {
+    const status = statuses.get(event.toolCallId) ?? 'unknown';
+    if (isLockedToolEvent(event)) return true;
+    // Raw unknown status is never a user-facing row, including verbose mode.
+    if (status === 'unknown') return false;
+    // Pending rows that lack a saved receipt stay in the verbose view only.
+    if (!showVerbose && isUnconfirmedToolStatus(event, status)) return false;
+    return true;
+  });
   if (events.length === 0) {
     return null;
   }
