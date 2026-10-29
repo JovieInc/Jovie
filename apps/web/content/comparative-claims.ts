@@ -1,5 +1,3 @@
-import type { PublishedClaimReceipt } from './published-claims';
-
 /**
  * Measured comparison claims: Jovie's public profile page against a Linktree
  * page (JOV-5037 published-claims pattern, external-metric receipts).
@@ -255,7 +253,9 @@ export function comparativeAnswer(): string {
   return `${lines} Measured ${COMPARATIVE_BENCHMARK.measuredAt} on jov.ie build ${COMPARATIVE_BENCHMARK.buildSha.slice(0, 10)}. Method: ${COMPARATIVE_BENCHMARK.method}`;
 }
 
-function receiptFor(claim: ComparativeClaim): PublishedClaimReceipt {
+// The web registry checks PublishedClaimReceipt at integration. Keep this leaf
+// free of application type imports for the benchmark's NodeNext compilation.
+function receiptFor(claim: ComparativeClaim) {
   return {
     id: claim.id,
     statement: `${renderComparativeClaim(claim)} (${claim.metric}: Jovie ${claim.baseline.jovie}, ${COMPARATIVE_BENCHMARK.competitor} ${claim.baseline.competitor}; ${claim.robustness}).`,
@@ -264,7 +264,7 @@ function receiptFor(claim: ComparativeClaim): PublishedClaimReceipt {
       COMPARATIVE_BENCHMARK.competitorUrl,
       COMPARATIVE_BENCHMARK.methodSource,
     ],
-    owner: 'marketing-architecture',
+    owner: 'marketing-architecture' as const,
     verifiedAt: COMPARATIVE_BENCHMARK.measuredAt,
     reviewAfter: COMPARATIVE_BENCHMARK.reviewAfter,
   };
@@ -272,7 +272,7 @@ function receiptFor(claim: ComparativeClaim): PublishedClaimReceipt {
 
 export const COMPARATIVE_CLAIM_RECEIPTS = Object.fromEntries(
   COMPARATIVE_CLAIMS.map(claim => [claim.id, receiptFor(claim)])
-) as Readonly<Record<ComparativeClaimId, PublishedClaimReceipt>>;
+) as Readonly<Record<ComparativeClaimId, ReturnType<typeof receiptFor>>>;
 
 export const COMPARATIVE_CLAIM_IDS = COMPARATIVE_CLAIMS.map(
   claim => claim.id
