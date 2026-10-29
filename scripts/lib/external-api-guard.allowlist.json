@@ -24,12 +24,6 @@
       "rule": "provider-host",
       "max": 2,
       "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
-    },
-    {
-      "path": "scripts/fleet-audit/audit.py",
-      "rule": "gh-subprocess",
-      "max": 1,
-      "reason": "The fleet-audit gh shim IS a gh wrapper: it must exec the real gh binary the agent invoked (and probe workflow state around a disable). Routing it through apiclient would recurse into the shim; agent calls keep their own budgets."
     }
   ]
 }

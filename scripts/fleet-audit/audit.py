@@ -131,7 +131,7 @@ def classify_gh(args: list[str]) -> dict:
     repo = _flag_value(args, "-R", "--repo")
     pos = _positional(args)
     if not pos:
-        return {"kind": READ, "action": "gh", "target": None, "repo": repo}
+        return {"kind": READ, "action": "gh.bare", "target": None, "repo": repo}
     group = pos[0]
 
     if group == "api":
