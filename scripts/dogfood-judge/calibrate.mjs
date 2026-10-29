@@ -261,8 +261,8 @@ KPI: Tim never has to point out the obvious. A miss is a frame Tim rejected that
 | False alarms | ${summary.falseAlarms.join(', ') || 'none'} |
 | Cases | ${summary.rejects} rejects, ${summary.approves} approves (floor ${FLOORS.minRejects}/${FLOORS.minApproves}) |
 | Screen tier alone | recall ${(summary.screenTierOnly.recall * 100).toFixed(0)}%, precision ${(summary.screenTierOnly.precision * 100).toFixed(0)}% |
-| Cold screenshot test alone | recall ${(summary.coldPassOnly.recall * 100).toFixed(0)}%, precision ${(summary.coldPassOnly.precision * 100).toFixed(0)}% |
-| Rubric alone | recall ${(summary.rubricOnly.recall * 100).toFixed(0)}%, precision ${(summary.rubricOnly.precision * 100).toFixed(0)}% |
+| Cold screenshot test alone | recall ${((summary.coldPassOnly?.recall ?? 0) * 100).toFixed(0)}%, precision ${((summary.coldPassOnly?.precision ?? 0) * 100).toFixed(0)}% |
+| Rubric alone | recall ${((summary.rubricOnly?.recall ?? 0) * 100).toFixed(0)}%, precision ${((summary.rubricOnly?.precision ?? 0) * 100).toFixed(0)}% |
 | Cost | $${summary.costUsd} total, $${summary.costPerCaseUsd} per case |
 | Tiers | screen ${summary.tiers.screen}, confirm ${summary.tiers.confirm} |
 
