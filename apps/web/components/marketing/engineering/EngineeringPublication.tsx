@@ -62,6 +62,9 @@ function StoryMeta({
   );
 }
 
+const EMPTY_INDEX_EXPLAINER =
+  'Each note is written from work that has already shipped, with the pull request, the checks that passed, and the result linked as evidence. Nothing is published until it is approved, so this index only ever lists finished work.';
+
 function PageFrame({
   kicker,
   title,
@@ -145,10 +148,7 @@ export function EngineeringIndex({
             </p>
             {preview ? null : (
               <p className='max-w-2xl text-secondary-token'>
-                Each note here is written from work that has already shipped,
-                with the pull request, the checks that passed, and the result
-                linked as evidence. Nothing is published until it is approved,
-                so this index only ever lists finished work.
+                {EMPTY_INDEX_EXPLAINER}
               </p>
             )}
           </div>
