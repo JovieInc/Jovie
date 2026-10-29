@@ -1,6 +1,6 @@
 ---
 name: design-system
-description: Entry point for all Jovie design-system work: art direction, tokens, components, Pen operations, Pen to code parity, certification. Use first for any UI, design, token, Pen canvas, component or visual QA task; routes to one sub-guide.
+description: "Entry point for design-system work: art direction, tokens, components, Pen, parity, certification."
 ---
 
 # design-system (single entry)

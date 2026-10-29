@@ -1,10 +1,7 @@
 ---
 name: perf-loop
 version: 2026-05-07
-description: |
-  Measurement-first Jovie performance hardening loop. Use when route budgets,
-  bundle size, DB/query behavior, test speed, Playwright throughput, or CI
-  duration regress.
+description: "Autonomous measure-experiment-keep loop for route budget, bundle, DB, test and CI regressions."
 allowed-tools:
   - Bash
   - Read

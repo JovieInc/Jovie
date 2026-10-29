@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "e432bd7b9d223fec22c3eb84bc978c5faa11c3176cfa80c7d7fed3c570e6195f"
+    "bodySha256": "aa9f652b2cc763822426c4fae59cbbef6e2774e3c93a7ddda3a622cb57b865a2"
   },
   {
     "file": ".claude/rules/db.md",
@@ -111,6 +111,18 @@
     "bodySha256": "bfabfbafb0ea988e669fba7b3ea3b4c62810855ea3f977a112746271a8ba77ab"
   },
   {
+    "file": ".claude/rules/marketing-ui.md",
+    "paths": [
+      "apps/web/app/(marketing)/**",
+      "apps/web/app/(home)/**",
+      "apps/web/components/marketing/**",
+      "apps/web/components/features/landing/**",
+      "apps/web/data/marketing/**",
+      "docs/marketing/**"
+    ],
+    "bodySha256": "ff2e7c6a7b579beeb02a4d7fae725d55a6dbd8f583bba991447841bd835876dd"
+  },
+  {
     "file": ".claude/rules/motion.md",
     "paths": [
       "apps/web/**/*.tsx",
@@ -199,6 +211,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "8d31145e6c638bd6e7fd89698abae04dd5e21de1ba1b50688efed603b14495f8"
+    "bodySha256": "e36765413e5cbf2652c3dfd0a4f26e83a33815c8defe5d24c7ee864988a26697"
   }
 ]
