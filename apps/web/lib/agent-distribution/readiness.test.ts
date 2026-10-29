@@ -7,6 +7,7 @@ import {
   CERT_MAX_AGE_MS,
   evaluatePackage,
   type LegalInputs,
+  namedAsCaller,
   TRUST_ROUTES,
   TRUST_WIDTHS,
 } from './readiness';
@@ -48,7 +49,7 @@ const taste = (over: Record<string, unknown> = {}) => ({
 
 const legalText = [
   'We read public artist identity from Spotify and Apple Music, plus release facts.',
-  'Agents such as ChatGPT, Claude, Grok and Muse can create unpublished drafts.',
+  'Connected assistants such as ChatGPT, Claude, Grok and Muse can create unpublished drafts.',
   'We keep acquisition attribution. A draft expires after seven days.',
 ].join('\n');
 const legalOk: LegalInputs = {
@@ -77,6 +78,20 @@ const allPass = {
   trustSurfaceVisual: visual(),
   homepageTasteApproval: taste(),
 };
+
+describe('named assistants', () => {
+  it('does not count a processor mention as a connector caller', () => {
+    const processor =
+      'We use Anthropic (Claude) for chat assistance in your dashboard.';
+    expect(namedAsCaller(processor, 'Claude')).toBe(false);
+    expect(
+      namedAsCaller('AI assistants that call Jovie include Claude.', 'Claude')
+    ).toBe(true);
+    expect(
+      namedAsCaller(`Claude ${'x'.repeat(400)} connected assistants`, 'Claude')
+    ).toBe(false);
+  });
+});
 
 describe('listing readiness gate', () => {
   it('is not ready when every receipt is missing', () => {
@@ -178,8 +193,8 @@ describe('listing readiness gate', () => {
     expect(reasons).toContain('/legal/terms is not linked from the footer');
     expect(reasons).toContain('unpublished drafts');
     expect(reasons).toContain('7-day draft expiry');
-    expect(reasons).toContain('named assistant: ChatGPT');
-    expect(reasons).not.toContain('named assistant: Claude');
+    expect(reasons).toContain('named assistant as a connector caller: ChatGPT');
+    expect(reasons).toContain('named assistant as a connector caller: Claude');
   });
 
   it('reads receipts and legal sources from disk', async () => {

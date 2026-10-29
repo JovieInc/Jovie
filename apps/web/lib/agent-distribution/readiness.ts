@@ -166,6 +166,20 @@ function footerHrefs(footerSource: string, routesSource: string): string[] {
   });
 }
 
+const CALLER_WORDING =
+  /\bconnected (AI )?assistants?\b|\b(AI )?assistants? (that|which) (call|connect|use)\b|\b(call|connect to|connects to) Jovie\b/iu;
+const CALLER_WINDOW = 200;
+
+/** A vendor named as a processor does not count: the name needs caller wording close by. */
+export function namedAsCaller(text: string, name: string): boolean {
+  for (const match of text.matchAll(new RegExp(`\\b${name}\\b`, 'giu'))) {
+    const start = Math.max(0, match.index - CALLER_WINDOW);
+    const near = text.slice(start, match.index + name.length + CALLER_WINDOW);
+    if (CALLER_WORDING.test(near)) return true;
+  }
+  return false;
+}
+
 /** What the connector declares, and the pattern the legal text must match to cover it. */
 export function legalTopics(listing: Listing) {
   const days = listing.draftRetentionDays;
@@ -193,8 +207,8 @@ export function legalTopics(listing: Listing) {
         ).test(t),
     },
     ...listing.assistants.map(name => ({
-      topic: `named assistant: ${name}`,
-      covered: (t: string) => new RegExp(`\\b${name}\\b`, 'iu').test(t),
+      topic: `named assistant as a connector caller: ${name}`,
+      covered: (t: string) => namedAsCaller(t, name),
     })),
   ];
 }
