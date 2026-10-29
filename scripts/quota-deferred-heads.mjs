@@ -6,6 +6,7 @@
 // head older than 1h means that re-run path is broken.
 //
 // CLI: node scripts/quota-deferred-heads.mjs [--max-age-minutes 60]
+//      node scripts/quota-deferred-heads.mjs --share [N]  (quota share of the last N PR Fleet Rules runs)
 //   prints {"metric":"quota_deferred_heads_older_than_1h","value":N,"heads":[...]}
 //   and exits 1 when N > 0 (the alert), 0 otherwise.
 import { pathToFileURL } from 'node:url';
@@ -35,6 +36,34 @@ export function metric(rows, nowMs, maxAgeMs) {
     metric: 'quota_deferred_heads_older_than_1h',
     value: heads.length,
     heads,
+  };
+}
+
+/**
+ * Share of PR Fleet Rules runs hit by GitHub quota. `runs`: [{ conclusion,
+ * annotations: string[] }] (completed runs, newest sample). A quota hit is a
+ * run whose annotations carry the marker, whether it failed (before the
+ * advisory change) or was annotated "Infrastructure, not a verdict" and passed.
+ * `quota_failure_share` is quota-marked failures over all failures (the number
+ * that was ~1/3); `quota_hit_share` is quota-marked runs over all runs.
+ */
+export function fleetRulesQuotaShare(runs) {
+  const hit = run =>
+    (run.annotations ?? []).some(m => m.includes(QUOTA_DEFERRED_MARKER));
+  const failures = runs.filter(
+    run => String(run.conclusion).toLowerCase() === 'failure'
+  );
+  const quotaFailures = failures.filter(hit).length;
+  const quotaHits = runs.filter(hit).length;
+  const ratio = (n, d) => (d === 0 ? 0 : Math.round((n / d) * 1000) / 1000);
+  return {
+    metric: 'fleet_rules_quota_share',
+    runs: runs.length,
+    failures: failures.length,
+    quota_failures: quotaFailures,
+    quota_failure_share: ratio(quotaFailures, failures.length),
+    quota_hits: quotaHits,
+    quota_hit_share: ratio(quotaHits, runs.length),
   };
 }
 
@@ -101,6 +130,32 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
+  if (process.argv.includes('--share')) {
+    const repo = process.env.GITHUB_REPOSITORY ?? 'JovieInc/Jovie';
+    const n = Number(process.argv[process.argv.indexOf('--share') + 1]) || 30;
+    const listed = JSON.parse(
+      await gh([
+        'api',
+        `repos/${repo}/actions/workflows/pr-fleet-rules.yml/runs?status=completed&per_page=${Math.min(n, 100)}`,
+      ])
+    ).workflow_runs;
+    const rows = [];
+    for (const run of listed) {
+      const jobs = JSON.parse(
+        await gh(['api', `repos/${repo}/actions/runs/${run.id}/jobs`])
+      ).jobs;
+      const annotations = [];
+      for (const job of jobs.filter(j => j.conclusion !== 'skipped'))
+        annotations.push(
+          ...JSON.parse(
+            await gh(['api', `repos/${repo}/check-runs/${job.id}/annotations`])
+          ).map(a => a.message ?? '')
+        );
+      rows.push({ conclusion: run.conclusion, annotations });
+    }
+    console.log(JSON.stringify(fleetRulesQuotaShare(rows)));
+    process.exit(0);
+  }
   const flag = process.argv.indexOf('--max-age-minutes');
   const minutes = flag > 0 ? Number(process.argv[flag + 1]) : 60;
   const result = metric(await liveRows(), Date.now(), minutes * 60_000);

@@ -768,3 +768,95 @@ export function buildReport({
     certificates,
   };
 }
+
+/** Agent-ready spec for one uncertified component: missing criteria + acceptance + commands. */
+export function renderAgentSpec(
+  cert,
+  { journeyNotes = [], benchmarkGaps = [] } = {}
+) {
+  const section = (heading, rows) =>
+    rows.length ? ['', heading, ...rows] : [];
+  return [
+    `# Certify ${cert.component}`,
+    '',
+    'Goal: make every criterion below pass so the component certificate reports certified. One small PR; UI fast lane if the diff stays visual-only (labels ui + fast and a Fast-track UI eligibility section with Why eligible, Before, After, Checks run).',
+    '',
+    '## Missing criteria',
+    ...cert.missing.map(m => `- [${m.criterion}] ${m.reason}. Do: ${m.how}`),
+    ...section(
+      '## Adopted benchmark gaps (acceptance criteria)',
+      benchmarkGaps.map(
+        g => `- (${g.decision}) ${g.item} - reference: ${g.reference}`
+      )
+    ),
+    ...section(
+      '## Golden-path journeys touching this component',
+      journeyNotes.map(n => `- ${n}`)
+    ),
+    '',
+    '## Rules',
+    '- Read DESIGN.md, .claude/rules/ui.md, .claude/rules/motion.md and the frontend skill contract (scripts/design-frontend-skill-check.mjs) first.',
+    '- Semantic tokens only, canonical @jovie/ui atoms, no layout shift, focus and typed input survive every re-render, reduced-motion respected.',
+    '- Adopt competitor behavior, never their visual identity.',
+    '- Do not weaken or skip any check; never --no-verify.',
+    '',
+    '## Verify (targeted, do not run the full suite)',
+    `- pnpm --filter @jovie/web exec vitest run ${cert.component.replace(/^apps\/web\//, '').replace(/\.tsx$/, '')}`,
+    `- node scripts/component-certificate.mjs --component ${cert.component}`,
+    '- pnpm design:conformance:gate',
+  ].join('\n');
+}
+
+export const GUARD_TYPES = Object.freeze([
+  'lint-ast-rule',
+  'ds-primitive-constraint',
+  'shared-test-helper',
+  'frontend-skill-rule',
+  'dogfood-assertion',
+  'benchmark-entry',
+  'search-relevance-fixture',
+]);
+export const FOUND_BY = Object.freeze(['human', 'guard', 'agent']);
+
+const isoWeek = iso => {
+  const d = new Date(iso);
+  const t = new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+  );
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return `${t.getUTCFullYear()}-W${String(Math.ceil(((t.getTime() - y0.getTime()) / 86400000 + 1) / 7)).padStart(2, '0')}`;
+};
+
+/** Defect -> guard registry check + weekly measure (found by humans vs caught by guards). */
+export function summarizeGuards(registry) {
+  const errors = [];
+  const weeks = {};
+  let withGuard = 0;
+  for (const d of registry.defects ?? []) {
+    if (!d.id || !d.class || !FOUND_BY.includes(d.foundBy) || !d.foundAt)
+      errors.push(`${d.id ?? '?'}: id, class, foundBy, foundAt required`);
+    if (
+      !d.guard ||
+      !GUARD_TYPES.includes(d.guard.type) ||
+      !d.guard.ref ||
+      !['landed', 'planned'].includes(d.guard.status)
+    )
+      errors.push(
+        `${d.id ?? '?'}: guard {type, ref, status landed|planned} required (every defect maps to the cheapest durable guard)`
+      );
+    else if (d.guard.status === 'landed') withGuard += 1;
+    const w = isoWeek(d.foundAt);
+    weeks[w] ??= { human: 0, guard: 0, agent: 0 };
+    if (FOUND_BY.includes(d.foundBy)) weeks[w][d.foundBy] += 1;
+  }
+  const total = (registry.defects ?? []).length;
+  return {
+    errors,
+    total,
+    guardsLanded: withGuard,
+    guardCoverage: total ? withGuard / total : null,
+    weeks,
+  };
+}
