@@ -193,9 +193,7 @@ describe('PricingRecipeBody', () => {
     expect(routeSource).toContain(
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"
     );
-    expect(routeSource).toContain(
-      'comparisonChart={<PricingComparisonChart categories={publicComparison} />}'
-    );
+    expect(routeSource).toContain('comparisonChart={publicComparisonChart}');
     expect(routeSource).not.toContain("headline='Pricing'");
 
     expect(storySource).toContain('component: PricingRecipeBody');
@@ -203,9 +201,7 @@ describe('PricingRecipeBody', () => {
     expect(storySource).toContain(
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"
     );
-    expect(storySource).toContain(
-      'comparisonChart={<PricingComparisonChart categories={publicComparison} />}'
-    );
+    expect(storySource).toContain('comparisonChart={publicComparisonChart}');
 
     expect(bodySource).not.toContain('FaqSection');
     expect(bodySource).not.toContain('SocialProof');

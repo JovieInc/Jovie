@@ -6,7 +6,9 @@ import { getPublicPricingComparison } from '@/lib/billing/public-pricing-compari
 import { PricingRecipeBody } from './PricingRecipeBody';
 
 const proClaim = getPublicPriceClaim('pro');
-const publicComparison = getPublicPricingComparison();
+const publicComparisonChart = (
+  <PricingComparisonChart categories={getPublicPricingComparison()} />
+);
 export const PRICING_RECIPE_STORY_REQUEST_ACCESS_COPY = `${proClaim.displayName} is ${proClaim.priceLabel}/month. Claim your profile.`;
 
 const meta = {
@@ -42,7 +44,7 @@ const meta = {
       plans={
         <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
       }
-      comparisonChart={<PricingComparisonChart categories={publicComparison} />}
+      comparisonChart={publicComparisonChart}
     />
   ),
 } satisfies Meta<typeof PricingRecipeBody>;
