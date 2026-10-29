@@ -7,10 +7,12 @@ import { getComparison, getComparisonSlugs } from '@/content/comparisons';
 import { marketingOgImage } from '@/data/marketingOgCards';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 import { documentTitle } from '@/lib/seo/document-title';
+import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const revalidate = false;
 
 export const metadata: Metadata = {
+  robots: NOINDEX_ROBOTS,
   title: documentTitle(`Compare — ${APP_NAME}`),
   description:
     'See how Jovie compares with the tools musicians already use to share music.',
