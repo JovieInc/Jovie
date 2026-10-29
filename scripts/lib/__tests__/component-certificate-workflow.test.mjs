@@ -111,6 +111,34 @@ describe('certificate artifact retention with separate runner and checkout roots
 });
 
 describe('Component Certificate workflow contract', () => {
+  it.each([false, true])(
+    'checks main ancestry before executing checkout scripts (unmerged=%s)',
+    unmerged => {
+      const root = mkdtempSync(resolve(tmpdir(), 'certificate-lineage-'));
+      fixtureRoots.push(root);
+      const gate = steps.find(step => step.name === 'Require main ancestry');
+      const commit =
+        'git -c user.name=Fixture -c user.email=fixture@example.invalid commit --allow-empty -qm fixture';
+      const result = spawnSync(
+        'bash',
+        [
+          '-ec',
+          `git init -q
+${commit}
+git update-ref refs/remotes/origin/main HEAD
+${unmerged ? commit : ''}
+${gate?.run || 'true'}`,
+        ],
+        { cwd: root, encoding: 'utf8' }
+      );
+      expect(result.status, result.stderr).toBe(unmerged ? 1 : 0);
+      expect(steps.indexOf(gate)).toBe(1);
+      expect(load(workflow).jobs.certify.if).toContain(
+        "github.ref == 'refs/heads/main'"
+      );
+    }
+  );
+
   it('runs on the gem pool only, with no hosted fallback', () => {
     const runsOn = [...workflow.matchAll(/^\s+runs-on:\s*(.+)$/gmu)].map(m =>
       m[1].trim()

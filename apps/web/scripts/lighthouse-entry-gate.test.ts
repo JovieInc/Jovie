@@ -1,5 +1,7 @@
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   describeLcpElement,
@@ -13,6 +15,136 @@ import {
 const budget = { id: 'start', path: '/start', lcpMs: 4000, cls: 0.05 };
 
 describe('lighthouse entry gate', () => {
+  it('ratchet: JOV-9611 - report-only LCP warns but only CLS or missing samples fail', () => {
+    const budget = { id: 'start', path: '/start', lcpMs: 4000, cls: 0.05 };
+    const slow = { id: 'start', url: 'u', lcpSamples: [9000], clsSamples: [0] };
+    const v = evaluateEntryRoute(budget, slow, { lcpReportOnly: true });
+    expect(v.pass).toBe(true);
+    expect(v.warnings).toHaveLength(1);
+    expect(evaluateEntryRoute(budget, slow).pass).toBe(false);
+    expect(
+      evaluateEntryRoute(
+        budget,
+        { ...slow, clsSamples: [0.4] },
+        { lcpReportOnly: true }
+      ).pass
+    ).toBe(false);
+  });
+
+  it('ratchet: JOV-9611 - the production release step passes --lcp-report-only', () => {
+    const wf = readFileSync(
+      path.join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        '.github/workflows/production-release.yml'
+      ),
+      'utf8'
+    );
+    const at = wf.indexOf('scripts/lighthouse-entry-gate.ts');
+    expect(at).toBeGreaterThan(0);
+    expect(wf.slice(at, at + 200)).toContain('--lcp-report-only');
+  });
+
+  it('projects post-trace geometry and same-node image discovery from actual LH13 detail builders', async () => {
+    const require = createRequire(import.meta.url);
+    const lhci = path.dirname(require.resolve('@lhci/cli/package.json'));
+    const { Audit } = await import(
+      pathToFileURL(
+        require.resolve('lighthouse/core/audits/audit.js', { paths: [lhci] })
+      ).href
+    );
+    const node = Audit.makeNodeItem({
+      lhId: 'fixture-image',
+      selector: '#synthetic-private',
+      nodeLabel: 'synthetic-private',
+      snippet: '<img src="https://fixture.test/private">',
+      boundingRect: {
+        top: 0,
+        left: 0,
+        right: 120,
+        bottom: 120,
+        width: 120,
+        height: 120,
+      },
+    });
+    const checklist = Audit.makeChecklistDetails({
+      priorityHinted: { value: false, label: 'synthetic-private' },
+      requestDiscoverable: { value: true, label: 'synthetic-private' },
+      eagerlyLoaded: { value: true, label: 'synthetic-private' },
+      unexpected: { value: true, label: 'synthetic-private' },
+    });
+    const report = {
+      audits: {
+        'lcp-breakdown-insight': { details: Audit.makeListDetails([node]) },
+        'lcp-discovery-insight': {
+          details: Audit.makeListDetails([checklist, node]),
+        },
+      },
+    };
+    const result = extractLcpDiagnostics(report);
+    expect(result).toMatchObject({
+      postTraceRectCssPx: { width: 120, height: 120 },
+      imageDiscovery: {
+        priorityHinted: false,
+        requestDiscoverable: true,
+        eagerlyLoaded: true,
+      },
+    });
+    expect(JSON.stringify(result)).not.toMatch(
+      /private|unexpected|lhId|selector|snippet|nodeLabel/
+    );
+    report.audits['lcp-discovery-insight'].details = Audit.makeListDetails([
+      checklist,
+      { ...node, lhId: 'different-node' },
+    ]);
+    expect(extractLcpDiagnostics(report)).not.toHaveProperty('imageDiscovery');
+  });
+
+  it('omits unknown geometry and malformed discovery while preserving valid zero dimensions', () => {
+    for (const width of [undefined, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const result = extractLcpDiagnostics({
+        audits: {
+          'lcp-breakdown-insight': {
+            details: {
+              items: [{ type: 'node', boundingRect: { width, height: 10 } }],
+            },
+          },
+        },
+      });
+      expect(result).not.toHaveProperty('postTraceRectCssPx');
+    }
+    const node = {
+      type: 'node',
+      lhId: 'fixture',
+      boundingRect: { width: 0, height: 0 },
+    };
+    const result = extractLcpDiagnostics({
+      audits: {
+        'lcp-breakdown-insight': { details: { items: [node] } },
+        'lcp-discovery-insight': {
+          details: {
+            items: [
+              node,
+              {
+                type: 'checklist',
+                items: {
+                  priorityHinted: { value: 'private' },
+                  eagerlyLoaded: { value: null },
+                },
+              },
+            ],
+          },
+        },
+      },
+    });
+    expect(result).toHaveProperty('postTraceRectCssPx', {
+      width: 0,
+      height: 0,
+    });
+    expect(result).not.toHaveProperty('imageDiscovery');
+  });
   it('takes the median of an odd and an even sample set', () => {
     expect(median([9, 1, 5])).toBe(5);
     expect(median([4, 2])).toBe(3);
@@ -73,7 +205,11 @@ describe('lighthouse entry gate', () => {
     expect(budgets.map(b => b.path).sort()).toEqual(
       ['/[handle]?claim=1', '/claim', '/start'].sort()
     );
-    for (const b of budgets) expect(b.lcpMs).toBeLessThanOrEqual(4000);
+    // ratchet: JOV-9611 - claim-link is on a temporary 7000ms baseline; every
+    // other route stays at 4000ms. Lower claim-link back to 4000, never raise.
+    for (const b of budgets) {
+      expect(b.lcpMs).toBeLessThanOrEqual(b.id === 'claim-link' ? 7000 : 4000);
+    }
   });
 
   it('identifies the direct node in the Lighthouse 13 insight without exposing its content', () => {

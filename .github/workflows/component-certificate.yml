@@ -4,20 +4,7 @@
 # revisit-trigger: Fold into the Production Controller evidence packets once they carry design-system certification, or retire when Ovie computes certificates itself.
 # necessary-trust-boundary: Runs on trusted main only, read-only token. The one secret (CRON_SECRET) is used by a single curl step after the certificate script has finished; it posts evidence to the Ovie ingest route and never writes to GitHub.
 name: Component Certificate
-
-# Informational design-system certificate for every apps/web and packages/ui
-# component (scripts/component-certificate.mjs, docs/design-system/
-# COMPONENT_CERTIFICATE.md). Uncertified components never fail the build; a
-# script crash does. The report is uploaded as an artifact, its totals go to
-# the job summary, and it is posted to the Ovie ingest route when both the
-# secret and the route exist.
-#
-# Spare-compute rule (2026-10-24): gem self-hosted pool only (jovie-fixed),
-# no hosted fallback. No cron (JOV-INV-042): starts when main CI completes.
-# Only `typescript` is installed (no workspace install): the script parses
-# source with the TypeScript API and reads everything else from the checkout.
-# Rolling mutation evidence is read from the sweep state on the runner when
-# present; absent evidence is reported as unknown.
+# Informational; script crashes fail. Contract: docs/design-system/COMPONENT_CERTIFICATE.md.
 
 on:
   workflow_run:
@@ -34,20 +21,18 @@ on:
         description: Post the report to the Ovie ingest route
         default: true
         type: boolean
-
 permissions: {}
-
 jobs:
   certify:
     name: Certify components
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.ref == 'refs/heads/main' && (
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success')
     runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 15
     permissions:
       contents: read
-    # Newest main wins; an older certificate is stale the moment a newer lands.
     concurrency:
       group: component-certificate
       cancel-in-progress: true
@@ -58,10 +43,10 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ env.CERT_SHA }}
+          fetch-depth: 0
           persist-credentials: false
-
-      # The script needs only `typescript`. Install that one package into the
-      # checkout root so Node resolves it, instead of a full workspace install.
+      - name: Require main ancestry
+        run: git merge-base --is-ancestor HEAD origin/main
       - name: Install typescript only
         run: |
           set -euo pipefail
@@ -70,7 +55,6 @@ jobs:
           mkdir -p node_modules
           rm -rf node_modules/typescript
           cp -R "$RUNNER_TEMP/ts/node_modules/typescript" node_modules/typescript
-
       - name: Build the certificate report
         run: |
           set -euo pipefail
@@ -83,7 +67,6 @@ jobs:
             "${mutation_args[@]}"
           node scripts/lib/component-certificate-summary.mjs \
             "$RUNNER_TEMP/component-certificate/report.json" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Locate certificate report
         id: certificate_report
         if: always()
@@ -92,7 +75,6 @@ jobs:
           available=false
           if [ -s "$RUNNER_TEMP/component-certificate/report.json" ]; then available=true; fi
           printf 'available=%s\n' "$available" >> "$GITHUB_OUTPUT"
-
       - name: Upload certificate report
         if: ${{ always() && steps.certificate_report.outputs.available == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -101,16 +83,12 @@ jobs:
           path: ${{ runner.temp }}/component-certificate/report.json
           if-no-files-found: error
           retention-days: 30
-
       - name: Resolve CRON_SECRET
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
         run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
-
-      # Evidence only. Skips cleanly (and says so) when the secret or the Ovie
-      # route is absent: 404 means the route is not deployed yet.
       - name: Post to Ovie
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
         env:

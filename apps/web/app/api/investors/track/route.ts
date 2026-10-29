@@ -7,6 +7,7 @@ import {
   isInvestorClaimTokenShape,
   isInvestorClaimUnexpired,
 } from '@/lib/investors/claim-token';
+import { apiLimiter } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -29,6 +30,19 @@ export async function POST(request: Request) {
 
     if (!isInvestorClaimTokenShape(token)) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+
+    // Per-IP abuse cap (JOV-8888): unauthenticated endpoint doing DB
+    // lookups must not be enumerable at scale. Same pattern as the events
+    // route: shape-check first, then the limiter, then the database.
+    const clientIp =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+      'unknown';
+    const rateLimit = await apiLimiter.limit(
+      `investor-portal:track:${clientIp}`
+    );
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
     }
 
     // Find the active link

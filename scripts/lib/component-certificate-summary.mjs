@@ -1,11 +1,7 @@
 #!/usr/bin/env node
-/**
- * Render a jovie.component-certificate-report/v1 JSON as a markdown job
- * summary. Usage: node scripts/lib/component-certificate-summary.mjs report.json
- */
+/** Usage: node scripts/lib/component-certificate-summary.mjs report.json */
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-
 export function renderCertificateSummary(report) {
   const t = report?.totals;
   if (!t?.byCriterion) throw new Error('report has no totals.byCriterion');
@@ -21,7 +17,6 @@ export function renderCertificateSummary(report) {
     lines.push(`| ${id} | ${v.pass} | ${v.fail} | ${v.unknown} | ${v.na} |`);
   return `${lines.join('\n')}\n`;
 }
-
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href

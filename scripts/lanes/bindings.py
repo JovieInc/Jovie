@@ -883,7 +883,8 @@ def publish(lane, binding: Binding, branch: str, worktree: Path, git, *, issue=N
     created = lane.sh(["gh", "pr", "create", "--repo", binding.slug, "--base", "main", "--head", branch,
                        "--title", f"fix: {issue.title[:80]} ({issue.identifier})",
                        "--body", f"Refs {issue.identifier}.\n\n<!-- linear-issue-id:{issue.id} -->\n"
-                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n\n"
+                                 f"<!-- linear-issue-identifier:{issue.identifier} -->\n"
+                                 '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n\n'
                                  f"Lane implementation (binding {binding.key}); {binding.slug} required checks "
                                  "gate merge."])
     url = (created.stdout or "").strip().splitlines()[-1:] if created.returncode == 0 else []

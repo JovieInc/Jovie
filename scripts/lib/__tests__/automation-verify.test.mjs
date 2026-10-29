@@ -2139,17 +2139,12 @@ describe('automation-verify affected scope', () => {
   describe('scripts typecheck selection', () => {
     // The affected bundle runs the scripts/ ratchet only when scripts/ changed
     // since the merge-base; execute that exact block against a temp repo.
-    const selection = script
-      .slice(
-        script.indexOf('if ! SCRIPTS_DIFF_BASE='),
-        script.indexOf('node scripts/turbo-local.mjs lint --affected')
-      )
-      .replace(
-        'node scripts/typecheck-scripts.mjs',
-        'echo RAN_SCRIPTS_TYPECHECK'
-      );
+    const selection = script.slice(
+      script.indexOf('if ! SCRIPTS_DIFF_BASE='),
+      script.indexOf('node scripts/turbo-local.mjs lint --affected')
+    );
 
-    function runSelection(changedPath) {
+    function runSelection(changedPath, state = 'committed', status = 0) {
       const repo = mkdtempSync(resolve(tmpdir(), 'scripts-typecheck-select-'));
       const git = args => {
         const result = spawnSync('git', args, {
@@ -2168,13 +2163,19 @@ describe('automation-verify affected scope', () => {
         git(['config', 'user.email', 'test@example.com']);
         git(['config', 'user.name', 'test']);
         writeFileSync(resolve(repo, 'README.md'), 'base\n');
+        mkdirSync(resolve(repo, 'scripts/lib'), { recursive: true });
+        writeFileSync(resolve(repo, 'scripts/lib/example.mjs'), 'base\n');
+        writeFileSync(
+          resolve(repo, 'scripts/typecheck-scripts.mjs'),
+          `console.log('RAN_SCRIPTS_TYPECHECK'); process.exit(${status});\n`
+        );
         git(['add', '.']);
         git(['commit', '-q', '-m', 'base']);
         git(['switch', '-q', '-c', 'feature']);
         mkdirSync(dirname(resolve(repo, changedPath)), { recursive: true });
         writeFileSync(resolve(repo, changedPath), 'change\n');
-        git(['add', '.']);
-        git(['commit', '-q', '-m', 'change']);
+        if (state === 'committed' || state === 'staged') git(['add', '.']);
+        if (state === 'committed') git(['commit', '-q', '-m', 'change']);
         return spawnSync(
           'bash',
           ['-c', `set -euo pipefail\nBASE_REF=main\n${selection}`],
@@ -2188,6 +2189,22 @@ describe('automation-verify affected scope', () => {
     it('runs the ratchet when scripts/ changed', () => {
       const result = runSelection('scripts/lib/example.mjs');
       expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it.each([
+      ['staged', 'scripts/lib/example.mjs'],
+      ['unstaged', 'scripts/lib/example.mjs'],
+      ['untracked', 'scripts/lib/new.mjs'],
+    ])('runs the ratchet for %s scripts before commit', (state, path) => {
+      const result = runSelection(path, state);
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
+    });
+
+    it('propagates a failing compiler status', () => {
+      const result = runSelection('scripts/lib/example.mjs', 'committed', 73);
+      expect(result.status, result.stderr).toBe(73);
       expect(result.stdout).toContain('RAN_SCRIPTS_TYPECHECK');
     });
 
@@ -3679,6 +3696,41 @@ describe('automation-verify affected scope', () => {
     });
   });
 
+  describe('onboarding confirmed-handle helper binding', () => {
+    const source =
+      'apps/web/components/features/onboarding/onboardingChatHelpers.ts';
+    const testFiles = [
+      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
+      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
+    ];
+
+    it('runs both live and restored confirmation regressions for a helper-only change', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      for (const testFile of testFiles) {
+        expect(plan.mandatoryTests).toContain(testFile);
+        expect(plan.selectedTests).toContain(testFile);
+      }
+      const commands = buildSelectedTestCommands(plan, '1');
+      for (const testFile of testFiles) {
+        expect(commands.flatMap(([, args]) => args)).toContain(
+          testFile.replace('apps/web/', '')
+        );
+      }
+    });
+
+    it.each(testFiles)(
+      'fails closed when behavioral proof %s is missing',
+      testFile => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== testFile,
+        });
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+  });
+
   describe.each([
     [
       'apps/web/tests/e2e/utils/start-entry-layout.ts',
@@ -3689,7 +3741,14 @@ describe('automation-verify affected scope', () => {
     ],
     [
       'apps/web/tests/e2e/helpers/golden-path-keyframes.ts',
-      ['apps/web/tests/unit/e2e/start-entry-essentials.test.ts'],
+      [
+        'apps/web/tests/unit/e2e/golden-path-keyframes-errors.test.ts',
+        'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+      ],
+    ],
+    [
+      'apps/web/tests/e2e/helpers/golden-path-tracking.ts',
+      ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
     ],
   ])('anonymous entry helper binding: %s', (source, testFiles) => {
     const unknownNeighbor = source.replace(/\.ts$/, '-neighbor.ts');
