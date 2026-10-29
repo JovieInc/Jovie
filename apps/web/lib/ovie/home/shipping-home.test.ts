@@ -342,8 +342,8 @@ describe('buildConstraint', () => {
       )
     ).toEqual({
       tone: 'bad',
-      text: '0 of 28 Todo issues eligible',
-      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+      text: 'Fleet degraded: 0 of 28 Todo issues eligible · 3 of 4 lanes running',
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
   });
 
@@ -364,8 +364,8 @@ describe('buildConstraint', () => {
     );
     expect(constraint).toEqual({
       tone: 'bad',
-      text: 'Remediation alerts are not being acknowledged (45 failed delivery records)',
-      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+      text: 'Fleet degraded: Remediation alerts are not being acknowledged (45 failed delivery records) · 3 of 4 lanes running',
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     });
   });
 
@@ -401,7 +401,11 @@ describe('buildConstraint', () => {
         [],
         'fresh'
       )
-    ).toEqual({ tone: 'warn', text: 'Lanes feed is stale' });
+    ).toEqual({
+      tone: 'bad',
+      text: 'Fleet not reporting: the lanes feed is stale · 3 of 4 lanes running',
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
+    });
     expect(buildConstraint(base, [], 'failed')).toEqual({
       tone: 'warn',
       text: 'Work items are not current',

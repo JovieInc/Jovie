@@ -368,7 +368,8 @@ describe('public-profile alias graduation policy', () => {
           'pnpm',
           // Record every invocation (the script runs other pnpm commands around the guard) and
           // fail only the performance-budgets guard, so the assertions read that guard's own arguments.
-          '#!/bin/sh\nprintf "%s\\n" "$@" >> "$ALIAS_GUARD_ARGUMENTS"\nprintf -- "--invocation-end--\\n" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
+          // Each call is appended with one write: the staged gate runs its budget lanes concurrently.
+          '#!/bin/sh\ncall="$(printf "%s\\n" "$@"; printf -- "--invocation-end--\\n")"\nprintf "%s\\n" "$call" >> "$ALIAS_GUARD_ARGUMENTS"\ncase "$*" in *performance-budgets-guard*) exit "$ALIAS_GUARD_EXIT" ;; *) exit 0 ;; esac\n'
         );
         const result = runScript(script, fixture, {
           ALIAS_GUARD_ARGUMENTS: join(fixture.root, 'arguments'),

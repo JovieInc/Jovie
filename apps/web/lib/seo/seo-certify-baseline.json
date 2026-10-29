@@ -54,11 +54,7 @@
       "agentic:structured-data"
     ],
     "/developers": ["geo:geo-jsonld-type"],
-    "/download": [
-      "geo:geo-jsonld-type",
-      "geo:geo-orphan",
-      "geo:geo-sibling-links"
-    ],
+    "/download": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/engineering": [
       "agentic:structured-data",
       "geo:geo-jsonld-type",
@@ -78,10 +74,9 @@
       "geo:geo-sibling-links"
     ],
     "/pricing": ["geo:geo-sibling-links"],
-    "/product": ["copy:copy-lint", "geo:geo-sibling-links"],
+    "/product": ["geo:geo-sibling-links"],
     "/smart-links": [
       "agentic:structured-data",
-      "copy:copy-lint",
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
