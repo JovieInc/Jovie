@@ -428,8 +428,7 @@ export function auditDeferredControlImports(manifest, root = ROOT) {
           ts.isImportDeclaration(statement) || ts.isExportDeclaration(statement)
             ? statement.moduleSpecifier
             : undefined;
-        if (!moduleSpecifier || !ts.isStringLiteral(moduleSpecifier))
-          continue;
+        if (!moduleSpecifier || !ts.isStringLiteral(moduleSpecifier)) continue;
         const specifier = moduleSpecifier.text;
         for (const candidate of moduleSpecifierCandidates(file, specifier))
           if (deferredModules.has(candidate))

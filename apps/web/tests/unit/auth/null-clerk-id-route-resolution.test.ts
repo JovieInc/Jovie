@@ -98,6 +98,12 @@ vi.mock('@/lib/auth/cached', () => ({
   getCachedCurrentUser: async () => null,
 }));
 
+// Keep the real SQL ownership regression below the launch boundary. Deferred
+// refusal with the real guard is covered by launch-enforcement.test.ts.
+vi.mock('@/lib/launch/launch-enforcement', () => ({
+  deferredLaunchRefusal: () => null,
+}));
+
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: async () => undefined,
 }));

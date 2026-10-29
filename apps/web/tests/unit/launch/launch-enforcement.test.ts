@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/db', () => ({ db: {} }));
 vi.mock('@/lib/auth/cached', () => ({ getCachedAuth: vi.fn() }));
@@ -14,6 +14,9 @@ vi.mock('@/lib/utils/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn() },
 }));
 
+import { getCachedAuth } from '@/lib/auth/cached';
+import { getExactProfileAccess } from '@/lib/auth/profile-access';
+import { withDbSession } from '@/lib/auth/session';
 import {
   deferredLaunchRefusal,
   isDeferredLaunchRoute,
@@ -49,6 +52,8 @@ describe('deferredLaunchRefusal', () => {
 });
 
 describe('deferred artist launch entry points refuse execution', () => {
+  beforeEach(() => vi.clearAllMocks());
+
   it('refuses every enforced method of each deferred route before auth or db work', async () => {
     const enforced = [
       ['api/dashboard/shop', ['GET', 'PUT']],
@@ -67,7 +72,11 @@ describe('deferred artist launch entry points refuse execution', () => {
           new Request(`https://jov.ie/${routePath}`, { method })
         );
         expect(response.status, `${method} /${routePath}`).toBe(404);
+        expect(response.headers.get('cache-control')).toContain('no-store');
         await expect(response.json()).resolves.toEqual({ error: 'Not found' });
+        expect(getCachedAuth).not.toHaveBeenCalled();
+        expect(getExactProfileAccess).not.toHaveBeenCalled();
+        expect(withDbSession).not.toHaveBeenCalled();
       }
     }
   });

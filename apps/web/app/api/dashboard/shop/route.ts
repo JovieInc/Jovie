@@ -6,11 +6,9 @@ import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { captureError } from '@/lib/error-tracking';
-import {
-  deferredLaunchRefusal,
-} from '@/lib/launch/launch-enforcement';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { deferredLaunchRefusal } from '@/lib/launch/launch-enforcement';
 import { getShopifyUrl, isShopifyDomain } from '@/lib/profile/shop-settings';
 
 export const dynamic = 'force-dynamic';
