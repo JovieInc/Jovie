@@ -134,4 +134,12 @@ export const LISTING = {
   ],
 } as const;
 
-export type Listing = typeof LISTING;
+type Widen<T> = T extends string
+  ? string
+  : T extends readonly (infer U)[]
+    ? readonly Widen<U>[]
+    : T extends object
+      ? { readonly [K in keyof T]: Widen<T[K]> }
+      : T;
+/** Same shape as LISTING with literal types widened, so tests and callers can supply other values. */
+export type Listing = Widen<typeof LISTING>;
