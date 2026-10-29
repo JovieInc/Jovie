@@ -28,8 +28,7 @@ export const ONBOARDING_STEPS = [
   {
     id: 'dsp',
     title: 'Connect your music',
-    prompt:
-      'Import your releases from Spotify so listeners can find your music.',
+    prompt: 'Import your releases from Spotify so listeners can find you.',
   },
   {
     id: 'profile-review',
