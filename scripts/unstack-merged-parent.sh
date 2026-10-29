@@ -6,7 +6,7 @@
 # original commits. Retargeting the child to main without a rebase re-adds the
 # parent diff (and trips PR Size Guard), so this controller:
 #
-#   1. proves the old base branch belongs to a MERGED parent PR (a closed,
+#   1. proves the old base branch belongs to a parent PR MERGED into main (a closed,
 #      unmerged parent is never unstacked: that would land abandoned work);
 #   2. rebases only the child's own commits onto main
 #      (`git rebase --onto origin/main <parent-head> <child>`);
@@ -121,7 +121,7 @@ pr_state() {  # pr_state <num>
 merged_parent() {  # merged_parent <branch> -> "<number> <head-sha>" or empty
   local owner="${REPO%%/*}"
   gh_retry api "repos/${REPO}/pulls?state=closed&head=${owner}:${1}&per_page=20" \
-    --jq '[.[] | select(.merged_at != null)] | sort_by(.merged_at) | last
+    --jq '[.[] | select(.merged_at != null and .base.ref == "main")] | sort_by(.merged_at) | last
           | if . == null then empty else "\(.number) \(.head.sha | ascii_downcase)" end'
 }
 

@@ -53,6 +53,7 @@ function commitFile(cwd, file, content, message) {
 function fixture({
   childConflicts = false,
   parentMerged = true,
+  parentBase = 'main',
   activeClaim = '',
   policyCheckout = false,
   commentOverride = false,
@@ -170,6 +171,7 @@ function fixture({
           {
             number: 10,
             merged_at: '2026-10-01T00:00:00Z',
+            base: { ref: parentBase },
             head: { sha: parentTip },
           },
         ],
@@ -303,6 +305,17 @@ describe('unstack-merged-parent.sh', () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('has no merged parent PR');
     expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+  });
+
+  it('preserves children when the parent merged into a feature branch', () => {
+    const fx = fixture({ parentBase: 'feature' });
+    const result = run(fx);
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
+    expect(git(fx.remote, 'rev-parse', 'grandchild')).toBe(fx.grandSha);
+    expect(readFileSync(join(fx.dir, 'calls.log'), 'utf8')).not.toContain(
+      'pr edit'
+    );
   });
 
   it('aborts on conflict without rewriting the branch', () => {
@@ -479,7 +492,7 @@ describe('unstack-merged-parent.sh', () => {
     expect(workflow).toContain(
       'github.event.pull_request.head.repo.full_name == github.repository'
     );
-    expect(workflow).toContain('--base "$MERGED_HEAD_REF"');
+    expect(workflow).toContain('-f base="$MERGED_HEAD_REF"');
     expect(workflow).toContain(
       'group: unstack-merged-parent-${{ matrix.child }}'
     );

@@ -1,4 +1,5 @@
 name: Auto-Merge Base Guard
+# github-token-budget: 0 calls/run - runtime API calls use the Jovie App token; Node is primed from nodejs.org.
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
 # necessary-trust-boundary: Disabling auto-merge on a PR is a repository write that GITHUB_TOKEN may not perform on a PR it does not own; the Jovie Bot app token does it from trusted main code.
@@ -44,6 +45,8 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: false
 
+      - name: Prime Node toolcache
+        uses: ./.github/actions/prime-node-toolcache
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
         with:
