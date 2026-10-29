@@ -145,7 +145,7 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
         label: 'Audience capture',
       },
       {
-        href: APP_ROUTES.ARTIST_NOTIFICATIONS,
+        href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
         label: 'Audience reactivation',
       },
       { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
@@ -208,7 +208,7 @@ const RAW_GENERIC_CREATOR_FOOTER_LINKS = [
     label: 'Audience Capture',
   },
   {
-    href: APP_ROUTES.ARTIST_NOTIFICATIONS,
+    href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
     label: 'Audience Reactivation',
   },
   { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },

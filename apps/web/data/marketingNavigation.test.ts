@@ -110,7 +110,7 @@ describe('public marketing navigation', () => {
     expect(
       customers?.links.find(link => link.label === 'Audience Reactivation')
         ?.href
-    ).toBe('/artist-notifications');
+    ).toBe('/artist-profiles#bring-them-back-automatically');
 
     expect(getMarketingToolsFlyoutLinks(true)[0]).toMatchObject({
       href: '/smart-links',
@@ -133,8 +133,8 @@ describe('public marketing navigation', () => {
   });
 
   it('points every /artist-profiles anchor at a section that exists', () => {
-    // "Audience reactivation" linked #bring-them-back-automatically after the
-    // section was removed, landing visitors mid-page (2026-10-28).
+    // "Audience reactivation" linked #bring-them-back-automatically with no
+    // matching section, landing visitors mid-page (2026-10-28).
     const page = readFileSync(
       path.join(
         process.cwd(),

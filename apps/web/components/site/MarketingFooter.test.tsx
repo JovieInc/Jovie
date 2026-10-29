@@ -90,7 +90,7 @@ describe('MarketingFooter', () => {
     ).toHaveAttribute('href', '/artist-profiles#capture-every-fan');
     expect(
       screen.getByRole('link', { name: 'Audience Reactivation' })
-    ).toHaveAttribute('href', '/artist-notifications');
+    ).toHaveAttribute('href', '/artist-profiles#bring-them-back-automatically');
     expect(screen.queryByRole('link', { name: 'Audience capture' })).toBeNull();
   });
 
