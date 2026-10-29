@@ -5,6 +5,19 @@
     "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"
   },
   {
+    "file": ".claude/rules/build-vs-buy.md",
+    "paths": [
+      "apps/**",
+      "packages/**",
+      "scripts/**",
+      ".github/**",
+      "workers/**",
+      "tools/**",
+      "**/package.json"
+    ],
+    "bodySha256": "e4c741ada342f654e22a73697b13afcb08c72842b681e7539c4d7ec71a461fc0"
+  },
+  {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
     "bodySha256": "5fabc1298ed53a98b1841258926c05b2a001435651388c5f414d2b3bb145bd54"

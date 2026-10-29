@@ -4,6 +4,7 @@
  * checklist for new workflows, scripts, migrations and registries. No
  * filesystem or git access here; the CLI passes in file lists and a reader.
  */
+import { BUILD_VS_BUY_TEMPLATE, PRIOR_ART_TEMPLATE } from './build-vs-buy.mjs';
 import { evaluateCustomerNoteContract } from './daily-changelog-publication.mjs';
 
 const CUSTOMER_MARKER =
@@ -41,6 +42,8 @@ const TEMPLATES = {
       '\n'
     ),
   'changelog-marker': () => CUSTOMER_MARKER,
+  'build-vs-buy': () => BUILD_VS_BUY_TEMPLATE,
+  'prior-art': () => PRIOR_ART_TEMPLATE,
 };
 
 function summarize(files) {

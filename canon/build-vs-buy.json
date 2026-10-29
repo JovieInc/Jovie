@@ -1,0 +1,105 @@
+{
+  "schema": "jovie-build-vs-buy/v1",
+  "doc": "canon/BUILD_VS_BUY.md",
+  "owner": "Summer",
+  "dataArchitecture": "canon/data-architecture.json",
+  "guard": "scripts/lib/build-vs-buy.mjs",
+  "newModuleLineThreshold": 400,
+  "waiverMarker": "build-vs-buy-ok:",
+  "algorithm": {
+    "labels": ["type: algorithm", "type:algorithm", "algorithm"],
+    "pathPattern": "(?:^|/)(?:resolvers?|ranking|rankers?|matching|matchers?|schedulers?|scheduling|pricing|merge-queue|scoring|allocators?|planners?|dedupe|dedup|reconcil\\w*|recommend\\w*)(?:/|[.-])",
+    "rewriteChangedLines": 150
+  },
+  "reinventions": [
+    {
+      "id": "date-helpers",
+      "pattern": "\\b(?:function|const|let)\\s+(?:add(?:Days|Weeks|Months|Years|Hours|Minutes)|sub(?:tract)?(?:Days|Weeks|Months|Years)|(?:startOf|endOf)(?:Day|Week|Month|Year)|daysBetween|diffInDays|isSameDay|timeAgo|formatRelativeTime|formatDate)\\b",
+      "approved": "date-fns (apps/web)",
+      "hint": "import the date-fns function instead of hand-rolling date arithmetic or formatting."
+    },
+    {
+      "id": "markdown-parser",
+      "pattern": "\\b(?:function|const|let)\\s+(?:markdownToHtml|mdToHtml|parseMarkdown|renderMarkdown|markdownTo\\w+)\\b",
+      "approved": "remark + remark-gfm + remark-html (apps/web)",
+      "hint": "parse markdown with the remark pipeline already in apps/web."
+    },
+    {
+      "id": "retry-backoff",
+      "pattern": "\\b(?:function|const|let)\\s+(?:withRetry|retryWith\\w*|fetchWithRetry|exponentialBackoff|backoffDelay|sleepWithJitter)\\b|Math\\.pow\\(\\s*2\\s*,\\s*(?:attempt|retries|retry|tries)\\b|\\b2\\s*\\*\\*\\s*(?:attempt|retries|retry|tries)\\b",
+      "approved": "packages/api-client (scripts/apiclient for Python)",
+      "hint": "third-party calls go through the api-client layer, which already owns bounded full-jitter retry; see .claude/rules/external-apis.md.",
+      "skipPaths": ["^packages/api-client/", "^scripts/apiclient/"]
+    },
+    {
+      "id": "debounce-throttle",
+      "pattern": "\\b(?:function|const|let)\\s+(?:debounce|throttle|useDebounce\\w*|useThrottle\\w*)\\b",
+      "approved": "@tanstack/react-pacer (apps/web lib/pacer)",
+      "hint": "client timing has one library; see canon/data-architecture.json.",
+      "skipPaths": ["pacer"]
+    },
+    {
+      "id": "csv-parser",
+      "pattern": "\\b(?:function|const|let)\\s+(?:parseCsv|parseCSV|csvToJson|csvToRows|splitCsvLine)\\b",
+      "approved": "csv-parse (apps/web)",
+      "hint": "quoted fields, escapes and BOMs are why hand-rolled CSV parsers break."
+    },
+    {
+      "id": "uuid",
+      "pattern": "\\b(?:function|const|let)\\s+(?:uuidv4|generateUuid|generateUUID|createUuid)\\b|xxxxxxxx-xxxx-4xxx",
+      "approved": "crypto.randomUUID() (platform)",
+      "hint": "the platform generates RFC 4122 ids."
+    },
+    {
+      "id": "deep-utils",
+      "pattern": "\\b(?:function|const|let)\\s+(?:deepClone|cloneDeep|deepEqual|isDeepEqual|groupBy|uniqBy)\\b",
+      "approved": "structuredClone, Object.groupBy, Map/Set (platform)",
+      "hint": "the platform covers cloning and grouping; compare with node:util isDeepStrictEqual or the existing test helpers."
+    },
+    {
+      "id": "class-names",
+      "pattern": "\\b(?:function|const)\\s+(?:classNames|classnames|cx)\\s*[=(]",
+      "approved": "clsx + tailwind-merge via cn() in @jovie/ui",
+      "hint": "import cn from @jovie/ui."
+    }
+  ],
+  "codeExtensions": [
+    "ts",
+    "tsx",
+    "js",
+    "jsx",
+    "mjs",
+    "cjs",
+    "py",
+    "swift",
+    "kt",
+    "sh"
+  ],
+  "excludePaths": [
+    "(?:^|/)(?:__tests__|__mocks__|__snapshots__|__fixtures__|fixtures|tests?|e2e|stories|node_modules|vendor|dist|drizzle|generated)(?:/|$)",
+    "\\.(?:test|spec|stories|gen|generated|d)\\.[a-z]+$",
+    "-lock\\.|\\.lock$|pnpm-lock"
+  ],
+  "ignoredManifestKeys": [
+    "name",
+    "version",
+    "license",
+    "packageManager",
+    "main",
+    "module",
+    "types",
+    "type",
+    "private",
+    "description",
+    "homepage",
+    "node",
+    "pnpm",
+    "npm",
+    "bin",
+    "import",
+    "require",
+    "default",
+    "browser",
+    "exports"
+  ]
+}

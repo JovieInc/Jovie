@@ -1,0 +1,77 @@
+{
+  "schema": "jovie-build-vs-buy-metrics/v1",
+  "generatedAt": "2026-10-29T18:58:58.344Z",
+  "dependencies": {
+    "manifests": 27,
+    "unique": 189,
+    "prod": 122,
+    "dev": 73
+  },
+  "maintainedLines": {
+    "total": 1732473,
+    "domains": 475,
+    "byDomain": {
+      ".github/actions/vendor/actions-cache": 190014,
+      "apps/web/components/features": 172266,
+      "scripts": 81507,
+      "apps/web/app/api": 78385,
+      "scripts/lib": 65074,
+      "apps/web/scripts": 64109,
+      "scripts/lanes": 48790,
+      "apps/web/app/app": 47367,
+      "apps/web/components/organisms": 42082,
+      "apps/web/lib/ovie": 32489,
+      "apps/web/lib/db": 24318,
+      "scripts/invariants": 23768,
+      "apps/web/components/jovie": 22986,
+      "scripts/backlog-orchestrator": 21602,
+      ".github/scripts": 20295,
+      "apps/web/data/marketing": 20113,
+      "apps/ios/JovieTests": 18132,
+      "apps/web/lib/chat": 15637,
+      "apps/web/lib/queries": 15555,
+      "apps/web/lib/agent-os": 15437,
+      "apps/web/lib/services": 14976,
+      "apps/web/components/molecules": 14911,
+      "apps/web/lib/connectors": 14726,
+      "apps/web/lib": 13750,
+      "apps/web/components/shell": 13003,
+      "apps/web/lib/discography": 12679,
+      "apps/ios/Jovie/Features": 12673,
+      "apps/web/app/exp": 11870,
+      "apps/web/lib/admin": 11043,
+      "apps/eve-pilot/agent/lib": 10904,
+      "apps/web/lib/ingestion": 10739,
+      "apps/web/lib/dsp-enrichment": 9965,
+      "apps/desktop/src": 9887,
+      "apps/web/lib/auth": 9875,
+      "packages/ui/atoms": 9857,
+      "apps/web/components/marketing": 9752,
+      "scripts/fleet-gate": 9626,
+      "apps/web/lib/notifications": 9594,
+      "apps/web/app/(marketing)": 9518,
+      "apps/ios/Jovie/Core": 8712
+    }
+  },
+  "reinventions": {
+    "standing": {
+      "retry-backoff": 30,
+      "deep-utils": 2,
+      "date-helpers": 30,
+      "debounce-throttle": 3,
+      "class-names": 3,
+      "markdown-parser": 3,
+      "uuid": 2,
+      "csv-parser": 2
+    },
+    "standingTotal": 75,
+    "waivers": 0
+  },
+  "thresholds": {
+    "newModuleLines": 400
+  },
+  "catches": {
+    "source": "pr-fleet-rules annotations",
+    "ledger": null
+  }
+}

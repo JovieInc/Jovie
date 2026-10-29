@@ -2,6 +2,7 @@
 // One policy for PR feedback, native admission, and durable delivery receipts.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { evaluateBuildVsBuy } from './lib/build-vs-buy.mjs';
 
 const RUN_URL =
   /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/actions\/runs\/([1-9]\d*)(?:\/attempts\/[1-9]\d*)?$/;
@@ -257,6 +258,11 @@ export function evaluateFleetRules({
     errors.push(
       `locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for ${[...new Set(locked)].join(', ')}. Add to the PR body: "## Locked areas\nGBrain: design/design-operating-system" (design-system.css and design baselines) or "Locking PR: #<number>".`
     );
+  // Build-vs-buy, reinvention and prior-art rules live in one module and one
+  // canon rubric (canon/BUILD_VS_BUY.md); this is only the call site.
+  const buildVsBuy = evaluateBuildVsBuy({ body, labels, files, section });
+  errors.push(...buildVsBuy.errors);
+  warnings.push(...buildVsBuy.warnings);
   return { errors, warnings };
 }
 

@@ -67,6 +67,8 @@ jobs:
             scripts/dependabot-workflow-run-adapter.mjs
             scripts/lib/source-admission-policy.mjs
             scripts/pr-fleet-rules.mjs
+            scripts/lib/build-vs-buy.mjs
+            canon/build-vs-buy.json
             packages/api-client
             scripts/lib/product-lane-classifier.mjs
             scripts/lib/merge-group-member-policy.mjs

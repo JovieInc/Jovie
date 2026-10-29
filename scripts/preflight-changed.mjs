@@ -229,7 +229,41 @@ export function changedFiles(cwd, base) {
         status: 'added',
         patch: '',
       });
+  attachPatches(cwd, mb, rows);
   return { mergeBase: mb, files: rows };
+}
+
+/**
+ * Give each row the GitHub-shaped `patch` and `additions` the Fleet Rules
+ * build-vs-buy checks read, so they run locally exactly as they run in CI.
+ */
+function attachPatches(cwd, mb, rows) {
+  const byName = new Map(rows.map(r => [r.filename, r]));
+  const diff = git(cwd, ['diff', '-U0', '--no-color', '-M', mb]);
+  for (const chunk of diff.split(/^diff --git /m).filter(Boolean)) {
+    const name = /^a\/.* b\/(.+)$/m.exec(chunk.split('\n')[0])?.[1];
+    const row = byName.get(name);
+    if (!row) continue;
+    const body = chunk.slice(chunk.indexOf('\n@@') + 1);
+    row.patch = chunk.includes('\n@@') ? body : '';
+    row.additions = row.patch
+      .split('\n')
+      .filter(l => l.startsWith('+') && !l.startsWith('+++')).length;
+    row.deletions = row.patch
+      .split('\n')
+      .filter(l => l.startsWith('-') && !l.startsWith('---')).length;
+  }
+  for (const row of rows) {
+    if (row.patch || row.status !== 'added') continue;
+    try {
+      const text = readFileSync(path.join(cwd, row.filename), 'utf8');
+      const lines = text.split('\n');
+      row.patch = lines.map(l => `+${l}`).join('\n');
+      row.additions = lines.length;
+    } catch {
+      // Binary or unreadable files carry no patch; the rules skip them.
+    }
+  }
 }
 
 /** GitHub reads go through the shared budgeted client (external-apis rule). */
