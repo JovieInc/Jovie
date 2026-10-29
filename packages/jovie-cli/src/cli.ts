@@ -174,6 +174,13 @@ Examples:
 `;
 }
 
+function processAbortSignal(): AbortSignal {
+  const controller = new AbortController();
+  for (const name of ['SIGINT', 'SIGTERM'] as const)
+    process.once(name, () => controller.abort());
+  return controller.signal;
+}
+
 function writeLine(output: CliOutput, value: string): void {
   output.write(`${value}\n`);
 }
@@ -342,10 +349,26 @@ async function execute(
     // Shared names (--kind) parse into both sets; only foreign ones are stray.
     if (values.full || values.dir || strayFlags(values.flags, MESH_FLAG_NAMES))
       throw new UsageError('Unsupported option for mesh.');
-    return runMesh(positionals, values.meshFlags, {
-      userAgent: `jovie-cli/${CLI_VERSION}`,
-      ...dependencies.mesh,
-    });
+    const watching = positionals[1] === 'watch';
+    const result = await runMesh(
+      positionals,
+      watching && values.json
+        ? { ...values.meshFlags, json: 'true' }
+        : values.meshFlags,
+      {
+        userAgent: `jovie-cli/${CLI_VERSION}`,
+        // Watch streams one line per message to stdout; Ctrl-C ends it.
+        ...(watching
+          ? {
+              emit: (line: string) =>
+                writeLine(dependencies.stdout ?? process.stdout, line),
+              signal: dependencies.mesh?.signal ?? processAbortSignal(),
+            }
+          : {}),
+        ...dependencies.mesh,
+      }
+    );
+    return watching ? undefined : result;
   }
   if (strayFlags(values.meshFlags, COMMAND_FLAG_NAMES))
     throw new UsageError('Mesh options are only supported by mesh commands.');
@@ -500,7 +523,7 @@ export async function runCli(
       } else {
         writeText(stdout, result);
       }
-    } else {
+    } else if (result !== undefined) {
       writeLine(stdout, JSON.stringify(result, null, values.json ? 0 : 2));
     }
     if (
