@@ -3015,6 +3015,18 @@ class HostHandoffAdmissionTest(unittest.TestCase):
 
 
 class RunIssueTest(unittest.TestCase):
+    def test_unmeasured_execution_never_turns_reservation_into_cash(self):
+        lane.verify_and_land = lambda *a, **k: {"verdict": "no-change", "reasons": []}
+        receipt = lane.run_issue(self.host, "devin", {"cmd": ["true"], "model": "swe-2-medium"},
+                                 FakeLinear([]), issue("JOV-8663"))
+        economics = receipt["economics"][0]
+        self.assertIsNone(economics["measurements"]["cashUsd"])
+        self.assertIsNone(economics["measurements"]["credits"])
+        self.assertEqual(economics["reservedLimits"], {"dispatchUnits": 1})
+        self.assertEqual(economics["binding"]["executionGeneration"], receipt["execution"]["executionGeneration"])
+        self.assertEqual(economics["binding"]["provider"], "devin")
+        self.assertEqual(self.ledger()[-1]["economics"], receipt["economics"])
+
     def setUp(self):
         disk = patch.object(lane.disk_guard, "free_pct", return_value=50.0)
         disk.start()
@@ -3232,6 +3244,12 @@ class RunIssueTest(unittest.TestCase):
         self.assertEqual(seen, [["codex-test"], ["claude-test", "opus"]])
         self.assertEqual(len(receipt["handoffs"]), 1)
         self.assertEqual(receipt["verdict"], "provider-error")
+        first, second = receipt["economics"]
+        self.assertEqual((first["exitCode"], second["exitCode"]), (75, 75))
+        self.assertEqual(second["binding"]["model"], "opus")
+        self.assertEqual(second["binding"]["handoffFrom"], first["binding"]["executionId"])
+        self.assertNotEqual(first["binding"]["executionId"], second["binding"]["executionId"])
+        self.assertEqual(first["binding"]["attemptId"], second["binding"]["attemptId"])
 
     def test_next_provider_takes_the_cheapest_enabled_healthy_uncooled_lane(self):
         providers = {
@@ -7914,6 +7932,26 @@ class FixRedTest(unittest.TestCase):
             sync.assert_called_once()
             _, second, agent2, _ = self.run_gate(tmp, "some unknown failure", pr=behind)
             agent2.assert_called_once()  # tried once for this head; the model gets the next run
+
+    def test_deterministic_fixes_record_economics_only_for_provider_fallback(self):
+        for action, fixer_name in ((lane.fix_red_classes.WIRE_CI_FAST, "wire_ci_fast_fix"),
+                                   (lane.fix_red_classes.RENUMBER, "renumber_migrations_fix")):
+            route = {"action": action, "cls": action, "key": "test-key", "signature": "test"}
+            for fixed in (True, False):
+                with self.subTest(action=action, fixed=fixed), tempfile.TemporaryDirectory() as tmp, \
+                        patch.object(lane, "route_fix_red", return_value=route), \
+                        patch.object(lane, fixer_name,
+                                     return_value=SimpleNamespace(returncode=0) if fixed else None) as fixer:
+                    _, receipt, agent, _ = self.run_gate(tmp, "unknown failure")
+                    fixer.assert_called_once()
+                    if fixed:
+                        agent.assert_not_called()
+                        self.assertEqual(lane.provider_economics.summarize([receipt]), [])
+                        self.assertEqual(receipt["economics"], [])
+                    else:
+                        agent.assert_called_once()
+                        self.assertEqual(len(receipt["economics"]), 1)
+                        self.assertEqual(receipt["economics"][0]["binding"]["provider"], "codex")
 
     def test_unknown_red_reaches_the_agent_with_a_stable_fingerprint(self):
         with tempfile.TemporaryDirectory() as tmp:

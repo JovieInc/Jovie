@@ -725,11 +725,42 @@ export const STRUCTURAL_WEB_JOB_PREFIXES = Object.freeze([
 ]);
 
 /** Files of the lanes coverage suite (one coverage map, sharded below). */
-export const LANES_PYTEST_FILES = Object.freeze(
-  'scripts/tests/test_factory_signals.py scripts/tests/test_factory_intake.py scripts/tests/test_backlog_admission.py scripts/tests/test_backlog_writer_guard.py scripts/tests/test_capacity_limit.py scripts/tests/test_claude_lane.py scripts/tests/test_codex_lane.py scripts/tests/test_conftest_host_isolation.py scripts/tests/test_continuity_clock.py scripts/tests/test_design_gate.py scripts/tests/test_devin_free_policy.py scripts/tests/test_disk_guard.py scripts/tests/test_doctor.py scripts/tests/test_epics.py scripts/tests/test_execution_attempt.py scripts/tests/test_gh_app_token.py scripts/tests/test_hud.py scripts/tests/test_hyperagent_cli.py scripts/tests/test_hyperagent_lane.py scripts/tests/test_issue_routing.py scripts/tests/test_lane_runner.py scripts/tests/test_model_radar.py scripts/tests/test_pr_events.py scripts/tests/test_qualification_guard.py scripts/tests/test_reason_lane.py scripts/tests/test_remediation.py scripts/tests/test_service_census.py scripts/tests/test_shipping_attribution.py scripts/tests/test_shipping_origin.py scripts/tests/test_telegram_archive.py scripts/tests/test_worktree_pool.py scripts/tests/test_worktree_sweep.py'.split(
-    ' '
-  )
-);
+// Keep one entry per line so independent roster changes can merge cleanly.
+export const LANES_PYTEST_FILES = Object.freeze([
+  'scripts/tests/test_backlog_admission.py',
+  'scripts/tests/test_backlog_writer_guard.py',
+  'scripts/tests/test_capacity_limit.py',
+  'scripts/tests/test_claude_lane.py',
+  'scripts/tests/test_codex_lane.py',
+  'scripts/tests/test_conftest_host_isolation.py',
+  'scripts/tests/test_continuity_clock.py',
+  'scripts/tests/test_design_gate.py',
+  'scripts/tests/test_devin_free_policy.py',
+  'scripts/tests/test_disk_guard.py',
+  'scripts/tests/test_doctor.py',
+  'scripts/tests/test_epics.py',
+  'scripts/tests/test_execution_attempt.py',
+  'scripts/tests/test_factory_intake.py',
+  'scripts/tests/test_factory_signals.py',
+  'scripts/tests/test_gh_app_token.py',
+  'scripts/tests/test_hud.py',
+  'scripts/tests/test_hyperagent_cli.py',
+  'scripts/tests/test_hyperagent_lane.py',
+  'scripts/tests/test_issue_routing.py',
+  'scripts/tests/test_lane_runner.py',
+  'scripts/tests/test_model_radar.py',
+  'scripts/tests/test_pr_events.py',
+  'scripts/tests/test_provider_economics.py',
+  'scripts/tests/test_qualification_guard.py',
+  'scripts/tests/test_reason_lane.py',
+  'scripts/tests/test_remediation.py',
+  'scripts/tests/test_service_census.py',
+  'scripts/tests/test_shipping_attribution.py',
+  'scripts/tests/test_shipping_origin.py',
+  'scripts/tests/test_telegram_archive.py',
+  'scripts/tests/test_worktree_pool.py',
+  'scripts/tests/test_worktree_sweep.py',
+]);
 
 /**
  * The lanes coverage pytest is ci-fast (remaining)'s long pole: 308.5s of
@@ -834,6 +865,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/backlog_writer_guard.py" --fail-under=90',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/hud.py" --fail-under=80',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/capacity_limit.py" --fail-under=90',
+      'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/provider_economics.py" --fail-under=95',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/qualification_guard.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/lanes/lane_runner.py,*/scripts/lanes/pr_events.py,*/scripts/lanes/reason_lane.py,*/scripts/lanes/gbrain_catalog.py,*/scripts/lanes/design_gate.py,*/scripts/lanes/doctor.py,*/scripts/lanes/disk_guard.py,*/scripts/lanes/continuity_clock.py" --fail-under=85',
       'COVERAGE_FILE="${RUNNER_TEMP:-/tmp}/jovie-lanes.coverage" python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90',

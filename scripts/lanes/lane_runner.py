@@ -58,6 +58,7 @@ import git_housekeeping  # noqa: E402  (detached git maintenance vs cleanup)
 import fleet_gate_emitter  # noqa: E402
 import doctor  # noqa: E402  (sibling module of the release)
 import execution_attempt  # noqa: E402
+import provider_economics  # noqa: E402
 import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
@@ -141,7 +142,7 @@ HOST = socket.gethostname().split(".")[0]
 # Every file a release must pass before `current` moves to it.
 LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_factory_intake.py", "scripts/tests/test_update_drain.py", "scripts/tests/test_machine_gap.py", "scripts/tests/test_slot_yield.py", "scripts/tests/test_machine_metrics.py", "scripts/tests/test_lanes_atomic_state.py", "scripts/tests/test_lifecycle.py", "scripts/tests/test_execution_attempt.py", "scripts/tests/test_backlog_admission.py", "scripts/tests/test_backlog_writer_guard.py", "scripts/tests/test_lane_runner.py", "scripts/tests/test_hyperagent_lane.py", "scripts/tests/test_fix_red_classes.py", "scripts/tests/test_migration_renumber.py",
               "scripts/tests/test_codex_lane.py", "scripts/tests/test_hud.py", "scripts/tests/test_devin_free_policy.py",
-              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py",
+              "scripts/tests/test_doctor.py", "scripts/tests/test_pr_events.py", "scripts/tests/test_provider_economics.py",
               "scripts/tests/test_reason_lane.py", "scripts/tests/test_yc_corpus.py",
               "scripts/tests/test_gh_app_token.py", "scripts/tests/test_linear_app_token.py",
               "scripts/tests/test_disk_guard.py", "scripts/tests/test_qualification_guard.py",
@@ -3462,6 +3463,10 @@ def run_hyperagent_issue(host: Host, spec: dict, issue: Issue, linear: Linear | 
             # Never expose OAuth errors, call another model, or call an unknown
             # create outcome cancelled. Its durable journal remains authoritative.
             receipt.update(hold("remote-adapter-unavailable"))
+    if claimed and claimed.get("admitted"):
+        provider_economics.segment(receipt, claimed, ident, "hyperagent", spec.get("model"), remote=True,
+            thread=receipt.get("remoteThreadId"), limits={"dispatchUnits": 1,
+                "maxCostUsd": (spec.get("verifiedRemote") or {}).get("maxCostUsd")})
     receipt.update(endedAt=now_iso(), result={"verdict": receipt.get("verdict"), "pr": receipt.get("pr"),
                    "prUrl": receipt.get("prUrl"), "commit": receipt.get("headSha")})
     with (runs / "ledger.jsonl").open("a") as ledger:
@@ -3478,6 +3483,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
     branch = f"{name}/{issue.identifier.lower()}-{run_id[:15].lower()}"
     worktree = host.state / "worktrees" / run_id
     provider_evidence = runs / f"{run_id}.provider.jsonl"
+    provider_evidence_paths = [provider_evidence]
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "repository": REPO_SLUG,
                "executionHost": HOST, "initiator": "symphony", "provider": name, "model": spec.get("model"),
                "accountClass": spec.get("accountClass"), "origin": AUTONOMOUS_ORIGIN,
@@ -3566,11 +3572,12 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
             started = time.time()
             execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                        {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="issue-dispatch")
-            agent = run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
+            agent = provider_economics.run(receipt, claimed, ident, name, spec.get("model"), provider_evidence,
+                lambda: run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file), "cwd": str(worktree),
                                                        "provider_receipt": str(provider_evidence),
                                                        "model": str(spec.get("model"))}),
                               worktree, log, host.agent_timeout,
-                              guard=lambda: run_guard("agent-running"), on_kill=revoke_run)
+                              guard=lambda: run_guard("agent-running"), on_kill=revoke_run))
             # Tim 2026-09-27: an exhausted provider never leaves the issue half-done; another
             # lane finishes it on the same worktree.
             handoffs, current = [], name
@@ -3594,12 +3601,16 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 note_failover(host, current, nxt_name, "provider-error")
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id=f"issue-handoff:{len(handoffs)}")
-                agent = run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
+                handoff_evidence = runs / f"{run_id}.handoff{len(handoffs)}.provider.jsonl"
+                provider_evidence_paths.append(handoff_evidence)
+                agent = provider_economics.run(receipt, claimed, ident, nxt_name, nxt_spec.get("model"), handoff_evidence,
+                    lambda: run_agent(template(nxt_spec["cmd"], {"prompt": handoff_prompt, "prompt_file": str(handoff_file),
                                                              "cwd": str(worktree),
-                                                             "provider_receipt": str(provider_evidence),
+                                                             "provider_receipt": str(handoff_evidence),
                                                              "model": str(nxt_spec.get("model"))}),
                                   worktree, log, host.agent_timeout,
-                                  guard=lambda: run_guard("handoff-agent-running"), on_kill=revoke_run)
+                                  guard=lambda: run_guard("handoff-agent-running"), on_kill=revoke_run),
+                    handoff=receipt["economics"][-1]["binding"]["executionId"])
                 current = nxt_name
             if handoffs:
                 receipt.update(handoffs=handoffs, finishedBy=current)
@@ -3629,7 +3640,7 @@ def run_issue(host: Host, name: str, spec: dict, linear: Linear, issue: Issue) -
                 reap_run_processes(worktree, receipt)
                 if remove_worktree(host, worktree):
                     sh(["git", "branch", "-D", branch], cwd=host.repo)
-    evidence = read_provider_evidence(provider_evidence)
+    evidence = [row for path in provider_evidence_paths for row in read_provider_evidence(path)]
     if evidence:
         receipt["providerEvidence"] = evidence
         leased = next((row for row in reversed(evidence) if row.get("event") == "account-leased"), None)
@@ -7502,7 +7513,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
     provider_evidence = runs / f"{run_id}.provider.jsonl"
     receipt = {"schema": "jovie-lane-run/v1", "runId": run_id, "repository": REPO_SLUG,
                "executionHost": HOST, "initiator": "symphony", "provider": name, "kind": "fix-red",
-               "accountClass": spec.get("accountClass"), "origin": AUTONOMOUS_ORIGIN,
+               "accountClass": spec.get("accountClass"), "origin": AUTONOMOUS_ORIGIN, "economics": [],
                "attribution": {"category": "autonomous-remediation", "provider": name},
                "worktree": str(worktree), "branch": pr["headRefName"], "pr": pr["number"],
                "headBefore": pr["headRefOid"], "requestSource": fix_request_source(pr),
@@ -7711,13 +7722,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
                          fix_red_classes.RENUMBER: renumber_migrations_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
-                agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
+                agent = agent or provider_economics.run(receipt, claimed, ident, name, spec.get("model"), provider_evidence,
+                    lambda: run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
                                                          "provider_receipt": str(provider_evidence),
                                                          "model": str(spec.get("model"))}),
                                   worktree, log, host.agent_timeout,
                                   guard=lambda: boundary("agent-running", allow_local_push=True),
-                                  on_kill=revoke_fix)
+                                  on_kill=revoke_fix))
             verify_target(pr, "after-agent", worktree=worktree)
             head = sh(["git", "ls-remote", "origin", f"refs/heads/{pr['headRefName']}"], cwd=host.repo).stdout.split()
             after = head[0] if head else ""

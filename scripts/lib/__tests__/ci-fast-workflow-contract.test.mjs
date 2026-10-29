@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
@@ -114,6 +115,44 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('merges independent lanes coverage roster edits without losing either suite', () => {
+    const roster = CI_FAST_SOURCE.match(
+      /export const LANES_PYTEST_FILES =[\s\S]*?(?=\n\n)/u
+    )[0];
+    const root = mkdtempSync(join(tmpdir(), 'lanes-roster-merge-'));
+    try {
+      const base = join(root, 'base.mjs');
+      const ours = join(root, 'ours.mjs');
+      const theirs = join(root, 'theirs.mjs');
+      writeFileSync(base, roster);
+      writeFileSync(
+        ours,
+        roster.replace('test_doctor.py', 'test_doctor_next.py')
+      );
+      writeFileSync(theirs, roster.replace('test_hud.py', 'test_hud_next.py'));
+      const merged = spawnSync(
+        'git',
+        ['merge-file', '-p', ours, base, theirs],
+        {
+          encoding: 'utf8',
+        }
+      );
+      expect(merged.status, merged.stdout || merged.stderr).toBe(0);
+      const files = runInNewContext(
+        `${merged.stdout.replace('export ', '')}\nLANES_PYTEST_FILES`
+      );
+      expect([...files]).toEqual(
+        LANES_PYTEST_FILES.map(file =>
+          file
+            .replace('test_doctor.py', 'test_doctor_next.py')
+            .replace('test_hud.py', 'test_hud_next.py')
+        )
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('selects both critical and interaction files for non-main manual units', () => {
     const unitJob = jobBlock('ci-unit-tests', 'ci-exact-head-coverage-shard');
     const command = unitJob
@@ -417,7 +456,8 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(32);
+    expect(new Set(LANES_PYTEST_FILES).size).toBe(LANES_PYTEST_FILES.length);
+    expect(whole).toContain('scripts/tests/test_provider_economics.py');
     expect(whole).toContain('scripts/tests/test_factory_signals.py');
     expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
