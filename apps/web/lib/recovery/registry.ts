@@ -36,7 +36,8 @@ export const KNOWN_BAD_FLOW_FIXES: readonly KnownBadFlowFix[] = [
     whatChanged: 'it now shows your own releases',
     fallbackPath: '/start',
     checkId: 'golden-path-preview-has-release',
-    deployedAt: null,
+    // #23575 live in production build 34c8a01 (verified 2026-10-29).
+    deployedAt: '2026-10-29T08:50:00Z',
   },
   {
     id: 'signup-confirmation-link',
