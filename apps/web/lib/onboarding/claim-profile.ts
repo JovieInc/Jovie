@@ -27,6 +27,7 @@ import { captureError } from '@/lib/error-tracking';
 import { isHandleUniqueViolation } from '@/lib/errors/onboarding';
 import { isMusicfetchVendorUnavailable } from '@/lib/musicfetch/errors';
 import { captureRevenueSpineFailure } from '@/lib/observability/revenue-spine';
+import { scheduleOnboardingCatalogImport } from '@/lib/onboarding/catalog-import.server';
 import {
   type ClaimedOnboardingState,
   deriveClaimedOnboardingStateFromMessageRows,
@@ -573,6 +574,19 @@ async function materializeProfile({
       unproven,
       waitlistEntryId,
     });
+
+  // JOV-9758: import the matched artist's real catalog (releases, artwork,
+  // release smartlinks, DSP links) for every materialized identity,
+  // including reserved waitlist holds, so the page is never an empty shell.
+  // A held high-reach identity has no artist here and imports on approval.
+  if (state.artist?.id && profileId) {
+    scheduleOnboardingCatalogImport({
+      profileId,
+      spotifyArtistId: state.artist.id,
+      spotifyArtistUrl: state.artist.url,
+      userId: verifiedUserId,
+    });
+  }
 
   if (verification) {
     await requestClaimVerification({

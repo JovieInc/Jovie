@@ -48,6 +48,7 @@ MAX_RANKED = 50
 CEILING_FLOOR = 30          # Todo above max(this, 4 x target) is over WIP
 DEMOTE_PRIORITIES = (3, 4)  # P3/P4 only; unset priority is unknown, not unimportant
 PROTECT_LABELS = frozenset({"dispatch-next", "plan-approved", "tim-approved", "incident", "factory"})
+MIRROR_MAX_AGE_S = 6 * 3600  # candidates are re-read live, so a lagging mirror only needs to be recent enough to nominate
 PUBKEY_ENV = "LANES_SUMMER_PORTFOLIO_PUBKEY"
 DEFAULT_PUBKEY = Path.home() / ".config" / "symphony" / "summer-portfolio-pubkey.pem"
 
@@ -289,6 +290,15 @@ def measure(state, now: float | None = None) -> dict:
             "samples": len(seconds), "targetMin": 15}
 
 
+def _live_state(client, issue_id: str):
+    """The issue's state name read from Linear right now; None when unreadable (never admit blind)."""
+    try:
+        issue = (client.gql(linear_sync.ISSUE_QUERY, {"id": issue_id}) or {}).get("issue") or {}
+        return (issue.get("state") or {}).get("name")
+    except Exception:
+        return None
+
+
 def run(lane, host, team: str, client, now: float | None = None, floor: int = 0, excluded=("hold",)) -> dict:
     """One priority-admission pass for `team`, written through the outbox."""
     now = time.time() if now is None else now
@@ -301,7 +311,7 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
     ranks = summer_ranks(state, now)
     receipt["summerRanks"] = len(ranks)
     mirror = linear_sync.read_mirror(state, team)
-    if now - float(mirror.get("syncedAt") or 0) > 900:  # a stale mirror proves nothing about Backlog or Todo
+    if now - float(mirror.get("syncedAt") or 0) > MIRROR_MAX_AGE_S:  # too old even to nominate candidates
         receipt["held"] = "mirror-stale"
         return _finish(state, team, receipt, now)
     rows = list((mirror.get("issues") or {}).values())
@@ -311,16 +321,31 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
     receipt.update(todo=len(todo), target=goal, ceiling=ceiling(goal))
     candidates, skipped = admit_candidates(rows, ranks, excluded, lambda row: lane.issue_hits_red_line(binding_refill._issue(lane, row)),
                                            now, pending)
-    receipt["skipped"] = dict(sorted(skipped.items())[:50])
+    for row in list(candidates):  # a superseded claim means a remote owner decided; the outbox would drop the move
+        if linear_sync.claim_status(state, row["id"]) in ("superseded", "active"):
+            candidates.remove(row)
+            skipped[row["identifier"]] = "claim-" + str(linear_sync.claim_status(state, row["id"]))
+    # Ranked and Urgent skips first: the reason a Summer pick did not run must survive the receipt cap.
+    receipt["skipped"] = dict(sorted(skipped.items(), key=lambda kv: (kv[0] not in ranks, kv[0]))[:50])
     outbox = linear_sync.Outboxed(state, client)
     live_todo = list(todo)
-    admitted = candidates[:MAX_ADMIT_PER_TICK]
+    admitted = []
+    for row in candidates:  # the mirror may lag: confirm in Linear that the candidate is still Backlog (and Urgent or ranked)
+        if len(admitted) >= MAX_ADMIT_PER_TICK:
+            break
+        if _live_state(client, row["id"]) == "Backlog":
+            admitted.append(row)
+        else:
+            receipt["skipped"][row["identifier"]] = "live-state-changed"
     victims = displacement_order(live_todo, ranks, now)
     for row in admitted:
         why = "Summer portfolio rank %s" % ranks[row["identifier"]] if row["identifier"] in ranks else "Urgent (P1)"
         displaced = None
         if len(live_todo) >= goal and len(receipt["displaced"]) < MAX_DISPLACE_PER_TICK and victims:
             displaced = victims.pop(0)
+            while displaced is not None and _live_state(client, displaced["id"]) != "Todo":
+                displaced = victims.pop(0) if victims else None
+        if displaced is not None:
             outbox.move(displaced["id"], "Backlog")
             outbox.comment(displaced["id"], f"Priority replacement: returned to Backlog so {row['identifier']} ({why}) can run now. "
                                             f"Todo was {len(live_todo)} of target {goal}; this item ranked lowest and oldest among "

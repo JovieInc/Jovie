@@ -189,6 +189,62 @@ class QueueUnmergeableTest(unittest.TestCase):
             self.assertNotIn("PR_2", " ".join(" ".join(c) for c in calls if any("dequeue" in a for a in c)))
 
 
+class QueueBreakerTest(unittest.TestCase):
+    def test_two_group_failures_in_three_hours_dequeue_hold_and_keep_the_head_blocked(self):
+        qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
+        qb.__spec__.loader.exec_module(qb)
+        calls, labels = [], []
+        head = {"sha": "a" * 40}
+        gone = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            path = args[-1] if args[0] == "api" else ""
+            flat = " ".join(args)
+            if "workflows/ci.yml/runs" in flat:
+                rows = [{"id": 11, "head_branch": "gh-readonly-queue/main/pr-23471-abc", "conclusion": "failure", "updated_at": iso(NOW - 600), "head_sha": "s1"},
+                        {"id": 12, "head_branch": "gh-readonly-queue/main/pr-23471-def", "conclusion": "failure", "updated_at": iso(NOW - 3000), "head_sha": "s2"},
+                        {"id": 13, "head_branch": "gh-readonly-queue/main/pr-500-abc", "conclusion": "failure", "updated_at": iso(NOW - 600), "head_sha": "s3"},
+                        {"id": 14, "head_branch": "gh-readonly-queue/main/pr-23471-old", "conclusion": "failure", "updated_at": iso(NOW - 40000), "head_sha": "s4"}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "mergeQueue" in flat:
+                nodes = ([] if gone else [{"state": "AWAITING_CHECKS", "pullRequest": {"id": "PR_X", "number": 23471, "headRefOid": "a" * 40}}]) + [
+                         {"state": "QUEUED", "pullRequest": {"id": "PR_Y", "number": 500, "headRefOid": "b" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            if path.endswith("/jobs?per_page=100"):
+                jobs = [{"id": 9, "name": "ci-fast (remaining)", "conclusion": "failure", "steps": [{"name": "Run structural ci-fast lane", "conclusion": "failure"}]},
+                        {"id": 8, "name": "ci-fast", "conclusion": "failure", "steps": []}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"jobs": jobs}))
+            if path.endswith("/logs"):
+                return SimpleNamespace(returncode=0, stderr="", stdout="x\n2026 ##[error]UpdateTest failed: 1 != 0\n")
+            if "/labels" in flat:
+                labels.append(flat)
+                return SimpleNamespace(returncode=0, stderr="", stdout="[]")
+            if "/pulls/" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"state": "open", "head": head, "labels": []}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            first = qb.sweep(Path(raw), run, NOW)
+            gone.append(1)  # dequeued
+            self.assertEqual(first["tripped"], [23471])
+            flat = "\n".join(" ".join(c) for c in calls)
+            self.assertIn("dequeuePullRequest", flat)
+            self.assertIn("ci-fast (remaining)", flat)
+            self.assertIn("UpdateTest failed", flat)
+            self.assertNotIn("PR_Y", "\n".join(" ".join(c) for c in calls if any("dequeue" in a for a in c)))
+            labels.clear()
+            # Same head, label cleared by a green Source Validation: the hold is put back.
+            again = qb.sweep(Path(raw), run, NOW + 600)
+            self.assertEqual(again["reblocked"], [23471])
+            self.assertTrue(any("issues/23471/labels" in l for l in labels))
+            # A new head releases the PR.
+            head["sha"] = "c" * 40
+            labels.clear()
+            released = qb.sweep(Path(raw), run, NOW + 1200)
+            self.assertEqual((released["reblocked"], labels), ([], []))
+
+
 class IdleNotDemandTest(unittest.TestCase):
     def test_idle_for_any_reason_but_no_demand_while_demand_exists_alarms_per_lane(self):
         pushed = {"JovieInc/Jovie|codex": 1}

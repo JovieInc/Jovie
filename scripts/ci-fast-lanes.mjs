@@ -237,9 +237,9 @@ export const SOURCE_GUARDS = Object.freeze([
     // measured and auditable), and the dead-man liveness contract stays green.
     id: 'automation-registry',
     command:
-      'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs',
+      'node --test --experimental-test-coverage --test-coverage-include=scripts/installation-budget-sentinel.mjs --test-coverage-lines=95 --test-coverage-branches=90 --test-coverage-functions=100 scripts/installation-budget-sentinel.test.mjs && pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/automation-registry.test.mjs lib/__tests__/automation-liveness.test.mjs',
     inputs:
-      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/automation-liveness\.mjs|scripts\/lib\/(?:automation-registry\.mjs|__tests__\/automation-(?:registry|liveness)\.test\.mjs))/u,
+      /^(?:\.github\/workflows\/[^/]+\.ya?ml|(?:apps\/[^/]+\/)?vercel\.json|scripts\/lanes\/continuity_clock\.py|canon\/automation-registry\.jsonl|scripts\/(?:automation-liveness\.mjs|installation-budget-sentinel(?:\.test)?\.mjs)|scripts\/lib\/(?:automation-registry\.mjs|__tests__\/automation-(?:registry|liveness)\.test\.mjs))/u,
     prOnly: false,
   }),
   Object.freeze({
@@ -859,8 +859,11 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/preflight.test.mjs',
+  'scripts/installation-budget-sentinel.test.mjs',
   'scripts/layout-guard-pen-contracts.test.mjs',
   'scripts/ci-rounds-report.test.mjs',
+  'scripts/preflight-changed.test.mjs',
+  'scripts/lib/__tests__/ci-rounds.test.mjs',
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
@@ -946,6 +949,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/quota-deferred-heads.test.mjs',
   'scripts/hold-contract.test.mjs',
   'scripts/invariants/art-direction/surface-media.test.mjs',
+  'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
@@ -967,6 +971,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/postmortem-review.test.mjs',
   'scripts/prebuild-install-dep0176.test.mjs',
   'scripts/public-benchmark/public-benchmark.test.mjs',
+  'scripts/catalog-completeness/check.test.mjs',
   'scripts/quality-gap-finder.test.mjs',
   'scripts/screenshot-loop/screenshot-bug-loop.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
@@ -2857,6 +2862,7 @@ export async function runStructural(opts = {}) {
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/controller-quota-replay.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=80 .github/scripts/controller-quota-replay.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-build-queue.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=100 .github/scripts/vercel-build-queue.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-source.mjs --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/staging-release-source.test.mjs',
+    'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-supersession-policy.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=90 .github/scripts/staging-supersession-policy.test.mjs',
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs',
