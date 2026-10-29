@@ -3089,6 +3089,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/health/revenue-spine/route.ts",
+      "kind": "handler",
+      "route": "/api/health/revenue-spine",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/health/route.ts",
       "kind": "handler",
       "route": "/api/health",

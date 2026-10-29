@@ -60,6 +60,12 @@ vi.mock('@/lib/spotify', () => ({
     `https://open.spotify.com/artist/${id}`,
 }));
 
+// JOV-9625: anonymous canary passage tokens. Defaults to no token.
+const passageTokenMock = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/synthetic/passage-token.server', () => ({
+  resolveSyntheticPassageToken: passageTokenMock,
+}));
+
 vi.mock('@/lib/flags/server', () => ({
   checkGateForUser: hoisted.checkGateForUserMock,
 }));
@@ -1421,8 +1427,33 @@ describe('tryHandleAnonymousOnboardingChat', () => {
       );
     });
 
+    it('verifies an anonymous canary passage token in test mode, consuming it (JOV-9625)', async () => {
+      arrangeProduction();
+      passageTokenMock.mockResolvedValueOnce({ actorId: 'prodcert' });
+
+      const result = await firstTurn('req-passage-token');
+
+      expect(result?.status).toBe(200);
+      expect(passageTokenMock).toHaveBeenCalledWith(
+        expect.anything(),
+        'onboarding_chat',
+        { consume: true, requestId: 'req-passage-token' }
+      );
+      expect(hoisted.verifyTurnstileTestModeTokenMock).toHaveBeenCalledWith(
+        DUMMY_TOKEN,
+        '203.0.113.5'
+      );
+      expect(hoisted.verifyTurnstileTokenMock).not.toHaveBeenCalled();
+      expect(hoisted.checkAnonymousChatRateLimitMock).toHaveBeenCalled();
+      expect(hoisted.setTagMock).toHaveBeenCalledWith(
+        'synthetic_principal',
+        'prodcert'
+      );
+    });
+
     it('still challenges an anonymous visitor who sends the dummy token', async () => {
       arrangeProduction();
+      passageTokenMock.mockResolvedValueOnce(null);
 
       const result = await firstTurn('req-anon-dummy');
 
