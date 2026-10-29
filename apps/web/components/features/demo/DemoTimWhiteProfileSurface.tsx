@@ -841,7 +841,7 @@ export function DemoTimWhiteProfileSurface() {
           <div
             aria-hidden='true'
             data-testid='demo-template-hero-capture'
-            className='pointer-events-none absolute inset-x-0 top-0 z-50 h-158'
+            className='pointer-events-none absolute inset-x-0 top-0 z-30 h-158'
           />
         ) : null}
         <StaticArtistPage
