@@ -162,6 +162,33 @@ class ClaimErrorTest(unittest.TestCase):
         self.assertNotIn("throughput-claim-errors:codex", few)
 
 
+class QueueUnmergeableTest(unittest.TestCase):
+    def test_unmergeable_entry_is_dequeued_commented_and_routed_after_the_grace(self):
+        qm = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_unmergeable", ROOT / "scripts/lanes/queue_unmergeable.py"))
+        qm.__spec__.loader.exec_module(qm)
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            if any("mergeQueue" in a for a in args):
+                nodes = [{"state": "UNMERGEABLE", "position": 3, "pullRequest": {"id": "PR_1", "number": 23519, "headRefOid": "a" * 40}},
+                         {"state": "AWAITING_CHECKS", "position": 1, "pullRequest": {"id": "PR_2", "number": 7, "headRefOid": "b" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            first = qm.sweep(Path(raw), run, NOW)
+            self.assertEqual((first["dequeued"], [r["pr"] for r in first["seen"]]), ([], [23519]))
+            second = qm.sweep(Path(raw), run, NOW + qm.GRACE_S + 1)
+            self.assertEqual(second["dequeued"], [23519])
+            flat = "\n".join(" ".join(c) for c in calls)
+            self.assertIn("dequeuePullRequest", flat)
+            self.assertIn("lane-fix-conflict", flat)
+            self.assertIn("queue-dequeue", flat)
+            self.assertIn("23519", (Path(raw) / qm.LOG_FILE).read_text())
+            self.assertNotIn("PR_2", " ".join(" ".join(c) for c in calls if any("dequeue" in a for a in c)))
+
+
 class IdleNotDemandTest(unittest.TestCase):
     def test_idle_for_any_reason_but_no_demand_while_demand_exists_alarms_per_lane(self):
         pushed = {"JovieInc/Jovie|codex": 1}

@@ -7,6 +7,8 @@ and routes through its Tracker like every other doctor alert; nothing here owns 
 Alarms (each names its stage and carries its evidence):
   throughput-no-push:<repo>:<lane>   demand > 0, seats configured, zero lane pushes for 60 min
   throughput-queue-no-merge          merge queue > 0, zero merges in the last 60 min
+  throughput-queue-unmergeable      an UNMERGEABLE queue entry the sweep could not dequeue (it dequeues, comments and
+                                     routes to lane-fix-conflict after 10 min; #23519 stalled the queue 3h)
   throughput-claim-errors:<lane>     >= 20% of a lane's runs in 30 min died on claim-error (a broken claim ledger
                                      killed ~560 fix-red runs from 2026-10-26 07:30Z and nothing alarmed)
   throughput-merge-group-start-slow  merge-group runs wait > 5 min (p50) for a runner
@@ -293,6 +295,13 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
 
 def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=None,
             fetch_remote: bool = True) -> dict:
+    queue_unmergeable = None
+    if fetch_remote:
+        try:
+            import queue_unmergeable as _queue
+            queue_unmergeable = _queue.sweep(state, run or _budgeted_gh, now)
+        except Exception as error:  # noqa: BLE001  (a sweep failure must never stop the sentinel)
+            queue_unmergeable = {"seen": [], "dequeued": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
     exits = read_idle_exits(state, now)
     repos, repo_errors = {}, {}
@@ -301,7 +310,7 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         repos[watched] = flow_row
         if flow_err:
             repo_errors[watched] = flow_err
-    return {"pushes1h": pushes_by_lane(receipts, now), "claimErrors30m": claim_errors_by_lane(receipts, now),
+    return {"queueUnmergeable": queue_unmergeable, "pushes1h": pushes_by_lane(receipts, now), "claimErrors30m": claim_errors_by_lane(receipts, now),
             "idleExits1h": dict(Counter(row["reason"] for row in exits)),
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
@@ -340,6 +349,12 @@ def judge(obs: dict) -> dict[str, str]:
             alerts[f"throughput-claim-errors:{provider}"] = (
                 f"stage claim ({provider}): {row['claimErrors']}/{row['runs']} runs in the last 30 min ended on claim-error "
                 f"({row.get('sample')}); check runs/execution-attempts.jsonl for a torn line and the execution coordinator")
+    # 1c. An UNMERGEABLE queue entry is dequeued and routed by queue_unmergeable; an alarm only when that fails.
+    stuck = sentinel.get("queueUnmergeable") or {}
+    if stuck.get("errors") and stuck.get("seen"):
+        alerts["throughput-queue-unmergeable"] = (
+            f"stage queued->merged: UNMERGEABLE merge-queue entries {[row['pr'] for row in stuck['seen']]} could not be "
+            f"auto-dequeued: {'; '.join(stuck['errors'])[:300]}")
     # 2. Queue but no merges.
     merge = obs.get("mergeThroughput") or {}
     if isinstance(merge.get("observedAt"), (int, float)) and obs["now"] - merge["observedAt"] < 1800 \
