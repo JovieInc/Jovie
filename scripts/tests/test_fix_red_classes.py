@@ -17,7 +17,9 @@ class ClassifyTest(unittest.TestCase):
         cases = {
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
+            "upstream returned HTTP 500 before the job started": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
+            "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "Error: Customer outcome decision missing or invalid (missing-metadata). See docs/CHANGELOG_PUBLICATION.md":
@@ -65,6 +67,55 @@ class StampChangelogTest(unittest.TestCase):
     def test_a_public_or_malformed_note_is_not_overwritten(self):
         body = 'See <!-- customer-changelog/v1 nope -->'
         self.assertIsNone(classes.stamp_internal_changelog(body))
+
+
+class SpacingSnapTest(unittest.TestCase):
+    DIFF = """diff --git a/apps/web/components/Card.tsx b/apps/web/components/Card.tsx
+--- a/apps/web/components/Card.tsx
++++ b/apps/web/components/Card.tsx
+@@ -1,0 +2 @@
++        <div className='mb-4 flex items-center gap-2.5 h-3.5 -mx-3.5 sm:gap-3.5'>
+diff --git a/apps/web/components/Card.test.tsx b/apps/web/components/Card.test.tsx
+--- a/apps/web/components/Card.test.tsx
++++ b/apps/web/components/Card.test.tsx
+@@ -1,0 +1 @@
++expect(node).toHaveClass('gap-2.5')
+diff --git a/apps/web/lib/skip.ts b/apps/web/lib/skip.ts
+--- a/apps/web/lib/skip.ts
++++ b/apps/web/lib/skip.ts
+@@ -1,0 +1 @@
++const klass = 'gap-2.5'
+"""
+
+    def test_snaps_only_the_added_product_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "apps/web/components/Card.tsx"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "const kept = 'gap-2.5'\n"
+                "        <div className='mb-4 flex items-center gap-2.5 h-3.5 -mx-3.5 sm:gap-3.5'>\n"
+            )
+            (root / "apps/web/components/Card.test.tsx").write_text("expect(node).toHaveClass('gap-2.5')\n")
+            (root / "apps/web/lib").mkdir()
+            (root / "apps/web/lib/skip.ts").write_text("const klass = 'gap-2.5'\n")
+            changed = classes.snap_added_conservative_spacing(root, self.DIFF)
+            self.assertEqual(changed, ["apps/web/components/Card.tsx"])
+            text = path.read_text()
+            self.assertIn("const kept = 'gap-2.5'\n", text)
+            self.assertIn("gap-2 h-3.5 -mx-3 sm:gap-3", text)
+            self.assertNotIn("gap-2.5 h-3.5", text)
+            self.assertIn("gap-2.5", (root / "apps/web/components/Card.test.tsx").read_text())
+            self.assertIn("gap-2.5", (root / "apps/web/lib/skip.ts").read_text())
+
+    def test_stale_line_is_not_rewritten(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            path = root / "apps/web/components/Card.tsx"
+            path.parent.mkdir(parents=True)
+            path.write_text("const kept = 'gap-2.5'\nalready snapped gap-2\n")
+            self.assertEqual(classes.snap_added_conservative_spacing(root, self.DIFF), [])
+            self.assertIn("already snapped gap-2\n", path.read_text())
 
 
 class WireTest(unittest.TestCase):
