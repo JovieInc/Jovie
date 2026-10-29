@@ -9,8 +9,10 @@ How agents claim, transition, and finish Linear-tracked work without colliding w
 ## Issue Gating
 
 <!-- JOV-INV-028 -->
-Legacy `human-review-required`, `needs-human`, and `no-auto` labels are invalid
-automation holds. Remove them when encountered and continue through the normal
+Legacy `human-review-required`, `needs-human`, `no-auto`, `tim-hold`, `tim:hold`,
+`hold:tim` and `do-not-merge` labels are invalid automation holds (EVENT
+2026-10-28: nothing waits on a human; reserved decisions are one non-blocking
+Ovie card with a default and a deadline). Remove them when encountered and continue through the normal
 machine gates. Product taste is steered before PR creation or certified after
 landing behind a feature flag. A physical or external action ships disabled and
 is tracked as a separate post-landing authority action; it never parks the code

@@ -11,6 +11,7 @@ import {
   hasUnparseableTscFailure,
   isSupportedTypecheckNode,
   parseTscOutput,
+  unknownJsonPropertyRepair,
 } from '../../typecheck-scripts.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
@@ -47,6 +48,35 @@ describe('scripts-typecheck: parseTscOutput', () => {
     const { counts: parsed, globalErrors } = parseTscOutput('');
     expect(parsed.size).toBe(0);
     expect(globalErrors).toHaveLength(0);
+  });
+});
+
+describe('scripts-typecheck: unknown JSON property repair', () => {
+  it('names the checkJs json() repair only for TS2339 on unknown', () => {
+    expect(
+      unknownJsonPropertyRepair([
+        "scripts/ci/neon-orphan-reaper.mjs(174,24): error TS2339: Property 'branches' does not exist on type 'unknown'.",
+      ])
+    ).toContain('response.json()');
+    expect(
+      unknownJsonPropertyRepair([
+        "scripts/a.mjs(1,1): error TS2339: Property 'x' does not exist on type 'Foo'.",
+      ])
+    ).toBeNull();
+    expect(unknownJsonPropertyRepair([])).toBeNull();
+  });
+
+  it('names the envelope mock repair for TS2322 against NeonJsonEnvelope', () => {
+    expect(
+      unknownJsonPropertyRepair([
+        "apps/web/tests/unit/ci/neon-branch-guard.test.ts(232,7): error TS2322: Type 'Mock<...>' is not assignable to type '((url: string) => Promise<NeonJsonEnvelope | null>) | undefined'.",
+      ])
+    ).toContain('unknown[]');
+    expect(
+      unknownJsonPropertyRepair([
+        "apps/web/tests/unit/ci/neon-branch-guard.test.ts(1,1): error TS2322: Type 'string' is not assignable to type 'number'.",
+      ])
+    ).toBeNull();
   });
 });
 
@@ -372,6 +402,35 @@ describe('scripts-typecheck: fail closed before baseline write (JOV-5450)', () =
     expect(result.errors).toContain('real Node 24 compiler run is required');
     expect(JSON.parse(readFileSync(baselineFile, 'utf8'))).toEqual(
       sentinelBaseline
+    );
+  });
+
+  it('prints the unknown-json repair when TS2339 on unknown exceeds the baseline', () => {
+    const { directory, baselineFile } = makeBaselineDir();
+    writeFileSync(
+      baselineFile,
+      `${JSON.stringify({
+        schemaVersion: BASELINE_SCHEMA_VERSION,
+        tool: 'scripts/typecheck-scripts.mjs',
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        totalErrors: 0,
+        files: {},
+      })}\n`
+    );
+    const result = captureEvaluate({
+      directory,
+      baselineFile,
+      updateMode: false,
+      runTsc: () => ({
+        status: 2,
+        output:
+          "scripts/ci/neon-orphan-reaper.mjs(174,24): error TS2339: Property 'branches' does not exist on type 'unknown'.\n",
+      }),
+    });
+    expect(result.exits).toEqual([1]);
+    expect(result.errors).toContain('response.json()');
+    expect(result.errors).toContain(
+      'Do not grow scripts/typecheck-baseline.json'
     );
   });
 

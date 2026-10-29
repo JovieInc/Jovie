@@ -47,11 +47,6 @@ export function VoicePageContent() {
           </>
         }
         media={<VoiceDemoVisual />}
-        photo={{
-          src: '/images/marketing-hero/voice.webp',
-          width: 1600,
-          height: 686,
-        }}
         headingId='voice-hero-heading'
         titleTestId='voice-hero-title'
         // JOV-7772: lg splits the hero into two columns, so use 40px in its

@@ -14,7 +14,7 @@ import type { PitchDestination } from './targets';
 import { type PitchInput, PLATFORM_LIMITS } from './types';
 
 const CURATOR_CHECKLIST_RULES = `CURATOR CHECKLIST — refuse to invent missing fields. Every outreach draft must include or explicitly mark UNKNOWN:
-artist, title, genre, 1–2 sentences on why this release exists, Spotify or private listen link, release date, why-this-playlist.
+artist, title, genre, 1-2 sentences on why this release exists, Spotify or private listen link, release date, why-this-playlist.
 
 If a required field is UNKNOWN, write UNKNOWN in that slot. Do not draft a finished pitch that hides the gap.
 
@@ -26,7 +26,7 @@ OUTPUT RULES:
 - Include FFO (for fans of) only from supplied references — never invent comparisons.
 - No attachments. Never invent a listen URL, @handle, or private email.
 - Include the Spotify or private listen link only when the artist supplied one.
-- When the release date is known, note that outreach should start 2–4 weeks pre-release.`;
+- When the release date is known, note that outreach should start 2-4 weeks pre-release.`;
 
 function checklistInputFromPitch(
   input: PitchInput,

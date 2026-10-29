@@ -26,6 +26,21 @@ export const PUBLIC_EXPORT_DIR = join(
 );
 export const SCREENSHOT_CLOCK_ISO = '2026-04-15T16:00:00.000Z';
 
+/** Resolve a scenario's `fixedNow` (ISO or `'capture-week'`) to a Date. */
+export function resolveScreenshotClock(
+  fixedNow: string | undefined,
+  now: Date = new Date()
+): Date {
+  if (fixedNow === 'capture-week') {
+    const monday = new Date(
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 16)
+    );
+    monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+    return monday;
+  }
+  return new Date(fixedNow ?? SCREENSHOT_CLOCK_ISO);
+}
+
 /**
  * Selectors for dev overlays that must be hidden before capturing screenshots.
  * Exported so tests can verify this list stays comprehensive.

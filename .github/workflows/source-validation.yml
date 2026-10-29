@@ -54,7 +54,7 @@ jobs:
       - &quota-runtime
         name: Setup the quota client runtime
         if: ${{ github.event.action == 'edited' && !github.event.changes.base }}
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .source-validation-client/.nvmrc
       # A PR body/title edit re-runs this workflow at an unchanged head and
@@ -137,14 +137,8 @@ jobs:
           path: ${{ runner.temp }}/jovie-dependency-parity/dep-digest.json
           if-no-files-found: error
           retention-days: 14
-      # component-ship-gate's live-storybook-cert launches Chromium when the
-      # diff touches in-scope UI components; without browsers the gate fails
-      # closed before any story is measured. The disk-read source contracts
-      # below also run on a metadata-only edit, and their script-contracts
-      # guard selects every PR and can run Chromium tests
-      # (component-rendered-evaluator). Gating this step on reuse failed those
-      # edits with "Executable doesn't exist" (#21956, #21946, #21774, #21725),
-      # so it carries the same (absent) condition as that step.
+      # Playwright stays unconditional: live-storybook-cert and script-contracts
+      # launch Chromium, including on metadata-only edits (#21956).
       - name: Setup Playwright (Chromium)
         uses: ./.github/actions/setup-playwright
       - name: Validate customer changelog decision from trusted base
@@ -338,14 +332,8 @@ jobs:
           trap 'rm -rf "$guard_root"' EXIT
           git archive "$trusted_ref" scripts/agent-context | tar -x -C "$guard_root"
           node "$guard_root/scripts/agent-context/merge-budget.mjs" --base "$trusted_ref" --head "$EXPECTED_HEAD"
-      # CI Risk Classifier runs these only on merge_group (ci.yml has no
-      # pull_request trigger). #21997 was green here and red in the queue:
-      # check.test.mjs design extraction. The suite is about a second and
-      # dependency-free, so it runs on every pull_request instead of a path
-      # filter that can miss a file the test reads. This job already checked
-      # out the full tree and installed Node; a sparse list omitted an import
-      # before (ERR_MODULE_NOT_FOUND) and a second pnpm install spends the
-      # installation quota. The merge-group step stays unconditional.
+      # These instruction contracts run on every pull_request. A path filter
+      # missed a file the suite reads (#21997); the merge-group step stays.
       - name: Evaluate repository instruction contracts
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
@@ -417,13 +405,8 @@ jobs:
             exit 0
           fi
           bash .github/scripts/run-actionlint.sh
-      # Read-only restore of the web tsc incremental state that
-      # tsc-cache-warm.yml writes on main. A pull_request can read that
-      # default-branch cache; merge_group already restores it in ci-fast.
-      # This job does not save: a PR-scoped entry is invisible to merge_group
-      # and competes for the 10 GB Actions cache cap. tsc re-hashes every
-      # input, so an older buildinfo cannot replay a passing typecheck.
-      # pnpm typecheck and the ci-fast --force gate are unchanged.
+      # Read-only restore of tsc-cache-warm.yml's main buildinfo. This job does
+      # not save: a PR cache is invisible to merge_group and spends the 10 GB cap.
       - name: Resolve tsc cache hour
         id: tsc-cache-hour
         if: steps.reuse.outputs.reuse != 'true'
@@ -509,12 +492,8 @@ jobs:
             exit 1
           fi
           node "$merged/scripts/layout-guard-pen-contracts.mjs"
-      # The merge group's ci-fast runs the same path-aware shadcn baseline
-      # probe; Source Validation previously skipped it, so a restyle that fit
-      # a PR's diff still ejected the whole merge group (group 36902907269,
-      # shadcn/no-restyle 65 > baseline 63). Run it here against the pinned
-      # event head and merge base so the regression fails before enqueue.
-      # Non-web diffs exit before the ESLint module load.
+      # Same path-aware shadcn baseline as merge-group ci-fast, so a restyle
+      # fails on the PR. Non-web diffs exit before the ESLint module load.
       - name: Lint changed web files against the shadcn baseline
         if: steps.reuse.outputs.reuse != 'true'
         env:
@@ -566,43 +545,7 @@ jobs:
       - *quota-prime
       - *quota-runtime
       - *proof-reuse
-      # TruffleHog reads the object store directly and cannot use a partial
-      # clone (#13994), so this job keeps the full-blob history fetch.
-      - if: steps.reuse.outputs.reuse != 'true'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.pull_request.head.sha }}
-          fetch-depth: 0
-          persist-credentials: false
-      # This job executes PR-head code and therefore holds NO secrets. The
-      # secret-bearing gate and dependency review live in `security-trusted`,
-      # which never executes PR code (a runner keeps every referenced secret in
-      # process memory for the whole job, so step ordering alone is not enough).
-      - &reused-setup
-        if: steps.reuse.outputs.reuse != 'true'
-        uses: ./.github/actions/setup-node-pnpm
-      - name: Scan the exact source diff
-        if: steps.reuse.outputs.reuse != 'true'
-        run: |
-          git fetch --no-tags origin "${{ github.base_ref }}"
-          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
-          ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
-          ./scripts/security/verify-gitleaks-coverage.sh
-          node scripts/golden-path-lock.mjs merge-gate
-  security-trusted:
-    name: Security Gate
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      actions: read
-      contents: read
-    steps:
-      - *quota-client
-      - *quota-prime
-      - *quota-runtime
-      - *proof-reuse
-      # Base commit only. The PR head is fetched as objects for a name-only
-      # diff and is never checked out, installed or executed in this job.
+      # Base checkout only. This job holds secrets, so it never runs PR-head code.
       - if: steps.reuse.outputs.reuse != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -621,21 +564,19 @@ jobs:
           base_sha="$(git merge-base HEAD "$HEAD_SHA")"
           git -c core.quotePath=false diff --name-only "$base_sha" "$HEAD_SHA" > "$RUNNER_TEMP/security-gate-files.txt"
           node scripts/security/security-gate.mjs --changed-files "$RUNNER_TEMP/security-gate-files.txt"
-      # Hosted GITHUB_TOKEN compare returns 403 on this public repository.
-      # A contents:read Jovie Bot installation token returns 200. Severity
-      # and the GPL/AGPL denylist stay blocking. The minted token is
-      # contents:read only; an empty key fails the mint closed. The config
-      # file comes from the base checkout, not the PR.
+      # contents:read app token; empty key fails closed. Config is the base checkout.
+      # Dependabot main PRs use the same pinned review in Fleet Rules Evidence.
+      # PR Ready requires that job. Non-main bases keep this check.
       - name: Mint dependency review read token
         id: dependency-review-token
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-contents: read
       - name: Review added and upgraded dependencies
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           repo-token: ${{ steps.dependency-review-token.outputs.token }}
@@ -670,7 +611,9 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --unshallow --filter=blob:none origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}" "$HEAD_SHA"
-      - *reused-setup
+      - &reused-setup
+        if: steps.reuse.outputs.reuse != 'true'
+        uses: ./.github/actions/setup-node-pnpm
       - name: Validate changed migration surfaces
         if: steps.reuse.outputs.reuse != 'true'
         env:
@@ -730,14 +673,8 @@ jobs:
           export JOVIE_COVERAGE_INCLUDE JOVIE_COVERAGE_RELATED_TESTS
           pnpm --filter @jovie/web test:coverage --changed "$base_sha" --bail 1
           node scripts/check-changed-test-coverage.mjs --base "$base_sha" --head "$EXPECTED_HEAD" --coverage apps/web/coverage/coverage-final.json
-      # Route JS budgets and SEO certification read a finished `next build`,
-      # so until now only the merge group's Build + Layout ran them. They were
-      # the top merge-group-only ejection: 61 group runs across 22 PRs in the
-      # 7 days to 2026-10-12 (/app/admin/* a few KB over), plus 6 from
-      # seo:certify. Run the same build and checks here when the diff can
-      # change build output, so the PR fails before enqueue; the merge-group
-      # job stays. Coverage plus this build still finishes inside Source
-      # Validation's wall time, so it adds no PR latency and no check record.
+      # Route JS budgets and SEO certification run here when the diff can change
+      # build output. The merge-group Build + Layout job stays.
       - name: Select build-affecting diff
         id: scope
         if: steps.reuse.outputs.reuse != 'true'
@@ -800,14 +737,8 @@ jobs:
         env:
           EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
         run: pnpm --filter @jovie/web seo:certify --sha "$EXPECTED_HEAD" --run-ref "pr-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-  # Shift-left (JOV-6834). Unit tests ran only on the merge-group head, so a
-  # PR-local defect was first caught in the queue: 168 of 307 merge-group
-  # failures in the 7 days to 2026-10-20 were fixed by a later PR commit, 44
-  # of them in Unit Tests (71 ejections across 27 of the 45 PRs merged in
-  # 48 h). This runs the merge-group shard command against the exact PR head,
-  # limited by `--changed` to tests whose module graph reaches the diff. The
-  # merge-group Unit Tests job stays: it validates the combined head, which
-  # differed from the PR head for 92 of 103 sampled merges.
+  # Shift-left (JOV-6834). Run the merge-group unit shard command on the PR
+  # head, limited by --changed. The merge-group Unit Tests job stays.
   unit:
     name: Affected Unit Tests (${{ matrix.shard }})
     runs-on: ubuntu-24.04
@@ -853,8 +784,29 @@ jobs:
             echo 'No unit-affecting source changed; non-applicable receipt recorded.'
           fi
       - name: Setup Node.js and pnpm
-        if: steps.reuse.outputs.reuse != 'true' && (steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true')
+        if: steps.reuse.outputs.reuse != 'true' && (matrix.shard == '1/4' || steps.scope.outputs.web == 'true' || steps.scope.outputs.ui == 'true' || steps.scope.outputs.ovie == 'true')
         uses: ./.github/actions/setup-node-pnpm
+      # Full history for TruffleHog (#13994). This job references no secrets.
+      - name: Checkout full history for the secret scan
+        if: steps.reuse.outputs.reuse != 'true' && matrix.shard == '1/4'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+          path: .secret-scan
+      - name: Scan the exact source diff
+        if: steps.reuse.outputs.reuse != 'true' && matrix.shard == '1/4'
+        working-directory: .secret-scan
+        run: |
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
+          ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
+          ./scripts/security/verify-gitleaks-coverage.sh
+          node scripts/golden-path-lock.mjs merge-gate
+      - name: Remove the secret-scan checkout
+        if: steps.reuse.outputs.reuse != 'true' && matrix.shard == '1/4'
+        run: rm -rf .secret-scan
       - name: Setup Playwright warm path
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
         uses: ./.github/actions/setup-playwright
@@ -950,7 +902,7 @@ jobs:
   ready:
     name: PR Ready
     if: ${{ always() }}
-    needs: [deterministic, security, security-trusted, migration, coverage, unit, a11y]
+    needs: [deterministic, security, migration, coverage, unit, a11y]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -959,17 +911,11 @@ jobs:
       - name: Require every source proof
         env:
           RESULTS: ${{ join(needs.*.result, ',') }}
-        run: test "$RESULTS" = 'success,success,success,success,success,success,success'
-      # Fleet-rule evidence is read by .github/workflows/fleet-rules-evidence.yml
-      # (pull_request_target: base-branch code only, so no PR branch can reach
-      # the CI App key) on the dedicated CI App installation budget. This step
-      # trusts that workflow's RUNS, never a commit status: any branch can post
-      # a status named anything, but only main's copy of the workflow can
-      # produce a pull_request_target run of fleet-rules-evidence.yml. The
-      # newest run for this head must have completed after this PR event
-      # (stale pre-edit verdicts read as missing). Missing, in-flight or
-      # deferred evidence exits 75 with github-quota-deferred; the evidence
-      # workflow re-runs this job when it finishes, so nothing polls.
+        run: test "$RESULTS" = 'success,success,success,success,success,success'
+      # Fleet-rule evidence is the pull_request_target run of
+      # fleet-rules-evidence.yml (base code, CI App budget), never a commit
+      # status. Missing or deferred evidence exits 75; that workflow re-runs
+      # this job, so nothing polls.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: ${{ always() && github.event_name == 'pull_request' }}
         with:
