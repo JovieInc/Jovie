@@ -97,6 +97,29 @@ export function parseTscOutput(output) {
 
 const countFor = (counts, file, code) => counts.get(file)?.get(code) ?? 0;
 
+const UNKNOWN_JSON_PROPERTY =
+  /error TS2339: Property '.+' does not exist on type 'unknown'/;
+
+/**
+ * Recurring Source Validation repair: scripts/tsconfig.json (checkJs, lib
+ * es2022) types `response.json()` as `unknown`, so a new property read is
+ * TS2339 and the shrink-only baseline fails. The fix is a JSDoc type at the
+ * read, never a higher baseline count.
+ * @param {readonly string[]} diagnosticLines
+ * @returns {string | null}
+ */
+export function unknownJsonPropertyRepair(diagnosticLines) {
+  const hit = (diagnosticLines ?? []).some(line =>
+    UNKNOWN_JSON_PROPERTY.test(line)
+  );
+  if (!hit) return null;
+  return (
+    'TS2339 on unknown: scripts checkJs types response.json() as unknown ' +
+    '(scripts/tsconfig.json lib es2022). Give that json() result a JSDoc type ' +
+    'before reading properties. Do not grow scripts/typecheck-baseline.json to absorb these.'
+  );
+}
+
 /**
  * Compare current error counts against a baseline.
  * @param {ErrorCounts} current
@@ -361,6 +384,13 @@ export function evaluateTypecheckBaseline({
       'Fix the new errors. If one is genuinely pre-existing, regenerate the ' +
         `baseline with \`${updateCommand}\` (visible in PR diff).`
     );
+    /** @type {string[]} */
+    const diagnosticLines = [];
+    for (const { file, code } of newErrors) {
+      diagnosticLines.push(...(lines.get(`${file}::${code}`) ?? []));
+    }
+    const repair = unknownJsonPropertyRepair(diagnosticLines);
+    if (repair) console.error(repair);
   }
   if (staleEntries.length > 0) {
     console.error(

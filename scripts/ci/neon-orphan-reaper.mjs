@@ -122,6 +122,22 @@ export async function proveCompletedWorkflowBranch({
   };
 }
 
+/**
+ * `response.json()` is `unknown` under scripts checkJs (lib es2022). This is
+ * the read surface for Neon list pages and the other JSON bodies this file
+ * fetches. Callers narrow with Array.isArray before reading list fields.
+ * @typedef {{
+ *   branches?: Array<{ id?: string, name?: string, default?: boolean, protected?: boolean }>,
+ *   endpoints?: Array<{ branch_id?: string, current_state?: string }>,
+ *   pagination?: { next?: string | null },
+ * }} NeonJsonEnvelope
+ */
+
+/**
+ * @param {string} url
+ * @param {{ method?: string, headers?: Record<string, string> }=} options
+ * @returns {Promise<NeonJsonEnvelope | null>}
+ */
 async function requestJson(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -129,7 +145,8 @@ async function requestJson(url, options = {}) {
       `${options.method || 'GET'} ${url} returned ${response.status}`
     );
   }
-  return response.status === 204 ? null : response.json();
+  if (response.status === 204) return null;
+  return /** @type {NeonJsonEnvelope} */ (await response.json());
 }
 
 export async function reapCompletedWorkflowBranches({
