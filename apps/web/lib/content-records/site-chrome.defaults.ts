@@ -1,8 +1,6 @@
 import type { SiteChrome } from './site-chrome';
 
-// Dependency-light on purpose: the public header, footer and navigation data
-// import this file, so it must not pull the schema (zod) or copy linter into
-// every marketing client bundle. Types only come from ./site-chrome.
+// Pure data, no zod or copy linter: public header, footer and nav import this.
 
 /** The code default: what the site shows before anything is published. */
 export const DEFAULT_SITE_CHROME: SiteChrome = {

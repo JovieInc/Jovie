@@ -5,9 +5,8 @@ import type {
 } from '@/data/marketingNavigation';
 import type { SiteChrome } from './site-chrome';
 
-// Kept apart from site-chrome.defaults.ts on purpose: that file is pure data
-// (the design-surfaces invariant parses it for label/destination binding), and
-// this resolver builds link objects from variables.
+// Apart from site-chrome.defaults.ts so that file stays literal data (the nav
+// invariant parses it).
 
 /** Serializable chrome props for the shared public shell. */
 export interface ResolvedSiteChrome {
