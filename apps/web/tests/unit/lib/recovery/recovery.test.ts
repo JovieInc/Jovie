@@ -9,7 +9,12 @@ vi.mock('@/lib/email/unsubscribe-token', () => ({
 
 import { memoryRecordBackend } from '@/lib/ovie/mcp/store';
 import { buildRecoveryEmail, RecoveryEmailBlocked } from '@/lib/recovery/email';
-import { certifyFix, type FixCertifier } from '@/lib/recovery/gate';
+import {
+  certifyFix,
+  type FixCertifier,
+  isGoldenPathGreen,
+  RECOVERY_GOLDEN_PATH_SURFACES,
+} from '@/lib/recovery/gate';
 import { createLedger } from '@/lib/recovery/ledger';
 import { decide, type StalledUser } from '@/lib/recovery/policy';
 import type { KnownBadFlowFix } from '@/lib/recovery/registry';
@@ -102,6 +107,7 @@ function deps(over: Partial<RunnerDeps> = {}, users = [user()]) {
     isLiveOnProduction: async () => true,
     deployedAt: async () => '2026-10-30T00:00:00.000Z',
     recheck: async () => true,
+    goldenPathGreen: async () => true,
   };
   const d: RunnerDeps = {
     fixes: [fix],
@@ -152,6 +158,7 @@ describe('runRecovery', () => {
       isLiveOnProduction: async () => true,
       deployedAt: async () => '2026-10-30T00:00:00.000Z',
       recheck: async () => false,
+      goldenPathGreen: async () => true,
     };
     const { d, sent, cards } = deps({ certifier: closed });
     const r = await runRecovery(d);
@@ -213,6 +220,7 @@ describe('certifyFix', () => {
     isLiveOnProduction: async () => true,
     deployedAt: async () => '2026-10-30T00:00:00.000Z',
     recheck: async () => true,
+    goldenPathGreen: async () => true,
   };
   it('certifies only when shipped, live, deployed and the check passes', async () => {
     expect((await certifyFix(fix, ok)).live).toBe(true);
@@ -229,5 +237,79 @@ describe('certifyFix', () => {
     expect(
       (await certifyFix(fix, { ...ok, recheck: async () => false })).reason
     ).toBe('check_failed');
+  });
+});
+
+describe('whole golden path gate', () => {
+  const now = new Date('2026-10-31T12:00:00Z');
+  const green = () =>
+    Object.fromEntries(
+      RECOVERY_GOLDEN_PATH_SURFACES.map(id => [
+        id,
+        { status: 'passed', sha: 'abc', endedAt: '2026-10-31T06:00:00Z' },
+      ])
+    );
+  it('is green only when every surface passed on this sha within 24h', () => {
+    expect(isGoldenPathGreen(green(), 'abc', now)).toBe(true);
+    expect(
+      isGoldenPathGreen(
+        {
+          ...green(),
+          claim: {
+            status: 'failed',
+            sha: 'abc',
+            endedAt: '2026-10-31T06:00:00Z',
+          },
+        },
+        'abc',
+        now
+      )
+    ).toBe(false);
+    expect(
+      isGoldenPathGreen(
+        {
+          ...green(),
+          chat: {
+            status: 'passed',
+            sha: 'old',
+            endedAt: '2026-10-31T06:00:00Z',
+          },
+        },
+        'abc',
+        now
+      )
+    ).toBe(false);
+    expect(
+      isGoldenPathGreen(
+        {
+          ...green(),
+          landing: {
+            status: 'passed',
+            sha: 'abc',
+            endedAt: '2026-10-30T06:00:00Z',
+          },
+        },
+        'abc',
+        now
+      )
+    ).toBe(false);
+    const { claim: _omit, ...missing } = green();
+    expect(isGoldenPathGreen(missing, 'abc', now)).toBe(false);
+  });
+  it('step fixed but golden path red: no send, no card', async () => {
+    const redPath: FixCertifier = {
+      isLiveOnProduction: async () => true,
+      deployedAt: async () => '2026-10-30T00:00:00.000Z',
+      recheck: async () => true,
+      goldenPathGreen: async () => false,
+    };
+    expect((await certifyFix(fix, redPath)).reason).toBe('golden_path_red');
+    const { d, sent, cards, status } = deps({ certifier: redPath });
+    status.v = 'approved';
+    const r = await runRecovery(d);
+    expect(r.sent).toBe(0);
+    expect(r.skipped.fix_not_live).toBe(1);
+    expect(sent).toEqual([]);
+    expect(cards).toEqual([]);
   });
 });

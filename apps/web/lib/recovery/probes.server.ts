@@ -7,7 +7,7 @@ import {
   readProdGoldenPathLedger,
 } from '@/lib/ovie/certifications/prod-golden-path-ledger';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
-import type { FixCertifier } from './gate';
+import { type FixCertifier, isGoldenPathGreen } from './gate';
 import { KNOWN_BAD_FLOW_FIXES } from './registry';
 
 const DEPLOYED_PREFIX = 'recovery:fix-deployed:';
@@ -22,6 +22,9 @@ const DEPLOYED_PREFIX = 'recovery:fix-deployed:';
  * - Deployed-at: the first time that holds, recorded once. It is never earlier
  *   than the real deploy, so a user is never judged to have stalled before a
  *   fix that was not yet live.
+ * - Whole path: every launch-gate surface (landing, signup, claim, onboarding,
+ *   chat, public profile) passed on this commit within 24 hours. A fixed step
+ *   is not enough if the user would fail at signup or claim afterwards.
  * - Recheck: the latest production golden-path receipt for the step's surface
  *   passed on exactly this commit.
  */
@@ -51,6 +54,18 @@ export function createProductionCertifier(
       if (await backend.setIfAbsent(key, now, 10 * 365 * 24 * 3600)) return now;
       const stored = await backend.get(key);
       return typeof stored === 'string' ? stored : null;
+    },
+    async goldenPathGreen() {
+      if (!ownSha) return false;
+      const ledger = await readProdGoldenPathLedger(backend);
+      if (!ledger) return false;
+      const latest = Object.fromEntries(
+        Object.entries(ledger.surfaces).map(([id, record]) => [
+          id,
+          record.latest,
+        ])
+      );
+      return isGoldenPathGreen(latest, ownSha, new Date());
     },
     async recheck(checkId) {
       if (!ownSha) return false;
