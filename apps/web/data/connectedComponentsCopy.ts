@@ -1,6 +1,6 @@
 /**
- * Connected-components copy: one release followed through the three real
- * product pages that carry it. Every state is a screenshot-registry capture of
+ * Connected-components copy: three connected release-page states.
+ * Every state is a screenshot-registry capture of
  * the shipped page (lib/screenshots/registry.ts), never a drawn mockup.
  *
  * General-page copy (MKT-D16): no segment nouns. Platform names stay out of
@@ -14,7 +14,7 @@
 export const CONNECTED_COMPONENTS_COPY = {
   headline: 'Announce it. Release it. Keep it on your profile.',
   intro:
-    'One release moves through three pages Jovie already runs. Each page links to the next.',
+    'Your profile and release pages stay connected before and after release day.',
   galleryLabel: 'Release pages',
   states: [
     {
