@@ -524,7 +524,7 @@ jobs:
       )
     # Hosted-only root of the PR DAG. Self-hosted cancel/hang here cascades into
     # SKIPPED risk/ci-fast/unit leaves and a red PR Ready (JOV-3464 drain).
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
       run_build: ${{ steps.detect.outputs.run_build || 'false' }}
@@ -1619,7 +1619,7 @@ jobs:
         (needs.ci-path-changes.outputs.run_homepage_visual == 'true' ||
         needs.ci-path-changes.outputs.run_marketing_dom == 'true'))
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -1991,7 +1991,7 @@ jobs:
     # JOV-5454: live Storybook certification needs Chromium plus bounded
     # build/serve budget inside the structural lane.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -2454,7 +2454,7 @@ jobs:
     # runtime behavior. The aggregate makes this required on PR and merge-group
     # heads whenever the bounded profile surface selector matches.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -2758,7 +2758,7 @@ jobs:
     # CPU-bound structural sum) off remaining's pool. Chromium serves the
     # tests/unit/ci Playwright contracts; no Python/Elixir command runs here.
     needs: [ci-lockfile-preflight, ci-path-changes, ci-merge-group-admission, ci-merge-group-workspace]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -3258,7 +3258,7 @@ jobs:
           needs.ci-path-changes.outputs.run_web == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -3553,7 +3553,7 @@ jobs:
           needs.ci-path-changes.outputs.run_web == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -4021,7 +4021,7 @@ jobs:
     needs: [ci-path-changes, ci-build-public]
     # Manual hosted evidence using the shared deep-lane build artifact.
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 8
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -4143,7 +4143,7 @@ jobs:
     name: Mobile Overflow Guard (${{ matrix.width }}px)
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
@@ -4358,7 +4358,7 @@ jobs:
     needs: [ci-build-public, ci-path-changes, neon-db]
     # Manual hosted evidence only; never starts from a source PR event.
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true', PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true' }
     strategy:
@@ -4637,7 +4637,7 @@ jobs:
           needs.ci-path-changes.outputs.run_golden_path == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -4823,7 +4823,7 @@ jobs:
           needs.ci-path-changes.outputs.run_golden_path == 'true'
         )
       )
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -4962,7 +4962,7 @@ jobs:
     # Reuse the shared neon-db artifact when run_neon=true; non-DB admin PRs read DATABASE_URL_MAIN.
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -5096,7 +5096,7 @@ jobs:
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -5439,7 +5439,7 @@ jobs:
     # Phase 0: quarantine generic fixed-runner routing until all five named
     # services have immutable warm-canary receipts. Combined heads use explicit
     # hosted capacity, so this change's own merge group gets the safe fast path.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       actions: read
       contents: read
@@ -6003,7 +6003,7 @@ jobs:
     # Manual hosted axe-core WCAG 2.1 AA evidence using the shared build artifact.
     needs: [ci-build-public, ci-path-changes, neon-db]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true'
@@ -6171,7 +6171,7 @@ jobs:
     # Manual hosted evidence only (when the build artifact is present).
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' }}
     continue-on-error: true
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     steps:
@@ -6320,7 +6320,7 @@ jobs:
     # The shared manual Neon producer is mandatory; no fallback branch can race it.
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ always() && needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' && needs.ci-build-public.outputs.has_artifact == 'true' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
@@ -6525,7 +6525,7 @@ jobs:
     needs: [ci-path-changes, ci-risk-classifier, ci-build-public, neon-db]
     if: ${{ always() && !cancelled() && ((github.event_name == 'workflow_dispatch' && needs.ci-path-changes.result == 'success' && needs.ci-build-public.outputs.has_artifact == 'true' && (needs.neon-db.result == 'success' || needs.neon-db.result == 'failure')) || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
     continue-on-error: ${{ github.event_name == 'push' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 40
     outputs:
       journey_outcome: ${{ steps.canonical_journey.outcome }}
@@ -6984,7 +6984,7 @@ jobs:
     # Removed push-to-main trigger — merge queue validates PRs before merge.
     needs: [ci-path-changes, neon-db, ci-build-public]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     concurrency:
@@ -7195,7 +7195,7 @@ jobs:
     # Opt-in validation lane for risky PRs. Keep it off the main deploy critical path.
     needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-migrate]
     if: ${{ needs.ci-path-changes.result == 'success' && needs.ci-e2e-migrate.outputs.run_full_ci == 'true' && github.event_name == 'workflow_dispatch' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
     strategy:
@@ -8311,7 +8311,7 @@ jobs:
     name: Extended Smoke (manual)
     needs: [ci-path-changes, ci-build-public, neon-db, ci-e2e-tests]
     if: ${{ needs.ci-path-changes.result == 'success' && always() && github.event_name == 'workflow_dispatch' && needs.neon-db.result == 'success' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: Preview – jovie
     timeout-minutes: 20
     env: { PLAYWRIGHT_ARTIFACT_REQUIRE_PRODUCER_STAGE: 'true' }
