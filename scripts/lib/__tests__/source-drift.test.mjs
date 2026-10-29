@@ -118,7 +118,7 @@ test('end to end with injected readers; no Stripe key skips with a warning', asy
   const report = await runDriftChecks({
     root,
     env: {},
-    fetchImpl,
+    fetchImpl: /** @type {typeof fetch} */ (/** @type {unknown} */ (fetchImpl)),
     gh,
     now: () => Date.parse('2026-10-29T12:00:00Z'),
   });

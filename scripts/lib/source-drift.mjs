@@ -155,7 +155,7 @@ export function driftPlan(finding, extra = '') {
 }
 
 /**
- * @returns {{ run: object, findings: object[], plans: object[], warnings: string[] }}
+ * @returns {Promise<{ run: any, findings: any[], plans: any[], warnings: string[] }>}
  */
 export async function runDriftChecks({
   root,
@@ -234,7 +234,9 @@ export async function runDriftChecks({
       signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) throw new Error(`build-info ${res.status}`);
-    const { commitSha } = await res.json();
+    const { commitSha } = /** @type {{ commitSha?: string }} */ (
+      await res.json()
+    );
     if (!commitSha) throw new Error('build-info has no commitSha');
     const cmp = JSON.parse(
       await gh([
