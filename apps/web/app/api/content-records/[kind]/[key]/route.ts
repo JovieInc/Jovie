@@ -172,6 +172,10 @@ export async function POST(request: Request, context: RouteContext) {
             reason: input.reason,
           })
         );
+      default: {
+        const unsupported: never = input;
+        return json({ error: 'Unsupported action', unsupported }, 400);
+      }
     }
   } catch (error) {
     if (error instanceof ContentValidationError) {

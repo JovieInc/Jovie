@@ -51,6 +51,7 @@ async function call(
   );
   const handler = method === 'GET' ? route.GET : route.POST;
   const response = await handler(request, { params: Promise.resolve(params) });
+  if (!response) throw new Error('handler returned no response');
   return { status: response.status, json: await response.json() };
 }
 
