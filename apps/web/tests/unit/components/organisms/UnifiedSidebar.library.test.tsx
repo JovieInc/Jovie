@@ -324,12 +324,12 @@ describe('UnifiedSidebar library route', () => {
       collapsed: false,
     });
     const row = screen
-      .getByRole('link', { name: /Inbox —/ })
+      .getByRole('link', { name: 'Inbox' })
       .closest('[data-sidebar-brand-row]');
     expect(row).toContainElement(
       screen.getByRole('button', { name: 'Search Sidebar' })
     );
-    expect(screen.getByRole('link', { name: /Inbox —/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: 'Inbox' })).toHaveAttribute(
       'href',
       '/app'
     );
