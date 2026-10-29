@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+  cpSync,
   mkdirSync,
   mkdtempSync,
   readdirSync,
@@ -12,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 import { MemoryLedgerStore } from '../packages/api-client/store.ts';
+import { stepBlocks } from './lib/workflow-token-budget.mjs';
 import {
   evaluateFleetRules,
   githubRequest,
@@ -491,15 +493,15 @@ test('contract: Fleet Rules Evidence is base-branch code only and never hands th
     text.indexOf('- name: Read evidence')
   );
   assert.doesNotMatch(setupNode, /token:|fleet-token/);
-  // The minted token is passed only to the evidence script (FLEET_TOKEN) and to the
-  // re-run hop's read lookups (GH_READ_TOKEN); never anywhere else.
+  // The minted read token feeds the pinned dependency review, policy script,
+  // and re-run lookups; setup-node keeps its own token.
   assert.deepEqual(
     [
       ...text.matchAll(
         /(\w+): \$\{\{ steps\.fleet-token\.outputs\.token \}\}/g
       ),
     ].map(match => match[1]),
-    ['FLEET_TOKEN', 'GH_READ_TOKEN']
+    ['token', 'FLEET_TOKEN', 'GH_READ_TOKEN']
   );
 });
 
@@ -1031,4 +1033,182 @@ test('section keeps a "# " line inside a code fence in the section', async () =>
   assert.match(out, /# comment line/);
   assert.match(out, /FAIL expected 1/);
   assert.doesNotMatch(out, /other/);
+});
+
+// Fleet policy runs before pnpm install. Reuse its dependency-free workflow
+// step reader so these regressions exercise the same bootstrap environment.
+const jobText = (file, job) =>
+  readFileSync(`.github/workflows/${file}.yml`, 'utf8')
+    .split(`\n  ${job}:`)[1]
+    .split(/\n  [\w-]+:/)[0];
+const namedStep = (job, name) => {
+  const step = stepBlocks(job).find(block => block.includes(`name: ${name}\n`));
+  assert.ok(step, `required workflow step missing: ${name}`);
+  return step;
+};
+const stepValue = (step, key) =>
+  step.match(new RegExp(`^\\s+(?:- )?${key}: (.+)$`, 'm'))?.[1];
+
+test('Dependabot dependency review uses the required trusted evidence job', () => {
+  const security = jobText('source-validation', 'security');
+  const evidence = jobText('fleet-rules-evidence', 'evidence');
+  const review = namedStep(evidence, 'Review Dependabot dependencies');
+  assert.equal(
+    stepValue(review, 'if'),
+    "github.event.pull_request.user.login == 'dependabot[bot]'"
+  );
+  const incumbent = namedStep(
+    security,
+    'Review added and upgraded dependencies'
+  );
+  assert.equal(stepValue(review, 'uses'), stepValue(incumbent, 'uses'));
+  assert.equal(
+    stepValue(review, 'config-file'),
+    stepValue(incumbent, 'config-file')
+  );
+  assert.equal(
+    stepValue(review, 'repo-token'),
+    '${{ steps.fleet-token.outputs.token }}'
+  );
+  assert.equal(stepValue(review, 'continue-on-error'), undefined);
+  assert.equal(stepValue(evidence, 'timeout-minutes'), '6');
+  const checkout = stepBlocks(evidence).find(step =>
+    /uses: actions\/checkout@/.test(step)
+  );
+  assert.ok(checkout);
+  assert.equal(stepValue(checkout, 'ref'), 'main');
+  assert.equal(stepValue(checkout, 'persist-credentials'), 'false');
+  assert.ok(checkout.includes('.github/dependency-review-config.yml'));
+  assert.ok(evidence.indexOf(review) < evidence.indexOf('name: Read evidence'));
+  for (const name of [
+    'Mint dependency review read token',
+    'Review added and upgraded dependencies',
+  ]) {
+    assert.equal(
+      stepValue(namedStep(security, name), 'if'),
+      "steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')"
+    );
+  }
+  assert.equal(stepValue(security, 'timeout-minutes'), '20');
+});
+
+test('PR Ready executes the exact-head evidence gate and denies missing, failed, or unrelated reviews', () => {
+  const step = namedStep(
+    jobText('source-validation', 'ready'),
+    'Require fleet-rule evidence'
+  );
+  const run = step
+    .match(/^ {8}run: \|\n([\s\S]*)/m)?.[1]
+    .replace(/^ {10}/gm, '');
+  assert.ok(run, 'execute the real PR Ready run block');
+  const dir = mkdtempSync(join(tmpdir(), 'dependency-evidence-'));
+  try {
+    mkdirSync(join(dir, '.github/workflows'), { recursive: true });
+    writeFileSync(
+      join(dir, '.github/workflows/fleet-rules-evidence.yml'),
+      'trusted workflow'
+    );
+    mkdirSync(join(dir, 'packages/api-client'), { recursive: true });
+    writeFileSync(
+      join(dir, 'packages/api-client/cli.ts'),
+      'process.stdout.write(process.env.RUNS);'
+    );
+    const row = {
+      path: '.github/workflows/fleet-rules-evidence.yml',
+      display_title: 'fleet-rules #42 base=main',
+      head_branch: 'dependabot/example',
+      head_repository: { id: 1 },
+      created_at: '2026-10-29T01:00:00Z',
+      id: 42,
+      status: 'completed',
+      conclusion: 'success',
+      html_url: 'https://github.com/o/r/actions/runs/42',
+    };
+    for (const [name, rows, expected] of [
+      ['success', [row], 0],
+      ['failed dependency review', [{ ...row, conclusion: 'failure' }], 1],
+      ['missing evidence', [], 75],
+      [
+        'in-flight review',
+        [{ ...row, status: 'in_progress', conclusion: null }],
+        75,
+      ],
+      ['cancelled review', [{ ...row, conclusion: 'cancelled' }], 75],
+      ['wrong workflow', [{ ...row, path: '.github/workflows/other.yml' }], 75],
+      [
+        'wrong PR',
+        [{ ...row, display_title: 'fleet-rules #43 base=main' }],
+        75,
+      ],
+      ['wrong head branch', [{ ...row, head_branch: 'other' }], 75],
+      ['wrong repository', [{ ...row, head_repository: { id: 2 } }], 75],
+      ['stale evidence', [{ ...row, created_at: '2026-10-28T01:00:00Z' }], 75],
+      [
+        'new failure supersedes success',
+        [
+          row,
+          {
+            ...row,
+            id: 43,
+            created_at: '2026-10-29T01:01:00Z',
+            conclusion: 'failure',
+          },
+        ],
+        1,
+      ],
+    ]) {
+      const result = spawnSync('bash', ['-e', '-o', 'pipefail', '-c', run], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          HEAD_SHA: 'a'.repeat(40),
+          PR_NUMBER: '42',
+          HEAD_REF: row.head_branch,
+          HEAD_REPO_ID: '1',
+          REPOSITORY: 'o/r',
+          EVENT_UPDATED_AT: row.created_at,
+          RUNS: JSON.stringify({ workflow_runs: rows }),
+        },
+      });
+      assert.equal(
+        result.status,
+        expected,
+        `${name}: ${result.stdout}${result.stderr}`
+      );
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('fleet policy regressions run before workspace dependencies are installed', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fleet-bootstrap-'));
+  try {
+    for (const path of [
+      'scripts/pr-fleet-rules.test.mjs',
+      'scripts/pr-fleet-rules.mjs',
+      'scripts/lib/workflow-token-budget.mjs',
+      'packages/api-client',
+      '.github/workflows/source-validation.yml',
+      '.github/workflows/fleet-rules-evidence.yml',
+    ]) {
+      const target = join(dir, path);
+      mkdirSync(join(target, '..'), { recursive: true });
+      cpSync(path, target, { recursive: true });
+    }
+    const result = spawnSync(
+      process.execPath,
+      [
+        '--test',
+        '--test-name-pattern=Dependabot dependency review uses|PR Ready executes',
+        'scripts/pr-fleet-rules.test.mjs',
+      ],
+      { cwd: dir, encoding: 'utf8', env: { PATH: process.env.PATH } }
+    );
+    assert.equal(result.status, 0, result.stdout + result.stderr);
+    assert.match(result.stdout, /pass 2/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -1,6 +1,9 @@
 import 'server-only';
 import { type ToolSet, tool, type UIMessage } from 'ai';
+import { cookies } from 'next/headers';
 import { z } from 'zod';
+import { recordArtistOfferStage } from '@/lib/acquisition/artist-offer-funnel.server';
+import { recordFunnelStep } from '@/lib/analytics/signup-funnel.server';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import {
@@ -15,6 +18,11 @@ import {
   type CanonicalArtistMetrics,
   normalizeArtistMetrics,
 } from '@/lib/onboarding/canonical-metrics';
+import {
+  type OnboardingCatalogPreview,
+  readOnboardingCatalogPreview,
+} from '@/lib/onboarding/catalog-preview';
+import { fetchOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview.server';
 import {
   buildSpotifyEnrichedFacts,
   spotifyEnrichmentSubjectId,
@@ -31,6 +39,7 @@ import {
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
+import { ACQUISITION_COOKIE_NAME } from '@/lib/tracking/consent';
 import { logger } from '@/lib/utils/logger';
 import type {
   GoldenPathAdmissionReason,
@@ -101,6 +110,8 @@ export interface OnboardingTurnState {
   spotifyFollowers: number | null;
   /** Full metrics snapshot for UI surfaces that need source/updatedAt. */
   artistMetrics: CanonicalArtistMetrics | null;
+  /** JOV-9758: newest public releases shown in the preview before pricing. */
+  catalogPreview?: OnboardingCatalogPreview | null;
   /** Append-only log of recordInterviewSignal calls within this turn. */
   signals: InterviewSignal[];
   /** Cumulative LLM turn count (1-indexed). Drives the proposeNextStep eval. */
@@ -178,6 +189,8 @@ function restoreArtistFromOutput(
   );
   state.artistMetrics = metrics;
   state.spotifyFollowers = metrics.spotifyFollowers;
+  state.catalogPreview =
+    readOnboardingCatalogPreview(output.catalog) ?? state.catalogPreview;
 
   state.spotifyPopularity =
     typeof artist?.popularity === 'number' && Number.isFinite(artist.popularity)
@@ -286,6 +299,8 @@ export interface ConfirmSpotifyArtistOutput {
   } | null;
   /** Top-level metrics mirror for consumers that do not unwrap artist. */
   readonly metrics: CanonicalArtistMetrics | null;
+  /** JOV-9758: the artist's real catalog for the preview, before pricing. */
+  readonly catalog?: OnboardingCatalogPreview | null;
   readonly summary: string;
 }
 
@@ -322,7 +337,10 @@ export async function buildConfirmSpotifyArtistOutput(
   state.spotifyPopularity = null;
   state.spotifyFollowers = null;
   state.artistMetrics = null;
+  state.catalogPreview = null;
   let artist: Awaited<ReturnType<typeof getSpotifyArtist>> = null;
+  // Fetched alongside the artist; never throws (null on failure).
+  const catalogPromise = fetchOnboardingCatalogPreview(spotifyArtistId);
 
   try {
     artist = await getSpotifyArtist(spotifyArtistId);
@@ -362,6 +380,11 @@ export async function buildConfirmSpotifyArtistOutput(
     state.spotifyPopularity = artist.popularity ?? null;
     state.artistMetrics = metrics;
     state.spotifyFollowers = metrics.spotifyFollowers;
+    const catalog = await catalogPromise;
+    state.catalogPreview = catalog;
+    if (catalog && catalog.releases.length > 0) {
+      void recordCatalogPreviewShown();
+    }
 
     return {
       action: 'spotify_artist_confirmed' as const,
@@ -392,7 +415,11 @@ export async function buildConfirmSpotifyArtistOutput(
         metrics,
       },
       metrics,
-      summary: `${artist.name} matched on Spotify.`,
+      ...(catalog ? { catalog } : {}),
+      summary:
+        catalog && catalog.total > 0
+          ? `${artist.name} matched on Spotify with ${catalog.total} releases. The preview shows the newest.`
+          : `${artist.name} matched on Spotify.`,
     };
   }
 
@@ -405,6 +432,28 @@ export async function buildConfirmSpotifyArtistOutput(
     metrics: null,
     summary: 'Spotify artist selected.',
   };
+}
+
+/**
+ * JOV-9758 measurement: the preview now carries the artist's real catalog.
+ * Anonymous funnel count plus the consented journey stage (p50/p95 timing).
+ * Never throws and never blocks the turn.
+ */
+async function recordCatalogPreviewShown(): Promise<void> {
+  await recordFunnelStep({
+    funnel: 'artist_signup',
+    step: 'catalog_preview',
+    surface: 'onboarding',
+  });
+  try {
+    const cookieStore = await cookies();
+    await recordArtistOfferStage(
+      cookieStore.get(ACQUISITION_COOKIE_NAME)?.value,
+      'catalog-preview'
+    );
+  } catch {
+    // No request cookie store (script engine tests): nothing to record.
+  }
 }
 
 /** The artist the server already confirmed, rebuilt from turn state. */
@@ -447,6 +496,7 @@ export function echoConfirmedArtist(
         }
       : null,
     metrics,
+    ...(state.catalogPreview ? { catalog: state.catalogPreview } : {}),
     summary: state.spotifyArtistName
       ? `${state.spotifyArtistName} is already confirmed.`
       : 'Spotify artist selected; profile data is unavailable right now.',
