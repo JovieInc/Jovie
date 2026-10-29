@@ -79,19 +79,7 @@ function shouldReportToSentry(issues: string[]): boolean {
     return false;
   }
 
-  // Filter out issues that are warnings in disguise or expected in certain contexts
-  const trulyBlockingIssues = issues.filter(issue => {
-    if (
-      issue.includes('CLERK') &&
-      (process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
-        process.env.NEXT_PUBLIC_CLERK_MOCK === '1')
-    ) {
-      return false;
-    }
-    return true;
-  });
-
-  return trulyBlockingIssues.length > 0;
+  return issues.length > 0;
 }
 
 /**
