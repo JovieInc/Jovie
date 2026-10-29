@@ -3,9 +3,10 @@ import path from 'node:path';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import {
-  SHIPPED_SITE_TILES,
+  PROFILE_STATE_TILES,
   SHIPPED_SITES_SHOWCASE_COPY,
 } from '@/data/marketingShowcaseSpecCopy';
+import { getScreenshotScenario } from '@/lib/screenshots/registry';
 import { TIM_WHITE_PROFILE } from '@/lib/tim-white';
 import { MarketingShippedSitesShowcase } from './MarketingShippedSitesShowcase';
 
@@ -18,7 +19,7 @@ const KIT_SOURCE_FILES = [
 ] as const;
 
 describe('MarketingShippedSitesShowcase', () => {
-  it('labels demo product views and links them to the real public profile', () => {
+  it('shows one profile state per tile with an outcome caption', () => {
     render(<MarketingShippedSitesShowcase />);
 
     expect(
@@ -27,52 +28,32 @@ describe('MarketingShippedSitesShowcase', () => {
         name: SHIPPED_SITES_SHOWCASE_COPY.headline,
       })
     ).toBeInTheDocument();
-    expect(
-      screen.getByTestId('marketing-shipped-sites-showcase')
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText(SHIPPED_SITES_SHOWCASE_COPY.body)
-    ).toHaveTextContent('Demonstration profiles');
-    expect(
-      screen.queryByText(
-        /Real Jovie profiles already shipping|Live Artist Sites/i
-      )
-    ).toBeNull();
     const tiles = screen.getAllByTestId('shipped-site-tile');
-    expect(tiles).toHaveLength(SHIPPED_SITE_TILES.length);
-    expect(tiles.length).toBeGreaterThanOrEqual(6);
+    // Fewer, bigger tiles: one idea each (Tim, 2026-10-28 critique).
+    expect(tiles).toHaveLength(PROFILE_STATE_TILES.length);
+    expect(tiles.length).toBeLessThanOrEqual(4);
 
-    const linkedTiles = tiles.filter(tile => tile.tagName === 'A');
-    expect(linkedTiles.length).toBeGreaterThan(0);
-    for (const tile of linkedTiles) {
-      expect(tile).toHaveAttribute('href', TIM_WHITE_PROFILE.publicProfilePath);
+    for (const tile of PROFILE_STATE_TILES) {
+      expect(
+        screen.getByRole('heading', { level: 3, name: tile.title })
+      ).toBeInTheDocument();
+      expect(screen.getByRole('img', { name: tile.alt })).toBeInTheDocument();
     }
-
-    expect(screen.getAllByText(TIM_WHITE_PROFILE.name).length).toBeGreaterThan(
-      0
-    );
-    expect(screen.getByText('Latest Release')).toBeInTheDocument();
-    expect(screen.getByText('Desktop Site')).toBeInTheDocument();
-    expect(screen.getByText('The Deep End')).toBeInTheDocument();
-    expect(screen.queryByText(/lorem/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/john doe/i)).not.toBeInTheDocument();
+    // Captions say the outcome, never the demo identity again.
     expect(
-      screen.queryByRole('link', { name: /Get started/i })
-    ).not.toBeInTheDocument();
+      screen.queryByText(TIM_WHITE_PROFILE.publicProfileDisplay)
+    ).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Open the live profile' })
+    ).toHaveAttribute('href', TIM_WHITE_PROFILE.publicProfilePath);
   });
 
-  it('uses the Tim White desktop demonstration for its Tim White identity', () => {
-    render(<MarketingShippedSitesShowcase />);
-    const desktop = screen.getByRole('img', {
-      name: /demo of Tim White.*desktop/i,
-    });
-    expect(desktop.getAttribute('src')).toContain(
-      'tim-white-profile-live-desktop.png'
-    );
-    expect(
-      desktop.closest('[data-testid="shipped-site-tile"]')
-    ).toHaveTextContent('Tim White');
+  it('uses element captures of the changing component, not full phone shots', () => {
+    for (const tile of PROFILE_STATE_TILES) {
+      const scenario = getScreenshotScenario(tile.scenarioId);
+      expect(scenario?.captureTarget, tile.id).toBe('locator');
+      expect(scenario?.consumers, tile.id).toContain('marketing-export');
+    }
   });
 
   it('stays on artist profiles and off the umbrella homepage', () => {
