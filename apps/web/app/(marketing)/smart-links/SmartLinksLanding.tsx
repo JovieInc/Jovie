@@ -82,7 +82,7 @@ export function SmartLinksLanding() {
           <div className='mt-10 grid gap-6 md:grid-cols-3'>
             {hero.stepTitles.map((title, index) => (
               <article key={title} className='border-t border-subtle pt-5'>
-                <h3 className='text-lg font-semibold'>{title}</h3>
+                <h3 className='text-balance text-lg font-semibold'>{title}</h3>
                 <p className='mt-3 text-sm leading-6 text-secondary-token'>
                   {STEP_BODIES[index]}
                 </p>
