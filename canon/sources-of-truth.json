@@ -284,6 +284,20 @@
         "note": "Binding and adopted company invariants; enforcement consumers name the checks."
       },
       "derived": ["scripts/invariants/registry.mjs"]
+    },
+    {
+      "id": "engineering-wins",
+      "title": "Engineering wins and the numbers in engineering posts",
+      "owner": {
+        "kind": "file",
+        "ref": "canon/wins/wins.jsonl",
+        "note": "One record per measured engineering win with before/after, source, query, PRs and post-deploy receipts. Status is computed (scripts/lib/wins-ledger.mjs), never stored."
+      },
+      "derived": [
+        "apps/web/content/engineering/",
+        "docs/metrics/wins-latest.json"
+      ],
+      "liveAuthority": "the measurement source named in each metric, re-run after deploy"
     }
   ],
   "scans": [
