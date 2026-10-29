@@ -76,7 +76,7 @@ function CalendarSubscribeRow({
           isPublicProfile ? (
             <Button variant='secondary' size='sm' onClick={handleCopy}>
               <Copy className='h-3.5 w-3.5' />
-              {copied ? 'Copied' : 'Copy Link'}
+              {copied ? 'Copied' : 'Copy link'}
             </Button>
           ) : undefined
         }

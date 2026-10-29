@@ -12,6 +12,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   checkDrift,
+  checkTitleCaseHeadings,
   findUnregisteredCopies,
   LEGACY_PATH,
   loadRegistry,
@@ -25,7 +26,7 @@ export function runValidate(root = REPO_ROOT) {
   const { errors } = validateRegistry(reg, root);
   const drift = checkDrift(reg, root);
   return {
-    errors: [...errors, ...drift.errors],
+    errors: [...errors, ...drift.errors, ...checkTitleCaseHeadings(root)],
     summary: summarize(reg),
     copies: drift.current.length,
   };

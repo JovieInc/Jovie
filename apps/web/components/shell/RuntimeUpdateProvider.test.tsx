@@ -99,7 +99,7 @@ describe('updates in the central Inbox', () => {
     rerender(<Surface />);
     expect(state.install).not.toHaveBeenCalled();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Restart Jovie To Update' })
+      screen.getByRole('button', { name: 'Restart Jovie to update' })
     );
     expect(state.install).toHaveBeenCalledOnce();
     expect(
@@ -123,7 +123,7 @@ describe('updates in the central Inbox', () => {
     );
     render(<Surface />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Restart Jovie To Update' })
+      screen.getByRole('button', { name: 'Restart Jovie to update' })
     );
     expect(
       screen.getByRole('button', { name: 'Updating Jovie…' })
@@ -131,7 +131,7 @@ describe('updates in the central Inbox', () => {
 
     await act(async () => settleInstall?.(false));
     const retry = screen.getByRole('button', {
-      name: 'Restart Jovie To Update',
+      name: 'Restart Jovie to update',
     });
     expect(retry).toBeEnabled();
     expect(retry).toHaveAccessibleDescription(
@@ -149,11 +149,11 @@ describe('updates in the central Inbox', () => {
     state.install.mockRejectedValueOnce(new Error('IPC channel closed'));
     render(<Surface />);
     fireEvent.click(
-      screen.getByRole('button', { name: 'Restart Jovie To Update' })
+      screen.getByRole('button', { name: 'Restart Jovie to update' })
     );
     await waitFor(() =>
       expect(
-        screen.getByRole('button', { name: 'Restart Jovie To Update' })
+        screen.getByRole('button', { name: 'Restart Jovie to update' })
       ).toBeEnabled()
     );
   });
@@ -161,7 +161,7 @@ describe('updates in the central Inbox', () => {
     state.available = true;
     render(<Surface />);
     expect(
-      screen.getByRole('button', { name: 'Downloading Jovie Update…' })
+      screen.getByRole('button', { name: 'Downloading Jovie update…' })
     ).toBeDisabled();
     expect(state.install).not.toHaveBeenCalled();
   });
@@ -177,7 +177,7 @@ describe('updates in the central Inbox', () => {
       </RuntimeUpdateProvider>
     );
     expect(
-      screen.getByRole('button', { name: 'Restart Jovie To Update' })
+      screen.getByRole('button', { name: 'Restart Jovie to update' })
     ).toBeEnabled();
   });
   it('exposes the existing browser version mismatch in the same destination', () => {
@@ -185,7 +185,7 @@ describe('updates in the central Inbox', () => {
     state.mismatch = true;
     render(<Surface />);
     expect(
-      screen.getByRole('button', { name: 'Reload Jovie To Update' })
+      screen.getByRole('button', { name: 'Reload Jovie to update' })
     ).toHaveAccessibleDescription(
       'New Version Available (v26.9.1). Reload when ready.'
     );
@@ -198,7 +198,7 @@ describe('updates in the central Inbox', () => {
     render(<Surface />);
     expect(reload).not.toHaveBeenCalled();
     fireEvent.click(
-      screen.getByRole('button', { name: 'Reload Jovie To Update' })
+      screen.getByRole('button', { name: 'Reload Jovie to update' })
     );
     expect(reload).toHaveBeenCalledOnce();
   });

@@ -11,7 +11,7 @@ export default function SettingsAudiencePage() {
   return (
     <SettingsSection
       id='audience-tracking'
-      title='Audience & Tracking'
+      title='Audience & tracking'
       description='Fan verification, opt-ins, and tracking.'
     >
       <div className='space-y-4'>
