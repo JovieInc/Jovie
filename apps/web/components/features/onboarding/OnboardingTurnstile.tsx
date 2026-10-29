@@ -4,6 +4,7 @@
 import { useReducedMotion } from 'motion/react';
 import Script from 'next/script';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { preconnect } from 'react-dom';
 import { publicEnv } from '@/lib/env-public';
 import {
   getBrowserTurnstileHostname,
@@ -122,7 +123,6 @@ export function OnboardingTurnstile({
   const widgetIdRef = useRef<string | null>(null);
   const lastResetSignalRef = useRef(resetSignal);
   const loadingStallRetryCountRef = useRef(0);
-  const lastInstructionNudgeRef = useRef<string | null>(null);
   const widgetDomId = useId();
   const reducedMotion = useReducedMotion();
   const [state, setState] = useState<OnboardingTurnstileState>(DEFAULT_STATE);
@@ -152,6 +152,12 @@ export function OnboardingTurnstile({
     !hasStaticBypass && localAutomationBypass === null;
   const awaitingSendVerification =
     Boolean(instruction) && state.status === 'loading';
+
+  useEffect(() => {
+    // Open the Cloudflare connection at mount so the silent token mint overlaps
+    // with the visitor typing instead of starting after the script loads.
+    if (siteKey) preconnect('https://challenges.cloudflare.com');
+  }, [siteKey]);
 
   useEffect(() => {
     setLocalAutomationBypass(isOnboardingLocalAutomationBypassRuntime());
@@ -300,20 +306,6 @@ export function OnboardingTurnstile({
     lastResetSignalRef.current = resetSignal;
     resetWidget();
   }, [resetSignal, resetWidget]);
-
-  useEffect(() => {
-    if (!instruction || shouldBypassTurnstile || isRuntimeBypassPending) return;
-    if (state.status !== 'loading') return;
-    if (lastInstructionNudgeRef.current === instruction) return;
-    lastInstructionNudgeRef.current = instruction;
-    resetWidget();
-  }, [
-    instruction,
-    isRuntimeBypassPending,
-    resetWidget,
-    shouldBypassTurnstile,
-    state.status,
-  ]);
 
   useEffect(() => {
     if (shouldBypassTurnstile || isRuntimeBypassPending || !siteKey) return;

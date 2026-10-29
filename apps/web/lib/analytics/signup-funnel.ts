@@ -29,6 +29,10 @@ export const SIGNUP_FUNNEL_STEPS = {
     'landing_view',
     'cta_click',
     'onboarding_started',
+    // Activation split of the /start leak: a visitor typed, and the invisible
+    // Turnstile pass minted its token (a failure is an `error` outcome here).
+    'composer_engaged',
+    'security_check_ready',
     'chat_started',
     // JOV-9758: the preview rendered the matched artist's real catalog.
     'catalog_preview',

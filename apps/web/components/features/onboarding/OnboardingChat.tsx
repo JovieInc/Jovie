@@ -42,7 +42,10 @@ import {
   widgetEventDisplayText,
 } from '@/lib/chat/onboarding-script/widget-events';
 import { useAppFlag } from '@/lib/flags/client';
-import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  ONBOARDING_ACTIVATION_EVENTS,
+  ONBOARDING_FUNNEL_EVENTS,
+} from '@/lib/onboarding/funnel-events';
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import {
@@ -801,6 +804,7 @@ export function OnboardingChat({
     hasInitialStarterPrompt ? initialStarterPrompt : null
   );
   const wasAwaitingTurnstileRetryRef = useRef(false);
+  const hasTrackedComposerEngagedRef = useRef(false);
   const wasSecurityCheckRecoveryRef = useRef(false);
   const pendingVerifiedSubmitRef = useRef(false);
   const starterBannerWrapRef = useRef<HTMLDivElement>(null);
@@ -969,6 +973,13 @@ export function OnboardingChat({
   const handleInputChange = useCallback(
     (nextInput: string) => {
       setComposerInput(nextInput);
+
+      if (!hasTrackedComposerEngagedRef.current && nextInput.trim()) {
+        hasTrackedComposerEngagedRef.current = true;
+        track(ONBOARDING_ACTIVATION_EVENTS.COMPOSER_ENGAGED, {
+          surface: 'start_chat',
+        });
+      }
 
       if (
         hasInjectedStarterPromptRef.current &&

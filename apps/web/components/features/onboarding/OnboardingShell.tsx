@@ -11,6 +11,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { AppShellFrame } from '@/components/organisms/AppShellFrame';
@@ -18,7 +19,10 @@ import { SidebarProvider } from '@/components/organisms/sidebar';
 import { APP_ROUTES } from '@/constants/routes';
 import { track } from '@/lib/analytics';
 import { publicEnv } from '@/lib/env-public';
-import { ONBOARDING_FUNNEL_EVENTS } from '@/lib/onboarding/funnel-events';
+import {
+  ONBOARDING_ACTIVATION_EVENTS,
+  ONBOARDING_FUNNEL_EVENTS,
+} from '@/lib/onboarding/funnel-events';
 import type { StartEntryHandoff } from '@/lib/onboarding/start-entry-handoff';
 import type { StartEntryProfile } from '@/lib/onboarding/start-entry-profile';
 import {
@@ -110,6 +114,7 @@ export function OnboardingShell({
   actionError = null,
   onBusyChange,
 }: OnboardingShellProps) {
+  const securityCheckReadyTracked = useRef(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [profileBuilderState, setProfileBuilderState] =
     useState<OnboardingProfileBuilderState>(
@@ -153,6 +158,24 @@ export function OnboardingShell({
   const handleTurnstileStateChange = useCallback(
     (nextState: OnboardingTurnstileState) => {
       setTurnstileState(nextState);
+      // Measure the check (activation leak, JOV-9955): ready once, failures by status.
+      if (
+        nextState.status === 'verified' &&
+        !securityCheckReadyTracked.current
+      ) {
+        securityCheckReadyTracked.current = true;
+        track(ONBOARDING_ACTIVATION_EVENTS.SECURITY_CHECK_READY, {
+          surface: 'start_chat',
+        });
+      } else if (
+        nextState.status === 'error' ||
+        nextState.status === 'unsupported'
+      ) {
+        track(ONBOARDING_ACTIVATION_EVENTS.SECURITY_CHECK_FAILED, {
+          surface: 'start_chat',
+          reason: nextState.status,
+        });
+      }
       if (nextState.status !== 'verified' && nextState.status !== 'bypassed') {
         setTurnstileToken(null);
       }

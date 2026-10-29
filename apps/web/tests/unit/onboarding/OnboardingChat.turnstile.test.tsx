@@ -810,7 +810,11 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.sendMessage).toHaveBeenCalledWith({
       text: 'I am Test Artist',
     });
-    expect(analyticsMocks.track).toHaveBeenCalledTimes(1);
+    expect(
+      analyticsMocks.track.mock.calls.filter(
+        ([event]) => event === ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED
+      )
+    ).toHaveLength(1);
     expect(analyticsMocks.track).toHaveBeenCalledWith(
       ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED,
       { surface: 'start_chat' }
@@ -830,7 +834,11 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(chatMocks.sendMessage).toHaveBeenCalledWith({
       text: 'I am Test Artist',
     });
-    expect(analyticsMocks.track).toHaveBeenCalledTimes(1);
+    expect(
+      analyticsMocks.track.mock.calls.filter(
+        ([event]) => event === ONBOARDING_FUNNEL_EVENTS.CHAT_STARTED
+      )
+    ).toHaveLength(1);
   });
 
   it('rolls back the optimistic user turn when Turnstile rejects the first message', () => {

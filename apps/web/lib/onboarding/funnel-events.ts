@@ -14,6 +14,13 @@ export const ONBOARDING_FUNNEL_EVENTS = {
   DASHBOARD_LOADED: 'dashboard_loaded',
 } as const;
 
+/** Activation-leak split of /start (JOV-9955); not part of the robot v1 contract. */
+export const ONBOARDING_ACTIVATION_EVENTS = {
+  COMPOSER_ENGAGED: 'composer_engaged',
+  SECURITY_CHECK_READY: 'security_check_ready',
+  SECURITY_CHECK_FAILED: 'security_check_failed',
+} as const;
+
 export type OnboardingFunnelEvent =
   (typeof ONBOARDING_FUNNEL_EVENTS)[keyof typeof ONBOARDING_FUNNEL_EVENTS];
 

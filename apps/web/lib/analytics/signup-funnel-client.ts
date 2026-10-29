@@ -137,6 +137,26 @@ export function forwardAnalyticsEventToFunnel(
   properties?: Record<string, unknown>
 ): void {
   switch (event) {
+    case 'composer_engaged':
+    case 'security_check_ready':
+      trackFunnelStep({
+        funnel: 'artist_signup',
+        step: event,
+        surface: 'onboarding',
+      });
+      return;
+    case 'security_check_failed':
+      trackFunnelStep({
+        funnel: 'artist_signup',
+        step: 'security_check_ready',
+        outcome: 'error',
+        surface: 'onboarding',
+        reason:
+          typeof properties?.reason === 'string'
+            ? properties.reason
+            : undefined,
+      });
+      return;
     case 'onboarding_started':
     case 'chat_started':
     case 'chat_completed':
