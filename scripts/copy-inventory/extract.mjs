@@ -18,7 +18,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
 const WEB = join(REPO, 'apps/web');
 export const IDS_PATH = join(HERE, 'ids.gen.json');
-export const OUT_PATH = join(WEB, 'data/copyInventory.gen.json');
+export const OUT_PATH = join(HERE, 'inventory.gen.json');
 
 // Object keys whose string values are visible copy.
 const COPY_KEYS = new Set([

@@ -5,7 +5,6 @@
   "maxHeadlineCharacters": 120,
   "maxHeadlineWords": 20,
   "exclude": [
-    { "path": "^apps/web/data/copyInventory\\.gen\\.json$", "reason": "Generated review index of existing marketing copy for Copy Jam; lines are scanned at their source and the index is never rendered." },
     { "path": "(?:^|/)(?:node_modules|\\.next|coverage|dist)/", "reason": "Dependency and build output; authored source is scanned." },
     { "path": "(?:^|/)(?:tests|__tests__|__mocks__|e2e)/|\\.(?:test|spec|stories)\\.[cm]?[jt]sx?$", "reason": "Test runners and Storybook entrypoints, never production routes. Other fixtures remain in scope." },
     { "path": "^apps/web/(?:docs|scripts|eslint-rules|\\.storybook)/|(?:^|/)(?:AGENTS|CLAUDE|README)\\.md$", "reason": "Engineering documentation and development tooling, not route content." },
