@@ -42,7 +42,7 @@ SPOOL = STATE_DIR / "spool.jsonl"
 FLUSH_STAMP = STATE_DIR / "last-flush"
 FLUSH_EVERY_S = 300
 MAX_FIELD = 300  # chars; keeps events ~0.5 KB so a month stays far under the 100 MB budget
-DEFAULT_URL = "https://audit.jov.ie"
+DEFAULT_URL = "https://jovie-fleet-audit.tim-fd8.workers.dev"
 SHIM_DIR_MARKER = "jovie-audit-bin"
 
 READ = "read"

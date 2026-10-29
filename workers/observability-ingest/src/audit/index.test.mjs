@@ -48,7 +48,7 @@ function env(extra = {}) {
 
 function signed(path, body, secret = 'hmac') {
   const text = JSON.stringify(body);
-  return new Request(`https://audit.jov.ie${path}`, {
+  return new Request(`https://jovie-fleet-audit.tim-fd8.workers.dev${path}`, {
     method: 'POST',
     body: text,
     headers: {
@@ -58,7 +58,7 @@ function signed(path, body, secret = 'hmac') {
 }
 
 const read = (path, token = 'read') =>
-  new Request(`https://audit.jov.ie${path}`, {
+  new Request(`https://jovie-fleet-audit.tim-fd8.workers.dev${path}`, {
     headers: { authorization: `Bearer ${token}` },
   });
 
@@ -86,7 +86,7 @@ test('rejects unsigned and wrongly signed writes', async () => {
   const bad = await handle(signed('/v1/events', [ev()], 'nope'), e);
   assert.equal(bad.status, 401);
   const unsigned = await handle(
-    new Request('https://audit.jov.ie/v1/events', {
+    new Request('https://jovie-fleet-audit.tim-fd8.workers.dev/v1/events', {
       method: 'POST',
       body: '[]',
     }),
@@ -353,7 +353,10 @@ test('scheduled handler runs the budget check without throwing', async () => {
     e
   );
   const health = await (
-    await handle(new Request('https://audit.jov.ie/healthz'), e)
+    await handle(
+      new Request('https://jovie-fleet-audit.tim-fd8.workers.dev/healthz'),
+      e
+    )
   ).json();
   assert.equal(health.last_cron_at, '2026-10-29T05:23:00.000Z');
 });

@@ -20,10 +20,9 @@ const flag = name => {
 };
 const repo =
   flag('--repo') ?? process.env.GITHUB_REPOSITORY ?? 'JovieInc/Jovie';
-const base = (process.env.FLEET_AUDIT_URL ?? 'https://audit.jov.ie').replace(
-  /\/$/,
-  ''
-);
+const base = (
+  process.env.FLEET_AUDIT_URL ?? 'https://jovie-fleet-audit.tim-fd8.workers.dev'
+).replace(/\/$/, '');
 const secret = process.env.FLEET_AUDIT_INGEST_SECRET;
 const token = process.env.GH_TOKEN ?? process.env.GITHUB_TOKEN;
 const dryRun = args.includes('--dry-run');

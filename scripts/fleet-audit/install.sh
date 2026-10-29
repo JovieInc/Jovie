@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Install the fleet audit shims (gh, git push, doppler) and the Claude Code secret-output hook on
 # this host (Mac or Gem). Idempotent.
-#   scripts/fleet-audit/install.sh            install / update
+#   scripts/fleet-audit/install.sh                     install / update the shims
+#   scripts/fleet-audit/install.sh --with-claude-hook  also register the Claude Code secret-output hook
+#                                                     in ~/.claude/settings.json (host owner opts in)
 #   scripts/fleet-audit/install.sh --uninstall
 # Copies (not symlinks) into ~/.local/share/jovie-audit-bin so removing a worktree never breaks gh,
 # then puts that dir first on PATH for login shells (zsh/bash), and for systemd user services on
@@ -38,6 +40,7 @@ install -m 0755 "$src/bin/git" "$dest/bin/git"
 install -m 0755 "$src/bin/doppler" "$dest/bin/doppler"
 mkdir -p "$dest/hooks"
 install -m 0755 "$src/hooks/block_secret_output.py" "$dest/hooks/block_secret_output.py"
+if [ "${1:-}" = "--with-claude-hook" ]; then
 # Claude Code PreToolUse(Bash) hook: blocks commands that print secret values (user-level settings,
 # so it covers every project and session on this host). Idempotent; keeps all other settings.
 python3 - "$HOME/.claude/settings.json" "$dest/hooks/block_secret_output.py" <<'PY'
@@ -54,6 +57,7 @@ if not any(h.get("command") == cmd for e in pre for h in e.get("hooks", [])):
     os.replace(tmp, path)
     print("fleet-audit: registered secret-output hook in", path)
 PY
+fi
 for rc in "${rcs[@]}"; do
   [ -f "$rc" ] || [ "$rc" = "$HOME/.zshenv" ] || continue
   touch "$rc"
