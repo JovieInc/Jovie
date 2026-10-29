@@ -861,6 +861,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/preflight.test.mjs',
   'scripts/layout-guard-pen-contracts.test.mjs',
   'scripts/ci-rounds-report.test.mjs',
+  'scripts/preflight-changed.test.mjs',
+  'scripts/lib/__tests__/ci-rounds.test.mjs',
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
