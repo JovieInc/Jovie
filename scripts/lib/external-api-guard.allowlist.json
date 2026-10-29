@@ -24,6 +24,12 @@
       "rule": "provider-host",
       "max": 2,
       "reason": "Research router source: the literal is the url passed to @jovie/api-client ApiClient.request, so the call is budgeted."
+    },
+    {
+      "path": "workers/observability-ingest/src/audit/broker.ts",
+      "rule": "provider-host",
+      "max": 2,
+      "reason": "Cloudflare Worker (no host api-ledger or gh): mints the jovie-bot installation token the fleet broker hands out, like scripts/lanes/gh_app_token.py, and reads workflow/ruleset state hourly (about 3 + N rulesets GETs per watched repo per hour) on its own installation budget."
     }
   ]
 }

@@ -1,10 +1,17 @@
 import assert from 'node:assert/strict';
-import { createHmac } from 'node:crypto';
+import { createHmac, createVerify, generateKeyPairSync } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { test } from 'node:test';
 
+import {
+  appJwt,
+  collectRepoState,
+  SCOPE_PERMISSIONS,
+  validateTokenRequest,
+} from './broker.ts';
 import worker, {
+  correlateWatchedRepos,
   handle,
   matchesTarget,
   retain,
@@ -296,6 +303,143 @@ test('budget alarm fires once at 80%', async () => {
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test('broker: validation, not-configured, and a verifiable RS256 app JWT', async () => {
+  assert.equal(
+    validateTokenRequest({
+      agent: 'lane:fix-red',
+      scope: 'admin',
+      reason: 'xxxxxxxxx',
+    }),
+    'scope must be fleet or ci'
+  );
+  assert.equal(
+    validateTokenRequest({
+      agent: 'lane:fix-red',
+      scope: 'ci',
+      reason: 'cancel stale runs',
+    }),
+    'ci scope needs a linked issue'
+  );
+  assert.equal(
+    typeof validateTokenRequest({
+      agent: 'lane:fix-red',
+      scope: 'fleet',
+      reason: 'push fix branch',
+    }),
+    'object'
+  );
+  assert.equal(SCOPE_PERMISSIONS.fleet.actions, 'read');
+  assert.equal(SCOPE_PERMISSIONS.ci.actions, 'write');
+  assert.ok(!('administration' in SCOPE_PERMISSIONS.ci));
+
+  const res = await handle(
+    signed('/v1/token', { agent: 'x', scope: 'fleet', reason: 'yyyyyyyyy' }),
+    env()
+  );
+  assert.equal(res.status, 503);
+
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+  });
+  const pem = privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const jwt = await appJwt('2934433', pem, 1_800_000_000);
+  const [h, p, s] = jwt.split('.');
+  const v = createVerify('RSA-SHA256');
+  v.update(`${h}.${p}`);
+  assert.ok(v.verify(publicKey, Buffer.from(s, 'base64url')));
+  assert.equal(JSON.parse(Buffer.from(p, 'base64url')).iss, '2934433');
+});
+
+test('watch scope is read-only and cannot be requested from outside', () => {
+  assert.deepEqual(SCOPE_PERMISSIONS.watch, {
+    actions: 'read',
+    metadata: 'read',
+  });
+  assert.equal(
+    validateTokenRequest({ agent: 'x1', scope: 'watch', reason: 'yyyyyyyyy' }),
+    'scope must be fleet or ci'
+  );
+});
+
+test('hourly cron correlation: mints a watch token, reads state, attributes a disable', async () => {
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const e = env({
+    GITHUB_APP_ID: '2934433',
+    GITHUB_INSTALLATION_ID: '112037986',
+    GITHUB_APP_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    WATCH_REPOS: 'JovieInc/Jovie',
+  });
+  let state = 'active';
+  const calls = [];
+  const fakeFetch = async (url, init = {}) => {
+    calls.push(`${init.method ?? 'GET'} ${new URL(url).pathname}`);
+    if (String(url).endsWith('/access_tokens')) {
+      assert.deepEqual(JSON.parse(init.body).permissions, {
+        actions: 'read',
+        metadata: 'read',
+      });
+      return new Response(
+        JSON.stringify({
+          token: 'ghs_x',
+          expires_at: '2026-10-29T02:00:00Z',
+          permissions: {},
+        })
+      );
+    }
+    if (String(url).includes('/actions/workflows'))
+      return new Response(
+        JSON.stringify({
+          workflows: [
+            {
+              id: 368087390,
+              name: 'Lane Fix Relay',
+              path: '.github/workflows/lane-fix-relay.yml',
+              state,
+              updated_at: '2026-10-29T00:23:50Z',
+            },
+          ],
+        })
+      );
+    return new Response('[]');
+  };
+  await handle(
+    signed('/v1/events', [ev()]),
+    e,
+    new Date('2026-10-29T00:24:00Z')
+  );
+  let out = await correlateWatchedRepos(
+    e,
+    new Date('2026-10-29T00:00:00Z'),
+    fakeFetch
+  );
+  assert.deepEqual(out, [{ repo: 'JovieInc/Jovie', items: 1, changes: 0 }]);
+  state = 'disabled_manually';
+  out = await correlateWatchedRepos(
+    e,
+    new Date('2026-10-29T01:00:00Z'),
+    fakeFetch
+  );
+  assert.equal(out[0].changes, 1);
+  const row = e.AUDIT_DB.raw
+    .prepare('SELECT status, matched_event_id FROM correlations')
+    .get();
+  assert.equal(row.status, 'attributed');
+  assert.ok(calls.includes('POST /app/installations/112037986/access_tokens'));
+});
+
+test('collectRepoState tolerates rulesets it cannot read', async () => {
+  const items = await collectRepoState('JovieInc/Jovie', 't', async url =>
+    String(url).includes('rulesets')
+      ? new Response('{}', { status: 403 })
+      : new Response(JSON.stringify({ workflows: [] }))
+  );
+  assert.deepEqual(items, []);
+});
+
+test('no App key: the cron correlation is a no-op', async () => {
+  assert.deepEqual(await correlateWatchedRepos(env(), new Date()), []);
 });
 
 test('scheduled handler runs the budget check without throwing', async () => {

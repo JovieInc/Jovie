@@ -5,6 +5,7 @@
  *   POST /v1/events        batches from the gh / git-push shim spool (scripts/fleet-audit)
  *   POST /v1/snapshot      GitHub-side state (workflow states, ruleset updated_at) from the hourly
  *                          correlator; changes are matched to shim events, unmatched ones alert Summer
+ *   POST /v1/token         token broker: short-lived, scoped jovie-bot installation tokens
  *   POST /v1/github-audit  rows from a GitHub org audit-log export (UI export; no API on our plan)
  * Readers (Authorization: Bearer READ_TOKEN):
  *   GET  /v1/who?target=&since=&limit=   GET /v1/summary
@@ -12,7 +13,12 @@
  * Storage is D1 (append-only events, ~0.5 KB each) with a 100 MB/month budget that alarms at 80%;
  * rows older than RETENTION_DAYS are archived as gzip NDJSON to R2 and deleted. No log drains,
  * no paid ingestion.
- */
+ */ import {
+  collectRepoState,
+  mintInstallationToken,
+  validateTokenRequest,
+} from './broker.ts';
+
 export interface Env {
   readonly AUDIT_DB: D1Database;
   readonly ARCHIVE?: R2Bucket;
@@ -24,6 +30,11 @@ export interface Env {
   readonly MESH_SENDER_ID?: string;
   readonly MESH_SENDER_KIND?: string;
   readonly MESH_TOKEN?: string;
+  readonly GITHUB_APP_ID?: string;
+  readonly GITHUB_INSTALLATION_ID?: string;
+  readonly GITHUB_APP_PRIVATE_KEY?: string;
+  /** Comma-separated owner/repo list the hourly cron correlates (default JovieInc/Jovie). */
+  readonly WATCH_REPOS?: string;
 }
 
 export interface AuditEvent {
@@ -724,7 +735,120 @@ export async function handle(
       ...(await applyGithubAudit(env, parsed as GithubAuditRow[], nowIso)),
     });
   }
+  if (url.pathname === '/v1/token') {
+    if (
+      !env.GITHUB_APP_PRIVATE_KEY ||
+      !env.GITHUB_APP_ID ||
+      !env.GITHUB_INSTALLATION_ID
+    )
+      return json({ error: 'broker_not_configured' }, 503);
+    const req = validateTokenRequest(parsed);
+    if (typeof req === 'string') return json({ error: req }, 400);
+    let minted;
+    try {
+      minted = await mintInstallationToken({
+        appId: env.GITHUB_APP_ID,
+        installationId: env.GITHUB_INSTALLATION_ID,
+        privateKey: env.GITHUB_APP_PRIVATE_KEY,
+        request: req,
+      });
+    } catch (err) {
+      return json(
+        { error: err instanceof Error ? err.message : 'mint failed' },
+        502
+      );
+    }
+    await insertEvents(
+      env,
+      [
+        {
+          id: crypto.randomUUID(),
+          ts: nowIso,
+          actor_agent: req.agent,
+          session_id: req.session ?? null,
+          host: req.host ?? null,
+          repo: `JovieInc/${(req.repositories ?? ['Jovie']).join(',')}`,
+          target: `scope:${req.scope}`,
+          action: 'token.issue',
+          danger: req.scope === 'ci' ? 1 : 0,
+          reason: req.reason,
+          issue: req.issue ?? null,
+          outcome: `expires ${minted.expires_at}`,
+          before: null,
+          after: null,
+          source: 'broker',
+        },
+      ],
+      nowIso
+    );
+    return json({
+      ok: true,
+      token: minted.token,
+      expires_at: minted.expires_at,
+      permissions: minted.permissions,
+    });
+  }
   return json({ error: 'not found' }, 404);
+}
+
+/**
+ * Hourly: read workflow states and ruleset versions for each watched repo with a read-only
+ * jovie-bot token, then diff and attribute them (applySnapshot). Replaces a GitHub cron, which
+ * repository policy forbids. No-op until the App key is bound.
+ */
+export async function correlateWatchedRepos(
+  env: Env,
+  now: Date,
+  fetchImpl: typeof fetch = fetch
+) {
+  if (
+    !env.GITHUB_APP_PRIVATE_KEY ||
+    !env.GITHUB_APP_ID ||
+    !env.GITHUB_INSTALLATION_ID
+  )
+    return [];
+  const out: Array<{
+    repo: string;
+    items: number;
+    changes: number;
+    error?: string;
+  }> = [];
+  for (const repo of (env.WATCH_REPOS ?? 'JovieInc/Jovie')
+    .split(',')
+    .map(r => r.trim())
+    .filter(Boolean)) {
+    try {
+      const { token } = await mintInstallationToken({
+        appId: env.GITHUB_APP_ID,
+        installationId: env.GITHUB_INSTALLATION_ID,
+        privateKey: env.GITHUB_APP_PRIVATE_KEY,
+        request: {
+          agent: 'fleet-audit-cron',
+          scope: 'watch',
+          repositories: [repo.split('/')[1]],
+          reason: 'hourly correlation',
+        },
+        fetchImpl,
+      });
+      const items = await collectRepoState(repo, token, fetchImpl);
+      const changes = await applySnapshot(
+        env,
+        repo,
+        items,
+        now.toISOString(),
+        'cron'
+      );
+      out.push({ repo, items: items.length, changes: changes.length });
+    } catch (err) {
+      out.push({
+        repo,
+        items: 0,
+        changes: 0,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+  return out;
 }
 
 export default {
@@ -740,6 +864,7 @@ export default {
     )
       .bind(now.toISOString())
       .run();
+    await correlateWatchedRepos(env, now);
     if (now.getUTCHours() === 3) await retain(env, now);
   },
 };
