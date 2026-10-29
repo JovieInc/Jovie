@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/workspace/Jovie/scripts/shipping_origin.py", line 257, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/workspace/Jovie/scripts/shipping_origin.py", line 246, in main
+    attribution.resolve_origin_head(payload["repository"], payload["pr"], payload["headSha"])
+  File "/workspace/Jovie/scripts/lanes/shipping_attribution.py", line 371, in resolve_origin_head
+    canonical = read(f"repos/{repository}")["full_name"]
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Jovie/scripts/lanes/shipping_attribution.py", line 365, in remote
+    result = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True,
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['gh', 'api', 'repos/JovieInc/Jovie']' returned non-zero exit status 1.

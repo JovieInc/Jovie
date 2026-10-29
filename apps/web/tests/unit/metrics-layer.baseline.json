@@ -217,10 +217,6 @@
       "tables": 0,
       "rates": 1
     },
-    "lib/admin/bragging-rights.ts": {
-      "tables": 13,
-      "rates": 0
-    },
     "lib/admin/conversion-funnel.ts": {
       "tables": 1,
       "rates": 0
