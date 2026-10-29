@@ -358,6 +358,7 @@ export const shippingCockpitProjectionSchema = z.object({
   terminalFailures: countMeasurementSchema,
   capacityAvailable: countMeasurementSchema,
   operationalTasks: operationalTaskFeedSchema,
+  delivery: z.unknown().optional().transform(parseDeliverySummary),
   sources: z.object(sourceMapShape),
 });
 

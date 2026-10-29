@@ -2,9 +2,9 @@ import 'server-only';
 
 import { sql as drizzleSql, type SQL } from 'drizzle-orm';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
+import { externalAccountSql } from '@/lib/accounts/internal-account';
 import { db } from '@/lib/db';
 import { captureError } from '@/lib/error-tracking';
-import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 
 export type FounderFunnelTimeRange = '7d' | '30d' | 'all';
 
@@ -196,7 +196,7 @@ function findBiggestDropOff(stages: FounderFunnelStage[]): string | null {
  * stage so seeded QA and team accounts never read as customers.
  */
 const EXTERNAL_USER_CONSTRAINT = drizzleSql`
-  (u.email IS NULL OR u.email !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})
+  ${externalAccountSql(drizzleSql.raw('u.email'), drizzleSql.raw('u.account_class'))}
 `;
 
 function userDateConstraint(dateFilter: Date | null): SQL {

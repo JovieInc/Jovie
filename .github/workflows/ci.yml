@@ -1110,7 +1110,7 @@ jobs:
     name: Merge Group Admission
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     # Must exceed MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS (66 min) plus the
     # 6-minute check poll plus setup/checkout. The helper sleeps until
     # x-ratelimit-reset inside that window. A hard cancel would eject the
@@ -1221,10 +1221,20 @@ jobs:
   # PR on a different queue SHA, and cancels each one whose queue ref git no
   # longer lists. Only the cancel itself spends GITHUB_TOKEN quota (the App
   # has actions:read). Any failed read logs and exits 0; it gates nothing.
+      - name: Clear sparse checkout for the next job on this workspace
+        if: always() && runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a leftover sparse checkout hides .github/scripts from the next job.
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
+
   ci-merge-group-supersede:
     name: Merge Group Supersede Older Runs
     if: ${{ github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
     permissions:
       actions: write
@@ -2210,7 +2220,7 @@ jobs:
 
           # Component receipts are executable test evidence; Storybook config and
           # the shared-UI token audit feed structural component proof.
-          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
+          STRUCTURAL_UI_PATTERN='^(apps/web/data/marketing/|apps/web/lib/agent-os/certification[^/]*\.ts$|apps/web/lib/acquisition/certification-store[^/]*\.ts$|apps/web/app/.*\.(tsx|css)$|apps/web/components/|apps/web/\.storybook/|apps/web/package\.json$|apps/web/scripts/(check-reliability-detectors|lint-contrast-|lint-motion-css|lint-no-native-dialogs|lint-composite-field|lint-ui-feel|next-proxy-guard|seo-ratchet-|tailwind-guard)|apps/web/tests/|apps/web/styles/|packages/ui/|package\.json$|DESIGN\.md$|design\.tokens\.json$|scripts/(component-|design-|ds-offscale|screen-certification|shared-ui-visual-arbitrary|story-coverage|storybook-story-quality|ui-story-coverage)|scripts/lib/__tests__/(component-|design-|screen-certification|story-coverage|storybook-story-quality|ui-story-coverage))'
           STRUCTURAL_DESKTOP_PATTERN='^scripts/desktop-release-(assets|guard|publisher)(\.test)?\.mjs$|^apps/desktop/electron-builder\.yml$|^apps/desktop/scripts/notarize-release-dmg\.cjs$'
           # A new scripts test must prove it is wired into a lane (inventory guard)
           # before the queue; #18714 was ejected for an unwired one.
@@ -2236,6 +2246,7 @@ jobs:
             echo "privacy=false"
             echo "tasks=false"
             echo "desktop_update=false"
+            echo "dsp=false"
             echo "run=false"
           } >> "$GITHUB_OUTPUT"
           if [[ "${{ github.event_name }}" != "pull_request" ]]; then
@@ -2246,6 +2257,7 @@ jobs:
           CRAWLER_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/organisms/ai-crawler/AiCrawler(DetailPanel|IntelligenceCard)(\.stories)?\.tsx|tests/e2e/storybook-ai-crawler\.spec\.ts)$'
           TASKS_STORYBOOK_PATTERN='^apps/web/(components/features/dashboard/tasks/(Task(DataTable|ListRow)(\.stories)?\.tsx|TasksPageClient\.tsx)|components/organisms/table/(atoms/TableCell\.tsx|table\.types\.ts|organisms/VirtualizedTableRow\.tsx|molecules/TaskProjectionListRow\.tsx)|tests/e2e/storybook-task-row-geometry\.spec\.ts)$'
           DESKTOP_UPDATE_STORYBOOK_PATTERN='^apps/web/(components/organisms/desktop-update/DesktopUpdateModal(\.stories)?\.tsx|tests/e2e/storybook-desktop-update-modal\.spec\.ts)$'
+          DSP_STORYBOOK_PATTERN='^apps/web/(components/shell/DspAvatarStack(\.mobile-drawer)?(\.stories|\.test)?\.tsx|components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow(\.stories)?\.tsx|components/organisms/release-sidebar/ReleaseSidebarSections\.tsx|components/molecules/drawer/RightDrawer\.tsx|lib/a11y/modal-focus-boundary\.ts|tests/e2e/storybook-dsp-details\.spec\.ts)$'
           # Overlay primitives, their layer tokens, and the
           # collision harness re-prove stacking, focus, and viewport fit.
           OVERLAY_STORYBOOK_PATTERN='^(packages/ui/atoms/(dialog|alert-dialog|sheet|popover|dropdown-menu|context-menu|select|tooltip)\.tsx|packages/ui/lib/(overlay-styles|overlay-focus|dropdown-styles|utils)\.ts|apps/web/styles/tailwind-foundation\.css|apps/web/\.storybook/stories/overlay-collisions\.stories\.tsx|apps/web/tests/e2e/storybook-overlay-collisions\.spec\.ts)$'
@@ -2279,6 +2291,12 @@ jobs:
           if grep -qE "$DESKTOP_UPDATE_STORYBOOK_PATTERN" "$changed_files"; then
             {
               echo "desktop_update=true"
+              echo "run=true"
+            } >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE "$DSP_STORYBOOK_PATTERN" "$changed_files"; then
+            {
+              echo "dsp=true"
               echo "run=true"
             } >> "$GITHUB_OUTPUT"
           fi
@@ -2318,7 +2336,7 @@ jobs:
       - &structural-python
         name: Set up Python (structural regression tests)
         if: ${{ success() && steps.structural.outputs.skip != 'true' }}
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
           cache: pip
@@ -2373,6 +2391,7 @@ jobs:
           RUN_PRIVACY: ${{ steps.storybook-browser.outputs.privacy }}
           RUN_TASKS: ${{ steps.storybook-browser.outputs.tasks }}
           RUN_DESKTOP_UPDATE: ${{ steps.storybook-browser.outputs.desktop_update }}
+          RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}
           STORYBOOK_BASE_URL: http://localhost:6006
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
@@ -2401,6 +2420,9 @@ jobs:
           fi
           if [[ "$RUN_DESKTOP_UPDATE" == 'true' ]]; then
             specs+=(tests/e2e/storybook-desktop-update-modal.spec.ts)
+          fi
+          if [[ "$RUN_DSP" == 'true' ]]; then
+            specs+=(tests/e2e/storybook-dsp-details.spec.ts)
           fi
           test "${#specs[@]}" -gt 0
           pnpm exec storybook dev -p 6006 --no-open &
@@ -2869,7 +2891,7 @@ jobs:
           neon_api_key: ${{ secrets.NEON_API_KEY }}
           neon_project_id: ${{ vars.NEON_PROJECT_ID }}
           branch_limit: '10'
-          protected_branches: 'main,development,preview,br-main,br-production'
+          protected_branches: 'main,production,prod,development,preview,br-main,br-production'
           cleanup_threshold: '7'
 
       - name: Determine owned ephemeral branch name
@@ -2928,7 +2950,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID }}
-          PROTECTED_BRANCHES: main,development,preview,br-main,br-production
+          PROTECTED_BRANCHES: main,production,prod,development,preview,br-main,br-production
         run: bash scripts/ci/verify-neon-branch-admission.sh
 
       - name: Resolve certification DATABASE_URL
@@ -3644,6 +3666,7 @@ jobs:
                   tests/e2e/storybook-onboarding-recovery.spec.ts \
                   tests/e2e/storybook-task-row-geometry.spec.ts \
                   tests/e2e/storybook-desktop-update-modal.spec.ts \
+                  tests/e2e/storybook-dsp-details.spec.ts \
                   --config=playwright.config.storybook.ts --project=chromium --reporter=line \
                   --workers=2 --shard="$STORYBOOK_SHARD"
               exit 0
@@ -3659,6 +3682,7 @@ jobs:
           CI: true
           JOVIE_STORYBOOK_MANUAL_AXE: '1'
           PLAYWRIGHT_ARTIFACT_ALLOW_IMAGES: 'true'
+          PLAYWRIGHT_ARTIFACT_ALLOW_PUBLIC_IMAGES: 'true'
           PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
           # Name the blocked file when the artifact guard stops the step;
           # "exit 1" alone left the JOV-6541 failures undiagnosable.
@@ -3670,14 +3694,15 @@ jobs:
         with:
           name: combined-storybook-report-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
           path: apps/web/test-results/
+          allow-images: 'true'
           allow-markdown: 'true'
           retention-days: 3
       - name: Upload input Storybook evidence
-        if: ${{ success() && hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' }}
+        if: ${{ success() && (hashFiles('apps/web/test-results/storybook-input-evidence/**') != '' || hashFiles('apps/web/test-results/storybook-dsp-details-*/last-provider.png') != '') }}
         uses: ./.github/actions/upload-safe-playwright-artifact
         with:
           name: storybook-input-evidence-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard }}
-          path: apps/web/test-results/storybook-input-evidence/
+          path: apps/web/test-results/{storybook-input-evidence/**,storybook-dsp-details-*/last-provider.png}
           allow-images: 'true'
           retention-days: 7
 
@@ -4682,7 +4707,7 @@ jobs:
           branch_name: dashboard-lighthouse-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -6585,7 +6610,7 @@ jobs:
           branch_name: golden-path-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production
+          protected_branches: main,production,prod,development,preview,br-main,br-production
 
       - name: Resolve DATABASE_URL (fallback Neon ephemeral)
         if: needs.neon-db.result != 'success'
@@ -7018,7 +7043,7 @@ jobs:
           branch_name: admin-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           role: neondb_owner
           api_key: ${{ secrets.NEON_API_KEY }}
-          protected_branches: main,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
+          protected_branches: main,production,prod,development,preview,br-main,br-production,${{ needs.neon-db.outputs.branch_name }}
 
       - name: Resolve DATABASE_URL (Neon ephemeral)
         if: steps.check_changes.outputs.run_full_ci == 'true'
@@ -7591,6 +7616,10 @@ jobs:
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
           set -euo pipefail
+          # GitHub masks secret substrings in the DEPLOYMENT_URL env dump, which
+          # removes the hostname. The base64 line keeps an openable URL for the
+          # funnel gate without printing a second plaintext copy.
+          echo "DEPLOYMENT_URL_B64: $(printf '%s' "$DEPLOYMENT_URL" | base64 -w0)"
           inspect_wait_status=0
           ./node_modules/.bin/vercel inspect "$DEPLOYMENT_URL" \
             --wait \
@@ -7661,7 +7690,7 @@ jobs:
         ci-lighthouse-onboarding-pr,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 2
     steps:
       - name: Evaluate combined-head checks

@@ -90,15 +90,17 @@ describe('homepage hero light budget', () => {
     expect(edge).toContain(
       `--hero-light-roll-period: ${HERO_LIGHT_PERF.rollPeriodMs / 1000}s`
     );
-    expect(edge).toContain(
-      'animation: homepage-hero-light-roll var(--hero-light-roll-period)'
+    // Static by default: the roll runs only under an enabled budget.
+    expect(edge).not.toMatch(/\banimation\s*:/);
+    expect(css).toMatch(
+      /prefers-reduced-motion:\s*no-preference\)\s*\{\s*\.homepage-hero-light\[data-animate="true"\] \.homepage-hero-light__edge\s*\{\s*animation: homepage-hero-light-roll var\(--hero-light-roll-period\)/
     );
     expect(css).toMatch(
       /prefers-reduced-motion:\s*reduce\)[\s\S]*animation:\s*none/
     );
   });
 
-  it('stacks the hero copy on the shared spine and keeps the proof phone inside the field', () => {
+  it('stacks the hero copy on the shared spine and sets the proof beside the lead', () => {
     const css = readFileSync(join(DIR, 'HomepageHeroCanvas.css'), 'utf8');
     const copy = cssBlock(css, '.homepage-hero-canvas__copy');
     expect(copy).toContain('flex-direction: column');
@@ -106,14 +108,44 @@ describe('homepage hero light budget', () => {
     // children align to the spine's left edge, not the field center.
     expect(copy).toContain('align-items: flex-start');
     expect(copy).toContain('margin-inline: auto');
-    const phone = cssBlock(
-      css,
-      '.homepage-hero-canvas__proof .homepage-artist-hero__phone'
+    // The proof keeps the crop's real aspect (780x1264 capture) and never exceeds the
+    // capture's native width (390 CSS px = 24.375rem), so it stays crisp.
+    // The lead fills the copy column instead of sizing to max-content, so
+    // the subhead and claim button never run past a phone viewport (the
+    // 390px CI capture clipped "Claim", 2026-10-29).
+    const lead = cssBlock(css, '.homepage-hero-canvas__lead');
+    expect(lead).toContain('align-self: stretch');
+    expect(lead).toContain('width: 100%');
+    expect(lead).toContain('min-width: 0');
+    // The proof's crop geometry (aspect ratio, native-width cap) is a layout
+    // spec, not a budget: HomepageHeroCanvas.test.tsx owns it.
+    const gridSelector = '.homepage-hero-canvas__copy[data-has-proof="true"] {';
+    const wideStart = css.lastIndexOf(
+      '@media (min-width: 64rem)',
+      css.indexOf(gridSelector)
     );
-    expect(phone).toContain('width: 100%');
+    const wide = balancedBlock(
+      css.slice(wideStart),
+      '@media (min-width: 64rem)'
+    );
+    const grid = cssBlock(
+      wide,
+      '.homepage-hero-canvas__copy[data-has-proof="true"]'
+    );
+    // Balanced two-column field at desktop: lead left, shot right.
+    expect(grid).toContain('display: grid');
+    expect(grid).toContain(
+      'grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)'
+    );
+    expect(grid).toContain('align-items: center');
+    // Width follows the viewport height so the whole crop fits the first
+    // viewport, capped at the native capture width.
+    expect(wide).toMatch(
+      /\.homepage-hero-canvas__proof \{[^}]*width: min\(\s*24rem,\s*calc\(\(100svh - var\(--hero-canvas-bar\) - var\(--space-32, 8rem\)\) \* 0\.617\)\s*\)/
+    );
   });
 
-  it('keeps the phone in the field flow under the copy on phone widths', () => {
+  it('keeps the shot in the field flow under the claim on phone widths', () => {
     const css = readFileSync(join(DIR, 'HomepageHeroCanvas.css'), 'utf8');
     const narrow = balancedBlock(css, '@media (max-width: 63.99rem)');
 
@@ -124,22 +156,20 @@ describe('homepage hero light budget', () => {
     const copy = balancedBlock(narrow, '.homepage-hero-canvas__copy');
     expect(copy).toContain('flex: 1 0 auto');
     expect(copy).toContain('min-height: 0');
-    expect(copy).toContain('overflow: hidden');
+    // Founder-directed 2026-10-28 (claim-field focus fix): the copy no longer
+    // clips. Text wraps via the width rules, and a clipping box cut the
+    // CompositeField focus ring that draws outside the pill edge.
+    expect(copy).toContain('overflow: visible');
     // The phone is in flow, so the copy never reserves fixed space for it.
     expect(copy).not.toMatch(/padding-bottom:\s*[\d.]+rem/);
 
+    // In flow under the claim, never layered over the headline.
     const proof = balancedBlock(narrow, '.homepage-hero-canvas__proof');
-    // In flow under the copy — never layered over the headline.
-    expect(proof).toContain('position: relative');
     expect(proof).not.toContain('position: absolute');
-    // Height-driven with the real screen aspect. The copy cannot shrink;
-    // the field grows when the phone and conversion form need more space.
-    expect(proof).toContain(
-      'height: min(30svh, 15.75rem, calc(100svh - var(--hero-canvas-bar) - 20rem))'
-    );
-    expect(proof).toContain('aspect-ratio: 402 / 874');
-    expect(proof).toContain('flex: 0 1 auto');
-    expect(proof).toContain('min-height: 7rem');
+    expect(proof).toContain('align-self: center');
+    const base = cssBlock(css, '.homepage-hero-canvas__proof');
+    expect(base).not.toContain('position: absolute');
+    expect(base).toContain('width: min(80vw, 20rem)');
   });
 
   it('records the scoped WebGL exception without rewriting the standing rule', () => {

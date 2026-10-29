@@ -16,8 +16,10 @@ import {
   formatCertificationSummary,
   HOMEPAGE_COPY_SOURCE,
   LANDING_GRAMMAR_SOURCE,
+  NAVIGATION_RECORD_SOURCE,
   NAVIGATION_SOURCE,
   RECIPES_SOURCE,
+  readRoutePaths,
   scanFixture,
   scanNavSemantics,
   scanRouteIntent,
@@ -322,6 +324,43 @@ describe('founder design invariants (JOV-INV-038)', () => {
     );
   });
 
+  it('binds the site-chrome record labels to their routes through path literals', () => {
+    const root = new URL('../../', import.meta.url).pathname;
+    const routePaths = readRoutePaths(root);
+    assert.equal(routePaths.get('/pricing'), 'PRICING');
+    const real = readFileSync(
+      new URL(`../../${NAVIGATION_RECORD_SOURCE}`, import.meta.url),
+      'utf8'
+    );
+    assert.deepEqual(
+      scanNavSemantics(NAVIGATION_RECORD_SOURCE, real, routePaths),
+      []
+    );
+  });
+
+  it('deliberate red: rejects a record label routed to the wrong path and an unknown path', () => {
+    const root = new URL('../../', import.meta.url).pathname;
+    const routePaths = readRoutePaths(root);
+    const wrong = scanNavSemantics(
+      NAVIGATION_RECORD_SOURCE,
+      "const L = [{ id: 'a', label: 'Pricing', href: '/about' }];",
+      routePaths
+    );
+    assert.deepEqual(
+      wrong.map(item => item.rule),
+      ['nav-label-route-mismatch']
+    );
+    const unknown = scanNavSemantics(
+      NAVIGATION_RECORD_SOURCE,
+      "const L = [{ id: 'a', label: 'Pricing', href: '/not-a-route' }];",
+      routePaths
+    );
+    assert.deepEqual(
+      unknown.map(item => item.rule),
+      ['nav-entry-unparseable']
+    );
+  });
+
   it('never pairs one link href with the next link label', () => {
     assert.deepEqual(
       scanNavSemantics(
@@ -452,8 +491,8 @@ describe('founder design invariants (JOV-INV-038)', () => {
   it('deliberate red: a mislabeled live nav entry cannot pass by not matching', () => {
     const mutated = replaceOnce(
       realNavigation,
-      "{ href: APP_ROUTES.COMPARE, label: 'Compare' }",
-      '{ label: "Compare", href: `${APP_ROUTES.PRICING}#compare` }'
+      "{ href: APP_ROUTES.CARD, label: 'Jovie Card' }",
+      '{ label: "Jovie Card", href: `${APP_ROUTES.PRICING}#card` }'
     );
     assert.deepEqual(
       scanNavSemantics(NAVIGATION_SOURCE, mutated).map(item => item.rule),

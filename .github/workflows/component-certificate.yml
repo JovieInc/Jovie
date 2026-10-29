@@ -1,0 +1,128 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Claude
+# capability-gap: The per-component certificate needs a whole-repo static pass after main settles, which no existing workflow owns; folding it into CI would add a step to every PR and merge group.
+# revisit-trigger: Fold into the Production Controller evidence packets once they carry design-system certification, or retire when Ovie computes certificates itself.
+# necessary-trust-boundary: Runs on trusted main only, read-only token. The one secret (CRON_SECRET) is used by a single curl step after the certificate script has finished; it posts evidence to the Ovie ingest route and never writes to GitHub.
+name: Component Certificate
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit to certify (defaults to the dispatched ref head)
+        required: false
+        type: string
+      post:
+        description: Post the report to the Ovie ingest route
+        default: true
+        type: boolean
+permissions: {}
+jobs:
+  certify:
+    name: Certify components
+    if: >-
+      github.ref == 'refs/heads/main' && (
+        github.event_name == 'workflow_dispatch' ||
+        github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    concurrency:
+      group: component-certificate
+      cancel-in-progress: true
+    env:
+      CERT_SHA: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CERT_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require main ancestry
+        run: git merge-base --is-ancestor HEAD origin/main
+      - uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Restore mutation evidence
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/state/jovie-mutation
+          key: mutation-sweep-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: mutation-sweep-state-
+      - name: Install typescript only
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./package.json').devDependencies.typescript.replace(/^[^0-9]*/, '')")"
+          npm install --prefix "$RUNNER_TEMP/ts" --no-save --no-audit --no-fund --ignore-scripts "typescript@${version}"
+          mkdir -p node_modules
+          rm -rf node_modules/typescript
+          cp -R "$RUNNER_TEMP/ts/node_modules/typescript" node_modules/typescript
+      - name: Build the certificate report
+        run: |
+          set -euo pipefail
+          mutation_args=()
+          state="$HOME/.local/state/jovie-mutation/sweep-state.json"
+          if [ -f "$state" ]; then mutation_args+=(--mutation-state "$state"); fi
+          mkdir -p "$RUNNER_TEMP/component-certificate"
+          nice -n 19 node scripts/component-certificate.mjs --all --sha "$CERT_SHA" \
+            --out "$RUNNER_TEMP/component-certificate/report.json" \
+            "${mutation_args[@]}"
+          node scripts/lib/component-certificate-summary.mjs \
+            "$RUNNER_TEMP/component-certificate/report.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Locate certificate report
+        id: certificate_report
+        if: always()
+        run: |
+          set -euo pipefail
+          available=false
+          if [ -s "$RUNNER_TEMP/component-certificate/report.json" ]; then available=true; fi
+          printf 'available=%s\n' "$available" >> "$GITHUB_OUTPUT"
+      - name: Upload certificate report
+        if: ${{ always() && steps.certificate_report.outputs.available == 'true' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: component-certificate-${{ github.run_id }}
+          path: ${{ runner.temp }}/component-certificate/report.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Resolve CRON_SECRET
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+        run: node .github/scripts/resolve-synthetic-secrets.mjs --name CRON_SECRET
+      - name: Post to Ovie
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.post }}
+        env:
+          OVIE_BASE_URL: ${{ vars.OVIE_BASE_URL || 'https://jov.ie' }}
+        run: |
+          set -uo pipefail
+          report="$RUNNER_TEMP/component-certificate/report.json"
+          if [ -z "${CRON_SECRET:-}" ]; then
+            echo "Ovie post skipped: CRON_SECRET not available." | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          code="$(curl -sS -o "$RUNNER_TEMP/ovie-response.txt" -w '%{http_code}' \
+            --retry 2 --max-time 60 --tlsv1.2 --proto '=https' \
+            -X POST "$OVIE_BASE_URL/api/internal/ovie/component-certificate-evidence" \
+            -H "authorization: Bearer ${CRON_SECRET}" \
+            -H 'content-type: application/json' \
+            --data-binary "@${report}")" || code="000"
+          case "$code" in
+            2*) echo "Posted component certificate to Ovie (HTTP $code)." | tee -a "$GITHUB_STEP_SUMMARY" ;;
+            404|405) echo "Ovie post skipped: ingest route not deployed (HTTP $code)." | tee -a "$GITHUB_STEP_SUMMARY" ;;
+            *) echo "::warning::Ovie post failed (HTTP $code); report is still in the artifact."
+               echo "Ovie post failed (HTTP $code)." >> "$GITHUB_STEP_SUMMARY" ;;
+          esac
+          exit 0
+
+      - name: Clean scratch
+        if: always()
+        run: rm -rf node_modules/typescript "$RUNNER_TEMP/ts" "$RUNNER_TEMP/component-certificate" "$RUNNER_TEMP/ovie-response.txt"
