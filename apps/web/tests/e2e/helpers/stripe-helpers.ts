@@ -219,7 +219,10 @@ export async function createCheckoutSession(
     { priceId, ...context }
   );
 
-  expect(response.ok).toBeTruthy();
+  expect(
+    response.ok,
+    `POST /api/stripe/checkout returned ${response.status}: ${JSON.stringify(response.body)}`
+  ).toBeTruthy();
   expect(response.body.sessionId).toBeTruthy();
   expect(response.body.url).toBeTruthy();
 

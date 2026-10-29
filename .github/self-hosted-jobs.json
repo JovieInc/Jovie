@@ -5,17 +5,17 @@
     {
       "workflow": "ci.yml",
       "job": "ci-merge-group-admission",
-      "reason": "light merge_group gate job; runs on the fixed pool so merge checks do not queue behind PR CI on hosted runners (merge-queue throughput, #23586)"
+      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
     },
     {
       "workflow": "ci.yml",
       "job": "ci-merge-group-ready",
-      "reason": "light merge_group gate job; runs on the fixed pool so merge checks do not queue behind PR CI on hosted runners (merge-queue throughput, #23586)"
+      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
     },
     {
       "workflow": "ci.yml",
       "job": "ci-merge-group-supersede",
-      "reason": "light merge_group gate job; runs on the fixed pool so merge checks do not queue behind PR CI on hosted runners (merge-queue throughput, #23586)"
+      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
     },
     {
       "workflow": "ci.yml",
@@ -55,17 +55,17 @@
     {
       "workflow": "pr-size-guard.yml",
       "job": "merge-group-fork",
-      "reason": "light merge_group gate job; runs on the fixed pool so merge checks do not queue behind PR CI on hosted runners (merge-queue throughput, #23586)"
+      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
     },
     {
       "workflow": "pr-size-guard.yml",
       "job": "merge-group-size",
-      "reason": "light merge_group gate job; runs on the fixed pool so merge checks do not queue behind PR CI on hosted runners (merge-queue throughput, #23586)"
+      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
     },
     {
       "workflow": "pr-size-guard.yml",
       "job": "merge-group-workflow-load",
-      "reason": "light merge_group gate job; runs on the fixed pool so merge checks do not queue behind PR CI on hosted runners (merge-queue throughput, #23586)"
+      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
     },
     {
       "workflow": "production-continuity.yml",
@@ -90,12 +90,12 @@
     {
       "workflow": "pr-fleet-rules.yml",
       "job": "*",
-      "reason": "light merge_group gate job; runs on the fixed pool so merge checks do not queue behind PR CI on hosted runners (merge-queue throughput, #23586)"
+      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
     },
     {
       "workflow": "pr-targets-main.yml",
       "job": "*",
-      "reason": "light merge_group gate job; runs on the fixed pool so merge checks do not queue behind PR CI on hosted runners (merge-queue throughput, #23586)"
+      "reason": "light merge_group gate job; hosted by default, routed to the fixed pool only while repo variable MERGE_GATE_POOL=fixed (hosted saturation fallback, #23586)"
     }
   ]
 }
