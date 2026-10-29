@@ -288,14 +288,11 @@ export class RateLimiter {
     }
 
     try {
-      const result = await withTimeout(
-        redisLimiter.getRemaining(identifier),
-        {
-          timeoutMs: REDIS_RATE_LIMIT_TIMEOUT_MS,
-          context: `rate-limit-read:${this.config.name}`,
-          timeoutMessage: `[RateLimit:${this.config.name}] Redis read timeout`,
-        }
-      );
+      const result = await withTimeout(redisLimiter.getRemaining(identifier), {
+        timeoutMs: REDIS_RATE_LIMIT_TIMEOUT_MS,
+        context: `rate-limit-read:${this.config.name}`,
+        timeoutMessage: `[RateLimit:${this.config.name}] Redis read timeout`,
+      });
       if (
         !Number.isFinite(result.limit) ||
         result.limit < 0 ||
