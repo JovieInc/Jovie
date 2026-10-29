@@ -94,7 +94,7 @@ jobs:
           # 2026-10-29). Fail here with the cause and the owner action.
           valid="$(curl -sS -m 20 -H "Authorization: Bearer ${SONAR_TOKEN}" https://sonarcloud.io/api/authentication/validate || true)"
           if ! printf '%s' "$valid" | grep -q '"valid":true'; then
-            echo "::error::SONAR_TOKEN is invalid or expired. Rotate it (ops/registry/credentials.json id sonarcloud-token): new token in SonarCloud account security, then gh secret set SONAR_TOKEN."
+            echo "::error::SONAR_TOKEN is invalid or expired. Rotate it (ops/registry/credentials.json id sonarcloud-token): create a new token in SonarCloud account security and store it as the SONAR_TOKEN repository secret."
             exit 1
           fi
 
