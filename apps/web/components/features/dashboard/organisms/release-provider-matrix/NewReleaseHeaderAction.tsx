@@ -46,7 +46,7 @@ export function NewReleaseHeaderAction({
   if (!canCreateManualReleases) {
     return (
       <DashboardHeaderActionButton
-        ariaLabel='Sync releases from Spotify'
+        ariaLabel={isSyncing ? 'Syncing...' : 'Sync from Spotify'}
         onClick={onSyncSpotify}
         disabled={isSyncing}
         icon={

@@ -59,7 +59,7 @@ describe('NewReleaseHeaderAction', () => {
     );
 
     const button = screen.getByRole('button', {
-      name: 'Sync releases from Spotify',
+      name: 'Sync from Spotify',
     });
     expect(button).toBeInTheDocument();
     fireEvent.click(button);
@@ -80,6 +80,24 @@ describe('NewReleaseHeaderAction', () => {
       screen.getByRole('button', { name: 'Create A New Release' })
     ).toBeInTheDocument();
     expect(screen.getByText('New release')).toBeInTheDocument();
+  });
+
+  it('names and disables the Spotify-only button while syncing', () => {
+    const onSyncSpotify = vi.fn();
+    render(
+      <NewReleaseHeaderAction
+        canCreateManualReleases={false}
+        isSyncing
+        onSyncSpotify={onSyncSpotify}
+        onCreateManual={vi.fn()}
+      />
+    );
+
+    const button = screen.getByRole('button', { name: 'Syncing...' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent('Syncing...');
+    fireEvent.click(button);
+    expect(onSyncSpotify).not.toHaveBeenCalled();
   });
 
   it('fires onSyncSpotify when "Sync from Spotify" is chosen', () => {

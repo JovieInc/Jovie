@@ -265,6 +265,7 @@ describe('publication range failures', () => {
     }
     for (const file of [
       'scripts/ci-branching-guard.mjs',
+      'scripts/component-ship-gate.mjs',
       'scripts/lib/policy-gate-liveness.mjs',
       'scripts/hooks/pre-push-gate.test.mjs',
     ]) {
