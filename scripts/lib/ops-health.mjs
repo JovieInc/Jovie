@@ -40,6 +40,11 @@ export function rollupStatus(dependencies) {
  * A dependency from a receipt (Summer's receiptFreshness model). A verified
  * receipt older than ttlMs is stale, which is reported as unknown with detail.
  */
+/**
+ * @param {string} name
+ * @param {any} receipt
+ * @param {any} [options]
+ */
 export function dependencyFromReceipt(
   name,
   { verified, observedAt, latencyMs = null },
@@ -60,6 +65,7 @@ export function dependencyFromReceipt(
 }
 
 /** Build an envelope. Unknown inputs stay explicit (null / unknown), never defaulted to healthy. */
+/** @param {any} input */
 export function buildOpsHealth({
   service,
   environment,

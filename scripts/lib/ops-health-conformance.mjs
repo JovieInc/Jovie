@@ -18,7 +18,8 @@ export function loadEndpointRegistry(path = ENDPOINTS_PATH) {
 /**
  * Where a deployed sha stands against the expected head.
  * `compare(repo, base, head)` returns GitHub's compare status and ahead/behind counts.
- * @returns {{state: 'identical'|'behind'|'ahead'|'diverged'|'unresolved', behindBy: number|null}}
+ * @param {{repo: string, headRef: string, deployedSha: string, compare: (repo: string, base: string, head: string) => Promise<any>}} input
+ * @returns {Promise<{state: 'identical'|'behind'|'ahead'|'diverged'|'unresolved', behindBy: number|null}>}
  */
 export async function resolveLag({ repo, headRef, deployedSha, compare }) {
   try {
@@ -46,7 +47,9 @@ function pick(json, path) {
 }
 
 /**
- * Check one endpoint. Never throws; every failure mode is a result.
+ * Check one endpoint.
+ * @param {any} endpoint
+ * @param {any} [options] Never throws; every failure mode is a result.
  * Result.verdict: 'ok' | 'fail' | 'pending' (not yet conforming, expected) | 'pending-conforms' (flip to enforced).
  */
 export async function checkEndpoint(
@@ -136,6 +139,7 @@ export function headsFromRegistry(registry) {
   return heads;
 }
 
+/** @param {any} [options] */
 export async function runConformance({
   registry = loadEndpointRegistry(),
   only = null,
