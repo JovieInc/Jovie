@@ -3,7 +3,7 @@
 // Usage: node scripts/turbo-cache-hit-rate.mjs <runId> [<runId> ...]
 // The CI timing collector records the same numbers as turbo_cache rows on a
 // sample of runs; this CLI is for ad-hoc before/after comparisons.
-import { execFileSync } from 'node:child_process';
+import { runGh } from '../packages/api-client/gh.ts';
 import {
   laneName,
   parseTurboCacheLog,
@@ -16,18 +16,15 @@ const rows = [];
 const backends = /** @type {Record<string, number>} */ ({});
 
 for (const runId of process.argv.slice(2)) {
-  let log = '';
-  try {
-    // gh run view --log prefixes each line with "<job>\t<step>\t".
-    log = execFileSync('gh', ['run', 'view', runId, '-R', repo, '--log'], {
-      encoding: 'utf8',
-      maxBuffer: 1 << 28,
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-  } catch {
-    console.error(`run ${runId}: log unavailable`);
+  // gh run view --log prefixes each line with "<job>\t<step>\t".
+  const result = await runGh(['run', 'view', runId, '-R', repo, '--log'], {
+    priority: 'report',
+  });
+  if (result.deferred || result.code !== 0) {
+    console.error(`run ${runId}: log unavailable (${result.code})`);
     continue;
   }
+  const log = result.stdout;
   /** @type {Map<string, string[]>} */
   const byJob = new Map();
   for (const line of log.split('\n')) {
