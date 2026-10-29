@@ -13,7 +13,9 @@
  *
  * Tiers (one App, permissions narrowed per request):
  *   fleet  code, PRs, issues; read-only checks/statuses/actions.
- *   ci     actions:write only (cancel/rerun runs). Needs a linked issue.
+ *   ci     actions:write (+ metadata read). Needed for cancel/rerun, but GitHub's actions:write
+ *          also allows dispatching, enabling and disabling workflows; the broker does not narrow it
+ *          further, so ci is granted per client and every issuance needs a linked issue.
  *   watch  internal only (hourly correlation): actions + metadata read; never grantable.
  *   admin  not mintable: rulesets/branch protection need administration:write, which jovie-bot
  *          does not have. That stays with a human.
@@ -324,21 +326,46 @@ interface WorkflowRow {
   updated_at: string;
 }
 
-/** Workflow states plus ruleset versions; about 3 + N(rulesets) calls per repo per hour. */
+export const MAX_PAGES = 10;
+
+function isWorkflowRow(w: unknown): w is WorkflowRow {
+  const r = w as WorkflowRow;
+  return (
+    Boolean(r) &&
+    Number.isInteger(r.id) &&
+    typeof r.name === 'string' &&
+    typeof r.path === 'string' &&
+    typeof r.state === 'string'
+  );
+}
+
+/**
+ * Workflow states plus ruleset versions; about 3 + N(rulesets) calls per repo per hour. Fails closed:
+ * a malformed page, a count that does not reach total_count, or more than MAX_PAGES pages throws,
+ * so the caller never diffs a partial set.
+ */
 export async function collectRepoState(
   repo: string,
   token: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<RepoStateItem[]> {
   const items: RepoStateItem[] = [];
-  for (let page = 1; page <= 5; page++) {
-    const body = await ghGet<{ workflows?: WorkflowRow[] }>(
+  let total = -1;
+  let workflows = 0;
+  for (let page = 1; ; page++) {
+    if (page > MAX_PAGES)
+      throw new Error(`${repo}: workflows exceed ${MAX_PAGES} pages`);
+    const body = await ghGet<{ total_count?: unknown; workflows?: unknown }>(
       `/repos/${repo}/actions/workflows?per_page=100&page=${page}`,
       token,
       fetchImpl
     );
-    const list = body.workflows ?? [];
-    for (const w of list)
+    if (!Number.isInteger(body.total_count) || !Array.isArray(body.workflows))
+      throw new Error(`${repo}: malformed workflows page ${page}`);
+    total = body.total_count as number;
+    for (const w of body.workflows) {
+      if (!isWorkflowRow(w))
+        throw new Error(`${repo}: malformed workflow row on page ${page}`);
       items.push({
         kind: 'workflow',
         id: w.id,
@@ -347,26 +374,61 @@ export async function collectRepoState(
         state: w.state,
         updated_at: w.updated_at,
       });
-    if (list.length < 100) break;
+      workflows++;
+    }
+    if (workflows >= total || body.workflows.length === 0) break;
   }
-  // A failed ruleset read fails the whole collection: skipping it would read as ruleset removals.
-  const rulesets = await ghGet<Array<{ id: number; name: string }>>(
-    `/repos/${repo}/rulesets?per_page=100`,
-    token,
-    fetchImpl
-  );
-  for (const r of rulesets) {
-    const full = await ghGet<{ updated_at?: string }>(
-      `/repos/${repo}/rulesets/${r.id}`,
+  if (workflows !== total)
+    throw new Error(`${repo}: collected ${workflows} of ${total} workflows`);
+
+  for (let page = 1; ; page++) {
+    if (page > MAX_PAGES)
+      throw new Error(`${repo}: rulesets exceed ${MAX_PAGES} pages`);
+    const list = await ghGet<unknown>(
+      `/repos/${repo}/rulesets?per_page=100&page=${page}`,
       token,
       fetchImpl
     );
-    items.push({
-      kind: 'ruleset',
-      id: r.id,
-      name: r.name,
-      updated_at: full.updated_at,
-    });
+    if (!Array.isArray(list))
+      throw new Error(`${repo}: malformed rulesets page ${page}`);
+    for (const r of list as Array<{ id?: unknown; name?: unknown }>) {
+      if (!Number.isInteger(r?.id) || typeof r?.name !== 'string')
+        throw new Error(`${repo}: malformed ruleset row`);
+      const full = await ghGet<{ updated_at?: unknown }>(
+        `/repos/${repo}/rulesets/${r.id}`,
+        token,
+        fetchImpl
+      );
+      if (typeof full.updated_at !== 'string')
+        throw new Error(`${repo}: ruleset ${r.id} has no updated_at`);
+      items.push({
+        kind: 'ruleset',
+        id: r.id as number,
+        name: r.name,
+        updated_at: full.updated_at,
+      });
+    }
+    if (list.length < 100) break;
   }
   return items;
+}
+
+/** Best-effort revoke of an installation token we must not hand out (e.g. its audit write failed). */
+export async function revokeInstallationToken(
+  token: string,
+  fetchImpl: typeof fetch = fetch
+): Promise<boolean> {
+  try {
+    const res = await fetchImpl('https://api.github.com/installation/token', {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${token}`,
+        accept: 'application/vnd.github+json',
+        'user-agent': 'jovie-fleet-audit',
+      },
+    });
+    return res.status === 204;
+  } catch {
+    return false;
+  }
 }

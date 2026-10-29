@@ -12,16 +12,22 @@ import {
   signBrokerRequest,
 } from './broker.ts';
 import worker, {
+  alertSummer,
+  applySnapshot,
   correlateWatchedRepos,
+  drainOutbox,
   handle,
   matchesTarget,
+  OUTBOX_MAX_ATTEMPTS,
   retain,
   sanitizeEvent,
 } from './index.ts';
 
-const MIGRATIONS = ['0001_init.sql', '0002_broker_grants.sql'].map(
-  f => new URL(`../../migrations/audit/${f}`, import.meta.url)
-);
+const MIGRATIONS = [
+  '0001_init.sql',
+  '0002_broker_grants.sql',
+  '0003_alert_outbox.sql',
+].map(f => new URL(`../../migrations/audit/${f}`, import.meta.url));
 
 /** Minimal D1 stand-in over node:sqlite (same SQL dialect). */
 function d1() {
@@ -38,7 +44,18 @@ function d1() {
   });
   return {
     prepare: sql => stmt(sql),
-    batch: async list => Promise.all(list.map(s => s.run())),
+    batch: async list => {
+      db.exec('BEGIN');
+      try {
+        const out = [];
+        for (const st of list) out.push(await st.run());
+        db.exec('COMMIT');
+        return out;
+      } catch (err) {
+        db.exec('ROLLBACK');
+        throw err;
+      }
+    },
     raw: db,
   };
 }
@@ -235,13 +252,24 @@ test('target matching uses id, name, or workflow file', () => {
           target: 'repos/JovieInc/Jovie/actions/workflows/368087390/disable',
         })
       ),
-      it
+      it,
+      'JovieInc/Jovie'
     )
   );
   assert.ok(
-    matchesTarget(sanitizeEvent(ev({ target: 'lane-fix-relay.yml' })), it)
+    matchesTarget(
+      sanitizeEvent(ev({ target: 'lane-fix-relay.yml' })),
+      it,
+      'JovieInc/Jovie'
+    )
   );
-  assert.ok(!matchesTarget(sanitizeEvent(ev({ target: 'ci.yml' })), it));
+  assert.ok(
+    !matchesTarget(
+      sanitizeEvent(ev({ target: 'ci.yml' })),
+      it,
+      'JovieInc/Jovie'
+    )
+  );
 });
 
 test('retention archives to R2 before deleting, and never deletes without an archive', async () => {
@@ -333,6 +361,7 @@ test('hourly cron correlation: mints a watch token, reads state, attributes a di
     if (String(url).includes('/actions/workflows'))
       return new Response(
         JSON.stringify({
+          total_count: 1,
           workflows: [
             {
               id: 368087390,
@@ -671,7 +700,12 @@ function stateFetch(state) {
       );
     if (state.fail) return new Response('{}', { status: 502 });
     if (u.includes('/actions/workflows'))
-      return new Response(JSON.stringify({ workflows: state.workflows }));
+      return new Response(
+        JSON.stringify({
+          total_count: state.workflows.length,
+          workflows: state.workflows,
+        })
+      );
     if (/\/rulesets\/\d+$/.test(u))
       return new Response(
         JSON.stringify({ updated_at: '2026-10-29T00:00:00Z' })
@@ -873,6 +907,258 @@ test('review 4c: oversized snapshots are rejected instead of truncated into fals
     env()
   );
   assert.equal(res.status, 400);
+});
+
+// ---------------------------------------------------------------- re-review of #23742 at d7532ce1f0
+
+test('re-review 1: attribution needs the exact normalized repo and exact object', () => {
+  const it = {
+    kind: 'workflow',
+    id: 368087390,
+    name: 'Lane Fix Relay',
+    path: '.github/workflows/lane-fix-relay.yml',
+  };
+  const m = over =>
+    matchesTarget(sanitizeEvent(ev(over)), it, 'JovieInc/Jovie');
+  assert.ok(m({}));
+  assert.ok(
+    m({ repo: 'https://github.com/JovieInc/Jovie.git' }),
+    'URL form normalizes'
+  );
+  assert.ok(!m({ repo: 'JovieInc/Jovie-old' }), 'no repo substring');
+  assert.ok(!m({ repo: null }), 'missing repo never attributes');
+  assert.ok(!m({ repo: 'origin' }), 'a git remote name is not a repository');
+  assert.ok(!m({ target: 'Lane Fix Relay (copy)' }), 'no target substring');
+  assert.ok(
+    !m({
+      target: 'repos/JovieInc/Other/actions/workflows/368087390/disable',
+      repo: null,
+    }),
+    'path repo must match'
+  );
+  assert.ok(
+    !m({ target: 'repos/JovieInc/Jovie/rulesets/368087390' }),
+    'path kind must match'
+  );
+  assert.ok(
+    m({
+      target: 'repos/JovieInc/Jovie/actions/workflows/368087390/disable',
+      repo: null,
+    }),
+    'path names the repo'
+  );
+});
+
+test('re-review 2a: snapshot state, correlations and alerts are one transaction', async () => {
+  const e = env();
+  const repo = 'JovieInc/Jovie';
+  const item = st => ({
+    kind: 'workflow',
+    id: 7,
+    name: 'Relay',
+    state: st,
+    updated_at: '2026-10-29T00:23:50Z',
+  });
+  await handle(
+    signed('/v1/snapshot', { repo, items: [item('active')] }),
+    e,
+    new Date('2026-10-29T00:00:00Z')
+  );
+  e.AUDIT_DB.raw.exec('DROP TABLE alert_outbox'); // the alert write will fail mid-batch
+  await assert.rejects(
+    applySnapshot(
+      e,
+      repo,
+      [item('disabled_manually')],
+      '2026-10-29T01:00:00.000Z',
+      'cron'
+    )
+  );
+  const snap = e.AUDIT_DB.raw
+    .prepare(`SELECT value FROM snapshots WHERE key = '${repo}:workflow:7'`)
+    .get();
+  assert.equal(
+    snap.value,
+    'active',
+    'state did not advance without its correlation and alert'
+  );
+  assert.equal(
+    e.AUDIT_DB.raw.prepare('SELECT COUNT(*) AS n FROM correlations').get().n,
+    0
+  );
+});
+
+test('re-review 2b: a failed alert delivery keeps bounded retry state and is retried', async () => {
+  const e = env({
+    MESH_TOKEN: 't',
+    MESH_SENDER_ID: 's',
+    MESH_SENDER_KIND: 'claude',
+  });
+  const realFetch = globalThis.fetch;
+  let up = false;
+  globalThis.fetch = async () => new Response('{}', { status: up ? 200 : 503 });
+  try {
+    assert.equal(await alertSummer(e, 'hello'), false);
+    let row = e.AUDIT_DB.raw
+      .prepare(
+        'SELECT attempts, delivered_at, last_error, next_attempt_at FROM alert_outbox'
+      )
+      .get();
+    assert.equal(row.attempts, 1);
+    assert.equal(row.delivered_at, null);
+    assert.equal(row.last_error, 'http_503');
+    assert.ok(
+      Date.parse(row.next_attempt_at) > Date.now(),
+      'backoff scheduled'
+    );
+    up = true;
+    assert.deepEqual(await drainOutbox(e, new Date(Date.now() + 3_600_000)), {
+      delivered: 1,
+      failed: 0,
+    });
+    row = e.AUDIT_DB.raw
+      .prepare('SELECT attempts, delivered_at FROM alert_outbox')
+      .get();
+    assert.ok(row.delivered_at);
+    up = false;
+    await alertSummer(e, 'never delivered');
+    for (let i = 0; i < 20; i++)
+      await drainOutbox(e, new Date(Date.now() + (i + 1) * 7 * 3_600_000));
+    const dead = e.AUDIT_DB.raw
+      .prepare(
+        "SELECT attempts FROM alert_outbox WHERE body = 'never delivered'"
+      )
+      .get();
+    assert.equal(dead.attempts, OUTBOX_MAX_ATTEMPTS, 'retries are bounded');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test('re-review 3a: incomplete pagination and malformed pages fail closed', async () => {
+  const row = i => ({
+    id: i,
+    name: `w${i}`,
+    path: `.github/workflows/w${i}.yml`,
+    state: 'active',
+  });
+  const pages =
+    (wf, rulesets = []) =>
+    async url => {
+      const u = new URL(String(url));
+      if (u.pathname.endsWith('/actions/workflows'))
+        return new Response(
+          JSON.stringify(wf(Number(u.searchParams.get('page'))))
+        );
+      if (/\/rulesets\/\d+$/.test(u.pathname))
+        return new Response(
+          JSON.stringify({ updated_at: '2026-10-01T00:00:00Z' })
+        );
+      return new Response(JSON.stringify(rulesets));
+    };
+  const full = await collectRepoState(
+    'JovieInc/Jovie',
+    't',
+    pages(p => ({
+      total_count: 150,
+      workflows: Array.from({ length: p === 1 ? 100 : 50 }, (_, i) =>
+        row((p - 1) * 100 + i)
+      ),
+    }))
+  );
+  assert.equal(full.length, 150);
+  await assert.rejects(
+    collectRepoState(
+      'JovieInc/Jovie',
+      't',
+      pages(p => ({
+        total_count: 150,
+        workflows: p === 1 ? Array.from({ length: 100 }, (_, i) => row(i)) : [],
+      }))
+    ),
+    /collected 100 of 150/
+  );
+  await assert.rejects(
+    collectRepoState(
+      'JovieInc/Jovie',
+      't',
+      pages(() => ({ workflows: [] }))
+    ),
+    /malformed workflows/
+  );
+  await assert.rejects(
+    collectRepoState(
+      'JovieInc/Jovie',
+      't',
+      pages(() => ({ total_count: 1, workflows: [{ id: 'x' }] }))
+    ),
+    /malformed workflow row/
+  );
+  await assert.rejects(
+    collectRepoState(
+      'JovieInc/Jovie',
+      't',
+      pages(() => ({ total_count: 0, workflows: [] }), { bad: true })
+    ),
+    /malformed rulesets/
+  );
+});
+
+test('re-review 3b: an empty first snapshot still sets a baseline, so later additions are drift', async () => {
+  const e = env();
+  const repo = 'JovieInc/gbrain';
+  let res = await handle(
+    signed('/v1/snapshot', { repo, items: [] }),
+    e,
+    new Date('2026-10-29T00:00:00Z')
+  );
+  assert.deepEqual((await res.json()).changes, []);
+  const rs = {
+    kind: 'ruleset',
+    id: 9,
+    name: 'new rule',
+    updated_at: '2026-10-29T00:30:00Z',
+  };
+  res = await handle(
+    signed('/v1/snapshot', { repo, items: [rs] }),
+    e,
+    new Date('2026-10-29T01:00:00Z')
+  );
+  const [change] = (await res.json()).changes;
+  assert.match(change.change, /added/);
+  assert.equal(change.status, 'unattributed');
+});
+
+test('re-review 4: if the issuance audit write fails, the token is revoked and never returned', async () => {
+  const e = brokerEnv();
+  e.AUDIT_DB.raw.exec('DROP TABLE events');
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init = {}) => {
+    calls.push(`${init.method ?? 'GET'} ${new URL(String(url)).pathname}`);
+    if (String(url).endsWith('/access_tokens'))
+      return new Response(
+        JSON.stringify({
+          token: 'ghs_secret',
+          expires_at: '2026-10-29T13:00:00Z',
+          permissions: {},
+        })
+      );
+    return new Response(null, { status: 204 });
+  };
+  try {
+    const res = await handle(
+      await brokerRequest({ scope: 'fleet', reason: 'push the fix branch' }),
+      e,
+      NOW
+    );
+    assert.equal(res.status, 503);
+    const text = await res.text();
+    assert.ok(!text.includes('ghs_secret'));
+    assert.ok(calls.includes('DELETE /installation/token'));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });
 
 test('scheduled handler runs the budget check without throwing', async () => {
