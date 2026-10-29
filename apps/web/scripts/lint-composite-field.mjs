@@ -10,7 +10,7 @@
  * square default ring inside a rounded pill (the homepage claim field bug,
  * 2026-10-28).
  *
- * Ratchet: existing offenders live in composite-field.debt.json and the
+ * Ratchet: existing offenders live in composite-field.baseline.json and the
  * count can only go down. Migrate an offender to CompositeField, then run
  * `--update`. A new offender fails the gate.
  *
@@ -27,7 +27,7 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const webRoot = join(here, '..');
 const repoRoot = join(webRoot, '..', '..');
-export const BASELINE_PATH = join(webRoot, 'composite-field.debt.json');
+export const BASELINE_PATH = join(webRoot, 'composite-field.baseline.json');
 
 const INPUT_TAG = /<(?:input|textarea|Input|Textarea)\b/g;
 export const DROPS_OWN_FOCUS =
