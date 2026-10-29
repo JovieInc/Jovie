@@ -16,10 +16,47 @@ class SwarmPolicyTest(unittest.TestCase):
         for path in ("apps/web/components/Button.tsx", "docs/README.md", "scripts/ci-fast-lanes.mjs"):
             self.assertFalse(swarm.SENSITIVE.search(path), path)
 
-    def test_sensitive_gate_blocks_model_edits_only(self):
-        src = Path(swarm.__file__).read_text()
-        self.assertIn('plan["action"] in {classes.AGENT, classes.WIRE_CI_FAST}', src)
-        self.assertNotIn('why = "sensitive-paths->codex"', src)
+    def _gate(self, failures, pending, log, *, sensitive=False, agent="true", receipts=None):
+        import types, tempfile
+        calls = {"claim": 0, "rerun": 0}
+        saved = {k: getattr(swarm, k) for k in ("latest_failures", "job_log_tail", "receipts_for", "take_claim", "finish_plan", "rerun_failed")}
+        swarm.latest_failures = lambda sha: (failures, pending)
+        swarm.job_log_tail = lambda run: log
+        swarm.receipts_for = lambda n, sha, key: receipts or {"fp": 0, "sha": 0}
+        swarm.take_claim = lambda plan, n: calls.__setitem__("claim", calls["claim"] + 1)
+        swarm.rerun_failed = lambda f: calls.__setitem__("rerun", calls["rerun"] + 1)
+        swarm.finish_plan = lambda plan, a: 0
+        try:
+            with tempfile.TemporaryDirectory() as d:
+                a = types.SimpleNamespace(agent=agent, log=str(Path(d) / "l.log"))
+                plan = {"pr": 9, "sha": "abc", "sensitive": sensitive}
+                swarm.prepare_red(a, plan, {"mergeable_state": "blocked"})
+                return plan, calls
+        finally:
+            for k, v in saved.items():
+                setattr(swarm, k, v)
+
+    def test_gate_skips_for_free_and_only_claims_real_work(self):
+        red = [{"name": "Source Validation", "conclusion": "failure", "id": 1}]
+        err = "AssertionError: expected 1 to equal 2\n  at scripts/foo.test.mjs:12:3"
+        plan, c = self._gate([], False, "")
+        self.assertEqual((plan["reason"], c["claim"]), ("no-failing-checks", 0))
+        plan, c = self._gate(red, True, err)
+        self.assertEqual((plan["reason"], c["claim"]), ("ci-running", 0))
+        plan, c = self._gate(red, False, "Post job cleanup.\nnothing useful")
+        self.assertEqual((plan["reason"], c["claim"]), ("no-concrete-error", 0))
+        plan, c = self._gate(red, False, err, sensitive=True)
+        self.assertEqual((plan["reason"], c["claim"]), ("sensitive-paths->codex", 0))
+        plan, c = self._gate(red, False, err, agent="false")
+        self.assertEqual((plan["reason"], c["claim"]), ("model-budget-closed", 0))
+        plan, c = self._gate(red, False, err, receipts={"fp": 0, "sha": 1})
+        self.assertEqual((plan["reason"], c["claim"]), ("already-handled-sha", 0))
+        plan, c = self._gate(red, False, err)
+        self.assertEqual((plan["action"], c["claim"]), ("agent", 1))
+        plan, c = self._gate(red, False, "API rate limit exceeded for installation\n::error::x")
+        self.assertEqual((plan["fix"], c["claim"], c["rerun"]), ("rerun-failed-jobs", 1, 1))
+        plan, c = self._gate(red, False, "generated workflow DAG is stale; run pnpm ci:topology:write\n::error::x")
+        self.assertEqual((plan["action"], plan["regen"], c["claim"]), ("regen", "pnpm ci:topology:write", 1))
 
     def test_launch_shepherd_prs_are_excluded(self):
         self.assertTrue({23495, 23519} <= swarm.EXCLUDED)
@@ -114,10 +151,43 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             swarm.gh_json = original
 
-    def test_agent_reads_the_failure_log_from_inside_the_checkout(self):
-        src = Path(swarm.__file__).read_text()
-        self.assertIn('log=".swarm-failed.log"', src)
-        self.assertIn(".git\" / \"info\" / \"exclude", src.replace("'", '"'))
+    def test_model_context_is_the_error_plus_the_named_files_and_bounded(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "scripts").mkdir()
+            (Path(d) / "scripts/foo.mjs").write_text("x" * 40_000)
+            (Path(d) / "scripts/bar.mjs").write_text("y" * 40_000)
+            (Path(d) / "scripts/baz.mjs").write_text("z" * 40_000)
+            out = swarm.named_files("Error in scripts/foo.mjs:3 and scripts/bar.mjs and scripts/baz.mjs and missing/nope.ts", d)
+            self.assertIn("--- scripts/foo.mjs ---", out)
+            self.assertNotIn("nope.ts", out)
+            self.assertLessEqual(len(out), swarm.CONTEXT_CHARS + 500)
+            self.assertEqual(swarm.named_files("Error in apps/web/lib/auth/session.ts", d), "(none of the named files exist in the checkout)")
+
+    def test_gate_needs_a_concrete_error_and_flags_regen_from_a_fixed_table(self):
+        self.assertFalse(swarm.concrete_error("cleanup line\nPost job cleanup.\n--- tail ---\nAssertionError in tail"))
+        self.assertTrue(swarm.concrete_error("AssertionError: expected 1\n--- tail ---\nx"))
+        self.assertFalse(swarm.concrete_error(""))
+        joined = "generated workflow DAG is stale; run pnpm ci:topology:write"
+        self.assertEqual(next(c for _, p, c in swarm.REGEN if p.search(joined)), "pnpm ci:topology:write")
+
+    def test_summary_reports_gate_skip_rate_and_alarms_on_cost_per_greened(self):
+        import contextlib, io, tempfile
+        rows = [{"outcome": "skipped", "reason": "no-failing-checks", "calls": 3},
+                {"outcome": "skipped", "reason": "no-concrete-error", "calls": 4},
+                {"outcome": "gave-up", "model": "m", "costUsd": 0.2, "calls": 9},
+                {"outcome": "agent-fixed", "model": "m", "costUsd": 0.05, "calls": 9}]
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "a.jsonl").write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+            class A: pass
+            a = A(); a.dir = tmp; a.out = str(Path(tmp) / "o.md")
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                swarm.cmd_summarize(a)
+            text = Path(a.out).read_text()
+            self.assertIn("gate-skipped=2/4 (50%)", text)
+            self.assertIn("usd-per-greened=$0.2500", text)
+            self.assertIn("::warning title=swarm cost per greened PR", buf.getvalue())
 
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"

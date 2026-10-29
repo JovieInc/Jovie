@@ -931,6 +931,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 3

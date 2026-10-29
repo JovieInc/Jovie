@@ -276,17 +276,48 @@ def latest_failures(sha: str) -> tuple[list[dict], bool]:
     return red, pending
 
 
-def job_log_tail(run: dict, n: int = 400) -> str:
+ERROR_LINE = re.compile(r"##\[error\]|::error|\bFAIL\b|✖|AssertionError|ERR_[A-Z_]+|\bError:|Unwired|exit code [1-9]|: FAIL$")
+ANSI = re.compile(r"\x1b\[[0-9;]*m|\[\d+(?:;\d+)*m")
+
+
+def extract_failure(text: str, tail: int = 60, context: int = 6, cap: int = 220) -> str:
+    """The lines that explain a failed job: every error-looking line with a little context, then the tail.
+    The raw tail alone is post-job cleanup noise for most failures."""
+    lines = [ANSI.sub("", re.sub(r"^\S+Z ", "", l)) for l in text.splitlines()]
+    # Best case: the output of the failing step (after its command echo, up to its ##[error] line).
+    errs = [i for i, l in enumerate(lines) if l.startswith("##[error]")]
+    if errs:
+        end = errs[-1]
+        groups = [i for i, l in enumerate(lines[:end]) if l.startswith("##[endgroup]")]
+        if groups:
+            span = lines[groups[-1] + 1:end + 2]
+            if any(l.strip() for l in span):
+                return "\n".join(span[-cap:] + ["--- tail ---"] + lines[-tail:][-20:])
+    keep: set[int] = set()
+    for i, line in enumerate(lines):
+        if ERROR_LINE.search(line) and "✓" not in line and "continue-on-error" not in line \
+                and not line.lstrip().startswith(("env:", "echo ", "if ")):
+            keep.update(range(max(0, i - context), min(len(lines), i + context + 1)))
+    picked = sorted(keep)[-cap:]
+    out = [lines[i] for i in picked]
+    return "\n".join(out + ["--- tail ---"] + lines[-tail:])
+
+
+def job_log_tail(run: dict) -> str:
     out = gh(["api", f"repos/{REPO}/actions/jobs/{run['id']}/logs"])
     if out.returncode != 0:
         return ""
-    lines = out.stdout.splitlines()
-    return "\n".join(lines[-n:])
+    return extract_failure(out.stdout)
 
 
-def attempts_for(number: int, key: str) -> int:
-    rows = gh_json(["api", f"repos/{REPO}/issues/{number}/comments?per_page=100&since={iso(now() - 24 * 3600)}"])
-    return sum(1 for r in rows if (r.get("body") or "").startswith("🤖 swarm receipt") and f"fp={key}" in r["body"])
+def receipts_for(number: int, sha: str, key: str) -> dict | None:
+    """Swarm receipts on the PR in the last 24h: {fp: attempts for this failure, sha: handled this head}."""
+    try:
+        rows = gh_json(["api", f"repos/{REPO}/issues/{number}/comments?per_page=100&since={iso(now() - 24 * 3600)}"])
+    except RuntimeError:
+        return {"fp": MAX_ATTEMPTS, "sha": 0}  # unreadable evidence fails closed: no attempt
+    mine = [r.get("body") or "" for r in rows if (r.get("body") or "").startswith("🤖 swarm receipt")]
+    return {"fp": sum(1 for b in mine if f"fp={key}" in b), "sha": sum(1 for b in mine if f"sha={sha}" in b)}
 
 
 def cmd_prepare(a) -> int:
@@ -315,9 +346,9 @@ def cmd_prepare(a) -> int:
         if why:
             plan.update(outcome="skipped", reason=why)
             return finish_plan(plan, a)
-        body = f"🤖 lane claim kind=fix sha={plan['sha']} host={HOST} at={iso()} run={os.environ.get('GITHUB_RUN_ID', '')}"
-        cid = gh_json(["api", f"repos/{REPO}/issues/{n}/comments", "-f", f"body={body}"])["id"]
-        plan["claimId"] = cid
+        if a.mode == "red":
+            return prepare_red(a, plan, pr)
+        take_claim(plan, n)
         if a.mode == "behind":
             if pr.get("mergeable_state") != "behind" or pr.get("draft"):
                 plan.update(outcome="skipped", reason="not-behind", action="none")
@@ -335,34 +366,88 @@ def cmd_prepare(a) -> int:
             else:
                 plan.update(cls="conflict", action="sync-main", fp="conflict")
             return finish_plan(plan, a)
-        failures, pending = latest_failures(plan["sha"])
-        if pending:
-            plan.update(outcome="skipped", reason="ci-running", action="none")
-            return finish_plan(plan, a)
-        logs = {r["name"]: job_log_tail(r) for r in failures[:4]}
-        view = {"mergeStateStatus": "BEHIND" if pr.get("mergeable_state") == "behind" else "BLOCKED",
-                "statusCheckRollup": [{"name": r["name"], "conclusion": (r["conclusion"] or "").upper()} for r in failures]}
-        cls = classes.classify(view, logs)
-        plan.update(cls=cls["cls"], fp=cls["key"], action=cls["action"], files_hint=cls["files"],
-                    checks=cls["checks"], signature=cls["signature"], mergeable=pr.get("mergeable_state"))
-        if pr.get("mergeable_state") == "dirty":
-            plan.update(action="sync-main", cls="conflict")
-        if plan.get("sensitive") and plan["action"] in {classes.AGENT, classes.WIRE_CI_FAST}:
-            plan.update(outcome="skipped", reason="sensitive-paths->codex", action="none")
-        elif plan["action"] == classes.AGENT and a.agent != "true":
-            plan.update(outcome="skipped", reason="model-budget-closed", action="none")
-        elif plan["action"] == classes.AGENT:
-            if attempts_for(n, cls["key"]) >= MAX_ATTEMPTS:
-                plan.update(outcome="gave-up", reason="attempt-cap->lanes", action="none")
-            else:
-                Path(a.log).write_text("\n\n".join(f"## {k}\n{v}" for k, v in logs.items()))
-        elif plan["action"] == classes.RERUN:
-            rerun_failed(failures)
-            plan.update(outcome="deterministic-fixed", fix="rerun-failed-jobs", action="none")
-        elif not failures:
-            plan.update(outcome="skipped", reason="no-failures", action="none")
     except Exception as exc:  # never raise past the claim: finalize must release it
         plan.update(outcome="error", reason=str(exc)[:200], action="none")
+    return finish_plan(plan, a)
+
+
+def take_claim(plan: dict, n: int) -> None:
+    body = f"🤖 lane claim kind=fix sha={plan['sha']} host={HOST} at={iso()} run={os.environ.get('GITHUB_RUN_ID', '')}"
+    plan["claimId"] = gh_json(["api", f"repos/{REPO}/issues/{n}/comments", "-f", f"body={body}"])["id"]
+
+
+# Deterministic regenerations: the command comes from this table, never from a log.
+REGEN = (
+    ("workflow-topology", re.compile(r"generated workflow DAG is stale|ci:topology:write"), "pnpm ci:topology:write"),
+    ("repository-docs", re.compile(r"repository_docs\.py --write"), "python3 scripts/repository_docs.py --write"),
+)
+# Classes a model cannot fix by editing files in the checkout.
+NOT_MODEL_FIXABLE = frozenset({"pr-body"})
+GATE_SKIPS = frozenset({"ci-running", "no-failing-checks", "no-concrete-error", "already-handled-sha",
+                        "deterministic-unsupported->lanes", "not-model-fixable->lanes", "sensitive-paths->codex",
+                        "model-budget-closed", "attempt-cap->lanes"})
+
+
+def concrete_error(text: str) -> bool:
+    """True when the extract holds an actual error line (not just cleanup noise or nothing)."""
+    body = text.split("--- tail ---")[0]
+    return any(ERROR_LINE.search(l) and "✓" not in l for l in body.splitlines())
+
+
+def prepare_red(a, plan: dict, pr: dict) -> int:
+    """Everything up to the claim costs $0 and posts nothing: only a PR that reaches a fixing action is
+    claimed. Only a model-fixable class with a concrete error extract reaches the model."""
+    n, sha = plan["pr"], plan["sha"]
+    failures, pending = latest_failures(sha)
+    if pending:
+        plan.update(outcome="skipped", reason="ci-running", action="none")
+        return finish_plan(plan, a)
+    if not failures:
+        plan.update(outcome="skipped", reason="no-failing-checks", action="none")
+        return finish_plan(plan, a)
+    logs = {r["name"]: job_log_tail(r) for r in failures[:4]}
+    view = {"mergeStateStatus": "BEHIND" if pr.get("mergeable_state") == "behind" else "BLOCKED",
+            "statusCheckRollup": [{"name": r["name"], "conclusion": (r["conclusion"] or "").upper()} for r in failures]}
+    cls = classes.classify(view, logs)
+    plan.update(cls=cls["cls"], fp=cls["key"], action=cls["action"], files_hint=cls["files"],
+                checks=cls["checks"], signature=cls["signature"], mergeable=pr.get("mergeable_state"))
+    if pr.get("mergeable_state") == "dirty":
+        plan.update(action="sync-main", cls="conflict")
+    joined = "\n".join(logs.values())
+    regen = next((cmd for name, pat, cmd in REGEN if pat.search(joined)), None)
+    action = plan["action"]
+    skip = None
+    if regen and action == classes.AGENT:
+        plan.update(action="regen", regen=regen, cls="regen")
+        action = "regen"
+    elif action == classes.RENUMBER:
+        skip = "deterministic-unsupported->lanes"
+    elif action == classes.AGENT:
+        if cls["cls"] in NOT_MODEL_FIXABLE:
+            skip = "not-model-fixable->lanes"
+        elif not concrete_error(joined):
+            skip = "no-concrete-error"
+        elif plan.get("sensitive"):
+            skip = "sensitive-paths->codex"
+        elif a.agent != "true":
+            skip = "model-budget-closed"
+    elif action == classes.WIRE_CI_FAST and plan.get("sensitive"):
+        skip = "sensitive-paths->codex"
+    if not skip:
+        counts = receipts_for(n, sha, cls["key"])
+        if counts["sha"]:
+            skip = "already-handled-sha"
+        elif action == classes.AGENT and counts["fp"] >= MAX_ATTEMPTS:
+            skip = "attempt-cap->lanes"
+    if skip:
+        plan.update(outcome="skipped", reason=skip, action="none")
+        return finish_plan(plan, a)
+    take_claim(plan, n)
+    if action == classes.RERUN:
+        rerun_failed(failures)
+        plan.update(outcome="deterministic-fixed", fix="rerun-failed-jobs", action="none")
+    elif action == classes.AGENT:
+        Path(a.log).write_text("\n\n".join(f"## {k}\n{v}" for k, v in logs.items()))
     return finish_plan(plan, a)
 
 
@@ -416,6 +501,21 @@ def diff_stats(cwd: str, base: str) -> tuple[list[str], int]:
     stat = sh(["git", "diff", "--numstat", base], cwd).stdout.split("\n")
     lines = sum(int(p[0]) + int(p[1]) for s in stat if (p := s.split("\t")) and len(p) == 3 and p[0].isdigit() and p[1].isdigit())
     return names, lines
+
+
+def cmd_regen(a) -> int:
+    plan = json.loads(Path(a.plan).read_text())
+    cmd = plan.get("regen")
+    if cmd not in {c for _, _, c in REGEN}:  # only table commands ever run
+        plan.update(outcome="gave-up", reason="regen-not-allowlisted")
+    else:
+        res = subprocess.run(cmd, shell=True, cwd=a.cwd, capture_output=True, text=True, timeout=600)
+        if res.returncode != 0:
+            plan.update(outcome="gave-up", reason="regen-failed:" + (res.stderr or res.stdout)[-80:].strip())
+        else:
+            plan.update(fix="regen:" + cmd, deterministic=True)
+    Path(a.plan).write_text(json.dumps(plan))
+    return 0
 
 
 def cmd_guard(a) -> int:
@@ -510,7 +610,7 @@ def release_claim(plan: dict) -> None:
 
 
 def receipt(plan: dict) -> None:
-    body = (f"🤖 swarm receipt pr={plan['pr']} fp={plan.get('fp', '-')} class={plan.get('cls', '-')} "
+    body = (f"🤖 swarm receipt pr={plan['pr']} sha={plan['sha']} fp={plan.get('fp', '-')} class={plan.get('cls', '-')} "
             f"outcome={plan['outcome']} fix={plan.get('fix', plan.get('reason', '-'))} model={plan.get('model', '-')} "
             f"cost_usd={plan.get('costUsd', 0)} seconds={plan['seconds']} api_calls={plan['calls']}")
     gh(["api", f"repos/{REPO}/issues/{plan['pr']}/comments", "-f", f"body={body}"])
@@ -521,11 +621,41 @@ def receipt(plan: dict) -> None:
 
 PROMPT = """You are a bounded CI remediator for one failing pull request in this repo.
 Failing checks: {checks}. Failure class: {cls}.
-The failed job log tail is in {log}. Fix ONLY what the log shows, editing the fewest files.
+Below are the extracted error and the files it names (truncated). Fix ONLY what the error shows,
+editing the fewest files. Do not explore the repo; the files you need are below.
 Rules: never edit tests to make them pass (no skip/only/deleted assertions), never touch auth, billing,
 migrations, secrets, .github or canon files, never add dependencies, never use --no-verify.
-Do not commit or push. Stop after the minimal fix; if the failure is not fixable in a few small
-edits, change nothing."""
+Do not commit or push. If the error is not fixable with a few small edits, change nothing.
+
+=== ERROR EXTRACT ===
+{error}
+
+=== FILES NAMED IN THE ERROR ===
+{files}
+"""
+CONTEXT_CHARS = 60_000  # about 15-20k tokens of named files
+ERROR_CHARS = 8_000
+FILE_REF = re.compile(r"(?<![\w/.-])((?:[\w.@-]+/)*[\w.@-]+\.(?:tsx?|mjs|cjs|jsx?|py|json|ya?ml|md|sh))(?::\d+)?")
+
+
+def named_files(error: str, cwd: str) -> str:
+    """Contents of repo files the error names, bounded in total and per file; sensitive paths excluded."""
+    seen, out, used = set(), [], 0
+    for m in FILE_REF.finditer(error):
+        rel = m.group(1)
+        path = Path(cwd) / rel
+        if rel in seen or SENSITIVE.search(rel) or not path.is_file() or ".." in rel:
+            continue
+        seen.add(rel)
+        try:
+            text = path.read_text()[:15_000]
+        except (OSError, UnicodeDecodeError):
+            continue
+        if used + len(text) > CONTEXT_CHARS:
+            break
+        used += len(text)
+        out.append(f"--- {rel} ---\n{text}")
+    return "\n\n".join(out) or "(none of the named files exist in the checkout)"
 
 
 CREDIT_TEXT = re.compile(r"insufficient[_ ]funds|insufficient credit|payment required|\"status\"\s*:\s*402", re.I)
@@ -595,18 +725,9 @@ def cmd_agent(a) -> int:
               "agent": {"build": {"steps": a.max_steps}}}
     env = {k: v for k, v in os.environ.items() if k not in {"SWARM_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"}}
     env["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
-    # external_directory is denied, so the agent can only read a log that lives inside the checkout.
-    # It is excluded from git so the diff guard and the commit never see it.
-    inside = Path(a.cwd) / ".swarm-failed.log"
-    try:
-        inside.write_text(Path(a.log).read_text())
-        exclude = Path(a.cwd) / ".git" / "info" / "exclude"
-        exclude.parent.mkdir(parents=True, exist_ok=True)
-        with exclude.open("a") as fh:
-            fh.write("\n.swarm-failed.log\n")
-    except OSError:
-        pass
-    prompt = PROMPT.format(checks=", ".join(plan.get("checks", [])), cls=plan.get("cls"), log=".swarm-failed.log")
+    error = Path(a.log).read_text()[:ERROR_CHARS]
+    prompt = PROMPT.format(checks=", ".join(plan.get("checks", [])), cls=plan.get("cls"), error=error,
+                           files=named_files(error, a.cwd))
     started = now()
     acc = {"in": 0, "out": 0}
     reported = 0.0
@@ -646,7 +767,6 @@ def cmd_agent(a) -> int:
     cost = max(acc["in"] * p_in + acc["out"] * p_out, reported)
     meta = {"model": model, "costUsd": round(cost, 5), "tokens": acc, "agentSeconds": int(now() - started),
             "agentSaid": last_text}
-    inside.unlink(missing_ok=True)
     if blocked_credits:
         meta["costUsd"] = 0  # no credit means nothing was charged: never reaches the ledger
         plan.update(outcome="blocked-credits", reason="gateway-insufficient_funds")
@@ -674,6 +794,9 @@ def sum_reported_cost(node) -> float:
 
 # ---------------------------------------------------------------- summarize
 
+ALARM_USD_PER_GREENED = 0.10
+
+
 def cmd_summarize(a) -> int:
     rows = [json.loads(l) for p in Path(a.dir).rglob("*.jsonl") for l in p.read_text().splitlines() if l.strip()]
     by: dict[str, int] = {}
@@ -681,19 +804,31 @@ def cmd_summarize(a) -> int:
         by[r["outcome"]] = by.get(r["outcome"], 0) + 1
     cost = sum(float(r.get("costUsd") or 0) for r in rows)
     api = sum(int(r.get("calls") or 0) for r in rows)
-    greened = by.get("deterministic-fixed", 0) + by.get("agent-fixed", 0)
     behind = [r for r in rows if r.get("kind") == "behind"]
     updated = sum(1 for r in behind if r["outcome"] == "deterministic-fixed")
     conflicts = [r for r in rows if r.get("kind") == "conflict"]
     cleared = sum(1 for r in conflicts if r["outcome"] == "deterministic-fixed")
     reds = [r for r in rows if r.get("kind") not in {"conflict", "behind"}]
     greened = sum(1 for r in reds if r["outcome"] in ("deterministic-fixed", "agent-fixed"))
-    lines = [f"## Remediation swarm", "", f"attempts={len(rows)} reds={len(reds)} reds-pushed-or-rerun={greened} "
-             f"conflicts={len(conflicts)} conflicts-cleared={cleared} behind={len(behind)} behind-updated={updated} blocked-credits={by.get('blocked-credits', 0)} cost=${cost:.4f} api_calls={api}", "",
+    gated = sum(1 for r in rows if r["outcome"] == "skipped" and r.get("reason") in GATE_SKIPS)
+    attempted = [r for r in rows if r.get("model")]
+    per_green = (cost / greened) if greened else None
+    lines = ["## Remediation swarm", "",
+             f"attempts={len(rows)} reds={len(reds)} reds-pushed-or-rerun={greened} conflicts={len(conflicts)} "
+             f"conflicts-cleared={cleared} behind={len(behind)} behind-updated={updated} "
+             f"blocked-credits={by.get('blocked-credits', 0)} cost=${cost:.4f} api_calls={api}", "",
+             f"gate-skipped={gated}/{len(rows)} ({(100 * gated // len(rows)) if rows else 0}%) model-attempts={len(attempted)} "
+             f"usd-per-greened={'n/a (none greened)' if per_green is None else f'${per_green:.4f}'}", "",
              "| outcome | n |", "|---|---|", *[f"| {k} | {v} |" for k, v in sorted(by.items())]]
+    if cost > 0 and (per_green is None or per_green > ALARM_USD_PER_GREENED):
+        msg = (f"swarm spent ${cost:.4f} for {greened} greened PRs"
+               + ("" if per_green is None else f" (${per_green:.4f} each)") + f"; alarm above ${ALARM_USD_PER_GREENED:.2f} per greened PR")
+        print(f"::warning title=swarm cost per greened PR::{msg}")
+        lines += ["", f"ALARM: {msg}"]
     Path(a.out).write_text("\n".join(lines) + "\n")
-    out_var("cents", str(int(round(cost * 100 + 0.499))))
+    out_var("cents", str(int(round(cost * 100 + 0.499))) if cost > 0 else "0")
     out_var("attempts", str(len(rows)))
+    out_var("greened", str(greened))
     return 0
 
 
@@ -704,18 +839,18 @@ def main() -> int:
     s.add_argument("--daily-cap-usd", type=float, default=5.0); s.add_argument("--attempt-cap-usd", type=float, default=0.10)
     s.add_argument("--ledger-issue", default=""); s.add_argument("--behind-limit", type=int, default=10); s.add_argument("--modes", default="all")
     pr = sub.add_parser("prepare"); pr.add_argument("--pr", type=int, required=True); pr.add_argument("--plan", required=True); pr.add_argument("--log", required=True); pr.add_argument("--mode", default="red"); pr.add_argument("--agent", default="true")
-    for name in ("fix", "guard"):
+    for name in ("fix", "guard", "regen"):
         x = sub.add_parser(name); x.add_argument("--plan", required=True); x.add_argument("--cwd", required=True)
     g = sub.add_parser("agent"); g.add_argument("--plan", required=True); g.add_argument("--cwd", required=True)
     g.add_argument("--log", required=True); g.add_argument("--meta", required=True); g.add_argument("--key-file", required=True)
-    g.add_argument("--max-steps", type=int, default=25); g.add_argument("--timeout", type=int, default=600)
+    g.add_argument("--max-steps", type=int, default=8); g.add_argument("--timeout", type=int, default=600)
     f = sub.add_parser("finalize"); f.add_argument("--plan", required=True); f.add_argument("--cwd", required=True)
     f.add_argument("--guard", default="fail"); f.add_argument("--repro", default="n/a"); f.add_argument("--agent-meta", default="")
     f.add_argument("--metrics", required=True)
     l = sub.add_parser("ledger"); l.add_argument("--issue", required=True); l.add_argument("--run", required=True); l.add_argument("--cents", required=True)
     m = sub.add_parser("summarize"); m.add_argument("--dir", required=True); m.add_argument("--out", required=True)
     a = p.parse_args()
-    return {"select": cmd_select, "prepare": cmd_prepare, "fix": cmd_fix, "agent": cmd_agent, "guard": cmd_guard,
+    return {"select": cmd_select, "prepare": cmd_prepare, "fix": cmd_fix, "regen": cmd_regen, "agent": cmd_agent, "guard": cmd_guard,
             "finalize": cmd_finalize, "ledger": cmd_ledger, "summarize": cmd_summarize}[a.cmd](a)
 
 
