@@ -45,6 +45,23 @@ When you choose to sign in with Spotify, we access the following data through th
 
 We request only the minimum scopes necessary for authentication. We do **not** access your Spotify listening history, playlists, or playback controls unless you explicitly grant additional permissions for specific features.
 
+### Agent Connector
+
+Jovie has a public connector for AI assistants at https://jov.ie/api/mcp, built on the Model Context Protocol (MCP). Connected assistants such as Meta Muse, ChatGPT, Claude, Grok, and other assistants that support MCP may call it when their users connect it. We do not control those assistants. What you share with an assistant is governed by that assistant's own privacy terms, not this policy.
+
+An assistant can use the connector without a Jovie account to look up public artist identity and public release facts and to create a private, unpublished draft of an artist page, release page, and smart link. To do this we send the artist name, link, or ID, and any release link or UPC the assistant provides, to music data providers (Spotify, Apple Music, and a third-party music-metadata service).
+
+When a draft is created, we store:
+
+- Public artist facts: artist ID, provider, name, source link, image, bio, and genres
+- Public release facts for the release the assistant asked about: title, artist name, release date, artwork link, UPC, and streaming links, plus any conflicts or missing details we found
+- The goal text the assistant supplied for the release launch
+- Acquisition attribution fields the assistant supplied, if any: agent source, client, installation ID, referral token, session or run ID, intent, and first-touch fields (source, medium, campaign, term, content, referrer, landing path, claim ID, run ID, candidate ID, and offer version)
+
+These fields are supplied by the assistant and are not verified. At this time we store them with the draft and return them in the connector's responses. A draft is not linked to a person or a Jovie account, and it is not public. It can be opened only with the private draft token the connector issued to the assistant. A search that does not create a draft does not store these fields.
+
+To limit abuse, we limit how many requests a caller can make to the connector, and we limit the total number of requests across all callers. We apply these limits using the caller's IP address and, for requests that create or change drafts, the connection session ID, draft ID, and installation ID when present, combined with the IP address into a hashed key.
+
 ### Usage Data
 
 We automatically gather operational signals to keep Jovie reliable:
@@ -178,6 +195,7 @@ We retain your data only as long as necessary to provide our services:
 - **Authentication tokens**: OAuth tokens are refreshed as needed and revoked upon account deletion
 - **Analytics data**: Aggregated and anonymized after 90 days; raw data deleted after 12 months
 - **Billing records**: Retained for 7 years as required by tax regulations
+- **Agent connector drafts**: A draft expires 7 days after it is created, and after that it can no longer be opened or changed through the connector. We do not currently delete expired draft records automatically
 
 ### Your Right to Delete
 

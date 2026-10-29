@@ -19,6 +19,12 @@ Jovie is a modern profile and link management platform. Our core features includ
 
 We deliver Jovie through a secure web app that respects your brand and creative control.
 
+### Agent Connector
+
+Jovie has a public connector at https://jov.ie/api/mcp that connected AI assistants, including Meta Muse, ChatGPT, Claude, Grok, and other assistants that support MCP, may call when their users connect it. Jovie does not operate or control those assistants, and your use of them is governed by their own terms.
+
+Through the connector, an assistant can look up public artist identity and public release facts and create a private, unpublished draft of an artist page, release page, and smart link without a Jovie account. A draft does not verify who owns an artist or release, does not publish anything, and does not make a purchase. A draft expires 7 days after it is created and can no longer be opened or changed through the connector. We limit how many requests a caller can make, and we may turn the connector off at any time. See the [Privacy Policy](/legal/privacy) for what we store when a draft is created.
+
 ## User Accounts
 
 ### Creation & Credentials
