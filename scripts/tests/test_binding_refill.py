@@ -52,6 +52,11 @@ class SelectTests(unittest.TestCase):
         self.assertEqual(skipped["LYB-7"], "blocked-by:LYB-1")
         self.assertEqual(skipped["LYB-8"], "blocked-by:LYB-138")
 
+    def test_done_heading_counts_as_acceptance(self):
+        body = BODY.replace("## Acceptance criteria", "## Done")
+        picked, skipped = br.select([row(1, description=body)], 1)
+        self.assertEqual(len(picked), 1, skipped)
+
     def test_closed_blocker_does_not_block(self):
         picked, _ = br.select([row(7, description=BODY + "\nBlocked by LYB-99.\n")], 1)  # LYB-99 not open
         self.assertEqual(len(picked), 1)
