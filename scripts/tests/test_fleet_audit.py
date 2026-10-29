@@ -288,3 +288,15 @@ def test_hook(command, blocked):
     r = subprocess.run([sys.executable, "-I", str(HOOK)], input=json.dumps(
         {"tool_name": "Bash", "tool_input": {"command": command}}), capture_output=True, text=True, timeout=10)
     assert (r.returncode == 2) == blocked, (command, r.stderr)
+
+
+def test_events_resolve_an_exact_repo_from_the_git_remote(tmp_path, monkeypatch):
+    repo = tmp_path / "r"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", "git@github.com:JovieInc/Jovie.git"], check=True)
+    monkeypatch.chdir(repo)
+    monkeypatch.delenv("GH_REPO", raising=False)
+    assert audit.resolve_repo({"repo": None}, "gh")["repo"] == "JovieInc/Jovie"
+    assert audit.resolve_repo({"repo": "origin"}, "git")["repo"] == "JovieInc/Jovie"
+    assert audit.resolve_repo({"repo": "JovieInc/gbrain"}, "gh")["repo"] == "JovieInc/gbrain"

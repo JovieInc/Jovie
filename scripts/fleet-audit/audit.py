@@ -298,6 +298,29 @@ def workflow_state(gh: str, repo: str | None, workflow: str | None) -> str | Non
 
 # ---------------------------------------------------------------- spool + transport
 
+def remote_repo(remote: str = "origin") -> str | None:
+    """owner/name of a git remote in the cwd, so events carry an exact repo (the Worker never
+    attributes an event whose repository it cannot resolve exactly)."""
+    git = real_binary("git")
+    if not git:
+        return None
+    try:
+        out = subprocess.run([git, "remote", "get-url", remote], capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    m = re.search(r"github\.com[:/]([\w.-]+/[\w.-]+?)(?:\.git)?/?$", out.stdout.strip())
+    return m.group(1) if m else None
+
+
+def resolve_repo(cls: dict, tool: str) -> dict:
+    repo = cls.get("repo")
+    if tool == "git":
+        return {**cls, "repo": remote_repo(repo or "origin") or repo}
+    if not repo:
+        return {**cls, "repo": os.environ.get("GH_REPO") or remote_repo()}
+    return cls
+
+
 def build_event(cls: dict, reason, issue, tool: str) -> dict:
     agent, session = actor()
     return {
@@ -538,7 +561,7 @@ def run_wrapped(tool: str, argv: list[str]) -> int:
 
     if cls.get("silence"):
         # Discard stdout: doppler prints the remaining config table (values) after a mutation.
-        event = build_event(cls, reason, issue, tool)
+        event = build_event(resolve_repo(cls, tool), reason, issue, tool)
         rc = subprocess.call([real, *argv], stdout=subprocess.DEVNULL)
         event["outcome"] = "ok" if rc == 0 else f"exit:{rc}"
         append_spool(event)
@@ -554,7 +577,7 @@ def run_wrapped(tool: str, argv: list[str]) -> int:
             return refuse(f"{cls['action']} needs a linked issue that names who re-enables it: add "
                           "--audit-issue JOV-123|<issue url> (or JOVIE_AUDIT_ISSUE).")
 
-    event = build_event(cls, reason, issue, tool)
+    event = build_event(resolve_repo(cls, tool), reason, issue, tool)
     probe = tool == "gh" and cls["action"] in ("workflow.disable", "workflow.enable")
     if probe:
         event["before"] = workflow_state(real, cls.get("repo"), cls.get("target"))
