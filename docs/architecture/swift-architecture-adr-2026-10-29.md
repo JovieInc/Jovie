@@ -74,7 +74,7 @@ Each decision states **Ship now / Re-evaluate when / Then**.
   - `viewContext` is main-queue and serves small UI-bound reads only;
   - dashboard and history fetches and all writes run on background contexts (`performBackgroundTask` / `newBackgroundContext`);
   - the main actor receives value snapshots and merges via `automaticallyMergesChangesFromParent`.
-  
+
   SwiftData is not adopted.
 - Ship now. Re-evaluate when LogYourBody's background-context migration lands, which ratchet rule `main-actor-core-data` tracks. Then make that rule zero-tolerance.
 
