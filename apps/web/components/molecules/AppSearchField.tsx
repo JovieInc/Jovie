@@ -42,7 +42,7 @@ export function AppSearchField({
       shape='pill'
       size='sm'
       surface='shell'
-      className={cn('text-primary-token', className)}
+      className={className}
     >
       <Search className='h-3.5 w-3.5 shrink-0 text-tertiary-token' />
       <Input

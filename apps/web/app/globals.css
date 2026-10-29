@@ -2117,6 +2117,7 @@ body {
     background: var(--color-bg-page);
   }
   .composite-field[data-surface="shell"] {
+    color: var(--color-text-primary-token);
     border: 1px solid var(--app-shell-frame-seam);
     background: var(--app-shell-content-surface);
   }
