@@ -68,6 +68,10 @@ test('staged integrity check cannot be masked by an unstaged policy or missing r
   t.after(() => rmSync(dir, { recursive: true, force: true }));
   mkdirSync(resolve(dir, '.claude/rules'), { recursive: true });
   mkdirSync(resolve(dir, 'scripts/agent-context'), { recursive: true });
+  writeFileSync(
+    resolve(dir, 'CLAUDE.md'),
+    '<!-- doc-freshness:scoped-rules-count:1 -->\n'
+  );
   const file = '.claude/rules/auth.md';
   const manifest = 'scripts/agent-context/rule-scopes.json';
   const policy = body => `---\npaths: ["apps/web/**"]\n---\n\n${body}\n`;
@@ -104,6 +108,59 @@ test('staged integrity check cannot be masked by an unstaged policy or missing r
   assert.equal(run(['--unknown']).status, 1);
   git(['rm', '-f', '-q', file]);
   assert.equal(run(['--staged']).status, 1);
+});
+
+test('rule authoring keeps counts in sync after additions and deletions and verifies the Git index', t => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'rule-count-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(resolve(dir, '.claude/rules'), { recursive: true });
+  mkdirSync(resolve(dir, 'scripts/agent-context'), { recursive: true });
+  const map = resolve(dir, 'CLAUDE.md');
+  const manifest = resolve(dir, 'scripts/agent-context/rule-scopes.json');
+  const marker = count =>
+    `# Router\n<!-- doc-freshness:scoped-rules-count:${count} -->\n`;
+  const policy = '---\npaths: ["apps/web/**"]\n---\n\nReviewed policy\n';
+  const first = resolve(dir, '.claude/rules/first.md');
+  const second = resolve(dir, '.claude/rules/second.md');
+  writeFileSync(first, policy);
+  writeFileSync(map, marker(0));
+  const git = args => execFileSync('git', args, { cwd: dir });
+  git(['init', '-q']);
+  const script = fileURLToPath(new URL('./rule-scopes.mjs', import.meta.url));
+  const run = args =>
+    spawnSync(process.execPath, [script, ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+  assert.equal(run(['--write']).status, 0);
+  assert.equal(readFileSync(map, 'utf8'), marker(1));
+  const reviewed = readFileSync(manifest, 'utf8');
+  assert.equal(run(['--write']).status, 0);
+  assert.equal(readFileSync(manifest, 'utf8'), reviewed);
+  writeFileSync(second, policy);
+  assert.equal(run([]).status, 1);
+  assert.equal(readFileSync(map, 'utf8'), marker(1));
+  assert.equal(run(['--write']).status, 0);
+  assert.equal(readFileSync(map, 'utf8'), marker(2));
+  git(['add', '.']);
+  writeFileSync(map, marker(99));
+  assert.equal(run([]).status, 1);
+  assert.equal(run(['--staged']).status, 0);
+  git(['add', 'CLAUDE.md']);
+  writeFileSync(map, marker(2));
+  assert.equal(run([]).status, 0);
+  assert.equal(run(['--staged']).status, 1);
+  unlinkSync(second);
+  assert.equal(run(['--write']).status, 0);
+  assert.equal(readFileSync(map, 'utf8'), marker(1));
+  git(['add', '-A']);
+  assert.equal(run(['--staged']).status, 0);
+  for (const invalid of ['# Missing marker\n', marker(1) + marker(1)]) {
+    writeFileSync(map, invalid);
+    assert.equal(run(['--write']).status, 1);
+    assert.equal(readFileSync(map, 'utf8'), invalid);
+    assert.equal(readFileSync(manifest, 'utf8'), reviewed);
+  }
 });
 
 function fixture(t) {

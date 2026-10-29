@@ -378,15 +378,15 @@
     "CLAUDE.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
-      "documentSha256": "375c8ef4d8ad65c06aef6bb63b2159fe44790ba5ee3499ebbccf8c76c8dd9e31",
+      "documentSha256": "c680fa1dd7549da29cda2ee553e67e12f1ce87762526a4e3dc36ea88686bcc95",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",
-          "sha256": "405911b953ba432a2ef6d41efc69633ed330ba80a5d577865fe7027e9baf08f5"
+          "sha256": "26ce991418f841cec79a05b92505bb1e49ab0bceed35919a37e3b0547c23bd3c"
         },
         {
           "path": "scripts/backlog-orchestrator/private-task.mjs",
-          "sha256": "46e9fd81de86670fca59bf19d113786428b7b189f758cad75e682bb8d68924a1"
+          "sha256": "6c31356a5e8f3c409051020a0325b0892a324e2e943aeff7ed435a4bb1afacee"
         },
         {
           "path": "canon/ENGINEERING.md",
@@ -511,12 +511,16 @@
     },
     "docs/agent-context/README.md": {
       "owner": "@itstimwhite",
-      "claim": "The existing context checker enforces bounded files and references; mechanical checks do not prove model quality.",
-      "documentSha256": "79300398b0ad99b70e9ee4a19f71602383bcbd24221cbdc20f75c41dca3a8372",
+      "claim": "The existing context checker enforces bounded files and references; explicit rule authoring synchronizes the rule-count marker while verification checks the Git index. Mechanical checks do not prove model quality.",
+      "documentSha256": "498870f7f639cb0892aad9884ddab0abc76aa7d3f259ba31d3c1a454c1217fb9",
       "sources": [
         {
           "path": "scripts/agent-context/check.mjs",
-          "sha256": "a30770da74c0ae9707811f20c7d6bba799fadc310d0b4181dac67d80f4613df2"
+          "sha256": "35fa733603cb58a64b179d565ee7e7362ffc40603973b6990b511af8101ca0a1"
+        },
+        {
+          "path": "scripts/agent-context/rule-scopes.mjs",
+          "sha256": "c0cd6ac04fb73fe102dbb56b9fbe09dae22ba51a8b9b953b378dbbd385710932"
         }
       ]
     },
