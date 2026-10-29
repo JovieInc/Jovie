@@ -129,6 +129,7 @@ export const PR_CHEAP_SCAN_COMMANDS = Object.freeze([
   'pnpm --filter=@jovie/web run lint:contrast-ratchet',
   'pnpm design:shared-ui-visual-arbitrary:check',
   'pnpm design:overlay-layers:check',
+  'pnpm design:no-dead-ends:check',
   'pnpm component-ship-gate',
   'pnpm screen-registration-gate',
   'pnpm ci:harness:check',
@@ -2915,6 +2916,8 @@ export async function runStructural(opts = {}) {
     'pnpm design:shared-ui-visual-arbitrary:check',
     // JOV-INV-036: no new raw global-layer z-index values in web source.
     'pnpm design:overlay-layers:check',
+    // JOV-INV-046: no new dead-end copy, no-op handlers, or unresolved hrefs.
+    'pnpm design:no-dead-ends:check',
     // JOV-6103: execute the certification kernel and its negative-path tests.
     // A missing selector or dependency must fail, never count as proof.
     CERTIFICATION_KERNEL_COMMAND,
