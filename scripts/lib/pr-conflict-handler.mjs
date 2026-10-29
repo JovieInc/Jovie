@@ -738,7 +738,6 @@ export function buildConflictFxPrompt({
     `Bounded attempt: ${attempt}/${maxAttempts}`,
     `Conflicting files: ${conflictFiles.join(', ') || 'unknown'}`,
     "Resolve only the listed unmerged files. Preserve both sides when compatible and keep the PR's original intent.",
-    "For navigation registries, retain base-added destinations, preserve the PR's explicit retirements, and keep current base labels when the PR does not intentionally change them. Reconcile desktop and mobile navigation and their tests against the combined registry, including active routes and deep links.",
     'Do not commit, push, open or close a PR, edit workflow/controller policy, weaken tests, or add a hold label.',
     'Human taste or steering is never a merge gate: preserve the already-shipping behavior and leave any optional subjective change for a separate follow-up PR.',
     'Finish with no unmerged paths and run the narrowest relevant deterministic checks. The trusted writer independently verifies and performs one non-force push after an exact-head reread.',

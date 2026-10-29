@@ -654,10 +654,6 @@ describe('conflict mutation policy', () => {
     expect(prompt).toContain('Bounded attempt: 1/2');
     expect(prompt).toContain('separate follow-up PR');
     expect(prompt).toContain('or add a hold label');
-    expect(prompt).toContain('retain base-added destinations');
-    expect(prompt).toContain("preserve the PR's explicit retirements");
-    expect(prompt).toContain('keep current base labels');
-    expect(prompt).toContain('desktop and mobile navigation');
     expect(prompt).not.toMatch(/needs-manual-rebase|needs-human/iu);
   });
 
@@ -1468,6 +1464,11 @@ printf '%s\n' '{"mode":"ask","rules":[{"permission":"*","pattern":"*","action":"
       expect(readFileSync(join(artifactDir, 'prompt.txt'), 'utf8')).toContain(
         'Conflicting files: safe.txt'
       );
+      const prompt = readFileSync(join(artifactDir, 'prompt.txt'), 'utf8');
+      expect(prompt).toContain('retain base-added destinations');
+      expect(prompt).toContain("preserve the PR's explicit retirements");
+      expect(prompt).toContain('keep current base labels');
+      expect(prompt).toContain('desktop and mobile navigation');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
