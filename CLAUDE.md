@@ -87,8 +87,8 @@ and regenerate. CLAUDE.md stays a router; use Playwright only for repo web QA.
 Message agents: `jovie mesh send/read`. Batch independent reads, serialize
 state changes, require evidence for delegated work.
 
-Run `pnpm preflight:changed` before every push. Publication follows
-`docs/PR_FLOW.md`: coherent draft → rolling CI → review
+Run `pnpm preflight:changed` before every push.
+Before publication follow `docs/PR_FLOW.md`: coherent draft → rolling CI → review
 and required checks. Auth/payment edits use CI + Migration Guard, not an extra
 human merge gate. Sensitive surfaces: proxy, migrations, billing, entitlements,
 onboarding, canonical tokens, and generated files.

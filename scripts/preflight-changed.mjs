@@ -357,6 +357,14 @@ export async function main({
   const childEnv = { ...env };
   for (const k of Object.keys(childEnv))
     if (/^GIT_/.test(k)) delete childEnv[k];
+  // Gates refuse the ambient Node when it violates engines (same pin preflight.mjs uses).
+  const pinned = spawnSync('bash', ['scripts/hooks/resolve-repo-node.sh'], {
+    cwd,
+    env: childEnv,
+    encoding: 'utf8',
+  });
+  if (pinned.status === 0 && pinned.stdout.trim())
+    childEnv.PATH = `${pinned.stdout.trim()}:${childEnv.PATH}`;
   Object.assign(childEnv, {
     NODE_OPTIONS: `--max-old-space-size=${HEAP_MB}`,
     GITHUB_BASE_REF: args.base,
