@@ -17,6 +17,7 @@ class ClassifyTest(unittest.TestCase):
         cases = {
             "github-quota-deferred; fleet evidence retry": ("quota-deferred", "rerun"),
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
+            "mesh kind zoe: no identity in canon/agent-identities.json declares it": ("mesh-identity", "bind-mesh-kinds"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
@@ -39,6 +40,9 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((behind["cls"], behind["action"]), ("stale-branch", "sync-main"))
         still = classes.classify(pr("A", merge="BEHIND"), {"A": "API rate limit exceeded"})
         self.assertEqual(still["action"], "rerun", "a deterministic log outranks the stale-branch default")
+        quota_first = classes.classify(pr("Source Validation"), {"Source Validation":
+            "github-quota-deferred\nmesh kind zoe: no identity in canon/agent-identities.json declares it"})
+        self.assertEqual(quota_first["action"], "rerun")
 
     def test_key_ignores_volatile_numbers_but_separates_failures(self):
         a = classes.classify(pr("T"), {"T": "AssertionError: expected 12 to equal 3"})

@@ -147,7 +147,8 @@
    "owner": "summer",
    "status": "active",
    "mesh": {
-    "registered": false
+    "registered": false,
+    "senderKind": "boardy"
    },
    "sharing": {
     "status": "dedicated"
@@ -206,7 +207,8 @@
    "owner": "gem-lanes",
    "status": "active",
    "mesh": {
-    "registered": false
+    "registered": false,
+    "senderKind": "gem-lanes"
    },
    "sharing": {
     "status": "borrowed",
@@ -236,7 +238,8 @@
    "owner": "gem-lanes",
    "status": "active",
    "mesh": {
-    "registered": false
+    "registered": false,
+    "senderKind": "lane-codex"
    },
    "sharing": {
     "status": "shared",
@@ -266,7 +269,8 @@
    "owner": "gem-lanes",
    "status": "active",
    "mesh": {
-    "registered": false
+    "registered": false,
+    "senderKind": "lane-grok"
    },
    "sharing": {
     "status": "shared",
@@ -665,6 +669,36 @@
     "status": "dedicated"
    }
   },
+  "aeon-air": {
+   "name": "Aeon (air)",
+   "kind": "agent",
+   "principals": {
+    "redacted": "(private: JovieInc/Ops jovie-private/canon/agent-identities.json)"
+   },
+   "credentials": [
+    {
+     "name": "(redacted)"
+    }
+   ],
+   "allowedActions": [
+    "(redacted)"
+   ],
+   "boundaries": [
+    "(redacted)"
+   ],
+   "auditTrail": [
+    "(redacted)"
+   ],
+   "owner": "summer",
+   "status": "active",
+   "mesh": {
+    "registered": false,
+    "senderKind": "aeon-air"
+   },
+   "sharing": {
+    "status": "dedicated"
+   }
+  },
   "dots": {
    "name": "Dots",
    "kind": "agent",
@@ -983,7 +1017,8 @@
    "owner": "zoe",
    "status": "active",
    "mesh": {
-    "registered": false
+    "registered": false,
+    "senderKind": "zoe"
    },
    "sharing": {
     "status": "borrowed",
@@ -1071,7 +1106,8 @@
    "owner": "gem-hostops",
    "status": "active",
    "mesh": {
-    "registered": false
+    "registered": false,
+    "senderKind": "ops-mac-host"
    },
    "sharing": {
     "status": "borrowed",
