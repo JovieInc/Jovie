@@ -192,6 +192,8 @@ describe('ToolPartsRenderer ops data cards', () => {
   });
 
   it('falls back to a status row when the ops card payload is malformed', () => {
+    // Unconfirmed rows are hidden by default; the fallback row is a verbose view.
+    window.localStorage.setItem('jovie:chat-verbose', '1');
     render(
       <ToolPartsRenderer
         variant='chat'
@@ -214,6 +216,7 @@ describe('ToolPartsRenderer ops data cards', () => {
 
     expect(screen.queryByTestId('chat-ops-data-card')).not.toBeInTheDocument();
     expect(screen.getByTestId('tool-status-row')).toBeInTheDocument();
+    window.localStorage.removeItem('jovie:chat-verbose');
   });
 });
 

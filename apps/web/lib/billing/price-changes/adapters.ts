@@ -5,6 +5,7 @@ import { BASE_URL } from '@/constants/domains';
 import { APP_ROUTES } from '@/constants/routes';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
+import { sendStreamEmail } from '@/lib/email/gateway';
 import {
   getPriceChangeNoticeHtml,
   getPriceChangeNoticeSubject,
@@ -13,37 +14,32 @@ import {
   PRICE_CHANGE_NOTICE_TEMPLATE_VERSION,
 } from '@/lib/email/templates/price-change-notice';
 import { captureCriticalError } from '@/lib/error-tracking';
-import { ResendEmailProvider } from '@/lib/notifications/providers/resend';
 import type { IncidentPort, MailPort, Recipient, RecipientPort } from './ports';
 import type { BuildNoticeInput, BuiltNotice } from './sweep';
 
-let provider: ResendEmailProvider | null = null;
-
 export const resendMailPort: MailPort = {
   async send(message) {
-    provider ??= new ResendEmailProvider();
-    const result = await provider.sendEmail({
+    const result = await sendStreamEmail({
+      stream: 'transactional',
+      purpose: 'price-change-notice',
+      consent: { basis: 'account-transaction' },
       to: message.to,
       subject: message.subject,
       text: message.text,
       html: message.html,
       idempotencyKey: message.idempotencyKey,
     });
-    if (
-      result.status === 'sent' &&
-      result.detail &&
-      result.detail !== 'resend'
-    ) {
-      return { status: 'sent', messageId: result.detail };
+    if (result.status === 'sent') {
+      return result.messageId
+        ? { status: 'sent', messageId: result.messageId }
+        : { status: 'error', detail: 'missing_provider_message_id' };
+    }
+    if (result.status === 'error') {
+      return { status: 'error', detail: result.error };
     }
     return {
-      status:
-        result.status === 'sent'
-          ? 'error'
-          : result.status === 'skipped'
-            ? 'skipped'
-            : 'error',
-      detail: result.detail ?? result.status,
+      status: result.status === 'skipped' ? 'skipped' : 'error',
+      detail: `${result.code}: ${result.detail}`,
     };
   },
 };

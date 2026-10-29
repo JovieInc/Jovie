@@ -1,9 +1,16 @@
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
+import { load as parseYaml } from 'js-yaml';
 import { describe, expect, it, vi } from 'vitest';
-import { deliverReport, sloFingerprint } from '../../shipping-slo-intake.mjs';
+import {
+  deliverReport,
+  sloFingerprint,
+  upsertSloFinding,
+} from '../../shipping-slo-intake.mjs';
 import { buildReport, collectRaw } from '../../shipping-slo-report.mjs';
+import { fakeLinear } from './fixtures/shipping-slo-fake-linear.mjs';
 
 vi.mock('node:child_process', async importOriginal => {
   /** @type {typeof import('node:child_process')} */
@@ -429,18 +436,17 @@ describe('validateBaseline', () => {
 // Keep delivery regressions in the suite registered by the CI inventory.
 describe('shipping SLO intake delivery', () => {
   const repo = 'JovieInc/Jovie';
-  const owner = {
-    id: 'slo-owner',
-    assignee: { id: 'devin' },
-    team: {
-      id: 'team-1',
-      states: { nodes: [{ id: 'triage', type: 'triage' }] },
-    },
-  };
   const makeState = () => ({
+    owner: {
+      id: 'slo-parent',
+      assignee: { id: 'slo-owner' },
+      team: {
+        id: 'jovie-team',
+        states: { nodes: [{ id: 'triage-state', type: 'triage' }] },
+      },
+    },
     issues: [],
-    comments: [],
-    creates: [],
+    calls: [],
     failure: null,
   });
   const report = (metric = 'lead_time.devin.p95') => ({
@@ -453,173 +459,298 @@ describe('shipping SLO intake delivery', () => {
     sampled: { ciRuns: 1, mergedPrs: 0 },
     offenders: { slowestPrs: [], slowestCiRuns: [] },
   });
-  const json = body => new Response(JSON.stringify(body), { status: 200 });
-  const fetchImpl = state => async (_url, init) => {
-    const payload = JSON.parse(String(init.body));
-    const query = payload.query;
-    if (query.includes('issueLabelCreate') || query.includes('labelIds')) {
-      throw new Error('SLO intake must not create a Linear label');
-    }
-    if (state.failure === 'lookup' && query.includes('ShippingSloOwner')) {
-      return json({ errors: [{ message: 'owner lookup failed' }] });
-    }
-    if (query.includes('ShippingSloOwner')) {
-      return json({ data: { issue: owner } });
-    }
-    if (query.includes('ShippingSloIssues')) {
-      const title = payload.variables.title;
-      const marker = payload.variables.marker;
-      const nodes = state.issues.filter(
-        issue => issue.title === title || issue.description.includes(marker)
-      );
-      return json({
-        data: {
-          issues: {
-            nodes,
-            pageInfo: { hasNextPage: false, endCursor: null },
-          },
-        },
-      });
-    }
-    if (query.includes('ShippingSloCreate')) {
-      const input = payload.variables.input;
-      state.creates.push(input);
-      const issue = {
-        id: `iss-${state.issues.length + 1}`,
-        identifier: `JOV-${8000 + state.issues.length}`,
-        url: 'https://linear.app/jovie/issue/test',
-        title: input.title,
-        description: input.description,
-        archivedAt: null,
-        state: { type: 'triage' },
-      };
-      state.issues.push(issue);
-      return json({
-        data: {
-          issueCreate: {
-            success: true,
-            issue: {
-              id: issue.id,
-              identifier: issue.identifier,
-              url: issue.url,
-            },
-          },
-        },
-      });
-    }
-    if (query.includes('ShippingSloComments')) {
-      const id = payload.variables.id;
-      return json({
-        data: {
-          issue: {
-            comments: {
-              nodes: state.comments.filter(comment => comment.issueId === id),
-              pageInfo: { hasNextPage: false, endCursor: null },
-            },
-          },
-        },
-      });
-    }
-    if (query.includes('commentCreate')) {
-      state.comments.push({
-        issueId: payload.variables.id,
-        body: payload.variables.body,
-      });
-      return json({
-        data: {
-          commentCreate: { success: true, comment: { id: 'comment-1' } },
-        },
-      });
-    }
-    if (query.includes('ReopenLinearIssue')) {
-      const issue = state.issues.find(row => row.id === payload.variables.id);
-      issue.state = { type: 'triage' };
-      return json({ data: { issueUpdate: { success: true } } });
-    }
-    throw new Error(query.slice(0, 80));
-  };
   const run = (state, id = 'oct05', input = report()) =>
     deliverReport(input, {
       repo,
       runUrl: `https://github.com/${repo}/actions/runs/${id}`,
-      apiKey: 'lin_test',
-      fetchImpl: fetchImpl(state),
+      apiKey: 'slo-test-key',
+      fetchImpl: fakeLinear(state),
     });
 
-  it('keeps the metric identity inside a 64-hex fingerprint, not a Linear label', () => {
+  it('keeps merge-queue metric identity in a stable 64-hex fingerprint', () => {
     const fingerprint = sloFingerprint(repo, 'merge_queue.wait.p95');
-    assert.match(fingerprint, /^[0-9a-f]{64}$/);
-    const asLabel = `remediation:shipping-slo:${repo}:${'merge_queue.wait.p95'}`;
-    assert.ok(asLabel.length <= 80);
-    assert.equal(asLabel.includes('~'), false);
+    expect(fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    expect(fingerprint).toBe(sloFingerprint(repo, 'merge_queue.wait.p95'));
+    expect(fingerprint).not.toBe(sloFingerprint(repo, 'lead_time.codex.p95'));
   });
-
-  it('files merge_queue.wait.p95 in Linear and dedupes the next run', async () => {
+  it('files merge_queue.wait.p95 in Linear and dedupes the next run using delivery options', async () => {
     const state = makeState();
     const input = report('merge_queue.wait.p95');
-    const first = await run(state, '39782428315', input);
-    assert.equal(first.status, 'succeeded');
-    assert.equal(first.findings[0].action, 'created');
-    assert.equal(first.findings[0].issue, 'JOV-8000');
-    assert.equal(state.creates.length, 1);
-    assert.equal(state.creates[0].parentId, 'slo-owner');
-    assert.equal('labelIds' in state.creates[0], false);
-    assert.match(state.issues[0].description, /39782428315/);
+    expect((await run(state, '39782428315', input)).findings[0]).toMatchObject({
+      action: 'created',
+      issue: 'JOV-9001',
+      fingerprint: sloFingerprint(repo, 'merge_queue.wait.p95'),
+    });
     const original = state.issues[0].description;
-    const second = await run(state, 'next', input);
-    assert.equal(second.findings[0].action, 'observed');
-    assert.equal(second.findings[0].issue, 'JOV-8000');
-    assert.equal(state.creates.length, 1);
-    assert.equal(state.issues[0].description, original);
-    assert.equal(state.comments.length, 1);
-    assert.match(state.comments[0].body, /actions\/runs\/next/);
-    const replay = await run(state, 'next', input);
-    assert.equal(replay.findings[0].action, 'replayed');
-    assert.equal(state.comments.length, 1);
-  });
-
-  it('lookup failure performs no create', async () => {
-    const state = makeState();
-    state.failure = 'lookup';
-    const receipt = await run(
-      state,
-      '39782428315',
-      report('merge_queue.wait.p95')
+    expect((await run(state, 'next', input)).findings[0]).toMatchObject({
+      action: 'observed',
+      issue: 'JOV-9001',
+    });
+    expect((await run(state, 'next', input)).findings[0].action).toBe(
+      'replayed'
     );
-    assert.equal(receipt.status, 'failed');
-    assert.equal(receipt.owner, 'Devin');
-    assert.equal(receipt.findings[0].metric, 'merge_queue.wait.p95');
-    assert.equal(receipt.findings[0].reason, 'owner_lookup_failed');
-    assert.equal(receipt.findings[0].retryDecision, 'reconcile-before-retry');
-    assert.equal(state.creates.length, 0);
+    expect(state.issues).toHaveLength(1);
+    expect(state.issues[0].description).toBe(original);
+    expect(state.issues[0].comments).toEqual([
+      expect.objectContaining({
+        body: expect.stringContaining('/actions/runs/next'),
+      }),
+    ]);
+    expect(
+      state.calls.filter(call => call.query.includes('ShippingSloCreate'))
+    ).toHaveLength(1);
+    expect(state.calls.some(call => /label/i.test(call.query))).toBe(false);
   });
-
-  it('distinct metrics and flat-growth investigations have distinct stable identities', async () => {
+  it('delivers to the current Linear SLO owner with no labels, appends runs once and replays safely', async () => {
+    const state = makeState();
+    expect(await run(state)).toMatchObject({
+      status: 'succeeded',
+      destination: 'linear',
+      owner: 'JOV-6783',
+    });
+    expect((await run(state, 'oct07')).findings[0].action).toBe('observed');
+    expect((await run(state, 'oct08')).findings[0].action).toBe('observed');
+    expect((await run(state, 'oct08')).findings[0].action).toBe('replayed');
+    expect((await run(state)).findings[0].action).toBe('replayed');
+    expect(state.issues).toHaveLength(1);
+    expect(state.issues[0]).toMatchObject({
+      teamId: 'jovie-team',
+      parentId: 'slo-parent',
+      assigneeId: 'slo-owner',
+      stateId: 'triage-state',
+    });
+    expect(state.issues[0].description).toContain('oct05');
+    expect(state.issues[0].comments.map(row => row.body)).toEqual([
+      expect.stringContaining('oct07'),
+      expect.stringContaining('oct08'),
+    ]);
+    expect(
+      state.calls.every(call => call.url === 'https://api.linear.app/graphql')
+    ).toBe(true);
+    expect(state.calls.some(call => /label/i.test(call.query))).toBe(false);
+  });
+  it('reuses an unlabeled exact title and preserves human content, assignment and state', async () => {
     const state = makeState();
     await run(state);
-    await run(state, 'oct05', report('lead_time.codex.p95'));
+    Object.assign(state.issues[0], {
+      description: 'Human hold and original finding',
+      assigneeId: 'human',
+      state: { type: 'started' },
+    });
+    expect((await run(state, 'oct07')).findings[0].issue).toBe('JOV-9001');
+    expect(state.issues[0]).toMatchObject({
+      description: 'Human hold and original finding',
+      assigneeId: 'human',
+      state: { type: 'started' },
+    });
+    state.issues[0].title += ' human edited';
+    state.issues[0].description = state.issues[0].comments[0].body;
+    expect((await run(state, 'oct08')).findings[0].issue).toBe('JOV-9001');
+    expect(state.issues).toHaveLength(1);
+  });
+  it.each(['lookup', 'graphql', 'incomplete'])(
+    'fails visibly without creating on %s lookup',
+    async failure => {
+      const state = makeState();
+      state.failure = failure;
+      expect(await run(state)).toMatchObject({
+        status: 'failed',
+        findings: [
+          { status: 'failed', retryDecision: 'reconcile-before-retry' },
+        ],
+      });
+      expect(state.calls.some(call => call.query.includes('mutation'))).toBe(
+        false
+      );
+    }
+  );
+  it('missing credentials or owner routing never falls back to GitHub', async () => {
+    const state = makeState();
+    const receipt = await deliverReport(report(), {
+      repo,
+      runUrl: `https://github.com/${repo}/actions/runs/1`,
+      apiKey: '',
+      fetchImpl: fakeLinear(state),
+    });
+    expect(receipt.findings[0].reason).toBe('missing_linear_api_key');
+    expect(state.calls).toHaveLength(0);
+    state.owner = null;
+    expect((await run(state)).findings[0].reason).toBe('owner_routing_missing');
+    expect(state.issues).toHaveLength(0);
+  });
+  it.each(['create', 'comment', 'reopen'])(
+    'does not retry an ambiguous %s and reconciles on restart',
+    async operation => {
+      const state = makeState();
+      if (operation !== 'create') await run(state, 'earlier');
+      if (operation === 'reopen') state.issues[0].state.type = 'completed';
+      state.failure = `${operation}-after-write`;
+      expect((await run(state)).findings[0].reason).toBe(
+        `${operation}_result_unknown`
+      );
+      const next = await run(state);
+      expect(next.status).toBe('succeeded');
+      expect(state.issues).toHaveLength(1);
+      expect(state.issues[0].comments).toHaveLength(
+        operation === 'create' ? 0 : 1
+      );
+      expect(
+        state.calls.filter(call => call.query.includes('ShippingSloCreate'))
+      ).toHaveLength(1);
+    }
+  );
+  it('keeps all four metric identities and flat growth separate across runs', async () => {
+    const state = makeState();
     const input = report();
+    input.evaluation.regressions = [
+      'lead_time.devin.p95',
+      'lead_time.codex.p95',
+      'remediation.main_red_to_green.p95',
+      'throughput.verified_per_day',
+    ].map(key => ({ key, baseline: 100, observed: 130, changeFraction: 0.3 }));
     input.evaluation.flatStall = true;
     await run(state, 'oct05', input);
-    assert.equal(state.issues.length, 3);
-    assert.equal(
+    await run(state, 'oct07', input);
+    await run(state, 'oct07', input);
+    expect(state.issues).toHaveLength(5);
+    expect(state.issues.every(issue => issue.comments.length === 1)).toBe(true);
+    expect(
       new Set(
         state.issues.map(
-          issue => issue.description.match(/fingerprint: ([0-9a-f]+)/)[1]
+          issue => issue.description.match(/fingerprint: ([a-f0-9]+)/)[1]
         )
-      ).size,
-      3
-    );
+      ).size
+    ).toBe(5);
   });
-
-  it('passes the existing Linear key into the filing step', () => {
-    const fileStep = WORKFLOW.slice(
-      WORKFLOW.indexOf('File deduped slo-regression issues')
+  it('duplicate canonical candidates fail without mutating either issue', async () => {
+    const state = makeState();
+    await run(state);
+    state.issues.push({ ...state.issues[0], id: 'duplicate' });
+    const calls = state.calls.length;
+    expect((await run(state, 'oct07')).findings[0].reason).toBe(
+      'ambiguous_canonical_issue'
     );
-    expect(fileStep).toContain('LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}');
-    expect(fileStep.slice(0, fileStep.indexOf('run:'))).not.toContain(
-      'GH_TOKEN'
+    expect(
+      state.calls.slice(calls).some(call => call.query.includes('mutation'))
+    ).toBe(false);
+  });
+  it('paginates recurrence history and detects replay beyond the first 100 comments', async () => {
+    const state = makeState();
+    await run(state);
+    state.issues[0].comments = Array.from({ length: 100 }, () => ({
+      body: 'old evidence',
+    }));
+    expect((await run(state, 'oct07')).findings[0].action).toBe('observed');
+    expect((await run(state, 'oct07')).findings[0].action).toBe('replayed');
+    expect(state.issues[0].comments).toHaveLength(101);
+  });
+  it('reopens the same completed metric in triage without replacing its body', async () => {
+    const state = makeState();
+    await run(state);
+    const body = state.issues[0].description;
+    state.issues[0].state.type = 'completed';
+    expect((await run(state, 'oct07')).findings[0].action).toBe('observed');
+    expect(state.issues[0]).toMatchObject({
+      description: body,
+      state: { type: 'triage' },
+    });
+    state.issues[0].archivedAt = '2026-10-09';
+    expect((await run(state, 'oct08')).findings[0].reason).toBe(
+      'canonical_issue_unavailable'
     );
+    expect(state.issues).toHaveLength(1);
+  });
+  it('stops a sweep on a failed observation lookup and does not file later metrics', async () => {
+    const state = makeState();
+    await run(state);
+    state.failure = 'comments';
+    const input = report();
+    input.evaluation.regressions.push({
+      ...input.evaluation.regressions[0],
+      key: 'lead_time.codex.p95',
+    });
+    expect((await run(state, 'oct07', input)).findings).toEqual([
+      expect.objectContaining({ reason: 'comment_lookup_failed' }),
+    ]);
+    expect(state.issues).toHaveLength(1);
+  });
+  it('executes the real workflow filing command and retains Linear replay and failure receipts', () => {
+    const workflow =
+      /** @type {{ jobs: { measure: { steps: { name: string, env: Record<string, string>, run: string }[] } } }} */ (
+        parseYaml(WORKFLOW)
+      );
+    const step = workflow.jobs.measure.steps.find(
+      step => step.name === 'File deduped slo-regression issues'
+    );
+    expect(step.env.LINEAR_API_KEY).toBe('${{ secrets.LINEAR_API_KEY }}');
+    expect(step.env.GH_TOKEN).toBeUndefined();
+    const dir = mkdtempSync(resolve(tmpdir(), 'jov8043-workflow-'));
+    try {
+      const statePath = resolve(dir, 'state.json');
+      const reportPath = resolve(dir, 'report.json');
+      writeFileSync(statePath, JSON.stringify(makeState()));
+      writeFileSync(reportPath, JSON.stringify(report()));
+      const execute = apiKey =>
+        spawnSync(
+          'bash',
+          ['-c', step.run.replaceAll('${{ github.repository }}', repo)],
+          {
+            cwd: REPO_ROOT,
+            encoding: 'utf8',
+            timeout: 15_000,
+            env: {
+              ...process.env,
+              REPORT: reportPath,
+              RUN_URL: `https://github.com/${repo}/actions/runs/123`,
+              RUNNER_TEMP: dir,
+              LINEAR_API_KEY: apiKey,
+              SLO_OFFLINE_STATE: statePath,
+              NODE_OPTIONS: `--import=${resolve(import.meta.dirname, 'fixtures/shipping-slo-fake-linear.mjs')}`,
+            },
+          }
+        );
+      const receipt = () =>
+        JSON.parse(
+          readFileSync(resolve(dir, 'shipping-slo-intake.json'), 'utf8')
+        );
+      expect(execute('slo-workflow-fixture').status).toBe(0);
+      expect(receipt().findings[0]).toMatchObject({
+        action: 'created',
+        issue: 'JOV-9001',
+      });
+      expect(execute('slo-workflow-fixture').status).toBe(0);
+      expect(receipt().findings[0].action).toBe('replayed');
+      expect(execute('').status).toBe(1);
+      expect(receipt().findings[0].reason).toBe('missing_linear_api_key');
+      expect(JSON.parse(readFileSync(statePath, 'utf8')).issues).toHaveLength(
+        1
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+  it('preserves terminal state when replaying a run already observed before closure', async () => {
+    const state = makeState();
+    await run(state);
+    state.issues[0].state.type = 'completed';
+    expect((await run(state)).findings[0].action).toBe('replayed');
+    expect(state.issues[0].state.type).toBe('completed');
+  });
+  it('does not call providers for a healthy report and rejects invalid identities', async () => {
+    const state = makeState();
+    const healthy = report();
+    healthy.evaluation.regressions = [];
+    expect((await run(state, 'oct05', healthy)).findings).toEqual([]);
+    expect(state.calls).toHaveLength(0);
+    await expect(
+      upsertSloFinding({
+        repo: 'invalid',
+        metric: 'invalid metric',
+        title: 'invalid',
+        body: '',
+        runUrl: 'invalid',
+      })
+    ).rejects.toMatchObject({ reason: 'invalid_finding_identity' });
   });
 });
 

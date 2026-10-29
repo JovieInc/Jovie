@@ -164,6 +164,8 @@ export const APP_ROUTES = {
   UNAVAILABLE: '/unavailable',
   USER_CREATION_ERROR: '/error/user-creation-failed',
   DESIGN_STUDIO: '/exp/page-builder',
+  /** Signed, noindex preview of one content-record version (no auth). */
+  CONTENT_PREVIEW: '/content-preview',
   /** Admin Ops HUD — shipper status, KPIs, and live metrics (admin-gated). */
   HUD: '/hud',
   /** Legacy TV URL. Redirects to /hud. */
@@ -189,6 +191,7 @@ export const APP_ROUTES = {
   DEMO: '/demo',
   DEMO_VIDEO: '/demovideo',
   DEVELOPERS: '/developers',
+  DEVELOPERS_AGENTS: '/developers/agents',
   CLI: '/cli',
   API_VERSIONING: '/api-versioning',
   ENGAGEMENT_ENGINE: '/engagement-engine',

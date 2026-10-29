@@ -121,8 +121,8 @@ export default defineConfig({
             E2E_WEB_SERVER_WARMUP: webServerWarmupProfile,
             ...(useTestAuthBypass
               ? {
-                  NEXT_PUBLIC_CLERK_MOCK: '1',
-                  NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+                  NEXT_PUBLIC_AUTH_MOCK: '1',
+                  NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1',
                 }
               : {}),
             NODE_OPTIONS:

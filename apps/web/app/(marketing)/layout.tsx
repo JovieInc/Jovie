@@ -5,6 +5,7 @@ import { MarketingEmailSignup } from '@/components/marketing/MarketingEmailSignu
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 import { MarketingEnhancements } from '@/features/home/MarketingEnhancements';
+import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 
 export const revalidate = false;
 
@@ -13,9 +14,11 @@ export default async function MarketingLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const chrome = await getSiteChrome();
   return (
     <ClientProviders forceSignedOutDefaults>
       <PublicPageShell
+        chrome={chrome}
         className='system-b-marketing overflow-x-clip bg-base text-primary-token'
         logoSize='xs'
       >
