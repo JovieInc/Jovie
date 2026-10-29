@@ -281,6 +281,8 @@ class QueueBreakerTest(unittest.TestCase):
 
 class QueueTimingsTest(unittest.TestCase):
     def test_queue_timings_report_group_ci_and_enqueue_to_merge(self):
+        receipts = []
+
         def run(args, **kwargs):
             path = args[-1]
             if "workflows/ci.yml/runs" in path:
@@ -288,7 +290,9 @@ class QueueTimingsTest(unittest.TestCase):
                         for c, secs in (("success", 600), ("success", 1200), ("cancelled", 300), ("failure", 700))]
                 return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
             if "/pulls?" in path:
-                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([{"number": 5, "merged_at": iso(NOW)}]))
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([{"number": 5, "merged_at": iso(NOW), "head": {"sha": "a" * 40}}]))
+            if "/statuses" in path:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(receipts))
             events = [{"event": "added_to_merge_queue", "created_at": iso(NOW - 3600)},
                       {"event": "removed_from_merge_queue", "created_at": iso(NOW - 2400), "actor": {"login": "github-merge-queue[bot]"}},
                       {"event": "added_to_merge_queue", "created_at": iso(NOW - 1200)}]
@@ -302,6 +306,14 @@ class QueueTimingsTest(unittest.TestCase):
             self.assertEqual(signal["groupCi"]["successP95Min"], 20.0)
             self.assertEqual((signal["enqueueToMerge"]["lastEnqueueP50Min"], signal["enqueueToMerge"]["firstEnqueueP50Min"]), (20.0, 60.0))
             self.assertEqual((signal["dequeues"]["silentGithub"], signal["dequeues"]["requeueLagP50Min"]), (1, 20.0))
+            self.assertEqual((signal["dequeues"]["autoRequeues"], signal["dequeues"]["pushToMainRequeues"]), (0, 1))
+            self.assertEqual(signal["dequeues"]["pushRequeueLagP50Min"], 20.0)
+        # A why= receipt written between the removal and the re-add makes it an auto re-queue.
+        receipts.append({"context": ts.REARM_CONTEXT, "description": "n=1;sha=" + "a" * 40 + ";run=9;why=unattributed", "created_at": iso(NOW - 1195)})
+        with tempfile.TemporaryDirectory() as raw:
+            signal, _ = ts.sample_queue_timings(Path(raw), NOW, run)
+            self.assertEqual((signal["dequeues"]["autoRequeues"], signal["dequeues"]["pushToMainRequeues"]), (1, 0))
+            self.assertEqual((signal["dequeues"]["autoRequeueLagP50Min"], signal["dequeues"]["pushRequeueLagP50Min"]), (20.0, None))
 
 
 class IdleNotDemandTest(unittest.TestCase):
