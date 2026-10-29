@@ -104,7 +104,7 @@ export class EmailPolicyError extends Error {
     readonly code: GatewayRejectCode,
     detail: string
   ) {
-    super(`[email-gateway] ${code}: ${detail}`);
+    super(`email-gateway rejected (${code}): ${detail}`);
     this.name = 'EmailPolicyError';
   }
 }

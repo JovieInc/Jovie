@@ -85,7 +85,7 @@ export async function runGateway(
     });
     if (result.status === 'rejected') {
       deps.onViolation(
-        new Error(`[email-gateway] ${result.code}: ${result.detail}`),
+        new Error(`email-gateway rejected (${result.code}): ${result.detail}`),
         { stream, purpose: request.purpose, code: result.code }
       );
     }
