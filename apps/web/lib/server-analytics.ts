@@ -406,6 +406,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['releases_synced'],
   },
   {
+    path: 'lib/agent-acquisition/draft-claim.server.ts',
+    invocations: 0,
+    events: ['claim_completed', 'activation_achieved'],
+  },
+  {
     path: 'lib/onboarding/upgrade-offer.ts',
     invocations: 1,
     events: [
