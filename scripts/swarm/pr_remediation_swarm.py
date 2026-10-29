@@ -276,12 +276,38 @@ def latest_failures(sha: str) -> tuple[list[dict], bool]:
     return red, pending
 
 
-def job_log_tail(run: dict, n: int = 400) -> str:
+ERROR_LINE = re.compile(r"##\[error\]|::error|\bFAIL\b|✖|AssertionError|ERR_[A-Z_]+|\bError:|Unwired|exit code [1-9]|: FAIL$")
+ANSI = re.compile(r"\x1b\[[0-9;]*m|\[\d+(?:;\d+)*m")
+
+
+def extract_failure(text: str, tail: int = 60, context: int = 6, cap: int = 220) -> str:
+    """The lines that explain a failed job: every error-looking line with a little context, then the tail.
+    The raw tail alone is post-job cleanup noise for most failures."""
+    lines = [ANSI.sub("", re.sub(r"^\S+Z ", "", l)) for l in text.splitlines()]
+    # Best case: the output of the failing step (after its command echo, up to its ##[error] line).
+    errs = [i for i, l in enumerate(lines) if l.startswith("##[error]")]
+    if errs:
+        end = errs[-1]
+        groups = [i for i, l in enumerate(lines[:end]) if l.startswith("##[endgroup]")]
+        if groups:
+            span = lines[groups[-1] + 1:end + 2]
+            if any(l.strip() for l in span):
+                return "\n".join(span[-cap:] + ["--- tail ---"] + lines[-tail:][-20:])
+    keep: set[int] = set()
+    for i, line in enumerate(lines):
+        if ERROR_LINE.search(line) and "✓" not in line and "continue-on-error" not in line \
+                and not line.lstrip().startswith(("env:", "echo ", "if ")):
+            keep.update(range(max(0, i - context), min(len(lines), i + context + 1)))
+    picked = sorted(keep)[-cap:]
+    out = [lines[i] for i in picked]
+    return "\n".join(out + ["--- tail ---"] + lines[-tail:])
+
+
+def job_log_tail(run: dict) -> str:
     out = gh(["api", f"repos/{REPO}/actions/jobs/{run['id']}/logs"])
     if out.returncode != 0:
         return ""
-    lines = out.stdout.splitlines()
-    return "\n".join(lines[-n:])
+    return extract_failure(out.stdout)
 
 
 def attempts_for(number: int, key: str) -> int:
@@ -347,7 +373,9 @@ def cmd_prepare(a) -> int:
                     checks=cls["checks"], signature=cls["signature"], mergeable=pr.get("mergeable_state"))
         if pr.get("mergeable_state") == "dirty":
             plan.update(action="sync-main", cls="conflict")
-        if plan.get("sensitive") and plan["action"] in {classes.AGENT, classes.WIRE_CI_FAST}:
+        if not failures and plan["action"] == classes.AGENT:
+            plan.update(outcome="skipped", reason="no-failing-checks", action="none")
+        elif plan.get("sensitive") and plan["action"] in {classes.AGENT, classes.WIRE_CI_FAST}:
             plan.update(outcome="skipped", reason="sensitive-paths->codex", action="none")
         elif plan["action"] == classes.AGENT and a.agent != "true":
             plan.update(outcome="skipped", reason="model-budget-closed", action="none")

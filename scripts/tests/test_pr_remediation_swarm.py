@@ -119,6 +119,16 @@ class SwarmPolicyTest(unittest.TestCase):
         self.assertIn('log=".swarm-failed.log"', src)
         self.assertIn(".git\" / \"info\" / \"exclude", src.replace("'", '"'))
 
+    def test_failure_extract_keeps_the_error_and_context_not_just_the_tail(self):
+        noise = [f"2026-10-29T00:00:{i % 60:02d}.0000000Z cleanup line {i}" for i in range(500)]
+        body = noise[:100] + ["2026-10-29T00:01:00.0000000Z AssertionError: expected 1 to equal 2",
+                              "2026-10-29T00:01:01.0000000Z   at scripts/foo.test.mjs:12:3"] + noise[100:]
+        out = swarm.extract_failure("\n".join(body))
+        self.assertIn("AssertionError: expected 1 to equal 2", out)
+        self.assertIn("scripts/foo.test.mjs:12:3", out)
+        self.assertIn("--- tail ---", out)
+        self.assertLess(len(out.splitlines()), 300)
+
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"
         fields = dict(p.split("=", 1) for p in body.split()[3:] if "=" in p)
