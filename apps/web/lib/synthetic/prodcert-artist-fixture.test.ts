@@ -54,15 +54,19 @@ describe('selectUnclaimedCertArtist', () => {
   });
 
   it('throws ProdcertFixtureUnavailableError naming every probed id when all are bound', async () => {
-    const promise = selectUnclaimedCertArtist(POOL, async () => true);
-    const error = await promise.catch(
-      caught => caught as ProdcertFixtureUnavailableError
+    const caughtError = await selectUnclaimedCertArtist(
+      POOL,
+      async () => true
+    ).then(
+      () => null,
+      caught =>
+        caught instanceof ProdcertFixtureUnavailableError ? caught : undefined
     );
-    expect(error).toBeInstanceOf(ProdcertFixtureUnavailableError);
-    expect(error.takenSpotifyIds).toEqual(
+    expect(caughtError).toBeInstanceOf(ProdcertFixtureUnavailableError);
+    expect(caughtError?.takenSpotifyIds).toEqual(
       POOL.map(candidate => candidate.spotifyId)
     );
-    expect(error.message).toContain(POOL[2].spotifyId);
+    expect(caughtError?.message).toContain(POOL[2].spotifyId);
   });
 
   it('propagates probe failures instead of silently choosing a fixture', async () => {
