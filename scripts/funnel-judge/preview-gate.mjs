@@ -215,6 +215,7 @@ export function parseDopplerScopes(
   let section = null;
   let scopeIndent = null;
   let currentPath = null;
+  /** @type {{ project?: string, config?: string } | null} */
   let current = null;
   const flush = () => {
     if (
@@ -265,6 +266,11 @@ function loadDopplerDevScopes(env = process.env) {
   }
 }
 
+/**
+ * @typedef {(command: string, args: string[], options: { encoding: 'utf8', timeout: number }) => { status: number | null, stdout: string }} BypassSpawn
+ */
+
+/** @param {BypassSpawn} spawn @param {string} [scope] */
 function dopplerBypassValue(spawn, scope) {
   const args = [
     'secrets',
@@ -287,7 +293,10 @@ function dopplerBypassValue(spawn, scope) {
   return String(result.stdout ?? '').trim() || null;
 }
 
-/** The bypass secret for protected previews, from the env or Doppler. */
+/**
+ * The bypass secret for protected previews, from the env or Doppler.
+ * @param {{ env?: NodeJS.ProcessEnv, spawn?: BypassSpawn, scopes?: string[] }} [options]
+ */
 export function readBypassSecret({
   env = process.env,
   spawn = spawnSync,
