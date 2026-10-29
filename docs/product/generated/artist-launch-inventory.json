@@ -1369,6 +1369,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/hud/route-usage/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/hud/route-usage",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/hud/shipper/route.ts",
       "kind": "handler",
       "route": "/api/admin/hud/shipper",

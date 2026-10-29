@@ -104,7 +104,7 @@ describe('GET /api/hud/shipping-state', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it('measures inline when the cached observation is past the freshness window', async () => {
+  it('measures inline when the cached observation is past the freshness cutoff', async () => {
     mockAuthorizeHud.mockResolvedValue({ ok: true, mode: 'admin' });
     mockReadCached.mockReturnValue({
       schema: 'ovie.shipping-state.v1',
