@@ -196,6 +196,41 @@ function isNoObjectGeneratedError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AI_NoObjectGeneratedError';
 }
 
+function errorHttpStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object') return null;
+  const candidate = error as {
+    readonly status?: unknown;
+    readonly statusCode?: unknown;
+  };
+  const status = candidate.status ?? candidate.statusCode;
+  return typeof status === 'number' && Number.isInteger(status) ? status : null;
+}
+
+/**
+ * A Gateway/upstream server failure (HTTP 5xx) is transient. JOV-8442: one
+ * of five identical calls failed with `GatewayResponseError:500` while the
+ * same model, prompt, and schema passed on the sibling surfaces, so a single
+ * upstream flake must not red the whole receipt. Forbidden (403), budget,
+ * and other non-5xx request errors are not transient and are not retried.
+ */
+function isTransientGatewayServerError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const status = errorHttpStatus(error);
+  return status !== null && status >= 500 && status < 600;
+}
+
+async function executeProbeWithTransientRetry(
+  executeProbe: ExecuteWebAiHealthProbe,
+  definition: WebAiHealthProbeDefinition
+): Promise<unknown> {
+  try {
+    return await executeProbe(definition);
+  } catch (error) {
+    if (!isTransientGatewayServerError(error)) throw error;
+    return await executeProbe(definition);
+  }
+}
+
 /**
  * Pull a short `response` string out of fenced or extra-field JSON.
  * Returns null when the model did not produce an object, so a real
@@ -307,8 +342,22 @@ export async function executeWebAiHealthProbe(
   } as const;
 
   if (definition.mode === 'stream') {
-    const result = streamText(common);
-    return result.text;
+    let streamError: unknown;
+    const result = streamText({
+      ...common,
+      onError: ({ error }) => {
+        streamError = error;
+      },
+    });
+    try {
+      const text = await result.text;
+      if (streamError !== undefined) throw streamError;
+      return text;
+    } catch (error) {
+      // The SDK's text promise can replace a Gateway failure with a statusless
+      // NoOutputGeneratedError. Preserve the callback error for retry/classification.
+      throw streamError ?? error;
+    }
   }
 
   if (definition.mode === 'text') {
@@ -351,7 +400,10 @@ export async function runWebAiHealth(input?: {
     WEB_AI_HEALTH_PROBES.map(async definition => {
       const startedAt = Date.now();
       try {
-        const output = await executeProbe(definition);
+        const output = await executeProbeWithTransientRetry(
+          executeProbe,
+          definition
+        );
         const failureCause = classifyOutput(output);
         return {
           surface: definition.surface,

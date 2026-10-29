@@ -1,3 +1,5 @@
+import { streamText as actualStreamText } from 'ai';
+import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it, vi } from 'vitest';
 
 const sdkMocks = vi.hoisted(() => ({
@@ -125,6 +127,172 @@ describe('runWebAiHealth', () => {
     ).rejects.toThrow('connection reset');
     expect(sdkMocks.generateObject).toHaveBeenCalledTimes(1);
   });
+
+  it('retries one transient Gateway 5xx per surface and keeps the receipt green', async () => {
+    const gateway500 = Object.assign(new Error('Gateway upstream error'), {
+      name: 'GatewayResponseError',
+      status: 500,
+    });
+    const executeProbe = vi
+      .fn()
+      .mockRejectedValueOnce(gateway500)
+      .mockResolvedValue('healthy');
+
+    const receipt = await runWebAiHealth({ executeProbe });
+
+    expect(receipt.status).toBe('passed');
+    expect(receipt.results.every(result => result.ok)).toBe(true);
+    // Five surfaces; the first probe's 500 is retried exactly once.
+    expect(executeProbe).toHaveBeenCalledTimes(6);
+  });
+
+  it('fails a persistent Gateway 500 after one bounded retry, never more', async () => {
+    const gateway500 = Object.assign(new Error('Gateway upstream error'), {
+      name: 'GatewayResponseError',
+      status: 500,
+    });
+    const executeProbe = vi.fn().mockRejectedValue(gateway500);
+
+    const receipt = await runWebAiHealth({ executeProbe });
+
+    expect(receipt.status).toBe('failed');
+    for (const result of receipt.results) {
+      expect(result).toMatchObject({
+        ok: false,
+        failureCause: 'request_error',
+        message: expect.stringContaining('GatewayResponseError:500'),
+      });
+    }
+    // Five surfaces, exactly two attempts each: one retry, no unbounded loop.
+    expect(executeProbe).toHaveBeenCalledTimes(10);
+  });
+
+  it('does not retry a forbidden 403 transport error', async () => {
+    const forbidden403 = Object.assign(new Error('model is forbidden'), {
+      statusCode: 403,
+    });
+    const executeProbe = vi
+      .fn()
+      .mockRejectedValueOnce(forbidden403)
+      .mockResolvedValue('healthy');
+
+    const receipt = await runWebAiHealth({ executeProbe });
+
+    // The rejected probe is NOT retried; the other four probes pass.
+    expect(executeProbe).toHaveBeenCalledTimes(5);
+    const failed = receipt.results.filter(result => !result.ok);
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({ failureCause: 'forbidden_model' });
+  });
+
+  it.each([502, 503, 504, 599])(
+    'retries a Gateway statusCode %i exactly once on every surface',
+    async statusCode => {
+      const attempts = new Map<string, number>();
+      const executeProbe = vi.fn(async ({ surface }: { surface: string }) => {
+        const attempt = (attempts.get(surface) ?? 0) + 1;
+        attempts.set(surface, attempt);
+        if (attempt === 1) {
+          throw Object.assign(new Error('Gateway upstream error'), {
+            statusCode,
+          });
+        }
+        return 'healthy';
+      });
+
+      const receipt = await runWebAiHealth({ executeProbe });
+
+      expect(receipt.status).toBe('passed');
+      expect([...attempts.values()]).toEqual([2, 2, 2, 2, 2]);
+      expect(executeProbe).toHaveBeenCalledTimes(10);
+    }
+  );
+
+  it.each([400, 429, 499, 600, 500.5, '503', undefined])(
+    'does not retry a request error outside integer HTTP 5xx: %s',
+    async statusCode => {
+      const executeProbe = vi
+        .fn()
+        .mockRejectedValue(
+          Object.assign(new Error('Request failed'), { statusCode })
+        );
+
+      const receipt = await runWebAiHealth({ executeProbe });
+
+      expect(receipt.status).toBe('failed');
+      expect(executeProbe).toHaveBeenCalledTimes(5);
+      expect(receipt.results.every(result => !result.ok)).toBe(true);
+    }
+  );
+
+  it.each([
+    { status: 500, failures: 1, attempts: 2, result: 'passed' },
+    { status: 503, failures: 1, attempts: 2, result: 'passed' },
+    { status: 500, failures: 2, attempts: 2, result: 'failed' },
+    { status: 403, failures: 1, attempts: 1, result: 'failed' },
+  ])(
+    'preserves real SDK stream errors: $status, $failures failure(s)',
+    async scenario => {
+      const model = new MockLanguageModelV4({
+        doStream: async () => {
+          if (model.doStreamCalls.length <= scenario.failures) {
+            throw Object.assign(new Error('private provider response'), {
+              name: 'GatewayResponseError',
+              status: scenario.status,
+            });
+          }
+          return {
+            stream: new ReadableStream({
+              start(controller) {
+                controller.enqueue({ type: 'text-start', id: 'text' });
+                controller.enqueue({
+                  type: 'text-delta',
+                  id: 'text',
+                  delta: 'healthy',
+                });
+                controller.enqueue({ type: 'text-end', id: 'text' });
+                controller.enqueue({
+                  type: 'finish',
+                  finishReason: { unified: 'stop', raw: 'stop' },
+                  usage: {
+                    inputTokens: {
+                      total: 1,
+                      noCache: 1,
+                      cacheRead: 0,
+                      cacheWrite: 0,
+                    },
+                    outputTokens: { total: 1, text: 1, reasoning: 0 },
+                  },
+                });
+                controller.close();
+              },
+            }),
+          };
+        },
+      });
+      await sdkMocks.streamText.withImplementation(
+        options => actualStreamText({ ...options, model }),
+        async () => {
+          const receipt = await runWebAiHealth({
+            executeProbe: definition =>
+              definition.mode === 'stream'
+                ? executeWebAiHealthProbe(definition)
+                : Promise.resolve('healthy'),
+          });
+          expect(receipt.status).toBe(scenario.result);
+          expect(model.doStreamCalls).toHaveLength(scenario.attempts);
+          if (scenario.result === 'failed') {
+            expect(receipt.results[0].failureCause).toBe(
+              scenario.status === 403 ? 'forbidden_model' : 'request_error'
+            );
+          }
+          expect(JSON.stringify(receipt)).not.toContain(
+            'private provider response'
+          );
+        }
+      );
+    }
+  );
 
   it('runs one bounded probe for every production Web AI surface', async () => {
     const executeProbe = vi.fn().mockResolvedValue('healthy');
