@@ -2857,6 +2857,7 @@ export async function runStructural(opts = {}) {
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/controller-quota-replay.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=80 .github/scripts/controller-quota-replay.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-build-queue.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=100 .github/scripts/vercel-build-queue.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-source.mjs --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/staging-release-source.test.mjs',
+    'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-supersession-policy.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=90 .github/scripts/staging-supersession-policy.test.mjs',
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs',
