@@ -8,7 +8,7 @@ const meta = {
   component: ProfileMockup,
   decorators: [
     Story => (
-      <div className='w-[28rem] max-w-full'>
+      <div className='w-md max-w-full'>
         <Story />
       </div>
     ),
