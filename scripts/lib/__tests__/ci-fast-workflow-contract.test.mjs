@@ -2157,7 +2157,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs scripts/workflow-runner-pin-check.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check'
     );
     expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
       'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'

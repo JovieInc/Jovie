@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { runTscProject } from './typecheck-scripts.mjs';
 import { checkRunnerPins } from './workflow-runner-pin-check.mjs';
 
 function fixture(workflows, allow = []) {
@@ -16,6 +17,22 @@ function fixture(workflows, allow = []) {
 }
 
 describe('workflow runner pins', () => {
+  it('typechecks the guard with the repository scripts compiler settings', t => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'pins-types-'));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    const tsconfig = path.join(dir, 'tsconfig.json');
+    writeFileSync(
+      tsconfig,
+      JSON.stringify({
+        extends: path.join(import.meta.dirname, 'tsconfig.json'),
+        include: [
+          path.join(import.meta.dirname, 'workflow-runner-pin-check.mjs'),
+        ],
+      })
+    );
+    const result = runTscProject({ tsconfig });
+    assert.equal(result.status, 0, result.output);
+  });
   it('passes explicit images', () => {
     assert.deepEqual(
       checkRunnerPins(
@@ -25,6 +42,18 @@ describe('workflow runner pins', () => {
       ),
       []
     );
+  });
+  it('handles null, scalar, and jobless YAML before checking workflow jobs', () => {
+    const errors = checkRunnerPins(
+      fixture({
+        'null.yml': 'null\n',
+        'scalar.yml': 'true',
+        'jobless.yml': 'name: No jobs\n',
+        'workflow.yml': 'jobs:\n  x:\n    runs-on: ubuntu-latest\n',
+      })
+    );
+    assert.equal(errors.length, 1);
+    assert.match(errors[0], /workflow\.yml#x uses floating ubuntu-latest/);
   });
   it('fails a new floating job', () => {
     const errors = checkRunnerPins(

@@ -38,7 +38,8 @@ export function findFloatingJobs(workflowsDir) {
   for (const file of readdirSync(workflowsDir).sort()) {
     if (!/\.ya?ml$/u.test(file)) continue;
     const doc = yamlLoad(readFileSync(path.join(workflowsDir, file), 'utf8'));
-    for (const [id, job] of Object.entries(doc?.jobs ?? {})) {
+    if (!doc || typeof doc !== 'object' || !('jobs' in doc)) continue;
+    for (const [id, job] of Object.entries(doc.jobs ?? {})) {
       if (job && floats(job))
         found.push({ key: `${file}#${id}`, playwright: usesPlaywright(job) });
     }
