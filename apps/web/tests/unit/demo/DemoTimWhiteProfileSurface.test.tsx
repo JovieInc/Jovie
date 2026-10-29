@@ -145,6 +145,26 @@ describe('DemoTimWhiteProfileSurface', () => {
     SLOW_DEMO_SURFACE_TIMEOUT_MS
   );
 
+  it('pins the share state to the open share sheet for the setup product shot', async () => {
+    const { HOMEPAGE_PROFILE_SHOWCASE_STATES } = await import(
+      '@/features/home/homepage-profile-preview-fixture'
+    );
+    const source = readFileSync(
+      'components/features/demo/DemoTimWhiteProfileSurface.tsx',
+      'utf8'
+    );
+
+    // `setup-share-profile` (lib/screenshots/product-shots.ts) captures
+    // /demo/showcase/tim-white-profile?state=share with the drawer open.
+    expect(HOMEPAGE_PROFILE_SHOWCASE_STATES.share.drawerView).toBe('share');
+    expect(source).toMatch(
+      /DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = \[[^\]]*'share'/
+    );
+    expect(source).toContain(
+      "showcaseState === 'more-menu' || showcaseState === 'share'"
+    );
+  });
+
   it('accepts releases mode from the screenshot route query string', async () => {
     const props = await renderSurface('mode=releases');
 
