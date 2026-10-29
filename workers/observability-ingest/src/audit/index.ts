@@ -5,7 +5,8 @@
  *   POST /v1/events        batches from the gh / git-push shim spool (scripts/fleet-audit)
  *   POST /v1/snapshot      GitHub-side state (workflow states, ruleset updated_at) from the hourly
  *                          correlator; changes are matched to shim events, unmatched ones alert Summer
- *   POST /v1/token         token broker: short-lived, scoped jovie-bot installation tokens
+ *   POST /v1/token         token broker: own per-client credential (not the ingest HMAC), grant
+ *                          table, nonce + timestamp replay protection; see broker.ts
  *   POST /v1/github-audit  rows from a GitHub org audit-log export (UI export; no API on our plan)
  * Readers (Authorization: Bearer READ_TOKEN):
  *   GET  /v1/who?target=&since=&limit=   GET /v1/summary
@@ -13,10 +14,13 @@
  * Storage is D1 (append-only events, ~0.5 KB each) with a 100 MB/month budget that alarms at 80%;
  * rows older than RETENTION_DAYS are archived as gzip NDJSON to R2 and deleted. No log drains,
  * no paid ingestion.
- */ import {
+ */
+import {
+  authenticateBrokerClient,
+  authorizeTokenRequest,
   collectRepoState,
+  type Grant,
   mintInstallationToken,
-  validateTokenRequest,
 } from './broker.ts';
 
 export interface Env {
@@ -33,6 +37,8 @@ export interface Env {
   readonly GITHUB_APP_ID?: string;
   readonly GITHUB_INSTALLATION_ID?: string;
   readonly GITHUB_APP_PRIVATE_KEY?: string;
+  /** JSON {clientId: key}; per-client issuance keys, distinct from INGEST_HMAC_SECRET. */
+  readonly BROKER_CLIENT_KEYS?: string;
   /** Comma-separated owner/repo list the hourly cron correlates (default JovieInc/Jovie). */
   readonly WATCH_REPOS?: string;
 }
@@ -60,6 +66,8 @@ const MAX_BATCH = 500;
 const DEFAULT_BUDGET = 100 * 1024 * 1024;
 const MATCH_BEFORE_MS = 30 * 60_000;
 const MATCH_AFTER_MS = 10 * 60_000;
+const MAX_SNAPSHOT_ITEMS = 500;
+const COLLECTION_STALE_MS = 2 * 3_600_000;
 const FIELDS: Array<[keyof AuditEvent, number]> = [
   ['actor_agent', 80],
   ['session_id', 80],
@@ -298,18 +306,40 @@ function itemValue(it: SnapshotItem): string {
     : String(it.updated_at ?? '');
 }
 
-function candidateActions(it: SnapshotItem, value: string): string[] {
-  if (it.kind === 'workflow') {
-    return value === 'active'
-      ? ['workflow.enable', 'api.PUT']
-      : ['workflow.disable', 'api.PUT'];
-  }
-  return [
-    'ruleset.edit',
-    'graphql.updateRepositoryRuleset',
-    'graphql.createRepositoryRuleset',
-    'graphql.deleteRepositoryRuleset',
-  ];
+export type ChangeKind = 'changed' | 'added' | 'removed';
+
+const RULESET_ACTIONS = [
+  'ruleset.edit',
+  'graphql.updateRepositoryRuleset',
+  'graphql.createRepositoryRuleset',
+  'graphql.deleteRepositoryRuleset',
+];
+
+function candidateActions(
+  it: SnapshotItem,
+  value: string,
+  kind: ChangeKind
+): string[] {
+  if (it.kind === 'ruleset') return RULESET_ACTIONS;
+  if (kind !== 'changed')
+    return ['git.push', 'git.push_force', 'api.PUT', 'api.DELETE'];
+  return value === 'active'
+    ? ['workflow.enable', 'api.PUT']
+    : ['workflow.disable', 'api.PUT'];
+}
+
+/**
+ * Unmatched changes alert Summer, except workflow files appearing or disappearing: those land
+ * through merged commits, which git history already attributes, so they are recorded as
+ * 'observed' rather than paged. Ruleset additions and removals always need a shim event.
+ */
+export function unmatchedStatus(
+  it: SnapshotItem,
+  kind: ChangeKind
+): 'unattributed' | 'observed' {
+  return it.kind === 'workflow' && kind !== 'changed'
+    ? 'observed'
+    : 'unattributed';
 }
 
 export function matchesTarget(ev: AuditEvent, it: SnapshotItem): boolean {
@@ -328,14 +358,17 @@ async function findMatch(
   repo: string,
   it: SnapshotItem,
   value: string,
-  changedAt: string
+  changedAt: string,
+  kind: ChangeKind = 'changed'
 ) {
   const at = Date.parse(changedAt);
   const lo = new Date(at - MATCH_BEFORE_MS).toISOString();
   const hi = new Date(at + MATCH_AFTER_MS).toISOString();
-  const actions = candidateActions(it, value);
+  const actions = candidateActions(it, value, kind);
+  // Only a mutation that succeeded explains a change: refused or failed attempts never attribute.
   const { results } = await env.AUDIT_DB.prepare(
-    `SELECT * FROM events WHERE ts BETWEEN ?1 AND ?2 AND action IN (${actions.map((_, i) => `?${i + 3}`).join(',')})
+    `SELECT * FROM events WHERE ts BETWEEN ?1 AND ?2 AND outcome = 'ok'
+       AND action IN (${actions.map((_, i) => `?${i + 3}`).join(',')})
      ORDER BY ts DESC LIMIT 50`
   )
     .bind(lo, hi, ...actions)
@@ -363,27 +396,73 @@ export async function applySnapshot(
     status: string;
     matched_event_id: string | null;
   }> = [];
-  for (const it of items.slice(0, 500)) {
-    const key = `${repo}:${it.kind}:${it.id}`;
+  // Never diff a partial set: a truncated snapshot would read as mass removals.
+  if (items.length > MAX_SNAPSHOT_ITEMS)
+    throw new Error(
+      `snapshot for ${repo} has ${items.length} items (max ${MAX_SNAPSHOT_ITEMS})`
+    );
+  const prefix = `${repo}:`;
+  const { results: prevRows } = await env.AUDIT_DB.prepare(
+    'SELECT key, value FROM snapshots WHERE substr(key, 1, ?1) = ?2'
+  )
+    .bind(prefix.length, prefix)
+    .all<{ key: string; value: string }>();
+  const prevByKey = new Map((prevRows ?? []).map(r => [r.key, r.value]));
+  const hasBaseline = prevByKey.size > 0; // the first snapshot of a repo is a baseline, not drift
+
+  const diffs: Array<{
+    it: SnapshotItem;
+    kind: ChangeKind;
+    prev: string | null;
+    value: string;
+  }> = [];
+  const seen = new Set<string>();
+  for (const it of items) {
+    const key = `${prefix}${it.kind}:${it.id}`;
+    seen.add(key);
     const value = itemValue(it);
-    const prev = await env.AUDIT_DB.prepare(
-      'SELECT value FROM snapshots WHERE key = ?1'
-    )
-      .bind(key)
-      .first<{ value: string }>();
+    const prev = prevByKey.get(key);
     await env.AUDIT_DB.prepare(
       `INSERT INTO snapshots (key, value, observed_at) VALUES (?1, ?2, ?3)
        ON CONFLICT(key) DO UPDATE SET value = ?2, observed_at = ?3`
     )
       .bind(key, value, nowIso)
       .run();
-    if (!prev || prev.value === value) continue; // first sighting is a baseline, not a change
-    const changedAt = it.updated_at ?? nowIso;
+    if (prev === undefined) {
+      if (hasBaseline) diffs.push({ it, kind: 'added', prev: null, value });
+    } else if (prev !== value) {
+      diffs.push({ it, kind: 'changed', prev, value });
+    }
+  }
+  for (const [key, prev] of prevByKey) {
+    if (seen.has(key)) continue;
+    const [, kindName, id] =
+      key.slice(prefix.length).match(/^(workflow|ruleset):(.+)$/) ?? [];
+    if (!kindName) continue;
+    await env.AUDIT_DB.prepare('DELETE FROM snapshots WHERE key = ?1')
+      .bind(key)
+      .run();
+    diffs.push({
+      it: { kind: kindName as SnapshotItem['kind'], id },
+      kind: 'removed',
+      prev,
+      value: '',
+    });
+  }
+
+  for (const { it, kind, prev, value } of diffs) {
+    const changedAt = (kind !== 'removed' && it.updated_at) || nowIso;
     const change =
-      it.kind === 'workflow' ? `${prev.value} -> ${value}` : `updated ${value}`;
+      kind === 'added'
+        ? `added (${value || 'present'})`
+        : kind === 'removed'
+          ? `removed (was ${prev})`
+          : it.kind === 'workflow'
+            ? `${prev} -> ${value}`
+            : `updated ${value}`;
     const target = it.name ?? String(it.id);
-    const match = await findMatch(env, repo, it, value, changedAt);
-    const status = match ? 'attributed' : 'unattributed';
+    const match = await findMatch(env, repo, it, value, changedAt, kind);
+    const status = match ? 'attributed' : unmatchedStatus(it, kind);
     await env.AUDIT_DB.prepare(
       `INSERT INTO correlations (id, observed_at, changed_at, repo, target, change, github_actor, matched_event_id, status)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`
@@ -406,7 +485,7 @@ export async function applySnapshot(
       status,
       matched_event_id: match?.id ?? null,
     });
-    if (!match) {
+    if (status === 'unattributed') {
       await alertSummer(
         env,
         `[fleet-audit] UNATTRIBUTED change: ${it.kind} "${target}" in ${repo} ${change} at ${changedAt}. ` +
@@ -661,7 +740,12 @@ export async function handle(
       const last = await env.AUDIT_DB.prepare(
         "SELECT value FROM snapshots WHERE key = 'cron:last'"
       ).first<{ value: string }>();
-      return json({ ok: true, last_cron_at: last?.value ?? null });
+      // last_collection_ok_at is the registry receipt: it only advances on a successful collection.
+      return json({
+        ok: true,
+        last_cron_at: last?.value ?? null,
+        ...(await collectionHealth(env, now)),
+      });
     }
     if (!authorizedReader(request, env))
       return json({ error: 'unauthorized' }, 401);
@@ -688,6 +772,9 @@ export async function handle(
   }
   if (request.method !== 'POST')
     return json({ error: 'method not allowed' }, 405);
+
+  // Token issuance never accepts the ingest signature: it has its own per-client credential.
+  if (url.pathname === '/v1/token') return issueToken(request, env, now);
 
   const parsed = await readSigned(request, env);
   if (parsed instanceof Response) return parsed;
@@ -718,6 +805,11 @@ export async function handle(
     };
     if (!body?.repo || !Array.isArray(body.items))
       return json({ error: 'repo and items are required' }, 400);
+    if (body.items.length > MAX_SNAPSHOT_ITEMS)
+      return json(
+        { error: `at most ${MAX_SNAPSHOT_ITEMS} items per snapshot` },
+        400
+      );
     const changes = await applySnapshot(
       env,
       body.repo,
@@ -735,60 +827,105 @@ export async function handle(
       ...(await applyGithubAudit(env, parsed as GithubAuditRow[], nowIso)),
     });
   }
-  if (url.pathname === '/v1/token') {
-    if (
-      !env.GITHUB_APP_PRIVATE_KEY ||
-      !env.GITHUB_APP_ID ||
-      !env.GITHUB_INSTALLATION_ID
-    )
-      return json({ error: 'broker_not_configured' }, 503);
-    const req = validateTokenRequest(parsed);
-    if (typeof req === 'string') return json({ error: req }, 400);
-    let minted;
-    try {
-      minted = await mintInstallationToken({
-        appId: env.GITHUB_APP_ID,
-        installationId: env.GITHUB_INSTALLATION_ID,
-        privateKey: env.GITHUB_APP_PRIVATE_KEY,
-        request: req,
-      });
-    } catch (err) {
-      return json(
-        { error: err instanceof Error ? err.message : 'mint failed' },
-        502
-      );
-    }
-    await insertEvents(
-      env,
-      [
-        {
-          id: crypto.randomUUID(),
-          ts: nowIso,
-          actor_agent: req.agent,
-          session_id: req.session ?? null,
-          host: req.host ?? null,
-          repo: `JovieInc/${(req.repositories ?? ['Jovie']).join(',')}`,
-          target: `scope:${req.scope}`,
-          action: 'token.issue',
-          danger: req.scope === 'ci' ? 1 : 0,
-          reason: req.reason,
-          issue: req.issue ?? null,
-          outcome: `expires ${minted.expires_at}`,
-          before: null,
-          after: null,
-          source: 'broker',
-        },
-      ],
-      nowIso
-    );
-    return json({
-      ok: true,
-      token: minted.token,
-      expires_at: minted.expires_at,
-      permissions: minted.permissions,
-    });
-  }
   return json({ error: 'not found' }, 404);
+}
+
+const MAX_TOKEN_BODY = 4096;
+
+export async function issueToken(
+  request: Request,
+  env: Env,
+  now: Date
+): Promise<Response> {
+  if (
+    !env.GITHUB_APP_PRIVATE_KEY ||
+    !env.GITHUB_APP_ID ||
+    !env.GITHUB_INSTALLATION_ID ||
+    !env.BROKER_CLIENT_KEYS
+  )
+    return json({ error: 'broker_not_configured' }, 503);
+  const body = await request.text();
+  if (body.length > MAX_TOKEN_BODY)
+    return json({ error: 'payload too large' }, 413);
+  const auth = await authenticateBrokerClient({
+    headers: request.headers,
+    body,
+    clientKeysJson: env.BROKER_CLIENT_KEYS,
+    ingestSecret: env.INGEST_HMAC_SECRET,
+    nowSec: Math.floor(now.getTime() / 1000),
+  });
+  if ('error' in auth) return json({ error: auth.error }, auth.status);
+
+  const grant = await env.AUDIT_DB.prepare(
+    'SELECT client_id, agent_class, repos, scopes, active FROM broker_grants WHERE client_id = ?1'
+  )
+    .bind(auth.clientId)
+    .first<Grant>();
+  if (!grant || !grant.active)
+    return json({ error: 'no active grant for this client' }, 403);
+
+  // Replay protection: each (client, nonce) is accepted once inside the timestamp window.
+  const seen = await env.AUDIT_DB.prepare(
+    'INSERT OR IGNORE INTO broker_nonces (client_id, nonce, seen_at) VALUES (?1, ?2, ?3)'
+  )
+    .bind(auth.clientId, auth.nonce, now.toISOString())
+    .run();
+  if ((seen.meta?.changes ?? 0) === 0)
+    return json({ error: 'replayed request' }, 409);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return json({ error: 'invalid json' }, 400);
+  }
+  const req = authorizeTokenRequest(parsed, grant);
+  if (typeof req === 'string') return json({ error: req }, 403);
+
+  let minted: Awaited<ReturnType<typeof mintInstallationToken>>;
+  try {
+    minted = await mintInstallationToken({
+      appId: env.GITHUB_APP_ID,
+      installationId: env.GITHUB_INSTALLATION_ID,
+      privateKey: env.GITHUB_APP_PRIVATE_KEY,
+      request: req,
+    });
+  } catch (err) {
+    return json(
+      { error: err instanceof Error ? err.message : 'mint failed' },
+      502
+    );
+  }
+  const nowIso = now.toISOString();
+  await insertEvents(
+    env,
+    [
+      {
+        id: crypto.randomUUID(),
+        ts: nowIso,
+        actor_agent: req.agent,
+        session_id: req.session ?? null,
+        host: req.host ?? null,
+        repo: `JovieInc/${(req.repositories ?? []).join(',')}`,
+        target: `client:${auth.clientId} scope:${req.scope}`,
+        action: 'token.issue',
+        danger: req.scope === 'ci' ? 1 : 0,
+        reason: req.reason,
+        issue: req.issue ?? null,
+        outcome: 'ok',
+        before: null,
+        after: `expires ${minted.expires_at}`,
+        source: 'broker',
+      },
+    ],
+    nowIso
+  );
+  return json({
+    ok: true,
+    token: minted.token,
+    expires_at: minted.expires_at,
+    permissions: minted.permissions,
+  });
 }
 
 /**
@@ -813,10 +950,7 @@ export async function correlateWatchedRepos(
     changes: number;
     error?: string;
   }> = [];
-  for (const repo of (env.WATCH_REPOS ?? 'JovieInc/Jovie')
-    .split(',')
-    .map(r => r.trim())
-    .filter(Boolean)) {
+  for (const repo of watchedRepos(env)) {
     try {
       const { token } = await mintInstallationToken({
         appId: env.GITHUB_APP_ID,
@@ -839,16 +973,84 @@ export async function correlateWatchedRepos(
         'cron'
       );
       out.push({ repo, items: items.length, changes: changes.length });
+      // Freshness advances only after a complete collection and diff succeeded.
+      await putMeta(env, `collect:${repo}:ok`, now.toISOString());
+      await env.AUDIT_DB.prepare('DELETE FROM snapshots WHERE key = ?1')
+        .bind(`collect:${repo}:error`)
+        .run();
     } catch (err) {
-      out.push({
-        repo,
-        items: 0,
-        changes: 0,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      const error = err instanceof Error ? err.message : String(err);
+      out.push({ repo, items: 0, changes: 0, error });
+      const already = await env.AUDIT_DB.prepare(
+        'SELECT value FROM snapshots WHERE key = ?1'
+      )
+        .bind(`collect:${repo}:error`)
+        .first<{ value: string }>();
+      await putMeta(
+        env,
+        `collect:${repo}:error`,
+        `${now.toISOString()} ${error.slice(0, 200)}`
+      );
+      if (!already)
+        await alertSummer(
+          env,
+          `[fleet-audit] correlation FAILED for ${repo} at ${now.toISOString()}: ${error.slice(0, 300)}. ` +
+            'Drift detection for this repo is stale until a collection succeeds.'
+        );
     }
   }
   return out;
+}
+
+async function putMeta(env: Env, key: string, value: string) {
+  await env.AUDIT_DB.prepare(
+    `INSERT INTO snapshots (key, value, observed_at) VALUES (?1, ?2, ?2)
+     ON CONFLICT(key) DO UPDATE SET value = ?2, observed_at = ?2`
+  )
+    .bind(key, value)
+    .run();
+}
+
+function watchedRepos(env: Env): string[] {
+  return (env.WATCH_REPOS ?? 'JovieInc/Jovie')
+    .split(',')
+    .map(r => r.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Collection freshness for the liveness receipt: the oldest last-successful collection across
+ * watched repos (null until every repo has succeeded once), plus any repo whose latest attempt failed.
+ */
+export async function collectionHealth(env: Env, now: Date) {
+  let oldest: string | null = null;
+  let missing = false;
+  const errors: Array<{ repo: string; error: string }> = [];
+  for (const repo of watchedRepos(env)) {
+    const ok = await env.AUDIT_DB.prepare(
+      'SELECT value FROM snapshots WHERE key = ?1'
+    )
+      .bind(`collect:${repo}:ok`)
+      .first<{ value: string }>();
+    const err = await env.AUDIT_DB.prepare(
+      'SELECT value FROM snapshots WHERE key = ?1'
+    )
+      .bind(`collect:${repo}:error`)
+      .first<{ value: string }>();
+    if (err) errors.push({ repo, error: err.value });
+    if (!ok) missing = true;
+    else if (!oldest || ok.value < oldest) oldest = ok.value;
+  }
+  const last = missing ? null : oldest;
+  const stale =
+    !last ||
+    errors.length > 0 ||
+    now.getTime() - Date.parse(last) > COLLECTION_STALE_MS;
+  return {
+    last_collection_ok_at: last,
+    collection_stale: stale,
+    collection_errors: errors,
+  };
 }
 
 export default {
@@ -865,6 +1067,9 @@ export default {
       .bind(now.toISOString())
       .run();
     await correlateWatchedRepos(env, now);
+    await env.AUDIT_DB.prepare('DELETE FROM broker_nonces WHERE seen_at < ?1')
+      .bind(new Date(now.getTime() - 3_600_000).toISOString())
+      .run();
     if (now.getUTCHours() === 3) await retain(env, now);
   },
 };
