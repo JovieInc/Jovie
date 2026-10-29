@@ -34,6 +34,7 @@ export const SHIPPED_SITES_SHOWCASE_COPY = {
   headline: 'The profile in action.',
   body: 'One profile, shown with demo data. Open Tim White’s profile to see it live.',
   liveProfileHref: LIVE_PROFILE_HREF,
+  liveProfileLabel: 'Open the live profile',
 } as const;
 
 export const PLATFORM_SPEC_BENTO_COPY = {

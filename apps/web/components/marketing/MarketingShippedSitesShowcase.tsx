@@ -75,7 +75,7 @@ export function MarketingShippedSitesShowcase({
           href={SHIPPED_SITES_SHOWCASE_COPY.liveProfileHref}
           className='focus-ring-themed mt-4 inline-flex text-sm text-secondary-token underline-offset-4 hover:text-primary-token hover:underline'
         >
-          Open the live profile
+          {SHIPPED_SITES_SHOWCASE_COPY.liveProfileLabel}
         </Link>
 
         <div className='m-shipped-sites__grid mt-10'>
