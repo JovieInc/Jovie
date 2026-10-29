@@ -158,11 +158,11 @@ export function ProfileDrawerShell({
           </div>
         ) : isDirectHeader ? (
           <div
-            className='grid grid-cols-[minmax(0,1fr)_44px] items-center gap-3 pt-5'
+            className='flex items-center gap-3 pt-5'
             data-testid='profile-drawer-direct-header'
           >
             <div
-              className='flex min-h-[2.625rem] min-w-0 flex-col justify-center py-px'
+              className='flex min-h-[2.625rem] min-w-0 flex-1 flex-col justify-center py-px'
               data-testid='profile-drawer-title-slot'
             >
               <h2
