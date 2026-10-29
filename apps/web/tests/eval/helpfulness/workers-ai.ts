@@ -53,7 +53,8 @@ export interface WaiResult {
 
 export interface WorkersAiConfig {
   readonly accountId: string;
-  readonly token: string;
+  /** Current bearer. Called per request so short-lived OAuth tokens refresh. */
+  readonly token: () => string;
 }
 
 /**
@@ -79,9 +80,9 @@ export function workersAiChat(config: WorkersAiConfig) {
     if (!client) {
       client = createApiClient({
         provider: 'cloudflare',
-        credential: `${hashCredential('cloudflare', config.token)}:${model}`,
+        credential: `${hashCredential('cloudflare', config.accountId)}:${model}`,
         authorize: headers => {
-          headers.set('authorization', `Bearer ${config.token}`);
+          headers.set('authorization', `Bearer ${config.token()}`);
         },
       });
       clients.set(model, client);

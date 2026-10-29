@@ -132,26 +132,37 @@ export function assertNoGatewaySpend(
   }
 }
 
+/** wrangler OAuth tokens live about an hour; refresh well before that. */
+const WRANGLER_TOKEN_TTL_MS = 20 * 60_000;
+
 function resolveWorkersAiConfig(): WorkersAiConfig {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required.');
-  let token = process.env.CLOUDFLARE_API_TOKEN ?? '';
-  if (!token) {
-    token =
-      execFileSync('npx', ['-y', 'wrangler@4', 'auth', 'token'], {
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'ignore'],
-      })
-        .trim()
-        .split('\n')
-        .at(-1)
-        ?.trim() ?? '';
-  }
-  if (!token) {
-    throw new Error(
-      'CLOUDFLARE_API_TOKEN is required (or run `wrangler login` on this host).'
-    );
-  }
+  const fixed = process.env.CLOUDFLARE_API_TOKEN ?? '';
+  if (fixed) return { accountId, token: () => fixed };
+  let cached = '';
+  let fetchedAt = 0;
+  const token = () => {
+    if (!cached || Date.now() - fetchedAt > WRANGLER_TOKEN_TTL_MS) {
+      cached =
+        execFileSync('npx', ['-y', 'wrangler@4', 'auth', 'token'], {
+          encoding: 'utf8',
+          stdio: ['ignore', 'pipe', 'ignore'],
+        })
+          .trim()
+          .split('\n')
+          .at(-1)
+          ?.trim() ?? '';
+      fetchedAt = Date.now();
+    }
+    if (!cached) {
+      throw new Error(
+        'CLOUDFLARE_API_TOKEN is required (or run `wrangler login` on this host).'
+      );
+    }
+    return cached;
+  };
+  token();
   return { accountId, token };
 }
 
