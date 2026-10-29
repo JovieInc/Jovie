@@ -1,0 +1,367 @@
+{
+  "measuredAt": "2026-10-25",
+  "source": "merge-group CI 40188929222 structural command timings",
+  "thresholdSeconds": 60,
+  "commands": [
+    {
+      "key": "node --test .github/scripts/publish-queue-junit.test.mjs scripts/record-quarantine-releases.test.mjs",
+      "part": "operationsParts",
+      "seconds": 1.3,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test .github/scripts/dependency-parity-evidence.test.mjs",
+      "part": "operationsParts",
+      "seconds": 0.6,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-controller.mjs --test-c",
+      "part": "operationsParts",
+      "seconds": 2.2,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-reconcile.mjs --test-co",
+      "part": "operationsParts",
+      "seconds": 0.6,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-native-run.mjs --test-coverage",
+      "part": "operationsParts",
+      "seconds": 4.9,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-lane-carryover.mjs --test-cover",
+      "part": "operationsParts",
+      "seconds": 3.8,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/canonical-staging-receipt.mjs --test-co",
+      "part": "operationsParts",
+      "seconds": 16.1,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-on-demand-ledger.mjs --test-cove",
+      "part": "operationsParts",
+      "seconds": 0.4,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/controller-quota-replay.mjs --test-cove",
+      "part": "operationsParts",
+      "seconds": 0.6,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-build-queue.mjs --test-coverage-",
+      "part": "operationsParts",
+      "seconds": 0.5,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-source.mjs --test-cover",
+      "part": "operationsParts",
+      "seconds": 15.1,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-inc",
+      "part": "operationsParts",
+      "seconds": 0.7,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-subscription.mjs --test-covera",
+      "part": "operationsParts",
+      "seconds": 0.5,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/promotion-loss-metrics.mjs --test-coverage-line",
+      "part": "operationsParts",
+      "seconds": 0.4,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm invariants:check",
+      "part": "operationsParts",
+      "seconds": 87.9,
+      "kind": "exempt-static"
+    },
+    {
+      "key": "pnpm ci:harness:check",
+      "part": "operationsParts",
+      "seconds": 2.7,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm ci:incident-contract:validate",
+      "part": "operationsParts",
+      "seconds": 0.9,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "node --test scripts/ci-release-trigger-contract.test.mjs .github/scripts/analyze-test-flakiness.test.js",
+      "part": "operationsParts",
+      "seconds": 0.8,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test .github/scripts/collect-quarantine-evidence.test.mjs",
+      "part": "operationsParts",
+      "seconds": 0.9,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test scripts/file-quarantine-clusters.test.mjs scripts/propose-quarantine-ledger.test.mjs",
+      "part": "operationsParts",
+      "seconds": 1.8,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test .github/scripts/marketing-dom-workflow.test.mjs",
+      "part": "operationsParts",
+      "seconds": 0.7,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test .github/scripts/update-quarantine.test.js",
+      "part": "operationsParts",
+      "seconds": 0.6,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm ci:control:test",
+      "part": "operationsParts",
+      "seconds": 40.1,
+      "kind": "exempt-static"
+    },
+    {
+      "key": "pnpm exec vitest --config scripts/vitest.config.mts run lib/__tests__/pr-visual-review.test.mjs lib/__tests__/pr-visual-",
+      "part": "operationsParts",
+      "seconds": 3.1,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/recheck-main-lineage-auth.test.mjs lib/__te",
+      "part": "operationsParts",
+      "seconds": 34.3,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/linear-client.mjs --test-c",
+      "part": "operationsParts",
+      "seconds": 1.3,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm ci:branching-guard:validate",
+      "part": "operationsParts",
+      "seconds": 0.9,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm ci:merge-queue:check",
+      "part": "operationsParts",
+      "seconds": 0.6,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm ci:typecheck-gate-guard",
+      "part": "operationsParts",
+      "seconds": 0.9,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm doc:freshness:check",
+      "part": "operationsParts",
+      "seconds": 1.7,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "node .github/scripts/quarantine-ledger.mjs validate",
+      "part": "operationsParts",
+      "seconds": 1.6,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "python3 .github/scripts/test-security-suppression-audit.py",
+      "part": "operationsParts",
+      "seconds": 0.6,
+      "kind": "suite"
+    },
+    {
+      "key": "COVERAGE_FILE=\"${RUNNER_TEMP:-/tmp}/jovie-closure-health.coverage\" python3 -m coverage run --branch scripts/fleet-gate/t",
+      "part": "operationsParts",
+      "seconds": 1.4,
+      "kind": "suite"
+    },
+    {
+      "key": "COVERAGE_FILE=\"${RUNNER_TEMP:-/tmp}/jovie-gem-priority-gate.coverage\" python3 -m coverage run --branch scripts/fleet-gat",
+      "part": "operationsParts",
+      "seconds": 20.5,
+      "kind": "suite"
+    },
+    {
+      "key": "COVERAGE_FILE=\"${RUNNER_TEMP:-/tmp}/jovie-fleet-admission.coverage\" python3 -m coverage run --branch scripts/fleet-gate/",
+      "part": "operationsParts",
+      "seconds": 68.8,
+      "kind": "expensive-merge-group-only"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/shipping-lead-gate.mjs --t",
+      "part": "operationsParts",
+      "seconds": 0.2,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/backlog-orchestrator/summer-shipping-lead-contr",
+      "part": "operationsParts",
+      "seconds": 0.2,
+      "kind": "suite"
+    },
+    {
+      "key": "python3 scripts/fleet-gate/tests/test_evaluate_fleet_gate.py",
+      "part": "operationsParts",
+      "seconds": 9.5,
+      "kind": "suite"
+    },
+    {
+      "key": "python3 scripts/fleet-gate/tests/test_receipt_writer.py",
+      "part": "operationsParts",
+      "seconds": 0.1,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test scripts/backlog-orchestrator/__tests__/pre-lease-gates.test.mjs",
+      "part": "operationsParts",
+      "seconds": 0.1,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test scripts/backlog-orchestrator/__tests__/gate-next-hold.test.mjs",
+      "part": "operationsParts",
+      "seconds": 0.1,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test scripts/backlog-orchestrator/__tests__/ownership-inventory.test.mjs",
+      "part": "operationsParts",
+      "seconds": 0.1,
+      "kind": "suite"
+    },
+    {
+      "key": "node --test --experimental-test-coverage --test-coverage-include=scripts/lib/publish-coverage-report.mjs --test-coverage",
+      "part": "operationsParts",
+      "seconds": 1.9,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm next:proxy-guard",
+      "part": "webParts",
+      "seconds": 1.3,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm tailwind:check",
+      "part": "webParts",
+      "seconds": 1.3,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm --filter=@jovie/web run lint:no-native-dialogs",
+      "part": "webParts",
+      "seconds": 1.7,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm --filter=@jovie/web run lint:seo",
+      "part": "webParts",
+      "seconds": 9.6,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm --filter=@jovie/web run lint:contrast-ratchet",
+      "part": "webParts",
+      "seconds": 1.3,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm design:shared-ui-visual-arbitrary:check",
+      "part": "webParts",
+      "seconds": 0.5,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm design:overlay-layers:check",
+      "part": "webParts",
+      "seconds": 0.7,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm design:no-dead-ends:check",
+      "part": "webParts",
+      "seconds": 1.2,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/chat/mobile-chat-certification.test.ts",
+      "part": "webParts",
+      "seconds": 5.0,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-ship-gate.test.mjs",
+      "part": "webParts",
+      "seconds": 4.2,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/component-live-storybook-certification.test",
+      "part": "webParts",
+      "seconds": 49.5,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm component-ship-gate",
+      "part": "webParts",
+      "seconds": 2.6,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm screen-registration-gate",
+      "part": "webParts",
+      "seconds": 0.5,
+      "kind": "pr-cheap-scan"
+    },
+    {
+      "key": "pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/design-exception-registry.test.mjs --covera",
+      "part": "webParts",
+      "seconds": 1.5,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/spacing-scale-ratchet.test.",
+      "part": "webParts",
+      "seconds": 5.7,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system/one-primary-action-per-scre",
+      "part": "webParts",
+      "seconds": 7.3,
+      "kind": "suite"
+    },
+    {
+      "key": "pnpm --filter @jovie/web run test:reliability-detectors",
+      "part": "webParts",
+      "seconds": 0.8,
+      "kind": "suite"
+    }
+  ]
+}

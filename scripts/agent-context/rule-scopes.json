@@ -7,7 +7,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "43e227649b57a96160f38afb85023e0bdefde8e551f69235e49765ae80fa052d"
+    "bodySha256": "d56c26e1a41cab201f71b0327bd15109dd37911f5745f9a553c08cdec9c13419"
   },
   {
     "file": ".claude/rules/code-style.md",
@@ -18,6 +18,11 @@
     "file": ".claude/rules/db.md",
     "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
     "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
+  },
+  {
+    "file": ".claude/rules/domain-writes.md",
+    "paths": ["apps/web/**"],
+    "bodySha256": "95d9db99d51c78dd7d07d0836f4692415ef8c2180896e9ed820fae44c99601c4"
   },
   {
     "file": ".claude/rules/environment.md",
@@ -41,7 +46,7 @@
       "canon/automation-registry.jsonl",
       "docs/metrics/**"
     ],
-    "bodySha256": "231c6da1fc81dee71971f0fbb887af84a64e3ca878746b78036c5e72d539006a"
+    "bodySha256": "20b2194cdea5e41ae73fa440530de8bbb766af2fba4b168365bd2ce6d44b825f"
   },
   {
     "file": ".claude/rules/external-apis.md",
@@ -53,7 +58,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "f946155ee825bd90ecab6f451012b05f69fe819e0e615748c8d07be5f6580199"
+    "bodySha256": "46fa336beeef6a6d9bfba990205368a7af77f17a50a405ef4451d303bf706a81"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -91,7 +96,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "a6a5e499e9dd40815b2db9048512cc41d75d4408d7fbd9c4197f9eee6379b4b7"
+    "bodySha256": "f0c1a664484bc6f73d8c6ab76cf8c814873c784d543dbe07ce859ed63d3bd084"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -135,7 +140,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "58152f4ec8c78b5f966f72df3eba353992a1d6bfd2f853220634c3406a59e90b"
+    "bodySha256": "188a218a8f0f73a88014cdc77736cf7190cef27c7a39cfc9a950b952f79979c6"
   },
   {
     "file": ".claude/rules/security.md",
@@ -166,7 +171,7 @@
       "**/vitest.config.*",
       "**/playwright.config.*"
     ],
-    "bodySha256": "07808bc5df7c7a6f5ffbaba2c2547ca58d6223b47f976708a4abe960a754dea3"
+    "bodySha256": "7cf119f5b7f3df3983b22e6eb33ffbd8b67f96dd9d73696ac10481bc6574e59c"
   },
   {
     "file": ".claude/rules/ui.md",
@@ -177,6 +182,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "4fb1c3b50414a6a0ebaf685ded81166aae40b945f7a18adcfd61e6ca889172b9"
+    "bodySha256": "5977cfcaaf24cb34bda42944a1d99fa0953ea54a12ba4f9afcc92108ad57df93"
   }
 ]

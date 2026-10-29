@@ -69,6 +69,7 @@ vi.mock('@/components/features/onboarding/OnboardingSessionBoundary', () => ({
 
 vi.mock('@/lib/onboarding/session', () => ({
   getOrMintOnboardingSessionId: getOrMintOnboardingSessionIdMock,
+  getCurrentOnboardingSessionId: vi.fn().mockResolvedValue(null),
 }));
 
 // The /start page resolves canonical access state server-side via

@@ -1,6 +1,7 @@
 import 'server-only';
 import { type ToolSet, tool, type UIMessage } from 'ai';
 import { z } from 'zod';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import { TOOL_SCHEMAS } from '@/lib/chat/tool-schemas';
 import {
   type AccessDecision,
@@ -23,10 +24,18 @@ import {
   normalizeHandleCandidate,
   toHandleAvailabilityResult,
 } from '@/lib/onboarding/handle-availability';
+import {
+  type OnboardingProfileDraft,
+  readOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 import { parseSocialLinkInput } from '@/lib/onboarding/social-link-parse';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { buildSpotifyArtistUrl, getSpotifyArtist } from '@/lib/spotify';
 import { logger } from '@/lib/utils/logger';
+import type {
+  GoldenPathAdmissionReason,
+  GoldenPathVerdict,
+} from '@/lib/waitlist/golden-path-admission';
 
 /**
  * Onboarding tool execute closures.
@@ -65,9 +74,14 @@ import { logger } from '@/lib/utils/logger';
  * outside the per-turn tool accumulator.
  */
 export interface OnboardingTurnState {
+  /** Server-persisted interview; public evidence never grants ownership/access. */
+  profileDraft?: OnboardingProfileDraft | null;
   sessionId: string;
   /** DB-backed controlled-access state resolved once by the request handler. */
   accessControlled: boolean;
+  /** Golden-path verdict for this turn; null holds the artist (fail closed). */
+  goldenPathVerdict?: GoldenPathVerdict | null;
+  goldenPathHold?: GoldenPathAdmissionReason | null;
   /** Set when confirmSpotifyArtist is called. */
   spotifyArtistId: string | null;
   /**
@@ -194,11 +208,15 @@ export function createOnboardingTurnState(input: {
   sessionId: string;
   turnCount: number;
   accessControlled?: boolean;
+  goldenPathVerdict?: GoldenPathVerdict | null;
+  goldenPathHold?: GoldenPathAdmissionReason | null;
   messages?: readonly UIMessage[];
 }): OnboardingTurnState {
   const state: OnboardingTurnState = {
     sessionId: input.sessionId,
     accessControlled: input.accessControlled ?? false,
+    goldenPathVerdict: input.goldenPathVerdict ?? null,
+    goldenPathHold: input.goldenPathHold ?? null,
     spotifyArtistId: null,
     publicProfileUrl: null,
     spotifyArtistName: null,
@@ -225,6 +243,10 @@ export function deriveOnboardingTurnStateFromMessages(
   for (const message of messages) {
     for (const part of getToolParts(message)) {
       if (isRecord(part.output)) {
+        state.profileDraft =
+          readOnboardingProfileDraft(part.output) ?? state.profileDraft;
+        if (state.profileDraft?.selectedSource)
+          state.publicProfileUrl = state.profileDraft.selectedSource.url;
         restoreArtistFromOutput(state, part.output);
         if (
           part.output.action === 'propose_social_link' &&
@@ -550,7 +572,10 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
         // JOV-7144: the single access gate shared with the scripted fallback.
         // The DB-backed controlled-access gate stays authoritative inside it.
         const decision = decideOnboardingAccess({
+          activeRole: state.profileDraft?.activeRole,
           accessControlled: state.accessControlled,
+          goldenPathVerdict: state.goldenPathVerdict,
+          goldenPathHold: state.goldenPathHold,
           spotifyArtistId: state.spotifyArtistId,
           publicProfileUrl: state.publicProfileUrl,
           spotifyFollowers: state.spotifyFollowers,
@@ -581,6 +606,27 @@ export function buildOnboardingTools(state: OnboardingTurnState): ToolSet {
       description: TOOL_SCHEMAS.proposeCheckout.description,
       inputSchema: TOOL_SCHEMAS.proposeCheckout.inputSchema,
       execute: async ({ plan }) => {
+        const decision = decideOnboardingAccess({
+          activeRole: state.profileDraft?.activeRole,
+          accessControlled: state.accessControlled,
+          goldenPathVerdict: state.goldenPathVerdict,
+          goldenPathHold: state.goldenPathHold,
+          spotifyArtistId: state.spotifyArtistId,
+          publicProfileUrl: state.publicProfileUrl,
+          spotifyFollowers: state.spotifyFollowers,
+          metrics: state.artistMetrics,
+          signals: state.signals,
+          turnCount: state.turnCount,
+        });
+        if (
+          decision.kind !== 'instant_access' ||
+          (plan && !getPublicPriceClaim(plan).selfService)
+        )
+          return {
+            action: 'checkout_unavailable',
+            summary:
+              'Checkout is unavailable for the current access and offer state.',
+          };
         const handoffUrl = plan
           ? `/onboarding/checkout?plan=${encodeURIComponent(plan)}`
           : '/onboarding/checkout';

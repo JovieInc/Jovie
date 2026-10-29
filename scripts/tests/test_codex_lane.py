@@ -1260,12 +1260,12 @@ class SubscriptionPoolTest(Isolated):
     def test_invalid_configuration_fails_closed_without_discovery(self):
         invalid = ["", "[]", "{}", "null", "{bad"]
         for mutate in (lambda p: p.pop("current-login"),
-                       lambda p: p.update(third=p["lyb-pro"]),
+                       lambda p: p.update(third=p["lyb-pro"]),  # duplicate home and identity
                        lambda p: p.update({"current-login.1": p.pop("lyb-pro")}),
                        lambda p: p.update({"_ledger": p.pop("lyb-pro")}),
                        lambda p: p["lyb-pro"].update(home=p["current-login"]["home"]),
                        lambda p: p["lyb-pro"].update(emailSha256=p["current-login"]["emailSha256"]),
-                       lambda p: p["lyb-pro"].update(slots=2),
+                       lambda p: p["lyb-pro"].update(slots=0),
                        lambda p: p["lyb-pro"].update(slots=True),
                        lambda p: p["current-login"].update(slots=2),
                        lambda p: p["current-login"].update(home=p["lyb-pro"]["home"]),
@@ -1279,6 +1279,18 @@ class SubscriptionPoolTest(Isolated):
                 with self.subTest(raw=raw), patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": raw}):
                     with self.assertRaises(ValueError):
                         codex.accounts()
+
+    def test_pool_accepts_more_than_two_distinct_bound_accounts_with_measured_seats(self):
+        home = Path(self.tmp.name) / "third"; home.mkdir()
+        value = json.loads(json.dumps(self.profiles))
+        value["jovie-pro"] = {"home": str(home), "slots": 2, "emailSha256": "ab" * 32}
+        with patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(value)}):
+            self.assertEqual(sorted(codex.subscription_profiles()), ["current-login", "jovie-pro", "lyb-pro"])
+            self.assertEqual(codex.subscription_profiles()["jovie-pro"]["slots"], 2)
+            value["fourth-pro"] = {"home": str(home), "slots": 1, "emailSha256": "cd" * 32}
+            with patch.dict(os.environ, {"CODEX_LANE_SUBSCRIPTION_PROFILES": json.dumps(value)}):
+                with self.assertRaises(ValueError):
+                    codex.subscription_profiles()  # a home may be bound to one alias only
 
     def test_three_primary_plus_one_extra_preserve_existing_slot_paths(self):
         self.reconcile()
@@ -1721,6 +1733,13 @@ class LaunchIdentityTest(Isolated):
         rows = [{"provider": "codex", "providerEvidence": events}]
         report = lane.provider_throughput(rows, ["codex"])
         self.assertEqual(report["providers"]["codex"]["accountLeases"], 1)
+
+
+class LaneConnectorsDisabledTest(unittest.TestCase):
+    def test_exec_command_disables_plugin_connectors(self):
+        source = (ROOT / "scripts/lanes/codex_lane.py").read_text()
+        for feature in ("plugins", "remote_plugin", "apps"):
+            self.assertIn(f'"--disable", "{feature}"', source)
 
 
 if __name__ == "__main__":

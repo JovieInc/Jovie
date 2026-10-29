@@ -92,9 +92,9 @@ PR/issue labels, Linear state) are event-driven. The Gem lanes tick
 
 - `hotfix/*` branches
 - `train/*` or integration→main train PRs
-- PRs labeled `needs-human`
+- Orchestrator-owned PRs that target `main` by design
 - Dependabot / `screenshots/*` automation
-- Workflow PRs that change CI itself (label `needs-human` or orchestrator-owned)
+- Workflow PRs that change CI itself (orchestrator-owned)
 
 ## Orchestration artifacts
 
@@ -127,7 +127,20 @@ deletes or empties an invariant test; or raises a CI timeout or retry. Demoting
 a blocking guard to advisory, `continue-on-error`, or `if: false` fails too.
 
 Override is never silent. The PR body needs a `gate-change: <reason>` line and
-the `codeowners-approved` label, which is the CODEOWNER approval record.
+the `codeowners-approved` label, which is a machine-checked audit record applied by the authoring agent after the strong LLM review (`internal-review`); no person approves it (EVENT 2026-10-28).
 Findings still print. Local run:
 `node scripts/invariants/gate-weakening-detector.mjs --check`. Do not remove it
 from `SOURCE_GUARDS` or mark it advisory.
+
+## Preflight before every push
+
+Run `pnpm preflight` before every push (workers: every push, no exceptions; the
+pre-push gate also runs it, so do not bypass hooks). It derives its plan from
+the `deterministic` job of `.github/workflows/source-validation.yml`, runs each
+statement on its own, and lists all failures in one pass: typecheck of affected
+packages, `lint:eslint:changed`, screen registry, census, nav and manifest
+registrations, component-ship-gate, ratchets and baselines. Add
+`--body-file <path> --title <title>` to lint the PR body (changelog marker,
+Red-before-green, Blast radius, Locked areas). `pnpm preflight --list` prints the
+plan. `pnpm ci:rounds` reports CI rounds (Source Validation head commits) per
+merged PR as p50/p95; the goal is to drive the p50 toward 1.

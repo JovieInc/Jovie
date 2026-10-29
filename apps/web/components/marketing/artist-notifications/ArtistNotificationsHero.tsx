@@ -26,7 +26,7 @@ export function ArtistNotificationsHero({
 }: Readonly<ArtistNotificationsHeroProps>) {
   return (
     <section
-      className='marketing-hero-dock relative overflow-hidden pb-20 pt-14 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24'
+      className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden pb-20 pt-14 sm:pb-24 sm:pt-20 lg:pb-28 lg:pt-24'
       data-testid='marketing-section-hero'
       data-marketing-variant='split-screenshot-right'
       data-marketing-owner='apps/web/components/marketing/artist-notifications/ArtistNotificationsHero.tsx'

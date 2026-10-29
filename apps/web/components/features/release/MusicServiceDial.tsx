@@ -14,7 +14,13 @@ export interface MusicServiceDialProvider {
 }
 
 interface MusicServiceDialProps {
+  /** Providers in display order. The caller owns ordering; the dial never reorders. */
   readonly providers: readonly MusicServiceDialProvider[];
+  /**
+   * Provider to start on when the fan has no saved preference (the routing
+   * layer's first pick). A saved cookie preference always wins over it.
+   */
+  readonly initialKey?: ProviderKey;
   readonly utmParams: PartialUTMParams;
   readonly onStream: (key: ProviderKey) => void;
 }
@@ -39,18 +45,23 @@ function rememberProvider(key: ProviderKey): void {
 
 export function MusicServiceDial({
   providers,
+  initialKey,
   utmParams,
   onStream,
 }: Readonly<MusicServiceDialProps>) {
+  const fallbackKey =
+    providers.find(provider => provider.key === initialKey)?.key ??
+    providers[0]?.key ??
+    null;
   const [selectedKey, setSelectedKey] = useState<ProviderKey | null>(
-    providers[0]?.key ?? null
+    fallbackKey
   );
 
   useLayoutEffect(() => {
     const preferred = readPreferredProvider();
     const available = providers.find(provider => provider.key === preferred);
-    setSelectedKey(available?.key ?? providers[0]?.key ?? null);
-  }, [providers]);
+    setSelectedKey(available?.key ?? fallbackKey);
+  }, [providers, fallbackKey]);
 
   const options = useMemo<ActionDialOption[]>(
     () =>

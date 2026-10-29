@@ -486,6 +486,11 @@ describe('public release supporting contracts', () => {
     expect(new PgDialect().sqlToQuery(predicates[0]).sql).toContain(
       '"deleted_at" is null'
     );
+    // Coming soon is only for genuinely upcoming releases (future release or
+    // reveal date); orphans fall through to a real 404.
+    const presenceSql = new PgDialect().sqlToQuery(predicates[0]).sql;
+    expect(presenceSql).toContain('"release_date" > NOW()');
+    expect(presenceSql).toContain('"reveal_date" > NOW()');
     expect(
       await getUnpublishedReleasePresence('profile-1', 'absent')
     ).toBeNull();

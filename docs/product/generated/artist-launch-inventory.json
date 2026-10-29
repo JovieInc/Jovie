@@ -2233,6 +2233,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/content-records/[kind]/[key]/route.ts",
+      "kind": "handler",
+      "route": "/api/content-records/[kind]/[key]",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/create-tip-intent/route.ts",
       "kind": "handler",
       "route": "/api/create-tip-intent",
@@ -2441,6 +2449,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/cron/summer-canary/route.ts",
+      "kind": "handler",
+      "route": "/api/cron/summer-canary",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/cron/sync-ai-crawler-analytics/route.ts",
       "kind": "handler",
       "route": "/api/cron/sync-ai-crawler-analytics",
@@ -2540,7 +2556,7 @@
       "source": "apps/web/app/api/dashboard/audience/subscribers/route.ts",
       "kind": "handler",
       "route": "/api/dashboard/audience/subscribers",
-      "methods": ["GET", "POST"],
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3252,6 +3268,14 @@
       "source": "apps/web/app/api/internal/ovie/fleet/events/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/fleet/events",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/golden-path-evidence",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
@@ -4577,6 +4601,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/v1/music/resolve/route.ts",
+      "kind": "handler",
+      "route": "/api/v1/music/resolve",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/v1/openapi.json/route.ts",
       "kind": "handler",
       "route": "/api/v1/openapi.json",
@@ -4661,6 +4693,14 @@
       "kind": "handler",
       "route": "/api/wallet/apple/v1/passes/[passTypeIdentifier]/[serialNumber]",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/webhooks/instantly/route.ts",
+      "kind": "handler",
+      "route": "/api/webhooks/instantly",
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4953,6 +4993,14 @@
       "source": "apps/web/app/app/(shell)/admin/campaigns/page.tsx",
       "kind": "page",
       "route": "/app/admin/campaigns",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/capacity/page.tsx",
+      "kind": "page",
+      "route": "/app/admin/capacity",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
@@ -6819,6 +6867,14 @@
       "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
+    },
+    {
+      "source": "apps/web/app/content-preview/[versionId]/page.tsx",
+      "kind": "page",
+      "route": "/content-preview/[versionId]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
     },
     {
       "source": "apps/web/app/demo/audience/page.tsx",

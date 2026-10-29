@@ -2,13 +2,14 @@ import {
   Activity,
   BadgeCheck,
   Banknote,
+  BatteryCharging,
   Briefcase,
   Cable,
-  CircleAlert,
   Flag,
   FolderKanban,
   Gauge,
   Image as ImageIcon,
+  Inbox,
   LayoutDashboard,
   ListChecks,
   ListMusic,
@@ -38,7 +39,7 @@ const OPERATOR_ICON_BY_ID = {
   outbound: Send,
   product: Flag,
   operations: Gauge,
-  needs_you: CircleAlert,
+  inbox: Inbox,
   ops: Gauge,
   shipping: Truck,
   people: Users,
@@ -52,6 +53,7 @@ const OPERATOR_ICON_BY_ID = {
   feature_registry: ListChecks,
   screenshots: ImageIcon,
   costs: Banknote,
+  capacity: BatteryCharging,
   revenue_lift: TrendingUp,
   share_studio: Share2,
   system_map: Map,
@@ -86,12 +88,12 @@ export const OPERATOR_NAV_GROUP_LABEL =
   'mb-1.5 block ps-(--app-shell-sidebar-label-inset) pe-(--app-shell-sidebar-inset) text-xs font-caption tracking-normal text-sidebar-muted';
 
 /**
- * Ovie is one Home plus a collapsed Tools group (Tim 2026-10-21). Home needs
- * no group label; Tools opens on demand and stays open while one of its
- * destinations is active.
+ * Ovie has five primary destinations plus collapsed Company and Tools groups.
+ * Primary navigation needs no group label; a group opens on demand and stays
+ * open while one of its destinations is active.
  */
 export interface OperatorNavSection {
-  readonly id: 'home' | 'tools';
+  readonly id: 'home' | 'business' | 'tools';
   /** `null`: the group renders without a label. */
   readonly label: string | null;
   readonly collapsible: boolean;
@@ -104,6 +106,14 @@ export const OPERATOR_NAV_SECTIONS: readonly OperatorNavSection[] = [
     label: null,
     collapsible: false,
     items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'workspaces'),
+  },
+  {
+    // Tim's swipe (2026-10-25 01:31Z) chose "Company" over "Business". The id
+    // and the `business` section key stay, so routes and registry are stable.
+    id: 'business',
+    label: 'Company',
+    collapsible: true,
+    items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'business'),
   },
   {
     id: 'tools',
