@@ -1,0 +1,183 @@
+{
+  "schema": "jovie.marketing-critic-rubric/v1",
+  "note": "Red-case classes a human critic flags on marketing pages (2026-10-29 production sweep, 124 findings over 33 routes). Each class lists its deterministic DOM/CSS detectors (scripts/invariants/marketing-critic/detectors.mjs) or the judge that must cover it. Detectors run warn-only on marketing PRs until scripts/invariants/marketing-critic/calibrate.mjs shows they meet the floors in marketing-critic.config.json.",
+  "classes": [
+    {
+      "id": "wallpaper-bg",
+      "title": "Colour or motion used as wallpaper",
+      "statement": "Backgrounds stay matte near-black. Saturated colour, animated canvas or looping video behind content is wallpaper, not an accent.",
+      "asr": ["ASR-010", "ASR-011", "ASR-016"],
+      "detectors": [
+        "animated-backdrop",
+        "saturated-gradient-bg",
+        "saturated-fold-pixels"
+      ]
+    },
+    {
+      "id": "no-focal-point",
+      "title": "Hero has no single focal point",
+      "statement": "Each hero has one dominant subject; competing visuals or a text-only void fail.",
+      "asr": ["ASR-014"],
+      "detectors": [],
+      "judge": "vision:hierarchy"
+    },
+    {
+      "id": "dead-space",
+      "title": "Unbalanced empty space",
+      "statement": "No band of empty page taller than half a viewport between content blocks.",
+      "asr": ["ASR-029"],
+      "detectors": ["vertical-dead-band"]
+    },
+    {
+      "id": "mis-scaled-mockup",
+      "title": "Product mockup at the wrong scale",
+      "statement": "Product shots are legible: neither a thumbnail-sized frame nor an oversized crop.",
+      "asr": ["ASR-013"],
+      "detectors": [],
+      "judge": "vision:mockup-quality"
+    },
+    {
+      "id": "text-on-art-duplicate",
+      "title": "Text over artwork that already has text",
+      "statement": "Never print a title over cover art that already shows the title; square art, caption below.",
+      "asr": ["ASR-026"],
+      "detectors": [],
+      "judge": "vision:polish"
+    },
+    {
+      "id": "icon-tiles",
+      "title": "Decorative icon tiles",
+      "statement": "No small icon on a coloured or bordered square heading each card.",
+      "asr": ["ASR-021"],
+      "detectors": ["icon-tiles"]
+    },
+    {
+      "id": "step-n",
+      "title": "Step numbering",
+      "statement": "No 'Step 1' or '01 02 03' numbering on marketing sections.",
+      "asr": ["ASR-020"],
+      "detectors": ["step-numbering"]
+    },
+    {
+      "id": "noisy-form",
+      "title": "Noisy form",
+      "statement": "Forms ask for one thing with one primary action; no stacked helper lines or duplicate actions.",
+      "asr": ["ASR-035"],
+      "detectors": [],
+      "judge": "vision:polish"
+    },
+    {
+      "id": "filler-cards",
+      "title": "Filler cards",
+      "statement": "No stat or benefit cards that describe the page instead of showing the product.",
+      "asr": ["ASR-020"],
+      "detectors": [],
+      "judge": "vision:hierarchy"
+    },
+    {
+      "id": "repeated-titles",
+      "title": "Repeated titles and calls to action",
+      "statement": "A heading appears once per page, and one call to action is not repeated in every section.",
+      "asr": ["ASR-035"],
+      "detectors": ["repeated-headings"]
+    },
+    {
+      "id": "desktop-dead-end",
+      "title": "Dead end",
+      "statement": "No touch-only instructions on desktop (haptic, tap, swipe) and no 'coming soon' promises or controls that lead nowhere.",
+      "asr": ["ASR-006"],
+      "detectors": ["desktop-touch-copy", "coming-soon-copy"]
+    },
+    {
+      "id": "square-focus-ring",
+      "title": "Square focus ring on a rounded control",
+      "statement": "The keyboard focus ring follows the shape of the control it marks.",
+      "asr": ["ASR-029"],
+      "detectors": ["square-focus-ring"]
+    },
+    {
+      "id": "eyebrow-caps",
+      "title": "All-caps eyebrow label",
+      "statement": "No small all-caps or letter-spaced label above a heading.",
+      "asr": ["ASR-022"],
+      "detectors": ["eyebrow-caps"]
+    },
+    {
+      "id": "stale-data",
+      "title": "Stale or impossible data",
+      "statement": "Sample data in mockups is current and plausible (dates, counts, release names).",
+      "asr": ["ASR-033"],
+      "detectors": [],
+      "judge": "human"
+    },
+    {
+      "id": "cookie-overlap",
+      "title": "Cookie banner covers content",
+      "statement": "The consent banner never covers a heading, call to action or product shot in the first viewport.",
+      "asr": [],
+      "detectors": ["cookie-overlap"]
+    }
+  ],
+  "detectors": [
+    {
+      "id": "step-numbering",
+      "class": "step-n",
+      "description": "Visible 'Step N' text, or two or more short numerals such as '01'/'02' or '1. Identify' headings, inside main."
+    },
+    {
+      "id": "desktop-touch-copy",
+      "class": "desktop-dead-end",
+      "description": "At viewports >= 1024px, visible copy that tells the reader to tap, swipe, pinch or feel a haptic."
+    },
+    {
+      "id": "coming-soon-copy",
+      "class": "desktop-dead-end",
+      "description": "Visible 'coming soon', 'available soon' or 'not available yet' copy inside main."
+    },
+    {
+      "id": "animated-backdrop",
+      "class": "wallpaper-bg",
+      "description": "A canvas, or a muted looping video without controls, covering >= 20% of the first two viewports."
+    },
+    {
+      "id": "saturated-gradient-bg",
+      "class": "wallpaper-bg",
+      "description": "An element at least half the viewport wide and 200px tall whose computed background uses a saturated colour stop (HSL s >= 0.45 or OKLCH chroma >= 0.1, alpha >= 0.25)."
+    },
+    {
+      "id": "saturated-fold-pixels",
+      "class": "wallpaper-bg",
+      "description": "More than the configured share of first-viewport pixels are saturated (HSV s >= 0.5, v >= 0.3)."
+    },
+    {
+      "id": "eyebrow-caps",
+      "class": "eyebrow-caps",
+      "description": "Short all-caps or uppercase-transformed, letter-spaced label directly above an h1-h3."
+    },
+    {
+      "id": "icon-tiles",
+      "class": "icon-tiles",
+      "description": "Three or more 24-72px square boxes with a fill or border that hold only an icon, outside buttons and links."
+    },
+    {
+      "id": "square-focus-ring",
+      "class": "square-focus-ring",
+      "description": "On keyboard focus, an unrounded element draws an outline while the borderless field sits in a rounded wrapper."
+    },
+    {
+      "id": "cookie-overlap",
+      "class": "cookie-overlap",
+      "description": "A fixed cookie banner covers >= 20% of a heading, call to action or image in the first viewport."
+    },
+    {
+      "id": "repeated-headings",
+      "class": "repeated-titles",
+      "description": "The same h1-h3 text appears twice, or the same multi-word call to action four or more times, inside main."
+    },
+    {
+      "id": "vertical-dead-band",
+      "class": "dead-space",
+      "description": "A vertical band inside main, between the first and last content, with no visible content and taller than max(360px, 0.5 x viewport height)."
+    }
+  ]
+}
