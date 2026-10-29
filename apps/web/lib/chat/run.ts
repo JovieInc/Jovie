@@ -29,6 +29,7 @@ import {
   downloadChatAttachments,
   validateChatMessageParts,
 } from '@/lib/chat/attachment-policy';
+import { copyFloorRepairTransform } from '@/lib/chat/copy-floor-repair';
 import { buildReferencedEntitiesBlock } from '@/lib/chat/entity-hydration';
 import {
   buildGroundingFacts,
@@ -656,7 +657,12 @@ export async function executeChatTurn(
     // JOV-3525: pace raw model deltas into a steady word-level reveal so the
     // client render cadence is smooth; pairs with useChat
     // experimental_throttle in useJovieChat.
-    experimental_transform: smoothStream({ delayInMs: 15, chunking: 'word' }),
+    // Copy floor first (canon/VOICE.md): rewrite dashes in flight so the
+    // streamed reply and the persisted reply are the same clean text.
+    experimental_transform: [
+      copyFloorRepairTransform(),
+      smoothStream({ delayInMs: 15, chunking: 'word' }),
+    ],
     experimental_telemetry: buildAiTelemetry({
       functionId: 'jovie-chat',
       identity: {
