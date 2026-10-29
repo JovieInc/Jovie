@@ -19,6 +19,7 @@ const { pushMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('next/navigation', () => ({
+  usePathname: () => null,
   useRouter: () => ({
     push: pushMock,
   }),
@@ -127,7 +128,7 @@ describe('Billing Components', () => {
       mockUseFeatureFlag.mockReturnValue(false);
       renderWithQueryClient(<UpgradeButton />);
       expect(
-        screen.getByText('Upgrade to Artist Presence')
+        screen.getByRole('button', { name: 'Upgrade to Artist Presence' })
       ).toBeInTheDocument();
       expect(screen.getByRole('button')).toBeInTheDocument();
     });
@@ -135,7 +136,9 @@ describe('Billing Components', () => {
     it('renders with custom children', () => {
       mockUseFeatureFlag.mockReturnValue(false);
       renderWithQueryClient(<UpgradeButton>Custom Upgrade Text</UpgradeButton>);
-      expect(screen.getByText('Custom Upgrade Text')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Custom Upgrade Text' })
+      ).toBeInTheDocument();
     });
 
     it('redirects to pricing when direct checkout is disabled', async () => {
