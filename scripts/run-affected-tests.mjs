@@ -624,15 +624,6 @@ const CI_CONTROL_NODE_COVERAGE_TESTS = [
     ],
   ],
   [
-    '.github/scripts/internal-pr-review.test.mjs',
-    '.github/scripts/internal-pr-review.mjs',
-    [
-      '--test-coverage-lines=85',
-      '--test-coverage-branches=80',
-      '--test-coverage-functions=85',
-    ],
-  ],
-  [
     'scripts/lib/__tests__/source-admission-policy.test.mjs',
     'scripts/lib/source-admission-policy.mjs',
     [

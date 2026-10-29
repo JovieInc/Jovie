@@ -7,12 +7,12 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "d56c26e1a41cab201f71b0327bd15109dd37911f5745f9a553c08cdec9c13419"
+    "bodySha256": "34478bbd5cba402c06f2f3b8c2887132ea2d7eaf1eb74f714b5de7a97e9bcbbf"
   },
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "d5f52bdb4af7fb39e6cf4eef8aaade5edbd285d900a3d13f9bf55f57f315d182"
+    "bodySha256": "01244fb188d2f4a7110bdffc1eea1fb2518ca1d6f95081285c93a4d0ffb00904"
   },
   {
     "file": ".claude/rules/db.md",
@@ -140,7 +140,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "188a218a8f0f73a88014cdc77736cf7190cef27c7a39cfc9a950b952f79979c6"
+    "bodySha256": "c3f1e3ced70228736e69729d2642486fdeee57a35a4e364eb8589003e3a86744"
   },
   {
     "file": ".claude/rules/security.md",

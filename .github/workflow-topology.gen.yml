@@ -505,18 +505,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:measure
     jobCount: 1
-  - name: Internal PR Review (advisory)
-    path: .github/workflows/internal-review.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - pull_request_target
-      - workflow_dispatch
-    terminalReceipt: job:review
-    jobCount: 1
   - name: iOS App Store Graphics
     path: .github/workflows/ios-app-store-graphics.yml
     active: true
@@ -935,29 +923,6 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:report
     jobCount: 3
-  - name: PR Review Learn
-    path: .github/workflows/pr-review-learn.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - schedule
-      - workflow_dispatch
-    terminalReceipt: job:learn
-    jobCount: 1
-  - name: PR Review (shadow)
-    path: .github/workflows/pr-review.yml
-    active: true
-    category: source-validation
-    authoritativeProducer: Source Validation
-    authoritativeFor: []
-    allowedConsumers: []
-    triggeringStateTransition:
-      - workflow_run
-    terminalReceipt: job:review
-    jobCount: 1
   - name: PR Size Guard Label Override
     path: .github/workflows/pr-size-guard-label-override.yml
     active: true
@@ -1320,7 +1285,6 @@ nodes:
       - Fleet Rules Evidence
       - Lane Fix Relay
       - Merge Queue Green Enroll
-      - PR Review (shadow)
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:ready
@@ -1600,9 +1564,6 @@ edges:
     type: workflow_call
   - from: Production Controller
     to: Post-Deploy Probes
-    type: workflow_run
-  - from: Source Validation
-    to: PR Review (shadow)
     type: workflow_run
   - from: Staging Controller
     to: Production Controller
