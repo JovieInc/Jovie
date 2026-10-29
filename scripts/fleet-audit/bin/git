@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Fleet audit shim for git: only `git push` goes through the audit core; every other git command
+# execs the real git immediately (no python startup on the hot path).
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+core="${JOVIE_AUDIT_CORE:-$here/../audit.py}"
+if [ "${1:-}" = "push" ] && command -v python3 >/dev/null 2>&1 && [ -f "$core" ]; then
+  exec python3 -I "$core" wrap git "$@"
+fi
+real=$(PATH=$(printf '%s' "$PATH" | tr ':' '\n' | grep -v jovie-audit-bin | paste -sd: -) command -v git)
+exec "$real" "$@"

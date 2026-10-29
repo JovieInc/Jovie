@@ -1,0 +1,43 @@
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: TimWhite
+# capability-gap: GitHub org audit-log API is Enterprise-only (404 on our Team plan) and every agent acts as one PAT, so nothing attributes workflow disables or ruleset edits to an agent; this hop only reads workflow and ruleset state (actions:read) and posts it to the fleet-audit Worker.
+# removal-trigger: Remove when the fleet-audit Worker cron reads this state itself with a jovie-bot broker token (GITHUB_APP_PRIVATE_KEY bound), or when the org audit-log API becomes available on our plan.
+name: Fleet Audit Correlate
+# Hourly: post workflow states and ruleset versions to the fleet-audit Worker, which attributes each
+# change to the agent whose gh-shim event caused it and alerts Summer on unattributed changes.
+# Registry: canon/automation-registry.jsonl (github:jovie:fleet-audit-correlate).
+# CLI: node scripts/fleet-audit/correlate.mjs --repo JovieInc/Jovie
+
+on:
+  schedule:
+    - cron: '41 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: fleet-audit-correlate
+  cancel-in-progress: true
+
+jobs:
+  correlate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: scripts/fleet-audit
+          persist-credentials: false
+      - name: Post snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FLEET_AUDIT_INGEST_SECRET: ${{ secrets.FLEET_AUDIT_INGEST_SECRET }}
+        run: |
+          if [ -z "$FLEET_AUDIT_INGEST_SECRET" ]; then
+            echo "::warning::FLEET_AUDIT_INGEST_SECRET not set; dry run only"
+            node scripts/fleet-audit/correlate.mjs --repo "$GITHUB_REPOSITORY" --dry-run
+          else
+            node scripts/fleet-audit/correlate.mjs --repo "$GITHUB_REPOSITORY"
+          fi
