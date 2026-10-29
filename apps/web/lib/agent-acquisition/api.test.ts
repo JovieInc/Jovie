@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   readLimit: vi.fn(),
   writeLimit: vi.fn(),
+  globalLimit: vi.fn(),
   flag: vi.fn(),
   resolve: vi.fn(),
   create: vi.fn(),
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/rate-limit', () => ({
   publicArtistApiLimiter: { limit: mocks.readLimit },
   agentProfileCreateLimiter: { limit: mocks.writeLimit },
+  agentWriteGlobalLimiter: { limit: mocks.globalLimit },
   getClientIP: () => '192.0.2.1',
   createRateLimitHeaders: () => ({ 'Retry-After': '60' }),
 }));
@@ -30,7 +32,7 @@ vi.mock('./release-launch', () => ({
 import { GET as mcpGet, POST as mcpPost } from '@/app/api/mcp/route';
 import { BASE_URL } from '@/constants/app';
 import { handleAgentDraftGet, handleAgentDraftPost } from './api';
-import { verifyDraftCapability } from './draft-capability';
+import { mintDraftCapability, verifyDraftCapability } from './draft-capability';
 
 const artistId = 'spotify:4Z8W4fKeB5YxbusRsdQVPb';
 const acquisition = {
@@ -55,6 +57,7 @@ beforeEach(() => {
   mocks.flag.mockResolvedValue(true);
   mocks.readLimit.mockResolvedValue({ success: true });
   mocks.writeLimit.mockResolvedValue({ success: true });
+  mocks.globalLimit.mockResolvedValue({ success: true });
   mocks.resolve.mockResolvedValue({
     status: 'resolved',
     artist: { artist_id: artistId },
@@ -263,11 +266,23 @@ describe('shared anonymous REST/MCP draft boundary', () => {
     );
     expect((await latest.json()).result.protocolVersion).toBe('2025-11-25');
     const list = await mcpPost(request(rpc('tools/list')));
-    expect(
-      (await list.json()).result.tools.map(
-        (tool: { name: string }) => tool.name
-      )
-    ).toEqual([
+    const tools = (await list.json()).result.tools as {
+      name: string;
+      title: string;
+      annotations: Record<string, unknown>;
+    }[];
+    for (const tool of tools) {
+      expect(tool.title).toBeTruthy();
+      expect(tool.annotations.title).toBe(tool.title);
+      for (const hint of ['readOnlyHint', 'destructiveHint', 'openWorldHint'])
+        expect(typeof tool.annotations[hint]).toBe('boolean');
+    }
+    expect(tools.map(tool => tool.title)).toEqual([
+      'Find artist',
+      'Create artist draft',
+      'Prepare release launch',
+    ]);
+    expect(tools.map(tool => tool.name)).toEqual([
       'artist.search_or_import',
       'workspace.create_draft',
       'release.prepare_launch',
@@ -410,5 +425,95 @@ describe('shared anonymous REST/MCP draft boundary', () => {
     ).toBe(503);
     for (const call of mocks.capture.mock.calls)
       expect(call[1].message).toBe('Agent draft service failure');
+  });
+  describe('write limits for shared-egress callers', () => {
+    const mint = (installation_id: string | null) =>
+      mintDraftCapability(
+        artistId,
+        { ...acquisition, installation_id } as never,
+        Date.now()
+      );
+    const writeKey = async (
+      headers: Record<string, string>,
+      token?: string
+    ) => {
+      mocks.writeLimit.mockClear();
+      await mcpPost(
+        request(
+          rpc('tools/call', {
+            name: 'workspace.create_draft',
+            arguments: { artist_id: artistId, draft_token: token ?? 'x' },
+          }),
+          headers
+        )
+      );
+      return mocks.writeLimit.mock.calls[0]![0] as string;
+    };
+    it('keys on IP alone without extra caller signals', async () => {
+      expect(await writeKey({})).toBe('192.0.2.1');
+    });
+    it('separates sessions and signed installations behind one IP', async () => {
+      const a = await writeKey({ 'mcp-session-id': 'a' });
+      const b = await writeKey({ 'mcp-session-id': 'b' });
+      expect(a).not.toBe(b);
+      expect(a.startsWith('192.0.2.1:')).toBe(true);
+      const t1 = mint('inst-1');
+      const t2 = mint('inst-2');
+      expect(await writeKey({}, t1.token)).not.toBe(
+        await writeKey({}, t2.token)
+      );
+      // Forged tokens contribute nothing to the key.
+      expect(await writeKey({}, 'forged.' + 'A'.repeat(43))).toBe('192.0.2.1');
+      expect(await writeKey({ 'mcp-session-id': 'a' }, t1.token)).not.toBe(a);
+    });
+    it('enforces the global ceiling after the per-caller budget', async () => {
+      mocks.globalLimit.mockResolvedValueOnce({ success: false });
+      const res = await mcpPost(
+        request(
+          rpc('tools/call', {
+            name: 'workspace.create_draft',
+            arguments: { artist_id: artistId, draft_token: 'x' },
+          })
+        )
+      );
+      expect(res.status).toBe(429);
+      expect(mocks.globalLimit).toHaveBeenCalledWith('global');
+      expect(mocks.create).not.toHaveBeenCalled();
+      // A per-caller denial never spends global budget.
+      mocks.globalLimit.mockClear();
+      mocks.writeLimit.mockResolvedValueOnce({ success: false });
+      await handleAgentDraftPost(
+        request({ tool: 'workspace.create_draft', arguments: {} })
+      );
+      expect(mocks.globalLimit).not.toHaveBeenCalled();
+      mocks.globalLimit.mockResolvedValueOnce({
+        success: false,
+        unavailable: true,
+      });
+      const down = await handleAgentDraftPost(
+        request({ tool: 'workspace.create_draft', arguments: {} })
+      );
+      expect(down.status).toBe(503);
+    });
+  });
+  it('returns self-correcting INVALID_INPUT details without echoing the token', async () => {
+    const res = await handleAgentDraftPost(
+      request({
+        tool: 'artist.search_or_import',
+        arguments: { input: 42, draft_token: 'secret-token-value' },
+      })
+    );
+    const body = await res.json();
+    expect(res.status).toBe(400);
+    expect(body).toMatchObject({
+      status: 'error',
+      code: 'INVALID_INPUT',
+      next_action: 'correct_input',
+      retryable: false,
+    });
+    expect(typeof body.message).toBe('string');
+    expect(body.fields.length).toBeGreaterThan(0);
+    expect(body.fields[0]).toHaveProperty('path');
+    expect(JSON.stringify(body)).not.toContain('secret-token-value');
   });
 });

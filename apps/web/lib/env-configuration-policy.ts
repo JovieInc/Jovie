@@ -74,3 +74,23 @@ export function checkUrlEncryptionKeyPolicy({
   }
   return null;
 }
+
+export function checkPIIEncryptionKeyPolicy({
+  key,
+  vercelEnv,
+}: {
+  key: string | undefined;
+  vercelEnv: string;
+}): { type: 'warning'; message: string } | null {
+  if (vercelEnv !== 'production' && vercelEnv !== 'preview') {
+    return null;
+  }
+  if (!key) {
+    return {
+      type: 'warning',
+      message:
+        'PII_ENCRYPTION_KEY is missing — encryptPII/decryptPII throw on the first PII write/read (email, phone, IP, tokens). Generate with: openssl rand -base64 32 and provision it in the production secret store (Doppler jovie-web/prd). JOV-9038.',
+    };
+  }
+  return null;
+}
