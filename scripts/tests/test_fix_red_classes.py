@@ -21,6 +21,7 @@ class ClassifyTest(unittest.TestCase):
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "This PR conflicts with main in: scripts/preflight-changed.mjs . Resolve the conflict (lane-fix-conflict).": ("narrowed-preflight", "merge-narrowed-preflight"),
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
+            "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence": ("census-certification", "sync-main"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
             "AssertionError: expected 1": ("other", "agent"),
@@ -42,6 +43,17 @@ class ClassifyTest(unittest.TestCase):
         self.assertEqual((behind["cls"], behind["action"]), ("stale-branch", "sync-main"))
         still = classes.classify(pr("A", merge="BEHIND"), {"A": "API rate limit exceeded"})
         self.assertEqual(still["action"], "rerun", "a deterministic log outranks the stale-branch default")
+
+    def test_stale_census_certification_syncs_main_while_checks_block_the_branch(self):
+        log = (
+            "run 900 attempt 1 failed on GitHub primary-rate-limit: re-ran failed jobs; not repair work\n"
+            "HttpError: API rate limit exceeded for installation\n"
+            "Error: apps/web/app/(marketing)/pricing/page.tsx: source changed; renew certification evidence\n"
+        )
+        blocked = classes.classify(pr("Source Validation", merge="BLOCKED"), {"Source Validation": log})
+        self.assertEqual((blocked["cls"], blocked["action"]), ("census-certification", "sync-main"))
+        behind = classes.classify(pr("Source Validation", merge="BEHIND"), {"Source Validation": log})
+        self.assertEqual((behind["cls"], behind["action"]), ("census-certification", "sync-main"))
 
     def test_missing_changelog_metadata_stamps_and_a_quota_mask_stamps_only_a_bare_body(self):
         missing = "Error: Customer outcome decision missing or invalid (missing-metadata)."
