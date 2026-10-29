@@ -172,20 +172,23 @@ export default function DownloadPage() {
 
                 {/* Phones get a crop of the releases list at the app's own
                     type size; sm+ shows the whole window. */}
-                <div
-                  className='download-mac-shot overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
-                  data-testid='download-desktop-screenshot'
-                >
-                  <Image
-                    src={DESKTOP_IMAGE.publicUrl}
-                    alt='Jovie Mac app showing the releases catalog'
-                    width={DESKTOP_IMAGE.width}
-                    height={DESKTOP_IMAGE.height}
-                    priority
-                    sizes='(min-width: 1440px) 1300px, (min-width: 640px) 92vw, 350vw'
-                    quality={85}
-                    className='download-mac-shot-image'
-                  />
+                <div className='relative'>
+                  <div className='marketing-lit-focal' aria-hidden='true' />
+                  <div
+                    className='download-mac-shot marketing-lit-enter relative overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
+                    data-testid='download-desktop-screenshot'
+                  >
+                    <Image
+                      src={DESKTOP_IMAGE.publicUrl}
+                      alt='Jovie public demo showing the releases catalog'
+                      width={DESKTOP_IMAGE.width}
+                      height={DESKTOP_IMAGE.height}
+                      priority
+                      sizes='(min-width: 1440px) 1300px, (min-width: 640px) 92vw, 350vw'
+                      quality={85}
+                      className='download-mac-shot-image'
+                    />
+                  </div>
                 </div>
               </div>
             </MarketingContainer>

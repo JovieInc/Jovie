@@ -28,6 +28,39 @@ const PAY_HERO_PHOTO = {
   height: 901,
 } as const;
 
+/** Hero copy: kicker, headline, lede and the one claim action. */
+function PayHeroCopy() {
+  return (
+    <div className='flex flex-col items-start'>
+      <div className='w-full'>
+        <p className='marketing-kicker'>Pay</p>
+        {/* ui-casing-allow: marketing display headline */}
+        {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
+        <h1
+          id='pay-hero-heading'
+          className='marketing-h1-linear mt-6 max-w-2xl text-primary-token'
+        >
+          Turn every payment into a follower.
+        </h1>
+        {/* eslint-enable @jovie/canonical-ui-label-casing */}
+
+        <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
+          Scan the code, pay in seconds, and land on a Jovie profile that keeps
+          the relationship going after the moment ends.
+        </p>
+
+        <div className='mt-8 w-full max-w-[29rem] text-left'>
+          <ClaimHandleForm />
+        </div>
+
+        <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
+          Free forever. No credit card required.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function TipsHero() {
   return (
     <section
@@ -44,31 +77,7 @@ function TipsHero() {
         headingId='pay-hero-heading'
         testId='pay-hero'
       >
-        <div className='flex flex-col items-start'>
-          <p className='marketing-kicker'>Pay</p>
-          {/* ui-casing-allow: marketing display headline */}
-          {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
-          <h1
-            id='pay-hero-heading'
-            className='marketing-h1-linear mt-6 max-w-2xl text-primary-token'
-          >
-            Turn every payment into a follower.
-          </h1>
-          {/* eslint-enable @jovie/canonical-ui-label-casing */}
-
-          <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
-            Scan the code, pay in seconds, and land on a Jovie profile that
-            keeps the relationship going after the moment ends.
-          </p>
-
-          <div className='mt-8 w-full max-w-[29rem] text-left'>
-            <ClaimHandleForm />
-          </div>
-
-          <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
-            Free forever. No credit card required.
-          </p>
-        </div>
+        <PayHeroCopy />
 
         {/* The real pay sheet from the profile (?mode=pay), cropped to the
             sheet so its amount chips and Venmo action read at hero size. */}
