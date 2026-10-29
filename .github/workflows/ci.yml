@@ -1221,6 +1221,16 @@ jobs:
   # PR on a different queue SHA, and cancels each one whose queue ref git no
   # longer lists. Only the cancel itself spends GITHUB_TOKEN quota (the App
   # has actions:read). Any failed read logs and exits 0; it gates nothing.
+      - name: Clear sparse checkout for the next job on this workspace
+        if: always() && runner.environment != 'github-hosted'
+        shell: bash
+        run: |
+          # Fixed runners reuse one workspace; a leftover sparse checkout hides .github/scripts from the next job.
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
+
   ci-merge-group-supersede:
     name: Merge Group Supersede Older Runs
     if: ${{ github.event_name == 'merge_group' }}
