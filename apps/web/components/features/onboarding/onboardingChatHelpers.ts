@@ -274,7 +274,7 @@ export function artistFromConfirmedOutput(
     followers: artist.followers ?? null,
     popularity: artist.popularity ?? null,
     genres: artist.genres ?? [],
-    catalog: readOnboardingCatalogPreview(output.catalog),
+    catalog: readOnboardingCatalogPreview(asRecord(output)?.catalog),
     dspMatches: [
       {
         id: 'spotify',

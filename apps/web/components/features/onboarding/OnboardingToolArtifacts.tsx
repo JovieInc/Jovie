@@ -57,8 +57,6 @@ export interface ArtistConfirmedOutput {
   readonly action?: 'spotify_artist_confirmed';
   readonly spotifyArtistId?: string;
   readonly metrics?: CanonicalArtistMetrics | null;
-  /** JOV-9758: real catalog snapshot rendered in the preview. */
-  readonly catalog?: unknown;
   readonly artist?: {
     readonly id: string;
     readonly name: string;

@@ -102,7 +102,7 @@ function CatalogPreviewCard({
           ? '1 release on your page'
           : `${catalog.total} releases on your page`}
       </p>
-      <ul className='space-y-2.5'>
+      <ul className='space-y-2'>
         {visible.map((release, index) => (
           <li
             key={release.id}
