@@ -23,6 +23,10 @@ on:
         description: Comma-separated PR numbers (empty = every lane-fix-red PR, plus lane-fix-conflict PRs for sync-main, plus up to 10 clean BEHIND PRs for update-branch)
         required: false
         default: ''
+      modes:
+        description: 'Which PRs to select when prs is empty: all, or a comma list of red, conflict, behind'
+        required: false
+        default: all
       limit:
         description: Max PRs this run
         required: false
@@ -63,13 +67,14 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           PR: ${{ inputs.prs }}
           LIMIT: ${{ inputs.limit }}
+          MODES: ${{ inputs.modes }}
           DAILY_CAP: ${{ vars.SWARM_DAILY_USD_CAP || '5' }}
           ATTEMPT_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
           LEDGER_ISSUE: ${{ vars.SWARM_LEDGER_ISSUE }}
           SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
           SWARM_CREDIT_PROBE: ${{ vars.SWARM_CREDIT_PROBE }}
-        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE"
+        run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE" --modes "${MODES:-all}"
 
   remediate:
     name: Remediate #${{ matrix.pr }}

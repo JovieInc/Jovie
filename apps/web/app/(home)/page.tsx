@@ -1,10 +1,6 @@
 import type { Metadata } from 'next';
 import { SignupFunnelBeacon } from '@/components/features/tracking/SignupFunnelBeacon';
-import {
-  HomepageArtistHero,
-  HomepageFanStates,
-  HomepageOfferClose,
-} from '@/components/homepage/HomepageArtistProfile';
+import { HomepageSpecSections } from '@/components/homepage/HomepageSpecSections';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { ARTIST_PROFILE_COPY } from '@/data/artistProfileCopy';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
@@ -15,6 +11,8 @@ import {
   buildSoftwareSchema,
   buildWebsiteSchema,
 } from '@/lib/constants/schemas';
+import { MARKETING_PAGE_KIND } from '@/lib/content-records/marketing-page';
+import { getLiveContent } from '@/lib/content-records/store.server';
 import { publicEnv } from '@/lib/env-public';
 import { HomepageQueryProvider } from './homepage-query-provider';
 
@@ -181,14 +179,19 @@ function HomePageShell({ children }: { readonly children: React.ReactNode }) {
  * same claim. The ORGANIZATION schema and page metadata keep the general
  * company identity; the WebSite and SoftwareApplication schemas speak with
  * the approved artist-profile launch (JOV-8565).
+ *
+ * Section order and copy slots come from the published `marketing-page/home`
+ * content record, so copy changes go live without a code deploy. The page
+ * stays static: the record is read at prerender and on publish-triggered
+ * regeneration only (publish expires its cache tag), never per request, and
+ * it falls back to the code default when nothing is published.
  */
-export default function HomePage() {
+export default async function HomePage() {
+  const spec = await getLiveContent(MARKETING_PAGE_KIND, 'home');
   return (
     <HomePageShell>
       <HomepageQueryProvider>
-        <HomepageArtistHero headingId='home-hero-heading' />
-        <HomepageFanStates />
-        <HomepageOfferClose />
+        <HomepageSpecSections sections={spec.data.sections} />
       </HomepageQueryProvider>
     </HomePageShell>
   );

@@ -90,6 +90,7 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
@@ -155,7 +156,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
@@ -859,7 +860,9 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    return (0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
+            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
@@ -3866,8 +3869,6 @@ def gate_disposition(pr: dict, held: dict, attempts: dict) -> str | None:
 
 
 def gate_deferral(host: Host, pr: dict) -> str | None:
-    if pr_events.unconfirmed_human_hold(host, pr):
-        return "human-hold-pending"
     held, attempts = held_path(host), host.state / "fix-attempts.json"
     return gate_disposition(pr, json.loads(held.read_text()) if held.exists() else {},
                             json.loads(attempts.read_text()) if attempts.exists() else {})
@@ -4365,7 +4366,8 @@ def backlog_wake(host: Host) -> dict:
     extra = {binding.key: binding for binding in bindings.extra_bindings(THIS)}
     for team in named:
         binding = extra.get(team) or types.SimpleNamespace(key=team, excluded=("hold",), min_todo=0)
-        report[team] = {"refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
+        report[team] = {"priority": priority_admission.run(THIS, host, team, client, floor=binding.min_todo, excluded=binding.excluded),
+                        "refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
                         "rank": binding_refill.rank_pass(THIS, host, binding, client, force=True)}
     return report
 
@@ -4691,6 +4693,15 @@ def _remember_class(data: dict, pr: dict, classified: dict) -> None:
                           if not (isinstance(row, dict) and row.get("pr") == number)]
     data["classified"].append({"pr": number, "cls": classified["cls"], "at": time.time()})
     data["bySource"]["pr"] = int(data["bySource"].get("pr") or 0) + 1
+    if classified.get("decisionAsk"):
+        # Non-blocking Ovie ask, one per PR head (EVENT 2026-10-28). The class above is
+        # unchanged and the PR keeps moving; Summer files the card from this durable row.
+        asks = data.setdefault("decisionAsks", [])
+        head = pr.get("headRefOid")
+        if not any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
+                   for row in asks):
+            asks.append(remediation.decision_card(pr, classified))
+            del asks[:-200]
 
 
 def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, reason: str,
@@ -4698,7 +4709,6 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
     """One deduped surface: PR comment, terminal disposition, exhausted label. No second queue."""
     head = pr.get("headRefOid") or ""
     number = pr["number"]
-    hold_pending = False
     already = any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
                   for row in data.get("surfaced") or [])
     if not already:
@@ -4708,21 +4718,17 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
                                  "head": head, "at": time.time()})
         if reason == "ladder-exhausted" and number not in data["ladderExhausted"]:
             data["ladderExhausted"].append(number)
-    # Only remediation's own structured disposition creates the honoured hold; comment text never
-    # does. Applied once per surfaced head, so a human removing the label releases it for good.
+    # A needs-human-decision disposition is a non-blocking Ovie decision ask, never a hold
+    # (EVENT 2026-10-28, Tim: nothing in the shipping machinery waits on a human). It carries a
+    # default and a deadline; Summer files the card from this row and the default ships if Tim is
+    # silent. No label is applied, so every machine gate (CI, security, Migration Guard) is the
+    # only thing that decides whether the PR lands.
     if classified.get("cls") == "needs-human-decision":
         row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == number
                     and row.get("head") == head), None)
-        if row is not None and not row.get("holdApplied"):
-            if pr_events.add_label(number, pr_events.HUMAN_DECISION_LABEL, sh, prefix=""):
-                row["holdApplied"] = True
-                row.pop("holdPending", None)
-            else:
-                # Not confirmed: stay held in every lanes path and retry on a later pass.
-                row["holdPending"] = True
-                hold_pending = True
-    if not hold_pending:
-        attempts[str(number)] = {**record, "escalated": True}
+        if row is not None and not row.get("ovieCard"):
+            row["ovieCard"] = remediation.decision_card(pr, classified)
+    attempts[str(number)] = {**record, "escalated": True}
     pr_events.add_label(number, pr_events.EXHAUSTED, sh)
     prefix = ["fix-exhausted"] if record.get("count", 0) else []
     update_json(held_path(host), lambda held, number=number, head=head, prefix=prefix: held.update(
@@ -4745,9 +4751,10 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
 
 
 def contain_history_rewrite(host: Host, pr: dict, after: str) -> dict:
-    """A rewritten head leaves the automatic path: the same needs-human-decision surface every
-    other human gate uses (symphony-surface comment, exhausted label, `tim-hold`), keyed to the
-    rewritten head so green-wake, finalizer and fix paths all refuse it."""
+    """A rewritten head leaves the automatic repair path: the same surface every other
+    needs-human-decision uses (comment, exhausted label, non-blocking Ovie card), keyed to the
+    rewritten head so green-wake, finalizer and fix paths refuse to repair it. The label is
+    the machine custody fence; no human hold is applied."""
     classified = {"cls": "needs-human-decision", "subtype": "history-rewrite-detected",
                   "evidence": [f"history-rewrite-detected: {after[:12]} does not descend from "
                                f"{pr['headRefOid'][:12]}"], "next_action": "tim-decides"}
@@ -4757,7 +4764,7 @@ def contain_history_rewrite(host: Host, pr: dict, after: str) -> dict:
     save_escalation(host, data)
     row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == pr["number"]
                 and row.get("head") == after), {})
-    return {"surfaced": True, "holdApplied": bool(row.get("holdApplied")), "holdPending": bool(row.get("holdPending"))}
+    return {"surfaced": True, "ovieCard": bool(row.get("ovieCard"))}
 
 
 def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
@@ -7029,8 +7036,6 @@ def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None, re
             raise RepairStopped("target-head-superseded", live, stage)
     if repair and remediation.review_authority_ask(live):
         raise RepairStopped("target-review-requires-authority", live, stage)
-    if repair and pr_events.human_holds(live):
-        raise RepairStopped("target-pr-human-hold", live, stage)
     return live
 
 
@@ -7509,8 +7514,6 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "startedAt": now_iso()}
     receipt["targetStateReads"] = 1
     try:
-        if pr_events.unconfirmed_human_hold(host, pr):
-            raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, "before-execution-claim")
         live = require_fix_target(pr, "before-execution-claim", repair=True)
     except RepairStopped as error:
         live, reason = error.live, str(error)
@@ -7640,8 +7643,6 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     return None
                 receipt["targetStateReads"] += 1
                 try:
-                    if pr_events.unconfirmed_human_hold(host, pr):
-                        raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, stage)
                     live = require_fix_target(target, stage, worktree=worktree, repair=True)
                 except RepairStopped as error:
                     # Mid-run, one unreadable snapshot (a check finishing between pages, a
@@ -7757,7 +7758,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 # summary carries no labels, so delete unconditionally (404 when absent).
                 sh(["gh", "api", "-X", "DELETE",
                     f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"], log=log)
-                if pr.get("liftHold") and remediation.lift_human_holds():
+                if pr.get("liftHold"):
                     sh(["gh", "api", "-X", "DELETE",
                         f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/hold"], log=log)
             if pushed and not pr.get("isDraft"):
@@ -9649,6 +9650,9 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
                                          for binding in refill_for}
                 tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
+                tick["priorityAdmission"] = {binding.key: priority_admission.run(THIS, host, binding.key, client, floor=binding.min_todo,
+                                                                                  excluded=binding.excluded)
+                                             for binding in refill_for}
                 tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]

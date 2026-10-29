@@ -114,6 +114,11 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             swarm.gh_json = original
 
+    def test_agent_reads_the_failure_log_from_inside_the_checkout(self):
+        src = Path(swarm.__file__).read_text()
+        self.assertIn('log=".swarm-failed.log"', src)
+        self.assertIn(".git\" / \"info\" / \"exclude", src.replace("'", '"'))
+
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"
         fields = dict(p.split("=", 1) for p in body.split()[3:] if "=" in p)
