@@ -5125,6 +5125,87 @@ def partial_main_sync(host: Host, pr: dict) -> str | None:
     return target if result.returncode == 0 else None
 
 
+DETERMINISTIC_CONFLICT_PER_PASS = 4
+CONFLICT_PASS_MIN_INTERVAL_S = 120
+
+
+def conflict_files(host: Host, pr: dict) -> list[str] | None:
+    """Files a DIRTY head conflicts with main in (`git merge-tree`, no checkout); None when
+    unknown, [] when it merges cleanly."""
+    number, head = pr["number"], pr["headRefOid"]
+    main_ref, pr_ref = f"{SYNC_REF}main", f"{SYNC_REF}pr-{number}"
+    git = lambda *args, timeout=300: sh(["git", *args], cwd=host.repo, timeout=timeout)
+    if git("fetch", "-q", "--no-tags", "origin", f"+refs/heads/main:{main_ref}",
+           f"+refs/pull/{number}/head:{pr_ref}", timeout=600).returncode \
+            or (git("rev-parse", pr_ref).stdout or "").strip() != head:
+        return None
+    merged = git("merge-tree", "--write-tree", "--name-only", "--no-messages", head, main_ref)
+    if merged.returncode == 0:
+        return []
+    if merged.returncode != 1:
+        return None
+    return [line for line in (merged.stdout or "").splitlines()[1:] if line.strip()]
+
+
+def deterministic_conflict_pass(host: Host, prs: list[dict], now: float | None = None) -> list[int]:
+    """Model-free, attempt-free conflict repair for every DIRTY PR whose conflict is confined to
+    generated or append-only files (remediation.RESOLVABLE_CONFLICT_FILES): merge main, take
+    main's copy, run the generator, push (no force). It costs no seat and no fix attempt, so a
+    spent or escalated PR is not left DIRTY by the thing a script can do. Each (PR, head, main)
+    is tried once; every try is ledgered with the time the PR has been DIRTY-visible."""
+    now = time.time() if now is None else now
+    path = host.state / "deterministic-conflict.json"
+    visits = read_json(path)
+    acted = []
+    due = sorted((pr for pr in prs if pr.get("mergeStateStatus") == "DIRTY" and not pr.get("isDraft")
+                  and pr.get("isCrossRepository") is False and pr.get("isInMergeQueue") is not True
+                  and not ({label.lower() for label in pr_events.label_names(pr)} & pr_events.HOLD_LABELS)
+                  and not (pr.get("headRefName") or "").startswith("dependabot/")),
+                 key=lambda pr: (float((visits.get(str(pr["number"])) or {}).get("at") or 0), pr["number"]))
+    if not due:
+        return []
+    listed = sh(["git", "ls-remote", "origin", "refs/heads/main"], cwd=host.repo, timeout=60)
+    main = (listed.stdout or "").split()[0] if listed.returncode == 0 and (listed.stdout or "").split() else None
+    if not main:
+        return []
+    for pr in due:
+        if len(acted) >= DETERMINISTIC_CONFLICT_PER_PASS:
+            break
+        last = visits.get(str(pr["number"])) or {}
+        if (last.get("head") == pr["headRefOid"] and last.get("main") == main) \
+                or now - float(last.get("at") or 0) < CONFLICT_PASS_MIN_INTERVAL_S \
+                or claimed_elsewhere(pr["number"], pr["headRefOid"], "fix"):
+            continue
+        files = conflict_files(host, pr)
+        outcome = "skipped"
+        if files is not None and files and set(files) <= remediation.RESOLVABLE_CONFLICT_FILES:
+            worktree = host.state / "worktrees" / f"detconflict-pr{pr['number']}"
+            outcome = "failed"
+            try:
+                fetched = sh(["git", "fetch", "-q", "origin", "main", pr["headRefName"]], cwd=host.repo, timeout=600)
+                added = fetched.returncode == 0 and sh(
+                    ["git", "worktree", "add", "-q", "--detach", str(worktree), f"origin/{pr['headRefName']}"],
+                    cwd=host.repo).returncode == 0
+                if added and sh(["git", "rev-parse", "HEAD"], cwd=worktree).stdout.strip() == pr["headRefOid"]:
+                    with open(os.devnull, "w") as log:
+                        outcome = "resolved" if resolve_generated_conflict(worktree, pr["headRefName"], log) else "failed"
+            finally:
+                sh(["git", "worktree", "remove", "--force", str(worktree)], cwd=host.repo)
+            acted.append(pr["number"])
+        elif files is not None:
+            outcome = "not-deterministic" if files else "clean"
+        visit = {"at": now, "head": pr["headRefOid"], "main": main, "outcome": outcome, "files": (files or [])[:8]}
+        update_json(path, lambda rows, key=str(pr["number"]), visit=visit: rows.update({key: visit}))
+        if outcome in ("resolved", "failed"):
+            pr_events.ledger(host, {"schema": "jovie-lane-run/v1", "kind": "deterministic-conflict",
+                                    "origin": AUTONOMOUS_ORIGIN,
+                                    "attribution": {"category": "finalizer-only", "provider": "lane-event"},
+                                    "pr": pr["number"], "headBefore": pr["headRefOid"], "main": main,
+                                    "action": "generated-conflict", "verdict": outcome,
+                                    "files": files, "endedAt": now_iso()})
+    return acted
+
+
 RERUN_RUNS_LIMIT = 5
 
 
@@ -6169,6 +6250,26 @@ def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: Non
     return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
 
 
+def union_merge_file(worktree: Path, path: str, log) -> bool:
+    """Resolve an append-only file by keeping both sides' lines (`git merge-file --union`)."""
+    stages = {}
+    for stage in (1, 2, 3):
+        shown = sh(["git", "show", f":{stage}:{path}"], cwd=worktree)
+        if stage != 1 and shown.returncode:
+            return False
+        stages[stage] = shown.stdout if shown.returncode == 0 else ""
+    with tempfile.TemporaryDirectory() as tmp:
+        names = {}
+        for stage, text in stages.items():
+            names[stage] = str(Path(tmp) / f"s{stage}")
+            Path(names[stage]).write_text(text)
+        merged = sh(["git", "merge-file", "--union", "-p", names[2], names[1], names[3]], cwd=worktree)
+    if merged.returncode < 0 or merged.returncode >= 128:
+        return False
+    (worktree / path).write_text(merged.stdout)
+    return sh(["git", "add", path], cwd=worktree, log=log).returncode == 0
+
+
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
     no model. Merge main, take its copy of each conflicted generated file, run each file's
@@ -6180,9 +6281,14 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
-        if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
+        if not conflicted or not conflicted <= remediation.RESOLVABLE_CONFLICT_FILES:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
+        for path in sorted(conflicted & remediation.UNION_MERGE_FILES):
+            if not union_merge_file(worktree, path, log):
+                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                return False
+        conflicted -= remediation.UNION_MERGE_FILES
         changed = sh(["git", "diff", "--name-only", "HEAD"], cwd=worktree)
         if changed.returncode or not regenerate_merged_generated(
                 worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
@@ -9396,6 +9502,10 @@ def worker_with_slot(host: Host, name: str, spec: dict, slot: Locked, *, mainten
             revisit_terminal_prs(host, candidates)
         except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
             pass  # Retried next pass; it never blocks the claimed repair.
+        try:
+            deterministic_conflict_pass(host, candidates)
+        except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+            pass  # Same contract: a script-only rung never blocks the claimed repair.
     if routing_refresh_reason and red is None and adopt is None and issue is None:
         record_idle_exit(host, name, "routing-preflight-required:" + routing_refresh_reason)
         slot.release()

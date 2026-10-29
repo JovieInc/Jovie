@@ -12346,6 +12346,24 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
             self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin), "main")
 
+    def test_append_only_registry_conflict_keeps_both_sides_without_a_model(self):
+        """2026-10-29: canon/automation-registry.jsonl conflicted on 4 PRs; both sides' lines are the merge."""
+        path = "canon/automation-registry.jsonl"
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {path: '{"id":"base"}\n{"id":"pr"}\n'},
+                                     main_changes={path: '{"id":"base"}\n{"id":"main"}\n', "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            merged = self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin)
+            self.assertIn('"id":"pr"', merged)
+            self.assertIn('"id":"main"', merged)
+            self.assertNotIn("<<<<<<<", merged)
+
+    def test_rule_scopes_record_is_a_generated_resolver(self):
+        self.assertEqual(lane.remediation.GENERATED_RESOLVERS["scripts/agent-context/rule-scopes.json"],
+                         ("node", "scripts/agent-context/rule-scopes.mjs", "--write"))
+        self.assertIn("canon/automation-registry.jsonl", lane.remediation.RESOLVABLE_CONFLICT_FILES)
+
     def test_mixed_generated_conflicts_run_each_resolver_once(self):
         topology = ".github/workflow-topology.gen.yml"
         with tempfile.TemporaryDirectory() as tmp:
