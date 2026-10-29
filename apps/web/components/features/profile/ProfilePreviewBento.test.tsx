@@ -23,6 +23,13 @@ function renderBento(
 }
 
 describe('ProfilePreviewBento', () => {
+  it('uses domain-specific phone content without mounting the music surface', () => {
+    renderBento({ phoneContent: <p>Company draft</p> });
+    expect(screen.getByText('Company draft')).toBeInTheDocument();
+    expect(
+      screen.queryByTestId('profile-compact-surface')
+    ).not.toBeInTheDocument();
+  });
   it('pins the overlay to the hero corner, outside the phone preview', () => {
     renderBento({
       phonePreviewTestId: 'phone-preview',

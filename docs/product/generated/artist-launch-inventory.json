@@ -4681,6 +4681,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/webhooks/instantly/route.ts",
+      "kind": "handler",
+      "route": "/api/webhooks/instantly",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/webhooks/linear/route.ts",
       "kind": "handler",
       "route": "/api/webhooks/linear",
@@ -4969,6 +4977,14 @@
       "source": "apps/web/app/app/(shell)/admin/campaigns/page.tsx",
       "kind": "page",
       "route": "/app/admin/campaigns",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/capacity/page.tsx",
+      "kind": "page",
+      "route": "/app/admin/capacity",
       "methods": [],
       "surface": "deferred",
       "classification": "C"

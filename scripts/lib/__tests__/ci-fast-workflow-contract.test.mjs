@@ -11,6 +11,7 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ACQUISITION_CERTIFICATION_COMMAND,
@@ -54,6 +55,7 @@ import {
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
+import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
@@ -113,6 +115,106 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('merges independent lanes coverage roster edits without losing either suite', () => {
+    const roster = CI_FAST_SOURCE.match(
+      /export const LANES_PYTEST_FILES =[\s\S]*?(?=\n\n)/u
+    )[0];
+    const root = mkdtempSync(join(tmpdir(), 'lanes-roster-merge-'));
+    try {
+      const base = join(root, 'base.mjs');
+      const ours = join(root, 'ours.mjs');
+      const theirs = join(root, 'theirs.mjs');
+      writeFileSync(base, roster);
+      writeFileSync(
+        ours,
+        roster.replace('test_doctor.py', 'test_doctor_next.py')
+      );
+      writeFileSync(theirs, roster.replace('test_hud.py', 'test_hud_next.py'));
+      const merged = spawnSync(
+        'git',
+        ['merge-file', '-p', ours, base, theirs],
+        {
+          encoding: 'utf8',
+        }
+      );
+      expect(merged.status, merged.stdout || merged.stderr).toBe(0);
+      const files = runInNewContext(
+        `${merged.stdout.replace('export ', '')}\nLANES_PYTEST_FILES`
+      );
+      expect([...files]).toEqual(
+        LANES_PYTEST_FILES.map(file =>
+          file
+            .replace('test_doctor.py', 'test_doctor_next.py')
+            .replace('test_hud.py', 'test_hud_next.py')
+        )
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('selects both critical and interaction files for non-main manual units', () => {
+    const unitJob = jobBlock('ci-unit-tests', 'ci-exact-head-coverage-shard');
+    const command = unitJob
+      .split('\n')
+      .find(
+        line =>
+          line.includes('pnpm turbo test:fast --affected --') &&
+          line.includes('--passWithNoTests')
+      );
+    const selectors = command?.match(
+      /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
+    )?.[1];
+    expect(selectors, 'manual unit filename selectors').toBeTruthy();
+    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${selectors}`], {
+      encoding: 'utf8',
+      timeout: 1000,
+    });
+    expect(parsed.status, parsed.stderr).toBe(0);
+    const [, ...runnerArgs] = buildWebVitestFastArgs(
+      parsed.stdout.split('\0').filter(Boolean)
+    );
+    const webRoot = resolve(REPO_ROOT, 'apps/web');
+    const outputDir = mkdtempSync(join(tmpdir(), 'manual-unit-selection-'));
+    try {
+      const report = join(outputDir, 'files.json');
+      // --filesOnly uses the real config/project selection without importing
+      // or executing test bodies. One unsharded list checks the intended union.
+      const selected = spawnSync(
+        process.execPath,
+        [
+          resolve(webRoot, 'node_modules/vitest/vitest.mjs'),
+          'list',
+          ...runnerArgs,
+          '--filesOnly',
+          `--json=${report}`,
+        ],
+        {
+          cwd: webRoot,
+          encoding: 'utf8',
+          env: { ...process.env, CI: 'true' },
+          timeout: 20_000,
+        }
+      );
+      expect(selected.error).toBeUndefined();
+      expect(selected.status, selected.stdout + selected.stderr).toBe(0);
+      const files = JSON.parse(readFileSync(report, 'utf8')).map(
+        entry => entry.file
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/lib/auth/gate.critical.test.ts')
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/chat/ChatInput.interaction.test.tsx')
+      );
+      expect(files).not.toContain(
+        resolve(webRoot, 'tests/unit/utils/capitalizeFirst.test.ts')
+      );
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
   it('discovers assurance behavior tests and executes them once with structural coverage', async () => {
     const test = 'scripts/invariants/assurance-matrix.test.mjs';
     expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(test);
@@ -354,10 +456,10 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(31);
-    expect(LANES_PYTEST_FILES).toContain(
-      'scripts/tests/test_provider_economics.py'
-    );
+    expect(new Set(LANES_PYTEST_FILES).size).toBe(LANES_PYTEST_FILES.length);
+    expect(whole).toContain('scripts/tests/test_provider_economics.py');
+    expect(whole).toContain('scripts/tests/test_factory_signals.py');
+    expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
     expect(command).toContain(

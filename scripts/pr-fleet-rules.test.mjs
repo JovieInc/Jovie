@@ -102,7 +102,6 @@ test('2: fixes and CI repair labels need a command and pre-fix red evidence', ()
     pr({ title: 'fix: repair' }),
     pr({ title: 'fix(auth)!: repair' }),
     pr({ labels: [{ name: 'bug' }] }),
-    pr({ labels: [{ name: 'lane-fix-red' }] }),
     pr({ labels: [{ name: 'ws:ci' }] }),
     pr({ body: '- [x] Bug fix' }),
   ]) {
@@ -110,6 +109,8 @@ test('2: fixes and CI repair labels need a command and pre-fix red evidence', ()
     assert.deepEqual(check({ ...pull, body: `${red}\n${proof}` }).errors, []);
   }
   assert.deepEqual(check(pr()).errors, []);
+  for (const name of ['lane-fix-red', 'lane-fix-dequeued'])
+    assert.deepEqual(check(pr({ labels: [{ name }] })).errors, []);
   assert.ok(
     check(
       pr({
@@ -929,4 +930,22 @@ test('missing test patches and placeholder decision references cannot bypass blo
     ).errors,
     []
   );
+});
+
+test('section keeps a "# " line inside a code fence in the section', async () => {
+  const { section } = await import('./pr-fleet-rules.mjs');
+  const body = [
+    '## Red-before-green',
+    'Failing command: `x`',
+    '```text',
+    '# comment line in the failing output',
+    'FAIL expected 1',
+    '```',
+    '## Next',
+    'other',
+  ].join('\n');
+  const out = section(body, 'Red-before-green');
+  assert.match(out, /# comment line/);
+  assert.match(out, /FAIL expected 1/);
+  assert.doesNotMatch(out, /other/);
 });

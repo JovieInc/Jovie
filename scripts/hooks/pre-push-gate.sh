@@ -10,6 +10,16 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# Git exports repository-local routing into hooks. Clear it before any child
+# check creates a fixture repository (as buildVerificationEnv does for affected
+# tests), so child Git commands discover their own repository from their cwd.
+# Use Git's complete list; preserve unrelated authentication and network env.
+git_local_env_names="$(git rev-parse --local-env-vars)"
+while IFS= read -r git_local_env_name; do
+  unset "$git_local_env_name"
+done <<< "$git_local_env_names"
+unset git_local_env_names git_local_env_name
+
 if [[ "${JOVIE_SKIP_PRE_PUSH_GATE:-}" == "1" ]]; then
   echo "[pre-push-gate] skipped (JOVIE_SKIP_PRE_PUSH_GATE=1)"
   exit 0
@@ -44,6 +54,11 @@ run_affected() {
   # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
   echo "[pre-push-gate] running component-ship-gate"
   pnpm component-ship-gate
+  # One pass over every changed-file step Source Validation runs, listing all
+  # failures (derived from the workflow, so it cannot drift). JOVIE_PREFLIGHT=0
+  # skips it; JOVIE_SKIP_PRE_PUSH_GATE is the only other escape hatch.
+  echo "[pre-push-gate] running preflight"
+  node scripts/preflight.mjs --hook
   bash scripts/automation-verify.sh affected
 }
 

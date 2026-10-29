@@ -2163,10 +2163,20 @@ describe('automation-verify affected scope', () => {
 
     function runSelection(changedPath) {
       const repo = mkdtempSync(resolve(tmpdir(), 'scripts-typecheck-select-'));
-      const git = args =>
-        spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+      const git = args => {
+        const result = spawnSync('git', args, {
+          cwd: repo,
+          encoding: 'utf8',
+        });
+        expect(result.status, `git ${args.join(' ')}: ${result.stderr}`).toBe(
+          0
+        );
+        return result;
+      };
       try {
         git(['init', '-q', '-b', 'main']);
+        // Synthetic fixture commits must not invoke a developer's signing agent.
+        git(['config', '--local', 'commit.gpgsign', 'false']);
         git(['config', 'user.email', 'test@example.com']);
         git(['config', 'user.name', 'test']);
         writeFileSync(resolve(repo, 'README.md'), 'base\n');
@@ -3681,6 +3691,137 @@ describe('automation-verify affected scope', () => {
     });
   });
 
+  describe('onboarding confirmed-handle helper binding', () => {
+    const source =
+      'apps/web/components/features/onboarding/onboardingChatHelpers.ts';
+    const testFiles = [
+      'apps/web/tests/unit/onboarding/OnboardingChat.completed-steps.test.tsx',
+      'apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx',
+    ];
+
+    it('runs both live and restored confirmation regressions for a helper-only change', () => {
+      const plan = buildAffectedTestPlan([source]);
+      expect(plan.mode).toBe('selected');
+      for (const testFile of testFiles) {
+        expect(plan.mandatoryTests).toContain(testFile);
+        expect(plan.selectedTests).toContain(testFile);
+      }
+      const commands = buildSelectedTestCommands(plan, '1');
+      for (const testFile of testFiles) {
+        expect(commands.flatMap(([, args]) => args)).toContain(
+          testFile.replace('apps/web/', '')
+        );
+      }
+    });
+
+    it.each(testFiles)(
+      'fails closed when behavioral proof %s is missing',
+      testFile => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== testFile,
+        });
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+  });
+
+  describe.each([
+    [
+      'apps/web/tests/e2e/utils/start-entry-layout.ts',
+      [
+        'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+        'apps/web/tests/unit/e2e/start-entry-layout.test.ts',
+      ],
+    ],
+    [
+      'apps/web/tests/e2e/helpers/golden-path-keyframes.ts',
+      [
+        'apps/web/tests/unit/e2e/golden-path-keyframes-errors.test.ts',
+        'apps/web/tests/unit/e2e/start-entry-essentials.test.ts',
+      ],
+    ],
+    [
+      'apps/web/tests/e2e/helpers/golden-path-tracking.ts',
+      ['apps/web/tests/unit/e2e/golden-path-tracking.test.ts'],
+    ],
+  ])('anonymous entry helper binding: %s', (source, testFiles) => {
+    const unknownNeighbor = source.replace(/\.ts$/, '-neighbor.ts');
+    const selectorFiles = [
+      'scripts/run-affected-tests.mjs',
+      'scripts/lib/__tests__/automation-verify.test.mjs',
+    ];
+
+    it('selects the existing behavioral test for a helper-only change', () => {
+      const plan = buildAffectedTestPlan([source]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(testFiles);
+      expect(plan.selectedTests).toEqual(testFiles);
+      expect(buildSelectedTestCommands(plan, '1')).toEqual([
+        [
+          'pnpm',
+          [
+            '--filter',
+            '@jovie/web',
+            'exec',
+            'vitest',
+            'run',
+            ...testFiles.map(file => file.replace('apps/web/', '')),
+            '--passWithNoTests',
+            '--maxWorkers',
+            '1',
+          ],
+        ],
+      ]);
+    });
+
+    it.each(testFiles)(
+      'fails closed when declared behavioral test %s is missing',
+      missingTest => {
+        const plan = buildAffectedTestPlan([source], {
+          isFileAvailable: file => file !== missingTest,
+        });
+
+        expect(plan.mode).toBe('full');
+        expect(plan.fallbackReason).toContain(source);
+      }
+    );
+
+    it.each([
+      [unknownNeighbor],
+      [source, unknownNeighbor],
+      [source, ...testFiles, 'apps/web/lib/unknown.ts'],
+      [source, ...selectorFiles, 'apps/web/lib/unknown.ts'],
+      [source, 'apps/web/tests/setup.ts'],
+      [source, 'package.json'],
+    ])(
+      'preserves full fallback for unknown or global inputs %j',
+      (...files) => {
+        expect(buildAffectedTestPlan(files).mode).toBe('full');
+      }
+    );
+
+    it('includes selector regression tests when the complete pair accompanies the helper', () => {
+      const plan = buildAffectedTestPlan([source, ...selectorFiles]);
+
+      expect(plan.mode).toBe('selected');
+      expect(plan.mandatoryTests).toEqual(testFiles);
+      expect(plan.selectedTests).toEqual(testFiles);
+      expect(plan.scriptVitestTests).toEqual([selectorFiles[1]]);
+    });
+
+    it('fails closed when the selector implementation changes without its proof', () => {
+      const plan = buildAffectedTestPlan([
+        source,
+        ...testFiles,
+        selectorFiles[0],
+      ]);
+
+      expect(plan.mode).toBe('full');
+    });
+  });
+
   describe('marketing Pen contract bindings', () => {
     const source = 'apps/web/data/marketing/penContracts.ts';
     const bindingTests = [
@@ -3917,6 +4058,50 @@ describe('automation-verify affected scope', () => {
     expect(runner).toContain('--diff-filter=ACDMR');
   });
 
+  /**
+   * @param {number} pid
+   * @param {(command: string, args: string[], options: {encoding: 'utf8', timeout: number}) => {status: number | null, stdout: string, error?: unknown}} [inspect]
+   */
+  function processCanRun(pid, inspect = spawnSync) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      return error.code !== 'ESRCH';
+    }
+    // A killed orphan can remain Z when a container's PID 1 does not reap it.
+    // kill(0) sees that PID, but it cannot execute. Unknown evidence stays live.
+    try {
+      const result = inspect('ps', ['-o', 'stat=', '-p', String(pid)], {
+        encoding: 'utf8',
+        timeout: 1000,
+      });
+      return result.error ||
+        result.status !== 0 ||
+        !/^Z[<NLsl+>AEVWXJKCP]*$/.test(result.stdout.trim())
+        ? true
+        : false;
+    } catch {
+      return true;
+    }
+  }
+
+  it('does not treat unreadable or invalid process-state evidence as stopped', () => {
+    for (const result of [
+      { status: 1, stdout: '' },
+      { status: 0, stdout: '' },
+      { status: 0, stdout: 'Z malformed' },
+      { status: 0, stdout: 'Z\nR' },
+      { status: 0, stdout: 'R' },
+      { status: 0, stdout: 'Z', error: new Error('unreadable') },
+    ])
+      expect(processCanRun(process.pid, () => result)).toBe(true);
+    expect(
+      processCanRun(process.pid, () => {
+        throw new Error('denied');
+      })
+    ).toBe(true);
+  });
+
   it.each(['SIGINT', 'SIGTERM'])(
     'terminates the owned child process group on %s',
     async signal => {
@@ -3941,6 +4126,11 @@ describe('automation-verify affected scope', () => {
         ['--input-type=module', '-e', wrapperCode],
         { stdio: 'ignore' }
       );
+      const unrelated = spawn(
+        process.execPath,
+        ['-e', 'setInterval(() => {}, 1000)'],
+        { stdio: 'ignore' }
+      );
       let grandchildPid;
       try {
         const deadline = Date.now() + 5000;
@@ -3957,6 +4147,8 @@ describe('automation-verify affected scope', () => {
           }
         }
         expect(grandchildPid).toBeGreaterThan(0);
+        expect(processCanRun(grandchildPid)).toBe(true);
+        expect(processCanRun(unrelated.pid)).toBe(true);
         wrapper.kill(signal);
         await Promise.race([
           new Promise(resolveExit => wrapper.once('exit', resolveExit)),
@@ -3967,15 +4159,14 @@ describe('automation-verify affected scope', () => {
         const exitDeadline = Date.now() + 5000;
         let alive = true;
         while (alive && Date.now() < exitDeadline) {
-          try {
-            process.kill(grandchildPid, 0);
+          alive = processCanRun(grandchildPid);
+          if (alive)
             await new Promise(resolveWait => setTimeout(resolveWait, 25));
-          } catch {
-            alive = false;
-          }
         }
         expect(alive).toBe(false);
+        expect(processCanRun(unrelated.pid)).toBe(true);
       } finally {
+        unrelated.kill('SIGKILL');
         if (wrapper.exitCode === null) wrapper.kill('SIGKILL');
         if (grandchildPid) {
           try {
