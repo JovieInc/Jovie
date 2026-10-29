@@ -6787,6 +6787,30 @@ def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
     return types.SimpleNamespace(returncode=0)
 
 
+def shrink_legacy_cache_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Drop new route-segment cache exports, commit and push. None when nothing applies."""
+    files = list(route.get("files") or [])
+    if not files or sh(["git", "rev-parse", "--verify", "--quiet", "origin/main"],
+                       cwd=worktree, log=log, timeout=60).returncode:
+        return None
+
+    def base_text(rel: str):
+        shown = sh(["git", "show", f"origin/main:{rel}"], cwd=worktree, log=log, timeout=60)
+        return None if shown.returncode else shown.stdout
+
+    changed = fix_red_classes.shrink_new_route_segment_exports(worktree, files, base_text)
+    if not changed:
+        return None
+    steps = [["git", "add", "--", *changed],
+             ["git", "commit", "-q", "-m", "fix(web): drop new legacy route-segment cache exports"],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="shrunk-legacy-cache", shrunkFiles=changed)
+    return types.SimpleNamespace(returncode=0)
+
+
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
     taken = []
@@ -7825,6 +7849,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
                          fix_red_classes.RENUMBER: renumber_migrations_fix,
                          fix_red_classes.SNAP_SPACING: snap_spacing_fix,
+                         fix_red_classes.SHRINK_LEGACY: shrink_legacy_cache_fix,
                          fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),

@@ -29,6 +29,22 @@ class ClassifyTest(unittest.TestCase):
             got = classes.classify(pr("Source Validation"), {"Source Validation": log})
             self.assertEqual((got["cls"], got["action"]), (cls, action), log)
 
+    def test_legacy_cache_surface_beats_http_500_and_stops_at_the_guard(self):
+        log = (
+            "stack-pattern-ratchet: legacy Cache Components surface grew to 248 (maximum 245):\n"
+            "2026-10-29T16:30:47Z   apps/web/app/api/ovie/summer-voice/ask/route.ts\n"
+            "  apps/web/app/page.tsx\n"
+            "upstream returned HTTP 500 before the job started\n"
+            "[source-guards] merged-with-base-invariants: exit 1\n"
+            "apps/web/app/api/later/route.ts\n"
+        )
+        got = classes.classify(pr("Source Validation"), {"Source Validation": log})
+        self.assertEqual((got["cls"], got["action"]), ("legacy-cache-surface", "shrink-legacy-cache"))
+        self.assertEqual(got["files"], [
+            "apps/web/app/api/ovie/summer-voice/ask/route.ts",
+            "apps/web/app/page.tsx",
+        ])
+
     def test_unwired_files_are_extracted_and_aggregates_ignored(self):
         got = classes.classify(pr("Source Validation"), {"Source Validation":
                                "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane"})
@@ -238,6 +254,46 @@ class MeasureTest(unittest.TestCase):
         rows = self.rows()
         self.assertEqual(classes.breaker_n(rows), 2)
         self.assertEqual(classes.breaker_n([]), classes.DEFAULT_BREAKER_N)
+
+
+class LegacyCacheShrinkTest(unittest.TestCase):
+    def test_strips_new_route_exports_and_leaves_grandfathered_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ask, old, added = (
+                "apps/web/app/api/ovie/summer-voice/ask/route.ts",
+                "apps/web/app/api/ovie/old/route.ts",
+                "apps/web/app/api/ovie/added/route.ts",
+            )
+            page, boom = "apps/web/app/api/ovie/summer-voice/page.tsx", "apps/web/app/api/ovie/boom/route.ts"
+            files = {
+                ask: "import { ask } from './x';\n\nexport const dynamic = 'force-dynamic';\n"
+                     "export const fetchCache = 'force-no-store';\n\nexport const maxDuration = 60;\n",
+                old: "export const dynamic = 'force-dynamic';\nexport async function GET() { return 1 }\n",
+                added: "export const revalidate = 30;\nexport async function GET() { return 1 }\n",
+                page: "export const revalidate = 60;\nexport default function Page() { return null }\n",
+                boom: "export const dynamic = 'force-dynamic';\n",
+            }
+            for rel, text in files.items():
+                path = root / rel
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+            bases = {old: files[old], added: "export async function GET() { return 1 }\n"}
+
+            def base_text(rel):
+                if rel == boom:
+                    raise OSError("unreadable base")
+                return bases.get(rel)
+
+            changed = classes.shrink_new_route_segment_exports(
+                root, [ask, old, added, page, boom, "../outside/route.ts", "/tmp/abs/route.ts"], base_text)
+            self.assertEqual(changed, [added, ask])
+            self.assertEqual((root / ask).read_text(), "import { ask } from './x';\n\nexport const maxDuration = 60;\n")
+            self.assertEqual((root / added).read_text(), bases[added])
+            self.assertEqual((root / old).read_text(), files[old])
+            self.assertIn("revalidate", (root / page).read_text())
+            self.assertIn("force-dynamic", (root / boom).read_text())
+            self.assertFalse((root / "outside" / "route.ts").exists())
 
 
 if __name__ == "__main__":

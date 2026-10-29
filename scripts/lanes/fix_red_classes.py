@@ -29,10 +29,10 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, AGENT = (
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, SHRINK_LEGACY, MERGE_NARROWED, AGENT = (
     "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
-    "merge-narrowed-preflight", "agent")
-DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED})
+    "shrink-legacy-cache", "merge-narrowed-preflight", "agent")
+DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, SHRINK_LEGACY, MERGE_NARROWED})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -55,6 +55,11 @@ CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit 
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
     r"off-grid 10px/14px spacing steps \(\*-2\.5, \*-3\.5\) grew")
+# Before platform-infra: a full Source Validation log also matches `\b5\d\d\b`.
+LEGACY_CACHE_TEXT = re.compile(r"legacy Cache Components surface grew to \d+ \(maximum \d+\):")
+_LEGACY_EXPORT = re.compile(r"(?m)^[ \t]*export const (?:dynamic|fetchCache|revalidate)\s*=[^\n]*\n?")
+_LEGACY_PATH = re.compile(r"apps/web/\S+")
+_ROUTE_FILE = re.compile(r"(?:^|/)route\.(?:[cm]?[jt]sx?)$")
 # Same utility shape as apps/web/scripts/optical-grid-scanners.ts, limited to the
 # armed conservative steps. Longer prefixes are not required: `p` fails closed on
 # `px-2.5` because the step hyphen does not follow `p`.
@@ -96,6 +101,7 @@ SIGNATURES = (
     # Before platform-infra: the ratchet message includes a count such as 591,
     # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
+    ("legacy-cache-surface", LEGACY_CACHE_TEXT, SHRINK_LEGACY),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -172,6 +178,10 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         for name in names:
             found = UNWIRED.search(logs.get(name) or "")
             files.extend(item.strip() for item in (found.group(1).split(",") if found else []) if item.strip())
+        files = sorted(set(files))
+    elif cls == "legacy-cache-surface":
+        for name in names:
+            files.extend(legacy_surface_files(logs.get(name) or ""))
         files = sorted(set(files))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
@@ -429,6 +439,56 @@ def resolve_preflight_narrowed_text(text: str) -> str | None:
     if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
         return None
     return resolved
+
+
+def _route_handler_path(rel: str) -> bool:
+    rel = str(rel or "").replace("\\", "/").strip()
+    return bool(rel) and not rel.startswith("/") and ".." not in Path(rel).parts \
+        and rel.startswith("apps/web/") and bool(_ROUTE_FILE.search(rel))
+
+
+def legacy_surface_files(text: str) -> list[str]:
+    match = LEGACY_CACHE_TEXT.search(text or "")
+    if not match:
+        return []
+    tail = text[match.end():]
+    stop = re.search(r"\[source-guards\]|::error", tail)
+    if stop:
+        tail = tail[:stop.start()]
+    return sorted({raw.rstrip(".,:;)'\"") for raw in _LEGACY_PATH.findall(tail)})
+
+
+def shrink_new_route_segment_exports(root: Path, files: list[str], base_text) -> list[str]:
+    """Drop segment-cache exports on route handlers the base does not already export.
+
+    base_text(rel) is the base file, None if new, or raises OSError (leave the file).
+    """
+    changed = []
+    root = Path(root)
+    root_resolved = root.resolve()
+    for rel in sorted({str(item) for item in files or []}):
+        if not _route_handler_path(rel):
+            continue
+        path = (root / rel).resolve()
+        try:
+            path.relative_to(root_resolved)
+            original = path.read_text()
+            base = base_text(rel)
+        except (OSError, ValueError):
+            continue
+        if isinstance(base, str) and _LEGACY_EXPORT.search(base):
+            continue
+        if base is not None and not isinstance(base, str):
+            continue
+        stripped = _LEGACY_EXPORT.sub("", original)
+        if stripped == original:
+            continue
+        try:
+            atomic_write_text(path, re.sub(r"\n{3,}", "\n\n", stripped))
+        except OSError:
+            continue
+        changed.append(rel)
+    return changed
 
 
 def wire_ci_fast(root: Path, files: list[str]) -> list[str]:

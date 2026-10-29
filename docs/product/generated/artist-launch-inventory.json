@@ -4113,6 +4113,30 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/summer-voice/ask/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/summer-voice/ask",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/ovie/summer-voice/session/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/summer-voice/session",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/ovie/summer-voice/status/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/summer-voice/status",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/summer/history/route.ts",
       "kind": "handler",
       "route": "/api/ovie/summer/history",
