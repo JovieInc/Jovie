@@ -1198,7 +1198,14 @@
     .profile-viewport--desktop-surface
   ) .public-profile-compact-shell {
     max-width: min(100%, var(--profile-desktop-max-width));
-    height: max(var(--profile-desktop-min-height), 100dvh);
+    /* Canvas height follows content with the designed minimum. Forcing
+       max(--profile-desktop-min-height, 100dvh) stretched the shell to
+       exactly viewport height (900px at 1280x900) and failed the
+       profile-visual-audit sizing gate ('desktop shell stays materially
+       below viewport height', < 780) on every scheduled run since
+       2026-10-26 (first red: run 40358085957). */
+    height: auto;
+    min-height: var(--profile-desktop-min-height);
     border: 0;
     border-radius: 0;
     background: transparent;
