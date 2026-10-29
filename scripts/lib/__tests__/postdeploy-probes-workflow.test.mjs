@@ -66,7 +66,7 @@ describe('certification steps outside the workspace', () => {
         const upload = workflow.jobs['auth-smoke'].steps.find(
           step => step.id === 'upload-cert-steps'
         );
-        const condition = upload.if
+        const condition = /** @type {any} */ (upload).if
           .replace(/^\$\{\{|\}\}$/g, '')
           .replace(/steps\.([\w-]+)/g, 'steps["$1"]');
         expect(
