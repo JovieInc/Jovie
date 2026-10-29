@@ -66,6 +66,9 @@ jobs:
           DAILY_CAP: ${{ vars.SWARM_DAILY_USD_CAP || '5' }}
           ATTEMPT_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
           LEDGER_ISSUE: ${{ vars.SWARM_LEDGER_ISSUE }}
+          SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
+          SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
+          SWARM_CREDIT_PROBE: ${{ vars.SWARM_CREDIT_PROBE }}
         run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE"
 
   remediate:
@@ -142,7 +145,7 @@ jobs:
       - name: Stage provider key outside the checkout (no repo code runs here)
         if: steps.prep.outputs.action == 'agent'
         env:
-          SWARM_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          SWARM_API_KEY: ${{ secrets.SWARM_WORKERS_AI_TOKEN }}
         run: |
           umask 077
           printf '%s' "$SWARM_API_KEY" > "$RUNNER_TEMP/swarm-key"
@@ -150,7 +153,7 @@ jobs:
         if: steps.prep.outputs.action == 'agent'
         env:
           SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
-          SWARM_MODELS: ${{ vars.SWARM_MODELS || 'zai/glm-5.3-flash,deepseek/deepseek-v4-flash,zai/glm-5.2' }}
+          SWARM_MODELS: ${{ vars.SWARM_MODELS || '@cf/zai-org/glm-5.3-flash' }}
           SWARM_ATTEMPT_USD_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
         run: python3 scripts/swarm/pr_remediation_swarm.py agent --plan "$PLAN" --cwd pr --log "$LOG" --meta "$META" --key-file "$RUNNER_TEMP/swarm-key" --max-steps 25 --timeout 600
       - name: Remove staged key
