@@ -1050,47 +1050,6 @@ body {
       display: none;
     }
   }
-  /* Unique per-route hero photograph (marketing-routes-code-spec,
-     2026-09-26). Lives behind hero copy inside the existing
-     `.relative overflow-hidden` hero wrapper. The scrim guarantees
-     header + headline legibility no matter how bright the source
-     photo is; `MarketingHeroPhoto`'s `opacity` prop tunes overall
-     image strength for specific routes (/ai, /download). */
-  .marketing-hero-photo {
-    z-index: 0;
-  }
-  /* The photo is positioned; static hero copy would paint underneath it
-     (the /pricing headline rendered invisible). Lift every later sibling. */
-  .marketing-hero-photo ~ * {
-    position: relative;
-    z-index: 1;
-  }
-  .marketing-hero-photo__img {
-    object-fit: cover;
-    object-position: right center;
-  }
-  .marketing-hero-photo__scrim {
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklab, var(--system-b-cinematic-black) 55%, transparent),
-        transparent 18%
-      ),
-      linear-gradient(
-        90deg,
-        var(--system-b-cinematic-black) 0%,
-        color-mix(in oklab, var(--system-b-cinematic-black) 68%, transparent)
-          34%,
-        color-mix(in oklab, var(--system-b-cinematic-black) 14%, transparent)
-          62%,
-        transparent 82%
-      );
-  }
-  @media (prefers-contrast: more) {
-    .marketing-hero-photo {
-      display: none;
-    }
-  }
   /* System B marketing type (2026-10-20). One class per role, bound to the
      --ds-marketing-* ramp in design-system.css. New marketing pages use these
      instead of the retired marketing-*-linear classes or page-local clamps:

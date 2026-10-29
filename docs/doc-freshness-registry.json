@@ -378,7 +378,7 @@
     "CLAUDE.md": {
       "owner": "@itstimwhite",
       "claim": "The top-level router inherits the constitution and routes personal/mixed requests to private intake before task tools.",
-      "documentSha256": "c680fa1dd7549da29cda2ee553e67e12f1ce87762526a4e3dc36ea88686bcc95",
+      "documentSha256": "87c54c6be6a9a9be77cd1993dad098fd5d0813f43e7fa39a19d0f0444b06c0b4",
       "sources": [
         {
           "path": "canon/OPERATING_SYSTEM.md",

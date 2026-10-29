@@ -267,6 +267,8 @@ export const ServerEnvSchema = z.object({
 
   // Revalidation
   REVALIDATE_SECRET: z.string().optional(),
+  // Content records: bearer for agent publish + HMAC key for preview links.
+  CONTENT_PUBLISH_SECRET: z.string().min(32).optional(),
 
   // Apple Music DSP enrichment
   APPLE_MUSIC_KEY_ID: z.string().optional(),
@@ -468,6 +470,8 @@ export const ServerEnvSchema = z.object({
   // Production waitlist canary. The base address is shared with the OTP
   // runner; the read token authorizes only the redacted canary receipt route.
   E2E_PROD_SIGNUP_EMAIL_BASE: z.string().email().optional(),
+  // Kill switch for canary passage tokens on the /start bot check (JOV-9625).
+  SYNTHETIC_PASSAGE_TOKENS_DISABLED: z.enum(['0', '1']).optional(),
   PRODUCTION_WAITLIST_CANARY_READ_TOKEN: z.string().min(32).optional(),
   E2E_PROD_SIGNUP_PASSWORD: z.string().optional(),
   E2E_PROD_MAILBOX_PROVIDER: z
@@ -641,6 +645,7 @@ export const ENV_KEYS = [
   'GBRAIN_API_KEY',
   'GBRAIN_HEALTH_URL',
   'REVALIDATE_SECRET',
+  'CONTENT_PUBLISH_SECRET',
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
   'APPLE_MUSIC_PRIVATE_KEY',
@@ -662,6 +667,7 @@ export const ENV_KEYS = [
   'E2E_REQUIRE_TURNSTILE_GATE',
   'ONBOARDING_SYSTEM1_ENGINE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
+  'SYNTHETIC_PASSAGE_TOKENS_DISABLED',
   'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
   'E2E_PROD_SIGNUP_PASSWORD',
   'E2E_PROD_MAILBOX_PROVIDER',

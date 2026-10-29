@@ -200,8 +200,8 @@ export function formatPitchChecklistForPrompt(
 /** Chat / tool procedure. Grill one field, recommend an answer, then draft. */
 export const PITCH_GRILL_PROCEDURE = `Do not call generateReleasePitch until the curator checklist is resolved or the artist explicitly marks a field unknown.
 
-Required fields: artist, title, genre, 1–2 sentences on why the release exists, Spotify or private listen link, release date, why-this-playlist.
+Required fields: artist, title, genre, 1-2 sentences on why the release exists, Spotify or private listen link, release date, why-this-playlist.
 
 Grill: ask ONE missing field at a time. Recommend a concrete answer from known context. Wait for confirm or an explicit UNKNOWN before asking the next field.
 
-Draft rules once resolved: readable in under 1 minute; start outreach 2–4 weeks pre-release when the date is known; target playlist fit over follower count; include FFO when a real comparison exists; no attachments; never open with "Dear Curator"; one ask only; never invent a listen URL, @handle, or private email.`;
+Draft rules once resolved: readable in under 1 minute; start outreach 2-4 weeks pre-release when the date is known; target playlist fit over follower count; include FFO when a real comparison exists; no attachments; never open with "Dear Curator"; one ask only; never invent a listen URL, @handle, or private email.`;

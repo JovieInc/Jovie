@@ -1,0 +1,10 @@
+{
+  "_generated": {
+    "version": "093cb926ca90",
+    "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
+    "listingHash": "3dc2c64c58654c6c87790cb1d3f9b50a31b1ff4e88830fdf7eef722e0b28b2b0",
+    "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
+  },
+  "ready": true,
+  "blockers": []
+}

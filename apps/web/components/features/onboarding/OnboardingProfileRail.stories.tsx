@@ -60,6 +60,52 @@ export const SideClearance: Story = {
   ),
 };
 
+const CATALOG_ARTIST_STATE: OnboardingProfileBuilderState = {
+  ...CONFIRMED_ARTIST_STATE,
+  artist: {
+    ...(CONFIRMED_ARTIST_STATE.artist as NonNullable<
+      OnboardingProfileBuilderState['artist']
+    >),
+    catalog: {
+      total: 22,
+      releases: [
+        {
+          id: 'release-new',
+          title: 'Newest Single',
+          releaseType: 'single',
+          releaseDate: '2026-08-14',
+          artworkUrl: null,
+          spotifyUrl: 'https://open.spotify.com/album/releasenew',
+        },
+        {
+          id: 'release-album',
+          title: 'Debut Album',
+          releaseType: 'album',
+          releaseDate: '2025-10-01',
+          artworkUrl: null,
+          spotifyUrl: 'https://open.spotify.com/album/releasealbum',
+        },
+      ],
+    },
+  },
+};
+
+/**
+ * JOV-9758: the matched artist's real catalog renders on the preview before
+ * any pricing step (latest release on the home rail).
+ */
+export const WithRealCatalog: Story = {
+  args: {
+    placement: 'side',
+    state: CATALOG_ARTIST_STATE,
+  },
+  render: () => (
+    <div style={{ height: 692, width: 380 }}>
+      <OnboardingProfileRail placement='side' state={CATALOG_ARTIST_STATE} />
+    </div>
+  ),
+};
+
 /** Golden-path mobile width (390×844) uses the inline rail. */
 export const InlineClearance: Story = {
   args: {

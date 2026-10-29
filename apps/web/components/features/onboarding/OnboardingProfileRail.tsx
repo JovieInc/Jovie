@@ -8,6 +8,10 @@ import {
   type CanonicalArtistMetrics,
   getDisplaySpotifyFollowers,
 } from '@/lib/onboarding/canonical-metrics';
+import {
+  type OnboardingCatalogPreview,
+  toPreviewPublicReleases,
+} from '@/lib/onboarding/catalog-preview';
 import type { OnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -33,6 +37,8 @@ export interface OnboardingProfileArtist {
   readonly popularity?: number | null;
   readonly genres?: readonly string[];
   readonly dspMatches?: readonly OnboardingDspMatch[];
+  /** JOV-9758: the artist's real catalog, rendered before any pricing step. */
+  readonly catalog?: OnboardingCatalogPreview | null;
 }
 
 export interface OnboardingProfileBuilderState {
@@ -350,6 +356,7 @@ export function OnboardingProfileRail({
         : state.socialLinks,
   });
   const profileHref = `/${previewArtist.handle}`;
+  const previewReleases = toPreviewPublicReleases(artist.catalog, artist.name);
   const draft = state.profileDraft;
   const source = draft?.selectedSource;
   const sourceLabels = {
@@ -374,6 +381,7 @@ export function OnboardingProfileRail({
       data-visible='true'
       data-placement={placement}
       data-onboarding-stage={state.profileDraft?.awaiting}
+      data-catalog-releases={previewReleases.length}
     >
       <div
         className={cn(
@@ -414,6 +422,7 @@ export function OnboardingProfileRail({
               ) : undefined
             }
             artist={previewArtist}
+            releases={previewReleases}
             socialLinks={previewLinks}
             genres={previewArtist.genres}
             profileHref={profileHref}

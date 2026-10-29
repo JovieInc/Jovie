@@ -83,6 +83,7 @@ import throughput_sentinel  # noqa: E402
 import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
+import model_family_sync  # noqa: E402
 import capacity_live  # noqa: E402  (live quota reads for the capacity registry)
 import capacity_registry  # noqa: E402  (caps and policies come from ops/registry/capacity.json)
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -90,6 +91,7 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
@@ -155,7 +157,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
@@ -859,7 +861,9 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    return (0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
+            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
@@ -3866,8 +3870,6 @@ def gate_disposition(pr: dict, held: dict, attempts: dict) -> str | None:
 
 
 def gate_deferral(host: Host, pr: dict) -> str | None:
-    if pr_events.unconfirmed_human_hold(host, pr):
-        return "human-hold-pending"
     held, attempts = held_path(host), host.state / "fix-attempts.json"
     return gate_disposition(pr, json.loads(held.read_text()) if held.exists() else {},
                             json.loads(attempts.read_text()) if attempts.exists() else {})
@@ -4365,7 +4367,8 @@ def backlog_wake(host: Host) -> dict:
     extra = {binding.key: binding for binding in bindings.extra_bindings(THIS)}
     for team in named:
         binding = extra.get(team) or types.SimpleNamespace(key=team, excluded=("hold",), min_todo=0)
-        report[team] = {"refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
+        report[team] = {"priority": priority_admission.run(THIS, host, team, client, floor=binding.min_todo, excluded=binding.excluded),
+                        "refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
                         "rank": binding_refill.rank_pass(THIS, host, binding, client, force=True)}
     return report
 
@@ -4691,6 +4694,15 @@ def _remember_class(data: dict, pr: dict, classified: dict) -> None:
                           if not (isinstance(row, dict) and row.get("pr") == number)]
     data["classified"].append({"pr": number, "cls": classified["cls"], "at": time.time()})
     data["bySource"]["pr"] = int(data["bySource"].get("pr") or 0) + 1
+    if classified.get("decisionAsk"):
+        # Non-blocking Ovie ask, one per PR head (EVENT 2026-10-28). The class above is
+        # unchanged and the PR keeps moving; Summer files the card from this durable row.
+        asks = data.setdefault("decisionAsks", [])
+        head = pr.get("headRefOid")
+        if not any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
+                   for row in asks):
+            asks.append(remediation.decision_card(pr, classified))
+            del asks[:-200]
 
 
 def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, reason: str,
@@ -4698,7 +4710,6 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
     """One deduped surface: PR comment, terminal disposition, exhausted label. No second queue."""
     head = pr.get("headRefOid") or ""
     number = pr["number"]
-    hold_pending = False
     already = any(isinstance(row, dict) and row.get("pr") == number and row.get("head") == head
                   for row in data.get("surfaced") or [])
     if not already:
@@ -4708,21 +4719,17 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
                                  "head": head, "at": time.time()})
         if reason == "ladder-exhausted" and number not in data["ladderExhausted"]:
             data["ladderExhausted"].append(number)
-    # Only remediation's own structured disposition creates the honoured hold; comment text never
-    # does. Applied once per surfaced head, so a human removing the label releases it for good.
+    # A needs-human-decision disposition is a non-blocking Ovie decision ask, never a hold
+    # (EVENT 2026-10-28, Tim: nothing in the shipping machinery waits on a human). It carries a
+    # default and a deadline; Summer files the card from this row and the default ships if Tim is
+    # silent. No label is applied, so every machine gate (CI, security, Migration Guard) is the
+    # only thing that decides whether the PR lands.
     if classified.get("cls") == "needs-human-decision":
         row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == number
                     and row.get("head") == head), None)
-        if row is not None and not row.get("holdApplied"):
-            if pr_events.add_label(number, pr_events.HUMAN_DECISION_LABEL, sh, prefix=""):
-                row["holdApplied"] = True
-                row.pop("holdPending", None)
-            else:
-                # Not confirmed: stay held in every lanes path and retry on a later pass.
-                row["holdPending"] = True
-                hold_pending = True
-    if not hold_pending:
-        attempts[str(number)] = {**record, "escalated": True}
+        if row is not None and not row.get("ovieCard"):
+            row["ovieCard"] = remediation.decision_card(pr, classified)
+    attempts[str(number)] = {**record, "escalated": True}
     pr_events.add_label(number, pr_events.EXHAUSTED, sh)
     prefix = ["fix-exhausted"] if record.get("count", 0) else []
     update_json(held_path(host), lambda held, number=number, head=head, prefix=prefix: held.update(
@@ -4745,9 +4752,10 @@ def _surface_exhausted(host: Host, pr: dict, record: dict, classified: dict, rea
 
 
 def contain_history_rewrite(host: Host, pr: dict, after: str) -> dict:
-    """A rewritten head leaves the automatic path: the same needs-human-decision surface every
-    other human gate uses (symphony-surface comment, exhausted label, `tim-hold`), keyed to the
-    rewritten head so green-wake, finalizer and fix paths all refuse it."""
+    """A rewritten head leaves the automatic repair path: the same surface every other
+    needs-human-decision uses (comment, exhausted label, non-blocking Ovie card), keyed to the
+    rewritten head so green-wake, finalizer and fix paths refuse to repair it. The label is
+    the machine custody fence; no human hold is applied."""
     classified = {"cls": "needs-human-decision", "subtype": "history-rewrite-detected",
                   "evidence": [f"history-rewrite-detected: {after[:12]} does not descend from "
                                f"{pr['headRefOid'][:12]}"], "next_action": "tim-decides"}
@@ -4757,7 +4765,7 @@ def contain_history_rewrite(host: Host, pr: dict, after: str) -> dict:
     save_escalation(host, data)
     row = next((row for row in data["surfaced"] if isinstance(row, dict) and row.get("pr") == pr["number"]
                 and row.get("head") == after), {})
-    return {"surfaced": True, "holdApplied": bool(row.get("holdApplied")), "holdPending": bool(row.get("holdPending"))}
+    return {"surfaced": True, "ovieCard": bool(row.get("ovieCard"))}
 
 
 def escalate_exhausted(host: Host, prs: list[dict], linear, *, model_only=False,
@@ -6093,6 +6101,13 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "Never hand-merge generated files: take main's generated copy, then run its canonical",
                    "generator (`pnpm ci:topology:write` for workflow topology or",
                    "`pnpm --filter @jovie/web drizzle:generate` for migration metadata).",
+                   "When the only conflict is scripts/preflight-changed.mjs in the NARROWED",
+                   "merge-group-unit-guards command, union && prefixes and vitest paths with",
+                   "fix_red_classes.merge_narrowed_guard_command. Unknown hunks stay unresolved.",
+                   "When the only conflict is added rows in the CLAUDE.md scoped-rule table, union",
+                   "them with fix_red_classes.resolve_scoped_rule_router_text, then run",
+                   "`node scripts/agent-context/rule-scopes.mjs --write` and refresh that file's",
+                   "document review digest. Unknown hunks stay unresolved.",
                    "Run the related checks after resolving.", ""]
     else:
         problem = []
@@ -6137,6 +6152,22 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
+def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: None) -> bool:
+    """Restore main's generated copies, then regenerate from the merged source, including
+    outputs that Git merged cleanly. Also usable after an agent resolves source conflicts."""
+    generated = sorted(set(paths) & remediation.GENERATED_RESOLVERS.keys())
+    if not generated:
+        return True
+    if sh(["git", "checkout", "origin/main", "--", *generated], cwd=worktree, log=log).returncode:
+        return False
+    commands = dict.fromkeys(remediation.GENERATED_RESOLVERS[path] for path in generated)
+    for command in commands:
+        guard()
+        if sh(list(command), cwd=worktree, timeout=900, log=log).returncode:
+            return False
+    return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
+
+
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
     no model. Merge main, take its copy of each conflicted generated file, run each file's
@@ -6151,23 +6182,115 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
         if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
-        guard()
-        commands = []
-        for path in sorted(conflicted):
-            command = list(remediation.GENERATED_RESOLVERS[path])
-            if command not in commands:
-                commands.append(command)
-        for command in commands:
-            if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        changed = sh(["git", "diff", "--name-only", "HEAD"], cwd=worktree)
+        if changed.returncode or not regenerate_merged_generated(
+                worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
     guard()
     return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def resolve_narrowed_preflight_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union a NARROWED preflight command when that file is the only conflict with main.
+
+    Both sides keep their shell prefixes and vitest paths. Any other conflict, or a hunk
+    the union cannot read, aborts and leaves the PR to the model. The push is a fast-forward
+    of the PR branch; this never rebases or force-pushes."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        target = worktree / fix_red_classes.NARROWED_PREFLIGHT
+        if conflicted != [fix_red_classes.NARROWED_PREFLIGHT]:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            resolved = fix_red_classes.resolve_preflight_narrowed_text(target.read_text())
+        except OSError:
+            resolved = None
+        if resolved is None:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            atomic_write_text(target, resolved)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["git", "add", "--", fix_red_classes.NARROWED_PREFLIGHT], cwd=worktree, log=log).returncode != 0 \
+                or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    pushed = sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+    return pushed
+
+
+def resolve_scoped_rule_router_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
+    """Union added CLAUDE.md scoped-rule rows when that file is the only conflict.
+
+    Then synchronize the count marker and that file's review digest. Any other conflict,
+    an unknown hunk, a budget miss, or a failed writer aborts and leaves the PR to the model.
+    The push is a fast-forward; this never rebases or force-pushes."""
+    guard()
+    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    if merged.returncode != 0:
+        conflicted = [path for path in (sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout or "").split() if path]
+        router = worktree / fix_red_classes.SCOPED_RULE_ROUTER
+        registry = worktree / "docs/doc-freshness-registry.json"
+        if conflicted != [fix_red_classes.SCOPED_RULE_ROUTER]:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            resolved = fix_red_classes.resolve_scoped_rule_router_text(router.read_text())
+        except OSError:
+            resolved = None
+        if resolved is None:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            atomic_write_text(router, resolved)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        guard()
+        if sh(["node", "scripts/agent-context/rule-scopes.mjs", "--write"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            document = router.read_text()
+            refreshed = fix_red_classes.refresh_router_document_digest(registry.read_text(), document)
+        except OSError:
+            document, refreshed = "", None
+        if not fix_red_classes.router_within_budget(document) or refreshed is None:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        try:
+            atomic_write_text(registry, refreshed)
+        except OSError:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+        staged = sh(["git", "add", "--", fix_red_classes.SCOPED_RULE_ROUTER,
+                     "scripts/agent-context/rule-scopes.json", "docs/doc-freshness-registry.json"],
+                    cwd=worktree, log=log)
+        if staged.returncode != 0 or sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
+    guard()
+    return sh(["git", "push", "-q", "origin", f"HEAD:refs/heads/{branch}"], cwd=worktree, log=log).returncode == 0
+
+
+def merge_narrowed_preflight_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """No-model fix when Source Validation reports only the narrowed preflight conflict."""
+    del host, route
+    if not resolve_narrowed_preflight_conflict(worktree, pr["headRefName"], log):
+        return None
+    receipt.update(resolution="narrowed-preflight-merged")
+    return types.SimpleNamespace(returncode=0)
 
 
 REPAIR_AUTHORITY_FIELDS = """number title body state mergedAt headRefName headRefOid url isDraft mergeStateStatus reviewDecision updatedAt
@@ -6697,6 +6820,26 @@ def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
     return types.SimpleNamespace(returncode=0)
 
 
+def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a grown spacing ratchet: snap added 10px/14px utilities onto the
+    4px grid, commit and push. Returns a finished-agent stand-in, or None when nothing applies."""
+    diff = sh(["git", "diff", "-U0", "origin/main...HEAD", "--", "apps/web", "packages/ui"],
+              cwd=worktree, log=log, timeout=300)
+    if diff.returncode:
+        return None
+    changed = fix_red_classes.snap_added_conservative_spacing(worktree, diff.stdout or "")
+    if not changed:
+        return None
+    steps = [["git", "add", "--", *changed],
+             ["git", "commit", "-q", "-m", "fix(ui): snap added off-grid spacing onto the 4px scale"],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="snapped-spacing", snappedFiles=changed)
+    return types.SimpleNamespace(returncode=0)
+
+
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
     taken = []
@@ -6724,10 +6867,33 @@ def route_fix_red(host: Host, pr: dict) -> dict | None:
         return None
 
 
+def stamp_changelog_decision(host: Host, pr: dict) -> bool:
+    """Write the internal customer-changelog note onto the PR body. False when the body cannot
+    take one or GitHub rejects the edit (the model then gets the head)."""
+    stamped = fix_red_classes.stamp_internal_changelog(pr.get("body"))
+    if stamped is None:
+        return False
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    path = runs / f"changelog-{int(pr['number'])}.md"
+    atomic_write_text(path, stamped)
+    edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
+                     priority="repair")
+    return edited.returncode == 0
+
+
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
-    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN}:
+    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
         return None
+    if route["action"] == fix_red_classes.STAMP_CHANGELOG:
+        # No body, or a note already present: do not spend the once-per-head claim. An invalid
+        # note is a different defect and still belongs to the model.
+        if fix_red_classes.stamp_internal_changelog(pr.get("body")) is None:
+            return None
+        if not claim_route(host, pr, route["action"]):
+            return None
+        return "infra-rerun:changelog-metadata" if stamp_changelog_decision(host, pr) else None
     # One rerun per head, shared with the platform-red gate above; one sync per head.
     if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
         return None
@@ -7029,8 +7195,6 @@ def require_fix_target(pr: dict, stage: str, *, worktree: Path | None = None, re
             raise RepairStopped("target-head-superseded", live, stage)
     if repair and remediation.review_authority_ask(live):
         raise RepairStopped("target-review-requires-authority", live, stage)
-    if repair and pr_events.human_holds(live):
-        raise RepairStopped("target-pr-human-hold", live, stage)
     return live
 
 
@@ -7509,8 +7673,6 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                "startedAt": now_iso()}
     receipt["targetStateReads"] = 1
     try:
-        if pr_events.unconfirmed_human_hold(host, pr):
-            raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, "before-execution-claim")
         live = require_fix_target(pr, "before-execution-claim", repair=True)
     except RepairStopped as error:
         live, reason = error.live, str(error)
@@ -7640,8 +7802,6 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                     return None
                 receipt["targetStateReads"] += 1
                 try:
-                    if pr_events.unconfirmed_human_hold(host, pr):
-                        raise RepairStopped("target-pr-human-hold-pending", {**pr, "state": "OPEN"}, stage)
                     live = require_fix_target(target, stage, worktree=worktree, repair=True)
                 except RepairStopped as error:
                     # Mid-run, one unreadable snapshot (a check finishing between pages, a
@@ -7680,13 +7840,27 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 require_disk(host, stage)
                 verify_target(pr, stage, worktree=worktree if allow_local_push else None)
             resolved_generated = False
+            resolved_narrowed = False
+            resolved_router = False
             if pr.get("mergeStateStatus") == "DIRTY":
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-generated-conflict")
                 resolved_generated = resolve_generated_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                if not resolved_generated:
+                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-narrowed-preflight")
+                    resolved_narrowed = resolve_narrowed_preflight_conflict(worktree, pr["headRefName"], log, guard=boundary)
+                if not resolved_generated and not resolved_narrowed:
+                    execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
+                                               {"spend": 0, "mutations": 1}, coordination=coordination, boundary_id="repair-scoped-rule-router")
+                    resolved_router = resolve_scoped_rule_router_conflict(worktree, pr["headRefName"], log, guard=boundary)
             agent = None
             if resolved_generated:
                 receipt.update(resolution="generated-regenerated")
+            elif resolved_narrowed:
+                receipt.update(resolution="narrowed-preflight-merged")
+            elif resolved_router:
+                receipt.update(resolution="scoped-rule-router-merged")
             else:
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
@@ -7709,7 +7883,9 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
-                         fix_red_classes.RENUMBER: renumber_migrations_fix}.get((route or {}).get("action"))
+                         fix_red_classes.RENUMBER: renumber_migrations_fix,
+                         fix_red_classes.SNAP_SPACING: snap_spacing_fix,
+                         fix_red_classes.MERGE_NARROWED: merge_narrowed_preflight_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
@@ -7757,7 +7933,7 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 # summary carries no labels, so delete unconditionally (404 when absent).
                 sh(["gh", "api", "-X", "DELETE",
                     f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/{pr_events.POISON_LABEL}"], log=log)
-                if pr.get("liftHold") and remediation.lift_human_holds():
+                if pr.get("liftHold"):
                     sh(["gh", "api", "-X", "DELETE",
                         f"repos/{REPO_SLUG}/issues/{pr['number']}/labels/hold"], log=log)
             if pushed and not pr.get("isDraft"):
@@ -9649,6 +9825,9 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
                                          for binding in refill_for}
                 tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
+                tick["priorityAdmission"] = {binding.key: priority_admission.run(THIS, host, binding.key, client, floor=binding.min_todo,
+                                                                                  excluded=binding.excluded)
+                                             for binding in refill_for}
                 tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
@@ -9759,6 +9938,12 @@ def finish_dispatch(host: Host, tick: dict) -> int:
                                     {"status": "not-owner", "owner": owner})
     except Exception as error:  # registry freshness never takes dispatch down
         tick["credentialsSpend"] = {"status": "error", "error": type(error).__name__}
+    try:
+        # Daily model-family sync (model_family_sync.py): provider lists -> registry PR, stale alarm.
+        owner = os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]
+        tick["modelFamilySync"] = (model_family_sync.tick(host.state, host.repo) if HOST == owner else {"status": "not-owner"})
+    except Exception as error:  # registry freshness never takes dispatch down
+        tick["modelFamilySync"] = {"status": "error", "error": type(error).__name__}
     try:
         # Live quota reads (Codex ledger, Grok /usage) for the capacity registry; metadata only.
         tick["capacityLive"] = (capacity_live.tick(host.state) if HOST == os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]

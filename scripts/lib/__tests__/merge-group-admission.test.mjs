@@ -685,6 +685,60 @@ describe('merge-group admission evidence', () => {
       expect(isTransientAdmissionFailureMessage(error.message)).toBe(false);
     });
 
+    describe('when Fork PR Gate only restates a failed PR Size Guard', () => {
+      const bothFailed = () => ({
+        loadQueueRef: vi.fn(async () => queueRef()),
+        loadLiveQueueEntries: vi.fn(async () => [liveEntry()]),
+        loadCheckRuns: vi.fn(async ({ checkName }) =>
+          checkPage(checkName, 'completed', 'failure')
+        ),
+      });
+      const derived = annotation(
+        "Merge-group fork policy verdict is 'missing', not pass"
+      );
+      const byRun = (fork, size) =>
+        vi.fn(async ({ checkRunId }) => (checkRunId === 1 ? fork : size));
+
+      it('reports the size job GitHub 5xx as infrastructure, not a source red', async () => {
+        // 2026-10-24 22:47Z, PRs 22583 and 22633: the Fork PR Gate red sorts
+        // first and used to hide the size job's 503.
+        const error = await admit(
+          bothFailed(),
+          byRun(
+            [derived, annotation('Process completed with exit code 1.')],
+            [
+              annotation(
+                'GitHub API 503 for /repos/JovieInc/Jovie/pulls/22583: unknown error'
+              ),
+            ]
+          )
+        ).catch(e => e);
+        expect(error.message).toBe(
+          'PR Size Guard failed on GitHub transient-server, not on the combined head'
+        );
+        expect(isTransientAdmissionFailureMessage(error.message)).toBe(true);
+      });
+
+      it('keeps a real size policy failure a real red', async () => {
+        const error = await admit(
+          bothFailed(),
+          byRun(
+            [derived],
+            [annotation('PR #12 failed size merge-group policy')]
+          )
+        ).catch(e => e);
+        expect(error.message).toBe('Fork PR Gate completed with failure');
+        expect(isTransientAdmissionFailureMessage(error.message)).toBe(false);
+      });
+
+      it('does not excuse a derived Fork PR Gate red on its own', async () => {
+        const error = await admit(bothFailed(), byRun([derived], [])).catch(
+          e => e
+        );
+        expect(error.message).toBe('Fork PR Gate completed with failure');
+      });
+    });
+
     it('keeps the old verdict without the shared classifier', async () => {
       const annotations = vi.fn(async () => []);
       await expect(
