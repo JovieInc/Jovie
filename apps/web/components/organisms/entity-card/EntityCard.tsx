@@ -24,6 +24,8 @@ import type {
 
 interface EntityCardProps {
   readonly model: EntityCardModel;
+  /** Evidence without artwork can use the same compact text/CTA anatomy. */
+  readonly media?: 'auto' | 'none';
   /** Feature Hero / Compact / Detailed — auto-selected by the carousel. */
   readonly treatment?: EntityTreatment;
   /** App shell surface, or the frosted public-profile pearl. */
@@ -231,6 +233,7 @@ function CardShell({
 
 export function EntityCard({
   model,
+  media = 'auto',
   treatment = 'compact',
   surface = 'app',
   shape,
@@ -326,7 +329,7 @@ export function EntityCard({
         className
       )}
     >
-      {isLandscapeNonMedia ? null : (
+      {isLandscapeNonMedia || media === 'none' ? null : (
         <div
           className={cn(
             'relative flex w-full items-center justify-center overflow-hidden',

@@ -1,5 +1,7 @@
 'use client';
 
+import { sourceFactsByMessage } from '@/components/jovie/source-facts';
+
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingChat.empty-intro.test.tsx
 
 import { useChat } from '@ai-sdk/react';
@@ -463,6 +465,7 @@ function OnboardingMessageList({
   readonly onSelectArtist: (artist: OnboardingArtistSelection) => void;
   readonly selectedArtistId: string | null;
 }) {
+  const sourceFacts = sourceFactsByMessage(displayMessages);
   const handleStepDone =
     hasToolOutputAction(
       displayMessages,
@@ -495,6 +498,7 @@ function OnboardingMessageList({
                 id={message.id}
                 role={message.role}
                 parts={(message.parts ?? []) as MessagePart[]}
+                sourceFacts={sourceFacts.get(message.id)}
                 isThinking={isThinking}
                 isStreaming={
                   isStreaming && message.id === lastAssistantMessageId
