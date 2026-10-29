@@ -428,8 +428,6 @@ export default function DownloadPage() {
 
         <MarketingFooterCta
           sectionVariant='final-single-claim'
-          title={DOWNLOAD_COPY.footerTitle}
-          body={DOWNLOAD_COPY.footerBody}
           ctaLabel={DOWNLOAD_COPY.footerCta}
           ctaHref={DOWNLOAD_URL}
           ctaAnalyticsEvent='download_mac_dmg'
