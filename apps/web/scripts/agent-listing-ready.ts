@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 /**
  * Re-evaluates the submit gate with the real clock.
  *   pnpm --filter @jovie/web agent-distribution:ready [-- --platform muse]
- * Exit 1 unless every selected package holds all four receipts.
+ * Exit 1 unless the distribution has no blockers and every selected package holds all gates; exit 2 on a bad argument.
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -17,12 +17,25 @@ const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 async function main() {
   const index = process.argv.indexOf('--platform');
   const only = index > 0 ? process.argv[index + 1] : null;
+  if (only !== null && !(PLATFORMS as readonly string[]).includes(only)) {
+    console.error(
+      `Unknown platform "${only}". Expected one of: ${PLATFORMS.join(', ')}`
+    );
+    return 2;
+  }
   const snapshot = JSON.parse(
     await readFile(
       resolve(WEB, 'lib/agent-distribution/generated/tools-list.snapshot.json'),
       'utf8'
     )
   );
+  const committed = JSON.parse(
+    await readFile(
+      resolve(WEB, 'lib/agent-distribution/generated/readiness.json'),
+      'utf8'
+    )
+  ) as { blockers?: readonly string[] };
+  const blockers = committed.blockers ?? [];
   const inputs = await readReadinessInputs(WEB);
   const iconSource = await loadIconSource(resolve(WEB, '../..'));
   const renderedIcons = iconSource
@@ -37,7 +50,8 @@ async function main() {
     snapshot.toolsListHash,
     new Date()
   );
-  let ready = true;
+  let ready = blockers.length === 0;
+  for (const blocker of blockers) process.stdout.write(`blocker: ${blocker}\n`);
   for (const platform of PLATFORMS.filter(p => !only || p === only)) {
     const pkg = all[platform];
     ready &&= pkg.ready;
