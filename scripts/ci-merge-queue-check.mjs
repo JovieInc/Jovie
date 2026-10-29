@@ -37,7 +37,7 @@ function readRepoFile(relativePath) {
 
 // The live read draws on the shared installation REST bucket every workflow
 // uses. 2026-10-29 06:15 PT (run 40880300194): the bucket was empty at this
-// read and the raw `gh api` turned the installation 403 into a hard red (plus
+// read and the raw gh API call turned the installation 403 into a hard red (plus
 // a Slack drift false alarm) while Automation Liveness deferred cleanly in
 // the same window. The read now retries quota/transient failures within this
 // budget and defers (exit 75, `github-quota-deferred`) when the reset lands
