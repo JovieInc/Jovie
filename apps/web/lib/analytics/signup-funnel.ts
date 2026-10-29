@@ -83,6 +83,24 @@ export interface SignupFunnelStepInput<
   readonly reason?: string;
   /** Server-derived metric cohort. Browser beacons are always unattributed. */
   readonly cohort?: AccountMetricCohort;
+  /** Milliseconds since the previous funnel step in this browser session. */
+  readonly stepMs?: number;
+  /** Milliseconds since the first funnel step in this browser session. */
+  readonly entryMs?: number;
+}
+
+/** A timing beyond one hour is a stale session, not a step duration. */
+export const SIGNUP_FUNNEL_MAX_TIMING_MS = 3_600_000;
+
+/** Keep only a sane non-negative integer duration; drop everything else. */
+export function normalizeFunnelTimingMs(
+  value: number | null | undefined
+): number | undefined {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return undefined;
+  const rounded = Math.round(value);
+  return rounded >= 0 && rounded <= SIGNUP_FUNNEL_MAX_TIMING_MS
+    ? rounded
+    : undefined;
 }
 
 export function isSignupFunnelStep(

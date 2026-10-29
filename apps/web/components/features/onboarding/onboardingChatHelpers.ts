@@ -15,6 +15,7 @@ import {
   type OnboardingWidgetEventType,
   parseWidgetEventFromMetadata,
 } from '@/lib/chat/onboarding-script/widget-events';
+import { readOnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
 import type {
@@ -303,10 +304,13 @@ export function deriveProfileBuilderState({
   let handle: string | null = null;
   let confirmedHandle: string | null = null;
   const socialLinks: string[] = [];
+  let profileDraft: OnboardingProfileBuilderState['profileDraft'] = null;
 
   for (const message of messages) {
+    profileDraft = readOnboardingProfileDraft(message.metadata) ?? profileDraft;
     for (const part of getToolParts(message)) {
       const output = part.output;
+      profileDraft = readOnboardingProfileDraft(output) ?? profileDraft;
 
       if (isArtistConfirmedOutput(output)) {
         const confirmedArtist = artistFromConfirmedOutput(output);
@@ -329,6 +333,7 @@ export function deriveProfileBuilderState({
   }
 
   return {
+    profileDraft,
     artist,
     artistConfirmed,
     // Confirmed server output wins over stale proposal cards and their drafts.
