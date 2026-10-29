@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
 import { execFile } from 'node:child_process';
-import { writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { promisify } from 'node:util';
+import { runGh } from '../packages/api-client/gh.ts';
 import { runCheck as runCredentialsCheck } from './credentials-spend-check.mjs';
 import {
   COMPANY_DOMAINS,
@@ -10,6 +13,7 @@ import {
   parseWhois,
 } from './lib/domain-expiry.mjs';
 import { upsertLinearIssueByTitleFingerprint } from './lib/linear-issue-intake.mjs';
+import { runProofLoop } from './lib/proof-loop.mjs';
 import {
   EXHAUSTED_LABEL,
   readVercelReadonlyToken,
@@ -343,6 +347,105 @@ export async function loadDriftPlans({
   return { plans: report.plans, warnings: report.warnings };
 }
 
+const ROOT = new URL('..', import.meta.url).pathname;
+
+/** Summer's proof-stat feed (stats, metrics, events) from production. */
+export async function loadProofFeed({
+  env = process.env,
+  fetchImpl = fetch,
+} = {}) {
+  if (!env.CONTENT_PUBLISH_SECRET)
+    throw new Error(
+      'CONTENT_PUBLISH_SECRET not set (repo secret; a Tim action)'
+    );
+  const base = env.JOVIE_BASE_URL ?? 'https://jov.ie';
+  const res = await fetchImpl(`${base}/api/internal/proof-stats`, {
+    headers: {
+      authorization: `Bearer ${env.CONTENT_PUBLISH_SECRET}`,
+      'x-content-actor': 'proof-loop',
+    },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) throw new Error(`proof-stats feed: ${res.status}`);
+  return res.json();
+}
+
+/** proof-ratchets.json from the latest successful Public Profile Benchmark run. */
+export async function loadProofRatchets({ ghRunner = runGh, dir } = {}) {
+  const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
+  const list = await ghRunner(
+    [
+      'run',
+      'list',
+      '-R',
+      repo,
+      '--workflow',
+      'public-benchmark.yml',
+      '--status',
+      'success',
+      '--limit',
+      '1',
+      '--json',
+      'databaseId',
+    ],
+    { priority: 'report' }
+  );
+  if (list.code !== 0)
+    throw new Error(`benchmark run lookup: ${list.stderr.trim()}`);
+  const id = JSON.parse(list.stdout || '[]')[0]?.databaseId;
+  if (!id) throw new Error('no successful public benchmark run');
+  const target = dir ?? mkdtempSync(join(tmpdir(), 'proof-ratchets-'));
+  const dl = await ghRunner(
+    [
+      'run',
+      'download',
+      String(id),
+      '-R',
+      repo,
+      '-n',
+      `public-benchmark-receipt-${id}`,
+      '-D',
+      target,
+    ],
+    { priority: 'report' }
+  );
+  if (dl.code !== 0)
+    throw new Error(`benchmark artifact download: ${dl.stderr.trim()}`);
+  const path = join(target, 'proof-ratchets.json');
+  if (!existsSync(path))
+    throw new Error(`run ${id} has no proof-ratchets.json yet`);
+  return JSON.parse(readFileSync(path, 'utf8'));
+}
+
+/** Stat-bound share of numeric marketing claims (stat-claims guard). */
+export async function loadClaimsMeasurement() {
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    ['scripts/invariants/stat-claims/check.mjs', '--json'],
+    { cwd: ROOT, maxBuffer: 4 * 1024 * 1024 }
+  );
+  return JSON.parse(stdout.trim().split('\n').pop());
+}
+
+/** Proof loop pass; run record (stages, metrics, approvals, wins) to PROOF_LOOP_RUN_RECEIPT. */
+export async function loadProofPlans({
+  env = process.env,
+  run = runProofLoop,
+} = {}) {
+  const report = await run({
+    root: ROOT,
+    loadFeed: () => loadProofFeed({ env }),
+    loadRatchets: () => loadProofRatchets(),
+    loadClaimsMeasurement,
+  });
+  if (env.PROOF_LOOP_RUN_RECEIPT)
+    writeFileSync(
+      env.PROOF_LOOP_RUN_RECEIPT,
+      `${JSON.stringify(report.run)}\n`
+    );
+  return { plans: report.plans, warnings: report.warnings };
+}
+
 function warn(message) {
   console.error(message);
   if (process.env.GITHUB_ACTIONS === 'true')
@@ -372,6 +475,7 @@ async function main() {
       if (out) writeFileSync(out, `${JSON.stringify(metrics, null, 2)}\n`);
       return metrics;
     },
+    loadProof: () => loadProofPlans(),
     vercelTokenPresent: Boolean(token),
     upsert: upsertLinearIssueByTitleFingerprint,
     apiKey: process.env.LINEAR_API_KEY,

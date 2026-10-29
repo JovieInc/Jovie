@@ -33,6 +33,7 @@ const MODES = new Set([
   'drift',
   'exhausted',
   'holds',
+  'proof',
   'summer',
   'summer-config',
   'swift-arch',
@@ -519,6 +520,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadDrift]
  * @param {() => { generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] } | Promise<{ generatedAt: string, total: number, byRule: Record<string, number>, topFiles: { rule: string, file: string, count: number }[] }>} [options.loadSwiftArch]
+ * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadProof]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -535,6 +537,7 @@ export async function runRemediationSweep({
   loadCredentials,
   loadDrift,
   loadSwiftArch,
+  loadProof,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -629,6 +632,17 @@ export async function runRemediationSweep({
       warnings.push('Swift architecture guard loader not wired; not judged');
     } else {
       plans.push(...planSwiftArchDebt(await loadSwiftArch()));
+    }
+  }
+  if (includesMode(mode, 'proof')) {
+    // Proof-stat loop (apps/web/data/proof-stats): establish issues for
+    // proposed stats, benchmark ratchets, stale-stat alarms.
+    if (!loadProof) {
+      warnings.push('Proof-stat loop loader not wired; not judged');
+    } else {
+      const proof = await loadProof();
+      warnings.push(...(proof.warnings ?? []));
+      plans.push(...proof.plans);
     }
   }
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });
