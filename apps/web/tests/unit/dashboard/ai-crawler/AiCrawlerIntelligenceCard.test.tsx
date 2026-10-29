@@ -89,7 +89,7 @@ describe('AiCrawlerIntelligenceCard', () => {
     renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     const skeleton = screen.getByTestId('ai-crawler-card-skeleton');
-    expect(skeleton).toHaveClass('min-h-12');
+    expect(skeleton).toHaveClass('min-h-10');
   });
 
   it('reserves compact row height on error without layout collapse', () => {
@@ -102,7 +102,7 @@ describe('AiCrawlerIntelligenceCard', () => {
     renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     const errorCard = screen.getByTestId('ai-crawler-card-error');
-    expect(errorCard).toHaveClass('min-h-12');
+    expect(errorCard).toHaveClass('min-h-10');
     expect(
       screen.getByText('AI crawler analytics temporarily unavailable.')
     ).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe('AiCrawlerIntelligenceCard', () => {
     renderWithQueryClient(<AiCrawlerIntelligenceCard />);
 
     const row = screen.getByTestId('ai-crawler-intelligence-card');
-    expect(row).toHaveClass('min-h-12');
+    expect(row).toHaveClass('min-h-10');
     expect(row.tagName).toBe('BUTTON');
     expect(screen.getByText('AI Crawler Reads')).toBeInTheDocument();
     expect(
@@ -165,7 +165,7 @@ describe('AiCrawlerIntelligenceCard', () => {
     );
 
     const row = screen.getByTestId('ai-crawler-intelligence-card');
-    expect(row).toHaveClass('min-h-12');
+    expect(row).toHaveClass('min-h-10');
     expect(row.tagName).not.toBe('BUTTON');
     const teaser = screen.getByTestId('ai-crawler-card-teaser');
     expect(

@@ -276,6 +276,8 @@ export function EmptyState({
         id={headingId}
         className={cn(
           'mb-1 text-app font-caption',
+          // Quiet state: heading then its one action, on the 12px step.
+          isQuiet && 'mb-3',
           styles.heading,
           isWorkspacePresentation &&
             'mb-2 text-sm font-semibold tracking-tight text-primary-token'

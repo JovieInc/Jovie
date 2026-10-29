@@ -20,8 +20,9 @@ interface AiCrawlerIntelligenceCardProps {
   readonly className?: string;
 }
 
-const ROW_CLASS =
-  'flex min-h-12 w-full items-center gap-3 rounded-xl border border-subtle px-3 py-2';
+// Inline notice row, no plate: the glyph sits on the workspace seam (px-3)
+// and the full-width row reads as one line of the page, not a card.
+const ROW_CLASS = 'flex min-h-10 w-full items-center gap-2 px-3 py-2';
 const CRAWLER_READ_DISCLOSURE = getAeoMeasurementDisclosure('crawler_read');
 
 function RowSkeleton({ className }: { readonly className?: string }) {
@@ -151,7 +152,7 @@ export function AiCrawlerIntelligenceCard({
       onClick={handleOpen}
       className={cn(
         ROW_CLASS,
-        'text-left transition-colors duration-subtle hover:border-default hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
+        'text-left transition-colors duration-subtle hover:bg-surface-1 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--color-focus-ring)',
         className
       )}
       data-testid='ai-crawler-intelligence-card'

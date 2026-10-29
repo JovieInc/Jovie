@@ -1,0 +1,235 @@
+{
+  "schema": "design-present-receipt/v1",
+  "set": "app-shell",
+  "pr": 23710,
+  "gateVersion": "c048978c27d3f145",
+  "manifest": "docs/design-present/app-shell/manifest.json",
+  "createdAt": "2026-10-29T19:52:56.986Z",
+  "pass": true,
+  "screens": [
+    {
+      "id": "home",
+      "title": "Home",
+      "route": "/app",
+      "pass": true,
+      "missing": [],
+      "deterministic": {
+        "pass": true,
+        "failures": []
+      },
+      "vision": {
+        "schema": "design-present-vision/v1",
+        "model": "anthropic/sonnet",
+        "status": "pass",
+        "findings": [
+          {
+            "category": "misalignment",
+            "severity": "minor",
+            "note": "The Needs You pill and the Add Notes control sit about 1px lower than in the Pen. The Add Notes glyph and label are shifted about 3px right, so its right gutter is slightly tighter than the Pen's."
+          },
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The Start A Chat button is about 1px lower than in the Pen. It is also slightly smaller and its fill is a light grey instead of near-white. The empty-state anatomy is otherwise the same: a muted title above a pill button, centred."
+          }
+        ],
+        "judgeMs": 16903
+      },
+      "files": {
+        "pen": {
+          "path": "docs/design-present/app-shell/pen/home.png",
+          "sha256": "ac5fee771fd357529c01eacf8798b10b9965357472e3abe8dd2afd7485d37497"
+        },
+        "before": {
+          "path": "docs/design-present/app-shell/before/home.png",
+          "sha256": "418d002ea31ebeefb2a0943d78fa64dc22f1fae3b634c44fe1679a630591c401"
+        },
+        "after": {
+          "path": "docs/design-present/app-shell/after/home.png",
+          "sha256": "d9f45f143bf3fcefdb799d2291d37c540039c1c4bb41628bcd166f1f7f4aec67"
+        },
+        "geometry": {
+          "path": "docs/design-present/app-shell/after/home.geometry.json",
+          "sha256": "6fa42b228443555e3c6649dc42a47651604fb1a2e88ab2ce60b07ac87faf1fd8"
+        },
+        "triptych": {
+          "path": "docs/design-present/app-shell/triptych/home.png",
+          "sha256": "3cd2b59b659b06d20cc08ecdf0aa4bd104e4d547fc5d619da0ad53b05b0164c5"
+        }
+      }
+    },
+    {
+      "id": "audience",
+      "title": "Audience",
+      "route": "/app/contacts?tab=audience",
+      "pass": true,
+      "missing": [],
+      "deterministic": {
+        "pass": true,
+        "failures": []
+      },
+      "vision": {
+        "schema": "design-present-vision/v1",
+        "model": "anthropic/sonnet",
+        "status": "pass",
+        "findings": [
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The table header row has an extra hairline above it, under the AI Crawler Reads row, which the Pen doesn't have. The header sits about 4px lower and the row is slightly taller."
+          },
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The table header columns are bolder and bunched to the right (State at x≈993, Alerts at x≈1092). In the Pen they are lighter and spread out (State at x≈907, Alerts at x≈1029). The column rhythm differs."
+          },
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The 'Copy profile link' button is an off-white or grey pill in the implementation. The Pen shows a pure white pill. It is a small difference in how the control is treated."
+          },
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The AI Crawler Reads row text is slightly larger and lower (y≈164 vs 162). The tab and filter row spacing differs by about 1px. This is a small vertical rhythm drift."
+          }
+        ],
+        "judgeMs": 13967
+      },
+      "files": {
+        "pen": {
+          "path": "docs/design-present/app-shell/pen/audience.png",
+          "sha256": "cde1203e86cf9e042201b3bd1110c9f56893121310c51b57e68fc56bb2d32ea6"
+        },
+        "before": {
+          "path": "docs/design-present/app-shell/before/audience.png",
+          "sha256": "ba402676d5136918fbda8ac2f6d99f40d2cf96c1808c99789c1b10609968118f"
+        },
+        "after": {
+          "path": "docs/design-present/app-shell/after/audience.png",
+          "sha256": "a576d1a1c143fe0d6bd1c78bf5aa3aef96ee1bd7baabd5c1528ccd7efc7cf5d8"
+        },
+        "geometry": {
+          "path": "docs/design-present/app-shell/after/audience.geometry.json",
+          "sha256": "64d67fa91648b46dd82587baa8ef55715d1c2709eaaae38524a46b2e9979bf1a"
+        },
+        "triptych": {
+          "path": "docs/design-present/app-shell/triptych/audience.png",
+          "sha256": "9cfc2e7bf28f66b22a4d8c16a007be3ff9a9e5b5fbadb93bb4736a8493ba79b5"
+        }
+      }
+    },
+    {
+      "id": "insights",
+      "title": "Insights",
+      "route": "/app/insights",
+      "pass": true,
+      "missing": [],
+      "deterministic": {
+        "pass": true,
+        "failures": []
+      },
+      "vision": {
+        "schema": "design-present-vision/v1",
+        "model": "anthropic/sonnet",
+        "status": "pass",
+        "findings": [
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The filter chip row is spaced tighter than in the Pen. Chip gaps are smaller, so the row ends at about x=851 where the Pen's ends at about x=870. The active 'All' pill matches."
+          },
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The empty-state block sits about 13px higher than in the Pen, and its 'Generate Insights' pill is slightly shorter and tighter. The anatomy matches: title, description, then primary and secondary actions."
+          }
+        ],
+        "judgeMs": 12228
+      },
+      "files": {
+        "pen": {
+          "path": "docs/design-present/app-shell/pen/insights.png",
+          "sha256": "798f7871d70f0801bcd969620c55e31463bc85333d84905a267312c5d531a178"
+        },
+        "before": {
+          "path": "docs/design-present/app-shell/before/insights.png",
+          "sha256": "7609d78d907edcbdb4aeeeab3255382670681bf9ab12d62ef741c16c1ea27a92"
+        },
+        "after": {
+          "path": "docs/design-present/app-shell/after/insights.png",
+          "sha256": "c7ec3c0d5690eb13a7d41afca43cc2a05347fef0908e0b16b2c2c186abed4f78"
+        },
+        "geometry": {
+          "path": "docs/design-present/app-shell/after/insights.geometry.json",
+          "sha256": "e96695572e796edd1af42c2d061bacc33945326ac3e3c02e8f8e82b12576d96f"
+        },
+        "triptych": {
+          "path": "docs/design-present/app-shell/triptych/insights.png",
+          "sha256": "9b510802f6326d508347864982a65f48fec8508f15a79bebc8afe607ddc5da95"
+        }
+      }
+    },
+    {
+      "id": "work",
+      "title": "Work",
+      "route": "/app/library",
+      "pass": true,
+      "missing": [],
+      "deterministic": {
+        "pass": true,
+        "failures": []
+      },
+      "vision": {
+        "schema": "design-present-vision/v1",
+        "model": "anthropic/sonnet",
+        "status": "pass",
+        "findings": [
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The Length column shows em-dash placeholders in the implementation, where the Pen shows durations. This is probably a data difference, so it is low priority."
+          },
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The status glyphs differ in style. The implementation uses filled check circles and a green half-filled icon, while the Pen uses outlined check circles. The brief says to ignore status-icon colour, so only the glyph style differs."
+          },
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The toolbar controls sit slightly differently. The tabs are spaced about 3px wider, and the Add pill and view-switcher icons are shifted about 5px left. The view-toggle glyphs also differ: the Pen has a grid and a list icon, and the implementation has a table and a detail-list icon."
+          },
+          {
+            "category": "pen-divergence",
+            "severity": "minor",
+            "note": "The artist column text is longer in the implementation and runs closer to the Type column. The title rows are 1px lower than in the Pen, and the footer count line sits about 4px lower. These are small vertical offsets."
+          }
+        ],
+        "judgeMs": 22350
+      },
+      "files": {
+        "pen": {
+          "path": "docs/design-present/app-shell/pen/work.png",
+          "sha256": "7b610dc612b42446a12273779b671ddf5aeaf9d6dad576f7f90bfa7db084d0ab"
+        },
+        "before": {
+          "path": "docs/design-present/app-shell/before/work.png",
+          "sha256": "8322ac14e9cb73529b9a0b217655aec19bda42badac14ec319cbd42c5a0c7aed"
+        },
+        "after": {
+          "path": "docs/design-present/app-shell/after/work.png",
+          "sha256": "36a195247431397f4d40a8a872185cfcadcf0b14149a58a8c82b1e1637644d1b"
+        },
+        "geometry": {
+          "path": "docs/design-present/app-shell/after/work.geometry.json",
+          "sha256": "0c4f3099e35cca0d9a332f0430027f4d49c706ab6dc854b8ab4ca3708db676e6"
+        },
+        "triptych": {
+          "path": "docs/design-present/app-shell/triptych/work.png",
+          "sha256": "2e7258c898c05642ee8cdaaf8be3848b7282c50c4f999243186775d4175167cc"
+        }
+      }
+    }
+  ]
+}

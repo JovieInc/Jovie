@@ -14,6 +14,8 @@
  * no images passes. A deliberate non-UI image (a chart, a log capture) may be
  * exempted with `<!-- design-present-exempt: <reason> -->`.
  */
+import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +54,29 @@ export function repoPathOf(url) {
   return null;
 }
 
+const git = (root, args) =>
+  spawnSync('git', args, { cwd: root, maxBuffer: 64 << 20 });
+
+/**
+ * sha256 of a receipt artifact: the working-tree file (geometry, small
+ * text), else the blob at the receipt's pinned evidence commit (images live
+ * on the evidence branch, outside the main tree). Fetches that commit by SHA
+ * with plain git when it is not local; no API calls.
+ */
+export function hashArtifact(root, path, evidence) {
+  const local = join(root, path);
+  if (existsSync(local)) return sha256File(local);
+  const commit = evidence?.commit;
+  if (!commit || !/^[0-9a-f]{40}$/.test(commit)) return null;
+  let blob = git(root, ['cat-file', 'blob', `${commit}:${path}`]);
+  if (blob.status !== 0) {
+    git(root, ['fetch', '--no-tags', '--depth=1', 'origin', commit]);
+    blob = git(root, ['cat-file', 'blob', `${commit}:${path}`]);
+  }
+  if (blob.status !== 0) return null;
+  return createHash('sha256').update(blob.stdout).digest('hex');
+}
+
 export function verifyReceipt(receiptPath, root = REPO_ROOT) {
   const errors = [];
   const abs = join(root, receiptPath);
@@ -78,10 +103,12 @@ export function verifyReceipt(receiptPath, root = REPO_ROOT) {
       if (!screen.files?.[need])
         errors.push(`${screen.id}: no ${need} image in receipt`);
     for (const [kind, file] of Object.entries(screen.files ?? {})) {
-      const p = join(root, file.path);
-      if (!existsSync(p))
-        errors.push(`${screen.id}: ${kind} ${file.path} is missing`);
-      else if (sha256File(p) !== file.sha256)
+      const actual = hashArtifact(root, file.path, receipt.evidence);
+      if (actual === null)
+        errors.push(
+          `${screen.id}: ${kind} ${file.path} is missing (not in the tree or the pinned evidence commit)`
+        );
+      else if (actual !== file.sha256)
         errors.push(
           `${screen.id}: ${kind} ${file.path} changed after the gate ran`
         );

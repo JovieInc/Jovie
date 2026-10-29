@@ -1,0 +1,113 @@
+{
+  "schema": "design-present-geometry/v1",
+  "url": "/app",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "column": {
+    "left": 240,
+    "right": 1432,
+    "top": 8,
+    "bottom": 892,
+    "width": 1192,
+    "height": 884
+  },
+  "atoms": [
+    {
+      "kind": "box",
+      "left": 1384,
+      "right": 1412,
+      "top": 16,
+      "bottom": 44,
+      "label": "button[data-testid=artist-profile-rail-toggle].inline-flex.items-center.justify-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 260,
+      "right": 343.13,
+      "top": 65,
+      "bottom": 95,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 347.13,
+      "right": 444.7,
+      "top": 65,
+      "bottom": 95,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1316.83,
+      "right": 1412,
+      "top": 66,
+      "bottom": 94,
+      "label": "button.relative.[font-weight:var(--font-weight-medium)].duration-subtle",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 790.22,
+      "right": 881.77,
+      "top": 475,
+      "bottom": 503,
+      "label": "a.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "Home",
+      "left": 260,
+      "right": 293.66,
+      "top": 22,
+      "bottom": 37,
+      "label": "h1.min-w-0.truncate.font-semibold",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "Your Inbox Is Clear",
+      "left": 782.55,
+      "right": 889.45,
+      "top": 446,
+      "bottom": 461,
+      "label": "p.text-app.font-caption.mb-3",
+      "bleed": false
+    }
+  ],
+  "iconTiles": [],
+  "emptyStatePlates": [],
+  "tabs": [
+    {
+      "text": "Needs You",
+      "fontSize": 12,
+      "height": 30,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]"
+    },
+    {
+      "text": "Done For You",
+      "fontSize": 12,
+      "height": 30,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]"
+    }
+  ],
+  "devChrome": [],
+  "shellRows": [
+    {
+      "y": 0,
+      "height": 44,
+      "label": "header[data-testid=dashboard-header].z-20.bg-(--app-shell-content-surface)"
+    },
+    {
+      "y": 52,
+      "height": 40,
+      "label": "div[data-testid=opportunity-inbox-toolbar].flex.min-h-10.min-w-0"
+    }
+  ],
+  "horizontalOverflow": 0
+}

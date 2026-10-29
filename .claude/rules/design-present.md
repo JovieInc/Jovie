@@ -34,8 +34,13 @@ Nothing visual reaches Tim (PR body, artifact page, Ovie card, chat) unless:
   then `pnpm design:present-check --manifest <set>/manifest.json
   --capture-before <main url> --capture <branch url>`. It writes
   `before/`, `after/` (PNG + geometry), `triptych/` and `receipt.json`.
-- Commit the set. In the PR body, show only receipt images and add
-  `<!-- design-present/v1 receipt=docs/design-present/<set>/receipt.json -->`.
+- `node scripts/design-present/evidence.mjs --manifest <set>/manifest.json`
+  pushes the images to the `design-present-evidence` branch (binaries stay
+  out of the main tree) and pins that commit in the receipt.
+- Commit the manifest, Pen readback, geometry and receipt. In the PR body,
+  link only receipt images at the evidence commit
+  (`https://github.com/JovieInc/Jovie/blob/<evidence>/docs/design-present/<set>/triptych/<id>.png?raw=true`)
+  and add `<!-- design-present/v1 receipt=docs/design-present/<set>/receipt.json -->`.
 
 ## Enforced
 

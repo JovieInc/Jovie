@@ -27,7 +27,7 @@
       "apps/web/components/**",
       "apps/web/app/**"
     ],
-    "bodySha256": "725f64dd23f02e6550b3e7d54d8e509d2327e52a9da65c7dafc603297e1a6f41"
+    "bodySha256": "d5da544631845969c2a75593bf7cd289fbced75def1c3102b9554caa7260db0f"
   },
   {
     "file": ".claude/rules/domain-writes.md",

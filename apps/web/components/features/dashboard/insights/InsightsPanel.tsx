@@ -117,7 +117,6 @@ function InsightsPanelContent({
           label: 'Share Profile',
           href: APP_ROUTES.CHAT_PROFILE_PANEL,
         }}
-        presentation='workspace'
         testId='insights-empty-state'
       />
     );
@@ -211,10 +210,6 @@ export function InsightsPanelView({
             />
           }
           label={isGenerating ? 'Generating...' : 'Generate'}
-          iconOnly
-          tooltipLabel={
-            isGenerating ? 'Generating insights...' : 'Generate insights'
-          }
         />
       }
     />

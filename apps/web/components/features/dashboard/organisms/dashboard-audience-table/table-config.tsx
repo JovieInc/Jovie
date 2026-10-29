@@ -57,16 +57,27 @@ export type AudienceTableLayout = 'narrow' | 'medium' | 'wide';
 export const AUDIENCE_COLUMN_SPECS: readonly ColumnPrioritySpec[] =
   columnPrioritySpecsFromDefs(buildAudienceMemberColumns('members'));
 
-export function buildAudienceMemberColumns(mode: 'members' | 'subscribers') {
+export function buildAudienceMemberColumns(
+  mode: 'members' | 'subscribers',
+  { selectable = true }: { readonly selectable?: boolean } = {}
+) {
+  // The selection track exists only when there is something to select. With
+  // no rows, the primary column returns to the shared workspace seam
+  // (.claude/rules/ui.md "One Workspace Left Seam").
+  const selectColumn = selectable
+    ? [
+        memberColumnHelper.display({
+          id: 'select',
+          header: () => null,
+          cell: SelectCell,
+          size: 40,
+          enableSorting: false,
+          meta: { minWidth: AUDIENCE_FIT.select },
+        }),
+      ]
+    : [];
   return [
-    memberColumnHelper.display({
-      id: 'select',
-      header: () => null,
-      cell: SelectCell,
-      size: 40,
-      enableSorting: false,
-      meta: { minWidth: AUDIENCE_FIT.select },
-    }),
+    ...selectColumn,
     memberColumnHelper.accessor('displayName', {
       id: 'fan',
       header: 'Member',

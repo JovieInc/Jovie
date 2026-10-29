@@ -292,3 +292,6 @@ apps/web/runtime-data/
 **/reports/mutation/
 apps/web/.agent-distribution-out/
 scripts/copy-inventory/inventory.gen.json
+
+# design-present images live on the design-present-evidence branch (scripts/design-present/evidence.mjs)
+docs/design-present/**/*.png

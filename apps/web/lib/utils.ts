@@ -1,9 +1,15 @@
+import { cn as mergeDesignSystemClasses } from '@jovie/ui/lib/utils';
 import { Debouncer } from '@tanstack/react-pacer';
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+import type { ClassValue } from 'clsx';
 
+/**
+ * One class merger for the app and the design system. Plain `twMerge` does
+ * not know Jovie's font-size steps (`text-app`, `text-2xs`, `text-3xs`), so it
+ * dropped them beside a `text-*-token` colour and the text fell back to 16px
+ * (EmptyState headings, 2026-10-29). `@jovie/ui` owns the configured merge.
+ */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+  return mergeDesignSystemClasses(...inputs);
 }
 
 /**

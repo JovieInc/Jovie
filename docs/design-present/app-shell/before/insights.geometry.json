@@ -1,0 +1,199 @@
+{
+  "schema": "design-present-geometry/v1",
+  "url": "/app/insights",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "column": {
+    "left": 240,
+    "right": 1432,
+    "top": 8,
+    "bottom": 892,
+    "width": 1192,
+    "height": 884
+  },
+  "atoms": [
+    {
+      "kind": "box",
+      "left": 1384,
+      "right": 1412,
+      "top": 66,
+      "bottom": 94,
+      "label": "button.relative.[font-weight:var(--font-weight-medium)].duration-subtle",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 260,
+      "right": 296.61,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 302.61,
+      "right": 391.38,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 397.38,
+      "right": 461.14,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 467.14,
+      "right": 534.8,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 540.8,
+      "right": 612.5,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 618.5,
+      "right": 666.56,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 672.56,
+      "right": 742.88,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 748.88,
+      "right": 843.16,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 849.16,
+      "right": 910.42,
+      "top": 108,
+      "bottom": 136,
+      "label": "button.relative.min-w-0.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 612,
+      "right": 1060,
+      "top": 423,
+      "bottom": 581,
+      "label": "div.w-full.max-w-md.rounded-md",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "Audience",
+      "left": 252,
+      "right": 306.2,
+      "top": 22,
+      "bottom": 37,
+      "label": "h1.min-w-0.truncate.font-semibold",
+      "bleed": false
+    }
+  ],
+  "iconTiles": [],
+  "emptyStatePlates": [
+    {
+      "reason": "bordered card",
+      "label": "div.w-full.max-w-md.rounded-md"
+    }
+  ],
+  "tabs": [
+    {
+      "text": "All",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Geographic",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Growth",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Content",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Revenue",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Tour",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Platform",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Engagement",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Timing",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    }
+  ],
+  "devChrome": [],
+  "shellRows": [
+    {
+      "y": 0,
+      "height": 44,
+      "label": "header[data-testid=dashboard-header].z-20.bg-(--app-shell-content-surface)"
+    }
+  ],
+  "horizontalOverflow": 0
+}

@@ -1,0 +1,233 @@
+{
+  "schema": "design-present-geometry/v1",
+  "url": "/app/contacts?tab=audience",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "column": {
+    "left": 240,
+    "right": 1432,
+    "top": 8,
+    "bottom": 892,
+    "width": 1192,
+    "height": 884
+  },
+  "atoms": [
+    {
+      "kind": "box",
+      "left": 1312,
+      "right": 1348,
+      "top": 12,
+      "bottom": 48,
+      "label": "button.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1352,
+      "right": 1384,
+      "top": 14,
+      "bottom": 46,
+      "label": "button.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1388,
+      "right": 1420,
+      "top": 14,
+      "bottom": 46,
+      "label": "button.relative.inline-flex.items-center",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 260,
+      "right": 548,
+      "top": 66,
+      "bottom": 100,
+      "label": "div.inline-flex.items-center.rounded-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 260,
+      "right": 316.38,
+      "top": 113,
+      "bottom": 141,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 320.38,
+      "right": 415.7,
+      "top": 113,
+      "bottom": 141,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 419.7,
+      "right": 529.58,
+      "top": 113,
+      "bottom": 141,
+      "label": "button.relative.rounded-full.[font-weight:var(--font-weight-medium)]",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1352,
+      "right": 1380,
+      "top": 113,
+      "bottom": 141,
+      "label": "button.relative.[font-weight:var(--font-weight-medium)].duration-subtle",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1384,
+      "right": 1412,
+      "top": 113,
+      "bottom": 141,
+      "label": "button.relative.[font-weight:var(--font-weight-medium)].duration-subtle",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 264,
+      "right": 1408,
+      "top": 155,
+      "bottom": 203,
+      "label": "button[data-testid=ai-crawler-intelligence-card].flex.min-h-12.w-full",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1164.41,
+      "right": 1252.41,
+      "top": 212,
+      "bottom": 244,
+      "label": "button.py-1.5.font-caption.text-secondary-token",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 1264.41,
+      "right": 1355.75,
+      "top": 212,
+      "bottom": 244,
+      "label": "button.py-1.5.font-caption.text-secondary-token",
+      "bleed": false
+    },
+    {
+      "kind": "box",
+      "left": 612,
+      "right": 1060,
+      "top": 284,
+      "bottom": 474,
+      "label": "div.w-full.max-w-md.rounded-md",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "text": "Audience",
+      "left": 252,
+      "right": 306.2,
+      "top": 22,
+      "bottom": 37,
+      "label": "h1.min-w-0.truncate.font-semibold",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "head",
+      "column": 1,
+      "columnLeft": 288,
+      "text": "Member",
+      "left": 300,
+      "right": 348.89,
+      "top": 220,
+      "bottom": 235,
+      "label": "div.py-1.5.font-caption.text-secondary-token",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "head",
+      "column": 2,
+      "columnLeft": 966.40625,
+      "text": "State",
+      "left": 978.41,
+      "right": 1009.11,
+      "top": 220,
+      "bottom": 235,
+      "label": "div.py-1.5.font-caption.text-secondary-token",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "head",
+      "column": 3,
+      "columnLeft": 1062.40625,
+      "text": "Alerts",
+      "left": 1074.41,
+      "right": 1109.92,
+      "top": 220,
+      "bottom": 235,
+      "label": "div.py-1.5.font-caption.text-secondary-token",
+      "bleed": false
+    },
+    {
+      "kind": "text",
+      "table": "head",
+      "column": 6,
+      "columnLeft": 1361.75,
+      "text": "Action",
+      "left": 1373.77,
+      "right": 1412,
+      "top": 220,
+      "bottom": 235,
+      "label": "div.text-right",
+      "bleed": false
+    }
+  ],
+  "iconTiles": [],
+  "emptyStatePlates": [
+    {
+      "reason": "bordered card",
+      "label": "div.w-full.max-w-md.rounded-md"
+    }
+  ],
+  "tabs": [
+    {
+      "text": "Contacts",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Audience",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    },
+    {
+      "text": "Insights",
+      "fontSize": 12,
+      "height": 28,
+      "label": "button.relative.min-w-0.rounded-full"
+    }
+  ],
+  "devChrome": [],
+  "shellRows": [
+    {
+      "y": 0,
+      "height": 44,
+      "label": "header[data-testid=dashboard-header].z-20.bg-(--app-shell-content-surface)"
+    }
+  ],
+  "horizontalOverflow": 0
+}

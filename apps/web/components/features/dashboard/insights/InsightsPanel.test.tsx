@@ -65,7 +65,7 @@ describe('InsightsPanelView', () => {
     }
   });
 
-  it('uses the canonical workspace empty state without decorative card chrome', () => {
+  it('uses the canonical empty state without a card plate', () => {
     render(
       <TooltipProvider>
         <InsightsPanelView
@@ -84,7 +84,13 @@ describe('InsightsPanelView', () => {
     const emptyState = screen.getByTestId('insights-empty-state');
     expect(emptyState.tagName).toBe('OUTPUT');
     expect(emptyState.querySelector('svg')).toBeNull();
-    expect(screen.getByText('No Insights Yet')).toHaveClass('text-sm');
+    // Founder ban: empty states never sit on a bordered card.
+    expect(emptyState).toHaveAttribute(
+      'data-empty-state-presentation',
+      'default'
+    );
+    expect(emptyState.querySelector('[data-empty-state-card]')).toBeNull();
+    expect(screen.getByText('No Insights Yet')).toHaveClass('text-app');
   });
 
   it('renders the canonical recoverable error state', () => {

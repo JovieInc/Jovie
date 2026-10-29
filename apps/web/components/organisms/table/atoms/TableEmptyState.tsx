@@ -76,7 +76,9 @@ export function TableEmptyState({
         description={description}
         variant={variant}
         secondaryAction={secondaryAction}
-        presentation='workspace'
+        // Founder ban (2026-10-28): empty states never sit on a bordered card.
+        // The table canvas is the surface; heading, one line, actions.
+        presentation='default'
         className='py-4'
         {...actionProps}
       />

@@ -8,6 +8,7 @@ import {
   PAGE_TOOLBAR_ACTION_BUTTON_CLASS,
   PAGE_TOOLBAR_BACK_LINK_CLASS,
   PAGE_TOOLBAR_BACK_LINK_LABEL_CLASS,
+  PAGE_TOOLBAR_CONTAINER_CLASS,
   PAGE_TOOLBAR_START_CLASS,
   PAGE_TOOLBAR_TAB_ACTIVE_CLASS,
   PAGE_TOOLBAR_TAB_BUTTON_CLASS,
@@ -90,6 +91,19 @@ vi.mock('@jovie/ui', () => ({
     readonly contentVariant?: 'compact' | 'rich';
   }) => <span data-tooltip-content-variant={contentVariant}>{children}</span>,
 }));
+
+describe('PageToolbar row geometry', () => {
+  it('is one 40px row from sm up and exposes the design-present hook', () => {
+    render(<PageToolbar data-testid='toolbar' start={<span>Tabs</span>} />);
+    const toolbar = screen.getByTestId('toolbar');
+    // Every route's toolbar is the same row as the Pen master (ftsrB, 40px);
+    // compact widths keep the padded min-height so wrapped controls fit.
+    expect(PAGE_TOOLBAR_CONTAINER_CLASS).toContain('sm:h-10');
+    expect(PAGE_TOOLBAR_CONTAINER_CLASS).toContain('sm:py-0');
+    expect(PAGE_TOOLBAR_CONTAINER_CLASS).toContain('min-h-10');
+    expect(toolbar).toHaveAttribute('data-page-toolbar');
+  });
+});
 
 describe('PageToolbar buttons', () => {
   it('renders a flat toolbar shell by default', () => {

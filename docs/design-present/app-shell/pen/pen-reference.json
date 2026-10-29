@@ -1,0 +1,45 @@
+{
+  "schema": "design-present-pen-reference/v1",
+  "provenance": {
+    "lockProfile": "jovie-founder-design-studio",
+    "penFile": "$HOME/Documents/Jovie/Jovie Marketing Workspace/Jovie Design Studio — canonical.lib.pen",
+    "frame": "CJcKQ · STAGING · App shell polish — one content axis",
+    "readMethod": "pencil MCP execute: Get(id, visitor) bounds readback; Export png scale 1",
+    "persist": "pen-live-canvas-persist/v1 disk_persist_verified (mtime 2026-10-27T04:46:52Z -> 2026-10-29T18:55:31Z, then -> 2026-10-29T19:41:56Z)"
+  },
+  "axisInset": 20,
+  "screens": {
+    "home": {
+      "nodeId": "AxYq9",
+      "column": { "x": 240, "y": 8, "width": 1192, "height": 884 },
+      "rows": [
+        { "name": "App Header · axis 20", "y": 0, "height": 44 },
+        { "name": "Page Toolbar · axis 20", "y": 52, "height": 40 }
+      ]
+    },
+    "audience": {
+      "nodeId": "N934h",
+      "column": { "x": 240, "y": 8, "width": 1192, "height": 884 },
+      "rows": [
+        { "name": "App Header · axis 20", "y": 0, "height": 44 },
+        { "name": "Page Toolbar · sub-nav · axis 20", "y": 52, "height": 40 }
+      ]
+    },
+    "insights": {
+      "nodeId": "wQ7fn",
+      "column": { "x": 240, "y": 8, "width": 1192, "height": 884 },
+      "rows": [
+        { "name": "App Header · axis 20", "y": 0, "height": 44 },
+        { "name": "Page Toolbar · sub-nav · axis 20", "y": 52, "height": 40 }
+      ]
+    },
+    "work": {
+      "nodeId": "gbNxo",
+      "column": { "x": 240, "y": 8, "width": 1192, "height": 884 },
+      "rows": [
+        { "name": "App Header · axis 20", "y": 0, "height": 44 },
+        { "name": "Page Toolbar · axis 20", "y": 52, "height": 40 }
+      ]
+    }
+  }
+}
