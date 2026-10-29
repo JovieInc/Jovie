@@ -134,7 +134,7 @@ export const PRODUCT_SHOTS = [
       '[data-testid="profile-pac"]',
     ],
     padding: 48,
-    frame: 'window',
+    frame: 'bare',
     displayWidth: 820,
     sources: [
       `${DEMO}/DemoTimWhiteProfileSurface.tsx`,
