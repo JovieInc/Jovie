@@ -9,6 +9,7 @@ import {
 } from './generate';
 import { loadIconSource } from './icons';
 import { LISTING } from './listing';
+import { readReadinessInputs } from './readiness-io';
 
 const ASSET_NAMES = ['icon.svg', 'icon-dark.svg', 'logo.svg', 'logo-dark.svg'];
 
@@ -25,15 +26,21 @@ async function walk(dir: string): Promise<string[]> {
 }
 
 export async function renderDistribution(
-  assetDir: string,
-  tools: readonly DistributionTool[] = AGENT_DRAFT_TOOLS as unknown as readonly DistributionTool[],
-  repoRoot: string = resolve(assetDir, '../../../../..')
+  webDir: string,
+  tools: readonly DistributionTool[] = AGENT_DRAFT_TOOLS as unknown as readonly DistributionTool[]
 ): Promise<DistributionOutput> {
+  const assetDir = join(webDir, 'plugins/jovie-artists/assets');
   const assets: Record<string, string> = {};
   for (const name of ASSET_NAMES)
     assets[name] = await readFile(join(assetDir, name), 'utf8');
-  const iconSource = await loadIconSource(repoRoot);
-  return buildDistribution(tools, LISTING, assets, iconSource?.info ?? null);
+  const iconSource = await loadIconSource(resolve(webDir, '../..'));
+  return buildDistribution(
+    tools,
+    LISTING,
+    assets,
+    await readReadinessInputs(webDir),
+    iconSource?.info ?? null
+  );
 }
 
 /** Paths whose committed content differs from `files`, plus committed files the generator no longer emits. */

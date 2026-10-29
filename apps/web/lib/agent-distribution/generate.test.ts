@@ -11,6 +11,7 @@ import {
 import { hashTools } from './hash';
 import { loadIconSource } from './icons';
 import { LISTING } from './listing';
+import { readReadinessInputs } from './readiness-io';
 
 const GENERATED = join(__dirname, 'generated');
 const ASSETS = join(__dirname, '../../plugins/jovie-artists/assets');
@@ -28,6 +29,7 @@ describe('agent distribution packages', () => {
       tools,
       LISTING,
       assets,
+      await readReadinessInputs(join(__dirname, '../..')),
       (await loadIconSource(join(__dirname, '../../../..')))?.info ?? null
     );
     const drift = Object.entries(files)
