@@ -152,7 +152,7 @@ describe('public-profile alias graduation policy', () => {
   it('keeps staging independent and bounds the production warning', () => {
     const staging = getJobBlock(RELEASE_WORKFLOW, 'promote-production');
     const production = getJobBlock(
-      RELEASE_WORKFLOW,
+      CONTROLLER_WORKFLOW,
       'production-public-profile-alias-gate'
     );
 
@@ -351,7 +351,7 @@ describe('public-profile alias graduation policy', () => {
     surface => {
       const staging = surface === 'staging';
       const job = getJobBlock(
-        RELEASE_WORKFLOW,
+        staging ? RELEASE_WORKFLOW : CONTROLLER_WORKFLOW,
         staging ? 'promote-production' : 'production-public-profile-alias-gate'
       );
       const script = getStepRunScript(
@@ -646,7 +646,6 @@ function releaseExpressions(overrides = {}) {
     'needs.deploy-staging.result': 'success',
     'needs.attest-staging-build.result': 'success',
     'needs.canary-health-gate.result': 'success',
-    'needs.production-public-profile-alias-gate.result': 'success',
     'github.repository': 'JovieInc/Jovie',
     ...overrides,
   };
@@ -690,6 +689,7 @@ function controllerVerifyExpressions(overrides = {}) {
     'needs.production-release.outputs.superseded_before_promotion': 'false',
     'needs.ci-public-profile-smoke.result': 'success',
     'needs.lighthouse-ci.result': 'success',
+    'needs.production-public-profile-alias-gate.result': 'success',
     'needs.ci-post-deploy-auth-smoke.result': 'success',
     'needs.ci-post-deploy-auth-smoke.outputs.auth_smoke_status': 'passed',
     'needs.ci-post-deploy-auth-smoke.outputs.credentials_configured': 'true',
@@ -770,6 +770,7 @@ function finalizeExpressions(overrides = {}) {
     'needs.ci-public-profile-smoke.result': 'success',
     'needs.ci-post-deploy-auth-smoke.result': 'success',
     'needs.lighthouse-ci.result': 'success',
+    'needs.production-public-profile-alias-gate.result': 'success',
     'needs.production-release.outputs.sentry_gate_status': 'passed',
     'needs.production-release.outputs.oauth_gate_status': 'passed',
     'github.repository': 'JovieInc/Jovie',
@@ -989,12 +990,37 @@ describe('production release supersession execution', () => {
     expect(incomplete.outputs.released).toBe('false');
   });
 
+  it('keeps the public-profile alias gate blocking Production Verified beside smoke', () => {
+    const gate = getJobBlock(
+      CONTROLLER_WORKFLOW,
+      'production-public-profile-alias-gate'
+    );
+    // Parallel with smoke: depends on the release, never on a smoke job.
+    expect(gate).toContain('needs: [authorize-production, production-release]');
+    expect(gate).not.toMatch(/ci-public-profile-smoke|lighthouse-ci/u);
+    expect(getJobBlock(CONTROLLER_WORKFLOW, 'production-verified')).toContain(
+      'production-public-profile-alias-gate,'
+    );
+    expect(RELEASE_WORKFLOW).not.toContain(
+      'production-public-profile-alias-gate'
+    );
+    const failed = runControllerVerify({
+      'needs.production-public-profile-alias-gate.result': 'failure',
+    });
+    expect(failed.result.status).not.toBe(0);
+    expect(
+      failed.outputs.released ?? failed.outputs.canonical_verified
+    ).not.toBe('true');
+    expect(failed.aliasCalled).toBe(false);
+  });
+
   it('leaves a pre-promotion supersession unverified without canonical mutation', () => {
     const neutral = runControllerVerify({
       'needs.production-release.outputs.released': 'false',
       'needs.production-release.outputs.superseded_before_promotion': 'true',
       'needs.ci-public-profile-smoke.result': 'skipped',
       'needs.lighthouse-ci.result': 'skipped',
+      'needs.production-public-profile-alias-gate.result': 'skipped',
       'needs.ci-post-deploy-auth-smoke.result': 'skipped',
     });
     expect(neutral.result.status, neutral.result.stderr).toBe(0);

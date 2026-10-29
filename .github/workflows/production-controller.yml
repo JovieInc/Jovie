@@ -888,6 +888,57 @@ jobs:
       staging_verified: ${{ needs.authorize-production.outputs.staging_verified == 'true' }}
       full_runtime_proof: ${{ needs.authorize-production.outputs.release_lane == 'high' }}
     secrets: inherit
+  production-public-profile-alias-gate:
+    name: Production public-profile alias usable-result gate
+    needs: [authorize-production, production-release]
+    # Runs beside post-deploy smoke, Lighthouse and auth smoke instead of before
+    # them (2026-10-29). It still gates Production Verified, and only the exact
+    # promoted SHA that passed sentry/OAuth gates (released == true) reaches it.
+    if: ${{ always() && needs.production-release.result == 'success' && needs.production-release.outputs.released == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    # Production canonical-alias policy is measured independently from staging.
+    # Ship now: WARN; the 2026-10-21 receipt has 11/14 qualifying runs and a
+    # current streak of 0/14 after tail misses at 1626.2, 2083.1 and 2431.6ms.
+    # Re-evaluate when: 14 eligible canonical-alias executions are consecutive,
+    # and no later than 2026-10-28 (JOV-8737). Then: hard-fail this gate when all
+    # six routes' five-sample nearest-rank p95 values are <=1500ms. Evidence:
+    # docs/performance/public-profile-alias-graduation.json.
+    outputs:
+      performance_status: ${{ steps.alias-perf.outputs.performance_status }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.authorize-production.outputs.expected_sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/setup-node-pnpm
+      - uses: ./.github/actions/setup-playwright
+      - name: Gate canonical public-profile aliases on usable results
+        id: alias-perf
+        working-directory: apps/web
+        env:
+          CI: 'true'
+        run: |
+          set -euo pipefail
+          # The checked-in 14-run receipt does not yet authorize fail-closed
+          # enforcement. Keep measuring; JOV-8737 owns the dated recheck.
+          if ! pnpm exec tsx scripts/performance-budgets-guard.ts \
+            --base-url https://jov.ie \
+            --runs 5 \
+            --route-id public-profile-listen \
+            --route-id public-profile-music \
+            --route-id public-profile-subscribe \
+            --route-id public-profile-tip \
+            --route-id public-profile-tour \
+            --route-id public-profile-releases; then
+            echo "::warning::Production public-profile alias budgets failed on jov.ie. Latest receipt: 11/14 qualifying, current streak 0/14, measured 2026-10-21; review by 2026-10-28 (JOV-8737)."
+            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
+          else
+            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
+          fi
+
   ci-public-profile-smoke:
     name: Post-Deploy Smoke (Production)
     needs: [authorize-production, production-release]
@@ -1161,6 +1212,7 @@ jobs:
         ci-public-profile-smoke,
         ci-post-deploy-auth-smoke,
         lighthouse-ci,
+        production-public-profile-alias-gate,
       ]
     if: >-
       ${{
@@ -1300,7 +1352,8 @@ jobs:
           fi
           for probe in \
             "Post-Deploy Smoke:${{ needs.ci-public-profile-smoke.result }}" \
-            "Lighthouse CI:$([ "$RELEASE_LANE" = high ] && echo '${{ needs.lighthouse-ci.result }}' || echo success)"; do
+            "Lighthouse CI:$([ "$RELEASE_LANE" = high ] && echo '${{ needs.lighthouse-ci.result }}' || echo success)" \
+            "Public-profile alias gate:${{ needs.production-public-profile-alias-gate.result }}"; do
             name="${probe%%:*}"
             result="${probe#*:}"
             if [ "$result" != "success" ]; then
@@ -1410,7 +1463,8 @@ jobs:
               "${{ needs.production-release.result }}" \
               "${{ needs.ci-public-profile-smoke.result }}" \
               "${{ needs.ci-post-deploy-auth-smoke.result }}" \
-              "${{ needs.lighthouse-ci.result }}"; do
+              "${{ needs.lighthouse-ci.result }}" \
+              "${{ needs.production-public-profile-alias-gate.result }}"; do
               [ "$result" = skipped ] || { echo "::error::Unselected Web release lane ran ($result)."; exit 1; }
             done
             jq -n \

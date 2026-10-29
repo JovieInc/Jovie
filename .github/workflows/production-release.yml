@@ -1793,54 +1793,6 @@ jobs:
         run: |
           echo "::warning::Staging freshness exceeded 10 minutes (SLO alarm, not a gate). Next: inspect this controller's staging build/canary timings. Proof: staging-deployment-${{ inputs.expected_sha }}."
 
-  production-public-profile-alias-gate:
-    name: Production public-profile alias usable-result gate
-    needs: [promote-production]
-    if: ${{ always() && needs.promote-production.result == 'success' && needs.promote-production.outputs.promotion_sha == inputs.expected_sha }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    # Production canonical-alias policy is measured independently from staging.
-    # Ship now: WARN; the 2026-10-21 receipt has 11/14 qualifying runs and a
-    # current streak of 0/14 after tail misses at 1626.2, 2083.1 and 2431.6ms.
-    # Re-evaluate when: 14 eligible canonical-alias executions are consecutive,
-    # and no later than 2026-10-28 (JOV-8737). Then: hard-fail this gate when all
-    # six routes' five-sample nearest-rank p95 values are <=1500ms. Evidence:
-    # docs/performance/public-profile-alias-graduation.json.
-    outputs:
-      performance_status: ${{ steps.alias-perf.outputs.performance_status }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ inputs.expected_sha }}
-          persist-credentials: false
-      - uses: ./.github/actions/setup-node-pnpm
-      - uses: ./.github/actions/setup-playwright
-      - name: Gate canonical public-profile aliases on usable results
-        id: alias-perf
-        working-directory: apps/web
-        env:
-          CI: 'true'
-        run: |
-          set -euo pipefail
-          # The checked-in 14-run receipt does not yet authorize fail-closed
-          # enforcement. Keep measuring; JOV-8737 owns the dated recheck.
-          if ! pnpm exec tsx scripts/performance-budgets-guard.ts \
-            --base-url https://jov.ie \
-            --runs 5 \
-            --route-id public-profile-listen \
-            --route-id public-profile-music \
-            --route-id public-profile-subscribe \
-            --route-id public-profile-tip \
-            --route-id public-profile-tour \
-            --route-id public-profile-releases; then
-            echo "::warning::Production public-profile alias budgets failed on jov.ie. Latest receipt: 11/14 qualifying, current streak 0/14, measured 2026-10-21; review by 2026-10-28 (JOV-8737)."
-            echo "performance_status=warn" >> "$GITHUB_OUTPUT"
-          else
-            echo "performance_status=passed" >> "$GITHUB_OUTPUT"
-          fi
-
   sentry-error-gate:
     name: Sentry Error Gate (production)
     needs: [promote-production]
@@ -2267,7 +2219,6 @@ jobs:
         staging-deployment-receipt,
         production-head,
         promote-production,
-        production-public-profile-alias-gate,
         sentry-error-gate,
         production-oauth-gate,
         rollback-production,
@@ -2428,7 +2379,6 @@ jobs:
             "migrate-production:${{ needs.migrate-production.result }}" \
             "production-head:${{ needs.production-head.result }}" \
             "promote-production:${{ needs.promote-production.result }}" \
-            "production-public-profile-alias-gate:${{ needs.production-public-profile-alias-gate.result }}" \
             "sentry-error-gate:$sentry_result" \
             "production-oauth-gate:$oauth_result"; do
             name="${gate%%:*}"
