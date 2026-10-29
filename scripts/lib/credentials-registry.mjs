@@ -146,6 +146,20 @@ export function validateSpendLedger(ledger) {
     if (entry.cap && !(entry.cap.amountUsd > 0))
       errors.push(`${entry.id}: cap.amountUsd must be positive`);
   }
+  // funding says who pays: `cash`, or `credits` drawn from another entry (the credit pool).
+  // Summer reads it to report net cash spend; an entry without it is reported as unknown.
+  for (const entry of ledger?.providers ?? []) {
+    const funding = entry.funding;
+    if (funding === undefined) continue;
+    if (funding?.source === 'credits') {
+      if (!ids.has(funding.creditPoolId))
+        errors.push(
+          `${entry.id}: funding.creditPoolId ${funding.creditPoolId} is not a spend entry`
+        );
+    } else if (funding?.source !== 'cash') {
+      errors.push(`${entry.id}: funding.source must be cash or credits`);
+    }
+  }
   return errors;
 }
 

@@ -349,6 +349,23 @@ describe('hygiene', () => {
     expect(
       validateSpendLedger(spend([{ id: 'x', cap: { amountUsd: 0 } }]))
     ).toHaveLength(1);
+    expect(
+      validateSpendLedger(
+        spend([
+          { id: 'pool' },
+          { id: 'a', funding: { source: 'credits', creditPoolId: 'pool' } },
+          { id: 'b', funding: { source: 'cash' } },
+        ])
+      )
+    ).toEqual([]);
+    expect(
+      validateSpendLedger(
+        spend([
+          { id: 'a', funding: { source: 'credits', creditPoolId: 'missing' } },
+          { id: 'b', funding: { source: 'free' } },
+        ])
+      )
+    ).toHaveLength(2);
     expect(() =>
       evaluate({ schema: 'nope' }, null, '2026-10-20T00:00:00Z')
     ).toThrow(/registry invalid/);
