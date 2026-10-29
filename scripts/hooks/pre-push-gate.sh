@@ -84,7 +84,7 @@ run_publication() {
   # Reuse the changed-file Biome guard so formatter failures never reach CI.
   bash scripts/hooks/biome-pre-push.sh
   # Catch missing component tests/stories before another Source Validation run.
-  node scripts/component-ship-gate.mjs --diff-base="$publication_base"
+  node scripts/component-ship-gate.mjs --check-artifacts --diff-base="$publication_base"
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs

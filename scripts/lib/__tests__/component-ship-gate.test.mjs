@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
@@ -382,6 +383,50 @@ describe('story match checks', () => {
 });
 
 describe('diff gate', () => {
+  it('checks publication artifacts without running full qualification', () => {
+    const inProcess = runComponentShipGate({
+      checkArtifacts: true,
+      diffBase: 'HEAD',
+    });
+    expect(inProcess.gate).toBe('component-artifacts');
+    expect(Object.keys(inProcess.sections)).toEqual(['diff']);
+    const result = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(
+          new URL('../../component-ship-gate.mjs', import.meta.url)
+        ),
+        '--check-artifacts',
+        '--diff-base=HEAD',
+        '--json',
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(result.status, result.stdout + result.stderr).toBe(0);
+    const report = JSON.parse(result.stdout);
+    expect(report.gate).toBe('component-artifacts');
+    expect(Object.keys(report.sections)).toEqual(['diff']);
+  });
+
+  it('requires a usable base for publication artifact checks', () => {
+    expect(() =>
+      runComponentShipGate({ checkArtifacts: true, diffBase: null })
+    ).toThrow(/artifact checks require a diff base/);
+    const result = spawnSync(
+      process.execPath,
+      [
+        fileURLToPath(
+          new URL('../../component-ship-gate.mjs', import.meta.url)
+        ),
+        '--check-artifacts',
+        '--diff-base=refs/heads/component-artifacts-invalid-fixture-ref',
+      ],
+      { encoding: 'utf8' }
+    );
+    expect(result.status).toBe(2);
+    expect(result.stderr).toMatch(/could not resolve changed files/);
+  });
+
   it('honors an explicit null diffBase instead of re-resolving origin/main', () => {
     // Regression for JOV-5454 contract failure: in CI origin/main is always
     // present, so re-resolving an explicit opt-out turned into a diff scan

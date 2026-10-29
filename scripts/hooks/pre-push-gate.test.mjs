@@ -320,7 +320,7 @@ test('publication blocks missing component stories and tests before publishing',
       `
 import assert from 'node:assert/strict';
 import { checkChangedComponents } from ${JSON.stringify(checker)};
-assert.deepEqual(process.argv.slice(2), ['--diff-base=fixture-base']);
+assert.deepEqual(process.argv.slice(2), ['--check-artifacts', '--diff-base=fixture-base']);
 const report = checkChangedComponents(${JSON.stringify([source, testFile])}, { repoRoot: process.cwd() });
 console.log(report.issues.map(issue => issue.rule).join('\\n'));
 process.exit(report.ok ? 0 : 1);

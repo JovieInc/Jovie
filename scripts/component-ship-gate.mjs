@@ -85,6 +85,7 @@ function parseArgs(argv) {
     captureDir: null,
     json: false,
     auditCoverageVia: false,
+    checkArtifacts: false,
   };
   for (const arg of argv) {
     if (arg.startsWith('--diff-base='))
@@ -99,6 +100,7 @@ function parseArgs(argv) {
     } else if (arg.startsWith('--capture-dir=')) {
       flags.captureDir = arg.slice('--capture-dir='.length);
     } else if (arg === '--audit-coverage-via') flags.auditCoverageVia = true;
+    else if (arg === '--check-artifacts') flags.checkArtifacts = true;
     else if (arg === '--json') flags.json = true;
     else if (arg === '--help' || arg === '-h') flags.help = true;
   }
@@ -2022,6 +2024,7 @@ export function resolveRenderedEvaluationSection({
 
 export function runComponentShipGate(options = {}) {
   const flags = {
+    checkArtifacts: options.checkArtifacts ?? false,
     // Honor an explicit null/empty diffBase as "no diff base" instead of
     // re-resolving origin/main behind the caller's back. In CI origin/main is
     // always present, so re-resolving turned an explicit opt-out into a diff
@@ -2046,9 +2049,13 @@ export function runComponentShipGate(options = {}) {
     liveNodeVersion: options.liveNodeVersion,
   };
 
+  if (flags.checkArtifacts && !flags.diffBase) {
+    throw new Error('publication artifact checks require a diff base');
+  }
+
   const report = {
     schemaVersion: 1,
-    gate: 'component-ship-gate',
+    gate: flags.checkArtifacts ? 'component-artifacts' : 'component-ship-gate',
     diffBase: flags.diffBase,
     sections: {},
     ok: true,
@@ -2075,6 +2082,10 @@ export function runComponentShipGate(options = {}) {
       note: 'no diff base; skipped changed-component checks',
     };
   }
+
+  // Publication validates the same artifact contract without launching the
+  // qualification/browser pipeline. The default gate still runs every section.
+  if (flags.checkArtifacts) return report;
 
   // 2) Story quality
   if (!flags.skipQuality) {
@@ -2335,6 +2346,7 @@ function main(argv = process.argv.slice(2)) {
   --storybook-url=URL    Evaluate computed DOM from a running Storybook instance
   --capture-dir=PATH     Save desktop/compact rendered screenshots
   --audit-coverage-via   Whole-tree executable @coverage-via receipt audit
+  --check-artifacts      Check changed component test/story prerequisites only
   --json                 Print machine-readable report`);
     return 0;
   }
@@ -2360,6 +2372,7 @@ function main(argv = process.argv.slice(2)) {
   }
 
   const report = runComponentShipGate({
+    checkArtifacts: flags.checkArtifacts,
     diffBase: flags.diffBase ?? resolveDiffBase(null),
     skipQuality: flags.skipQuality,
     skipRatchet: flags.skipRatchet,
@@ -2372,6 +2385,13 @@ function main(argv = process.argv.slice(2)) {
 
   if (flags.json) {
     console.log(JSON.stringify(report, null, 2));
+  } else if (flags.checkArtifacts) {
+    for (const issue of report.sections.diff.issues) {
+      console.error(`- ${issue.path}: [${issue.rule}] ${issue.detail}`);
+    }
+    console.log(
+      `[component-artifacts] ${report.ok ? 'PASS' : 'FAIL'} (${report.sections.diff.changedComponents.length} changed components)`
+    );
   } else {
     printReport(report);
   }
