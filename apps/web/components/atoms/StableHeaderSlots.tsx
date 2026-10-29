@@ -111,6 +111,7 @@ export function StableHeaderChipRail({
       className={cn('relative min-w-0', !hasContent && 'invisible', className)}
     >
       <div
+        tabIndex={hasContent ? 0 : undefined}
         className={cn(
           'flex min-h-6 max-w-full items-center gap-1.5 overflow-x-auto overflow-y-hidden whitespace-nowrap pr-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0 [&_*]:whitespace-nowrap',
           '[mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent)] [-webkit-mask-image:linear-gradient(to_right,black_calc(100%_-_18px),transparent)]',

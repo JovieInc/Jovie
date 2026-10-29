@@ -44,7 +44,7 @@ describe('OnboardingHandleStep keyboard focus', () => {
     expect(input).toHaveClass('focus-ring-themed');
 
     await user.tab();
-    const submit = screen.getByTestId('onboarding-handle-submit');
+    const submit = screen.getByRole('button', { name: 'Continue' });
     expect(submit).toHaveFocus();
     expect(submit).toHaveClass('focus-ring-themed');
     await user.keyboard('{Enter}');
@@ -65,7 +65,7 @@ describe('OnboardingHandleStep keyboard focus', () => {
     expect(screen.getByTestId('handle-unavailable')).toHaveTextContent(
       'That handle is unavailable'
     );
-    const submit = screen.getByTestId('onboarding-handle-submit');
+    const submit = screen.getByRole('button', { name: 'Continue' });
     expect(submit).toBeDisabled();
     expect(submit).toHaveAccessibleDescription('Choose another handle');
     await user.tab();
@@ -75,7 +75,7 @@ describe('OnboardingHandleStep keyboard focus', () => {
 
   it('shows the button spinner while submitting and prevents another submission', async () => {
     const { onSubmit } = renderStep({ isSubmitting: true });
-    const submit = screen.getByTestId('onboarding-handle-submit');
+    const submit = screen.getByRole('button', { name: 'Continue' });
     const spinner = screen.getByRole('status', { name: 'Loading' });
     expect(submit).toContainElement(spinner);
     expect(spinner).toHaveAttribute('data-tone', 'inverse');

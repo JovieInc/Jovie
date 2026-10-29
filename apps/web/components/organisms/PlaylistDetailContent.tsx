@@ -69,9 +69,9 @@ export function PlaylistDetailContent({
         <h1 className='mt-6 text-center text-2xl font-[510] leading-[1.2] tracking-[-0.48px] text-white dark:text-white'>
           {playlist.title}
         </h1>
-        <p className='mt-1 text-app font-[450] text-white/40'>
+        <p className='mt-1 text-app font-[450] text-white/60'>
           Curated by{' '}
-          <Link href='/' className='text-white/60 hover:text-white'>
+          <Link href='/' className='text-white/60 underline hover:text-white'>
             Jovie
           </Link>
         </p>
@@ -162,7 +162,7 @@ export function PlaylistDetailContent({
         <div className='mt-12 text-center'>
           <Link
             href='/playlists'
-            className='text-app font-[450] text-white/40 hover:text-white/60'
+            className='text-app font-[450] text-white/60 hover:text-white'
           >
             Discover More Playlists
           </Link>

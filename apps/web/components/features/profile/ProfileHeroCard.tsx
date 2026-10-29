@@ -183,7 +183,7 @@ export function ArtistHero({
               type='button'
               onClick={onBellClick}
               className={`${heroPearlClassName} inline-flex h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 text-mid font-semibold tracking-[-0.015em] text-white/88 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
-              aria-label={`Manage alerts for ${artist.name}`}
+              aria-label={`Notify — Manage alerts for ${artist.name}`}
             >
               <Bell className='h-4 w-4' aria-hidden='true' />
               <span className='sr-only md:not-sr-only md:inline'>Notify</span>
@@ -213,7 +213,7 @@ export function ArtistHero({
               type='button'
               onClick={onPlayClick}
               className={`${heroPearlClassName} inline-flex min-h-11 shrink-0 items-center justify-center rounded-full px-4 py-2.5 text-mid font-semibold tracking-[-0.015em] text-white/92 transition-[background-color,border-color,color,opacity] hover:bg-white/12 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--focus-ring))]`}
-              aria-label={`Listen to ${artist.name}`}
+              aria-label={`Play — Listen to ${artist.name}`}
             >
               <Play className='mr-2 h-4 w-4 fill-current' aria-hidden='true' />
               Play
@@ -231,7 +231,9 @@ export function ArtistHero({
                       {primaryAction.label || 'Open'}
                     </>
                   );
-                  const label = primaryAction.ariaLabel ?? primaryAction.label;
+                  const label = primaryAction.ariaLabel
+                    ? `${primaryAction.label || 'Open'} — ${primaryAction.ariaLabel}`
+                    : primaryAction.label || 'Open';
 
                   return primaryAction.href ? (
                     <a

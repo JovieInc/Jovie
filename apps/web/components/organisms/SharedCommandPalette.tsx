@@ -255,7 +255,13 @@ export function PaletteList({
 }: PaletteListProps) {
   if (sections.length === 0) {
     return (
-      <div className='px-3 py-6 text-center text-xs text-tertiary-token'>
+      <div
+        role='option'
+        tabIndex={-1}
+        aria-selected='false'
+        aria-disabled='true'
+        className='px-3 py-6 text-center text-xs text-tertiary-token'
+      >
         {emptyHint}
       </div>
     );

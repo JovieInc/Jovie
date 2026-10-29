@@ -41,18 +41,18 @@ describe('ProfileHeroCard', () => {
     );
 
     const primaryAction = screen.getByRole('link', {
-      name: 'Get Tim White tickets',
+      name: 'Get tickets — Get Tim White tickets',
     });
     expect(primaryAction).toHaveAttribute('href', '/timwhite/tour');
     expect(primaryAction).toHaveClass('min-h-12');
 
     const playButton = screen.getByRole('button', {
-      name: 'Listen to Tim White',
+      name: 'Play — Listen to Tim White',
     });
     expect(playButton).toHaveClass('min-h-11');
 
     const alertsButton = screen.getByRole('button', {
-      name: 'Manage alerts for Tim White',
+      name: 'Notify — Manage alerts for Tim White',
     });
     expect(alertsButton).toHaveClass('h-11', 'min-w-11');
   });

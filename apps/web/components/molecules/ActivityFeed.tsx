@@ -282,8 +282,8 @@ export function ActivityFeed({
     return (
       <div
         className={ACTIVITY_TIMELINE_LIST_CLASSNAME}
-        role='feed'
-        aria-label='Activity Feed'
+        role='status'
+        aria-label='Loading Activity Feed'
         aria-busy='true'
       >
         <ActivityFeedSkeleton rows={4} />

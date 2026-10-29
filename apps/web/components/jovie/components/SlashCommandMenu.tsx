@@ -24,7 +24,7 @@ import {
   Music2,
   UserCircle,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef } from 'react';
 import {
   flattenSections,
   InlinePalette,
@@ -414,6 +414,11 @@ export function SlashCommandMenu({
   attachmentActions,
   onQueryChange,
 }: SlashCommandMenuProps) {
+  // aria-controls on the combobox must always reference a real listbox id
+  // (axe aria-required-attr); fall back to a generated id when the caller
+  // does not pass one.
+  const generatedListId = useId();
+  const listId = listIdProp ?? generatedListId;
   const filterInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (onQueryChange) filterInputRef.current?.focus();
@@ -570,10 +575,10 @@ export function SlashCommandMenu({
                 ref={filterInputRef}
                 role='combobox'
                 aria-expanded='true'
-                aria-controls={listIdProp}
+                aria-controls={listId}
                 aria-activedescendant={
-                  listIdProp && flatItems.length
-                    ? `${listIdProp}-row-${Math.min(state.selectedIndex, flatItems.length - 1)}`
+                  flatItems.length
+                    ? `${listId}-row-${Math.min(state.selectedIndex, flatItems.length - 1)}`
                     : undefined
                 }
                 aria-autocomplete='list'
@@ -589,7 +594,7 @@ export function SlashCommandMenu({
           )
         }
         emptyHint={isLoading ? 'Searching…' : 'No matches'}
-        listIdProp={listIdProp}
+        listIdProp={listId}
         onActiveRowChange={onActiveRowChange}
       />
     </div>

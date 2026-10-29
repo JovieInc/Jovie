@@ -219,10 +219,13 @@ function AgentOsBoardCard({
           type='button'
           variant='ghost'
           onClick={() => onSelect(artifact)}
-          aria-label={artifact.title}
           aria-pressed={isSelected}
           className='min-w-0 h-auto flex-1 justify-start rounded-md text-left hover:bg-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-(--app-shell-content-surface)'
         >
+          {/* No aria-label: it shadowed the visible title/source/progress
+              text (WCAG 2.5.3 label-in-name). The sr-only prefix keeps the
+              control's purpose first in the accessible name. */}
+          <span className='sr-only'>Select run:</span>
           <p className='line-clamp-2 text-app font-[560] leading-5 text-primary-token'>
             {artifact.title}
           </p>

@@ -283,3 +283,16 @@ describe('IconButton', () => {
     expect(button.className).not.toMatch(/(?:hover|focus-visible):shadow-\[/);
   });
 });
+
+describe('IconButton destructive contrast (JOV-8873)', () => {
+  it('uses the AA error text token for destructive icons', () => {
+    render(
+      <IconButton ariaLabel='Delete item' destructive>
+        <svg aria-hidden='true' />
+      </IconButton>
+    );
+    const button = screen.getByRole('button', { name: 'Delete item' });
+    expect(button).toHaveClass('text-error-text');
+    expect(button).not.toHaveClass('text-error');
+  });
+});

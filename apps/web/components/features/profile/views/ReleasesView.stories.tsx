@@ -5,6 +5,16 @@ const meta = {
   title: 'Profile/ReleasesView',
   component: ReleasesView,
   parameters: { layout: 'centered' },
+  // ReleasesView is a dark-surface profile drawer view (white-on-dark type);
+  // give the centered canvas the dark base so axe measures the intended
+  // contrast context.
+  decorators: [
+    Story => (
+      <div className='w-full max-w-md bg-base'>
+        <Story />
+      </div>
+    ),
+  ],
   args: {
     artistId: 'artist-1',
     artistHandle: 'tim',

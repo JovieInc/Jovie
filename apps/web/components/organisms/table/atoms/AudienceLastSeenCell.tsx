@@ -33,6 +33,8 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
       )}
     >
       <span className='line-clamp-1'>{formatTimeAgo(lastSeenAt)}</span>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation wrapper keeps the row click from firing when using the inline row actions; the interactive control lives inside. */}
+      {/* biome-ignore lint/a11y/noNoninteractiveElementInteractions: same stopPropagation wrapper as above. */}
       <div
         className={cn(
           'opacity-0 pointer-events-none transition-opacity group-hover:opacity-100 group-hover:pointer-events-auto focus-within:opacity-100 focus-within:pointer-events-auto',
@@ -42,7 +44,9 @@ export const AudienceLastSeenCell = React.memo(function AudienceLastSeenCell({
         onKeyDown={event =>
           handleActivationKeyDown(event, e => e.stopPropagation())
         }
-        aria-hidden='true'
+        // No aria-hidden: the row actions menu inside stays focusable, and
+        // aria-hidden on a focusable container is an axe aria-hidden-focus
+        // violation. The hover/focus-within reveal already manages visibility.
       >
         <AudienceRowActionsMenu
           row={row}

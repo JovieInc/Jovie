@@ -464,4 +464,13 @@ describe('FounderReviewRegistry', () => {
       );
     });
   });
+
+  it('renders the ready mark with light-safe success text', async () => {
+    renderRegistry();
+
+    const readyRow = screen.getByTestId('founder-review-row-feature.ready');
+    const mark = await within(readyRow).findByText('Ready');
+    expect(mark.className).toContain('text-emerald-700');
+    expect(mark.className).toContain('dark:text-emerald-300');
+  });
 });

@@ -161,7 +161,7 @@ export function ReleaseTrackList({
   if (hasError) {
     return (
       <DrawerInlineNote
-        className='min-h-12 px-0'
+        inset='flush'
         message='Failed to load tracks.'
         tone='error'
       />
@@ -170,10 +170,7 @@ export function ReleaseTrackList({
 
   if (!tracks || tracks.length === 0) {
     return (
-      <DrawerInlineNote
-        className='min-h-12 px-0'
-        message='No track data available.'
-      />
+      <DrawerInlineNote inset='flush' message='No track data available.' />
     );
   }
 
@@ -340,7 +337,7 @@ function TrackListRow({
             !isActiveTrack &&
             'cursor-not-allowed text-quaternary-token hover:bg-transparent hover:text-quaternary-token'
         )}
-        aria-label={controlLabel}
+        aria-label={`Track ${trackLabel}: ${controlLabel}`}
         data-testid={`release-track-control-${track.id}`}
       >
         {trackButtonContent}

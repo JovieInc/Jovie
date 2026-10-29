@@ -31,7 +31,7 @@ function OptionItemStory({
         value={selected ? option : null}
         onChange={() => undefined}
       >
-        <ComboboxOptions static className='space-y-1'>
+        <ComboboxOptions static aria-label='Artists' className='space-y-1'>
           <ComboboxOptionItem option={option} index={0} />
         </ComboboxOptions>
       </HeadlessCombobox>

@@ -7,6 +7,15 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
+  // LyricsView is a dark-surface shell view; give the centered canvas the
+  // dark base so axe measures the intended contrast context.
+  decorators: [
+    Story => (
+      <div className='h-96 w-full max-w-2xl bg-base'>
+        <Story />
+      </div>
+    ),
+  ],
 } satisfies Meta<typeof LyricsView>;
 
 export default meta;

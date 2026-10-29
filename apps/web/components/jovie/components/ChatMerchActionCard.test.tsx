@@ -87,3 +87,27 @@ describe('ChatMerchActionCard', () => {
     );
   });
 });
+
+describe('ChatMerchActionCard destructive contrast (JOV-8873)', () => {
+  it('uses the destructive button tokens for archive', () => {
+    render(
+      <ChatMerchActionCard
+        profileId='profile-1'
+        merchCardId='card-1'
+        action='archive'
+        title='Tour Tee'
+        currentStatus='live'
+        retailPrice='$25.00'
+      />
+    );
+    const destructive = screen
+      .getAllByRole('button')
+      .find(button =>
+        button.className.includes('bg-(--color-btn-destructive-bg)')
+      );
+    expect(destructive).toBeDefined();
+    expect(destructive?.className).toContain(
+      'text-(--color-btn-destructive-fg)'
+    );
+  });
+});

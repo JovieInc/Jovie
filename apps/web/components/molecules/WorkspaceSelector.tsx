@@ -34,7 +34,7 @@ export function WorkspaceSelector<Id extends string>({
       <DropdownMenuTrigger asChild>
         <button
           type='button'
-          aria-label='Switch Workspace'
+          aria-label={`Switch Workspace: ${currentWorkspace.label}`}
           data-electron-no-drag='true'
           style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
           className={cn(

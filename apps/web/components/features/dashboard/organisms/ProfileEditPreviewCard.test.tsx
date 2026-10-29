@@ -120,3 +120,16 @@ describe('ProfileEditPreviewCard', () => {
     expect(screen.queryByRole('button', { name: /apply/i })).toBeNull();
   });
 });
+
+describe('ProfileEditPreviewCard contrast', () => {
+  it('renders the New label on the primary token (WCAG AA on the accent tint)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    const source = readFileSync(
+      resolve(__dirname, 'ProfileEditPreviewCard.tsx'),
+      'utf8'
+    );
+    expect(source).not.toContain('text-(--linear-accent)');
+    expect(source).toContain('text-primary-token');
+  });
+});
