@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { and, sql as drizzleSql, eq, inArray, isNull, lt } from 'drizzle-orm';
+import { externalAccountSql } from '@/lib/accounts/internal-account';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
-import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import { buildSignupWaitlistEntryValues } from '@/lib/waitlist/signup-entry';
 
 /** A gated customer should hear back within this window (Ovie review SLA). */
@@ -87,7 +87,7 @@ export async function reconcileWaitlistAdmission(
         eq(users.userStatus, 'waitlist_pending'),
         isNull(users.deletedAt),
         lt(users.createdAt, cutoff),
-        drizzleSql`lower(coalesce(${users.email}, '')) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}`
+        externalAccountSql()
       )
     );
 

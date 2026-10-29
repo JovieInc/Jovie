@@ -491,4 +491,20 @@ describe('release.prepare_launch', () => {
     expect(mocks.resolve).not.toHaveBeenCalled();
     expect(mocks.store).not.toHaveBeenCalled();
   });
+  it('explains which fields to correct on INVALID_INPUT', async () => {
+    const result = await prepareReleaseLaunch({
+      draft_id: '9efebd98-39b7-4a77-8965-04b5aafad9ad',
+      draft_token: 'private-token',
+      goal: 'Launch',
+    });
+    expect(result).toMatchObject({
+      code: 'INVALID_INPUT',
+      next_action: 'correct_input',
+      retryable: false,
+    });
+    const body = result as { message: string; fields: { message: string }[] };
+    expect(body.message).toContain('release URL, UPC, or release metadata');
+    expect(body.fields[0]!.message).toContain('release URL');
+    expect(JSON.stringify(result)).not.toContain('private-token');
+  });
 });
