@@ -48,6 +48,8 @@
     {"id": "workflow:golden-path-nightly", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/golden-path-nightly.yml"},
     {"id": "workflow:golden-path-prod-autofix", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/golden-path-prod-autofix.yml"},
     {"id": "workflow:help-center-recertification", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/help-center-recertification.yml"},
+    {"id": "workflow:main-health", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/main-health.yml"},
+    {"id": "workflow:surface-recertify", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/surface-recertify.yml"},
     {"id": "workflow:hermes-cli-worker", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/hermes-cli-worker.yml", "note": "Runs on the [self-hosted, hermes] runner although the Hermes runtime is retired (docs/operations/SUMMER_RUNTIME_RETIREMENT.md); retire or rehome."},
     {"id": "workflow:interaction-latency-audit", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/interaction-latency-audit.yml"},
     {"id": "workflow:internal-review", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/internal-review.yml"},

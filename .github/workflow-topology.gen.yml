@@ -689,6 +689,18 @@ nodes:
       - workflow_call
     terminalReceipt: job:build
     jobCount: 2
+  - name: Main Health
+    path: .github/workflows/main-health.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:health
+    jobCount: 1
   - name: Marketing Certification Producer
     path: .github/workflows/marketing-certification-producer.yml
     active: true
@@ -1391,6 +1403,18 @@ nodes:
       - schedule
       - workflow_dispatch
     terminalReceipt: job:check
+    jobCount: 2
+  - name: Surface Recertify
+    path: .github/workflows/surface-recertify.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:recertify
     jobCount: 2
   - name: Production Synthetic Monitoring
     path: .github/workflows/synthetic-monitoring.yml
