@@ -523,6 +523,12 @@ export async function main({
       'sources-of-truth map',
       'node scripts/sources-of-truth.mjs'
     );
+  if (any(/^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\//))
+    cmd(
+      'duplicate-literals',
+      'no copied owner values (prices, names, retention, limits)',
+      'node scripts/invariants/duplicate-literals.mjs'
+    );
   if (any(/(?:^|\/)package\.json$|pnpm-lock\.yaml$/))
     cmd(
       'lockfile',
