@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, test } from 'node:test';
-import { parseShowinfoTimes, pickKeyframes, stepWindows } from './ingest.mjs';
+import {
+  coverWindow,
+  parseShowinfoTimes,
+  pickKeyframes,
+  readCanary,
+  readNotes,
+  stepWindows,
+} from './ingest.mjs';
 import {
   buildColdPrompt,
   buildColdSchema,
@@ -8,10 +18,12 @@ import {
   buildJudgeSchema,
   CRITERIA,
   coldFails,
+  isCanaryArtifact,
   missingAsrRefs,
   parseColdOutput,
   parseJudgeOutput,
   RUBRIC_VERSION,
+  scanBannedTerms,
   stepVerdict,
 } from './rubric.mjs';
 
@@ -123,8 +135,10 @@ describe('cold screenshot test', () => {
     );
   });
 
-  test('any credible issue fails, whatever its severity; non-credible does not', () => {
-    assert.equal(coldFails([{ credible: true, severity: 'minor' }]), true);
+  test('a credible blocker or major fails; credible minors and non-credible issues do not', () => {
+    assert.equal(coldFails([{ credible: true, severity: 'major' }]), true);
+    assert.equal(coldFails([{ credible: true, severity: 'blocker' }]), true);
+    assert.equal(coldFails([{ credible: true, severity: 'minor' }]), false);
     assert.equal(coldFails([{ credible: false, severity: 'blocker' }]), false);
     assert.equal(coldFails([]), false);
   });
@@ -185,5 +199,75 @@ describe('ingest', () => {
     assert.equal(picked.length, 3);
     assert.ok(picked.every(t => t >= 2 && t < 9));
     assert.deepEqual(pickKeyframes([1, 20], { start: 5, end: 10 }), []);
+  });
+});
+
+describe('calibration fixes (2026-10-29)', () => {
+  test('DOM scan catches "fans" copy the frames never showed (the calibration miss)', () => {
+    const found = scanBannedTerms(
+      'Social Profile URL Paste the full URL fans already use. Attach Account'
+    );
+    assert.equal(found.length, 1);
+    assert.equal(found[0].criterion, 'TT-13');
+    assert.equal(found[0].severity, 'blocker');
+    assert.match(found[0].evidence, /fans already use/u);
+    assert.deepEqual(
+      scanBannedTerms('Grow your audience. Fanfare not matched.'),
+      []
+    );
+    assert.deepEqual(scanBannedTerms(null), []);
+  });
+
+  test('declared canary identities are harness artifacts, other leaks are not', () => {
+    const canary = ['browse-ready+synthetic-prodcert-wlcert1029a@jov.ie'];
+    assert.equal(
+      isCanaryArtifact(
+        {
+          evidence: 'Watch browse-ready+synthetic-prodcert-wlcert1029a@jov.ie',
+          detail: 'A synthetic test identity is on screen',
+        },
+        canary
+      ),
+      true
+    );
+    assert.equal(
+      isCanaryArtifact(
+        { evidence: '(source: enrichment)', detail: 'pipeline vocabulary' },
+        canary
+      ),
+      false
+    );
+    assert.equal(isCanaryArtifact({ evidence: 'x', detail: 'y' }, []), false);
+  });
+
+  test('window coverage samples long steps instead of clustering on one scene change', () => {
+    const times = coverWindow([71.6, 71.64, 72.28], { start: 40, end: 80 });
+    assert.ok(
+      times.some(t => t < 60),
+      'covers the first half of the step'
+    );
+    assert.ok(
+      times.every((t, i) => i === 0 || t - times[i - 1] >= 1.5),
+      'near-duplicates dropped'
+    );
+    assert.ok(pickKeyframes(times, { start: 40, end: 80 }, 4).length === 4);
+  });
+
+  test('reads canary.json and per-screenshot notes', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'dj-ingest-'));
+    writeFileSync(
+      join(dir, 'canary.json'),
+      JSON.stringify({ identities: ['a@jov.ie', 'wlcert'] })
+    );
+    writeFileSync(
+      join(dir, 'notes.jsonl'),
+      '{"name":"W02","text":"fans"}\nnot json\n'
+    );
+    assert.deepEqual(readCanary(join(dir, 'canary.json')), [
+      'a@jov.ie',
+      'wlcert',
+    ]);
+    assert.equal(readNotes(join(dir, 'notes.jsonl')).get('W02'), 'fans');
+    assert.deepEqual(readCanary(join(dir, 'missing.json')), []);
   });
 });

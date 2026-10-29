@@ -3,7 +3,7 @@
 // vision models against the Tim-taste rubric before it may reach Tim or a
 // real user.
 //
-//   judge      --surface <id> --run <dir> [--out <dir>] [--sha <40hex>] [--confirm-all] [--propose [live]]
+//   judge      --surface <id> --run <dir> [--out <dir>] [--sha <40hex>] [--confirm-all] [--propose [live]] [--notes <jsonl>] [--canary <json>]
 //   gate       --surface <id> [--sha <40hex>]        exit 0 allow, 1 deny (fail closed)
 //   coverage   [--json] [--next]                      judged-surface coverage + expansion queue
 //   invalidate --before <bindings.json|git-ref>       model change -> re-record/re-judge plan
@@ -95,6 +95,8 @@ async function cmdJudge(opts) {
     runDir: opts.run,
     outDir,
     surface: surface.title,
+    notesPath: opts.notes,
+    canaryPath: opts.canary,
   });
   writeFileSync(
     join(outDir, 'manifest.json'),

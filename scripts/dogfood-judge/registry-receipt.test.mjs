@@ -148,12 +148,19 @@ describe('registry', () => {
 describe('receipt, signature and gate', () => {
   const key = 'test-key';
 
-  test('nothing-wrong signoff only when every step passed both passes with zero findings', () => {
+  test('nothing-wrong signoff only when every step passed both passes with no blocker or major findings', () => {
     assert.equal(sampleReceipt().signoff.nothingWrong, true);
     assert.equal(sampleReceipt({ cold: 'fail' }).signoff.nothingWrong, false);
     assert.equal(
       sampleReceipt({
         findings: [{ ...finding({ severity: 'minor' }), id: '4e-1' }],
+      }).signoff.nothingWrong,
+      true,
+      'minors are remediation items, not gate failures'
+    );
+    assert.equal(
+      sampleReceipt({
+        findings: [{ ...finding({ severity: 'major' }), id: '4e-1' }],
       }).signoff.nothingWrong,
       false
     );

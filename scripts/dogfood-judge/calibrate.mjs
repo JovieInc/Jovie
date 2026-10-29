@@ -124,6 +124,7 @@ function caseManifest(c, outDir) {
   return {
     surface: c.surface ?? 'calibration case',
     runDir: resolve(REPO_ROOT, IMAGE_DIR),
+    canary: c.canary ?? [],
     videos: [],
     unjudgeable: [],
     steps: [
@@ -132,6 +133,7 @@ function caseManifest(c, outDir) {
         title: c.title ?? c.id,
         url: null,
         video: null,
+        text: c.text,
         images: c.images.map((path, index) => ({
           name: `${c.id}-${index + 1}`,
           path: resolve(REPO_ROOT, path),

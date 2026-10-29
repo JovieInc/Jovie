@@ -73,18 +73,26 @@ export function buildReceipt({
       findings: step.findings,
     })),
   };
-  const credible = body.steps.reduce((n, step) => n + step.findings.length, 0);
+  const gating = body.steps.reduce(
+    (n, step) => n + step.findings.filter(f => f.severity !== 'minor').length,
+    0
+  );
+  const minors = body.steps.reduce(
+    (n, step) => n + step.findings.filter(f => f.severity === 'minor').length,
+    0
+  );
   const nothingWrong =
     body.verdict === 'pass' &&
-    credible === 0 &&
+    gating === 0 &&
     body.unjudgeable.length === 0 &&
     body.coldPassVersion !== null &&
     body.steps.every(step => step.coldVerdict === 'pass');
   body.signoff = {
     nothingWrong,
     statement: nothingWrong
-      ? `Watched every step of ${body.surface} (${body.steps.length} steps): rubric and cold screenshot test found nothing wrong.`
-      : `Not signed off: ${credible} finding(s), ${body.unjudgeable.length} unrecorded step(s).`,
+      ? `Watched every step of ${body.surface} (${body.steps.length} steps): rubric and cold screenshot test found nothing blocking${minors ? `; ${minors} minor item(s) filed as remediation` : ''}.`
+      : `Not signed off: ${gating} blocker or major finding(s), ${body.unjudgeable.length} unrecorded step(s).`,
+    minorItems: minors,
   };
   return {
     ...body,
