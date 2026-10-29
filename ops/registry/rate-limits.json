@@ -27,7 +27,7 @@
       "ledger": { "provider": "github", "resource": "core" },
       "consumers": [
         "Mac Claude/Codex sessions and hooks",
-        "~/.hermes/scripts (pr-merge-queue, pr-autofix, codex-kanban-ship)",
+        "Hermes ship-loop scripts (pr-merge-queue, pr-autofix, codex-kanban-ship)",
         "scripts/lanes via apiclient when GH_TOKEN is the user token"
       ],
       "notes": "2026-10-28 16:40Z sample: 962 used in the first 40 minutes of the window by one fleet. Prefer the App token for fleet work."
