@@ -18,12 +18,16 @@
 import { pathToFileURL } from 'node:url';
 import {
   evaluateStagingDbHostGuard,
+  type GuardEnv,
   parseDatabaseHost,
 } from '@/lib/startup/db-host-guard';
 
-function main(): void {
-  const env = process.env;
-
+/**
+ * Checkable core: returns the process exit code (0 ok, 1 fail). Exported so
+ * the exact-head coverage gate and unit tests can exercise every branch
+ * without spawning a process.
+ */
+export function runDbHostIsolationCheck(env: GuardEnv = process.env): number {
   // Prefer a host-name reference when provided; otherwise parse the prod URL
   // in-process. Both paths only ever surface the hostname for comparison.
   const prodUrlHost = parseDatabaseHost(env.PROD_DATABASE_URL);
@@ -37,7 +41,7 @@ function main(): void {
     console.log(
       '[db-host-guard] inactive: environment is not staging/preview (JOV-9959).'
     );
-    return;
+    return 0;
   }
 
   if (verdict.reason === 'prod_database_host_reference_missing') {
@@ -45,7 +49,7 @@ function main(): void {
       '[db-host-guard] FAIL: no production host reference provided. ' +
         'Set PROD_DATABASE_URL (parsed in-process) or PROD_DATABASE_HOST(S).'
     );
-    process.exit(1);
+    return 1;
   }
 
   if (!verdict.ok) {
@@ -53,14 +57,16 @@ function main(): void {
       '[db-host-guard] FATAL: staging/preview DATABASE_URL resolves to the ' +
         'production database host (JOV-9959). Refusing to deploy.'
     );
-    process.exit(1);
+    return 1;
   }
 
   console.log('[db-host-guard] ok: staging database host is isolated.');
+  return 0;
 }
+
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  main();
+  process.exit(runDbHostIsolationCheck());
 }

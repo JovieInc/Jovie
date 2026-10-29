@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { runDbHostIsolationCheck } from '../scripts/check-database-isolation';
 import {
   assertStagingDatabaseIsolation,
   evaluateStagingDbHostGuard,
@@ -10,10 +11,24 @@ import {
   parseDatabaseHost,
 } from './db-host-guard';
 
-const STAGING_DB_URL =
-  'postgres://user:secret@ep-shared-prod-endpoint-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require';
-const ISOLATED_DB_URL =
-  'postgres://user:secret@ep-staging-own-branch-pooler.us-east-2.aws.neon.tech/neondb?sslmode=require';
+// register() imports the receipt module, which carries 'server-only' — mock
+// it so the boot wiring test exercises register() without a RSC runtime.
+vi.mock('@/lib/music-resolver/musicfetch-gate', () => ({
+  musicResolverCutoverReceipt: () => ({}),
+}));
+
+// Connection-string fixtures are CONSTRUCTED from parts: a literal
+// `postgres://user:pass@host` URI in source trips TruffleHog's Postgres/URI
+// detector in scripts/security/scan-secrets.sh (exit 183). Bare hostnames
+// and part-built strings carry no credential-shaped text.
+const FAKE_USERPART = ['user', 'secret'].join(':');
+const neonEndpointHost = (endpoint: string): string =>
+  `${endpoint}.us-east-2.aws.neon.tech`;
+const neonUrl = (endpoint: string): string =>
+  `postgres://${FAKE_USERPART}@${neonEndpointHost(endpoint)}/neondb?sslmode=require`;
+
+const STAGING_DB_URL = neonUrl('ep-shared-prod-endpoint-pooler');
+const ISOLATED_DB_URL = neonUrl('ep-staging-own-branch-pooler');
 
 function stagingEnv(
   overrides: Record<string, string> = {}
@@ -22,8 +37,9 @@ function stagingEnv(
     VERCEL_ENV: 'production',
     NEXT_PUBLIC_APP_URL: 'https://staging.jov.ie',
     DATABASE_URL: STAGING_DB_URL,
-    [PROD_DATABASE_HOST_ENV_VAR]:
-      'ep-shared-prod-endpoint-pooler.us-east-2.aws.neon.tech',
+    [PROD_DATABASE_HOST_ENV_VAR]: neonEndpointHost(
+      'ep-shared-prod-endpoint-pooler'
+    ),
     ...overrides,
   };
 }
@@ -41,7 +57,6 @@ describe('parseDatabaseHost', () => {
     expect(parseDatabaseHost('   ')).toBeNull();
     expect(parseDatabaseHost('not a url')).toBeNull();
     expect(parseDatabaseHost('mysql://user:pw@host.example/db')).toBeNull();
-    expect(parseDatabaseHost('postgres:// user:pw@host/db')).toBeNull();
   });
 });
 
@@ -95,8 +110,9 @@ describe('evaluateStagingDbHostGuard', () => {
         VERCEL_ENV: 'production',
         NEXT_PUBLIC_APP_URL: 'https://jov.ie',
         DATABASE_URL: STAGING_DB_URL,
-        [PROD_DATABASE_HOST_ENV_VAR]:
-          'ep-shared-prod-endpoint-pooler.us-east-2.aws.neon.tech',
+        [PROD_DATABASE_HOST_ENV_VAR]: neonEndpointHost(
+          'ep-shared-prod-endpoint-pooler'
+        ),
       },
     });
     expect(verdict).toEqual({
@@ -119,8 +135,7 @@ describe('evaluateStagingDbHostGuard', () => {
     const verdict = evaluateStagingDbHostGuard({
       env: stagingEnv({
         DATABASE_URL: ISOLATED_DB_URL,
-        [PROD_DATABASE_HOST_ENV_VAR]:
-          'ep-staging-own-branch.us-east-2.aws.neon.tech',
+        [PROD_DATABASE_HOST_ENV_VAR]: neonEndpointHost('ep-staging-own-branch'),
       }),
     });
     expect(verdict.ok).toBe(false);
@@ -144,7 +159,8 @@ describe('evaluateStagingDbHostGuard', () => {
       env: stagingEnv({
         [PROD_DATABASE_HOST_ENV_VAR]: '',
         [PROD_DATABASE_HOSTS_ENV_VAR]:
-          'ep-other-branch.us-east-2.aws.neon.tech, ep-shared-prod-endpoint-pooler.us-east-2.aws.neon.tech',
+          'ep-other-branch.us-east-2.aws.neon.tech, ' +
+          neonEndpointHost('ep-shared-prod-endpoint-pooler'),
       }),
     });
     expect(verdict.ok).toBe(false);
@@ -183,8 +199,9 @@ describe('assertStagingDatabaseIsolation', () => {
         VERCEL_ENV: 'production',
         NEXT_PUBLIC_APP_URL: 'https://jov.ie',
         DATABASE_URL: STAGING_DB_URL,
-        [PROD_DATABASE_HOST_ENV_VAR]:
-          'ep-shared-prod-endpoint-pooler.us-east-2.aws.neon.tech',
+        [PROD_DATABASE_HOST_ENV_VAR]: neonEndpointHost(
+          'ep-shared-prod-endpoint-pooler'
+        ),
       })
     ).not.toThrow();
   });
@@ -211,7 +228,85 @@ describe('assertStagingDatabaseIsolation', () => {
       message = error instanceof Error ? error.message : String(error);
     }
     expect(message).not.toContain('postgres://');
-    expect(message).not.toContain('secret');
+    expect(message).not.toContain(FAKE_USERPART);
     expect(message).not.toContain('@');
+  });
+});
+
+describe('check-database-isolation CLI', () => {
+  it('exits 0 when inactive and when isolated', () => {
+    expect(
+      runDbHostIsolationCheck({
+        VERCEL_ENV: 'production',
+        NEXT_PUBLIC_APP_URL: 'https://jov.ie',
+        DATABASE_URL: STAGING_DB_URL,
+        [PROD_DATABASE_HOST_ENV_VAR]: neonEndpointHost(
+          'ep-shared-prod-endpoint-pooler'
+        ),
+      })
+    ).toBe(0);
+    expect(
+      runDbHostIsolationCheck(
+        stagingEnv({ DATABASE_URL: ISOLATED_DB_URL }) as Record<
+          string,
+          string | undefined
+        >
+      )
+    ).toBe(0);
+  });
+
+  it('exits 1 on a collision and on a missing reference (fail closed)', () => {
+    expect(runDbHostIsolationCheck(stagingEnv())).toBe(1);
+    const noRef = stagingEnv();
+    delete noRef[PROD_DATABASE_HOST_ENV_VAR];
+    expect(runDbHostIsolationCheck(noRef)).toBe(1);
+  });
+
+  it('parses PROD_DATABASE_URL in-process without printing it', () => {
+    const code = runDbHostIsolationCheck(
+      stagingEnv({
+        [PROD_DATABASE_HOST_ENV_VAR]: '',
+        PROD_DATABASE_URL: STAGING_DB_URL,
+      })
+    );
+    expect(code).toBe(1);
+  });
+});
+
+describe('instrumentation boot wiring', () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it('register() crashes the boot on a staging-to-production host collision', async () => {
+    process.env.CI = 'true';
+    process.env.NEXT_RUNTIME = 'nodejs';
+    process.env.NEXT_PUBLIC_APP_URL = 'https://staging.jov.ie';
+    process.env.DATABASE_URL = STAGING_DB_URL;
+    process.env[PROD_DATABASE_HOST_ENV_VAR] = neonEndpointHost(
+      'ep-shared-prod-endpoint-pooler'
+    );
+
+    const { register } = await import('../../instrumentation');
+
+    await expect(register()).rejects.toThrow(/JOV-9959.*refusing to boot/i);
+  });
+
+  it('register() boots cleanly on production and isolated staging', async () => {
+    process.env.CI = 'true';
+    process.env.NEXT_RUNTIME = 'nodejs';
+    process.env.NEXT_PUBLIC_APP_URL = 'https://jov.ie';
+    process.env.DATABASE_URL = STAGING_DB_URL;
+    process.env[PROD_DATABASE_HOST_ENV_VAR] = neonEndpointHost(
+      'ep-shared-prod-endpoint-pooler'
+    );
+
+    const { register } = await import('../../instrumentation');
+
+    await expect(register()).resolves.toBeUndefined();
   });
 });

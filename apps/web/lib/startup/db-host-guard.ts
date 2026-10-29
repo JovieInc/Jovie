@@ -9,6 +9,8 @@
 
 type GuardEnv = Readonly<Record<string, string | undefined>>;
 
+export type { GuardEnv };
+
 export type DbHostGuardVerdict = {
   /** Guard applies to this environment (staging or preview). */
   active: boolean;
