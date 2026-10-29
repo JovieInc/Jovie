@@ -70,7 +70,7 @@ export interface AdminNavRegistryItem {
 
 /**
  * Five daily destinations (Tim's jobs: what matters, what is blocked on me,
- * what is shipping, is the fleet healthy, what does capacity cost). Business
+ * what is shipping, is the fleet healthy, what does capacity cost). Company
  * and Tools hold everything else. See fleet/ovie-ia.md.
  */
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
@@ -254,7 +254,7 @@ function orderedIds(): readonly AdminWorkspaceId[] {
   ];
 }
 
-/** Registry order is the sidebar order: primary, Business, Tools. */
+/** Registry order is the sidebar order: primary, Company, Tools. */
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = orderedIds()
   .map(id => {
     const item = ADMIN_NAV_ITEMS.find(entry => entry.id === id);

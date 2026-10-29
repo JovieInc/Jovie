@@ -304,6 +304,12 @@
       "kind": "pr-cheap-scan"
     },
     {
+      "key": "pnpm design:no-dead-ends:check",
+      "part": "webParts",
+      "seconds": 1.2,
+      "kind": "pr-cheap-scan"
+    },
+    {
       "key": "pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/chat/mobile-chat-certification.test.ts",
       "part": "webParts",
       "seconds": 5.0,
