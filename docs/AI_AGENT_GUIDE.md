@@ -81,6 +81,8 @@ no literal `fetch` call for their paths.
 | `/api/admin/leads/keywords` | GET | Admin | Lead keywords |
 | `/api/admin/leads/qualify` | POST | Admin | Qualify leads |
 | `/api/admin/moderation` | GET/POST | Admin | Abuse reports + takedowns |
+| `/api/admin/mesh` | GET | Ovie admin | Read-only mesh roster: registry sender ids + Summer mesh mailbox/watcher projection (`JOVIE_MESH_URL`); unavailable sources render as unknown |
+| `/api/admin/mesh/ping` | POST | Ovie admin | Send a `jovie.mesh-ping/v1` test message to the mesh inbox (`/summer/v1/mesh/inbox`) with the `JOVIE_MESH_TOKEN`/`_SENDER_ID`/`_SENDER_KIND` credentials. Cap: 10 pings per agent per hour (`MESH_PING_HOURLY_LIMIT` in apps/web/lib/rate-limit/config.ts), 429 beyond (JOV-8937) |
 | `/api/admin/overview` | GET | Admin | Admin dashboard overview |
 | `/api/admin/roles` | POST | Admin | Manage user roles |
 | `/api/admin/screenshots/[filename]` | GET | Admin | Serve screenshot |
