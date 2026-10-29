@@ -546,12 +546,17 @@ async function main(): Promise<void> {
         .map(r => ({
           id: r.result.id,
           score: r.result.score,
-          why:
-            r.result.judge?.why ??
+          // A failed hard check caps the score, so name it before the
+          // judge's note.
+          why: [
             r.result.hardChecks
               .filter(c => !c.ok)
               .map(c => `${c.id}${c.detail ? ` (${c.detail})` : ''}`)
               .join('; '),
+            r.result.judge?.why ?? '',
+          ]
+            .filter(Boolean)
+            .join(' | '),
         })),
     });
   }
