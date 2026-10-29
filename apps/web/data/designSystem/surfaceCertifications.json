@@ -2,7 +2,7 @@
   "schema": "jovie.design-surface-certifications/v1",
   "entries": {
     "apps/web/app/(marketing)/pricing/page.tsx": {
-      "sourceDigest": "b2711005ff8ce7d99b5f36a3b49d1c5db1d924c1112bb0e7cde3b2b15732c805",
+      "sourceDigest": "e0180a8a8e53d55364292acd9716a81b55ac1648c8cf8d2ce936bb9a5feb4c64",
       "certifiedAt": "2026-10-29T00:00:00.000Z",
       "captures": [
         {
