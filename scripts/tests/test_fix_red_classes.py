@@ -20,6 +20,8 @@ class ClassifyTest(unittest.TestCase):
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
+            "Error: Customer outcome decision missing or invalid (missing-metadata). See docs/CHANGELOG_PUBLICATION.md":
+                ("changelog-decision", "stamp-changelog"),
             "AssertionError: expected 1": ("other", "agent"),
         }
         for log, (cls, action) in cases.items():
@@ -46,6 +48,23 @@ class ClassifyTest(unittest.TestCase):
         c = classes.classify(pr("T"), {"T": "TypeError: x is not a function"})
         self.assertEqual(a["key"], b["key"])
         self.assertNotEqual(a["key"], c["key"])
+
+
+class StampChangelogTest(unittest.TestCase):
+    NOTE = classes.INTERNAL_CHANGELOG_NOTE
+
+    def test_appends_the_internal_decision_once(self):
+        self.assertEqual(classes.stamp_internal_changelog(""), self.NOTE + "\n")
+        self.assertEqual(classes.stamp_internal_changelog("null"), self.NOTE + "\n")
+        stamped = classes.stamp_internal_changelog("## Summary\nInternal HUD.\n")
+        self.assertTrue(stamped.startswith("## Summary\nInternal HUD.\n\n" + self.NOTE))
+        self.assertIsNone(classes.stamp_internal_changelog(stamped))
+        self.assertIsNone(classes.stamp_internal_changelog(
+            '<!-- customer-changelog/v1 {"releaseWorthy":true} -->'))
+
+    def test_a_public_or_malformed_note_is_not_overwritten(self):
+        body = 'See <!-- customer-changelog/v1 nope -->'
+        self.assertIsNone(classes.stamp_internal_changelog(body))
 
 
 class WireTest(unittest.TestCase):

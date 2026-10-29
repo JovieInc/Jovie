@@ -29,8 +29,9 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, AGENT = "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "agent"
-DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER})
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, AGENT = (
+    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "agent")
+DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -43,11 +44,16 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# Source Validation's customer-outcome step. The PR template's internal decision; a public note
+# is an author choice and is never invented here. Only the missing-note failure matches.
+CHANGELOG_MISSING = re.compile(r"Customer outcome decision missing or invalid \(missing-metadata\)")
+INTERNAL_CHANGELOG_NOTE = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
+    ("changelog-decision", CHANGELOG_MISSING, STAMP_CHANGELOG),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, AGENT),
@@ -110,6 +116,22 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
+
+
+def stamp_internal_changelog(body: str | None) -> str | None:
+    """Append the template internal decision when the body has no customer-changelog note.
+
+    None when a note is already present. Malformed, ambiguous, and public notes stay with a
+    model. `releaseWorthy:false` does not invent a public changelog entry. `gh --jq .body`
+    prints the literal `null` for an empty body.
+    """
+    text = "" if body is None else str(body)
+    if text.strip() == "null":
+        text = ""
+    if "customer-changelog/v1" in text:
+        return None
+    separated = text.rstrip() + ("\n\n" if text.strip() else "")
+    return separated + INTERNAL_CHANGELOG_NOTE + "\n"
 
 
 def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
@@ -194,7 +216,8 @@ def measure(rows: list[dict], now: float, days: int = 5, cost_per_run: dict | No
     cost_per_run = cost_per_run or {}
     window = [row for row in fix_rows(rows) if (_epoch(row) or 0) >= now - days * 86400]
     llm = [row for row in window if row.get("verdict") in LLM_VERDICTS and not row.get("attemptRefunded")]
-    routed = [row for row in window if str((row.get("reasons") or [""])[0]).startswith("infra-rerun:")]
+    routed = [row for row in window if str((row.get("reasons") or [""])[0]).startswith(
+        ("infra-rerun:", "stamped-changelog:"))]
     pushed = [row for row in llm if row.get("verdict") == "fix-pushed"]
     spend = sum(float(cost_per_run.get(row.get("provider")) or 0) for row in llm)
     merged = {row.get("pr") for row in pushed if merged_prs is not None and row.get("pr") in merged_prs}

@@ -6697,9 +6697,45 @@ def route_fix_red(host: Host, pr: dict) -> dict | None:
         return None
 
 
+def changelog_stamp_done(host: Host, pr: dict) -> bool:
+    """True after a missing-metadata stamp landed on this head. Later ticks must not hire a model
+    to paste the same note while the old red log is still the check's details URL."""
+    try:
+        data = json.loads((host.state / "class-routes.json").read_text())
+    except (OSError, ValueError):
+        return False
+    row = data.get(str(pr["number"])) if isinstance(data, dict) else None
+    return isinstance(row, dict) and row.get("stamp-changelog:ok") == pr["headRefOid"]
+
+
+def mark_changelog_stamp(host: Host, pr: dict) -> None:
+    def change(data: dict) -> None:
+        data.setdefault(str(pr["number"]), {})["stamp-changelog:ok"] = pr["headRefOid"]
+    try:
+        update_json(host.state / "class-routes.json", change)
+    except (OSError, ValueError):
+        pass
+
+
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
-    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN}:
+    if not route:
+        return None
+    if route["action"] == fix_red_classes.STAMP_CHANGELOG:
+        reason = f"stamped-changelog:{route['cls']}"
+        if changelog_stamp_done(host, pr):
+            return reason
+        if not claim_route(host, pr, route["action"]):
+            return None
+        if not pr_events.ensure_internal_changelog(pr):
+            return None
+        mark_changelog_stamp(host, pr)
+        try:
+            pr_events.consume(THIS, pr, ["red"])
+        except (OSError, subprocess.SubprocessError):
+            pass
+        return reason
+    if route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN}:
         return None
     # One rerun per head, shared with the platform-red gate above; one sync per head.
     if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):

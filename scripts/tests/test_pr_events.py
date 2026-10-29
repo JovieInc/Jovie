@@ -3293,3 +3293,20 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
             events.ensure_red_before_green(self.PR, "FAIL x", shell)
             self.assertEqual(len(shell.made("pr", "edit")), edits)
+
+    def test_internal_changelog_is_appended_only_when_the_note_is_absent(self):
+        present = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+        for body, edits in (("## Summary\nInternal.\n", 1), (present, 0), ("null", 1)):
+            saved = {}
+
+            def edit(args, saved=saved):
+                saved["body"] = Path(args[args.index("--body-file") + 1]).read_text()
+                return (0, "")
+
+            shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): edit})
+            self.assertEqual(events.ensure_internal_changelog(self.PR, shell), edits == 1)
+            self.assertEqual(len(shell.made("pr", "edit")), edits)
+            if edits:
+                self.assertIn(present, saved["body"])
+                self.assertEqual(saved["body"].count("customer-changelog/v1"), 1)
+                self.assertIn("## Summary", saved["body"]) if body.startswith("##") else None

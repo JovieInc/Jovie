@@ -1377,6 +1377,31 @@ def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh) -> bool:
         return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
 
 
+def ensure_internal_changelog(pr: dict, sh=api_gh) -> bool:
+    """Append the template internal changelog decision when this body has none.
+
+    A body that already carries a customer-changelog note is left alone (returns False) so a
+    model still sees malformed, ambiguous, and public-note failures. The lane calls this only
+    after the failed log says missing-metadata.
+    """
+    if not isinstance(pr.get("number"), int):
+        return False
+    import fix_red_classes
+    viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
+    if viewed.returncode != 0:
+        return False
+    updated = fix_red_classes.stamp_internal_changelog(viewed.stdout or "")
+    if not updated:
+        return False
+    with tempfile.TemporaryDirectory(prefix="changelog-decision-") as tmp:
+        path = Path(tmp) / "body.md"
+        from atomic_state import atomic_write_text
+        atomic_write_text(path, updated)
+        if fix_red_classes.INTERNAL_CHANGELOG_NOTE not in path.read_text():
+            return False
+        return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
+
+
 HOLD_DEQUEUE = "dequeued-by-hand"
 FAILURE_HOLD_CONTEXT = "jovie-queue-failure-hold/v1"
 FAILURE_HOLD_WRITERS = frozenset({"jovie-bot[bot]", "jovie-ci-lane[bot]", "jovie-symphony-lane[bot]", "jovie-agents-lane[bot]", "jovie-bot", "jovie-ci-lane", "jovie-symphony-lane", "jovie-agents-lane"})
