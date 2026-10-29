@@ -140,9 +140,13 @@ describe('capability-bound draft persistence', () => {
   });
   it('denies artist substitution, unrelated receipt IDs, expiry and malformed inputs before DB access', async () => {
     const g = grant();
-    expect(await createAgentDraft({ ...g.input, publish: true })).toMatchObject(
-      { code: 'INVALID_INPUT' }
-    );
+    const invalid = await createAgentDraft({ ...g.input, publish: true });
+    expect(invalid).toMatchObject({
+      code: 'INVALID_INPUT',
+      next_action: 'correct_input',
+    });
+    expect((invalid as { message: string }).message).toContain('publish');
+    expect(JSON.stringify(invalid)).not.toContain(g.token);
     expect(
       await createAgentDraft({ ...g.input, artist_id: 'apple_music:657515' })
     ).toMatchObject({ code: 'DRAFT_UNAVAILABLE' });
