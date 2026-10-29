@@ -82,13 +82,13 @@ class ThroughputSentinelTest(unittest.TestCase):
         slow_fixed = {"n": 13, "p50S": 120.0, "p95S": 451.0}
         alert = ts.judge(flow({"hosted": hosted, "self-hosted": slow_fixed}))["throughput-merge-gate-pool"]
         self.assertIn("self-hosted p50 120.0s", alert)
-        self.assertIn("gh variable delete MERGE_GATE_POOL", alert)
+        self.assertIn("deleting repo variable MERGE_GATE_POOL", alert)
         # Within the margin, or too few self-hosted jobs: no alarm.
         self.assertNotIn("throughput-merge-gate-pool", ts.judge(flow({"hosted": hosted, "self-hosted": {"n": 13, "p50S": 30.0, "p95S": 60.0}})))
         self.assertNotIn("throughput-merge-gate-pool", ts.judge(flow({"hosted": hosted, "self-hosted": {"n": 2, "p50S": 900.0, "p95S": 900.0}})))
         # Hosted saturated with nothing on the gem pool: suggest the fallback.
         saturated = ts.judge(flow({"hosted": {"n": 20, "p50S": 141.0, "p95S": 167.0}}))["throughput-merge-gate-pool"]
-        self.assertIn("MERGE_GATE_POOL --body fixed", saturated)
+        self.assertIn("MERGE_GATE_POOL=fixed", saturated)
         self.assertEqual(ts.runner_pool(["self-hosted", "jovie-fixed"]), "self-hosted")
         self.assertEqual(ts.runner_pool(["ubuntu-latest"]), "hosted")
         self.assertEqual(ts.runner_pool(None), "hosted")

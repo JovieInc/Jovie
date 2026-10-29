@@ -502,12 +502,12 @@ def judge(obs: dict) -> dict[str, str]:
             and fixed["p50S"] > hosted["p50S"] + POOL_SLOWER_MARGIN_S:
         alerts["throughput-merge-gate-pool"] = (
             f"stage merge-group created->started: self-hosted p50 {fixed['p50S']}s / p95 {fixed['p95S']}s vs hosted "
-            f"p50 {hosted['p50S']}s / p95 {hosted['p95S']}s; route merge-gate jobs to hosted: "
-            "gh variable delete MERGE_GATE_POOL -R JovieInc/Jovie")
+            f"p50 {hosted['p50S']}s / p95 {hosted['p95S']}s; route merge-gate jobs to hosted by deleting repo variable MERGE_GATE_POOL"
+            "")
     elif (hosted.get("n") or 0) >= POOL_MIN_JOBS and not fixed and hosted["p50S"] > HOSTED_SATURATED_P50_S:
         alerts["throughput-merge-gate-pool"] = (
             f"stage merge-group created->started: hosted p50 {hosted['p50S']}s / p95 {hosted['p95S']}s (saturated); "
-            "consider the gem pool: gh variable set MERGE_GATE_POOL --body fixed -R JovieInc/Jovie")
+            "consider the gem pool: set repo variable MERGE_GATE_POOL=fixed")
     if (flow.get("leaseHeldMin") or 0) > LEASE_HELD_MIN:
         alerts["throughput-prod-lease-held"] = (
             f"stage deploy: a Production Controller run has held the production lease {flow['leaseHeldMin']} min "
