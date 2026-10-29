@@ -267,6 +267,8 @@ export const ServerEnvSchema = z.object({
 
   // Revalidation
   REVALIDATE_SECRET: z.string().optional(),
+  // Content records: bearer for agent publish + HMAC key for preview links.
+  CONTENT_PUBLISH_SECRET: z.string().min(32).optional(),
 
   // Apple Music DSP enrichment
   APPLE_MUSIC_KEY_ID: z.string().optional(),
@@ -641,6 +643,7 @@ export const ENV_KEYS = [
   'GBRAIN_API_KEY',
   'GBRAIN_HEALTH_URL',
   'REVALIDATE_SECRET',
+  'CONTENT_PUBLISH_SECRET',
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
   'APPLE_MUSIC_PRIVATE_KEY',

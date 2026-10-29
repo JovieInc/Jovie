@@ -2233,6 +2233,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/content-records/[kind]/[key]/route.ts",
+      "kind": "handler",
+      "route": "/api/content-records/[kind]/[key]",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/create-tip-intent/route.ts",
       "kind": "handler",
       "route": "/api/create-tip-intent",
@@ -6851,6 +6859,14 @@
       "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
+    },
+    {
+      "source": "apps/web/app/content-preview/[versionId]/page.tsx",
+      "kind": "page",
+      "route": "/content-preview/[versionId]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
     },
     {
       "source": "apps/web/app/demo/audience/page.tsx",
