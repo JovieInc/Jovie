@@ -35,7 +35,11 @@ export const OFFER = {
       interval: ARTIST_VISIBILITY_OFFER.pro.interval,
       intervalCount: 1,
       selfServe: true,
+      /** Legacy annual/yearly prices exist for old subscribers only; none is offered. */
+      annualOffered: false,
     },
+    /** Max is contact-sales; there is no self-serve Max checkout. */
+    max: { selfServe: false },
   },
   /**
    * Reverse trial. `mechanism: 'entitlement'` means an app-side plan state with

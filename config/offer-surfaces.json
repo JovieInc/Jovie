@@ -1,0 +1,149 @@
+{
+  "schema": "jovie-offer-surfaces/v1",
+  "surfaces": [
+    {
+      "id": "page-home",
+      "kind": "page",
+      "route": "/",
+      "owner": "web",
+      "verify": "live-render",
+      "allowAmounts": [
+        {
+          "text": "$6 a month",
+          "reason": "home-loop demo fixture about fan-send spend, not a plan price; migrate to generated fixture"
+        }
+      ],
+      "lastVerifiedOfferHash": null,
+      "lastVerifiedAt": null
+    },
+    {
+      "id": "page-pricing",
+      "kind": "page",
+      "route": "/pricing",
+      "owner": "web",
+      "verify": "live-render",
+      "requires": ["price.pro.amount"]
+    },
+    {
+      "id": "page-claim",
+      "kind": "page",
+      "route": "/claim",
+      "owner": "web",
+      "verify": "live-render",
+      "requires": ["price.pro.amount"]
+    },
+    {
+      "id": "page-terms",
+      "kind": "page",
+      "route": "/legal/terms",
+      "owner": "legal",
+      "verify": "live-render",
+      "knownMismatch": {
+        "reason": "terms.md still says Pro and Max are paid plans billed monthly or annually; the offer has no annual price and Max is contact-sales",
+        "issue": "offer-truth: migrate legal/terms.md",
+        "until": "2026-11-08"
+      }
+    },
+    {
+      "id": "page-llms-full",
+      "kind": "page",
+      "route": "/llms-full.txt",
+      "owner": "web",
+      "verify": "live-render"
+    },
+    {
+      "id": "stripe-checkout-hosted",
+      "kind": "stripe-hosted",
+      "owner": "billing",
+      "verify": "live-stripe",
+      "note": "Product name, price, trial and consent text on the hosted Checkout page; covered by stripe_price/stripe_product checks plus the CI session-params test."
+    },
+    {
+      "id": "stripe-portal",
+      "kind": "stripe-dashboard",
+      "owner": "billing",
+      "verify": "live-stripe",
+      "note": "Customer portal cancel mode and plan switching (stripe_portal check)."
+    },
+    {
+      "id": "stripe-promotions",
+      "kind": "stripe-dashboard",
+      "owner": "billing",
+      "verify": "live-stripe",
+      "note": "Active promotion codes (stripe_promotions check)."
+    },
+    {
+      "id": "stripe-tax",
+      "kind": "stripe-dashboard",
+      "owner": "billing",
+      "verify": "live-stripe",
+      "note": "Tax settings (stripe_tax check)."
+    },
+    {
+      "id": "stripe-receipts-invoices",
+      "kind": "stripe-dashboard",
+      "owner": "billing",
+      "verify": "attested",
+      "note": "Receipt, invoice and dunning email text and branding live in the Stripe dashboard; not readable through the API.",
+      "lastVerifiedOfferHash": null,
+      "lastVerifiedAt": null
+    },
+    {
+      "id": "chat-closer-live",
+      "kind": "chat-runtime",
+      "owner": "onboarding",
+      "verify": "blocked",
+      "blocker": "needs a sanctioned synthetic principal to pass Turnstile and render the first assistant turn (JOV-9004)"
+    },
+    {
+      "id": "checkout-page-live",
+      "kind": "page",
+      "owner": "onboarding",
+      "verify": "blocked",
+      "blocker": "/onboarding/checkout is behind sign-in; needs the synthetic principal (JOV-9004)"
+    },
+    {
+      "id": "app-store-listing",
+      "kind": "app-store",
+      "owner": "ios",
+      "verify": "attested",
+      "note": "App Store metadata and screenshots. The iOS app currently has no price, trial or StoreKit copy; attest that the listing makes none.",
+      "lastVerifiedOfferHash": null,
+      "lastVerifiedAt": null
+    },
+    {
+      "id": "lyb",
+      "kind": "other-product",
+      "owner": "lyb",
+      "verify": "attested",
+      "note": "LYB pricing and trial copy; LYB is not in this repo. Owner must inventory and attest.",
+      "lastVerifiedOfferHash": null,
+      "lastVerifiedAt": null
+    },
+    {
+      "id": "partner-affiliate-copy",
+      "kind": "partner",
+      "owner": "growth",
+      "verify": "attested",
+      "note": "Partner, affiliate and press copy that quotes price, trial or discounts. Promotion codes are allowed at checkout, so discount promises outside the repo are unowned until attested.",
+      "lastVerifiedOfferHash": null,
+      "lastVerifiedAt": null
+    },
+    {
+      "id": "images-og-and-marketing",
+      "kind": "image-set",
+      "owner": "design",
+      "verify": "attested",
+      "note": "apps/web/public og, compare and marketing images and demo videos can bake in prices; no OCR yet.",
+      "lastVerifiedOfferHash": null,
+      "lastVerifiedAt": null
+    },
+    {
+      "id": "email-trial-reminders",
+      "kind": "email",
+      "owner": "lifecycle",
+      "verify": "blocked",
+      "blocker": "day-10 and day-13 reminder emails do not exist yet; they will render from OFFER.trial.reminderDays"
+    }
+  ]
+}
