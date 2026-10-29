@@ -410,3 +410,65 @@ test.describe('Instant merch hero media stability', () => {
     }
   }
 });
+
+test.describe('UTM links hero panel stability', () => {
+  for (const width of [390, 768, 1024, 1440]) {
+    test(`builder arrival at ${width}px keeps the hero still`, async ({
+      browser,
+      baseURL,
+    }) => {
+      // CI saw utm-links-panel grow 424px -> 775px about 370ms after load
+      // and push the hero copy (CLS 0.0686). Deterministic probe: with the
+      // server render only, take the builder out (an island that has not
+      // painted yet) and require the copy, the panel and the next band to
+      // keep their geometry.
+      const context = await browser.newContext({
+        baseURL,
+        viewport: { width, height: 900 },
+        javaScriptEnabled: false,
+        reducedMotion: 'reduce',
+      });
+      try {
+        const page = await context.newPage();
+        const response = await page.goto('/product/utm-links', {
+          waitUntil: 'load',
+        });
+        expect(response?.status()).toBe(200);
+        await page.evaluate(() => document.fonts.ready);
+        const measure = async () => ({
+          copy: await page
+            .getByRole('heading', { level: 1, name: 'UTM links' })
+            .boundingBox(),
+          panel: await page.getByTestId('utm-links-panel').boundingBox(),
+          footer: await page
+            .locator('footer, [role="contentinfo"]')
+            .first()
+            .boundingBox(),
+        });
+        const complete = await measure();
+        const builder = await page.getByTestId('utm-builder').elementHandle();
+        if (!builder) throw new Error('Missing UTM builder');
+        await builder.evaluate(element => {
+          const marker = document.createComment('utm-builder');
+          element.before(marker);
+          (element as Element & { restoreMarker?: Comment }).restoreMarker =
+            marker;
+          element.remove();
+        });
+        expect(
+          await measure(),
+          'builder arrival must not change hero layout'
+        ).toEqual(complete);
+        await builder.evaluate(element => {
+          const marker = (element as Element & { restoreMarker?: Comment })
+            .restoreMarker;
+          if (!marker) throw new Error('Missing builder restore marker');
+          marker.replaceWith(element);
+        });
+        expect(await measure(), 'restored builder geometry').toEqual(complete);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+});
