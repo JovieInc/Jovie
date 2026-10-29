@@ -19,6 +19,7 @@ import {
   rearmDescription,
   trustedRearmRecords,
 } from '../../merge-group-victim-rearm.mjs';
+import { fleetCommit, nonGreenFleetProofs } from './fixtures/fleet-rules.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const sha = 'a'.repeat(40);
@@ -228,6 +229,7 @@ test('apply re-checks the live state and skips a head that turned BLOCKED', asyn
       async readPullRequest() {
         return {
           headSha: sha,
+          fleetRulesCommit: fleetCommit(sha),
           mergeStateStatus,
           inQueue: false,
           autoMerge: false,
@@ -283,6 +285,7 @@ test('apply writes the receipt after a successful enqueue and skips a moved head
         return prNumber === 10
           ? {
               headSha: sha,
+              fleetRulesCommit: fleetCommit(sha),
               mergeStateStatus: 'CLEAN',
               inQueue: false,
               autoMerge: false,
@@ -331,6 +334,7 @@ test('a failed enqueue writes no receipt and leaves the cap unused', async () =>
         async readPullRequest() {
           return {
             headSha: sha,
+            fleetRulesCommit: fleetCommit(sha),
             mergeStateStatus: 'CLEAN',
             inQueue: false,
             autoMerge: false,
@@ -443,6 +447,7 @@ test('apply hands the live node id and head to enable', async () => {
       async readPullRequest() {
         return {
           nodeId: 'PR_kwDOA',
+          fleetRulesCommit: fleetCommit(sha),
           headSha: sha,
           mergeStateStatus: 'CLEAN',
           inQueue: false,
@@ -807,3 +812,26 @@ test('latestDequeue picks the newest removal and ignores other events', () => {
   );
   assert.equal(latestDequeue([]), null);
 });
+
+for (const [reason, proof] of Object.entries(nonGreenFleetProofs(sha))) {
+  test(`JOV-9966 ${reason} Fleet Rules never rearms a green-looking victim`, async () => {
+    const effects = [];
+    const applied = await applyVictimRearms(
+      [{ action: 'rearm', prNumber: 10, headSha: sha, increment: true }],
+      {
+        readPullRequest: async () => ({
+          nodeId: 'PR_test',
+          headSha: sha,
+          mergeStateStatus: 'CLEAN',
+          inQueue: false,
+          autoMerge: false,
+          fleetRulesCommit: proof,
+        }),
+        enable: async () => effects.push('enqueue'),
+        writeStatus: async () => effects.push('status'),
+      }
+    );
+    assert.deepEqual(effects, []);
+    assert.deepEqual(applied, []);
+  });
+}

@@ -921,6 +921,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers:
       - Lane Fix Relay
+      - Merge Queue Green Enroll
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -1632,6 +1633,9 @@ edges:
     to: Merge Queue Green Enroll
     type: workflow_run
   - from: PR Size Guard
+    to: Merge Queue Green Enroll
+    type: workflow_run
+  - from: PR Fleet Rules
     to: Merge Queue Green Enroll
     type: workflow_run
   - from: CI
