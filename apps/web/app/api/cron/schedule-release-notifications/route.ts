@@ -10,6 +10,10 @@ import {
   or,
 } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
+import {
+  type ReleaseEmailCanaryScope,
+  readReleaseEmailCanaryScope,
+} from '@/lib/canaries/release-email';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db } from '@/lib/db';
 import { notificationSubscriptions } from '@/lib/db/schema/analytics';
@@ -18,6 +22,7 @@ import { discogReleases, providerLinks } from '@/lib/db/schema/content';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { getBatchCreatorEntitlements } from '@/lib/entitlements/creator-plan';
+import { env } from '@/lib/env-server';
 import { captureError } from '@/lib/error-tracking';
 import { getReleaseNotificationEligibility } from '@/lib/notifications/release-eligibility';
 import {
@@ -137,7 +142,11 @@ async function scheduleNotificationsForRelease(
     releaseDate: Date;
   },
   now: Date,
-  options?: { campaignId?: string | null; segment?: string | null }
+  options?: {
+    campaignId?: string | null;
+    segment?: string | null;
+    canaryScope?: ReleaseEmailCanaryScope | null;
+  }
 ): Promise<number> {
   let lastId = '';
   let pendingBatch: NotificationInsertValue[] = [];
@@ -158,6 +167,13 @@ async function scheduleNotificationsForRelease(
       drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
       drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`,
     ];
+    if (options?.canaryScope) {
+      // Canary carve-out: only the reserved synthetic inbox, never a real subscriber.
+      conditions.push(
+        eq(notificationSubscriptions.channel, 'email'),
+        drizzleSql`lower(${notificationSubscriptions.email}) = ${options.canaryScope.recipientEmail}`
+      );
+    }
 
     if (lastId) {
       conditions.push(gt(notificationSubscriptions.id, lastId));
@@ -227,12 +243,23 @@ export async function scheduleReleaseNotifications(): Promise<{
   scheduled: number;
   releasesFound: number;
   policyBlocked?: BlockedEffectReceipt;
+  canaryOnly?: true;
 }> {
   const policy = denyAudienceEffect('audience.delivery.schedule');
+  let canaryScope: ReleaseEmailCanaryScope | null = null;
   if (!policy.dispatchAllowed) {
-    // Do not create or revive audience jobs while dispatch is disabled.
-    return { scheduled: 0, releasesFound: 0, policyBlocked: policy };
+    // Do not create or revive audience jobs while dispatch is disabled. The
+    // one exception is the JOV-9779 release-email canary: one configured
+    // synthetic profile and one synthetic inbox. Without that config this
+    // returns before any database read, as before.
+    canaryScope = readReleaseEmailCanaryScope(env);
+    if (!canaryScope) {
+      return { scheduled: 0, releasesFound: 0, policyBlocked: policy };
+    }
   }
+  const canaryResult = canaryScope
+    ? ({ policyBlocked: policy, canaryOnly: true } as const)
+    : {};
   const now = new Date();
   const windowStart = new Date(now.getTime() - SCHEDULING_LOOKBACK_MS);
   const windowEnd = new Date(now.getTime() + SCHEDULING_LOOKAHEAD_MS);
@@ -247,25 +274,30 @@ export async function scheduleReleaseNotifications(): Promise<{
     })
     .from(discogReleases)
     .where(
-      or(
-        and(
-          gte(discogReleases.releaseDate, windowStart),
-          lte(discogReleases.releaseDate, windowEnd)
-        ),
-        and(
-          gte(discogReleases.createdAt, windowStart),
-          gte(
-            discogReleases.releaseDate,
-            new Date(now.getTime() - NEWLY_DISCOVERED_MAX_RELEASE_AGE_MS)
+      and(
+        or(
+          and(
+            gte(discogReleases.releaseDate, windowStart),
+            lte(discogReleases.releaseDate, windowEnd)
           ),
-          lte(discogReleases.releaseDate, windowEnd)
-        )
+          and(
+            gte(discogReleases.createdAt, windowStart),
+            gte(
+              discogReleases.releaseDate,
+              new Date(now.getTime() - NEWLY_DISCOVERED_MAX_RELEASE_AGE_MS)
+            ),
+            lte(discogReleases.releaseDate, windowEnd)
+          )
+        ),
+        canaryScope
+          ? eq(discogReleases.creatorProfileId, canaryScope.creatorProfileId)
+          : undefined
       )
     );
 
   if (upcomingReleases.length === 0) {
     logger.info('[schedule-release-notifications] No upcoming releases found');
-    return { scheduled: 0, releasesFound: 0 };
+    return { scheduled: 0, releasesFound: 0, ...canaryResult };
   }
 
   const creatorProfileIds = [
@@ -389,7 +421,11 @@ export async function scheduleReleaseNotifications(): Promise<{
     logger.info(
       '[schedule-release-notifications] No eligible releases after eligibility checks'
     );
-    return { scheduled: 0, releasesFound: upcomingReleases.length };
+    return {
+      scheduled: 0,
+      releasesFound: upcomingReleases.length,
+      ...canaryResult,
+    };
   }
 
   // Stream subscribers per-release, insert in parallel batches as we go
@@ -400,7 +436,8 @@ export async function scheduleReleaseNotifications(): Promise<{
     try {
       const count = await scheduleNotificationsForRelease(
         { ...release, releaseDate },
-        now
+        now,
+        { canaryScope }
       );
       totalScheduled += count;
     } catch (err) {
@@ -416,7 +453,11 @@ export async function scheduleReleaseNotifications(): Promise<{
     `[schedule-release-notifications] Processed ${totalScheduled} notifications for ${upcomingReleases.length} releases`
   );
 
-  return { scheduled: totalScheduled, releasesFound: upcomingReleases.length };
+  return {
+    scheduled: totalScheduled,
+    releasesFound: upcomingReleases.length,
+    ...canaryResult,
+  };
 }
 
 /**
@@ -436,11 +477,13 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: true,
-        message: result.policyBlocked
-          ? 'Audience delivery is disabled; no release notifications were scheduled'
-          : result.releasesFound === 0
-            ? 'No release notifications to schedule in the current window'
-            : `Processed ${result.scheduled} notifications`,
+        message: result.canaryOnly
+          ? `Audience delivery is disabled; scheduled ${result.scheduled} release-email canary notifications`
+          : result.policyBlocked
+            ? 'Audience delivery is disabled; no release notifications were scheduled'
+            : result.releasesFound === 0
+              ? 'No release notifications to schedule in the current window'
+              : `Processed ${result.scheduled} notifications`,
         scheduled: result.scheduled,
         releasesFound: result.releasesFound,
         ...(result.policyBlocked

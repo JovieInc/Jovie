@@ -218,7 +218,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
   }
 
-  const [username] = recipientEmail.split('@');
+  // Plus-addressing (`artist+tag@`) delivers to the artist's inbox; the tag
+  // is kept on `toEmail`. The JOV-9779 release-email canary relies on this.
+  const [localPart] = recipientEmail.split('@');
+  const [username] = (localPart ?? '').split('+');
   if (!username) {
     return NextResponse.json({ ok: true }, { headers: NO_STORE_HEADERS });
   }
