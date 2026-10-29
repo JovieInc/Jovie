@@ -207,6 +207,26 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             swarm.gh = original
 
+    def test_smoke_fails_loudly_on_an_empty_log_and_passes_on_a_real_one(self):
+        import contextlib, io
+        saved = (swarm.gh_json, swarm.fetch_job_log, swarm.gh_version)
+        swarm.gh_version = lambda: "2.93.0"
+        def jsons(args, **kw):
+            return {"workflow_runs": [{"id": 1, "conclusion": "success"}]} if "/runs?" in args[1] else {"jobs": [{"id": 5, "name": "x", "conclusion": "success", "started_at": "t"}]}
+        swarm.gh_json = jsons
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 0, "stdout": "log", "stderr": ""})
+                self.assertEqual(swarm.cmd_smoke(None), 0)
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 1, "stdout": "", "stderr": "escape sequences"})
+                self.assertEqual(swarm.cmd_smoke(None), 1)
+                swarm.fetch_job_log = lambda j: swarm._Result({"code": 0, "stdout": "", "stderr": ""})
+                self.assertEqual(swarm.cmd_smoke(None), 1)  # rc 0 but empty is still a failure
+                swarm.gh_version = lambda: "2.10.0"
+                self.assertEqual(swarm.cmd_smoke(None), 1)  # below the supported minimum
+        finally:
+            swarm.gh_json, swarm.fetch_job_log, swarm.gh_version = saved
+
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"
         fields = dict(p.split("=", 1) for p in body.split()[3:] if "=" in p)
