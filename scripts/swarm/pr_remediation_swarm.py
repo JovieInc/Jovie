@@ -303,8 +303,13 @@ def extract_failure(text: str, tail: int = 60, context: int = 6, cap: int = 220)
     return "\n".join(out + ["--- tail ---"] + lines[-tail:])
 
 
+LOG_DIAG: list[dict] = []
+
+
 def job_log_tail(run: dict) -> str:
     out = gh(["api", f"repos/{REPO}/actions/jobs/{run['id']}/logs"])
+    LOG_DIAG.append({"check": run["name"], "rc": out.returncode, "bytes": len(out.stdout or ""),
+                     "err": (out.stderr or "")[:120]})
     if out.returncode != 0:
         return ""
     return extract_failure(out.stdout)
@@ -414,6 +419,7 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     if pr.get("mergeable_state") == "dirty":
         plan.update(action="sync-main", cls="conflict")
     joined = "\n".join(logs.values())
+    plan["logDiag"] = LOG_DIAG[:4]
     regen = next((cmd for name, pat, cmd in REGEN if pat.search(joined)), None)
     action = plan["action"]
     skip = None
