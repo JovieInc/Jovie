@@ -75,7 +75,8 @@ export async function readOutboundLedger(
   return byLead;
 }
 
-async function ensureLeadContact(lead: OutboundLeadIdentity) {
+/** The canonical contact for a lead, created on first decision. */
+export async function ensureLeadContact(lead: OutboundLeadIdentity) {
   const dedupeKey =
     contactDedupeKey({
       email: lead.contactEmail,

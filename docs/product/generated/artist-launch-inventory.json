@@ -3337,6 +3337,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/outreach-engine/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/outreach-engine",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/pipeline-bottleneck/contributions/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/pipeline-bottleneck/contributions",

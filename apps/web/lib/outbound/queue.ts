@@ -11,9 +11,20 @@ import {
   type OutboundTarget,
   resolveOutboundApproval,
 } from './approval';
+import {
+  DOGFOOD_GATE_CLOSED,
+  type DogfoodGateResult,
+} from './cold/dogfood-gate';
+import {
+  COLD_TEMPLATE_VERSION,
+  composeColdSequence,
+  isRecentRelease,
+} from './cold/draft';
+import { coldSegmentKey } from './cold/funnel';
 import type {
   OutboundBand,
   OutboundChannel,
+  OutboundCopy,
   OutboundFitBasis,
   OutboundFlag,
   OutboundNextAction,
@@ -66,6 +77,95 @@ export interface OutboundLeadFacts {
    * certification inspection). Null when no profile is built yet.
    */
   readonly evidenceClasses: readonly string[] | null;
+  /** Catalog facts of the built profile; absent until one is built. */
+  readonly artifact?: OutboundArtifactFacts | null;
+  /** Dogfood judge gate for this person; absent means closed. */
+  readonly dogfood?: DogfoodGateResult | null;
+}
+
+/** What the built profile carries, from its own catalog rows. */
+export interface OutboundArtifactFacts {
+  readonly releaseCount: number;
+  readonly platformCount: number;
+  readonly latestRelease: {
+    readonly title: string;
+    readonly releasedOn: string;
+  } | null;
+}
+
+/** The legacy one-line draft, used when no built artifact facts exist. */
+export const LEGACY_TEMPLATE_VERSION = 'outbound-default/v1';
+
+export interface OutboundMachineDraft {
+  readonly copy: OutboundCopy;
+  readonly templateVersion: string;
+  /** Follow-up steps; empty for DM and for the legacy draft. */
+  readonly followUps: readonly {
+    readonly subject: string;
+    readonly body: string;
+  }[];
+  readonly segment: string;
+}
+
+/**
+ * The machine draft Tim reviews for one lead. One function, so the queue Tim
+ * sees and the edit pair recorded on his decision start from the same text.
+ */
+export function outboundMachineDraft(input: {
+  readonly channel: OutboundChannel;
+  readonly name: string;
+  readonly claimUrl: string;
+  readonly dmCopy: string | null;
+  readonly artifact: OutboundArtifactFacts | null | undefined;
+  readonly latestReleaseDate: Date | null;
+  readonly now: Date;
+}): OutboundMachineDraft {
+  const artifact = input.artifact ?? null;
+  const recent =
+    isRecentRelease(artifact?.latestRelease ?? null, input.now) ||
+    (input.latestReleaseDate !== null &&
+      input.latestReleaseDate.getTime() <= input.now.getTime() &&
+      input.now.getTime() - input.latestReleaseDate.getTime() < 90 * DAY_MS);
+  const segment = coldSegmentKey({
+    channel: input.channel,
+    recentRelease: recent,
+  });
+  if (input.channel === 'email' && artifact) {
+    const sequence = composeColdSequence(
+      {
+        artistName: input.name,
+        firstName: null,
+        claimUrl: input.claimUrl,
+        artifact: 'profile',
+        latestRelease: artifact.latestRelease,
+        platformCount: artifact.platformCount,
+        releaseCount: artifact.releaseCount,
+      },
+      input.now
+    );
+    const [first, ...rest] = sequence.steps;
+    if (first && sequence.lint.length === 0)
+      return {
+        copy: { channel: 'email', subject: first.subject, body: first.body },
+        templateVersion: COLD_TEMPLATE_VERSION,
+        followUps: rest.map(step => ({
+          subject: step.subject,
+          body: step.body,
+        })),
+        segment,
+      };
+  }
+  return {
+    copy: draftOutboundCopy({
+      channel: input.channel,
+      displayName: input.name,
+      claimUrl: input.claimUrl,
+      dmCopy: input.dmCopy,
+    }),
+    templateVersion: LEGACY_TEMPLATE_VERSION,
+    followUps: [],
+    segment,
+  };
 }
 
 /** Linktree page titles leak into names: "Ada - Listen on Spotify". */
@@ -200,7 +300,9 @@ function nextActionFor(
         ? 'check_entity'
         : 'review_facts';
     case 'certified':
-      return 'approve_message';
+      return facts.dogfood?.passed === true
+        ? 'approve_message'
+        : 'await_dogfood';
     case 'approved':
       return 'send';
     case 'sent':
@@ -239,19 +341,28 @@ export function buildOutboundRow(input: {
   // A saved draft keeps its channel only while its recipient is on file.
   const channel = saved && reachable(saved, facts) ? saved : channelFor(facts);
   const name = cleanOutboundName(facts.displayName, facts.linktreeHandle);
-  const message = approval.latestCopy
-    ? approval.latestCopy
-    : channel && target.claimUrl
-      ? {
-          ...draftOutboundCopy({
-            channel,
-            displayName: name,
-            claimUrl: target.claimUrl,
-            dmCopy: facts.dmCopy,
-          }),
-          revision: null,
-        }
+  // Hard gate: no draft reaches Tim until the built artifact and the
+  // onboarding flow both pass the dogfood judge.
+  const dogfood = facts.dogfood ?? DOGFOOD_GATE_CLOSED;
+  const machine =
+    dogfood.passed && channel && target.claimUrl
+      ? outboundMachineDraft({
+          channel,
+          name,
+          claimUrl: target.claimUrl,
+          dmCopy: facts.dmCopy,
+          artifact: facts.artifact,
+          latestReleaseDate: facts.latestReleaseDate,
+          now: input.now,
+        })
       : null;
+  const message = !dogfood.passed
+    ? null
+    : approval.latestCopy
+      ? approval.latestCopy
+      : machine
+        ? { ...machine.copy, revision: null }
+        : null;
   return {
     leadId: facts.id,
     dedupeKey: input.dedupeKey,
@@ -271,6 +382,7 @@ export function buildOutboundRow(input: {
     ability: 'unknown',
     intent: 'unknown',
     certified: facts.certified,
+    dogfoodBlocks: dogfood.blocks,
     channel,
     nextAction: nextActionFor(view, facts, flags),
     approval: {
@@ -281,12 +393,21 @@ export function buildOutboundRow(input: {
       approvedAt: approval.approvedAt,
     },
     message,
+    draft: machine
+      ? {
+          copy: machine.copy,
+          templateVersion: machine.templateVersion,
+          followUps: machine.followUps,
+          segment: machine.segment,
+        }
+      : null,
   };
 }
 
 const ACTION_ORDER: Record<OutboundNextAction, number> = {
   send: 0,
   approve_message: 1,
+  await_dogfood: 1.5,
   review_facts: 2,
   gather_evidence: 3,
   check_entity: 4,

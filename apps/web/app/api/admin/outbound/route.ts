@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { loadOutreachEngineStatus } from '@/lib/outbound/cold/engine.server';
 import {
   approveOutbound,
   decideOutboundTarget,
@@ -65,10 +66,16 @@ async function requireAdmin(purpose?: 'read') {
  * GET /api/admin/outbound — the ranked outbound queue.
  * GET /api/admin/outbound?lead=<id> — per-fact certification for one row.
  * GET /api/admin/outbound?summary=1 — view counts only, for the sidebar.
+ * GET /api/admin/outbound?engine=1 — learning, auto-approve, controller, funnel.
  */
 export async function GET(request: Request) {
   const gate = await requireAdmin('read');
   if (gate.error) return gate.error;
+
+  if (new URL(request.url).searchParams.get('engine') === '1')
+    return NextResponse.json(await loadOutreachEngineStatus(), {
+      headers: NO_STORE_HEADERS,
+    });
 
   const leadId = new URL(request.url).searchParams.get('lead');
   if (leadId) {

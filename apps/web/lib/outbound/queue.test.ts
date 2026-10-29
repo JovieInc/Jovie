@@ -13,6 +13,7 @@ import {
   fitBand,
   fitBasis,
   type OutboundLeadFacts,
+  outboundMachineDraft,
   rankOutboundRows,
   whyNow,
 } from './queue';
@@ -52,6 +53,7 @@ function facts(overrides: Partial<OutboundLeadFacts> = {}): OutboundLeadFacts {
     certified: false,
     replied: false,
     evidenceClasses: ['dsp', 'catalog', 'search', 'reachability'],
+    dogfood: { passed: true, blocks: [] },
     ...overrides,
   };
 }
@@ -276,6 +278,24 @@ describe('outbound queue display', () => {
     expect(approved.nextAction).toBe('send');
   });
 
+  it('shows no draft and waits on the dogfood judge while the gate is shut', () => {
+    for (const dogfood of [
+      undefined,
+      null,
+      { passed: false, blocks: ['onboarding_failed'] as const },
+    ]) {
+      const gated = row(facts({ certified: true, dogfood }));
+      expect(gated.view).toBe('certified');
+      expect(gated.nextAction).toBe('await_dogfood');
+      expect(gated.message).toBeNull();
+      expect(gated.draft).toBeNull();
+      expect(gated.dogfoodBlocks.length).toBeGreaterThan(0);
+    }
+    const open = row(facts({ certified: true }));
+    expect(open.nextAction).toBe('approve_message');
+    expect(open.dogfoodBlocks).toEqual([]);
+  });
+
   it('ranks closest-to-revenue first, then fit, then priority', () => {
     const ranked = rankOutboundRows(
       [
@@ -305,5 +325,39 @@ describe('outbound queue display', () => {
       certified: 1,
       approved: 0,
     });
+  });
+});
+
+describe('outboundMachineDraft', () => {
+  const NOW_DRAFT = new Date('2026-10-29T12:00:00Z');
+  const base = {
+    channel: 'email' as const,
+    name: 'Nova Lane',
+    claimUrl: 'https://jov.ie/claim/tok',
+    dmCopy: null,
+    latestReleaseDate: null,
+    now: NOW_DRAFT,
+  };
+
+  it('uses the cold draft and its follow-ups once the built artifact has facts', () => {
+    const draft = outboundMachineDraft({
+      ...base,
+      artifact: {
+        releaseCount: 4,
+        platformCount: 5,
+        latestRelease: { title: 'Low Tide', releasedOn: '2026-10-10' },
+      },
+    });
+    expect(draft.templateVersion).toBe('cold-draft/v1');
+    expect(draft.segment).toBe('email:recent_release');
+    expect(draft.copy.body).toContain('"Low Tide" is on it.');
+    expect(draft.followUps).toHaveLength(2);
+  });
+
+  it('falls back to the legacy one-liner without artifact facts', () => {
+    const draft = outboundMachineDraft({ ...base, artifact: null });
+    expect(draft.templateVersion).toBe('outbound-default/v1');
+    expect(draft.segment).toBe('email:catalog');
+    expect(draft.followUps).toEqual([]);
   });
 });
