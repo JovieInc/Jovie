@@ -4,7 +4,7 @@ const SHA = 'a'.repeat(40);
 const shared = vi.hoisted(() => ({ backend: null as unknown }));
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/env', () => ({
-  env: { VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://jov.ie' },
+  env: { VERCEL_ENV: 'production' },
 }));
 vi.mock('@/lib/observability/build-info', () => ({
   resolveCommitSha: () => 'a'.repeat(40),

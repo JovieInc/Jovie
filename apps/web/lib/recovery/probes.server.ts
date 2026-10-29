@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { BASE_URL } from '@/constants/domains';
 import { env } from '@/lib/env';
 import { resolveCommitSha } from '@/lib/observability/build-info';
 import { readProdGoldenPathLedger } from '@/lib/ovie/certifications/prod-golden-path-ledger';
@@ -36,10 +37,10 @@ export function createProductionCertifier(
     async isLiveOnProduction() {
       if (!ownSha || env.VERCEL_ENV !== 'production') return false;
       try {
-        const res = await fetchImpl(
-          `${env.NEXT_PUBLIC_APP_URL ?? 'https://jov.ie'}/api/health/build-info`,
-          { cache: 'no-store', signal: AbortSignal.timeout(5000) }
-        );
+        const res = await fetchImpl(`${BASE_URL}/api/health/build-info`, {
+          cache: 'no-store',
+          signal: AbortSignal.timeout(5000),
+        });
         if (!res.ok) return false;
         const body = (await res.json()) as { commitSha?: string };
         return body.commitSha === ownSha;
@@ -56,7 +57,7 @@ export function createProductionCertifier(
     },
     async goldenPathGreen() {
       const ledger = await readLedger();
-      return isGoldenPathGreen(ledger, ownSha, new Date());
+      return isGoldenPathGreen(ledger, ownSha ?? null, new Date());
     },
     async recheck(checkId) {
       if (!ownSha) return false;
