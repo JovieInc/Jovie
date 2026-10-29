@@ -1,8 +1,8 @@
 {
   "_generated": {
-    "version": "9ee886e0a97c",
+    "version": "64ddf08fc83f",
     "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
-    "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
+    "listingHash": "a85d2d6e7ee9757b15e990a03c5750e3e08fdf5c616c2ebe6ccced9b55f3a8e6",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   },
   "name": "Jovie",
@@ -13,7 +13,7 @@
     "Productivity",
     "Marketing"
   ],
-  "documentationUrl": "https://jov.ie/support",
+  "documentationUrl": "https://jov.ie/developers/agents",
   "privacyPolicyUrl": "https://jov.ie/legal/privacy",
   "supportUrl": "https://jov.ie/support",
   "serverUrl": "https://jov.ie/api/mcp",

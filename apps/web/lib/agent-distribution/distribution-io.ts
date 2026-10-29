@@ -1,5 +1,5 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { AGENT_DRAFT_TOOLS } from '@/lib/agent-acquisition/api';
 import {
   buildDistribution,
@@ -7,6 +7,7 @@ import {
   type DistributionTool,
   REGENERATE_COMMAND,
 } from './generate';
+import { loadIconSource } from './icons';
 import { LISTING } from './listing';
 
 const ASSET_NAMES = ['icon.svg', 'icon-dark.svg', 'logo.svg', 'logo-dark.svg'];
@@ -25,12 +26,14 @@ async function walk(dir: string): Promise<string[]> {
 
 export async function renderDistribution(
   assetDir: string,
-  tools: readonly DistributionTool[] = AGENT_DRAFT_TOOLS as unknown as readonly DistributionTool[]
+  tools: readonly DistributionTool[] = AGENT_DRAFT_TOOLS as unknown as readonly DistributionTool[],
+  repoRoot: string = resolve(assetDir, '../../../../..')
 ): Promise<DistributionOutput> {
   const assets: Record<string, string> = {};
   for (const name of ASSET_NAMES)
     assets[name] = await readFile(join(assetDir, name), 'utf8');
-  return buildDistribution(tools, LISTING, assets);
+  const iconSource = await loadIconSource(repoRoot);
+  return buildDistribution(tools, LISTING, assets, iconSource?.info ?? null);
 }
 
 /** Paths whose committed content differs from `files`, plus committed files the generator no longer emits. */
