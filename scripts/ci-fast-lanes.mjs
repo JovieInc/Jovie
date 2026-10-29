@@ -917,6 +917,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/evals/summer-ops-card-copy.test.mjs',
   'scripts/dogfood-judge/judge-core.test.mjs',
   'scripts/dogfood-judge/registry-receipt.test.mjs',
+  'scripts/dogfood-judge/loop.test.mjs',
   'scripts/funnel-judge/preview-gate.test.mjs',
   'scripts/funnel-judge/proof-gate.test.mjs',
   'scripts/funnel-judge/rubric.test.mjs',

@@ -67,6 +67,7 @@
     {"id": "workflow:macos-ci", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/macos-ci.yml", "repair": "JOV-8657. Mac-only failures: a diff defect (e.g. GNU-only `date -d`/`sed -i`) is labelled to the PR's writer lane by Lane Fix Relay; a lane or runner defect is repaired by gem-ci-repair, filed as remediation:mac-lane; an offline or asleep jovie-mac pool falls back to hosted macOS and is repaired by gem-hostops."},
     {"id": "workflow:marketing-certification-producer", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/marketing-certification-producer.yml"},
     {"id": "workflow:merge-queue-green-enroll", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/merge-queue-green-enroll.yml"},
+    {"id": "workflow:dogfood-judge-recert", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/dogfood-judge-recert.yml"},
     {"id": "workflow:merge-queue-ruleset-verify", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/merge-queue-ruleset-verify.yml"},
     {"id": "workflow:mutation-diff", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/mutation-diff.yml"},
     {"id": "workflow:neon-ephemeral-branch-cleanup", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/neon-ephemeral-branch-cleanup.yml"},

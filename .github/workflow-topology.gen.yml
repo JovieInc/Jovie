@@ -379,6 +379,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:garden
     jobCount: 1
+  - name: Dogfood Judge Recert
+    path: .github/workflows/dogfood-judge-recert.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:recalibrate
+    jobCount: 3
   - name: E2E Full Browser Matrix
     path: .github/workflows/e2e-full-matrix.yml
     active: true

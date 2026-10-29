@@ -81,6 +81,12 @@ Finding shape:
 
 ### vision-critique (`/qa-swarm-vision`)
 
+For a recorded agent run (video plus step screenshots), run the LLM dogfood
+judge instead of scoring by hand: `node scripts/dogfood-judge/cli.mjs judge
+--surface <id> --run <dir> --propose live` (Tim-taste rubric, cold screenshot
+test, Pen side-by-side; findings propose through this recipe). Gates read
+`cli.mjs gate`; Tim's corrections on judge-passed runs go in via `cli.mjs miss`.
+
 1. Capture before/after screenshots for affected surfaces.
 2. Score polish 1-10; flag `broken` when unusable, `janky` when polish < 6.
 3. Use `/design-review` for fixable objective issues; tag taste-only as `kind:
