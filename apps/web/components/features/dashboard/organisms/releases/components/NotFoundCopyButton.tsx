@@ -2,9 +2,9 @@
 
 // @coverage-via apps/web/tests/components/dashboard/organisms/releases/cells/ProviderCell.interaction.test.tsx
 
+import { Button } from '@jovie/ui';
 import { memo } from 'react';
 import { Icon } from '@/components/atoms/Icon';
-import { DrawerButton } from '@/components/molecules/drawer';
 import { cn } from '@/lib/utils';
 
 export interface NotFoundCopyButtonProps {
@@ -30,16 +30,11 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
   onCopy,
 }: Readonly<NotFoundCopyButtonProps>) {
   return (
-    <DrawerButton
+    <Button
       type='button'
-      tone={isCopied ? 'secondary' : 'ghost'}
+      variant={isCopied ? 'secondary' : 'ghost'}
       size='sm'
-      className={cn(
-        'group/btn h-7 gap-1.5 rounded-full px-2.5 text-2xs font-normal',
-        isCopied
-          ? 'border-success/15 bg-success/10 text-success'
-          : 'text-tertiary-token'
-      )}
+      className='group/btn'
       onClick={() =>
         void onCopy(smartLinkPath, `${releaseTitle} smart link`, testId)
       }
@@ -48,6 +43,7 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
         name={isCopied ? 'Check' : 'Copy'}
         className={cn(
           'h-3 w-3 transition-opacity',
+          isCopied ? 'text-success' : undefined,
           isCopied
             ? 'opacity-100'
             : 'opacity-0 group-hover/btn:opacity-100 group-focus-visible/btn:opacity-100'
@@ -57,11 +53,11 @@ export const NotFoundCopyButton = memo(function NotFoundCopyButton({
       <span
         className={cn(
           'line-clamp-1',
-          isCopied ? 'text-inherit' : 'text-tertiary-token'
+          isCopied ? 'text-success' : 'text-tertiary-token'
         )}
       >
         {isCopied ? 'Copied!' : '—'}
       </span>
-    </DrawerButton>
+    </Button>
   );
 });

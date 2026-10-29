@@ -8,6 +8,7 @@ import { AvailabilityCell } from '@/features/dashboard/organisms/releases/cells/
 import { ProviderCell } from '@/features/dashboard/organisms/releases/cells/ProviderCell';
 import { NotFoundCopyButton } from '@/features/dashboard/organisms/releases/components/NotFoundCopyButton';
 import { ProviderCopyButton } from '@/features/dashboard/organisms/releases/components/ProviderCopyButton';
+import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 vi.mock('@/lib/utils/platform-detection', () => ({
@@ -107,7 +108,7 @@ describe('ProviderCell actions', () => {
         ),
         'utf8'
       )
-    ).toContain("'border-success/15 bg-success/10 text-success'");
+    ).toContain("isCopied ? 'text-success' : undefined");
     expect(
       readFileSync(
         resolve(
@@ -116,11 +117,55 @@ describe('ProviderCell actions', () => {
         ),
         'utf8'
       )
-    ).toContain("'border-success/15 bg-success/10 text-success'");
+    ).toContain("isCopied ? 'text-success' : undefined");
   });
 });
 
 describe('Ion-token feedback on availability surfaces', () => {
+  it('submits the latest edited provider URL', async () => {
+    const user = userEvent.setup();
+    const onAddUrl = vi.fn().mockResolvedValue(undefined);
+    const release: ReleaseViewModel = {
+      id: 'release-1',
+      profileId: 'profile-1',
+      title: 'Midnight Signal',
+      status: 'released',
+      slug: 'midnight-signal',
+      smartLinkPath: '/r/midnight-signal',
+      releaseType: 'single',
+      isExplicit: false,
+      totalTracks: 1,
+      providers: [],
+    };
+    render(
+      <TooltipProvider>
+        <AvailabilityCell
+          release={release}
+          allProviders={['spotify']}
+          providerConfig={PROVIDER_CONFIG}
+          onCopy={vi.fn().mockResolvedValue('copied')}
+          onAddUrl={onAddUrl}
+        />
+      </TooltipProvider>
+    );
+    await user.click(
+      screen.getByRole('button', { name: 'Show Provider Availability Details' })
+    );
+    await user.click(screen.getByRole('button', { name: '+ Add link' }));
+    const input = screen.getByPlaceholderText('Paste URL...');
+    await user.type(input, 'https://open.spotify.com/track/first');
+    await user.clear(input);
+    await user.type(input, 'https://open.spotify.com/track/latest');
+    await user.click(screen.getByRole('button', { name: 'Confirm URL' }));
+    await waitFor(() =>
+      expect(onAddUrl).toHaveBeenCalledExactlyOnceWith(
+        'release-1',
+        'spotify',
+        'https://open.spotify.com/track/latest'
+      )
+    );
+  });
+
   it.each([false, true])(
     'copies a provider link with manual=%s',
     async isManual => {
@@ -160,9 +205,10 @@ describe('Ion-token feedback on availability surfaces', () => {
       />
     );
     const button = screen.getByRole('button', { name: 'Copied!' });
-    expect(button).toHaveClass(
-      'border-success/15',
-      'bg-success/10',
+    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveAttribute('data-size', 'sm');
+    expect(screen.getByText('Copied!')).toHaveClass('text-success');
+    expect(button.querySelector('svg')?.parentElement).toHaveClass(
       'text-success'
     );
     expect(button.className).not.toMatch(/emerald|amber/);
@@ -259,9 +305,10 @@ describe('Ion-token feedback on availability surfaces', () => {
     );
 
     const button = screen.getByRole('button');
-    expect(button.className).toContain('border-success/15');
-    expect(button.className).toContain('bg-success/10');
-    expect(button.className).toContain('text-success');
+    expect(button).toHaveAttribute('data-variant', 'secondary');
+    expect(button).toHaveAttribute('data-size', 'sm');
+    expect(screen.getByText('Copied!')).toHaveClass('text-success');
+    expect(button.querySelector('svg')).toHaveClass('text-success');
     expect(button.className).not.toMatch(/emerald|amber/);
   });
 });
