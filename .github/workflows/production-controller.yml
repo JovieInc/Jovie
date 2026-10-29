@@ -1626,13 +1626,13 @@ jobs:
             # 2026-10-25..29). Close it and regenerate: the publisher recollects
             # from the last merged receipt, so nothing is lost.
             age_hours="$(jq -r '((now - (.[0].created_at | fromdateiso8601)) / 3600) | floor' <<<"$open_notes")"
-            in_queue="$(gh api graphql -f query='query($n:Int!){repository(owner:"JovieInc",name:"Jovie"){pullRequest(number:$n){isInMergeQueue}}}' -F n="$pr" --jq .data.repository.pullRequest.isInMergeQueue)"
+            in_queue="$(node packages/api-client/cli.ts gh --priority default -- api graphql -f query='query($n:Int!){repository(owner:"JovieInc",name:"Jovie"){pullRequest(number:$n){isInMergeQueue}}}' -F n="$pr" --jq .data.repository.pullRequest.isInMergeQueue)"
             if [ "$in_queue" = true ] || [ "$age_hours" -lt 6 ]; then
               echo "Existing release PR owns publication: #$pr (${age_hours}h old)"
               exit 0
             fi
             echo "::warning title=Stale customer changelog PR::#$pr open ${age_hours}h; closing so publication continues"
-            gh pr close "$pr" --delete-branch \
+            node packages/api-client/cli.ts gh --priority default -- pr close "$pr" --delete-branch \
               --comment "Closing: open ${age_hours}h without merging, which blocks later customer changelog publication. A fresh release PR is generated from the last merged receipt."
           fi
           branch="release/daily-changelog-$(date -u +%F)-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"

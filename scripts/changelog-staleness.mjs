@@ -6,6 +6,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, readFileSync } from 'node:fs';
+import { runGh } from '../packages/api-client/gh.ts';
 import { evaluateChangelogStaleness } from './lib/changelog-staleness.mjs';
 import { extractDailyReceipts } from './lib/daily-changelog.mjs';
 import { readCustomerNote } from './lib/daily-changelog-publication.mjs';
@@ -57,15 +58,18 @@ for (let i = 0; i < numbers.length; i += 50) {
   const fields = batch
     .map(n => `p${n}:pullRequest(number:${n}){number mergedAt body}`)
     .join('\n');
-  const response = JSON.parse(
-    execFileSync('gh', ['api', 'graphql', '--input', '-'], {
-      input: JSON.stringify({
-        query: `query { repository(owner:"JovieInc",name:"Jovie") { ${fields} } }`,
-      }),
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    })
+  const result = await runGh(
+    [
+      'api',
+      'graphql',
+      '-f',
+      `query=query { repository(owner:"JovieInc",name:"Jovie") { ${fields} } }`,
+    ],
+    { priority: 'report' }
   );
+  if (result.code !== 0)
+    throw new Error(`GitHub read failed (exit ${result.code})`);
+  const response = JSON.parse(result.stdout);
   for (const n of batch) {
     const pr = response.data?.repository?.[`p${n}`];
     if (pr?.mergedAt && readCustomerNote(pr.body).note)
