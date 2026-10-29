@@ -42,9 +42,25 @@ describe('HomepageHeroCanvas', () => {
     const light = screen.getByTestId('homepage-hero-light');
     expect(light).toHaveAttribute('data-renderer', 'css');
     expect(light.querySelector('canvas')).toBeNull();
+    // The proof is the template profile capture in the canonical phone
+    // frame, beside the lead and never a person (no face on `/`).
+    const proof = screen.getByTestId('homepage-hero-proof');
     expect(
-      document.querySelector('.homepage-artist-hero__phone')
+      proof.querySelector(
+        '[data-testid="product-screenshot-frame-template-profile-live-mobile"]'
+      )
     ).not.toBeNull();
+    expect(proof.querySelector('.mobile-web-screen')).not.toBeNull();
+    const shot = screen.getByRole('img', { name: hero.profile.alt });
+    expect(shot.getAttribute('src')).toMatch(
+      /^\/product-screenshots\/template-profile-live-phone\.png/
+    );
+    expect(shot).toHaveAttribute('data-priority', 'true');
+    expect(
+      document
+        .querySelector('.homepage-hero-canvas__copy')
+        ?.getAttribute('data-has-proof')
+    ).toBe('true');
   });
 
   it('keeps the canonical shell header and moves the claim into the copy column', () => {
@@ -143,7 +159,12 @@ describe('HomepageHeroCanvas', () => {
       hero.headline
     );
     expect(document.querySelector('.homepage-hero-canvas__proof')).toBeNull();
-    expect(document.querySelector('.homepage-artist-hero__phone')).toBeNull();
+    expect(screen.queryByTestId('homepage-hero-proof')).toBeNull();
+    expect(
+      document
+        .querySelector('.homepage-hero-canvas__copy')
+        ?.hasAttribute('data-has-proof')
+    ).toBe(false);
     expect(screen.queryByRole('img')).toBeNull();
   });
 });

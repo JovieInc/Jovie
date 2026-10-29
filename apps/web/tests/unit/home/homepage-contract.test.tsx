@@ -229,10 +229,23 @@ describe('homepage contract', { timeout: 60_000 }, () => {
   it('shows no person capture on the homepage (Tim, 2026-10-26)', async () => {
     const { container } = await renderHomePage();
     const images = [...container.querySelectorAll('main img, section img')];
+    const sources = images.map(image => image.getAttribute('src') ?? '');
 
-    expect(images.map(image => image.getAttribute('src'))).toEqual([]);
+    // One image on `/`: the hero's real product shot, the template profile
+    // capture (jov.ie/you, monogram avatar, abstract release art).
+    expect(sources).toHaveLength(1);
+    expect(sources[0]).toMatch(
+      /^\/product-screenshots\/template-profile-live-phone\.png(\?v=\w+)?$/
+    );
+    const hero = container.querySelector(
+      '[data-testid="marketing-section-hero"]'
+    );
+    expect(hero?.querySelector('[data-testid="homepage-hero-proof"] img')).toBe(
+      images[0]
+    );
+    // No person capture is wired anywhere in the homepage sources.
     for (const path of HOMEPAGE_SOURCES) {
-      expect(read(path), path).not.toContain('/product-screenshots/');
+      expect(read(path), path).not.toMatch(/tim-white|tim-profile/iu);
     }
   });
 

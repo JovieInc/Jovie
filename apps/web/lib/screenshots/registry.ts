@@ -400,6 +400,16 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       fixedNow: '2026-04-15T12:00:00.000Z',
     },
     {
+      // Homepage hero product shot. The template identity (jov.ie/you,
+      // monogram avatar, abstract release art) keeps every person off `/`.
+      id: 'template-profile-live-mobile',
+      title: 'Template Profile — Latest Release',
+      route: '/demo/showcase/tim-white-profile?archetype=template',
+      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      viewport: 'mobile',
+      publicExportPath: 'template-profile-live-phone.png',
+    },
+    {
       id: 'release-presave-mobile',
       title: 'Release Presave Mobile',
       route: '/demo/showcase/release-presave',
@@ -674,6 +684,7 @@ const PUBLIC_EXPORT_DIMENSIONS: Record<
   'release-tasks-active.png': { width: 1624, height: 1428 },
   'releases-dashboard-full.png': { width: 2880, height: 1800 },
   'releases-dashboard-sidebar.png': { width: 2880, height: 1800 },
+  'template-profile-live-phone.png': { width: 780, height: 1688 },
   'tim-white-profile-contact-phone.png': { width: 780, height: 1688 },
   'tim-white-profile-listen-phone.png': { width: 780, height: 1688 },
   'tim-white-profile-live-phone.png': { width: 780, height: 1688 },
