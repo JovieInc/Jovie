@@ -15,6 +15,7 @@ import {
   MarketingHeroPhoto,
   MarketingPageShell,
 } from '@/components/marketing';
+import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
 import { ClaimHandleForm } from '@/features/home/claim-handle';
 
 /* -------------------------------------------------------------------------- */
@@ -38,34 +39,52 @@ function TipsHero() {
       <MarketingHeroPhoto {...PAY_HERO_PHOTO} />
       <div className='hero-glow pointer-events-none absolute inset-0' />
       <MarketingHero
-        variant='centered'
-        className='items-start text-left'
+        variant='split'
+        className='items-center text-left'
         headingId='pay-hero-heading'
         testId='pay-hero'
       >
-        <p className='marketing-kicker'>Pay</p>
-        {/* ui-casing-allow: marketing display headline */}
-        {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
-        <h1
-          id='pay-hero-heading'
-          className='marketing-h1-linear mt-6 max-w-2xl text-primary-token'
-        >
-          Turn every payment into a follower.
-        </h1>
-        {/* eslint-enable @jovie/canonical-ui-label-casing */}
+        <div className='flex flex-col items-start'>
+          <p className='marketing-kicker'>Pay</p>
+          {/* ui-casing-allow: marketing display headline */}
+          {/* eslint-disable @jovie/canonical-ui-label-casing -- Preserve approved sentence-case marketing copy while adding binding evidence. */}
+          <h1
+            id='pay-hero-heading'
+            className='marketing-h1-linear mt-6 max-w-2xl text-primary-token'
+          >
+            Turn every payment into a follower.
+          </h1>
+          {/* eslint-enable @jovie/canonical-ui-label-casing */}
 
-        <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
-          Scan the code, pay in seconds, and land on a Jovie profile that keeps
-          the relationship going after the moment ends.
-        </p>
+          <p className='marketing-lead-linear mt-6 max-w-[33rem] text-secondary-token'>
+            Scan the code, pay in seconds, and land on a Jovie profile that
+            keeps the relationship going after the moment ends.
+          </p>
 
-        <div className='mt-8 w-full max-w-[29rem] text-left'>
-          <ClaimHandleForm />
+          <div className='mt-8 w-full max-w-[29rem] text-left'>
+            <ClaimHandleForm />
+          </div>
+
+          <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
+            Free forever. No credit card required.
+          </p>
         </div>
 
-        <p className='mt-4 text-[length:var(--linear-label-size)] text-tertiary-token'>
-          Free forever. No credit card required.
-        </p>
+        {/* The real pay sheet from the profile (?mode=pay), cropped to the
+            sheet so its amount chips and Venmo action read at hero size. */}
+        <div
+          data-testid='pay-hero-product'
+          className='relative mx-auto aspect-[780/1000] w-full max-w-[22rem] overflow-hidden rounded-[2rem] border border-subtle bg-surface-0 shadow-card md:mr-0'
+        >
+          <MarketingPhoneImage
+            scenarioId='tim-white-profile-pay-mobile'
+            altOverride='Pay sheet on a Jovie profile: pick $5, $10 or $20 and continue with Venmo'
+            fill
+            priority
+            sizes='(min-width: 768px) 22rem, 90vw'
+            className='rounded-none object-cover object-bottom'
+          />
+        </div>
       </MarketingHero>
     </section>
   );

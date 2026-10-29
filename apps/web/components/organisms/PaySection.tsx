@@ -285,7 +285,7 @@ export function PaySection({
               groupLabel='Choose a payment method'
               hint={
                 effectiveMethod === 'venmo'
-                  ? 'Enter the amount in Venmo before sending.'
+                  ? `Send ${formatDollarAmount(selectedAmount)} in Venmo.`
                   : methods.length > 1
                     ? 'Swipe to switch methods. Payment starts only when you press Pay.'
                     : 'Payment starts only when you press Pay.'
