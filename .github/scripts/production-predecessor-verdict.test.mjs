@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 import {
   applyInFlightOverride,
@@ -145,9 +148,9 @@ test('wait: FAIL while waiting refuses immediately (no further polling)', async 
   assert.equal(states.length, 1);
 });
 
-test('wait: a throwing reader is UNREADABLE, never PASS', async () => {
+test('wait: a rejecting reader is UNREADABLE, never PASS', async () => {
   const result = await waitForVerdict({
-    readMarker: () => {
+    readMarker: async () => {
       throw new Error('boom');
     },
     ...ctx,
@@ -245,3 +248,84 @@ test('a live generation still verifying (no marker, earlier run active) is PENDI
   assert.equal(applyInFlightOverride(verified, active), verified);
   assert.deepEqual(earlierActiveRuns(runs, undefined), []);
 });
+
+// Exercise the shipped CLI and the real shared client against a local gh fixture.
+// The persisted ledger proves the call crossed budget admission at deploy priority.
+for (const [scenario, expectedExit, verdict, calls] of [
+  ['bootstrap', EXIT.PASS, 'PASS', 2],
+  ['active', EXIT.PENDING_TIMEOUT, 'PENDING', 2],
+  ['denied', EXIT.UNREADABLE, 'UNREADABLE', 1],
+]) {
+  test(`CLI: ${scenario} uses the shared deploy budget and preserves ${verdict}`, t => {
+    const dir = mkdtempSync(join(tmpdir(), 'predecessor-verdict-'));
+    t.after(() => rmSync(dir, { recursive: true, force: true }));
+    writeFileSync(
+      join(dir, 'gh'),
+      `#!${process.execPath}
+const args = process.argv.slice(2);
+const endpoint = args.at(-1);
+let body;
+if (endpoint.endsWith('/production-controller.yml')) {
+  if (process.env.VERDICT_SCENARIO === 'denied') {
+    process.stderr.write('HTTP 403: permission denied');
+    process.exit(1);
+  }
+  body = { id: 42, path: '.github/workflows/production-controller.yml', state: 'active' };
+} else if (endpoint.includes('/artifacts?')) {
+  body = { total_count: 0, artifacts: [] };
+} else if (endpoint.includes('/production-controller.yml/runs?')) {
+  body = { workflow_runs: process.env.VERDICT_SCENARIO === 'active' ? [{ id: 90, status: 'in_progress' }] : [] };
+} else {
+  process.stderr.write('unexpected endpoint: ' + endpoint);
+  process.exit(1);
+}
+if (args.includes('--include')) process.stdout.write('HTTP/2.0 200 OK\\n\\n');
+process.stdout.write(JSON.stringify(body));
+`,
+      { mode: 0o755 }
+    );
+    const output = join(dir, 'output');
+    const run = spawnSync(
+      process.execPath,
+      [
+        new URL('./production-predecessor-verdict.mjs', import.meta.url)
+          .pathname,
+        '--repo',
+        'JovieInc/Jovie',
+        '--predecessor-sha',
+        PRED,
+        '--release-sha',
+        REL,
+        '--current-run-id',
+        '100',
+        '--budget-seconds',
+        '0',
+      ],
+      {
+        encoding: 'utf8',
+        timeout: 10_000,
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          JOVIE_API_STATE_DIR: dir,
+          JOVIE_GITHUB_CREDENTIAL: 'predecessor-test',
+          GITHUB_OUTPUT: output,
+          VERDICT_SCENARIO: scenario,
+        },
+      }
+    );
+    assert.equal(run.status, expectedExit, run.stderr);
+    assert.match(
+      readFileSync(output, 'utf8'),
+      new RegExp(`^verdict=${verdict}\n`)
+    );
+    const ledger = JSON.parse(
+      readFileSync(join(dir, 'api-ledger/github.json'), 'utf8')
+    );
+    const usage = Object.values(ledger.credentials['predecessor-test'].usage);
+    assert.equal(
+      usage.reduce((sum, hour) => sum + hour.deploy.attempts, 0),
+      calls
+    );
+  });
+}
