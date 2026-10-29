@@ -451,6 +451,33 @@ describe('OpportunityInboxPageClient', () => {
     );
   });
 
+  it('switches views with the canonical toolbar tabs on one centre axis', async () => {
+    const user = userEvent.setup();
+    render(
+      <OpportunityInboxPageClient
+        inbox={{
+          cards: [],
+          availability: HEALTHY_AVAILABILITY,
+          emptyActionCards: [],
+        }}
+      />
+    );
+    const needs = screen.getByRole('button', { name: 'Needs You' });
+    const done = screen.getByRole('button', { name: 'Done For You' });
+    expect(needs).toHaveAttribute('aria-pressed', 'true');
+    expect(done).toHaveAttribute('aria-pressed', 'false');
+    // Shell canon: the view toggle and the notes control share one axis.
+    expect(screen.getByRole('toolbar', { name: 'Inbox View' })).toHaveClass(
+      'justify-center'
+    );
+    expect(screen.getByTestId('opportunity-inbox-notes')).toHaveClass(
+      'items-center'
+    );
+    await user.click(done);
+    expect(done).toHaveAttribute('aria-pressed', 'true');
+    expect(needs).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('discloses empty notes by keyboard and restores focus on Escape', async () => {
     const user = userEvent.setup();
     render(
