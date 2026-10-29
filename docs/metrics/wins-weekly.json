@@ -1,0 +1,33 @@
+{
+  "schema": "jovie.wins-weekly/v1",
+  "at": "2026-10-29T22:21:54.057Z",
+  "weeks": [
+    {
+      "week": "2026-10-19",
+      "wins": 0,
+      "verified": 0,
+      "claimed": 0,
+      "mergedPrs": 146,
+      "mergesPerDay": 20.9,
+      "leadTimeHoursP50": 2.7,
+      "secondsSavedPerMergeVerified": 0,
+      "secondsSavedPerMergeClaimed": 0
+    },
+    {
+      "week": "2026-10-26",
+      "wins": 9,
+      "verified": 1,
+      "claimed": 4,
+      "mergedPrs": 354,
+      "mergesPerDay": 50.6,
+      "leadTimeHoursP50": 2.8,
+      "secondsSavedPerMergeVerified": 0,
+      "secondsSavedPerMergeClaimed": 0
+    }
+  ],
+  "unmeasured": [
+    "ciMinutesSaved",
+    "costPerMergedPr"
+  ],
+  "note": "Engineering metrics only. Dollar figures belong in the private ops store and are never written here."
+}
