@@ -20,7 +20,8 @@ import {
 type ClaimOperationSource =
   | 'token_backed_onboarding'
   | 'direct_profile_reserve'
-  | 'direct_profile_spotify_match';
+  | 'direct_profile_spotify_match'
+  | 'agent_draft_handoff';
 
 interface ClaimTargetProfile {
   readonly id: string;
@@ -266,6 +267,11 @@ export async function claimPrebuiltProfileForUser(
     source: ClaimOperationSource;
     claimTokenHash?: string | null;
     finalizeOnboarding?: boolean;
+    /**
+     * Defaults to true (existing callers publish on claim). Agent-draft claims
+     * pass false: the owner publishes from the dashboard.
+     */
+    publish?: boolean;
   }
 ): Promise<{ profileId: string; username: string; status: 'updated' }> {
   const profile = await getClaimTargetProfile(tx, params.creatorProfileId);
@@ -335,7 +341,7 @@ export async function claimPrebuiltProfileForUser(
       userId: params.userId,
       displayName: params.displayName,
       isClaimed: true,
-      isPublic: true,
+      ...(params.publish === false ? {} : { isPublic: true }),
       claimedAt: profile.claimedAt ?? now,
       onboardingCompletedAt: params.finalizeOnboarding
         ? (profile.onboardingCompletedAt ?? now)
