@@ -1,0 +1,60 @@
+name: Production Prebuild
+# controller-hop-exception: jovie-controller-hop/v1
+# accountable-writer: Symphony
+# capability-gap: The production build must start the moment main CI is green, beside Staging Controller, but a build failure must never change the Staging Controller conclusion that gates Production Controller. Only a separate workflow run isolates that result.
+# revisit-trigger: Remove this hop when a called job can be best-effort without a job-level error override, or when staged builds become promotable.
+run-name: ${{ github.event.workflow_run.head_sha }} from CI ${{ github.event.workflow_run.id }}
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+permissions: {actions: read, contents: read}
+# One prebuild per SHA. It holds no release lease: it creates an unpromoted
+# deployment only, and Production Controller re-verifies it before any use.
+concurrency: {group: "production-prebuild-${{ github.event.workflow_run.head_sha }}", cancel-in-progress: false}
+jobs:
+  authorize-prebuild:
+    if: ${{ github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs: {web: "${{ steps.receipt.outputs.web }}"}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          sparse-checkout: |
+            packages/api-client
+            .nvmrc
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # github-token-budget: 2 calls/run - one lookup and one download of the sealed product-lane receipt
+      - id: receipt
+        env: {EXPECTED_SHA: "${{ github.event.workflow_run.head_sha }}", REPOSITORY: "${{ github.repository }}", SOURCE_CI_RUN_ATTEMPT: "${{ github.event.workflow_run.run_attempt }}", SOURCE_CI_RUN_ID: "${{ github.event.workflow_run.id }}", SOURCE_CI_HEAD_BRANCH: "${{ github.event.workflow_run.head_branch }}", SOURCE_CI_HEAD_REPOSITORY: "${{ github.event.workflow_run.head_repository.full_name }}", GH_TOKEN: "${{ github.token }}"}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]] && [ "$SOURCE_CI_HEAD_BRANCH" = main ] && [ "$SOURCE_CI_HEAD_REPOSITORY" = "$REPOSITORY" ] || { echo "::error::Production Prebuild received malformed exact-main CI evidence."; exit 1; }
+          # Same sealed receipt Staging Controller reads: build only for SHAs
+          # whose selected lanes include web. Anything else stays a no-op.
+          echo "web=false" >> "$GITHUB_OUTPUT"
+          receipt_name="product-lane-release-${EXPECTED_SHA}-${SOURCE_CI_RUN_ATTEMPT}"
+          run_id="$(node packages/api-client/cli.ts gh --priority deploy -- api "repos/$REPOSITORY/actions/artifacts?name=$receipt_name&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.id) | last | .workflow_run.id // empty')"
+          if ! [[ "$run_id" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::notice::No sealed product-lane receipt for $EXPECTED_SHA; no prebuild."
+            exit 0
+          fi
+          mkdir "$RUNNER_TEMP/receipt"
+          node packages/api-client/cli.ts gh --priority deploy -- run download "$run_id" --repo "$REPOSITORY" --name "$receipt_name" --dir "$RUNNER_TEMP/receipt"
+          if jq -e --arg sha "$EXPECTED_SHA" --arg run "$SOURCE_CI_RUN_ID" '.provenance.sha == $sha and .releaseRouting.sourceMainRunId == $run and .aggregatePassed == true and (.selectedLanes | index("web") != null)' "$RUNNER_TEMP/receipt/release.json" >/dev/null; then
+            echo "web=true" >> "$GITHUB_OUTPUT"
+          fi
+  prebuild:
+    needs: [authorize-prebuild]
+    if: ${{ needs.authorize-prebuild.result == 'success' && needs.authorize-prebuild.outputs.web == 'true' }}
+    uses: ./.github/workflows/production-release.yml
+    permissions: {actions: read, attestations: write, contents: read, id-token: write}
+    with: {expected_sha: "${{ github.event.workflow_run.head_sha }}", release_mode: prebuild}
+    secrets: inherit
