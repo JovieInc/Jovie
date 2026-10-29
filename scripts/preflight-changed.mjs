@@ -44,6 +44,7 @@ import {
   PR_BODY_SKELETON,
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
+import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HEAP_MB = process.env.JOVIE_PREFLIGHT_HEAP_MB || '4096';
@@ -393,6 +394,12 @@ export async function main({
     return 0;
   }
   const cwd = args.repo;
+  // Fail fast before any check runs against an install this worktree did not make.
+  const install = checkInstallMatchesLockfile({ repo: cwd });
+  if (!install.ok) {
+    log(`[preflight:changed] ${install.message}`);
+    return 1;
+  }
   const started = Date.now();
   const childEnv = { ...env };
   for (const k of Object.keys(childEnv))
