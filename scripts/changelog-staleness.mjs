@@ -13,6 +13,7 @@ import { readCustomerNote } from './lib/daily-changelog-publication.mjs';
 
 const run = (cmd, args) =>
   execFileSync(cmd, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+/** @type {{ commitSha?: unknown }} */
 const live = await (
   await fetch('https://jov.ie/api/health/build-info', {
     signal: AbortSignal.timeout(15000),

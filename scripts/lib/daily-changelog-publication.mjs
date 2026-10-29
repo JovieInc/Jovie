@@ -42,7 +42,10 @@ function customerStoryIdentity(outcomeKey) {
   };
 }
 
-/** Customer-facing groups for a catch-up post, in display order. */
+/**
+ * Customer-facing groups for a catch-up post, in display order.
+ * @type {[string, string, RegExp][]}
+ */
 const CATCH_UP_GROUPS = [
   ['mac-app', 'Mac app', /\bmac\b|\bcmd\+/i],
   [
