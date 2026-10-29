@@ -1553,6 +1553,22 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/mesh/ping/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/mesh/ping",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/mesh/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/mesh",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/moderation/route.ts",
       "kind": "handler",
       "route": "/api/admin/moderation",
@@ -5281,6 +5297,14 @@
       "source": "apps/web/app/app/(shell)/admin/lists/views/[viewId]/page.tsx",
       "kind": "page",
       "route": "/app/admin/lists/views/[viewId]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/mesh/page.tsx",
+      "kind": "page",
+      "route": "/app/admin/mesh",
       "methods": [],
       "surface": "deferred",
       "classification": "C"

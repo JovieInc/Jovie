@@ -1,7 +1,7 @@
 'use client';
 
 import { Input } from '@jovie/ui';
-import { List, ListFilter, Plus } from 'lucide-react';
+import { List, ListFilter, Network, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { type KeyboardEvent, useState } from 'react';
@@ -175,6 +175,42 @@ function NewListRow() {
 }
 
 /**
+ * Static Mesh entry (JOV-8937): the read-only agent mesh roster. Lives next
+ * to the entity lists in the sidebar but outside the dynamic lists block so
+ * it renders before any list data loads.
+ */
+function MeshRow({ pathname }: { readonly pathname: string }) {
+  const { state, isMobile } = useSidebar();
+  const active = pathname === APP_ROUTES.ADMIN_MESH;
+
+  return (
+    <SidebarMenuItem>
+      <Tooltip label='Mesh' side='right' block>
+        <Link
+          href={APP_ROUTES.ADMIN_MESH}
+          aria-current={active ? 'page' : undefined}
+          aria-label='Mesh'
+          className={getSidebarNavRowClassName({
+            calm: true,
+            active,
+            collapsed: state === 'closed' && !isMobile,
+            className: 'rounded-lg',
+          })}
+        >
+          <Network
+            className={getSidebarNavIconClassName({ calm: true, active })}
+            aria-hidden='true'
+          />
+          <span className={cn('min-w-0 truncate', SHELL_RAIL_LABEL_OVERLAY)}>
+            Mesh
+          </span>
+        </Link>
+      </Tooltip>
+    </SidebarMenuItem>
+  );
+}
+
+/**
  * Ovie-only sidebar block: the founder's lists ("Collab list", "Press") and
  * smart views with counts. Views with no matches are omitted by the server,
  * so the block only shows where there is work. Never rendered by the Jovie
@@ -220,6 +256,12 @@ export function OperatorListsNav({ pathname }: { readonly pathname: string }) {
           </SidebarMenu>
         </div>
       ) : null}
+      <div>
+        <GroupLabel>Mesh</GroupLabel>
+        <SidebarMenu aria-label='Mesh'>
+          <MeshRow pathname={pathname} />
+        </SidebarMenu>
+      </div>
     </div>
   );
 }
