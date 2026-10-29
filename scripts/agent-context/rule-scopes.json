@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "d5f52bdb4af7fb39e6cf4eef8aaade5edbd285d900a3d13f9bf55f57f315d182"
+    "bodySha256": "e432bd7b9d223fec22c3eb84bc978c5faa11c3176cfa80c7d7fed3c570e6195f"
   },
   {
     "file": ".claude/rules/db.md",
@@ -96,7 +96,7 @@
       "scripts/lanes/**",
       "docs/PR_FLOW.md"
     ],
-    "bodySha256": "f0c1a664484bc6f73d8c6ab76cf8c814873c784d543dbe07ce859ed63d3bd084"
+    "bodySha256": "196fc8918b6923e4d1b4d67430c4dc91b2bf7e88b85f92e1e833ad103971d3d0"
   },
   {
     "file": ".claude/rules/macos.md",
@@ -140,7 +140,7 @@
       "docs/PR_FLOW.md",
       "RELEASE_CHECKLIST.md"
     ],
-    "bodySha256": "188a218a8f0f73a88014cdc77736cf7190cef27c7a39cfc9a950b952f79979c6"
+    "bodySha256": "5998b5a821de1c3ae4dc6ab2faadfbb8db382c83dfb3ff5cbc5f9c239f07db0c"
   },
   {
     "file": ".claude/rules/security.md",
@@ -152,6 +152,23 @@
       "scripts/**"
     ],
     "bodySha256": "8fc3a2864799b7d08f7512eeda0c5ec7a074e6b2f1c283ab750fc50d60b77e30"
+  },
+  {
+    "file": ".claude/rules/source-of-truth.md",
+    "paths": [
+      "canon/sources-of-truth.json",
+      "canon/SOURCES_OF_TRUTH.md",
+      "apps/web/lib/config/**",
+      "apps/web/lib/entitlements/**",
+      "apps/web/lib/billing/**",
+      "apps/web/lib/stripe/**",
+      "apps/web/data/marketingPricingPlans.ts",
+      "apps/web/content/legal/**",
+      "ops/registry/**",
+      "scripts/sources-of-truth*",
+      "scripts/lib/sources-of-truth*"
+    ],
+    "bodySha256": "10f64ffccb9f9cf17c8d18949b43550fb230fcafe534215282866c9ff073ae70"
   },
   {
     "file": ".claude/rules/swarm.md",
@@ -182,6 +199,6 @@
       "DESIGN.md",
       "docs/design-system/**"
     ],
-    "bodySha256": "5977cfcaaf24cb34bda42944a1d99fa0953ea54a12ba4f9afcc92108ad57df93"
+    "bodySha256": "8d31145e6c638bd6e7fd89698abae04dd5e21de1ba1b50688efed603b14495f8"
   }
 ]

@@ -45,6 +45,11 @@ export function HomepageHeroCanvas({
   profile,
   sectionOwner,
   sectionVariant = 'split-claim-card',
+  headingTestId,
+  claimTestId = 'homepage-hero-claim',
+  claimInputId = 'homepage-claim-handle',
+  claimTestIdPrefix = 'homepage',
+  claimSubmitTestId = 'homepage-primary-cta',
 }: Readonly<{
   headingId: string;
   headline: HomepageCopy['hero']['headline'];
@@ -65,6 +70,16 @@ export function HomepageHeroCanvas({
    * default keeps the shipped homepage look when it is omitted.
    */
   sectionVariant?: string;
+  headingTestId?: string;
+  /**
+   * Test and form identity for the claim control. The homepage keeps the
+   * defaults; a product page passes its own so its tests and analytics
+   * names stay stable when it adopts this treatment.
+   */
+  claimTestId?: string;
+  claimInputId?: string;
+  claimTestIdPrefix?: string;
+  claimSubmitTestId?: string;
 }>) {
   const rootRef = useRef<HTMLElement>(null);
   const beats = headlineBeats(headline);
@@ -98,6 +113,7 @@ export function HomepageHeroCanvas({
             <div className='homepage-hero-canvas__lead'>
               <h1
                 id={headingId}
+                data-testid={headingTestId}
                 className='marketing-type-display text-balance text-primary-token homepage-hero-canvas__headline'
               >
                 {beats.map((beat, index) => (
@@ -115,15 +131,15 @@ export function HomepageHeroCanvas({
               </p>
               <div
                 className='homepage-hero-canvas__conversion'
-                data-testid='homepage-hero-claim'
+                data-testid={claimTestId}
               >
                 <ProductClaimHandleForm
                   domain={claim.domain}
                   placeholder={claim.placeholder}
                   submitLabel={claim.action}
-                  inputId='homepage-claim-handle'
-                  testIdPrefix='homepage'
-                  submitTestId='homepage-primary-cta'
+                  inputId={claimInputId}
+                  testIdPrefix={claimTestIdPrefix}
+                  submitTestId={claimSubmitTestId}
                 />
                 <p className='homepage-hero-canvas__support'>{supportNote}</p>
               </div>
