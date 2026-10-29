@@ -8,8 +8,10 @@ import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { ACTION_BAR_BUTTON_CLASS, ActionBar } from './ActionBar';
 
+// One 40px toolbar row on every route (Pen ftsrB). Compact widths keep the
+// padded min-height so wrapped controls stay reachable.
 export const PAGE_TOOLBAR_CONTAINER_CLASS =
-  'flex min-h-10 min-w-0 items-center gap-1.5 bg-transparent px-3 py-1.5';
+  'flex min-h-10 min-w-0 items-center gap-1.5 bg-transparent px-3 py-1.5 sm:h-10 sm:py-0';
 
 export const PAGE_TOOLBAR_START_CLASS =
   'flex min-w-0 flex-1 items-center gap-1 overflow-x-auto p-0.5 -m-0.5 scroll-smooth [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden';
@@ -103,6 +105,7 @@ export function PageToolbar({
   return (
     <div
       data-testid={testId}
+      data-page-toolbar=''
       data-top-divider={topDivider ? 'true' : undefined}
       className={cn(
         PAGE_TOOLBAR_CONTAINER_CLASS,

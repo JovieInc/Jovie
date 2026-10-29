@@ -60,7 +60,7 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | Auth/Better Auth | [auth](.claude/rules/auth.md) |
 | Security, billing, entitlements | [security](.claude/rules/security.md) |
 | External APIs | [external-apis](.claude/rules/external-apis.md) |
-| UI/design | [DESIGN](DESIGN.md), [ui](.claude/rules/ui.md) |
+| UI/design | [DESIGN](DESIGN.md), [ui](.claude/rules/ui.md); screenshots shown to anyone: [design-present](.claude/rules/design-present.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
 | Writing/copy | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
 | Strategy (pricing, tiers, delegation) | [private strategy canon](canon/strategy/README.md) |
