@@ -454,8 +454,19 @@ export function buildInventory(registry = { ids: {} }) {
   return { rows, registry: { ids } };
 }
 
+// Compact on purpose: one entry per line keeps diffs reviewable and the
+// tracked-bytes budget (repo-hygiene) intact.
 function stable(obj) {
-  return `${JSON.stringify(obj, null, 1)}\n`;
+  const lines = Object.entries(obj).map(([k, v]) => {
+    if (Array.isArray(v))
+      return ` ${JSON.stringify(k)}: [\n${v.map(x => `  ${JSON.stringify(x)}`).join(',\n')}\n ]`;
+    if (v && typeof v === 'object')
+      return ` ${JSON.stringify(k)}: {\n${Object.entries(v)
+        .map(([a, b]) => `  ${JSON.stringify(a)}: ${JSON.stringify(b)}`)
+        .join(',\n')}\n }`;
+    return ` ${JSON.stringify(k)}: ${JSON.stringify(v)}`;
+  });
+  return `{\n${lines.join(',\n')}\n}\n`;
 }
 
 function main() {
@@ -471,8 +482,9 @@ function main() {
   const outJson = stable({ schema: 1, count: rows.length, rows });
   if (check) {
     const stale =
-      !existsSync(OUT_PATH) ||
-      !isDeepStrictEqual(JSON.parse(read(OUT_PATH)), JSON.parse(outJson)) ||
+      // inventory.gen.json is untracked (repo byte budget); verify only if present.
+      (existsSync(OUT_PATH) &&
+        !isDeepStrictEqual(JSON.parse(read(OUT_PATH)), JSON.parse(outJson))) ||
       !isDeepStrictEqual(JSON.parse(read(IDS_PATH)), JSON.parse(idsOut));
     if (stale) {
       console.error(

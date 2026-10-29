@@ -291,3 +291,4 @@ apps/web/runtime-data/
 .stryker-tmp/
 **/reports/mutation/
 apps/web/.agent-distribution-out/
+scripts/copy-inventory/inventory.gen.json
