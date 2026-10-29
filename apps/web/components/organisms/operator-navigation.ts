@@ -88,7 +88,7 @@ export const OPERATOR_NAV_GROUP_LABEL =
   'mb-1.5 block ps-(--app-shell-sidebar-label-inset) pe-(--app-shell-sidebar-inset) text-xs font-caption tracking-normal text-sidebar-muted';
 
 /**
- * Ovie has five primary destinations plus collapsed Business and Tools groups.
+ * Ovie has five primary destinations plus collapsed Company and Tools groups.
  * Primary navigation needs no group label; a group opens on demand and stays
  * open while one of its destinations is active.
  */
@@ -108,8 +108,10 @@ export const OPERATOR_NAV_SECTIONS: readonly OperatorNavSection[] = [
     items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'workspaces'),
   },
   {
+    // Tim's swipe (2026-10-25 01:31Z) chose "Company" over "Business". The id
+    // and the `business` section key stay, so routes and registry are stable.
     id: 'business',
-    label: 'Business',
+    label: 'Company',
     collapsible: true,
     items: OPERATOR_NAV_ITEMS.filter(item => item.section === 'business'),
   },

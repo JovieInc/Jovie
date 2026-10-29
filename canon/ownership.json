@@ -103,6 +103,7 @@
     {"id": "workflow:runner-health-monitor", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/runner-health-monitor.yml"},
     {"id": "workflow:runner-heartbeat", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/runner-heartbeat.yml"},
     {"id": "workflow:safe-pr-remediation", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/safe-pr-remediation.yml"},
+    {"id": "workflow:pr-remediation-swarm", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/pr-remediation-swarm.yml"},
     {"id": "workflow:screenshots", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/screenshots.yml"},
     {"id": "workflow:security-suppression-audit", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/security-suppression-audit.yml"},
     {"id": "workflow:security", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/security.yml"},
