@@ -12,9 +12,8 @@ const REPAIR_LABELS = new Set([
   'ci-fix',
   'ws:ci',
   'remediation',
-  'lane-fix-red',
-  'lane-fix-dequeued',
 ]);
+// lane-fix-* labels are lane bookkeeping applied after any red check; only the PR's own declared intent (fix: title, bug-fix checkbox, repair labels a human/author chose) triggers red-before-green.
 const EXEMPT_LABELS = new Set(['ios-ci', 'visual-regression']);
 const TEST_FILE = /(?:\.(?:test|spec)\.[cm]?[jt]sx?$|(?:^|\/)test_[^/]+\.py$)/;
 const ASSERTION = /\b(?:expect\s*\(|assert[.(]|assert\s)/;
@@ -205,7 +204,15 @@ export function evaluateFleetRules({
     const link = field(red, 'Failing run \\(before fix\\)').replace(/`/g, '');
     if (!text(command) || (!output && !RUN_URL.test(link)))
       errors.push(
-        'red-before-green: include Failing command: plus a red-output fence or Failing run (before fix): <URL>.'
+        `red-before-green: ${
+          red.trim()
+            ? 'the "## Red-before-green" section is present but incomplete'
+            : 'this repair PR has no "## Red-before-green" section'
+        }${text(command) ? '' : '; missing "- Failing command: <cmd>"'}${
+          output || RUN_URL.test(link)
+            ? ''
+            : '; missing "- Failing run (before fix): <https://github.com/JovieInc/Jovie/actions/runs/ID URL>" (or a red-output fence containing FAIL/Error). Exact format: a "## Red-before-green" heading, then the lines "- Failing command: <cmd>" and "- Failing run (before fix): <URL>"'
+        }. Not a repair? Use a non-fix title (chore/ci/docs/refactor) and drop the bug-fix checkbox.`
       );
   }
   if (
@@ -248,7 +255,7 @@ export function evaluateFleetRules({
     );
   if (locked.length && !citation)
     errors.push(
-      `locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for ${[...new Set(locked)].join(', ')}.`
+      `locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for ${[...new Set(locked)].join(', ')}. Add to the PR body: "## Locked areas\nGBrain: design/design-operating-system" (design-system.css and design baselines) or "Locking PR: #<number>".`
     );
   return { errors, warnings };
 }

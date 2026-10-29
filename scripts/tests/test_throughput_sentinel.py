@@ -139,11 +139,27 @@ class ThroughputSentinelTest(unittest.TestCase):
             self.assertEqual((signal["mergeGroupRuns"], signal["mergeGroupStartP50Min"], signal["leaseHeldMin"]),
                              (3, 10.0, 50.0))  # skipped run ignored, three jobs sampled
             again, _ = ts.sample_release_flow(Path(raw), NOW + 10, run)
-            self.assertEqual(len(calls), 5)  # 1 runs + 3 jobs + 1 lease; cached for five minutes
+            self.assertEqual(len(calls), 6)  # 1 runs + 3 jobs + 1 lease + 1 queued count; cached for five minutes
             self.assertEqual(again["leaseRunIds"], [7])
             failing = lambda args, **kw: SimpleNamespace(returncode=1, stdout="", stderr="boom")
             signal, error = ts.sample_release_flow(Path(raw), NOW + 3600, failing)
             self.assertIn("boom", error)
+
+
+class ClaimErrorTest(unittest.TestCase):
+    def test_claim_error_rate_over_twenty_percent_alarms_per_lane(self):
+        dead = {"provider": "codex", "endedAt": iso(NOW - 60), "verdict": "failed",
+                "reasons": ["claim-error:JSONDecodeError:Unterminated string starting at: line 1 column 421"]}
+        ok = {"provider": "codex", "endedAt": iso(NOW - 120), "verdict": "fix-pushed", "reasons": []}
+        old = {"provider": "codex", "endedAt": iso(NOW - 7200), "verdict": "failed", "reasons": dead["reasons"]}
+        rows = ts.claim_errors_by_lane([dead] * 3 + [ok] * 4 + [old] * 9, NOW)
+        self.assertEqual((rows["codex"]["runs"], rows["codex"]["claimErrors"]), (7, 3))
+        alerts = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": rows}})
+        self.assertIn("throughput-claim-errors:codex", alerts)
+        healthy = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": ts.claim_errors_by_lane([dead] + [ok] * 9, NOW)}})
+        self.assertNotIn("throughput-claim-errors:codex", healthy)
+        few = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": ts.claim_errors_by_lane([dead] * 3, NOW)}})
+        self.assertNotIn("throughput-claim-errors:codex", few)
 
 
 class IdleNotDemandTest(unittest.TestCase):

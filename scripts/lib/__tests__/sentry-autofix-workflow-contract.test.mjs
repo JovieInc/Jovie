@@ -202,7 +202,7 @@ exit "$TEST_NODE_EXIT"
 
   it('keeps recurrence off the production-mutation lease with a cost and permission boundary', () => {
     expect(RECURRENCE).toContain('permissions: {}');
-    expect(RECURRENCE).toContain('runs-on: ubuntu-latest');
+    expect(RECURRENCE).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(RECURRENCE).toContain('timeout-minutes: 10');
     expect(RECURRENCE).toContain('group: sentry-autofix-recurrence');
     expect(RECURRENCE).toContain('cancel-in-progress: false');

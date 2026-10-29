@@ -46,13 +46,9 @@ RED_CONCLUSIONS = frozenset({"failure", "timed_out", "startup_failure"})
 # Same required-green set green enroll admits on. Missing, UNKNOWN, BLOCKED,
 # DIRTY and BEHIND keep lane-fix-red.
 REQUIRED_GREEN = frozenset({"CLEAN", "HAS_HOOKS", "UNSTABLE"})
-HOLD_LABELS = frozenset({"hold", "gated", "incident", "do-not-merge", "tim-hold", "tim:hold", "hold:tim",
-                         "queue-deferred"})
-# A hold the lanes apply from remediation's own structured needs-human-decision disposition and
-# never remove: only a human removing the label releases it. Always a member of HOLD_LABELS.
-HUMAN_DECISION_LABEL = "tim-hold"
-# Holds a human owns. A repair or sync must refuse these even where a bot `hold` may be lifted.
-HUMAN_HOLD_LABELS = frozenset({"tim-hold", "tim:hold", "hold:tim", "do-not-merge"})
+# No stop label is human-owned (tim-hold, tim:hold, hold:tim and do-not-merge are retired,
+# EVENT 2026-10-28): every hold here is a machine hold with a receipt and a release.
+HOLD_LABELS = frozenset({"hold", "gated", "incident", "queue-deferred"})
 LANE_BRANCH = re.compile(r"^(?P<lane>[a-z0-9-]+)/(?P<issue>jov-\d+)-\d{8}")
 # Agent/automation-owned prefixes that are not lane branches (a codex run, a manual agent
 # session). Their drafts are still lane-owned work: the reconcile sweep owes them a
@@ -423,11 +419,6 @@ def add_label(number: int, kind: str, sh=run, *, prefix: str = PREFIX) -> bool:
                "-f", f"labels[]={prefix}{kind}"]).returncode == 0
 
 
-def human_holds(pr: dict | None) -> list[str]:
-    """Human-owned hold labels on this PR snapshot, sorted; empty means none."""
-    return sorted({label.lower() for label in label_names(pr or {})} & HUMAN_HOLD_LABELS)
-
-
 def stale_fix_labels(pr: dict, labels: set) -> list[str]:
     """Repair labels whose cause is gone on this exact head (2026-10-21: #22320 kept
     lane-fix-red after its replacement run passed; #22394 kept lane-fix-conflict and
@@ -785,8 +776,6 @@ def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
     blocker (a dependency, a qualification pass, a pricing red line) are human gates, not
     storm leftovers: no row, no alert. The row's `auto` marks the stricter mode's subset:
     the hold came from automation and the head moved after it."""
-    if human_holds(pr):
-        return None  # a human hold is released by a human removing it, never by staleness
     ctx = hold_context(number, sh)
     if not ctx or not ctx["events"]:
         return None
@@ -810,8 +799,6 @@ def stale_hold(number: int, pr: dict, now: float, sh=run) -> dict | None:
 
 def auto_unhold_labels(pr: dict) -> list[str]:
     """Labels the stale-hold sweep may lift. The human-decision hold is never among them."""
-    if human_holds(pr):
-        return []  # any human-owned hold keeps every other hold and poison label in place too
     return [label for label in label_names(pr) if label.lower() in HOLD_LABELS or label == POISON_LABEL]
 
 
@@ -901,6 +888,23 @@ def failed_step_text(log: str) -> str:
     return "\n".join(lines[start:end + 1])
 
 
+def quota_log_gh(args, timeout=60):
+    """Safe log read through canonical admission, with the relay's token and time bound."""
+    scripts = str(HERE.parent)
+    if scripts not in sys.path:
+        sys.path.insert(0, scripts)
+    from apiclient.gh import default_run, run_gh
+    env = dict(os.environ)
+    if env.get(READ_TOKEN_ENV):
+        env["GH_TOKEN"] = env[READ_TOKEN_ENV]
+
+    def execute(argv, read_env):
+        return default_run(argv, read_env, timeout=timeout, execute=lifecycle.run)
+
+    done = run_gh(args[1:], priority="repair", env=env, run=execute, max_attempts=1, max_wait_ms=0)
+    return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
+
+
 def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
     """The GitHub failure kind when every failed job of this run failed only on a GitHub
     quota/abuse limit or a transient 5xx (2026-10-11 20:07Z: PR Size Guard and Source
@@ -908,9 +912,10 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
     Any real error line, an unreadable log or a missing classifier keeps the red signal."""
     classify = classify or classify_github_failure
     run_id = workflow_run.get("id")
-    if not isinstance(run_id, int) or run_id <= 0:
+    attempt = workflow_run.get("run_attempt")
+    if type(run_id) is not int or run_id <= 0 or type(attempt) is not int or attempt <= 0:
         return None
-    jobs = sh(["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/jobs?filter=latest&per_page=100",
+    jobs = sh(["gh", "api", f"repos/{REPO}/actions/runs/{run_id}/attempts/{attempt}/jobs?per_page=100",
                "--jq", '[.jobs[] | select(.conclusion == "failure" or .conclusion == "timed_out") | .id]'])
     if jobs.returncode != 0:
         # The relay's own read hitting the exhausted quota is the same outage.
@@ -920,11 +925,18 @@ def quota_failure(workflow_run: dict, sh=run, classify=None) -> str | None:
         ids = json.loads(jobs.stdout or "[]")
     except ValueError:
         return None
-    if not isinstance(ids, list) or not ids or len(ids) > 3:
+    if not isinstance(ids, list) or not ids or len(ids) > 3 \
+            or any(type(job_id) is not int or job_id <= 0 for job_id in ids):
         return None
     kinds = set()
     for job_id in ids:
-        log = sh(["gh", "api", f"repos/{REPO}/actions/jobs/{int(job_id)}/logs"], timeout=60)
+        # gh 2.102 rejects ANSI-bearing raw API bodies even into a pipe. The
+        # existing run-view reader sanitizes logs before stdout; never disable
+        # terminal safety. Bind both discovery and this read to the event attempt.
+        # Cold-cache ZIP fallback costs <=5 reads/job, bounded by the 3-job cap.
+        log_reader = quota_log_gh if sh is run else sh
+        log = log_reader(["gh", "run", "view", "--repo", REPO, "--job", str(job_id),
+                          "--attempt", str(attempt), "--log"], timeout=60)
         if log.returncode != 0:
             return None
         step = failed_step_text(log.stdout or "")
@@ -1543,18 +1555,7 @@ def preservation_reason(pr: dict, record: dict, max_attempts: int, *, held: dict
     return None
 
 
-def unconfirmed_human_hold(host, pr: dict) -> bool:
-    """A needs-human-decision disposition exists for this exact head but its label write has not
-    been confirmed. The PR is held until a later pass applies the label."""
-    rows = read_state(host, "escalation.json").get("surfaced")
-    return isinstance(rows, list) and any(
-        isinstance(row, dict) and row.get("holdPending") is True and row.get("pr") == pr.get("number")
-        and row.get("head") == pr.get("headRefOid") for row in rows)
-
-
 def maintenance_hold(host, lane, pr: dict, now: float, *, terminal_ok: bool = False) -> str | None:
-    if unconfirmed_human_hold(host, pr):
-        return "human-hold-pending"
     reason = preservation_reason(pr, read_state(host, "fix-attempts.json").get(str(pr["number"]), {}),
                                  lane.MAX_FIX_ATTEMPTS, held=read_state(host, "held.json").get(str(pr["number"])), now=now,
                                  terminal_ok=terminal_ok)

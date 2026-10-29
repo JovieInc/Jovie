@@ -77,6 +77,8 @@ async function fixture(
     readCurrentSnapshot,
     effectSink,
     env = {},
+    queueEntries = [],
+    files = [{ filename: 'apps/web/page.tsx' }],
   } = {}
 ) {
   const mutations = [];
@@ -115,6 +117,7 @@ async function fixture(
       },
       pulls: {
         list: Symbol('pulls.list'),
+        listFiles: Symbol('pulls.listFiles'),
         get: async params => {
           gets.push(params.pull_number);
           return {
@@ -144,6 +147,7 @@ async function fixture(
       },
     },
     paginate: async (endpoint, params) => {
+      if (endpoint === github.rest.pulls.listFiles) return files;
       if (endpoint === github.rest.repos.listCommitStatusesForRef) {
         if (beforeStatusResponse) await beforeStatusResponse();
         return statuses;
@@ -169,8 +173,15 @@ async function fixture(
       return roster;
     },
     graphql: async (query, params) => {
+      if (query.includes('mergeQueue(branch')) {
+        return {
+          repository: { mergeQueue: { entries: { nodes: queueEntries } } },
+        };
+      }
       if (query.includes('enqueuePullRequest')) {
-        mutations.push(params);
+        mutations.push(
+          query.includes('jump: true') ? { ...params, jump: true } : params
+        );
         if (mutationError) throw mutationError;
         if (failMutation) throw new Error('head changed');
         return { enqueuePullRequest: { mergeQueueEntry: { position: 1 } } };
@@ -1187,7 +1198,6 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
     'hold',
     'gated',
     'incident',
-    'do-not-merge',
     'queue-poison',
     'lane-fix-red',
   ]) {
@@ -1217,8 +1227,8 @@ test('wakes on completed Source Validation and on the push-to-main reconciliatio
     'unlabeled',
     'reopened',
     'ready_for_review',
-    'synchronize',
   ]);
+  assert.ok(!workflow.on.pull_request_target.types.includes('synchronize'));
   // A label is never an enroll wake; only a blocking one dequeues its PR.
   assert.match(workflow.jobs.enroll.if, /github\.event\.action != 'labeled'/);
   // Leaving draft is the only wake for an already-green head (JOV-INV-029);
@@ -2017,7 +2027,6 @@ for (const label of [
   'hold',
   'gated',
   'incident',
-  'do-not-merge',
   'queue-poison',
   'lane-fix-red',
 ]) {
@@ -2181,7 +2190,6 @@ test('a deferred current-state read cannot dequeue a repaired head after its hol
 test('a landing on main reconciles the full roster and the hold contract without a timer', async () => {
   // Tim 2026-10-12: no time-based loops. The push wake replaces the */15 sweep.
   assert.deepEqual(workflow.on.push, { branches: ['main'] });
-  assert.ok(workflow.on.pull_request_target.types.includes('synchronize'));
   assert.match(workflow.concurrency.group, /'push'/);
   assert.equal(
     concurrencyGroup({ event_name: 'push', event: {}, run_id: 1 }),
@@ -2400,7 +2408,7 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
     "receipt(pr, 'recheck', `blocked-recheck=",
     "receipt(pr, 'held', failure.reason)",
     "receipt(pr, 'skip', `head-unchanged-since-removal:",
-    "receipt(pr, 'enqueued',",
+    "receipt(pr, jump ? 'enqueued-jump' : 'enqueued',",
     "receipt(pr, 'error',",
   ])
     assert.ok(script.includes(decision), decision);
@@ -2410,4 +2418,42 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
   assert.ok(script.includes("addHeading('Enroll decisions', 3)"));
   // The receipt script carries no expressions, so it never counts toward the 21k expression budget.
   assert.ok(!script.includes('${{'));
+});
+
+test('compounding PRs jump the queue, capped at two jumped entries, and every decision leaves a receipt', async () => {
+  const compounding = {
+    labels: {
+      pageInfo: { hasNextPage: false },
+      nodes: [{ name: 'compounding' }],
+    },
+  };
+  const entry = number => ({
+    pullRequest: { number, labels: { nodes: [{ name: 'compounding' }] } },
+  });
+  const byLabel = await fixture({ overrides: { 1: compounding } });
+  assert.deepEqual(byLabel.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
+  const byPaths = await fixture({
+    files: [
+      { filename: 'scripts/lanes/autoscale.py' },
+      { filename: '.github/workflows/lane-fix-relay.yml' },
+    ],
+  });
+  assert.deepEqual(byPaths.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
+  const mixed = await fixture({
+    files: [
+      { filename: 'scripts/lanes/autoscale.py' },
+      { filename: 'apps/web/page.tsx' },
+    ],
+  });
+  assert.deepEqual(mixed.mutations, [{ id: 'PR_1', oid: sha }]);
+  const capped = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [entry(8), entry(9)],
+  });
+  assert.deepEqual(capped.mutations, [{ id: 'PR_1', oid: sha }]);
+  const room = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [entry(8)],
+  });
+  assert.deepEqual(room.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
 });
