@@ -20,6 +20,7 @@ import {
   main,
   onlyWeakensAssertions,
   runFleetRules,
+  section,
   validateDoneReceipt,
 } from './pr-fleet-rules.mjs';
 
@@ -95,6 +96,21 @@ test('1: claimed Done PR sections are blocking, pending delivery is allowed', ()
       })
     ).errors.length
   );
+});
+
+test('PR template starts delivery pending and still requires proof for completion', () => {
+  const body = readFileSync('.github/pull_request_template.md', 'utf8');
+  const receipt = section(body, 'Done receipt');
+  assert.match(receipt.trim(), /^Pending\./);
+  assert.deepEqual(check(pr({ body })).errors, []);
+  // Replay the wording that blocked #22960 rather than accepting an unproven
+  // completion claim or loosening the Fleet Rules policy.
+  const unproven = body.replace(receipt.trim(), 'Source qualification only.');
+  assert.deepEqual(check(pr({ body: unproven })).errors, [
+    'done-receipt: cite Merge-group run: <run id or URL> before claiming Done.',
+  ]);
+  const proven = body.replace(receipt.trim(), 'Merge-group run: 123');
+  assert.deepEqual(check(pr({ body: proven })).errors, []);
 });
 
 test('2: fixes and CI repair labels need a command and pre-fix red evidence', () => {
