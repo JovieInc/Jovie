@@ -156,7 +156,7 @@ function HowItWorksSection() {
                   className='h-6 w-6 text-secondary-token'
                   aria-hidden='true'
                 />
-                <h3 className='mt-5 text-lg font-medium tracking-tight text-primary-token'>
+                <h3 className='mt-5 text-balance text-lg font-medium tracking-tight text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
