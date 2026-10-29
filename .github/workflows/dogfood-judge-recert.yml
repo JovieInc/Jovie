@@ -1,0 +1,165 @@
+name: Dogfood Judge Recert
+
+# Event-driven re-certification for the LLM dogfood judge.
+# A change to a model binding (ops/registry/capacity.json modelFamilies/roles,
+# apps/web/lib/constants/ai-models.ts, the judge tiers in surfaces.json) or to
+# the rubric invalidates the affected receipts. The gate already denies stale
+# receipts on its own because it recomputes the fingerprint live; this
+# workflow turns the change into work: plan which surfaces must be re-recorded
+# and re-judged, then re-judge them on the self-hosted worker that holds the
+# recorded runs and the subscription judge CLI. A judge model change also
+# re-calibrates the judge against Tim's rejection set.
+#
+# repository_dispatch `dogfood_judge_rejudge` (client_payload.surface) is the
+# on-deploy / on-record entry point for the lanes clock and recorders.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ops/registry/capacity.json
+      - apps/web/lib/constants/ai-models.ts
+      - scripts/dogfood-judge/surfaces.json
+      - scripts/dogfood-judge/rubric.mjs
+      - docs/design-system/anti-slop-rules.json
+  repository_dispatch:
+    types: [dogfood_judge_rejudge]
+  workflow_dispatch:
+    inputs:
+      surface:
+        description: 'Surface id to re-judge (blank = plan from the last commit)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dogfood-judge-recert-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan invalidation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      surfaces: ${{ steps.plan.outputs.surfaces }}
+      recalibrate: ${{ steps.plan.outputs.recalibrate }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Compute invalidation plan
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          DISPATCH_SURFACE: ${{ github.event.client_payload.surface || inputs.surface }}
+        run: |
+          set -euo pipefail
+          if [ -n "${DISPATCH_SURFACE:-}" ]; then
+            printf 'surfaces=["%s"]\nrecalibrate=false\n' "$DISPATCH_SURFACE" >> "$GITHUB_OUTPUT"
+            echo "Re-judge requested for \`$DISPATCH_SURFACE\` ($EVENT_NAME)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          before="${BEFORE:-HEAD~1}"
+          if ! git cat-file -e "$before^{commit}" 2>/dev/null; then before="HEAD~1"; fi
+          node scripts/dogfood-judge/cli.mjs invalidate --before "$before" > plan.json
+          node -e '
+            const p = require("./plan.json");
+            const ids = p.surfaces.map(s => s.id);
+            const fs = require("fs");
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `surfaces=${JSON.stringify(ids)}\nrecalibrate=${p.recalibrateJudge}\n`);
+            const lines = ["### Dogfood judge invalidation", ""];
+            if (!p.changed.length) lines.push("No model binding changed; receipts stay valid.");
+            for (const c of p.changed) lines.push(`- \`${c.binding}\`: \`${c.from}\` -> \`${c.to}\``);
+            if (ids.length) lines.push("", `Re-record and re-judge: ${ids.map(i => "`" + i + "`").join(", ")}`);
+            if (p.recalibrateJudge) lines.push("", "Judge model changed: re-calibrating against Tim’s rejection set.");
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join("\n") + "\n");
+          '
+
+  rejudge:
+    name: Re-judge ${{ matrix.surface }}
+    needs: plan
+    if: needs.plan.outputs.surfaces != '[]' && needs.plan.outputs.surfaces != ''
+    runs-on: [self-hosted, hermes]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        surface: ${{ fromJSON(needs.plan.outputs.surfaces) }}
+    env:
+      DOGFOOD_JUDGE_LEDGER: ${{ vars.DOGFOOD_JUDGE_LEDGER || '' }}
+    steps:
+      - name: Clear stale sparse state on the shared workspace
+        run: |
+          # Fixed self-hosted runners reuse one workspace; a sparse checkout left by
+          # another job would hide scripts/dogfood-judge from this full checkout.
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Re-judge the latest recorded run
+        env:
+          SURFACE: ${{ matrix.surface }}
+          RUN_STORE: ${{ vars.DOGFOOD_RUN_STORE || '' }}
+        run: |
+          set -euo pipefail
+          run_dir="${RUN_STORE:-$HOME/.local/state/dogfood-runs}/$SURFACE/latest"
+          if [ ! -f "$run_dir/steps.json" ]; then
+            echo "::warning::No recorded run for $SURFACE at $run_dir; the gate stays closed until its recorder writes one (see surfaces.json recorder)."
+            echo "- \`$SURFACE\`: waiting for a re-recorded run (gate closed)" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          node scripts/dogfood-judge/cli.mjs judge --surface "$SURFACE" --run "$run_dir" --sha "$GITHUB_SHA" --propose live \
+            | tee judge.json || true
+          node -e 'const r=require("./judge.json"); require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- \`${process.env.SURFACE}\`: ${r.verdict}, ${r.findings} finding(s), ${r.blockers} blocker(s), $${r.costUsd}\n`)'
+      - name: Publish the design-judge ledger (waitlist admission reads it)
+        if: always()
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
+          PROD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          # Real judged receipts only: a stale or failing surface publishes as fail.
+          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+            node scripts/dogfood-judge/cli.mjs publish --post --prod-sha "$PROD_SHA" > publish.json
+          node -e 'const p=require("./publish.json"); require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Design leg: ${p.gateDecision.reason}\n`)'
+
+  recalibrate:
+    name: Re-calibrate judge
+    needs: plan
+    if: needs.plan.outputs.recalibrate == 'true'
+    runs-on: [self-hosted, hermes]
+    timeout-minutes: 60
+    steps:
+      - name: Clear stale sparse state on the shared workspace
+        run: |
+          # Fixed self-hosted runners reuse one workspace; a sparse checkout left by
+          # another job would hide scripts/dogfood-judge from this full checkout.
+          if [[ -d .git ]]; then
+            git sparse-checkout disable 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckout 2>/dev/null || true
+            git config --local --unset-all core.sparseCheckoutCone 2>/dev/null || true
+            rm -f .git/info/sparse-checkout
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Calibrate against Tim's verdicts
+        run: |
+          set -euo pipefail
+          node scripts/dogfood-judge/cli.mjs calibrate --publish | tee calibration.json
+          node -e 'const m=require("./calibration.json"); require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Judge recall ${(m.recall*100).toFixed(0)}%, precision ${(m.precision*100).toFixed(0)}%, misses: ${m.misses.join(", ")||"none"}\n`)'

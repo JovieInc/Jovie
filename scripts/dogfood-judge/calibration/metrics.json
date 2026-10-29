@@ -1,0 +1,121 @@
+{
+  "schema": "jovie.dogfood-judge-calibration/v1",
+  "rubricVersion": "tim-taste-rubric/2026-10-29.1",
+  "tiers": {
+    "screen": "claude-sonnet-5-5",
+    "confirm": "claude-opus-5-5"
+  },
+  "measuredAt": "2026-10-29T19:56:18.724Z",
+  "cases": 18,
+  "costUsd": 14.1037,
+  "costPerCaseUsd": 0.7835,
+  "tp": 11,
+  "fp": 7,
+  "fn": 0,
+  "tn": 0,
+  "precision": 0.6111111111111112,
+  "recall": 1,
+  "precisionLower95": 0.3861866858065617,
+  "recallLower95": 0.7411599827511859,
+  "criterionRecall": 0.9375,
+  "misses": [],
+  "falseAlarms": [
+    "desktop-profile-a3",
+    "dial-final",
+    "release-hero-square",
+    "pen-claim-qualify-chat",
+    "pen-claim-reserved",
+    "pen-claim-proof-profile",
+    "pen-auth-signin"
+  ],
+  "rejects": 11,
+  "approves": 7,
+  "meetsFloors": false,
+  "sampleShortfall": {
+    "rejects": 9,
+    "approves": 13
+  },
+  "screenTierOnly": {
+    "tp": 11,
+    "fp": 7,
+    "fn": 0,
+    "tn": 0,
+    "precision": 0.6111111111111112,
+    "recall": 1,
+    "precisionLower95": 0.3861866858065617,
+    "recallLower95": 0.7411599827511859,
+    "criterionRecall": 0.9375,
+    "misses": [],
+    "falseAlarms": [
+      "desktop-profile-a3",
+      "dial-final",
+      "release-hero-square",
+      "pen-claim-qualify-chat",
+      "pen-claim-reserved",
+      "pen-claim-proof-profile",
+      "pen-auth-signin"
+    ],
+    "rejects": 11,
+    "approves": 7,
+    "meetsFloors": false,
+    "sampleShortfall": {
+      "rejects": 9,
+      "approves": 13
+    }
+  },
+  "coldPassOnly": {
+    "tp": 11,
+    "fp": 7,
+    "fn": 0,
+    "tn": 0,
+    "precision": 0.6111111111111112,
+    "recall": 1,
+    "precisionLower95": 0.3861866858065617,
+    "recallLower95": 0.7411599827511859,
+    "criterionRecall": 0.9375,
+    "misses": [],
+    "falseAlarms": [
+      "desktop-profile-a3",
+      "dial-final",
+      "release-hero-square",
+      "pen-claim-qualify-chat",
+      "pen-claim-reserved",
+      "pen-claim-proof-profile",
+      "pen-auth-signin"
+    ],
+    "rejects": 11,
+    "approves": 7,
+    "meetsFloors": false,
+    "sampleShortfall": {
+      "rejects": 9,
+      "approves": 13
+    }
+  },
+  "rubricOnly": {
+    "tp": 11,
+    "fp": 6,
+    "fn": 0,
+    "tn": 1,
+    "precision": 0.6470588235294118,
+    "recall": 1,
+    "precisionLower95": 0.41299966721211817,
+    "recallLower95": 0.7411599827511859,
+    "criterionRecall": 0.9375,
+    "misses": [],
+    "falseAlarms": [
+      "desktop-profile-a3",
+      "dial-final",
+      "release-hero-square",
+      "pen-claim-qualify-chat",
+      "pen-claim-reserved",
+      "pen-auth-signin"
+    ],
+    "rejects": 11,
+    "approves": 7,
+    "meetsFloors": false,
+    "sampleShortfall": {
+      "rejects": 9,
+      "approves": 13
+    }
+  }
+}
