@@ -4,6 +4,8 @@
   "type": "module",
   "exports": {
     ".": "./index.ts",
+    "./pipeline-bottleneck": "./pipeline-bottleneck.ts",
+    "./pipeline-bottleneck.node": "./pipeline-bottleneck.node.ts",
     "./learning-evidence": "./learning-evidence.ts",
     "./provider-attempt-receipt": "./provider-attempt-receipt.ts",
     "./provider-incident": "./provider-incident.ts",
