@@ -183,6 +183,23 @@ export const RATE_LIMITERS = {
    * outage rather than hard-failing a new visitor's first message. Subsequent
    * turns stay fail-closed via the IP/ASN/session limiters below.
    */
+  /**
+   * Canary passage tokens for the /start bot check (JOV-9625): 12 granted
+   * passages per hour across all canary runs. A production certification
+   * run uses one. Fail closed without Redis: when exceeded or unavailable the
+   * request falls back to the real Turnstile verification.
+   */
+  syntheticPassageToken: {
+    name: 'Synthetic Passage Token',
+    limit: 12,
+    window: '1 h',
+    prefix: 'synthetic_passage_token',
+    requireRedis: true,
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'internal',
+  } satisfies RateLimitConfig,
+
   anonymousOnboardingChatFirstTouch: {
     name: 'Anonymous Onboarding Chat (First Touch)',
     limit: 20,
