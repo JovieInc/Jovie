@@ -92,6 +92,10 @@ CLOCKS = (
     Clock("prodGoldenPathCert", "postdeploy-probes.yml", "clock_prod_golden_path_cert", 12 * 3600,
           "prod-golden-path-cert-clock.json", github_cron=False,
           ignored_events=frozenset({"workflow_run"})),
+    # Backstop for the event-driven dependency loop (Dependabot PR and lockfile events fire it).
+    Clock("dependencyLoop", "dependency-loop.yml", "clock_dependency_loop", 12 * 3600,
+          "dependency-loop-clock.json", github_cron=False,
+          ignored_events=frozenset({"push", "pull_request_target"})),
 )
 CONTINUITY = CLOCKS[0]
 
