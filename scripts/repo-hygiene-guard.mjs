@@ -11,7 +11,11 @@ import {
 import { extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { validateControllerHopChanges } from './invariants/controller-hop-contract.mjs';
-import { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
+import {
+  GEN_JSON_SIZE_ALLOWLIST,
+  HYGIENE_LIMITS,
+  MAX_GEN_JSON_BYTES,
+} from './lib/repo-hygiene-limits.mjs';
 
 export { HYGIENE_LIMITS } from './lib/repo-hygiene-limits.mjs';
 
@@ -785,6 +789,14 @@ export function evaluateRepoHygiene({
     }
     if (!stats.isFile()) continue;
     trackedFilesTotal += 1;
+    if (
+      /\.gen\.json$/.test(path) &&
+      stats.size > MAX_GEN_JSON_BYTES &&
+      !GEN_JSON_SIZE_ALLOWLIST.includes(path)
+    )
+      errors.push(
+        `${path}: generated .gen.json is ${formatBytes(stats.size)} (over ${formatBytes(MAX_GEN_JSON_BYTES)}); shrink or untrack it, or allowlist it in GEN_JSON_SIZE_ALLOWLIST`
+      );
     if (!TRACKED_FILE_COUNT_EXCLUSIONS.some(pattern => pattern.test(path)))
       trackedFiles += 1;
     trackedBytes += stats.size;
@@ -1104,7 +1116,7 @@ function main() {
   if (result.errors.length === 0) {
     const growth = `${result.netTrackedFiles >= 0 ? '+' : ''}${result.netTrackedFiles}`;
     console.log(
-      `[repo-hygiene] clean (${result.changedFiles} changed files, ${formatBytes(result.changedBytes)}, net ${growth} regular; ${result.trackedFilesTotal} tracked regular files, ${formatBytes(result.trackedBytes)}, ${formatBytes(result.trackedBinaryBytes)} binary; ${result.snapshotFiles} visual baselines, ${formatBytes(result.snapshotBytes)})`
+      `[repo-hygiene] clean (${result.changedFiles} changed files, ${formatBytes(result.changedBytes)}, net ${growth} regular; ${result.trackedFilesTotal} tracked regular files, ${formatBytes(result.trackedBytes)} of ${formatBytes(HYGIENE_LIMITS.maxTrackedBytes)}, ${formatBytes(HYGIENE_LIMITS.maxTrackedBytes - result.trackedBytes)} headroom, ${formatBytes(result.trackedBinaryBytes)} binary; ${result.snapshotFiles} visual baselines, ${formatBytes(result.snapshotBytes)})`
     );
     return;
   }

@@ -204,6 +204,7 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
 
 
 QUEUE_TIMINGS_REFRESH_S, QUEUE_TIMINGS_PRS, QUEUE_TIMINGS_FILE = 900, 12, "queue-timings.json"
+REARM_CONTEXT = "jovie-queue-victim-rearm/v1"  # scripts/merge-group-victim-rearm.mjs
 
 
 def _pct(values: list, q: float):
@@ -233,7 +234,8 @@ def sample_queue_timings(state: Path, now: float, run=None, repo: str = REPO) ->
         merged = [pr for pr in merged if pr.get("merged_at")][:QUEUE_TIMINGS_PRS]
         last, first = [], []
         dequeues = {"github": 0, "bot": 0, "human": 0}
-        requeue_lag = []
+        requeue_lag, auto_lag, push_lag = [], [], []
+        receipts_cache: dict[str, list[float]] = {}
         for pr in merged:
             events = _gh_json(run, f"repos/{repo}/issues/{pr['number']}/timeline?per_page=100")
             adds = [_iso_epoch(e.get("created_at")) for e in events if e.get("event") == "added_to_merge_queue"]
@@ -248,7 +250,19 @@ def sample_queue_timings(state: Path, now: float, run=None, repo: str = REPO) ->
                 dequeues["github" if actor.startswith("github-merge-queue") else "bot" if actor.endswith("[bot]") else "human"] += 1
                 later = [a for a in adds if a > at]
                 if later:
-                    requeue_lag.append((min(later) - at) / 60)
+                    back = min(later)
+                    lag = (back - at) / 60
+                    requeue_lag.append(lag)
+                    # Auto = the victim-rearm job wrote a why= receipt on this head between the removal and the
+                    # re-add (the enqueue lands seconds before the receipt); anything else came from the enroll sweep.
+                    sha = str((pr.get("head") or {}).get("sha") or "")
+                    if sha and sha not in receipts_cache:
+                        rows = _gh_json(run, f"repos/{repo}/commits/{sha}/statuses?per_page=100")
+                        receipts_cache[sha] = [t for t in (_iso_epoch(r.get("created_at")) for r in rows
+                                               if r.get("context") == REARM_CONTEXT and ";why=" in str(r.get("description") or ""))
+                                               if t is not None]
+                    auto = any(at <= t <= back + 120 for t in receipts_cache.get(sha, []))
+                    (auto_lag if auto else push_lag).append(lag)
             merged_at = _iso_epoch(pr.get("merged_at"))
             if adds and merged_at is not None:
                 last.append((merged_at - max(adds)) / 60)
@@ -262,7 +276,10 @@ def sample_queue_timings(state: Path, now: float, run=None, repo: str = REPO) ->
                                      "firstEnqueueP50Min": _pct(first, .5), "firstEnqueueP95Min": _pct(first, .95),
                                      "targets": {"p50Min": 30, "p95Min": 60}},
                   "dequeues": {"prs": len(last), "silentGithub": dequeues["github"], "bot": dequeues["bot"], "human": dequeues["human"],
-                               "requeueLagP50Min": _pct(requeue_lag, .5), "requeueLagP95Min": _pct(requeue_lag, .95)}}
+                               "requeueLagP50Min": _pct(requeue_lag, .5), "requeueLagP95Min": _pct(requeue_lag, .95),
+                               "autoRequeues": len(auto_lag), "pushToMainRequeues": len(push_lag),
+                               "autoRequeueLagP50Min": _pct(auto_lag, .5), "autoRequeueLagP95Min": _pct(auto_lag, .95),
+                               "pushRequeueLagP50Min": _pct(push_lag, .5), "pushRequeueLagP95Min": _pct(push_lag, .95)}}
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, sort_keys=True))
         os.replace(tmp, path)
