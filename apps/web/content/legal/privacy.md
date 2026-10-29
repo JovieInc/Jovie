@@ -59,7 +59,7 @@ When a draft is created, we store:
 - Acquisition attribution fields the assistant supplied, if any: agent source, client, installation ID, referral token, session or run ID, intent, and first-touch fields (source, medium, campaign, term, content, referrer, landing path, claim ID, run ID, candidate ID, and offer version)
 - A hash of the private draft token, the draft's creation and expiry times, and, once claimed, the claim time
 
-These fields are supplied by the assistant and are not verified. At this time we store them with the draft and return them in the connector's responses. A search that does not create a draft does not write a draft record, but the attribution fields the assistant supplied are carried inside the signed draft token we return to that assistant.
+These fields are supplied by the assistant and are not verified. At this time we store them with the draft and return them in the connector's responses. A search that does not create a draft does not create a draft record, but the attribution fields the assistant supplied are carried inside the signed draft token we return to that assistant.
 
 #### Who can access a draft before it is claimed
 
