@@ -23,6 +23,7 @@ export const VISUAL_PROOF_PREFIX = 'dogfood-judge:';
 export const REMEDIATION_SCHEMA = 'jovie.dogfood-judge-remediation/v1';
 export const DEFAULT_LEDGER = '.context/dogfood-judge/ledger';
 
+/** @returns {Record<string, any>} */
 export function buildReceipt({
   surface,
   result,
@@ -33,6 +34,7 @@ export function buildReceipt({
   runId,
 }) {
   const bindings = surfaceBindings(surface, resolved);
+  /** @type {Record<string, any>} */
   const body = {
     schema: RECEIPT_SCHEMA,
     runId,

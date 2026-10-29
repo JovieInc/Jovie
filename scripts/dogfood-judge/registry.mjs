@@ -72,6 +72,7 @@ export function resolveBindings(registry, root = REPO_ROOT) {
   } catch {
     capacity = null;
   }
+  /** @type {Record<string, string | null>} */
   const resolved = {};
   for (const [name, source] of Object.entries(registry.bindingSources)) {
     let value = null;
