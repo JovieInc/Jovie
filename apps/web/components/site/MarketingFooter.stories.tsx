@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { marketingFullscreenParameters } from '@/components/marketing/storybook/marketingStoryMeta';
-import {
-  DEFAULT_SITE_CHROME,
-  toResolvedSiteChrome,
-} from '@/lib/content-records/site-chrome.defaults';
+import { DEFAULT_SITE_CHROME } from '@/lib/content-records/site-chrome.defaults';
+import { toResolvedSiteChrome } from '@/lib/content-records/site-chrome.resolve';
 import { MarketingFooter } from './MarketingFooter';
 
 const meta = {

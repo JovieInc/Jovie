@@ -10,9 +10,11 @@ import {
 export {
   DEFAULT_SITE_CHROME,
   isExternalChromeHref,
+} from './site-chrome.defaults';
+export {
   type ResolvedSiteChrome,
   toResolvedSiteChrome,
-} from './site-chrome.defaults';
+} from './site-chrome.resolve';
 
 /**
  * Site chrome: the header navigation and the site footer as one content

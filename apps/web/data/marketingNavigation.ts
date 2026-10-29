@@ -1,9 +1,7 @@
 import { APP_ROUTES } from '@/constants/routes';
 import { isNavigationEligiblePath } from '@/data/marketing/featureAvailability';
-import {
-  DEFAULT_SITE_CHROME,
-  isExternalChromeHref,
-} from '@/lib/content-records/site-chrome.defaults';
+import { DEFAULT_SITE_CHROME } from '@/lib/content-records/site-chrome.defaults';
+import { toResolvedSiteChrome } from '@/lib/content-records/site-chrome.resolve';
 
 export interface MarketingNavLink {
   readonly href: string;
@@ -120,17 +118,9 @@ export function getMarketingToolsFlyoutLinks(
  * is unavailable. Edit the record, not this file.
  */
 export const MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] =
-  DEFAULT_SITE_CHROME.footer.columns.map(column => ({
+  toResolvedSiteChrome(DEFAULT_SITE_CHROME).footerColumns.map(column => ({
     title: column.title,
-    links: eligibleLinks(
-      column.links.map(
-        (link): MarketingFooterLink => ({
-          href: link.href,
-          label: link.label,
-          external: isExternalChromeHref(link.href) || undefined,
-        })
-      )
-    ),
+    links: eligibleLinks(column.links),
   }));
 
 /**

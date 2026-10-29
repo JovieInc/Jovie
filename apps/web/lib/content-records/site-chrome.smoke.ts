@@ -1,5 +1,5 @@
 import type { SiteChrome } from './site-chrome';
-import { toResolvedSiteChrome } from './site-chrome.defaults';
+import { toResolvedSiteChrome } from './site-chrome.resolve';
 
 /**
  * Resolution smoke test for the site-chrome publish gate: run the record

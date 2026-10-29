@@ -2,7 +2,7 @@ import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import type { MarketingHeaderBrand } from '@/data/marketing/headerBrand';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import type { ResolvedSiteChrome } from '@/lib/content-records/site-chrome.defaults';
+import type { ResolvedSiteChrome } from '@/lib/content-records/site-chrome.resolve';
 import { cn } from '@/lib/utils';
 import { MarketingFooter } from './MarketingFooter';
 import {
