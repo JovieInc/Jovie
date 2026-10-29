@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SupportPageContent } from './SupportPageContent';
 import { SUPPORT_STORY_RECEIPT } from './SupportPageContent.stories';
@@ -24,9 +24,10 @@ describe('SupportPageContent', () => {
     // per-breakpoint Tailwind size ramp on the route.
     expect(heading).toHaveClass(
       'system-b-marketing-route-title',
-      'mt-6',
       'text-primary-token'
     );
+    // No eyebrow label above the one H1.
+    expect(heading.previousElementSibling).toBeNull();
     for (const residue of [
       'text-4xl',
       'sm:text-5xl',
@@ -47,9 +48,21 @@ describe('SupportPageContent', () => {
     expect(sectionHeadings).toEqual([
       "We're here to help.",
       'How Can We Help?',
-      'Still Need Help?',
+      'Prefer Email?',
     ]);
-    expect(screen.getAllByRole('article')).toHaveLength(2);
+    // Matte list, not icon tiles: no cards, no decorative icons beside titles.
+    expect(screen.queryAllByRole('article')).toHaveLength(0);
+    const channels = screen.getByTestId('marketing-section-content-prose');
+    expect(within(channels).getAllByRole('listitem')).toHaveLength(2);
+    for (const item of within(channels).getAllByRole('listitem')) {
+      expect(item.querySelectorAll('svg')).toHaveLength(1);
+      expect(item.querySelector('a svg')).not.toBeNull();
+    }
+    expect(container.querySelector('.text-accent')).toBeNull();
+    // No texture image or accent wash behind the hero.
+    const hero = screen.getByTestId('marketing-section-hero');
+    expect(hero.querySelector('img')).toBeNull();
+    expect(hero.querySelector('.marketing-route-hero__accent')).toBeNull();
     expect(screen.getAllByTestId('marketing-section-cta')).toHaveLength(1);
     for (const action of screen
       .getAllByRole('link')
@@ -79,14 +92,10 @@ describe('SupportPageContent', () => {
     expect(
       screen.getByRole('link', { name: /browse the help center/i })
     ).toHaveAttribute('href', 'https://docs.jov.ie/docs');
-    for (const action of screen.getAllByRole('link', {
-      name: /contact support/i,
-    })) {
-      expect(action).toHaveAttribute(
-        'href',
-        'https://docs.jov.ie/contact?from=/support'
-      );
-    }
+    // One contact action, not a repeat of it in a second section.
+    expect(
+      screen.getByRole('link', { name: /contact support/i })
+    ).toHaveAttribute('href', 'https://docs.jov.ie/contact?from=/support');
     // Direct email remains a usable fallback when the Help Center is unreachable.
     expect(
       screen.getByRole('link', { name: 'support@jov.ie' })

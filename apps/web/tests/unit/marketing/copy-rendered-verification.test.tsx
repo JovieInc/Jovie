@@ -82,9 +82,8 @@ function planCardSection(
   const lines = scrapedLines(element, [
     ['headline', '.marketing-pricing-plan-card__name'],
     ['body', '.marketing-pricing-plan-card__body'],
-    ['supporting:0', '.marketing-pricing-plan-card__badge'],
-    ['supporting:1', '.marketing-pricing-plan-card__price'],
-    ['supporting:2', '.marketing-pricing-plan-card__cta'],
+    ['supporting:0', '.marketing-pricing-plan-card__price'],
+    ['supporting:1', '.marketing-pricing-plan-card__cta'],
   ]);
   const features = [
     ...element.querySelectorAll(
@@ -92,7 +91,7 @@ function planCardSection(
     ),
   ].map(node => node.textContent?.trim() ?? '');
   for (const [index, feature] of features.entries()) {
-    lines.push(renderedLine(`supporting:${3 + index}`, feature));
+    lines.push(renderedLine(`supporting:${2 + index}`, feature));
   }
   return { sectionId, lines };
 }
@@ -150,8 +149,6 @@ function pricingRenderedSurface(): RenderedCopySurface {
             ['body', '.system-b-pricing-final-copy'],
           ]),
           renderedLine('supporting:0', finalCtas[0] ?? ''),
-          renderedLine('supporting:1', finalCtas[1] ?? ''),
-          renderedLine('supporting:2', finalCtas[2] ?? ''),
         ],
       },
     ],

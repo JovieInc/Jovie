@@ -23,6 +23,7 @@ import { getComparison } from '@/content/comparisons';
 import { ARTIST_NOTIFICATIONS_COPY } from '@/data/artistNotificationsCopy';
 import { MARKETING_RECIPES, type RecipeId } from '@/data/marketing';
 import { PricingComparisonChart } from '@/features/pricing/PricingComparisonChart';
+import { getPublicPricingComparison } from '@/lib/billing/public-pricing-comparison';
 import { STORY_BLOG_POSTS, STORY_FAQ_ITEMS } from './fixtures';
 import {
   MARKETING_STORY_DESCRIPTION,
@@ -166,7 +167,9 @@ export const pricing: Story = {
                   </p>
                 </div>
                 <div className='system-b-pricing-chart-wrap'>
-                  <PricingComparisonChart />
+                  <PricingComparisonChart
+                    categories={getPublicPricingComparison()}
+                  />
                 </div>
               </div>
             </MarketingContainer>

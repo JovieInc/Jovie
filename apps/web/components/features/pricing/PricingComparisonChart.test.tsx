@@ -1,11 +1,60 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ARTIST_VISIBILITY_OFFER_CONTRACT_ID } from '@/lib/billing/offer-truth';
+import {
+  getPublicPricingComparison,
+  isPublicPricingFeature,
+} from '@/lib/billing/public-pricing-comparison';
+import { PRICING_COMPARISON } from '@/lib/entitlements/registry';
 import { PricingComparisonChart } from './PricingComparisonChart';
 
+const COMPARISON = getPublicPricingComparison();
+const PUBLIC_ROWS = COMPARISON.flatMap(category => category.features);
+
 describe('PricingComparisonChart', () => {
+  it('renders every public registry row on desktop, by registry category', () => {
+    render(<PricingComparisonChart categories={COMPARISON} />);
+    const desktopTable = screen.getByRole('table', {
+      name: 'Feature comparison by plan',
+    });
+
+    // More than a token pair of rows: the table is the full public matrix.
+    expect(PUBLIC_ROWS.length).toBeGreaterThanOrEqual(10);
+    expect(within(desktopTable).getAllByRole('rowheader')).toHaveLength(
+      PUBLIC_ROWS.length
+    );
+    for (const feature of PUBLIC_ROWS) {
+      expect(
+        within(desktopTable).getByRole('rowheader', { name: feature.name })
+      ).toBeInTheDocument();
+    }
+    for (const category of COMPARISON) {
+      expect(
+        within(desktopTable).getByText(category.category)
+      ).toBeInTheDocument();
+    }
+  });
+
+  it('keeps roadmap, Max-only and unproven registry rows off public pricing', () => {
+    const { container } = render(
+      <PricingComparisonChart categories={COMPARISON} />
+    );
+    const hidden = PRICING_COMPARISON.flatMap(
+      category => category.features
+    ).filter(feature => !isPublicPricingFeature(feature));
+
+    expect(hidden.length).toBeGreaterThan(0);
+    for (const feature of hidden) {
+      expect(screen.queryAllByText(feature.name)).toHaveLength(0);
+    }
+    expect(container.textContent).not.toMatch(/\bsoon\b/i);
+    expect(container.textContent).not.toMatch(/\bfans?\b/i);
+  });
+
   it('names the profile feature as a Jovie profile, not an artist profile', () => {
-    const { container } = render(<PricingComparisonChart />);
+    const { container } = render(
+      <PricingComparisonChart categories={COMPARISON} />
+    );
 
     expect(
       screen.getAllByText('Public Jovie profile page').length
@@ -14,7 +63,9 @@ describe('PricingComparisonChart', () => {
   });
 
   it('renders named comparison tables from monthly-only public offer truth', () => {
-    const { container } = render(<PricingComparisonChart />);
+    const { container } = render(
+      <PricingComparisonChart categories={COMPARISON} />
+    );
 
     const desktopTable = screen.getByRole('table', {
       name: 'Feature comparison by plan',
@@ -35,7 +86,7 @@ describe('PricingComparisonChart', () => {
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
-      name: 'Fan email capture',
+      name: PUBLIC_ROWS.find(row => row.pro !== false)?.name ?? '',
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');
@@ -50,8 +101,14 @@ describe('PricingComparisonChart', () => {
     expect(
       within(mobileTable).getByText('Artist Presence')
     ).toBeInTheDocument();
-    expect(within(desktopTable).getAllByText('Included')).toHaveLength(4);
-    expect(within(mobileTable).getAllByText('Included')).toHaveLength(3);
+    const included = (plan: 'free' | 'pro') =>
+      PUBLIC_ROWS.filter(feature => feature[plan] === true).length;
+    expect(within(desktopTable).getAllByText('Included')).toHaveLength(
+      included('free') + included('pro')
+    );
+    expect(within(mobileTable).getAllByText('Included')).toHaveLength(
+      included('pro')
+    );
     expect(desktopTable.querySelector('svg')).toBeNull();
     expect(mobileTable.querySelector('svg')).toBeNull();
     expect(
@@ -80,8 +137,7 @@ describe('PricingComparisonChart', () => {
     expect(selector).toHaveValue('free');
     expect(within(mobileTable).getByText('Free')).toBeInTheDocument();
     expect(within(mobileTable).getByText('$0')).toBeInTheDocument();
-    expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();
-    expect(within(mobileTable).getAllByText('Not included')).toHaveLength(2);
+    expect(within(mobileTable).getByText('Up to 100')).toBeInTheDocument();
     expect(within(mobileTable).queryByText('/mo')).not.toBeInTheDocument();
 
     fireEvent.change(selector, { target: { value: 'unknown-plan' } });

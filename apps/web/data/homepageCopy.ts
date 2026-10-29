@@ -57,7 +57,7 @@ export const HOMEPAGE_COPY = {
       },
       {
         label: 'Artist bio and social links',
-        entitlement: 'Artist bio & social links',
+        entitlement: 'Bio & social links',
       },
       {
         label: 'Release pages with listen links for every service',
