@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { AdminReadUnavailable } from '@/components/features/admin/AdminReadUnavailable';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { listAlternatives } from '@/lib/copy-jam/alternatives.server';
 import { COPY_ROWS, listCopyRoutes } from '@/lib/copy-jam/inventory';
 import {
   type CopyVerdictRecord,
@@ -12,6 +13,7 @@ import {
 import { listCopyVerdicts } from '@/lib/copy-jam/verdicts.server';
 import { captureError } from '@/lib/error-tracking';
 import { CopyRowList } from './CopyRowList';
+import { VoiceJam } from './VoiceJam';
 
 export const metadata: Metadata = {
   title: 'Copy | Admin',
@@ -49,6 +51,7 @@ export default async function AdminCopyPage({ searchParams }: PageProps) {
     });
   }
 
+  const alternatives = await listAlternatives().catch(() => new Map());
   const routes = listCopyRoutes();
   const records = verdicts ? [...verdicts.values()] : [];
   const stats = computeStats(COPY_ROWS.length, records);
@@ -77,6 +80,8 @@ export default async function AdminCopyPage({ searchParams }: PageProps) {
           great · {stats.sucks} sucks · {stats.meh} meh · rewrites re-rated
           great {pct(rewrite.rate)} ({rewrite.rerated})
         </p>
+
+        <VoiceJam />
 
         <nav
           aria-label='Filter By Route'
@@ -136,6 +141,12 @@ export default async function AdminCopyPage({ searchParams }: PageProps) {
 
         <CopyRowList
           rows={rows}
+          alternatives={Object.fromEntries(
+            [...alternatives].map(([id, a]) => [
+              id,
+              { forText: a.forText, alternatives: a.alternatives },
+            ])
+          )}
           verdicts={Object.fromEntries(
             [...(verdicts ?? new Map<string, CopyVerdictRecord>())].map(
               ([id, v]) => [id, { verdict: v.verdict, note: v.note }]

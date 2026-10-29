@@ -11,6 +11,10 @@ interface Shown {
 
 interface Props {
   readonly rows: readonly CopyRow[];
+  /** Pending rewrites from Summer, shown only while they match the live text. */
+  readonly alternatives?: Readonly<
+    Record<string, { forText: string; alternatives: readonly string[] }>
+  >;
   readonly verdicts: Readonly<Record<string, Shown>>;
 }
 
@@ -20,7 +24,7 @@ const VERDICT_CLASS: Record<CopyVerdict, string> = {
   great: 'text-primary-token',
 };
 
-export function CopyRowList({ rows, verdicts }: Props) {
+export function CopyRowList({ rows, verdicts, alternatives = {} }: Props) {
   const [local, setLocal] = useState<Record<string, Shown>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -72,6 +76,15 @@ export function CopyRowList({ rows, verdicts }: Props) {
                   {shown.verdict}
                   {shown.note ? ` · ${shown.note}` : ''}
                 </p>
+              ) : null}
+              {alternatives[row.id]?.forText === row.text ? (
+                <ul className='mt-2 flex flex-col gap-1 border-l border-subtle pl-3'>
+                  {alternatives[row.id]?.alternatives.map(alt => (
+                    <li key={alt} className='text-sm text-secondary-token'>
+                      {alt}
+                    </li>
+                  ))}
+                </ul>
               ) : null}
               {errors[row.id] ? (
                 <p role='alert' className='mt-1 text-sm text-secondary-token'>
