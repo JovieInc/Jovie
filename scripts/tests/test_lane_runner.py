@@ -12356,6 +12356,16 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertEqual(calls.count(["pnpm", "install", "--lockfile-only", "--ignore-scripts"]), 1)
             self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
 
+    def test_cleanly_merged_generated_file_is_also_regenerated(self):
+        topology = ".github/workflow-topology.gen.yml"
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n"},
+                                     main_changes={"pnpm-lock.yaml": "main\n", topology: "main topology\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
+            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{topology}", cwd=origin), "regenerated")
+
     def test_a_source_conflict_is_left_to_the_agent_untouched(self):
         with tempfile.TemporaryDirectory() as tmp:
             origin, work = self.repo(Path(tmp), {"pnpm-lock.yaml": "pr\n", "a.ts": "pr\n"})
@@ -12365,6 +12375,19 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
             self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
             self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
+
+    def test_failed_generated_restore_or_generator_stops_before_staging(self):
+        for failure in ("checkout", "generator"):
+            calls = []
+            def shell(args, **kwargs):
+                calls.append(args)
+                failed = (failure == "checkout" and args[:2] == ["git", "checkout"]
+                          or failure == "generator" and args[0] == "pnpm")
+                return SimpleNamespace(returncode=int(failed), stdout="", stderr="")
+            with self.subTest(failure=failure), patch.object(lane, "sh", side_effect=shell):
+                self.assertFalse(lane.regenerate_merged_generated(
+                    Path("/not-used"), [".github/workflow-topology.gen.yml"], None))
+            self.assertFalse(any(cmd[:2] == ["git", "add"] for cmd in calls))
 
 
 class GateOutcomeTest(unittest.TestCase):
