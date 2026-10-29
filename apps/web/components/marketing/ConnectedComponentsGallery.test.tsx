@@ -47,6 +47,16 @@ describe('ConnectedComponentsGallery', () => {
     );
   });
 
+  it('preserves the complete headline through the canonical section header', () => {
+    render(<ConnectedComponentsGallery />);
+    const heading = screen.getByRole('heading', {
+      level: 2,
+      name: CONNECTED_COMPONENTS_COPY.headline,
+    });
+    expect(heading).toHaveAttribute('data-wrap', 'editorial-title');
+    expect(heading.className).not.toMatch(/line-clamp|truncate/);
+  });
+
   it('only shows scenarios the screenshot registry captures', () => {
     for (const state of CONNECTED_COMPONENTS_COPY.states) {
       expect(getScreenshotScenario(state.scenarioId)).not.toBeNull();

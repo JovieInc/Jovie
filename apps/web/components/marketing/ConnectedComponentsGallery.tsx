@@ -1,3 +1,4 @@
+import { ArtistProfileSectionHeader } from '@/components/marketing/artist-profile/ArtistProfileSectionHeader';
 import { ArtistProfileSectionShell } from '@/components/marketing/artist-profile/ArtistProfileSectionShell';
 import { MarketingPhoneStateGallery } from '@/components/marketing/MarketingPhoneStateGallery';
 import {
@@ -30,15 +31,11 @@ export function ConnectedComponentsGallery({
       }
     >
       <div data-accent='ion'>
-        <h2
-          id='connected-components-heading'
-          className='marketing-type-section text-balance text-primary-token'
-        >
-          {copy.headline}
-        </h2>
-        <p className='marketing-type-lede mt-4 max-w-xl text-secondary-token'>
-          {copy.intro}
-        </p>
+        <ArtistProfileSectionHeader
+          headline={copy.headline}
+          body={copy.intro}
+          align='left'
+        />
         <div className='mt-10'>
           <MarketingPhoneStateGallery
             states={copy.states}
