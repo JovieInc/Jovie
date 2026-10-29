@@ -62,6 +62,7 @@ import file_overlap  # noqa: E402
 import claude_lane  # noqa: E402  (subscription quota bank read by the router)
 import hyperagent_lane  # noqa: E402
 import migration_renumber  # noqa: E402  (no-model fix for migration number collisions)
+import conflict_intent  # noqa: E402  (whitespace-equivalent merge hunks, no model)
 import fix_red_classes  # noqa: E402  (fingerprint + deterministic routing of fix-red failures)
 from gh_budget import gh_call  # noqa: E402  (budgeted gh for new lane code)
 import machine_gap  # noqa: E402
@@ -6149,27 +6150,34 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
     no model. Merge main, take its copy of each conflicted generated file, run each file's
     canonical regenerator (remediation.GENERATED_RESOLVERS: `pnpm install --lockfile-only`
     for pnpm-lock.yaml, `pnpm ci:topology:write` for workflow-topology.gen.yml), push (no
-    force). Any other conflict, or a failed regeneration, aborts and leaves the PR to the
-    agent."""
+    force). Whitespace-equivalent source hunks resolve to main's text via conflict_intent.
+    Any remaining source conflict, or a failed regeneration, aborts and leaves the PR to
+    the agent."""
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
         conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
-        if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
+        generated_names = set(remediation.GENERATED_RESOLVERS)
+        source = sorted(conflicted - generated_names)
+        generated = sorted(conflicted & generated_names)
+        if not conflicted or (source and not conflict_intent.resolve_paths(worktree, source)):
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
-        guard()
-        commands = []
-        for path in sorted(conflicted):
-            command = list(remediation.GENERATED_RESOLVERS[path])
-            if command not in commands:
-                commands.append(command)
-        for command in commands:
-            if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        if source:
+            sh(["git", "add", "--", *source], cwd=worktree, log=log)
+        if generated:
+            sh(["git", "checkout", "origin/main", "--", *generated], cwd=worktree, log=log)
+            guard()
+            commands = []
+            for path in generated:
+                command = list(remediation.GENERATED_RESOLVERS[path])
+                if command not in commands:
+                    commands.append(command)
+            for command in commands:
+                if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
+                    sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                    return False
+            sh(["git", "add", "--", *generated], cwd=worktree, log=log)
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False

@@ -12230,7 +12230,11 @@ class OnePrPerIssueTest(unittest.TestCase):
 
 
 class LockfileConflictTest(unittest.TestCase):
-    """JOV-6837/JOV-7594: a generated-file-only conflict is resolved without a model; anything else is not."""
+    """JOV-6837/JOV-7594: generated-file conflicts regenerate without a model.
+
+    Whitespace-equivalent source hunks keep main's text. A real source disagreement
+    still aborts for the agent.
+    """
 
     def test_rechecks_target_immediately_before_runner_owned_install_and_push(self):
         for conflict in (True, False):
@@ -12347,6 +12351,44 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
             self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
             self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
+
+    def test_whitespace_equivalent_source_conflict_keeps_main_text(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(
+                Path(tmp),
+                {"a.ts": 'const name = "Inbox";\n'},
+                main_changes={"a.ts": 'const name = "Inbox"; \n'},
+            )
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertFalse(any(cmd[:2] == ["pnpm", "install"] for cmd in calls))
+            # LockfileConflictTest.git() strips trailing whitespace, which would
+            # hide the space this resolver must keep from main.
+            shown = subprocess.run(
+                ["git", "show", "devin/jov-1-20260927:a.ts"],
+                cwd=origin,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(shown, 'const name = "Inbox"; \n')
+
+    def test_disagreement_and_retired_key_stay_marked(self):
+        import conflict_intent
+
+        same = conflict_intent.fully_resolved(
+            "before\n<<<<<<< HEAD\nvalue\n=======\nvalue\n \n>>>>>>> main\nafter\n"
+        )
+        self.assertEqual(same, "before\nvalue\n \nafter\n")
+        disagree = conflict_intent.fully_resolved(
+            "<<<<<<< HEAD\n  PROFILES_WORKSPACE: false,\n=======\n  /** comment */\n>>>>>>> main\n"
+        )
+        self.assertIsNone(disagree)
+        partial = conflict_intent.apply_safe_hunks(
+            "<<<<<<< HEAD\nkeep\n=======\nkeep\n>>>>>>> main\n<<<<<<< HEAD\nours\n=======\ntheirs\n>>>>>>> main\n"
+        )
+        self.assertIn("<<<<<<< HEAD\nours\n", partial)
+        self.assertNotIn("<<<<<<< HEAD\nkeep\n", partial)
 
 
 class GateOutcomeTest(unittest.TestCase):
