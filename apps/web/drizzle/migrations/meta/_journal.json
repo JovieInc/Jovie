@@ -1051,6 +1051,13 @@
       "when": 1793232287260,
       "tag": "0149_content_records",
       "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1793245440740,
+      "tag": "0150_signup_replays",
+      "breakpoints": true
     }
   ]
 }

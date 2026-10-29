@@ -1383,6 +1383,8 @@ export {
   selectCreatorSendingReputationSchema,
   selectEmailSendAttributionSchema,
 } from './sender';
+// Signup session replays (internal activation evidence)
+export { type SignupReplayRow, signupReplays } from './signup-replays';
 // Suppression (Email Suppressions, Webhook Events, Delivery Logs)
 export {
   type CategorySubscription,

@@ -1,6 +1,6 @@
 ## Privacy Policy
 
-_Last updated: February 2026_
+_Last updated: October 2026_
 
 This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
@@ -52,6 +52,7 @@ We automatically gather operational signals to keep Jovie reliable:
 - Analytics about profile visits, clicks, and link engagement
 - Device, browser, and user-agent details for rendering safely
 - IP addresses (anonymized for monitoring abuse)
+- Session recordings: every session on our start, claim, sign-in, sign-up, onboarding, and billing pages, and a sample of sessions on the home page and in the signed-in dashboard. A recording replays your clicks, scrolling, and page navigation so we can find where sign-up breaks. All text and form fields, including email addresses and passwords, are masked before they leave your browser, and media is blocked. Recordings are stored by Sentry, linked to your account only for internal product review, and deleted after 90 days. We do not record automated browsers.
 
 ### Third-Party Services
 
@@ -65,7 +66,7 @@ Our stack uses a small set of trusted partners:
 - **Anthropic** for AI-powered chat assistance and analytics insights (Claude language models)
 - **Google AI** for AI-generated conversation titles (Gemini language models)
 - **Vercel** for hosting, edge functions, file storage, web analytics, and AI Gateway routing
-- **Sentry** for error tracking and performance monitoring
+- **Sentry** for error tracking, performance monitoring, and session replay
 - **Resend** for transactional email delivery
 
 We never introduce other analytics platforms or tracking cookies without explicit notice.

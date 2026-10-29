@@ -6,7 +6,8 @@
  *
  * - Public pages (/, /artists, /[username], etc.): Lite SDK for faster LCP
  *   - Core error tracking only (~20-30KB gzipped)
- *   - No Replay, no Profiling
+ *   - No Profiling. Replay is added only on the activation funnel
+ *     (see lib/sentry/replay-policy.ts); profiles never load it.
  *
  * - Dashboard pages (/app, /account, /billing, etc.): Full SDK with all features
  *   - Session Replay (~40-50KB gzipped)
@@ -121,11 +122,18 @@ export function onRouterTransitionStart(
       void loadRouterTransitionCapture();
       const { initFullSentryAsync } = await import('./lib/sentry/client-full');
       await initFullSentryAsync();
+      // Onboarding/billing record every session; /app keeps the low rate.
+      const { scheduleReplayLink } = await import('./lib/sentry/replay-start');
+      scheduleReplayLink();
     } else {
       // Public routes: Load lite SDK for better LCP
       // Dynamic import enables webpack to create a separate chunk
       const { initLiteSentry } = await import('./lib/sentry/client-lite');
       initLiteSentry();
+      // Activation funnel (/, /start, /claim, auth) records sessions; profiles
+      // and other public pages load no Replay code.
+      const { startFunnelReplay } = await import('./lib/sentry/replay-start');
+      await startFunnelReplay(pathname);
     }
   } catch (error) {
     // Silently fail Sentry initialization to avoid breaking the app
