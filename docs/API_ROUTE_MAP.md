@@ -43,6 +43,7 @@ sibling deployments, machine publishers, or source-repository automation.
 | `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer clients use the shared certification and receipt-backed product-quality projection |
 | `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
 | `/api/internal/ovie/pipeline-bottleneck/contributions` | POST | `cron` | Hourly loop publishes a validated `pipeline-bottleneck-contribution/v1` (maximum 16 KiB) to `summer-bottleneck/contributions/hourly-loop.json` |
+| `/api/internal/ovie/email-deliverability` | GET, POST | Summer OIDC | Summer reads per-stream and per-domain delivered, bounce and complaint rates and Forge readiness (aggregates only); POST records the weekly Resend Forge eligibility observation and files the one-tap activation card when eligible and clean |
 | `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
 | `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |
 

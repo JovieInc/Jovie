@@ -16,6 +16,7 @@ const mockLogDelivery = vi.hoisted(() => vi.fn());
 const mockLoggerInfo = vi.hoisted(() => vi.fn());
 const mockLoggerWarn = vi.hoisted(() => vi.fn());
 const mockLoggerError = vi.hoisted(() => vi.fn());
+const mockEvaluateStream = vi.hoisted(() => vi.fn());
 const mockResendSecret = vi.hoisted(
   () => `whsec_${Buffer.from('resend-secret').toString('base64')}`
 );
@@ -65,6 +66,10 @@ vi.mock('@/lib/notifications/reputation', () => ({
 vi.mock('@/lib/notifications/suppression', () => ({
   addSuppression: mockAddSuppression,
   logDelivery: mockLogDelivery,
+}));
+
+vi.mock('@/lib/email/deliverability/loop.server', () => ({
+  evaluateStreamFromEvent: mockEvaluateStream,
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
@@ -230,7 +235,11 @@ describe('POST /api/webhooks/resend', () => {
         recipientEmail: 'fan@example.com',
         status: 'delivered',
         providerMessageId: 'email_123',
-        metadata: { creatorProfileId: 'creator_123' },
+        metadata: {
+          eventType: 'email.delivered',
+          creatorProfileId: 'creator_123',
+          senderDomain: 'example.com',
+        },
       })
     );
     expect(mockUpdate).toHaveBeenCalledTimes(1);
@@ -274,6 +283,7 @@ describe('POST /api/webhooks/resend', () => {
           from: 'artist@example.com',
           to: ['fan@example.com', 'other@example.com'],
           subject: 'Release update',
+          tags: { stream: 'broadcast', purpose: 'changelog' },
           created_at: '2026-05-24T00:00:00.000Z',
           bounce: {
             message: 'Mailbox full, try again later',
@@ -323,9 +333,13 @@ describe('POST /api/webhooks/resend', () => {
         metadata: expect.objectContaining({
           creatorProfileId: 'creator_456',
           eventType: 'email.bounced',
+          stream: 'broadcast',
+          senderDomain: 'example.com',
         }),
       })
     );
+    // Closed loop: the bounce re-judges its stream (auto-pause + Summer card).
+    expect(mockEvaluateStream).toHaveBeenCalledWith('broadcast');
     expect(mockStopEnrollmentsForEmail).toHaveBeenCalledWith(
       'fan@example.com',
       'bounced',
