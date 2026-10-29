@@ -7,6 +7,8 @@ and routes through its Tracker like every other doctor alert; nothing here owns 
 Alarms (each names its stage and carries its evidence):
   throughput-no-push:<repo>:<lane>   demand > 0, seats configured, zero lane pushes for 60 min
   throughput-queue-no-merge          merge queue > 0, zero merges in the last 60 min
+  throughput-claim-errors:<lane>     >= 20% of a lane's runs in 30 min died on claim-error (a broken claim ledger
+                                     killed ~560 fix-red runs from 2026-10-26 07:30Z and nothing alarmed)
   throughput-merge-group-start-slow  merge-group runs wait > 5 min (p50) for a runner
   throughput-prod-lease-held         a Production Controller run holds the lease > 45 min
   throughput-idle-dominant           one idle/hold reason is > 50% of the last hour's exits
@@ -45,6 +47,7 @@ NO_DEMAND_REASONS = frozenset({"maintenance-only-idle", "no-demand", "pool-empty
 GROWTH_ALARM_FRACTION = 0.7
 RELEASE_FLOW_REFRESH_S = 300
 MERGE_GROUP_SAMPLE_RUNS = 3
+CLAIM_ERROR_WINDOW_S, CLAIM_ERROR_FRACTION, CLAIM_ERROR_MIN_RUNS = 1800, 0.2, 5
 PUSH_VERDICTS = frozenset({"pr-opened", "pushed", "fix-pushed", "landing", "verified-not-queued", "decomposed"})
 REPO = "JovieInc/Jovie"
 # Repos the lanes do not claim work in; their demand and merge signals come from GitHub alone.
@@ -98,6 +101,22 @@ def read_idle_exits(state: Path, now: float, window_s: float = 3600) -> list[dic
                 and isinstance(row.get("reason"), str):
             rows.append(row)
     return rows
+
+
+def claim_errors_by_lane(receipts: list[dict], now: float) -> dict[str, dict]:
+    """Per provider over the last 30 min: finished runs and how many died on a claim-error receipt."""
+    out: dict[str, dict] = {}
+    for row in receipts or []:
+        ended = _iso_epoch(row.get("endedAt"))
+        if ended is None or not 0 <= now - ended <= CLAIM_ERROR_WINDOW_S or not row.get("provider"):
+            continue
+        slot = out.setdefault(row["provider"], {"runs": 0, "claimErrors": 0, "sample": None})
+        slot["runs"] += 1
+        reason = next((r for r in row.get("reasons") or [] if isinstance(r, str) and r.startswith("claim-error:")), None)
+        if reason:
+            slot["claimErrors"] += 1
+            slot["sample"] = slot["sample"] or reason[:120]
+    return out
 
 
 def pushes_by_lane(receipts: list[dict], now: float) -> dict[str, int]:
@@ -282,7 +301,7 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         repos[watched] = flow_row
         if flow_err:
             repo_errors[watched] = flow_err
-    return {"pushes1h": pushes_by_lane(receipts, now),
+    return {"pushes1h": pushes_by_lane(receipts, now), "claimErrors30m": claim_errors_by_lane(receipts, now),
             "idleExits1h": dict(Counter(row["reason"] for row in exits)),
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
@@ -315,6 +334,12 @@ def judge(obs: dict) -> dict[str, str]:
                     f"({row.get('running', 0)} running, oldest lease "
                     f"{round((row.get('oldestLeaseAge') or 0) / 60)} min) but zero {provider} pushes in the last 60 min; "
                     f"idle exits 1h: {_top(idle)}; held: {obs.get('heldByReason') or {}}")
+    # 1b. Claim errors: runs that die before any work because the claim ledger is unreadable.
+    for provider, row in sorted((sentinel.get("claimErrors30m") or {}).items()):
+        if row.get("runs", 0) >= CLAIM_ERROR_MIN_RUNS and row.get("claimErrors", 0) / row["runs"] > CLAIM_ERROR_FRACTION:
+            alerts[f"throughput-claim-errors:{provider}"] = (
+                f"stage claim ({provider}): {row['claimErrors']}/{row['runs']} runs in the last 30 min ended on claim-error "
+                f"({row.get('sample')}); check runs/execution-attempts.jsonl for a torn line and the execution coordinator")
     # 2. Queue but no merges.
     merge = obs.get("mergeThroughput") or {}
     if isinstance(merge.get("observedAt"), (int, float)) and obs["now"] - merge["observedAt"] < 1800 \

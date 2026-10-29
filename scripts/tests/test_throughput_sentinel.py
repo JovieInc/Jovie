@@ -146,6 +146,22 @@ class ThroughputSentinelTest(unittest.TestCase):
             self.assertIn("boom", error)
 
 
+class ClaimErrorTest(unittest.TestCase):
+    def test_claim_error_rate_over_twenty_percent_alarms_per_lane(self):
+        dead = {"provider": "codex", "endedAt": iso(NOW - 60), "verdict": "failed",
+                "reasons": ["claim-error:JSONDecodeError:Unterminated string starting at: line 1 column 421"]}
+        ok = {"provider": "codex", "endedAt": iso(NOW - 120), "verdict": "fix-pushed", "reasons": []}
+        old = {"provider": "codex", "endedAt": iso(NOW - 7200), "verdict": "failed", "reasons": dead["reasons"]}
+        rows = ts.claim_errors_by_lane([dead] * 3 + [ok] * 4 + [old] * 9, NOW)
+        self.assertEqual((rows["codex"]["runs"], rows["codex"]["claimErrors"]), (7, 3))
+        alerts = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": rows}})
+        self.assertIn("throughput-claim-errors:codex", alerts)
+        healthy = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": ts.claim_errors_by_lane([dead] + [ok] * 9, NOW)}})
+        self.assertNotIn("throughput-claim-errors:codex", healthy)
+        few = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": ts.claim_errors_by_lane([dead] * 3, NOW)}})
+        self.assertNotIn("throughput-claim-errors:codex", few)
+
+
 class IdleNotDemandTest(unittest.TestCase):
     def test_idle_for_any_reason_but_no_demand_while_demand_exists_alarms_per_lane(self):
         pushed = {"JovieInc/Jovie|codex": 1}
