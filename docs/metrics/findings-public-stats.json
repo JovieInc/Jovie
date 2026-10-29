@@ -1,9 +1,0 @@
-{
-  "schema": "jovie.findings-public-stats/v1",
-  "observedAt": "2026-10-29T18:21:59.244Z",
-  "openCriticalHigh": 119,
-  "sloBreaches": 35,
-  "remediationP50Hours": 215.53305555555556,
-  "remediationP95Hours": 1936.3327777777777,
-  "sourcesMonitored": 7
-}
