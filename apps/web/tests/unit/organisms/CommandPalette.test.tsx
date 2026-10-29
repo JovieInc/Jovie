@@ -577,6 +577,8 @@ describe('CommandPalette', () => {
     // Customer rows must not leak into the operator palette.
     expect(text).not.toContain('Generate album art');
     expect(text).not.toContain('Contacts');
+    expect(screen.queryByText('Recent Chats')).not.toBeInTheDocument();
+    expect(screen.queryByText('Q1 release plan')).not.toBeInTheDocument();
 
     const fleet = options.find(el => el.textContent?.includes('Fleet'));
     fireEvent.mouseDown(fleet!);

@@ -214,16 +214,16 @@ function CommandPaletteInner({
 }: CommandPaletteInnerProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const operatorMode = isOvieSurface(pathname);
 
   const { data: conversations } = useChatConversationsQuery({
     limit: RECENT_CHAT_QUERY_LIMIT,
-    enabled: open,
+    enabled: open && !operatorMode,
   });
 
   // Recent chats are not part of the
   // command registry — they're palette-local. We fold them into a synthetic
   // entity section so the shared list+keyboard machinery picks them up.
-  const operatorMode = isOvieSurface(pathname);
   const additionalSections = useMemo<PaletteSection[]>(() => {
     const sections: PaletteSection[] = [];
     if (operatorMode) {
@@ -281,7 +281,7 @@ function CommandPaletteInner({
         });
       }
     }
-    if (conversations && conversations.length > 0) {
+    if (!operatorMode && conversations && conversations.length > 0) {
       const currentConversationId = getCurrentConversationId(pathname);
       const rankedConversations = rankPaletteConversations(
         conversations,
