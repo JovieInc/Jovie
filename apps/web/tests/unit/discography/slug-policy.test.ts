@@ -30,6 +30,47 @@ const solo = item({
 });
 
 describe('planSlugs', () => {
+  it.each(['', '   ', '🎵', '---'])(
+    'uses the content kind when the title %j has no URL-safe characters',
+    title => {
+      const plan = planSlugs([
+        item({ key: 'release', title }),
+        item({ key: 'recording', title, kind: 'recording' }),
+      ]);
+      expect(plan.get('release')).toEqual({
+        slug: 'release',
+        qualifier: 'bare',
+      });
+      expect(plan.get('recording')).toEqual({
+        slug: 'recording',
+        qualifier: 'bare',
+      });
+    }
+  );
+
+  it('qualifies missing-title content around named and reserved slugs', () => {
+    const plan = planSlugs(
+      [
+        item({ key: 'named', title: 'Release' }),
+        item({ key: 'missing', title: '' }),
+        item({
+          key: 'dated',
+          title: '🎵',
+          releaseDate: new Date('2020-01-01T00:00:00Z'),
+        }),
+        item({ key: 'recording', title: '', kind: 'recording' }),
+      ],
+      new Set(['release', 'release-2020', 'recording'])
+    );
+    const slugs = [...plan.values()].map(({ slug }) => slug);
+    expect(new Set(slugs).size).toBe(4);
+    for (const slug of slugs) {
+      expect(slug).toMatch(/^(?:release|recording)-[a-z][a-z0-9-]*$/);
+      expect(slug).not.toMatch(NUMERIC_SUFFIX);
+      expect(['release', 'release-2020', 'recording']).not.toContain(slug);
+    }
+  });
+
   it("gives the bare slug to the artist's solo original, even if later", () => {
     const plan = planSlugs([vigel, solo]);
     // Vigel & Tim White is a legitimate second version with a co-primary

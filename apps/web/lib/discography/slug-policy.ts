@@ -190,7 +190,7 @@ export function planSlugs(
   const groups = new Map<string, SlugItem[]>();
   for (const item of items) {
     if (pinned.has(item.key)) continue;
-    const base = slugify(item.title) || 'untitled';
+    const base = slugify(item.title) || item.kind;
     groups.set(base, [...(groups.get(base) ?? []), item]);
   }
 
