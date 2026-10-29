@@ -55,7 +55,7 @@ merge_group CI runs (~17:40Z), measured as job `created_at` → `started_at`:
 The repo is public, so hosted minutes are free. Org concurrency is still
 capped: at 05:30Z hosted waits were p50 141 s, which is why #23586 moved these
 jobs to Gem. The fix is a measured, switchable pool (`MERGE_GATE_POOL`) with a
-sentinel alarm on whichever pool is slower (separate PR). Every queue option
+sentinel alarm on whichever pool is slower (#23671). Every queue option
 below inherits this saving; it is not an argument for or against the queue.
 
 So about half of today's merge-group failures are rules a local or fast gate

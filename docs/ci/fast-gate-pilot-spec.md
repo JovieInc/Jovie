@@ -1,7 +1,7 @@
 # Fast gate, signed receipts, post-merge bisect and revert: pilot spec
 
 Status: design spec (2026-10-29). Nothing here is implemented except the
-shared Turbo R2 cache (#23675), which the fast gate depends on. The decision and
+shared Turbo R2 cache (#23676), which the fast gate depends on. The decision and
 kill criteria are in [merge-queue-alternatives.md](merge-queue-alternatives.md).
 Each section names the existing script the next PR extends; build on those,
 never next to them.
