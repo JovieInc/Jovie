@@ -1,10 +1,237 @@
 {
   "_generated": {
-    "version": "093cb926ca90",
+    "version": "7dfffcc6ab23",
     "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
-    "listingHash": "3dc2c64c58654c6c87790cb1d3f9b50a31b1ff4e88830fdf7eef722e0b28b2b0",
+    "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   },
-  "ready": true,
-  "blockers": []
+  "ready": false,
+  "blockers": [],
+  "timeChecks": "Receipt age and deadlines are checked by the agent-distribution:ready script, not here.",
+  "platforms": {
+    "muse": {
+      "ready": false,
+      "gates": {
+        "agentPathCert": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "trustSurfaceVisual": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "legalConsistency": {
+          "status": "fail",
+          "receiptId": "legal-source-check",
+          "reasons": [
+            "legal text does not cover data collected: public artist identity and release facts",
+            "legal text does not cover anonymous write action: unpublished drafts",
+            "legal text does not cover data collected: acquisition attribution",
+            "legal text does not cover retention: 7-day draft expiry",
+            "legal text does not cover named assistant as a connector caller: ChatGPT",
+            "legal text does not cover named assistant as a connector caller: Claude",
+            "legal text does not cover named assistant as a connector caller: Grok",
+            "legal text does not cover named assistant as a connector caller: Muse"
+          ]
+        },
+        "homepageTasteApproval": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "connectorDocs": {
+          "status": "pass",
+          "receiptId": "docs:/developers/agents",
+          "reasons": []
+        },
+        "listingIcons": {
+          "status": "pass",
+          "receiptId": "icons:0c1fd4011498",
+          "reasons": []
+        }
+      },
+      "missingReceipts": [
+        "agentPathCert",
+        "trustSurfaceVisual",
+        "legalConsistency",
+        "homepageTasteApproval"
+      ]
+    },
+    "grok": {
+      "ready": false,
+      "gates": {
+        "agentPathCert": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "trustSurfaceVisual": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "legalConsistency": {
+          "status": "fail",
+          "receiptId": "legal-source-check",
+          "reasons": [
+            "legal text does not cover data collected: public artist identity and release facts",
+            "legal text does not cover anonymous write action: unpublished drafts",
+            "legal text does not cover data collected: acquisition attribution",
+            "legal text does not cover retention: 7-day draft expiry",
+            "legal text does not cover named assistant as a connector caller: ChatGPT",
+            "legal text does not cover named assistant as a connector caller: Claude",
+            "legal text does not cover named assistant as a connector caller: Grok",
+            "legal text does not cover named assistant as a connector caller: Muse"
+          ]
+        },
+        "homepageTasteApproval": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "connectorDocs": {
+          "status": "pass",
+          "receiptId": "docs:/developers/agents",
+          "reasons": []
+        },
+        "listingIcons": {
+          "status": "pass",
+          "receiptId": "icons:0c1fd4011498",
+          "reasons": []
+        }
+      },
+      "missingReceipts": [
+        "agentPathCert",
+        "trustSurfaceVisual",
+        "legalConsistency",
+        "homepageTasteApproval"
+      ]
+    },
+    "chatgpt": {
+      "ready": false,
+      "gates": {
+        "agentPathCert": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "trustSurfaceVisual": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "legalConsistency": {
+          "status": "fail",
+          "receiptId": "legal-source-check",
+          "reasons": [
+            "legal text does not cover data collected: public artist identity and release facts",
+            "legal text does not cover anonymous write action: unpublished drafts",
+            "legal text does not cover data collected: acquisition attribution",
+            "legal text does not cover retention: 7-day draft expiry",
+            "legal text does not cover named assistant as a connector caller: ChatGPT",
+            "legal text does not cover named assistant as a connector caller: Claude",
+            "legal text does not cover named assistant as a connector caller: Grok",
+            "legal text does not cover named assistant as a connector caller: Muse"
+          ]
+        },
+        "homepageTasteApproval": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "connectorDocs": {
+          "status": "pass",
+          "receiptId": "docs:/developers/agents",
+          "reasons": []
+        },
+        "listingIcons": {
+          "status": "pass",
+          "receiptId": "icons:0c1fd4011498",
+          "reasons": []
+        }
+      },
+      "missingReceipts": [
+        "agentPathCert",
+        "trustSurfaceVisual",
+        "legalConsistency",
+        "homepageTasteApproval"
+      ]
+    },
+    "claude": {
+      "ready": false,
+      "gates": {
+        "agentPathCert": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "trustSurfaceVisual": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "legalConsistency": {
+          "status": "fail",
+          "receiptId": "legal-source-check",
+          "reasons": [
+            "legal text does not cover data collected: public artist identity and release facts",
+            "legal text does not cover anonymous write action: unpublished drafts",
+            "legal text does not cover data collected: acquisition attribution",
+            "legal text does not cover retention: 7-day draft expiry",
+            "legal text does not cover named assistant as a connector caller: ChatGPT",
+            "legal text does not cover named assistant as a connector caller: Claude",
+            "legal text does not cover named assistant as a connector caller: Grok",
+            "legal text does not cover named assistant as a connector caller: Muse"
+          ]
+        },
+        "homepageTasteApproval": {
+          "status": "missing",
+          "receiptId": null,
+          "reasons": [
+            "no receipt"
+          ]
+        },
+        "connectorDocs": {
+          "status": "pass",
+          "receiptId": "docs:/developers/agents",
+          "reasons": []
+        },
+        "listingIcons": {
+          "status": "pass",
+          "receiptId": "icons:0c1fd4011498",
+          "reasons": []
+        }
+      },
+      "missingReceipts": [
+        "agentPathCert",
+        "trustSurfaceVisual",
+        "legalConsistency",
+        "homepageTasteApproval"
+      ]
+    }
+  }
 }
