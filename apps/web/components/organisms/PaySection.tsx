@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/organisms/TipSection.test.tsx
 
 import { Button } from '@jovie/ui';
 import { useEffect, useRef, useState } from 'react';

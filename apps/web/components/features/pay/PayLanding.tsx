@@ -74,14 +74,14 @@ function TipsHero() {
             sheet so its amount chips and Venmo action read at hero size. */}
         <div
           data-testid='pay-hero-product'
-          className='relative mx-auto aspect-[780/1000] w-full max-w-[22rem] overflow-hidden rounded-[2rem] border border-subtle bg-surface-0 shadow-card md:mr-0'
+          className='relative mx-auto aspect-4/5 w-full max-w-sm overflow-hidden rounded-3xl border border-subtle bg-surface-0 shadow-card md:mr-0'
         >
           <MarketingPhoneImage
             scenarioId='tim-white-profile-pay-mobile'
             altOverride='Pay sheet on a Jovie profile: pick $5, $10 or $20 and continue with Venmo'
             fill
             priority
-            sizes='(min-width: 768px) 22rem, 90vw'
+            sizes='(min-width: 768px) 24rem, 90vw'
             className='rounded-none object-cover object-bottom'
           />
         </div>
