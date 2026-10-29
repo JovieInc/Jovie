@@ -1,6 +1,13 @@
 'use client';
 
-import { createContext, type ReactNode, useContext, useMemo } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
+import { useIsomorphicLayoutEffect } from '@/hooks/useIsomorphicLayoutEffect';
 import { clearLegacyClerkSessionMarker } from '@/lib/auth/auth-session-cookies';
 import { authClient } from '@/lib/auth/client';
 import {
@@ -62,6 +69,8 @@ export interface UseAuthSafeReturn {
   readonly isSignedIn: boolean;
   readonly userId: string | null;
   readonly sessionId: string | null;
+  /** Trusted server seed only, until the first live session result settles. */
+  readonly bootstrapSessionPending?: boolean;
   readonly getToken: () => Promise<string | null>;
   readonly signOut: (options?: JovieSignOutOptions) => Promise<void>;
 }
@@ -162,6 +171,15 @@ export function JovieAuthValuesProvider({
   readonly initialUser?: BetterAuthSessionUser | null;
 }) {
   const { data, isPending } = authClient.useSession();
+  const [sessionSettled, setSessionSettled] = useState(
+    () => !isPending || Boolean(data?.session)
+  );
+  useIsomorphicLayoutEffect(() => {
+    if (!isPending || data?.session) setSessionSettled(true);
+  }, [isPending, data?.session]);
+  const bootstrapSessionPending = Boolean(
+    initialUser && isPending && !sessionSettled && !data?.user
+  );
 
   const value = useMemo<JovieAuthContextValue>(() => {
     // Clerk's isLoaded meant "Clerk JS finished booting"; the Better Auth
@@ -182,6 +200,7 @@ export function JovieAuthValuesProvider({
         isSignedIn,
         userId: user?.id ?? null,
         sessionId: data?.session?.id ?? null,
+        bootstrapSessionPending,
         getToken,
         signOut,
       },
@@ -194,7 +213,7 @@ export function JovieAuthValuesProvider({
       },
       canRenderAuthUi: true,
     };
-  }, [data, initialUser, isPending]);
+  }, [data, initialUser, isPending, bootstrapSessionPending]);
 
   return (
     <JovieAuthContext.Provider value={value}>
@@ -205,8 +224,7 @@ export function JovieAuthValuesProvider({
 
 /**
  * Safe-defaults provider for mock/DB-less mode: build-time rendering, tests,
- * and bypassed-auth origins (keyed off NEXT_PUBLIC_AUTH_MOCK, with a
- * one-release NEXT_PUBLIC_CLERK_MOCK fallback). Everything renders
+ * and bypassed-auth origins (keyed off NEXT_PUBLIC_AUTH_MOCK). Everything renders
  * signed-out and auth UI stays hidden.
  */
 export function JovieAuthDefaultsProvider({

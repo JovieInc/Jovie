@@ -2,16 +2,15 @@
 
 import { Button } from '@jovie/ui';
 import {
+  BadgeCheck,
   BarChart3,
-  CircleCheck,
-  Eye,
+  CalendarClock,
   Loader2,
+  Mail,
   PartyPopper,
-  Radar,
   Rocket,
   ShieldCheck,
   Workflow,
-  Wrench,
   XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -24,6 +23,7 @@ import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { page, track } from '@/lib/analytics';
+import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
 import { useBillingStatusQuery } from '@/lib/queries';
 import {
@@ -60,28 +60,36 @@ const MAX_UNLOCK_TILES = [
 ] as const;
 
 const ARTIST_VISIBILITY_STEP_ICONS = {
-  monitor: Eye,
-  surface: Radar,
-  approve: CircleCheck,
-  fix: Wrench,
+  notify: Mail,
+  prerelease: CalendarClock,
+  analytics: BarChart3,
+  verify: BadgeCheck,
 } as const;
 
 async function fetchValidatedSession(
   sessionId: string,
   signal: AbortSignal
-): Promise<{ plan: PaidPlanId | null; needsProfile: boolean }> {
+): Promise<{
+  plan: PaidPlanId | null;
+  needsProfile: boolean;
+  proofPending: boolean;
+}> {
   const response = await fetch(
     `/api/billing/checkout-session?session_id=${encodeURIComponent(sessionId)}`,
     { cache: 'no-store', signal }
   );
-  if (!response.ok) return { plan: null, needsProfile: false };
+  if (!response.ok) {
+    return { plan: null, needsProfile: false, proofPending: false };
+  }
   const body = (await response.json()) as {
     plan?: string | null;
     needsProfile?: boolean;
+    proofPending?: boolean;
   };
   return {
     plan: resolvePaidPlan(body.plan ?? null),
     needsProfile: body.needsProfile === true,
+    proofPending: body.proofPending === true,
   };
 }
 
@@ -91,7 +99,7 @@ function FeatureCard({
   description,
   status,
 }: {
-  readonly icon: typeof Eye;
+  readonly icon: typeof Mail;
   readonly title: string;
   readonly description: string;
   readonly status?: string;
@@ -137,6 +145,8 @@ export default function CheckoutSuccessPage() {
   const [validatedSessionPlan, setValidatedSessionPlan] =
     useState<PaidPlanId | null>(null);
   const [needsProfile, setNeedsProfile] = useState(false);
+  // Private until we confirm it is the artist's: never say "live".
+  const [proofPending, setProofPending] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const shouldSuppressMotion = hasHydratedMotion && prefersReducedMotion;
   const isBillingPending =
@@ -169,6 +179,7 @@ export default function CheckoutSuccessPage() {
         if (controller.signal.aborted) return;
         setValidatedSessionPlan(session.plan);
         setNeedsProfile(session.needsProfile);
+        setProofPending(session.proofPending);
       })
       .catch(error => {
         if (controller.signal.aborted) return;
@@ -305,6 +316,8 @@ export default function CheckoutSuccessPage() {
       view.kind === 'pending'
         ? CHECKOUT_PENDING_COPY.title
         : CHECKOUT_RECOVERY_COPY.title;
+  } else if (isOnboardingUpgrade && proofPending) {
+    successTitle = 'Your plan is active';
   } else if (isOnboardingUpgrade) {
     successTitle = 'Your profile is live and upgraded';
   } else if (paidDisplayName) {
@@ -318,9 +331,11 @@ export default function CheckoutSuccessPage() {
     successSubtitle = CHECKOUT_PENDING_COPY.subtitle;
   } else if (view.kind === 'recovery') {
     successSubtitle = CHECKOUT_RECOVERY_COPY.subtitle;
+  } else if (isOnboardingUpgrade && proofPending) {
+    successSubtitle = PROOF_PENDING_TERMS;
   } else if (isOnboardingUpgrade) {
     successSubtitle = isArtistVisibilitySuccess
-      ? "You're all set. Artist Visibility is ready to start."
+      ? `You're all set. ${ARTIST_VISIBILITY_ACTIVATION_COPY.status}.`
       : "You're all set. Here's what you just unlocked.";
   } else if (isArtistVisibilitySuccess) {
     successSubtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;

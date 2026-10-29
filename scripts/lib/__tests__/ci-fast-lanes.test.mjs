@@ -34,6 +34,7 @@ import {
   runDesignConformance,
   runMergeGroupGuards,
   runStructural,
+  SCRIPT_CONTRACT_NODE_TESTS,
   SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
@@ -246,7 +247,9 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
     '..',
     '..',
     'apps/web/tests/quarantine.json'
-  )
+  ),
+  // The deploy contract runs by name regardless of its quarantine membership.
+  ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
@@ -1801,11 +1804,40 @@ describe('webCiContractTestsCommand', () => {
     }
   });
 
-  it('excludes the live ledger deploy-workflow quarantine', () => {
-    expect(WEB_CI_CONTRACT_TESTS_COMMAND).toContain(
-      '--exclude=tests/unit/ci/deploy-workflow.test.ts'
-    );
-  });
+  it.each([true, false])(
+    'excludes separately run contracts exactly once with deploy quarantined=%s',
+    quarantined => {
+      const dir = mkdtempSync(join(tmpdir(), 'ci-contract-membership-'));
+      const ledger = join(dir, 'quarantine.json');
+      const deploy = 'tests/unit/ci/deploy-workflow.test.ts';
+      const other = 'tests/unit/ci/quarantine-fixture.test.ts';
+      try {
+        writeFileSync(
+          ledger,
+          JSON.stringify({
+            entries: [
+              { kind: 'unit', path: other },
+              ...(quarantined ? [{ kind: 'unit', path: deploy }] : []),
+            ],
+          })
+        );
+        const command = webCiContractTestsCommand(ledger, [deploy]);
+        const { options } = parseCLI(
+          command.replace('pnpm --filter @jovie/web exec ', '')
+        );
+        expect(options.exclude).toEqual(
+          [
+            deploy,
+            other,
+            'tests/unit/ci/playwright-artifact-secrets.test.ts',
+            'tests/unit/ci/production-marker-state.test.ts',
+          ].sort()
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
 });
 
 describe('failure annotation helpers', () => {
@@ -2108,6 +2140,11 @@ describe('source-read guard selection', () => {
     /\.(?:ts|tsx|js|mjs|cjs|mts|cts|py|sh|bash|ya?ml)$/u.test(path)
       ? ['external-api-guard']
       : [];
+  // domain-write-guard scans the web app and its registry.
+  const domainGuard = path =>
+    /^apps\/web\/(?:app|lib|components)\/.+\.(?:ts|tsx|mts)$/u.test(path)
+      ? ['domain-write-guard']
+      : [];
 
   it.each(['pull_request', 'merge_group', 'push'])(
     'runs profile conformance for adapters on %s',
@@ -2121,7 +2158,12 @@ describe('source-read guard selection', () => {
   it.each([
     [
       'pull_request',
-      ['web-source-read-tests', 'script-contracts', 'gate-weakening-detector'],
+      [
+        'web-source-read-tests',
+        'script-contracts',
+        'merged-with-base-invariants',
+        'gate-weakening-detector',
+      ],
     ],
     ['merge_group', []],
     ['push', []],
@@ -2226,8 +2268,18 @@ describe('source-read guard selection', () => {
     expect(selected('pull_request', [path])).toEqual([
       ...guards,
       ...apiGuard(path),
+      ...domainGuard(path),
       'web-source-read-tests',
       'script-contracts',
+      ...(/^(?:apps\/web\/components\/|packages\/ui\/)/u.test(path)
+        ? ['ui-story-coverage-allowlist']
+        : []),
+      'merged-with-base-invariants',
+      ...(/^(?:scripts\/|packages\/|ops\/registry\/|\.nvmrc$|pnpm-lock\.yaml$)/u.test(
+        path
+      )
+        ? ['lanes-selftest-changed-tests']
+        : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
       'gate-weakening-detector',
     ]);
@@ -2260,6 +2312,27 @@ describe('source-read guard selection', () => {
     ).toContain('public-command-openapi.test.ts');
   });
 
+  it.each([
+    'scripts/installation-budget-sentinel.mjs',
+    'scripts/installation-budget-sentinel.test.mjs',
+    '.github/workflows/automation-liveness.yml',
+  ])('runs budget sample coverage before queue admission for %s', path => {
+    for (const event of ['pull_request', 'merge_group', 'push']) {
+      expect(selected(event, [path])).toContain('automation-registry');
+    }
+    const guard = SOURCE_GUARDS.find(
+      entry => entry.id === 'automation-registry'
+    );
+    expect(guard.command).toContain(
+      'scripts/installation-budget-sentinel.test.mjs'
+    );
+    expect(guard.command).toContain('--test-coverage-lines=95');
+    expect(guard.command).toContain('--test-coverage-branches=90');
+    expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(
+      'scripts/installation-budget-sentinel.test.mjs'
+    );
+  });
+
   it('keeps web unit guards on PRs and runs profile conformance on every head', () => {
     for (const path of [
       'apps/web/lib/queries/fetch.ts',
@@ -2267,7 +2340,12 @@ describe('source-read guard selection', () => {
     ]) {
       expect(classifyProductLanes([path]).selectedLanes).toContain('web');
       const expected = path.startsWith('apps/web/lib/')
-        ? ['artist-profile-conformance', ...apiGuard(path), 'copy-leak']
+        ? [
+            'artist-profile-conformance',
+            ...apiGuard(path),
+            ...domainGuard(path),
+            'copy-leak',
+          ]
         : ['copy-leak'];
       expect(selected('merge_group', [path])).toEqual(expected);
       expect(selected('push', [path])).toEqual(expected);
@@ -2295,10 +2373,13 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
+      'growth-registry',
       'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
+      'anti-slop',
       'external-api-guard',
+      'domain-write-guard',
       'copy-leak',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
@@ -2309,10 +2390,13 @@ describe('source-read guard selection', () => {
       'artist-profile-conformance',
       'ci-schedule-inventory',
       'automation-registry',
+      'growth-registry',
       'synthetic-canary-liveness',
       'playbook-authoring',
       'icp-language',
+      'anti-slop',
       'external-api-guard',
+      'domain-write-guard',
       'copy-leak',
     ]);
   });
@@ -2386,6 +2470,32 @@ describe('source-read guard selection', () => {
         ).toContain("from 'node:test'");
         continue;
       }
+      if (guard.id === 'lanes-selftest-changed-tests') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain('LANES_SELFTEST=1');
+        expect(guard.command).toContain('python3 -m unittest');
+        continue;
+      }
+      if (guard.id === 'merged-with-base-invariants') {
+        expect(guard.prOnly).toBe(true);
+        expect(guard.command).toContain('git worktree add');
+        expect(guard.command).toContain(
+          'scripts/invariants/design-surfaces.mjs'
+        );
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/invariants/design-surfaces.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'domain-write-guard') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/domain-write-guard.mjs')
+        );
+        continue;
+      }
       if (guard.id === 'external-api-guard') {
         expect(guard.command).toContain(
           join(REPO_ROOT, 'scripts/external-api-guard.mjs')
@@ -2425,6 +2535,17 @@ describe('source-read guard selection', () => {
         expect(guard.command).toBe(
           'node --test scripts/invariants/art-direction/container-width.test.mjs'
         );
+        continue;
+      }
+      if (guard.id === 'anti-slop') {
+        expect(guard.prOnly).toBe(false);
+        expect(guard.command).toContain('scripts/anti-slop/run.mjs validate');
+        expect(
+          readFileSync(
+            join(REPO_ROOT, 'scripts/anti-slop/anti-slop.test.mjs'),
+            'utf8'
+          )
+        ).toContain("from 'node:test'");
         continue;
       }
       if (guard.id === 'script-contracts') {

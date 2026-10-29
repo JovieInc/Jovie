@@ -12,6 +12,7 @@
     "includes": [
       "**/*",
       "!!.claude",
+      "!.github/actions/vendor/**",
       "!apps/web/drizzle/migrations/**",
       "!**/.context/**",
       "!.agents/skills/gstack/**",
@@ -21,6 +22,7 @@
       "!**/.next",
       "!apps/web/styles/generated/**",
       "!apps/web/lib/design/generated/**",
+      "!apps/web/lib/agent-distribution/generated/**",
       "!apps/web/design/oklch-palette.json",
       "!apps/web/typecheck-tests-baseline.json",
       "!apps/web/typecheck-stories-baseline.json",
@@ -145,6 +147,20 @@
     }
   },
   "overrides": [
+    {
+      "includes": ["scripts/agent/pen-instance-drift.js"],
+      "javascript": {
+        "globals": [
+          "Get",
+          "Print",
+          "Replace",
+          "Insert",
+          "Move",
+          "Delete",
+          "__penDrift"
+        ]
+      }
+    },
     {
       "includes": [
         "scripts/invariants/copy-leak/config.json",

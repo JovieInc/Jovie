@@ -42,6 +42,7 @@ import {
 } from '@/features/dashboard/dashboard-nav/config';
 import { NavMenuItem } from '@/features/dashboard/dashboard-nav/NavMenuItem';
 import type { NavItem } from '@/features/dashboard/dashboard-nav/types';
+import { ProfileCompletionCard } from '@/features/dashboard/molecules/ProfileCompletionCard';
 import { useProfileData } from '@/hooks/useProfileData';
 import { APP_SHELL_WORKSPACES } from '@/lib/app-shell/workspaces';
 import { BRAND_WORDMARKS, type BrandVariant } from '@/lib/brand/tokens';
@@ -105,7 +106,9 @@ function SettingsNavGroup({
   );
 }
 
-const TOOLS_OPEN_KEY = 'ovie.nav.tools-open.v1';
+/** Tools keeps its original key so saved preferences survive; others append the id. */
+const groupOpenKey = (id: string) =>
+  id === 'tools' ? 'ovie.nav.tools-open.v1' : `ovie.nav.${id}-open.v1`;
 
 /**
  * One operator nav group. Tools is collapsed by default (Tim 2026-10-21: Ovie
@@ -129,11 +132,13 @@ function OperatorNavGroup({
   useEffect(() => {
     if (!section.collapsible) return;
     try {
-      setStored(globalThis.localStorage?.getItem(TOOLS_OPEN_KEY) === '1');
+      setStored(
+        globalThis.localStorage?.getItem(groupOpenKey(section.id)) === '1'
+      );
     } catch {
       // Storage is a per-viewer convenience; the group defaults to closed.
     }
-  }, [section.collapsible]);
+  }, [section.collapsible, section.id]);
   const isActive = (item: NavItem) =>
     isOperatorNavigationHrefActive(pathname, item.href);
   const holdsActive = section.items.some(isActive);
@@ -142,7 +147,10 @@ function OperatorNavGroup({
     const next = !stored;
     setStored(next);
     try {
-      globalThis.localStorage?.setItem(TOOLS_OPEN_KEY, next ? '1' : '0');
+      globalThis.localStorage?.setItem(
+        groupOpenKey(section.id),
+        next ? '1' : '0'
+      );
     } catch {
       // Ignore unavailable storage.
     }
@@ -314,7 +322,7 @@ function SidebarHeaderNav({
   routeBackLabel?: string;
 }>) {
   const isDesktop = useIsElectronRuntime();
-  const { state, isMobile, open: pinned } = useSidebar();
+  const { state, isMobile, isPreview, open: pinned } = useSidebar();
   const chromeHidden = state === 'closed' && !isMobile;
   const { inboxNavigation, selectedProfile } = useDashboardData();
 
@@ -426,7 +434,9 @@ function SidebarHeaderNav({
 
       {!isDesktop ? (
         <RailStagedContent
-          hidden={!pinned && !isMobile && headerOwnsCollapsedToggle}
+          hidden={
+            !pinned && !isPreview && !isMobile && headerOwnsCollapsedToggle
+          }
           stage={headerOwnsCollapsedToggle}
           className='ml-auto shrink-0 group-data-[collapsible=icon]:order-first group-data-[collapsible=icon]:mx-auto'
         >
@@ -448,7 +458,12 @@ export function UnifiedSidebar({
   variant = 'jovie',
   headerOwnsCollapsedToggle = false,
 }: UnifiedSidebarProps) {
-  const { identities, isAdmin: canSwitchWorkspaces, user } = useDashboardData();
+  const {
+    identities,
+    isAdmin: canSwitchWorkspaces,
+    user,
+    profileCompletion,
+  } = useDashboardData();
   const sidebarOverride = useShellSidebarOverride();
   const { state: sidebarState } = useSidebar();
   const pathname = usePathname();
@@ -460,6 +475,13 @@ export function UnifiedSidebar({
 
   const { profileHref } = useProfileData(section !== 'ov');
   const isSidebarCollapsed = sidebarState === 'closed';
+  // JOV-8137: the completion widget persists on every page's sidebar until
+  // the profile hits 100%, then disappears. Missing data reads as complete.
+  const showProfileCompletionWidget =
+    !isOperatorSection &&
+    !isRouteSidebar &&
+    !isDemoRoute &&
+    (profileCompletion?.percentage ?? 100) < 100;
 
   return (
     <Sidebar
@@ -519,6 +541,16 @@ export function UnifiedSidebar({
             )}
           </SidebarGroupContent>
         </SidebarGroup>
+        {/* JOV-8137: the completion widget persists on every page's sidebar
+            until the profile hits 100% — it hides itself once complete. */}
+        {showProfileCompletionWidget ? (
+          <div
+            className='group-data-[collapsible=icon]:hidden px-(--app-shell-sidebar-inset)'
+            data-testid='sidebar-profile-completion'
+          >
+            <ProfileCompletionCard />
+          </div>
+        ) : null}
       </SidebarContent>
 
       <SidebarFooter className='mt-auto gap-0 border-t border-subtle px-0 pt-(--space-2-5) pb-(--space-3-5) [&_[data-slot=common-dropdown-trigger]]:min-h-8'>

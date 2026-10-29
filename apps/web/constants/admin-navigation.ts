@@ -52,12 +52,13 @@ export type AdminWorkspaceId =
   | 'feature_registry'
   | 'screenshots'
   | 'costs'
+  | 'capacity'
   | 'revenue_lift'
   | 'share_studio'
   | 'system_map'
   | 'features';
 
-export type AdminNavigationSection = 'workspaces' | 'utilities';
+export type AdminNavigationSection = 'workspaces' | 'business' | 'utilities';
 
 export interface AdminNavRegistryItem {
   readonly id: AdminWorkspaceId;
@@ -67,74 +68,75 @@ export interface AdminNavRegistryItem {
   readonly section: AdminNavigationSection;
 }
 
-/** Home and Inbox are primary; operational workspaces live under Tools. */
+/**
+ * Five daily destinations (Tim's jobs: what matters, what is blocked on me,
+ * what is shipping, is the fleet healthy, what does capacity cost). Company
+ * and Tools hold everything else. See fleet/ovie-ia.md.
+ */
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
   'overview',
   'inbox',
+  'shipping',
+  'operations',
+  'costs',
 ] as const satisfies readonly AdminWorkspaceId[];
 
-export const ADMIN_SETTINGS_TOOL_IDS = [
+/** Company-facing workspaces: growth, customers, money in, investors. */
+export const ADMIN_BUSINESS_IDS = [
   'growth',
-  'product',
-  'operations',
-  'ops',
-  'certifications',
-  'outbound',
-  'shipping',
   'people',
+  'outbound',
   'interviews',
-  'platform_connections',
-  'playlists',
-  'presence',
-  'activity',
   'investors',
-  'share_studio',
-  'costs',
   'revenue_lift',
 ] as const satisfies readonly AdminWorkspaceId[];
 
-export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
+export const ADMIN_SETTINGS_TOOL_IDS = [
+  'ops',
+  'certifications',
+  'platform_connections',
+  'playlists',
+  'presence',
+  'share_studio',
+  'capacity',
+] as const satisfies readonly AdminWorkspaceId[];
+
+const ADMIN_NAV_ITEMS: readonly Omit<AdminNavRegistryItem, 'section'>[] = [
   {
     id: 'overview',
     label: 'Home',
     href: APP_ROUTES.ADMIN_NOW,
     description: 'What matters now, shipping, and the composer',
-    section: 'workspaces',
   },
   {
     id: 'inbox',
     label: 'Inbox',
     href: APP_ROUTES.ADMIN_INBOX,
     description: 'Decision requests that need your attention',
-    section: 'workspaces',
   },
   {
     id: 'growth',
     label: 'Growth',
     href: APP_ROUTES.ADMIN_GROWTH,
     description: 'Visited through expanded, with people behind every stage',
-    section: 'utilities',
   },
   {
     id: 'product',
     label: 'Product',
     href: APP_ROUTES.ADMIN_PRODUCT,
     description: 'Certified, deployed, exposed, and observed customer reality',
-    section: 'utilities',
   },
   {
     id: 'operations',
-    label: 'Operations',
+    label: 'Fleet',
     href: APP_ROUTES.ADMIN_OPERATIONS,
-    description: 'Autonomous execution outcomes, exceptions, costs, and queues',
-    section: 'utilities',
+    description: 'Agents, lanes, health, exceptions, and queues',
   },
   {
     id: 'ops',
     label: 'Ops',
     href: APP_ROUTES.ADMIN_OPS,
     description: 'Full operations dashboard: cash, funnel, health, deployments',
-    section: 'utilities',
   },
   {
     id: 'certifications',
@@ -142,7 +144,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_CERTIFICATIONS,
     description:
       'Founder review of certification evidence, with certify and reject',
-    section: 'utilities',
   },
   {
     id: 'outbound',
@@ -150,7 +151,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_OUTBOUND,
     description:
       'Certify potential outbound artists and approve every target and message',
-    section: 'utilities',
   },
   {
     id: 'shipping',
@@ -158,7 +158,6 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_SHIPPING,
     description:
       'Read-only shipping pipeline, merge velocity, deployment, and runtime receipts',
-    section: 'utilities',
   },
   {
     id: 'people',
@@ -166,57 +165,55 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_PEOPLE,
     description:
       'User table, roles, waitlist, creators, and individual actions',
-    section: 'utilities',
   },
   {
     id: 'interviews',
     label: 'Interviews',
     href: APP_ROUTES.ADMIN_INTERVIEWS,
     description: 'Review post-onboarding interview transcripts and summaries',
-    section: 'utilities',
   },
   {
     id: 'platform_connections',
     label: 'Platform Connections',
     href: APP_ROUTES.ADMIN_PLATFORM_CONNECTIONS,
     description: 'Spotify publisher and playlist generation controls',
-    section: 'utilities',
   },
   {
     id: 'playlists',
     label: 'Playlists',
     href: APP_ROUTES.ADMIN_PLAYLISTS,
     description: 'Review and publish generated playlists',
-    section: 'utilities',
   },
   {
     id: 'presence',
     label: 'Presence',
     href: APP_ROUTES.ADMIN_PRESENCE,
     description: 'Inspect indexing, SEO, copy, and Lighthouse health',
-    section: 'utilities',
   },
   {
     id: 'activity',
     label: 'Timeline',
     href: APP_ROUTES.ADMIN_ACTIVITY,
     description: 'Semantic company changes, evidence, and measured outcomes',
-    section: 'utilities',
   },
   {
     id: 'investors',
     label: 'Investors',
     href: APP_ROUTES.ADMIN_INVESTORS,
     description: 'Fundraising links and investor pipeline utility',
-    section: 'utilities',
   },
   {
     id: 'costs',
-    label: 'Costs',
+    label: 'Capacity',
     href: APP_ROUTES.ADMIN_COSTS,
+    description: 'Provider capacity and vendor spend (30-day view)',
+  },
+  {
+    id: 'capacity',
+    label: 'Agent Plans',
+    href: APP_ROUTES.ADMIN_CAPACITY,
     description:
-      'Company infra, AI gateway, Neon, and vendor spend (30-day view)',
-    section: 'utilities',
+      'Agent plans, cost, remaining quota and credits, and pace per provider',
   },
   {
     id: 'revenue_lift',
@@ -224,16 +221,70 @@ export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = [
     href: APP_ROUTES.ADMIN_REVENUE_LIFT,
     description:
       'IRPAA North Star, KPI tree, cohort lift, multi-agent contribution',
-    section: 'utilities',
   },
   {
     id: 'share_studio',
     label: 'Share Studio',
     href: APP_ROUTES.ADMIN_SHARE_STUDIO,
     description: 'Preview story assets, payloads, and tracked share outputs',
-    section: 'utilities',
   },
-] as const;
+];
+
+function sectionFor(id: AdminWorkspaceId): AdminNavigationSection {
+  if ((ADMIN_PRIMARY_WORKSPACE_IDS as readonly AdminWorkspaceId[]).includes(id))
+    return 'workspaces';
+  if ((ADMIN_BUSINESS_IDS as readonly AdminWorkspaceId[]).includes(id))
+    return 'business';
+  return 'utilities';
+}
+
+const SECTION_ORDER: readonly AdminNavigationSection[] = [
+  'workspaces',
+  'business',
+  'utilities',
+];
+
+function orderedIds(): readonly AdminWorkspaceId[] {
+  return [
+    ...ADMIN_PRIMARY_WORKSPACE_IDS,
+    ...ADMIN_BUSINESS_IDS,
+    ...ADMIN_SETTINGS_TOOL_IDS,
+  ];
+}
+
+/** Registry order is the sidebar order: primary, Company, Tools. */
+export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = orderedIds()
+  .map(id => {
+    const item = ADMIN_NAV_ITEMS.find(entry => entry.id === id);
+    if (!item) throw new Error(`Missing admin nav item: ${id}`);
+    return { ...item, section: sectionFor(id) };
+  })
+  .sort(
+    (a, b) =>
+      SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section)
+  );
+
+export interface AdminWorkspaceTab {
+  readonly label: string;
+  readonly href: string;
+}
+
+/**
+ * Views behind one sidebar row. Product and Timeline are Shipping views, and
+ * Agents (the skill and system map) is a Fleet view; they keep their routes so
+ * deep links and drilldowns stay valid, but have no sidebar row of their own.
+ */
+export const ADMIN_WORKSPACE_TABS = {
+  shipping: [
+    { label: 'Pipeline', href: APP_ROUTES.ADMIN_SHIPPING },
+    { label: 'Customer Reality', href: APP_ROUTES.ADMIN_PRODUCT },
+    { label: 'Timeline', href: APP_ROUTES.ADMIN_ACTIVITY },
+  ],
+  operations: [
+    { label: 'Health', href: APP_ROUTES.ADMIN_OPERATIONS },
+    { label: 'Agents', href: APP_ROUTES.ADMIN_SYSTEM },
+  ],
+} as const satisfies Record<string, readonly AdminWorkspaceTab[]>;
 
 export const ADMIN_PEOPLE_VIEW_LABELS: Record<AdminPeopleView, string> = {
   contacts: 'Customers',

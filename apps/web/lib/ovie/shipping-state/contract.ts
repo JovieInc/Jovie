@@ -17,6 +17,30 @@ export const SHIPPING_STATE_FRESHNESS_MS = 10_000;
 export const SHIPPING_STATE_CLOCK_SKEW_MS = 60_000;
 export const MAX_ACCEPTED_SOURCE_SEQUENCE_GAP = 10_000;
 
+/**
+ * Branch prefixes of agent lanes. Every prefix gets one GitHub search (cost 1
+ * point each). The list was `devin|codex` only, so on 2026-10-25 ~50 of ~140
+ * open PRs (glm, opus, grok, cursor) were invisible and Home read "No work in
+ * flight" beside 91 red PRs. Add a prefix here when a new lane ships.
+ */
+export const LANE_BRANCH_PREFIXES = [
+  'codex',
+  'devin',
+  'glm',
+  'grok',
+  'opus',
+  'cursor',
+  'sonnet',
+  'fable',
+] as const;
+const LANE_PREFIX_ALTERNATION = LANE_BRANCH_PREFIXES.join('|');
+export const LANE_BRANCH_RE = new RegExp(`^(?:${LANE_PREFIX_ALTERNATION})/`);
+export const LANE_AGENT_RE = new RegExp(`^(${LANE_PREFIX_ALTERNATION})/`, 'i');
+export const LANE_ISSUE_RE = new RegExp(
+  `^(?:${LANE_PREFIX_ALTERNATION})/(jov-\\d+)(?:-|$)`,
+  'i'
+);
+
 export const SHIPPING_SOURCE_IDS = [
   'lanes-status',
   'lane-pull-requests',
@@ -403,6 +427,22 @@ export type DeliveryMergedPullRequest = {
   readonly mergedAt: string;
 };
 
+/** One repo's production deploy health from the lanes feed's `deployHealth` block (scripts/lanes/deploy_health.py). */
+export type DeployHealthRepo = {
+  readonly repo: string;
+  readonly status: 'ok' | 'failing' | 'unknown';
+  readonly failedStreak: number;
+  readonly behindMain: number | null;
+  readonly oldestUnshippedAgeSeconds: number | null;
+  readonly lastSuccessAt: string | null;
+};
+
+export type DeployHealth = {
+  readonly observedAt: string | null;
+  readonly healthy: boolean;
+  readonly repos: readonly DeployHealthRepo[];
+};
+
 export type DeliveryLanes = {
   readonly running: CountMeasurement;
   readonly slots: CountMeasurement;
@@ -422,6 +462,8 @@ export type DeliveryLanes = {
    */
   readonly stageSummary?: StageSummary | null;
   readonly flow?: DeliveryFlow | null;
+  /** Production deploy failure and lag per repo (Jovie, LogYourBody). Null when the feed does not publish it. */
+  readonly deployHealth?: DeployHealth | null;
   readonly publishedAt: string | null;
   /** The feed's own `at` is older than the lanes semantic window. */
   readonly stale: boolean;
@@ -590,6 +632,7 @@ export function emptyDeliverySummary(): DeliverySummary {
       failedByReason: {},
       capacity: null,
       stageSummary: null,
+      deployHealth: null,
       publishedAt: null,
       stale: false,
     },

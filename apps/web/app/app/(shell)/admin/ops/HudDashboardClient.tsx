@@ -974,7 +974,7 @@ export function HudDashboardClient({
                       data={hudUrl ?? ''}
                       size={196}
                       label='HUD Link'
-                      className='rounded-lg bg-white dark:bg-white'
+                      className='rounded-lg bg-surface-1'
                     />
                   </div>
                 </div>
@@ -1098,7 +1098,10 @@ export function HudDashboardClient({
         </ContentSurfaceCard>
       )}
       {presentation === 'token' ? null : <OvieLauncherRail />}
-      <OperationalTasksPanel kioskToken={kioskToken} />
+      {/* Fleet owns the task panel; only the kiosk wall display keeps it here. */}
+      {presentation === 'token' ? (
+        <OperationalTasksPanel kioskToken={kioskToken} />
+      ) : null}
       {sections.map(section => renderSection(section))}
       <div
         data-testid='hud-bottom-marker'

@@ -22,7 +22,17 @@ export const REARM_CONTEXT = 'jovie-queue-victim-rearm/v1';
 export const REARM_CAP = 2;
 const SHA = /^[0-9a-f]{40}$/;
 const REARM_DESCRIPTION =
-  /^n=([1-9][0-9]*);sha=([0-9a-f]{40});run=([1-9][0-9]*)$/;
+  /^n=([1-9][0-9]*);sha=([0-9a-f]{40});run=([1-9][0-9]*)(?:;why=[a-z-]+)?$/;
+// Event-driven flake re-queue: a merge-group failure with no implicated path
+// (nothing to attribute to this PR or another) removes every PR in the group
+// via github-merge-queue[bot] while each head stays green. The enroll sweep
+// only ran on a push to main, so re-queue lag reached 24 minutes (#23562).
+// Such a victim is re-enqueued here when GitHub itself removed it within
+// DEQUEUE_FRESH_MS, under the same per-head REARM_CAP the breaker
+// (scripts/lanes/queue_breaker.py) backstops. A human or bot dequeue is a
+// deliberate stop and is never reversed.
+export const DEQUEUE_FRESH_MS = 30 * 60 * 1000;
+export const GITHUB_DEQUEUE_ACTOR = 'github-merge-queue[bot]';
 const BUDGET_FILE = /([A-Za-z0-9_./-]+\.md): \d+ bytes exceeds \d+/;
 // GitHub reports BLOCKED while any required check is pending or red, so
 // UNSTABLE means every required check is green and only a non-required context
@@ -81,8 +91,21 @@ export function trustedRearmRecords(statuses) {
   return records;
 }
 
-function classify(candidate, candidates, paths) {
-  if (paths.length === 0) return { reason: 'unclassified' };
+function classify(candidate, candidates, paths, now) {
+  if (paths.length === 0) {
+    // Flake or unattributable: only a fresh GitHub-made dequeue is positive
+    // evidence that this PR is a victim rather than the culprit.
+    const removed = candidate.dequeue;
+    if (!removed) return { reason: 'unclassified' };
+    if (removed.actor !== GITHUB_DEQUEUE_ACTOR) {
+      return { reason: 'not-github-dequeue' };
+    }
+    const age = now - removed.atMs;
+    if (!Number.isFinite(age) || age < 0 || age > DEQUEUE_FRESH_MS) {
+      return { reason: 'stale-dequeue' };
+    }
+    return { classification: 'unattributed' };
+  }
   const owns = path => (candidate.files ?? []).includes(path);
   if (paths.some(owns)) return { reason: 'own-failure' };
   const otherOwns = path =>
@@ -107,6 +130,7 @@ export function planVictimRearms({
   candidates,
   cap = REARM_CAP,
   heldRevision = null,
+  now = Date.now(),
 }) {
   if (!Number.isSafeInteger(runId) || runId < 1) fail('run id is missing');
   if (!Number.isSafeInteger(cap) || cap < 1) fail('cap is missing');
@@ -146,7 +170,7 @@ export function planVictimRearms({
     if (candidate.filesTruncated || candidate.statusesTruncated) {
       return skip('evidence-truncated');
     }
-    const verdict = classify(candidate, candidates, paths);
+    const verdict = classify(candidate, candidates, paths, now);
     if (!verdict.classification) return skip(verdict.reason);
     if (failureOwner && verdict.classification !== 'another-pr') {
       return skip('failure-owner');
@@ -209,8 +233,11 @@ export function heldRevisionFromReceipt(raw, repository) {
   };
 }
 
-export function rearmDescription({ n, headSha, runId }) {
-  const description = `n=${n};sha=${headSha};run=${runId}`;
+export function rearmDescription({ n, headSha, runId, classification }) {
+  const why = /^[a-z-]+$/.test(classification ?? '')
+    ? `;why=${classification}`
+    : '';
+  const description = `n=${n};sha=${headSha};run=${runId}${why}`;
   if (description.length > 140)
     fail('rearm description exceeds 140 characters');
   return description;
@@ -464,12 +491,37 @@ function loadCandidates(repository, headSha, frontPr) {
       labels: (data?.labels?.nodes ?? []).map(label =>
         String(label.name ?? '').toLowerCase()
       ),
+      dequeue: lastDequeue(repository, prNumber),
       files: files.rows.map(file => file.filename).filter(Boolean),
       filesTruncated: files.truncated,
       statuses: statuses.rows,
       statusesTruncated: statuses.truncated,
     };
   });
+}
+
+/** The most recent removed_from_merge_queue event, or null when none is visible. */
+export function latestDequeue(events) {
+  let latest = null;
+  for (const event of events ?? []) {
+    if (event?.event !== 'removed_from_merge_queue') continue;
+    const atMs = Date.parse(event.created_at ?? '');
+    if (!Number.isFinite(atMs)) continue;
+    if (!latest || atMs >= latest.atMs) {
+      latest = { actor: String(event.actor?.login ?? ''), atMs };
+    }
+  }
+  return latest;
+}
+
+function lastDequeue(repository, prNumber) {
+  try {
+    return latestDequeue(
+      restPages(`repos/${repository}/issues/${prNumber}/timeline`, 5).rows
+    );
+  } catch {
+    return null;
+  }
 }
 
 function loadAnnotations(repository, runId) {
@@ -589,7 +641,7 @@ function main() {
       for (const decision of decisions) {
         console.log(
           decision.action === 'rearm'
-            ? `rearm #${decision.prNumber} class=${decision.classification} n=${decision.n} increment=${decision.increment}`
+            ? `rearm #${decision.prNumber} class=${decision.classification} reason=${decision.classification === 'unattributed' ? 'github-dequeued-green-head-no-implicated-path' : 'victim-of-group-failure'} n=${decision.n} increment=${decision.increment} run=${decision.runId}`
             : `skip #${decision.prNumber} ${decision.reason}`
         );
       }

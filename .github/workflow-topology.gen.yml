@@ -115,7 +115,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:liveness
-    jobCount: 1
+    jobCount: 3
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -160,6 +160,7 @@ nodes:
     allowedConsumers:
       - iOS CI
       - Mac CI
+      - Component Certificate
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -233,6 +234,18 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:analyze
+    jobCount: 1
+  - name: Component Certificate
+    path: .github/workflows/component-certificate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:certify
     jobCount: 1
   - name: Controller Quota Replay
     path: .github/workflows/controller-quota-replay.yml
@@ -350,7 +363,6 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
-      - schedule
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:record-production-publish
@@ -438,9 +450,7 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Auto-Ready Agent Drafts
       - Lane Fix Relay
-      - Merge Queue Green Enroll
     triggeringStateTransition:
       - pull_request
       - pull_request_review
@@ -495,6 +505,18 @@ nodes:
       - repository_dispatch
       - workflow_dispatch
     terminalReceipt: job:worker
+    jobCount: 1
+  - name: Interaction latency audit
+    path: .github/workflows/interaction-latency-audit.yml
+    active: true
+    category: telemetry-aggregation
+    authoritativeProducer: Delivery Control Receipts
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - workflow_dispatch
+    terminalReceipt: job:measure
     jobCount: 1
   - name: Internal PR Review (advisory)
     path: .github/workflows/internal-review.yml
@@ -827,6 +849,18 @@ nodes:
       - repository_dispatch
     terminalReceipt: job:sync-issue
     jobCount: 1
+  - name: Ovie Summer Canary
+    path: .github/workflows/ovie-summer-canary.yml
+    active: true
+    category: production-verification
+    authoritativeProducer: Production Controller
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:canary
+    jobCount: 1
   - name: Pen still diff (advisory)
     path: .github/workflows/pen-still-diff.yml
     active: true
@@ -860,10 +894,11 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 6
+    jobCount: 7
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -884,7 +919,8 @@ nodes:
     category: source-validation
     authoritativeProducer: Source Validation
     authoritativeFor: []
-    allowedConsumers: []
+    allowedConsumers:
+      - Lane Fix Relay
     triggeringStateTransition:
       - merge_group
       - pull_request
@@ -901,6 +937,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:prepare
     jobCount: 2
+  - name: PR Remediation Swarm
+    path: .github/workflows/pr-remediation-swarm.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:report
+    jobCount: 3
   - name: PR Review Learn
     path: .github/workflows/pr-review-learn.yml
     active: true
@@ -942,7 +990,6 @@ nodes:
     authoritativeProducer: Source Validation
     authoritativeFor: []
     allowedConsumers:
-      - Auto-Ready Agent Drafts
       - Lane Fix Relay
       - Merge Queue Green Enroll
     triggeringStateTransition:
@@ -972,6 +1019,19 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:capture
+    jobCount: 1
+  - name: Private Data Guard
+    path: .github/workflows/private-data-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - merge_group
+      - pull_request
+      - push
+    terminalReceipt: job:guard
     jobCount: 1
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml
@@ -1165,6 +1225,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:certify
     jobCount: 3
+  - name: Security Advisory Loop (Linear devin lane)
+    path: .github/workflows/security-advisory-loop.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:loop
+    jobCount: 1
   - name: Security Suppression Audit
     path: .github/workflows/security-suppression-audit.yml
     active: true
@@ -1459,6 +1532,9 @@ edges:
   - from: CLI Chaos
     to: Mac Lane Route
     type: workflow_call
+  - from: CI
+    to: Component Certificate
+    type: workflow_run
   - from: Staging Controller
     to: Controller Quota Replay
     type: workflow_run
@@ -1501,6 +1577,9 @@ edges:
   - from: PR Size Guard
     to: Lane Fix Relay
     type: workflow_run
+  - from: PR Fleet Rules
+    to: Lane Fix Relay
+    type: workflow_run
   - from: CI
     to: Lane Fix Relay
     type: workflow_run
@@ -1538,9 +1617,6 @@ edges:
     to: Merge Queue Green Enroll
     type: workflow_run
   - from: CI
-    to: Merge Queue Green Enroll
-    type: workflow_run
-  - from: Fork PR Gate
     to: Merge Queue Green Enroll
     type: workflow_run
   - from: PR Size Guard

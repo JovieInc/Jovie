@@ -80,7 +80,7 @@ export default defineConfig({
             PORT: managedWebServerPort,
             NEXT_DISABLE_TOOLBAR: '1',
             NEXT_PUBLIC_E2E_MODE: '1',
-            NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
+            NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1',
           },
           url: managedWebServerUrl.origin,
           reuseExistingServer: process.env.REUSE_EXISTING_SERVER === '1',

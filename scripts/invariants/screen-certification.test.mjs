@@ -210,9 +210,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
 
   it('rejects stale product names, versions, destinations, locales, and disabled-feature screenshot claims', () => {
     const screen = SCREEN_REGISTRY.find(entry => entry.id === 'web.presence');
-    const current = readProductReferenceOwner().getProductProjection({
-      PROFILES_WORKSPACE: true,
-    });
+    const current = readProductReferenceOwner().getProductProjection({});
     const proof = { ...validExternalProof(screen), productReferences: current };
     const errors = candidate =>
       evaluateScreenProof(candidate, { screen, headSha: HEAD }).filter(
@@ -236,12 +234,6 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       },
       snapshot => {
         snapshot.features[0].destination = '/app/profiles';
-      },
-      snapshot => {
-        snapshot.flags.PROFILES_WORKSPACE = false;
-      },
-      snapshot => {
-        delete snapshot.flags.PROFILES_WORKSPACE;
       },
       snapshot => {
         snapshot.features = [];
@@ -448,20 +440,20 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
-  it('registers provider-host layouts that ship with start and public profile', () => {
+  it('registers live provider-host layouts and retires the deleted start loading screen', () => {
     assert.equal(
       kindOf('apps/web/app/(dynamic)/start/layout.tsx'),
       'registered'
     );
     assert.equal(
       kindOf('apps/web/app/(dynamic)/start/loading.tsx'),
-      'registered'
+      'unregistered'
     );
     assert.equal(kindOf('apps/web/app/[username]/layout.tsx'), 'registered');
     const result = evaluateChangedScreens({
       changedFiles: [
         { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
-        { path: 'apps/web/app/(dynamic)/start/loading.tsx', status: 'M' },
+        { path: 'apps/web/app/(dynamic)/start/loading.tsx', status: 'D' },
         { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
       ],
       headSha: HEAD,
@@ -472,6 +464,35 @@ describe('JOV-INV-018 screen-certification/v2', () => {
       'web.public-profile',
       'web.start',
     ]);
+    assert.deepEqual(result.removedScreens, [
+      'apps/web/app/(dynamic)/start/loading.tsx',
+    ]);
+    const missingProof = evaluateChangedScreens({
+      changedFiles: [
+        { path: 'apps/web/app/(dynamic)/start/layout.tsx', status: 'M' },
+        { path: 'apps/web/app/[username]/layout.tsx', status: 'M' },
+      ],
+      headSha: HEAD,
+      proofs: [],
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(missingProof.issues, [
+      'missing exact-head proof for web.start',
+      'missing exact-head proof for web.public-profile',
+    ]);
+    for (const status of ['A', 'M']) {
+      const reintroduced = evaluateChangedScreens({
+        changedFiles: [
+          { path: 'apps/web/app/(dynamic)/start/loading.tsx', status },
+        ],
+        headSha: HEAD,
+        proofs: [],
+        requireExternalEvidence: true,
+      });
+      assert.deepEqual(reintroduced.issues, [
+        'missing registration for changed in-scope screen apps/web/app/(dynamic)/start/loading.tsx',
+      ]);
+    }
   });
 
   it('registers the artist pay page when that screen changes', () => {
@@ -1786,10 +1807,8 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 3,
         producerJobId: 99,
         environment: 'local-production-build',
-        sourcePaths: [
-          'apps/web/app/(home)/page.tsx',
-          'apps/web/app/(home)/layout.tsx',
-        ],
+        // The producer emits the registered screen sources (screen-proof-emit).
+        sourcePaths: [...home().sources],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
@@ -2357,10 +2376,8 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 3,
         producerJobId: 99,
         environment: 'local-production-build',
-        sourcePaths: [
-          'apps/web/app/(home)/page.tsx',
-          'apps/web/app/(home)/layout.tsx',
-        ],
+        // The producer emits the registered screen sources (screen-proof-emit).
+        sourcePaths: [...home().sources],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
@@ -2667,10 +2684,7 @@ if (p.endsWith('/zip')) {
         context: {
           headSha: head,
           screenId: 'web.homepage',
-          sourcePaths: [
-            'apps/web/app/(home)/page.tsx',
-            'apps/web/app/(home)/layout.tsx',
-          ],
+          sourcePaths: [...home().sources],
           viewports: home().viewports,
           marketingRoute: '/',
         },
@@ -4267,6 +4281,34 @@ if (p.endsWith('/zip')) {
     ]);
   });
 
+  it('registers the app shell root loading boundary for changed-surface certification', () => {
+    const source = 'apps/web/app/app/loading.tsx';
+    const screen = SCREEN_REGISTRY.find(
+      entry => entry.id === 'web.app-loading'
+    );
+
+    assert.deepEqual(screen, {
+      id: 'web.app-loading',
+      platform: 'web',
+      owner: 'app-shell',
+      sources: [source],
+      viewports: ['desktop', 'mobile'],
+    });
+
+    const result = evaluateChangedScreens({
+      changedFiles: [{ path: source, status: 'M' }],
+      headSha: HEAD,
+    });
+    assert.deepEqual(result.issues, []);
+    assert.deepEqual(result.changedScreens, [
+      {
+        id: 'web.app-loading',
+        verdict: 'evidence-required',
+        findings: [],
+      },
+    ]);
+  });
+
   it('registers the app shell root not-found page for changed-surface certification', () => {
     const source = 'apps/web/app/app/not-found.tsx';
     const screen = SCREEN_REGISTRY.find(
@@ -4350,6 +4392,27 @@ if (p.endsWith('/zip')) {
     });
     assert.deepEqual(result.issues, []);
     assert.ok(result.excludedChanges.length >= 4);
+  });
+
+  it('registers the existing sounds page and still requires exact-head rendered evidence', () => {
+    const changedFiles = ['apps/web/app/[username]/[slug]/sounds/page.tsx'];
+    const registration = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+    });
+    assert.deepEqual(registration.issues, []);
+    assert.deepEqual(
+      registration.changedScreens.map(screen => screen.id),
+      ['web.smartlink-sounds']
+    );
+    const certification = evaluateChangedScreens({
+      changedFiles,
+      headSha: HEAD,
+      requireExternalEvidence: true,
+    });
+    assert.deepEqual(certification.issues, [
+      'missing exact-head proof for web.smartlink-sounds',
+    ]);
   });
 
   it('rejects missing registration for a changed in-scope screen', () => {

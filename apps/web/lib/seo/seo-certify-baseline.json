@@ -20,13 +20,11 @@
     "/blog/authors/tim": [
       "copy:copy-lint",
       "geo:geo-direct-answer",
-      "geo:geo-orphan",
-      "technical:open-graph"
+      "geo:geo-orphan"
     ],
     "/blog/category/artist-management": [
       "geo:geo-jsonld-type",
-      "geo:geo-sibling-links",
-      "technical:open-graph"
+      "geo:geo-sibling-links"
     ],
     "/card": [
       "agentic:structured-data",
@@ -56,18 +54,12 @@
       "agentic:structured-data"
     ],
     "/developers": ["geo:geo-jsonld-type"],
-    "/download": [
-      "geo:geo-jsonld-type",
-      "geo:geo-orphan",
-      "geo:geo-sibling-links"
-    ],
+    "/download": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/engineering": [
       "agentic:structured-data",
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
-    "/engineering/preview": ["agentic:structured-data"],
-    "/engineering/preview/verified-changelog": ["agentic:structured-data"],
     "/instant-merch": [
       "agentic:structured-data",
       "copy:copy-lint",
@@ -82,10 +74,9 @@
       "geo:geo-sibling-links"
     ],
     "/pricing": ["geo:geo-sibling-links"],
-    "/product": ["copy:copy-lint", "geo:geo-sibling-links"],
+    "/product": ["geo:geo-sibling-links"],
     "/smart-links": [
       "agentic:structured-data",
-      "copy:copy-lint",
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],

@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { CapabilityEvidenceMatrix } from '@/components/features/admin/CapabilityEvidenceMatrix';
 import { OvieShippingStateCard } from '@/components/features/admin/hud/OvieShippingStateCard';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRouteTabs';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
+import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { loadCapabilityEvidence } from '@/lib/admin/capability-evidence';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
@@ -38,6 +40,10 @@ export default async function ProductPage() {
       description='What customers are actually experiencing, from intent through healthy production observation.'
       testId='founder-product-page'
     >
+      <OperatorRouteTabs
+        tabs={ADMIN_WORKSPACE_TABS.shipping}
+        label='Shipping Views'
+      />
       <ol
         className='flex min-h-11 items-center gap-1 overflow-x-auto text-2xs text-secondary-token'
         aria-label='Product Delivery Lifecycle'

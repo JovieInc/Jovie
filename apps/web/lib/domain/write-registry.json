@@ -1,0 +1,356 @@
+{
+  "schema": "jovie-domain-write-registry/v1",
+  "doc": "One place per domain write. Direct DB writes to coreTables belong in a listed module (scripts/domain-write-guard.mjs). Every chat/MCP tool maps to a domain function, a read, a generator, or a named debt (apps/web/lib/domain/write-registry.test.ts). Rule: .claude/rules/domain-writes.md",
+  "sideEffects": {
+    "socialLinks": ["invalidateSocialLinksCache", "invalidateProfileCache"]
+  },
+  "sideEffectWaivers": {
+    "apps/web/app/[username]/s/[platform]/route.ts": "click counter increment; no public-profile content changes",
+    "apps/web/app/api/track/route.ts": "click counter increment; no public-profile content changes"
+  },
+  "coreTables": {
+    "creatorProfiles": "creator_profiles",
+    "discogReleases": "discog_releases",
+    "discogTracks": "discog_tracks",
+    "discogRecordings": "discog_recordings",
+    "socialLinks": "social_links",
+    "tourDates": "tour_dates",
+    "audienceMembers": "audience_members",
+    "notificationSubscriptions": "notification_subscriptions",
+    "waitlistEntries": "waitlist_entries",
+    "userProfileClaims": "user_profile_claims",
+    "creatorClaimInvites": "creator_claim_invites",
+    "users": "users"
+  },
+  "domains": [
+    {
+      "id": "release.catalog",
+      "entity": "release",
+      "module": "apps/web/lib/discography/queries.ts",
+      "exports": [
+        "upsertRelease",
+        "upsertTrack",
+        "upsertRecording",
+        "upsertReleaseTrack",
+        "purgeOrphanRecordings"
+      ],
+      "tables": ["discogReleases", "discogTracks", "discogRecordings"]
+    },
+    {
+      "id": "release.metadata",
+      "entity": "release",
+      "module": "apps/web/lib/chat/release-writes.ts",
+      "exports": [
+        "updateOwnedReleaseMetadata",
+        "updateOwnedReleaseGeneratedPitches"
+      ],
+      "tables": ["discogReleases"]
+    },
+    {
+      "id": "profile.fields",
+      "entity": "profile",
+      "module": "apps/web/lib/services/profile/mutations.ts",
+      "exports": [
+        "updateProfileById",
+        "updateProfileByClerkId",
+        "publishProfile"
+      ],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "social-links",
+      "entity": "link",
+      "module": "apps/web/lib/services/social-links/mutations.ts",
+      "exports": ["createLink", "updateLink", "deleteLink", "reorderLinks"],
+      "tables": ["socialLinks"]
+    },
+    {
+      "id": "tour-dates",
+      "entity": "tour date",
+      "module": "apps/web/lib/events/insert.ts",
+      "exports": ["insertEvent", "bulkInsertSyncedEvents"],
+      "tables": ["tourDates"]
+    },
+    {
+      "id": "subscriptions",
+      "entity": "contact/audience/subscription",
+      "module": "apps/web/lib/notifications/domain.ts",
+      "exports": [
+        "subscribeToNotificationsDomain",
+        "verifyEmailOtpDomain",
+        "unsubscribeFromNotificationsDomain",
+        "updateNotificationPreferencesDomain"
+      ],
+      "tables": ["notificationSubscriptions", "audienceMembers"]
+    },
+    {
+      "id": "waitlist.admission",
+      "entity": "waitlist/admission",
+      "module": "apps/web/lib/waitlist/approval.ts",
+      "exports": [
+        "approveWaitlistEntryInTx",
+        "disapproveWaitlistEntryInTx",
+        "stampWaitlistAcquisitionId"
+      ],
+      "tables": ["waitlistEntries", "creatorProfiles"]
+    },
+    {
+      "id": "claim.finalize",
+      "entity": "claim",
+      "module": "apps/web/lib/claim/finalize.ts",
+      "exports": [
+        "reservePrebuiltProfileForUser",
+        "claimPrebuiltProfileForUser"
+      ],
+      "tables": ["creatorProfiles", "userProfileClaims"]
+    },
+    {
+      "id": "billing.status",
+      "entity": "subscription/payment",
+      "module": "apps/web/lib/stripe/customer-sync/update-status.ts",
+      "exports": ["updateUserBillingStatus"],
+      "tables": ["users"]
+    },
+    {
+      "id": "merch.cards",
+      "entity": "merch",
+      "module": "apps/web/lib/merch/service.ts",
+      "exports": [
+        "createMerchGeneration",
+        "selectMerchDesign",
+        "publishMerchCard",
+        "updateMerchCardDetails",
+        "updateMerchCardStatus",
+        "reorderMerchCards"
+      ],
+      "tables": []
+    },
+    {
+      "id": "tasks",
+      "entity": "tasks",
+      "module": "apps/web/app/app/(shell)/dashboard/tasks/task-actions.ts",
+      "exports": ["createTask"],
+      "tables": []
+    },
+    {
+      "id": "feedback.submit",
+      "entity": "feedback",
+      "module": "apps/web/lib/chat/submit-feedback.ts",
+      "exports": ["submitChatFeedback"],
+      "tables": []
+    },
+    {
+      "id": "agent.draft-claim",
+      "entity": "agent draft claim",
+      "module": "apps/web/lib/agent-acquisition/draft-claim.server.ts",
+      "exports": ["claimAgentDraft"],
+      "tables": ["creatorProfiles"]
+    },
+    {
+      "id": "agent.draft",
+      "entity": "agent draft",
+      "module": "apps/web/lib/agent-acquisition/draft-store.ts",
+      "exports": ["createAgentDraft"],
+      "tables": []
+    },
+    {
+      "id": "youtube.thumbnail-review",
+      "entity": "youtube",
+      "module": "apps/web/lib/youtube-library/thumbnail-review.ts",
+      "exports": ["registerThumbnailCandidateReview"],
+      "tables": []
+    }
+  ],
+  "agentTools": {
+    "chat:proposeAvatarUpload": {
+      "kind": "debt",
+      "reason": "commit is /api/images/upload, which writes profile photos and creatorProfiles directly"
+    },
+    "chat:proposeSocialLink": {
+      "kind": "debt",
+      "reason": "commit is /api/chat/confirm-link, which writes socialLinks directly and skips cache invalidation"
+    },
+    "chat:proposeSocialLinkRemoval": {
+      "kind": "debt",
+      "reason": "commit is /api/chat/confirm-remove-link, which writes socialLinks directly and skips cache invalidation"
+    },
+    "chat:submitFeedback": {
+      "kind": "domain",
+      "domain": "feedback.submit"
+    },
+    "chat:showAccountStatus": {
+      "kind": "read"
+    },
+    "chat:showUsage": {
+      "kind": "read"
+    },
+    "chat:openBillingPortal": {
+      "kind": "read"
+    },
+    "chat:showTopInsights": {
+      "kind": "read"
+    },
+    "chat:proposeProfileEdit": {
+      "kind": "debt",
+      "reason": "commit is /api/chat/confirm-edit (name and bio only); Ovie agent-first worker owns the fix"
+    },
+    "chat:importBioFromUrl": {
+      "kind": "read"
+    },
+    "chat:inspectPressSource": {
+      "kind": "read"
+    },
+    "chat:checkCanvasStatus": {
+      "kind": "read"
+    },
+    "chat:suggestRelatedArtists": {
+      "kind": "read"
+    },
+    "chat:writeWorldClassBio": {
+      "kind": "generate"
+    },
+    "chat:generateCanvasPlan": {
+      "kind": "generate"
+    },
+    "chat:generateAlbumArt": {
+      "kind": "generate"
+    },
+    "chat:retouchImage": {
+      "kind": "generate"
+    },
+    "chat:createPromoStrategy": {
+      "kind": "generate"
+    },
+    "chat:voicePromo": {
+      "kind": "generate"
+    },
+    "chat:formatLyrics": {
+      "kind": "generate"
+    },
+    "chat:markCanvasUploaded": {
+      "kind": "domain",
+      "domain": "release.metadata"
+    },
+    "chat:createRelease": {
+      "kind": "debt",
+      "reason": "calls upsertRelease directly with its own slug rule and no status, reveal date, genres or explicit flag; Ovie agent-first worker owns the fix"
+    },
+    "chat:generateReleasePitch": {
+      "kind": "domain",
+      "domain": "release.metadata"
+    },
+    "chat:findMerchSources": {
+      "kind": "read"
+    },
+    "chat:createMerch": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:previewMerchOptions": {
+      "kind": "generate"
+    },
+    "chat:selectMerchDesign": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:createMerchAlternativeItem": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:updateMerchCard": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:publishMerchCard": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:pauseMerchCard": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:unpauseMerchCard": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:deleteOrArchiveMerchCard": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:reorderMerchCards": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:optimizeMerchCards": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "chat:showMerchSales": {
+      "kind": "read"
+    },
+    "chat:showArtistPayouts": {
+      "kind": "read"
+    },
+    "chat:proposeVideoRecording": {
+      "kind": "generate"
+    },
+    "chat:manageTasks": {
+      "kind": "domain",
+      "domain": "tasks"
+    },
+    "mcp:artist:get_ticket_link": {
+      "kind": "read"
+    },
+    "mcp:artist:check_merch_availability": {
+      "kind": "read"
+    },
+    "mcp:artist:add_to_cart": {
+      "kind": "read"
+    },
+    "mcp:artist:generate_merch": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "mcp:artist:select_merch_design": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "mcp:artist:publish_merch_card": {
+      "kind": "domain",
+      "domain": "merch.cards"
+    },
+    "mcp:artist:list_videos": {
+      "kind": "read"
+    },
+    "mcp:artist:get_video_metrics": {
+      "kind": "read"
+    },
+    "mcp:artist:register_thumbnail_version": {
+      "kind": "domain",
+      "domain": "youtube.thumbnail-review"
+    },
+    "mcp:draft:artist.search_or_import": {
+      "kind": "read"
+    },
+    "mcp:draft:workspace.create_draft": {
+      "kind": "domain",
+      "domain": "agent.draft"
+    },
+    "mcp:draft:release.prepare_launch": {
+      "kind": "domain",
+      "domain": "agent.draft"
+    },
+    "mcp:chatgpt:find_artist": {
+      "kind": "read"
+    },
+    "mcp:chatgpt:get_profile": {
+      "kind": "read"
+    },
+    "mcp:chatgpt:get_updates": {
+      "kind": "read"
+    },
+    "mcp:chatgpt:subscribe_to_updates": {
+      "kind": "read"
+    }
+  }
+}

@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { CanonicalLifecycleFunnel } from '@/components/features/admin/contacts-table/CanonicalLifecycleFunnel';
 import { FounderFunnelDrilldown } from '@/components/features/admin/hud/FounderFunnelDrilldown';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { GoldenPathFunnelPanel } from '@/components/features/admin/leads/GoldenPathFunnelPanel';
 import { GtmCollapsibles } from '@/components/features/admin/leads/GtmCollapsibles';
 import {
   GtmFunnel,
@@ -14,6 +15,7 @@ import { LeadTable } from '@/components/features/admin/leads/LeadTable';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { buildAdminGrowthHref } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
+import { getArtistOfferFunnelReport } from '@/lib/acquisition/artist-offer-funnel.server';
 import { getCanonicalContactMetrics } from '@/lib/admin/contacts';
 import {
   getFounderFunnelData,
@@ -55,14 +57,19 @@ export default async function AdminGrowthPage({
   const drilldownStage = isFounderFunnelDrilldownStage(params.funnelStage)
     ? params.funnelStage
     : null;
-  const [counts, funnel, lifecycleMetrics, drilldown] = await Promise.all([
-    getLeadFunnelCounts(),
-    getFounderFunnelData(params.funnelRange),
-    getCanonicalContactMetrics(),
-    drilldownStage
-      ? getFounderFunnelStageRows(drilldownStage, params.funnelRange)
-      : Promise.resolve(null),
-  ]);
+  const [counts, funnel, lifecycleMetrics, drilldown, goldenPath] =
+    await Promise.all([
+      getLeadFunnelCounts(),
+      getFounderFunnelData(params.funnelRange),
+      getCanonicalContactMetrics(),
+      drilldownStage
+        ? getFounderFunnelStageRows(drilldownStage, params.funnelRange)
+        : Promise.resolve(null),
+      // A failed read renders an honest error state, never a fake zero.
+      getArtistOfferFunnelReport()
+        .then(report => report.goldenPath ?? null)
+        .catch(() => null),
+    ]);
 
   return (
     <AdminPage
@@ -81,6 +88,7 @@ export default async function AdminGrowthPage({
           urlSearchParams={urlSearchParams}
         />
       ) : null}
+      <GoldenPathFunnelPanel report={goldenPath} />
       <CanonicalLifecycleFunnel metrics={lifecycleMetrics} />
       <ContentSurfaceCard surface='details'>
         <div className='p-3'>

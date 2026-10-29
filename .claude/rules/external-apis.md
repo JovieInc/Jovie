@@ -51,3 +51,32 @@ reason and a cap in `scripts/lib/external-api-guard.allowlist.json`.
 New provider: register it in `providers.json` (the one registry both languages
 and the guard read; no per-consumer hooks) with its budget headers, then run
 `--onboard` to grandfather calls to it that already exist.
+
+## GitHub Actions `GITHUB_TOKEN` budget
+
+`GITHUB_TOKEN` gets a fixed hourly REST budget per repo, shared by every
+workflow (Team plan; the 05:22Z sample shows limit=5000). On 2026-10-25 demand was 5-7x that and Fleet Rules
+Evidence / PR Ready deferred every hour with `API rate limit exceeded for
+installation`. The two biggest leaks were `actions/setup-node` (one manifest
+call per run, 10 per Source Validation run, because `.nvmrc`'s exact Node is
+not on the hosted image) and per-PR-event evidence reads.
+
+- Put `uses: ./.github/actions/prime-node-toolcache` before every hosted
+  `actions/setup-node` (the `setup-node-pnpm` composite already does).
+- Prefer the CI App token (its own bucket) for read-only calls where the
+  workflow's security contract allows it; never hand the minted token to
+  setup-node (`scripts/pr-fleet-rules.test.mjs`).
+- `node scripts/workflow-token-budget-guard.mjs` (run by PR Fleet Rules) fails
+  on a new unbudgeted `github.token` spend. Grandfathered sites live in
+  `scripts/lib/workflow-token-budget.ratchet.json` and only shrink (`--write`).
+  A workflow that must spend it declares
+  `# github-token-budget: <N> calls/run - <reason>`.
+- PR Fleet Rules (the `pull_request` copy, which can never hold the App key) runs
+  `pr-fleet-rules.mjs --advisory`: PR from the event payload (files are its only
+  call, was two), backoff up to 120s, and a quota answer that outlasts it is an
+  "Infrastructure, not a verdict" warning (`github-quota-deferred`), never red.
+  Fleet Rules Evidence (CI App budget) stays the authoritative verdict. Quota
+  share: `node scripts/quota-deferred-heads.mjs --share 40`.
+- Headroom, from the `api-quota` notices Merge Queue Green Enroll emits about
+  once a minute: `node scripts/lib/api-quota-report.mjs headroom --hours 1`
+  (hourly min remaining per bucket, exhausted samples, JSON with `--json`).

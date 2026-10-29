@@ -176,6 +176,8 @@ Pruned under this rule (JOV-6671): historical `apps/web/drizzle/migrations/meta/
 
 2026-10-20 hygiene pass: pruned `0117`–`0136` snapshots (16 files, ~16 MiB) back to the 8-snapshot cap after main drifted to 24; the cap test had been failing on main.
 
+2026-10-26 hygiene pass: main was 198.00 MiB of 198 MiB and the drizzle cap test failing (12 snapshots, cap 8) after #23277 and neighbours. Pruned 0137-0140 (4 files, ~4.6 MiB) per the JOV-6671 rule; 0141-0148 remain. Tracked bytes 198.00 -> 193.54 MiB (4.46 MiB headroom). The vendored actions (JOV-8754, #22504, already merged) stay vendored: they exist to avoid GITHUB_TOKEN REST calls and are hash-verified against upstream, so deduping the two actions-cache bundles would need a custom build; budget unchanged.
+
 ### Repository-root allowlist
 
 Stale audit, status, and one-off script files accumulated at the root (`*_AUDIT.md`, `.agent-status.json`, `run-checks.sh`, `test-homepage.*`). The 2026-10-20 pass deleted the dead ones and moved the JOV-2712 hardening bundle to `docs/hardening/`. To stop regrowth, `scripts/repo-root-allowlist.json` lists every tracked top-level file and directory; `scripts/repo-hygiene-guard.mjs` fails any added path whose first segment is not listed, and a guard test keeps the list equal to the tracked root. Put docs under `docs/` or `canon/`, scripts under `scripts/`, and run evidence outside git. Adding a root entry is a reviewed edit to the allowlist; retiring one removes it.
@@ -212,3 +214,5 @@ Otherwise keep the monorepo and address the measured payload, build, or ownershi
 4. Move ephemeral output to an ignored owned path or retained CI artifact; keep stable consumed manifests only.
 5. Curate/split binary churn. Use an expiring exception only after promotion, never a global raise to land one change.
 6. Run focused tests, typecheck/lint, hygiene, and Knip; retain the receipt and write durable decisions to GBrain.
+
+2026-10-29 hygiene pass (ratchet): main was 197.49 MiB of 198 MiB. Pruned drizzle snapshots 0141-0149 (9 files, 10.29 MiB) and kept only the newest (`0151`), per the JOV-6671 rule; retention cap lowered 8 -> 3 (`MAX_RETAINED_DRIZZLE_SNAPSHOTS`). Tracked bytes 197.49 -> 187.20 MiB (about 10.8 MiB headroom); the budget stays 198 MiB and the `maxTrackedBytes` comment marks it as a ratchet. The clean line of `repo-hygiene-guard` now prints the budget and remaining headroom. New guard: tracked `*.gen.json` files over 1 MiB fail unless listed in `GEN_JSON_SIZE_ALLOWLIST`; none exist today (largest generated JSON is 216 KiB). Not touched: docs/screenshots evidence (moving off-repo in #23631), the investor-deck PDF and demo video (served at runtime), the vendored actions, and the registry-driven screenshot catalog.

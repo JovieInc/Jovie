@@ -10,6 +10,20 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# Git exports repository-local routing into hooks. Clear it before any child
+# check creates a fixture repository (as buildVerificationEnv does for affected
+# tests), so child Git commands discover their own repository from their cwd.
+# Use Git's complete list; preserve unrelated authentication and network env.
+git_local_env_names="$(git rev-parse --local-env-vars)"
+while IFS= read -r git_local_env_name; do
+  # An empty list still yields one empty line from the here-string; skip it,
+  # since `unset ""` is an error that aborts the gate (seen in the fixture test).
+  if [ -n "$git_local_env_name" ]; then
+    unset "$git_local_env_name"
+  fi
+done <<< "$git_local_env_names"
+unset git_local_env_names git_local_env_name
+
 if [[ "${JOVIE_SKIP_PRE_PUSH_GATE:-}" == "1" ]]; then
   echo "[pre-push-gate] skipped (JOVIE_SKIP_PRE_PUSH_GATE=1)"
   exit 0
@@ -44,6 +58,14 @@ run_affected() {
   # JOV-4421: hard ship gate (diff match + story quality + multi-root ratchet).
   echo "[pre-push-gate] running component-ship-gate"
   pnpm component-ship-gate
+  # One pass over every changed-file step Source Validation runs, listing all
+  # failures (derived from the workflow, so it cannot drift). JOVIE_PREFLIGHT=0
+  # skips it; JOVIE_SKIP_PRE_PUSH_GATE is the only other escape hatch.
+  echo "[pre-push-gate] running preflight"
+  node scripts/preflight.mjs --hook
+  # JOV-9727: path-scoped rules, PR body and companion edits. JOVIE_PREFLIGHT_CHANGED=0 skips it.
+  echo "[pre-push-gate] running preflight:changed"
+  node scripts/preflight-changed.mjs --hook --no-typecheck --no-coverage
   bash scripts/automation-verify.sh affected
 }
 
@@ -63,6 +85,10 @@ run_publication() {
     return 1
   fi
   git diff --check "${publication_base}..HEAD"
+  # Reuse the changed-file Biome guard so formatter failures never reach CI.
+  bash scripts/hooks/biome-pre-push.sh
+  # Catch missing component tests/stories before another Source Validation run.
+  node scripts/component-ship-gate.mjs --check-artifacts --diff-base="$publication_base"
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs

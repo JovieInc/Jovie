@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRouteTabs';
+import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { ActivityTableUnified } from '@/features/admin/ActivityTableUnified';
 import { filterAdminActivityItems } from '@/lib/admin/activity-search';
@@ -51,6 +53,10 @@ export default async function AdminActivityPage({
       testId='admin-activity-page'
       viewTestId='admin-activity-view'
     >
+      <OperatorRouteTabs
+        tabs={ADMIN_WORKSPACE_TABS.shipping}
+        label='Shipping Views'
+      />
       <Suspense fallback={<AdminActivitySkeleton />}>
         <ActivityContent query={query} />
       </Suspense>

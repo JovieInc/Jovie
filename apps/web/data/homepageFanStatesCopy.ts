@@ -16,30 +16,31 @@ function landingCard(id: (typeof LANDING_CARDS)[number]['id']) {
 }
 
 export const HOMEPAGE_FAN_STATES_COPY = {
-  headline: 'Each visit gets the right next step.',
+  headline: 'Your profile leads with one clear thing.',
   galleryLabel: 'Profile states',
   states: [
     {
       id: 'listen',
-      scenarioId: 'tim-white-profile-listen-mobile',
-      alt: "Tim White's Jovie profile showing his music catalog.",
       title: landingCard('straight-to-listen').title,
       body: landingCard('straight-to-listen').description,
     },
     {
       id: 'show-up',
-      scenarioId: 'tim-white-profile-tour-mobile',
-      alt: "Tim White's Jovie profile showing upcoming shows with ticket links.",
       title: landingCard('local-dates-first').title,
       body: landingCard('local-dates-first').description,
     },
     {
       id: 'stay-close',
-      scenarioId: 'tim-white-profile-subscribe-mobile',
-      alt: "Tim White's Jovie profile asking a fan to get updates by email.",
       title: landingCard('capture-the-fan').title,
       body: landingCard('capture-the-fan').description,
     },
   ],
 } as const;
-export type HomepageFanStatesCopy = typeof HOMEPAGE_FAN_STATES_COPY;
+/** Headline and label widen so a published page spec can fill them. */
+export type HomepageFanStatesCopy = Omit<
+  typeof HOMEPAGE_FAN_STATES_COPY,
+  'headline' | 'galleryLabel'
+> & {
+  readonly headline: string;
+  readonly galleryLabel: string;
+};

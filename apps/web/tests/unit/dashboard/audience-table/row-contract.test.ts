@@ -16,6 +16,7 @@ const anonymousMember: Pick<
 > = {
   displayName: null,
   email: null,
+  emailVisibleToArtist: true,
   phone: null,
   spotifyConnected: false,
 };
@@ -51,6 +52,6 @@ describe('audience row contract', () => {
         ...anonymousMember,
         phone: '+14155550123',
       })
-    ).toBe('Fan');
+    ).toBe('Audience member');
   });
 });

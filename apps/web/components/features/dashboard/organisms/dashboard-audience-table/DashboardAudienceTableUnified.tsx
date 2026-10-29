@@ -35,6 +35,10 @@ import { AiCrawlerDetailPanel } from '@/features/dashboard/organisms/ai-crawler/
 import { AiCrawlerIntelligenceCard } from '@/features/dashboard/organisms/ai-crawler/AiCrawlerIntelligenceCard';
 import { AudienceMemberSidebar } from '@/features/dashboard/organisms/audience-member-sidebar';
 import { useRegisterRightPanel } from '@/hooks/useRegisterRightPanel';
+import {
+  canShareContactOut,
+  redactUnsharedContact,
+} from '@/lib/audience/share-gate';
 import { captureError } from '@/lib/error-tracking';
 import { queryKeys } from '@/lib/queries';
 import type {
@@ -71,7 +75,7 @@ import { copyTextToClipboard, downloadVCard } from './utils';
 
 function getSrDescription(isEmpty: boolean): string {
   if (isEmpty) {
-    return 'Track visitors and grow your fan base';
+    return 'Track visitors and grow your audience';
   }
   return 'Every visitor, anonymous or identified, lives in this table.';
 }
@@ -303,7 +307,11 @@ export const DashboardAudienceTableUnified = memo(
     );
 
     const defaultExportMember = React.useCallback((member: AudienceMember) => {
-      downloadVCard(member);
+      if (!canShareContactOut(member)) {
+        toast.error('This person has not shared their contact with you');
+        return;
+      }
+      downloadVCard(redactUnsharedContact(member));
       toast.success('Contact exported as vCard');
     }, []);
 
@@ -348,7 +356,9 @@ export const DashboardAudienceTableUnified = memo(
 
     const defaultSendNotification = React.useCallback(
       (member: AudienceMember) => {
-        const contact = member.email ?? member.phone;
+        const contact = canShareContactOut(member)
+          ? (member.email ?? member.phone)
+          : null;
         if (!contact) {
           return;
         }
@@ -570,7 +580,7 @@ export const DashboardAudienceTableUnified = memo(
         return buildAudienceActions(member, {
           onViewDetails: setSelectedMember,
           onCopyEmail: m => {
-            if (m.email) {
+            if (m.email && canShareContactOut(m)) {
               void copyTextToClipboard(m.email).then(success => {
                 if (success) {
                   toast.success('Copied');
@@ -581,7 +591,7 @@ export const DashboardAudienceTableUnified = memo(
             }
           },
           onCopyPhone: m => {
-            if (m.phone) {
+            if (m.phone && canShareContactOut(m)) {
               void copyTextToClipboard(m.phone).then(success => {
                 if (success) {
                   toast.success('Copied');

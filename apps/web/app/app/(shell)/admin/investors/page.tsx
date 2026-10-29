@@ -9,6 +9,7 @@ import {
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { HypotheticalDilutionPreview } from '@/components/features/admin/investors/HypotheticalDilutionPreview';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UnifiedTableSkeleton } from '@/components/organisms/table';
@@ -137,6 +138,7 @@ export default async function InvestorPipelinePage() {
       <Suspense fallback={<TableSkeleton />}>
         <InvestorPipelineTable />
       </Suspense>
+      <HypotheticalDilutionPreview />
     </AdminPage>
   );
 }

@@ -5,11 +5,15 @@ import {
   canonicalSidebarNavigation,
   primaryNavigation,
 } from '@/components/features/dashboard/dashboard-nav/config';
-import { OPERATOR_NAV_ITEMS } from '@/components/organisms/operator-navigation';
+import {
+  OPERATOR_NAV_ITEMS,
+  OPERATOR_NAV_SECTIONS,
+} from '@/components/organisms/operator-navigation';
 import {
   ADMIN_NAV_REGISTRY,
   ADMIN_PRIMARY_WORKSPACE_IDS,
   ADMIN_SETTINGS_TOOL_IDS,
+  ADMIN_WORKSPACE_TABS,
 } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveAppShellModeFromPathname } from '@/lib/app-shell/mode';
@@ -72,55 +76,101 @@ describe('exclusive customer vs OV navigation', () => {
     ).toEqual([]);
   });
 
-  it('keeps Home and Inbox primary with operational workspaces under Tools', () => {
-    expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual(['overview', 'inbox']);
+  it("labels the second operator group Company (Tim's swipe, 2026-10-25), keeping its stable id", () => {
+    expect(
+      OPERATOR_NAV_SECTIONS.map(section => [section.id, section.label])
+    ).toEqual([
+      ['home', null],
+      ['business', 'Company'],
+      ['tools', 'Tools'],
+    ]);
+    expect(OPERATOR_NAV_SECTIONS.map(section => section.label)).not.toContain(
+      'Business'
+    );
+  });
+
+  it('keeps five daily destinations primary with Company and Tools collapsed', () => {
+    expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual([
+      'overview',
+      'inbox',
+      'shipping',
+      'operations',
+      'costs',
+    ]);
     expect(
       ADMIN_NAV_REGISTRY.filter(item => item.section === 'workspaces').map(
         item => item.label
       )
-    ).toEqual(['Home', 'Inbox']);
+    ).toEqual(['Home', 'Inbox', 'Shipping', 'Fleet', 'Capacity']);
     expect(ADMIN_NAV_REGISTRY.map(item => item.id)).not.toContain('needs_you');
-    expect(ADMIN_SETTINGS_TOOL_IDS.slice(0, 3)).toEqual([
-      'growth',
-      'product',
-      'operations',
-    ]);
     expect(
-      ADMIN_NAV_REGISTRY.find(item => item.id === 'activity')
-    ).toMatchObject({ label: 'Timeline', section: 'utilities' });
+      ADMIN_NAV_REGISTRY.filter(item => item.section === 'business').map(
+        item => item.label
+      )
+    ).toEqual([
+      'Growth',
+      'People',
+      'Outbound',
+      'Interviews',
+      'Investors',
+      'Revenue Lift',
+    ]);
+    expect(ADMIN_SETTINGS_TOOL_IDS.slice(0, 2)).toEqual([
+      'ops',
+      'certifications',
+    ]);
+    // Product and Timeline are Shipping views, Agents is a Fleet view: they
+    // keep their routes but have no sidebar row.
+    for (const id of ['product', 'activity']) {
+      expect(ADMIN_NAV_REGISTRY.some(item => item.id === id)).toBe(false);
+    }
+    expect(ADMIN_WORKSPACE_TABS.shipping.map(tab => tab.label)).toEqual([
+      'Pipeline',
+      'Customer Reality',
+      'Timeline',
+    ]);
+    expect(ADMIN_WORKSPACE_TABS.operations.map(tab => tab.label)).toEqual([
+      'Health',
+      'Agents',
+    ]);
     expect(
       ADMIN_NAV_REGISTRY.filter(item =>
         ['certifications', 'shipping'].includes(item.id)
       ).map(({ id, section }) => ({ id, section }))
     ).toEqual([
+      { id: 'shipping', section: 'workspaces' },
       { id: 'certifications', section: 'utilities' },
-      { id: 'shipping', section: 'utilities' },
     ]);
-    expect(ADMIN_SETTINGS_TOOL_IDS).toEqual(
-      expect.arrayContaining(['certifications', 'shipping'])
-    );
+    expect(ADMIN_SETTINGS_TOOL_IDS).toContain('certifications');
+    expect(
+      ADMIN_NAV_REGISTRY.find(item => item.id === 'capacity')
+    ).toMatchObject({
+      label: 'Agent Plans',
+      href: APP_ROUTES.ADMIN_CAPACITY,
+      section: 'utilities',
+    });
   });
 
   it('gives every operator review workspace a canonical navigation door', () => {
     const reviewWorkspaces = [
-      { id: 'interviews', href: APP_ROUTES.ADMIN_INTERVIEWS },
-      { id: 'playlists', href: APP_ROUTES.ADMIN_PLAYLISTS },
-      { id: 'presence', href: APP_ROUTES.ADMIN_PRESENCE },
+      {
+        id: 'interviews',
+        href: APP_ROUTES.ADMIN_INTERVIEWS,
+        section: 'business',
+      },
+      {
+        id: 'playlists',
+        href: APP_ROUTES.ADMIN_PLAYLISTS,
+        section: 'utilities',
+      },
+      { id: 'presence', href: APP_ROUTES.ADMIN_PRESENCE, section: 'utilities' },
     ];
 
     expect(
       ADMIN_NAV_REGISTRY.filter(item =>
         reviewWorkspaces.some(workspace => workspace.id === item.id)
       ).map(({ id, href, section }) => ({ id, href, section }))
-    ).toEqual(
-      reviewWorkspaces.map(workspace => ({
-        ...workspace,
-        section: 'utilities',
-      }))
-    );
-    expect(ADMIN_SETTINGS_TOOL_IDS).toEqual(
-      expect.arrayContaining(reviewWorkspaces.map(workspace => workspace.id))
-    );
+    ).toEqual(reviewWorkspaces);
   });
 
   it.each([

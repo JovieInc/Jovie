@@ -6,7 +6,7 @@ JOV-7706); grok and kimi stay `enabled: false`. Symphony Elixir on Gem is retire
 `gem-retire-elixir.sh`); nothing else claims JOV work.
 
 A lane is a provider command in `providers.json` plus a Linear label that expresses a routing
-preference. Every JOV Todo issue is eligible (Tim 2026-10-11: no `agent-ready`, plan or
+preference. Every JOV Todo issue is eligible, and since 2026-10-29 Backlog admission no longer requires `agent-ready` either (readiness is computed: spec, acceptance, no hold, no blocker, no red line) (Tim 2026-10-11: no `agent-ready`, plan or
 approval label is required): every lane reads one shared all-Todo snapshot per TTL (at most
 `TODO_POOL_PAGES` x 100 issues; a larger pool fails closed) and the cost-aware router (below)
 decides which lane takes each issue. `hold` is the one stop signal, and it expires: the
@@ -31,7 +31,7 @@ The harness, not the model, owns:
 | File-overlap admission: declared paths, then the workstream map, are compared with the cached open-PR inventory and In Progress lane tasks; hot control-plane and duplicate migration-number collisions wait, shared/generated files sequence, other overlaps flag | `file_overlap.py`, `overlap_inventory()` |
 | Hotspot admission (JOV-7708): an issue whose predicted touch set (named file paths, else its workstream area; Symphony-throughput = the lanes harness) hits a hotspot an open, non-parked PR holds waits as `hotspot-held:<path>#<pr>`. Hotspots = a static seed (lanes harness, `code-flags.ts`, command/product-truth registries, `node-environment-files.json`, `destructive-red-drift.baseline.json`) plus any file two open PRs touch; an unreadable file list admits ungated | `pool_rejections()`, `hotspot_holds()`, `open_hotspot_holds()` |
 | Sweep (every 30 min per lane): retire only explicitly labeled duplicates after live head, hold and queue revalidation; preserve unlabelled stale drafts | `sweep_lane_prs()` |
-| Generated-file conflicts: merge main, take its copy, run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`), push; no model, no force-push | `resolve_generated_conflict()`, `remediation.GENERATED_RESOLVERS` |
+| Generated-file conflicts: merge main, restore its generated copies (including cleanly merged outputs), run each file's canonical regenerator (`pnpm install --lockfile-only` for `pnpm-lock.yaml`, `pnpm ci:topology:write` for `.github/workflow-topology.gen.yml`), push; after resolving source conflicts, reuse the same regeneration helper | `resolve_generated_conflict()`, `regenerate_merged_generated()`, `remediation.GENERATED_RESOLVERS` |
 | Slot locks that die with their holder | `Locked` |
 | Worktree from `origin/main`: a pre-installed pool slot when one is ready (`worktreeSource: pool` on the receipt), else fresh; shared-store hardlink install; background refill; afterwards an idle, clean checkout with fresh origin publication proof is recycled into the pool (`verdict: recycled` in `worktree-removals.jsonl`) or removed. Busy, dirty, unpublished or unverified source is preserved with a cleanup receipt; its branch is deleted only after successful checkout retirement | `run_issue()`, `worktree_pool.take()`, `remove_worktree()`, `worktree_pool.recycle()` |
 | GBrain context pack in the prompt, plus the repo contract | `context_pack()`, `render_prompt()` |
@@ -63,20 +63,17 @@ The harness, not the model, owns:
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
-Execution receipts retain `jovie-execution-attempt/v1`. The default production and CLI
-writer still emits legacy numeric status chains; self-update cannot activate the new
-wire format. `IMMUTABLE_WRITER_ENABLED` is checked in as false, with no environment or
-caller override. The upgraded reader also validates candidate-linked receipts, while
-a disabled writer refuses to extend them. Enabling the writer requires a separately
-reviewed source change after every participating reader and writer is drained, updated
-and verified ready; JOV-8293 remains open for that activation and runtime outcome.
+Execution receipts retain `jovie-execution-attempt/v1`. The production and CLI writer
+now emits the candidate-linked immutable wire format (JOV-8293 enablement), with no
+environment or caller override; the dual reader still validates legacy numeric
+chains, while an un-updated writer refuses to extend candidate-linked reservations.
 Enabled recovery reserves an existing `failed_unknown` disposition before projecting
 an unknown boundary, so helper crashes and repeated retries remain held. Boundary IDs
 bind existing dispatch, handoff, repair and adoption phases within the original fence;
 duplicate or changed-cost reuse is held, and distinct intended phases charge normally.
 Legacy common-source-SHA reservations have no owner proof and remain held for
-authoritative reconciliation. Source merge is preparatory and does not repair or
-certify the running coordinator.
+authoritative reconciliation. Source merge is preparatory; the exact installed
+runtime generation still needs its own interrupted-reservation outcome receipts.
 
 PR repair selection captures one qualified bulk inventory outside the global claim lock,
 using the existing per-key cache lock. Current local preservation and attempt state,
@@ -747,7 +744,7 @@ the relay), deploy
 failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
 `jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
 `ready`, `needs-rebase` (`lockfile-only`, `generated-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
-`needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
+`needs-human-decision` (a reserved decision or a secret-file security gate: it surfaces once and files a non-blocking Ovie `decisionAsk` with a default and a deadline; it applies no label and holds nothing, EVENT 2026-10-28), `obsolete`, plus `main-red` when main itself is the failure.
 
 The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
 the existing generated-file resolver, one `gh run rerun --failed` per head. Those spend no model
@@ -760,7 +757,7 @@ Spent caps are `ladder-exhausted`. Re-entry is a new external head, a cleared de
 main turning green; attempt history is kept on the `jovie-reentry/v1` receipt.
 
 Flags: `LANES_ESCALATION` default on; `LANES_ESCALATION_NOTIFY_TIM` default off (Linear
-`needs-human` label plus one comment); `LANES_ESCALATION_LIFT_HUMAN_HOLDS` default off.
+`needs-human` label plus one comment). A repaired PR always lifts its machine `hold`.
 Needs-human, obsolete and ladder-exhausted share one PR comment marked
 `<!-- symphony-surface pr=N head=SHA -->`. Hold nags are at most one per PR per head per 24h.
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)
@@ -853,6 +850,33 @@ MusicFetch.
 (state, issue, class, lane, and the exact ask). A surfaced PR that is still open raises
 alert `escalation-surfaced` for the lanes repair owner (never a human by default); PRs
 that merged or closed drop out once the reconcile pass has a complete open-PR view.
+
+## Fleet work ledger (`fleet_ledger.py`)
+
+One read-only view of every claim (lanes run leases, repo-binding issue locks, the claim ledger and
+external-agent claims in `fleet-claims/`), each with a verdict: `live`, `starting`, `stranded`
+(active, no live lease for 3 h) or `expired` (external claim silent past its ttl). Non-lane agents
+(Lola, Hyperagent threads, Summer) take work with `fleet_ledger.py claim JOV-1 --agent lola --ttl 1800`,
+renew with `heartbeat`, and drop it with `release`; anyone checking `external_active` ignores an
+expired claim. `metrics` reports duplicate overlapping runs, overnight (00-08 UTC) vs day
+throughput and the factory share of issue runs (floor 20 %). `ownership.reconcile` also releases
+repo-binding claims whose binding issue lock is no longer held.
+
+Also in the same module and companions:
+
+- Lanes skip any issue under an unexpired external claim (`held_back_issues`); the doctor raises
+  `stranded-claims` and records one `fleet-ready.jsonl` row per pass, so `metrics` reports
+  `idleWhileReady` (allowed seat free while work waited) and `throttledMin` (autoscaler cut seats).
+- `fleet_ledger.py gates`: human-gated issues must carry `Default:` and `Deadline:` lines; they park
+  (lanes skip them), come due, or are `unbounded` (a gate that can block forever).
+- `fleet_ledger.py burn` reads `quota-windows.json` and ranks capped agents by how far behind their
+  reset window they are, so quota is spent before it resets.
+- `factory_intake.py`: `state/factory-signals/*.json` (`jovie-factory-signal/v1`: fingerprint, problem,
+  acceptance, metric) become Todo issues labelled `factory`, `ws:symphony-throughput` and
+  `factory-fp:<fp>` on each doctor pass (max 3, deduped by the label). Done means the metric moved.
+- `codex_delegate.py --agent dots -- codex exec ...`: agents that delegate to Codex take a
+  `slots/codex.N` seat under the lanes' admission lock and cap (exit 75 if none) and are logged per
+  agent in `runs/delegations.jsonl`.
 
 ## Tests
 

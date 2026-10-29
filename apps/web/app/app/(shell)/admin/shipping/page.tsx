@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRouteTabs';
+import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
@@ -21,6 +23,10 @@ export default async function ShippingPage() {
       description='Live PR and merge-queue status matrix.'
       testId='ovie-shipping-page'
     >
+      <OperatorRouteTabs
+        tabs={ADMIN_WORKSPACE_TABS.shipping}
+        label='Shipping Views'
+      />
       <ShippingMatrix />
       <ShippingStatistics />
     </AdminPage>

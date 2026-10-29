@@ -1,0 +1,9 @@
+{
+  "schema": "jovie.model-id-guard-ratchet/v1",
+  "entries": {
+    "apps/web/data/marketing/modelRoles.ts": 7,
+    "scripts/agent-context/promptfooconfig.yaml": 1,
+    "scripts/lanes/outcome_escalation.py": 3,
+    "scripts/security/deepsec-loop.mjs": 1
+  }
+}

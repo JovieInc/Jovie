@@ -155,6 +155,7 @@ const markdownAllowedJobs = new Set([
   'ci.yml:ci-e2e-smoke',
   'ci.yml:ci-e2e-tests',
   'ci.yml:ci-fast-remaining',
+  'ci.yml:ci-golden-path',
   'ci.yml:ci-smoke-required',
   'ci.yml:ci-storybook-surfaces',
   'ci.yml:ci-visual-snapshot-compare',
@@ -1348,10 +1349,7 @@ ${fixtureCheckout}
       Object.entries(generate?.env ?? {})
         .filter(([name]) => isCredentialBearingName(name))
         .map(([name, value]) => `${name}: ${value}`)
-    ).toEqual([
-      'DATABASE_URL: postgresql://localhost/noop',
-      'CLERK_SECRET_KEY: sk_test_mock',
-    ]);
+    ).toEqual(['DATABASE_URL: postgresql://localhost/noop']);
     const publishSteps = publish?.steps ?? [];
     const tokenIndex = publishSteps.findIndex(step =>
       /create-github-app-token@/.test(step.uses ?? '')
