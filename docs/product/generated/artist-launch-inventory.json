@@ -6909,6 +6909,21 @@
       "classification": "B"
     },
     {
+      "source": "apps/web/app/claim/agent/[draftId]/actions.ts",
+      "kind": "action",
+      "export": "claimAgentDraftAction",
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/claim/agent/[draftId]/page.tsx",
+      "kind": "page",
+      "route": "/claim/agent/[draftId]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/claim/page.tsx",
       "kind": "page",
       "route": "/claim",
