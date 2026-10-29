@@ -101,11 +101,14 @@
       "capacityProviderId": "instinct",
       "label": "Instinct",
       "kind": "external-agent",
-      "status": "active",
+      "status": "pending-route",
       "route": {
-        "kind": "mesh",
-        "senderKind": "instinct",
-        "note": "Summer mesh mailbox (summer.jov.ie/summer/v1/mesh). Instinct polls its own mailbox with its own token; results return as a mesh message to summer carrying the FLT ref."
+        "kind": "slack",
+        "note": "Tim 2026-10-28: Instinct is reachable on Slack and iMessage, not the mesh. Slack is preferred. Not wired: the only Slack bot token found on this Mac (the retired Hermes-era demo_app bot in the Slack workspace) has scopes assistant:write, channels:read, groups:read, mpim:read, im:read, chat:write, channels:join. It cannot look up Instinct (no users:read), open a DM (no im:write) or read a reply (no im:history/channels:history), and it is another runtime's credential, so Summer does not use it.",
+        "needs": [
+          "A Slack app owned by Summer with bot scopes users:read, im:write, chat:write and im:history (or channels:history for a shared channel), installed in the workspace; its bot token in Summer's Vercel env.",
+          "Instinct's Slack user id, or the channel Instinct reads."
+        ]
       },
       "capabilities": [
         "dogfood",
@@ -131,19 +134,31 @@
       },
       "tos": {
         "verdict": "allowed-by-design",
-        "basis": "Tasks are assigned through Jovie's own mesh protocol that Instinct itself polls; no consumer subscription CLI is driven. Vendor terms not read.",
+        "basis": "Tasks would go out through Slack, Instinct's own interface, once a Summer-owned Slack app exists; no consumer subscription CLI is driven. Not wired yet, so nothing is dispatched. Vendor terms not read.",
         "checkedAt": null
       },
       "verified": {
         "level": "unverified",
         "asOf": "2026-10-28",
-        "evidence": "Mesh sender kind is registered in canon/agent-identities.json; no live round trip recorded yet."
+        "evidence": "Slack and iMessage reachability is from Tim via the coordinator; no message sent, no reply observed."
       },
       "standingWorkloads": [
         "dogfood-golden-path",
         "qa-sweep",
         "pr-review",
         "prospect-research-outreach"
+      ],
+      "routesAlt": [
+        {
+          "kind": "imessage",
+          "verdict": "not-routable",
+          "note": "Summer's Photon lane is the founder-private thread. Agent traffic does not go through it. Needs a separate iMessage identity for Summer-to-agent traffic, which does not exist."
+        },
+        {
+          "kind": "mesh",
+          "verdict": "unavailable",
+          "note": "Instinct does not poll the mesh (Tim, 2026-10-28). Its mesh kind stays registered but unused."
+        }
       ]
     },
     {
@@ -547,18 +562,21 @@
       "id": "cursor",
       "identityId": "cursor",
       "capacityProviderId": null,
-      "label": "Cursor (Ultra: CLI, cloud agents, Origin automations)",
+      "label": "Cursor (Ultra, CLI)",
       "kind": "bot",
-      "status": "pending-auth",
+      "status": "pending-bridge",
       "route": {
-        "kind": "cursor-cli",
-        "note": "Headless `cursor-agent -p --mode ask` (read-only) on the Mac or Gem; documented in the CLI help for scripts and non-interactive use. Cursor Origin (cursor.com/codebase/jovie) cloud agents and automations are a second route; no API route verified. Not dispatchable until the CLI is authenticated."
+        "kind": "mesh",
+        "senderKind": "ops-mac-host",
+        "executor": "A bridge on the Mac polls the ops-mac-host mailbox and runs `cursor-agent -p --trust --mode ask --model auto \"<prompt>\"` in a scratch directory (read-only), replying by mesh with the FLT ref. Never pass --force or drop --mode ask for reviews and research.",
+        "note": "Proven 2026-10-28 through Summer dispatch and result code with an in-memory mesh and the real cursor-agent (PR review of two PRs, 243s, found real defects). Not live: no bridge is registered or polling. Cursor Origin cloud agents and automations are an unverified second route."
       },
       "capabilities": ["code", "code-review", "analysis"],
-      "capabilitySource": "Tim/coordinator, 2026-10-28 (Cursor Ultra; Origin syncs all repos with cloud agents and automations). Not observed.",
+      "capabilitySource": "Tim/coordinator 2026-10-28 and one observed task.",
       "limits": {
-        "usage": "unknown",
-        "note": "Ultra plan limits not readable: cursor-agent reports Authentication required (no CURSOR_API_KEY, no login). Record limits after login."
+        "usage": "capped-quota",
+        "note": "Subscription Tier reports Ultra (`cursor-agent about`, 2026-10-28), but the default model returned \"You're out of usage. Switch to Auto\"; only `--model auto` works. That is an exhausted included-usage pool on the logged-in account, so Auto is the only available capacity. The login is an Apple private-relay address, so it may not be the company Ultra account. Reset date and remaining quota are not readable from the CLI.",
+        "model": "auto"
       },
       "cost": {
         "listUsdMonthly": null,
@@ -574,9 +592,9 @@
         "checkedAt": null
       },
       "verified": {
-        "level": "unverified",
+        "level": "observed",
         "asOf": "2026-10-28",
-        "evidence": "cursor-agent 2026.09.02 installed; headless run fails with Authentication required using existing auth."
+        "evidence": "cursor-agent logged in; `--model auto` answers; one real PR-review task ran through Summer dispatch/record code in 243s (4 busy minutes in the ledger)."
       },
       "standingWorkloads": ["pr-review"]
     },

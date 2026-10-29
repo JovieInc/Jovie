@@ -303,8 +303,23 @@ def extract_failure(text: str, tail: int = 60, context: int = 6, cap: int = 220)
     return "\n".join(out + ["--- tail ---"] + lines[-tail:])
 
 
+LOG_DIAG: list[dict] = []
+
+
+def fetch_job_log(job_id) -> "_Result":
+    """Job logs hold ANSI escapes; current gh refuses to print them without --allow-escape-sequences
+    (older gh lacks the flag), so retry with it only when gh asks."""
+    url = f"repos/{REPO}/actions/jobs/{job_id}/logs"
+    out = gh(["api", url])
+    if out.returncode != 0 and "allow-escape-sequences" in (out.stderr or ""):
+        out = gh(["api", "--allow-escape-sequences", url])
+    return out
+
+
 def job_log_tail(run: dict) -> str:
-    out = gh(["api", f"repos/{REPO}/actions/jobs/{run['id']}/logs"])
+    out = fetch_job_log(run["id"])
+    LOG_DIAG.append({"check": run["name"], "rc": out.returncode, "bytes": len(out.stdout or ""),
+                     "err": (out.stderr or "")[:120]})
     if out.returncode != 0:
         return ""
     return extract_failure(out.stdout)
@@ -322,7 +337,7 @@ def receipts_for(number: int, sha: str, key: str) -> dict | None:
 
 def cmd_prepare(a) -> int:
     n = a.pr
-    plan: dict = {"kind": a.mode, "schema": SCHEMA, "pr": n, "startedAt": iso(), "outcome": "skipped", "action": "none"}
+    plan: dict = {"kind": a.mode, "ghVersion": gh_version(), "schema": SCHEMA, "pr": n, "startedAt": iso(), "outcome": "skipped", "action": "none"}
     Path(a.plan).write_text(json.dumps(plan))
     try:
         pr = gh_json(["api", f"repos/{REPO}/pulls/{n}"])
@@ -414,6 +429,7 @@ def prepare_red(a, plan: dict, pr: dict) -> int:
     if pr.get("mergeable_state") == "dirty":
         plan.update(action="sync-main", cls="conflict")
     joined = "\n".join(logs.values())
+    plan["logDiag"] = LOG_DIAG[:4]
     regen = next((cmd for name, pat, cmd in REGEN if pat.search(joined)), None)
     action = plan["action"]
     skip = None
@@ -570,6 +586,10 @@ def cmd_finalize(a) -> int:
     plan["finishedAt"] = iso()
     plan["seconds"] = int(now() - datetime.fromisoformat(plan["startedAt"].replace("Z", "+00:00")).timestamp())
     plan["calls"] = plan.get("calls", 0) + calls + (2 if plan.get("claimId") else 0)
+    if str(plan.get("reason", "")).startswith("rebase-conflict") and plan["outcome"] == "gave-up":
+        # a real textual conflict belongs to the conflict lane: label it, never drop it
+        gh(["api", "-X", "POST", f"repos/{REPO}/issues/{plan['pr']}/labels", "-f", f"labels[]={CONFLICT_LABEL}"])
+        plan["calls"] = plan.get("calls", 0) + 1
     if plan.get("claimId"):
         release_claim(plan)
         if plan["outcome"] not in {"skipped", "blocked-credits"}:
@@ -832,6 +852,81 @@ def cmd_summarize(a) -> int:
     return 0
 
 
+MIN_GH = (2, 40, 0)
+
+
+def gh_version() -> str:
+    try:
+        first = run_gh(["--version"])["stdout"].splitlines()[0]
+        return first.split()[2] if first.startswith("gh version") else first
+    except (OSError, IndexError):
+        return "unknown"
+
+
+def cmd_smoke(a) -> int:
+    """Runner-side canary for the log path: log the gh version and fetch a known completed job's log
+    through the exact production fetch. Exits 1 (no fan-out) if the log is empty, so client drift
+    (e.g. gh refusing escape sequences) fails loudly here instead of silently skipping every PR."""
+    version = gh_version()
+    parts = tuple(int(x) for x in re.findall(r"\d+", version)[:3]) or (0,)
+    print(f"gh version {version} (minimum {'.'.join(map(str, MIN_GH))})")
+    out_var("gh_version", version)
+    if parts < MIN_GH:
+        print(f"::error title=swarm smoke::gh {version} is older than the supported minimum")
+        return 1
+    runs = gh_json(["api", f"repos/{REPO}/actions/runs?status=completed&per_page=20"], priority="report")["workflow_runs"]
+    tried = 0
+    for run in runs:
+        if run.get("conclusion") not in {"success", "failure"}:
+            continue
+        jobs = gh_json(["api", f"repos/{REPO}/actions/runs/{run['id']}/jobs?per_page=10"], priority="report")["jobs"]
+        for job in jobs:
+            if job.get("conclusion") not in {"success", "failure"} or not job.get("started_at"):
+                continue  # skipped/cancelled jobs have no log to read
+            log = fetch_job_log(job["id"])
+            size = len(log.stdout or "")
+            tried += 1
+            print(f"smoke job {job['id']} ({job['name']}): rc={log.returncode} bytes={size} err={(log.stderr or '')[:100]!r}")
+            if log.returncode == 0 and size > 0:
+                return 0
+            if "escape" in (log.stderr or "") or tried >= 6:
+                print(f"::error title=swarm smoke::job log fetch returned rc={log.returncode} bytes={size}; gh {version} cannot read job logs")
+                return 1
+    print("::error title=swarm smoke::no readable completed job log to smoke-test the log fetch")
+    return 1
+
+
+def cmd_diagnose(a) -> int:
+    """Local, read-only replay of the runner's gate for PRs: the same API calls, job selection and
+    extraction as prepare_red, with whatever token `gh` holds. Posts nothing, claims nothing."""
+    for n in (int(x) for x in a.prs.split(",") if x.strip()):
+        pr = gh_json(["api", f"repos/{REPO}/pulls/{n}"])
+        sha = pr["head"]["sha"]
+        runs = gh_json(["api", f"repos/{REPO}/commits/{sha}/check-runs?per_page=100"])["check_runs"]
+        latest: dict[str, dict] = {}
+        for r in runs:
+            if r["name"] not in latest or r["id"] > latest[r["name"]]["id"]:
+                latest[r["name"]] = r
+        print(f"== #{n} {sha[:9]} state={pr['mergeable_state']} check-runs={len(runs)} distinct={len(latest)}")
+        failures, pending = latest_failures(sha)
+        print(f"   failing={[r['name'] for r in failures]} pending={pending}")
+        for r in failures[:4]:
+            app = (r.get("app") or {}).get("slug")
+            m = re.search(r"/runs/(\d+)/job/(\d+)", r.get("details_url") or "")
+            out = fetch_job_log(r["id"])
+            attempt = ""
+            if m:
+                job = gh_json(["api", f"repos/{REPO}/actions/jobs/{m.group(2)}"])
+                attempt = f" run_attempt={job.get('run_attempt')} job_conclusion={job.get('conclusion')} id_match={str(job['id']) == str(r['id'])}"
+            text = extract_failure(out.stdout) if out.returncode == 0 else ""
+            print(f"   - {r['name']!r} id={r['id']} app={app} conclusion={r['conclusion']} details={'job' if m else 'NO-JOB-URL'}"
+                  f" logs rc={out.returncode} bytes={len(out.stdout or '')} err={(out.stderr or '')[:80]!r}{attempt}")
+            print(f"     extract_lines={len(text.splitlines())} concrete={concrete_error(text)} classify={classes.classify({'mergeStateStatus': 'BLOCKED', 'statusCheckRollup': [{'name': r['name'], 'conclusion': r['conclusion'].upper()}]}, {r['name']: text})['cls']}")
+            if a.show:
+                print("     " + text.split("--- tail ---")[0][-600:].replace("\n", "\n     "))
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -848,10 +943,12 @@ def main() -> int:
     f.add_argument("--guard", default="fail"); f.add_argument("--repro", default="n/a"); f.add_argument("--agent-meta", default="")
     f.add_argument("--metrics", required=True)
     l = sub.add_parser("ledger"); l.add_argument("--issue", required=True); l.add_argument("--run", required=True); l.add_argument("--cents", required=True)
+    sub.add_parser("smoke")
+    d = sub.add_parser("diagnose"); d.add_argument("--prs", required=True); d.add_argument("--show", action="store_true")
     m = sub.add_parser("summarize"); m.add_argument("--dir", required=True); m.add_argument("--out", required=True)
     a = p.parse_args()
     return {"select": cmd_select, "prepare": cmd_prepare, "fix": cmd_fix, "regen": cmd_regen, "agent": cmd_agent, "guard": cmd_guard,
-            "finalize": cmd_finalize, "ledger": cmd_ledger, "summarize": cmd_summarize}[a.cmd](a)
+            "finalize": cmd_finalize, "diagnose": cmd_diagnose, "smoke": cmd_smoke, "ledger": cmd_ledger, "summarize": cmd_summarize}[a.cmd](a)
 
 
 if __name__ == "__main__":

@@ -514,9 +514,21 @@ jobs:
 
       # Step names, timestamps and one-line summaries only; no cookies, codes
       # or addresses (the step helper never records them).
+      - name: Check golden-path certification steps
+        id: check-cert-steps
+        if: ${{ always() && steps.check-creds.outputs.skip != 'true' }}
+        env:
+          PROD_CERT_STEPS_FILE: ${{ runner.temp }}/prod-cert-steps.jsonl
+        run: |
+          if [ -s "$PROD_CERT_STEPS_FILE" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Upload golden-path certification steps
         id: upload-cert-steps
-        if: ${{ always() && steps.check-creds.outputs.skip != 'true' && hashFiles(format('{0}/prod-cert-steps.jsonl', runner.temp)) != '' }}
+        if: ${{ always() && steps.check-cert-steps.outputs.available == 'true' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: prod-cert-steps-${{ github.run_id }}

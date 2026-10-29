@@ -306,23 +306,11 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/releases/cells/AvailabilityCell.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/releases/cells/PopularityCell.tsx",
       "linearIssue": "JOV-8847"
     },
     {
       "path": "apps/web/components/features/dashboard/organisms/releases/cells/ProviderCell.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/releases/components/NotFoundCopyButton.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
-      "path": "apps/web/components/features/dashboard/organisms/releases/components/ProviderCopyButton.tsx",
       "linearIssue": "JOV-8847"
     },
     {
