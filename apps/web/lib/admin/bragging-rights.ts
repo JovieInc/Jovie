@@ -1,3 +1,4 @@
+import { notInternalProfileSql } from '@/lib/accounts/internal-account';
 import 'server-only';
 
 import { and, desc, sql as drizzleSql, eq } from 'drizzle-orm';
@@ -50,6 +51,7 @@ async function getTopLabels(): Promise<string[]> {
       .where(
         and(
           eq(creatorProfiles.isClaimed, true),
+          notInternalProfileSql(creatorProfiles.id),
           drizzleSql`${discogReleases.label} IS NOT NULL AND ${discogReleases.label} <> ''`
         )
       )
@@ -81,6 +83,7 @@ async function getTopDistributors(): Promise<string[]> {
       .where(
         and(
           eq(creatorProfiles.isClaimed, true),
+          notInternalProfileSql(creatorProfiles.id),
           drizzleSql`${discogReleases.distributor} IS NOT NULL AND ${discogReleases.distributor} <> ''`
         )
       )
@@ -114,7 +117,8 @@ async function getTotalProfileViews(): Promise<number> {
       .select({
         total: drizzleSql<number>`COALESCE(SUM(${dailyProfileViews.viewCount}), 0)::int`,
       })
-      .from(dailyProfileViews);
+      .from(dailyProfileViews)
+      .where(notInternalProfileSql(dailyProfileViews.creatorProfileId));
     return Number(row?.total ?? 0);
   } catch (error) {
     if (isMissingDailyProfileViewsSchemaError(error)) {
@@ -138,7 +142,9 @@ async function getTotalDspClicks(): Promise<number> {
     const [row] = await db
       .select({ total: drizzleSql<number>`count(*)::int` })
       .from(clickEvents)
-      .where(drizzleSql`${clickEvents.linkType} = 'listen'`);
+      .where(
+        drizzleSql`${clickEvents.linkType} = 'listen' and ${clickEvents.isBot} = false and ${notInternalProfileSql(clickEvents.creatorProfileId)}`
+      );
     return Number(row?.total ?? 0);
   } catch (error) {
     captureError('Error fetching total DSP clicks for bragging rights', error);
@@ -151,7 +157,9 @@ async function getTotalContactsCaptured(): Promise<number> {
     const [row] = await db
       .select({ total: drizzleSql<number>`count(*)::int` })
       .from(notificationSubscriptions)
-      .where(drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL`);
+      .where(
+        drizzleSql`${notificationSubscriptions.unsubscribedAt} IS NULL and ${notInternalProfileSql(notificationSubscriptions.creatorProfileId)}`
+      );
     return Number(row?.total ?? 0);
   } catch (error) {
     captureError('Error fetching total contacts for bragging rights', error);
