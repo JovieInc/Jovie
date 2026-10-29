@@ -144,6 +144,9 @@ function caseManifest(c, outDir) {
   };
 }
 
+/**
+ * @param {{ casesPath?: string, only?: string, log?: (line: string) => void }} [options]
+ */
 export async function calibrate({ casesPath, only, log = () => {} } = {}) {
   const registry = readSurfaces();
   const cases = readCases(casesPath ? resolve(casesPath) : undefined).filter(
@@ -240,6 +243,10 @@ export async function calibrate({ casesPath, only, log = () => {} } = {}) {
 }
 
 /** Publish judge precision/recall where Summer reads: gbrain + the checked-in metrics file. */
+/**
+ * @param {{ summary: any }} metrics
+ * @param {(line: string) => void} [log]
+ */
 export function publishMetrics({ summary }, log = () => {}) {
   const slug = `metrics/dogfood-judge-calibration-${summary.measuredAt.slice(0, 10)}`;
   const page = `---
@@ -283,6 +290,9 @@ Source: JovieInc/Jovie ${METRICS_PATH}.
 /**
  * Tim gave feedback on something the judge passed: record it as a miss in the
  * eval set and the taste-label set (the canonical store of Tim's verdicts).
+ */
+/**
+ * @param {{ id?: string, image?: string, words?: string, criteria?: string, surface?: string, source?: string }} input
  */
 export function recordMiss({
   id,

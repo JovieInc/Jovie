@@ -120,7 +120,11 @@ export function designLegDecision(ledger, prodSha) {
       };
 }
 
-/** POST the ledger to production. Fails loudly; never prints the secret. */
+/**
+ * POST the ledger to production. Fails loudly; never prints the secret.
+ * @param {any} ledger
+ * @param {{ origin?: string, secret?: string, fetchImpl?: (url: URL, init: any) => Promise<{ ok: boolean, status?: number, text: () => Promise<string> }> }} [options]
+ */
 export async function postLedger(
   ledger,
   {

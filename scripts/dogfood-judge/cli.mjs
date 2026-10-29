@@ -43,6 +43,7 @@ import {
 import { renderReport } from './report.mjs';
 
 function args(argv) {
+  /** @type {Record<string, any>} */
   const out = { _: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];

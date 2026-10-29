@@ -148,6 +148,7 @@ describe('publish: design-judge ledger for the waitlist gate (#23720)', () => {
   test('POST needs CRON_SECRET and sends the ledger', async () => {
     const { postLedger } = await import('./publish.mjs');
     await assert.rejects(postLedger({}, { secret: '' }), /CRON_SECRET/u);
+    /** @type {any} */
     let seen;
     const res = await postLedger(
       { schema: 'x' },
