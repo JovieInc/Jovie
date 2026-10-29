@@ -9,12 +9,22 @@ name: Visual & A11y Tests
 # stays Storybook-only to avoid double Neon/build cost. It is deep evidence, so
 # source PRs and main releases never wait on it.
 on:
-  # Daily via the Gem lanes clock (repository_dispatch clock_visual_a11y;
-  # JOV-INV-042 freezes GitHub crons). Per-push runs on component paths spent
-  # ~15k runner-minutes a month and failed every run; the standing failure
-  # issue below and the Linear burn-down own the violations.
-  repository_dispatch:
-    types: [clock_visual_a11y]
+  # Runs once the inputs it audits land on main. These paths mirror
+  # VISUAL_PATTERNS below; nothing else can change a Storybook a11y result.
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/components/**'
+      - 'apps/web/.storybook/**'
+      - 'apps/web/app/globals.css'
+      - 'apps/web/styles/**'
+      - 'apps/web/tailwind.config.*'
+      - 'apps/web/postcss.config.*'
+      - 'apps/web/vitest.config.storybook.mts'
+      - 'apps/web/package.json'
+      - 'packages/ui/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/visual-a11y.yml'
   workflow_dispatch:
 
 permissions:
@@ -41,7 +51,7 @@ jobs:
         id: detect
         run: |
           VISUAL_PATTERNS='^(apps/web/components/|apps/web/\.storybook/|apps/web/app/globals\.css|apps/web/styles/|apps/web/(tailwind|postcss)\.config\.|apps/web/vitest\.config\.storybook\.mts|apps/web/package\.json|packages/ui/|pnpm-lock\.yaml|\.github/workflows/visual-a11y\.yml)'
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "repository_dispatch" ]; then
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]; then
             echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_visual_changes=false" >> "$GITHUB_OUTPUT"
@@ -117,7 +127,7 @@ jobs:
     # run opens or updates one standing issue, deduped by title. Not required.
     name: Report main failure
     needs: [ci-visual-path-changes, storybook-a11y]
-    if: ${{ always() && github.event_name == 'repository_dispatch' && github.ref_name == 'main' && contains(needs.*.result, 'failure') }}
+    if: ${{ always() && github.event_name == 'push' && github.ref_name == 'main' && contains(needs.*.result, 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
