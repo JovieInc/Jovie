@@ -88,10 +88,7 @@ jobs:
         working-directory: apps/web
         env:
           DATABASE_URL: postgresql://localhost/noop
-          NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_mock
-          CLERK_SECRET_KEY: sk_test_mock
           NEXT_DISABLE_TOOLBAR: '1'
-          NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1'
           E2E_USE_TEST_AUTH_BYPASS: '1'
           E2E_CLERK_USER_ID: user_test
           PUBLIC_NOAUTH_SMOKE: '1'
