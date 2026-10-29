@@ -287,15 +287,14 @@ describe('MarketingFooter', () => {
     expect(screen.getByTestId('marketing-footer-cta')).toBeInTheDocument();
   });
 
-  it('links to the canonical Card route without duplicating its terminal CTA', () => {
+  it('withholds the Card route from links without duplicating its terminal CTA', () => {
     mockUsePathname.mockReturnValue('/card');
 
     render(<MarketingFooter />);
 
-    expect(screen.getByRole('link', { name: 'Jovie Card' })).toHaveAttribute(
-      'href',
-      '/card'
-    );
+    expect(
+      screen.queryByRole('link', { name: 'Jovie Card' })
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByTestId('marketing-footer-cta')
     ).not.toBeInTheDocument();

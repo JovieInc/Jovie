@@ -452,8 +452,8 @@ describe('founder design invariants (JOV-INV-038)', () => {
   it('deliberate red: a mislabeled live nav entry cannot pass by not matching', () => {
     const mutated = replaceOnce(
       realNavigation,
-      "{ href: APP_ROUTES.COMPARE, label: 'Compare' }",
-      '{ label: "Compare", href: `${APP_ROUTES.PRICING}#compare` }'
+      "{ href: APP_ROUTES.SUPPORT, label: 'Support' }",
+      '{ label: "Support", href: `${APP_ROUTES.PRICING}#support` }'
     );
     assert.deepEqual(
       scanNavSemantics(NAVIGATION_SOURCE, mutated).map(item => item.rule),

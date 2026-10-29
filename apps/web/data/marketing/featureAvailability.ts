@@ -1,3 +1,4 @@
+import { isWithheldMarketingPath } from '@/data/marketing/withheldRoutes';
 import {
   type CapabilityDefinition,
   FEATURE_MATURITY_STATES,
@@ -263,12 +264,14 @@ export function describeFeatureAccess(
  * fragments or query strings normalize to their pathname before lookup.
  */
 export function isNavigationEligiblePath(href: string): boolean {
+  if (isWithheldMarketingPath(href)) return false;
   const record = getRouteCapability(href);
   if (!record) return true; // unbound routes are governed by the manifest alone
   return isCapabilityNavigable(record);
 }
 
 export function isIndexableCapabilityPath(path: string): boolean {
+  if (isWithheldMarketingPath(path)) return false;
   const record = getRouteCapability(path);
   if (!record) return true;
   return isCapabilityIndexable(record);
