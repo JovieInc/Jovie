@@ -334,7 +334,6 @@ export const queryKeys = {
     all: ['hud'] as const,
     pipelineBottleneck: () =>
       [...queryKeys.hud.all, 'pipeline-bottleneck'] as const,
-    timeLeverage: () => [...queryKeys.hud.all, 'time-leverage'] as const,
     metrics: (scope: 'admin' | 'kiosk') =>
       [...queryKeys.hud.all, 'metrics', scope] as const,
   },

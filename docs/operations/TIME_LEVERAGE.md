@@ -59,6 +59,6 @@ right project, build those with `needsReservedDecision: false`, record `{issue, 
 
 ## Surface
 
-`python3 -m timewaste surface --json` emits `time-leverage/v1`. Ovie reads it at
-`/api/internal/ovie/time-leverage` (POST with the cron secret, GET for admins) and renders a compact card on
-the ops HUD; Summer's morning brief appends the same lines (`brief_lines`).
+`python3 -m timewaste surface --json` emits `time-leverage/v1`. Ovie receives it at
+`/api/internal/ovie/time-leverage` (POST with the cron secret, GET for admins or Summer OIDC; shipped in the
+Ovie PR) and renders a compact card on the ops HUD; Summer's morning brief appends the same lines (`brief_lines`).
