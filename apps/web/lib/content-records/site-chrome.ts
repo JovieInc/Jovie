@@ -37,7 +37,7 @@ const SITE_CHROME_SCHEMA_VERSION = 1;
  * Each carries the reason so a rejected publish explains itself.
  */
 export const CHROME_BLOCKED_PATHS: Readonly<Record<string, string>> = {
-  '/card': 'Jovie Card is coming soon (dead end)',
+  '/card': 'Jovie Card has no live page (dead end)',
   '/demovideo': 'the product demo has no video (dead end)',
   '/compare': 'near-empty comparison index (dead end)',
   '/alternatives': 'near-empty alternatives index (dead end)',

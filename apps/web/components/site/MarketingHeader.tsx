@@ -136,9 +136,15 @@ function resolveNavConfig(
     const desktop: readonly MarketingHeaderNavLink[] = [
       ...(iconOnly
         ? []
-        : [{ href: APP_ROUTES.HOME, label: 'Jovie', treatment: 'wordmark' }]),
+        : [
+            {
+              href: APP_ROUTES.HOME,
+              label: 'Jovie',
+              treatment: 'wordmark' as const,
+            },
+          ]),
       ...primary,
-    ] as const;
+    ];
     return {
       flyoutMenus: [
         {
