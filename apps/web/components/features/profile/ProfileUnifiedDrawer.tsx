@@ -380,6 +380,7 @@ export function ProfileUnifiedDrawer({
           {renderedView === 'share' && (
             <PublicShareActionList
               context={shareContext}
+              alignToDrawerHeader
               onActionComplete={() => handleOpenChange(false)}
             />
           )}

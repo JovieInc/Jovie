@@ -82,7 +82,16 @@ vi.mock('@/features/profile/views/PayView', () => ({
 }));
 
 vi.mock('@/features/share/PublicShareMenu', () => ({
-  PublicShareActionList: () => <div data-testid='public-share-action-list' />,
+  PublicShareActionList: ({
+    alignToDrawerHeader,
+  }: {
+    readonly alignToDrawerHeader?: boolean;
+  }) => (
+    <div
+      data-testid='public-share-action-list'
+      data-align-to-drawer-header={String(Boolean(alignToDrawerHeader))}
+    />
+  ),
 }));
 
 vi.mock('@/features/profile/artist-contacts-button/useArtistContacts', () => ({
@@ -154,6 +163,15 @@ describe('ProfileUnifiedDrawer', () => {
       'text|release|text'
     );
     expect(section).toHaveAttribute('data-contacts', 'contact-1');
+  });
+
+  it('aligns share rows to the drawer header grid', () => {
+    render(<ProfileUnifiedDrawer {...baseProps} view='share' />);
+
+    expect(screen.getByTestId('public-share-action-list')).toHaveAttribute(
+      'data-align-to-drawer-header',
+      'true'
+    );
   });
 
   it('names the recipient in the pay drawer title, not in a body block', () => {

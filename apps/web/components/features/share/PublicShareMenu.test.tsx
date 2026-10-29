@@ -1,7 +1,11 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ShareContext, ShareLaunchResult } from '@/lib/share/types';
-import { PublicShareActionList } from './PublicShareMenu';
+import {
+  PUBLIC_SHARE_DRAWER_ITEM_CLASS,
+  PUBLIC_SHARE_MENU_ITEM_CLASS,
+  PublicShareActionList,
+} from './PublicShareMenu';
 
 const { launchMock, toastMock } = vi.hoisted(() => ({
   launchMock:
@@ -91,5 +95,17 @@ describe('PublicShareActionList', () => {
       await screen.findByText('Share text copied — paste it into your post.')
     ).toBeInTheDocument();
     expect(toastMock.message).toHaveBeenCalledTimes(1);
+  });
+
+  it('aligns rows to the drawer header grid only when asked', () => {
+    const { rerender } = render(<PublicShareActionList context={context} />);
+    const row = () => screen.getAllByRole('button')[0];
+    expect(row().className).toBe(PUBLIC_SHARE_MENU_ITEM_CLASS);
+
+    rerender(<PublicShareActionList context={context} alignToDrawerHeader />);
+    // Icons centre under the 44px back button; labels sit on the title edge.
+    expect(row().className).toBe(PUBLIC_SHARE_DRAWER_ITEM_CLASS);
+    expect(row().className).toContain('px-3.5');
+    expect(row().className).toContain('gap-6');
   });
 });

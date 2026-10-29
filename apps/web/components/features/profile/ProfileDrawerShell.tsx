@@ -95,7 +95,7 @@ export function ProfileDrawerShell({
             </button>
 
             <div
-              className='min-h-[2.625rem] min-w-0 py-px'
+              className='flex min-h-[2.625rem] min-w-0 flex-col justify-center py-px'
               data-testid='profile-drawer-title-slot'
             >
               <h2
