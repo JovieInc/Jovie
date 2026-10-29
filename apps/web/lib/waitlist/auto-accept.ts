@@ -32,6 +32,10 @@ import {
 } from '@/lib/waitlist/cohort-learnings';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
 import {
+  readWaitlistInviteGates,
+  scheduleProfileCertification,
+} from '@/lib/waitlist/profile-certification.server';
+import {
   getWaitlistSettings,
   tryReserveAutoAcceptSlot,
 } from '@/lib/waitlist/settings';
@@ -45,6 +49,8 @@ export interface WaitlistAutoAcceptResult {
   skipped: number;
   failed: number;
   capacityRemaining: number;
+  /** Candidates held because their profile has no passing certification. */
+  uncertified?: number;
   /** The existing queue remains held while readiness or learning evidence is missing. */
   pausedReason?:
     | 'open_learnings'
@@ -202,6 +208,7 @@ export async function runWaitlistAutoAccept(
     .limit(limit);
 
   let approved = 0;
+  let uncertified = 0;
   let skipped = 0;
   let failed = 0;
   let pausedReason: WaitlistAutoAcceptResult['pausedReason'];
@@ -211,6 +218,10 @@ export async function runWaitlistAutoAccept(
     getBlockedExistingUserEmails(candidateEmails),
   ]);
 
+  const certifiedEntries = await readWaitlistInviteGates(
+    candidates.map(candidate => candidate.id)
+  );
+
   for (const candidate of candidates) {
     const normalizedEmail = candidate.email.trim().toLowerCase();
     if (
@@ -218,6 +229,22 @@ export async function runWaitlistAutoAccept(
       suppressedEmailHashes.has(hashEmail(candidate.email)) ||
       blockedUserEmails.has(normalizedEmail)
     ) {
+      skipped += 1;
+      continue;
+    }
+
+    // Waitlist gate (Tim, 2026-10-29): invite only a person whose own
+    // profile certified. Anything else is certified now (event), and its
+    // remediation is dispatched; the next drain admits it once it passes.
+    const gate = certifiedEntries.get(candidate.id);
+    if (!gate?.certified) {
+      if (gate?.profileId) {
+        scheduleProfileCertification({
+          profileId: gate.profileId,
+          trigger: 'auto_accept',
+        });
+      }
+      uncertified += 1;
       skipped += 1;
       continue;
     }
@@ -323,6 +350,7 @@ export async function runWaitlistAutoAccept(
     skipped,
     failed,
     capacityRemaining: Math.max(0, capacityRemaining - approved),
+    uncertified,
     ...(pausedReason ? { pausedReason } : {}),
   };
 }

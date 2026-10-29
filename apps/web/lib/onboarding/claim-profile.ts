@@ -50,6 +50,7 @@ import {
   getAccountMetricCohort,
 } from '@/lib/utils/email';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
+import { scheduleProfileCertification } from '@/lib/waitlist/profile-certification.server';
 
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
 
@@ -579,13 +580,19 @@ async function materializeProfile({
   // release smartlinks, DSP links) for every materialized identity,
   // including reserved waitlist holds, so the page is never an empty shell.
   // A held high-reach identity has no artist here and imports on approval.
-  if (state.artist?.id && profileId) {
-    scheduleOnboardingCatalogImport({
-      profileId,
-      spotifyArtistId: state.artist.id,
-      spotifyArtistUrl: state.artist.url,
-      userId: verifiedUserId,
-    });
+  // The import's completion certifies the profile (waitlist gate); without
+  // an import the claim itself is the certification event.
+  const importScheduled =
+    state.artist?.id && profileId
+      ? scheduleOnboardingCatalogImport({
+          profileId,
+          spotifyArtistId: state.artist.id,
+          spotifyArtistUrl: state.artist.url,
+          userId: verifiedUserId,
+        })
+      : false;
+  if (profileId && !importScheduled) {
+    scheduleProfileCertification({ profileId, trigger: 'claim' });
   }
 
   if (verification) {

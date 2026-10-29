@@ -201,7 +201,7 @@ function buildPreviewArtist(
     tagline:
       artist.tagline ??
       (followerLabel
-        ? `${followerLabel} Spotify followers (source: enrichment)`
+        ? `${followerLabel} Spotify followers`
         : (firstGenre ?? undefined)),
     theme: undefined,
     settings: undefined,

@@ -16,7 +16,11 @@ const {
   mockIsNotNull,
   mockCountOpenCohortLearnings,
   mockReadCachedAcquisitionEligibility,
+  mockReadWaitlistInviteGates,
+  mockScheduleProfileCertification,
 } = vi.hoisted(() => ({
+  mockReadWaitlistInviteGates: vi.fn(),
+  mockScheduleProfileCertification: vi.fn(),
   mockReadCachedAcquisitionEligibility: vi.fn(),
   mockIsNotNull: vi.fn((column: unknown) => ({ op: 'isNotNull', column })),
   mockCountOpenCohortLearnings: vi.fn(),
@@ -131,6 +135,21 @@ vi.mock('@/lib/waitlist/email-jobs', () => ({
   enqueueWaitlistApprovalInviteEmail: mockEnqueueWaitlistApprovalInviteEmail,
 }));
 
+vi.mock('@/lib/waitlist/profile-certification.server', () => ({
+  readWaitlistInviteGates: mockReadWaitlistInviteGates,
+  scheduleProfileCertification: mockScheduleProfileCertification,
+}));
+
+/** Every candidate has a certified profile unless a test says otherwise. */
+function certifyAll() {
+  mockReadWaitlistInviteGates.mockImplementation(
+    async (ids: readonly string[]) =>
+      new Map(
+        ids.map(id => [id, { profileId: `profile-${id}`, certified: true }])
+      )
+  );
+}
+
 vi.mock('@/lib/db/serializable-retry', () => ({
   withSerializableRetry: mockWithSerializableRetry,
 }));
@@ -215,6 +234,7 @@ describe('runWaitlistAutoAccept', () => {
       autoAcceptedToday: 0,
     });
     mockCountOpenCohortLearnings.mockResolvedValue(0);
+    certifyAll();
     mockReadCachedAcquisitionEligibility.mockReset();
     mockReadCachedAcquisitionEligibility.mockResolvedValue({
       eligible: true,
@@ -512,5 +532,56 @@ describe('runWaitlistAutoAccept', () => {
     await runWaitlistAutoAccept({ now: new Date('2026-09-29T00:00:00Z') });
 
     expect(mockIsNotNull).toHaveBeenCalledWith('waitlist_entries.spotify_url');
+  });
+
+  it('invites only entries whose own profile certified, and certifies the rest now', async () => {
+    candidateRows = [
+      { id: 'certified', email: 'a@example.com', status: 'waitlisted' },
+      { id: 'failing', email: 'b@example.com', status: 'waitlisted' },
+      { id: 'no-profile', email: 'c@example.com', status: 'waitlisted' },
+    ];
+    mockReadWaitlistInviteGates.mockResolvedValue(
+      new Map([
+        ['certified', { profileId: 'p-certified', certified: true }],
+        ['failing', { profileId: 'p-failing', certified: false }],
+      ])
+    );
+
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    const result = await runWaitlistAutoAccept({
+      now: new Date('2026-09-29T00:00:00Z'),
+    });
+
+    expect(result).toMatchObject({ approved: 1, uncertified: 2, skipped: 2 });
+    expect(mockApproveWaitlistEntryInTx).toHaveBeenCalledTimes(1);
+    expect(mockApproveWaitlistEntryInTx).toHaveBeenCalledWith(
+      expect.anything(),
+      'certified',
+      expect.anything()
+    );
+    expect(mockScheduleProfileCertification).toHaveBeenCalledWith({
+      profileId: 'p-failing',
+      trigger: 'auto_accept',
+    });
+    expect(mockScheduleProfileCertification).toHaveBeenCalledTimes(1);
+  });
+
+  it('admits nobody when the certification ledger cannot be read', async () => {
+    candidateRows = [
+      { id: 'artist', email: 'artist@example.com', status: 'waitlisted' },
+    ];
+    mockReadWaitlistInviteGates.mockResolvedValue(new Map());
+
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    const result = await runWaitlistAutoAccept({
+      now: new Date('2026-09-29T00:00:00Z'),
+    });
+
+    expect(result).toMatchObject({ approved: 0, uncertified: 1 });
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 });
