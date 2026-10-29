@@ -62,11 +62,11 @@ describe('normalizeKernelCertificationRow', () => {
   it.each([
     [
       'Flow signup',
-      'sha256:4eef1a42d11113be250cd5f076f3d9ec0a28914e0d06212cb898093924d65832',
+      'sha256:6157c41f909cef4e7dc649a7f47009a20a11db93dbe7d3c128a2d27f32061a3d',
     ],
     [
       'L’été · 東京 🎵',
-      'sha256:b268dd194303ea0cd162eb47a1a2df013128f76b115891adbb1652b79b32ece3',
+      'sha256:bd364159c36e003410cca4d72447a391640dd7ed499bf233b578c24d596376dc',
     ],
   ])(
     'preserves the existing Node SHA-256 evidence digest for %s',

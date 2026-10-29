@@ -190,6 +190,8 @@ export const OUTBOUND_REFUSAL_MESSAGES = {
   stale_target:
     'This person changed since you opened them. Review the refreshed row.',
   not_certified: 'Certify the current profile facts before approving outreach.',
+  judge_denied:
+    'The dogfood judge has not passed the outreach review cards, so nothing is sendable.',
   no_channel: 'No email or Instagram on file to reach them.',
   invalid: 'The message must be non-empty and keep the claim link.',
 } as const;

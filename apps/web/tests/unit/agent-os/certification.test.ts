@@ -4,6 +4,7 @@ import {
   type CertificationEvidenceReceipt,
   type CertificationReviewPacket,
   type CertificationState,
+  DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX,
   evaluateCertificationAdmission,
   recordFounderCertificationDecision,
   shouldEmitTasteInboxCard,
@@ -75,7 +76,13 @@ function reviewPacket(
       title: 'Feature Proof Library',
     },
     testsCoverage: [receipt('tests_coverage', 'focused-vitest-coverage')],
-    visualProof: [receipt('visual_proof', 'item-specific-visual-proof')],
+    visualProof: [
+      receipt('visual_proof', 'item-specific-visual-proof'),
+      receipt(
+        'visual_proof',
+        `${DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX}feature-proof-library`
+      ),
+    ],
     ...overrides,
   };
 }
@@ -288,6 +295,36 @@ describe('certification admission kernel', () => {
         'visual_proof',
       ])
     );
+  });
+
+  describe('dogfood judge receipt', () => {
+    const judge = (status: 'passed' | 'failed' = 'passed') => ({
+      ...receipt(
+        'visual_proof',
+        `${DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX}feature-proof-library`
+      ),
+      status,
+    });
+    const codes = (visualProof: CertificationReviewPacket['visualProof']) =>
+      evaluateCertificationAdmission({
+        packet: reviewPacket({ visualProof }),
+      }).blockers.map(item => item.code);
+
+    it('blocks visual proof that has no judge receipt', () => {
+      expect(codes([receipt('visual_proof', 'screenshot')])).toContain(
+        'visual_proof_judge_missing'
+      );
+    });
+
+    it('blocks a failed judge receipt', () => {
+      expect(codes([judge('failed')])).toContain('visual_proof_failed');
+    });
+
+    it('admits a passing judge receipt', () => {
+      const result = codes([receipt('visual_proof', 'screenshot'), judge()]);
+      expect(result).not.toContain('visual_proof_judge_missing');
+      expect(result).not.toContain('visual_proof_failed');
+    });
   });
 
   it('does not accept operational receipts as taste evidence', () => {
@@ -671,7 +708,7 @@ describe('certification decision digest', () => {
     // Golden captured from the node:crypto implementation; stored founder
     // decisions bind to this digest, so the value must never drift.
     expect(buildCertificationDecisionDigest(reviewPacket())).toBe(
-      'sha256:6cc6a0e660a8b4b83a3cf732826cb9b25d498282b9fdef689995c9d19a3cb112'
+      'sha256:b9f693f683525d6bbe03d3a3b0c849577e6f21356348d65d746f706dde9c199a'
     );
   });
 });

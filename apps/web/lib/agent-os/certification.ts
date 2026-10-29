@@ -77,6 +77,7 @@ export type CertificationBlockerCode =
   | 'tests_coverage_failed'
   | 'visual_proof_missing'
   | 'visual_proof_failed'
+  | 'visual_proof_judge_missing'
   | 'required_variant_missing'
   | 'required_variant_failed'
   | 'required_media_missing'
@@ -97,6 +98,13 @@ export type CertificationBlockerCode =
   /** Inbox-only: domain machine evidence (e.g. ACQUISITION_ELIGIBLE) is red/unknown. */
   | 'machine_evidence_failed'
   | 'machine_evidence_unknown';
+
+/**
+ * Visual proof is only admitted with a real dogfood-judge receipt (a vision
+ * model that watched the recorded run against the taste rubric). Producers
+ * must never fabricate one; without it the kernel blocks.
+ */
+export const DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX = 'dogfood-judge:';
 
 const MISSING_TASTE_BLOCKER_CODES = {
   canonical_references: 'canonical_reference_missing',
@@ -538,6 +546,42 @@ function requireReceiptGroup(
   );
 }
 
+function requireDogfoodJudgeReceipt(
+  packet: CertificationReviewPacket
+): CertificationBlocker[] {
+  // An empty group is already reported as visual_proof_missing.
+  if (packet.visualProof.length === 0) return [];
+  const judged = packet.visualProof.filter(
+    receipt =>
+      receipt.tier === 'visual_proof' &&
+      receipt.id.startsWith(DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX)
+  );
+  if (judged.length === 0) {
+    return [
+      blocker(
+        'visual_proof_judge_missing',
+        'visual_proof',
+        'visual_proof',
+        `visual_proof requires a passing ${DOGFOOD_JUDGE_VISUAL_PROOF_PREFIX} receipt.`
+      ),
+    ];
+  }
+  // Failed judge receipts are already blocked by the group check
+  // (visual_proof_failed); at least one must pass for this source.
+  return judged.some(
+    receipt => receiptPassedForSource(packet, receipt) === null
+  )
+    ? []
+    : [
+        blocker(
+          'visual_proof_failed',
+          'visual_proof',
+          judged[0].id,
+          'No dogfood-judge receipt passed for this source.'
+        ),
+      ];
+}
+
 function collectSourceBlockers(packet: CertificationReviewPacket) {
   const source = packet.source;
   if (!source) {
@@ -738,6 +782,7 @@ function collectTasteBlockers(packet: CertificationReviewPacket) {
     ),
     ...requireReceiptGroup(packet, packet.testsCoverage, 'tests_coverage'),
     ...requireReceiptGroup(packet, packet.visualProof, 'visual_proof'),
+    ...requireDogfoodJudgeReceipt(packet),
     ...collectRequiredVariantBlockers(packet),
   ];
 }

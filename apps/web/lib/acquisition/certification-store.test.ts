@@ -57,7 +57,7 @@ function candidate(): AcquisitionCertificationCandidate {
       canonicalReferences: [proof('canonical_references')],
       invariantEvaluation: [proof('invariant_evaluation')],
       testsCoverage: [proof('tests_coverage')],
-      visualProof: [proof('visual_proof')],
+      visualProof: [{ ...proof('visual_proof'), id: 'dogfood-judge:fixture' }],
       requiredVariants: [
         {
           id: 'profile',
