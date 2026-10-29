@@ -21,6 +21,7 @@ export type PresenceIssueKind =
   | 'missing_profile'
   | 'broken_link'
   | 'stale_check'
+  | 'identity_conflict'
   | 'handle_mismatch'
   | 'bio_mismatch'
   | 'photo_mismatch'
@@ -39,14 +40,17 @@ export interface ProfileObservation {
   readonly url: string;
   /** The user (or company) owns this profile, per qualification. */
   readonly qualified: boolean;
-  readonly httpStatus: number | null;
+  /** null = not observed (never guessed). */
+  readonly reachable: boolean | null;
+  /** Qualification found conflicting evidence for this identity. */
+  readonly identityConflict?: boolean;
   readonly handle: string | null;
   readonly bio: string | null;
   readonly photoHash: string | null;
   /** This profile's bio/links point at the Jovie page. */
-  readonly linksBackToJovie: boolean;
+  readonly linksBackToJovie: boolean | null;
   /** The Jovie page links out to this profile. */
-  readonly jovieLinksOut: boolean;
+  readonly jovieLinksOut: boolean | null;
   readonly lastCheckedAt: Date | null;
 }
 
@@ -61,6 +65,9 @@ export interface PresenceRow {
   readonly url: string | null;
   readonly status: PresenceHealthStatus;
   readonly issues: readonly PresenceIssue[];
+  /** Observed link-web state; null = not observed. */
+  readonly linkBack: boolean | null;
+  readonly linkOut: boolean | null;
 }
 
 export const STALE_AFTER_DAYS = 14;
@@ -89,9 +96,7 @@ export function classifyProfile(
   now: Date
 ): PresenceRow {
   const issues: PresenceIssue[] = [];
-  const broken =
-    obs.httpStatus !== null &&
-    (obs.httpStatus === 404 || obs.httpStatus >= 410);
+  const broken = obs.reachable === false;
   if (broken) {
     issues.push({
       kind: 'broken_link',
@@ -99,6 +104,13 @@ export function classifyProfile(
       severity: 'high',
     });
   } else {
+    if (obs.identityConflict) {
+      issues.push({
+        kind: 'identity_conflict',
+        platform: obs.platform,
+        severity: 'high',
+      });
+    }
     if (obs.handle !== null && norm(obs.handle) !== norm(canonical.handle)) {
       issues.push({
         kind: 'handle_mismatch',
@@ -131,14 +143,14 @@ export function classifyProfile(
       });
     }
   }
-  if (!obs.linksBackToJovie) {
+  if (obs.linksBackToJovie === false) {
     issues.push({
       kind: 'no_link_back_to_jovie',
       platform: obs.platform,
       severity: 'medium',
     });
   }
-  if (!obs.jovieLinksOut) {
+  if (obs.jovieLinksOut === false) {
     issues.push({
       kind: 'jovie_does_not_link_out',
       platform: obs.platform,
@@ -150,6 +162,7 @@ export function classifyProfile(
   let status: PresenceHealthStatus = 'verified';
   if (kinds.has('broken_link')) status = 'broken_link';
   else if (
+    kinds.has('identity_conflict') ||
     kinds.has('handle_mismatch') ||
     kinds.has('bio_mismatch') ||
     kinds.has('photo_mismatch')
@@ -160,7 +173,14 @@ export function classifyProfile(
   // a profile is verified only when the loop is closed in both directions.
   else if (kinds.size > 0) status = 'out_of_date';
 
-  return { platform: obs.platform, url: obs.url, status, issues };
+  return {
+    platform: obs.platform,
+    url: obs.url,
+    status,
+    issues,
+    linkBack: obs.linksBackToJovie,
+    linkOut: obs.jovieLinksOut,
+  };
 }
 
 export function buildPresenceRows(input: {
@@ -179,6 +199,8 @@ export function buildPresenceRows(input: {
       url: null,
       status: 'missing',
       issues: [{ kind: 'missing_profile', platform, severity: 'medium' }],
+      linkBack: null,
+      linkOut: null,
     });
   }
   return rows.sort(
@@ -204,6 +226,7 @@ const FIX_TITLES: Record<PresenceIssueKind, string> = {
   missing_profile: 'Create this profile',
   broken_link: 'Repair the broken link',
   stale_check: 'Re-check this profile',
+  identity_conflict: 'Resolve the conflicting identity',
   handle_mismatch: 'Align the handle',
   bio_mismatch: 'Update the bio',
   photo_mismatch: 'Update the photo',
@@ -242,30 +265,32 @@ export interface LoopMetrics {
     Record<PresenceIssue['severity'], number>
   >;
   /** Share of owned profiles whose bio/links point at Jovie. */
-  readonly inboundCoverage: number;
+  readonly inboundCoverage: number | null;
   /** Share of owned profiles the Jovie page links out to. */
-  readonly outboundCoverage: number;
+  readonly outboundCoverage: number | null;
   /** Mean of inbound and outbound: the headline link-web coverage. */
-  readonly linkWebCoverage: number;
+  readonly linkWebCoverage: number | null;
 }
 
 function pct(n: number, d: number): number {
   return d === 0 ? 0 : Math.round((n / d) * 1000) / 10;
 }
 
+/** Coverage over observed rows only; null when nothing was observed. */
+function coverage(
+  rows: readonly PresenceRow[],
+  observed: (r: PresenceRow) => boolean | null
+): number | null {
+  const seen = rows.filter(r => observed(r) !== null);
+  if (seen.length === 0) return null;
+  return pct(seen.filter(r => observed(r) === true).length, seen.length);
+}
+
 export function computeLoopMetrics(rows: readonly PresenceRow[]): LoopMetrics {
-  const present = rows.filter(r => r.status !== 'missing');
   const issues = rows.flatMap(r => r.issues);
-  const hasIssue = (r: PresenceRow, k: PresenceIssueKind) =>
-    r.issues.some(i => i.kind === k);
-  const inbound = pct(
-    present.filter(r => !hasIssue(r, 'no_link_back_to_jovie')).length,
-    present.length
-  );
-  const outbound = pct(
-    present.filter(r => !hasIssue(r, 'jovie_does_not_link_out')).length,
-    present.length
-  );
+  const present = rows.filter(r => r.status !== 'missing');
+  const inbound = coverage(present, r => r.linkBack);
+  const outbound = coverage(present, r => r.linkOut);
   return {
     profiles: rows.length,
     verifiedPct: pct(
@@ -280,6 +305,9 @@ export function computeLoopMetrics(rows: readonly PresenceRow[]): LoopMetrics {
     },
     inboundCoverage: inbound,
     outboundCoverage: outbound,
-    linkWebCoverage: Math.round(((inbound + outbound) / 2) * 10) / 10,
+    linkWebCoverage:
+      inbound === null || outbound === null
+        ? (inbound ?? outbound)
+        : Math.round(((inbound + outbound) / 2) * 10) / 10,
   };
 }

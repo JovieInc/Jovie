@@ -18,7 +18,7 @@ const good: ProfileObservation = {
   platform: 'instagram',
   url: 'https://instagram.com/timwhite',
   qualified: true,
-  httpStatus: 200,
+  reachable: true,
   handle: '@TimWhite',
   bio: 'Founder.  Runs, reads.',
   photoHash: 'p1',
@@ -35,12 +35,27 @@ describe('classifyProfile', () => {
   });
   it('flags broken links and skips content checks', () => {
     const row = classifyProfile(
-      { ...good, httpStatus: 404, bio: 'other' },
+      { ...good, reachable: false, bio: 'other' },
       canonical,
       NOW
     );
     expect(row.status).toBe('broken_link');
     expect(row.issues.map(i => i.kind)).toEqual(['broken_link']);
+  });
+  it('flags conflicting identity evidence as inconsistent', () => {
+    expect(
+      classifyProfile({ ...good, identityConflict: true }, canonical, NOW)
+        .status
+    ).toBe('inconsistent');
+  });
+  it('never guesses unobserved link state', () => {
+    const row = classifyProfile(
+      { ...good, linksBackToJovie: null, jovieLinksOut: null },
+      canonical,
+      NOW
+    );
+    expect(row.status).toBe('verified');
+    expect(computeLoopMetrics([row]).linkWebCoverage).toBeNull();
   });
   it('flags handle, bio and photo drift as inconsistent', () => {
     const row = classifyProfile(
