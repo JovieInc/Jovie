@@ -73,7 +73,7 @@ not on the hosted image) and per-PR-event evidence reads.
   `# github-token-budget: <N> calls/run - <reason>`.
 - PR Fleet Rules (the `pull_request` copy, which can never hold the App key) runs
   `pr-fleet-rules.mjs --advisory`: PR from the event payload (files are its only
-  call, was two), backoff up to 240s, and a quota answer that outlasts it is an
+  call, was two), backoff up to 120s, and a quota answer that outlasts it is an
   "Infrastructure, not a verdict" warning (`github-quota-deferred`), never red.
   Fleet Rules Evidence (CI App budget) stays the authoritative verdict. Quota
   share: `node scripts/quota-deferred-heads.mjs --share 40`.

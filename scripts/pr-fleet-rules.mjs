@@ -330,7 +330,7 @@ const EX_TEMPFAIL = 75;
 const QUOTA_DEFERRED_MARKER = 'github-quota-deferred';
 // Total time one run may spend waiting out a quota/outage answer. Waits use the
 // reset header when it fits the remaining budget, else a doubling backoff.
-const DEFAULT_QUOTA_HOLD_SECONDS = 240;
+const DEFAULT_QUOTA_HOLD_SECONDS = 120;
 const BACKOFF_BASE_MS = 15_000;
 
 /** @returns {{ infra: boolean, retryAtMs: number | null }} */

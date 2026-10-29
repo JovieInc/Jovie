@@ -723,7 +723,7 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
       assert.match(String(logs.at(-1)), /github-quota-deferred/);
       assert.doesNotMatch(String(logs.at(-1)), /secret detail/);
     }
-    // Unknown reset: doubling backoff (15s, 30s, 60s, 120s) inside the 240s
+    // Unknown reset: doubling backoff (15s, 30s, 60s) inside the 120s
     // budget, then the deferral. Never a pass, never a policy verdict.
     {
       const logs = [];
@@ -741,7 +741,7 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
         }),
         75
       );
-      assert.deepEqual(sleeps, [15_000, 30_000, 60_000, 120_000]);
+      assert.deepEqual(sleeps, [15_000, 30_000, 60_000]);
       assert.match(String(logs.at(-1)), /github-quota-deferred/);
     }
     // Advisory (pull_request copy): a 403 rate limit that outlasts the hold is
@@ -762,7 +762,7 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
         }),
         0
       );
-      assert.equal(sleeps.length, 4);
+      assert.equal(sleeps.length, 3);
       assert.ok(!logs.some(x => x.startsWith('::error')));
       assert.match(
         String(logs.at(-1)),
