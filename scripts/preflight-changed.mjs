@@ -355,8 +355,12 @@ export function typecheckTargets(files, cwd) {
       continue;
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
-    if (web) out.add(isTest ? 'web-tests' : 'web');
-    else if (/^scripts\//.test(f.filename)) out.add('scripts');
+    if (web) {
+      out.add(isTest ? 'web-tests' : 'web');
+      // Ovie mounts shared web routes/components under its own TypeScript graph.
+      // Validate that consumer too, matching Source Validation's typecheck.
+      if (!isTest) out.add('pkg:@jovie/ovie');
+    } else if (/^scripts\//.test(f.filename)) out.add('scripts');
     else {
       let dir = path.dirname(f.filename);
       while (dir && dir !== '.') {

@@ -113,7 +113,29 @@ test('typecheck targets are the affected packages only', () => {
     ],
     process.cwd()
   );
-  assert.deepEqual(t.sort(), ['scripts', 'web', 'web-tests']);
+  assert.deepEqual(t.sort(), [
+    'pkg:@jovie/ovie',
+    'scripts',
+    'web',
+    'web-tests',
+  ]);
+});
+
+test('shared web source selects the Ovie consumer typecheck before push', () => {
+  for (const filename of [
+    'apps/web/lib/queries/shipping-state.ts',
+    'apps/web/app/api/admin/hud/route-usage/route.ts',
+    'apps/web/components/features/admin/hud/FleetVerdictPanel.tsx',
+  ]) {
+    assert.deepEqual(typecheckTargets([file(filename)], process.cwd()).sort(), [
+      'pkg:@jovie/ovie',
+      'web',
+    ]);
+  }
+  assert.deepEqual(
+    typecheckTargets([file('apps/web/lib/foo.test.ts')], process.cwd()),
+    ['web-tests']
+  );
 });
 
 test('arguments parse and unknown flags fail', () => {

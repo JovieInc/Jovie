@@ -12,8 +12,8 @@ export const runtime = 'nodejs';
 
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
-async function denied(purpose: 'read' | 'write') {
-  const entitlements = await getOvieOperatorEntitlements({ purpose });
+async function denied() {
+  const entitlements = await getOvieOperatorEntitlements({ purpose: 'read' });
   if (!entitlements.isAuthenticated) {
     return NextResponse.json(
       { error: 'Unauthorized' },
@@ -31,7 +31,7 @@ async function denied(purpose: 'read' | 'write') {
 
 /** POST { path }: count one view of an Ovie destination (route template only). */
 export async function POST(request: Request): Promise<Response> {
-  const refusal = await denied('read');
+  const refusal = await denied();
   if (refusal) return refusal;
   const body = (await request.json().catch(() => null)) as {
     path?: unknown;
@@ -52,7 +52,7 @@ export async function POST(request: Request): Promise<Response> {
 
 /** GET ?days=30: views per route, most used first. */
 export async function GET(request: Request): Promise<Response> {
-  const refusal = await denied('read');
+  const refusal = await denied();
   if (refusal) return refusal;
   const days = Number(new URL(request.url).searchParams.get('days') ?? 30);
   const usage = await readOvieRouteUsage(Number.isFinite(days) ? days : 30);
