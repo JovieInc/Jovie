@@ -20,6 +20,10 @@ export const signupReplays = pgTable(
     userId: uuid('user_id').references(() => users.id, {
       onDelete: 'cascade',
     }),
+    /** Why the buffered replay was sent (see lib/sentry/replay-start.ts). */
+    flushTrigger: text('flush_trigger'),
+    /** Set when the buffer was flushed; counts against the monthly cap. */
+    flushedAt: timestamp('flushed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .defaultNow()
       .notNull(),
@@ -29,6 +33,7 @@ export const signupReplays = pgTable(
   },
   table => ({
     userIdx: index('signup_replays_user_id_idx').on(table.userId),
+    flushedAtIdx: index('signup_replays_flushed_at_idx').on(table.flushedAt),
     sessionIdx: index('signup_replays_onboarding_session_id_idx').on(
       table.onboardingSessionId
     ),

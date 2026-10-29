@@ -25,6 +25,7 @@ import {
 import {
   getReplaySessionSampleRate,
   isAutomatedBrowser,
+  isGoldenPathRoute,
 } from './replay-policy';
 
 /**
@@ -226,10 +227,14 @@ export function initFullSentry(options: FullSentryConfig = {}): boolean {
  *
  * @param sessionSampleRate - Session sample rate for this route (see
  *   replay-policy). Defaults to the shared dashboard rate.
+ * @param buffer - Buffer mode: record into memory and send nothing until
+ *   `replay.flush()` is called (see replay-start). Error auto-send is off so
+ *   every send goes through the monthly cap guard.
  * @returns true if Replay was added, false if already loaded or no client.
  */
 export async function addReplayIntegration(
-  sessionSampleRate: number = REPLAY_SESSION_SAMPLE_RATE
+  sessionSampleRate: number = REPLAY_SESSION_SAMPLE_RATE,
+  buffer = false
 ): Promise<boolean> {
   if (isReplayLoaded) {
     return false;
@@ -243,15 +248,19 @@ export async function addReplayIntegration(
   // The Replay integration reads its sample rates from the client options when
   // it is added, so set them first.
   const options = client.getOptions() as unknown as Record<string, unknown>;
-  options.replaysSessionSampleRate = sessionSampleRate;
-  options.replaysOnErrorSampleRate = REPLAY_ERROR_SAMPLE_RATE;
+  options.replaysSessionSampleRate = buffer ? 0 : sessionSampleRate;
+  options.replaysOnErrorSampleRate = buffer ? 0 : REPLAY_ERROR_SAMPLE_RATE;
 
   // replayIntegration is a client-only runtime export (see clientSentry note).
   const mod = (await import('@sentry/nextjs')) as unknown as {
     replayIntegration: (options?: Record<string, unknown>) => SentryIntegration;
   };
 
-  client.addIntegration(mod.replayIntegration({ ...REPLAY_PRIVACY_OPTIONS }));
+  const integration = mod.replayIntegration({ ...REPLAY_PRIVACY_OPTIONS });
+  client.addIntegration(integration);
+  if (buffer) {
+    (integration as unknown as { startBuffering: () => void }).startBuffering();
+  }
   isReplayLoaded = true;
 
   return true;
@@ -304,7 +313,10 @@ export async function initFullSentryAsync(
   if (enableReplay && !isAutomatedBrowser(globalThis.navigator)) {
     const pathname = globalThis.location?.pathname ?? '/app';
     const rate = restOptions.replaysSessionSampleRate;
-    await addReplayIntegration(rate ?? getReplaySessionSampleRate(pathname));
+    await addReplayIntegration(
+      rate ?? getReplaySessionSampleRate(pathname),
+      isGoldenPathRoute(pathname)
+    );
   }
 
   return true;

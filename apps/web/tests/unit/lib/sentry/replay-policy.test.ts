@@ -4,7 +4,6 @@ import {
   getReplaySessionSampleRate,
   isAutomatedBrowser,
   isGoldenPathRoute,
-  REPLAY_GOLDEN_PATH_SAMPLE_RATE,
 } from '@/lib/sentry/replay-policy';
 
 describe('replay policy', () => {
@@ -19,11 +18,15 @@ describe('replay policy', () => {
     '/onboarding',
     '/onboarding/checkout',
     '/billing/success',
-  ])('records every session on %s', path => {
+    '/pricing',
+  ])('buffers (never auto-records) on %s', path => {
     expect(isGoldenPathRoute(path)).toBe(true);
-    expect(getReplaySessionSampleRate(path)).toBe(
-      REPLAY_GOLDEN_PATH_SAMPLE_RATE
-    );
+    expect(getReplaySessionSampleRate(path)).toBe(0);
+  });
+
+  it('keeps / out of replay', () => {
+    expect(isGoldenPathRoute('/')).toBe(false);
+    expect(getReplaySessionSampleRate('/')).toBe(0);
   });
 
   it('keeps returning-user dashboard sessions at the shared low rate', () => {

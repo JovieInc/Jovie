@@ -22,9 +22,11 @@ no new spend.
    the recording. If they say no, take notes only.
 2. Open Granola, start the meeting note, join the call.
 3. Open the user's replay first if one exists: ask Summer for
-   `GET /api/internal/ovie/summer-company/stuck-signups`, or search Sentry
-   Replays for the user id. Watching the session first makes the call about
-   what they actually did.
+   `GET /api/internal/ovie/summer-company/stuck-signups`. Replays are buffered
+   and sent only on a trigger (idle or left on claim/pricing, onboarding
+   stalled or abandoned, client error, new signup, profile claimed), within a
+   45-per-month cap, so a user may have none. Check `flush_trigger` on the
+   `signup_replays` row to see why one exists.
 
 ## Questions (stuck before claim)
 
@@ -70,3 +72,12 @@ transcript slug and replay ids, never the raw transcript.
 
 - Fireflies: no need for a second recorder.
 - Heatmaps: not useful at this volume (see the replay evidence PR).
+
+## Replay budget
+
+Replays are buffered in the browser and sent only on a trigger, so the free
+Sentry plan (50 a month) stays enough. The server stops allowing sends at 45
+per billing period (period starts on the 24th UTC) and logs every send and
+every suppression as `[replay-flush]` with its trigger. If suppressions show
+up in the logs, the paid tier ($15 a month for 5k) is an option for Tim to
+choose later; it has not been bought.

@@ -1,5 +1,5 @@
 {
-  "id": "a91d7329-6475-4f8d-8691-408d0de79b23",
+  "id": "fd4448ef-1001-4ddb-910c-4014ad1f700d",
   "prevId": "c68efd0e-5f3d-4550-8e2e-5241811153bc",
   "version": "7",
   "dialect": "postgresql",
@@ -36390,6 +36390,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "flush_trigger": {
+          "name": "flush_trigger",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "flushed_at": {
+          "name": "flushed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -36411,6 +36423,21 @@
           "columns": [
             {
               "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "signup_replays_flushed_at_idx": {
+          "name": "signup_replays_flushed_at_idx",
+          "columns": [
+            {
+              "expression": "flushed_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

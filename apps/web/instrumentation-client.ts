@@ -122,16 +122,17 @@ export function onRouterTransitionStart(
       void loadRouterTransitionCapture();
       const { initFullSentryAsync } = await import('./lib/sentry/client-full');
       await initFullSentryAsync();
-      // Onboarding/billing record every session; /app keeps the low rate.
+      // Onboarding/billing buffer replays and flush on triggers; /app keeps
+      // the low session rate.
       const { scheduleReplayLink } = await import('./lib/sentry/replay-start');
-      scheduleReplayLink();
+      scheduleReplayLink(pathname);
     } else {
       // Public routes: Load lite SDK for better LCP
       // Dynamic import enables webpack to create a separate chunk
       const { initLiteSentry } = await import('./lib/sentry/client-lite');
       initLiteSentry();
-      // Activation funnel (/, /start, /claim, auth) records sessions; profiles
-      // and other public pages load no Replay code.
+      // Activation funnel (/start, /claim, auth, /pricing) buffers replays;
+      // `/`, profiles and other public pages load no Replay code.
       const { startFunnelReplay } = await import('./lib/sentry/replay-start');
       await startFunnelReplay(pathname);
     }

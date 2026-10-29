@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
+  countPeriodFlushes,
+  REPLAY_FLUSH_TRIGGERS,
+  REPLAY_MONTHLY_CAP,
+  recordReplayFlush,
   recordSignupReplay,
+  resolveServerFlushTrigger,
   SENTRY_REPLAY_ID_PATTERN,
 } from '@/lib/analytics/signup-replay.server';
 import { getCachedAuth } from '@/lib/auth/cached';
@@ -17,7 +22,10 @@ export const dynamic = 'force-dynamic';
 const MAX_BODY_BYTES = 256;
 
 const bodySchema = z
-  .object({ replayId: z.string().regex(SENTRY_REPLAY_ID_PATTERN) })
+  .object({
+    replayId: z.string().regex(SENTRY_REPLAY_ID_PATTERN),
+    trigger: z.enum(REPLAY_FLUSH_TRIGGERS).optional(),
+  })
   .strict();
 
 const accepted = () =>
@@ -65,15 +73,39 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       getCurrentOnboardingSessionId(),
       getCachedAuth(),
     ]);
-    await recordSignupReplay({
-      replayId: parsed.data.replayId,
+    const { replayId, trigger } = parsed.data;
+
+    // The browser flushed its buffer for a trigger: count it against the cap.
+    if (trigger) {
+      const counted = await recordReplayFlush({
+        replayId,
+        trigger,
+        onboardingSessionId,
+        userId,
+      });
+      return NextResponse.json(
+        { flushed: counted },
+        { headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Plain link report: attach identity, say whether a flush is allowed, and
+    // name a success-path trigger when the server has seen a new account.
+    const row = await recordSignupReplay({
+      replayId,
       onboardingSessionId,
       userId,
     });
+    const canFlush = (await countPeriodFlushes()) < REPLAY_MONTHLY_CAP;
+    const flush = canFlush ? await resolveServerFlushTrigger(row) : null;
+    return NextResponse.json(
+      { canFlush, flush },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (error) {
     await captureError('Signup replay link failed', error, {
       route: '/api/onboarding/replay',
     });
+    return accepted();
   }
-  return accepted();
 }

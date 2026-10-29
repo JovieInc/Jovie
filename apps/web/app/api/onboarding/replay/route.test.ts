@@ -3,6 +3,9 @@ import { beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   record: vi.fn(),
+  flush: vi.fn(),
+  count: vi.fn(),
+  serverTrigger: vi.fn(),
   session: vi.fn(),
   auth: vi.fn(),
   limit: vi.fn(),
@@ -10,6 +13,11 @@ const mocks = vi.hoisted(() => ({
 }));
 vi.mock('@/lib/analytics/signup-replay.server', () => ({
   recordSignupReplay: mocks.record,
+  recordReplayFlush: mocks.flush,
+  countPeriodFlushes: mocks.count,
+  resolveServerFlushTrigger: mocks.serverTrigger,
+  REPLAY_MONTHLY_CAP: 45,
+  REPLAY_FLUSH_TRIGGERS: ['claim_idle', 'client_error', 'signup'],
   SENTRY_REPLAY_ID_PATTERN: /^[0-9a-f]{32}$/,
 }));
 vi.mock('@/lib/onboarding/session', () => ({
@@ -40,12 +48,17 @@ beforeEach(() => {
   mocks.limit.mockResolvedValue({ success: true });
   mocks.session.mockResolvedValue('session-1');
   mocks.auth.mockResolvedValue({ userId: null });
+  mocks.count.mockResolvedValue(3);
+  mocks.record.mockResolvedValue(null);
+  mocks.serverTrigger.mockResolvedValue(null);
+  mocks.flush.mockResolvedValue(true);
 });
 
 it('attaches server-verified identity, never a caller-supplied one', async () => {
   mocks.auth.mockResolvedValue({ userId: 'user-1' });
   const res = await post(JSON.stringify({ replayId: ID }));
-  expect(res.status).toBe(204);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ canFlush: true, flush: null });
   expect(mocks.record).toHaveBeenCalledWith({
     replayId: ID,
     onboardingSessionId: 'session-1',
@@ -69,4 +82,34 @@ it('drops bots and rate-limited callers silently', async () => {
   mocks.limit.mockResolvedValue({ success: false });
   expect((await post(JSON.stringify({ replayId: ID }))).status).toBe(204);
   expect(mocks.record).not.toHaveBeenCalled();
+});
+
+it('stops offering flushes once the monthly count nears the cap', async () => {
+  mocks.count.mockResolvedValue(45);
+  mocks.serverTrigger.mockResolvedValue('signup');
+  const res = await post(JSON.stringify({ replayId: ID }));
+  expect(await res.json()).toEqual({ canFlush: false, flush: null });
+  expect(mocks.serverTrigger).not.toHaveBeenCalled();
+});
+
+it('names a success-path trigger for a new account', async () => {
+  mocks.serverTrigger.mockResolvedValue('signup');
+  const res = await post(JSON.stringify({ replayId: ID }));
+  expect(await res.json()).toEqual({ canFlush: true, flush: 'signup' });
+});
+
+it('records a reported flush with its trigger', async () => {
+  const res = await post(
+    JSON.stringify({ replayId: ID, trigger: 'claim_idle' })
+  );
+  expect(await res.json()).toEqual({ flushed: true });
+  expect(mocks.flush).toHaveBeenCalledWith({
+    replayId: ID,
+    trigger: 'claim_idle',
+    onboardingSessionId: 'session-1',
+    userId: null,
+  });
+  expect(
+    (await post(JSON.stringify({ replayId: ID, trigger: 'bogus' }))).status
+  ).toBe(400);
 });
