@@ -90,6 +90,7 @@ import qualification_guard  # noqa: E402
 import dependency_diff  # noqa: E402  (immutable dependency-version chore evidence)
 import bindings  # noqa: E402  (extra Linear team -> repo bindings, e.g. LYB)
 import binding_refill  # noqa: E402  (Backlog -> Todo refill per extra binding)
+import priority_admission  # noqa: E402  (Urgent/Summer-ranked admission, Todo WIP sanity, claim rank; JOV-7073)
 import macos_pool  # noqa: E402  (shared hosted-macOS pool: measure, record, gate LYB iOS intake)
 import decompose_pass  # noqa: E402  (standing epic decomposition when Todo < half target)
 import epics  # noqa: E402  (epic decomposition/closure and the expiring hold)
@@ -155,7 +156,7 @@ LANE_TESTS = ["scripts/tests/test_factory_signals.py", "scripts/tests/test_facto
               "scripts/tests/test_capacity_limit.py", "scripts/tests/test_capacity_registry.py", "scripts/tests/test_fleet_gate_emitter.py",
               "scripts/tests/test_claude_lane.py", "scripts/tests/test_issue_routing.py",
               "scripts/tests/test_epics.py",
-              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_macos_pool.py",
+              "scripts/tests/test_linear_sync.py", "scripts/tests/test_binding_refill.py", "scripts/tests/test_priority_admission.py", "scripts/tests/test_macos_pool.py",
               "scripts/tests/test_backlog_rank.py", "scripts/tests/test_decompose_pass.py",
               "scripts/tests/test_pytest_hook_names.py"]
 # Dependencies outside scripts/lanes for installed source admission and the HUD's
@@ -859,7 +860,9 @@ def admission_order(issue: Issue, now: float) -> tuple:
     labels = {label.lower() for label in issue.labels}
     tier = (-1 if {SHARED_LABEL, "dispatch-next"} <= labels
             else 0 if effective_priority == 1 or workstreams.compounding(stream) else 1)
-    return (0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
+    # Summer's signed portfolio rank is the first key, then explicit Urgent, tier, aged priority, age (JOV-7073).
+    return (*priority_admission.claim_key(issue.identifier, priority_admission.summer_ranks(now=now)),
+            0 if priority == 1 else 1, tier, effective_priority, workstreams.rank(stream),
             created_at if created_at is not None else float("inf"))
 
 
@@ -4365,7 +4368,8 @@ def backlog_wake(host: Host) -> dict:
     extra = {binding.key: binding for binding in bindings.extra_bindings(THIS)}
     for team in named:
         binding = extra.get(team) or types.SimpleNamespace(key=team, excluded=("hold",), min_todo=0)
-        report[team] = {"refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
+        report[team] = {"priority": priority_admission.run(THIS, host, team, client, floor=binding.min_todo, excluded=binding.excluded),
+                        "refill": binding_refill.refill(THIS, host, binding, client, binding.min_todo),
                         "rank": binding_refill.rank_pass(THIS, host, binding, client, force=True)}
     return report
 
@@ -9649,6 +9653,9 @@ def _dispatch(host: Host, unclean_previous: dict | None) -> int:
                 tick["backlogRefill"] = {binding.key: binding_refill.refill(THIS, host, binding, client, binding.min_todo)
                                          for binding in refill_for}
                 tick["backlogRank"] = {binding.key: binding_refill.rank_pass(THIS, host, binding, client) for binding in refill_for}
+                tick["priorityAdmission"] = {binding.key: priority_admission.run(THIS, host, binding.key, client, floor=binding.min_todo,
+                                                                                  excluded=binding.excluded)
+                                             for binding in refill_for}
                 tick["backlogDecompose"] = decompose_pass.maybe_spawn(host.state, [binding.key for binding in refill_for])
             except (Exception, SystemExit) as error:  # a refill fault never blocks dispatch
                 tick["backlogRefillError"] = f"{type(error).__name__}: {error}"[:200]
