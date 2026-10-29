@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  bindMeshSenderKinds,
   checkRepository,
   compareLiveFleet,
   IDENTITY_SCHEMA,
@@ -224,6 +225,33 @@ test('schema markers are required', () => {
   });
   assert.match(problems.join('\n'), /schema must be jovie-ownership-registry/);
   assert.match(problems.join('\n'), /schema must be jovie-agent-identity/);
+});
+
+test('bindMeshSenderKinds sets senderKind on the matching identity and leaves unknowns', () => {
+  const registry = {
+    identities: {
+      zoe: identity({ mesh: { registered: false } }),
+      aeon: identity({ mesh: { registered: true, senderKind: 'aeon' } }),
+      taken: identity({ mesh: { registered: false, senderKind: 'other' } }),
+    },
+  };
+  const first = bindMeshSenderKinds(registry, [
+    'aeon',
+    'zoe',
+    'taken',
+    'missing',
+  ]);
+  assert.deepEqual(first.changed, ['zoe']);
+  assert.deepEqual(first.unbound, ['taken', 'missing']);
+  assert.deepEqual(registry.identities.zoe.mesh, {
+    registered: false,
+    senderKind: 'zoe',
+  });
+  assert.equal(registry.identities.aeon.mesh.senderKind, 'aeon');
+  assert.equal(registry.identities.taken.mesh.senderKind, 'other');
+  assert.equal(registry.identities.missing, undefined);
+  const second = bindMeshSenderKinds(registry, ['zoe', 'aeon']);
+  assert.deepEqual(second, { changed: [], unbound: [] });
 });
 
 test('parsers read the Mac lanes and mesh kinds from source', () => {

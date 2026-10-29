@@ -26,6 +26,9 @@ class BuildTest(unittest.TestCase):
         merged = [pr(1), pr(2, author="dependabot[bot]"), pr(3), pr(4, body="x\nMachine: built scripts/lanes/a.py\n"), pr(5, days=30)]
         got = mm.build(rows, merged, [], NOW)
         self.assertEqual((got["merged"], got["machineMade"], got["machineBuilt"], got["machineMergeShare"]), (4, 3, 1, 0.75))
+        bound = mm.build([{"kind": "fix-red", "pr": 8, "resolution": "bound-mesh-kinds", "startedAt": iso(1)}],
+                         [pr(8)], [], NOW)
+        self.assertEqual(bound["machineMade"], 1)
 
     def test_recurring_fingerprints_and_days_to_machine(self):
         day = 86400

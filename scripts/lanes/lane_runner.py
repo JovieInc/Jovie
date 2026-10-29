@@ -6670,6 +6670,25 @@ def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
     return types.SimpleNamespace(returncode=0)
 
 
+def bind_mesh_kinds_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """Bind mesh sender kinds whose identity id matches the kind. Exit 2 (no identity) leaves the head
+    for the model; a clean tree or a failed commit/push does too."""
+    if sh(["node", "scripts/ownership-registry.mjs", "--bind-mesh-kinds"],
+          cwd=worktree, log=log, timeout=120).returncode:
+        return None
+    diff = sh(["git", "diff", "--name-only", "--", "canon/agent-identities.json"], cwd=worktree, log=log)
+    if diff.returncode or not (diff.stdout or "").strip():
+        return None
+    steps = [["git", "add", "--", "canon/agent-identities.json"],
+             ["git", "commit", "-q", "-m", "fix(canon): bind mesh sender kinds to agent identities"],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="bound-mesh-kinds")
+    return types.SimpleNamespace(returncode=0)
+
+
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
     taken = []
@@ -7635,7 +7654,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
-                         fix_red_classes.RENUMBER: renumber_migrations_fix}.get((route or {}).get("action"))
+                         fix_red_classes.RENUMBER: renumber_migrations_fix,
+                         fix_red_classes.BIND: bind_mesh_kinds_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),

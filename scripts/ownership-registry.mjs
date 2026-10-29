@@ -14,6 +14,7 @@
  *   without a tracked least-privilege fix.
  *
  * Usage: node scripts/ownership-registry.mjs [--report] [--json]
+ *        node scripts/ownership-registry.mjs --bind-mesh-kinds
  *        node scripts/ownership-registry.mjs --live [--mesh-as kind | --mesh-file f] [--automation-file f]
  *
  * --live compares the identity registry with the running fleet: the live mesh
@@ -342,6 +343,45 @@ function readMeshKinds(root) {
     : [];
 }
 
+/**
+ * Declare each mesh sender kind on the identity whose id is that kind.
+ * Kinds already declared, including by another identity, are left alone.
+ * A matching identity that already names a different senderKind, and a kind
+ * with no identity, stay unbound — this does not invent identities or
+ * overwrite a binding. Mutates `registry`. Callers write the file only when
+ * `unbound` is empty, so a partial bind never lands.
+ */
+export function bindMeshSenderKinds(registry, kinds) {
+  const identities = registry?.identities ?? {};
+  const declared = new Set(
+    Object.values(identities)
+      .map(identity => identity?.mesh?.senderKind)
+      .filter(Boolean)
+  );
+  const changed = [];
+  const unbound = [];
+  for (const kind of kinds) {
+    if (declared.has(kind)) continue;
+    const identity = identities[kind];
+    const mesh =
+      identity?.mesh && typeof identity.mesh === 'object'
+        ? identity.mesh
+        : null;
+    if (!identity || typeof identity !== 'object' || Array.isArray(identity)) {
+      unbound.push(kind);
+      continue;
+    }
+    if (mesh?.senderKind && mesh.senderKind !== kind) {
+      unbound.push(kind);
+      continue;
+    }
+    identity.mesh = { ...(mesh ?? {}), senderKind: kind };
+    declared.add(kind);
+    changed.push(kind);
+  }
+  return { changed, unbound };
+}
+
 export function checkRepository(root = DEFAULT_ROOT) {
   return validateRegistries({
     ownership: readJson(root, 'canon/ownership.json'),
@@ -482,8 +522,35 @@ function live(argv) {
   return drift.length === 0 ? 0 : 1;
 }
 
+function bindMeshKinds(root = DEFAULT_ROOT) {
+  const file = path.join(root, 'canon/agent-identities.json');
+  const registry = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const { changed, unbound } = bindMeshSenderKinds(
+    registry,
+    readMeshKinds(root)
+  );
+  if (unbound.length > 0) {
+    for (const kind of unbound) {
+      process.stderr.write(
+        `::error::mesh kind ${kind}: no identity in canon/agent-identities.json declares it\n`
+      );
+    }
+    return 2;
+  }
+  if (changed.length > 0) {
+    fs.writeFileSync(file, `${JSON.stringify(registry, null, 1)}\n`);
+  }
+  process.stdout.write(
+    changed.length > 0
+      ? `bound mesh sender kinds: ${changed.join(', ')}\n`
+      : 'mesh sender kinds already bound\n'
+  );
+  return 0;
+}
+
 function main(argv) {
   if (argv.includes('--live')) return live(argv);
+  if (argv.includes('--bind-mesh-kinds')) return bindMeshKinds();
   const result = checkRepository();
   if (argv.includes('--json')) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
