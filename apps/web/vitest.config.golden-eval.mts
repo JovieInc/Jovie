@@ -32,7 +32,10 @@ export default defineConfig({
       URL_ENCRYPTION_KEY: 'test-encryption-key-32-chars!!',
       NODE_ENV: 'test',
     },
-    include: ['tests/eval/golden/**/*.ci.test.ts'],
+    include: [
+      'tests/eval/golden/**/*.ci.test.ts',
+      'tests/eval/helpfulness/**/*.ci.test.ts',
+    ],
     exclude: ['node_modules/**', '.next/**', '.stryker-tmp/**'],
     pool: 'forks',
     isolate: true,

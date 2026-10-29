@@ -29,9 +29,11 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, FILL_BODY, AGENT = (
-    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "fill-pr-body", "agent")
-DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, FILL_BODY})
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, FILL_BODY, AGENT = (
+    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing",
+    "merge-narrowed-preflight", "fill-pr-body", "agent")
+DETERMINISTIC = frozenset({
+    RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, MERGE_NARROWED, FILL_BODY})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -44,9 +46,57 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
+# The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
+# contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
+# the guard could not re-read the body, so the log no longer says missing-metadata.
+INTERNAL_CHANGELOG_NOTE = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+CHANGELOG_MISSING = re.compile(r"Customer outcome decision missing or invalid \(missing-metadata\)")
+CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit GitHub")
+# Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
+# PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
+SPACING_RATCHET_TEXT = re.compile(
+    r"off-grid 10px/14px spacing steps \(\*-2\.5, \*-3\.5\) grew")
+# Same utility shape as apps/web/scripts/optical-grid-scanners.ts, limited to the
+# armed conservative steps. Longer prefixes are not required: `p` fails closed on
+# `px-2.5` because the step hyphen does not follow `p`.
+CONSERVATIVE_UTILITY = re.compile(
+    r"(?<![\w-])(?P<sign>-)?(?P<prefix>p|px|py|pt|pr|pb|pl|ps|pe|m|mx|my|mt|mr|mb|ml|ms|me|"
+    r"gap|gap-x|gap-y|space-x|space-y)-(?P<step>2\.5|3\.5)(?![\w./%])")
+# 10px and 14px sit halfway between canonical seams. Tie-break toward the lower
+# seam (8px / 12px) so the rewrite is deterministic and stays on the 4px grid.
+SNAP_STEP = {"2.5": "2", "3.5": "3"}
+SPACING_SCAN_PREFIXES = ("apps/web/app/", "apps/web/components/", "packages/ui/")
+NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
+# Source Validation's merge probe. Only this one file has a deterministic union:
+# both sides append to the same NARROWED vitest command. Any other path stays a model fix.
+NARROWED_PREFLIGHT = "scripts/preflight-changed.mjs"
+NARROWED_CONFLICT = re.compile(
+    r"This PR conflicts with \S+ in: scripts/preflight-changed\.mjs\s*\. "
+    r"Resolve the conflict \(lane-fix-conflict\)")
+_NARROWED_NOTE_PHRASES = (
+    "source identity",
+    "metrics-layer",
+    "locked chrome",
+    "heading contracts",
+)
+_NARROWED_THOROUGH = re.compile(
+    r";\s*full (?:design-system )?suite (?:runs )?with --thorough\s*$")
+_NARROWED_TEST = re.compile(
+    r"(?:^|\s)((?:[\w.@/-]+)\.(?:test|spec)\.[cm]?[jt]sx?)(?=\s|$)")
+_NARROWED_HUNK = re.compile(
+    r"^<<<<<<<[^\n]*\n(?P<ours>.*?)^=======\n(?P<theirs>.*?)^>>>>>>>[^\n]*(?:\n|\Z)",
+    re.M | re.S)
+_NARROWED_SIDE = re.compile(
+    r"\A(?P<prefix>(?:[ \t]*command:\n)?)(?P<cindent>[ \t]*)'(?P<command>[^'\n]+)',\n"
+    r"(?P<nindent>[ \t]*)note: '(?P<note>[^'\n]+)',\n?\Z")
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("narrowed-preflight", NARROWED_CONFLICT, MERGE_NARROWED),
+    ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
+    # Before platform-infra: the ratchet message includes a count such as 591,
+    # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
+    ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
@@ -83,6 +133,16 @@ def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
 
 
+def stamp_internal_changelog(body) -> str | None:
+    """Append the internal customer-changelog note. None when `body` is not a string or already
+    contains a note (a second note is an ambiguous contract, not a stamp)."""
+    if not isinstance(body, str) or "customer-changelog/v1" in body:
+        return None
+    if body and not body.endswith("\n"):
+        body += "\n"
+    return body + INTERNAL_CHANGELOG_NOTE + "\n"
+
+
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, checks, signature, files}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
@@ -103,6 +163,11 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     signature = error_signature("\n".join(logs.get(name) or "" for name in names)) if cls in {"other", "mixed"} else ""
     if cls in {"other", "mixed"} and pr.get("mergeStateStatus") == "BEHIND":
         cls, action = BEHIND_CLASS, SYNC_MAIN
+    # Attempt 2 of the changelog guard reports only the quota error. Stamp the missing internal
+    # note when the body can take one; a body that already has a note stays a quota rerun.
+    if cls == "quota-deferred" and CHANGELOG_QUOTA_READ.search("\n".join(logs.get(name) or "" for name in names)) \
+            and stamp_internal_changelog(pr.get("body")) is not None:
+        cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
     files = []
     if cls == "ci-fast-wiring":
         for name in names:
@@ -111,6 +176,260 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
+
+
+def _snap_spacing_line(line: str) -> str:
+    def repl(match: re.Match) -> str:
+        sign = match.group("sign") or ""
+        return f"{sign}{match.group('prefix')}-{SNAP_STEP[match.group('step')]}"
+    return CONSERVATIVE_UTILITY.sub(repl, line)
+
+
+def _spacing_product_path(path: str) -> bool:
+    """Product TS/TSX under the spacing ratchet's scan roots. Tests and stories are debt-free."""
+    rel = str(path or "").replace("\\", "/")
+    if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+        return False
+    if not rel.endswith((".ts", ".tsx")) or NON_PRODUCT_SPACING.search(rel):
+        return False
+    return rel.startswith(SPACING_SCAN_PREFIXES)
+
+
+def _added_spacing_edits(diff: str) -> dict[str, dict[int, tuple[str, str]]]:
+    """Map eligible file -> {new 1-based line: (added text, snapped text)} for utilities the diff adds."""
+    edits: dict[str, dict[int, tuple[str, str]]] = {}
+    rel = ""
+    eligible = False
+    new_line = 0
+    in_hunk = False
+    for raw in str(diff or "").splitlines():
+        if raw.startswith("+++ b/"):
+            rel = raw[6:]
+            eligible = _spacing_product_path(rel)
+            in_hunk = False
+            continue
+        if raw.startswith("--- ") or raw.startswith("diff --git "):
+            continue
+        header = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", raw)
+        if header:
+            new_line = int(header.group(1))
+            in_hunk = True
+            continue
+        if not in_hunk:
+            continue
+        if raw.startswith("\\"):
+            continue  # "\ No newline at end of file" is not a source line
+        if raw.startswith("+"):
+            added = raw[1:]
+            snapped = _snap_spacing_line(added)
+            if eligible and snapped != added:
+                edits.setdefault(rel, {})[new_line] = (added, snapped)
+            new_line += 1
+        elif raw.startswith("-"):
+            continue
+        else:
+            # A context line (rare with -U0) still occupies a new-file line.
+            new_line += 1
+    return edits
+
+
+def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
+    """Snap conservative spacing utilities on lines this diff adds. Returns the files written.
+
+    Grandfathered lines are left alone, including an identical `gap-2.5` elsewhere in the
+    file. A line that no longer matches the diff is left alone so a stale patch cannot
+    rewrite a neighbor. 2.5 -> 2 (10px -> 8px) and 3.5 -> 3 (14px -> 12px).
+    """
+    changed = []
+    root = Path(root)
+    for rel, lines in _added_spacing_edits(diff).items():
+        path = root / rel
+        try:
+            original = path.read_text()
+        except OSError:
+            continue
+        file_lines = original.splitlines(keepends=True)
+        dirty = False
+        for lineno, (added, snapped) in lines.items():
+            index = lineno - 1
+            if index < 0 or index >= len(file_lines):
+                continue
+            ending = "\r\n" if file_lines[index].endswith("\r\n") else "\n" if file_lines[index].endswith("\n") else ""
+            current = file_lines[index][: len(file_lines[index]) - len(ending)]
+            if current != added:
+                continue
+            file_lines[index] = snapped + ending
+            dirty = True
+        if not dirty:
+            continue
+        try:
+            atomic_write_text(path, "".join(file_lines))
+        except OSError:
+            continue
+        changed.append(rel)
+    return sorted(changed)
+
+
+def _split_shell_and(command: str) -> list[str] | None:
+    """Split a `&&` chain. Quoted or empty segments fail closed."""
+    if "'" in command or '"' in command or "\n" in command:
+        return None
+    parts = [part.strip() for part in command.split("&&")]
+    if not parts or any(not part for part in parts):
+        return None
+    return parts
+
+
+def _vitest_prefix_and_files(segment: str) -> tuple[str, list[str]] | None:
+    if "vitest run" not in segment:
+        return None
+    files = _NARROWED_TEST.findall(segment)
+    if not files:
+        return None
+    prefix = segment
+    for name in files:
+        prefix = re.sub(rf"(^|\s){re.escape(name)}(?=\s|$)", " ", prefix)
+    prefix = re.sub(r"\s+", " ", prefix).strip()
+    if "vitest run" not in prefix:
+        return None
+    return prefix, files
+
+
+def merge_narrowed_guard_command(ours: str, theirs: str) -> str | None:
+    """Union two NARROWED vitest commands. Shell prefixes stay in base order, then
+    head-only prefixes; test paths follow the same rule. A changed vitest invocation
+    or two different arguments for one executable returns None."""
+    ours_parts = _split_shell_and(str(ours or "").strip())
+    theirs_parts = _split_shell_and(str(theirs or "").strip())
+    if not ours_parts or not theirs_parts:
+        return None
+
+    def split(parts: list[str]) -> tuple[list[tuple[str, list[str]]], list[str]] | None:
+        vitest = []
+        other = []
+        for part in parts:
+            parsed = _vitest_prefix_and_files(part)
+            if parsed:
+                vitest.append(parsed)
+            else:
+                other.append(part)
+        if len(vitest) != 1:
+            return None
+        by_exe: dict[str, str] = {}
+        for segment in other:
+            exe = segment.split()[0]
+            if by_exe.get(exe, segment) != segment:
+                return None
+            by_exe[exe] = segment
+        return vitest, other
+
+    ours_split = split(ours_parts)
+    theirs_split = split(theirs_parts)
+    if not ours_split or not theirs_split:
+        return None
+    ours_vitest, ours_other = ours_split
+    theirs_vitest, theirs_other = theirs_split
+    if ours_vitest[0][0] != theirs_vitest[0][0]:
+        return None
+    theirs_by = {segment.split()[0]: segment for segment in theirs_other}
+    ours_by = {segment.split()[0]: segment for segment in ours_other}
+    for exe in set(theirs_by) & set(ours_by):
+        if theirs_by[exe] != ours_by[exe]:
+            return None
+    files: list[str] = []
+    for name in theirs_vitest[0][1] + ours_vitest[0][1]:
+        if name not in files:
+            files.append(name)
+    merged_vitest = f"{theirs_vitest[0][0]} {' '.join(files)}"
+    result: list[str] = []
+    emitted = False
+
+    def emit_vitest() -> None:
+        nonlocal emitted
+        if not emitted:
+            result.append(merged_vitest)
+            emitted = True
+
+    for segment in theirs_parts:
+        if _vitest_prefix_and_files(segment):
+            emit_vitest()
+        else:
+            result.append(segment)
+    for segment in ours_parts:
+        if _vitest_prefix_and_files(segment):
+            emit_vitest()
+        elif segment not in result:
+            result.insert(result.index(merged_vitest) if emitted else len(result), segment)
+    if not emitted:
+        return None
+    return " && ".join(result)
+
+
+def merge_narrowed_guard_note(ours: str, theirs: str) -> str | None:
+    """Union the known NARROWED note phrases. An unrecognized phrase fails closed."""
+
+    def parse(note: str) -> tuple[list[str], bool] | None:
+        text = str(note or "").strip()
+        thorough = _NARROWED_THOROUGH.search(text) is not None
+        head = _NARROWED_THOROUGH.sub("", text).strip().rstrip(";").strip()
+        phrases = [part.strip() for part in head.replace(" and ", ", ").split(",") if part.strip()]
+        if any(phrase not in _NARROWED_NOTE_PHRASES for phrase in phrases):
+            return None
+        return phrases, thorough
+
+    ours_parsed = parse(ours)
+    theirs_parsed = parse(theirs)
+    if not ours_parsed or not theirs_parsed:
+        return None
+    present = set(ours_parsed[0] + theirs_parsed[0])
+    ordered = [phrase for phrase in _NARROWED_NOTE_PHRASES if phrase in present]
+    if not ordered and not (ours_parsed[1] or theirs_parsed[1]):
+        return None
+    if len(ordered) <= 1:
+        head = ordered[0] if ordered else ""
+    elif len(ordered) == 2:
+        head = f"{ordered[0]} and {ordered[1]}"
+    else:
+        head = ", ".join(ordered[:-1]) + " and " + ordered[-1]
+    if ours_parsed[1] or theirs_parsed[1]:
+        return f"{head}; full suite with --thorough" if head else "full suite with --thorough"
+    return head
+
+
+def resolve_preflight_narrowed_text(text: str) -> str | None:
+    """Replace conflict hunks that are only the NARROWED command and note. None when any
+    hunk has another shape, so the caller aborts and leaves the merge to a model."""
+    if "<<<<<<<" not in str(text or ""):
+        return None
+    hunks = list(_NARROWED_HUNK.finditer(text))
+    if not hunks:
+        return None
+    if "<<<<<<<" in _NARROWED_HUNK.sub("", text) or ">>>>>>>" in _NARROWED_HUNK.sub("", text):
+        return None
+    pieces = []
+    last = 0
+    for hunk in hunks:
+        ours = _NARROWED_SIDE.match(hunk.group("ours"))
+        theirs = _NARROWED_SIDE.match(hunk.group("theirs"))
+        if not ours or not theirs:
+            return None
+        if ours.group("prefix") != theirs.group("prefix") or ours.group("cindent") != theirs.group("cindent") \
+                or ours.group("nindent") != theirs.group("nindent"):
+            return None
+        command = merge_narrowed_guard_command(ours.group("command"), theirs.group("command"))
+        note = merge_narrowed_guard_note(ours.group("note"), theirs.group("note"))
+        if command is None or note is None:
+            return None
+        pieces.append(text[last:hunk.start()])
+        pieces.append(
+            f"{ours.group('prefix')}{ours.group('cindent')}'{command}',\n"
+            f"{ours.group('nindent')}note: '{note}',\n")
+        last = hunk.end()
+    pieces.append(text[last:])
+    resolved = "".join(pieces)
+    if "<<<<<<<" in resolved or ">>>>>>>" in resolved:
+        return None
+    return resolved
 
 
 def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
