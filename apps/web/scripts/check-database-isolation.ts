@@ -19,8 +19,8 @@ import { pathToFileURL } from 'node:url';
 import {
   evaluateStagingDbHostGuard,
   type GuardEnv,
-  parseDatabaseHost,
   PROD_DATABASE_HOST_ENV_VAR,
+  parseDatabaseHost,
 } from '@/lib/startup/db-host-guard';
 
 /**
