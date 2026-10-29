@@ -101,14 +101,4 @@ export function buildServerRunnerDeps(
   };
 }
 
-/**
- * Production certifier. Until a fix records `deployedAt` it is never live.
- * The deploy and check probes are the golden-path evidence feeds; no probe
- * answers yes by default, so an unwired check keeps the gate closed.
- */
-export const closedCertifier: FixCertifier = {
-  isLiveOnProduction: async () => false,
-  recheck: async () => false,
-};
-
 export { runRecovery };

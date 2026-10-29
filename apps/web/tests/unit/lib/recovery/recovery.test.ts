@@ -9,7 +9,7 @@ vi.mock('@/lib/email/unsubscribe-token', () => ({
 
 import { memoryRecordBackend } from '@/lib/ovie/mcp/store';
 import { buildRecoveryEmail, RecoveryEmailBlocked } from '@/lib/recovery/email';
-import { type FixCertifier } from '@/lib/recovery/gate';
+import { certifyFix, type FixCertifier } from '@/lib/recovery/gate';
 import { createLedger } from '@/lib/recovery/ledger';
 import { decide, type StalledUser } from '@/lib/recovery/policy';
 import type { KnownBadFlowFix } from '@/lib/recovery/registry';
@@ -25,7 +25,7 @@ const fix: KnownBadFlowFix = {
   whatChanged: 'it now shows your releases',
   fallbackPath: '/start',
   checkId: 'c1',
-  deployedAt: '2026-10-30T00:00:00.000Z',
+  shippedInCode: true,
 };
 const user = (over: Partial<StalledUser> = {}): StalledUser => ({
   userId: 'u1',
@@ -37,7 +37,7 @@ const user = (over: Partial<StalledUser> = {}): StalledUser => ({
   suppressed: false,
   ...over,
 });
-const live = new Set(['f1']);
+const live = new Map([['f1', '2026-10-30T00:00:00.000Z']]);
 const none = { fixIdsSent: [], totalSent: 0 };
 
 describe('decide', () => {
@@ -45,7 +45,7 @@ describe('decide', () => {
     expect(decide(user(), fix, live, none).eligible).toBe(true);
   });
   it.each([
-    ['fix_not_live', user(), new Set<string>(), none],
+    ['fix_not_live', user(), new Map<string, string>(), none],
     ['internal_account', user({ email: 'a@jov.ie' }), live, none],
     ['suppressed', user({ suppressed: true }), live, none],
     [
@@ -100,6 +100,7 @@ function deps(over: Partial<RunnerDeps> = {}, users = [user()]) {
   const status = { v: 'none' as 'none' | 'pending' | 'approved' | 'rejected' };
   const certifier: FixCertifier = {
     isLiveOnProduction: async () => true,
+    deployedAt: async () => '2026-10-30T00:00:00.000Z',
     recheck: async () => true,
   };
   const d: RunnerDeps = {
@@ -149,6 +150,7 @@ describe('runRecovery', () => {
   it('never sends when the gate is closed', async () => {
     const closed: FixCertifier = {
       isLiveOnProduction: async () => true,
+      deployedAt: async () => '2026-10-30T00:00:00.000Z',
       recheck: async () => false,
     };
     const { d, sent, cards } = deps({ certifier: closed });
@@ -203,5 +205,29 @@ describe('buildRecoveryReport', () => {
       paid: 0,
       clickToCompleteMsP50: 60000,
     });
+  });
+});
+
+describe('certifyFix', () => {
+  const ok: FixCertifier = {
+    isLiveOnProduction: async () => true,
+    deployedAt: async () => '2026-10-30T00:00:00.000Z',
+    recheck: async () => true,
+  };
+  it('certifies only when shipped, live, deployed and the check passes', async () => {
+    expect((await certifyFix(fix, ok)).live).toBe(true);
+    expect(
+      (await certifyFix({ ...fix, shippedInCode: false }, ok)).reason
+    ).toBe('no_deploy_recorded');
+    expect(
+      (await certifyFix(fix, { ...ok, isLiveOnProduction: async () => false }))
+        .reason
+    ).toBe('not_on_production');
+    expect(
+      (await certifyFix(fix, { ...ok, deployedAt: async () => null })).reason
+    ).toBe('no_deploy_recorded');
+    expect(
+      (await certifyFix(fix, { ...ok, recheck: async () => false })).reason
+    ).toBe('check_failed');
   });
 });
