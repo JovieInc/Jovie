@@ -212,7 +212,8 @@ export function getPublicPriceClaim(plan: PublicOfferPlan): PublicPriceClaim {
       cadence: '/mo',
       badge: 'Self-serve',
       note: PRO_SELF_SERVE_TRUTH,
-      ctaLabel: 'Claim your profile',
+      // Paid CTA names the plan and price (JOV-9692): never a bare "Claim".
+      ctaLabel: `Start ${ARTIST_VISIBILITY_OFFER.pro.displayName}, ${formatUsdAmount(priceUsd)}/mo`,
       // `plan=pro` keeps the shared signup-intent contract on every
       // self-serve CTA; /claim/start persists the Pro monthly intent.
       ctaHref: `${APP_ROUTES.CLAIM}?plan=pro`,

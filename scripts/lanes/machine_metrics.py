@@ -30,7 +30,7 @@ REFRESH_S = 6 * 3600
 WINDOW_DAYS = 7
 PUBLIC_MAX_BYTES = 1200
 BOT_AUTHORS = frozenset({"dependabot", "dependabot[bot]", "jovie-bot", "github-actions[bot]", "app/jovie-bot"})
-DETERMINISTIC_RESOLUTIONS = frozenset({"wired-ci-fast", "generated-regenerated"})
+DETERMINISTIC_RESOLUTIONS = frozenset({"wired-ci-fast", "generated-regenerated", "snapped-spacing"})
 QUERY = ('query($q:String!,$after:String){search(query:$q,type:ISSUE,first:100,after:$after){'
          'pageInfo{hasNextPage endCursor} nodes{... on PullRequest{number mergedAt body author{login}}}}}')
 MAX_PAGES = 4
