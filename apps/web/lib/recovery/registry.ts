@@ -3,9 +3,11 @@
  * listed here, linked to the issue that fixed it and the production check that
  * proves it (canon: never email about an unfixed flow).
  *
- * `deployedAt` stays null until the fix is merged AND live on production.
- * Setting it is part of the fix PR's own checklist; the gate re-runs the
- * step's check before every send, so a stale value cannot send on its own.
+ * `shippedInCode` is flipped by the fix PR itself, so it is true only in builds
+ * that contain the fix. The deploy time is never hand-set: the production
+ * certifier records the first moment a production build with the flag is
+ * observed serving (see probes.server.ts), and the gate re-runs the step's
+ * production golden-path check before every send.
  */
 
 export type RecoveryStep = 'preview' | 'signup_pending';
@@ -21,9 +23,9 @@ export interface KnownBadFlowFix {
   readonly whatChanged: string;
   /** Where the recipient lands, relative to BASE_URL, when no page link exists. */
   readonly fallbackPath: string;
-  /** Production check id re-run by the gate (see gate.ts). */
+  /** Production golden-path surface id re-run by the gate (see gate.ts). */
   readonly checkId: string;
-  readonly deployedAt: string | null;
+  readonly shippedInCode: boolean;
 }
 
 export const KNOWN_BAD_FLOW_FIXES: readonly KnownBadFlowFix[] = [
@@ -36,8 +38,7 @@ export const KNOWN_BAD_FLOW_FIXES: readonly KnownBadFlowFix[] = [
     whatChanged: 'it now shows your own releases',
     fallbackPath: '/start',
     checkId: 'golden-path-preview-has-release',
-    // #23575 live in production build 34c8a01 (verified 2026-10-29).
-    deployedAt: '2026-10-29T08:50:00Z',
+    shippedInCode: true,
   },
   {
     id: 'signup-confirmation-link',
@@ -48,8 +49,8 @@ export const KNOWN_BAD_FLOW_FIXES: readonly KnownBadFlowFix[] = [
     whatChanged:
       'signups now get a confirmation and pick up where they left off',
     fallbackPath: '/start',
-    checkId: 'golden-path-signup-confirmation',
-    deployedAt: null,
+    checkId: 'signup-signin',
+    shippedInCode: false,
   },
 ];
 
