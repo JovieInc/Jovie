@@ -26,7 +26,13 @@ export interface AgentClaimScreenProps {
   readonly claimAction: (formData: FormData) => void | Promise<void>;
 }
 
-function StateCard({ copy }: { readonly copy: AgentClaimStateCopy }) {
+function StateCard({
+  copy,
+  hasPrimary = true,
+}: {
+  readonly copy: AgentClaimStateCopy;
+  readonly hasPrimary?: boolean;
+}) {
   return (
     <ContentSurfaceCard data-testid='agent-claim-state'>
       <ContentSectionHeader
@@ -39,7 +45,7 @@ function StateCard({ copy }: { readonly copy: AgentClaimStateCopy }) {
           <Button
             key={action.href}
             asChild
-            variant={index === 0 ? 'primary' : 'secondary'}
+            variant={hasPrimary && index === 0 ? 'primary' : 'secondary'}
             size='lg'
           >
             <Link href={action.href}>{action.label}</Link>
@@ -169,10 +175,29 @@ export function AgentClaimScreen({
   }
 
   const claimPath = agentClaimPath(draftId, handoff ?? '');
+  // One primary action per screen: claim when signed in, sign up otherwise.
+  const primaryAction = (
+    <Button
+      asChild={!signedIn}
+      type={signedIn ? 'submit' : undefined}
+      variant='primary'
+      size='lg'
+    >
+      {signedIn ? (
+        'Claim This Draft'
+      ) : (
+        <Link href={authHref(APP_ROUTES.SIGNUP, claimPath)}>
+          Sign Up To Claim
+        </Link>
+      )}
+    </Button>
+  );
   return (
     <StandaloneProductPage width='sm' centered>
       <div className='space-y-4' data-testid='agent-claim-page'>
-        {error ? <StateCard copy={agentClaimStateCopy(error)} /> : null}
+        {error ? (
+          <StateCard copy={agentClaimStateCopy(error)} hasPrimary={false} />
+        ) : null}
         <ContentSurfaceCard className='overflow-hidden'>
           <ContentSectionHeader
             headingLevel={error ? 'h2' : 'h1'}
@@ -186,17 +211,11 @@ export function AgentClaimScreen({
                 <input type='hidden' name='draftId' value={draftId} />
                 <input type='hidden' name='h' value={handoff ?? ''} />
                 <input type='hidden' name='p' value={view.preview.digest} />
-                <Button type='submit' variant='primary' size='lg'>
-                  Claim This Draft
-                </Button>
+                {primaryAction}
               </form>
             ) : (
               <>
-                <Button asChild variant='primary' size='lg'>
-                  <Link href={authHref(APP_ROUTES.SIGNUP, claimPath)}>
-                    Sign Up To Claim
-                  </Link>
-                </Button>
+                {primaryAction}
                 <Button asChild variant='secondary' size='lg'>
                   <Link href={authHref(APP_ROUTES.SIGNIN, claimPath)}>
                     Sign In
