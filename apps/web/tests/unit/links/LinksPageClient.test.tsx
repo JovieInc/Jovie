@@ -3,10 +3,12 @@ import userEvent from '@testing-library/user-event';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LinkRow } from '@/app/app/(shell)/links/links-model';
+import { LinksRailShellProvider } from '@/app/app/(shell)/LinksRailShell';
 import {
   RightPanelProvider,
   useRightPanel,
 } from '@/contexts/RightPanelContext';
+import { useLinksRailTransform } from '@/contexts/links-rail-transform';
 
 const { copyToClipboardMock } = vi.hoisted(() => ({
   copyToClipboardMock: vi.fn(),
@@ -25,16 +27,19 @@ import { LinksPageClient } from '@/app/app/(shell)/links/LinksPageClient';
  * canonical entity rail instead of a local aside.
  */
 function RightPanelSlot() {
-  const panel = useRightPanel();
+  const transformPanel = useLinksRailTransform();
+  const panel = transformPanel(useRightPanel());
   return <div data-testid='shell-right-panel-slot'>{panel}</div>;
 }
 
 function renderLinksWorkspace(ui: ReactElement) {
   return render(
-    <RightPanelProvider>
-      <RightPanelSlot />
-      {ui}
-    </RightPanelProvider>
+    <LinksRailShellProvider>
+      <RightPanelProvider>
+        <RightPanelSlot />
+        {ui}
+      </RightPanelProvider>
+    </LinksRailShellProvider>
   );
 }
 
@@ -114,7 +119,7 @@ describe('LinksPageClient', () => {
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
     );
 
-    const inspector = screen.getByTestId('links-inspector');
+    const inspector = await screen.findByTestId('links-inspector');
     expect(inspector).toBeInTheDocument();
     expect(inspector).toHaveTextContent('Midnight City');
     expect(inspector).toHaveTextContent('17 7d clicks');
@@ -142,6 +147,7 @@ describe('LinksPageClient', () => {
     await user.click(
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
     );
+    await screen.findByTestId('links-inspector');
     await user.click(screen.getByRole('button', { name: 'Copy' }));
 
     expect(copyToClipboardMock).toHaveBeenCalled();
@@ -163,7 +169,7 @@ describe('LinksPageClient', () => {
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
     );
 
-    const inspector = screen.getByTestId('links-inspector');
+    const inspector = await screen.findByTestId('links-inspector');
     expect(inspector).not.toHaveTextContent('Campaign');
     expect(inspector).not.toHaveTextContent('utm:');
     expect(inspector).toHaveTextContent('—');
@@ -183,7 +189,9 @@ describe('LinksPageClient', () => {
     // Entity-rail parity: the inspector must present through the shell's
     // registered right-panel slot, not as a local aside next to the table.
     const slot = screen.getByTestId('shell-right-panel-slot');
-    expect(within(slot).getByTestId('links-inspector')).toBeInTheDocument();
+    expect(
+      await within(slot).findByTestId('links-inspector')
+    ).toBeInTheDocument();
     expect(
       within(slot).getByRole('button', { name: 'Close' })
     ).toBeInTheDocument();
@@ -196,7 +204,7 @@ describe('LinksPageClient', () => {
     await user.click(
       screen.getByRole('button', { name: 'jov.ie/tim/midnight-city' })
     );
-    expect(screen.getByTestId('links-inspector')).toBeInTheDocument();
+    expect(await screen.findByTestId('links-inspector')).toBeInTheDocument();
 
     await user.keyboard('{Escape}');
 

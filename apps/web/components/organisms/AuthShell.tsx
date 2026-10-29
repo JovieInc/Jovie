@@ -10,6 +10,7 @@ import { SidebarCollapseButton } from '@/components/molecules/sidebar-collapse-b
 import { SidebarProvider, useSidebar } from '@/components/organisms/sidebar';
 import { UnifiedSidebar } from '@/components/organisms/UnifiedSidebar';
 import { RuntimeUpdateProvider } from '@/components/shell/RuntimeUpdateProvider';
+import { useLinksRailTransform } from '@/contexts/links-rail-transform';
 import { useRightPanel } from '@/contexts/RightPanelContext';
 import { DashboardHeader } from '@/features/dashboard/organisms/DashboardHeader';
 import { DashboardMobileTabs } from '@/features/dashboard/organisms/DashboardMobileTabs';
@@ -61,7 +62,9 @@ function AuthShellInner({
 }: Readonly<Omit<AuthShellProps, 'children'> & { children: ReactNode }>) {
   const { isMobile, open: sidebarPinned } = useSidebar();
   const { isComposerFocused } = useComposerFocus();
-  const rightPanel = useRightPanel();
+  const registeredPanel = useRightPanel();
+  const transformPanel = useLinksRailTransform();
+  const rightPanel = transformPanel(registeredPanel);
   const previewPanelState = usePreviewPanelState();
   const isElectron = useIsElectronRuntime();
   // The desktop window-control row (DesktopTitlebar) owns the single canonical

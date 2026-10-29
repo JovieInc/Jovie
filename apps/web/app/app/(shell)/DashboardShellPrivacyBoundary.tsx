@@ -4,6 +4,7 @@ import { Button } from '@jovie/ui';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { AuthShellWrapper } from '@/components/organisms/AuthShellWrapper';
+import { LinksRailShellProvider } from './LinksRailShell';
 import { WorkspaceLockScreen } from '@/features/workspace-lock/WorkspaceLockScreen';
 import {
   getWorkspacePrivacyLockState,
@@ -273,6 +274,7 @@ export function DashboardShellPrivacyBoundary({
   return (
     <DashboardDataProvider value={shellData}>
       {!effectiveLock ? unlockedShellChrome : null}
+      <LinksRailShellProvider>
       <AuthShellWrapper
         mode={mode}
         isWorkspaceLocked={effectiveLock}
@@ -306,6 +308,7 @@ export function DashboardShellPrivacyBoundary({
           children
         )}
       </AuthShellWrapper>
+      </LinksRailShellProvider>
     </DashboardDataProvider>
   );
 }
