@@ -9,7 +9,7 @@ export const SMART_LINKS_HERO_COPY = {
   current: {
     title: 'One Link. Their Music App.',
     intro:
-      'Visitors pick their music app once. Every release you share after that opens there.',
+      'Visitors pick where to listen once. Every release you share after that opens there.',
     howTitle: 'Choose Your Sound. Once.',
     stepTitles: ['Land on the release', 'Choose once', 'Come back already set'],
     ctaTitle: 'Make Every Link Sing.',
@@ -19,7 +19,7 @@ export const SMART_LINKS_HERO_COPY = {
   generic: {
     title: 'Share your work with one link.',
     intro:
-      'Share a release. People pick their music app once, and every link after that opens there.',
+      'Share a release. People pick where to listen once, and every link after that opens there.',
     howTitle: 'One link, three beats.',
     stepTitles: [
       'Land on the work',
