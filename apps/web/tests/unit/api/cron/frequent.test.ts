@@ -27,7 +27,11 @@ const {
   mockGetPublicProfileCanaryStatus,
   mockRefreshCompanyStateCache,
   mockApplySummerCardDefaults,
+  mockRunReleaseEmailCanary,
+  mockGetReleaseEmailCanaryStatus,
 } = vi.hoisted(() => ({
+  mockRunReleaseEmailCanary: vi.fn(),
+  mockGetReleaseEmailCanaryStatus: vi.fn(),
   mockDbExecute: vi.fn(),
   mockDbSelect: vi.fn(),
   mockDbInsert: vi.fn(),
@@ -59,6 +63,11 @@ const {
 vi.mock('@/lib/admin/ops-queries', () => ({
   getAuthSignupOnboardingCanaryStatus: mockGetAuthSignupOnboardingCanaryStatus,
   getPublicProfileCanaryStatus: mockGetPublicProfileCanaryStatus,
+}));
+
+vi.mock('@/lib/canaries/release-email.server', () => ({
+  runReleaseEmailCanary: mockRunReleaseEmailCanary,
+  getReleaseEmailCanaryStatus: mockGetReleaseEmailCanaryStatus,
 }));
 
 vi.mock('@/lib/acquisition/eligibility.server', () => ({
@@ -259,6 +268,14 @@ describe('GET /api/cron/frequent', () => {
     mockGetPublicProfileCanaryStatus.mockImplementation(async () => ({
       runAt: new Date().toISOString(),
     }));
+    mockRunReleaseEmailCanary.mockImplementation(async () => ({
+      runAt: new Date().toISOString(),
+      status: 'failed',
+      failureReason: 'not_configured',
+    }));
+    mockGetReleaseEmailCanaryStatus.mockImplementation(async () => ({
+      runAt: new Date().toISOString(),
+    }));
     mockApplySummerCardDefaults.mockResolvedValue({
       checked: 2,
       defaulted: 1,
@@ -355,6 +372,27 @@ describe('GET /api/cron/frequent', () => {
       error: expect.stringContaining('public-profile (missing)'),
     });
     expect(mockGetAcquisitionEligibility).not.toHaveBeenCalled();
+  });
+
+  // JOV-9779: the release-email canary runs in the hourly slot before the
+  // schedule/send steps, and its receipt joins the freshness check.
+  it('runs the release-email canary hourly and checks its receipt freshness', async () => {
+    vi.setSystemTime(new Date('2026-03-24T10:00:00.000Z'));
+    mockGetReleaseEmailCanaryStatus.mockResolvedValue(null);
+    const { GET } = await import('@/app/api/cron/frequent/route');
+    const body = await (
+      await GET(
+        new Request('http://localhost/api/cron/frequent', {
+          headers: { authorization: 'Bearer test-secret' },
+        })
+      )
+    ).json();
+    expect(mockRunReleaseEmailCanary).toHaveBeenCalledOnce();
+    expect(body.results.releaseEmailCanary).toMatchObject({ success: true });
+    expect(body.results.canaryReceiptFreshness).toMatchObject({
+      success: false,
+      error: expect.stringContaining('release-email (missing)'),
+    });
   });
 
   it('keeps hourly freshness reads out of the other frequent invocations', async () => {

@@ -104,6 +104,10 @@ export const ServerEnvSchema = z.object({
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   RESEND_INBOUND_WEBHOOK_SECRET: z.string().optional(),
+  // JOV-9779 release-email canary: the only scope the audience-delivery
+  // carve-out admits. Both unset (or invalid) keeps every send denied.
+  RELEASE_EMAIL_CANARY_PROFILE_ID: z.string().uuid().optional(),
+  RELEASE_EMAIL_CANARY_INBOX: z.string().email().optional(),
 
   // Slack notifications (admin alerts for claims, signups, upgrades, waitlist)
   SLACK_WEBHOOK_URL: z.string().url().optional(),
@@ -568,6 +572,8 @@ export const ENV_KEYS = [
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
   'RESEND_INBOUND_WEBHOOK_SECRET',
+  'RELEASE_EMAIL_CANARY_PROFILE_ID',
+  'RELEASE_EMAIL_CANARY_INBOX',
   'SLACK_WEBHOOK_URL',
   'DATABASE_URL',
   'DB_POOL_MAX',

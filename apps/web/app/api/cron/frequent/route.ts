@@ -32,6 +32,10 @@ import {
   assertCanaryReceiptsFresh,
   CanaryReceiptFreshnessError,
 } from '@/lib/canaries/receipt-freshness';
+import {
+  getReleaseEmailCanaryStatus,
+  runReleaseEmailCanary,
+} from '@/lib/canaries/release-email.server';
 import { reconcileOrphanedAcceptedActions } from '@/lib/connectors/workflows/reconcile-orphaned-approved-actions';
 import { verifyCronRequest } from '@/lib/cron/auth';
 import { db, withRetry } from '@/lib/db';
@@ -161,15 +165,32 @@ export async function GET(request: Request) {
   // JOV-7895: reuse the hourly detector slot; two Redis reads, no new cron.
   // Missing, stale or unreadable reports fail loud through the existing Sentry
   // error path even when acquisition/outreach is disabled.
+  // JOV-9779: hourly release-email canary. Evaluates the canary release it
+  // triggered last hour, then triggers the next one; steps 4-5 below schedule
+  // and send it in this same invocation. One synthetic release and at most one
+  // email to the synthetic canary inbox per hour; nothing when unconfigured.
+  results.releaseEmailCanary =
+    minute < 15
+      ? await runSubJob('releaseEmailCanary', async () => {
+          const receipt = await runReleaseEmailCanary(new Date());
+          return { ...receipt } as unknown as Record<string, unknown>;
+        })
+      : { success: true, skipped: true };
+
   results.canaryReceiptFreshness =
     minute < 15
       ? await runSubJob('canaryReceiptFreshness', async () => {
-          const [auth, profile] = await Promise.all([
+          const [auth, profile, releaseEmail] = await Promise.all([
             getAuthSignupOnboardingCanaryStatus(),
             getPublicProfileCanaryStatus(),
+            getReleaseEmailCanaryStatus(),
           ]);
           return assertCanaryReceiptsFresh(
-            { 'auth-signup-onboarding': auth, 'public-profile': profile },
+            {
+              'auth-signup-onboarding': auth,
+              'public-profile': profile,
+              'release-email': releaseEmail,
+            },
             new Date()
           );
         })
