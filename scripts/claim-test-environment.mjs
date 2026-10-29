@@ -81,6 +81,8 @@ if (
       ? process.env.DOGFOOD_RESOLVED_SHA
       : null,
     ...result,
+    /** @type {{ ok: boolean, failures: string[] } | undefined} */
+    stripeFixture: undefined,
   };
   // Live check of the Stripe test fixture (revoked key, archived or edited
   // $12 price) BEFORE migrations/build. The shape check above cannot catch
