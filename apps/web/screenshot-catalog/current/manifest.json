@@ -140,8 +140,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-28T23:07:17.604Z",
-    "gitSha": "b4a38e8ed20662ef0d4ee2c46647ebbac7028714",
+    "capturedAt": "2026-10-29T14:10:42.216Z",
+    "gitSha": "83d0fd663f4623f8b0c18616cf92236038d7ab6b",
     "imagePath": "artist-profile-outcomes-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-29T12:55:30.677Z",
-    "gitSha": "822933e7a355d4369754864b8e9631857ffd629f",
+    "capturedAt": "2026-10-29T14:11:24.625Z",
+    "gitSha": "83d0fd663f4623f8b0c18616cf92236038d7ab6b",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
