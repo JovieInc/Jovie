@@ -118,7 +118,7 @@ async function reserveFallbackProfileHandle(
 ): Promise<string> {
   // Fail closed: handle reservation success requires verified ownership.
   return reserveOnboardingHandle(
-    state.artist?.name ?? cleanedProposedHandle ?? 'artist',
+    state.artist?.name ?? cleanedProposedHandle ?? 'profile',
     userId
   );
 }
@@ -142,6 +142,7 @@ function buildOnboardingSettings(
       selectedSpotifyArtistName: state.artist?.name ?? null,
       socialLinks: [...state.socialLinks],
       interviewSignalCount: state.interviewSignals.length,
+      profileDraft: state.profileDraft ?? null,
     },
   };
 }
@@ -269,6 +270,7 @@ function buildImportedProfileFields({
 }
 
 interface PersistClaimedProfileInput {
+  readonly creatorType: CreatorProfile['creatorType'];
   readonly tx: DbOrTransaction;
   readonly userId: string;
   readonly handle: string;
@@ -284,6 +286,7 @@ interface PersistClaimedProfileInput {
 }
 
 async function persistClaimedProfileRow({
+  creatorType,
   tx,
   userId,
   handle,
@@ -347,7 +350,7 @@ async function persistClaimedProfileRow({
     .values({
       userId,
       waitlistEntryId,
-      creatorType: 'artist',
+      creatorType,
       username: handle,
       usernameNormalized: handle,
       displayName,
@@ -438,6 +441,13 @@ async function persistClaimedProfileWithHandleRetry({
             );
           }
           return persistClaimedProfileRow({
+            creatorType: state.profileDraft?.activeRole
+              ? state.profileDraft.activeRole === 'artist'
+                ? 'artist'
+                : 'creator'
+              : state.artist
+                ? 'artist'
+                : 'creator',
             tx,
             userId,
             handle,
