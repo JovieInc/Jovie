@@ -280,5 +280,99 @@
       },
       "derived": ["scripts/invariants/registry.mjs"]
     }
+  ],
+  "scans": [
+    {
+      "id": "plan-prices",
+      "domain": "plans-prices-offers",
+      "label": "Plan price",
+      "owner": "apps/web/lib/config/plan-prices.ts",
+      "extract": [
+        "monthlyUsd:\\s*(\\d+)",
+        "yearly:\\s*(\\d+)",
+        "\\bmonthly:\\s*(\\d+)"
+      ],
+      "literal": [
+        "\\${n}(?![\\d])",
+        "\\b{n}\\s*(?:/|per\\s+)(?:mo|month|yr|year)\\b"
+      ],
+      "scope": [
+        "apps/web/app",
+        "apps/web/components",
+        "apps/web/data",
+        "apps/web/content",
+        "apps/web/lib",
+        "apps/docs/app",
+        "apps/docs/content"
+      ],
+      "exts": [".ts", ".tsx", ".md", ".mdx"],
+      "allow": []
+    },
+    {
+      "id": "plan-names",
+      "domain": "plans-prices-offers",
+      "label": "Plan display name",
+      "owner": "apps/web/lib/config/plan-prices.ts",
+      "extract": ["pro:\\s*\\{\\s*displayName:\\s*'([^']+)'"],
+      "literal": "\\b{n}\\b",
+      "scope": [
+        "apps/web/app",
+        "apps/web/components",
+        "apps/web/data",
+        "apps/web/content",
+        "apps/docs/app",
+        "apps/docs/content"
+      ],
+      "exts": [".ts", ".tsx", ".md", ".mdx"],
+      "allow": []
+    },
+    {
+      "id": "retention-days",
+      "domain": "retention-and-limits",
+      "label": "Retention window",
+      "owner": "apps/web/lib/analytics/data-retention.ts",
+      "extract": ["_RETENTION_DAYS\\s*=\\s*(\\d+)"],
+      "literal": "\\b{n}[- ]days?\\b",
+      "scope": [
+        "apps/web/app",
+        "apps/web/components",
+        "apps/web/data",
+        "apps/web/content",
+        "apps/docs/app",
+        "apps/docs/content"
+      ],
+      "exts": [".ts", ".tsx", ".md", ".mdx"],
+      "allow": []
+    },
+    {
+      "id": "entitlement-limits",
+      "domain": "entitlements-limits",
+      "label": "Plan limit",
+      "owner": "apps/web/lib/entitlements/registry.ts",
+      "extract": [
+        "(?:analyticsRetentionDays|contactsLimit|aiWeeklyMessageLimit|aiRetouchDailyLimit):\\s*(\\d+)"
+      ],
+      "minValue": 50,
+      "literal": "\\b{n}\\s+(?:days?|contacts|messages|retouch\\w*)\\b",
+      "scope": [
+        "apps/web/app",
+        "apps/web/components",
+        "apps/web/data",
+        "apps/web/content",
+        "apps/docs/app",
+        "apps/docs/content"
+      ],
+      "exts": [".ts", ".tsx", ".md", ".mdx"],
+      "allow": []
+    }
+  ],
+  "scanExcludes": [
+    "\\.(test|spec|stories)\\.",
+    "/__tests__/",
+    "/tests?/",
+    "/fixtures?/",
+    "\\.gen\\.",
+    "/drizzle/",
+    "/node_modules/"
   ]
 }
