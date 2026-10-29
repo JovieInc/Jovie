@@ -53,6 +53,15 @@ class SwarmPolicyTest(unittest.TestCase):
         self.assertFalse(any(x["agent"] for x in m))
         self.assertFalse(swarm.credits_available("https://example.invalid/v1", ""))
 
+    def test_relay_mode_skips_the_credit_probe_and_prices_at_list(self):
+        import os
+        os.environ["SWARM_CREDIT_PROBE"] = "off"
+        try:
+            self.assertTrue(swarm.credits_available("https://relay.invalid/v1", "k"))
+            self.assertFalse(swarm.credits_available("https://relay.invalid/v1", ""))
+        finally:
+            del os.environ["SWARM_CREDIT_PROBE"]
+
     def test_credit_text_is_recognised_as_blocked_credits(self):
         for line in ('{"error":{"code":"insufficient_funds"}}', "Payment Required", '{"status": 402}'):
             self.assertTrue(swarm.CREDIT_TEXT.search(line), line)

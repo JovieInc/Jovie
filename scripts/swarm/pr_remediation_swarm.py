@@ -178,6 +178,8 @@ def cmd_ledger(a) -> int:
 def credits_available(base: str, key: str) -> bool:
     """True only when the gateway reports a positive balance. Anything else (no key, 402,
     insufficient_funds, unreadable) closes the model slots; deterministic actions still run."""
+    if os.environ.get("SWARM_CREDIT_PROBE") == "off":
+        return bool(key)  # Workers AI relay: startup credits, no balance endpoint; the daily cap and 429s bound it
     if not key:
         return False
     import urllib.error
@@ -493,7 +495,10 @@ def pick_model(base: str, key: str, candidates: list[str]) -> tuple[str, float, 
     for c in candidates:
         if c in data:
             pricing = data[c].get("pricing") or {}
-            return c, float(pricing.get("input") or 0), float(pricing.get("output") or 0)
+            # A relay lists no prices: fall back to list price per token so the cost stop still trips.
+            p_in = float(pricing.get("input") or 0) or float(os.environ.get("SWARM_PRICE_IN_PER_M", "0.15")) / 1e6
+            p_out = float(pricing.get("output") or 0) or float(os.environ.get("SWARM_PRICE_OUT_PER_M", "0.50")) / 1e6
+            return c, p_in, p_out
     raise SystemExit(f"no candidate model available: {candidates}")
 
 
