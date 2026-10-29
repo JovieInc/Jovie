@@ -163,8 +163,8 @@ test('a red head, an armed PR, and a poison label are not rearmed', () => {
   );
 });
 
-test('every admission-blocking label, including the tim-hold variants, prevents a rearm', () => {
-  for (const label of ['tim:hold', 'hold:tim', 'tim-hold', 'do-not-merge']) {
+test('every admission-blocking label, prevents a rearm', () => {
+  for (const label of ['hold', 'gated', 'incident', 'queue-deferred']) {
     const [decision] = planVictimRearms({
       runId: 7,
       implicatedPaths: ['CLAUDE.md'],
@@ -499,10 +499,13 @@ test('rearm enqueues the verified head and does not request a merge strategy', (
     '.github/workflows/merge-queue-green-enroll.yml',
     'utf8'
   );
+  // The enroll mutation may add `jump: true` for compounding PRs; the verified head
+  // is still bound and no merge strategy is ever requested.
   assert.match(
     enroll,
-    /enqueuePullRequest\(input: \{ pullRequestId: \$id, expectedHeadOid: \$oid \}\)/
+    /enqueuePullRequest\(input: \{ pullRequestId: \$id, expectedHeadOid: \$oid(\$\{withJump \? ', jump: true' : ''\})? \}\)/
   );
+  assert.doesNotMatch(enroll, /enablePullRequestAutoMerge\(|mergeMethod:/);
 });
 
 test('a token that cannot enqueue names the PR and fails the step', () => {
