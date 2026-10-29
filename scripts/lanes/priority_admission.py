@@ -325,7 +325,8 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
         if linear_sync.claim_status(state, row["id"]) in ("superseded", "active"):
             candidates.remove(row)
             skipped[row["identifier"]] = "claim-" + str(linear_sync.claim_status(state, row["id"]))
-    receipt["skipped"] = dict(sorted(skipped.items())[:50])
+    # Ranked and Urgent skips first: the reason a Summer pick did not run must survive the receipt cap.
+    receipt["skipped"] = dict(sorted(skipped.items(), key=lambda kv: (kv[0] not in ranks, kv[0]))[:50])
     outbox = linear_sync.Outboxed(state, client)
     live_todo = list(todo)
     admitted = []
