@@ -73,6 +73,6 @@
     "/voice": ["agentic:structured-data", "copy:copy-lint"],
     "/waitlist": ["technical:html-source"],
     "/waitlist/invite": ["technical:html-source"],
-    "/youtube-thumbnails": ["agentic:structured-data", "geo:geo-sibling-links"]
+    "/youtube-thumbnails": ["agentic:structured-data"]
   }
 }
