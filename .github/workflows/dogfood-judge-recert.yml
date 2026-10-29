@@ -111,8 +111,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Check for the Doppler CLI
+        id: doppler
+        run: echo "have=$(command -v doppler >/dev/null && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: ./.github/actions/setup-doppler
+        if: steps.doppler.outputs.have != 'true'
       - name: Re-judge the latest recorded run
         env:
+          # Signing key comes from Doppler prd through the CI token, never a copy.
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_PRD }}
           SURFACE: ${{ matrix.surface }}
           RUN_STORE: ${{ vars.DOGFOOD_RUN_STORE || '' }}
         run: |
@@ -123,7 +130,8 @@ jobs:
             echo "- \`$SURFACE\`: waiting for a re-recorded run (gate closed)" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          node scripts/dogfood-judge/cli.mjs judge --surface "$SURFACE" --run "$run_dir" --sha "$GITHUB_SHA" --propose live \
+          doppler run --project jovie-web --config prd --only-secrets=DOGFOOD_JUDGE_SIGNING_KEY --no-fallback -- \
+            node scripts/dogfood-judge/cli.mjs judge --surface "$SURFACE" --run "$run_dir" --sha "$GITHUB_SHA" --propose live \
             | tee judge.json || true
           node -e 'const r=require("./judge.json"); require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, `- \`${process.env.SURFACE}\`: ${r.verdict}, ${r.findings} finding(s), ${r.blockers} blocker(s), $${r.costUsd}\n`)'
       - name: Publish the design-judge ledger (waitlist admission reads it)
@@ -134,7 +142,7 @@ jobs:
         run: |
           set -euo pipefail
           # Real judged receipts only: a stale or failing surface publishes as fail.
-          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET --no-fallback -- \
+          doppler run --project jovie-web --config prd --only-secrets=CRON_SECRET,DOGFOOD_JUDGE_SIGNING_KEY --no-fallback -- \
             node scripts/dogfood-judge/cli.mjs publish --post --prod-sha "$PROD_SHA" > publish.json
           node -e 'const p=require("./publish.json"); require("fs").appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Design leg: ${p.gateDecision.reason}\n`)'
 

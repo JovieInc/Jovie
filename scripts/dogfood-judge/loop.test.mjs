@@ -132,6 +132,16 @@ describe('publish: design-judge ledger for the waitlist gate (#23720)', () => {
         'fail'
       );
     }
+    assert.equal(
+      buildLedger({
+        registry: reg,
+        receipts: { waitlist: good },
+        resolved,
+        signingKey: '',
+      }).surfaces.waitlist.verdict,
+      'fail',
+      'no signing key available: never publish a pass'
+    );
     const stale = buildLedger({
       registry: reg,
       receipts: { waitlist: good },
