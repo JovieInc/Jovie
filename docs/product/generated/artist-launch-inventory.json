@@ -606,6 +606,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/developers/agents/page.tsx",
+      "kind": "page",
+      "route": "/developers/agents",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/developers/page.tsx",
       "kind": "page",
       "route": "/developers",

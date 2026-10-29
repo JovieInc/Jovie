@@ -7,8 +7,6 @@ import { LISTING } from '@/lib/agent-distribution/listing';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
 import { documentTitle } from '@/lib/seo/document-title';
 
-export const revalidate = false;
-
 const PAGE_URL = `${BASE_URL}${APP_ROUTES.DEVELOPERS_AGENTS}`;
 
 export const metadata: Metadata = {
