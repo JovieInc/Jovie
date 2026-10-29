@@ -6,13 +6,6 @@ import type { FocusEvent as ReactFocusEvent, ReactNode } from 'react';
 import { useLayoutEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
-/**
- * Selector for the first actionable element in a pane. Mirrors the canonical
- * focusable set; disabled controls are excluded.
- */
-const ACTIONABLE_SELECTOR =
-  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
 export interface EmptyToFilledProps {
   /** Which pane is visible. Controlled — the consumer owns the swap moment. */
   readonly state: 'empty' | 'filled';
@@ -60,6 +53,12 @@ export function EmptyToFilled({
       event.target instanceof HTMLElement ? event.target : null;
   };
 
+  const handleBlurCapture = (event: ReactFocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      lastFocusedRef.current = null;
+    }
+  };
+
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root || prevStateRef.current === state) {
@@ -86,11 +85,24 @@ export function EmptyToFilled({
       return;
     }
 
-    const next =
-      showingPane.querySelector<HTMLElement>(ACTIONABLE_SELECTOR) ??
-      showingPane;
-    next.focus({ preventScroll: true });
-    lastFocusedRef.current = next;
+    const candidates = showingPane.querySelectorAll<HTMLElement>(
+      'a[href], button, input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    for (const candidate of candidates) {
+      if (
+        candidate.matches(':disabled, input[type="hidden"]') ||
+        candidate.closest('[hidden], [inert]')
+      ) {
+        continue;
+      }
+      candidate.focus({ preventScroll: true });
+      if (root.ownerDocument.activeElement === candidate) {
+        lastFocusedRef.current = candidate;
+        return;
+      }
+    }
+    showingPane.focus({ preventScroll: true });
+    lastFocusedRef.current = showingPane;
   }, [state]);
 
   return (
@@ -101,6 +113,7 @@ export function EmptyToFilled({
       data-state={state}
       className={cn('grid grid-cols-1', className)}
       onFocusCapture={handleFocusCapture}
+      onBlurCapture={handleBlurCapture}
     >
       <div
         data-part='pane'

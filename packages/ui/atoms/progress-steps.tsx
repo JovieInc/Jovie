@@ -41,7 +41,7 @@ const MARKER_STATE_CLASSES: Record<
   { marker: string; connector: string }
 > = {
   completed: {
-    marker: 'border-transparent bg-accent text-white',
+    marker: 'border-transparent bg-accent text-(--color-accent-foreground)',
     connector: 'bg-accent',
   },
   current: {

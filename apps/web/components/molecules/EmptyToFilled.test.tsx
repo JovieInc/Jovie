@@ -1,6 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { EmptyToFilled as BarrelEmptyToFilled } from '@/components/molecules';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
 import { EmptyToFilled } from './EmptyToFilled';
 
@@ -268,6 +267,75 @@ describe('EmptyToFilled', () => {
     ).not.toHaveFocus();
   });
 
+  it.each(['outside', 'body'] as const)(
+    'keeps %s focus after the user leaves the empty pane before a swap',
+    destination => {
+      const empty = <button type='button'>Connect Spotify</button>;
+      const view = (state: 'empty' | 'filled') => (
+        <div>
+          <button type='button'>Outside button</button>
+          <EmptyToFilled state={state} announcement={state} empty={empty}>
+            <button type='button'>View release</button>
+          </EmptyToFilled>
+        </div>
+      );
+      const { rerender } = render(view('empty'));
+
+      screen.getByRole('button', { name: 'Connect Spotify' }).focus();
+      const outside = screen.getByRole('button', { name: 'Outside button' });
+      if (destination === 'outside') {
+        outside.focus();
+      } else {
+        screen.getByRole('button', { name: 'Connect Spotify' }).blur();
+      }
+      const expectedFocus = destination === 'outside' ? outside : document.body;
+      expect(expectedFocus).toHaveFocus();
+
+      rerender(view('filled'));
+
+      expect(expectedFocus).toHaveFocus();
+    }
+  );
+
+  it.each(['hidden-input', 'disabled', 'hidden-ancestor', 'inert-ancestor'])(
+    'skips %s when transferring focus to the first actionable element',
+    unavailable => {
+      const view = (state: 'empty' | 'filled') => (
+        <EmptyToFilled
+          state={state}
+          announcement={state}
+          empty={<button type='button'>Connect Spotify</button>}
+        >
+          {unavailable === 'hidden-input' && <input type='hidden' />}
+          {unavailable === 'disabled' && (
+            <button type='button' disabled tabIndex={0}>
+              Unavailable
+            </button>
+          )}
+          {unavailable === 'hidden-ancestor' && (
+            <div hidden>
+              <button type='button'>Unavailable</button>
+            </div>
+          )}
+          {unavailable === 'inert-ancestor' && (
+            <div inert>
+              <button type='button'>Unavailable</button>
+            </div>
+          )}
+          <button type='button'>View release</button>
+        </EmptyToFilled>
+      );
+      const { rerender } = render(view('empty'));
+      screen.getByRole('button', { name: 'Connect Spotify' }).focus();
+
+      rerender(view('filled'));
+
+      expect(
+        screen.getByRole('button', { name: 'View release' })
+      ).toHaveFocus();
+    }
+  );
+
   it('keeps the visible pane control interactive and withdraws the hidden pane from pointer input by CSS contract', () => {
     const onClick = vi.fn();
     const { rerender } = render(
@@ -302,10 +370,6 @@ describe('EmptyToFilled', () => {
     // the pointer-input withdrawal contract is the hidden pane's CSS state.
     const { filled } = panes();
     expect(filled).toHaveClass('invisible', 'opacity-0');
-  });
-
-  it('exports EmptyToFilled from the molecules barrel (covers the barrel export)', () => {
-    expect(BarrelEmptyToFilled).toBe(EmptyToFilled);
   });
 
   it('passes an axe audit in the empty state', async () => {

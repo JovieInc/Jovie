@@ -1,7 +1,7 @@
 import { ProgressSteps } from '@jovie/ui';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { expectNoA11yViolations } from '../../utils/a11y';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const STEPS = [
   { id: 'account', label: 'Create account' },

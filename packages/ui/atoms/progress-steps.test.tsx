@@ -186,7 +186,10 @@ describe('ProgressSteps', () => {
       .getAllByRole('listitem')
       .map(item => item.querySelector('[data-part="marker"]'))
       .at(0);
-    expect(completedMarker).toHaveClass('bg-accent', 'text-white');
+    expect(completedMarker).toHaveClass(
+      'bg-accent',
+      'text-(--color-accent-foreground)'
+    );
   });
 
   it('renders connectors only between steps, tinted when the earlier step completed', () => {
