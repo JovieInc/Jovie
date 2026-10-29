@@ -83,6 +83,7 @@ import throughput_sentinel  # noqa: E402
 import taste_default  # noqa: E402
 import yc_corpus  # noqa: E402
 import credentials_spend  # noqa: E402
+import model_family_sync  # noqa: E402
 import capacity_live  # noqa: E402  (live quota reads for the capacity registry)
 import capacity_registry  # noqa: E402  (caps and policies come from ops/registry/capacity.json)
 import design_gate  # noqa: E402  (IA-first admission for UI and landing work)
@@ -9872,6 +9873,12 @@ def finish_dispatch(host: Host, tick: dict) -> int:
                                     {"status": "not-owner", "owner": owner})
     except Exception as error:  # registry freshness never takes dispatch down
         tick["credentialsSpend"] = {"status": "error", "error": type(error).__name__}
+    try:
+        # Daily model-family sync (model_family_sync.py): provider lists -> registry PR, stale alarm.
+        owner = os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]
+        tick["modelFamilySync"] = (model_family_sync.tick(host.state, host.repo) if HOST == owner else {"status": "not-owner"})
+    except Exception as error:  # registry freshness never takes dispatch down
+        tick["modelFamilySync"] = {"status": "error", "error": type(error).__name__}
     try:
         # Live quota reads (Codex ledger, Grok /usage) for the capacity registry; metadata only.
         tick["capacityLive"] = (capacity_live.tick(host.state) if HOST == os.environ.get("CREDENTIALS_SPEND_OWNER", "gem").split(".")[0]
