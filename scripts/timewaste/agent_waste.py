@@ -212,6 +212,11 @@ def token_cost(since: float, projects_dir: Path | None = None) -> dict:
     return {"available": True, "tokens": tokens, "estUsd": round(usd, 2), "note": "local Claude Code transcripts only"}
 
 
+def time_now() -> float:
+    import time
+    return time.time()
+
+
 def collect(since: float, state: Path | None, wake: dict | None, slo_path: Path | None, fetch=_gh_json,
             projects_dir: Path | None = None) -> dict:
     ci, dup = ci_rework(since, fetch), duplicate_work(since, fetch)
@@ -219,7 +224,9 @@ def collect(since: float, state: Path | None, wake: dict | None, slo_path: Path 
     cost = token_cost(since, projects_dir)
     wake = wake or {"notifications": 0, "noOpWakes": 0}
     noop_h = wake["noOpWakes"] * NOOP_WAKE_AGENT_H
-    merged = ci.get("prs") if ci.get("available") else None
+    # Denominator: merges in the window (shipping-slo throughput), else the CI sample; never the sample when SLO exists.
+    per_day = queue.get("mergesPerDay")
+    merged = round(per_day * max(1, (time_now() - since) / 86400)) if per_day else (ci.get("prs") if ci.get("available") else None)
     wasted = sum(x for x in (ci.get("agentHours"), dup.get("agentHours"), queue.get("agentHours"),
                              lanes.get("stalledAgentHours"), round(noop_h, 1)) if x)
     return {"ci": ci, "duplicates": dup, "queue": queue, "lanes": lanes, "wakes": {**wake, "agentHours": round(noop_h, 1)},

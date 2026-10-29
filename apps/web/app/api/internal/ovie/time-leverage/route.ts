@@ -4,6 +4,7 @@ import { verifyCronRequest } from '@/lib/cron/auth';
 import { captureError } from '@/lib/error-tracking';
 import { NO_STORE_HEADERS } from '@/lib/http/headers';
 import { parseJsonBody } from '@/lib/http/parse-json';
+import { verifySummerOidcRequest } from '@/lib/ovie/summer-oidc.server';
 import {
   TIME_LEVERAGE_MAX_BYTES,
   timeLeverageSchema,
@@ -15,12 +16,15 @@ import {
 
 const ROUTE = '/api/internal/ovie/time-leverage';
 
-export async function GET(): Promise<NextResponse> {
+/** Admins read it on the ops HUD; Summer reads it with its OIDC token for the morning brief. */
+export async function GET(request: Request): Promise<NextResponse> {
   try {
-    const denied = await requireAdmin();
-    if (denied) {
-      denied.headers.set('Cache-Control', 'no-store');
-      return denied;
+    if (!(await verifySummerOidcRequest(request))) {
+      const denied = await requireAdmin();
+      if (denied) {
+        denied.headers.set('Cache-Control', 'no-store');
+        return denied;
+      }
     }
     return NextResponse.json(await loadTimeLeverage(), {
       headers: NO_STORE_HEADERS,

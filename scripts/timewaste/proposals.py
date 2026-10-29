@@ -72,7 +72,7 @@ CATALOG = [
          automation="Check merge-group parity before enqueue and route each ejection by failure class to a targeted fix.",
          reduction=0.5, confidence=0.5, cost_h=16, owner="Merge queue", needs_decision=False,
          base=lambda s: (_get(s, "queue", "agentHours"), f"{_get(s, 'queue', 'mergeGroupFailed'):.0f} of {_get(s, 'queue', 'mergeGroupRuns'):.0f} merge-group runs failed")),
-    dict(id="agent-duplicate-work", scope="agent", title="Reject duplicate builds at admission",
+    dict(id="agent-duplicate-work", scope="agent", title="Reject duplicate builds up front",
          automation="Admission rejects an issue or branch that already has an open or recently closed PR; worker prompts require search-before-build.",
          reduction=0.7, confidence=0.7, cost_h=6, owner="Symphony lanes", needs_decision=False,
          base=lambda s: (_get(s, "duplicates", "agentHours"), f"{_get(s, 'duplicates', 'builtTwice'):.0f} issues built twice, {_get(s, 'duplicates', 'closedUnmerged'):.0f} PRs closed unmerged")),
