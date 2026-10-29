@@ -22,6 +22,7 @@
  * suite; this file stays DOM-free so it can also certify server captures.
  */
 
+import { claims } from '@/lib/billing/offer/claims';
 import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import type {
   MarketingCopyLineBinding,
@@ -334,7 +335,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-pro-v1',
         controlHeadline: 'Pro plan',
         headline: 'Artist Presence',
-        body: 'Self-serve. Cancel anytime.',
+        body: `Self-serve. ${claims(['billing.cancel_short', 'billing.refund'])}`,
         supportingText: [
           'Self-serve',
           '$12/mo',
