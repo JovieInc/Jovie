@@ -253,3 +253,17 @@ describe('incident metrics', () => {
     ).toBe(true);
   });
 });
+
+describe('ambiguity', () => {
+  it('alerts instead of reverting a culprit with an unproven predecessor', () => {
+    const d = decideEject({
+      culprit: { sha: 'c', pr: 1, subject: 'feat: x (#1)' },
+      check: 'k',
+      ambiguous: true,
+    });
+    expect(d).toEqual({
+      action: 'alert',
+      reason: 'ambiguous-culprit-needs-bisect',
+    });
+  });
+});

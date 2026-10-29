@@ -187,9 +187,8 @@ export async function plan({
   }
   let attribution = attributeCulprit(evidence);
   if (attribution.status === 'ambiguous') {
-    const probe = process.env.MAIN_RED_PROBE_CMD
-      ? commandProbe(process.env.MAIN_RED_PROBE_CMD)
-      : null;
+    const probeCmd = process.env.MAIN_RED_PROBE_CMD || PROBES[check];
+    const probe = probeCmd ? commandProbe(probeCmd) : null;
     if (probe) {
       const { culprit, probes } = await bisectFirstRed(
         attribution.candidates,
@@ -232,6 +231,7 @@ export async function plan({
     priorAttempts,
     now,
     mode,
+    ambiguous: attribution.status === 'ambiguous',
     culpritLabels: (prior?.labels ?? []).map(l => l.name),
   });
   return {
@@ -254,6 +254,13 @@ export async function plan({
     priorAttempts,
   };
 }
+
+// Node-only repro commands so a bisect needs no install (same checks Main Health runs).
+const PROBES = {
+  'gate:Design Conformance': 'node scripts/design-conformance-check.mjs',
+  'test:lib/__tests__/design-surface-census.test.mjs':
+    'node scripts/design-surface-census.mjs HEAD^',
+};
 
 function commandProbe(cmd) {
   return async sha => {

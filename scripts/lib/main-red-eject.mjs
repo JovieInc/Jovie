@@ -170,10 +170,13 @@ export function decideEject({
   repairs = [],
   now = Date.now(),
   mode = 'apply',
+  ambiguous = false,
 }) {
   const no = (action, reason) => ({ action, reason });
   if (mode === 'off') return no('skip', 'kill-switch-off');
   if (!culprit) return no('alert', 'no-culprit');
+  // An unproven predecessor (fail-fast hid this gate) means the first red may be a victim.
+  if (ambiguous) return no('alert', 'ambiguous-culprit-needs-bisect');
   if (isRevertSubject(culprit.subject) || culpritLabels.includes(REVERT_LABEL))
     return no('alert', 'culprit-is-a-revert');
   if (openReverts.some(pr => pr.check === check))
