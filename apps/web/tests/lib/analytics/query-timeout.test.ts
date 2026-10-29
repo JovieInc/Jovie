@@ -169,7 +169,9 @@ describe('Query Timeout', () => {
             'current transaction is aborted, commands ignored until end of transaction block'
           )
         );
-      const db = { execute } as const;
+      const db = { execute } as unknown as Parameters<
+        typeof setStatementTimeout
+      >[0];
 
       await expect(setStatementTimeout(db, 5000)).resolves.toBeUndefined();
       expect(execute).toHaveBeenCalledTimes(1);
