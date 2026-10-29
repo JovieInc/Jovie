@@ -1,13 +1,10 @@
 {
   "_generated": {
-    "version": "f6053149fdf5",
+    "version": "093cb926ca90",
     "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
-    "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
+    "listingHash": "3dc2c64c58654c6c87790cb1d3f9b50a31b1ff4e88830fdf7eef722e0b28b2b0",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   },
-  "ready": false,
-  "blockers": [
-    "docsUrl points at /support: add a public docs page for the agent MCP before submission",
-    "icons: 512 and 1024 reuse the brand app icon; 48 and 64 PNGs still need to be exported (binary assets are blocked by repo-hygiene outside allowlisted paths)"
-  ]
+  "ready": true,
+  "blockers": []
 }

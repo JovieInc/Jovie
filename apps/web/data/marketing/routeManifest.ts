@@ -1415,6 +1415,30 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
     },
   },
   {
+    glob: '(marketing)/developers/agents/page.tsx',
+    renderedSections: [],
+    bindingEvidence: {
+      status: 'exempt',
+      source: 'JOV-9762 agent connector docs',
+      notes:
+        'Agent connector docs page is generated from the listing and tools/list snapshot; prose-led, not recipe-composable.',
+    },
+    exempt: {
+      reason:
+        'public agent connector documentation — generated reference; not recipe-composable',
+      linearId: 'JOV-9762',
+      approvedBy: 'autonomous-shipping-policy (agent)',
+      prUrl: 'https://github.com/JovieInc/Jovie/pull/23608',
+    },
+    status: 'active',
+    specVersion: '1.0.0',
+    url: '/developers/agents',
+    healthCheck: {
+      path: '/developers/agents',
+      expected: 'page',
+    },
+  },
+  {
     glob: '(marketing)/api-versioning/page.tsx',
     renderedSections: [],
     bindingEvidence: {

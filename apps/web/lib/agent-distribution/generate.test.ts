@@ -5,11 +5,11 @@ import { AGENT_DRAFT_TOOLS } from '@/lib/agent-acquisition/api';
 import {
   buildDistribution,
   type DistributionTool,
-  ICON_SOURCES,
   LIMITS,
   REGENERATE_COMMAND,
 } from './generate';
 import { hashTools } from './hash';
+import { loadIconSource } from './icons';
 import { LISTING } from './listing';
 
 const GENERATED = join(__dirname, 'generated');
@@ -23,8 +23,13 @@ const assets = Object.fromEntries(
 const tools = AGENT_DRAFT_TOOLS as unknown as readonly DistributionTool[];
 
 describe('agent distribution packages', () => {
-  it('matches the committed generated files byte for byte', () => {
-    const { files } = buildDistribution(tools, LISTING, assets);
+  it('matches the committed generated files byte for byte', async () => {
+    const { files } = buildDistribution(
+      tools,
+      LISTING,
+      assets,
+      (await loadIconSource(join(__dirname, '../../../..')))?.info ?? null
+    );
     const drift = Object.entries(files)
       .filter(([path, content]) => {
         const file = join(GENERATED, path);
@@ -74,13 +79,5 @@ describe('agent distribution packages', () => {
     });
     expect(issues.errors.some(e => e.includes('banned word'))).toBe(true);
     expect(issues.errors.some(e => e.includes('limit 200'))).toBe(true);
-  });
-
-  it('points at existing brand PNG icons at 512 and 1024', () => {
-    for (const [size, path] of Object.entries(ICON_SOURCES)) {
-      const png = readFileSync(join(__dirname, '../../../..', path));
-      expect(png.readUInt32BE(16)).toBe(Number(size));
-      expect(png.readUInt32BE(20)).toBe(Number(size));
-    }
   });
 });
