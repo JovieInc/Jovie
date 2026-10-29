@@ -72,7 +72,6 @@ export function InlineSubscribe({
         type='email'
         autoComplete='email'
         maxLength={maxLength}
-        // eslint-disable-next-line @jovie/canonical-ui-label-casing -- email placeholder literal
         placeholder={placeholder}
         aria-label={ariaLabel}
         aria-invalid={invalid ? 'true' : undefined}
