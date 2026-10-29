@@ -1,6 +1,5 @@
 import {
   MarketingHero,
-  MarketingHeroPhoto,
   MarketingPageShell,
   MarketingSurfaceCard,
 } from '@/components/marketing';
@@ -8,12 +7,6 @@ import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductClaimHandleForm } from './ProductClaimHandleForm';
 import './ProductLanding.css';
-
-const PRODUCT_HERO_PHOTO = {
-  src: '/images/marketing-hero/product.webp',
-  width: 1600,
-  height: 901,
-} as const;
 
 function ProductClaimCard() {
   const { claimCard } = PRODUCT_COPY;
@@ -85,7 +78,6 @@ export function ProductLanding() {
   return (
     <MarketingPageShell className='bg-base text-primary-token'>
       <div className='product-hero marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
-        <MarketingHeroPhoto {...PRODUCT_HERO_PHOTO} />
         <div
           aria-hidden='true'
           className='marketing-hero-backdrop pointer-events-none absolute inset-0'

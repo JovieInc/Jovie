@@ -1,0 +1,46 @@
+◇ injected env (0) from .env.test
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.fast.mts:16:41). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ target: 'esnext', format: 'esm' }`
+
+ RUN  v5.0.5 /workspace/Jovie/apps/web
+
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > returns 401 without probing when OIDC fails 7ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > uses company state without probing providers for an ordinary read 3ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > returns the predicate uncached and honors fresh=1 1ms
+ × |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > never serves a stale eligible snapshot to Summer when the producer stops 7ms
+   → expected true to be false // Object.is equality
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > rejects a pre-commerce company-state cache entry 3ms
+ ✓ |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > fails closed with an UNKNOWN verdict instead of an error 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |jsdom| tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts > GET /api/internal/ovie/summer-company/acquisition-eligibility > never serves a stale eligible snapshot to Summer when the producer stops
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts:168:27
+    166|     const response = await route.GET(new Request(URL));
+    167|     const body = await response.json();
+    168|     expect(body.eligible).toBe(false);
+       |                           ^
+    169|     expect(body.policy.outboundAcquisition).toBe('blocked');
+    170|     expect(hoisted.eligibility).not.toHaveBeenCalled();
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 5 passed (6)
+   Start at  22:56:16
+   Duration  960ms (environment 60%, transform 22%, setup 7%, import 7%, tests 3%, worker 1%)
+
+undefined
+/workspace/Jovie/apps/web:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run tests/unit/api/internal/ovie/summer-company-acquisition-eligibility.test.ts --reporter=verbose

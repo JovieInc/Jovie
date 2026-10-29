@@ -10,6 +10,7 @@ import {
   isNull,
   lte,
 } from 'drizzle-orm';
+import { externalAccountSql } from '@/lib/accounts/internal-account';
 import {
   buildEvidenceReceiptSet,
   buildMetricReceipt,
@@ -47,7 +48,6 @@ import {
 import { users } from '@/lib/db/schema/auth';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { sqlTimestamp } from '@/lib/db/sql-helpers';
-import { INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN } from '@/lib/utils/email';
 import type {
   AnalyticsRange,
   DashboardAnalyticsResponse,
@@ -780,7 +780,7 @@ export async function getCanonicalCustomerProfileExposure(
         drizzleSql`${dailyProfileViews.viewDate} >= current_date - ${windowDays}::int`,
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, true),
-        drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+        externalAccountSql()
       )
     );
 
@@ -820,7 +820,7 @@ export async function getCanonicalCustomerLinkOutcome(
         eq(clickEvents.isBot, false),
         eq(creatorProfiles.isPublic, true),
         eq(creatorProfiles.isClaimed, true),
-        drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`
+        externalAccountSql()
       )
     );
 

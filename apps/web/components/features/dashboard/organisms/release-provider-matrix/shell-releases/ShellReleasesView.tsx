@@ -32,10 +32,7 @@ import type {
   FilterPill,
 } from '@/components/shell/pill-search.types';
 import { shouldOpenSpotifyCatalogConnection } from '@/constants/routes';
-import {
-  useRegisterHeaderActions,
-  useRegisterHeaderSearch,
-} from '@/contexts/HeaderActionsContext';
+import { useRegisterHeaderActions } from '@/contexts/HeaderActionsContext';
 import { DashboardHeaderActionGroup } from '@/features/dashboard/atoms/DashboardHeaderActionGroup';
 import {
   buildReleaseActions,
@@ -135,23 +132,6 @@ function applyPills(
       return pill.op === 'is' ? anyValueMatches : !anyValueMatches;
     })
   );
-}
-
-function distinctValues(
-  releases: readonly ReleaseViewModel[],
-  pick: (r: ReleaseViewModel) => string | string[] | undefined
-): string[] {
-  const seen = new Set<string>();
-  for (const r of releases) {
-    const picked = pick(r);
-    if (Array.isArray(picked)) {
-      for (const v of picked) if (v) seen.add(v);
-    } else if (picked) {
-      seen.add(picked);
-    }
-    if (seen.size >= 200) break;
-  }
-  return [...seen];
 }
 
 // ── Empty / list content ───────────────────────────────────────────────────────
@@ -528,16 +508,6 @@ export function ShellReleasesView({
   );
 
   const visibleReleases = useMemo(() => applyPills(rows, pills), [rows, pills]);
-
-  const artistOptions = useMemo(
-    () => distinctValues(rows, r => r.artistNames),
-    [rows]
-  );
-  const titleOptions = useMemo(
-    () => distinctValues(rows, r => r.title),
-    [rows]
-  );
-  const albumOptions = titleOptions;
 
   const handleSelect = useCallback(
     (release: ReleaseViewModel) => {
@@ -974,36 +944,6 @@ export function ShellReleasesView({
   const handleClearFilters = useCallback(() => {
     setPills([]);
   }, []);
-
-  const headerSearchAdapter = useMemo(
-    () => ({
-      key: 'shell-releases',
-      pills,
-      onPillsChange: setPills,
-      artistOptions,
-      titleOptions,
-      albumOptions,
-      totalCount: rows.length,
-      visibleCount: visibleReleases.length,
-      triggerLabel:
-        pills.length > 0
-          ? `Filter Releases (${pills.length})`
-          : 'Filter Releases',
-      ariaLabel: 'Filter releases',
-      placeholder: 'Search releases',
-      allowedFields: ['artist', 'title', 'album', 'status', 'has'] as const,
-    }),
-    [
-      albumOptions,
-      artistOptions,
-      pills,
-      rows.length,
-      titleOptions,
-      visibleReleases.length,
-    ]
-  );
-
-  useRegisterHeaderSearch(headerSearchAdapter);
 
   const headerActions = useMemo(() => {
     return (
