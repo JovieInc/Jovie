@@ -69,6 +69,7 @@ const { values } = parseArgs({
     'github-output': { type: 'string' },
     'propose-baseline': { type: 'string' },
     'file-issues': { type: 'boolean', default: false },
+    'touch-file': { type: 'string' },
     'list-only': { type: 'boolean', default: false },
     preflight: { type: 'boolean', default: false },
   },
@@ -203,6 +204,15 @@ const GENERIC_STEMS = new Set([
 ]);
 /** @type {{ file: string, blob: string, testCount: number }[]} */
 const candidates = [];
+/** @type {Record<string, number>} */
+const touchByFile = values['touch-file']
+  ? Object.fromEntries(
+      JSON.parse(readFileSync(values['touch-file'], 'utf8')).map(r => [
+        r.file,
+        r.touch,
+      ])
+    )
+  : {};
 for (const file of sources) {
   const text = readModule(file);
   if (typeof text !== 'string' || text.split('\n').length > maxLoc) continue;
@@ -216,6 +226,7 @@ for (const file of sources) {
       blobs.get(`${WEB_ROOT}/${file}`) ?? '',
       testBlobsByStem.get(stem) ?? []
     ),
+    touch: touchByFile[file] ?? 0,
     testCount: !GENERIC_STEMS.has(stem) && testStems.has(stem) ? 1 : 0,
   });
 }
