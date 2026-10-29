@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AvailabilityCell } from '@/features/dashboard/organisms/releases/cells/AvailabilityCell';
 import { ProviderCell } from '@/features/dashboard/organisms/releases/cells/ProviderCell';
 import { NotFoundCopyButton } from '@/features/dashboard/organisms/releases/components/NotFoundCopyButton';
+import { ProviderCopyButton } from '@/features/dashboard/organisms/releases/components/ProviderCopyButton';
 import type { ProviderKey, ReleaseViewModel } from '@/lib/discography/types';
 
 vi.mock('@/lib/utils/platform-detection', () => ({
@@ -120,6 +121,70 @@ describe('ProviderCell actions', () => {
 });
 
 describe('Ion-token feedback on availability surfaces', () => {
+  it.each([false, true])(
+    'copies a provider link with manual=%s',
+    async isManual => {
+      const onCopy = vi.fn().mockResolvedValue(undefined);
+      render(
+        <ProviderCopyButton
+          testId='copy-provider'
+          path='/r/midnight-signal'
+          releaseTitle='Midnight Signal'
+          providerLabel='Spotify'
+          isCopied={false}
+          isManual={isManual}
+          onCopy={onCopy}
+        />
+      );
+      await userEvent.click(
+        screen.getByRole('button', { name: isManual ? 'Custom' : 'Detected' })
+      );
+      expect(onCopy).toHaveBeenCalledWith(
+        '/r/midnight-signal',
+        'Midnight Signal – Spotify',
+        'copy-provider'
+      );
+    }
+  );
+
+  it('renders copied provider feedback on the success token', () => {
+    render(
+      <ProviderCopyButton
+        testId='copy-provider'
+        path='/r/midnight-signal'
+        releaseTitle='Midnight Signal'
+        providerLabel='Spotify'
+        isCopied
+        isManual={false}
+        onCopy={vi.fn().mockResolvedValue(undefined)}
+      />
+    );
+    const button = screen.getByRole('button', { name: 'Copied!' });
+    expect(button).toHaveClass(
+      'border-success/15',
+      'bg-success/10',
+      'text-success'
+    );
+    expect(button.className).not.toMatch(/emerald|amber/);
+  });
+
+  it('does not copy a provider without a link', async () => {
+    const onCopy = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ProviderCopyButton
+        testId='copy-provider'
+        path={undefined}
+        releaseTitle='Midnight Signal'
+        providerLabel='Spotify'
+        isCopied={false}
+        isManual={false}
+        onCopy={onCopy}
+      />
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Detected' }));
+    expect(onCopy).not.toHaveBeenCalled();
+  });
+
   it('renders the manual-status ring and copied feedback on tokens inside the availability popover', async () => {
     const user = userEvent.setup();
     const onCopy = vi.fn().mockResolvedValue('copied');

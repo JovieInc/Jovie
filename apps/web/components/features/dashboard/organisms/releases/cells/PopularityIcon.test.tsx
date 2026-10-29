@@ -33,6 +33,13 @@ describe('PopularityIcon', () => {
       const control = screen.getByRole('button', {
         name: `Popularity ${popularity} out of 100`,
       });
+      const bars = Array.from(control.querySelectorAll('div'));
+      expect(
+        bars.filter(bar => bar.classList.contains('bg-accent'))
+      ).toHaveLength(popularity === 50 ? 2 : 3);
+      expect(
+        bars.filter(bar => bar.classList.contains('bg-subtle'))
+      ).toHaveLength(popularity === 50 ? 1 : 0);
       expect(control.className).not.toMatch(/amber|emerald|orange/);
       for (const bar of control.querySelectorAll('div')) {
         expect(bar.className).not.toMatch(/amber|emerald/);
