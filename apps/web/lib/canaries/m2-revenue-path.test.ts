@@ -177,7 +177,10 @@ describe('evaluateClaimSurface', () => {
     expect(
       evaluateClaimSurface({
         pricingStatus: 200,
-        pricingBody: PRICING_HTML.replace('$12', '$39'),
+        pricingBody: PRICING_HTML.replace(
+          `<span>${M2_CLAIM_PRICE_DISPLAY}</span>`,
+          '<span>$39</span>'
+        ),
         signupStatus: 200,
         signupBody: `<html><body>${'signup'.repeat(200)}<div data-auth-shell-ready="true"></div></body></html>`,
       }).detail
