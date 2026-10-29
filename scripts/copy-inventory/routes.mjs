@@ -2,7 +2,7 @@
 // judgement until real route traffic is wired in; rows inherit it, so
 // reordering this list reorders the Ovie table and nothing else.
 // `prefix` is the speakable ID prefix ("HOME-3", "SL-7"). Prefixes are unique
-// and never change once rows exist, because IDs live in ids.json.
+// and never change once rows exist, because IDs live in ids.gen.json.
 export const SITE_CHROME = {
   route: 'site',
   prefix: 'SITE',
