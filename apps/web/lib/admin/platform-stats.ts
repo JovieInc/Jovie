@@ -105,7 +105,7 @@ const getCachedAdminPlatformStats = unstable_cache(
       db.execute(drizzleSql<{ count: number }>`
           SELECT count(DISTINCT COALESCE(NULLIF(fingerprint, ''), lower(email), phone, id::text))::int AS count
           FROM audience_members
-          WHERE ${notInternalProfileSql(drizzleSql.raw('audience_members.creator_profile_id'))}
+          WHERE ${notInternalProfileSql(drizzleSql.raw('creator_profile_id'))}
         `),
       db
         .select({ count: count() })
@@ -114,7 +114,7 @@ const getCachedAdminPlatformStats = unstable_cache(
           and(
             eq(clickEvents.linkType, 'listen'),
             eq(clickEvents.isBot, false),
-            notInternalProfileSql(clickEvents.creatorProfileId)
+            notInternalProfileSql(drizzleSql.raw('creator_profile_id'))
           )
         ),
       db.execute(drizzleSql<{ email_count: number; phone_count: number }>`
@@ -122,7 +122,7 @@ const getCachedAdminPlatformStats = unstable_cache(
             count(DISTINCT lower(email)) FILTER (WHERE email IS NOT NULL AND email <> '')::int AS email_count,
             count(DISTINCT phone) FILTER (WHERE phone IS NOT NULL AND phone <> '')::int AS phone_count
           FROM notification_subscriptions
-          WHERE ${notInternalProfileSql(drizzleSql.raw('notification_subscriptions.creator_profile_id'))}
+          WHERE ${notInternalProfileSql(drizzleSql.raw('creator_profile_id'))}
         `),
       db
         .select({ count: count() })

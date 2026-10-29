@@ -92,13 +92,17 @@ export function internalEmailSql(email: SQL | AnyPgColumn): SQL {
  * is not discarded. `profileId` is the row's creator_profile_id column.
  */
 export function notInternalProfileSql(profileId: SQL | AnyPgColumn): SQL {
+  // The owner is resolved in a scalar subquery so the only tables in scope are
+  // internal_cp and internal_u; neither has a creator_profile_id column, which
+  // lets single-table callers pass an unqualified drizzleSql.raw('creator_profile_id').
   return drizzleSql`not exists (
     select 1 from creator_profiles internal_cp
-    left join user_profile_claims internal_claim
-      on internal_claim.creator_profile_id = internal_cp.id
-      and internal_claim.role = 'owner'
     join users internal_u
-      on internal_u.id = coalesce(internal_claim.user_id, internal_cp.user_id)
+      on internal_u.id = coalesce(
+        (select ic.user_id from user_profile_claims ic
+          where ic.creator_profile_id = internal_cp.id and ic.role = 'owner'
+          limit 1),
+        internal_cp.user_id)
     where internal_cp.id = ${profileId}
       and ${internalAccountSql(
         drizzleSql.raw('internal_u.email'),
