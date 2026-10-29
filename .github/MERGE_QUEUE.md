@@ -395,3 +395,17 @@ Commit signing remains an audit signal, but live ruleset `10512119` does not
 currently require signatures. Keep agent signing enabled where supported and
 use `commit-signature-check` on `main`; do not claim this as an admission gate
 until an explicit ruleset cutover is verified against native squash commits.
+
+## Auto-merge only on main-based PRs
+
+Auto-merge and enqueue belong only on a PR whose base is `main`. A stacked
+child armed against its parent branch merges into that branch, and the work
+never ships. Two layers enforce it: `assertEnrollCandidate` in
+`scripts/merge-queue-backend.mjs` refuses a non-main base (this covers green
+enroll and `drain-pr-queue.sh`), and the `Auto-Merge Base Guard` workflow
+disables auto-merge the moment it is enabled on a non-main base (covers a
+person or agent running `gh pr merge --auto`). When a parent merges,
+`Unstack Merged Parent` retargets its children to `main`, rebases them without
+the parent's squash-merged commits, then enqueues (CLEAN) or arms auto-merge
+(squash) unless the child is draft or carries an admission-blocking label.
+`QUEUE_FREEZE=1` stops the arming step; the retarget and rebase still run.
