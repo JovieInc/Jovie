@@ -1,0 +1,88 @@
+{
+  "schema": "jovie.wins-metrics/v1",
+  "at": "2026-10-29T19:36:09.030Z",
+  "winsTotal": 12,
+  "winsVerified": 1,
+  "winsClaimed": 4,
+  "winsUnverified": 3,
+  "winsNotReproduced": 1,
+  "winsPendingMerge": 3,
+  "winsPendingMeasure": 0,
+  "winsLast7d": 12,
+  "clusters": [
+    {
+      "theme": "release-reliability",
+      "total": 3,
+      "verified": 1,
+      "ready": false
+    },
+    {
+      "theme": "merge-throughput",
+      "total": 6,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "ai-quality",
+      "total": 2,
+      "verified": 0,
+      "ready": false
+    },
+    {
+      "theme": "source-of-truth",
+      "total": 1,
+      "verified": 0,
+      "ready": false
+    }
+  ],
+  "wins": [
+    {
+      "id": "win-2026-10-29-release-starvation-fix",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-29-merge-gate-runner-pool",
+      "status": "not-reproduced"
+    },
+    {
+      "id": "win-2026-10-29-auto-requeue-dropped-green-prs",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-29-preflight-ci-parity",
+      "status": "pending-merge"
+    },
+    {
+      "id": "win-2026-10-29-repo-size-headroom",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-29-sparse-checkout-reset",
+      "status": "pending-merge"
+    },
+    {
+      "id": "win-2026-10-29-summer-triage-low-effort",
+      "status": "unverified"
+    },
+    {
+      "id": "win-2026-10-29-helpfulness-score",
+      "status": "claimed"
+    },
+    {
+      "id": "win-2026-10-29-prod-golden-path-cert",
+      "status": "verified"
+    },
+    {
+      "id": "win-2026-10-29-model-registry-single-source",
+      "status": "unverified"
+    },
+    {
+      "id": "win-2026-10-29-merge-gate-hosted-runners",
+      "status": "pending-merge"
+    },
+    {
+      "id": "win-2026-10-29-remote-preflight",
+      "status": "unverified"
+    }
+  ]
+}

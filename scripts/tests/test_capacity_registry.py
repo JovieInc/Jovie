@@ -265,6 +265,8 @@ class CostPerMerge(unittest.TestCase):
 
 VECTORS = json.loads((ROOT / "scripts/tests/fixtures/capacity-pricing-vectors.json").read_text())
 MODELS = json.loads((ROOT / "scripts/backlog-orchestrator/config/model-registry.json").read_text())
+import model_families as MF  # noqa: E402  (the one family registry; no literal model ids here)
+LUNA = MF.resolve(REGISTRY, "openai:luna@latest")
 LUNA_TASK = {"inputTokens": 1_000_000, "outputTokens": 100_000, "cachedTokens": 0}
 
 
@@ -293,10 +295,12 @@ class AccessPathPricing(unittest.TestCase):
             self.assertEqual((got["class"], got["routable"]), (seat["class"], seat["routable"]), seat["name"])
 
     def test_the_same_luna_task_on_a_pro_seat_versus_the_api(self):
-        rows = CP.price_model(with_quota(400), MODELS, self.state, "gpt-5.6-luna", LUNA_TASK, NOW)
+        rows = CP.price_model(with_quota(400), MODELS, self.state, LUNA, LUNA_TASK, NOW)
         api = next(r for r in rows if r["accessPath"] == "api")
         seats = {r["account"]: r for r in rows if r["accessPath"] == "subscription"}
-        self.assertAlmostEqual(api["usd"], 0.32, places=9)
+        price = next(m for m in MODELS["models"] if m["model"] == LUNA and m["provider"] == "codex")
+        expected = price["list_price_in"] + 0.1 * price["list_price_out"]  # 1M input + 100k output tokens
+        self.assertAlmostEqual(api["usd"], expected, places=9)
         self.assertEqual(set(seats), {"current-login", "jovie-pro", "lyb-pro"})
         self.assertTrue(all(seat["usd"] < api["usd"] for seat in seats.values()))
         self.assertLess(seats["jovie-pro"]["usd"], seats["current-login"]["usd"])
@@ -305,15 +309,15 @@ class AccessPathPricing(unittest.TestCase):
 
     def test_routing_prefers_the_subsidized_seat_with_headroom_and_the_api_when_seats_are_spent(self):
         registry = with_quota(400)
-        self.assertEqual(CP.price_model(registry, MODELS, self.state, "gpt-5.6-luna", LUNA_TASK, NOW)[0]["accessPath"], "subscription")
+        self.assertEqual(CP.price_model(registry, MODELS, self.state, LUNA, LUNA_TASK, NOW)[0]["accessPath"], "subscription")
         write_live(self.state, codex_rows(100, 100, 100))
-        spent = CP.price_model(registry, MODELS, self.state, "gpt-5.6-luna", LUNA_TASK, NOW)
+        spent = CP.price_model(registry, MODELS, self.state, LUNA, LUNA_TASK, NOW)
         self.assertEqual(spent[0]["accessPath"], "api")
         self.assertTrue(all(not r["routable"] for r in spent if r["accessPath"] == "subscription"))
 
     def test_without_a_fresh_reading_or_measured_quota_a_seat_is_unknown_not_free_money(self):
         write_live(self.state, {})
-        rows = CP.price_model(REGISTRY, MODELS, self.state, "gpt-5.6-luna", LUNA_TASK, NOW)
+        rows = CP.price_model(REGISTRY, MODELS, self.state, LUNA, LUNA_TASK, NOW)
         seat = next(r for r in rows if r["accessPath"] == "subscription")
         self.assertIsNone(seat["usd"])
         self.assertEqual(seat["class"], "unknown")

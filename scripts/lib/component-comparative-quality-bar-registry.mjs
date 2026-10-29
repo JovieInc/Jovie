@@ -70,9 +70,9 @@ export const QUALITY_BAR_REFERENCES = deepFreeze({
 export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([
   {
     root: 'packages/ui/atoms',
-    total: 39,
+    total: 41,
     sourceSetSha256:
-      'd8e40eac1840ee47fc6d73a0474acb268795aee455acbe9fe87cdd28a8880e49',
+      'fafa4586e3f254203ca1c1d8415407eb78c0413dc55b1f9254589b1749af317c',
   },
   {
     root: 'apps/web/components/**/atoms',
@@ -82,9 +82,9 @@ export const ATOM_MOLECULE_INVENTORY_RATCHET = deepFreeze([
   },
   {
     root: 'apps/web/components/**/molecules',
-    total: 172,
+    total: 174,
     sourceSetSha256:
-      '62a04dc92c3391f97017c7ec0485d0549d8b908d0094c182f09c8c8b3f020b1d',
+      'bf72e293ce9665013ca1e6ab47db8f569e849ee6c39ae328ffc283fb5db89264',
   },
   {
     root: 'registered-out-of-taxonomy/atoms',

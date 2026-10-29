@@ -45,6 +45,7 @@ import {
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
+import { remoteHint } from './lib/remote-hint.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HEAP_MB = process.env.JOVIE_PREFLIGHT_HEAP_MB || '4096';
@@ -62,8 +63,8 @@ export const HEAVY_GUARDS = new Set([
 export const NARROWED = {
   'merge-group-unit-guards': {
     command:
-      'node scripts/design-system-source-ratchet.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
-    note: 'source identity, metrics-layer and locked chrome; full suite with --thorough',
+      'node scripts/design-system-source-ratchet.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts',
+    note: 'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough',
   },
 };
 
@@ -397,6 +398,8 @@ export async function main({
     return 0;
   }
   const cwd = args.repo;
+  const hint = remoteHint({ env });
+  if (hint) log(hint);
   // Fail fast before any check runs against an install this worktree did not make.
   const install = checkInstallMatchesLockfile({ repo: cwd });
   if (!install.ok) {
@@ -510,6 +513,24 @@ export async function main({
       'ownership registry',
       'node scripts/ownership-registry.mjs --report',
       1
+    );
+  // One source of truth per fact (canon/SOURCES_OF_TRUTH.md): the map must stay
+  // sound whenever it, the rule or an owner file changes.
+  if (
+    any(
+      /^(?:canon\/(?:sources-of-truth\.json|SOURCES_OF_TRUTH\.md)|\.claude\/rules\/source-of-truth\.md|scripts\/(?:lib\/)?sources-of-truth|apps\/web\/lib\/(?:config\/plan-prices|entitlements\/registry|analytics\/data-retention)|ops\/registry\/)/
+    )
+  )
+    cmd(
+      'sources-of-truth',
+      'sources-of-truth map',
+      'node scripts/sources-of-truth.mjs'
+    );
+  if (any(/^apps\/(?:web|docs)\/(?:app|components|data|content|lib)\//))
+    cmd(
+      'duplicate-literals',
+      'no copied owner values (prices, names, retention, limits)',
+      'node scripts/invariants/duplicate-literals.mjs'
     );
   if (any(/(?:^|\/)package\.json$|pnpm-lock\.yaml$/))
     cmd(

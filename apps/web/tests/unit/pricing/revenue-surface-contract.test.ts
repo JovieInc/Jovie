@@ -114,7 +114,9 @@ describe('revenue-surface contract (JOV-7809)', () => {
     // The paid offer's outcome claims are the contract — revenue surfaces
     // must not invent capabilities beyond the registry. JOV-7794: the plan
     // tagline names certified capabilities; monitoring is internal-only.
-    expect(ARTIST_VISIBILITY_OFFER.pro.outcomes.length).toBeGreaterThan(0);
+    // The uncertified monitoring/agentic-fix outcomes were removed from the
+    // offer (MVP pricing audit, 2026-10-29); none may come back.
+    expect(ARTIST_VISIBILITY_OFFER.pro).not.toHaveProperty('outcomes');
     expect(ENTITLEMENT_REGISTRY.pro.marketing.tagline).toContain(
       'Take payments'
     );

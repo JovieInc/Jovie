@@ -69,12 +69,13 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | iOS/macOS | [ios](.claude/rules/ios.md) / [macos](.claude/rules/macos.md) |
 | Pen canvas/registry | [pen](.claude/rules/pen.md) |
 | Skills | [gstack](.claude/rules/gstack.md) |
+| New fact (price, limit, copy) | [owner first](.claude/rules/source-of-truth.md): `canon/sources-of-truth.json`; derive, never copy |
 
 Other scoped rules: ci-branching, event-driven, infra, linear, motion,
 pr-stacking, swarm, hermes-air.
 Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:22 -->
+<!-- doc-freshness:scoped-rules-count:23 -->
 
 ## Tools and workflow
 
@@ -84,8 +85,8 @@ gates, or use `--no-verify`.
 
 Select skills by intent; load their entry and references. Edit `.tmpl` sources
 and regenerate. CLAUDE.md stays a router; use Playwright only for repo web QA.
-Message agents: `jovie mesh send/read`. Batch independent reads, serialize
-state changes, require evidence for delegated work.
+Message agents: `jovie mesh send/read`. Batch independent reads; serialize
+state changes.
 
 Run `pnpm preflight:changed` before every push.
 Before publication follow `docs/PR_FLOW.md`: coherent draft → rolling CI → review
@@ -102,7 +103,6 @@ present them as live model or UI proof. UI changes require state coverage
 and layout stability; DESIGN.md lists bounded disclosure exceptions.
 
 Run narrow checks first; broaden for changed boundaries, failures, or required CI
-coverage. Skip redundant reruns. Report changes, exact checks, failures, and
-limitations. Do not infer local source, hosted CI, native merge queue, deployed
-build, or observed runtime from each other. Preserve the goal and user
-corrections across compaction; resume at the next unfinished step.
+coverage. Report changes, exact checks, failures, and
+limitations. Do not infer local source, hosted CI, merge queue, deployed
+build, or runtime from each other. Keep the goal and user corrections.

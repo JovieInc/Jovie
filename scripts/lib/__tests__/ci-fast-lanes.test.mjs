@@ -247,7 +247,9 @@ const WEB_CI_CONTRACT_TESTS_COMMAND = webCiContractTestsCommand(
     '..',
     '..',
     'apps/web/tests/quarantine.json'
-  )
+  ),
+  // The deploy contract runs by name regardless of its quarantine membership.
+  ['tests/unit/ci/deploy-workflow.test.ts']
 );
 const STRUCTURAL_RUNNER_COVERAGE_COMMAND =
   'pnpm exec vitest --root scripts --config vitest.config.mts run lib/__tests__/ci-fast-lanes.test.mjs lib/__tests__/ci-fast-workflow-contract.test.mjs --coverage --coverage.include=ci-fast-lanes.mjs --coverage.include=invariants/scanned-paths.mjs --coverage.include=lib/ci-repo-lanes.mjs --coverage.reporter=text --coverage.reporter=json --coverage.reportsDirectory="${RUNNER_TEMP:-/tmp}/jovie-ci-fast-structural-coverage" --coverage.thresholds.statements=30 --coverage.thresholds.lines=32 --coverage.thresholds.branches=24 --coverage.thresholds.functions=27';
@@ -1802,11 +1804,40 @@ describe('webCiContractTestsCommand', () => {
     }
   });
 
-  it('excludes the live ledger deploy-workflow quarantine', () => {
-    expect(WEB_CI_CONTRACT_TESTS_COMMAND).toContain(
-      '--exclude=tests/unit/ci/deploy-workflow.test.ts'
-    );
-  });
+  it.each([true, false])(
+    'excludes separately run contracts exactly once with deploy quarantined=%s',
+    quarantined => {
+      const dir = mkdtempSync(join(tmpdir(), 'ci-contract-membership-'));
+      const ledger = join(dir, 'quarantine.json');
+      const deploy = 'tests/unit/ci/deploy-workflow.test.ts';
+      const other = 'tests/unit/ci/quarantine-fixture.test.ts';
+      try {
+        writeFileSync(
+          ledger,
+          JSON.stringify({
+            entries: [
+              { kind: 'unit', path: other },
+              ...(quarantined ? [{ kind: 'unit', path: deploy }] : []),
+            ],
+          })
+        );
+        const command = webCiContractTestsCommand(ledger, [deploy]);
+        const { options } = parseCLI(
+          command.replace('pnpm --filter @jovie/web exec ', '')
+        );
+        expect(options.exclude).toEqual(
+          [
+            deploy,
+            other,
+            'tests/unit/ci/playwright-artifact-secrets.test.ts',
+            'tests/unit/ci/production-marker-state.test.ts',
+          ].sort()
+        );
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
 });
 
 describe('failure annotation helpers', () => {

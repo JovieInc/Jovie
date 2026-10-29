@@ -232,13 +232,13 @@ export const GOLDEN_PATH_CLAIMS: readonly GoldenPathClaim[] = [
     evidence: { class: 'computed', slot: 'assembled-profile' },
   },
   {
-    id: 'upgrade.checkout.payments',
+    id: 'upgrade.checkout.release-emails',
     step: 'upgrade',
     route: APP_ROUTES.ONBOARDING_CHECKOUT,
     source: CHECKOUT_CLIENT,
-    copy: 'Take tips and payments on your profile',
+    copy: 'Email your verified subscribers when new music drops',
     nature: 'capability',
-    capabilityIds: ['pay'],
+    capabilityIds: ['artist-notifications'],
   },
   {
     id: 'pricing.pro.note',
