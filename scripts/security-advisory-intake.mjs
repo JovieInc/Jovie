@@ -9,10 +9,10 @@
 // Env: GH_TOKEN (deployments), ALERTS_TOKEN (Dependabot alerts read; falls back
 // to GH_TOKEN), LINEAR_API_KEY, GITHUB_REPOSITORY, RECEIPT_PATH.
 
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { runGh } from '../packages/api-client/gh.ts';
 import { resolveLabelId } from './deprecation-intake.mjs';
 import {
   closeLinearIssueByFingerprint,
@@ -28,30 +28,31 @@ import {
 export const MAX_UPSERTS_PER_RUN = 60;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-function gh(args, token, { paginate = true } = {}) {
+async function gh(args, token, { paginate = true } = {}) {
   const env = token ? { ...process.env, GH_TOKEN: token } : process.env;
-  const out = JSON.parse(
-    execFileSync(
-      'gh',
-      ['api', ...(paginate ? ['--paginate', '--slurp'] : []), ...args],
-      {
-        encoding: 'utf8',
-        env,
-        maxBuffer: 64 * 1024 * 1024,
-      }
-    )
+  const result = await runGh(
+    ['api', ...(paginate ? ['--paginate', '--slurp'] : []), ...args],
+    { env, priority: 'report' }
   );
+  if (result.code !== 0)
+    throw Object.assign(
+      new Error(`GitHub advisory read failed (exit ${result.code}).`),
+      { exitCode: result.code }
+    );
+  const out = JSON.parse(result.stdout);
   return paginate ? out.flat() : out;
 }
 
-export function latestProductionDeploy(repo, token) {
-  const deployments = gh([`repos/${repo}/deployments?per_page=40`], token, {
-    paginate: false,
-  });
+export async function latestProductionDeploy(repo, token) {
+  const deployments = await gh(
+    [`repos/${repo}/deployments?per_page=40`],
+    token,
+    { paginate: false }
+  );
   for (const d of deployments
     .filter(x => /^production/i.test(x.environment))
     .slice(0, 12)) {
-    const [status] = gh(
+    const [status] = await gh(
       [`repos/${repo}/deployments/${d.id}/statuses?per_page=1`],
       token,
       { paginate: false }
@@ -96,16 +97,16 @@ async function main() {
   const alertsToken = process.env.ALERTS_TOKEN || process.env.GH_TOKEN;
   const now = new Date();
   const alerts = [
-    ...gh(
+    ...(await gh(
       [`repos/${repo}/dependabot/alerts?state=open&per_page=100`],
       alertsToken
-    ),
-    ...gh(
+    )),
+    ...(await gh(
       [`repos/${repo}/dependabot/alerts?state=fixed&per_page=100`],
       alertsToken
-    ),
+    )),
   ];
-  const deployedAt = latestProductionDeploy(repo, process.env.GH_TOKEN);
+  const deployedAt = await latestProductionDeploy(repo, process.env.GH_TOKEN);
   const exceptions = JSON.parse(
     readFileSync(
       path.join(ROOT, 'scripts/security/advisory-exceptions.json'),
@@ -195,5 +196,10 @@ async function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  await main();
+  try {
+    await main();
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = error.exitCode ?? 1;
+  }
 }

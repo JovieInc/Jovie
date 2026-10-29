@@ -1,8 +1,22 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { credentialState } from '../packages/api-client/policy.ts';
+import {
+  FileLedgerStore,
+  hashCredential,
+} from '../packages/api-client/store.ts';
 import {
   advisoryFingerprint,
   groupAlerts,
@@ -16,6 +30,89 @@ import { stageMetrics } from './security-advisory-intake.mjs';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const NOW = new Date('2026-10-25T12:00:00Z');
 const hoursAgo = h => new Date(NOW.getTime() - h * 3_600_000).toISOString();
+
+function cliFixture(t) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'advisory-api-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(path.join(dir, 'bin'));
+  const called = path.join(dir, 'called');
+  writeFileSync(
+    path.join(dir, 'bin/gh'),
+    `#!/usr/bin/env node
+const args = process.argv.slice(2);
+require('node:fs').appendFileSync(${JSON.stringify(called)}, JSON.stringify({args, token: process.env.GH_TOKEN}) + '\\n');
+const endpoint = args.find(a => a.startsWith('repos/'));
+let body = [];
+if (endpoint.includes('/deployments?')) body = [{id: 7, environment: 'Production', created_at: '2026-10-25T12:00:00Z'}];
+if (endpoint.includes('/statuses?')) body = [{state: 'success'}];
+if (args.includes('--paginate')) body = [body];
+const json = JSON.stringify(body);
+console.log(args.includes('--include') ? 'HTTP/2.0 200 OK\\n\\n' + json : json);
+`,
+    { mode: 0o755 }
+  );
+  const env = {
+    ...process.env,
+    PATH: `${path.join(dir, 'bin')}:${process.env.PATH}`,
+    GH_TOKEN: 'fixture-default-credential',
+    GITHUB_TOKEN: '',
+    ALERTS_TOKEN: 'fixture-alerts-credential',
+    JOVIE_GITHUB_CREDENTIAL: '',
+    JOVIE_API_STATE_DIR: dir,
+    GITHUB_REPOSITORY: 'fixture/repo',
+    RECEIPT_PATH: path.join(dir, 'receipt.json'),
+  };
+  const run = (args = ['--check']) =>
+    spawnSync(
+      process.execPath,
+      [path.join(ROOT, 'scripts/security-advisory-intake.mjs'), ...args],
+      { env, encoding: 'utf8', timeout: 10_000 }
+    );
+  return { dir, called, env, run };
+}
+
+test('CLI defers exhausted shared quota before invoking GitHub', async t => {
+  const { dir, called, env, run } = cliFixture(t);
+  const store = new FileLedgerStore(dir);
+  await store.transact('github', ledger => {
+    const now = Date.now();
+    const state = credentialState(
+      ledger,
+      hashCredential('github', env.ALERTS_TOKEN),
+      now
+    );
+    state.buckets.core = {
+      limit: 5000,
+      remaining: 0,
+      resetAt: now + 3_600_000,
+      observedAt: now,
+    };
+  });
+  const result = run();
+  assert.equal(result.status, 75, result.stderr);
+  assert.equal(existsSync(called), false, 'quota denial must prevent the call');
+});
+
+test('CLI preserves alert pagination and separate deployment credentials', t => {
+  const { called, env, run } = cliFixture(t);
+  const result = run(['--dry-run']);
+  assert.equal(result.status, 0, result.stderr);
+  const receipt = JSON.parse(readFileSync(env.RECEIPT_PATH, 'utf8'));
+  assert.equal(receipt.open, 0);
+  assert.equal(receipt.stages.latestProductionDeployAt, '2026-10-25T12:00:00Z');
+  const calls = readFileSync(called, 'utf8')
+    .trim()
+    .split('\n')
+    .map(line => JSON.parse(line));
+  assert.deepEqual(
+    calls.map(c => c.token),
+    [env.ALERTS_TOKEN, env.ALERTS_TOKEN, env.GH_TOKEN, env.GH_TOKEN]
+  );
+  assert.deepEqual(
+    calls.map(c => c.args.includes('--paginate')),
+    [true, true, false, false]
+  );
+});
 
 function alert(
   n,
