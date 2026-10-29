@@ -12,7 +12,7 @@
   {
     "file": ".claude/rules/code-style.md",
     "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
-    "bodySha256": "d5f52bdb4af7fb39e6cf4eef8aaade5edbd285d900a3d13f9bf55f57f315d182"
+    "bodySha256": "4e7eca180165c77185f44e1466ac381dfca05c3944d75804d95b910adb8f12ba"
   },
   {
     "file": ".claude/rules/db.md",
