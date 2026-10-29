@@ -31,6 +31,17 @@ describe('fleet registry (committed data)', () => {
     expect(registry.agents.some(a => /groxy/i.test(a.id))).toBe(false);
     expect(registry.unresolved.map(u => u.name)).toContain('Groxy');
   });
+  it('records local subscription proxies as forbidden and Hyperagent models without Opus', () => {
+    const r = loadAll().registry;
+    for (const id of ['cliproxyapi', 'kimi-coding-oauth-proxy', 'grok-cli']) {
+      const a = r.agents.find(x => x.id === id);
+      expect(a.tos.verdict).toBe('forbidden');
+      expect(a.standingWorkloads).toEqual([]);
+    }
+    expect(
+      r.agents.find(x => x.id === 'hyperagent').limits.models
+    ).not.toContain('claude-opus-5-5');
+  });
   it('never routes the forbidden Claude subscription lane', () => {
     const lane = agent(loadAll(), 'lane-claude');
     expect(lane.tos.verdict).toBe('forbidden');

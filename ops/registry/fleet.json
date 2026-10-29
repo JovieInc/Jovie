@@ -91,7 +91,7 @@
   "unresolved": [
     {
       "name": "Groxy",
-      "note": "Named in the 2026-10-28 brief but defined in no registry, canon file, memory note or gbrain page. Not registered. Tim to say what it is (or confirm it is Grokbot's mesh or Grok account)."
+      "note": "Not defined in any registry, canon file, memory note or gbrain page. Coordinator thinks it is the local subscription proxies (cliproxyapi, kimi-coding-oauth-proxy, grok CLI, Grok Bot app); those are now registered as forbidden entries. Still unconfirmed by Tim."
     }
   ],
   "agents": [
@@ -168,7 +168,10 @@
         "listUsdMonthly": null,
         "note": "Plan and price not recorded."
       },
-      "box": { "has": "unknown", "notes": "Not recorded." },
+      "box": {
+        "has": "unknown",
+        "notes": "Not recorded."
+      },
       "tos": {
         "verdict": "unverified",
         "basis": "Nothing recorded about what Dots is or how it is run.",
@@ -204,10 +207,13 @@
         "billedUsdMonthly": 99,
         "note": "Promo until about 2026-12-01 (capacity registry)."
       },
-      "box": { "has": "unknown", "notes": "Not recorded." },
+      "box": {
+        "has": "unknown",
+        "notes": "Not recorded."
+      },
       "tos": {
         "verdict": "unverified",
-        "basis": "xAI terms for automated use of the consumer Grok plan not read. Only mesh-delivered tasks that Grokbot itself picks up are in scope; never script the Grok consumer UI.",
+        "basis": "xAI terms for automated use of the consumer Grok plan not read. Only mesh-delivered tasks that Grokbot itself picks up are in scope; never script the Grok consumer UI. Grok Bot used through its own app interface stays unverified pending its terms; the consumer Grok CLI and proxies are separate entries and forbidden.",
         "checkedAt": null
       },
       "verified": {
@@ -239,7 +245,10 @@
         "billedUsdMonthly": 99,
         "note": "See xai-grok."
       },
-      "box": { "has": true, "notes": "Runs on the Gem host." },
+      "box": {
+        "has": true,
+        "notes": "Runs on the Gem host."
+      },
       "tos": {
         "verdict": "unverified",
         "basis": "Terms for unattended use of the Grok plan from a server not read.",
@@ -270,8 +279,14 @@
         "usage": "capped-quota",
         "note": "Capped; burn the quota before each reset. Reset cadence and remaining quota are not recorded or readable."
       },
-      "cost": { "listUsdMonthly": null, "note": "Plan not recorded." },
-      "box": { "has": "unknown", "notes": "Not recorded." },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Plan not recorded."
+      },
+      "box": {
+        "has": "unknown",
+        "notes": "Not recorded."
+      },
       "tos": {
         "verdict": "unverified",
         "basis": "Meta terms for automated use of the Muse agent not read.",
@@ -294,7 +309,8 @@
       "route": {
         "kind": "hyperagent-mcp",
         "endpoint": "https://hyperagent.com/api/mcp",
-        "note": "Account-level OAuth MCP: start a thread on a personal, shared or team agent, follow the run, read results (skills/hyperagent/SKILL.md). Webhook triggers exist per hosted agent for internal briefs."
+        "executor": "Mac or Gem `hyperagent execute` (OAuth token at ~/.config/hyperagent/mcp-oauth.json, mode 0600) running a task it picks up from the mesh. The token is not copied to Vercel.",
+        "note": "Account-level OAuth MCP: start a thread, follow the run, read results (skills/hyperagent/SKILL.md)."
       },
       "capabilities": [
         "research",
@@ -309,7 +325,8 @@
         "usage": "credits",
         "perRunCapUsd": 10,
         "softRunsPerDay": 24,
-        "note": "Spend the credits before they expire; pace by balance over days left (capacity registry)."
+        "note": "Spend the credits before they expire; pace by balance over days left (capacity registry). `hyperagent models --json` lists only GLM 5.3 Flash, GLM 5.3 and astra: Opus 5.5 is not selectable (2026-10-28).",
+        "models": ["z-ai/glm-5.3-flash", "z-ai/glm-5.3", "astra"]
       },
       "cost": {
         "listUsdMonthly": null,
@@ -354,8 +371,14 @@
         "usage": "credits",
         "note": "Shares the Hyperagent credits."
       },
-      "cost": { "listUsdMonthly": null, "note": "See hyperagent." },
-      "box": { "has": "unknown", "notes": "Not recorded." },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "See hyperagent."
+      },
+      "box": {
+        "has": "unknown",
+        "notes": "Not recorded."
+      },
       "tos": {
         "verdict": "allowed",
         "basis": "Same documented MCP route as hyperagent.",
@@ -385,8 +408,14 @@
         "usage": "subscription-pool",
         "note": "Shared weekly window across ChatGPT Pro accounts; preserve the pool; unused quota is lost at reset (capacity registry)."
       },
-      "cost": { "listUsdMonthly": 200, "note": "ChatGPT Pro per account." },
-      "box": { "has": true, "notes": "Runs on the Gem host." },
+      "cost": {
+        "listUsdMonthly": 200,
+        "note": "ChatGPT Pro per account."
+      },
+      "box": {
+        "has": true,
+        "notes": "Runs on the Gem host."
+      },
       "tos": {
         "verdict": "conditional",
         "basis": "Codex CLI is a first-party tool and `codex exec` is its documented non-interactive mode. Whether unattended server use of a ChatGPT-plan login, and one login leased across runs, is covered by the plan terms is not verified here.",
@@ -418,8 +447,14 @@
         "usage": "subscription-pool",
         "note": "Draws the same shared Codex window."
       },
-      "cost": { "listUsdMonthly": 200, "note": "ChatGPT Pro per account." },
-      "box": { "has": "unknown", "notes": "Wherever the session runs." },
+      "cost": {
+        "listUsdMonthly": 200,
+        "note": "ChatGPT Pro per account."
+      },
+      "box": {
+        "has": "unknown",
+        "notes": "Wherever the session runs."
+      },
       "tos": {
         "verdict": "allowed-by-design",
         "basis": "A person-run interactive session using the product as designed; Summer only leaves messages in a mailbox the session reads.",
@@ -450,8 +485,14 @@
         "usage": "subscription-pool",
         "note": "Frontier work only (capacity registry)."
       },
-      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
-      "box": { "has": "unknown", "notes": "Wherever the session runs." },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Not recorded."
+      },
+      "box": {
+        "has": "unknown",
+        "notes": "Wherever the session runs."
+      },
       "tos": {
         "verdict": "allowed-by-design",
         "basis": "Person-run interactive sessions. This verdict does not cover server automation on the subscription; see lane-claude.",
@@ -471,12 +512,24 @@
       "label": "Gem lane: claude",
       "kind": "provider-lane",
       "status": "disabled",
-      "route": { "kind": "none", "note": "Disabled." },
+      "route": {
+        "kind": "none",
+        "note": "Disabled."
+      },
       "capabilities": [],
       "capabilitySource": "canon/agent-identities.json",
-      "limits": { "usage": "subscription-pool", "note": "Not routable." },
-      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
-      "box": { "has": true, "notes": "Gem host." },
+      "limits": {
+        "usage": "subscription-pool",
+        "note": "Not routable."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Not recorded."
+      },
+      "box": {
+        "has": true,
+        "notes": "Gem host."
+      },
       "tos": {
         "verdict": "forbidden",
         "basis": "Anthropic requires an API key for Agent SDK and server use; the Claude subscription is not a legitimate route for server automation (Tim, 2026-10-28). Anything that still runs `claude -p` on the subscription (scripts/lanes/reason_lane.py) is being moved to Hyperagent or the Gateway.",
@@ -493,32 +546,38 @@
       "id": "cursor",
       "identityId": "cursor",
       "capacityProviderId": null,
-      "label": "Cursor (golden-path prod autofix)",
+      "label": "Cursor (Ultra: CLI, cloud agents, Origin automations)",
       "kind": "bot",
-      "status": "active",
+      "status": "pending-auth",
       "route": {
-        "kind": "none",
-        "note": "Triggered by the golden-path production alert flow, not dispatchable by Summer. How it is wired is not recorded here."
+        "kind": "cursor-cli",
+        "note": "Headless `cursor-agent -p --mode ask` (read-only) on the Mac or Gem; documented in the CLI help for scripts and non-interactive use. Cursor Origin (cursor.com/codebase/jovie) cloud agents and automations are a second route; no API route verified. Not dispatchable until the CLI is authenticated."
       },
-      "capabilities": ["code"],
-      "capabilitySource": "canon/agent-identities.json (name and owner only)",
-      "limits": { "usage": "unknown", "note": "Not recorded." },
-      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
+      "capabilities": ["code", "code-review", "analysis"],
+      "capabilitySource": "Tim/coordinator, 2026-10-28 (Cursor Ultra; Origin syncs all repos with cloud agents and automations). Not observed.",
+      "limits": {
+        "usage": "unknown",
+        "note": "Ultra plan limits not readable: cursor-agent reports Authentication required (no CURSOR_API_KEY, no login). Record limits after login."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Cursor Ultra per Tim; price not recorded."
+      },
       "box": {
         "has": "unknown",
-        "notes": "Cursor cloud agent environment; not recorded."
+        "notes": "Origin cloud agents run in Cursor-hosted environments; per-agent machine access not recorded."
       },
       "tos": {
-        "verdict": "unverified",
-        "basis": "Cursor terms not read.",
+        "verdict": "allowed-by-design",
+        "basis": "The CLI documents --print for scripts and non-interactive use and Cursor markets background/cloud agents for dispatch; Cursor terms were not read, so no allowed verdict yet.",
         "checkedAt": null
       },
       "verified": {
         "level": "unverified",
         "asOf": "2026-10-28",
-        "evidence": "Identity exists, owner gem-ci-repair."
+        "evidence": "cursor-agent 2026.09.02 installed; headless run fails with Authentication required using existing auth."
       },
-      "standingWorkloads": []
+      "standingWorkloads": ["pr-review"]
     },
     {
       "id": "chloe",
@@ -534,9 +593,18 @@
       },
       "capabilities": ["planning", "orchestration"],
       "capabilitySource": "Tim, 2026-10-28 (release-to-launch plan of record)",
-      "limits": { "usage": "unknown", "note": "Not recorded." },
-      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
-      "box": { "has": false, "notes": "A desktop app window." },
+      "limits": {
+        "usage": "unknown",
+        "note": "Not recorded."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Not recorded."
+      },
+      "box": {
+        "has": false,
+        "notes": "A desktop app window."
+      },
       "tos": {
         "verdict": "restricted",
         "basis": "Typing into the ChatGPT consumer app with a UI driver is UI automation of a consumer product; terms not read. Use the mesh, where Chloe consumes her own mailbox.",
@@ -563,9 +631,18 @@
       },
       "capabilities": ["dogfood", "browser"],
       "capabilitySource": "memory project_office_hud_aeon (tests the HUD and Summer chat)",
-      "limits": { "usage": "unknown", "note": "Not recorded." },
-      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
-      "box": { "has": true, "notes": "Office MacBook Air." },
+      "limits": {
+        "usage": "unknown",
+        "note": "Not recorded."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Not recorded."
+      },
+      "box": {
+        "has": true,
+        "notes": "Office MacBook Air."
+      },
       "tos": {
         "verdict": "allowed-by-design",
         "basis": "Receives tasks over our own mesh.",
@@ -592,9 +669,18 @@
       },
       "capabilities": [],
       "capabilitySource": "No capability list recorded.",
-      "limits": { "usage": "unknown", "note": "Not recorded." },
-      "cost": { "listUsdMonthly": null, "note": "Not recorded." },
-      "box": { "has": "unknown", "notes": "Not recorded." },
+      "limits": {
+        "usage": "unknown",
+        "note": "Not recorded."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Not recorded."
+      },
+      "box": {
+        "has": "unknown",
+        "notes": "Not recorded."
+      },
       "tos": {
         "verdict": "unverified",
         "basis": "Nothing recorded.",
@@ -620,9 +706,18 @@
       },
       "capabilities": ["code"],
       "capabilitySource": "capacity registry",
-      "limits": { "usage": "free", "note": "Not routable." },
-      "cost": { "listUsdMonthly": 0, "note": "Free plan, disabled." },
-      "box": { "has": "unknown", "notes": "Not recorded." },
+      "limits": {
+        "usage": "free",
+        "note": "Not routable."
+      },
+      "cost": {
+        "listUsdMonthly": 0,
+        "note": "Free plan, disabled."
+      },
+      "box": {
+        "has": "unknown",
+        "notes": "Not recorded."
+      },
       "tos": {
         "verdict": "unverified",
         "basis": "Not read; unavailable anyway.",
@@ -642,15 +737,24 @@
       "label": "Gem lane: kimi",
       "kind": "provider-lane",
       "status": "disabled",
-      "route": { "kind": "none", "note": "Disabled; plan unverified." },
+      "route": {
+        "kind": "none",
+        "note": "Disabled; plan unverified."
+      },
       "capabilities": [],
       "capabilitySource": "capacity registry",
-      "limits": { "usage": "capped-quota", "note": "Not routable." },
+      "limits": {
+        "usage": "capped-quota",
+        "note": "Not routable."
+      },
       "cost": {
         "listUsdMonthly": 200,
         "note": "Verify the plan is still paid before counting it."
       },
-      "box": { "has": true, "notes": "Gem host." },
+      "box": {
+        "has": true,
+        "notes": "Gem host."
+      },
       "tos": {
         "verdict": "unverified",
         "basis": "Not read; unavailable anyway.",
@@ -660,6 +764,117 @@
         "level": "config",
         "asOf": "2026-10-28",
         "evidence": "Disabled in identities."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "cliproxyapi",
+      "identityId": null,
+      "capacityProviderId": null,
+      "label": "CLIProxyAPI (Homebrew service)",
+      "kind": "local-proxy",
+      "status": "running",
+      "route": {
+        "kind": "none",
+        "note": "Exposes consumer CLI subscriptions as an OpenAI-compatible API (probably including Grok; not verified)."
+      },
+      "capabilities": [],
+      "capabilitySource": "Coordinator, 2026-10-28 (likely what the brief called Groxy). Not independently inspected beyond service presence.",
+      "limits": {
+        "usage": "unknown",
+        "note": "Draws a consumer subscription."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Not recorded."
+      },
+      "box": {
+        "has": true,
+        "notes": "Runs on the Mac."
+      },
+      "tos": {
+        "verdict": "forbidden",
+        "basis": "Standing rule: consumer-subscription CLIs and proxies are banned as automation backends. Do not dispatch through it; not stopped or removed pending a call by Tim.",
+        "checkedAt": "2026-10-28"
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Service present on the Mac (launchctl)."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "kimi-coding-oauth-proxy",
+      "identityId": null,
+      "capacityProviderId": null,
+      "label": "Kimi coding OAuth proxy (com.jovie.kimi-coding-oauth-proxy)",
+      "kind": "local-proxy",
+      "status": "running",
+      "route": {
+        "kind": "none",
+        "note": "Local launchd proxy for the Kimi coding plan."
+      },
+      "capabilities": [],
+      "capabilitySource": "Coordinator, 2026-10-28 (likely what the brief called Groxy). Not independently inspected beyond service presence.",
+      "limits": {
+        "usage": "unknown",
+        "note": "Draws a consumer subscription."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Not recorded."
+      },
+      "box": {
+        "has": true,
+        "notes": "Runs on the Mac."
+      },
+      "tos": {
+        "verdict": "forbidden",
+        "basis": "Standing rule: consumer-subscription CLIs and proxies are banned as automation backends. Do not dispatch through it; not stopped or removed pending a call by Tim.",
+        "checkedAt": "2026-10-28"
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Service present on the Mac (launchctl)."
+      },
+      "standingWorkloads": []
+    },
+    {
+      "id": "grok-cli",
+      "identityId": null,
+      "capacityProviderId": null,
+      "label": "Grok CLI (~/.local/bin/grok)",
+      "kind": "local-proxy",
+      "status": "present",
+      "route": {
+        "kind": "none",
+        "note": "Consumer Grok CLI."
+      },
+      "capabilities": [],
+      "capabilitySource": "Coordinator, 2026-10-28 (likely what the brief called Groxy). Not independently inspected beyond service presence.",
+      "limits": {
+        "usage": "unknown",
+        "note": "Draws a consumer subscription."
+      },
+      "cost": {
+        "listUsdMonthly": null,
+        "note": "Not recorded."
+      },
+      "box": {
+        "has": true,
+        "notes": "Runs on the Mac."
+      },
+      "tos": {
+        "verdict": "forbidden",
+        "basis": "Standing rule: consumer-subscription CLIs and proxies are banned as automation backends. Do not dispatch through it; not stopped or removed pending a call by Tim.",
+        "checkedAt": "2026-10-28"
+      },
+      "verified": {
+        "level": "config",
+        "asOf": "2026-10-28",
+        "evidence": "Service present on the Mac (launchctl)."
       },
       "standingWorkloads": []
     }

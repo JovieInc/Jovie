@@ -10,6 +10,7 @@ export const ROUTE_KINDS = [
   'hyperagent-mcp',
   'gem-lanes',
   'jovie-fleet-lease',
+  'cursor-cli',
   'none',
 ];
 export const TOS_VERDICTS = [
@@ -78,7 +79,9 @@ export function validateFleetRegistry(
       errors.push(`${where}: id missing or duplicated`);
     seen.add(a?.id);
     const identity = identities[a?.identityId];
-    if (identityKeys.size && !identity)
+    if (a?.identityId === null && a?.kind === 'local-proxy') {
+      /* host services have no mesh identity */
+    } else if (identityKeys.size && !identity)
       errors.push(
         `${where}: identityId ${a?.identityId} not in agent-identities`
       );
