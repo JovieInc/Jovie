@@ -2,7 +2,7 @@
 // One policy for PR feedback, native admission, and durable delivery receipts.
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { winSectionErrors } from './lib/wins-ledger.mjs';
+import { requiredWinErrors, winSectionErrors } from './lib/wins-ledger.mjs';
 
 const RUN_URL =
   /^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)\/actions\/runs\/([1-9]\d*)(?:\/attempts\/[1-9]\d*)?$/;
@@ -238,6 +238,7 @@ export function evaluateFleetRules({
       'assertions: red-to-green diff only weakens existing tests; restore assertions and prove the repair.'
     );
   for (const message of winSectionErrors(body)) errors.push(`win: ${message}`);
+  errors.push(...requiredWinErrors({ title: pr.title, labels, body }));
   const blast = section(body, 'Blast radius');
   if (!text(field(blast, 'What could break')) || !text(field(blast, 'Proof')))
     warnings.push(

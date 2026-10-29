@@ -1,13 +1,14 @@
 {
   "schema": "jovie.wins-metrics/v1",
-  "at": "2026-10-29T17:21:22.690Z",
-  "winsTotal": 10,
+  "at": "2026-10-29T19:36:09.030Z",
+  "winsTotal": 12,
   "winsVerified": 1,
   "winsClaimed": 4,
-  "winsUnverified": 2,
+  "winsUnverified": 3,
   "winsNotReproduced": 1,
-  "winsPendingMerge": 2,
-  "winsLast7d": 10,
+  "winsPendingMerge": 3,
+  "winsPendingMeasure": 0,
+  "winsLast7d": 12,
   "clusters": [
     {
       "theme": "release-reliability",
@@ -17,7 +18,7 @@
     },
     {
       "theme": "merge-throughput",
-      "total": 4,
+      "total": 6,
       "verified": 0,
       "ready": false
     },
@@ -73,6 +74,14 @@
     },
     {
       "id": "win-2026-10-29-model-registry-single-source",
+      "status": "unverified"
+    },
+    {
+      "id": "win-2026-10-29-merge-gate-hosted-runners",
+      "status": "pending-merge"
+    },
+    {
+      "id": "win-2026-10-29-remote-preflight",
       "status": "unverified"
     }
   ]

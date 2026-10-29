@@ -4,18 +4,24 @@
 //   summary [--json]         counts by status and the weekly metric
 //   ingest --pr N [--repo R] append a win from a merged PR "## Win" section
 //   sync                     refresh PR mergedAt from GitHub
+//   rollup [--write]         weekly investor rollup (docs/metrics/wins-weekly.json)
+//   due                      merged wins still waiting on their after-value
+//   notify                   one-line messages for verified, meaningful wins
 //   receipt --id --metric --value --evidence [--sha]  record a post-deploy re-measurement
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { runGh } from '../packages/api-client/gh.ts';
 import {
   clusters,
+  dueMeasurements,
+  notifyLine,
   parseWinSection,
   readLedger,
   validateLedger,
   validateWin,
   WINS_PATH,
   weeklyMetrics,
+  weeklyRollup,
   winFromPr,
   winStatus,
 } from './lib/wins-ledger.mjs';
@@ -90,6 +96,54 @@ export async function main(argv, io = console) {
     save(wins);
     return 0;
   }
+  if (cmd === 'due') {
+    const due = dueMeasurements(wins);
+    for (const w of due)
+      io.log(`${w.id}: measure the after-value, then wins-ledger.mjs receipt`);
+    io.log(`${due.length} pending-measure wins due`);
+    return 0;
+  }
+  if (cmd === 'notify') {
+    for (const line of wins.map(notifyLine).filter(Boolean)) io.log(line);
+    return 0;
+  }
+  if (cmd === 'rollup') {
+    const since = new Date(Date.now() - 56 * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const r = await runGh(
+      [
+        'pr',
+        'list',
+        '--repo',
+        'JovieInc/Jovie',
+        '--state',
+        'merged',
+        '--search',
+        `merged:>=${since}`,
+        '--limit',
+        '500',
+        '--json',
+        'createdAt,mergedAt',
+      ],
+      { priority: 'default' }
+    );
+    if (r.code !== 0) throw new Error(`GitHub read failed: ${r.stderr.trim()}`);
+    const out = {
+      schema: 'jovie.wins-weekly/v1',
+      at: new Date().toISOString(),
+      weeks: weeklyRollup(wins, JSON.parse(r.stdout)),
+      unmeasured: ['ciMinutesSaved', 'costPerMergedPr'],
+      note: 'Engineering metrics only. Dollar figures belong in the private ops store and are never written here.',
+    };
+    if (argv.includes('--write'))
+      writeFileSync(
+        'docs/metrics/wins-weekly.json',
+        `${JSON.stringify(out, null, 2)}\n`
+      );
+    io.log(JSON.stringify(out, null, 2));
+    return 0;
+  }
   if (cmd === 'receipt') {
     const win = wins.find(w => w.id === arg(argv, 'id'));
     if (!win) throw new Error('unknown win id');
@@ -106,7 +160,9 @@ export async function main(argv, io = console) {
     io.log(`${win.id}: ${winStatus(win)}`);
     return 0;
   }
-  io.error('usage: wins-ledger.mjs validate|summary|ingest|sync|receipt');
+  io.error(
+    'usage: wins-ledger.mjs validate|summary|ingest|sync|rollup|due|notify|receipt'
+  );
   return 2;
 }
 

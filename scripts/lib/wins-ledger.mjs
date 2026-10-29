@@ -80,9 +80,12 @@ export function holds(m, value) {
  * not-reproduced: a post-merge receipt exists and does not improve on `before`.
  * unverified: no sourced before/after numbers.
  * pending-merge: a PR is not merged yet; never counted.
+ * pending-measure: merged, but the after-value is measured once the change is live (win.pendingAfter); never counted.
  */
 export function winStatus(win) {
   if (win.prs.some(pr => !pr.mergedAt)) return 'pending-merge';
+  if (win.pendingAfter && !(win.receipts ?? []).length)
+    return 'pending-measure';
   const metrics = win.metrics ?? [];
   if (!metrics.some(m => m.before !== null)) return 'unverified';
   const mergedAt = win.prs
@@ -189,6 +192,8 @@ export function parseWinSection(body) {
     area: field('Area'),
     theme: field('Theme'),
     verifyLink: field('Verify'),
+    pendingAfter: /^(yes|true|pending)\b/i.test(field('Pending') ?? ''),
+    perMerge: /^(yes|true)\b/i.test(field('Per-merge') ?? ''),
     metrics,
   };
 }
@@ -212,8 +217,11 @@ export function winFromPr({ repo, number, mergedAt }, win) {
     theme: win.theme,
     claim: win.claim,
     prs: [{ repo, number, mergedAt }],
-    metrics: win.metrics,
+    metrics: win.perMerge
+      ? win.metrics.map(m => ({ ...m, perMerge: true }))
+      : win.metrics,
     verifyLink: win.verifyLink,
+    ...(win.pendingAfter ? { pendingAfter: true } : {}),
     receipts: [],
     notes: null,
   };
@@ -226,9 +234,145 @@ export function winSectionErrors(body) {
     { repo: 'x/y', number: 1, mergedAt: '2026-01-01T00:00:00Z' },
     w
   );
-  return validateWin({ ...rec, id: 'win-2026-01-01-check' }).filter(
+  const problems = validateWin({ ...rec, id: 'win-2026-01-01-check' }).filter(
     msg => !msg.startsWith('id ')
   );
+  for (const m of w.metrics)
+    if (m.after === null && !w.pendingAfter)
+      problems.push(
+        `${m.name}: after is empty; measure it, or add "- Pending: yes" to log it as pending-measure`
+      );
+  return problems;
+}
+
+const WIN_SCOPES =
+  /^(?:perf|ci|build|queue|throughput|preflight)\b|^\w+\((?:[^)]*[,/ ])?(?:ci|perf|build|queue|throughput|preflight)(?:[,/ ][^)]*)?\)/i;
+
+/** A PR owes a measured win when it is labeled `compounding` or is a throughput, CI or perf change. */
+export function requiresWin({ title = '', labels = [] }) {
+  return labels.includes('compounding') || WIN_SCOPES.test(title.trim());
+}
+
+export const WIN_TEMPLATE = `## Win
+
+- Claim: <one line: what got faster, cheaper or more reliable>
+- Area: ci
+- Theme: merge-throughput
+- Metric: <name> | s | lower | <before> | <after> | <source> | <exact command or query that reproduces it>
+- Verify: <run or query URL>
+- Per-merge: yes   <!-- only when every merge pays the saving; feeds the investor rollup -->
+- Pending: yes   <!-- only when the after-value is measured once live; remove otherwise -->`;
+
+/** Fleet Rules errors for a PR that owes a win. */
+export function requiredWinErrors({ title, labels, body }) {
+  if (!requiresWin({ title, labels })) return [];
+  const w = parseWinSection(body);
+  if (w.present && !w.declined) return [];
+  return [
+    `win: this PR is compounding/throughput/CI/perf work and needs a measured win (metric, before, after, method, evidence). Paste into the PR body:\n${WIN_TEMPLATE}`,
+  ];
+}
+
+/** Metric movement. Positive gain means better, whichever direction is better. */
+export function metricDelta(m) {
+  if (m.before === null || m.after === null) return null;
+  const delta = m.after - m.before;
+  const gain = m.better === 'lower' ? -delta : delta;
+  return {
+    delta,
+    gain,
+    gainPct: m.before
+      ? Math.round((gain / Math.abs(m.before)) * 1000) / 10
+      : null,
+  };
+}
+
+const TO_SECONDS = { s: 1, ms: 0.001, min: 60 };
+
+/** Merged wins whose after-value is due: pending-measure and live for at least `hours`. */
+export function dueMeasurements(wins, nowMs = Date.now(), hours = 24) {
+  return wins.filter(
+    w =>
+      winStatus(w) === 'pending-measure' &&
+      w.prs.every(pr => nowMs - Date.parse(pr.mergedAt) >= hours * 3_600_000)
+  );
+}
+
+/** One-line text for a meaningful (verified, 20 percent or better) win; otherwise null. */
+export function notifyLine(win) {
+  if (winStatus(win) !== 'verified') return null;
+  const best = win.metrics
+    .map(m => ({ m, d: metricDelta(m) }))
+    .filter(x => x.d && x.d.gain > 0)
+    .sort((a, b) => (b.d.gainPct ?? 0) - (a.d.gainPct ?? 0))[0];
+  if (!best || (best.d.gainPct ?? 0) < 20) return null;
+  const { m, d } = best;
+  return `Win (verified): ${win.claim} ${m.name} ${m.before} to ${m.after} ${m.unit} (${d.gainPct}% better). ${win.verifyLink}`;
+}
+
+/**
+ * Weekly investor rollup. Engineering metrics only: no dollars, which belong in
+ * the private ops store. merged is [{createdAt, mergedAt}] from GitHub.
+ */
+export function weeklyRollup(wins, merged = []) {
+  const weekOf = iso => {
+    const d = new Date(iso);
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  };
+  const weeks = new Map();
+  const week = k =>
+    weeks.get(k) ??
+    weeks
+      .set(k, {
+        week: k,
+        wins: 0,
+        verified: 0,
+        claimed: 0,
+        mergedPrs: 0,
+        mergesPerDay: null,
+        leadTimeHoursP50: null,
+        secondsSavedPerMergeVerified: 0,
+        secondsSavedPerMergeClaimed: 0,
+        _lead: [],
+      })
+      .get(k);
+  for (const w of wins) {
+    const status = winStatus(w);
+    if (status === 'pending-merge') continue;
+    const row = week(weekOf(w.date));
+    row.wins += 1;
+    if (status === 'verified') row.verified += 1;
+    if (status === 'claimed') row.claimed += 1;
+    for (const m of w.metrics) {
+      const d = metricDelta(m);
+      const f = TO_SECONDS[m.unit];
+      if (!d || !f || !m.perMerge || d.gain <= 0) continue;
+      if (status === 'verified') row.secondsSavedPerMergeVerified += d.gain * f;
+      if (status === 'claimed') row.secondsSavedPerMergeClaimed += d.gain * f;
+    }
+  }
+  for (const pr of merged) {
+    const row = week(weekOf(pr.mergedAt));
+    row.mergedPrs += 1;
+    row._lead.push(
+      (Date.parse(pr.mergedAt) - Date.parse(pr.createdAt)) / 3_600_000
+    );
+  }
+  return [...weeks.values()]
+    .sort((a, b) => a.week.localeCompare(b.week))
+    .map(({ _lead, ...row }) => {
+      const sorted = [..._lead].sort((a, b) => a - b);
+      return {
+        ...row,
+        mergesPerDay: row.mergedPrs
+          ? Math.round((row.mergedPrs / 7) * 10) / 10
+          : null,
+        leadTimeHoursP50: sorted.length
+          ? Math.round(sorted[Math.floor((sorted.length - 1) / 2)] * 10) / 10
+          : null,
+      };
+    });
 }
 
 /** Counts for the metric Summer reads: wins/week, verified, drafts, posts. */
@@ -242,6 +386,7 @@ export function weeklyMetrics(wins, nowMs = Date.now()) {
     winsUnverified: status.filter(s => s === 'unverified').length,
     winsNotReproduced: status.filter(s => s === 'not-reproduced').length,
     winsPendingMerge: status.filter(s => s === 'pending-merge').length,
+    winsPendingMeasure: status.filter(s => s === 'pending-measure').length,
     winsLast7d: wins.filter(w => w.date >= weekAgo).length,
   };
 }
