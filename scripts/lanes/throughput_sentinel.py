@@ -232,10 +232,23 @@ def sample_queue_timings(state: Path, now: float, run=None, repo: str = REPO) ->
         merged = _gh_json(run, f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=40")
         merged = [pr for pr in merged if pr.get("merged_at")][:QUEUE_TIMINGS_PRS]
         last, first = [], []
+        dequeues = {"github": 0, "bot": 0, "human": 0}
+        requeue_lag = []
         for pr in merged:
             events = _gh_json(run, f"repos/{repo}/issues/{pr['number']}/timeline?per_page=100")
             adds = [_iso_epoch(e.get("created_at")) for e in events if e.get("event") == "added_to_merge_queue"]
             adds = [a for a in adds if a is not None]
+            # Silent dequeues: removals with no check named on the PR. github-merge-queue[bot] = GitHub ejected
+            # the entry after a merge-group failure/timeout; each is followed by a re-enqueue (lag measured).
+            removed = [(_iso_epoch(e.get("created_at")), str((e.get("actor") or {}).get("login") or ""))
+                       for e in events if e.get("event") == "removed_from_merge_queue"]
+            for at, actor in removed:
+                if at is None:
+                    continue
+                dequeues["github" if actor.startswith("github-merge-queue") else "bot" if actor.endswith("[bot]") else "human"] += 1
+                later = [a for a in adds if a > at]
+                if later:
+                    requeue_lag.append((min(later) - at) / 60)
             merged_at = _iso_epoch(pr.get("merged_at"))
             if adds and merged_at is not None:
                 last.append((merged_at - max(adds)) / 60)
@@ -247,7 +260,9 @@ def sample_queue_timings(state: Path, now: float, run=None, repo: str = REPO) ->
                       "failureShare": round(len(by["failure"]) / total, 3) if total else None},
                   "enqueueToMerge": {"prs": len(last), "lastEnqueueP50Min": _pct(last, .5), "lastEnqueueP95Min": _pct(last, .95),
                                      "firstEnqueueP50Min": _pct(first, .5), "firstEnqueueP95Min": _pct(first, .95),
-                                     "targets": {"p50Min": 30, "p95Min": 60}}}
+                                     "targets": {"p50Min": 30, "p95Min": 60}},
+                  "dequeues": {"prs": len(last), "silentGithub": dequeues["github"], "bot": dequeues["bot"], "human": dequeues["human"],
+                               "requeueLagP50Min": _pct(requeue_lag, .5), "requeueLagP95Min": _pct(requeue_lag, .95)}}
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, sort_keys=True))
         os.replace(tmp, path)

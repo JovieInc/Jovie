@@ -290,6 +290,7 @@ class QueueTimingsTest(unittest.TestCase):
             if "/pulls?" in path:
                 return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([{"number": 5, "merged_at": iso(NOW)}]))
             events = [{"event": "added_to_merge_queue", "created_at": iso(NOW - 3600)},
+                      {"event": "removed_from_merge_queue", "created_at": iso(NOW - 2400), "actor": {"login": "github-merge-queue[bot]"}},
                       {"event": "added_to_merge_queue", "created_at": iso(NOW - 1200)}]
             return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(events))
 
@@ -300,6 +301,7 @@ class QueueTimingsTest(unittest.TestCase):
             self.assertEqual((signal["groupCi"]["cancelledShare"], signal["groupCi"]["failureShare"]), (0.25, 0.25))
             self.assertEqual(signal["groupCi"]["successP95Min"], 20.0)
             self.assertEqual((signal["enqueueToMerge"]["lastEnqueueP50Min"], signal["enqueueToMerge"]["firstEnqueueP50Min"]), (20.0, 60.0))
+            self.assertEqual((signal["dequeues"]["silentGithub"], signal["dequeues"]["requeueLagP50Min"]), (1, 20.0))
 
 
 class IdleNotDemandTest(unittest.TestCase):
