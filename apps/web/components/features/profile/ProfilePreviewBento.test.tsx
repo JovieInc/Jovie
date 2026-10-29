@@ -35,8 +35,11 @@ describe('ProfilePreviewBento', () => {
     const socialLinks = [
       {
         id: 'instagram',
+        artist_id: PROFILE_STORY_ARTIST.id,
         platform: 'instagram',
         url: 'https://instagram.com/artist',
+        clicks: 0,
+        created_at: '2026-10-20T00:00:00.000Z',
       },
     ];
     renderBento({
