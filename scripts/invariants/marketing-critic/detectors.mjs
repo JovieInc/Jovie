@@ -27,6 +27,9 @@ export const DETECTOR_IDS = Object.freeze(Object.keys(DETECTOR_CLASSES));
 
 /** Browser-side: every DOM/CSS detector except focus and pixel probes. */
 export function collectDomFindings() {
+  // Browser globals, typed loosely: this file is type-checked as Node code.
+  const { document, window, Element } = /** @type {any} */ (globalThis);
+  const getComputedStyle = el => window.getComputedStyle(el);
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const scrollY = window.scrollY;
@@ -443,6 +446,9 @@ export function collectDomFindings() {
 
 /** Browser-side probe of the focused element after a keyboard Tab. */
 export function probeFocusRing() {
+  // Browser globals, typed loosely: this file is type-checked as Node code.
+  const { document, window } = /** @type {any} */ (globalThis);
+  const getComputedStyle = el => window.getComputedStyle(el);
   const el = document.activeElement;
   if (!el || el === document.body) return null;
   const cs = getComputedStyle(el);
@@ -506,6 +512,8 @@ export function probeFocusRing() {
 
 /** Browser-side: share of saturated pixels in a PNG data URL. */
 export async function saturatedShare(dataUrl) {
+  // Browser globals, typed loosely: this file is type-checked as Node code.
+  const { document, Image } = /** @type {any} */ (globalThis);
   const img = new Image();
   img.src = dataUrl;
   await img.decode();
@@ -537,6 +545,7 @@ export async function runDetectors(page, options = {}) {
 
   // Reveal scroll-triggered content, then return to the top.
   await page.evaluate(async () => {
+    const { document, window } = /** @type {any} */ (globalThis);
     const step = window.innerHeight * 0.8;
     for (let y = 0; y < document.documentElement.scrollHeight; y += step) {
       window.scrollTo(0, y);
@@ -573,7 +582,9 @@ export async function runDetectors(page, options = {}) {
       rings.push(hit);
     }
   }
-  await page.evaluate(() => window.scrollTo(0, 0));
+  await page.evaluate(() =>
+    /** @type {any} */ (globalThis).window.scrollTo(0, 0)
+  );
   if (rings.length)
     out.push(
       tag({
