@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/dashboard/ReleaseProviderMatrix.test.tsx
+
 import { ConfirmDialog } from '@jovie/ui';
 import { useRouter } from 'next/navigation';
 import {

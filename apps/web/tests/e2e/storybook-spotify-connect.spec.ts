@@ -210,6 +210,8 @@ async function assertSearchInteraction(
   const input = page.getByRole('combobox', {
     name: 'Search Spotify artists or paste a link',
   });
+  const inputBounds = await input.boundingBox();
+  expect(inputBounds?.height).toBeGreaterThanOrEqual(24);
   await input.fill('tim white');
 
   const dropdown = page.locator(

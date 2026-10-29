@@ -290,10 +290,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/ReleaseWorkflowOverlays.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/dashboard/organisms/release-provider-matrix/utils/release-context-actions.tsx",
       "linearIssue": "JOV-8847"
     },

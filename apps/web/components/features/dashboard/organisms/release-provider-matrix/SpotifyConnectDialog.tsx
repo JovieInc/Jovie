@@ -30,13 +30,15 @@ import {
   DialogTitle,
 } from '@/components/organisms/Dialog';
 import type { ReleaseViewModel } from '@/lib/discography/types';
-import { useArtistSearchQuery } from '@/lib/queries';
+import {
+  type SpotifyArtistResult as SpotifyArtist,
+  useArtistSearchQuery,
+} from '@/lib/queries';
 import { cn } from '@/lib/utils';
 import {
   formatFollowers,
   initialState,
   releasesEmptyStateReducer,
-  type SpotifyArtist,
   useSpotifyConnect,
 } from './releases-empty-state';
 
@@ -248,6 +250,11 @@ function ArtistResultOption({
   );
 }
 
+type SpotifyConnectedHandler = (
+  releases: ReleaseViewModel[],
+  artistName: string
+) => void;
+
 interface SpotifyConnectDialogProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
@@ -256,10 +263,7 @@ interface SpotifyConnectDialogProps {
   readonly connectedArtistName?: string | null;
   readonly connectedArtistImage?: string | null;
   readonly connectedFollowers?: number | null;
-  readonly onConnected?: (
-    releases: ReleaseViewModel[],
-    artistName: string
-  ) => void;
+  readonly onConnected?: SpotifyConnectedHandler;
   readonly onImportStart?: (artistName: string) => void;
   readonly onDisconnect?: () => void | Promise<void>;
 }
@@ -289,6 +293,7 @@ export function SpotifyConnectDialog({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsListRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastQueryRef = useRef('');
 
@@ -297,6 +302,7 @@ export function SpotifyConnectDialog({
     state: searchState,
     error: searchError,
     search,
+    searchImmediate,
     clear,
   } = useArtistSearchQuery({ debounceMs: 200, limit: 5 });
 
@@ -326,7 +332,9 @@ export function SpotifyConnectDialog({
     !isResolving && (succeeded || !connected || showChangeSearch);
   const trimmedQuery = formState.searchQuery.trim();
   const isLoading = searchState === 'loading';
-  lastQueryRef.current = trimmedQuery;
+  useEffect(() => {
+    lastQueryRef.current = trimmedQuery;
+  }, [trimmedQuery]);
 
   // Offline keeps the typed query; going online re-runs the last query.
   useEffect(() => {
@@ -414,13 +422,14 @@ export function SpotifyConnectDialog({
 
   const handleRetrySearch = useCallback(() => {
     if (!trimmedQuery || isSpotifyUrl(trimmedQuery)) return;
-    search(trimmedQuery);
+    searchImmediate(trimmedQuery);
     dispatch({ type: 'SET_SHOW_RESULTS', payload: true });
-  }, [search, trimmedQuery]);
+  }, [searchImmediate, trimmedQuery]);
 
   const handleSelectArtist = useCallback((artist: SpotifyArtist) => {
     if (!canSelectArtist(artist)) return;
     setSelectedArtist(artist);
+    dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: 0 });
     inputRef.current?.focus();
   }, []);
 
@@ -474,7 +483,7 @@ export function SpotifyConnectDialog({
             payload: getNextSelectableIndex(
               formState.activeResultIndex,
               e.key === 'ArrowDown' ? 1 : -1,
-              results
+              selectedArtist ? [selectedArtist] : results
             ),
           });
           break;
@@ -492,10 +501,6 @@ export function SpotifyConnectDialog({
           handleConnectFromInput();
           break;
         }
-        case 'Tab':
-          dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
-          dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: -1 });
-          break;
       }
     },
     [
@@ -527,6 +532,9 @@ export function SpotifyConnectDialog({
     selectedArtist,
     trimmedQuery,
   ]);
+
+  const hasVisibleResults =
+    shouldShowDropdown && (selectedArtist !== null || results.length > 0);
 
   const statusAnnouncement = useMemo(() => {
     if (!isSearchMode || selectedArtist) return '';
@@ -597,26 +605,28 @@ export function SpotifyConnectDialog({
                 )}
               </p>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant='ghost'
-                  size='icon-sm'
-                  aria-label='More Artist Actions'
-                  data-testid='spotify-connect-overflow'
-                >
-                  <EllipsisVertical className='h-4 w-4' aria-hidden='true' />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='end'>
-                <DropdownMenuItem
-                  variant='destructive'
-                  onSelect={() => void onDisconnect?.()}
-                >
-                  Disconnect
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {onDisconnect && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant='ghost'
+                    size='icon-sm'
+                    aria-label='More Artist Actions'
+                    data-testid='spotify-connect-overflow'
+                  >
+                    <EllipsisVertical className='h-4 w-4' aria-hidden='true' />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align='end'>
+                  <DropdownMenuItem
+                    variant='destructive'
+                    onSelect={() => void onDisconnect?.()}
+                  >
+                    Disconnect
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         ) : succeeded ? (
           <p
@@ -628,7 +638,7 @@ export function SpotifyConnectDialog({
             Connected
           </p>
         ) : (
-          <div>
+          <div ref={containerRef}>
             {isOffline && (
               <InlineOfflineNotice
                 message="You're offline. Your search will re-run when you reconnect."
@@ -655,7 +665,10 @@ export function SpotifyConnectDialog({
               }}
               onBlur={e => {
                 const next = e.relatedTarget;
-                if (next instanceof Element && next.closest(`#${RESULTS_ID}`))
+                if (
+                  next instanceof Node &&
+                  containerRef.current?.contains(next)
+                )
                   return;
                 dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
                 dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: -1 });
@@ -667,13 +680,12 @@ export function SpotifyConnectDialog({
               disabled={isPending}
               error={formState.error ?? undefined}
               aria-describedby={HINTS_ID}
-              className='min-h-6'
               role='combobox'
               aria-autocomplete='list'
-              aria-expanded={shouldShowDropdown}
-              aria-controls={shouldShowDropdown ? RESULTS_ID : undefined}
+              aria-expanded={hasVisibleResults}
+              aria-controls={hasVisibleResults ? RESULTS_ID : undefined}
               aria-activedescendant={
-                shouldShowDropdown && formState.activeResultIndex >= 0
+                hasVisibleResults && formState.activeResultIndex >= 0
                   ? `spotify-connect-result-${formState.activeResultIndex}`
                   : undefined
               }
@@ -806,9 +818,9 @@ export function SpotifyConnectDialog({
             }
             aria-label={selectedArtist ? primaryLabel : undefined}
             data-testid='spotify-connect-primary'
-            className='max-w-56 justify-center truncate'
+            className='max-w-56'
           >
-            {primaryLabel}
+            <span className='truncate'>{primaryLabel}</span>
           </Button>
         </DialogActions>
       )}

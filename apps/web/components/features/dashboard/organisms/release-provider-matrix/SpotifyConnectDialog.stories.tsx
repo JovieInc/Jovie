@@ -64,11 +64,14 @@ const respondUnavailable: SearchResponder = () =>
 const respondForeverPending: SearchResponder = () =>
   new Promise<Response>(() => {});
 
-function SpotifyConnectDialogStory(
-  args: ComponentProps<typeof SpotifyConnectDialog>,
-  respond: SearchResponder = respondWithResults,
-  wrapperClassName = 'min-h-144'
-) {
+function SpotifyConnectDialogStory({
+  respond = respondWithResults,
+  wrapperClassName = 'min-h-144',
+  ...args
+}: ComponentProps<typeof SpotifyConnectDialog> & {
+  respond?: SearchResponder;
+  wrapperClassName?: string;
+}) {
   useEffect(() => {
     const previousFetch = window.fetch;
     window.fetch = async (input, init) => {
@@ -98,7 +101,7 @@ function SpotifyConnectDialogStory(
 }
 
 async function typeQuery(canvasElement: HTMLElement, query: string) {
-  const canvas = within(canvasElement);
+  const canvas = within(canvasElement.ownerDocument.body);
   const input = canvas.getByRole('combobox', {
     name: 'Search Spotify artists or paste a link',
   });
@@ -114,6 +117,7 @@ const meta = {
   },
   args: {
     open: true,
+    connected: false,
     onOpenChange: () => undefined,
   },
 } satisfies Meta<typeof SpotifyConnectDialog>;
@@ -126,7 +130,9 @@ export const Default: Story = {
 };
 
 export const Empty: Story = {
-  render: args => <SpotifyConnectDialogStory {...args} respondEmpty />,
+  render: args => (
+    <SpotifyConnectDialogStory {...args} respond={respondEmpty} />
+  ),
 };
 
 export const Loading: Story = {
@@ -138,8 +144,8 @@ export const Loading: Story = {
     await waitFor(
       () =>
         expect(
-          within(canvasElement).getByRole('status', {
-            name: 'Loading',
+          within(canvasElement.ownerDocument.body).getByRole('status', {
+            busy: true,
           })
         ).toBeTruthy(),
       { timeout: 5000 }
@@ -156,7 +162,7 @@ export const NoMatch: Story = {
     await waitFor(
       () =>
         expect(
-          within(canvasElement).getByText(/No artists match/)
+          within(canvasElement.ownerDocument.body).getByText(/No artists match/)
         ).toBeTruthy(),
       { timeout: 5000 }
     );
@@ -171,9 +177,9 @@ export const Error: Story = {
     await typeQuery(canvasElement, 'tim white');
     await waitFor(
       () =>
-        expect(within(canvasElement).getByRole('alert')).toHaveTextContent(
-          /Spotify search is unavailable/
-        ),
+        expect(
+          within(canvasElement.ownerDocument.body).getByRole('alert')
+        ).toHaveTextContent(/Spotify search is unavailable/),
       { timeout: 5000 }
     );
   },

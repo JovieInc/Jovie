@@ -95,7 +95,9 @@ describe('SpotifyConnectDialog', () => {
 
   it('selects the current user artist and connects only from the primary', async () => {
     const user = userEvent.setup();
-    render(<SpotifyConnectDialog open onOpenChange={vi.fn()} />);
+    render(
+      <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
+    );
 
     const input = screen.getByRole('combobox', {
       name: 'Search Spotify artists or paste a link',
@@ -115,7 +117,9 @@ describe('SpotifyConnectDialog', () => {
 
   it('selects with Enter, connects with a second Enter, and skips other owners', async () => {
     const user = userEvent.setup();
-    render(<SpotifyConnectDialog open onOpenChange={vi.fn()} />);
+    render(
+      <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
+    );
 
     const input = screen.getByRole('combobox', {
       name: 'Search Spotify artists or paste a link',
@@ -150,7 +154,9 @@ describe('SpotifyConnectDialog', () => {
       search: vi.fn(),
       clear: vi.fn(),
     });
-    render(<SpotifyConnectDialog open onOpenChange={vi.fn()} />);
+    render(
+      <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
+    );
 
     const input = screen.getByRole('combobox', {
       name: 'Search Spotify artists or paste a link',

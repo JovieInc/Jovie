@@ -288,7 +288,19 @@ vi.mock(
 vi.mock(
   '@/features/dashboard/organisms/release-provider-matrix/SpotifyConnectDialog',
   () => ({
-    SpotifyConnectDialog: () => null,
+    SpotifyConnectDialog: ({
+      connected,
+      connectedArtistName,
+    }: {
+      connected?: boolean;
+      connectedArtistName?: string | null;
+    }) => (
+      <div
+        data-testid='spotify-dialog-connection'
+        data-connected={String(connected)}
+        data-artist={connectedArtistName ?? ''}
+      />
+    ),
   })
 );
 
@@ -514,10 +526,7 @@ vi.mock(
   })
 );
 
-// ── Import after mocks ──
-const { ReleaseProviderMatrix } = await import(
-  '@/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix'
-);
+import { ReleaseProviderMatrix } from '@/components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix';
 
 interface ProviderConfigEntry {
   label: string;
@@ -687,6 +696,29 @@ describe('ReleaseProviderMatrix', () => {
       expect(screen.getByTestId('release-table')).toBeInTheDocument();
       expect(screen.getByTestId('release-subheader')).toBeInTheDocument();
     });
+
+    it.each([true, false])(
+      'passes connection state %s into the Spotify dialog',
+      connected => {
+        renderWithProviders(
+          <ReleaseProviderMatrix
+            releases={[]}
+            providerConfig={providerConfig}
+            primaryProviders={primaryProviders}
+            spotifyConnected={connected}
+            spotifyArtistName='Tim White'
+          />
+        );
+        expect(screen.getByTestId('spotify-dialog-connection')).toHaveAttribute(
+          'data-connected',
+          String(connected)
+        );
+        expect(screen.getByTestId('spotify-dialog-connection')).toHaveAttribute(
+          'data-artist',
+          'Tim White'
+        );
+      }
+    );
 
     it('keeps the spotify import banner footprint when import is idle', () => {
       renderWithProviders(

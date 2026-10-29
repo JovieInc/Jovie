@@ -8,6 +8,7 @@ import { providerDialogReadsConnectionBeforeSearch } from '@/tests/utils/provide
 const mockArtistSearch = vi.hoisted(() => vi.fn());
 const mockConnectSpotifyArtist = vi.hoisted(() => vi.fn());
 const mockSearch = vi.hoisted(() => vi.fn());
+const mockSearchImmediate = vi.hoisted(() => vi.fn());
 const mockClear = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/queries', () => ({
@@ -24,7 +25,9 @@ vi.mock('@/app/app/(shell)/dashboard/releases/actions', () => ({
 
 vi.mock('@/components/organisms/Dialog', () => ({
   Dialog: ({ children }: { children: ReactNode }) => (
-    <div role='dialog'>{children}</div>
+    <div role='dialog' aria-labelledby='spotify-dialog-title'>
+      {children}
+    </div>
   ),
   DialogActions: ({ children }: { children: ReactNode }) => (
     <div>{children}</div>
@@ -33,7 +36,9 @@ vi.mock('@/components/organisms/Dialog', () => ({
   DialogDescription: ({ children }: { children: ReactNode }) => (
     <p>{children}</p>
   ),
-  DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
+  DialogTitle: ({ children }: { children: ReactNode }) => (
+    <h2 id='spotify-dialog-title'>{children}</h2>
+  ),
 }));
 
 vi.mock('@/components/atoms/ProviderIcon', () => ({
@@ -72,6 +77,7 @@ function mockSearchHook(overrides: Record<string, unknown> = {}) {
     state: 'success',
     error: null,
     search: mockSearch,
+    searchImmediate: mockSearchImmediate,
     clear: mockClear,
     ...overrides,
   });
@@ -119,8 +125,13 @@ describe('SpotifyConnectDialog', () => {
       renderDialog({ connected: true, connectedArtistName: 'Tim White' })
     );
 
+    expect(
+      screen.getByRole('dialog', { name: 'Connect Spotify' })
+    ).toBeVisible();
     expect(getPrimary()).toHaveTextContent('Done');
-    expect(getPrimary()).toHaveTextContent('Done');
+    expect(
+      screen.queryByTestId('spotify-connect-overflow')
+    ).not.toBeInTheDocument();
     await expectNoA11yViolations(container);
   }, 15_000);
 
@@ -135,7 +146,9 @@ describe('SpotifyConnectDialog', () => {
     expect(
       screen.getByTestId('spotify-connect-connected-name')
     ).toHaveTextContent('Tim White');
-    expect(screen.getByText('9.9K followers')).toBeInTheDocument();
+    expect(
+      screen.getByTestId('spotify-connect-connected-followers')
+    ).toHaveTextContent('9.9K followers');
 
     const change = screen.getByTestId('spotify-connect-change');
     expect(change).toHaveTextContent('Change artist');
@@ -151,9 +164,8 @@ describe('SpotifyConnectDialog', () => {
     const { container } = renderDialog();
 
     const input = await getFocusedCombobox();
-    // The canonical Input atom carries the hit-target floor (h-11 / sm:h-8);
-    // min-h-6 keeps the raw input at or above the 24px floor in every mode.
-    expect(input).toHaveClass('min-h-6');
+    // The canonical Input owns its 44px mobile and 32px desktop height.
+    expect(input).toHaveClass('h-11');
     expect(input).toHaveClass('sm:h-8');
     expect(input).toBeEnabled();
     await expectNoA11yViolations(container);
@@ -163,7 +175,10 @@ describe('SpotifyConnectDialog', () => {
     const { container } = renderDialog({ connected: undefined });
 
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
-    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('status', { busy: true })).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
     expect(
       screen.queryByTestId('spotify-connect-primary')
     ).not.toBeInTheDocument();
@@ -193,6 +208,20 @@ describe('SpotifyConnectDialog', () => {
     expect(getPrimary()).toHaveTextContent('Connect Tim White');
     await expectNoA11yViolations(container);
   }, 15_000);
+
+  it('keeps the active descendant on the rendered selection', async () => {
+    mockSearchHook({ results: [otherClaimedArtist, currentUserArtist] });
+    const user = userEvent.setup();
+    const { container } = renderDialog();
+    const input = await getFocusedCombobox();
+    await user.type(input, 'tim');
+    await user.keyboard('{ArrowDown}{Enter}{ArrowDown}');
+    expect(input).toHaveAttribute(
+      'aria-activedescendant',
+      screen.getByRole('option', { selected: true }).id
+    );
+    await expectNoA11yViolations(container);
+  });
 
   it('selecting via the primary connects and closes after success', async () => {
     const user = userEvent.setup();
@@ -287,7 +316,8 @@ describe('SpotifyConnectDialog', () => {
     expect(input).toHaveValue('tim white');
     expect(input).toHaveFocus();
 
-    input.focus();
+    await user.tab();
+    await user.click(input);
     await waitFor(() =>
       expect(
         within(container).getAllByTestId('spotify-connect-result')
@@ -303,7 +333,10 @@ describe('SpotifyConnectDialog', () => {
     const loadingView = renderDialog();
     const loadingInput = await getFocusedCombobox();
     await user.type(loadingInput, 'tim');
-    expect(screen.getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('status', { busy: true })).toHaveAttribute(
+      'aria-busy',
+      'true'
+    );
     expect(loadingInput).toBeEnabled();
     await expectNoA11yViolations(loadingView.container);
     loadingView.unmount();
@@ -333,8 +366,12 @@ describe('SpotifyConnectDialog', () => {
     await expectNoA11yViolations(errorView.container);
 
     mockSearch.mockClear();
-    await user.click(screen.getByTestId('spotify-connect-retry'));
-    expect(mockSearch).toHaveBeenCalledWith('tim');
+    const retry = screen.getByTestId('spotify-connect-retry');
+    await user.tab();
+    expect(retry).toHaveFocus();
+    expect(retry).toBeInTheDocument();
+    await user.click(retry);
+    expect(mockSearchImmediate).toHaveBeenCalledWith('tim');
   }, 15_000);
 
   it('goes offline with inputs kept and re-runs the query on reconnect', async () => {
