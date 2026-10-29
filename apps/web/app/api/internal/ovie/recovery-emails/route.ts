@@ -12,7 +12,6 @@ import {
 } from '@/lib/recovery/server';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 const json = (body: Record<string, unknown>, status = 200) =>
   NextResponse.json(body, { status, headers: NO_STORE_HEADERS });
