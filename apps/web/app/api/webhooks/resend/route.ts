@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { webhookEvents } from '@/lib/db/schema/suppression';
 import { stopEnrollmentsForEmail } from '@/lib/email/campaigns/enrollment';
+import { senderDomainOf } from '@/lib/email/streams';
 import { env } from '@/lib/env-server';
 import { captureCriticalError } from '@/lib/error-tracking';
 import {
@@ -381,6 +382,7 @@ async function processBounceOrComplaint(
           bounceCode: data.bounce?.diagnostic_code,
           complaintType,
           ...(creatorProfileId && { creatorProfileId }),
+          ...senderMetadata(data.from),
         },
       })
     )
@@ -432,6 +434,12 @@ async function processOpenOrClick(
   );
 }
 
+/** Sending domain on every outcome event, so rates can be split per stream. */
+function senderMetadata(from: string | undefined): { senderDomain?: string } {
+  const senderDomain = senderDomainOf(from);
+  return senderDomain ? { senderDomain } : {};
+}
+
 /**
  * Process a delivery confirmation event
  */
@@ -454,9 +462,10 @@ async function processDelivered(event: ResendWebhookPayload): Promise<void> {
         recipientEmail: email,
         status: 'delivered',
         providerMessageId: data.email_id,
-        ...(creatorProfileId && {
-          metadata: { creatorProfileId },
-        }),
+        metadata: {
+          ...(creatorProfileId && { creatorProfileId }),
+          ...senderMetadata(data.from),
+        },
       })
     )
   );

@@ -112,6 +112,8 @@ export interface DeliveryLogMetadata {
   releaseId?: string;
   releaseName?: string;
   suppressionReason?: string;
+  /** Sending domain from the provider event, for per-stream deliverability. */
+  senderDomain?: string;
 }
 
 /**

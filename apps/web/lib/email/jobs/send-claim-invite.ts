@@ -247,6 +247,9 @@ export async function processSendClaimInviteJob(
 
   const emailContent = getClaimInviteEmail(templateData);
   const founderSender = getSenderPolicy('founder');
+  // Cold stream: Resend's AUP forbids unsolicited mail and cold outreach never
+  // uses jov.ie. This path is closed (isColdClaimInviteSendOpen); the guard in
+  // tests/unit/lib/email/streams-guard.test.ts fails if it opens on Resend.
 
   // Send via Resend (using singleton provider)
   const emailProvider = getEmailProvider();

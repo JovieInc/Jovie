@@ -1,9 +1,13 @@
 import { APP_NAME } from '@/constants/app';
+import { requireStreamDomain } from '@/lib/email/streams';
 import { env } from '@/lib/env-server';
 
-export const FOUNDER_FROM_EMAIL = 'tim@send.jov.ie';
+// Founder mail lives on its own stream domain (EMAIL_STREAM_FOUNDER_DOMAIN),
+// so a lifecycle or transactional problem cannot burn 1:1 mail to users.
+export const FOUNDER_FROM_EMAIL = `tim@${requireStreamDomain('founder', env)}`;
 export const SYSTEM_FROM_EMAIL =
-  env.RESEND_FROM_EMAIL ?? 'notifications@send.jov.ie';
+  env.RESEND_FROM_EMAIL ??
+  `notifications@${requireStreamDomain('transactional', env)}`;
 
 export const FOUNDER_REPLY_TO_EMAIL = 'tim@jov.ie';
 export const SYSTEM_REPLY_TO_EMAIL =

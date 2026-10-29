@@ -183,8 +183,12 @@ async function main() {
       process.exit(0);
     }
 
+    // Lifecycle stream: changelog mail goes to opted-in subscribers from the
+    // lifecycle domain, never the transactional one (lib/email/streams.ts).
+    const lifecycleDomain =
+      process.env.EMAIL_STREAM_LIFECYCLE_DOMAIN?.trim() || 'send.jov.ie';
     const fromEmail =
-      process.env.RESEND_FROM_EMAIL || 'notifications@send.jov.ie';
+      process.env.CHANGELOG_FROM_EMAIL || `Jovie <updates@${lifecycleDomain}>`;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
     let sent = 0;
     let errors = 0;
