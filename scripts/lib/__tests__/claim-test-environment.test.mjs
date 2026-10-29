@@ -9,11 +9,11 @@ import {
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { validateClaimTestEnvironment } from '../claim-test-environment.mjs';
 import {
   probeStripeTestFixture,
   shouldProbeLiveFixture,
 } from '../claim-stripe-fixture.mjs';
+import { validateClaimTestEnvironment } from '../claim-test-environment.mjs';
 import { buildPreviewEnvAdmission } from '../preview-env-contract.mjs';
 
 const now = Date.parse('2026-10-23T06:00:00Z');
@@ -398,7 +398,11 @@ describe('live Stripe fixture probe', () => {
       'price_1USkjzASl9B9udHvEYkZLYZp',
     STRIPE_WEBHOOK_SECRET: 'whsec_5f2_probeSecretNotReal',
   };
-  const stripeResponse = (ok, body) => ({ ok, status: ok ? 200 : 401, json: async () => body });
+  const stripeResponse = (ok, body) => ({
+    ok,
+    status: ok ? 200 : 401,
+    json: async () => body,
+  });
   const priceFixture = {
     livemode: false,
     active: true,
@@ -445,7 +449,11 @@ describe('live Stripe fixture probe', () => {
   it('names the env var and its store when a var is missing', async () => {
     const probe = await probeStripeTestFixture(
       { STRIPE_SECRET_KEY: 'sk_test_x' },
-      { fetchImpl: async () => { throw new Error('must not be called'); } }
+      {
+        fetchImpl: async () => {
+          throw new Error('must not be called');
+        },
+      }
     );
     expect(probe.ok).toBe(false);
     expect(probe.failures.join('\n')).toContain(
@@ -457,7 +465,11 @@ describe('live Stripe fixture probe', () => {
   it('fails closed on a live-looking key without calling Stripe', async () => {
     const probe = await probeStripeTestFixture(
       { ...realFixture, STRIPE_SECRET_KEY: 'sk_live_abc' },
-      { fetchImpl: async () => { throw new Error('must not be called'); } }
+      {
+        fetchImpl: async () => {
+          throw new Error('must not be called');
+        },
+      }
     );
     expect(probe.ok).toBe(false);
     expect(probe.failures.join('\n')).toContain('sk_test_');
@@ -465,7 +477,8 @@ describe('live Stripe fixture probe', () => {
 
   it('names a rejected key on a 401', async () => {
     const probe = await probeStripeTestFixture(realFixture, {
-      fetchImpl: async () => stripeResponse(false, { message: 'Invalid API key' }),
+      fetchImpl: async () =>
+        stripeResponse(false, { message: 'Invalid API key' }),
     });
     expect(probe.ok).toBe(false);
     expect(probe.failures.join('\n')).toContain('STRIPE_SECRET_KEY');
@@ -496,7 +509,8 @@ describe('live Stripe fixture probe', () => {
 
   it('never prints the secret key in output', async () => {
     const probe = await probeStripeTestFixture(realFixture, {
-      fetchImpl: async () => stripeResponse(false, { message: 'Invalid API key' }),
+      fetchImpl: async () =>
+        stripeResponse(false, { message: 'Invalid API key' }),
     });
     for (const failure of probe.failures) {
       expect(failure).not.toContain('sk_test_5f2_probeKeyNotReal');
