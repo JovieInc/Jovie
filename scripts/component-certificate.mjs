@@ -2,7 +2,7 @@
 /**
  * Component certificate CLI.
  *   node scripts/component-certificate.mjs --all [--out report.json] [--summary]
- *   node scripts/component-certificate.mjs --component apps/web/components/x/Y.tsx
+ *   node scripts/component-certificate.mjs --component apps/web/components/x/Y.tsx [--spec]
  * Optional evidence inputs (absent evidence = `unknown`, which counts as missing):
  *   --mutation-state sweep-state.json  --a11y a11y.json  --visual visual.json  --journeys journeys.json
  */
@@ -19,6 +19,8 @@ import {
   buildReport,
   certifyComponent,
   DEFAULT_POLICY,
+  renderAgentSpec,
+  summarizeGuards,
 } from './lib/component-certificate.mjs';
 
 const { values } = parseArgs({
@@ -26,6 +28,7 @@ const { values } = parseArgs({
     all: { type: 'boolean', default: false },
     component: { type: 'string', multiple: true },
     out: { type: 'string' },
+    spec: { type: 'boolean', default: false },
     summary: { type: 'boolean', default: false },
     'repo-root': { type: 'string', default: REPO_ROOT },
     'mutation-state': { type: 'string' },
@@ -44,6 +47,11 @@ const { values } = parseArgs({
       default: 'docs/design-system/component-certification.json',
     },
     sha: { type: 'string', default: 'unknown' },
+    guards: { type: 'boolean', default: false },
+    'guard-registry': {
+      type: 'string',
+      default: 'docs/design-system/defect-guard-registry.json',
+    },
   },
 });
 
@@ -58,6 +66,14 @@ const read = rel => {
   const abs = join(root, rel);
   return existsSync(abs) ? readFileSync(abs, 'utf8') : null;
 };
+
+if (values.guards) {
+  const s = summarizeGuards(
+    readJson(values['guard-registry'], { defects: [] })
+  );
+  console.log(JSON.stringify(s, null, 1));
+  process.exit(s.errors.length ? 1 : 0);
+}
 
 const registry = readJson(values.registry, { policy: {}, waivers: {} });
 const policy = { ...DEFAULT_POLICY, ...(registry.policy ?? {}) };
@@ -161,6 +177,16 @@ const certificates = list.map(c => {
 const report = buildReport({ certificates, headSha: values.sha });
 if (values.out)
   writeFileSync(values.out, `${JSON.stringify(report, null, 1)}\n`);
+if (values.spec)
+  for (const c of certificates)
+    if (!c.certified)
+      console.log(
+        renderAgentSpec(c, {
+          benchmarkGaps: (benchmarks[c.component]?.gaps ?? []).filter(
+            g => g.decision !== 'skip' && g.status !== 'done'
+          ),
+        })
+      );
 if (values.summary || !values.out) {
   const t = report.totals;
   console.log(`components ${t.components}, certified ${t.certified}`);

@@ -57,8 +57,8 @@ const TEST_SPOTIFY_ARTIST = {
 
 const IS_LOCAL_AUTH_BYPASS =
   process.env.E2E_USE_TEST_AUTH_BYPASS === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_MOCK === '1' ||
-  process.env.NEXT_PUBLIC_CLERK_PROXY_DISABLED === '1';
+  process.env.NEXT_PUBLIC_AUTH_MOCK === '1' ||
+  process.env.NEXT_PUBLIC_AUTH_PROXY_DISABLED === '1';
 const IS_REQUIRED_GOLDEN_PATH = process.env.GOLDEN_PATH_REQUIRED === '1';
 
 /** Auth is real from this journey; Insight responses below are presentation fixtures. */
@@ -605,6 +605,33 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     'Real Spotify artist confirmation did not render the resolved identity'
   ).toBeVisible({ timeout: 60_000 });
 
+  // JOV-9758 guard: value before paywall. The preview must render at least
+  // one release from the artist's real Spotify catalog before any pricing
+  // step exists on the page. An empty "name and a photo" preview fails here.
+  const previewRail = page
+    .locator(
+      '[data-testid="onboarding-profile-rail"], [data-testid="onboarding-profile-rail-inline"]'
+    )
+    .filter({ visible: true })
+    .first();
+  await expect
+    .poll(
+      async () =>
+        Number((await previewRail.getAttribute('data-catalog-releases')) ?? 0),
+      {
+        message:
+          'Onboarding preview did not show any release from the real catalog',
+        timeout: 60_000,
+      }
+    )
+    .toBeGreaterThanOrEqual(1);
+  expect(
+    await page.locator('a[href^="/onboarding/checkout"]').count(),
+    'A pricing step rendered before the catalog preview'
+  ).toBe(0);
+  expect(new URL(page.url()).pathname).not.toBe('/onboarding/checkout');
+  await captureKeyframe(page, 'catalog-preview');
+
   const handleResponse = await sendChatMessage('Set my profile handle');
   expect(handleResponse.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
   const handleCard = page.getByTestId('onboarding-handle-check');
@@ -1047,38 +1074,13 @@ test.describe('Golden Path: auth -> claim -> catalog -> billing -> return', () =
     );
     await captureKeyframe(page, 'dashboard');
 
-    // Drive the canonical product import owner. The test never writes profile
-    // identity or catalog rows; the server action performs a real Spotify sync.
+    // JOV-9758 / JOV-9771: a real user never clicks "Sync from Spotify"
+    // after signing up. Onboarding itself must import the matched artist's
+    // catalog, so the journey only opens the releases page and waits for the
+    // real import to land. The test never writes profile or catalog rows.
     await page.goto(APP_ROUTES.RELEASES, {
       waitUntil: 'domcontentloaded',
       timeout: 90_000,
-    });
-    const syncButton = page
-      .locator(
-        '[data-testid="library-sync-spotify-empty-state"], [data-testid="sync-spotify-empty-state"], [data-testid="shell-releases-sync-empty-state"]'
-      )
-      .filter({ visible: true })
-      .first();
-    await expect(
-      syncButton,
-      'Claimed Spotify profile did not expose the canonical catalog import action'
-    ).toBeVisible({ timeout: 60_000 });
-    // A click that lands before hydration is silently dropped and no import
-    // ever starts (intermittent 180s timeouts, 2026-09-26/28). Prove the click
-    // registered: the button goes disabled while syncing, or leaves once the
-    // catalog exists. The import is idempotent, so a retried click is safe.
-    await expect(async () => {
-      if (await syncButton.isVisible()) await syncButton.click();
-      await expect
-        .poll(
-          async () =>
-            !(await syncButton.isVisible()) || (await syncButton.isDisabled()),
-          { timeout: 5_000 }
-        )
-        .toBe(true);
-    }, 'Spotify sync click never registered (button stayed enabled)').toPass({
-      timeout: 60_000,
-      intervals: [1_000, 2_000, 5_000],
     });
 
     await expect

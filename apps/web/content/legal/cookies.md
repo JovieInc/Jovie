@@ -76,7 +76,6 @@ Note that disabling certain cookies may affect your experience on Jovie.
 
 Our trusted partners may set cookies on your device:
 
-- **Clerk**: For secure authentication
 - **Statsig**: Used server-side for analytics and experimentation; Jovie does not currently set browser Statsig cookies
 - **Stripe**: For payment processing (only on checkout pages)
 

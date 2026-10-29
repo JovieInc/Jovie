@@ -54,7 +54,10 @@ const mocks = vi.hoisted(() => {
       })
     );
 
+  const afterTasks: Promise<unknown>[] = [];
+
   return {
+    afterTasks,
     selectMock,
     selectLimitMock,
     sourceLink,
@@ -63,6 +66,13 @@ const mocks = vi.hoisted(() => {
     recordAudienceEvent: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+vi.mock('@/lib/next/schedule-after', () => ({
+  scheduleAfter: (task: () => unknown) => {
+    mocks.afterTasks.push(Promise.resolve().then(task));
+    return true;
+  },
+}));
 
 vi.mock('@/lib/db', () => ({
   db: {
@@ -133,6 +143,12 @@ vi.mock('@/lib/error-tracking', () => ({
   captureError: vi.fn().mockResolvedValue(undefined),
 }));
 
+async function callRoute(...args: Parameters<typeof GET>) {
+  const response = await GET(...args);
+  await Promise.all(mocks.afterTasks.splice(0));
+  return response;
+}
+
 describe('GET /s/[code]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -146,9 +162,12 @@ describe('GET /s/[code]', () => {
       reason: 'known_crawler',
     });
 
-    const response = await GET(new NextRequest('http://localhost/s/abc123'), {
-      params: Promise.resolve({ code: 'abc123' }),
-    });
+    const response = await callRoute(
+      new NextRequest('http://localhost/s/abc123'),
+      {
+        params: Promise.resolve({ code: 'abc123' }),
+      }
+    );
 
     expect(response.status).toBe(302);
     expect(response.headers.get('location')).toBe(
@@ -163,6 +182,78 @@ describe('GET /s/[code]', () => {
     expect(recordAudienceEvent).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Mobile/21F90 Instagram 340.0.0.20.100',
+    'WhatsApp/2.24.19 iOS/18.0',
+    'Mozilla/5.0 [FBAN/FBIOS;FBAV/480.0]',
+  ])(
+    'records Meta in-app browser fans as real visitors: %s',
+    async userAgent => {
+      vi.mocked(detectBot).mockReturnValueOnce({
+        isBot: true,
+        isMeta: true,
+        reason: 'Meta crawler detected',
+        shouldBlock: false,
+        userAgent,
+      });
+
+      const response = await callRoute(
+        new NextRequest('http://localhost/s/abc123'),
+        {
+          params: Promise.resolve({ code: 'abc123' }),
+        }
+      );
+
+      expect(response.status).toBe(302);
+      expect(recordAnonymousBotMetric).not.toHaveBeenCalled();
+      expect(publicClickLimiter.limit).toHaveBeenCalled();
+      expect(recordAudienceEvent).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ eventType: 'source_scanned' })
+      );
+    }
+  );
+
+  it('still skips analytics for the Facebook link-preview crawler', async () => {
+    vi.mocked(detectBot).mockReturnValueOnce({
+      isBot: true,
+      isMeta: true,
+      reason: 'Meta crawler detected',
+      shouldBlock: false,
+      userAgent: 'facebookexternalhit/1.1',
+    });
+
+    const response = await callRoute(
+      new NextRequest('http://localhost/s/abc123'),
+      {
+        params: Promise.resolve({ code: 'abc123' }),
+      }
+    );
+
+    expect(response.status).toBe(302);
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+  });
+
+  it('flushes the 302 before analytics finish (redirect latency budget)', async () => {
+    let releaseAnalytics: () => void = () => undefined;
+    mocks.withSystemIngestionSession.mockImplementationOnce(
+      () =>
+        new Promise<void>(resolve => {
+          releaseAnalytics = resolve;
+        })
+    );
+
+    const response = await GET(new NextRequest('http://localhost/s/abc123'), {
+      params: Promise.resolve({ code: 'abc123' }),
+    });
+
+    // The route resolved while the analytics transaction is still pending.
+    expect(response.status).toBe(302);
+    expect(recordAudienceEvent).not.toHaveBeenCalled();
+    releaseAnalytics();
+    await Promise.all(mocks.afterTasks.splice(0));
+  });
+
   it('treats partial consent cookies as malformed through the shared parser', async () => {
     const request = new NextRequest('http://localhost/s/abc123', {
       headers: {
@@ -170,7 +261,7 @@ describe('GET /s/[code]', () => {
       },
     });
 
-    const response = await GET(request, {
+    const response = await callRoute(request, {
       params: Promise.resolve({ code: 'abc123' }),
     });
 
@@ -193,7 +284,7 @@ describe('GET /s/[code]', () => {
 
     const request = new NextRequest('http://localhost/s/abc123');
 
-    const response = await GET(request, {
+    const response = await callRoute(request, {
       params: Promise.resolve({ code: 'abc123' }),
     });
 
@@ -219,7 +310,7 @@ describe('GET /s/[code]', () => {
         },
       });
 
-      const response = await GET(request, {
+      const response = await callRoute(request, {
         params: Promise.resolve({ code: 'abc123' }),
       });
 
@@ -240,7 +331,7 @@ describe('GET /s/[code]', () => {
       },
     });
 
-    const response = await GET(request, {
+    const response = await callRoute(request, {
       params: Promise.resolve({ code: 'abc123' }),
     });
 

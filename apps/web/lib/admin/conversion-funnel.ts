@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql as drizzleSql } from 'drizzle-orm';
+import { externalAccountSql } from '@/lib/accounts/internal-account';
 
 import {
   type AnalyticsRange,
@@ -73,6 +74,7 @@ export async function getConversionFunnelData(
           SELECT u.id
           FROM users u
           WHERE u.deleted_at IS NULL
+          AND ${externalAccountSql(drizzleSql.raw('u.email'), drizzleSql.raw('u.account_class'))}
           ${dateConstraint}
         ),
         user_profiles AS (

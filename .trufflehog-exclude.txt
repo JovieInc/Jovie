@@ -46,7 +46,3 @@ scripts/fetch-current-artist-images.ts
 # JOV-7495 public work link test: URI-detector bait for a userinfo origin
 # (https://user:…@example.com/) asserting that such links are rejected.
 apps/web/lib/agent/public-work-links.test.ts
-# merge-queue-green-enroll.yml: the pinned actions/github-script SHA (line ~254) is
-# a GitHubOauth2 detector false positive (unverified, a 40-hex action pin), same
-# class as sonarcloud.yml above. gitleaks and GitHub secret scanning still cover it.
-.github/workflows/merge-queue-green-enroll.yml
