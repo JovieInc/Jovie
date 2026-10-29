@@ -108,7 +108,7 @@ export function applyPriceLockToOptions<T extends PricedOption>(
   return out;
 }
 
-/** "$12/mo" for the lock's monthly price, or null when it has none. */
+/** The monthly label (for example "<amount>/mo") for the lock's monthly price, or null when it has none. */
 export function lockedMonthlyLabel(lock: PriceLockView | null): string | null {
   return lock?.month ? formatLockedPrice(lock.month) : null;
 }

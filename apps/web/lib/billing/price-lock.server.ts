@@ -152,8 +152,8 @@ export interface PriceLockBackfillResult {
 
 /**
  * Backfills locks for paying subscribers from the price they pay today
- * (users.stripe_price_id). Grandfathered $12 accounts keep $12 because their
- * subscription price is $12. People with no paid subscription are locked on
+ * (users.stripe_price_id). Grandfathered accounts keep the price they pay
+ * because the lock copies their subscription price. People with no paid subscription are locked on
  * first need (signup hook, first price view, checkout), not retroactively.
  * Idempotent; the daily reconcile runs it so a missed hook self-heals.
  */

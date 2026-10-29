@@ -43,7 +43,7 @@ export function LockedPlanPrice({
       </>
     );
   }
-  // lockedMonthlyLabel already carries the cadence ("$12/mo").
+  // lockedMonthlyLabel already carries the cadence (for example "/mo" is part of the label).
   return (
     <>
       <span data-testid='locked-plan-price'>{locked}</span>

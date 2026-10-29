@@ -10,7 +10,7 @@
  *   - Stripe price ids come from `lib/stripe/price-ids.ts` env at lock time.
  *
  * This registry only NAMES each list price so a lock can point at it. When the
- * list price changes (JOV-9769: $12 -> $19/mo, $190/yr) a new version is added
+ * list price changes (JOV-9769) a new version is added
  * here and made current; every existing lock keeps pointing at its own
  * snapshot, so the change reaches new signups only. A test fails when the
  * current version stops matching the list price, so a list-price edit cannot
@@ -102,7 +102,7 @@ export function assertPriceVersionsValid(
   }
   if (current.monthlyUsd !== listMonthlyUsd) {
     throw new Error(
-      `current price version ${currentId} is $${current.monthlyUsd}/mo but the list price is $${listMonthlyUsd}/mo: register a new price version and make it current (existing locks keep their own snapshot)`
+      `current price version ${currentId} is priced ${current.monthlyUsd} USD per month but the list price is ${listMonthlyUsd} USD per month. Add a price version for the list price and make it current; existing locks keep their own snapshot.`
     );
   }
 }
@@ -241,7 +241,7 @@ export function resolveLockedPrice(input: {
   };
 }
 
-/** "$12/mo" or "$190/yr": whole dollars drop the cents. */
+/** Monthly or yearly label such as "$N/mo": whole dollars drop the cents. */
 export function formatLockedPrice(
   price: Pick<ResolvedLockedPrice, 'amountCents' | 'interval' | 'currency'>
 ): string {

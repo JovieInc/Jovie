@@ -33,7 +33,7 @@ export function formatVerifiedPriceLabel(
   return `${formatted}/mo`;
 }
 
-/** "Get Verified — $12/mo", or "Get Verified" until the price is known. */
+/** "Get Verified — <price>", or "Get Verified" until the price is known. */
 export function formatVerifiedUpgradeLabel(
   option: PricingOption | undefined
 ): string {
