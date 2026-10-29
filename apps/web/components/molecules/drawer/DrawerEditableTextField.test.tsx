@@ -57,8 +57,12 @@ describe('DrawerEditableTextField', () => {
     );
 
     const copyButton = screen.getByLabelText('Copy UPC');
-    expect(copyButton.className).toContain('min-h-6');
-    expect(copyButton.className).toContain('min-w-6');
+    expect(copyButton).toHaveClass('h-6', 'w-6', 'before:h-11', 'before:w-11');
+    expect(copyButton.parentElement).toHaveClass(
+      'opacity-0',
+      'group-focus-within:opacity-100',
+      'shrink-0'
+    );
   });
 
   it('copies the current value from display mode', async () => {
@@ -74,6 +78,9 @@ describe('DrawerEditableTextField', () => {
 
     await waitFor(() => {
       expect(writeText).toHaveBeenCalledWith('5054227019579');
+      expect(screen.getByLabelText('Copy UPC').parentElement).toHaveClass(
+        'opacity-100'
+      );
     });
   });
 

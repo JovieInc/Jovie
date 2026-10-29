@@ -29,6 +29,9 @@ the final Git index, so an unstaged edit cannot validate stale staged policy.
 CI retains the independent body-hash and path-routing checks; it never
 regenerates the integrity record automatically.
 
+For reviewed design edits, run `node scripts/agent-context/design-sections.mjs
+--write` and stage its record. Resolve conflicts from main's record and regenerate.
+
 Keep stable instructions/tools first and variable task material later when the
 provider permits it. Preserve provider-owned message IDs, tool call/result pairs,
 and reasoning/compaction items through the native SDK. Do not reorder, stringify,

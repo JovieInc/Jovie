@@ -186,6 +186,88 @@ test('every scenario catches a wrong answer and extra unsupported claims', () =>
     }
   }
 });
+test('design record CLI regenerates reviewed sections and checks without writing', t => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'design-record-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  mkdirSync(resolve(dir, 'docs/design-system'), { recursive: true });
+  mkdirSync(resolve(dir, 'scripts/agent-context'), { recursive: true });
+  const active = '## Tokens\n\nUse [tokens](./tokens.md).\n';
+  const details = '## Layout\n\nKeep controls stable.\n';
+  const recordPath = resolve(dir, 'scripts/agent-context/design-sections.json');
+  const record = ['## Layout', '## Tokens'].map(heading => ({
+    heading,
+    sha256: 'stale',
+  }));
+  writeFileSync(resolve(dir, 'DESIGN.md'), active);
+  writeFileSync(resolve(dir, 'docs/design-system/DETAILS.md'), details);
+  const original = JSON.stringify(record);
+  writeFileSync(recordPath, original);
+  const script = resolve(root, 'scripts/agent-context/design-sections.mjs');
+  const run = (...args) =>
+    spawnSync(process.execPath, [script, ...args], {
+      cwd: dir,
+      encoding: 'utf8',
+    });
+  const read = () => readFileSync(recordPath, 'utf8');
+  assert.equal(run().status, 1);
+  assert.equal(read(), original);
+  const written = run('--write');
+  assert.equal(written.status, 0, written.stderr);
+  const generated = read();
+  assert.deepEqual(JSON.parse(generated), [
+    {
+      heading: '## Layout',
+      sha256: createHash('sha256').update(details.trim()).digest('hex'),
+    },
+    {
+      heading: '## Tokens',
+      sha256: createHash('sha256')
+        .update('## Tokens\n\nUse [tokens](link).')
+        .digest('hex'),
+    },
+  ]);
+  assert.equal(run().status, 0);
+  assert.equal(run('--write').status, 0);
+  assert.equal(read(), generated);
+  // A routing stub must not replace the relocated body with the same heading.
+  writeFileSync(
+    resolve(dir, 'DESIGN.md'),
+    active + details.replace('Keep', 'Read')
+  );
+  assert.equal(run().status, 0);
+  assert.equal(run('--write').status, 0);
+  assert.equal(read(), generated);
+  writeFileSync(
+    resolve(dir, 'docs/design-system/DETAILS.md'),
+    details.replace('Keep', 'Maintain')
+  );
+  assert.equal(run('--write').status, 1);
+  assert.equal(read(), generated);
+  writeFileSync(resolve(dir, 'docs/design-system/DETAILS.md'), details);
+  writeFileSync(
+    resolve(dir, 'DESIGN.md'),
+    active.replace('./tokens.md', '../tokens.md')
+  );
+  assert.equal(run().status, 0);
+  writeFileSync(resolve(dir, 'DESIGN.md'), active.replace('Use', 'Review'));
+  assert.equal(run().status, 1);
+  assert.equal(read(), generated);
+  for (const invalid of [
+    { active: '', record },
+    { active: active + active, record },
+    { active, record: [] },
+    { active, record: [...record, record[0]] },
+    { active, record: [{ heading: 1 }] },
+  ]) {
+    writeFileSync(resolve(dir, 'DESIGN.md'), invalid.active);
+    writeFileSync(recordPath, JSON.stringify(invalid.record));
+    const before = read();
+    assert.equal(run('--write').status, 1);
+    assert.equal(read(), before);
+  }
+  assert.equal(run('--unknown').status, 1);
+});
+
 test('design extraction preserves every original section modulo relocated links', () => {
   const baseline = JSON.parse(
     readFileSync(new URL('./design-sections.json', import.meta.url), 'utf8')
