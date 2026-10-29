@@ -6,6 +6,7 @@ import { MarketingContentProse } from '@/components/marketing/MarketingContentPr
 import { MarketingEditorialHeroPhoto } from '@/components/marketing/MarketingEditorialHeroPhoto';
 import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { APP_ROUTES } from '@/constants/routes';
+import { ENGINEERING_COPY } from '@/data/engineeringCopy';
 import type { EngineeringStoryRecord } from '@/lib/engineering-publication';
 
 function formatDate(iso: string): string {
@@ -61,9 +62,6 @@ function StoryMeta({
     </div>
   );
 }
-
-const EMPTY_INDEX_EXPLAINER =
-  'Each note is written from work that has already shipped, with the pull request, the checks that passed, and the result linked as evidence. Nothing is published until it is approved, so this index only ever lists finished work.';
 
 function PageFrame({
   kicker,
@@ -148,7 +146,7 @@ export function EngineeringIndex({
             </p>
             {preview ? null : (
               <p className='max-w-2xl text-secondary-token'>
-                {EMPTY_INDEX_EXPLAINER}
+                {ENGINEERING_COPY.emptyIndexExplainer}
               </p>
             )}
           </div>
