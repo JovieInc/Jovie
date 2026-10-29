@@ -7896,27 +7896,23 @@ class FixRedTest(unittest.TestCase):
                 self.assertEqual(lane.file_breaker_signals(host, linear), 0)
             intake.assert_called_once()
 
-    def test_missing_changelog_metadata_is_stamped_instead_of_dispatching_an_agent(self):
-        log = "Error: Customer outcome decision missing or invalid (missing-metadata). Internal work."
-        with tempfile.TemporaryDirectory() as tmp, \
-                patch.object(lane.pr_events, "ensure_internal_changelog", return_value=True) as stamp:
-            _, receipt, agent, again = self.run_gate(tmp, log)
-            self.assertEqual(receipt["verdict"], "skipped")
-            self.assertEqual(receipt["reasons"], ["stamped-changelog:changelog-decision"])
-            self.assertEqual(receipt["failureFingerprint"]["action"], "stamp-changelog")
+    def test_changelog_quota_mask_stamps_the_internal_note_once_per_head(self):
+        body = "## Summary\nadmin label\n"
+        log = "Error: github-quota-deferred: PR metadata read hit GitHub primary-rate-limit\n"
+        target = {**self.pr(), "body": body}
+        with tempfile.TemporaryDirectory() as tmp:
+            host, receipt, agent, again = self.run_gate(tmp, log, pr=target)
+            self.assertEqual(receipt["reasons"], ["infra-rerun:changelog-metadata"])
+            self.assertEqual(receipt["failureFingerprint"]["cls"], "changelog-metadata")
             agent.assert_not_called()
             again.assert_not_called()
-            stamp.assert_called_once()
-            # The old red log stays on the check until the body-edit run finishes. A second tick
-            # must not hire a model to paste the note again.
-            _, second, agent2, _ = self.run_gate(tmp, log)
-            self.assertEqual(second["reasons"], ["stamped-changelog:changelog-decision"])
-            agent2.assert_not_called()
-            stamp.assert_called_once()
-        with tempfile.TemporaryDirectory() as tmp, \
-                patch.object(lane.pr_events, "ensure_internal_changelog", return_value=False):
-            _, _, agent, _ = self.run_gate(tmp, log)
-            agent.assert_called_once()
+            written = (host.state / "runs" / "changelog-5.md").read_text()
+            self.assertTrue(written.startswith(body))
+            self.assertIn(lane.fix_red_classes.INTERNAL_CHANGELOG_NOTE, written)
+            self.assertEqual(written.count("customer-changelog/v1"), 1)
+            _, second, agent2, _ = self.run_gate(tmp, log, pr=target)
+            agent2.assert_called_once()
+            self.assertNotEqual(second["reasons"][:1], ["infra-rerun:changelog-metadata"])
 
     def test_quota_deferred_red_is_rerun_not_dispatched_and_carries_its_fingerprint(self):
         with tempfile.TemporaryDirectory() as tmp:

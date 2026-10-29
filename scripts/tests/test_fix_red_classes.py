@@ -22,8 +22,6 @@ class ClassifyTest(unittest.TestCase):
             "AssertionError: off-grid 10px/14px spacing steps (*-2.5, *-3.5) grew: 591 > baseline 590.": ("spacing-scale", "snap-spacing"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
             "red-before-green: include Failing command:": ("pr-body", "agent"),
-            "Error: Customer outcome decision missing or invalid (missing-metadata). See docs/CHANGELOG_PUBLICATION.md":
-                ("changelog-decision", "stamp-changelog"),
             "AssertionError: expected 1": ("other", "agent"),
         }
         for log, (cls, action) in cases.items():
@@ -44,29 +42,38 @@ class ClassifyTest(unittest.TestCase):
         still = classes.classify(pr("A", merge="BEHIND"), {"A": "API rate limit exceeded"})
         self.assertEqual(still["action"], "rerun", "a deterministic log outranks the stale-branch default")
 
+    def test_missing_changelog_metadata_stamps_and_a_quota_mask_stamps_only_a_bare_body(self):
+        missing = "Error: Customer outcome decision missing or invalid (missing-metadata)."
+        got = classes.classify(pr("Source Validation"), {"Source Validation": missing})
+        self.assertEqual((got["cls"], got["action"]), ("changelog-metadata", "stamp-changelog"))
+        quota = "Error: github-quota-deferred: PR metadata read hit GitHub primary-rate-limit\n"
+        bare = {**pr("Source Validation"), "body": "## Summary\nadmin label\n"}
+        stamped = classes.classify(bare, {"Source Validation": quota})
+        self.assertEqual((stamped["cls"], stamped["action"]), ("changelog-metadata", "stamp-changelog"))
+        noted = {**bare, "body": bare["body"] + classes.INTERNAL_CHANGELOG_NOTE + "\n"}
+        stay = classes.classify(noted, {"Source Validation": quota})
+        self.assertEqual((stay["cls"], stay["action"]), ("quota-deferred", "rerun"))
+        fleet = classes.classify({**pr("Source Validation"), "body": "bare\n"},
+                                 {"Source Validation": "github-quota-deferred; fleet evidence retry"})
+        self.assertEqual((fleet["cls"], fleet["action"]), ("quota-deferred", "rerun"))
+        nobody = classes.classify(pr("Source Validation"), {"Source Validation": quota})
+        self.assertEqual((nobody["cls"], nobody["action"]), ("quota-deferred", "rerun"))
+
+    def test_stamp_appends_one_internal_note_and_refuses_a_second(self):
+        self.assertIsNone(classes.stamp_internal_changelog(None))
+        body = "## Summary\nadmin label"
+        once = classes.stamp_internal_changelog(body)
+        self.assertEqual(once, body + "\n" + classes.INTERNAL_CHANGELOG_NOTE + "\n")
+        self.assertEqual(once.count("customer-changelog/v1"), 1)
+        self.assertIsNone(classes.stamp_internal_changelog(once))
+        self.assertEqual(classes.stamp_internal_changelog(""), classes.INTERNAL_CHANGELOG_NOTE + "\n")
+
     def test_key_ignores_volatile_numbers_but_separates_failures(self):
         a = classes.classify(pr("T"), {"T": "AssertionError: expected 12 to equal 3"})
         b = classes.classify(pr("T"), {"T": "AssertionError: expected 99 to equal 4"})
         c = classes.classify(pr("T"), {"T": "TypeError: x is not a function"})
         self.assertEqual(a["key"], b["key"])
         self.assertNotEqual(a["key"], c["key"])
-
-
-class StampChangelogTest(unittest.TestCase):
-    NOTE = classes.INTERNAL_CHANGELOG_NOTE
-
-    def test_appends_the_internal_decision_once(self):
-        self.assertEqual(classes.stamp_internal_changelog(""), self.NOTE + "\n")
-        self.assertEqual(classes.stamp_internal_changelog("null"), self.NOTE + "\n")
-        stamped = classes.stamp_internal_changelog("## Summary\nInternal HUD.\n")
-        self.assertTrue(stamped.startswith("## Summary\nInternal HUD.\n\n" + self.NOTE))
-        self.assertIsNone(classes.stamp_internal_changelog(stamped))
-        self.assertIsNone(classes.stamp_internal_changelog(
-            '<!-- customer-changelog/v1 {"releaseWorthy":true} -->'))
-
-    def test_a_public_or_malformed_note_is_not_overwritten(self):
-        body = 'See <!-- customer-changelog/v1 nope -->'
-        self.assertIsNone(classes.stamp_internal_changelog(body))
 
 
 class SpacingSnapTest(unittest.TestCase):

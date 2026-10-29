@@ -29,9 +29,9 @@ from atomic_state import atomic_write_text
 
 SCHEMA = "jovie-fix-red-class/v1"
 # Actions a class can route to. `agent` is the default (a model run); the others spend no model.
-RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, SNAP_SPACING, STAMP_CHANGELOG, AGENT = (
-    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "snap-spacing", "stamp-changelog", "agent")
-DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, SNAP_SPACING, STAMP_CHANGELOG})
+RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING, AGENT = (
+    "rerun", "sync-main", "wire-ci-fast", "renumber-migrations", "stamp-changelog", "snap-spacing", "agent")
+DETERMINISTIC = frozenset({RERUN, SYNC_MAIN, WIRE_CI_FAST, RENUMBER, STAMP_CHANGELOG, SNAP_SPACING})
 
 # remediation.INFRA_TEXT (runner loss, OOM, 5xx) plus the platform failures seen in 52 agent-declined
 # fix runs. Kept out of INFRA_TEXT: the exhausted-PR classifier deliberately routes a rate-limited
@@ -44,10 +44,12 @@ UNWIRED = re.compile(r"Unwired: (.+?)\. Wire each file into a ci-fast lane")
 ATOMIC_TEXT = re.compile(r"use atomic_state\.atomic_write_text for whole-file state")
 BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?## ?(?:Red-before-green|Blast radius)",
                        re.IGNORECASE)
-# Source Validation's customer-outcome step. The PR template's internal decision; a public note
-# is an author choice and is never invented here. Only the missing-note failure matches.
-CHANGELOG_MISSING = re.compile(r"Customer outcome decision missing or invalid \(missing-metadata\)")
+# The internal customer-changelog decision. A second note is `ambiguous`, so a body that already
+# contains one is never stamped again. The quota form is the attempt>1 mask of the same defect:
+# the guard could not re-read the body, so the log no longer says missing-metadata.
 INTERNAL_CHANGELOG_NOTE = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+CHANGELOG_MISSING = re.compile(r"Customer outcome decision missing or invalid \(missing-metadata\)")
+CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit GitHub")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -66,12 +68,12 @@ NON_PRODUCT_SPACING = re.compile(r"\.(?:test|spec|stories)\.[tj]sx?$")
 
 # (class, pattern, action). First match wins per check; order is most specific first.
 SIGNATURES = (
+    ("changelog-metadata", CHANGELOG_MISSING, STAMP_CHANGELOG),
     # Before platform-infra: the ratchet message includes a count such as 591,
     # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
-    ("changelog-decision", CHANGELOG_MISSING, STAMP_CHANGELOG),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
     ("ci-fast-wiring", UNWIRED, WIRE_CI_FAST),
     ("atomic-write", ATOMIC_TEXT, AGENT),
@@ -106,6 +108,16 @@ def fingerprint_key(cls: str, names: list[str], signature: str = "") -> str:
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:12]
 
 
+def stamp_internal_changelog(body) -> str | None:
+    """Append the internal customer-changelog note. None when `body` is not a string or already
+    contains a note (a second note is an ambiguous contract, not a stamp)."""
+    if not isinstance(body, str) or "customer-changelog/v1" in body:
+        return None
+    if body and not body.endswith("\n"):
+        body += "\n"
+    return body + INTERNAL_CHANGELOG_NOTE + "\n"
+
+
 def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     """{cls, key, action, checks, signature, files}. `logs` maps a failing check name to its failed-job log;
     a check with no log is `other`. A BEHIND branch with nothing deterministic to say is `stale-branch`."""
@@ -126,6 +138,11 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
     signature = error_signature("\n".join(logs.get(name) or "" for name in names)) if cls in {"other", "mixed"} else ""
     if cls in {"other", "mixed"} and pr.get("mergeStateStatus") == "BEHIND":
         cls, action = BEHIND_CLASS, SYNC_MAIN
+    # Attempt 2 of the changelog guard reports only the quota error. Stamp the missing internal
+    # note when the body can take one; a body that already has a note stays a quota rerun.
+    if cls == "quota-deferred" and CHANGELOG_QUOTA_READ.search("\n".join(logs.get(name) or "" for name in names)) \
+            and stamp_internal_changelog(pr.get("body")) is not None:
+        cls, action, signature = "changelog-metadata", STAMP_CHANGELOG, ""
     files = []
     if cls == "ci-fast-wiring":
         for name in names:
@@ -134,22 +151,6 @@ def classify(pr: dict, logs: dict[str, str] | None = None) -> dict:
         files = sorted(set(files))
     return {"schema": SCHEMA, "cls": cls, "key": fingerprint_key(cls, names, signature), "action": action,
             "checks": names, "signature": signature, "files": files}
-
-
-def stamp_internal_changelog(body: str | None) -> str | None:
-    """Append the template internal decision when the body has no customer-changelog note.
-
-    None when a note is already present. Malformed, ambiguous, and public notes stay with a
-    model. `releaseWorthy:false` does not invent a public changelog entry. `gh --jq .body`
-    prints the literal `null` for an empty body.
-    """
-    text = "" if body is None else str(body)
-    if text.strip() == "null":
-        text = ""
-    if "customer-changelog/v1" in text:
-        return None
-    separated = text.rstrip() + ("\n\n" if text.strip() else "")
-    return separated + INTERNAL_CHANGELOG_NOTE + "\n"
 
 
 def _snap_spacing_line(line: str) -> str:
@@ -326,8 +327,7 @@ def measure(rows: list[dict], now: float, days: int = 5, cost_per_run: dict | No
     cost_per_run = cost_per_run or {}
     window = [row for row in fix_rows(rows) if (_epoch(row) or 0) >= now - days * 86400]
     llm = [row for row in window if row.get("verdict") in LLM_VERDICTS and not row.get("attemptRefunded")]
-    routed = [row for row in window if str((row.get("reasons") or [""])[0]).startswith(
-        ("infra-rerun:", "stamped-changelog:"))]
+    routed = [row for row in window if str((row.get("reasons") or [""])[0]).startswith("infra-rerun:")]
     pushed = [row for row in llm if row.get("verdict") == "fix-pushed"]
     spend = sum(float(cost_per_run.get(row.get("provider")) or 0) for row in llm)
     merged = {row.get("pr") for row in pushed if merged_prs is not None and row.get("pr") in merged_prs}

@@ -6751,46 +6751,33 @@ def route_fix_red(host: Host, pr: dict) -> dict | None:
         return None
 
 
-def changelog_stamp_done(host: Host, pr: dict) -> bool:
-    """True after a missing-metadata stamp landed on this head. Later ticks must not hire a model
-    to paste the same note while the old red log is still the check's details URL."""
-    try:
-        data = json.loads((host.state / "class-routes.json").read_text())
-    except (OSError, ValueError):
+def stamp_changelog_decision(host: Host, pr: dict) -> bool:
+    """Write the internal customer-changelog note onto the PR body. False when the body cannot
+    take one or GitHub rejects the edit (the model then gets the head)."""
+    stamped = fix_red_classes.stamp_internal_changelog(pr.get("body"))
+    if stamped is None:
         return False
-    row = data.get(str(pr["number"])) if isinstance(data, dict) else None
-    return isinstance(row, dict) and row.get("stamp-changelog:ok") == pr["headRefOid"]
-
-
-def mark_changelog_stamp(host: Host, pr: dict) -> None:
-    def change(data: dict) -> None:
-        data.setdefault(str(pr["number"]), {})["stamp-changelog:ok"] = pr["headRefOid"]
-    try:
-        update_json(host.state / "class-routes.json", change)
-    except (OSError, ValueError):
-        pass
+    runs = host.state / "runs"
+    runs.mkdir(parents=True, exist_ok=True)
+    path = runs / f"changelog-{int(pr['number'])}.md"
+    atomic_write_text(path, stamped)
+    edited = gh_call(["pr", "edit", str(int(pr["number"])), "--repo", REPO_SLUG, "--body-file", str(path)],
+                     priority="repair")
+    return edited.returncode == 0
 
 
 def deterministic_route_taken(host: Host, pr: dict, route: dict | None) -> str | None:
     """Run the no-model action for a routed class once per head; the reason on success (None: use the model)."""
-    if not route:
+    if not route or route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN, fix_red_classes.STAMP_CHANGELOG}:
         return None
     if route["action"] == fix_red_classes.STAMP_CHANGELOG:
-        reason = f"stamped-changelog:{route['cls']}"
-        if changelog_stamp_done(host, pr):
-            return reason
+        # No body, or a note already present: do not spend the once-per-head claim. An invalid
+        # note is a different defect and still belongs to the model.
+        if fix_red_classes.stamp_internal_changelog(pr.get("body")) is None:
+            return None
         if not claim_route(host, pr, route["action"]):
             return None
-        if not pr_events.ensure_internal_changelog(pr):
-            return None
-        mark_changelog_stamp(host, pr)
-        try:
-            pr_events.consume(THIS, pr, ["red"])
-        except (OSError, subprocess.SubprocessError):
-            pass
-        return reason
-    if route["action"] not in {fix_red_classes.RERUN, fix_red_classes.SYNC_MAIN}:
-        return None
+        return "infra-rerun:changelog-metadata" if stamp_changelog_decision(host, pr) else None
     # One rerun per head, shared with the platform-red gate above; one sync per head.
     if not (claim_infra_rerun(host, pr) if route["action"] == fix_red_classes.RERUN else claim_route(host, pr, route["action"])):
         return None
