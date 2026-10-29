@@ -14,7 +14,7 @@ concurrency:
 jobs:
   fleet:
     name: PR Fleet Rules
-    runs-on: ${{ github.event_name == 'merge_group' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name == 'merge_group' && vars.MERGE_GATE_POOL == 'fixed' && fromJSON('["self-hosted","Linux","X64","jovie-fixed"]') || 'ubuntu-latest' }}
     # 3 min of work plus bounded quota holds (FLEET_RULES_QUOTA_HOLD_SECONDS, 120s).
     timeout-minutes: 6
     steps:
