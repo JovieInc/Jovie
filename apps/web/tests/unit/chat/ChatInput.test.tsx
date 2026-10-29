@@ -148,6 +148,15 @@ function removeMockSpeechRecognition() {
   Reflect.deleteProperty(window, 'webkitSpeechRecognition');
 }
 
+/** ElevenLabs health fails in jsdom, then the ladder opens Web Speech. */
+async function startedWebSpeechSession(): Promise<MockSpeechRecognition> {
+  return waitFor(() => {
+    const recognition = MockSpeechRecognition.instances[0];
+    expect(recognition).toBeDefined();
+    return recognition as MockSpeechRecognition;
+  });
+}
+
 function setElectronAPI(api: object) {
   Object.defineProperty(window, 'electronAPI', {
     configurable: true,
@@ -533,7 +542,7 @@ describe('ChatInput', () => {
 
     for (const buttonName of [
       /Attachment options/i,
-      /dictation unavailable/i,
+      /hold to dictate/i,
       /send message/i,
     ]) {
       expect(
@@ -688,14 +697,14 @@ describe('ChatInput', () => {
     expect(inlineField.className).not.toContain('min-h-7');
   });
 
-  it('keeps a quiet disabled dictation control when speech input is unavailable', () => {
+  it('offers the adaptive mic when Web Speech is absent and keeps send enabled', () => {
     fastRender(withProviders(<ChatInput {...baseProps} />));
 
     const dictationButton = screen.getByRole('button', {
-      name: /dictation unavailable/i,
+      name: /hold to dictate/i,
     });
 
-    expect(dictationButton).toBeDisabled();
+    expect(dictationButton).toBeEnabled();
     expect(screen.getByRole('button', { name: /send message/i })).toBeEnabled();
   });
 
@@ -721,13 +730,13 @@ describe('ChatInput', () => {
     await waitFor(() => expect(dictationButton).toBeEnabled());
 
     fireEvent.pointerDown(dictationButton);
-    expect(MockSpeechRecognition.instances).toHaveLength(1);
-    expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
+    const recognition = await startedWebSpeechSession();
+    expect(recognition.start).toHaveBeenCalledTimes(1);
     expect(dictationButton).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('status')).toHaveTextContent(/listening/i);
 
     fireEvent.pointerUp(dictationButton);
-    expect(MockSpeechRecognition.instances[0]?.stop).toHaveBeenCalledTimes(1);
+    expect(recognition.stop).toHaveBeenCalledTimes(1);
     expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
   });
 
@@ -745,12 +754,12 @@ describe('ChatInput', () => {
     dictationButton.focus();
     await user.keyboard('{Enter}');
 
-    expect(MockSpeechRecognition.instances).toHaveLength(1);
-    expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
+    const recognition = await startedWebSpeechSession();
+    expect(recognition.start).toHaveBeenCalledTimes(1);
     expect(dictationButton).toHaveAttribute('aria-pressed', 'true');
 
     await user.keyboard('{Enter}');
-    expect(MockSpeechRecognition.instances[0]?.stop).toHaveBeenCalledTimes(1);
+    expect(recognition.stop).toHaveBeenCalledTimes(1);
     expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
   });
 
@@ -777,8 +786,8 @@ describe('ChatInput', () => {
     await waitFor(() => expect(dictationButton).toBeEnabled());
 
     fireEvent.pointerDown(dictationButton);
-    const recognition = MockSpeechRecognition.instances[0];
-    recognition?.onresult?.({
+    const recognition = await startedWebSpeechSession();
+    recognition.onresult?.({
       results: [
         {
           0: { transcript: 'next tour dates', confidence: 1 },
@@ -810,7 +819,8 @@ describe('ChatInput', () => {
     await waitFor(() => expect(dictationButton).toBeEnabled());
 
     fireEvent.pointerDown(dictationButton);
-    MockSpeechRecognition.instances[0]?.onerror?.({
+    const recognition = await startedWebSpeechSession();
+    recognition.onerror?.({
       error: 'not-allowed',
     } as Event);
 
@@ -929,9 +939,8 @@ describe('ChatInput', () => {
     expect(input).toHaveValue('Keep this draft');
   });
 
-  it('degrades to the system-dictation hint when Electron Web Speech fails with a network error', async () => {
+  it('degrades to the system-dictation hint when the Electron in-app engine cannot start', async () => {
     installMockSpeechRecognition();
-    // Older desktop binaries still advertise the Web Speech fallback.
     setElectronAPI({
       platform: 'darwin',
       getDictationStatus: vi.fn().mockResolvedValue({
@@ -945,24 +954,18 @@ describe('ChatInput', () => {
 
     fastRender(withProviders(<ChatInput {...baseProps} />));
 
-    // In Electron the hint state enables the mic before the bridge promise
-    // resolves, so wait for the live-dictation label, not just "enabled".
+    // The bridge promise enables the mic. Electron dictation is ElevenLabs,
+    // which cannot open in jsdom, so the ladder ends on the OS hint.
     const dictationButton = await screen.findByTestId('dictation-toggle');
     await waitFor(() =>
       expect(dictationButton).toHaveAccessibleName(/hold to dictate/i)
     );
     fireEvent.pointerDown(dictationButton);
-    expect(MockSpeechRecognition.instances).toHaveLength(1);
 
-    MockSpeechRecognition.instances[0]?.onerror?.({
-      error: 'network',
-    } as unknown as Event);
-
-    // No misleading "needs a network connection" alert — the runtime simply
-    // cannot dictate, so the affordance flips to the OS-dictation hint.
     await waitFor(() =>
       expect(dictationButton).toHaveAccessibleName(/show how to dictate/i)
     );
+    expect(MockSpeechRecognition.instances).toHaveLength(0);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
   });
@@ -991,8 +994,8 @@ describe('ChatInput', () => {
     await waitFor(() => expect(dictationButton).toBeEnabled());
 
     fireEvent.pointerDown(dictationButton);
-    const recognition = MockSpeechRecognition.instances[0];
-    recognition?.onresult?.(speechResultEvent('ship the single'));
+    const recognition = await startedWebSpeechSession();
+    recognition.onresult?.(speechResultEvent('ship the single'));
     await waitFor(() => expect(textarea).toHaveValue('ship the single'));
 
     fireEvent.pointerUp(dictationButton);
@@ -1000,11 +1003,11 @@ describe('ChatInput', () => {
     await waitFor(() => expect(textarea).toHaveValue(''));
     // Release already stopped the engine; send seals the session so the
     // stopped instance's generation is invalidated (no abort needed).
-    expect(recognition?.stop).toHaveBeenCalledTimes(1);
+    expect(recognition.stop).toHaveBeenCalledTimes(1);
 
     // The engine's trailing final result arrives after the draft was sent.
-    recognition?.onresult?.(speechResultEvent('ship the single'));
-    recognition?.onend?.();
+    recognition.onresult?.(speechResultEvent('ship the single'));
+    recognition.onend?.();
     expect(textarea).toHaveValue('');
   });
 
@@ -1032,14 +1035,14 @@ describe('ChatInput', () => {
     await waitFor(() => expect(dictationButton).toBeEnabled());
 
     fireEvent.click(dictationButton);
-    const recognition = MockSpeechRecognition.instances[0];
-    recognition?.onresult?.(speechResultEvent('wrong words'));
+    const recognition = await startedWebSpeechSession();
+    recognition.onresult?.(speechResultEvent('wrong words'));
     await waitFor(() => expect(textarea).toHaveValue('Keep this wrong words'));
 
     fireEvent.keyDown(textarea, { key: 'Escape' });
 
     await waitFor(() => expect(textarea).toHaveValue('Keep this'));
-    expect(recognition?.abort).toHaveBeenCalledTimes(1);
+    expect(recognition.abort).toHaveBeenCalledTimes(1);
     expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
@@ -1068,9 +1071,8 @@ describe('ChatInput', () => {
     await waitFor(() => expect(dictationButton).toBeEnabled());
 
     fireEvent.click(dictationButton);
-    MockSpeechRecognition.instances[0]?.onresult?.(
-      speechResultEvent('scratch that')
-    );
+    const recognition = await startedWebSpeechSession();
+    recognition.onresult?.(speechResultEvent('scratch that'));
     await waitFor(() => expect(textarea).toHaveValue('Keep this scratch that'));
 
     fireEvent.click(screen.getByRole('button', { name: /cancel dictation/i }));
@@ -1079,7 +1081,7 @@ describe('ChatInput', () => {
     expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('restarts recognition when the engine ends mid-hold and keeps the banked text', async () => {
+  it('keeps banked text when the engine ends mid-hold', async () => {
     installMockSpeechRecognition();
 
     function DraftHarness() {
@@ -1103,28 +1105,21 @@ describe('ChatInput', () => {
     await waitFor(() => expect(dictationButton).toBeEnabled());
 
     fireEvent.pointerDown(dictationButton);
-    const first = MockSpeechRecognition.instances[0];
-    first?.onresult?.(speechResultEvent('first half'));
+    const recognition = await startedWebSpeechSession();
+    recognition.onresult?.(speechResultEvent('first half'));
     await waitFor(() => expect(textarea).toHaveValue('first half'));
 
-    // Chrome ends continuous sessions on its own (silence / ~60s cap).
-    first?.onend?.();
-    expect(MockSpeechRecognition.instances).toHaveLength(2);
-    const second = MockSpeechRecognition.instances[1];
-    expect(second?.start).toHaveBeenCalledTimes(1);
-    expect(dictationButton).toHaveAttribute('aria-pressed', 'true');
-
-    second?.onresult?.(speechResultEvent('second half'));
-    await waitFor(() => expect(textarea).toHaveValue('first half second half'));
-
-    fireEvent.pointerUp(dictationButton);
-    expect(second?.stop).toHaveBeenCalledTimes(1);
-    second?.onend?.();
-    expect(MockSpeechRecognition.instances).toHaveLength(2);
-    expect(dictationButton).toHaveAttribute('aria-pressed', 'false');
+    // A closed Web Speech session ends the hold. The adaptive ladder owns
+    // reconnect, and text already written into the draft stays put.
+    recognition.onend?.();
+    await waitFor(() =>
+      expect(dictationButton).toHaveAttribute('aria-pressed', 'false')
+    );
+    expect(MockSpeechRecognition.instances).toHaveLength(1);
+    expect(textarea).toHaveValue('first half');
   });
 
-  it('uses Web Speech fallback when the Electron bridge allows trusted dictation', async () => {
+  it('keeps Electron keyboard dictation off Web Speech when the in-app engine cannot open', async () => {
     const user = userEvent.setup();
     installMockSpeechRecognition();
     setElectronAPI({
@@ -1147,8 +1142,10 @@ describe('ChatInput', () => {
     dictationButton.focus();
     await user.keyboard('{Enter}');
 
-    expect(MockSpeechRecognition.instances).toHaveLength(1);
-    expect(MockSpeechRecognition.instances[0]?.start).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(dictationButton).toHaveAccessibleName(/show how to dictate/i)
+    );
+    expect(MockSpeechRecognition.instances).toHaveLength(0);
   });
 
   it('keeps structured chips inline with the editable text field', () => {

@@ -50,11 +50,12 @@ describe('CDN domain registry', () => {
   });
 
   describe('getCspConnectSrcDomains', () => {
-    it('prefixes every domain with https://', () => {
+    it('uses https for fetches and wss for realtime sockets', () => {
       const domains = getCspConnectSrcDomains();
       for (const domain of domains) {
-        expect(domain).toMatch(/^https:\/\//);
+        expect(domain).toMatch(/^(?:https|wss):\/\//);
       }
+      expect(domains).toContain('wss://api.elevenlabs.io');
     });
 
     it('includes vercel.com for chat surface deployment status', () => {

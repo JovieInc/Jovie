@@ -111,6 +111,16 @@ describe('buildContentSecurityPolicy', () => {
     expect(connectSrc).toContain('https://api.qrserver.com');
   });
 
+  it('includes the ElevenLabs realtime socket in connect-src', () => {
+    const csp = buildContentSecurityPolicy({
+      nonce: 'test-nonce',
+      isDev: false,
+    });
+    const connectSrc = findDirective(csp, 'connect-src');
+
+    expect(connectSrc).toContain('wss://api.elevenlabs.io');
+  });
+
   it('includes Sentry regional ingest wildcard in connect-src', () => {
     const csp = buildContentSecurityPolicy({
       nonce: 'test-nonce',

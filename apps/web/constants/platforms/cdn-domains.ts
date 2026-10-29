@@ -199,7 +199,8 @@ export function getCspMediaSrcDomains(): string[] {
 }
 
 /**
- * Returns all connect domains prefixed with `https://` for CSP connect-src.
+ * Returns CSP connect-src entries. Fetch hosts are `https://`. Realtime
+ * websocket hosts are `wss://` so the browser can open the provider socket.
  * Used by content-security-policy.ts.
  */
 export function getCspConnectSrcDomains(): string[] {
