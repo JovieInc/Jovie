@@ -224,3 +224,47 @@ export const PR_BODY_SKELETON = [
 ].join('\n');
 
 export { CUSTOMER_MARKER, heading };
+
+/**
+ * Turn component-ship-gate violations into the exact files to add or touch.
+ * The gate prints `- <component path>: <detail>`; the detail names a story
+ * base or a test path, but not the full path an agent has to create.
+ */
+export function explainShipGate(output) {
+  const out = [];
+  for (const line of String(output).split('\n')) {
+    const m = line.match(/^\s*-\s+(\S+\.tsx?):\s+(.*)$/);
+    if (!m) continue;
+    const [, source, detail] = m;
+    const dir = source.slice(0, source.lastIndexOf('/'));
+    const base = source
+      .slice(source.lastIndexOf('/') + 1)
+      .replace(/\.tsx?$/, '');
+    if (/No adjacent .*\.stories\.tsx/.test(detail))
+      out.push(`add story: ${dir}/${base}.stories.tsx  (for ${source})`);
+    else if (/No colocated .*\.test\.tsx/.test(detail))
+      out.push(
+        `add test: ${dir}/${base}.test.tsx  (for ${source}), or a verified // @coverage-via directive`
+      );
+    else if (/was not touched in this diff/.test(detail)) {
+      const test = detail.match(/test (\S+) was not touched/)?.[1];
+      out.push(
+        `touch test: ${test ?? `${dir}/${base}.test.tsx`}  (for ${source})`
+      );
+    }
+  }
+  return out;
+}
+
+/** Conflicting paths from `git merge-tree --write-tree` output. */
+export function parseMergeConflicts(output) {
+  return [
+    ...new Set(
+      [
+        ...String(output).matchAll(
+          /CONFLICT \([^)]*\): (?:Merge conflict in )?(.+)/g
+        ),
+      ].map(m => m[1].trim())
+    ),
+  ];
+}

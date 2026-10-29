@@ -3,7 +3,9 @@ import test from 'node:test';
 import {
   CUSTOMER_MARKER,
   companionChecklist,
+  explainShipGate,
   lintPrBody,
+  parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 import {
@@ -134,4 +136,28 @@ test('host-only reds are downgraded on macOS but real reds are not', () => {
   assert.equal(downgradeHostRed(check, host, 'darwin').code, 0);
   assert.equal(downgradeHostRed(check, real, 'darwin').code, 1);
   assert.equal(downgradeHostRed(check, host, 'linux').code, 1);
+});
+
+test('ship gate violations become exact files to add or touch', () => {
+  const todo = explainShipGate(
+    [
+      '- apps/web/components/atoms/Chip.tsx: No adjacent Chip.stories.tsx or verified canonical marketing story',
+      '- apps/web/components/atoms/Pill.tsx: No colocated Pill.test.tsx (or .spec) and no valid // @coverage-via directive',
+      '- apps/web/components/atoms/Tag.tsx: Component changed but test apps/web/components/atoms/Tag.test.tsx was not touched in this diff. Update it',
+    ].join('\n')
+  );
+  assert.deepEqual(todo, [
+    'add story: apps/web/components/atoms/Chip.stories.tsx  (for apps/web/components/atoms/Chip.tsx)',
+    'add test: apps/web/components/atoms/Pill.test.tsx  (for apps/web/components/atoms/Pill.tsx), or a verified // @coverage-via directive',
+    'touch test: apps/web/components/atoms/Tag.test.tsx  (for apps/web/components/atoms/Tag.tsx)',
+  ]);
+});
+
+test('merge-tree conflict output yields the conflicting paths', () => {
+  const out =
+    'abc123\nCONFLICT (content): Merge conflict in apps/web/a.ts\nCONFLICT (modify/delete): b.ts deleted in HEAD and modified in x';
+  assert.deepEqual(parseMergeConflicts(out), [
+    'apps/web/a.ts',
+    'b.ts deleted in HEAD and modified in x',
+  ]);
 });

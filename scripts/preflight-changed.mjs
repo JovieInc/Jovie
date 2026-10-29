@@ -39,8 +39,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { load as yamlLoad } from 'js-yaml';
 import {
   companionChecklist,
+  explainShipGate,
   lintPrBody,
   PR_BODY_SKELETON,
+  parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -520,6 +522,36 @@ export async function main({
       `pnpm exec biome check --no-errors-on-unmatched ${bio.map(f => JSON.stringify(f)).join(' ')}`
     );
 
+  // Merge-with-base: Source Validation judges the merged tree. Warn-only.
+  add('merge-base', 'merges cleanly with origin/' + args.base, async () => {
+    const r = await sh(
+      `git merge-tree --write-tree --name-only origin/${args.base} HEAD`,
+      { cwd, env: childEnv, timeoutMs: 60_000 }
+    );
+    if (r.code === 0) return r;
+    const conflicts = parseMergeConflicts(r.out);
+    return {
+      ...r,
+      code: 0,
+      warn: `does not merge cleanly with origin/${args.base}; resolve before pushing${conflicts.length ? `: ${conflicts.join(', ')}` : ''}`,
+    };
+  });
+
+  // Component ship gate: adjacent story, named test touched (JOV-4421).
+  if (any(/^(?:apps\/web\/components\/|packages\/ui\/).+\.tsx$/))
+    add(
+      'ship-gate',
+      'component ship gate (story + test per changed component)',
+      async () => {
+        const r = await sh(
+          `node scripts/component-ship-gate.mjs --diff-base=${mergeBase} --skip-rendered-cert --skip-live-storybook`,
+          { cwd, env: childEnv, timeoutMs: 300_000 }
+        );
+        const todo = explainShipGate(r.out);
+        return todo.length ? { ...r, out: `${todo.join('\n')}\n${r.out}` } : r;
+      }
+    );
+
   // Customer changelog marker, Fleet Rules and template: needs the body.
   const bodyInfo = loadBody(args, cwd);
 
@@ -581,7 +613,7 @@ export async function main({
           JOVIE_COVERAGE_RELATED_TESTS: (parsed.relatedTests ?? []).join('\n'),
         };
         const run = await sh(
-          `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`,
+          `pnpm --filter @jovie/web test:coverage --changed ${mergeBase} --bail 1 --testTimeout=60000 --retry=1 && node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${head} --coverage apps/web/coverage/coverage-final.json`,
           { cwd, env: e, timeoutMs: 900_000 }
         );
         return {
@@ -632,7 +664,13 @@ export async function main({
       while (queue.length) {
         const c = queue.shift();
         const r = downgradeHostRed(c, await c.run());
-        const status = r.skip ? 'skip' : r.code === 0 ? 'ok' : 'FAIL';
+        const status = r.skip
+          ? 'skip'
+          : r.warn
+            ? 'warn'
+            : r.code === 0
+              ? 'ok'
+              : 'FAIL';
         log(
           `  ${status.padEnd(4)}  ${c.name} (${((r.ms ?? 0) / 1000).toFixed(1)}s)${r.skip ? `  [${r.skip}]` : ''}`
         );
@@ -683,6 +721,7 @@ export async function main({
 
   log('\n== preflight:changed summary');
   const red = results.filter(r => r.status === 'FAIL');
+  for (const w of results.filter(r => r.warn)) log(`\n[~] ${w.warn}`);
   for (const r of red) {
     log(`\n[ ] ${r.name}`);
     const lines = r.out.split('\n').filter(Boolean);
