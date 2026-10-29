@@ -102,7 +102,7 @@ export function assertPriceVersionsValid(
   }
   if (current.monthlyUsd !== listMonthlyUsd) {
     throw new Error(
-      `current price version ${currentId} is priced ${current.monthlyUsd} USD per month but the list price is ${listMonthlyUsd} USD per month. Add a price version for the list price and make it current; existing locks keep their own snapshot.`
+      `price version mismatch: current version ${currentId} is ${current.monthlyUsd} USD per month, list price is ${listMonthlyUsd} USD per month (a new version must be registered and made current)`
     );
   }
 }
