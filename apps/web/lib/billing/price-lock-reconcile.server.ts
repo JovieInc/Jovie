@@ -36,7 +36,8 @@ export function toReconcileSubscription(
     priceId: item?.price?.id ?? null,
     unitAmountCents: item?.price?.unit_amount ?? null,
     currency: item?.price?.currency ?? null,
-    interval: interval === 'month' || interval === 'year' ? interval : null,
+    interval:
+      interval === 'month' ? 'month' : interval === 'year' ? 'year' : null,
   };
 }
 
