@@ -28,6 +28,10 @@ describe('sanitizeRedirectUrl', () => {
     expect(sanitizeRedirectUrl(path)).toBeNull();
   });
   describe('valid redirect URLs', () => {
+    it('preserves an explicit homepage destination', () => {
+      expect(sanitizeRedirectUrl('/')).toBe('/');
+    });
+
     it('should accept valid relative paths', () => {
       expect(sanitizeRedirectUrl('/dashboard')).toBe('/dashboard');
       expect(sanitizeRedirectUrl('/onboarding')).toBe('/onboarding');
@@ -100,10 +104,6 @@ describe('sanitizeRedirectUrl', () => {
       expect(sanitizeRedirectUrl('../')).toBeNull();
       expect(sanitizeRedirectUrl('path/to/page')).toBeNull();
     });
-
-    it('should return null for root path only', () => {
-      expect(sanitizeRedirectUrl('/')).toBeNull();
-    });
   });
 
   describe('hash fragment stripping (PR #2146 fix)', () => {
@@ -127,9 +127,8 @@ describe('sanitizeRedirectUrl', () => {
       );
     });
 
-    it('should return null if only hash fragment remains after path', () => {
-      // Edge case: path is just "/" followed by hash
-      expect(sanitizeRedirectUrl('/#hash')).toBeNull();
+    it('preserves the homepage after stripping its fragment', () => {
+      expect(sanitizeRedirectUrl('/#hash')).toBe('/');
     });
 
     it('should handle multiple hash symbols (only first matters)', () => {

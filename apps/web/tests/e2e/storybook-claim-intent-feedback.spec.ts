@@ -73,7 +73,7 @@ for (const width of [390, 1280]) {
       );
       const review = page.getByTestId('onboarding-profile-review');
       await expect(
-        review.getByRole('heading', { name: 'Here is jov.ie/fixtureartist' })
+        review.getByRole('heading', { name: 'jov.ie/fixtureartist' })
       ).toBeVisible();
       await expect(
         review.getByText('Latest release: Fixture release')
@@ -117,7 +117,9 @@ for (const width of [390, 1280]) {
         )
         .toBe(true);
       await expect(page.getByTestId('onboarding-save-auth')).toHaveCount(0);
-      await review.getByRole('button', { name: /keep this profile/i }).click();
+      await review
+        .getByRole('button', { name: /continue with this profile/i })
+        .click();
       await expect(page.getByTestId('onboarding-save-auth')).toBeVisible();
       await expect(
         page.getByRole('button', { name: /continue with google/i })
@@ -137,10 +139,10 @@ for (const width of [390, 1280]) {
       await review.getByRole('button', { name: /back to preview/i }).click();
       await expect(page.getByTestId('onboarding-save-auth')).toHaveCount(0);
       await expect(
-        review.getByRole('button', { name: /keep this profile/i })
+        review.getByRole('button', { name: /continue with this profile/i })
       ).toBeVisible();
       await expect(
-        review.getByRole('button', { name: /keep this profile/i })
+        review.getByRole('button', { name: /continue with this profile/i })
       ).toBeFocused();
       expect(writes).toEqual([]);
       expect(

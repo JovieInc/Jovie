@@ -141,7 +141,7 @@ describe('profile review before authentication', () => {
   it('shows the real profile and catalog before mounting auth, then preserves handle through signup', async () => {
     render(reviewCard());
     expect(
-      screen.getByRole('heading', { name: 'Here is jov.ie/fixtureartist' })
+      screen.getByRole('heading', { name: 'jov.ie/fixtureartist' })
     ).toBeInTheDocument();
     expect(
       screen.getByText('Latest release: Catalog release')
@@ -149,7 +149,7 @@ describe('profile review before authentication', () => {
     expect(screen.getByTestId('catalog-preview')).toBeInTheDocument();
     expect(screen.queryByTestId('waitlist-signup')).not.toBeInTheDocument();
     await userEvent.click(
-      screen.getByRole('button', { name: /keep this profile/i })
+      screen.getByRole('button', { name: /continue with this profile/i })
     );
     expect(
       screen.getByRole('button', { name: /continue with google/i })
@@ -170,19 +170,19 @@ describe('profile review before authentication', () => {
     );
     expect(screen.queryByTestId('waitlist-signup')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /keep this profile/i })
+      screen.getByRole('button', { name: /continue with this profile/i })
     ).toHaveFocus();
   });
 
   it('requires a new keep action after the artist or handle changes', async () => {
     const { rerender } = render(reviewCard());
     await userEvent.click(
-      screen.getByRole('button', { name: /keep this profile/i })
+      screen.getByRole('button', { name: /continue with this profile/i })
     );
     rerender(reviewCard({ ...preview, handle: 'different' }));
     expect(screen.queryByTestId('waitlist-signup')).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /keep this profile/i })
+      screen.getByRole('button', { name: /continue with this profile/i })
     ).toBeEnabled();
   });
 
@@ -190,7 +190,7 @@ describe('profile review before authentication', () => {
     authState.providerPending = true;
     const { rerender } = render(reviewCard());
     await userEvent.click(
-      screen.getByRole('button', { name: /keep this profile/i })
+      screen.getByRole('button', { name: /continue with this profile/i })
     );
     expect(
       screen.getByRole('button', { name: /continue with google/i })
@@ -210,7 +210,7 @@ describe('profile review before authentication', () => {
     );
     authState.providerPending = true;
     await userEvent.click(
-      screen.getByRole('button', { name: /keep this profile/i })
+      screen.getByRole('button', { name: /continue with this profile/i })
     );
     await userEvent.click(
       screen.getByRole('button', { name: /back to preview/i })
@@ -221,7 +221,7 @@ describe('profile review before authentication', () => {
       screen.queryByRole('button', { name: /continue with google/i })
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: /keep this profile/i })
+      screen.getByRole('button', { name: /continue with this profile/i })
     ).toHaveFocus();
   });
 
@@ -236,7 +236,7 @@ describe('profile review before authentication', () => {
       reviewCard({ ...preview, artist: null, handle: null, socialLinks: [] })
     );
     expect(
-      screen.getByRole('button', { name: /keep this profile/i })
+      screen.getByRole('button', { name: /continue with this profile/i })
     ).toBeDisabled();
     expect(screen.queryByTestId('waitlist-signup')).not.toBeInTheDocument();
   });

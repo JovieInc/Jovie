@@ -190,7 +190,7 @@ export function ChatProposeNextStepCard({
       data-testid='onboarding-profile-review'
     >
       <h2 className='text-balance text-xl font-semibold text-primary-token'>
-        {reviewKey ? `Here is jov.ie/${handle}` : 'Your profile draft'}
+        {reviewKey ? `jov.ie/${handle}` : 'Your profile draft'}
       </h2>
       <p className='text-app leading-6 text-secondary-token'>
         Preview first. Sign in to save and verify your claim. This profile has
@@ -260,7 +260,7 @@ export function ChatProposeNextStepCard({
             disabled={!reviewKey || !canRenderAuthUi}
             onClick={() => setKeptProfile(reviewKey)}
           >
-            Keep This Profile
+            Continue With This Profile
           </Button>
           <Button
             variant='ghost'
