@@ -29,7 +29,7 @@ jobs:
       github.ref == 'refs/heads/main' && (
         github.event_name == 'workflow_dispatch' ||
         github.event.workflow_run.conclusion == 'success')
-    runs-on: [self-hosted, Linux, X64, jovie-fixed]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
@@ -47,6 +47,15 @@ jobs:
           persist-credentials: false
       - name: Require main ancestry
         run: git merge-base --is-ancestor HEAD origin/main
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6.4.0
+        with:
+          node-version-file: .nvmrc
+      - name: Restore mutation evidence
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.local/state/jovie-mutation
+          key: mutation-sweep-state-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: mutation-sweep-state-
       - name: Install typescript only
         run: |
           set -euo pipefail

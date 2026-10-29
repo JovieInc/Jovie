@@ -20,14 +20,14 @@ const workflow = readFileSync(
   'utf8'
 );
 const { load } = createRequire(import.meta.url)('js-yaml');
-const steps = load(workflow).jobs.certify.steps;
+const job = load(workflow).jobs.certify;
+const steps = job.steps;
 const fixtureRoots = [];
 
 afterEach(() => {
   for (const root of fixtureRoots.splice(0))
     rmSync(root, { recursive: true, force: true });
 });
-
 /** @param {{report?: string, workspaceDecoy?: boolean}} options */
 function reportUploadEligible({ report, workspaceDecoy = false }) {
   const root = mkdtempSync(
@@ -97,14 +97,12 @@ describe('certificate artifact retention with separate runner and checkout roots
     expect(result.reportExists).toBe(true);
     expect(result.enabled).toBe(true);
   });
-
   it.each([undefined, ''])(
     'does not upload a missing or empty actual report (%s)',
     report => {
       expect(reportUploadEligible({ report }).enabled).toBe(false);
     }
   );
-
   it('does not let a workspace decoy authorize uploading a missing runner report', () => {
     expect(reportUploadEligible({ workspaceDecoy: true }).enabled).toBe(false);
   });
@@ -133,20 +131,18 @@ ${gate?.run || 'true'}`,
       );
       expect(result.status, result.stderr).toBe(unmerged ? 1 : 0);
       expect(steps.indexOf(gate)).toBe(1);
-      expect(load(workflow).jobs.certify.if).toContain(
-        "github.ref == 'refs/heads/main'"
-      );
+      expect(job.if).toContain("github.ref == 'refs/heads/main'");
     }
   );
-
-  it('runs on the gem pool only, with no hosted fallback', () => {
-    const runsOn = [...workflow.matchAll(/^\s+runs-on:\s*(.+)$/gmu)].map(m =>
-      m[1].trim()
+  it('uses hosted runners and the mutation producer cache contract', () => {
+    expect(job['runs-on']).toBe('ubuntu-latest');
+    const restore = job.steps.find(
+      step => step.name === 'Restore mutation evidence'
     );
-    expect(runsOn).toEqual(['[self-hosted, Linux, X64, jovie-fixed]']);
-    expect(workflow).not.toMatch(/ubuntu-/u);
+    expect(restore.uses).toMatch(/^actions\/cache\/restore@/u);
+    expect(restore.with.path).toBe('~/.local/state/jovie-mutation');
+    expect(restore.with['restore-keys']).toBe('mutation-sweep-state-');
   });
-
   it('is event-driven: no cron, no pull_request, main CI completion only', () => {
     expect(workflow).not.toMatch(/^\s*schedule:/mu);
     expect(workflow).not.toMatch(/pull_request/u);
@@ -157,12 +153,10 @@ ${gate?.run || 'true'}`,
       "github.event.workflow_run.conclusion == 'success'"
     );
   });
-
   it('installs only typescript, not the workspace', () => {
     expect(workflow).not.toContain('setup-node-pnpm');
     expect(workflow).not.toMatch(/pnpm install/u);
   });
-
   it('is informational: uncertified components cannot fail the job, the Ovie post cannot either', () => {
     expect(workflow).toContain('scripts/component-certificate.mjs --all');
     expect(workflow).not.toMatch(/--(strict|fail-on)/u);
@@ -171,7 +165,6 @@ ${gate?.run || 'true'}`,
     expect(post).toContain('ingest route not deployed');
     expect(post).toMatch(/exit 0\n\n\s+- name: Clean scratch/u);
   });
-
   it('exposes CRON_SECRET only to the resolve step and read-only permissions', () => {
     expect(workflow).toContain('permissions: {}');
     expect(workflow).not.toMatch(/actions: write|contents: write/u);
@@ -181,7 +174,6 @@ ${gate?.run || 'true'}`,
     expect(uses.sort()).toEqual(['CRON_SECRET', 'DOPPLER_TOKEN_PRD']);
   });
 });
-
 describe('renderCertificateSummary', () => {
   it('renders totals and per-criterion rows', () => {
     const md = renderCertificateSummary({
@@ -196,7 +188,6 @@ describe('renderCertificateSummary', () => {
     expect(md).toContain('`abcdef123456`');
     expect(md).toContain('| story | 2 | 1 | 0 | 0 |');
   });
-
   it('throws on a malformed report so the job fails on a crash', () => {
     expect(() => renderCertificateSummary({})).toThrow();
   });
