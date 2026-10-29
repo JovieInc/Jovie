@@ -12,6 +12,7 @@ import {
   downgradeHostRed,
   GENERATORS,
   HEAVY_GUARDS,
+  NARROWED,
   parseArgs,
   typecheckTargets,
 } from './preflight-changed.mjs';
@@ -141,6 +142,25 @@ test('host-only reds are downgraded on macOS but real reds are not', () => {
   assert.equal(downgradeHostRed(check, host, 'darwin').code, 0);
   assert.equal(downgradeHostRed(check, real, 'darwin').code, 1);
   assert.equal(downgradeHostRed(check, host, 'linux').code, 1);
+});
+
+test('default preflight checks heading bounds without truncating marketing copy', () => {
+  const command = NARROWED['merge-group-unit-guards'].command;
+  assert.ok(
+    command.startsWith('node scripts/design-system-source-ratchet.mjs && ')
+  );
+  assert.ok(
+    command.includes('tests/unit/design-system/mac-header-two-lines-v1.test.ts')
+  );
+  assert.ok(
+    command.includes(
+      'tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts'
+    )
+  );
+  assert.equal(
+    NARROWED['merge-group-unit-guards'].note,
+    'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough'
+  );
 });
 
 test('ship gate violations become exact files to add or touch', () => {

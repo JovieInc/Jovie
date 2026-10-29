@@ -279,6 +279,30 @@ class QueueBreakerTest(unittest.TestCase):
             again = qb.sweep(Path(raw), run, NOW)
             self.assertEqual(again["tripped"], [23570])
 
+class QueueTimingsTest(unittest.TestCase):
+    def test_queue_timings_report_group_ci_and_enqueue_to_merge(self):
+        def run(args, **kwargs):
+            path = args[-1]
+            if "workflows/ci.yml/runs" in path:
+                rows = [{"status": "completed", "conclusion": c, "created_at": iso(NOW - 3600), "updated_at": iso(NOW - 3600 + secs)}
+                        for c, secs in (("success", 600), ("success", 1200), ("cancelled", 300), ("failure", 700))]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "/pulls?" in path:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps([{"number": 5, "merged_at": iso(NOW)}]))
+            events = [{"event": "added_to_merge_queue", "created_at": iso(NOW - 3600)},
+                      {"event": "removed_from_merge_queue", "created_at": iso(NOW - 2400), "actor": {"login": "github-merge-queue[bot]"}},
+                      {"event": "added_to_merge_queue", "created_at": iso(NOW - 1200)}]
+            return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps(events))
+
+        with tempfile.TemporaryDirectory() as raw:
+            signal, error = ts.sample_queue_timings(Path(raw), NOW, run)
+            self.assertIsNone(error)
+            self.assertEqual(signal["groupCi"]["runs"], 4)
+            self.assertEqual((signal["groupCi"]["cancelledShare"], signal["groupCi"]["failureShare"]), (0.25, 0.25))
+            self.assertEqual(signal["groupCi"]["successP95Min"], 20.0)
+            self.assertEqual((signal["enqueueToMerge"]["lastEnqueueP50Min"], signal["enqueueToMerge"]["firstEnqueueP50Min"]), (20.0, 60.0))
+            self.assertEqual((signal["dequeues"]["silentGithub"], signal["dequeues"]["requeueLagP50Min"]), (1, 20.0))
+
 
 class IdleNotDemandTest(unittest.TestCase):
     def test_idle_for_any_reason_but_no_demand_while_demand_exists_alarms_per_lane(self):

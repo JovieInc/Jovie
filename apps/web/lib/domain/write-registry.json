@@ -31,7 +31,8 @@
         "upsertRelease",
         "upsertTrack",
         "upsertRecording",
-        "upsertReleaseTrack"
+        "upsertReleaseTrack",
+        "purgeOrphanRecordings"
       ],
       "tables": ["discogReleases", "discogTracks", "discogRecordings"]
     },

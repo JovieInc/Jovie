@@ -78,9 +78,10 @@ export function buildApprovalCard(
 }
 
 export async function runRecovery(deps: RunnerDeps): Promise<RunResult> {
-  const live = new Set<string>();
+  const live = new Map<string, string>();
   for (const fix of deps.fixes) {
-    if ((await certifyFix(fix, deps.certifier)).live) live.add(fix.id);
+    const cert = await certifyFix(fix, deps.certifier);
+    if (cert.live && cert.deployedAt) live.set(fix.id, cert.deployedAt);
   }
   const skipped: Partial<
     Record<SkipReason | 'rejected' | 'send_failed', number>

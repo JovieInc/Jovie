@@ -36,20 +36,22 @@ export interface UserHistory {
 /**
  * A user is eligible when they stalled at the fix's step BEFORE the fix went
  * live, the fix is certified live now, and no cap or suppression applies.
- * `liveFixIds` comes from the gate, never from the registry alone.
+ * `liveFixes` (fix id to observed deploy time) comes from the gate, never
+ * from the registry alone.
  */
 export function decide(
   user: StalledUser,
   fix: KnownBadFlowFix,
-  liveFixIds: ReadonlySet<string>,
+  liveFixes: ReadonlyMap<string, string>,
   history: UserHistory
 ): Decision {
   const no = (reason: SkipReason): Decision => ({ eligible: false, reason });
   if (!user.email) return no('no_email');
-  if (!liveFixIds.has(fix.id) || !fix.deployedAt) return no('fix_not_live');
+  const deployedAt = liveFixes.get(fix.id);
+  if (!deployedAt) return no('fix_not_live');
   if (isInternalOrTestAccountEmail(user.email)) return no('internal_account');
   if (user.suppressed) return no('suppressed');
-  if (user.stalledAt.getTime() >= new Date(fix.deployedAt).getTime()) {
+  if (user.stalledAt.getTime() >= new Date(deployedAt).getTime()) {
     return no('stalled_after_fix');
   }
   if (history.fixIdsSent.includes(fix.id)) return no('already_sent_for_fix');
