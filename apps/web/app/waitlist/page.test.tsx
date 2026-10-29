@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   access: vi.fn(),
   reservedHandle: vi.fn(),
   gateEnabled: vi.fn(),
+  admission: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
@@ -19,6 +20,9 @@ vi.mock('@/lib/auth/gate', async () => ({
   resolveUserState: mocks.resolve,
   getWaitlistAccess: mocks.access,
   getWaitlistReservedHandle: mocks.reservedHandle,
+}));
+vi.mock('@/lib/waitlist/admission-gate.server', () => ({
+  decideAdmissionForEmail: mocks.admission,
 }));
 vi.mock('@/lib/waitlist/settings', () => ({
   isWaitlistGateEnabled: mocks.gateEnabled,
@@ -51,6 +55,7 @@ describe('waitlist receipt reload', () => {
     mocks.gateEnabled.mockResolvedValue(true);
     mocks.access.mockResolvedValue({ entryId: null, status: null });
     mocks.reservedHandle.mockResolvedValue(null);
+    mocks.admission.mockResolvedValue({ admit: false, blocking: ['design'] });
   });
 
   it('renders an honest error when a pending account has no saved receipt', async () => {
@@ -74,7 +79,21 @@ describe('waitlist receipt reload', () => {
     expect(mocks.reservedHandle).toHaveBeenCalledWith('entry_1');
     expect(receipt.props.reservedHandle).toBe('coolartist');
     expect(receipt.props.email).toBe('test@example.com');
-    // Anyone waiting can buy Pro now; payment admits them (JOV-7701).
-    expect(receipt.props.proCheckoutPriceId).toBe('price_pro_monthly');
+    // Admission gate closed: no price on a page that cannot admit them.
+    expect(receipt.props.proCheckoutPriceId).toBeNull();
+  });
+
+  it('offers Pro checkout only once the admission gate admits the person', async () => {
+    mocks.access.mockResolvedValue({
+      entryId: 'entry_1',
+      status: 'waitlisted',
+    });
+    mocks.admission.mockResolvedValue({ admit: true, blocking: [] });
+
+    const result = await WaitlistPage();
+
+    expect(result.props.children.props.proCheckoutPriceId).toBe(
+      'price_pro_monthly'
+    );
   });
 });

@@ -59,7 +59,6 @@ import {
   certifyProfile,
   certifyWaitlistEntry,
   readProfileCertRecord,
-  readWaitlistInviteGates,
   scheduleProfileCertification,
 } from '@/lib/waitlist/profile-certification.server';
 
@@ -74,6 +73,9 @@ const PROFILE = {
   isPublic: false,
   settings: { onboarding: { selectedSpotifyArtistId: 'sp1' } },
 };
+const certifiedIdentity = async () =>
+  ({ decision: 'certified', score: 0.95, threshold: 0.85 }) as const;
+
 const OWNER = {
   name: 'Ana Lund',
   plan: 'free',
@@ -112,6 +114,7 @@ describe('certifyProfile', () => {
     const receipt = await certifyProfile({
       profileId: 'profile-1',
       trigger: 'waitlist_approval',
+      readIdentity: certifiedIdentity,
     });
 
     expect(receipt?.status).toBe('passed');
@@ -130,6 +133,7 @@ describe('certifyProfile', () => {
       profileId: 'profile-1',
       trigger: 'waitlist_approval',
       importCatalog: mocks.importCatalog,
+      readIdentity: certifiedIdentity,
     });
 
     expect(receipt?.status).toBe('failed');
@@ -149,6 +153,7 @@ describe('certifyProfile', () => {
       profileId: 'profile-1',
       trigger: 'catalog_import',
       importCatalog: mocks.importCatalog,
+      readIdentity: certifiedIdentity,
     });
 
     expect(mocks.importCatalog).not.toHaveBeenCalled();
@@ -174,12 +179,23 @@ describe('certifyProfile', () => {
     const receipt = await certifyProfile({
       profileId: 'profile-1',
       trigger: 'manual',
+      readIdentity: certifiedIdentity,
     });
 
     expect(mocks.fetch).toHaveBeenCalledTimes(2);
     expect(receipt?.checks.find(c => c.id === 'public_page')?.status).toBe(
       'passed'
     );
+  });
+
+  it('fails the artist check closed when no identity reader is wired', async () => {
+    queueProfile(PROFILE, [{ id: 'r1', title: 'Spring', slug: 'spring' }]);
+    mocks.queue.push([{ userId: 'user-1' }]);
+    const receipt = await certifyProfile({
+      profileId: 'profile-1',
+      trigger: 'manual',
+    });
+    expect(receipt?.status).toBe('needs_artist_confirmation');
   });
 
   it('returns null for an unknown profile', async () => {
@@ -201,35 +217,5 @@ describe('certifyProfile', () => {
     scheduleProfileCertification({ profileId: 'missing', trigger: 'claim' });
     await vi.waitFor(() => expect(mocks.scheduleAfter).toHaveBeenCalled());
     expect(mocks.capture).not.toHaveBeenCalled();
-  });
-});
-
-describe('readWaitlistInviteGates', () => {
-  beforeEach(() => {
-    mocks.store.clear();
-    mocks.queue.length = 0;
-  });
-
-  it('marks only entries whose latest receipt passed', async () => {
-    queueProfile(PROFILE, [{ id: 'r1', title: 'Spring', slug: 'spring' }]);
-    mocks.queue.push([{ userId: 'user-1' }]);
-    await certifyProfile({ profileId: 'profile-1', trigger: 'manual' });
-
-    mocks.queue.push([
-      { id: 'profile-1', entryId: 'entry-1' },
-      { id: 'profile-2', entryId: 'entry-2' },
-    ]);
-    const gates = await readWaitlistInviteGates(['entry-1', 'entry-2']);
-
-    expect(gates.get('entry-1')).toMatchObject({ certified: true });
-    expect(gates.get('entry-2')).toEqual({
-      profileId: 'profile-2',
-      certified: false,
-      certifiedAt: null,
-    });
-  });
-
-  it('returns no gates for no entries', async () => {
-    expect((await readWaitlistInviteGates([])).size).toBe(0);
   });
 });

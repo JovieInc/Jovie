@@ -22,7 +22,6 @@ import {
   applyProfileCertReceipt,
   emptyProfileCertLedger,
   evaluateProfileCertification,
-  isProfileCertifiedForInvite,
   PROFILE_CERT_LEDGER_KEY,
   PROFILE_CERT_RECEIPT_SCHEMA,
   type ProfileCertEvidence,
@@ -95,7 +94,10 @@ async function probePage(url: string): Promise<{
 /** Reads one profile's certification facts from production. */
 export async function readProfileCertFacts(
   profileId: string,
-  options: { readonly probe?: boolean } = {}
+  options: {
+    readonly probe?: boolean;
+    readonly readIdentity?: ProfileCertIdentityReader;
+  } = {}
 ): Promise<ProfileCertFacts | null> {
   const [profile] = await db
     .select({
@@ -210,6 +212,9 @@ export async function readProfileCertFacts(
     },
     publicPage,
     smartLinkProbes,
+    identity: options.readIdentity
+      ? await options.readIdentity(profile.id).catch(() => null)
+      : null,
   };
 }
 
@@ -251,6 +256,15 @@ export async function recordProfileCertReceipt(
     },
   });
 }
+
+/**
+ * Resolver identity confidence (`getArtistIdentityConfidence`, #23732),
+ * injected by the runner. Absent or failing reads leave identity unscored,
+ * which fails the artist check closed.
+ */
+export type ProfileCertIdentityReader = (
+  profileId: string
+) => Promise<ProfileCertFacts['identity']>;
 
 /** Runs the canonical catalog import (injected to avoid an import cycle). */
 export type ProfileCertCatalogImporter = (input: {
@@ -325,10 +339,12 @@ export async function certifyProfile(input: {
   readonly evidence?: ProfileCertEvidence | null;
   /** Catalog import remediation; absent means no import is dispatched. */
   readonly importCatalog?: ProfileCertCatalogImporter;
+  readonly readIdentity?: ProfileCertIdentityReader;
 }): Promise<ProfileCertReceipt | null> {
   const startedAt = new Date().toISOString();
   const facts = await readProfileCertFacts(input.profileId, {
     probe: input.probe,
+    readIdentity: input.readIdentity,
   });
   if (!facts) return null;
   const verdict = evaluateProfileCertification(facts);
@@ -431,46 +447,4 @@ export function scheduleProfileCertification(input: {
       });
     }
   });
-}
-
-export interface WaitlistInviteGate {
-  readonly profileId: string;
-  readonly certified: boolean;
-  /** When the latest receipt was written; null when never certified. */
-  readonly certifiedAt: string | null;
-}
-
-/**
- * Waitlist invite gate: entry id -> its profile and whether that profile's
- * latest certification passed. Entries without a profile are absent. An
- * unreadable ledger certifies nobody (fail closed).
- */
-export async function readWaitlistInviteGates(
-  entryIds: readonly string[]
-): Promise<ReadonlyMap<string, WaitlistInviteGate>> {
-  const gates = new Map<string, WaitlistInviteGate>();
-  if (entryIds.length === 0) return gates;
-  const profiles = await db
-    .select({
-      id: creatorProfiles.id,
-      entryId: creatorProfiles.waitlistEntryId,
-    })
-    .from(creatorProfiles)
-    .where(inArray(creatorProfiles.waitlistEntryId, [...entryIds]));
-  const ledger = await readProfileCertLedger().catch(error => {
-    logger.warn('[profile-certification] ledger unreadable', {
-      error: error instanceof Error ? error.message : String(error),
-    });
-    return null;
-  });
-  for (const profile of profiles) {
-    if (!profile.entryId) continue;
-    const latest = ledger?.profiles[profile.id]?.latest;
-    gates.set(profile.entryId, {
-      profileId: profile.id,
-      certified: isProfileCertifiedForInvite(latest),
-      certifiedAt: latest?.endedAt ?? null,
-    });
-  }
-  return gates;
 }

@@ -22,6 +22,7 @@ import { withSerializableRetry } from '@/lib/db/serializable-retry';
 import { withSystemIngestionSession } from '@/lib/ingestion/session';
 import { hashEmail } from '@/lib/notifications/suppression';
 import { logger } from '@/lib/utils/logger';
+import { readWaitlistInviteGates } from '@/lib/waitlist/admission-gate.server';
 import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
@@ -31,7 +32,6 @@ import {
   MAX_OPEN_COHORT_LEARNINGS,
 } from '@/lib/waitlist/cohort-learnings';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
-import { readWaitlistInviteGates } from '@/lib/waitlist/profile-certification.server';
 import { scheduleProfileCertification } from '@/lib/waitlist/profile-certification-runner.server';
 import {
   getWaitlistSettings,
@@ -236,8 +236,9 @@ export async function runWaitlistAutoAccept(
       continue;
     }
 
-    // Waitlist gate (Tim, 2026-10-29): invite only a person whose own
-    // profile certified. Anything else is certified now (event), and its
+    // Admission gate (Tim, 2026-10-29): invite only when the person's
+    // profile, the golden path and the design judge are all certified for
+    // the current production SHA (admission-gate.ts). Anything else is certified now (event), and its
     // remediation is dispatched; the next drain admits it once it passes.
     const gate = certifiedEntries.get(candidate.id);
     if (!gate?.certified) {
@@ -248,8 +249,11 @@ export async function runWaitlistAutoAccept(
         !gate?.certifiedAt ||
         now.getTime() - Date.parse(gate.certifiedAt) >
           AUTO_ACCEPT_RECERTIFY_AFTER_MS;
+      // Only the profile leg is per-person; golden-path and design legs are
+      // re-certified by their own deploy and judge events.
       if (
         gate?.profileId &&
+        gate.blocking.includes('profile') &&
         stale &&
         recertifyScheduled < AUTO_ACCEPT_MAX_RECERTIFY_PER_DRAIN
       ) {

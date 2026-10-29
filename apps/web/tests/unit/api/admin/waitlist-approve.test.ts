@@ -6,6 +6,7 @@ const mockInvalidateProxyUserStateCache = vi.hoisted(() => vi.fn());
 const mockApproveWaitlistEntryInTx = vi.hoisted(() => vi.fn());
 const mockFinalizeWaitlistApproval = vi.hoisted(() => vi.fn());
 const mockEnqueueWaitlistApprovalInviteEmail = vi.hoisted(() => vi.fn());
+const mockDecideAdmissionForEntries = vi.hoisted(() => vi.fn());
 
 const {
   mockWaitlistEntries,
@@ -36,6 +37,31 @@ vi.mock('@/lib/waitlist/approval', () => ({
   finalizeWaitlistApproval: mockFinalizeWaitlistApproval,
 }));
 
+vi.mock('@/lib/waitlist/admission-gate.server', () => ({
+  decideAdmissionForEntries: mockDecideAdmissionForEntries,
+}));
+
+/** The admission gate admits (or blocks) whichever entry is asked about. */
+function admissionGate(blocking: readonly string[]) {
+  mockDecideAdmissionForEntries.mockImplementation(
+    async (ids: readonly string[]) => ({
+      context: {},
+      decisions: new Map(
+        ids.map(id => [
+          id,
+          {
+            admit: blocking.length === 0,
+            prodSha: 'a'.repeat(40),
+            blocking,
+            legs: [],
+            profileId: null,
+          },
+        ])
+      ),
+    })
+  );
+}
+
 vi.mock('@/lib/waitlist/email-jobs', () => ({
   enqueueWaitlistApprovalInviteEmail: mockEnqueueWaitlistApprovalInviteEmail,
 }));
@@ -58,6 +84,37 @@ describe('Admin Waitlist Approve API', () => {
     );
     mockFinalizeWaitlistApproval.mockResolvedValue(undefined);
     mockEnqueueWaitlistApprovalInviteEmail.mockResolvedValue('job-1');
+    admissionGate([]);
+  });
+
+  it('refuses approval with the blocking legs while the admission gate is closed', async () => {
+    admissionGate(['design']);
+    mockGetCurrentUserEntitlements.mockResolvedValue({
+      userId: 'admin_123',
+      email: 'admin@example.com',
+      isAuthenticated: true,
+      isAdmin: true,
+      isPro: true,
+      hasAdvancedFeatures: true,
+      canRemoveBranding: true,
+    });
+
+    const response = await POST(
+      new Request('http://localhost/app/admin/waitlist/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryId: '33333333-3333-4333-8333-333333333333',
+        }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(409);
+    expect(data.error).toBe('admission_gate_closed');
+    expect(data.blocking).toEqual(['design']);
+    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(mockEnqueueWaitlistApprovalInviteEmail).not.toHaveBeenCalled();
   });
 
   it('returns 401 when the caller is not authenticated', async () => {

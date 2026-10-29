@@ -19,6 +19,7 @@ import {
   createActionsCellRenderer,
   createSelectCellRenderer,
   createSelectHeaderRenderer,
+  renderAdmissionCell,
   renderDateCellWrapper,
   renderEmailCell,
   renderHeardAboutCell,
@@ -189,6 +190,14 @@ export function AdminWaitlistTableUnified({
         header: 'Status',
         cell: ({ getValue }) => renderStatusCell(getValue()),
         size: 110,
+      }),
+
+      // Admission gate: which certification leg blocks this entry
+      columnHelper.accessor('admissionBlocking', {
+        id: 'admission',
+        header: 'Admission',
+        cell: ({ getValue }) => renderAdmissionCell(getValue()),
+        size: 170,
       }),
 
       // Created Date column

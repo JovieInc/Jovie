@@ -135,7 +135,7 @@ vi.mock('@/lib/waitlist/email-jobs', () => ({
   enqueueWaitlistApprovalInviteEmail: mockEnqueueWaitlistApprovalInviteEmail,
 }));
 
-vi.mock('@/lib/waitlist/profile-certification.server', () => ({
+vi.mock('@/lib/waitlist/admission-gate.server', () => ({
   readWaitlistInviteGates: mockReadWaitlistInviteGates,
 }));
 vi.mock('@/lib/waitlist/profile-certification-runner.server', () => ({
@@ -147,7 +147,15 @@ function certifyAll() {
   mockReadWaitlistInviteGates.mockImplementation(
     async (ids: readonly string[]) =>
       new Map(
-        ids.map(id => [id, { profileId: `profile-${id}`, certified: true }])
+        ids.map(id => [
+          id,
+          {
+            profileId: `profile-${id}`,
+            certified: true,
+            certifiedAt: null,
+            blocking: [],
+          },
+        ])
       )
   );
 }
@@ -547,11 +555,21 @@ describe('runWaitlistAutoAccept', () => {
       new Map([
         [
           'certified',
-          { profileId: 'p-certified', certified: true, certifiedAt: null },
+          {
+            profileId: 'p-certified',
+            certified: true,
+            certifiedAt: null,
+            blocking: [],
+          },
         ],
         [
           'failing',
-          { profileId: 'p-failing', certified: false, certifiedAt: null },
+          {
+            profileId: 'p-failing',
+            certified: false,
+            certifiedAt: null,
+            blocking: ['profile', 'design'],
+          },
         ],
         [
           'recently-failed',
@@ -559,6 +577,7 @@ describe('runWaitlistAutoAccept', () => {
             profileId: 'p-recent',
             certified: false,
             certifiedAt: '2026-09-28T23:00:00.000Z',
+            blocking: ['profile'],
           },
         ],
       ])
@@ -584,6 +603,36 @@ describe('runWaitlistAutoAccept', () => {
     });
     // A receipt from an hour ago already dispatched its own remediation.
     expect(mockScheduleProfileCertification).toHaveBeenCalledTimes(1);
+  });
+
+  it('holds a certified profile while the design or golden-path leg blocks, without re-certifying it', async () => {
+    candidateRows = [
+      { id: 'artist', email: 'artist@example.com', status: 'waitlisted' },
+    ];
+    mockReadWaitlistInviteGates.mockResolvedValue(
+      new Map([
+        [
+          'artist',
+          {
+            profileId: 'p-artist',
+            certified: false,
+            certifiedAt: null,
+            blocking: ['design'],
+          },
+        ],
+      ])
+    );
+
+    const { runWaitlistAutoAccept } = await import(
+      '@/lib/waitlist/auto-accept'
+    );
+    const result = await runWaitlistAutoAccept({
+      now: new Date('2026-09-29T00:00:00Z'),
+    });
+
+    expect(result).toMatchObject({ approved: 0, uncertified: 1 });
+    expect(mockApproveWaitlistEntryInTx).not.toHaveBeenCalled();
+    expect(mockScheduleProfileCertification).not.toHaveBeenCalled();
   });
 
   it('admits nobody when the certification ledger cannot be read', async () => {

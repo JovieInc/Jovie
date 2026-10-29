@@ -5,6 +5,7 @@ import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { logger } from '@/lib/utils/logger';
+import { decideAdmissionForUser } from '@/lib/waitlist/admission-gate.server';
 
 /**
  * A verified paid subscription admits its buyer. Anyone may check out the
@@ -20,7 +21,27 @@ import { logger } from '@/lib/utils/logger';
 export async function admitPaidUser(input: {
   readonly appUserId: string;
   readonly cacheKeys: readonly string[];
-}): Promise<{ readonly admitted: boolean }> {
+}): Promise<{
+  readonly admitted: boolean;
+  /** Admission legs that held a paying buyer on the waitlist. */
+  readonly heldBy?: readonly string[];
+}> {
+  // Admission gate (Tim, 2026-10-29): paying does not bypass certification.
+  // The subscription and entitlement stay recorded; the account stays
+  // pending until profile, golden path and design judge certify, and the
+  // hold is logged for operator follow-up.
+  const decision = await decideAdmissionForUser(input.appUserId).catch(
+    () => null
+  );
+  if (!decision?.admit) {
+    const heldBy = decision?.blocking ?? ['profile', 'golden_path', 'design'];
+    logger.warn('[waitlist] paid buyer held by the admission gate', {
+      appUserId: input.appUserId,
+      heldBy,
+    });
+    return { admitted: false, heldBy };
+  }
+
   const admitted = await db
     .update(users)
     .set({ userStatus: 'waitlist_approved', updatedAt: new Date() })

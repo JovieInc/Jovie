@@ -139,6 +139,39 @@ export function renderHeardAboutCell(value: string | null) {
   );
 }
 
+const ADMISSION_LEG_LABELS = {
+  profile: 'Profile',
+  golden_path: 'Golden path',
+  design: 'Design judge',
+} as const;
+
+/**
+ * Admission gate cell: which certification legs block this entry on the
+ * current production SHA, or that it is admissible.
+ */
+export function renderAdmissionCell(
+  blocking: WaitlistEntryRow['admissionBlocking']
+) {
+  if (blocking === null || blocking === undefined) {
+    return <span className='text-xs text-tertiary-token'>-</span>;
+  }
+  if (blocking.length === 0) {
+    return (
+      <Badge size='sm' variant='success'>
+        Admissible
+      </Badge>
+    );
+  }
+  return (
+    <span
+      className='text-xs text-secondary-token'
+      title='Certification legs blocking admission on this deploy'
+    >
+      Blocked: {blocking.map(leg => ADMISSION_LEG_LABELS[leg]).join(', ')}
+    </span>
+  );
+}
+
 /**
  * Renders the status badge cell
  */

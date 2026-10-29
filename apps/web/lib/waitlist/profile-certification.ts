@@ -168,50 +168,42 @@ function check(
 }
 
 export function checkArtistMatch(facts: ProfileCertFacts): ProfileCertCheck {
-  if (facts.identity) {
-    const { decision, score, threshold } = facts.identity;
-    return decision === 'certified'
-      ? check(
-          'artist_match',
-          'passed',
-          `Artist identity certified by evidence (${score} >= ${threshold}).`
-        )
-      : check(
-          'artist_match',
-          'failed',
-          `Artist identity ${decision.replace('_', ' ')} (${score} < ${threshold}); the owner confirms in product.`
-        );
-  }
   if (!facts.spotifyId) {
     return check('artist_match', 'failed', 'No artist matched yet.');
   }
-  if (facts.selectedSpotifyArtistId) {
-    return facts.selectedSpotifyArtistId === facts.spotifyId
-      ? check(
-          'artist_match',
-          'passed',
-          'Matched artist is the one the person picked.'
-        )
-      : check(
-          'artist_match',
-          'failed',
-          'Matched artist differs from the one the person picked.'
-        );
-  }
-  const person = normalizeArtistName(facts.personName);
-  const artist = normalizeArtistName(facts.displayName);
-  if (person && artist && person === artist) {
+  if (
+    facts.selectedSpotifyArtistId &&
+    facts.selectedSpotifyArtistId !== facts.spotifyId
+  ) {
     return check(
       'artist_match',
-      'passed',
-      'Matched artist name equals the name the person gave.'
+      'failed',
+      'Matched artist differs from the one the person picked.'
     );
   }
-  return check(
-    'artist_match',
-    'failed',
-    'Artist was matched without the person confirming it.'
-  );
+  // Admission bar (Tim, 2026-10-29): resolver identity confidence at or
+  // above the threshold, or owner confirmation (which the resolver scores).
+  // An owner pick alone is evidence, not certification; no identity read
+  // fails closed.
+  if (!facts.identity) {
+    return check(
+      'artist_match',
+      'failed',
+      'Artist identity not scored by the resolver yet; an owner pick alone is below the bar.'
+    );
+  }
+  const { decision, score, threshold } = facts.identity;
+  return decision === 'certified'
+    ? check(
+        'artist_match',
+        'passed',
+        `Artist identity certified by evidence (${score} >= ${threshold}).`
+      )
+    : check(
+        'artist_match',
+        'failed',
+        `Artist identity ${decision.replaceAll('_', ' ')} (${score} < ${threshold}); the owner confirms in product.`
+      );
 }
 
 export function checkReleases(facts: ProfileCertFacts): ProfileCertCheck {

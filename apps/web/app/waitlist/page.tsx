@@ -11,6 +11,7 @@ import {
   resolveUserState,
 } from '@/lib/auth/gate';
 import { PRICING } from '@/lib/config/pricing';
+import { decideAdmissionForEmail } from '@/lib/waitlist/admission-gate.server';
 import { isWaitlistGateEnabled } from '@/lib/waitlist/settings';
 import { isWaitlistPendingStatus } from '@/lib/waitlist/state-machine';
 
@@ -68,9 +69,17 @@ export default async function WaitlistPage() {
     );
   }
 
-  // Anyone signed in can buy the self-serve Pro offer while waiting; a
-  // verified payment admits them (JOV-7701 founder decision, 2026-10-03).
-  const proCheckoutPriceId = PRICING.pro.monthly.priceId || null;
+  // JOV-7701 (2026-10-03) let a waiting person buy Pro, and payment admitted
+  // them. The admission gate (Tim, 2026-10-29) supersedes that: nobody gets
+  // in, paying or not, until their profile, the golden path and the design
+  // judge are certified for this deploy. Until then the receipt offers no
+  // checkout, so there is no price on a page that cannot admit them.
+  const admission = authResult.context.email
+    ? await decideAdmissionForEmail(authResult.context.email).catch(() => null)
+    : null;
+  const proCheckoutPriceId = admission?.admit
+    ? PRICING.pro.monthly.priceId || null
+    : null;
 
   // JOV-6449: gate-off post-auth must not depend on a waitlist table read.
   // Canonical WAITLIST_PENDING is enough to render the receipt.

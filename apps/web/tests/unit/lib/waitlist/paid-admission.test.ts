@@ -5,6 +5,7 @@ const hoisted = vi.hoisted(() => ({
   where: vi.fn(),
   set: vi.fn(),
   invalidate: vi.fn(),
+  decide: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -22,6 +23,9 @@ vi.mock('@/lib/db', () => ({
     }),
   },
 }));
+vi.mock('@/lib/waitlist/admission-gate.server', () => ({
+  decideAdmissionForUser: hoisted.decide,
+}));
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: hoisted.invalidate,
 }));
@@ -32,6 +36,23 @@ describe('admitPaidUser', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     hoisted.invalidate.mockResolvedValue(undefined);
+    hoisted.decide.mockResolvedValue({ admit: true, blocking: [] });
+  });
+
+  it('holds a paying buyer on the waitlist while the admission gate is closed', async () => {
+    hoisted.decide.mockResolvedValue({ admit: false, blocking: ['design'] });
+    await expect(
+      admitPaidUser({ appUserId: 'app-1', cacheKeys: [] })
+    ).resolves.toEqual({ admitted: false, heldBy: ['design'] });
+    expect(hoisted.set).not.toHaveBeenCalled();
+    expect(hoisted.invalidate).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the gate cannot be read', async () => {
+    hoisted.decide.mockRejectedValue(new Error('db down'));
+    const result = await admitPaidUser({ appUserId: 'app-1', cacheKeys: [] });
+    expect(result.admitted).toBe(false);
+    expect(hoisted.set).not.toHaveBeenCalled();
   });
 
   it('moves a pending buyer to waitlist_approved and busts every cache key', async () => {

@@ -38,6 +38,7 @@ function facts(overrides: Partial<ProfileCertFacts> = {}): ProfileCertFacts {
     },
     publicPage: null,
     smartLinkProbes: [],
+    identity: { decision: 'certified', score: 0.95, threshold: 0.85 },
     ...overrides,
   };
 }
@@ -73,26 +74,14 @@ describe('evaluateProfileCertification', () => {
     expect(isProfileCertifiedForInvite(result)).toBe(false);
   });
 
-  it('asks for confirmation when nobody picked the artist and names differ', () => {
-    const unconfirmed = facts({
-      selectedSpotifyArtistId: null,
-      personName: 'Someone Else',
-    });
-    expect(evaluateProfileCertification(unconfirmed).status).toBe(
+  it('fails closed when the resolver has not scored the identity', () => {
+    const picked = facts({ identity: null });
+    expect(evaluateProfileCertification(picked).status).toBe(
       'needs_artist_confirmation'
     );
   });
 
-  it('accepts an unpicked match whose name equals the person, ignoring accents', () => {
-    const named = facts({
-      selectedSpotifyArtistId: null,
-      displayName: 'Ána Lund',
-      personName: 'ana lund',
-    });
-    expect(statusOf(named, 'artist_match')).toBe('passed');
-  });
-
-  it('lets evidence-scored identity override the owner pick', () => {
+  it('certifies only at or above the resolver bar', () => {
     const below = facts({
       identity: {
         decision: 'needs_confirmation',
@@ -105,7 +94,6 @@ describe('evaluateProfileCertification', () => {
     );
     const certified = facts({
       selectedSpotifyArtistId: null,
-      personName: 'Someone Else',
       identity: { decision: 'certified', score: 0.85, threshold: 0.85 },
     });
     expect(statusOf(certified, 'artist_match')).toBe('passed');

@@ -6,6 +6,7 @@ import { captureCriticalError } from '@/lib/error-tracking';
 import { parseJsonBody } from '@/lib/http/parse-json';
 import { waitlistApproveSchema } from '@/lib/validation/schemas';
 import { recordAdmittedForEntry } from '@/lib/waitlist/acquisition-stages';
+import { decideAdmissionForEntries } from '@/lib/waitlist/admission-gate.server';
 import {
   approveWaitlistEntryInTx,
   finalizeWaitlistApproval,
@@ -51,6 +52,27 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { success: false, error: 'Invalid request body' },
         { status: 400, headers: NO_STORE_HEADERS }
+      );
+    }
+
+    // Admission gate (Tim, 2026-10-29): manual approval admits nobody unless
+    // the profile, golden path and design judge are certified for this
+    // production SHA. No admin override.
+    const { decisions } = await decideAdmissionForEntries([
+      parsed.data.entryId,
+    ]);
+    const admission = decisions.get(parsed.data.entryId);
+    if (!admission?.admit) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'admission_gate_closed',
+          message: `Not admissible yet. Blocked by: ${(admission?.blocking ?? ['profile', 'golden_path', 'design']).join(', ')}.`,
+          blocking: admission?.blocking ?? ['profile', 'golden_path', 'design'],
+          legs: admission?.legs ?? [],
+          prodSha: admission?.prodSha ?? null,
+        },
+        { status: 409, headers: NO_STORE_HEADERS }
       );
     }
 
