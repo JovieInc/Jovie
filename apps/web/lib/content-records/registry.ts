@@ -1,3 +1,4 @@
+import { PROOF_STATS_KIND } from '@/lib/proof-stats/content-kind';
 import type { AnyContentKind } from './kind';
 import { MARKETING_PAGE_KIND } from './marketing-page';
 import { SITE_CHROME_KIND } from './site-chrome';
@@ -10,6 +11,7 @@ import { siteChromeSmoke } from './site-chrome.smoke';
 export const CONTENT_KINDS: readonly AnyContentKind[] = [
   MARKETING_PAGE_KIND as AnyContentKind,
   { ...SITE_CHROME_KIND, smoke: siteChromeSmoke } as AnyContentKind,
+  PROOF_STATS_KIND as AnyContentKind,
 ];
 
 export function getContentKind(kind: string): AnyContentKind | null {
