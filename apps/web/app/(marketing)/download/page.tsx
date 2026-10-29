@@ -11,11 +11,7 @@ import {
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  FaqSection,
-  MarketingContainer,
-  MarketingHeroPhoto,
-} from '@/components/marketing';
+import { FaqSection, MarketingContainer } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -32,12 +28,6 @@ const DOWNLOAD_URL = '/api/desktop/download';
 const DESKTOP_RELEASES_HTML_URL = 'https://github.com/JovieInc/Jovie/releases';
 const DESKTOP_IMAGE = getMarketingExportImage('dashboard-releases-desktop');
 const PROFILE_IMAGE = getMarketingExportImage('tim-white-profile-live-mobile');
-const DOWNLOAD_HERO_PHOTO = {
-  src: '/images/marketing-hero/download.webp',
-  width: 1600,
-  height: 901,
-  opacity: 0.22,
-} as const;
 
 const PLATFORM_ROWS = [
   {
@@ -129,7 +119,6 @@ export default function DownloadPage() {
           data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
         >
           <div className='relative flex min-h-svh flex-col overflow-hidden pt-28 sm:pt-32'>
-            <MarketingHeroPhoto {...DOWNLOAD_HERO_PHOTO} />
             <MarketingContainer
               width='page'
               className='relative z-3 flex flex-1 flex-col'

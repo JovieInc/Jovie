@@ -18,11 +18,7 @@ import {
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import {
-  MarketingContainer,
-  MarketingHeroPhoto,
-  MarketingPageShell,
-} from '@/components/marketing';
+import { MarketingContainer, MarketingPageShell } from '@/components/marketing';
 import { APP_NAME, BASE_URL, LEGAL_ENTITY_NAME } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
@@ -470,11 +466,6 @@ export default function LaunchPage() {
           className='system-b-launch-hero marketing-hero-dock relative overflow-hidden'
           {...launchStamp('hero', 'split-screenshot-right')}
         >
-          <MarketingHeroPhoto
-            src='/images/marketing-hero/launch.webp'
-            width={1600}
-            height={901}
-          />
           <MarketingContainer width='page' className='relative z-3'>
             <div className='system-b-launch-hero-grid'>
               <div className='system-b-launch-hero-copy'>

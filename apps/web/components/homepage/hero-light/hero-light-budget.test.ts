@@ -90,8 +90,10 @@ describe('homepage hero light budget', () => {
     expect(edge).toContain(
       `--hero-light-roll-period: ${HERO_LIGHT_PERF.rollPeriodMs / 1000}s`
     );
-    expect(edge).toContain(
-      'animation: homepage-hero-light-roll var(--hero-light-roll-period)'
+    // Static by default: the roll runs only under an enabled budget.
+    expect(edge).not.toMatch(/\banimation\s*:/);
+    expect(css).toMatch(
+      /prefers-reduced-motion:\s*no-preference\)\s*\{\s*\.homepage-hero-light\[data-animate="true"\] \.homepage-hero-light__edge\s*\{\s*animation: homepage-hero-light-roll var\(--hero-light-roll-period\)/
     );
     expect(css).toMatch(
       /prefers-reduced-motion:\s*reduce\)[\s\S]*animation:\s*none/
