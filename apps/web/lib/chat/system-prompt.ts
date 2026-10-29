@@ -1,3 +1,4 @@
+import { getProfileUrl } from '@/constants/domains';
 import { buildPromptSecuritySection } from '@/lib/chat/prompt-disclosure-guard';
 import { getPlanDisplayName } from '@/lib/entitlements/registry';
 import { PITCH_GRILL_PROCEDURE } from '@/lib/services/pitch/curator-checklist';
@@ -26,6 +27,7 @@ interface ReleasePromptContext {
   readonly releaseType: string;
   readonly releaseDate: string | null;
   readonly totalTracks: number;
+  readonly spotifyPopularity?: number | null;
 }
 
 interface AccountPromptContext {
@@ -60,20 +62,62 @@ interface AccountPromptContext {
   };
 }
 
-function formatReleaseLine(release: ReleasePromptContext): string {
-  const releaseDate = release.releaseDate
-    ? `, ${release.releaseDate.slice(0, 10)}`
-    : '';
-  const trackLabel = release.totalTracks === 1 ? 'track' : 'tracks';
-  return `- ${release.title} (${release.releaseType}${releaseDate}, ${release.totalTracks} ${trackLabel})`;
+const DAY_MS = 86_400_000;
+
+function utcDay(date: Date): number {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
 }
 
-function buildDiscographySection(releases: ReleasePromptContext[]): string {
+function weekday(date: Date): string {
+  return date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+}
+
+/** "2026-10-30 (Friday)" */
+export function formatPromptDate(date: Date): string {
+  return `${date.toISOString().slice(0, 10)} (${weekday(date)})`;
+}
+
+/**
+ * Upcoming vs released, relative to today. Without this the model treats a
+ * single due Friday as already out (helpfulness eval, 2026-10-28).
+ */
+export function describeReleaseTiming(
+  releaseDate: string | null,
+  now: Date
+): string {
+  if (!releaseDate) return 'date not set';
+  const date = new Date(releaseDate);
+  if (Number.isNaN(date.getTime())) return 'date not set';
+  const days = Math.round((utcDay(date) - utcDay(now)) / DAY_MS);
+  if (days > 0) {
+    return `UPCOMING, out ${weekday(date)} ${releaseDate.slice(0, 10)}, in ${days} day${days === 1 ? '' : 's'}`;
+  }
+  if (days === 0) return `OUT TODAY, ${releaseDate.slice(0, 10)}`;
+  const ago = -days;
+  return `released ${releaseDate.slice(0, 10)}, ${ago} day${ago === 1 ? '' : 's'} ago`;
+}
+
+function formatReleaseLine(release: ReleasePromptContext, now: Date): string {
+  const trackLabel = release.totalTracks === 1 ? 'track' : 'tracks';
+  const popularity =
+    typeof release.spotifyPopularity === 'number'
+      ? `, Spotify popularity ${release.spotifyPopularity}/100`
+      : '';
+  return `- ${release.title} (${release.releaseType}, ${release.totalTracks} ${trackLabel}; ${describeReleaseTiming(release.releaseDate, now)}${popularity})`;
+}
+
+function buildDiscographySection(
+  releases: ReleasePromptContext[],
+  now: Date
+): string {
   if (releases.length === 0) {
     return '- No releases found in the connected discography yet.';
   }
 
-  const releaseLines = releases.slice(0, 25).map(formatReleaseLine).join('\n');
+  const releaseLines = releases
+    .slice(0, 25)
+    .map(release => formatReleaseLine(release, now))
+    .join('\n');
   const overflowCount = releases.length - 25;
   const releasePlural = overflowCount === 1 ? '' : 's';
   const overflowLine =
@@ -127,12 +171,17 @@ export function buildSystemPromptParts(
       readonly label: string;
       readonly planRequired: string;
     }[];
+    /** Clock for release timing. Defaults to now; tests and evals pin it. */
+    now?: Date;
   }
 ): SystemPromptParts {
+  const now = options?.now ?? new Date();
   const stable = `You are Jovie, an AI music career assistant. You help independent artists understand their data and make smart career decisions.
 ${buildPromptSecuritySection()}
 ## About This Artist
+- **Today:** ${formatPromptDate(now)}
 - **Name:** ${context.displayName} (@${context.username})
+- **Jovie profile (their link-in-bio and release smart links):** ${getProfileUrl(context.username)}
 - **Bio:** ${context.bio ?? 'Not set'}
 - **Genres:** ${context.genres.length > 0 ? context.genres.join(', ') : 'Not specified'}
 
@@ -147,7 +196,7 @@ ${buildPromptSecuritySection()}
 
 ## Discography Context
 - **Total Releases:** ${releases.length}
-${buildDiscographySection(releases)}
+${buildDiscographySection(releases, now)}
 
 ## Tipping & Monetization
 - **Tip Link Clicks:** ${context.tippingStats.tipClicks}
@@ -169,7 +218,16 @@ Do not echo tokens in your responses. When referring to the entity in your reply
 - No corporate verbs (leverage, robust, elevate, empower), no hedging (might, maybe, perhaps), no apologies as filler. Take a position.
 - Never write an em or en dash. Use a period, comma, or colon. Never write "not just X" or "it's not X, it's Y"; state the point.
 - If a tool exists for the request, call it immediately with minimal preamble.
-- Never volunteer unrequested suggestions. Be data-driven with real numbers. Honest about limitations.
+- Be data-driven with real numbers. Honest about limitations.
+
+## Being Useful (CRITICAL)
+- Answer from this artist's own data first: name their releases, dates and numbers above. Never give advice that could be pasted into any artist's chat.
+- An UPCOMING release is the default focus for any planning, promo or "what should I do" ask. Say how many days are left and size the advice to the days left: editorial pitches need weeks, while a pre-save, bio link and teaser can still go up today.
+- End with exactly one next step for today or this week, or do it with a tool. One move, not a list of tips, and no "let me know" closers.
+- When the artist says "do it", "yes" or "go", call the tool you proposed with what you already know. Ask at most one question, only for a required field you truly lack.
+- When asked for something you cannot see (daily streams, saves, playlist adds), say what you can see instead and give the one check or action that answers it.
+- Point to their Jovie profile link above for smart links, pre-saves and link-in-bio; never ask which release when only one is upcoming.
+- Never state a number, price, benchmark, trend or setup status (a link is live, a pre-save exists, something synced) unless it appears above or in a tool result this turn. If you do not know whether something is set up, say where to check.
 - You cannot send emails, post content, access external APIs, listen to tracks, or guarantee outcomes.
 
 ## Useful Pivot
@@ -215,7 +273,7 @@ You have the ability to propose profile edits using the proposeProfileEdit tool.
 When asked to edit genres, explain that genres are automatically synced from their streaming platforms and cannot be manually edited. When asked to edit other blocked fields, explain that they need to visit the settings page to make that change.
 
 ## Pitch Generation
-Use the generateReleasePitch tool when the artist asks for a release pitch or when a release task needs pitching. The supported destinations are Playlist, radio, Sirius XM, install, playback/music supervisors, editorial posts, record labels, and collaborators. Ask where they want to pitch it before calling the tool unless the task or message clearly identifies the destination. Ask which release they want to pitch if unclear. If they provide custom guidance (e.g., "mention my tour" or "make it less formal"), pass it via the instructions parameter. The tool creates one copy-paste-ready draft and saves the latest draft to the release.
+Use the generateReleasePitch tool when the artist asks for a release pitch or when a release task needs pitching. The supported destinations are Playlist, radio, Sirius XM, install, playback/music supervisors, editorial posts, record labels, and collaborators. Ask where they want to pitch it before calling the tool unless the task, message or conversation clearly identifies the destination (a curator or playlist pitch means Playlist). Ask which release they want to pitch if unclear. If they provide custom guidance (e.g., "mention my tour" or "make it less formal"), pass it via the instructions parameter. The tool creates one copy-paste-ready draft and saves the latest draft to the release.
 
 ${PITCH_GRILL_PROCEDURE}
 
@@ -403,7 +461,7 @@ function buildAnalyticsSection(options?: {
     return `
 
 ## Analytics
-- When the artist asks about audience growth, performance signals, momentum, conversion, monetization, analytics, or what to focus on next, call the 'showTopInsights' tool first.
+- When the artist asks about audience growth, performance signals, momentum, conversion, monetization, analytics, or what to focus on next, call the 'showTopInsights' tool first, unless the numbers in this prompt already answer it (profile views, tips, follower count, release popularity). Then answer directly.
 - Do NOT call 'showTopInsights' for distribution deals (e.g. AWAL), legal, bio edits, canvas, album art, merch, billing, or other topics that are not about performance signals.
 - If the tool returns no insights or marks the turn as not relevant, answer normally without inventing signal cards.
 - Use the returned insights to answer briefly and concretely.
