@@ -98,6 +98,7 @@ function prState(overrides = {}) {
     number: 14359,
     state: 'OPEN',
     isDraft: false,
+    baseRefName: 'main',
     headRefOid: HEAD,
     labels: { nodes: [] },
     isInMergeQueue: false,
@@ -2257,6 +2258,16 @@ describe('native enrollment', () => {
     });
     await expect(enroll(runner)).rejects.toMatchObject({
       code: 'head_changed',
+    });
+    expect(invokedEnrollment(runner)).toBe(false);
+  });
+
+  it('refuses to arm a PR whose base is not main before invoking enrollment', async () => {
+    const runner = createNativeRunner({
+      states: [prState({ baseRefName: 'feat/parent-branch' })],
+    });
+    await expect(enroll(runner)).rejects.toMatchObject({
+      code: 'non_main_base',
     });
     expect(invokedEnrollment(runner)).toBe(false);
   });
