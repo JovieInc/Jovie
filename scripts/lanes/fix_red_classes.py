@@ -216,7 +216,7 @@ def snap_added_conservative_spacing(root: Path, diff: str) -> list[str]:
         if not dirty:
             continue
         try:
-            path.write_text("".join(file_lines))
+            atomic_write_text(path, "".join(file_lines))
         except OSError:
             continue
         changed.append(rel)
