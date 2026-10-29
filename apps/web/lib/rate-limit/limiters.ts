@@ -143,6 +143,12 @@ export const anonymousOnboardingChatFirstTouchLimiter = createRateLimiter(
   RATE_LIMITERS.anonymousOnboardingChatFirstTouch
 );
 
+/** Canary passage tokens for the /start bot check (JOV-9625). Redis only. */
+export const syntheticPassageTokenLimiter = createRateLimiter(
+  RATE_LIMITERS.syntheticPassageToken,
+  { requireRedis: true }
+);
+
 export interface AnonymousChatLimitInput {
   readonly ip: string;
   readonly sessionId: string;
@@ -352,6 +358,17 @@ export const publicArtistApiLimiter = createRateLimiter(
  */
 export const agentProfileCreateLimiter = createRateLimiter(
   RATE_LIMITERS.agentProfileCreate,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
+ * Global ceiling for agent draft writes across all callers (constant key).
+ * Limit: 600 requests per hour. Fails closed without Redis.
+ */
+export const agentWriteGlobalLimiter = createRateLimiter(
+  RATE_LIMITERS.agentWriteGlobal,
   {
     requireRedis: true,
   }
@@ -1324,6 +1341,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicProfile: publicProfileLimiter,
     publicArtistApi: publicArtistApiLimiter,
     agentProfileCreate: agentProfileCreateLimiter,
+    agentWriteGlobal: agentWriteGlobalLimiter,
     agentCreatorLookup: agentCreatorLookupLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
     investorPortalToken: investorPortalTokenLimiter,

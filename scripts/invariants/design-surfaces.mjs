@@ -494,6 +494,10 @@ export const NAV_LABEL_DESTINATIONS = Object.freeze({
   Pay: ['PAY'],
   'Fan Capture': ['ARTIST_PROFILES'],
   'Fan Reactivation': ['ARTIST_PROFILES'],
+  // Phase-1 truth pass: audience wording replaces fan wording in the nav.
+  'Audience notifications': ['ARTIST_NOTIFICATIONS'],
+  'Audience capture': ['ARTIST_PROFILES'],
+  'Audience reactivation': ['ARTIST_PROFILES'],
   'Product Demo': ['DEMO_VIDEO'],
   'Release System': ['LAUNCH'],
   'Artist Directory': ['ARTISTS'],

@@ -54,6 +54,7 @@ import {
   validateLaneGroups,
 } from '../../ci-fast-lanes.mjs';
 import { buildControlTestCommands } from '../../run-affected-tests.mjs';
+import { buildWebVitestFastArgs } from '../ci-web-vitest-fast-args.mjs';
 
 const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..');
 
@@ -113,6 +114,68 @@ function jobBlock(jobId, nextJobId) {
 }
 
 describe('ci-fast bounded parallel workflow', () => {
+  it('selects both critical and interaction files for non-main manual units', () => {
+    const unitJob = jobBlock('ci-unit-tests', 'ci-exact-head-coverage-shard');
+    const command = unitJob
+      .split('\n')
+      .find(
+        line =>
+          line.includes('pnpm turbo test:fast --affected --') &&
+          line.includes('--passWithNoTests')
+      );
+    const selectors = command?.match(
+      /unit_excludes \}\}\s+(.+?)\s+\$OUTPUT_FLAG$/u
+    )?.[1];
+    expect(selectors, 'manual unit filename selectors').toBeTruthy();
+    const parsed = spawnSync('bash', ['-c', `printf '%s\\0' ${selectors}`], {
+      encoding: 'utf8',
+      timeout: 1000,
+    });
+    expect(parsed.status, parsed.stderr).toBe(0);
+    const [, ...runnerArgs] = buildWebVitestFastArgs(
+      parsed.stdout.split('\0').filter(Boolean)
+    );
+    const webRoot = resolve(REPO_ROOT, 'apps/web');
+    const outputDir = mkdtempSync(join(tmpdir(), 'manual-unit-selection-'));
+    try {
+      const report = join(outputDir, 'files.json');
+      // --filesOnly uses the real config/project selection without importing
+      // or executing test bodies. One unsharded list checks the intended union.
+      const selected = spawnSync(
+        process.execPath,
+        [
+          resolve(webRoot, 'node_modules/vitest/vitest.mjs'),
+          'list',
+          ...runnerArgs,
+          '--filesOnly',
+          `--json=${report}`,
+        ],
+        {
+          cwd: webRoot,
+          encoding: 'utf8',
+          env: { ...process.env, CI: 'true' },
+          timeout: 20_000,
+        }
+      );
+      expect(selected.error).toBeUndefined();
+      expect(selected.status, selected.stdout + selected.stderr).toBe(0);
+      const files = JSON.parse(readFileSync(report, 'utf8')).map(
+        entry => entry.file
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/lib/auth/gate.critical.test.ts')
+      );
+      expect(files).toContain(
+        resolve(webRoot, 'tests/unit/chat/ChatInput.interaction.test.tsx')
+      );
+      expect(files).not.toContain(
+        resolve(webRoot, 'tests/unit/utils/capitalizeFirst.test.ts')
+      );
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
+
   it('discovers assurance behavior tests and executes them once with structural coverage', async () => {
     const test = 'scripts/invariants/assurance-matrix.test.mjs';
     expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(test);
@@ -280,6 +343,7 @@ describe('ci-fast bounded parallel workflow', () => {
     // select the identical files with complementary -k expressions so every
     // collected test runs in exactly one shard (never zero, never twice).
     expect(STRUCTURAL_PYTEST_FILES).toEqual([
+      'scripts/prod-errors/test_prod_errors.py',
       'scripts/tests/test_gh_retry.py',
       'scripts/tests/test_vercel_prebuilt_deploy.py',
       'scripts/tests/test_brand_scrub.py',
@@ -353,8 +417,14 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(29);
+    expect(LANES_PYTEST_FILES).toHaveLength(32);
+    expect(whole).toContain('scripts/tests/test_factory_signals.py');
+    expect(whole).toContain('scripts/tests/test_factory_intake.py');
+    expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
     expect(whole).toContain('scripts/tests/test_model_radar.py');
+    expect(command).toContain(
+      'coverage report --include="*/scripts/lanes/model_radar.py" --fail-under=90'
+    );
     expect(new Set(shards.map(shard => shard.basetemp)).size).toBe(4);
     expect(new Set(shards.map(shard => shard.data)).size).toBe(4);
     const combine = command.indexOf(
@@ -363,6 +433,9 @@ describe('ci-fast bounded parallel workflow', () => {
     expect(combine).toBeGreaterThan(-1);
     expect(command.indexOf('python3 -m coverage report')).toBeGreaterThan(
       combine
+    );
+    expect(command).toContain(
+      'python3 -m coverage report --include="*/scripts/hyperagent/*.py" --fail-under=90'
     );
   });
 
@@ -403,6 +476,69 @@ describe('ci-fast bounded parallel workflow', () => {
         rmSync(root, { recursive: true, force: true });
       }
     }
+  });
+
+  describe('lanes pytest retry-once', () => {
+    // Timing-sensitive lanes tests ejected unrelated product PRs from merge
+    // groups (test_update_installs_tested_release_and_only_moves_the_symlink,
+    // 7 distinct PRs). A deterministic failure must still fail the shard.
+    const run = ({ failedLines, retryRc }) => {
+      const root = mkdtempSync(join(tmpdir(), 'lanes-retry-'));
+      try {
+        const bin = join(root, 'bin');
+        mkdirSync(bin);
+        const failures = failedLines
+          .map(line => `echo "FAILED ${line} - boom"`)
+          .join('\n');
+        writeFileSync(
+          join(bin, 'python3'),
+          `#!/bin/sh\necho "$COVERAGE_FILE $*" >> "${root}/calls.log"\ncase "$*" in *"coverage run -a --branch"*) exit ${retryRc} ;; esac\ncase "$COVERAGE_FILE" in *jovie-lanes-a.coverage) ${failures || ':'}; [ -n "${failedLines.length}" ] && [ "${failedLines.length}" != 0 ] && exit 1 ;; esac\nexit 0\n`,
+          { mode: 0o755 }
+        );
+        const [command] = STRUCTURAL_PYTHON_REGRESSION_COMMANDS;
+        const result = spawnSync('sh', ['-c', command], {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            RUNNER_TEMP: root,
+          },
+        });
+        return { result, calls: readFileSync(join(root, 'calls.log'), 'utf8') };
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    };
+    it('passes the shard when its one failed node passes on retry, and says so', () => {
+      const { result, calls } = run({
+        failedLines: ['scripts/tests/test_x.py::T::flaky'],
+        retryRc: 0,
+      });
+      expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout).toContain(
+        '::warning title=lanes pytest retry::shard a retried 1 failed node(s) once: scripts/tests/test_x.py::T::flaky'
+      );
+      expect(calls).toContain(
+        'coverage run -a --branch -m pytest scripts/tests/test_x.py::T::flaky'
+      );
+      expect(calls).toContain('-m coverage combine');
+    });
+    it('still fails when the retry fails too (deterministic regression)', () => {
+      const { result, calls } = run({
+        failedLines: ['scripts/tests/test_x.py::T::real'],
+        retryRc: 4,
+      });
+      expect(result.status).toBe(4);
+      expect(calls).not.toContain('-m coverage report');
+    });
+    it('never retries a wide failure', () => {
+      const { result, calls } = run({
+        failedLines: [1, 2, 3, 4].map(n => `scripts/tests/test_x.py::T::t${n}`),
+        retryRc: 0,
+      });
+      expect(result.status).toBe(1);
+      expect(calls).not.toContain('coverage run -a');
+    });
   });
 
   it('runs the scanner-heavy invariant suites outside the V8-coverage node --test batch', () => {
@@ -459,7 +595,6 @@ describe('ci-fast bounded parallel workflow', () => {
       'scripts/desktop-release-guard.test.mjs',
       'scripts/desktop-release-publisher.test.mjs',
       'apps/desktop/electron-builder.yml',
-      'apps/desktop/electron-builder.staging.yml',
       'apps/desktop/scripts/notarize-release-dmg.cjs',
     ]) {
       expect(
@@ -566,6 +701,7 @@ describe('ci-fast bounded parallel workflow', () => {
         kbd: 'false',
         crawler: 'true',
         desktop_update: 'false',
+        dsp: 'false',
         overlay: 'false',
         privacy: 'false',
         tasks: 'false',
@@ -699,6 +835,119 @@ describe('ci-fast bounded parallel workflow', () => {
     ).toContain('tests/e2e/storybook-desktop-update-modal.spec.ts');
   });
 
+  it('selects DSP details only for its real consumers and runs the maintained browser proof', () => {
+    const remaining = jobBlock(
+      'ci-fast-remaining',
+      'ci-profile-admission-browser'
+    );
+    const pattern = remaining.match(/DSP_STORYBOOK_PATTERN='([^']+)'/)?.[1];
+    expect(pattern).toBeTruthy();
+    const affected = [
+      'apps/web/components/shell/DspAvatarStack.tsx',
+      'apps/web/components/shell/DspAvatarStack.test.tsx',
+      'apps/web/components/shell/DspAvatarStack.stories.tsx',
+      'apps/web/components/shell/DspAvatarStack.mobile-drawer.test.tsx',
+      'apps/web/components/shell/DspAvatarStack.mobile-drawer.stories.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.tsx',
+      'apps/web/components/features/dashboard/organisms/release-provider-matrix/shell-releases/ShellReleaseRow.stories.tsx',
+      'apps/web/components/organisms/release-sidebar/ReleaseSidebarSections.tsx',
+      'apps/web/components/molecules/drawer/RightDrawer.tsx',
+      'apps/web/lib/a11y/modal-focus-boundary.ts',
+      'apps/web/tests/e2e/storybook-dsp-details.spec.ts',
+    ];
+    const unrelated = 'apps/web/components/shell/Other.tsx';
+    for (const path of [...affected, unrelated, `${affected[0]}.bak`]) {
+      const match = spawnSync('grep', ['-qE', pattern ?? 'a^'], {
+        input: `${path}\n`,
+        encoding: 'utf8',
+      });
+      expect(match.status, path).toBe(affected.includes(path) ? 0 : 1);
+    }
+    const selector = remaining
+      .split('id: storybook-browser\n')[1]
+      .split('      - name: Start ci-fast lanes')[0];
+    const command = selector
+      .split('run: |\n')[1]
+      .replaceAll('${{ github.event_name }}', 'pull_request')
+      .replaceAll('${{ github.base_ref }}', 'main');
+    const root = mkdtempSync(join(tmpdir(), 'dsp-storybook-selection-'));
+    try {
+      for (const [changed, selected] of [
+        [affected.join('\n'), 'true'],
+        [unrelated, 'false'],
+      ]) {
+        const output = join(root, `output-${selected}`);
+        const result = spawnSync(
+          'bash',
+          ['-c', 'git() { printf "%s\\n" "$CHANGED_PATHS"; }\n' + command],
+          {
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              CHANGED_PATHS: changed,
+              RUNNER_TEMP: root,
+              GITHUB_OUTPUT: output,
+            },
+          }
+        );
+        expect(result.status, result.stderr).toBe(0);
+        const values = Object.fromEntries(
+          readFileSync(output, 'utf8')
+            .trim()
+            .split('\n')
+            .map(line => line.split('='))
+        );
+        expect(values.dsp).toBe(selected);
+        expect(values.run).toBe(selected);
+      }
+      const runner = remaining
+        .split('id: storybook-browser-test')[1]
+        .split('      - name: Upload Storybook browser evidence')[0];
+      const selection = runner.slice(
+        runner.indexOf('          specs=()'),
+        runner.indexOf('          pnpm exec storybook dev')
+      );
+      const chosen = spawnSync(
+        'bash',
+        ['-c', selection + '\nprintf "%s\\n" "${specs[@]}"'],
+        {
+          encoding: 'utf8',
+          env: {
+            ...process.env,
+            RUN_SPOTIFY: 'false',
+            RUN_KBD: 'false',
+            RUN_CRAWLER: 'false',
+            RUN_OVERLAY: 'false',
+            RUN_PRIVACY: 'false',
+            RUN_TASKS: 'false',
+            RUN_DESKTOP_UPDATE: 'false',
+            RUN_DSP: 'true',
+          },
+        }
+      );
+      const spec = 'tests/e2e/storybook-dsp-details.spec.ts';
+      expect(chosen.status, chosen.stderr).toBe(0);
+      expect(chosen.stdout.trim().split('\n')).toEqual([spec]);
+      expect(remaining).toContain(
+        'RUN_DSP: ${{ steps.storybook-browser.outputs.dsp }}'
+      );
+      const surfaces = jobBlock(
+        'ci-storybook-surfaces',
+        'ci-cross-product-integration'
+      );
+      const invocation = surfaces.match(
+        /pnpm exec playwright test ([\s\S]*?)--config=playwright\.config\.storybook\.ts/
+      );
+      expect(invocation).not.toBeNull();
+      expect(
+        invocation[1].match(/tests\/e2e\/storybook-dsp-details\.spec\.ts/g)
+      ).toHaveLength(1);
+      expect(existsSync(resolve(REPO_ROOT, 'apps/web', spec))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('selects the Tasks row geometry proof for its shared cell and feature surfaces', () => {
     const remaining = jobBlock(
       'ci-fast-remaining',
@@ -773,6 +1022,7 @@ describe('ci-fast bounded parallel workflow', () => {
         overlay: 'false',
         tasks: 'true',
         desktop_update: 'false',
+        dsp: 'false',
         privacy: 'false',
       });
 

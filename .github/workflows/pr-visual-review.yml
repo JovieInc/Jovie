@@ -45,7 +45,7 @@ jobs:
   capture:
     # Capture evidence remains fail-closed (JOV-5459).
     name: Capture changed UI (desktop + mobile)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     permissions:
       contents: read
@@ -213,6 +213,25 @@ jobs:
             --retries=0 \
             -g "deliberate-red|$tests"
 
+      # Marketing visual critic (rubric: docs/design-system/marketing-critic-rubric.json).
+      # Warn-only by construction: the script exits 0 while
+      # marketing-critic.config.json is in shadow mode, and posts findings as
+      # warning annotations plus the step summary. Every finding is recorded to
+      # pr-visual-artifacts/marketing-critic/findings.jsonl so calibrate.mjs can
+      # measure precision before any detector is promoted to blocking.
+      - name: Marketing visual critic (shadow)
+        id: marketing_critic
+        if: ${{ !cancelled() && steps.route.outputs.should_review == 'true' && steps.build.outcome == 'success' && steps.server.outcome == 'success' }}
+        env:
+          BASE_URL: http://127.0.0.1:3100
+          EXPECTED_COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          node scripts/invariants/marketing-critic/run.mjs \
+            --changed-files "$RUNNER_TEMP/changed-files.txt" \
+            --out pr-visual-artifacts/marketing-critic \
+            --source pr
+
       # The exact-route capture (console errors, HTTP/request failures,
       # registered axe quality checks per marketing route) ran only on main
       # push in screenshots.yml, so failing feature pages merged untested and
@@ -225,6 +244,10 @@ jobs:
         env:
           BASE_URL: http://127.0.0.1:3100
           SCREENSHOT_BUILD_MODE: pr-premerge
+          # A failing test writes Playwright's error-context.md; without this the
+          # guard files it as unknown-binary and adds a second, misleading red.
+          # The guard still redacts it and fails if a secret survives.
+          PLAYWRIGHT_ARTIFACT_ALLOW_MARKDOWN: 'true'
         run: |
           set -euo pipefail
           marketing_surface='^(apps/web/(app/\((marketing|home)\)/|components/(marketing|site|homepage)/|data/marketing/|styles/|lib/agent-os/visual-qa/|tests/product-screenshots/(marketing-routes|helpers|source-provenance)|tests/visual-qa/)|packages/ui/|\.github/workflows/pr-visual-review\.yml)'
@@ -245,7 +268,8 @@ jobs:
           fi
           cd apps/web
           # Same Playwright artifact guard as every other producer step, so
-          # no reviewed exemption is needed for this step.
+          # no reviewed exemption is needed for this step. Markdown evidence is
+          # allowed (scanned and redacted) via the step env above.
           node "$GITHUB_WORKSPACE/.github/scripts/guard-playwright-artifacts.mjs" --run -- \
             pnpm exec playwright test \
               tests/product-screenshots/marketing-routes.spec.ts \

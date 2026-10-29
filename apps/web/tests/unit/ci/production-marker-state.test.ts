@@ -1,13 +1,23 @@
-import { readFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   admitReleaseBase,
+  attachEntryHandoff,
   classifyProducerCoalescence,
   classifyProductionMarkerEvidence,
+  entryRatchetDigest as entryDigest,
   normalizeProductionJobs,
   selectNewerControllerRun,
+  validEntryRatchet,
 } from '../../../../../.github/scripts/production-marker-state.mjs';
 
 const processRunner = vi.hoisted(() => vi.fn());
@@ -25,6 +35,610 @@ const liveFixturePath = resolve(
   testDir,
   'fixtures/production-controller-run-live-shape.json'
 );
+
+// Frozen synthetic proof produced by the reviewed collector before the layer split.
+// Digests are recorded bytes, not regenerated expectations or a second decision implementation.
+const ENTRY_FIXTURE_TIME = 1793059200000;
+function entryHandoffFixture() {
+  const now = ENTRY_FIXTURE_TIME;
+  const profile = {
+    harnessSha256: 'f'.repeat(64),
+    lighthouseVersion: '13.4.1',
+    browser: 'Chrome/140',
+    device: 'mobile',
+    cpu: '4x',
+    network: 'slow4g',
+    cache: 'reset-browser-observed-server',
+    bypass: 'vercel-header',
+  };
+  const measurement = (letter: string, deploymentId: string, lcp: number) => ({
+    identity: {
+      sha: letter.repeat(40),
+      deploymentId,
+      origin: `https://jovie-${letter}-jovie.vercel.app`,
+    },
+    profileDigest:
+      '50db59db8bfb98614eb9c84b20b3351ec42b2baf535cd9f45611304f3b6f4808',
+    cohorts: [0, 1].map(ordinal => ({
+      ordinal,
+      startedAt: now - 900 + ordinal * 100,
+      completedAt: now - 850 + ordinal * 100,
+      routes: (['start', 'claim', 'claim-link'] as const).map(id => ({
+        id,
+        lcpSamples: [lcp, lcp, lcp],
+        clsSamples: [0, 0, 0],
+        serverCache: ['HIT', 'HIT', 'HIT'],
+      })),
+    })),
+  });
+  const served = measurement('b', 'dpl_served', 6000);
+  const candidate = measurement('a', 'dpl_primary123', 5000);
+  const producer = { sha, runId: controllerRun, attempt: 1 };
+  const entryRatchet = {
+    schema: 'jovie-entry-lcp-ratchet/v1',
+    budgets: [
+      { id: 'start', path: '/start', lcpMs: 4000, cls: 0.05 },
+      { id: 'claim', path: '/claim', lcpMs: 4000, cls: 0.05 },
+      { id: 'claim-link', path: '/[handle]?claim=1', lcpMs: 4000, cls: 0.05 },
+    ],
+    declaredAt: now - 1000,
+    completedAt: now,
+    policyDigest:
+      '068b88c15cbdbec8dacb803bec18c5dfd9a86ee1dc2f21efbab5ec7acae40504',
+    profile,
+    profileDigest:
+      '50db59db8bfb98614eb9c84b20b3351ec42b2baf535cd9f45611304f3b6f4808',
+    producer,
+    baseline: {
+      state: 'verified',
+      sha: served.identity.sha,
+      deploymentId: served.identity.deploymentId,
+      markerArtifactId: 10,
+      controllerRun: 5,
+      controllerAttempt: 1,
+    },
+    served,
+    candidate,
+    reference: served,
+    anchor: { measurement: candidate, producer, role: 'candidate' },
+    previousAnchor: { measurement: served, producer, role: 'served' },
+    previousAnchorDigest: null,
+    initializedFrom: 'verified-served',
+    releaseEligible: true,
+    certified: false,
+    failures: [],
+    digest: '1201edb6c4aa3042c4bd48a37cee7c7de88d7b203e1223a7ce95fb128153dde5',
+  };
+  return {
+    schema: 'jovie-entry-lcp-handoff/v1',
+    producer,
+    candidate: candidate.identity,
+    mode: 'measured',
+    entryRatchet,
+  };
+}
+
+function entryPolicyFixture(lineageSha = sha, selectedLane = 'high') {
+  return {
+    schema: 'jovie.release-risk-receipt/v1',
+    policyVersion: 'jovie.release-risk-policy/2026-10-21.1',
+    lineageSha,
+    selectedLane,
+    requiredProof:
+      selectedLane === 'high' ? ['high-confidence-runtime-proof'] : [],
+  };
+}
+
+describe('entry ratchet artifact handoff', () => {
+  beforeEach(() => {
+    vi.spyOn(Date, 'now').mockReturnValue(ENTRY_FIXTURE_TIME + 5000);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+  it('accepts the immutable pre-split proof with its recorded digest', () => {
+    const receipt = entryHandoffFixture().entryRatchet;
+    const { digest, ...body } = receipt;
+    expect(entryDigest(body)).toBe(digest);
+    expect(validEntryRatchet(receipt)).toBe(true);
+  });
+  it.each(['certification', 'regression', 'weaker-policy', 'wrong-anchor'])(
+    'independently rejects a rehashed contradictory %s decision',
+    fault => {
+      const receipt = structuredClone(entryHandoffFixture().entryRatchet);
+      if (fault === 'certification') receipt.certified = true;
+      if (fault === 'regression')
+        receipt.candidate.cohorts[0].routes[0].lcpSamples = [7000, 7000, 7000];
+      if (fault === 'weaker-policy') {
+        Object.assign(receipt.budgets[0], { lcpMs: 9000 });
+        receipt.policyDigest = entryDigest({
+          schema: receipt.schema,
+          budgets: receipt.budgets,
+          cohorts: 2,
+          samples: 3,
+          positiveRegressionAllowance: 0,
+        });
+      }
+      if (fault === 'wrong-anchor') receipt.anchor = receipt.previousAnchor;
+      const { digest: _old, ...body } = receipt;
+      receipt.digest = entryDigest(body);
+      expect(validEntryRatchet(receipt)).toBe(false);
+    }
+  );
+
+  it.each(['qualified', 'missing-status', 'foreign-source'])(
+    'binds a measured ratchet to the actual marker producer (%s)',
+    mode => {
+      const marker = primaryMarker('completed', 'success');
+      const receipt = structuredClone(entryHandoffFixture().entryRatchet);
+      if (mode === 'foreign-source') {
+        receipt.producer.runId = 999;
+        const { digest: _old, ...body } = receipt;
+        receipt.digest = entryDigest(body);
+        expect(validEntryRatchet(receipt)).toBe(true);
+      }
+      const payload = {
+        ...marker.payload,
+        releasePolicy: entryPolicyFixture(),
+        entryRatchet: receipt,
+        ...(mode === 'missing-status'
+          ? {}
+          : { entryMeasurementStatus: 'measured' }),
+      };
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({ markers: [{ ...marker, payload }] })
+        ).state
+      ).toBe(mode === 'qualified' ? 'verified' : 'manual');
+    }
+  );
+  it('serializes the actual controller and recovery marker commands before applying the original-attempt handoff', async () => {
+    const { spawnSync: nativeSpawn } =
+      await vi.importActual<typeof import('node:child_process')>(
+        'node:child_process'
+      );
+    const directory = mkdtempSync(resolve(tmpdir(), 'entry-workflow-test-'));
+    mkdirSync(resolve(directory, 'release-lineage'));
+    writeFileSync(
+      resolve(directory, 'release-lineage/fleet-admission.json'),
+      '{"scopedAdmission":{}}'
+    );
+    writeFileSync(
+      resolve(directory, 'release-risk-receipt.json'),
+      JSON.stringify(entryPolicyFixture())
+    );
+    const handoff = entryHandoffFixture();
+    try {
+      for (const workflow of [
+        'production-controller.yml',
+        'production-marker-recovery.yml',
+      ]) {
+        const source = readFileSync(
+          resolve(testDir, '../../../../../.github/workflows', workflow),
+          'utf8'
+        );
+        const lines = source.split('\n');
+        const endings = lines.flatMap((line, index) =>
+          line.includes('> "$RUNNER_TEMP/production-generation-verified.json"')
+            ? [index]
+            : []
+        );
+        expect(endings).toHaveLength(
+          workflow === 'production-controller.yml' ? 2 : 1
+        );
+        for (const end of endings) {
+          let start = end;
+          while (start >= 0 && lines[start].trim() !== 'jq -n \\') start--;
+          expect(start).toBeGreaterThanOrEqual(0);
+          const recovery = workflow === 'production-marker-recovery.yml';
+          const script = lines
+            .slice(start, end + 1)
+            .map(line => line.trimStart())
+            .join('\n')
+            .replaceAll(
+              '${{ github.run_id }}',
+              recovery ? '900' : String(controllerRun)
+            )
+            .replaceAll('${{ github.run_attempt }}', recovery ? '2' : '1');
+          writeFileSync(
+            resolve(directory, 'release-risk-receipt.json'),
+            JSON.stringify(
+              entryPolicyFixture(
+                sha,
+                script.includes('deploymentId: "not-applicable"')
+                  ? 'not_applicable'
+                  : 'high'
+              )
+            )
+          );
+          const executed = nativeSpawn(
+            'bash',
+            ['-euo', 'pipefail', '-c', script],
+            {
+              encoding: 'utf8',
+              timeout: 5000,
+              env: {
+                NODE_ENV: 'test',
+                PATH: process.env.PATH,
+                RUNNER_TEMP: directory,
+                EXPECTED_SHA: sha,
+                DEPLOYMENT_ID: handoff.candidate.deploymentId,
+                EXPECTED_DEPLOYMENT_ID: handoff.candidate.deploymentId,
+                DEPLOYED_SHA: 'b'.repeat(40),
+                WEB_EVIDENCE_SHA: sha,
+                SELECTED_LANES: 'web',
+                AUTH_SMOKE_STATUS: 'passed',
+                terminal_reason: 'promoted',
+                SOURCE_CONTROLLER_RUN: String(controllerRun),
+                SOURCE_CONTROLLER_ATTEMPT: '1',
+              },
+            }
+          );
+          expect(executed.status, executed.stderr).toBe(0);
+          const marker = JSON.parse(
+            readFileSync(
+              resolve(directory, 'production-generation-verified.json'),
+              'utf8'
+            )
+          );
+          if (marker.deploymentId === 'not-applicable') {
+            expect(marker.deploymentBaseSha).toBe('b'.repeat(40));
+          } else {
+            const attached = attachEntryHandoff(
+              marker,
+              handoff,
+              entryPolicyFixture()
+            );
+            expect(attached.entryRatchet).toEqual(handoff.entryRatchet);
+          }
+        }
+      }
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['qualified', 'legacy', 'expired', 'missing'])(
+    'executes no-web carry from a %s served marker without renewing its evidence',
+    async state => {
+      const primary = primaryMarker('completed', 'success');
+      const receipt = entryHandoffFixture().entryRatchet;
+      if (state !== 'legacy')
+        Object.assign(primary.payload, {
+          entryMeasurementStatus: 'measured',
+          entryRatchet: receipt,
+          releasePolicy: entryPolicyFixture(),
+        });
+      const directory = mkdtempSync(resolve(tmpdir(), 'entry-no-web-test-'));
+      const filename = resolve(
+        directory,
+        'production-generation-verified.json'
+      );
+      const original = JSON.stringify({
+        sha: 'c'.repeat(40),
+        deploymentId: 'not-applicable',
+        deploymentBaseSha: sha,
+        controllerRun: '900',
+        controllerAttempt: '1',
+        webEvidenceSha: 'none',
+        selectedLanes: [],
+        authSmoke: 'not-applicable',
+        releasePolicy: entryPolicyFixture('c'.repeat(40), 'not_applicable'),
+      });
+      writeFileSync(filename, original);
+      processRunner.mockImplementation((command: string, args: string[]) => {
+        const endpoint = args[1];
+        let output: string | Buffer;
+        if (command === 'unzip')
+          output =
+            args[0] === '-Z1'
+              ? 'production-generation-verified.json\n'
+              : JSON.stringify(primary.payload);
+        else if (command === 'gh' && args[0] === 'api') {
+          if (endpoint.endsWith('/zip')) output = Buffer.from('archive');
+          else if (endpoint.endsWith('/production-controller.yml'))
+            output = JSON.stringify({ id: workflowId });
+          else if (endpoint.includes('/artifacts?')) {
+            const artifacts =
+              state !== 'missing' &&
+              endpoint.includes(`name=production-generation-verified-${sha}&`)
+                ? [
+                    {
+                      ...primary.artifact,
+                      expired: state === 'expired',
+                      workflow_run: { id: controllerRun },
+                    },
+                  ]
+                : [];
+            output = JSON.stringify({
+              total_count: artifacts.length,
+              artifacts,
+            });
+          } else if (endpoint.includes('/jobs?'))
+            output = JSON.stringify({
+              total_count: primary.attemptJobs.length,
+              jobs: primary.attemptJobs,
+            });
+          else if (endpoint.endsWith('/attempts/1'))
+            output = JSON.stringify(primary.attemptRun);
+          else throw new Error(`Unexpected offline endpoint ${endpoint}`);
+        } else throw new Error(`Unexpected offline command ${command}`);
+        return { status: 0, stdout: output, stderr: '' };
+      });
+      const argv = process.argv;
+      try {
+        process.argv = [
+          process.execPath,
+          resolve(
+            testDir,
+            '../../../../../.github/scripts/production-marker-state.mjs'
+          ),
+          '--entry-carry',
+          filename,
+          '--repo',
+          repo,
+        ];
+        vi.resetModules();
+        const execute = () =>
+          import('../../../../../.github/scripts/production-marker-state.mjs');
+        if (state === 'qualified' || state === 'legacy') {
+          await execute();
+          const carried = JSON.parse(readFileSync(filename, 'utf8'));
+          expect(carried.entryMeasurementStatus).toBe(
+            state === 'legacy' ? 'uninitialized' : 'carried'
+          );
+          expect(carried.entryRatchet).toEqual(
+            state === 'legacy' ? null : receipt
+          );
+        } else {
+          await expect(execute()).rejects.toThrow();
+          expect(readFileSync(filename, 'utf8')).toBe(original);
+        }
+      } finally {
+        process.argv = argv;
+        processRunner.mockReset();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
+  it('preserves the original measurement and anchor bytes through recovery and supersession', () => {
+    const handoff = entryHandoffFixture();
+    const primary = primaryMarker('completed', 'success').payload;
+    const recovered = {
+      ...primary,
+      controllerRun: '900',
+      controllerAttempt: '2',
+      recoveredFromControllerRun: String(controllerRun),
+      recoveredFromControllerAttempt: '1',
+    };
+    for (const marker of [
+      primary,
+      recovered,
+      { ...primary, terminalReason: 'skipped_superseded' },
+    ]) {
+      const attached = attachEntryHandoff(
+        marker,
+        handoff,
+        entryPolicyFixture()
+      );
+      expect(attached.entryRatchet).toEqual(handoff.entryRatchet);
+      expect(attached.entryRatchet.completedAt).toBe(
+        handoff.entryRatchet.completedAt
+      );
+      expect(attached.entryMeasurementStatus).toBe('measured');
+    }
+  });
+
+  it('carries an old anchor without claiming that the current SHA was measured', () => {
+    const handoff = entryHandoffFixture();
+    const carried = {
+      ...handoff,
+      mode: 'carried',
+      producer: { ...handoff.producer, sha: 'c'.repeat(40), runId: 700 },
+      candidate: {
+        ...handoff.candidate,
+        sha: 'c'.repeat(40),
+        deploymentId: 'dpl_c',
+        origin: 'https://jovie-c-jovie.vercel.app',
+      },
+    };
+    const marker = {
+      sha: carried.producer.sha,
+      deploymentId: 'dpl_c',
+      controllerRun: '700',
+      controllerAttempt: '1',
+    };
+    expect(
+      attachEntryHandoff(marker, carried, entryPolicyFixture(marker.sha, 'low'))
+    ).toMatchObject({
+      entryMeasurementStatus: 'carried',
+      entryRatchet: handoff.entryRatchet,
+    });
+    expect(() =>
+      attachEntryHandoff(
+        marker,
+        { ...carried, mode: 'measured' },
+        entryPolicyFixture(marker.sha, 'low')
+      )
+    ).toThrow(/source mismatch/);
+  });
+
+  it.each([
+    'expired',
+    'future',
+    'extra-field',
+    'digest',
+    'incomplete',
+    'invalid-sample',
+  ])('rejects %s persisted evidence', fault => {
+    const receipt = structuredClone(entryHandoffFixture().entryRatchet);
+    if (fault === 'expired') receipt.completedAt -= 31 * 86400000;
+    if (fault === 'future') receipt.completedAt += 100000;
+    if (fault === 'extra-field')
+      Object.assign(receipt, { secret: 'must-not-survive' });
+    if (fault === 'digest') receipt.digest = '0'.repeat(64);
+    if (fault === 'incomplete') receipt.anchor.measurement.cohorts.pop();
+    if (fault === 'invalid-sample')
+      receipt.candidate.cohorts[0].routes[0].lcpSamples[0] = Number.NaN;
+    expect(validEntryRatchet(receipt)).toBe(false);
+  });
+
+  it.each([
+    'exact',
+    'missing',
+    'expired',
+    'foreign-run',
+    'wrong-attempt',
+    'changed-list',
+    'unexpected-file',
+    'private-field',
+    'wrong-name',
+    'invalid-id',
+    'unknown-expiry',
+    'high-carried',
+    'high-uninitialized',
+    'low-carried',
+    'foreign-policy',
+    'missing-policy',
+  ])(
+    'executes the real artifact-to-marker CLI with %s evidence',
+    async fault => {
+      const handoff = entryHandoffFixture();
+      const policy = entryPolicyFixture(
+        fault === 'foreign-policy' ? 'f'.repeat(40) : sha,
+        fault === 'low-carried' ? 'low' : 'high'
+      );
+      if (fault === 'high-carried' || fault === 'low-carried')
+        handoff.mode = 'carried';
+      if (fault === 'high-uninitialized')
+        Object.assign(handoff, { mode: 'uninitialized', entryRatchet: null });
+      if (fault === 'wrong-attempt') handoff.producer.attempt = 2;
+      if (fault === 'private-field')
+        Object.assign(handoff.candidate, { header: 'private' });
+      const marker = {
+        ...primaryMarker('completed', 'success').payload,
+        controllerRun: '900',
+        controllerAttempt: '2',
+        recoveredFromControllerRun: String(controllerRun),
+        recoveredFromControllerAttempt: '1',
+      };
+      const directory = mkdtempSync(resolve(tmpdir(), 'entry-artifact-test-'));
+      const filename = resolve(
+        directory,
+        'production-generation-verified.json'
+      );
+      const original = `${JSON.stringify(marker)}\n`;
+      writeFileSync(filename, original);
+      let listings = 0;
+      let archive = 'entry';
+      const name = `entry-lcp-handoff-${sha}-${controllerRun}-1`;
+      processRunner.mockImplementation((command: string, args: string[]) => {
+        let output: string | Buffer;
+        if (command === 'unzip')
+          output =
+            args[0] === '-Z1'
+              ? archive === 'policy'
+                ? 'release-risk-receipt.json\nproduction-lane-range.json\nfleet-admission.json\n'
+                : fault === 'unexpected-file'
+                  ? 'entry-lcp-handoff.json\nheaders.json\n'
+                  : 'entry-lcp-handoff.json\n'
+              : JSON.stringify(archive === 'policy' ? policy : handoff);
+        else if (
+          command === 'gh' &&
+          args[0] === 'api' &&
+          args[1].endsWith('/zip')
+        ) {
+          archive = args[1].includes('/51/zip') ? 'policy' : 'entry';
+          output = Buffer.from('archive');
+        } else if (
+          command === 'gh' &&
+          args[0] === 'api' &&
+          args[1].includes('name=production-lane-range-')
+        ) {
+          const artifacts =
+            fault === 'missing-policy'
+              ? []
+              : [
+                  {
+                    id: 51,
+                    name: `production-lane-range-${sha}-1`,
+                    expired: false,
+                    workflow_run: { id: controllerRun },
+                  },
+                ];
+          output = JSON.stringify({ total_count: artifacts.length, artifacts });
+        } else if (
+          command === 'gh' &&
+          args[0] === 'api' &&
+          args[1].includes(`name=${name}`)
+        ) {
+          listings++;
+          const artifacts =
+            fault === 'missing'
+              ? []
+              : [
+                  {
+                    id:
+                      fault === 'invalid-id'
+                        ? 0
+                        : fault === 'changed-list' && listings > 1
+                          ? 42
+                          : 41,
+                    name: fault === 'wrong-name' ? 'unbound-artifact' : name,
+                    expired:
+                      fault === 'unknown-expiry'
+                        ? undefined
+                        : fault === 'expired',
+                    workflow_run: {
+                      id: fault === 'foreign-run' ? 900 : controllerRun,
+                    },
+                  },
+                ];
+          output = JSON.stringify({ total_count: artifacts.length, artifacts });
+        } else throw new Error(`Unexpected offline command ${command}`);
+        return { status: 0, stdout: output, stderr: '' };
+      });
+      const argv = process.argv;
+      try {
+        process.argv = [
+          process.execPath,
+          resolve(
+            testDir,
+            '../../../../../.github/scripts/production-marker-state.mjs'
+          ),
+          '--entry-attach',
+          filename,
+          '--repo',
+          repo,
+        ];
+        vi.resetModules();
+        const execute = () =>
+          import('../../../../../.github/scripts/production-marker-state.mjs');
+        if (fault === 'exact' || fault === 'low-carried') {
+          await execute();
+          expect(JSON.parse(readFileSync(filename, 'utf8'))).toMatchObject({
+            entryRatchet: handoff.entryRatchet,
+            entryMeasurementStatus:
+              fault === 'low-carried' ? 'carried' : 'measured',
+          });
+          expect(listings).toBe(2);
+        } else {
+          await expect(execute()).rejects.toThrow();
+          expect(readFileSync(filename, 'utf8')).toBe(original);
+        }
+        expect(
+          processRunner.mock.calls.some(call =>
+            /--method| -X /.test(String(call[1]))
+          )
+        ).toBe(false);
+      } finally {
+        process.argv = argv;
+        processRunner.mockReset();
+        rmSync(directory, { recursive: true, force: true });
+      }
+    }
+  );
+});
 
 function run(attempt: number, status: string, conclusion: string | null) {
   return {
@@ -177,6 +791,14 @@ function evidence(overrides: Record<string, unknown> = {}) {
 }
 
 describe('production marker attempt state', () => {
+  it('refuses an unknown entry ratchet version instead of silently dropping its authority', () => {
+    const marker = primaryMarker('completed', 'success');
+    Object.assign(marker.payload, { entryRatchet: { schema: 'unknown/v99' } });
+    expect(
+      classifyProductionMarkerEvidence(evidence({ markers: [marker] })).state
+    ).toBe('manual');
+  });
+
   const normalRerunMarker = () => ({
     ...recoveryMarker('completed', 'success'),
     artifact: { ...primaryMarker('completed', 'success').artifact },
@@ -2000,5 +2622,87 @@ describe('producer activation evidence CLI', () => {
         call => call.startsWith('gh api repos/') || call.startsWith('unzip ')
       )
     ).toBe(true);
+  });
+});
+
+// R1 characterization for the release-lease split (fleet/release-lease-split-design.md).
+// These pin TODAY's behavior so the classifier rewrite (verification run as the
+// authority, a promoted SHA is never `none`) shows up as an intentional diff, not
+// an accident. Each case names the hazard the adversarial review found; the R1
+// change flips the cases marked FLIPS in R1 and keeps the rest.
+describe('R1 characterization: states the lease split must not leave admissible', () => {
+  const live = 'b'.repeat(40);
+
+  it('FLIPS in R1: a generation with no marker is `none`, and a foreign live SHA is admitted as bootstrap', () => {
+    // After the split, the controller run for a promoted generation completes
+    // while its verification is still running, so its marker is still absent.
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [], recoveryArtifacts: [] })
+    );
+    expect(result).toEqual({ state: 'none', reason: 'no_marker' });
+    const admission = admitReleaseBase(result, live, sha);
+    expect(admission.ok).toBe(true);
+    expect(admission.warning).toContain('Bootstrapping the release range');
+    // R1: a SHA our controller promoted must classify PENDING (verification
+    // active), FAIL (failed or rolled back) or UNREADABLE (past deadline),
+    // never `none`, and none of those may be admissible.
+  });
+
+  it('keeps refusing to bootstrap the release SHA from its own missing marker', () => {
+    const result = classifyProductionMarkerEvidence(evidence({ markers: [] }));
+    expect(admitReleaseBase(result, sha, sha)).toMatchObject({
+      ok: false,
+      errors: [
+        'Current production cannot bootstrap its own missing verified marker.',
+      ],
+    });
+  });
+
+  it('FLIPS in R1: a marker whose run is not the production controller is rejected (verification-run markers would stall releases)', () => {
+    const marker = primaryMarker('completed', 'success');
+    marker.attemptRun = {
+      ...marker.attemptRun,
+      path: '.github/workflows/production-verification.yml',
+    };
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [marker] })
+    );
+    expect(result.state).toBe('manual');
+    expect(admitReleaseBase(result, live, sha).ok).toBe(false);
+  });
+
+  it('keeps a pending generation inadmissible as a release base', () => {
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [primaryMarker('in_progress', null)] })
+    );
+    expect(result.state).toBe('pending');
+    expect(admitReleaseBase(result, live, sha).ok).toBe(false);
+  });
+
+  it('keeps a rolled-back generation inadmissible (verdict FAIL stays refused)', () => {
+    const rolledBack = primaryMarker(
+      'completed',
+      'cancelled',
+      job(
+        'Production Release / Centralized production rollback',
+        1,
+        'completed',
+        'success'
+      )
+    );
+    const result = classifyProductionMarkerEvidence(
+      evidence({ markers: [rolledBack] })
+    );
+    expect(result).toMatchObject({
+      state: 'manual',
+      reason: 'unsafe_or_contradictory_rollback',
+    });
+    expect(admitReleaseBase(result, live, sha).ok).toBe(false);
+  });
+
+  it('keeps an interrupted (cancelled) generation inadmissible', () => {
+    const result = classifyProductionMarkerEvidence(evidence());
+    expect(result.state).not.toBe('verified');
+    expect(admitReleaseBase(result, live, sha).ok).toBe(false);
   });
 });

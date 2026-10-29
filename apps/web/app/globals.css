@@ -205,6 +205,28 @@ html[data-desktop-runtime="electron"]
   background: transparent;
 }
 
+/* JOV-8941: Electron's native window owns the right and bottom edge. Keep
+   the shared browser shell inset everywhere else, but let the main panel meet
+   the window frame instead of reading as a floating card on those edges.
+   Scoped to lg: the browser shell's gutter, radius, and panel card styling
+   only exist at >=1024px, so the flush override must not invent panel
+   treatment (e.g. a top-left radius) on compact Electron windows. */
+@media (min-width: 1024px) {
+  html[data-desktop-runtime="electron"]
+    [data-app-shell-body="true"][data-electron-top-gap-owner="titlebar"] {
+    padding-right: 0;
+    padding-bottom: 0;
+  }
+
+  html[data-desktop-runtime="electron"]
+    [data-app-shell-main-column="true"]
+    > #main-content {
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: var(--app-shell-radius) 0 0 0;
+  }
+}
+
 /* JOV-7207: reserve only the window controls' overlap into the header row,
    measured in the header's own coordinate system. The header already begins
    inside the shell gap + collapsed icon rail + gap, so adding the full root
@@ -1025,47 +1047,6 @@ body {
   }
   @media (prefers-contrast: more) {
     .hero-glow {
-      display: none;
-    }
-  }
-  /* Unique per-route hero photograph (marketing-routes-code-spec,
-     2026-09-26). Lives behind hero copy inside the existing
-     `.relative overflow-hidden` hero wrapper. The scrim guarantees
-     header + headline legibility no matter how bright the source
-     photo is; `MarketingHeroPhoto`'s `opacity` prop tunes overall
-     image strength for specific routes (/ai, /download). */
-  .marketing-hero-photo {
-    z-index: 0;
-  }
-  /* The photo is positioned; static hero copy would paint underneath it
-     (the /pricing headline rendered invisible). Lift every later sibling. */
-  .marketing-hero-photo ~ * {
-    position: relative;
-    z-index: 1;
-  }
-  .marketing-hero-photo__img {
-    object-fit: cover;
-    object-position: right center;
-  }
-  .marketing-hero-photo__scrim {
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklab, var(--system-b-cinematic-black) 55%, transparent),
-        transparent 18%
-      ),
-      linear-gradient(
-        90deg,
-        var(--system-b-cinematic-black) 0%,
-        color-mix(in oklab, var(--system-b-cinematic-black) 68%, transparent)
-          34%,
-        color-mix(in oklab, var(--system-b-cinematic-black) 14%, transparent)
-          62%,
-        transparent 82%
-      );
-  }
-  @media (prefers-contrast: more) {
-    .marketing-hero-photo {
       display: none;
     }
   }

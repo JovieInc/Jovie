@@ -35,6 +35,12 @@ describe('TipSection', () => {
   const mockOnVenmoPayment = vi.fn();
 
   beforeEach(() => {
+    // Reduced motion snaps the dial instantly, so these flows are deterministic.
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('reduce'),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
     vi.clearAllMocks();
     globalThis.localStorage.removeItem('jovie:pay:method');
   });
@@ -52,6 +58,9 @@ describe('TipSection', () => {
     expect(
       screen.getByText('Choose an amount and a payment method')
     ).toBeDefined();
+    // The Venmo hint names the amount to send; no retype instruction.
+    expect(screen.getByText(/^Send \$\d+ in Venmo\.$/)).toBeInTheDocument();
+    expect(screen.queryByText(/Enter the amount in Venmo/)).toBeNull();
   });
 
   it('starts Stripe checkout only after Pay and does not claim payment completed', async () => {
@@ -114,9 +123,7 @@ describe('TipSection', () => {
     expect(
       screen.getByRole('button', { name: 'Pay $10 with Apple Pay / Card' })
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Select Venmo' })
-    ).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Venmo' })).toBeInTheDocument();
   });
 
   it('keeps the payment action neutral with provider color only on the logo', async () => {
@@ -129,7 +136,7 @@ describe('TipSection', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Venmo' }));
     const venmoButton = await screen.findByRole('button', {
       name: 'Continue with Venmo',
     });
@@ -141,7 +148,7 @@ describe('TipSection', () => {
       ?.getAttribute('class');
 
     expect(venmoButton).toHaveAttribute('data-dsp-provider', 'venmo');
-    expect(activeIcon).toHaveStyle({ transform: 'translateY(0%)' });
+    expect(activeIcon).toHaveStyle({ transform: 'translate3d(0, 0%, 0)' });
     expect(venmoButton.className).toContain('bg-btn-primary');
     expect(venmoButton.className).not.toContain('bg-[#008CFF]');
     expect(venmoLogoClass).toContain('text-brand-venmo');
@@ -160,8 +167,8 @@ describe('TipSection', () => {
       />
     );
 
-    const venmoMethodButton = screen.getByRole('button', {
-      name: 'Select Venmo',
+    const venmoMethodButton = screen.getByRole('option', {
+      name: 'Venmo',
     });
     fireEvent.click(venmoMethodButton);
     expect(mockOnVenmoPayment).not.toHaveBeenCalled();
@@ -200,11 +207,9 @@ describe('TipSection', () => {
       />
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Venmo' }));
     await screen.findByRole('button', { name: 'Continue with Venmo' });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Select Apple Pay / Card' })
-    );
+    fireEvent.click(screen.getByRole('option', { name: 'Apple Pay / Card' }));
     expect(
       await screen.findByRole('button', {
         name: 'Pay $10 with Apple Pay / Card',
@@ -222,7 +227,7 @@ describe('TipSection', () => {
         onVenmoPayment={mockOnVenmoPayment}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Select Venmo' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Venmo' }));
     await screen.findByRole('button', { name: 'Continue with Venmo' });
     await waitFor(() =>
       expect(globalThis.localStorage.getItem('jovie:pay:method')).toBe('venmo')

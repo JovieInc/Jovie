@@ -21,6 +21,8 @@ export interface HumanHoldoutItem {
   /** Golden-case name or trace id the label refers to. */
   readonly caseId: string;
   readonly humanLabel: JudgeBinaryLabel;
+  /** An explicitly bound founder rejection that aggregate agreement cannot override. */
+  readonly mustReject?: true;
   readonly notes?: string;
 }
 
@@ -141,7 +143,21 @@ export function parseHumanHoldoutSet(raw: unknown): HumanHoldoutSet {
     else if (typeof entry.notes === 'string') notes = entry.notes;
     else throw new Error(`Holdout item "${id}" has invalid notes`);
 
-    items.push({ id, caseId, humanLabel, notes });
+    if (
+      entry.mustReject !== undefined &&
+      (entry.mustReject !== true || humanLabel !== 'fail')
+    ) {
+      throw new Error(
+        `Holdout item "${id}" has invalid mustReject: requires true and a fail label`
+      );
+    }
+    items.push({
+      id,
+      caseId,
+      humanLabel,
+      notes,
+      ...(entry.mustReject === true ? { mustReject: true as const } : {}),
+    });
   }
 
   return {
@@ -286,9 +302,14 @@ export function runJudgeCalibrationGate(input: {
   const disagreements = paired.filter(
     item => item.humanLabel !== item.judgeLabel
   );
+  const requiredRejections = new Set(
+    input.holdout.items.filter(item => item.mustReject).map(item => item.id)
+  );
 
   return {
-    passed: kappaResult.kappa >= threshold,
+    passed:
+      kappaResult.kappa >= threshold &&
+      !disagreements.some(item => requiredRejections.has(item.id)),
     kappa: kappaResult.kappa,
     threshold,
     pairedCount: kappaResult.pairedCount,
@@ -307,7 +328,7 @@ export function assertJudgeCalibrationGate(input: {
 
   if (!result.passed) {
     throw new CalibrationGateError(
-      `Judge calibration gate failed: Cohen's kappa ${result.kappa.toFixed(3)} is below threshold ${result.threshold}`,
+      `Judge calibration gate failed: Cohen's kappa ${result.kappa.toFixed(3)} (threshold ${result.threshold}); disagreements: ${result.disagreements.map(item => item.id).join(', ')}. Required rejections cannot be overridden by aggregate agreement.`,
       result
     );
   }

@@ -48,6 +48,7 @@ export {
   adminImpersonateLimiter,
   agentCreatorLookupLimiter,
   agentProfileCreateLimiter,
+  agentWriteGlobalLimiter,
   aiChatLimiter,
   aiChatWeeklyFreeLimiter,
   aiChatWeeklyMaxLimiter,

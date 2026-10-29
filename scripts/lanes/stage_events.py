@@ -23,6 +23,8 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+import ledger_archive
+
 SCHEMA = "jovie-stage-event/v1"
 WINDOW_S = 28 * 86400
 MAX_BYTES = 8 * 1024 * 1024
@@ -90,6 +92,15 @@ def events(row: dict) -> list[dict]:
         return [{"schema": SCHEMA, "entityType": "shipping", "entityId": issue, "stage": "outcome-receipt",
                  "enteredAt": _iso(started), "exitedAt": _iso(ended), "actor": row["provider"],
                  "outcome": outcome, "sourceReceipt": f"lanes-ledger:{row['runId']}"}]
+    if row.get("kind") == "taste-decision":
+        started, ended = _epoch(row.get("startedAt")), _epoch(row.get("endedAt"))
+        issue = str(row.get("issue") or "")
+        if started is None or ended is None or ended < started or not issue.startswith("JOV-"):
+            return []
+        base = {"schema": SCHEMA, "entityType": "taste-decision", "entityId": issue, "actor": row["provider"],
+                "sourceReceipt": f"lanes-ledger:{row['runId']}"}
+        return [{**base, "stage": "waiting", "enteredAt": _iso(started), "exitedAt": _iso(ended), "outcome": "advanced"},
+                {**base, "stage": "decided", "enteredAt": _iso(ended), "exitedAt": _iso(ended), "outcome": "completed"}]
     if row.get("kind") == "adopt":
         started, ended = _epoch(row.get("startedAt")), _epoch(row.get("endedAt"))
         if started is None or ended is None or ended < started:
@@ -121,19 +132,54 @@ def event(row: dict) -> dict | None:
             "outcome": _outcome(row), "sourceReceipt": f"lanes-ledger:{row['runId']}"}
 
 
-def ndjson(ledger: Path, now: float) -> str:
-    """Rolling 28-day NDJSON (by exitedAt), newest kept when the 8 MB cap is reached."""
+def mirror_events(state: Path, now: float) -> list[dict]:
+    """linear-mirror stale -> mirrored rows: oldest change in a pass -> the mirror holding it (target under 5 min)."""
     rows = []
     try:
-        with open(ledger, encoding="utf-8", errors="replace") as handle:
-            for line in handle:
-                try:
-                    found = events(json.loads(line))
-                except ValueError:
-                    continue
-                rows.extend(row for row in found if now - (_epoch(row["exitedAt"]) or 0) <= WINDOW_S)
+        lines = (Path(state) / "mirror-sync.jsonl").read_text().splitlines()
     except OSError:
-        return ""
+        return rows
+    for line in lines:
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        entered, exited = _epoch(item.get("enteredAt")), _epoch(item.get("exitedAt"))
+        if not isinstance(item.get("team"), str) or entered is None or exited is None or exited < entered \
+                or now - exited > WINDOW_S:
+            continue
+        base = {"schema": SCHEMA, "entityType": "linear-mirror", "entityId": item["team"], "actor": "lanes",
+                "sourceReceipt": f"linear-mirror:{item['team']}@{_iso(exited)}"}
+        rows.append({**base, "stage": "stale", "enteredAt": _iso(entered), "exitedAt": _iso(exited), "outcome": "advanced"})
+        rows.append({**base, "stage": "mirrored", "enteredAt": _iso(exited), "exitedAt": _iso(exited), "outcome": "completed"})
+    return rows
+
+
+def ndjson(ledger: Path, now: float) -> str:
+    """Rolling 28-day NDJSON (by exitedAt), newest kept when the 8 MB cap is reached."""
+    rows, seen = [], set()
+    # Rotated rows (ledger_archive.py) still belong to the 28-day window.
+    sources = [*ledger_archive.archive_files(Path(ledger).parent.parent, now - WINDOW_S), Path(ledger)]
+    for source in sources:
+        try:
+            with open(source, encoding="utf-8", errors="replace") as handle:
+                for line in handle:
+                    try:
+                        found = events(json.loads(line))
+                    except ValueError:
+                        continue
+                    for row in found:
+                        key = (row["sourceReceipt"], row["stage"])
+                        if now - (_epoch(row["exitedAt"]) or 0) <= WINDOW_S and key not in seen:
+                            seen.add(key)
+                            rows.append(row)
+        except OSError:
+            continue
+    for row in mirror_events(Path(ledger).parent.parent, now):
+        key = (row["sourceReceipt"], row["stage"])
+        if key not in seen:
+            seen.add(key)
+            rows.append(row)
     rows.sort(key=lambda row: (row["exitedAt"], row["sourceReceipt"], row["stage"]))
     lines = [json.dumps(row, separators=(",", ":"), sort_keys=True) for row in rows]
     kept, size = [], 0

@@ -35,7 +35,6 @@ import { rankPaletteReleases } from '@/lib/commands/palette-ranking';
 import {
   type Command,
   commandsForSurface,
-  isCommandVisible,
   type NavCommand,
   type SkillCommand,
 } from '@/lib/commands/registry';
@@ -72,6 +71,11 @@ interface CmdKPaletteProps {
    * without baking them into the registry.
    */
   readonly additionalSectionsAfter?: PaletteSection[];
+  /**
+   * Ovie operator palette: customer skills, nav, releases and artists are not
+   * offered; only `additionalSectionsAfter` rows (operator commands) show.
+   */
+  readonly operatorMode?: boolean;
   /** Caller-handled commit for `additionalSectionsAfter` items. */
   readonly onAdditionalSelect?: (id: string) => void;
   /** `main` renders inside the existing shell plane; `dialog` preserves legacy embedding. */
@@ -80,19 +84,17 @@ interface CmdKPaletteProps {
   readonly onHeaderChange?: (header: ReactNode | null) => void;
 }
 
-function useCmdkData(profileId: string, query: string, open: boolean) {
+function useCmdkData(
+  profileId: string,
+  query: string,
+  open: boolean,
+  operatorMode = false
+) {
   const youtubeWorkspaceNav = useAppFlag('YOUTUBE_WORKSPACE_NAV');
   const jovieWorkNav = useAppFlag('JOVIE_WORK_NAV');
-  const profilesWorkspaceEnabled = useAppFlag('PROFILES_WORKSPACE');
   const commands = useMemo<readonly Command[]>(
-    () =>
-      commandsForSurface('cmdk', { youtubeWorkspaceNav, jovieWorkNav }).filter(
-        command =>
-          isCommandVisible(command, {
-            PROFILES_WORKSPACE: profilesWorkspaceEnabled,
-          })
-      ),
-    [youtubeWorkspaceNav, jovieWorkNav, profilesWorkspaceEnabled]
+    () => commandsForSurface('cmdk', { youtubeWorkspaceNav, jovieWorkNav }),
+    [youtubeWorkspaceNav, jovieWorkNav]
   );
   const { data: chatCapabilities } = useChatCapabilitiesQuery({
     profileId,
@@ -174,6 +176,16 @@ function useCmdkData(profileId: string, query: string, open: boolean) {
     }
   };
 
+  // The operator palette runs no customer queries; their error or pending
+  // state must never leak into it ("Some results could not load", JOV-9020).
+  if (operatorMode) {
+    return {
+      sections,
+      isSearching: false,
+      hasSearchError: false,
+      retrySearch,
+    };
+  }
   return { sections, isSearching, hasSearchError, retrySearch };
 }
 
@@ -185,6 +197,7 @@ export function CmdKPalette({
   onAdditionalSelect,
   presentation = 'dialog',
   onHeaderChange,
+  operatorMode = false,
 }: CmdKPaletteProps) {
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -210,7 +223,12 @@ export function CmdKPalette({
     isSearching,
     hasSearchError,
     retrySearch,
-  } = useCmdkData(profileId, query, open);
+  } = useCmdkData(
+    profileId,
+    operatorMode ? '' : query,
+    open && !operatorMode,
+    operatorMode
+  );
   const pendingMessage =
     query.trim().length > 0 ? 'Searching…' : 'Loading results…';
   const filteredAdditional = useMemo(
@@ -218,8 +236,11 @@ export function CmdKPalette({
     [query, additionalSectionsAfter]
   );
   const unboundedSections = useMemo<PaletteSection[]>(
-    () => [...registrySections, ...filteredAdditional],
-    [registrySections, filteredAdditional]
+    () =>
+      operatorMode
+        ? filteredAdditional
+        : [...registrySections, ...filteredAdditional],
+    [operatorMode, registrySections, filteredAdditional]
   );
   const allSections = useMemo<PaletteSection[]>(
     () => applyPaletteDefaultLimits(query, unboundedSections),

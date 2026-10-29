@@ -104,6 +104,8 @@ export interface UpsertReleaseInput {
   spotifyPopularity?: number | null;
   sourceType?: ReleaseSourceType;
   metadata?: Record<string, unknown>;
+  /** Omitted keeps the column default ('released') on insert. */
+  status?: 'draft' | 'scheduled' | 'released';
 }
 
 // Base fields shared by both release and track links
@@ -756,6 +758,7 @@ export async function upsertRelease(
     spotifyPopularity: input.spotifyPopularity ?? null,
     sourceType: input.sourceType ?? 'ingested',
     metadata: input.metadata ?? {},
+    ...(input.status ? { status: input.status } : {}),
     createdAt: now,
     updatedAt: now,
   };

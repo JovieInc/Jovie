@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   initialCursors,
   interpretAuthorityRead,
+  LANE_BRANCH_PREFIXES,
   laneIssueIdentifier,
   projectDelivery,
   publishShippingState,
@@ -117,6 +118,50 @@ function lanePr(overrides: Record<string, unknown>) {
 
 afterEach(() => {
   resetShippingStatePublisher();
+});
+
+describe('lanes-status deployHealth block', () => {
+  const block = {
+    schema: 'jovie-deploy-health/v1',
+    observedAt: '2026-10-25T06:40:00Z',
+    healthy: false,
+    repos: {
+      'JovieInc/LogYourBody': {
+        status: 'failing',
+        failedStreak: 15,
+        failingSince: '2026-10-23T16:14:55Z',
+        lastSuccessAt: '2026-10-23T16:03:00Z',
+        behindMain: 54,
+        oldestUnshippedAge: 140083,
+      },
+    },
+  };
+
+  it('parses the per-repo production state and rejects a malformed block', async () => {
+    const read = await readLanesStatus(
+      io(async () => json({ ...LANES_FEED, deployHealth: block }))
+    );
+    expect(read.delivery?.lanes?.deployHealth).toEqual({
+      observedAt: '2026-10-25T06:40:00.000Z',
+      healthy: false,
+      repos: [
+        {
+          repo: 'JovieInc/LogYourBody',
+          status: 'failing',
+          failedStreak: 15,
+          behindMain: 54,
+          oldestUnshippedAgeSeconds: 140083,
+          lastSuccessAt: '2026-10-23T16:03:00.000Z',
+        },
+      ],
+    });
+    const bad = await readLanesStatus(
+      io(async () =>
+        json({ ...LANES_FEED, deployHealth: { ...block, schema: 'x' } })
+      )
+    );
+    expect(bad.delivery?.lanes?.deployHealth).toBeNull();
+  });
 });
 
 describe('lanes-status (symphony-lanes-status/v1 gist)', () => {
@@ -383,7 +428,14 @@ describe('lane-pull-requests (open devin/ and codex/ PRs)', () => {
   it('searches each lane head prefix and keeps only lane branches', async () => {
     const live = io(async (_url, init) => {
       const { variables } = graphqlBody(init);
-      const lane = variables.query?.includes('head:codex/') ? 'codex' : 'devin';
+      const lane = variables.query?.includes('head:codex/')
+        ? 'codex'
+        : variables.query?.includes('head:devin/')
+          ? 'devin'
+          : 'other';
+      if (lane === 'other') {
+        return json({ data: { search: { issueCount: 0, nodes: [] } } });
+      }
       return json({
         data: {
           search: {
@@ -417,14 +469,21 @@ describe('lane-pull-requests (open devin/ and codex/ PRs)', () => {
     });
     const read = await readLanePullRequests(live);
 
-    expect(live.fetch).toHaveBeenCalledTimes(2);
+    expect(live.fetch).toHaveBeenCalledTimes(LANE_BRANCH_PREFIXES.length);
     const queries = live.fetch.mock.calls.map(
       ([, init]) => graphqlBody(init).variables.query
     );
-    expect(queries).toEqual([
-      'repo:JovieInc/Jovie is:pr is:open head:devin/',
-      'repo:JovieInc/Jovie is:pr is:open head:codex/',
-    ]);
+    expect(queries).toEqual(
+      LANE_BRANCH_PREFIXES.map(
+        lane => `repo:JovieInc/Jovie is:pr is:open head:${lane}/`
+      )
+    );
+    // glm/opus/grok/cursor lanes were invisible when only devin+codex were searched.
+    for (const lane of ['glm', 'opus', 'grok', 'cursor']) {
+      expect(queries).toContain(
+        `repo:JovieInc/Jovie is:pr is:open head:${lane}/`
+      );
+    }
     expect(read).toMatchObject({
       status: 'ok',
       truncated: false,
