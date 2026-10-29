@@ -219,10 +219,11 @@ async function assertSearchInteraction(
   );
   await expect(dropdown).toBeVisible();
   await expect(dropdown).toHaveCSS('position', 'static');
-  const timWhiteRow = page
-    .locator('[data-testid="spotify-connect-result"]')
-    .filter({ hasText: 'Tim White' });
-  await expect(timWhiteRow).toBeEnabled();
+  await expect(
+    page
+      .locator('[data-testid="spotify-connect-result"]')
+      .filter({ hasText: 'Tim White' })
+  ).toBeEnabled();
   await expect(
     page
       .locator('[data-testid="spotify-connect-result"]')
@@ -233,13 +234,15 @@ async function assertSearchInteraction(
   await expect(rows).toHaveCount(5);
   const firstRow = rows.nth(0);
   const lastRow = rows.nth(4);
-  const searchInput = input;
+  const searchShell = input;
+  const claimButton = page.getByTestId('spotify-connect-primary');
   const dialog = page.locator('[data-slot="dialog-content"]');
   const resultsList = page.getByRole('listbox');
 
   await expect(firstRow).toBeVisible();
   await expect(lastRow).toBeAttached();
-  await expect(searchInput).toBeVisible();
+  await expect(searchShell).toBeVisible();
+  await expect(claimButton).toBeVisible();
 
   // The initial state is the user's natural entry point. It must not depend on
   // scrollIntoViewIfNeeded(), which can place the first row under the trailing
@@ -250,7 +253,8 @@ async function assertSearchInteraction(
     state: 'initial-top',
     dialog: dialogTopScroll,
     resultsList: resultsTopScroll,
-    searchInput: await measureGeometry(searchInput),
+    searchShell: await measureGeometry(searchShell),
+    claimButton: await measureGeometry(claimButton),
     firstRow: await measureGeometry(firstRow),
     lastRow: await measureGeometry(lastRow),
   };
@@ -264,7 +268,11 @@ async function assertSearchInteraction(
   ).toBe(true);
   expect(topGeometry.firstRow.clippingAncestorCount).toBeGreaterThan(0);
   expect(
-    rectanglesOverlap(topGeometry.firstRow.rect, topGeometry.searchInput.rect),
+    rectanglesOverlap(topGeometry.firstRow.rect, topGeometry.searchShell.rect),
+    JSON.stringify(topGeometry)
+  ).toBe(false);
+  expect(
+    rectanglesOverlap(topGeometry.firstRow.rect, topGeometry.claimButton.rect),
     JSON.stringify(topGeometry)
   ).toBe(false);
   console.log(`[spotify geometry] ${JSON.stringify(topGeometry)}`);
@@ -288,7 +296,8 @@ async function assertSearchInteraction(
     state: 'outer-bottom',
     dialog: dialogBottomScroll,
     resultsList: resultsBottomScroll,
-    searchInput: await measureGeometry(searchInput),
+    searchShell: await measureGeometry(searchShell),
+    claimButton: await measureGeometry(claimButton),
     firstRow: await measureGeometry(firstRow),
     lastRow: await measureGeometry(lastRow),
   };

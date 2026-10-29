@@ -2,16 +2,12 @@
 
 import {
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   InlineOfflineNotice,
   Input,
   Kbd,
   Spinner as LoadingSpinner,
 } from '@jovie/ui';
-import { BadgeCheck, EllipsisVertical, Search } from 'lucide-react';
+import { BadgeCheck, Search } from 'lucide-react';
 import Image from 'next/image';
 import {
   useCallback,
@@ -42,14 +38,81 @@ import {
   useSpotifyConnect,
 } from './releases-empty-state';
 
+const LOADING_SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];
+const DEFAULT_PLACEHOLDER = 'Search your artist name or paste a Spotify link';
 const RESULTS_ID = 'spotify-connect-results';
 const HINTS_ID = 'spotify-connect-keyboard-hints';
-const SEARCH_PLACEHOLDER = 'Artist name or Spotify link';
-const SKELETON_KEYS = ['skeleton-1', 'skeleton-2', 'skeleton-3'];
 
-function isSpotifyUrl(value: string): boolean {
-  const trimmed = value.trim();
-  return trimmed.startsWith('https://open.spotify.com/');
+function SearchDropdownState({
+  message,
+  tone = 'default',
+  onRetry,
+  onEscapeHatch,
+}: {
+  readonly message: string;
+  readonly tone?: 'default' | 'error';
+  readonly onRetry?: () => void;
+  readonly onEscapeHatch: () => void;
+}) {
+  return (
+    <div className='flex flex-wrap items-center gap-2 py-2 pl-1'>
+      <p
+        className={cn(
+          'min-w-0 flex-1 text-xs',
+          tone === 'error' ? 'text-error' : 'text-secondary-token'
+        )}
+        role={tone === 'error' ? 'alert' : undefined}
+      >
+        {message}
+      </p>
+      {onRetry && (
+        <Button
+          type='button'
+          variant='tertiary'
+          size='sm'
+          onClick={onRetry}
+          data-testid='spotify-connect-retry'
+        >
+          Retry
+        </Button>
+      )}
+      <Button
+        type='button'
+        variant='ghost'
+        size='sm'
+        onClick={onEscapeHatch}
+        data-testid='spotify-connect-paste-hatch'
+      >
+        {/* ui-casing-allow: sentence case per owner decision JOV-8975 (2026-10-23) */}
+        Paste a Spotify artist link
+      </Button>
+    </div>
+  );
+}
+
+function SearchResultsLoadingSkeleton() {
+  return (
+    <output
+      className='block space-y-1 p-2.5'
+      aria-live='polite'
+      aria-label='Loading Spotify Artist Results'
+      aria-busy='true'
+    >
+      {LOADING_SKELETON_KEYS.map(key => (
+        <div
+          key={key}
+          className='flex items-center gap-2.5 px-2.5 py-2'
+          aria-hidden='true'
+        >
+          <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
+          <div className='min-w-0 flex-1 space-y-1.5'>
+            <div className='h-3.5 w-32 rounded skeleton' />
+            <div className='h-2.5 w-20 rounded skeleton' />
+          </div>
+        </div>
+      ))}
+    </output>
+  );
 }
 
 function canSelectArtist(artist: SpotifyArtist): boolean {
@@ -73,53 +136,20 @@ function getNextSelectableIndex(
   return -1;
 }
 
-function ArtistAvatar({
-  imageUrl,
-  name,
-}: {
-  readonly imageUrl?: string | null;
-  readonly name: string;
-}) {
+function isSpotifyUrl(value: string): boolean {
+  const trimmed = value.trim();
   return (
-    <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full'>
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={name}
-          fill
-          sizes='40px'
-          className='object-cover'
-          unoptimized
-        />
-      ) : (
-        <div className='flex h-full w-full items-center justify-center'>
-          <ProviderIcon provider='spotify' className='h-5 w-5' />
-        </div>
-      )}
-    </div>
+    trimmed.startsWith('https://open.spotify.com/') ||
+    trimmed.startsWith('open.spotify.com/') ||
+    trimmed.startsWith('spotify.com/')
   );
 }
 
-/** Resolving + search loading share one skeleton at final row height. */
-function SkeletonRows() {
-  return (
-    <output className='block space-y-1' aria-label='Loading' aria-busy='true'>
-      {SKELETON_KEYS.map(key => (
-        <div
-          key={key}
-          className='flex items-center gap-2.5 px-2.5 py-2'
-          aria-hidden='true'
-        >
-          <div className='h-10 w-10 shrink-0 rounded-full skeleton' />
-          <div className='min-w-0 flex-1 space-y-1.5'>
-            <div className='h-3.5 w-32 rounded skeleton' />
-            <div className='h-2.5 w-20 rounded skeleton' />
-          </div>
-        </div>
-      ))}
-    </output>
-  );
-}
+const KEYBOARD_HINTS = [
+  ['Up / Down', 'to move'],
+  ['Enter', 'to select'],
+  ['Esc', 'to close'],
+];
 
 function SearchKeyboardHints() {
   return (
@@ -127,133 +157,39 @@ function SearchKeyboardHints() {
       id={HINTS_ID}
       className='mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs text-tertiary-token'
     >
-      <span className='inline-flex items-center gap-1'>
-        <Kbd>Up</Kbd>
-        <Kbd>Down</Kbd> to move
-      </span>
-      <span className='inline-flex items-center gap-1'>
-        <Kbd>Enter</Kbd> to select
-      </span>
-      <span className='inline-flex items-center gap-1'>
-        <Kbd>Esc</Kbd> to close
-      </span>
+      {KEYBOARD_HINTS.map(([key, hint]) => (
+        <span key={key} className='inline-flex items-center gap-1'>
+          <Kbd>{key}</Kbd> {hint}
+        </span>
+      ))}
     </p>
   );
 }
 
-function StatusMessage({
-  message,
-  tone = 'default',
-  onRetry,
-  onEscapeHatch,
+function SearchInputTrailing({
+  isLoading,
+  isPending,
 }: {
-  readonly message: string;
-  readonly tone?: 'default' | 'error';
-  readonly onRetry?: () => void;
-  readonly onEscapeHatch?: () => void;
+  readonly isLoading: boolean;
+  readonly isPending: boolean;
 }) {
+  if (isPending || isLoading) {
+    return (
+      <div className='flex shrink-0'>
+        <LoadingSpinner size='sm' tone='muted' label='Loading' />
+      </div>
+    );
+  }
+
   return (
-    <div className='flex flex-wrap items-center gap-2 py-2 pl-1'>
-      <p
-        className={cn(
-          'min-w-0 flex-1 text-xs',
-          tone === 'error' ? 'text-error' : 'text-secondary-token'
-        )}
-        role={tone === 'error' ? 'alert' : undefined}
-      >
-        {message}
-      </p>
-      {tone === 'error' && onRetry && (
-        <Button
-          type='button'
-          variant='tertiary'
-          size='sm'
-          onClick={onRetry}
-          data-testid='spotify-connect-retry'
-        >
-          Retry
-        </Button>
-      )}
-      {onEscapeHatch && (
-        <Button
-          type='button'
-          variant='ghost'
-          size='sm'
-          onClick={onEscapeHatch}
-          data-testid='spotify-connect-paste-hatch'
-        >
-          {/* ui-casing-allow: sentence case per owner decision JOV-8975 (2026-10-23) */}
-          Paste a Spotify artist link
-        </Button>
-      )}
+    <div className='flex shrink-0'>
+      <Search
+        className='h-4 w-4 shrink-0 text-tertiary-token'
+        aria-hidden='true'
+      />
     </div>
   );
 }
-
-function ArtistResultOption({
-  artist,
-  index,
-  active,
-  selected,
-  onHover,
-  onSelect,
-}: {
-  readonly artist: SpotifyArtist;
-  readonly index: number;
-  readonly active: boolean;
-  readonly selected: boolean;
-  readonly onHover: () => void;
-  readonly onSelect: (artist: SpotifyArtist) => void;
-}) {
-  const selectable = canSelectArtist(artist);
-  // Repo-canonical combobox option (picker-rows pattern): a native button
-  // with role='option'; keyboard activation flows through the combobox input.
-  return (
-    <button
-      type='button'
-      role='option'
-      id={`spotify-connect-result-${index}`}
-      aria-selected={active || selected}
-      disabled={!selectable}
-      data-testid='spotify-connect-result'
-      className={cn(
-        'flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-interactive-hover',
-        (active || selected) && selectable && 'bg-interactive-hover',
-        !selectable && 'cursor-not-allowed opacity-50 hover:bg-transparent'
-      )}
-      onMouseEnter={onHover}
-      onClick={() => onSelect(artist)}
-    >
-      <ArtistAvatar imageUrl={artist.imageUrl} name={artist.name} />
-      <div className='min-w-0 flex-1'>
-        <div className='truncate text-app font-caption text-primary-token'>
-          {artist.name}
-        </div>
-        <div className='text-2xs text-tertiary-token'>
-          {artist.isClaimed && !artist.isClaimedByCurrentUser
-            ? 'Already claimed'
-            : artist.followers !== undefined
-              ? formatFollowers(artist.followers)
-              : ''}
-        </div>
-      </div>
-      {artist.verified && (
-        <div
-          className='shrink-0 text-brand-spotify'
-          data-testid='verified-badge'
-        >
-          <BadgeCheck className='h-4 w-4' aria-hidden='true' />
-          <span className='sr-only'>Verified artist</span>
-        </div>
-      )}
-    </button>
-  );
-}
-
-type SpotifyConnectedHandler = (
-  releases: ReleaseViewModel[],
-  artistName: string
-) => void;
 
 interface SpotifyConnectDialogProps {
   readonly open: boolean;
@@ -261,11 +197,8 @@ interface SpotifyConnectDialogProps {
   /** Provider link state read before any search renders (undefined = resolving). */
   readonly connected?: boolean;
   readonly connectedArtistName?: string | null;
-  readonly connectedArtistImage?: string | null;
-  readonly connectedFollowers?: number | null;
-  readonly onConnected?: SpotifyConnectedHandler;
+  readonly onConnected?: Parameters<typeof useSpotifyConnect>[0]['onConnected'];
   readonly onImportStart?: (artistName: string) => void;
-  readonly onDisconnect?: () => void | Promise<void>;
 }
 
 export function SpotifyConnectDialog({
@@ -273,11 +206,8 @@ export function SpotifyConnectDialog({
   onOpenChange,
   connected,
   connectedArtistName = null,
-  connectedArtistImage = null,
-  connectedFollowers = null,
   onConnected,
   onImportStart,
-  onDisconnect,
 }: SpotifyConnectDialogProps) {
   const [formState, dispatch] = useReducer(
     releasesEmptyStateReducer,
@@ -289,13 +219,11 @@ export function SpotifyConnectDialog({
   );
   const [succeeded, setSucceeded] = useState(false);
   const [isOffline, setIsOffline] = useState(false);
-  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsListRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastQueryRef = useRef('');
 
   const {
     results,
@@ -304,7 +232,10 @@ export function SpotifyConnectDialog({
     search,
     searchImmediate,
     clear,
-  } = useArtistSearchQuery({ debounceMs: 200, limit: 5 });
+  } = useArtistSearchQuery({
+    debounceMs: 300,
+    limit: 5,
+  });
 
   const handleConnected = useCallback(
     (releases: ReleaseViewModel[], artistName: string) => {
@@ -332,16 +263,13 @@ export function SpotifyConnectDialog({
     !isResolving && (succeeded || !connected || showChangeSearch);
   const trimmedQuery = formState.searchQuery.trim();
   const isLoading = searchState === 'loading';
-  useEffect(() => {
-    lastQueryRef.current = trimmedQuery;
-  }, [trimmedQuery]);
 
   // Offline keeps the typed query; going online re-runs the last query.
   useEffect(() => {
     const goOffline = () => setIsOffline(true);
     const goOnline = () => {
       setIsOffline(false);
-      const query = lastQueryRef.current;
+      const query = inputRef.current?.value.trim();
       if (query && !isSpotifyUrl(query)) search(query);
     };
     window.addEventListener('offline', goOffline);
@@ -352,22 +280,22 @@ export function SpotifyConnectDialog({
     };
   }, [search]);
 
-  // Reset only on a real open transition so a parent re-render (or an
-  // unstable `clear` identity) can never wipe typed input mid-search.
   const prevOpenRef = useRef(open);
   useEffect(() => {
-    if (prevOpenRef.current === open) return;
-    prevOpenRef.current = open;
-    if (!open) {
-      if (successTimerRef.current) clearTimeout(successTimerRef.current);
-      return;
+    if (prevOpenRef.current !== open) {
+      prevOpenRef.current = open;
+      if (open) {
+        dispatch({ type: 'RESET_STATE' });
+        setShowChangeSearch(false);
+        setSelectedArtist(null);
+        setSucceeded(false);
+        clear();
+      } else if (successTimerRef.current) clearTimeout(successTimerRef.current);
     }
-    dispatch({ type: 'RESET_STATE' });
-    setShowChangeSearch(false);
-    setSelectedArtist(null);
-    setSucceeded(false);
-    clear();
-  }, [open, clear]);
+    if (!open || !isSearchMode) return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 100);
+    return () => clearTimeout(timer);
+  }, [open, clear, isSearchMode]);
 
   useEffect(
     () => () => {
@@ -375,22 +303,6 @@ export function SpotifyConnectDialog({
     },
     []
   );
-
-  useEffect(() => {
-    if (!open || !isSearchMode) return;
-    const timer = setTimeout(() => inputRef.current?.focus(), 100);
-    return () => clearTimeout(timer);
-  }, [open, isSearchMode]);
-
-  // The loading spinner only appears once loading passes 300 ms.
-  useEffect(() => {
-    if (searchState !== 'loading') {
-      setShowLoadingSpinner(false);
-      return;
-    }
-    const timer = setTimeout(() => setShowLoadingSpinner(true), 300);
-    return () => clearTimeout(timer);
-  }, [searchState]);
 
   useEffect(() => {
     if (
@@ -439,21 +351,31 @@ export function SpotifyConnectDialog({
   }, [handleArtistSelect, isOffline, isPending, selectedArtist]);
 
   // Enter without a selection only connects an explicit pasted URL.
-  const handleConnectFromInput = useCallback(() => {
-    if (isPending) return;
-    const query = trimmedQuery;
-    if (!query || !isSpotifyUrl(query)) return;
+  const handleClaimArtist = useCallback(() => {
+    if (isPending || isOffline) return;
+    const query = formState.searchQuery.trim();
+    if (!query) return;
+
     dispatch({ type: 'SET_ERROR', payload: null });
-    const artistId = extractSpotifyArtistId(query);
-    if (!artistId) {
-      dispatch({
-        type: 'SET_ERROR',
-        payload: 'Enter a valid Spotify artist URL',
-      });
-      return;
+
+    if (isSpotifyUrl(query)) {
+      const artistId = extractSpotifyArtistId(query);
+      if (!artistId) {
+        dispatch({
+          type: 'SET_ERROR',
+          payload: 'Enter a valid Spotify artist URL',
+        });
+        return;
+      }
+      connectFromUrl(artistId);
     }
-    connectFromUrl(artistId);
-  }, [connectFromUrl, extractSpotifyArtistId, isPending, trimmedQuery]);
+  }, [
+    connectFromUrl,
+    extractSpotifyArtistId,
+    formState.searchQuery,
+    isPending,
+    isOffline,
+  ]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -470,19 +392,29 @@ export function SpotifyConnectDialog({
         if (e.key === 'Enter') {
           e.preventDefault();
           if (selectedArtist) handleConnectSelected();
-          else handleConnectFromInput();
+          else handleClaimArtist();
         }
         return;
       }
       switch (e.key) {
         case 'ArrowDown':
+          e.preventDefault();
+          dispatch({
+            type: 'SET_ACTIVE_RESULT_INDEX',
+            payload: getNextSelectableIndex(
+              formState.activeResultIndex,
+              1,
+              selectedArtist ? [selectedArtist] : results
+            ),
+          });
+          break;
         case 'ArrowUp':
           e.preventDefault();
           dispatch({
             type: 'SET_ACTIVE_RESULT_INDEX',
             payload: getNextSelectableIndex(
               formState.activeResultIndex,
-              e.key === 'ArrowDown' ? 1 : -1,
+              -1,
               selectedArtist ? [selectedArtist] : results
             ),
           });
@@ -498,7 +430,7 @@ export function SpotifyConnectDialog({
             handleSelectArtist(activeArtist);
             return;
           }
-          handleConnectFromInput();
+          handleClaimArtist();
           break;
         }
       }
@@ -506,7 +438,7 @@ export function SpotifyConnectDialog({
     [
       formState.activeResultIndex,
       formState.showResults,
-      handleConnectFromInput,
+      handleClaimArtist,
       handleConnectSelected,
       handleSelectArtist,
       results,
@@ -514,25 +446,15 @@ export function SpotifyConnectDialog({
     ]
   );
 
-  const shouldShowDropdown = useMemo(() => {
-    if (selectedArtist) return true;
-    if (!formState.showResults) return false;
-    if (!trimmedQuery || isSpotifyUrl(trimmedQuery)) return false;
-    if (
-      searchState === 'loading' ||
-      searchState === 'empty' ||
-      searchState === 'error'
-    )
-      return true;
-    return results.length > 0;
-  }, [
-    formState.showResults,
-    results.length,
-    searchState,
-    selectedArtist,
-    trimmedQuery,
-  ]);
+  const shouldShowDropdown = Boolean(
+    selectedArtist ||
+      (formState.showResults &&
+        trimmedQuery &&
+        !isSpotifyUrl(trimmedQuery) &&
+        (searchState !== 'idle' || results.length > 0))
+  );
 
+  const visibleResults = selectedArtist ? [selectedArtist] : results;
   const hasVisibleResults =
     shouldShowDropdown && (selectedArtist !== null || results.length > 0);
 
@@ -556,13 +478,12 @@ export function SpotifyConnectDialog({
           ? `Connect ${selectedArtist.name}`
           : 'Connect';
   const primaryDisabled =
-    isOffline || (isSearchMode && !succeeded && !selectedArtist);
+    isOffline ||
+    (isSearchMode &&
+      !succeeded &&
+      !selectedArtist &&
+      !isSpotifyUrl(trimmedQuery));
   const escapeHatchFocus = () => inputRef.current?.focus();
-  const showEscapeHatch =
-    !selectedArtist &&
-    (searchState === 'empty' || searchState === 'error') &&
-    !!trimmedQuery &&
-    !isSpotifyUrl(trimmedQuery);
 
   return (
     <Dialog open={open} onClose={() => onOpenChange(false)} size='lg'>
@@ -575,16 +496,13 @@ export function SpotifyConnectDialog({
 
       <DialogBody>
         {isResolving ? (
-          <SkeletonRows />
+          <SearchResultsLoadingSkeleton />
         ) : !isSearchMode ? (
           <div
             className='flex items-center gap-3'
             data-testid='spotify-connect-connected-summary'
           >
-            <ArtistAvatar
-              imageUrl={connectedArtistImage}
-              name={connectedArtistName ?? 'Spotify'}
-            />
+            <ProviderIcon provider='spotify' className='h-10 w-10' />
             <div className='min-w-0 flex-1'>
               <p
                 className='truncate text-app font-caption text-primary-token'
@@ -598,35 +516,8 @@ export function SpotifyConnectDialog({
                   aria-hidden='true'
                 />
                 Connected
-                {connectedFollowers != null && (
-                  <span data-testid='spotify-connect-connected-followers'>
-                    · {formatFollowers(connectedFollowers)}
-                  </span>
-                )}
               </p>
             </div>
-            {onDisconnect && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant='ghost'
-                    size='icon-sm'
-                    aria-label='More Artist Actions'
-                    data-testid='spotify-connect-overflow'
-                  >
-                    <EllipsisVertical className='h-4 w-4' aria-hidden='true' />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align='end'>
-                  <DropdownMenuItem
-                    variant='destructive'
-                    onSelect={() => void onDisconnect?.()}
-                  >
-                    Disconnect
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
           </div>
         ) : succeeded ? (
           <p
@@ -673,7 +564,7 @@ export function SpotifyConnectDialog({
                 dispatch({ type: 'SET_SHOW_RESULTS', payload: false });
                 dispatch({ type: 'SET_ACTIVE_RESULT_INDEX', payload: -1 });
               }}
-              placeholder={SEARCH_PLACEHOLDER}
+              placeholder={DEFAULT_PLACEHOLDER}
               autoCapitalize='none'
               autoCorrect='off'
               autoComplete='off'
@@ -690,16 +581,10 @@ export function SpotifyConnectDialog({
                   : undefined
               }
               trailing={
-                isPending ? (
-                  <LoadingSpinner size='sm' tone='muted' label='Connecting' />
-                ) : showLoadingSpinner ? (
-                  <LoadingSpinner size='sm' tone='muted' label='Loading' />
-                ) : (
-                  <Search
-                    className='h-4 w-4 shrink-0 text-tertiary-token'
-                    aria-hidden='true'
-                  />
-                )
+                <SearchInputTrailing
+                  isLoading={isLoading}
+                  isPending={isPending}
+                />
               }
             />
 
@@ -714,28 +599,24 @@ export function SpotifyConnectDialog({
                 data-testid='spotify-connect-results-region'
               >
                 {isLoading && results.length === 0 && !selectedArtist && (
-                  <SkeletonRows />
+                  <SearchResultsLoadingSkeleton />
                 )}
 
                 {searchState === 'empty' && !selectedArtist && (
-                  <StatusMessage
+                  <SearchDropdownState
                     message={`No artists match '${formState.searchQuery}'.`}
-                    onEscapeHatch={
-                      showEscapeHatch ? escapeHatchFocus : undefined
-                    }
+                    onEscapeHatch={escapeHatchFocus}
                   />
                 )}
 
                 {searchState === 'error' && !selectedArtist && (
-                  <StatusMessage
+                  <SearchDropdownState
                     message={
                       searchError || "Couldn't reach Spotify. Try again."
                     }
                     tone='error'
                     onRetry={handleRetrySearch}
-                    onEscapeHatch={
-                      showEscapeHatch ? escapeHatchFocus : undefined
-                    }
+                    onEscapeHatch={escapeHatchFocus}
                   />
                 )}
 
@@ -747,33 +628,82 @@ export function SpotifyConnectDialog({
                     aria-label='Spotify Artist Results'
                     className='max-h-64 overflow-y-auto py-1'
                   >
-                    {selectedArtist ? (
-                      <ArtistResultOption
-                        artist={selectedArtist}
-                        index={0}
-                        active
-                        selected
-                        onHover={() => undefined}
-                        onSelect={handleSelectArtist}
-                      />
-                    ) : (
-                      results.map((artist, index) => (
-                        <ArtistResultOption
-                          key={artist.id}
-                          artist={artist}
-                          index={index}
-                          active={index === formState.activeResultIndex}
-                          selected={false}
-                          onHover={() =>
-                            dispatch({
-                              type: 'SET_ACTIVE_RESULT_INDEX',
-                              payload: index,
-                            })
-                          }
-                          onSelect={handleSelectArtist}
-                        />
-                      ))
-                    )}
+                    {visibleResults.map((artist, index) => (
+                      <button
+                        key={artist.id}
+                        type='button'
+                        role='option'
+                        id={`spotify-connect-result-${index}`}
+                        aria-selected={index === formState.activeResultIndex}
+                        data-testid='spotify-connect-result'
+                        disabled={!canSelectArtist(artist)}
+                        className={cn(
+                          'flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 text-left hover:bg-interactive-hover',
+                          index === formState.activeResultIndex &&
+                            canSelectArtist(artist) &&
+                            'bg-interactive-hover',
+                          !canSelectArtist(artist)
+                            ? 'cursor-not-allowed opacity-50 hover:bg-transparent'
+                            : 'cursor-pointer'
+                        )}
+                        onClick={() => handleSelectArtist(artist)}
+                        onMouseEnter={() =>
+                          dispatch({
+                            type: 'SET_ACTIVE_RESULT_INDEX',
+                            payload: index,
+                          })
+                        }
+                      >
+                        <div className='relative h-10 w-10 shrink-0 overflow-hidden rounded-full'>
+                          {artist.imageUrl ? (
+                            <Image
+                              src={artist.imageUrl}
+                              alt={artist.name}
+                              fill
+                              sizes='40px'
+                              className='object-cover'
+                              unoptimized
+                            />
+                          ) : (
+                            <div className='flex h-full w-full items-center justify-center'>
+                              <ProviderIcon
+                                provider='spotify'
+                                className='h-5 w-5'
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className='min-w-0 flex-1'>
+                          <div className='truncate text-app font-caption text-primary-token'>
+                            {artist.name}
+                          </div>
+                          {artist.isClaimed &&
+                            !artist.isClaimedByCurrentUser && (
+                              <div className='text-2xs tabular-nums text-tertiary-token'>
+                                Already claimed
+                              </div>
+                            )}
+                          {canSelectArtist(artist) &&
+                            artist.followers !== undefined && (
+                              <div className='text-2xs tabular-nums text-tertiary-token'>
+                                {formatFollowers(artist.followers)}
+                              </div>
+                            )}
+                        </div>
+                        {artist.verified && (
+                          <div
+                            className='shrink-0 text-brand-spotify'
+                            data-testid='verified-badge'
+                          >
+                            <BadgeCheck
+                              className='h-4 w-4'
+                              aria-hidden='true'
+                            />
+                            <span className='sr-only'>Verified artist</span>
+                          </div>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -814,7 +744,9 @@ export function SpotifyConnectDialog({
             onClick={
               succeeded || !isSearchMode
                 ? () => onOpenChange(false)
-                : handleConnectSelected
+                : selectedArtist
+                  ? handleConnectSelected
+                  : handleClaimArtist
             }
             aria-label={selectedArtist ? primaryLabel : undefined}
             data-testid='spotify-connect-primary'

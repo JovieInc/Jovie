@@ -526,6 +526,7 @@ vi.mock(
   })
 );
 
+// ── Import after mocks ──
 const { ReleaseProviderMatrix } = await import(
   '@/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix'
 );

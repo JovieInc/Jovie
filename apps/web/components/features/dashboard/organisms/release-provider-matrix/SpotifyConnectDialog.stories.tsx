@@ -1,10 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { type ComponentProps, useEffect } from 'react';
-import { expect, userEvent, waitFor, within } from 'storybook/test';
+import { expect, userEvent, within } from 'storybook/test';
 import { SpotifyConnectDialog } from './SpotifyConnectDialog';
-
-const LONG_NAME =
-  'Timothy White the Third and His Very Long Sibling Ensemble Collective';
 
 const SEARCH_RESULTS = [
   {
@@ -49,28 +46,18 @@ const SEARCH_RESULTS = [
 
 type SearchResponder = (query: string) => Response | Promise<Response>;
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-const respondWithResults: SearchResponder = () =>
-  jsonResponse([...SEARCH_RESULTS]);
-const respondEmpty: SearchResponder = () => jsonResponse([]);
+const respondWithResults: SearchResponder = () => Response.json(SEARCH_RESULTS);
+const respondEmpty: SearchResponder = () => Response.json([]);
 const respondUnavailable: SearchResponder = () =>
-  jsonResponse({ error: 'Spotify search is unavailable' }, 404);
+  Response.json({ error: 'Spotify search is unavailable' }, { status: 404 });
 const respondForeverPending: SearchResponder = () =>
   new Promise<Response>(() => {});
 
 function SpotifyConnectDialogStory({
   respond = respondWithResults,
-  wrapperClassName = 'min-h-144',
   ...args
 }: ComponentProps<typeof SpotifyConnectDialog> & {
   respond?: SearchResponder;
-  wrapperClassName?: string;
 }) {
   useEffect(() => {
     const previousFetch = window.fetch;
@@ -94,7 +81,7 @@ function SpotifyConnectDialogStory({
   }, [respond]);
 
   return (
-    <div className={wrapperClassName}>
+    <div className='min-h-144'>
       <SpotifyConnectDialog {...args} />
     </div>
   );
@@ -109,6 +96,11 @@ async function typeQuery(canvasElement: HTMLElement, query: string) {
   return { canvas, input };
 }
 
+const renderWithResponse = (respond: SearchResponder) =>
+  function Story(args: ComponentProps<typeof SpotifyConnectDialog>) {
+    return <SpotifyConnectDialogStory {...args} respond={respond} />;
+  };
+
 const meta = {
   title: 'Features/Dashboard/Releases/SpotifyConnectDialog',
   component: SpotifyConnectDialog,
@@ -120,67 +112,36 @@ const meta = {
     connected: false,
     onOpenChange: () => undefined,
   },
+  render: args => <SpotifyConnectDialogStory {...args} />,
 } satisfies Meta<typeof SpotifyConnectDialog>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-  render: args => <SpotifyConnectDialogStory {...args} />,
-};
-
-export const Empty: Story = {
-  render: args => (
-    <SpotifyConnectDialogStory {...args} respond={respondEmpty} />
-  ),
-};
+export const Default: Story = {};
 
 export const Loading: Story = {
-  render: args => (
-    <SpotifyConnectDialogStory {...args} respond={respondForeverPending} />
-  ),
+  render: renderWithResponse(respondForeverPending),
   play: async ({ canvasElement }) => {
-    await typeQuery(canvasElement, 'tim white');
-    await waitFor(
-      () =>
-        expect(
-          within(canvasElement.ownerDocument.body).getByRole('status', {
-            busy: true,
-          })
-        ).toBeTruthy(),
-      { timeout: 5000 }
-    );
+    const { canvas } = await typeQuery(canvasElement, 'tim white');
+    expect(await canvas.findByRole('status', { busy: true })).toBeVisible();
   },
 };
 
-export const NoMatch: Story = {
-  render: args => (
-    <SpotifyConnectDialogStory {...args} respond={respondEmpty} />
-  ),
+export const Empty: Story = {
+  render: renderWithResponse(respondEmpty),
   play: async ({ canvasElement }) => {
-    await typeQuery(canvasElement, 'zzz');
-    await waitFor(
-      () =>
-        expect(
-          within(canvasElement.ownerDocument.body).getByText(/No artists match/)
-        ).toBeTruthy(),
-      { timeout: 5000 }
-    );
+    const { canvas } = await typeQuery(canvasElement, 'zzz');
+    expect(await canvas.findByText(/No artists match/)).toBeVisible();
   },
 };
 
 export const Error: Story = {
-  render: args => (
-    <SpotifyConnectDialogStory {...args} respond={respondUnavailable} />
-  ),
+  render: renderWithResponse(respondUnavailable),
   play: async ({ canvasElement }) => {
-    await typeQuery(canvasElement, 'tim white');
-    await waitFor(
-      () =>
-        expect(
-          within(canvasElement.ownerDocument.body).getByRole('alert')
-        ).toHaveTextContent(/Spotify search is unavailable/),
-      { timeout: 5000 }
+    const { canvas } = await typeQuery(canvasElement, 'tim white');
+    expect(await canvas.findByRole('alert')).toHaveTextContent(
+      /Spotify search is unavailable/
     );
   },
 };
@@ -190,13 +151,13 @@ export const Connected: Story = {
     connected: true,
     connectedArtistName: 'Tim White',
   },
-  render: args => <SpotifyConnectDialogStory {...args} />,
 };
 
 export const Rtl: Story = {
   args: {
     connected: true,
-    connectedArtistName: LONG_NAME,
+    connectedArtistName:
+      'Timothy White the Third and His Very Long Sibling Ensemble Collective',
   },
   render: args => (
     <div dir='rtl' className='min-h-144'>

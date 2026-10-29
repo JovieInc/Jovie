@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import type { ComponentProps } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ReleaseWorkflowOverlays } from './ReleaseWorkflowOverlays';
+import meta from './ReleaseWorkflowOverlays.stories';
 
 vi.mock('./release-lazy-components', () => ({
   SpotifyConnectDialog: ({
@@ -19,26 +19,7 @@ vi.mock('./release-lazy-components', () => ({
   ReleasePlanWizard: () => null,
 }));
 
-const props: ComponentProps<typeof ReleaseWorkflowOverlays> = {
-  amPaletteOpen: false,
-  setAmPaletteOpen: vi.fn(),
-  spotifySearchOpen: true,
-  setSpotifySearchOpen: vi.fn(),
-  onAppleMusicConnect: vi.fn(),
-  onSpotifyConnected: vi.fn(),
-  onSpotifyImportStart: vi.fn(),
-  postCreateRelease: null,
-  isPostCreatePlanModalOpen: false,
-  isReleasePlanGateLoading: false,
-  canGenerateReleasePlans: false,
-  isGeneratingReleasePlan: false,
-  closePostCreatePlanModal: vi.fn(),
-  onGenerateReleasePlan: vi.fn(),
-  deleteTarget: null,
-  isDeleting: false,
-  closeDeleteDialog: vi.fn(),
-  onDeleteConfirm: vi.fn(),
-};
+const props = meta.args;
 
 describe('ReleaseWorkflowOverlays connection state', () => {
   it.each([true, false])(

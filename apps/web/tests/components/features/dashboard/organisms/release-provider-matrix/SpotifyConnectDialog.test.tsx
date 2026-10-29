@@ -6,8 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockArtistSearch = vi.hoisted(() => vi.fn());
 const mockUseSpotifyConnect = vi.hoisted(() => vi.fn());
 const mockHandleArtistSelect = vi.hoisted(() => vi.fn());
-const mockConnectFromUrl = vi.hoisted(() => vi.fn());
-const mockExtractSpotifyArtistId = vi.hoisted(() => vi.fn());
+const mockSearch = vi.hoisted(() => vi.fn());
+const mockClear = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/queries', () => ({
   useArtistSearchQuery: mockArtistSearch,
@@ -32,6 +32,27 @@ vi.mock('@/components/organisms/Dialog', () => ({
   DialogTitle: ({ children }: { children: ReactNode }) => <h2>{children}</h2>,
 }));
 
+vi.mock('@/components/molecules/drawer', () => ({
+  DrawerButton: ({
+    children,
+    ...props
+  }: {
+    children: ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <button type='button' {...props}>
+      {children}
+    </button>
+  ),
+  DrawerSurfaceCard: ({
+    children,
+    ...props
+  }: {
+    children: ReactNode;
+    [key: string]: unknown;
+  }) => <div {...props}>{children}</div>,
+}));
+
 vi.mock('@/components/atoms/ProviderIcon', () => ({
   ProviderIcon: () => <span aria-hidden='true'>Spotify</span>,
 }));
@@ -54,24 +75,26 @@ const currentUserArtist = {
   id: 'current-id',
   name: 'Tim White',
   url: 'https://open.spotify.com/artist/current-id',
-  followers: 9900,
   popularity: 60,
+  followers: 9900,
   isClaimed: true,
   isClaimedByCurrentUser: true,
 };
 
-function getResultOption(name: string) {
-  const option = screen
-    .getAllByTestId('spotify-connect-result')
-    .find(candidate => candidate.textContent?.includes(name));
-  if (!(option instanceof HTMLElement)) {
-    throw new Error(`Missing result option for ${name}`);
-  }
-  return option;
+function renderDialog() {
+  render(
+    <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
+  );
 }
 
-function getPrimary() {
-  return screen.getByTestId('spotify-connect-primary');
+function getResultButton(name: string) {
+  const button = screen
+    .getAllByRole('option')
+    .find(candidate => candidate.textContent?.includes(name));
+  if (!(button instanceof HTMLButtonElement)) {
+    throw new Error(`Missing result button for ${name}`);
+  }
+  return button;
 }
 
 describe('SpotifyConnectDialog', () => {
@@ -82,44 +105,42 @@ describe('SpotifyConnectDialog', () => {
       results: [currentUserArtist, otherClaimedArtist],
       state: 'success',
       error: null,
-      search: vi.fn(),
-      clear: vi.fn(),
+      search: mockSearch,
+      clear: mockClear,
     });
     mockUseSpotifyConnect.mockReturnValue({
       isPending: false,
-      extractSpotifyArtistId: mockExtractSpotifyArtistId,
-      connectFromUrl: mockConnectFromUrl,
+      extractSpotifyArtistId: vi.fn(),
+      connectFromUrl: vi.fn(),
       handleArtistSelect: mockHandleArtistSelect,
     });
   });
 
   it('selects the current user artist and connects only from the primary', async () => {
     const user = userEvent.setup();
-    render(
-      <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
-    );
+    renderDialog();
 
     const input = screen.getByRole('combobox', {
       name: 'Search Spotify artists or paste a link',
     });
     await user.type(input, 'tim white');
 
-    expect(getResultOption('Tim White')).toBeEnabled();
-    expect(getResultOption('Other Owner')).toBeDisabled();
+    expect(getResultButton('Tim White')).toBeEnabled();
+    expect(getResultButton('Other Owner')).toBeDisabled();
 
-    await user.click(getResultOption('Tim White'));
+    await user.click(getResultButton('Tim White'));
     expect(mockHandleArtistSelect).not.toHaveBeenCalled();
-    expect(getPrimary()).toHaveTextContent('Connect Tim White');
+    expect(screen.getByTestId('spotify-connect-primary')).toHaveTextContent(
+      'Connect Tim White'
+    );
 
-    await user.click(getPrimary());
+    await user.click(screen.getByTestId('spotify-connect-primary'));
     expect(mockHandleArtistSelect).toHaveBeenCalledWith(currentUserArtist);
   }, 15_000);
 
   it('selects with Enter, connects with a second Enter, and skips other owners', async () => {
     const user = userEvent.setup();
-    render(
-      <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
-    );
+    renderDialog();
 
     const input = screen.getByRole('combobox', {
       name: 'Search Spotify artists or paste a link',
@@ -128,7 +149,9 @@ describe('SpotifyConnectDialog', () => {
 
     await user.keyboard('{ArrowDown}{Enter}');
     expect(mockHandleArtistSelect).not.toHaveBeenCalled();
-    expect(getPrimary()).toHaveTextContent('Connect Tim White');
+    expect(screen.getByTestId('spotify-connect-primary')).toHaveTextContent(
+      'Connect Tim White'
+    );
 
     await user.keyboard('{Enter}');
     expect(mockHandleArtistSelect).toHaveBeenCalledWith(currentUserArtist);
@@ -151,20 +174,20 @@ describe('SpotifyConnectDialog', () => {
       results: [otherClaimedArtist],
       state: 'success',
       error: null,
-      search: vi.fn(),
-      clear: vi.fn(),
+      search: mockSearch,
+      clear: mockClear,
     });
-    render(
-      <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
-    );
+    renderDialog();
 
     const input = screen.getByRole('combobox', {
       name: 'Search Spotify artists or paste a link',
     });
     await user.type(input, 'other owner');
 
-    expect(getPrimary()).toBeDisabled();
-    expect(getPrimary()).toHaveTextContent('Connect');
-    expect(getResultOption('Other Owner')).toBeDisabled();
+    expect(screen.getByTestId('spotify-connect-primary')).toBeDisabled();
+    expect(screen.getByTestId('spotify-connect-primary')).toHaveTextContent(
+      'Connect'
+    );
+    expect(getResultButton('Other Owner')).toBeDisabled();
   });
 });
