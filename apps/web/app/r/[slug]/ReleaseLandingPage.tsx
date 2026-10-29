@@ -32,6 +32,10 @@ import {
   formatReleaseArtistLine,
   formatReleaseArtistLineParts,
 } from '@/lib/discography/formatting';
+import {
+  localizeProviderUrl,
+  readVisitorCountryCookie,
+} from '@/lib/discography/storefront';
 import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { buildReleaseShareContext } from '@/lib/share/context';
@@ -350,12 +354,23 @@ export function ReleaseLandingPage({
     setMenuOpen(initialMenuOpen);
   }, [initialMenuOpen]);
 
+  // Read after mount so server HTML (ISR) and first client render match.
+  const [visitorCountry, setVisitorCountry] = useState<string | null>(null);
+  useEffect(() => {
+    setVisitorCountry(readVisitorCountryCookie());
+  }, []);
+
   const clickableProviders = useMemo(
     () =>
-      providers.filter((provider): provider is Provider & { url: string } =>
-        Boolean(provider.url)
-      ),
-    [providers]
+      providers
+        .filter((provider): provider is Provider & { url: string } =>
+          Boolean(provider.url)
+        )
+        .map(provider => ({
+          ...provider,
+          url: localizeProviderUrl(provider.key, provider.url, visitorCountry),
+        })),
+    [providers, visitorCountry]
   );
   const resolvedUtmParams = useMemo(
     () => resolveReleaseUtmParams(utmParams),
