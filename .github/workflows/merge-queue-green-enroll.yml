@@ -289,6 +289,13 @@ jobs:
               ...holdLabels.machineBlockLabels,
             ]);
             const BREAKER_LABEL = 'queue-breaker';
+            const COMPOUNDING_LABEL = 'compounding', MAX_JUMPED = 2;
+            const COMPOUNDING_PATHS = [
+              /^\.github\/(workflows|actions|ci-harness|scripts|runner-host|runner-image)\//,
+              /^scripts\/(lanes|swarm|hermes)\//,
+              /^scripts\/(ci-|merge-|pr-|fleet-|quota-)[^/]*$/,
+              /^scripts\/tests\/test_[a-z_]*(lane|autoscale|sentinel|execution|codex|stage)[a-z_]*\.py$/,
+            ];
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
@@ -790,16 +797,62 @@ jobs:
                   }
                   if (!await breakerReleaseStillCurrent(false)) continue;
                 }
+                // Tim 2026-10-28: compounding work (infra that speeds up all other work) jumps
+                // the queue, at most MAX_JUMPED entries at once. A PR is compounding when it carries the
+                // label or every touched file is lanes/swarm/CI/controller infrastructure. Every decision
+                // is logged as a receipt. Any failure here falls back to a plain enqueue.
+                let jump = false;
+                try {
+                  let compounding = pr.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
+                  let basis = 'label';
+                  if (!compounding) {
+                    const files = await github.paginate(github.rest.pulls.listFiles, {
+                      owner, repo, pull_number: pr.number, per_page: 100,
+                    });
+                    compounding = files.length > 0 && files.length <= 100 &&
+                      files.every(f => COMPOUNDING_PATHS.some(re => re.test(f.filename)));
+                    basis = 'paths';
+                  }
+                  if (compounding) {
+                    const queue = await github.graphql(`
+                      query($owner: String!, $repo: String!) {
+                        repository(owner: $owner, name: $repo) {
+                          mergeQueue(branch: "main") {
+                            entries(first: 50) { nodes { pullRequest { number labels(first: 30) { nodes { name } } } } }
+                          }
+                        }
+                      }`, { owner, repo });
+                    const jumped = (queue.repository.mergeQueue?.entries?.nodes ?? []).filter(e =>
+                      e.pullRequest.number !== pr.number &&
+                      e.pullRequest.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL)).length;
+                    jump = jumped < MAX_JUMPED;
+                    receipt(pr, jump ? 'jump' : 'jump-capped', `compounding(${basis}) queued=${jumped}/${MAX_JUMPED}`);
+                    core.notice(`COMPOUNDING #${pr.number} ${jump ? 'jumps' : 'capped'} (${basis}, ${jumped}/${MAX_JUMPED} jumped entries queued)`);
+                  }
+                } catch (error) {
+                  core.warning(`#${pr.number} compounding check failed, plain enqueue: ${error.message}`);
+                }
                 enqueueAttempted = true;
-                const r = await github.graphql(`
+                const enqueue = withJump => github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
-                    enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid }) {
+                    enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid${withJump ? ', jump: true' : ''} }) {
                       mergeQueueEntry { position }
                     }
                   }`, { id: pr.id, oid: pr.headRefOid });
+                let r;
+                try {
+                  r = await enqueue(jump);
+                } catch (error) {
+                  // A token without maintain/admin cannot jump; a plain enqueue still lands the PR.
+                  if (!jump || /head|stale|changed/i.test(String(error.message))) throw error;
+                  core.warning(`#${pr.number} jump rejected (${error.message}); plain enqueue`);
+                  receipt(pr, 'jump-rejected', String(error.message).slice(0, 120));
+                  jump = false;
+                  r = await enqueue(false);
+                }
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
-                receipt(pr, 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                receipt(pr, jump ? 'enqueued-jump' : 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
                 if (breakerMarked && !breakerRestore) {
                   await github.rest.issues.removeLabel({
                     owner, repo, issue_number: pr.number, name: BREAKER_LABEL,

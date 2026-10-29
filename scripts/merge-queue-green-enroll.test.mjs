@@ -77,6 +77,8 @@ async function fixture(
     readCurrentSnapshot,
     effectSink,
     env = {},
+    queueEntries = [],
+    files = [{ filename: 'apps/web/page.tsx' }],
   } = {}
 ) {
   const mutations = [];
@@ -115,6 +117,7 @@ async function fixture(
       },
       pulls: {
         list: Symbol('pulls.list'),
+        listFiles: Symbol('pulls.listFiles'),
         get: async params => {
           gets.push(params.pull_number);
           return {
@@ -144,6 +147,7 @@ async function fixture(
       },
     },
     paginate: async (endpoint, params) => {
+      if (endpoint === github.rest.pulls.listFiles) return files;
       if (endpoint === github.rest.repos.listCommitStatusesForRef) {
         if (beforeStatusResponse) await beforeStatusResponse();
         return statuses;
@@ -169,8 +173,15 @@ async function fixture(
       return roster;
     },
     graphql: async (query, params) => {
+      if (query.includes('mergeQueue(branch')) {
+        return {
+          repository: { mergeQueue: { entries: { nodes: queueEntries } } },
+        };
+      }
       if (query.includes('enqueuePullRequest')) {
-        mutations.push(params);
+        mutations.push(
+          query.includes('jump: true') ? { ...params, jump: true } : params
+        );
         if (mutationError) throw mutationError;
         if (failMutation) throw new Error('head changed');
         return { enqueuePullRequest: { mergeQueueEntry: { position: 1 } } };
@@ -2399,7 +2410,7 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
     "receipt(pr, 'recheck', `blocked-recheck=",
     "receipt(pr, 'held', failure.reason)",
     "receipt(pr, 'skip', `head-unchanged-since-removal:",
-    "receipt(pr, 'enqueued',",
+    "receipt(pr, jump ? 'enqueued-jump' : 'enqueued',",
     "receipt(pr, 'error',",
   ])
     assert.ok(script.includes(decision), decision);
@@ -2409,4 +2420,42 @@ test('every enroll decision on a ready PR leaves a receipt (pr, head, reason)', 
   assert.ok(script.includes("addHeading('Enroll decisions', 3)"));
   // The receipt script carries no expressions, so it never counts toward the 21k expression budget.
   assert.ok(!script.includes('${{'));
+});
+
+test('compounding PRs jump the queue, capped at two jumped entries, and every decision leaves a receipt', async () => {
+  const compounding = {
+    labels: {
+      pageInfo: { hasNextPage: false },
+      nodes: [{ name: 'compounding' }],
+    },
+  };
+  const entry = number => ({
+    pullRequest: { number, labels: { nodes: [{ name: 'compounding' }] } },
+  });
+  const byLabel = await fixture({ overrides: { 1: compounding } });
+  assert.deepEqual(byLabel.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
+  const byPaths = await fixture({
+    files: [
+      { filename: 'scripts/lanes/autoscale.py' },
+      { filename: '.github/workflows/lane-fix-relay.yml' },
+    ],
+  });
+  assert.deepEqual(byPaths.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
+  const mixed = await fixture({
+    files: [
+      { filename: 'scripts/lanes/autoscale.py' },
+      { filename: 'apps/web/page.tsx' },
+    ],
+  });
+  assert.deepEqual(mixed.mutations, [{ id: 'PR_1', oid: sha }]);
+  const capped = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [entry(8), entry(9)],
+  });
+  assert.deepEqual(capped.mutations, [{ id: 'PR_1', oid: sha }]);
+  const room = await fixture({
+    overrides: { 1: compounding },
+    queueEntries: [entry(8)],
+  });
+  assert.deepEqual(room.mutations, [{ id: 'PR_1', oid: sha, jump: true }]);
 });
