@@ -6,7 +6,7 @@ import { type SummerVoiceState, useSummerVoice } from './useSummerVoice';
 
 const ERROR_COPY: Record<string, string> = {
   voice_not_configured: 'Voice is not set up yet.',
-  voice_provider_unavailable: 'Voice is unavailable right now.',
+  voice_provider_unavailable: 'Voice did not connect. Try again.',
   microphone_denied: 'Microphone access was denied.',
   founder_required: 'Voice is limited to the founder account.',
 };

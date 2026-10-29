@@ -239,7 +239,7 @@ export function useSummerVoice(): {
                   ? encodeToolResult(action.toolCallId, body.text, false)
                   : encodeToolResult(
                       action.toolCallId,
-                      'Summer is unavailable right now.',
+                      'Summer did not answer. Try again.',
                       true
                     )
               );
@@ -247,7 +247,7 @@ export function useSummerVoice(): {
               ws.send(
                 encodeToolResult(
                   action.toolCallId,
-                  'Summer is unavailable right now.',
+                  'Summer did not answer. Try again.',
                   true
                 )
               );

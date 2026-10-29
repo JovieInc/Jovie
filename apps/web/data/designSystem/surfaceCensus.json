@@ -398,7 +398,7 @@
         "kind": "certification",
         "at": "2026-10-29T08:57:42.000Z",
         "ref": "docs/screenshots/mvp-pricing-audit-1029/README.md. PR #23570 replaced the false comparison row (fan capture capped at 100 on Free) with true certified rows; layout unchanged; pricing e2e 11/11 at 320-1440, no horizontal overflow at 1440 and 390. Merged with PR #23618 (main): its shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements. Main Renewed 2026-10-29 (PR #23597 rebase onto #23618): MarketingHero dropped its unused photo prop and photo-only classes; content-mode DOM and classes are unchanged (MarketingHero.test.tsx).",
-        "sourceDigest": "3ebeeb62f1f8601d039c39367c14c12c5a3476e7b5cdb4893656a6b13e85a06d"
+        "sourceDigest": "08157b107ab53755f8b64d849110922f7131a97724883fb0979803b6889fa54b"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
