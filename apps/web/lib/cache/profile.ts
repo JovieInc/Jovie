@@ -26,7 +26,13 @@ export async function invalidateProfileCache(
   const cacheLife = options.privacyChanged ? { expire: 0 } : 'max';
   // Invalidate dashboard data cache
   revalidateTag(CACHE_TAGS.DASHBOARD_DATA, cacheLife);
-  revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, cacheLife);
+  // The public profile snapshot is tagged per handle (profile:<handle>, see
+  // public-profile-loader.ts), so a routine edit expires only this artist's
+  // entry below. The cross-tenant `profiles-all` family is flushed only when
+  // the handle is unknown or privacy changed (fail closed for privacy).
+  if (!usernameNormalized || options.privacyChanged) {
+    revalidateTag(CACHE_TAGS.PUBLIC_PROFILE, cacheLife);
+  }
   revalidateTag(CACHE_TAGS.SITEMAP_CATALOG, cacheLife);
   revalidateTag(CACHE_TAGS.FEATURED_CREATORS, cacheLife);
   revalidateTag(CACHE_TAGS.ARTISTS_DIRECTORY, cacheLife);

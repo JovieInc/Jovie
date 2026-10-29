@@ -163,6 +163,7 @@ Options:
   -v, --version          Show the installed CLI version
 
 Environment:
+  FLEET_AUDIT_READ_TOKEN  Read token for jovie audit (FLEET_AUDIT_URL overrides jovie-fleet-audit worker)
   JOVIE_TIMEOUT_MS       Request deadline in ms, retries included (default 30000)
 
 Examples:
@@ -400,6 +401,7 @@ async function execute(
     {
       arg: positionals[2],
       full: values.full === true,
+      json: values.json === true,
       flags: values.flags,
       meta: { channel: 'cli', version: CLI_VERSION },
     },

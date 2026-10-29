@@ -4001,6 +4001,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/fleet-audit/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/fleet-audit",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/inbox/route.ts",
       "kind": "handler",
       "route": "/api/ovie/inbox",
