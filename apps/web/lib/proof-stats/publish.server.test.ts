@@ -39,6 +39,7 @@ vi.mock('./queries.server', () => ({
   }),
 }));
 const {
+  getPublicProofComparison,
   getPublicProofStat,
   getPublicProofStats,
   recordProofObservations,
@@ -144,6 +145,13 @@ describe('proof-stat publishing', () => {
     expect(state.live?.observations.profile_lcp_rank?.approval?.cardId).toBe(
       'card_abc'
     );
+    // Measuring stat: approved and fresh, but not live yet, so no chart.
+    expect(
+      await getPublicProofComparison('profile_lcp_rank', at(168))
+    ).toBeNull();
+    expect(
+      await getPublicProofComparison('accounts_total', at(168))
+    ).toBeNull();
     await record(1, 336);
     expect(state.live?.observations.profile_lcp_rank?.approval).toBeNull();
   });

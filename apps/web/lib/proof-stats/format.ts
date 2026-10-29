@@ -11,6 +11,12 @@ export interface ProofStatObservation {
     readonly cardId: string;
     readonly approvedAt: string;
   } | null;
+  /** Comparative stats: every measured entrant (ranked chart data). */
+  readonly breakdown?: readonly {
+    readonly label: string;
+    readonly value: number;
+    readonly self: boolean;
+  }[];
 }
 export type ProofStatState =
   | 'publishable'

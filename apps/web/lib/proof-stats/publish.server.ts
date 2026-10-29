@@ -63,6 +63,43 @@ export async function getPublicProofStats(
   }
   return out;
 }
+
+/**
+ * A comparative stat and its ranked entrants, for ProofRankedBarChart. Null
+ * unless the stat is publishable (fresh, founder-approved) and has data.
+ */
+export async function getPublicProofComparison(
+  id: string,
+  now = new Date()
+): Promise<{
+  readonly stat: ResolvedProofStat;
+  readonly entries: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly value: number;
+    readonly self: boolean;
+  }[];
+} | null> {
+  const definition = getProofStat(id);
+  if (!definition || definition.legalClass !== 'comparative') return null;
+  const { record } = await getProofStatsRecord();
+  const observation = record.observations[id];
+  const stat = resolveProofStat(definition, observation, {
+    now,
+    surface: 'public',
+  });
+  if (stat.state !== 'publishable' || !observation?.breakdown?.length) {
+    return null;
+  }
+  return {
+    stat,
+    entries: observation.breakdown.map((entry, index) => ({
+      id: `${id}-${index}`,
+      ...entry,
+    })),
+  };
+}
+
 export interface ProofStatUpdate {
   readonly id: string;
   readonly observation: ProofStatObservation;

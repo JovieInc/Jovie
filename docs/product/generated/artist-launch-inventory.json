@@ -798,6 +798,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/proof/methodology/page.tsx",
+      "kind": "page",
+      "route": "/proof/methodology",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/renders/[state]/page.tsx",
       "kind": "page",
       "route": "/renders/[state]",

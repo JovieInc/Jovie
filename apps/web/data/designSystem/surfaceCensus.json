@@ -307,6 +307,7 @@
         "apps/web/app/(marketing)/product/pre-save/page.tsx",
         "apps/web/app/(marketing)/product/release-scheduling/page.tsx",
         "apps/web/app/(marketing)/product/utm-links/page.tsx",
+        "apps/web/app/(marketing)/proof/methodology/page.tsx",
         "apps/web/app/(marketing)/smart-links/page.tsx",
         "apps/web/app/(marketing)/solutions/[audience]/page.tsx",
         "apps/web/app/(marketing)/support/page.tsx",
@@ -717,6 +718,13 @@
       "to": "holdout",
       "at": "2026-10-29T16:20:00Z",
       "evidence": "PR #23573 introduces the agent draft claim page (JOV-9760); source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/proof/methodology/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T18:00:00Z",
+      "evidence": "Proof-stat methodology page generated from the stat registry; source registration only, not rendered certification."
     }
   ]
 }
