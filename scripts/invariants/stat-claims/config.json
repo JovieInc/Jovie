@@ -1,0 +1,72 @@
+{
+  "schema": "jovie-stat-claims/v1",
+  "rule": "A numeric claim in marketing copy (a count of artists or users, a speed or size multiple, a percentage lift, a rank) binds to a proof stat: write {stat:<id>} and the number comes from apps/web/data/proof-stats/registry.json and its live observation. Hand-written numbers ratchet down through baseline.json, which only shrinks.",
+  "roots": [
+    "apps/web/app/(marketing)",
+    "apps/web/app/(home)",
+    "apps/web/components/marketing",
+    "apps/web/components/homepage",
+    "apps/web/components/site",
+    "apps/web/data",
+    "apps/web/lib/content-records",
+    "apps/web/content",
+    "apps/web/public"
+  ],
+  "textExtensions": [".md", ".mdx", ".json", ".html", ".txt"],
+  "exclude": [
+    {
+      "path": "(?:^|/)(?:node_modules|\\.next|coverage|dist)/",
+      "reason": "Build output and dependencies."
+    },
+    {
+      "path": "(?:^|/)(?:tests|__tests__|__mocks__|fixtures)/|\\.(?:test|spec|stories|smoke)\\.[cm]?[jt]sx?$",
+      "reason": "Tests, fixtures and Storybook assert or demo rendered text; they are not shipped copy."
+    },
+    {
+      "path": "^apps/web/data/proof-stats/",
+      "reason": "The stat registry: the one place a stat's sentence and thresholds are written."
+    },
+    {
+      "path": "^apps/web/content/(?:blog|comparisons|legal)/",
+      "reason": "Editorial and legal prose: quotes third-party figures and dated facts; reviewed in content PRs. Must never state a live Jovie count."
+    },
+    {
+      "path": "^apps/web/public/(?:images|fonts|media|videos|icons)/|\\.(?:svg|webmanifest)$|^apps/web/public/.*\\.(?:json|txt)$",
+      "reason": "Static assets, manifests and crawler files (robots, llms) are not marketing claims."
+    },
+    {
+      "path": "^apps/web/data/(?:designSystem|product|generated)/|\\.gen\\.[cm]?[jt]s$|generated",
+      "reason": "Generated inventories and design-system data, not copy."
+    },
+    {
+      "path": "^apps/web/content/engineering/",
+      "reason": "Engineering posts state measured wins; every number there derives from canon/wins/wins.jsonl (engineering-wins domain) and is checked by the wins ledger. Public product stats still bind {stat:<id>}."
+    }
+  ],
+  "patterns": [
+    {
+      "id": "count_claim",
+      "source": "(?<![\\w#=./:-])\\d(?:[\\d,.]*\\d)?\\s?[kmb]?\\+?\\s+(?:artists?|creators?|musicians?|users?|teams?|labels?|managers?|customers?|fans?|listeners?|profiles?|smart\\s+links?|releases?|alerts?|streams?|plays?|clicks?|countries|downloads?|subscribers?|followers?|members?)\\b"
+    },
+    {
+      "id": "multiple_claim",
+      "source": "\\b\\d+(?:\\.\\d+)?\\s?(?:x|×|times)\\s+(?:faster|more|higher|better|quicker|lighter|smaller|cheaper)\\b"
+    },
+    {
+      "id": "percent_claim",
+      "source": "\\b\\d+(?:\\.\\d+)?\\s?%\\s+(?:faster|more|higher|lower|less|smaller|fewer|better|increase|lift|growth|uplift|of\\s+(?:artists|users|fans|creators|listeners))\\b"
+    },
+    {
+      "id": "trusted_by_claim",
+      "source": "\\b(?:trusted\\s+by|used\\s+by|loved\\s+by|join(?:ed)?)\\s+(?:over\\s+|more\\s+than\\s+)?\\d"
+    },
+    {
+      "id": "speed_claim",
+      "source": "\\b(?:loads?|responds?|renders?)\\s+in\\s+(?:under\\s+|less\\s+than\\s+)?\\d|\\b\\d+(?:\\.\\d+)?\\s?(?:ms|milliseconds|seconds)\\s+(?:faster|to\\s+load)\\b"
+    },
+    {
+      "id": "rank_claim",
+      "source": "(?:^|\\s)(?:#1|no\\.\\s?1|number\\s+one)\\s+(?:link|platform|tool|choice|app|bio|profile|smart|music|artist)|\\bfastest\\b"
+    }
+  ]
+}
