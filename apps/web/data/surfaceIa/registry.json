@@ -126,7 +126,7 @@
       },
       "header": "pageHeader",
       "routes": ["/app/admin", "/app/admin/inbox"],
-      "publicPath": "/app/ov (next.config rewrite onto /app/admin)"
+      "publicPath": "/app/ov"
     },
     {
       "id": "public-profile",
