@@ -145,7 +145,9 @@ describe('capability-bound draft persistence', () => {
       code: 'INVALID_INPUT',
       next_action: 'correct_input',
     });
-    expect((invalid as { message: string }).message).toContain('publish');
+    expect((invalid as unknown as { message: string }).message).toContain(
+      'publish'
+    );
     expect(JSON.stringify(invalid)).not.toContain(g.token);
     expect(
       await createAgentDraft({ ...g.input, artist_id: 'apple_music:657515' })
