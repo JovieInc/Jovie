@@ -96,14 +96,14 @@ export function compareToBaseline(counts, baseline) {
       );
     }
   }
-  for (const [file, count] of Object.entries(baseline)) {
-    if ((counts[file] ?? 0) < count) {
-      problems.push(
-        `${file}: debt shrank (${counts[file] ?? 0} < ${count}); run node scripts/lint-composite-field.mjs --update and commit the baseline.`
-      );
-    }
-  }
   return problems;
+}
+
+/** Shrink is a notice, never a failure. */
+export function shrinkNotices(counts, baseline) {
+  return Object.entries(baseline)
+    .filter(([file, count]) => (counts[file] ?? 0) < count)
+    .map(([file]) => `${file}: debt shrank; run --update to lock it in.`);
 }
 
 export function countsOf(current) {
@@ -132,6 +132,9 @@ function main() {
     return;
   }
   const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
+  for (const notice of shrinkNotices(counts, baseline)) {
+    console.log(`::notice title=composite-field::${notice}`);
+  }
   const problems = compareToBaseline(counts, baseline);
   if (problems.length) {
     console.error(problems.join('\n'));

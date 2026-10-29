@@ -862,6 +862,7 @@ export const STRUCTURAL_PYTHON_REGRESSION_COMMANDS = Object.freeze([
 export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/sources-of-truth.test.mjs',
   'scripts/invariants/duplicate-literals.test.mjs',
+  'scripts/lib/__tests__/source-drift.test.mjs',
   'scripts/lib/__tests__/typecheck-slot.test.mjs',
   'scripts/preflight.test.mjs',
   'scripts/installation-budget-sentinel.test.mjs',
@@ -872,6 +873,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/ci-rounds.test.mjs',
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/invariants/offer-claims/offer-claims.test.mjs',
+  'scripts/copy-inventory/extract.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.claude/hooks/post-task-validate.test.mjs',

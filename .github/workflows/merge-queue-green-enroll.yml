@@ -1096,7 +1096,9 @@ jobs:
   # another member of the group, or by the base branch, is enqueued again on
   # that same SHA via enqueuePullRequest (no --auto, no --squash). A token
   # that still cannot enqueue names the PR with ::error:: and the step
-  # summary. Two rearms per SHA; the enroll job is not involved.
+  # summary. Two rearms per SHA; the enroll job is not involved. A failure with
+  # no implicated path (a flake) re-enqueues a green head that github-merge-queue[bot]
+  # removed within 30 minutes, tagged why=unattributed in the receipt (#23562: 24 min lag).
   rearm-green-victims:
     name: Rearm green merge-group victims
     needs: [hold-failed-revision]

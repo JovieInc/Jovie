@@ -83,4 +83,54 @@ describe('self-hosted workspace reset contract', () => {
       }
     }
   });
+
+  // PR Fleet Rules merge_group run 40908938908: setup-node could not find .nvmrc because an earlier
+  // sparse job left core.sparseCheckout on the shared workspace and the full checkout kept it.
+  it('every pooled job with a full checkout resets sparse state before its first checkout', () => {
+    for (const { file, name, steps } of pooledJobs()) {
+      const first = steps.findIndex(isChecked);
+      if (first < 0 || steps[first].with?.['sparse-checkout']) continue;
+      expect(
+        steps.slice(0, first).some(resets),
+        `${file}:${name} full-checks-out on a shared workspace without clearing stale sparse state`
+      ).toBe(true);
+    }
+  });
+
+  it('every pooled sparse job lists the files it reads after checkout (node-version-file, pnpm install, local actions)', () => {
+    for (const { file, name, steps } of pooledJobs()) {
+      const sparse = steps.filter(
+        s => isChecked(s) && s.with?.['sparse-checkout']
+      );
+      if (!sparse.length) continue;
+      const patterns = sparse.map(s => s.with['sparse-checkout']).join('\n');
+      const lists = path =>
+        patterns.split('\n').some(p => p.trim().replace(/^\//, '') === path);
+      const needs = new Set();
+      for (const s of steps) {
+        const v = s.with?.['node-version-file'];
+        if (v) {
+          needs.add(v);
+          needs.add('package.json');
+        }
+        if (/pnpm (install|i)\b/.test(s.run ?? '')) {
+          needs.add('package.json');
+          needs.add('pnpm-lock.yaml');
+          needs.add('pnpm-workspace.yaml');
+        }
+        const local = /^\.\/(\.github\/actions\/[\w.-]+)/.exec(s.uses ?? '');
+        if (local) needs.add(`${local[1]}/action.yml`);
+      }
+      for (const path of needs) {
+        const covered =
+          lists(path) ||
+          (path.endsWith('/action.yml') &&
+            lists(path.replace('/action.yml', '')));
+        expect(
+          covered,
+          `${file}:${name} reads ${path} after a sparse checkout that does not list it`
+        ).toBe(true);
+      }
+    }
+  });
 });
