@@ -88,6 +88,18 @@ class MirrorSyncTest(Base):
         self.assertEqual(linear.calls[0][1]["since"], "2026-10-11T00:00:00.000Z")
         self.assertEqual(ls.read_mirror(self.state, "JOV")["cursor"], "2026-10-11T09:00:00.000Z")
 
+    def test_incremental_asks_newest_first_and_logs_freshness_stage(self):
+        ls.apply(self.state, "JOV", [node(1)])
+        with ls._mutating(ls.mirror_path(self.state, "JOV"), ls.MIRROR) as data:
+            data.update(cursor="2026-10-11T00:00:00.000Z", syncedAt=1.0)
+        linear = FakeLinear([page([node(2, updated="2026-10-11T09:00:00.000Z"), node(3, updated="2026-10-11T08:00:00.000Z")])])
+        self.assertEqual(self.sync(linear)["outcome"], "synced")
+        self.assertIn("orderBy:updatedAt", ls.SYNC_QUERY)
+        import stage_events
+        rows = [r for r in stage_events.mirror_events(self.state, time.time()) if r["stage"] == "stale"]
+        self.assertEqual((rows[0]["entityId"], rows[0]["enteredAt"]), ("JOV", "2026-10-11T08:00:00Z"))
+        self.assertEqual({r["stage"] for r in stage_events.mirror_events(self.state, time.time())}, {"stale", "mirrored"})
+
     def test_budget_and_rate_limits_skip_the_read_and_keep_the_mirror(self):
         ls.apply(self.state, "JOV", [node(1)])
         linear = FakeLinear([])
@@ -183,6 +195,25 @@ class OutboxTest(Base):
         self.assertEqual(ls.read_mirror(self.state, "JOV")["issues"]["id-1"]["state"], "In Progress")
         self.assertEqual(ls.status(self.state)["outbox"]["depth"], 0)
         self.assertEqual(ls.claim_status(self.state, "id-1"), "active")
+
+    def test_one_flush_drains_far_more_than_ten_entries_until_the_wall_budget_ends(self):
+        # Gem 2026-10-25: 504 pending writes, arrivals 80-175 per 30 min, 10 delivered per tick.
+        ls.claim(self.state, "id-1", "JOV-1", "codex")
+        for index in range(25):
+            ls.enqueue(self.state, "comment", "id-1", body=f"note {index}")
+        linear = FakeLinear([{"commentCreate": {"success": True}}] * 25)
+        report = ls.flush(self.state, linear, lambda n: True, (Limited,))
+        self.assertEqual((report["outcome"], len(report["delivered"])), ("drained", 25))
+        for index in range(3):
+            ls.enqueue(self.state, "comment", "id-1", body=f"later {index}")
+        held = ls.flush(self.state, FakeLinear([]), lambda n: True, (Limited,), budget_s=-1)
+        self.assertEqual((held["outcome"], held["delivered"]), ("partial", []))
+        self.assertEqual(ls.status(self.state)["outbox"]["depth"], 3)
+
+    def test_outbox_alert_fires_at_an_hour(self):
+        view = {"outbox": {"depth": 400, "oldestAgeS": 3700, "dead": 0}}
+        self.assertIn("linear-outbox-stale", ls.alerts(view))
+        self.assertNotIn("linear-outbox-stale", ls.alerts({"outbox": {"depth": 9, "oldestAgeS": 600, "dead": 0}}))
 
     def test_budget_rate_limit_and_errors_keep_the_entry_without_failing_work(self):
         ls.claim(self.state, "id-1", "JOV-1", "codex")

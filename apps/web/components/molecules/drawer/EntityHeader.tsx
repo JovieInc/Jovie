@@ -52,6 +52,8 @@ export interface EntityHeaderThumbnailProps {
   /** Density belongs to the consumer; semantics and fallback belong here. */
   readonly size?: number;
   readonly priority?: boolean;
+  /** Responsive image `sizes` hint; defaults to the rendered `size`. */
+  readonly sizes?: string;
   /** Only a source-backed Jovie profile verification flag; never connection status. */
   readonly verified?: boolean;
   readonly eventDate?: string | null;
@@ -82,6 +84,7 @@ export function EntityHeaderThumbnail({
   name,
   size = ENTITY_HEADER_THUMBNAIL_SIZE_PX,
   priority = false,
+  sizes,
   verified = false,
   eventDate,
   icon,
@@ -112,7 +115,7 @@ export function EntityHeaderThumbnail({
           src={src}
           alt={label}
           dimension={size}
-          sizes={`${size}px`}
+          sizes={sizes ?? `${size}px`}
           sizeClassName='h-full w-full'
           className='rounded-full'
           imageClassName='rounded-full'

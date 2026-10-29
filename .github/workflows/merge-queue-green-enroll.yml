@@ -37,14 +37,22 @@ name: Merge Queue Green Enroll
 # manual dispatch scan the complete roster.
 
 on:
+  # Fork PR Gate is not subscribed: Source Validation completed last on 84 of 85
+  # PR heads measured 2026-10-25, and a straggler is re-armed by the main-push
+  # sweep (guard: scripts/lib/__tests__/wake-fanout-contract.test.mjs).
   workflow_run:
-    workflows: ['Source Validation', 'CI', 'Fork PR Gate', 'PR Size Guard']
+    workflows: ['Source Validation', 'CI', 'PR Size Guard']
     types: [completed]
   # ready_for_review: leaving draft emits no check completion (JOV-INV-029:
   # an unchanged head never earns a second CI flight), so this is the wake
   # that admits an already-green head. Sole ready_for_review subscriber.
   pull_request_target:
-    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review, synchronize]
+    # `synchronize` is deliberately absent (JOV-INV-029 coalescing): a new head
+    # has no green verdict yet, so the push cannot change the enroll decision.
+    # Its Source Validation completion (PR Ready) is the wake that can. Over 24h
+    # synchronize was the bulk of ~560 pull_request_target runs, nearly all
+    # no-ops. Head-change hold release rides the next label event or landing on main.
+    types: [converted_to_draft, labeled, unlabeled, reopened, ready_for_review]
   # Event-driven reconciliation (JOV-7589): every landing on main re-scans the
   # roster (re-enrolls green heads whose dequeue left no wake) and re-checks
   # hold receipts, so neither waits on a timer. Pushes coalesce into the one
@@ -110,14 +118,20 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -203,6 +217,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            packages/api-client
             scripts/merge-group-failure-hold.mjs
             scripts/lib/merge-group-ahead-attribution.mjs
             scripts/lib/merge-group-admission.mjs
@@ -274,6 +289,13 @@ jobs:
               ...holdLabels.machineBlockLabels,
             ]);
             const BREAKER_LABEL = 'queue-breaker';
+            const COMPOUNDING_LABEL = 'compounding', MAX_JUMPED = 2, JUMP_MAX_BUILD_S = 300, JUMP_BATCH_S = 1800;
+            const COMPOUNDING_PATHS = [
+              /^\.github\/(workflows|actions|ci-harness|scripts|runner-host|runner-image)\//,
+              /^scripts\/(lanes|swarm|hermes)\//,
+              /^scripts\/(ci-|merge-|pr-|fleet-|quota-)[^/]*$/,
+              /^scripts\/tests\/test_[a-z_]*(lane|autoscale|sentinel|execution|codex|stage)[a-z_]*\.py$/,
+            ];
             if (BLOCKING.size < 2) throw new Error('admission hold labels are unreadable');
             // Required checks green and no conflicts. UNSTABLE only adds a
             // non-required pending/red context (e.g. lane execution receipts).
@@ -455,7 +477,7 @@ jobs:
             // Every decision on an open, ready, unqueued PR leaves a receipt (pr, head, reason) in the
             // job summary and one machine line, so a non-enroll is never silent (event-driven dwell).
             const receipts = [];
-            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason });
+            const receipt = (pr, decision, reason) => receipts.push({ pr: pr?.number, head: String(pr?.headRefOid ?? '').slice(0, 12), decision, reason, at: new Date().toISOString() });
             for (const [index, candidate] of prs.entries()) {
               if (overBudget()) {
                 core.warning(`sweep budget spent after ${index}/${prs.length} PRs; the rest wait for their own events or the next sweep`);
@@ -545,8 +567,16 @@ jobs:
               }
               if (!eligible(pr)) {
                 if (pr && pr.state === 'OPEN' && !pr.isDraft && !pr.isInMergeQueue) {
-                  core.info(`skip #${candidate.number}: mergeStateStatus=${pr.mergeStateStatus}`);
-                  receipt(pr, 'skip', `mergeStateStatus=${pr.mergeStateStatus}`);
+                  // Name the real cause: a blocking label or a moved head is not a merge
+                  // state, and a CLEAN reason beside a skip hid the stale lane-fix-red.
+                  const blockers = pr.labels.nodes.filter(l => BLOCKING.has(l.name.toLowerCase())).map(l => l.name);
+                  const why = pr.headRefOid !== candidate.head.sha ? `head-moved:${String(candidate.head.sha).slice(0, 12)}`
+                    : pr.isCrossRepository ? 'cross-repository'
+                    : blockers.length > 0 ? `blocking-label:${blockers.join(',')}`
+                    : pr.labels.pageInfo.hasNextPage ? 'labels-truncated'
+                    : `merge-state-not-admissible:${pr.mergeStateStatus}`;
+                  core.info(`skip #${candidate.number}: ${why}`);
+                  receipt(pr, 'skip', why);
                 }
                 continue;
               }
@@ -767,16 +797,80 @@ jobs:
                   }
                   if (!await breakerReleaseStillCurrent(false)) continue;
                 }
+                // Tim 2026-10-28: compounding work (infra that speeds up all other work) jumps
+                // the queue, at most MAX_JUMPED entries at once. A PR is compounding when it carries the
+                // label or every touched file is lanes/swarm/CI/controller infrastructure. Every decision
+                // is logged as a receipt. Any failure here falls back to a plain enqueue.
+                let jump = false;
+                try {
+                  let compounding = pr.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
+                  let basis = 'label';
+                  if (!compounding) {
+                    const files = await github.paginate(github.rest.pulls.listFiles, {
+                      owner, repo, pull_number: pr.number, per_page: 100,
+                    });
+                    compounding = files.length > 0 && files.length <= 100 &&
+                      files.every(f => COMPOUNDING_PATHS.some(re => re.test(f.filename)));
+                    basis = 'paths';
+                  }
+                  if (compounding) {
+                    const queue = await github.graphql(`
+                      query($owner: String!, $repo: String!) {
+                        repository(owner: $owner, name: $repo) {
+                          mergeQueue(branch: "main") {
+                            entries(first: 50) { nodes { state enqueuedAt pullRequest { number labels(first: 30) { nodes { name } } } } }
+                          }
+                        }
+                      }`, { owner, repo });
+                    const entries = (queue.repository.mergeQueue?.entries?.nodes ?? []).filter(e => e.pullRequest.number !== pr.number);
+                    const isCompounding = e => e.pullRequest.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
+                    const ageS = e => (Date.now() - Date.parse(e.enqueuedAt)) / 1000;
+                    // A jump invalidates every merge group already building and restarts its CI (10-20 min;
+                    // the 04:00Z jump of #23554 reset three groups and nothing merged for 90 min). So jump only
+                    // while no building group has had time to make progress: AWAITING_CHECKS entries enqueued
+                    // under JUMP_MAX_BUILD_S ago (enqueuedAt bounds the build start from above), at most one jump per
+                    // JUMP_BATCH_S, and at most MAX_JUMPED compounding entries queued.
+                    const jumped = entries.filter(isCompounding).length;
+                    const building = entries.filter(e => e.state === 'AWAITING_CHECKS');
+                    const stale = building.filter(e => !(ageS(e) < JUMP_MAX_BUILD_S));
+                    const recent = entries.filter(e => isCompounding(e) && ageS(e) < JUMP_BATCH_S);
+                    let deferred = null;
+                    if (jumped >= MAX_JUMPED) deferred = `cap ${jumped}/${MAX_JUMPED}`;
+                    else if (stale.length > 0) deferred = `building groups older than ${JUMP_MAX_BUILD_S}s: ${stale.map(e => '#' + e.pullRequest.number).join(',')}`;
+                    else if (recent.length > 0) deferred = `batch window: ${recent.map(e => '#' + e.pullRequest.number).join(',')} jumped under ${JUMP_BATCH_S}s ago`;
+                    jump = deferred === null;
+                    receipt(pr, jump ? 'jump' : 'jump-deferred', `compounding(${basis}) ${deferred ?? `queued=${jumped}/${MAX_JUMPED}`}`);
+                    core.notice(`COMPOUNDING #${pr.number} ${jump ? 'jumps' : 'deferred'} (${basis}; ${deferred ?? 'clear'})`);
+                    if (jump && building.length > 0) {
+                      // Every reset a jump causes is logged with the groups it restarts.
+                      receipt(pr, 'jump-reset', `restarts building groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                      core.warning(`JUMP RESET by #${pr.number}: restarts building merge groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                    }
+                  }
+                } catch (error) {
+                  core.warning(`#${pr.number} compounding check failed, plain enqueue: ${error.message}`);
+                }
                 enqueueAttempted = true;
-                const r = await github.graphql(`
+                const enqueue = withJump => github.graphql(`
                   mutation($id: ID!, $oid: GitObjectID!) {
-                    enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid }) {
+                    enqueuePullRequest(input: { pullRequestId: $id, expectedHeadOid: $oid${withJump ? ', jump: true' : ''} }) {
                       mergeQueueEntry { position }
                     }
                   }`, { id: pr.id, oid: pr.headRefOid });
+                let r;
+                try {
+                  r = await enqueue(jump);
+                } catch (error) {
+                  // A token without maintain/admin cannot jump; a plain enqueue still lands the PR.
+                  if (!jump || /head|stale|changed/i.test(String(error.message))) throw error;
+                  core.warning(`#${pr.number} jump rejected (${error.message}); plain enqueue`);
+                  receipt(pr, 'jump-rejected', String(error.message).slice(0, 120));
+                  jump = false;
+                  r = await enqueue(false);
+                }
                 enqueued += 1;
                 core.notice(`ENQUEUED #${pr.number} at position ${r.enqueuePullRequest.mergeQueueEntry.position}`);
-                receipt(pr, 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
+                receipt(pr, jump ? 'enqueued-jump' : 'enqueued', `position=${r.enqueuePullRequest.mergeQueueEntry.position}`);
                 if (breakerMarked && !breakerRestore) {
                   await github.rest.issues.removeLabel({
                     owner, repo, issue_number: pr.number, name: BREAKER_LABEL,
@@ -828,8 +922,13 @@ jobs:
             scripts/lib/merge-queue-guard.mjs
             scripts/lib/pre-land-changelog.mjs
             scripts/version-fanout-guard.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -857,10 +956,11 @@ jobs:
           })));
           NODE
 
-  # Hold contract (scripts/hold-contract.mjs, jovie-hold/v1): every stop label
-  # (hold, gated, incident, do-not-merge, tim-hold variants) needs a receipt
-  # comment naming an owner plus an expiry or a head-change release.
-  # Ownerless holds past their grace period and expired or released receipts
+  # No stop label is human-owned (tim-hold, tim:hold, hold:tim and do-not-merge
+  # are retired, 2026-10-28). Every stop label uses the hold contract
+  # (scripts/hold-contract.mjs, jovie-hold/v1): a receipt names an owner and an
+  # expiry or head-change release.
+  # Ownerless machine holds past their grace period and expired receipts
   # are removed with one comment. The Jovie Bot unlabel event then wakes the
   # enroll job above; required checks still gate admission. Expiry is checked
   # on the next event after it lapses: a landing on main, a merge-group CI
@@ -886,8 +986,13 @@ jobs:
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
             scripts/lib/queue-deferral-receipt.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -918,7 +1023,7 @@ jobs:
     if: >-
       github.event_name == 'pull_request_target' &&
       github.event.action == 'labeled' &&
-      contains(fromJSON('["hold","gated","incident","do-not-merge","tim-hold","tim:hold","hold:tim","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
+      contains(fromJSON('["hold","gated","incident","queue-deferred","queue-poison","lane-fix-red"]'), github.event.label.name)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     permissions: {}
@@ -942,7 +1047,7 @@ jobs:
             const sourceHead = context.payload.pull_request?.head?.sha;
             const rawLabel = context.payload.label?.name;
             const label = typeof rawLabel === 'string' ? rawLabel.toLowerCase() : null;
-            const blocking = new Set(['hold', 'gated', 'incident', 'do-not-merge', 'tim-hold', 'tim:hold', 'hold:tim', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
+            const blocking = new Set(['hold', 'gated', 'incident', 'queue-deferred', 'queue-poison', 'lane-fix-red']);
             if (!Number.isSafeInteger(number) || number <= 0 ||
                 typeof sourceHead !== 'string' || !/^[a-f0-9]{40}$/.test(sourceHead) || !blocking.has(label)) {
               core.info('Ignoring an incomplete blocking-label event');
@@ -970,6 +1075,18 @@ jobs:
                 { id: pr.id }
               );
               core.notice(`DEQUEUED #${number}: labeled ${context.payload.label.name} while queued`);
+              // The queue timeline records only "manual" for this removal, so say why on the PR
+              // (24h to 2026-10-26: 14 bot dequeues with no recorded reason). The marker is
+              // machine-readable; scripts/queue-dequeue.mjs writes the same shape for agents.
+              const record = { code: 'hold', by: 'merge-queue-green-enroll/dequeue-held', label: context.payload.label.name, labeledBy: context.payload.sender?.login ?? null };
+              try {
+                await github.rest.issues.createComment({
+                  owner, repo, issue_number: number,
+                  body: `Dequeued from the merge queue (hold): \`${context.payload.label.name}\` was added by @${context.payload.sender?.login ?? 'unknown'} while it was queued. Remove the label to re-enroll once CLEAN.\n<!-- queue-dequeue ${JSON.stringify(record)} -->`,
+                });
+              } catch (commentError) {
+                core.warning(`could not record the dequeue reason on #${number}: ${commentError.message}`);
+              }
             } catch (error) {
               // A denied dequeue leaves today's behaviour: its merge group fails the gate.
               core.warning(`dequeue of held #${number} failed: ${error.message}`);
@@ -1007,8 +1124,13 @@ jobs:
             scripts/merge-group-victim-rearm.mjs
             scripts/lib/admission-hold-labels.json
             scripts/lib/admission-hold-labels.mjs
+            .github/actions/prime-node-toolcache/action.yml
+            .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - name: Set up pinned Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

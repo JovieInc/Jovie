@@ -432,6 +432,52 @@
         }
       ]
     },
+    "linear-mirror": {
+      "entityId": "Linear team key whose local lanes mirror was refreshed",
+      "description": "Freshness of the lanes Linear mirror: the oldest change in a sync pass until the mirror held it. Target p95 under 5 minutes; Urgent and recently updated issues sync first.",
+      "endToEnd": [["stale", "mirrored"]],
+      "stages": [
+        {
+          "id": "stale",
+          "meaning": "updatedAt of the oldest changed issue in an incremental pass, until the pass finished",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "mirrored",
+          "meaning": "the local mirror holds every change up to that pass",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
+    },
+    "taste-decision": {
+      "entityId": "JOV issue identifier awaiting a founder-taste receipt",
+      "description": "A founder-taste wait ending in a founder decision or the risk- and confidence-scaled default (scripts/lanes/taste-policy.json).",
+      "endToEnd": [["waiting", "decided"]],
+      "stages": [
+        {
+          "id": "waiting",
+          "meaning": "issue entered Validating owing a founder-taste receipt, until a decision or the default shipped",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        },
+        {
+          "id": "decided",
+          "meaning": "founder-taste receipt recorded (founder decision or default-accepted)",
+          "producer": "lanes",
+          "status": "spec",
+          "source": "lanes-stage-feed",
+          "owner": "lanes worker"
+        }
+      ]
+    },
     "claim-dogfood": {
       "entityId": "claim-checkout-dogfood#<run id>@<run attempt>",
       "description": "One browser dogfood of the $12 artist claim (Stripe test mode, fixture artists): from the staging deploy (or dispatch) that made it due to the journey verdict.",
@@ -583,6 +629,7 @@
       "pr-preparation-canary.yml": "harness self-test, not a delivery stage",
       "runner-autoscaler-canary.yml": "runner health probe, not a delivery stage",
       "m2-revenue-path-canary.yml": "synthetic revenue probe; gap tracked in the stage gap audit",
+      "ovie-summer-canary.yml": "synthetic Summer fast-chat probe, not a delivery stage",
       "production-controller-health.yml": "controller liveness monitor; measures the controller, not a stage",
       "postdeploy-probes.yml": "manual re-run of production probes; production-controller.yml owns the stage",
       "desktop-release.yml": "desktop app release; gap tracked in the stage gap audit",

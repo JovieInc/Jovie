@@ -5,7 +5,10 @@ import {
   canonicalSidebarNavigation,
   primaryNavigation,
 } from '@/components/features/dashboard/dashboard-nav/config';
-import { OPERATOR_NAV_ITEMS } from '@/components/organisms/operator-navigation';
+import {
+  OPERATOR_NAV_ITEMS,
+  OPERATOR_NAV_SECTIONS,
+} from '@/components/organisms/operator-navigation';
 import {
   ADMIN_NAV_REGISTRY,
   ADMIN_PRIMARY_WORKSPACE_IDS,
@@ -73,7 +76,20 @@ describe('exclusive customer vs OV navigation', () => {
     ).toEqual([]);
   });
 
-  it('keeps five daily destinations primary with Business and Tools collapsed', () => {
+  it("labels the second operator group Company (Tim's swipe, 2026-10-25), keeping its stable id", () => {
+    expect(
+      OPERATOR_NAV_SECTIONS.map(section => [section.id, section.label])
+    ).toEqual([
+      ['home', null],
+      ['business', 'Company'],
+      ['tools', 'Tools'],
+    ]);
+    expect(OPERATOR_NAV_SECTIONS.map(section => section.label)).not.toContain(
+      'Business'
+    );
+  });
+
+  it('keeps five daily destinations primary with Company and Tools collapsed', () => {
     expect(ADMIN_PRIMARY_WORKSPACE_IDS).toEqual([
       'overview',
       'inbox',
@@ -126,6 +142,13 @@ describe('exclusive customer vs OV navigation', () => {
       { id: 'certifications', section: 'utilities' },
     ]);
     expect(ADMIN_SETTINGS_TOOL_IDS).toContain('certifications');
+    expect(
+      ADMIN_NAV_REGISTRY.find(item => item.id === 'capacity')
+    ).toMatchObject({
+      label: 'Agent Plans',
+      href: APP_ROUTES.ADMIN_CAPACITY,
+      section: 'utilities',
+    });
   });
 
   it('gives every operator review workspace a canonical navigation door', () => {

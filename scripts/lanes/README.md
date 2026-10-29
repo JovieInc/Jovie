@@ -63,20 +63,17 @@ The harness, not the model, owns:
 | Guarded sensitive work: auth/billing/infra labels route only to Codex at `xhigh`; 500-line cap, canonical security/boundary gates, and independent `llm-review` run before enrollment | `pick_issue()`, `gate_pr()`, `sensitive_review()` |
 | Stop revokes publication: a kill writes `runs/publication-revocations.jsonl` before the kill is acked, and every irreversible boundary (push, PR open, label, enqueue) revalidates it — revoked branches never ship (JOV-5060) | `run_agent(on_kill=)`, `revoke_publication()`, `require_publishable()` |
 
-Execution receipts retain `jovie-execution-attempt/v1`. The default production and CLI
-writer still emits legacy numeric status chains; self-update cannot activate the new
-wire format. `IMMUTABLE_WRITER_ENABLED` is checked in as false, with no environment or
-caller override. The upgraded reader also validates candidate-linked receipts, while
-a disabled writer refuses to extend them. Enabling the writer requires a separately
-reviewed source change after every participating reader and writer is drained, updated
-and verified ready; JOV-8293 remains open for that activation and runtime outcome.
+Execution receipts retain `jovie-execution-attempt/v1`. The production and CLI writer
+now emits the candidate-linked immutable wire format (JOV-8293 enablement), with no
+environment or caller override; the dual reader still validates legacy numeric
+chains, while an un-updated writer refuses to extend candidate-linked reservations.
 Enabled recovery reserves an existing `failed_unknown` disposition before projecting
 an unknown boundary, so helper crashes and repeated retries remain held. Boundary IDs
 bind existing dispatch, handoff, repair and adoption phases within the original fence;
 duplicate or changed-cost reuse is held, and distinct intended phases charge normally.
 Legacy common-source-SHA reservations have no owner proof and remain held for
-authoritative reconciliation. Source merge is preparatory and does not repair or
-certify the running coordinator.
+authoritative reconciliation. Source merge is preparatory; the exact installed
+runtime generation still needs its own interrupted-reservation outcome receipts.
 
 PR repair selection captures one qualified bulk inventory outside the global claim lock,
 using the existing per-key cache lock. Current local preservation and attempt state,
@@ -747,7 +744,7 @@ the relay), deploy
 failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
 `jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
 `ready`, `needs-rebase` (`lockfile-only`, `generated-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
-`needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
+`needs-human-decision` (a reserved decision or a secret-file security gate: it surfaces once and files a non-blocking Ovie `decisionAsk` with a default and a deadline; it applies no label and holds nothing, EVENT 2026-10-28), `obsolete`, plus `main-red` when main itself is the failure.
 
 The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
 the existing generated-file resolver, one `gh run rerun --failed` per head. Those spend no model
@@ -760,7 +757,7 @@ Spent caps are `ladder-exhausted`. Re-entry is a new external head, a cleared de
 main turning green; attempt history is kept on the `jovie-reentry/v1` receipt.
 
 Flags: `LANES_ESCALATION` default on; `LANES_ESCALATION_NOTIFY_TIM` default off (Linear
-`needs-human` label plus one comment); `LANES_ESCALATION_LIFT_HUMAN_HOLDS` default off.
+`needs-human` label plus one comment). A repaired PR always lifts its machine `hold`.
 Needs-human, obsolete and ladder-exhausted share one PR comment marked
 `<!-- symphony-surface pr=N head=SHA -->`. Hold nags are at most one per PR per head per 24h.
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)

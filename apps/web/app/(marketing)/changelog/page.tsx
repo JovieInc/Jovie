@@ -185,9 +185,8 @@ export default async function ChangelogPage() {
       </MarketingContainer>
 
       <MarketingFooterCta
-        title='Take control of your presence.'
         ctaLabel='Find your profile'
-        ctaHref='/#handle-input'
+        ctaHref='/#homepage-claim-handle'
       />
     </div>
   );

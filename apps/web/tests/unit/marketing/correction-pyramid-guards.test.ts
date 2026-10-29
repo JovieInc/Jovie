@@ -117,6 +117,30 @@ describe('correction pyramid guards', () => {
     ).toBe(liveGrandfather);
   });
 
+  it('bans fan, white-label, remove-branding, revolutionary and all-in-one', () => {
+    const planted = findBannedPhrases(
+      [
+        "const a = 'Reach every fan';",
+        "const b = 'A white-label, all-in-one tool';",
+        "const c = 'Remove branding with Pro';",
+        "const d = 'A revolutionary link';",
+        "const id = 'capture-the-fan';",
+        '// fan in a comment',
+      ].join('\n'),
+      'apps/web/data/sample.ts'
+    );
+    expect(planted.map(hit => hit.rule).sort()).toEqual([
+      'all-in-one',
+      'banned-fan',
+      'remove-branding',
+      'revolutionary',
+      'white-label',
+    ]);
+    expect(
+      findBannedPhrases('Fans buy tickets', 'apps/web/content/blog/post.md')
+    ).toEqual([]);
+  });
+
   it('keeps raw marketing JSX copy on the warn baseline', () => {
     const source = [
       '<h1>{copy.headline}</h1>',
@@ -147,7 +171,15 @@ describe('correction pyramid guards', () => {
     expect(hero).toContain('copy.headline');
     expect(hero).toContain('HOMEPAGE_COPY');
     expect(hero).not.toContain(`>${LOCKED_HOMEPAGE_H1}<`);
-    expect(page).toContain('HomepageArtistHero');
+    // The page renders the published spec; the hero headline has no spec
+    // slot, so the renderer always passes the locked copy module headline.
+    expect(page).toContain('<HomepageSpecSections');
+    const renderer = readFileSync(
+      path.join(webRoot, 'components/homepage/HomepageSpecSections.tsx'),
+      'utf8'
+    );
+    expect(renderer).toContain('<HomepageArtistHero');
+    expect(renderer).toContain('...HOMEPAGE_COPY.hero,');
   });
 
   it('tightens a warn baseline only when every live key is already known', () => {

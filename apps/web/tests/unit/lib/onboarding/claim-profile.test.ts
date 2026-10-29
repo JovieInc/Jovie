@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 
 const mockRevenueFailure = vi.hoisted(() => vi.fn());
 const claimVerification = vi.hoisted(() => ({
@@ -31,6 +35,19 @@ const {
   mockFetchArtistBySpotifyUrl: vi.fn(),
   mockReserveOnboardingHandle: vi.fn(),
   mockDeriveClaimedOnboardingStateFromMessageRows: vi.fn(),
+}));
+
+const mockRecordArtistOfferStage = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: mockRecordArtistOfferStage,
+}));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({
+    get: (name: string) =>
+      name === 'jv_acquisition_id'
+        ? { value: '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f' }
+        : undefined,
+  }),
 }));
 
 vi.mock('@/lib/analytics/signup-funnel.server', () => ({
@@ -160,6 +177,11 @@ vi.mock('@/lib/onboarding/claimed-state', () => ({
 
 vi.mock('@/lib/onboarding/reserved-handle', () => ({
   reserveOnboardingHandle: mockReserveOnboardingHandle,
+}));
+
+const mockScheduleCatalogImport = vi.hoisted(() => vi.fn(() => true));
+vi.mock('@/lib/onboarding/catalog-import.server', () => ({
+  scheduleOnboardingCatalogImport: mockScheduleCatalogImport,
 }));
 
 vi.mock('@/lib/tasks/chat-work-record', () => ({
@@ -458,6 +480,11 @@ describe('materializeClaimedOnboardingProfile', () => {
         step: 'claim_complete',
         cohort,
       });
+      // Golden-path "page claimed" is keyed to the consented journey cookie.
+      expect(mockRecordArtistOfferStage).toHaveBeenCalledWith(
+        '9b0c2f4e-1d2a-4c3b-8e5f-0a1b2c3d4e5f',
+        'claimed'
+      );
     }
   );
 
@@ -541,6 +568,15 @@ describe('materializeClaimedOnboardingProfile', () => {
         spotifyUrl: 'https://open.spotify.com/artist/spotify_1',
       })
     );
+    // JOV-9758 root cause: the chat claim attached the Spotify identity but
+    // never imported its catalog. The matched artist's releases and links
+    // must be imported as part of materializing the profile.
+    expect(mockScheduleCatalogImport).toHaveBeenCalledWith({
+      profileId: 'profile_new',
+      spotifyArtistId: 'spotify_1',
+      spotifyArtistUrl: 'https://open.spotify.com/artist/spotify_1',
+      userId: 'user_1',
+    });
   });
 
   it('holds a high-reach artist for verification instead of attaching it', async () => {
@@ -581,6 +617,8 @@ describe('materializeClaimedOnboardingProfile', () => {
     >;
     expect(inserted.spotifyId ?? null).toBeNull();
     expect(inserted.displayName).not.toBe('Famous Artist');
+    // A held identity is not attached, so its catalog is not imported yet.
+    expect(mockScheduleCatalogImport).not.toHaveBeenCalled();
     expect(claimVerification.request).toHaveBeenCalledWith(
       expect.objectContaining({
         profileId: 'profile_new',
@@ -766,6 +804,45 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
     mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
   });
 
+  it.each(['artist', 'author', 'creator', 'expert', 'founder'] as const)(
+    'reserves a %s draft without an invented artist classification',
+    async role => {
+      const profileDraft = advanceOnboardingProfileDraft(
+        emptyOnboardingProfileDraft(),
+        { id: 'role', text: `I am a ${role}. I want a useful profile` }
+      );
+      mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+        artist: null,
+        handle: 'mywork',
+        socialLinks: [],
+        interviewSignals: [],
+        profileDraft,
+      });
+      setupOwnedConversationAndMessages();
+      setupExistingProfileSelect(null);
+      const [insertValues] = queueProfileInsert({ id: 'profile_reserved' });
+      queueReservedPostPersistWrites();
+      await materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+        visibility: 'reserved',
+        waitlistEntryId: 'entry_1',
+      });
+      expect(insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creatorType: role === 'artist' ? 'artist' : 'creator',
+          isPublic: false,
+          isClaimed: false,
+          settings: expect.objectContaining({
+            onboarding: expect.objectContaining({ profileDraft }),
+          }),
+        })
+      );
+    }
+  );
+
   it('creates a hidden, unclaimed profile that holds the handle for the waitlist entry', async () => {
     setupOwnedConversationAndMessages();
     setupExistingProfileSelect(null);
@@ -803,6 +880,43 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
     // Only the profile insert + audit log — no userProfileClaims row.
     expect(mockDbInsert).toHaveBeenCalledTimes(2);
     expect(mockRecordFunnelStep).not.toHaveBeenCalled();
+  });
+
+  it('imports the matched catalog for a reserved waitlist hold too (JOV-9758)', async () => {
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: 'spotify_pianist',
+        name: 'Canary Pianist',
+        url: 'https://open.spotify.com/artist/spotify_pianist',
+        imageUrl: null,
+        followers: 42,
+        popularity: 10,
+        genres: ['classical piano'],
+      },
+      handle: 'canarypianist',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    queueProfileInsert({ id: 'profile_reserved' });
+    queueReservedPostPersistWrites();
+
+    await materializeClaimedOnboardingProfile({
+      userId: 'user_1',
+      conversationId: 'conv_1',
+      ipAddress: null,
+      userAgent: null,
+      visibility: 'reserved',
+      waitlistEntryId: 'entry_1',
+    });
+
+    expect(mockScheduleCatalogImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        profileId: 'profile_reserved',
+        spotifyArtistId: 'spotify_pianist',
+      })
+    );
   });
 
   it('refuses a second claimant the held handle and reserves a fallback instead', async () => {
@@ -867,6 +981,59 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
 
     expect(setSpy).toHaveBeenCalledWith(
       expect.objectContaining({ isPublic: true, isClaimed: true })
+    );
+  });
+});
+
+describe('materializeClaimedOnboardingProfile — unproven admission (private until proof)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIdentityConflict.mockReset();
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: '4Uwpa6zW3zzCSQvooQNksm',
+        name: 'Mid Artist',
+        url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+        imageUrl: null,
+        genres: [],
+        followers: 3_200,
+        popularity: 30,
+      },
+      handle: 'midartist',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    mockReserveOnboardingHandle.mockResolvedValue('midartist');
+    mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
+  });
+
+  it('creates a claimed but private profile, holds the Spotify identity and opens a proof request', async () => {
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    const [insertValues] = queueProfileInsert({ id: 'profile_unproven' });
+    queuePostPersistWrites();
+
+    await materializeClaimedOnboardingProfile({
+      userId: 'user_1',
+      conversationId: 'conv_1',
+      ipAddress: null,
+      userAgent: null,
+      visibility: 'unproven',
+    });
+
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ isPublic: false, isClaimed: true })
+    );
+    const inserted = insertValues.mock.calls[0]?.[0] as Record<string, unknown>;
+    // No catalog or identity is attributed to the requester before proof.
+    expect(inserted.spotifyId).toBeUndefined();
+    expect(claimVerification.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+        reach: 3_200,
+        paid: false,
+        proofOnly: true,
+      })
     );
   });
 });
