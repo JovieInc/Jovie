@@ -6,8 +6,6 @@ import { AgentClaimScreen } from './AgentClaimScreen';
 import { claimAgentDraftAction } from './actions';
 import { parseAgentClaimErrorCode } from './claim-states';
 
-export const dynamic = 'force-dynamic';
-
 export const metadata: Metadata = {
   title: `Claim your draft | ${APP_NAME}`,
   description: 'Claim the artist draft your assistant prepared on Jovie.',
