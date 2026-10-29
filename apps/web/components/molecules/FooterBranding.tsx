@@ -75,7 +75,9 @@ function getLogoLinkClass(mark: string, isLinear: boolean): string {
   if (mark === 'brand') {
     // Same brand line as the smart-link footer: 14px medium, quiet token
     // color, invisible 44px hit container.
-    return "relative inline-flex items-center gap-2 rounded-md text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']";
+    return cn(
+      "relative inline-flex items-center gap-2 rounded-md text-sm font-medium text-secondary-token transition-colors duration-subtle hover:text-primary-token focus-ring-themed before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-full before:min-w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+    );
   }
   if (mark === 'text') {
     return 'inline-flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-2 -mx-2 -my-3 focus-ring-themed text-3xs uppercase tracking-widest text-neutral-700 hover:text-neutral-950 dark:text-white/70 dark:hover:text-white';
