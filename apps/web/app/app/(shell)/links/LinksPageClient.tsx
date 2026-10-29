@@ -48,11 +48,15 @@ function StatusBadge({ status }: { readonly status: LinkRow['status'] }) {
 function LinkInspector({
   row,
   onClose,
+  onUnmount,
 }: {
   readonly row: LinkRow;
   readonly onClose: () => void;
+  readonly onUnmount: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => onUnmount, [onUnmount]);
 
   return (
     <EntitySidebarShell
@@ -146,7 +150,6 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
   );
   const closeInspector = useCallback(() => setSelectedId(null), []);
   const originatingControlRef = useRef<HTMLElement | null>(null);
-  const railWasOpenRef = useRef(false);
 
   const openInspector = useCallback((rowId: string) => {
     originatingControlRef.current =
@@ -156,31 +159,31 @@ export function LinksPageClient({ rows }: { readonly rows: LinkRow[] }) {
     setSelectedId(rowId);
   }, []);
 
-  // Entity-rail parity: present the inspector through the shell's right-rail
-  // slot (AppShellFrame + AppShellRightRail) like every other workspace,
-  // instead of a local aside bolted onto the table row.
-  useRegisterRightPanel(
-    selectedRow ? (
-      <LinkInspector row={selectedRow} onClose={closeInspector} />
-    ) : null
-  );
-
-  // Focus return mirrors the shared rails' discipline: restore focus to the
-  // originating row control only when the closing rail still owned it (focus
-  // fell back to <body> on unmount). Never steal focus from a live control.
-  useEffect(() => {
-    const closing = railWasOpenRef.current && selectedRow == null;
-    railWasOpenRef.current = selectedRow != null;
-    if (!closing) return;
+  // The registered panel unmounts in a later context update. Restore focus
+  // after that unmount, when its focused control has fallen back to <body>.
+  // Never steal focus from a live control.
+  const restoreOriginatingFocus = useCallback(() => {
     const target = originatingControlRef.current;
-    originatingControlRef.current = null;
     const active = document.activeElement;
     const railOwnedFocus =
       active === document.body || active === document.documentElement;
     if (!target || !railOwnedFocus || !target.isConnected) return;
     if (target.closest('[inert], [aria-hidden="true"]')) return;
     target.focus({ preventScroll: true });
-  }, [selectedRow]);
+  }, []);
+
+  // Entity-rail parity: present the inspector through the shell's right-rail
+  // slot (AppShellFrame + AppShellRightRail) like every other workspace,
+  // instead of a local aside bolted onto the table row.
+  useRegisterRightPanel(
+    selectedRow ? (
+      <LinkInspector
+        row={selectedRow}
+        onClose={closeInspector}
+        onUnmount={restoreOriginatingFocus}
+      />
+    ) : null
+  );
 
   if (rows.length === 0) {
     return (

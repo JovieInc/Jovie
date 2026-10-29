@@ -29,12 +29,13 @@ function RightPanelSlot() {
   return <div data-testid='shell-right-panel-slot'>{panel}</div>;
 }
 
-function renderLinksWorkspace(ui: ReactElement) {
+function renderLinksWorkspace(ui: ReactElement, reactStrictMode = false) {
   return render(
     <RightPanelProvider>
-      <RightPanelSlot />
       {ui}
-    </RightPanelProvider>
+      <RightPanelSlot />
+    </RightPanelProvider>,
+    { reactStrictMode }
   );
 }
 
@@ -246,45 +247,79 @@ describe('LinksPageClient', () => {
     expect(screen.getByTestId('shell-right-panel-slot')).toBeEmptyDOMElement();
   });
 
-  it('supports the complete keyboard path and returns focus to the originating row', async () => {
+  it.each([false, true])(
+    'supports the complete keyboard path and returns focus to the originating row (StrictMode=%s)',
+    async reactStrictMode => {
+      const user = userEvent.setup();
+      renderLinksWorkspace(
+        <LinksPageClient
+          rows={[
+            baseRow,
+            {
+              ...baseRow,
+              id: 'row-2',
+              title: 'Neon Sky',
+              jovieUrl: 'https://jov.ie/tim/neon-sky',
+            },
+          ]}
+        />,
+        reactStrictMode
+      );
+
+      // Table row → rail: Enter on the row's action control opens the inspector.
+      const rowButton = screen.getByRole('button', {
+        name: 'jov.ie/tim/neon-sky',
+      });
+      rowButton.focus();
+      await user.keyboard('{Enter}');
+
+      const slot = screen.getByTestId('shell-right-panel-slot');
+      expect(within(slot).getByTestId('links-inspector')).toBeInTheDocument();
+
+      // Opening the desktop rail preserves focus on the originating row.
+      expect(rowButton).toHaveFocus();
+
+      // The shell renders the rail after the route: Tab from the last row
+      // reaches the rail's header actions.
+      await user.tab();
+      expect(
+        within(screen.getByTestId('links-inspector')).getByRole('button', {
+          name: 'More actions',
+        })
+      ).toHaveFocus();
+
+      // Escape → originating row: closing the rail returns focus to the row
+      // control that opened it instead of dropping focus on <body>.
+      await user.keyboard('{Escape}');
+      expect(screen.queryByTestId('links-inspector')).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(rowButton);
+    }
+  );
+
+  it('preserves focus on another live row when the inspector closes', async () => {
     const user = userEvent.setup();
     renderLinksWorkspace(
       <LinksPageClient
         rows={[
           baseRow,
-          {
-            ...baseRow,
-            id: 'row-2',
-            title: 'Neon Sky',
-            jovieUrl: 'https://jov.ie/tim/neon-sky',
-          },
+          { ...baseRow, id: 'row-2', jovieUrl: 'https://jov.ie/tim/neon-sky' },
         ]}
       />
     );
-
-    // Table row → rail: Enter on the row's action control opens the inspector.
-    const rowButton = screen.getAllByRole('button', {
+    const opener = screen.getByRole('button', {
       name: 'jov.ie/tim/midnight-city',
-    })[0];
-    rowButton.focus();
+    });
+    opener.focus();
     await user.keyboard('{Enter}');
 
-    const slot = screen.getByTestId('shell-right-panel-slot');
-    expect(within(slot).getByTestId('links-inspector')).toBeInTheDocument();
-
-    // Rail → portalled controls: Tab reaches the shell-rendered rail controls
-    // (Close, copy) after the table controls in DOM order.
-    await user.tab();
-    const focused = document.activeElement;
-    expect(
-      within(screen.getByTestId('links-inspector')).contains(focused)
-    ).toBe(true);
-
-    // Escape → originating row: closing the rail returns focus to the row
-    // control that opened it instead of dropping focus on <body>.
+    const otherRow = screen.getByRole('button', {
+      name: 'jov.ie/tim/neon-sky',
+    });
+    otherRow.focus();
     await user.keyboard('{Escape}');
+
     expect(screen.queryByTestId('links-inspector')).not.toBeInTheDocument();
-    expect(document.activeElement).toBe(rowButton);
+    expect(otherRow).toHaveFocus();
   });
 
   it('switches the inspector content when selecting another row', async () => {
