@@ -216,7 +216,7 @@ function errorHttpStatus(error: unknown): number | null {
 function isTransientGatewayServerError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const status = errorHttpStatus(error);
-  return status !== null && status >= 500;
+  return status !== null && status >= 500 && status < 600;
 }
 
 async function executeProbeWithTransientRetry(
@@ -342,8 +342,22 @@ export async function executeWebAiHealthProbe(
   } as const;
 
   if (definition.mode === 'stream') {
-    const result = streamText(common);
-    return result.text;
+    let streamError: unknown;
+    const result = streamText({
+      ...common,
+      onError: ({ error }) => {
+        streamError = error;
+      },
+    });
+    try {
+      const text = await result.text;
+      if (streamError !== undefined) throw streamError;
+      return text;
+    } catch (error) {
+      // The SDK's text promise can replace a Gateway failure with a statusless
+      // NoOutputGeneratedError. Preserve the callback error for retry/classification.
+      throw streamError ?? error;
+    }
   }
 
   if (definition.mode === 'text') {

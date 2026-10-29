@@ -957,14 +957,38 @@ JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\
 RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
+def red_section_bounds(body: str) -> tuple[int, int] | None:
+    """Match Fleet Rules' section boundaries without treating fenced logs as headings."""
+    # Map visible characters back to raw offsets, keeping complete comments around
+    # the section even when a comment ends on the same line as a heading.
+    chunks, offsets, cursor = [], [], 0
+    for comment in re.finditer(r"<!--[\s\S]*?-->", body or ""):
+        chunks.append(body[cursor:comment.start()])
+        offsets.extend(range(cursor, comment.start()))
+        cursor = comment.end()
+    chunks.append(body[cursor:])
+    offsets.extend(range(cursor, len(body)))
+    fenced, start, position = False, None, 0
+    for line in "".join(chunks).splitlines(keepends=True):
+        if re.match(r"^\s*(```|~~~)", line):
+            fenced = not fenced
+        elif not fenced and ANY_HEADING.match(line):
+            if start is not None:
+                return offsets[start], offsets[position]
+            if RED_HEADING.match(line):
+                start = position
+        position += len(line)
+    return (offsets[start], len(body)) if start is not None else None
+
+
 def red_section_complete(body: str) -> bool:
     """Mirror of scripts/pr-fleet-rules.mjs: a Failing command plus a red-output fence or run URL."""
-    lines = re.sub(r"<!--[\s\S]*?-->", "", body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    visible = re.sub(r"<!--[\s\S]*?-->", "", body or "")
+    bounds = red_section_bounds(visible)
+    if bounds is None:
         return False
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
-    section = "\n".join(lines[start + 1:end])
+    start, end = bounds
+    section = visible[start:end]
     command = re.search(r"^\s*(?:-\s*)?Failing command:\s*(.+)$", section, re.I | re.M)
     run_url = re.search(r"^\s*(?:-\s*)?Failing run \(before fix\):\s*`?(https://\S+?)`?\s*$", section, re.I | re.M)
     fence = re.search(r"```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```",
@@ -1002,12 +1026,12 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
 
 def with_red_section(body: str, block: str) -> str:
     """Replace an empty/placeholder Red-before-green section with the block, or append one."""
-    lines = (body or "").split("\n")
-    start = next((i for i, line in enumerate(lines) if RED_HEADING.match(line.strip())), None)
-    if start is None:
+    body = body or ""
+    bounds = red_section_bounds(body)
+    if bounds is None:
         return (body or "").rstrip("\n") + "\n\n" + block + "\n"
-    end = next((i for i in range(start + 1, len(lines)) if ANY_HEADING.match(lines[i])), len(lines))
-    return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
+    start, end = bounds
+    return body[:start] + block + "\n\n" + body[end:]
 
 
 def api_gh(args, **_):
