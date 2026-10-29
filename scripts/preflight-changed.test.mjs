@@ -113,7 +113,12 @@ test('typecheck targets are the affected packages only', () => {
     ],
     process.cwd()
   );
-  assert.deepEqual(t.sort(), ['scripts', 'web', 'web-tests']);
+  assert.deepEqual(t.sort(), [
+    'pkg:@jovie/ovie',
+    'scripts',
+    'web',
+    'web-tests',
+  ]);
 });
 
 test('arguments parse and unknown flags fail', () => {

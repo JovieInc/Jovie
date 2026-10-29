@@ -3109,11 +3109,17 @@ ${selectedGateScript}`,
     );
     expect(resolve).toContain('should_probe');
 
+    // JOV-9822: auth smoke feeds the golden-path certification, which also
+    // runs after every Production Verified and on the lanes clock.
+    expect(resolve).toContain('should_certify');
+    expect(resolve).toContain('.name == "Production Verified"');
     for (const jobId of ['smoke', 'auth-smoke', 'lighthouse']) {
       const job = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, jobId);
       expect(job, jobId).toContain('needs: [resolve-target]');
       expect(job, jobId).toContain(
-        "needs.resolve-target.outputs.should_probe == 'true'"
+        jobId === 'auth-smoke'
+          ? "needs.resolve-target.outputs.should_certify == 'true'"
+          : "needs.resolve-target.outputs.should_probe == 'true'"
       );
       expect(job, jobId).toContain(
         'ref: ${{ needs.resolve-target.outputs.commit_sha }}'
