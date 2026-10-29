@@ -1,0 +1,80 @@
+{
+  "schema": "jovie-data-architecture/v1",
+  "adr": "docs/architecture/data-architecture-adr-2026-10-29.md",
+  "owner": "Summer",
+  "guard": "scripts/data-architecture-guard.mjs",
+  "doc": "Every data-fetching, client-state, cache, realtime or database library a Next.js app depends on must be listed here with its one role. A second library for an existing role is a one-off; extend the approved one or amend the ADR first.",
+  "watchedDependencyPattern": "^(?:@tanstack\\/(?:react-)?(?:query|pacer|db|store)[\\w-]*|swr|axios|ky|got|ofetch|@apollo\\/.*|urql|@urql\\/.*|graphql-request|zustand|jotai|valtio|recoil|redux|@reduxjs\\/.*|mobx.*|nuqs|drizzle-(?:orm|kit|zod|seed)|@neondatabase\\/.*|pg|pg-pool|postgres|@vercel\\/(?:postgres|kv)|@prisma\\/.*|prisma|kysely|knex|typeorm|@supabase\\/.*|ioredis|redis|@upstash\\/.*|ws|socket\\.io.*|pusher.*|ably|@electric-sql\\/.*|@trpc\\/.*|@orpc\\/.*)$",
+  "libraries": [
+    {
+      "name": "drizzle-orm",
+      "role": "ORM and query builder; the only way app code talks to Postgres (via @/lib/db).",
+      "apps": ["web"]
+    },
+    {
+      "name": "drizzle-kit",
+      "role": "Migration generation only (drizzle-kit generate). Migrations apply through apps/web/scripts/drizzle-migrate.ts on the direct endpoint; never push/migrate from drizzle-kit in CI or prod.",
+      "apps": ["web"]
+    },
+    {
+      "name": "drizzle-zod",
+      "role": "Schema-derived validators in lib/db/schema.",
+      "apps": ["web"]
+    },
+    {
+      "name": "@neondatabase/serverless",
+      "role": "The one driver: WebSocket Pool in lib/db/client/connection.ts (app, RLS session state); HTTP neon() only in scripts.",
+      "apps": ["web"]
+    },
+    {
+      "name": "ws",
+      "role": "WebSocket constructor for the Neon Pool in Node.",
+      "apps": ["web"]
+    },
+    {
+      "name": "postgres",
+      "role": "Test-only driver for local Postgres fixtures (tests/, *.test-utils.ts). Never imported by app code.",
+      "apps": ["web"]
+    },
+    {
+      "name": "@electric-sql/pglite",
+      "role": "Test-only in-process Postgres for unit tests.",
+      "apps": ["web"]
+    },
+    {
+      "name": "@tanstack/react-query",
+      "role": "The one client cache, only where client interactivity needs it (lib/queries).",
+      "apps": ["web"]
+    },
+    {
+      "name": "@tanstack/react-query-devtools",
+      "role": "Dev-only inspector for the client cache.",
+      "apps": ["web"]
+    },
+    {
+      "name": "@tanstack/react-pacer",
+      "role": "Client-side timing only: debounce/throttle/rate-limit of user input and autosave (lib/pacer). Not a cache, not a fetcher.",
+      "apps": ["web"]
+    },
+    {
+      "name": "nuqs",
+      "role": "URL search-param state (filters, tabs) through lib/nuqs.",
+      "apps": ["web"]
+    },
+    {
+      "name": "@upstash/redis",
+      "role": "Durable cross-instance counters, locks, rate limits and dedupe. Not a read cache for data the Next cache already holds.",
+      "apps": ["web"]
+    },
+    {
+      "name": "@upstash/ratelimit",
+      "role": "Rate limiting on top of @upstash/redis.",
+      "apps": ["web"]
+    },
+    {
+      "name": "redis",
+      "role": "Local-development Redis client behind lib/redis-local-client.ts only.",
+      "apps": ["web"]
+    }
+  ]
+}

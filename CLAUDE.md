@@ -57,6 +57,7 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | Environment/tooling | [environment](.claude/rules/environment.md) |
 | TypeScript, React, boundaries, prior art | [code-style](.claude/rules/code-style.md) |
 | DB/migrations | [db](.claude/rules/db.md) |
+| Data fetching, caching, mutations, realtime | [data-architecture](.claude/rules/data-architecture.md) |
 | Auth/Better Auth | [auth](.claude/rules/auth.md) |
 | Security, billing, entitlements | [security](.claude/rules/security.md) |
 | External APIs | [external-apis](.claude/rules/external-apis.md) |

@@ -2145,6 +2145,13 @@ describe('source-read guard selection', () => {
     /^apps\/web\/(?:app|lib|components)\/.+\.(?:ts|tsx|mts)$/u.test(path)
       ? ['domain-write-guard']
       : [];
+  // data-architecture-guard scans Next.js app source and app manifests.
+  const dataArchGuard = path =>
+    /^(?:apps\/(?:web|ovie|console|docs|should-i-make)\/(?!scripts\/|drizzle\/|tests?\/).+\.(?:ts|tsx|mts|js|jsx)$|apps\/[^/]+\/package\.json$)/u.test(
+      path
+    )
+      ? ['data-architecture-guard']
+      : [];
 
   it.each(['pull_request', 'merge_group', 'push'])(
     'runs profile conformance for adapters on %s',
@@ -2269,6 +2276,7 @@ describe('source-read guard selection', () => {
       ...guards,
       ...apiGuard(path),
       ...domainGuard(path),
+      ...dataArchGuard(path),
       'web-source-read-tests',
       'script-contracts',
       ...(/^(?:apps\/web\/components\/|packages\/ui\/)/u.test(path)
@@ -2344,6 +2352,7 @@ describe('source-read guard selection', () => {
             'artist-profile-conformance',
             ...apiGuard(path),
             ...domainGuard(path),
+            ...dataArchGuard(path),
             'copy-leak',
           ]
         : ['copy-leak'];
@@ -2380,6 +2389,7 @@ describe('source-read guard selection', () => {
       'anti-slop',
       'external-api-guard',
       'domain-write-guard',
+      'data-architecture-guard',
       'copy-leak',
     ]);
     expect(selected('', ['README.md'])).toEqual(all);
@@ -2397,6 +2407,7 @@ describe('source-read guard selection', () => {
       'anti-slop',
       'external-api-guard',
       'domain-write-guard',
+      'data-architecture-guard',
       'copy-leak',
     ]);
   });
@@ -2488,6 +2499,12 @@ describe('source-read guard selection', () => {
             'utf8'
           )
         ).toContain("from 'node:test'");
+        continue;
+      }
+      if (guard.id === 'data-architecture-guard') {
+        expect(guard.command).toContain(
+          join(REPO_ROOT, 'scripts/data-architecture-guard.mjs')
+        );
         continue;
       }
       if (guard.id === 'domain-write-guard') {

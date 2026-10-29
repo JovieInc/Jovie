@@ -28,6 +28,7 @@ export const VERCEL_TOKEN_MISSING_WARNING =
 const MODES = new Set([
   'all',
   'credentials',
+  'data-arch',
   'domains',
   'drafts',
   'drift',
@@ -405,6 +406,47 @@ export function planSummerReceipts(health, nowMs) {
   });
 }
 
+export const DATA_ARCH_ADR =
+  'docs/architecture/data-architecture-adr-2026-10-29.md';
+
+/**
+ * One owned, fingerprinted issue per data-architecture rule that still has
+ * grandfathered debt (scripts/data-architecture-guard.mjs --json). The guard
+ * stops new violations; this turns the remaining ratchet into owned fixes so
+ * it shrinks. Totals in the description are the daily trend Summer reads.
+ */
+export function planDataArchitectureDebt(metrics, rules = {}) {
+  const plans = [];
+  for (const [rule, total] of Object.entries(metrics?.totals ?? {})) {
+    if (!total) continue;
+    const fingerprint = `remediation:data-arch-debt:${rule}`;
+    const top = (metrics.top?.[rule] ?? [])
+      .map(([path, n]) => `- \`${path}\` (${n})`)
+      .join('\n');
+    plans.push(
+      issue({
+        fingerprint,
+        summary: `Data architecture debt: ${total} ${rule}`,
+        priority: 3,
+        reason: `${total} grandfathered ${rule} violations`,
+        description: note(
+          fingerprint,
+          [
+            `${total} grandfathered \`${rule}\` violations remain (ADR: \`${DATA_ARCH_ADR}\`).`,
+            rules[rule] ? `Fix: ${rules[rule]}` : '',
+            '',
+            'Top offenders:',
+            top || '- none listed',
+            '',
+            'Fix a file, then run `node scripts/data-architecture-guard.mjs --write` so the ratchet locks the gain. New violations already fail Source Validation.',
+          ].join('\n')
+        ),
+      })
+    );
+  }
+  return plans;
+}
+
 export function deploymentState(deployment) {
   return String(
     deployment?.readyState ?? deployment?.state ?? ''
@@ -477,6 +519,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<any[]>} [options.loadDomains]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadDrift]
+ * @param {() => Promise<{ metrics: any, rules?: Record<string, string> }>} [options.loadDataArchitecture]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -492,6 +535,7 @@ export async function runRemediationSweep({
   loadDomains,
   loadCredentials,
   loadDrift,
+  loadDataArchitecture,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -556,6 +600,14 @@ export async function runRemediationSweep({
     for (const record of records) {
       const plan = planDomainExpiry(record, nowMs);
       if (plan) plans.push(plan);
+    }
+  }
+  if (includesMode(mode, 'data-arch')) {
+    if (!loadDataArchitecture) {
+      warnings.push('Data architecture loader not wired; not judged');
+    } else {
+      const { metrics, rules } = await loadDataArchitecture();
+      plans.push(...planDataArchitectureDebt(metrics, rules));
     }
   }
   if (includesMode(mode, 'credentials')) {
