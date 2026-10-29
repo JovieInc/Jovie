@@ -13,6 +13,6 @@ local source/browser evidence, not production:
 - `tests/e2e/pricing.spec.ts`, chromium project: **11/11 passed**. Covers comparison geometry and plan
   selection from 320 to 1440px, accessibility, offer labels and CTA destinations, and the new row
   assertions.
-- Full-page captures: `pricing-1440.jpg`, `pricing-390.jpg`. There is no horizontal overflow at either width.
+- Full-page captures: `pricing-1440.jpg` (captured at 1440, stored downscaled to 960 wide) and `pricing-390.jpg`, both compressed to fit the repo byte budget. There is no horizontal overflow at either width.
 - Rendered comparison rows at both widths: Pre-release & countdown pages, Public Jovie profile page, Fan
   email capture, Release notifications (email to fans).
