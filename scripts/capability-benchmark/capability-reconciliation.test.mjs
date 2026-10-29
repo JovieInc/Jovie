@@ -691,6 +691,7 @@ test('stack pattern ratchet names every legacy file when the budget is exceeded'
     assert.throws(
       () => reconciliation.assertStackPatternRatchet(root, 1),
       error => {
+        assert.ok(error instanceof Error);
         assert.match(error.message, /grew to 2 \(maximum 1\)/);
         assert.ok(error.message.includes(first));
         assert.ok(error.message.includes(second));
