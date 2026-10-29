@@ -271,7 +271,7 @@ async function main() {
   } catch (error) {
     if (error?.deferred) {
       console.warn(
-        `Hold contract sweep deferred (${error.message}); no holds were released and none were judged. It re-runs on the next enroll wake.`
+        `Hold contract sweep deferred (${error.message}); the remaining holds were not judged and stay applied. It re-runs on the next enroll wake.`
       );
       process.exitCode = error.exitCode ?? EX_TEMPFAIL;
       return;
