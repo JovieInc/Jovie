@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import {
   advisoryFingerprint,
   groupAlerts,
+  issueDescription,
   planAdvisories,
   SLA_HOURS,
   slaDueAt,
@@ -179,6 +180,15 @@ test('exceptions file is time-boxed and carries a reachability reason', () => {
     assert.ok(Number.isFinite(Date.parse(e.expires)));
     assert.ok(e.owner);
   }
+});
+
+test('Linear exception guidance points to an existing advisory policy', () => {
+  const [group] = planAdvisories({ alerts: [alert(1)], now: NOW }).upserts;
+  const description = issueDescription(group);
+  const match = description.match(/time-boxed entry in `([^`]+)`/);
+  assert.ok(match, 'exception instructions must name the policy file');
+  const policy = JSON.parse(readFileSync(path.join(ROOT, match[1]), 'utf8'));
+  assert.ok(Array.isArray(policy.exceptions));
 });
 
 test('loop is wired: workflow runs sync + check on the lanes clock, registry row has the SLA', () => {

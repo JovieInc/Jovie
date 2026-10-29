@@ -188,7 +188,7 @@ export function issueDescription(g) {
     '## Done when',
     '- Every Dependabot alert for this advisory is `fixed` on main (upgrade, override, or replace; no `--no-verify`, no weakened tests).',
     '- A Production deployment created after the fix landed has succeeded. The loop closes this issue itself; do not close it by hand.',
-    '- If no patch exists, record a time-boxed entry in `config/security/advisory-exceptions.json` with the reachability proof.'
+    '- If no patch exists, record a time-boxed entry in `scripts/security/advisory-exceptions.json` with the reachability proof.'
   );
   return lines.join('\n');
 }
