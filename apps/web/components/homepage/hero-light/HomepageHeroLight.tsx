@@ -27,12 +27,14 @@ interface HeroLightHandle {
  * missing WebGL, a refused context, and context loss leave the static poster
  * in place.
  */
+export interface HomepageHeroLightProps {
+  /** Overrides the registered budget's default. Static unless enabled. */
+  readonly animate?: boolean;
+}
+
 export function HomepageHeroLight({
   animate = isAnimatedBackgroundEnabled('homepage-hero-light'),
-}: Readonly<{
-  /** Overrides the registered budget's default. Static unless enabled. */
-  animate?: boolean;
-}> = {}) {
+}: HomepageHeroLightProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mountCanvas, setMountCanvas] = useState(false);
   const [live, setLive] = useState(false);

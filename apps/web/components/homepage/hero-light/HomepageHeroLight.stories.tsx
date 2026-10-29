@@ -5,6 +5,7 @@ import { HomepageHeroLight } from './HomepageHeroLight';
 const meta = {
   title: 'Marketing/HomepageHeroLight',
   component: HomepageHeroLight,
+  args: { animate: false },
   parameters: {
     layout: 'fullscreen',
     docs: {
@@ -35,6 +36,6 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const Poster: Story = {};
+export const Poster: Story = { args: { animate: false } };
 
 export const BudgetEnabled: Story = { args: { animate: true } };
