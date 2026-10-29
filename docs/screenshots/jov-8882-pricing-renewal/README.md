@@ -41,10 +41,10 @@ Fresh full-page captures:
 
 | Width | Capture | Shared header/main/footer container | Overflow / layout |
 | --- | --- | --- | --- |
-| 320 | [320px](pricing-320.png) | x=24, width=272 | None; stable |
-| 390 | [390px](pricing-390.png) | x=24, width=342 | None; stable |
-| 768 | [768px](pricing-768.png) | x=32, width=704 | None; stable |
-| 1440 | [1440px](pricing-1440.png) | x=71, width=1298 | None; stable |
+| 320 | [320px](pricing-320.png.evidence.json) | x=24, width=272 | None; stable |
+| 390 | [390px](pricing-390.png.evidence.json) | x=24, width=342 | None; stable |
+| 768 | [768px](pricing-768.png.evidence.json) | x=32, width=704 | None; stable |
+| 1440 | [1440px](pricing-1440.png.evidence.json) | x=71, width=1298 | None; stable |
 
 Playwright measured matching container edges, zero horizontal overflow and equal
 main/footer heights across two animation frames after fonts at all four widths.

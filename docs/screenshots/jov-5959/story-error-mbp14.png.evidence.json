@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "084716c37db3e0ad8cafbec033289f51dea5adee9ea91693500cd5e1232b1094",
+  "bytes": 27522,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/08/084716c37db3e0ad8cafbec033289f51dea5adee9ea91693500cd5e1232b1094.png",
+  "viewport": "1512x982",
+  "capturedAt": "2026-10-21T01:32:55Z",
+  "label": "docs/screenshots/jov-5959/story-error-mbp14.png"
+}

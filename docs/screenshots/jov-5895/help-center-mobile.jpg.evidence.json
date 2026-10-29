@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "f6bf026abd50a7f7f3ca6630cd4d0ff9dc3b3fea9a4b5b158548a5f630f9b0ce",
+  "bytes": 44532,
+  "contentType": "image/jpeg",
+  "url": "r2://jovie-evidence/evidence/f6/f6bf026abd50a7f7f3ca6630cd4d0ff9dc3b3fea9a4b5b158548a5f630f9b0ce.jpg",
+  "viewport": null,
+  "capturedAt": "2026-09-26T22:44:07Z",
+  "label": "docs/screenshots/jov-5895/help-center-mobile.jpg"
+}

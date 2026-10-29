@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "e970a736ea796366ebde08cc47743ed5678cd52cebba239ca40735324500a9bf",
+  "bytes": 12677,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/e9/e970a736ea796366ebde08cc47743ed5678cd52cebba239ca40735324500a9bf.png",
+  "viewport": "390x844",
+  "capturedAt": "2026-10-15T09:55:35Z",
+  "label": "docs/screenshots/jov-8176/pending-light.png"
+}

@@ -8,8 +8,8 @@ section-shell owner. Both changes are covered by the renewed source digest.
 - Node 24.21.0, Next 16.4.1, Chromium; local URL `http://localhost:33151/pricing`.
 - `PUBLIC_NOAUTH_SMOKE=1 NEXT_DISABLE_TOOLBAR=1 NEXT_PUBLIC_E2E_MODE=1`.
 - `BASE_URL=http://localhost:33151 E2E_SKIP_WEB_SERVER=1 E2E_SKIP_SEED=1 E2E_SKIP_WARMUP=1 pnpm --filter @jovie/web exec playwright test tests/e2e/pricing.spec.ts --config=playwright.config.noauth.ts --project=chromium --workers=1 --reporter=line`: **10 passed**.
-- Renewed captures: [320px](pricing-320.png), [390px](pricing-390.png),
-  [768px](pricing-768.png), [1440px](pricing-1440.png). Reviewed at 320px and 1440px.
+- Renewed captures: [320px](pricing-320.png.evidence.json), [390px](pricing-390.png.evidence.json),
+  [768px](pricing-768.png.evidence.json), [1440px](pricing-1440.png.evidence.json). Reviewed at 320px and 1440px.
 - At all four capture widths: no horizontal overflow and stable main-content
   geometry across two animation frames after fonts. The suite checks zero axe
   WCAG 2 A/AA + 2.1 A/AA violations in main content and the footer at its responsive
@@ -33,10 +33,10 @@ This is local source/browser evidence, not a deployment receipt.
 
 | Evidence | Result |
 | --- | --- |
-| [Mobile, 320px](pricing-320.png) | Reviewed: complete one-line plan heading, wrapped feature labels, no horizontal overflow |
-| [Mobile, 390px](pricing-390.png) | Reviewed: full footer, one-line comparison heading, no horizontal overflow |
-| [Tablet, 768px](pricing-768.png) | Reviewed: shared grid, header and full footer |
-| [Desktop, 1440px](pricing-1440.png) | Reviewed: shared shell, three plan cards, one closing CTA |
+| [Mobile, 320px](pricing-320.png.evidence.json) | Reviewed: complete one-line plan heading, wrapped feature labels, no horizontal overflow |
+| [Mobile, 390px](pricing-390.png.evidence.json) | Reviewed: full footer, one-line comparison heading, no horizontal overflow |
+| [Tablet, 768px](pricing-768.png.evidence.json) | Reviewed: shared grid, header and full footer |
+| [Desktop, 1440px](pricing-1440.png.evidence.json) | Reviewed: shared shell, three plan cards, one closing CTA |
 | Pricing Playwright suite | 11 passed, including setup; selection at 320–1440px, both motion preferences, keyboard, checkout links, redirect attribution |
 | Axe WCAG 2 A/AA + 2.1 A/AA | Zero violations in main content and footer at 390/768/1440px; comparison additionally checked at 320px |
 | Hydrated/footer geometry | Stable across two animation frames after fonts; no duplicate footer or closing CTA |

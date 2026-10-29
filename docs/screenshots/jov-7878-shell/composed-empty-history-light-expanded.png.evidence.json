@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "6c78d23a023c42bd68efbc0aa4b198ea3f77e09371cb05ab542f1f4fc8d043b7",
+  "bytes": 19405,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/6c/6c78d23a023c42bd68efbc0aa4b198ea3f77e09371cb05ab542f1f4fc8d043b7.png",
+  "viewport": "1126x798",
+  "capturedAt": "2026-10-15T08:57:12Z",
+  "label": "docs/screenshots/jov-7878-shell/composed-empty-history-light-expanded.png"
+}

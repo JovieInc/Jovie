@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "c7d75ae9964d5bde1f5fb7be9206336c2cf77a0e6ec815a47a9f54cdbb2d3ec3",
+  "bytes": 14857,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/c7/c7d75ae9964d5bde1f5fb7be9206336c2cf77a0e6ec815a47a9f54cdbb2d3ec3.png",
+  "viewport": "1440x900",
+  "capturedAt": "2026-10-05T04:53:04Z",
+  "label": "docs/screenshots/jov-7241/after-whats-new-docked-dark-1440x900.png"
+}

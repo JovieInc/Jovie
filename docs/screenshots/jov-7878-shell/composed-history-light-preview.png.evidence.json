@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "29f98141a38ffed737d0e93b13ef2ed1d4e2a3efa2e1884b92619fbfb27c600a",
+  "bytes": 30439,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/29/29f98141a38ffed737d0e93b13ef2ed1d4e2a3efa2e1884b92619fbfb27c600a.png",
+  "viewport": "1126x798",
+  "capturedAt": "2026-10-15T08:57:12Z",
+  "label": "docs/screenshots/jov-7878-shell/composed-history-light-preview.png"
+}

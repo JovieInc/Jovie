@@ -72,9 +72,9 @@ owners. Admin adapters supply composition defaults rather than a parallel design
 system. Ship now: stabilize these owners and People. Re-evaluate when the
 JOV-8393 inventory pass is ready; then remove the remaining report exceptions.
 
-Component evidence: [original desktop](screenshots/jov-8098/before-desktop.png),
-[canonical desktop](screenshots/jov-8098/after-desktop.png), and
-[canonical mobile inspector](screenshots/jov-8098/after-mobile.png).
+Component evidence: [original desktop](screenshots/jov-8098/before-desktop.png.evidence.json),
+[canonical desktop](screenshots/jov-8098/after-desktop.png.evidence.json), and
+[canonical mobile inspector](screenshots/jov-8098/after-mobile.png.evidence.json).
 The original fixture's table scroller measured 6435px tall in a 900px viewport;
 the canonical desktop scroller measured 748px, with tabs and pagination visible.
 The exact selected-owner coverage run passed 123 tests in 22 files, with 90.09%
