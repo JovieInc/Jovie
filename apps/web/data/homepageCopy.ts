@@ -39,7 +39,7 @@ export const HOMEPAGE_COPY = {
     supportNote: MARKETING_CTA_INTENTS.claimProfile.support,
     profile: {
       scenarioId: 'tim-white-profile-live-mobile',
-      alt: "Tim White's Jovie artist profile with his latest release first.",
+      alt: "Tim White's Jovie profile with his latest release first.",
     },
   },
   offer: {

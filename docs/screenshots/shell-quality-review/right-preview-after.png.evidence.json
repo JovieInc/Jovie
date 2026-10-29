@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "cacef2a852e364251a2c5cd63b8ae48140b62f5138171c76205b444891c1c8e5",
+  "bytes": 96154,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/ca/cacef2a852e364251a2c5cd63b8ae48140b62f5138171c76205b444891c1c8e5.png",
+  "viewport": "1440x900",
+  "capturedAt": "2026-10-07T07:02:33Z",
+  "label": "docs/screenshots/shell-quality-review/right-preview-after.png"
+}

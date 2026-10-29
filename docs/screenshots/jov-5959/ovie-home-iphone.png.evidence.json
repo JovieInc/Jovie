@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "9720baf4b141d6e14e7ebbc83c0c4b4a6c492996ba0b46ad33f0073c9cc48547",
+  "bytes": 65549,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/97/9720baf4b141d6e14e7ebbc83c0c4b4a6c492996ba0b46ad33f0073c9cc48547.png",
+  "viewport": "393x852",
+  "capturedAt": "2026-10-21T01:32:55Z",
+  "label": "docs/screenshots/jov-5959/ovie-home-iphone.png"
+}

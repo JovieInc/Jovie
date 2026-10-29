@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "41388cfb7e40c437c1a543aea8e4426046ea9493ad118520105198765661a0b7",
+  "bytes": 66576,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/41/41388cfb7e40c437c1a543aea8e4426046ea9493ad118520105198765661a0b7.png",
+  "viewport": "1440x1142",
+  "capturedAt": "2026-10-03T14:15:22Z",
+  "label": "docs/screenshots/jov-4762-chat-playground.png"
+}

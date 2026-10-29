@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "5f706ceff9418778ef9e27b855e22249f2bffaf392862ef7a1deae49d51c452e",
+  "bytes": 40992,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/5f/5f706ceff9418778ef9e27b855e22249f2bffaf392862ef7a1deae49d51c452e.png",
+  "viewport": "1280x720",
+  "capturedAt": "2026-10-15T02:35:12Z",
+  "label": "docs/screenshots/jov-6545/before-minimized.png"
+}

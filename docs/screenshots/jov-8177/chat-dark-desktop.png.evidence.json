@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "4e23354f605e6c498da898f1ab04157a802d73975dae360ce3663f2cde3c34de",
+  "bytes": 19254,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/4e/4e23354f605e6c498da898f1ab04157a802d73975dae360ce3663f2cde3c34de.png",
+  "viewport": "1280x844",
+  "capturedAt": "2026-10-15T16:08:16Z",
+  "label": "docs/screenshots/jov-8177/chat-dark-desktop.png"
+}

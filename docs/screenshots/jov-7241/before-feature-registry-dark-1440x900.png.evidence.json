@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "0bb1071745117839378eb65883693580fb8f96f3828ce458baf6d9f816f0a37c",
+  "bytes": 110767,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/0b/0bb1071745117839378eb65883693580fb8f96f3828ce458baf6d9f816f0a37c.png",
+  "viewport": "1440x900",
+  "capturedAt": "2026-10-05T04:53:04Z",
+  "label": "docs/screenshots/jov-7241/before-feature-registry-dark-1440x900.png"
+}

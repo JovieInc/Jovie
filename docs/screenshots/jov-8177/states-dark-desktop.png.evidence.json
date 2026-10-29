@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "49ce299898e0ec2bc4b94ed506b3452291a2f16baac1412c9dff95097918bb17",
+  "bytes": 13067,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/49/49ce299898e0ec2bc4b94ed506b3452291a2f16baac1412c9dff95097918bb17.png",
+  "viewport": "1280x844",
+  "capturedAt": "2026-10-15T16:08:16Z",
+  "label": "docs/screenshots/jov-8177/states-dark-desktop.png"
+}

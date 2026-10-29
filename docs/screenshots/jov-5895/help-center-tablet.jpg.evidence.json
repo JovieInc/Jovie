@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "af4e5edc8a2fb7ca938ba7043fa6b9c8aff9a191ad7a31a94b6dab4930ac64f1",
+  "bytes": 54029,
+  "contentType": "image/jpeg",
+  "url": "r2://jovie-evidence/evidence/af/af4e5edc8a2fb7ca938ba7043fa6b9c8aff9a191ad7a31a94b6dab4930ac64f1.jpg",
+  "viewport": null,
+  "capturedAt": "2026-09-26T22:44:07Z",
+  "label": "docs/screenshots/jov-5895/help-center-tablet.jpg"
+}

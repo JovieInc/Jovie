@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "cb558d75f9d332028950d309742fd64b171feb33a2b2e3da45a207c7f0312c4a",
+  "bytes": 109922,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/cb/cb558d75f9d332028950d309742fd64b171feb33a2b2e3da45a207c7f0312c4a.png",
+  "viewport": "1440x900",
+  "capturedAt": "2026-10-05T04:53:04Z",
+  "label": "docs/screenshots/jov-7241/after-feature-registry-dark-1440x900.png"
+}

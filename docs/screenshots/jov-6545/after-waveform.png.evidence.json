@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "7640fae23570609164a890c7081452bb23b8f96ccdb061ce7dcec2e4517374ce",
+  "bytes": 41769,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/76/7640fae23570609164a890c7081452bb23b8f96ccdb061ce7dcec2e4517374ce.png",
+  "viewport": "1280x720",
+  "capturedAt": "2026-10-15T02:35:12Z",
+  "label": "docs/screenshots/jov-6545/after-waveform.png"
+}

@@ -69,9 +69,9 @@ production fixes. The fixture's diagnostic output is test-only.
 
 | State | Before | After |
 | --- | --- | --- |
-| Hidden waveform, 1280px dark | [before](../screenshots/jov-6545/before-waveform.png) | [after](../screenshots/jov-6545/after-waveform.png) |
-| Minimized player, 1280px dark | [before](../screenshots/jov-6545/before-minimized.png) | [after](../screenshots/jov-6545/after-minimized.png) |
-| Narrow mobile targets, 320px dark | [before](../screenshots/jov-6545/before-narrow.png) | [after](../screenshots/jov-6545/after-narrow.png) |
+| Hidden waveform, 1280px dark | [before](../screenshots/jov-6545/before-waveform.png.evidence.json) | [after](../screenshots/jov-6545/after-waveform.png.evidence.json) |
+| Minimized player, 1280px dark | [before](../screenshots/jov-6545/before-minimized.png.evidence.json) | [after](../screenshots/jov-6545/after-minimized.png.evidence.json) |
+| Narrow mobile targets, 320px dark | [before](../screenshots/jov-6545/before-narrow.png.evidence.json) | [after](../screenshots/jov-6545/after-narrow.png.evidence.json) |
 
 Focus and duplicate controls require the executable assertions, not visual
 inference from still images. Browser runs also write screenshots and failure

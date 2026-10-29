@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "41f8d6b9359eb7ab9f87450f40ab3b0dd987981a962f0718e24812de44bb264f",
+  "bytes": 15372,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/41/41f8d6b9359eb7ab9f87450f40ab3b0dd987981a962f0718e24812de44bb264f.png",
+  "viewport": "1440x900",
+  "capturedAt": "2026-10-05T04:53:04Z",
+  "label": "docs/screenshots/jov-7241/before-whats-new-overlay-dark-1440x900.png"
+}

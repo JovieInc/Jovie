@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "67a5020ec12231480a4a83f74b1f6dc241a0b9bcd737d11f729b970073e328e1",
+  "bytes": 31756,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/67/67a5020ec12231480a4a83f74b1f6dc241a0b9bcd737d11f729b970073e328e1.png",
+  "viewport": "320x844",
+  "capturedAt": "2026-10-15T02:35:12Z",
+  "label": "docs/screenshots/jov-6545/before-narrow.png"
+}

@@ -1,0 +1,10 @@
+{
+  "schema": "jovie.evidence-pointer/v1",
+  "sha256": "858165e291c708327f17b7d7abacc896724ecda1f4ad99bf6c23453906dd8cc8",
+  "bytes": 570120,
+  "contentType": "image/png",
+  "url": "r2://jovie-evidence/evidence/85/858165e291c708327f17b7d7abacc896724ecda1f4ad99bf6c23453906dd8cc8.png",
+  "viewport": "900x1574",
+  "capturedAt": "2026-10-22T06:05:55Z",
+  "label": "docs/screenshots/homepage-artist-profile/before-desktop.png"
+}
