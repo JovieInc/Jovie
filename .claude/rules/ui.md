@@ -526,6 +526,15 @@ Global UI elements must only render in root `app/layout.tsx`:
 
 Marketing pages reference product screenshots through `apps/web/lib/screenshots/registry.ts` only — never via `<Image src="/product-screenshots/..." />` literals. Use `<MarketingScreenshot scenarioId>` or `<MarketingPhoneImage scenarioId>`. See `docs/CANONICAL_SURFACES.md` → "How to add a marketing screenshot". Do not build a parallel registry.
 
+Show product moments, not full-viewport screenshots. New marketing product
+imagery is a registry product shot (`apps/web/lib/screenshots/product-shots.ts`,
+`<ProductShot id>`): a real component in a demo state, cropped to one element,
+framed in CSS, AVIF/WebP at 2x. Desktop page-level captures on marketing pages
+are a shrink-only baseline (`tests/unit/marketing/product-imagery-invariant.test.ts`);
+a shot older than its source fails `scripts/invariants/art-direction/product-shots.mjs`.
+Fix stale shots with `pnpm --filter @jovie/web shots:render --stale` against a
+demo-mode server.
+
 ## Founder / Featured Creator Identity Must Be Canonical
 
 - **NEVER** invent, substitute, or mix placeholder creator identities on the homepage or marketing demos when Tim White or a real featured creator from canonical data should be used.

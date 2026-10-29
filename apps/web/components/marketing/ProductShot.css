@@ -1,0 +1,40 @@
+/**
+ * ProductShot frames. One framing rule set for every registry shot
+ * (lib/screenshots/product-shots.ts): the image is the UI only; the radius,
+ * hairline and depth live here on DS tokens so a token change reframes every
+ * shot without a re-render. Matte: no glass, no glow, no tilt, no hover motion.
+ */
+
+.product-shot {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  background: var(--color-bg-surface-0);
+  box-shadow: var(--shadow-card-elevated);
+}
+
+.product-shot__image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Window: one hairline title bar, neutral marks, no traffic-light colour. */
+.product-shot--window .product-shot__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding-inline: 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-1);
+}
+
+.product-shot--window .product-shot__bar span {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--color-border-subtle);
+}

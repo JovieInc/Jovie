@@ -1,0 +1,18 @@
+{
+  "schema": "jovie.marketing-product-imagery/v1",
+  "ids": [
+    "apps/web/app/(marketing)/download/page.tsx#dashboard-releases-desktop",
+    "apps/web/components/features/home/home-surface-seed.ts#dashboard-audience-desktop",
+    "apps/web/components/features/home/home-surface-seed.ts#dashboard-releases-sidebar-desktop",
+    "apps/web/components/marketing/homepage-v2/HomepageV2Route.tsx#dashboard-releases-sidebar-desktop",
+    "apps/web/data/artistNotificationsFeatures.ts#public-profile-desktop",
+    "apps/web/data/homepageLaunchCopy.ts#design-studio-shell-library-desktop",
+    "apps/web/data/homepageLaunchCopy.ts#public-profile-desktop",
+    "apps/web/data/product-truth/registry.ts#dashboard-analytics-desktop",
+    "apps/web/data/product-truth/registry.ts#dashboard-audience-desktop",
+    "apps/web/data/product-truth/registry.ts#dashboard-earnings-desktop",
+    "apps/web/data/product-truth/registry.ts#dashboard-releases-desktop",
+    "apps/web/data/product-truth/registry.ts#public-profile-desktop",
+    "apps/web/data/product-truth/registry.ts#tim-white-profile-live-desktop"
+  ]
+}

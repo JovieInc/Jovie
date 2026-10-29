@@ -1,0 +1,69 @@
+{
+  "schema": "jovie.product-shots/v1",
+  "shots": {
+    "profile-hero-desktop": {
+      "width": 1640,
+      "height": 1172,
+      "sourceHash": "483a4768bf35827d6878cade97a6a0b11e1baddce7b145e40580581f7bb566ae",
+      "specHash": "2c9e20071cf0967f2c7846870c33dd2da18f2f2814aa9459fd1ab5073f6dbe21",
+      "renderedAt": "2026-10-29T17:31:07.696Z",
+      "sources": [
+        "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
+        "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx",
+        "apps/web/components/features/profile/ProfileIdentityHeader.tsx",
+        "apps/web/components/features/profile/pac/ProfilePacCard.tsx"
+      ],
+      "bytes": {
+        "avif": 26784,
+        "webp": 41214
+      }
+    },
+    "setup-claim-handle": {
+      "width": 1120,
+      "height": 405,
+      "sourceHash": "de31834c23943481cce057174f7ddab901d3c9e400e20f560999c3f60740359a",
+      "specHash": "78f761aa3443e302dde518cd5a5f51854b5efebc71b9dc693876f0db340427c8",
+      "renderedAt": "2026-10-29T17:31:48.144Z",
+      "sources": [
+        "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
+        "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
+        "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
+      ],
+      "bytes": {
+        "avif": 7105,
+        "webp": 9758
+      }
+    },
+    "setup-connect-music": {
+      "width": 972,
+      "height": 530,
+      "sourceHash": "b5f67e2d7921a991f3797c654a2e2bc5b70785fd42fabe7fdc7b67ae01df42e4",
+      "specHash": "4ae18cae15f09a2e8026da5ca135a11f497176b3bfceadd9f7ba39901079468f",
+      "renderedAt": "2026-10-29T17:30:32.366Z",
+      "sources": [
+        "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx",
+        "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
+        "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
+      ],
+      "bytes": {
+        "avif": 12520,
+        "webp": 17678
+      }
+    },
+    "setup-share-profile": {
+      "width": 640,
+      "height": 704,
+      "sourceHash": "a1f34ceec3641708eb5811a37dd82b936b833d886fe2652faea1ecc19fd17de1",
+      "specHash": "5c29cd82664210fdd54a32c304b3bb83286d0cc1ce4cbfadb24d0495f5ba8d76",
+      "renderedAt": "2026-10-29T17:35:05.320Z",
+      "sources": [
+        "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
+        "apps/web/components/features/profile/ProfileIdentityHeader.tsx"
+      ],
+      "bytes": {
+        "avif": 10316,
+        "webp": 16044
+      }
+    }
+  }
+}
