@@ -132,6 +132,50 @@ async function assertOvieHome(page, route) {
   }
 }
 
+/**
+ * Jovie's chat home, typing (the shared chat-home rule): suggestions and wins
+ * fade out and are inert; emptying the composer brings them back.
+ */
+async function assertChatHomeTyping(page) {
+  const surface = page.getByTestId('chat-home-surface');
+  await surface.waitFor({ state: 'attached', timeout: 15_000 });
+  const input = page.locator(COMPOSER_SELECTOR).first();
+  await input.click();
+  await page.keyboard.type('Help me plan');
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[data-testid="chat-home-surface"]')
+        ?.getAttribute('data-chat-home-state') === 'composing',
+    undefined,
+    { timeout: 5_000 }
+  );
+  await page.waitForTimeout(400);
+  const faded = await surface.evaluate(el => ({
+    opacity: getComputedStyle(el).opacity,
+    inert: el.hasAttribute('inert'),
+    hidden: el.getAttribute('aria-hidden'),
+  }));
+  if (faded.opacity !== '0' || !faded.inert || faded.hidden !== 'true')
+    throw new Error(
+      `Chat home did not fade out while typing: ${JSON.stringify(faded)}`
+    );
+  // Round trip: emptied composer brings it back; then leave the typed state for the shot.
+  await page.keyboard.press('Control+A');
+  await page.keyboard.press('Meta+A');
+  await page.keyboard.press('Backspace');
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('[data-testid="chat-home-surface"]')
+        ?.getAttribute('data-chat-home-state') === 'home',
+    undefined,
+    { timeout: 5_000 }
+  );
+  await page.keyboard.type('Help me plan');
+  await page.waitForTimeout(500);
+}
+
 async function assertComposerUsable(page, fullscreen) {
   const result = await page.evaluate(selector => {
     const input = document.querySelector(selector);
@@ -326,7 +370,7 @@ async function waitForAuthenticatedShell(page, route) {
 
   if (isOvieCaptureRoute(route)) await assertOvieHome(page, route);
 
-  if (route === '/app/chat' || route.startsWith('/app/chat/')) {
+  if (route.split('?')[0] === '/app/chat' || route.startsWith('/app/chat/')) {
     // JOV-7150: the loaded empty state is one greeting sentence rendered as
     // chat-empty-state-greeting-text. The loading still-frame only renders an
     // aria-hidden skeleton inside chat-empty-state-greeting-region, so the
@@ -341,6 +385,7 @@ async function waitForAuthenticatedShell(page, route) {
         timeout: NEW_CHAT_EMPTY_WAIT_MS,
       });
   }
+  if (route.includes('capture=typing')) await assertChatHomeTyping(page);
 }
 
 function sanitizeRuntimeFailures(failures) {

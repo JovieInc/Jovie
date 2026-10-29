@@ -129,6 +129,7 @@ describe('bounded PR visual review contract', () => {
       routeChangedFiles(['apps/web/components/jovie/JovieChat.tsx']).routes
     ).toEqual([
       '/app/chat',
+      '/app/chat?capture=typing',
       '/app/ov',
       '/app/ov?capture=chat',
       '/app/ov?fullscreen=1',
@@ -1031,5 +1032,42 @@ describe('Ovie Home to conversation capture (Tim, 2026-10-25)', () => {
         ['/app/chat']
       ).join()
     ).toMatch(/Ovie Home files changed/);
+  });
+});
+
+describe('shared chat-home primitive capture (Tim, 2026-10-25)', () => {
+  it('routes primitive files to both apps: Jovie idle and typing, and every Ovie Home route', () => {
+    const routes = routeChangedFiles([
+      'apps/web/components/jovie/chat-home/useChatHomeState.ts',
+    ]).routes;
+    expect(routes).toEqual([
+      '/app/chat',
+      '/app/chat?capture=typing',
+      '/app/ov',
+      '/app/ov?capture=chat',
+      '/app/ov?fullscreen=1',
+      '/app/ov?fullscreen=1&capture=chat',
+    ]);
+  });
+  it('captures Jovie typing at 1440 and 390 as a creator, not admin', () => {
+    expect(captureViewportNamesForRoute('/app/chat?capture=typing')).toEqual([
+      'desktop',
+      'mobile',
+    ]);
+    expect(capturePersonaForRoute('/app/chat?capture=typing')).toBe(
+      'creator-ready'
+    );
+  });
+  it('guard: primitive changes captured on one app only fail', () => {
+    const files = ['apps/web/components/jovie/chat-home/ChatHomeSurface.tsx'];
+    expect(
+      validateRoutesMatchChange(files, [
+        '/app/chat',
+        '/app/chat?capture=typing',
+      ]).join()
+    ).toMatch(/Ovie Home files changed/);
+    expect(
+      validateRoutesMatchChange(files, routeChangedFiles(files).routes)
+    ).toEqual([]);
   });
 });

@@ -40,6 +40,13 @@ const PUBLIC_CARD_CAPTURE_FILE =
   /^(?:apps\/web\/app\/\(marketing\)\/card\/|apps\/web\/data\/jovieCardCopy\.ts$)/;
 const PUBLIC_PROFILE_CAPTURE_ROUTE = '/demo/showcase/public-profile';
 const AUTHENTICATED_CHAT_CAPTURE_ROUTE = '/app/chat';
+// Jovie's chat home while typing: the shared chat-home rule fades suggestions
+// and wins out (and back when emptied). `capture=typing` is read by the
+// capture script only.
+export const JOVIE_CHAT_TYPING_CAPTURE_ROUTE = '/app/chat?capture=typing';
+// The shared chat-home primitive: evidence on both apps' chat homes.
+const CHAT_HOME_PRIMITIVE_FILE =
+  /^apps\/web\/components\/jovie\/(?:chat-home\/|JovieChat\.tsx$)/;
 // Ovie Home (the operator's company HUD) and its Full Screen mode. These are
 // admin-only app routes: they need the admin test-auth persona, and the
 // ultra-wide viewport is part of what Full Screen promises.
@@ -157,7 +164,9 @@ export function validateRoutesMatchChange(files, routes) {
   if (
     changed.some(
       file =>
-        OVIE_HOME_CAPTURE_FILE.test(file) || OVIE_CHAT_SWAP_FILE.test(file)
+        OVIE_HOME_CAPTURE_FILE.test(file) ||
+        OVIE_CHAT_SWAP_FILE.test(file) ||
+        CHAT_HOME_PRIMITIVE_FILE.test(file)
     ) &&
     !OVIE_HOME_CAPTURE_ROUTES.every(route => list.includes(route))
   )
@@ -275,6 +284,11 @@ export function routeChangedFiles(files) {
     };
   const routes = new Set();
   for (const file of changed) {
+    if (CHAT_HOME_PRIMITIVE_FILE.test(file)) {
+      routes.add(AUTHENTICATED_CHAT_CAPTURE_ROUTE);
+      routes.add(JOVIE_CHAT_TYPING_CAPTURE_ROUTE);
+      for (const ovieRoute of OVIE_HOME_CAPTURE_ROUTES) routes.add(ovieRoute);
+    }
     if (OVIE_CHAT_SWAP_FILE.test(file))
       for (const ovieRoute of OVIE_HOME_CAPTURE_ROUTES) routes.add(ovieRoute);
     // Route only to fixtures that are present in the production build. Generic
