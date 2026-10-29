@@ -803,10 +803,13 @@ jobs:
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" HEAD)"
           ./scripts/security/scan-secrets.sh ci-pr "$base_sha"
           ./scripts/security/verify-gitleaks-coverage.sh
-          node scripts/golden-path-lock.mjs merge-gate
       - name: Remove the secret-scan checkout
         if: steps.reuse.outputs.reuse != 'true' && matrix.shard == '1/4'
         run: rm -rf .secret-scan
+      # Installed workspace. The bare .secret-scan checkout has no vitest.
+      - name: Run the golden-path merge gate
+        if: steps.reuse.outputs.reuse != 'true' && matrix.shard == '1/4'
+        run: node scripts/golden-path-lock.mjs merge-gate
       - name: Setup Playwright warm path
         if: steps.reuse.outputs.reuse != 'true' && steps.scope.outputs.web == 'true'
         uses: ./.github/actions/setup-playwright

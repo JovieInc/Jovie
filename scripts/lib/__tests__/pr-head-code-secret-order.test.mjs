@@ -3,13 +3,31 @@ import { readFileSync } from 'node:fs';
 import { load } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
 
-const wf = load(
-  readFileSync(
-    new URL(
-      '../../../.github/workflows/source-validation.yml',
-      import.meta.url
-    ),
-    'utf8'
+/**
+ * @typedef {{
+ *   uses?: string,
+ *   run?: string,
+ *   if?: string,
+ *   'working-directory'?: string,
+ *   with?: {
+ *     ref?: string,
+ *     path?: string,
+ *     'fetch-depth'?: number | string,
+ *     'persist-credentials'?: boolean,
+ *   },
+ * }} WorkflowStep
+ * @typedef {{ steps?: WorkflowStep[], needs?: string[] }} WorkflowJob
+ */
+
+const wf = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
+  load(
+    readFileSync(
+      new URL(
+        '../../../.github/workflows/source-validation.yml',
+        import.meta.url
+      ),
+      'utf8'
+    )
   )
 );
 const runs = job => (job.steps ?? []).map(step => step.run ?? '').join('\n');
@@ -47,6 +65,17 @@ describe('Source Validation secret boundary', () => {
     expect(secret(job)).toBe(false);
     expect(runs(job)).toMatch(/verify-gitleaks-coverage\.sh/);
     expect(runs(job)).toMatch(/golden-path-lock\.mjs merge-gate/);
+    const scan = job.steps.find(
+      step => step['working-directory'] === '.secret-scan'
+    );
+    expect(scan.run).toMatch(/scan-secrets\.sh ci-pr/);
+    expect(scan.run).toMatch(/verify-gitleaks-coverage\.sh/);
+    expect(scan.run).not.toMatch(/golden-path-lock|pnpm|npm (ci|install)|yarn/);
+    const gate = job.steps.find(step =>
+      /golden-path-lock\.mjs merge-gate/.test(step.run ?? '')
+    );
+    expect(gate['working-directory']).toBeUndefined();
+    expect(gate.if).toBe(scan.if);
     const full = job.steps.find(step => step.with?.path === '.secret-scan');
     expect(String(full.with.ref)).toMatch(/head\.sha/);
     expect(Number(full.with['fetch-depth'])).toBe(0);
