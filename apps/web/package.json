@@ -67,6 +67,7 @@
     "validate": "pnpm run next:proxy-guard && pnpm run biome:check && pnpm run typecheck",
     "evals": "bash scripts/run-deterministic-promptfoo-evals.sh eval",
     "evals:golden": "bash scripts/run-golden-eval-set-ci.sh",
+    "eval:helpfulness": "tsx --import ./tests/eval/promptfoo/server-only-preload.mjs scripts/jovie-helpfulness-eval.ts",
     "evals:validate": "bash scripts/run-deterministic-promptfoo-evals.sh validate",
     "promptfoo": "promptfoo",
     "stryker": "stryker",
