@@ -4,6 +4,7 @@ import { ConnectedComponentsGallery } from '@/components/marketing/ConnectedComp
 import { MarketingCtaSection } from '@/components/site/MarketingCtaSection';
 import { PRODUCT_COPY } from '@/data/productCopy';
 import { ProductClaimHandleForm } from './ProductClaimHandleForm';
+import { ProductExploreLinks } from './ProductExploreLinks';
 import './ProductLanding.css';
 
 function ProductClose() {
@@ -69,6 +70,7 @@ export function ProductLanding() {
         claimSubmitTestId='product-claim-cta'
       />
       <ConnectedComponentsGallery />
+      <ProductExploreLinks />
       <ProductClose />
     </MarketingPageShell>
   );

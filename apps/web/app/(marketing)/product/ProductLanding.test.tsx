@@ -184,3 +184,33 @@ describe('ProductLanding locked hero (DESIGN_READY 2026-09-17)', () => {
     expect(scope.queryByText('Claim your Jovie')).toBeNull();
   });
 });
+
+describe('ProductLanding explore links', () => {
+  it('links every product page that is not in the footer', async () => {
+    const { PRODUCT_EXPLORE_GROUPS } = await import(
+      '@/data/productExploreLinks'
+    );
+    render(<ProductLanding />);
+    const section = screen.getByTestId('product-explore-links');
+    const hrefs = within(section)
+      .getAllByRole('link')
+      .map(link => link.getAttribute('href'));
+    expect(hrefs).toEqual(
+      PRODUCT_EXPLORE_GROUPS.flatMap(group => group.links.map(l => l.href))
+    );
+    for (const href of [
+      '/product/isrc',
+      '/product/utm-links',
+      '/product/dsp-links',
+      '/product/command-palette',
+      '/product/release-scheduling',
+      '/solutions/artists',
+      '/launch',
+      '/compare',
+      '/alternatives',
+      '/engineering',
+    ]) {
+      expect(hrefs).toContain(href);
+    }
+  });
+});
