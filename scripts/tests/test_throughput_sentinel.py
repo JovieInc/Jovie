@@ -480,6 +480,18 @@ class SupplyFlowTest(unittest.TestCase):
             ts.backstop_enroll(Path(tmp), later, NOW + 800, run)
             self.assertEqual(len(calls), 1)
 
+    def test_remediation_dead_man_alarms_after_thirty_silent_minutes_with_waiting_prs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            supply, _ = ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1, "DIRTY"), self.pr(2, "BLOCKED")], 3))
+            old = iso(NOW - 3600)
+            run = lambda args, **_: SimpleNamespace(returncode=0, stdout=json.dumps({"workflow_runs": [{"created_at": old}]}), stderr="")
+            live = ts.remediation_liveness(Path(tmp), supply, NOW, run)
+            self.assertEqual((live["waiting"], live["silentForS"]), (2, 3600))
+            alerts = ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=live))
+            self.assertIn("throughput-remediation-silent", alerts)
+            fresh = {**live, "silentForS": 300}
+            self.assertNotIn("throughput-remediation-silent", ts.judge(obs(pushes1h={"JovieInc/Jovie|codex": 1}, supplyFlow=supply, remediation=fresh)))
+
     def test_enqueue_records_green_to_enqueue_dwell_and_supply_dwell_alarm(self):
         with tempfile.TemporaryDirectory() as tmp:
             ts.sample_supply_flow(Path(tmp), NOW, self.graphql([self.pr(1)], 4))

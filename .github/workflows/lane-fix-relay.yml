@@ -176,3 +176,40 @@ jobs:
           GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
           MODE: ${{ github.event_name == 'workflow_dispatch' && 'backfill' || 'relay' }}
         run: python3 scripts/lanes/pr_events.py "$MODE"
+
+      # 2026-10-29: this relay is the one topology-approved remediation dispatcher, but nothing
+      # ever sent `swarm-remediate`, so the swarm only ran when a person dispatched it (last
+      # automatic-era run 05:35Z). The first failed workflow on a same-repo PR head now wakes
+      # the swarm for that PR, in the same event, without waiting for a label or a sweep. The
+      # swarm's prepare gate dedupes per head (handled, in flight, sensitive, budget).
+      - name: Generate Jovie Bot dispatch token
+        id: swarm-token
+        if: >-
+          (github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          contains(fromJSON('["failure","timed_out"]'), github.event.workflow_run.conclusion) &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          github.event.workflow_run.pull_requests[0].number != null)
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.JOVIE_BOT_APP_ID }}
+          private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+
+      - name: Wake the PR Remediation Swarm for the failed head
+        if: >-
+          steps.swarm-token.outcome == 'success' && (github.event_name == 'workflow_run' &&
+          github.event.workflow_run.event == 'pull_request' &&
+          contains(fromJSON('["failure","timed_out"]'), github.event.workflow_run.conclusion) &&
+          github.event.workflow_run.head_repository.full_name == github.repository &&
+          github.event.workflow_run.pull_requests[0].number != null)
+        env:
+          GH_TOKEN: ${{ steps.swarm-token.outputs.token }}
+          PR: ${{ github.event.workflow_run.pull_requests[0].number }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=swarm-remediate \
+            -f "client_payload[pr]=$PR" -f "client_payload[sha]=$SHA"
+          echo "swarm-remediate pr=$PR sha=$SHA first_failed=$WORKFLOW at=$(date -u +%FT%TZ)"

@@ -13,6 +13,9 @@ Alarms (each names its stage and carries its evidence):
                                      green PRs are not being enrolled; 2026-10-29 17:53Z the queue held 1 entry beside
                                      5 CLEAN unqueued PRs and 35 DIRTY ones)
   throughput-supply-dwell:<state>    p95 dwell of non-draft PRs in BLOCKED/DIRTY/CLEAN-unqueued past its SLO
+  throughput-remediation-silent      no remediation dispatcher (swarm run or lane fix) for 30 min while red or DIRTY PRs
+                                     exist (2026-10-29: the swarm last ran 05:35Z, safe-pr-remediation 10-26, the relay
+                                     that was meant to call them was disabled)
   throughput-claim-errors:<lane>     >= 20% of a lane's runs in 30 min died on claim-error (a broken claim ledger
                                      killed ~560 fix-red runs from 2026-10-26 07:30Z and nothing alarmed)
   throughput-merge-group-start-slow  merge-group runs wait > 5 min (p50) for a runner
@@ -330,6 +333,34 @@ def sample_supply_flow(state: Path, now: float, run=None, repo: str = REPO) -> t
         return (cached or None), f"{type(error).__name__}: {error}"[:200]
 
 
+REMEDIATION_SILENT_S = 1800
+SWARM_WORKFLOW = "pr-remediation-swarm.yml"
+
+
+def remediation_liveness(state: Path, supply: dict | None, now: float, run=None, repo: str = REPO) -> dict | None:
+    """Dead-man for every remediation dispatcher: the newest of the swarm's last run and the lanes' last
+    fix attempt, against the count of red/DIRTY PRs the supply sample sees."""
+    if not supply or not isinstance(supply.get("observedAt"), (int, float)):
+        return None
+    counts = supply.get("counts") or {}
+    waiting = int(counts.get("DIRTY", 0)) + int(counts.get("BLOCKED", 0))
+    last_swarm = None
+    try:
+        rows = _gh_json(run, f"repos/{repo}/actions/workflows/{SWARM_WORKFLOW}/runs?per_page=1").get("workflow_runs") or []
+        last_swarm = _iso_epoch(rows[0].get("created_at")) if rows else None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError):
+        pass
+    last_lane = None
+    try:
+        attempts = json.loads((Path(state) / "fix-attempts.json").read_text())
+        last_lane = max((float(r["at"]) for r in attempts.values() if isinstance(r, dict) and isinstance(r.get("at"), (int, float))), default=None)
+    except (OSError, ValueError):
+        pass
+    newest = max([t for t in (last_swarm, last_lane) if t is not None], default=None)
+    return {"observedAt": now, "waiting": waiting, "lastSwarmRun": last_swarm, "lastLaneFix": last_lane,
+            "silentForS": None if newest is None else round(now - newest)}
+
+
 def backstop_enroll(state: Path, supply: dict | None, now: float, run=None, repo: str = REPO) -> dict | None:
     """Lanes-tick backstop for a lost Green Enroll wake (JOV-INV-042 keeps admission off cron, so the
     clock lives here): when a CLEAN unqueued PR has waited BACKSTOP_ENROLL_AFTER_S, dispatch the
@@ -537,11 +568,12 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         except Exception as error:  # noqa: BLE001  (a sweep failure must never stop the sentinel)
             queue_unmergeable = {"seen": [], "dequeued": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
-    supply, supply_error, backstop = (None, None, None)
+    supply, supply_error, backstop, remediation = (None, None, None, None)
     if fetch_remote:
         sample_queue_timings(state, now, run)
         supply, supply_error = sample_supply_flow(state, now, run)
         backstop = backstop_enroll(state, supply, now, run)
+        remediation = remediation_liveness(state, supply, now, run)
     exits = read_idle_exits(state, now)
     repos, repo_errors = {}, {}
     for watched in (WATCHED_REPOS if fetch_remote else ()):
@@ -560,7 +592,7 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
             "idleExits1h": dict(Counter(row["reason"] for row in exits)),
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
-            "supplyFlow": supply, "supplyFlowError": supply_error, "enrollBackstop": backstop,
+            "supplyFlow": supply, "supplyFlowError": supply_error, "enrollBackstop": backstop, "remediation": remediation,
             "releaseFlow": flow, "releaseFlowError": flow_error, "repos": repos, "repoErrors": repo_errors,
             "growth": growth_bounds(state, limits)}
 
@@ -632,6 +664,14 @@ def judge(obs: dict) -> dict[str, str]:
                 alerts[f"throughput-supply-dwell:{state_name}"] = (
                     f"stage {state_name}: {counts[state_name]} non-draft PRs, dwell p50 {round((row.get('p50') or 0) / 60)} min, "
                     f"p95 {round(row['p95'] / 60)} min (SLO {round(slo / 60)} min); state counts {counts}")
+    # 2c. Dead-man: red or DIRTY PRs exist and no dispatcher has acted for 30 minutes.
+    liveness = sentinel.get("remediation") or {}
+    if isinstance(liveness.get("observedAt"), (int, float)) and obs["now"] - liveness["observedAt"] < 900 \
+            and (liveness.get("waiting") or 0) > 0 and (liveness.get("silentForS") or 0) > REMEDIATION_SILENT_S:
+        alerts["throughput-remediation-silent"] = (
+            f"stage red->remediation: {liveness['waiting']} DIRTY/BLOCKED non-draft PRs and no remediation dispatcher "
+            f"acted for {round(liveness['silentForS'] / 60)} min (PR Remediation Swarm last run {liveness.get('lastSwarmRun')}, "
+            f"lanes last fix {liveness.get('lastLaneFix')}); check the swarm's workflow_run wake and the lanes service")
     # 3 and 4. Merge-group runner wait and production lease.
     flow = sentinel.get("releaseFlow") or {}
     if (flow.get("mergeGroupJobs") or 0) >= MERGE_GROUP_MIN_RUNS and \
