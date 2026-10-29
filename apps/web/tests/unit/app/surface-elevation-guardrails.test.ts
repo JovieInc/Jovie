@@ -472,7 +472,7 @@ describe('surface elevation guardrails', () => {
     );
   });
 
-  it('defines one elevation ladder from window background to modals (JOV-8976)', () => {
+  it('defines one elevation ladder from app background to modals (JOV-8976)', () => {
     const designSystem = readFileSync(
       join(ROOT, 'styles/design-system.css'),
       'utf-8'
@@ -489,7 +489,7 @@ describe('surface elevation guardrails', () => {
       }
     }
 
-    // L0 is the window background plane; L4 overlays and the L5 modal ride
+    // L0 is the app background plane; L4 overlays and the L5 modal ride
     // the popover shadow, and the modal carries its own scrim token.
     expect(designSystem).toContain('--elev-0-border: transparent;');
     expect(designSystem).toContain('--elev-0-shadow: none;');
