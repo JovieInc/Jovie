@@ -635,6 +635,7 @@ describe('jovie mesh watch', () => {
         now: () => NOW,
         signal: controller.signal,
         emit: line => lines.push(line),
+        sleep: async () => undefined,
       }
     );
     expect(lines).toEqual([
@@ -643,6 +644,31 @@ describe('jovie mesh watch', () => {
     expect(urls[0]).not.toContain('wait=');
     expect(urls[1]).toContain('wait=25');
     expect(result).toMatchObject({ ok: true, stopped: true, emitted: 1 });
+  });
+
+  it('pauses instead of spinning when the server ignores wait', async () => {
+    const pauses: number[] = [];
+    const controller = new AbortController();
+    let calls = 0;
+    const fetchImpl: FetchImplementation = async () => {
+      if (++calls > 3) controller.abort();
+      return page([]);
+    };
+    await meshWatch(
+      { cursor: 'c' },
+      {
+        env,
+        fetchImpl,
+        now: () => NOW,
+        signal: controller.signal,
+        emit: () => undefined,
+        sleep: async ms => {
+          pauses.push(ms);
+        },
+      }
+    );
+    expect(pauses.length).toBeGreaterThanOrEqual(2);
+    expect(pauses.every(ms => ms >= 5000)).toBe(true);
   });
 
   it('reconnects with exponential backoff on 503 and stops on an auth error', async () => {
@@ -688,7 +714,13 @@ describe('jovie mesh watch', () => {
     const code = await runCli(['mesh', 'watch', '--cursor', 'abc', '--json'], {
       stdout: out.output,
       stderr: sink().output,
-      mesh: { env, fetchImpl, now: () => NOW, signal: controller.signal },
+      mesh: {
+        env,
+        fetchImpl,
+        now: () => NOW,
+        signal: controller.signal,
+        sleep: async () => undefined,
+      },
     });
     expect(code).toBe(0);
     expect(urls[0]).toContain('cursor=abc');

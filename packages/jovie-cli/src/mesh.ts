@@ -384,6 +384,8 @@ const WATCH_WAIT_SECONDS = 25;
 const WATCH_BACKOFF_START_MS = 1_000;
 const WATCH_BACKOFF_MAX_MS = 60_000;
 const WATCH_SEEN_LIMIT = 500;
+const WATCH_MIN_HOLD_MS = 2_000;
+const WATCH_FALLBACK_PAUSE_MS = 10_000;
 
 const defaultSleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>(resolve => {
@@ -472,12 +474,17 @@ export async function meshWatch(
         primed = true;
         continue;
       }
+      const startedAt = Date.now();
       const page = await read(day, WATCH_WAIT_SECONDS);
       backoff = WATCH_BACKOFF_START_MS;
+      const quiet = !Array.isArray(page.messages) || page.messages.length === 0;
       while (take(page, true)) {
         if (deps.signal?.aborted) break;
         Object.assign(page, await read(day, 0));
       }
+      // A server that ignores `wait` (not yet deployed) answers at once: never spin on it.
+      if (quiet && Date.now() - startedAt < WATCH_MIN_HOLD_MS)
+        await sleep(WATCH_FALLBACK_PAUSE_MS, deps.signal);
     } catch (error) {
       if (deps.signal?.aborted) break;
       const retryable =
