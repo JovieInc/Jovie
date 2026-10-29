@@ -396,8 +396,8 @@
     "viewport": "mobile",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-16T12:25:51.322Z",
-    "gitSha": "9ad96f55e39c5214fe51e3f7d7e3402bcb110d35",
+    "capturedAt": "2026-10-29T07:49:50.828Z",
+    "gitSha": "9e41edbd300669a853aad75e1a4ce38a3cd3de72",
     "imagePath": "tim-white-profile-pay-mobile.png",
     "publicExportPath": "tim-white-profile-pay-phone.png"
   },
