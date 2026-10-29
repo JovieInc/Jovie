@@ -18,7 +18,7 @@ import { getPlanDisplayName } from '@/lib/entitlements/registry';
  */
 /** Shared opener / waitlist receipts — imported by the script bank to avoid copy drift. */
 export const ONBOARDING_OPENER_PRIMARY =
-  "Hey, I'm Jovie. Early access is limited, so some artists waitlist first. I'll remember this chat if you sign up. What are you working on?";
+  "Hey, I'm Jovie. Early access is limited. I'll remember this chat if you sign up. What are you working on?";
 /** Waitlist receipt without promising email (no contact address confirmed yet). */
 export const ONBOARDING_WAITLIST_RECEIPT =
   'On the early list. Return here or /start to resume when a spot opens.';

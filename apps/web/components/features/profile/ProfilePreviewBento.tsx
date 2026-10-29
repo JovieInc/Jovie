@@ -17,6 +17,8 @@ import type { Artist, LegacySocialLink } from '@/types/db';
  * built and toggle the chrome they need.
  */
 export interface ProfilePreviewBentoProps {
+  /** Domain-specific draft content inside the shared phone and hero chrome. */
+  readonly phoneContent?: ReactNode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
   readonly genres?: string[] | null;
@@ -80,6 +82,7 @@ const DEFAULT_COVER_VARS = {
 } as CSSProperties;
 
 export function ProfilePreviewBento({
+  phoneContent,
   artist,
   socialLinks,
   genres,
@@ -108,35 +111,37 @@ export function ProfilePreviewBento({
         style={coverVars ?? DEFAULT_COVER_VARS}
         data-testid={phonePreviewTestId}
       >
-        <ProfileCompactSurface
-          renderMode='preview'
-          presentation='embedded'
-          artist={artist}
-          socialLinks={socialLinks}
-          contacts={[]}
-          showPayButton={false}
-          genres={genres}
-          drawerOpen={false}
-          drawerView='menu'
-          activeMode='profile'
-          onDrawerOpenChange={() => {}}
-          onDrawerViewChange={() => {}}
-          onBack={() => {}}
-          onOpenMenu={() => {}}
-          onPlayClick={() => {}}
-          onShare={() => {}}
-          onModeSelect={() => {}}
-          profileHref={profileHref}
-          dataTestId={surfaceTestId}
-          isSubscribed={isSubscribed}
-          hideBackButton
-          hideJovieBranding
-          hideMoreMenu
-          renderInteractiveOverlays={false}
-          renderSemanticHeading={false}
-          headerSocialLinksOverride={[]}
-          resolveNearbyTour={false}
-        />
+        {phoneContent ?? (
+          <ProfileCompactSurface
+            renderMode='preview'
+            presentation='embedded'
+            artist={artist}
+            socialLinks={socialLinks}
+            contacts={[]}
+            showPayButton={false}
+            genres={genres}
+            drawerOpen={false}
+            drawerView='menu'
+            activeMode='profile'
+            onDrawerOpenChange={() => {}}
+            onDrawerViewChange={() => {}}
+            onBack={() => {}}
+            onOpenMenu={() => {}}
+            onPlayClick={() => {}}
+            onShare={() => {}}
+            onModeSelect={() => {}}
+            profileHref={profileHref}
+            dataTestId={surfaceTestId}
+            isSubscribed={isSubscribed}
+            hideBackButton
+            hideJovieBranding
+            hideMoreMenu
+            renderInteractiveOverlays={false}
+            renderSemanticHeading={false}
+            headerSocialLinksOverride={[]}
+            resolveNearbyTour={false}
+          />
+        )}
       </div>
     </PhoneFrame>
   );
