@@ -1,18 +1,17 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
+import { connection } from 'next/server';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { getProfileModeHref } from '@/features/profile/registry';
 import { sanitizeMetadataText } from '@/lib/profile/metadata';
 import { getProfileAndLinks } from '../_lib/public-profile-loader';
-
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
 
 interface Props {
   readonly params: Promise<{ username: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  await connection();
   const { username } = await params;
   const result = await getProfileAndLinks(username);
 
@@ -51,6 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function NotificationsPage({ params }: Props) {
+  await connection();
   const { username } = await params;
   redirect(getProfileModeHref(username, 'subscribe'));
 }
