@@ -25,7 +25,11 @@ export const STREAM_REGISTRY_PATH = 'apps/web/lib/email/stream-registry.json';
 const CONTRACT = 'docs/company/email-sending-streams.md';
 
 /** The gateway is the only place allowed to talk to a mail provider. */
-export const GATEWAY = [/^apps\/web\/lib\/email\/gateway\//];
+export const GATEWAY = [
+  /^apps\/web\/lib\/email\/gateway\//,
+  // The guard itself lists the hosts and SDKs it forbids.
+  /^scripts\/lib\/mail-send-guard\.mjs$/,
+];
 
 const CODE = /\.(?:ts|tsx|js|mjs|cjs|mts|cts)$/;
 const PY = /\.py$/;

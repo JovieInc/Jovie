@@ -92,6 +92,7 @@ describe('mail send guard rules', () => {
     expect(mailInScope('apps/web/lib/connectors/gmail/__fixtures__/a.ts')).toBe(
       false
     );
+    expect(mailInScope('scripts/lib/mail-send-guard.mjs')).toBe(false);
     expect(mailInScope('apps/web/lib/email/send.ts')).toBe(true);
     expect(mailInScope('scripts/send-changelog-email.mjs')).toBe(true);
   });
