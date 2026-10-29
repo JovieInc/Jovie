@@ -16,7 +16,11 @@ cd "$REPO_ROOT"
 # Use Git's complete list; preserve unrelated authentication and network env.
 git_local_env_names="$(git rev-parse --local-env-vars)"
 while IFS= read -r git_local_env_name; do
-  unset "$git_local_env_name"
+  # An empty list still yields one empty line from the here-string; skip it,
+  # since `unset ""` is an error that aborts the gate (seen in the fixture test).
+  if [ -n "$git_local_env_name" ]; then
+    unset "$git_local_env_name"
+  fi
 done <<< "$git_local_env_names"
 unset git_local_env_names git_local_env_name
 
