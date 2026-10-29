@@ -18,6 +18,7 @@ export type { FeatureCardProps } from './FeatureCard';
 export { FeatureCard } from './FeatureCard';
 export { FrostedContainer } from './FrostedContainer';
 export { OptimizedImage } from './OptimizedImage';
+export { PaySelector } from './PaySelector';
 export { ProfileNavButton } from './ProfileNavButton';
 export { getQrCodeUrl, QRCode } from './QRCode';
 export { QRCodeCard } from './QRCodeCard';
