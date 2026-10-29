@@ -131,7 +131,11 @@ function renderSection(section: PageSpecSection) {
       return (
         <Shell key={section.id} section={section} labelId={labelId}>
           <div className='flex max-w-3xl flex-col items-start gap-5'>
-            <h1 id={labelId} className='marketing-type-display'>
+            <h1
+              id={labelId}
+              className='marketing-type-display'
+              data-wrap='editorial-title'
+            >
               {section.title}
             </h1>
             <p className={BODY_CLASS}>{section.body}</p>
@@ -142,7 +146,7 @@ function renderSection(section: PageSpecSection) {
     case 'product-shot':
       return (
         <Shell key={section.id} section={section} labelId={labelId}>
-          <h2 id={labelId} className={TITLE_CLASS}>
+          <h2 id={labelId} className={TITLE_CLASS} data-wrap='editorial-title'>
             {section.title}
           </h2>
           <figure className='mt-8 overflow-hidden rounded-2xl border border-subtle'>
@@ -165,7 +169,7 @@ function renderSection(section: PageSpecSection) {
     case 'feature-list':
       return (
         <Shell key={section.id} section={section} labelId={labelId}>
-          <h2 id={labelId} className={TITLE_CLASS}>
+          <h2 id={labelId} className={TITLE_CLASS} data-wrap='editorial-title'>
             {section.title}
           </h2>
           <ul className='mt-10 grid list-none gap-x-10 gap-y-8 p-0 sm:grid-cols-2'>
@@ -205,7 +209,11 @@ function renderSection(section: PageSpecSection) {
       return (
         <Shell key={section.id} section={section} labelId={labelId}>
           <div className='flex max-w-2xl flex-col items-start gap-4'>
-            <h2 id={labelId} className={TITLE_CLASS}>
+            <h2
+              id={labelId}
+              className={TITLE_CLASS}
+              data-wrap='editorial-title'
+            >
               {section.title}
             </h2>
             {section.mode === 'link' ? (
@@ -228,7 +236,7 @@ function renderSection(section: PageSpecSection) {
     case 'faq':
       return (
         <Shell key={section.id} section={section} labelId={labelId}>
-          <h2 id={labelId} className={TITLE_CLASS}>
+          <h2 id={labelId} className={TITLE_CLASS} data-wrap='editorial-title'>
             {section.title}
           </h2>
           <dl className='mt-8 grid max-w-3xl gap-6'>
