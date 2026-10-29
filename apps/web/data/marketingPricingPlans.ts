@@ -65,7 +65,13 @@ export const MARKETING_PRICING_PLANS: readonly MarketingPricingPlan[] = [
     cadence: PRO_CLAIM.cadence ?? undefined,
     badge: PRO_CLAIM.badge,
     body: PRO_CLAIM.note,
-    features: ['Public Jovie profile and audience capture'],
+    // Entitlement-gated, certified Pro capabilities only (canSendNotifications,
+    // canAccessFutureReleases). Do not add uncertified or ungated items.
+    features: [
+      'Everything in Free',
+      'Release emails to your verified subscribers',
+      'Pre-release and countdown pages',
+    ],
     accent: 'blue',
     ctaLabel: PRO_CLAIM.ctaLabel,
     ctaHref: PRO_CLAIM.ctaHref,

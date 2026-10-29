@@ -22,10 +22,15 @@ describe('MarketingPricingPlans', () => {
       '.marketing-pricing-plan-card__features li'
     );
     expect(features.length).toBeGreaterThan(0);
+    // Only certified, entitlement-gated claims; nothing internal-only.
+    const allowed = new Set([
+      'Public Jovie profile and audience capture',
+      'Everything in Free',
+      'Release emails to your verified subscribers',
+      'Pre-release and countdown pages',
+    ]);
     for (const feature of features) {
-      expect(feature.textContent).toBe(
-        'Public Jovie profile and audience capture'
-      );
+      expect(allowed.has(feature.textContent ?? '')).toBe(true);
       expect(feature.querySelector('svg')).toBeNull();
     }
   });
