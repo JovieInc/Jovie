@@ -96,7 +96,7 @@ describe('Ovie route usage access', () => {
     expect(await response.json()).toEqual({ recorded: false });
   });
 
-  it('normalizes legacy observations and reads the requested window', async () => {
+  it('normalizes legacy observations and reads the requested period', async () => {
     mocks.read.mockResolvedValue({ measured: true, rows: [] });
     const recorded = await POST(
       new Request('https://example.test/api/admin/hud/route-usage', {
@@ -115,7 +115,7 @@ describe('Ovie route usage access', () => {
     expect(read.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('falls back to the default read window for an invalid number', async () => {
+  it('falls back to the default read period for an invalid number', async () => {
     const response = await GET(
       new Request('https://example.com/api/admin/hud/route-usage?days=invalid')
     );
