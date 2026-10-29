@@ -4,8 +4,11 @@ import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { APP_ROUTES } from '@/constants/routes';
 import { getAdminCapacity } from '@/lib/admin/capacity';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 
-export const metadata: Metadata = { title: 'Capacity | Ovie' };
+export const metadata: Metadata = {
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_CAPACITY, 'ov'),
+};
 
 export const runtime = 'nodejs';
 

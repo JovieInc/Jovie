@@ -2,13 +2,15 @@ import type { Metadata } from 'next';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
 import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRouteTabs';
 import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
+import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 import { ShippingMatrix } from './ShippingMatrix';
 import { ShippingStatistics } from './ShippingStatistics';
 
 export const metadata: Metadata = {
-  title: 'Shipping | Ovie',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_SHIPPING, 'ov'),
   robots: NOINDEX_ROBOTS,
 };
 export const dynamic = 'force-dynamic';

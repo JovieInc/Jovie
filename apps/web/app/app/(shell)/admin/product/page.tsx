@@ -8,8 +8,11 @@ import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { loadCapabilityEvidence } from '@/lib/admin/capability-evidence';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 
-export const metadata: Metadata = { title: 'Product | Ovie' };
+export const metadata: Metadata = {
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_PRODUCT, 'ov'),
+};
 export const runtime = 'nodejs';
 
 const lifecycle = [

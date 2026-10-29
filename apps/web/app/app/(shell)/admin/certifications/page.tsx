@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { OvieCertificationsWorkspace } from '@/components/features/admin/certifications/OvieCertificationsWorkspace';
+import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { NOINDEX_ROBOTS } from '@/lib/seo/noindex-metadata';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const metadata: Metadata = {
-  title: 'Certifications',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_CERTIFICATIONS, 'ov'),
   description: 'Founder review table for every certification item.',
   robots: NOINDEX_ROBOTS,
 };

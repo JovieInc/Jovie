@@ -8,6 +8,7 @@ import { PageErrorState } from '@/components/features/feedback/PageErrorState';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import {
   buildDisplayUrl,
   buildMailtoHref,
@@ -23,7 +24,7 @@ import {
 } from './loader';
 
 export const metadata: Metadata = {
-  title: 'Share Studio | Admin',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_SHARE_STUDIO, 'ov'),
 };
 
 export const runtime = 'nodejs';

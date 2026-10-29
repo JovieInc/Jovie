@@ -1864,11 +1864,7 @@ function ProfilesWorkspaceContent({
       toolbar={
         <PageToolbar
           data-testid='connections-workspace-toolbar'
-          start={
-            <span className='text-app font-medium text-primary-token'>
-              Profiles
-            </span>
-          }
+          start={null}
           end={
             <>
               <Button

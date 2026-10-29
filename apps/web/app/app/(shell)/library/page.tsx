@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { libraryNavItem } from '@/components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCreatorDocumentAccess } from '@/lib/creator-documents/access';
 import type { CreatorDocumentListItem } from '@/lib/creator-documents/types';
@@ -37,7 +38,7 @@ import { LibraryPageClient } from './LibraryPageClient';
 export const runtime = 'nodejs';
 
 export const metadata: Metadata = {
-  title: 'Work',
+  title: libraryNavItem.name,
   description: 'Manage what you make and put into the world',
 };
 

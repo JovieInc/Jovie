@@ -95,11 +95,11 @@ describe('dashboard metadata generation', () => {
     mockLimit.mockResolvedValue([]);
   });
 
-  it('uses the static dashboard title for the app root', async () => {
+  it('uses the sidebar Inbox title for the app root', async () => {
     const { generateMetadata } = await import('@/app/app/(shell)/page');
     const metadata = await generateMetadata();
 
-    expect(metadata.title).toBe('Home');
+    expect(metadata.title).toBe('Inbox');
   });
 
   it('uses the visible New Chat title for the chat home route', async () => {

@@ -7,9 +7,12 @@ import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRo
 import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import { getHudMetrics } from '@/lib/hud/metrics';
 
-export const metadata: Metadata = { title: 'Fleet | Ovie' };
+export const metadata: Metadata = {
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_OPERATIONS, 'ov'),
+};
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 

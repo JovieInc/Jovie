@@ -327,6 +327,9 @@ web.admin-chat-playground|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/chat
 web.ov-founder-cockpit|web|ovie-founder-cockpit|apps/web/app/app/(shell)/admin/activity/page.tsx,apps/web/app/app/(shell)/admin/growth/page.tsx,apps/web/app/app/(shell)/admin/operations/page.tsx,apps/web/app/app/(shell)/admin/product/page.tsx|desktop,mobile
 web.ov-company-presence|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/presence/page.tsx|desktop,mobile
 web.admin-costs|web|admin-costs|apps/web/app/app/(shell)/admin/costs/page.tsx|desktop,mobile
+web.admin-interviews|web|admin-interviews|apps/web/app/app/(shell)/admin/interviews/page.tsx|desktop,mobile
+web.admin-playlists|web|admin-playlists|apps/web/app/app/(shell)/admin/playlists/page.tsx|desktop,mobile
+web.admin-revenue-lift|web|admin-revenue-lift|apps/web/app/app/(shell)/admin/revenue-lift/page.tsx|desktop,mobile
 web.admin-capacity|web|ovie-ops-shell|apps/web/app/app/(shell)/admin/capacity/page.tsx|desktop,mobile
 web.admin-features|web|admin-features|apps/web/app/app/(shell)/admin/features/page.tsx|desktop,mobile
 web.admin-feature-registry|web|admin-feature-registry|apps/web/app/app/(shell)/admin/feature-registry/page.tsx|desktop,mobile

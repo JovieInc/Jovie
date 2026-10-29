@@ -45,7 +45,15 @@ function assertThinWrapper(source: string) {
   const imports = file.statements.filter(ts.isImportDeclaration);
   expect(
     imports.map(node => (node.moduleSpecifier as ts.StringLiteral).text).sort()
-  ).toEqual(['../../presence/page', '@/lib/admin/page-access', 'next'].sort());
+  ).toEqual(
+    [
+      '../../presence/page',
+      '@/constants/routes',
+      '@/lib/admin/page-access',
+      '@/lib/constants/sidebar-route-labels',
+      'next',
+    ].sort()
+  );
   const functions = file.statements.filter(ts.isFunctionDeclaration);
   expect(functions).toHaveLength(1);
   expect(

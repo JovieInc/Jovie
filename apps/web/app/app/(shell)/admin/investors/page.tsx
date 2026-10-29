@@ -16,6 +16,7 @@ import { UnifiedTableSkeleton } from '@/components/organisms/table';
 import { PersonCell } from '@/components/organisms/table/atoms/PersonCell';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
+import { getSidebarRouteLabel } from '@/lib/constants/sidebar-route-labels';
 import type { ColumnDef } from '@/lib/tanstack-table';
 import { cn } from '@/lib/utils';
 import {
@@ -31,7 +32,7 @@ import { loadAdminInvestorPipelineData } from './investors-data';
 import { TokenCopyButton } from './TokenCopyButton';
 
 export const metadata: Metadata = {
-  title: 'Investor Pipeline',
+  title: getSidebarRouteLabel(APP_ROUTES.ADMIN_INVESTORS, 'ov'),
 };
 
 export const runtime = 'nodejs';

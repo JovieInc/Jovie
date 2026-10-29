@@ -686,6 +686,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
 
   it('shows one full profile inventory and a focused add action without category controls', () => {
     renderWorkspace(dataWithConnector);
+    expect(
+      screen.queryByText('Profiles', { exact: true })
+    ).not.toBeInTheDocument();
     expect(screen.getByText('Spotify')).toBeInTheDocument();
     expect(screen.getByText('Jovie Profile')).toBeInTheDocument();
     expect(screen.queryByText('Gmail')).not.toBeInTheDocument();
@@ -713,7 +716,8 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     expect(
       within(toolbar).getByRole('button', { name: 'Add Profile Or Site' })
     ).toBeInTheDocument();
-    expect(within(toolbar).getByText('Profiles')).toBeInTheDocument();
+    // The breadcrumb owns the page name; the toolbar must not repeat it.
+    expect(within(toolbar).queryByText('Profiles')).not.toBeInTheDocument();
     expect(
       screen.getByTestId('registered-header-actions')
     ).toBeEmptyDOMElement();
@@ -1241,7 +1245,9 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       screen.getByRole('button', { name: /Add public profile/i })
     );
     const url = screen.getByRole('textbox', { name: 'Public Profile URL' });
-    await user.type(url, 'Instagram.com/tim/?utm_source=test');
+    // Paste a profile URL; typed-handle keyboard selection is covered below.
+    await user.click(url);
+    await user.paste('Instagram.com/tim/?utm_source=test');
     expect(screen.getByText(/instagram\.com\/tim/)).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Review Profile' })

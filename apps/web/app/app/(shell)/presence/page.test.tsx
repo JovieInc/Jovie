@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { isValidElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { presenceNavItem } from '@/components/features/dashboard/dashboard-nav/config';
 import { APP_ROUTES } from '@/constants/routes';
 
 const mocks = vi.hoisted(() => ({
@@ -52,8 +53,8 @@ describe('Profiles public page route', () => {
     mocks.loadProfiles.mockResolvedValue({ profileId: 'identity-1' });
   });
 
-  it('names the customer page Profiles while preserving the identity description', () => {
-    expect(metadata.title).toBe('Profiles');
+  it('names the customer page after its sidebar label while preserving the identity description', () => {
+    expect(metadata.title).toBe(presenceNavItem.name);
     expect(metadata.description).toBe(
       'Manage who you are and how you are represented across public surfaces'
     );
