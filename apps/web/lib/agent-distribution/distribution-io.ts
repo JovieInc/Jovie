@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, relative } from 'node:path';
 import { AGENT_DRAFT_TOOLS } from '@/lib/agent-acquisition/api';
@@ -13,9 +12,10 @@ import { LISTING } from './listing';
 const ASSET_NAMES = ['icon.svg', 'icon-dark.svg', 'logo.svg', 'logo-dark.svg'];
 
 async function walk(dir: string): Promise<string[]> {
-  if (!existsSync(dir)) return [];
+  const entries = await readdir(dir, { withFileTypes: true }).catch(() => null);
+  if (!entries) return [];
   const out: string[] = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
+  for (const entry of entries) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) out.push(...(await walk(path)));
     else out.push(path);
@@ -41,7 +41,7 @@ export async function findDrift(
   const drift: string[] = [];
   for (const [path, content] of Object.entries(files)) {
     const file = join(dir, path);
-    const current = existsSync(file) ? await readFile(file, 'utf8') : null;
+    const current = await readFile(file, 'utf8').catch(() => null);
     if (current !== content) drift.push(path);
   }
   const existing = (await walk(dir)).map(p => relative(dir, p));
