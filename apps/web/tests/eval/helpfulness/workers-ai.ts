@@ -70,13 +70,23 @@ export function workersAiChat(config: WorkersAiConfig) {
     nextSlot.set(model, slot + WORKERS_AI_MIN_INTERVAL_MS);
     if (slot > now) await new Promise(r => setTimeout(r, slot - now));
   };
-  const client = createApiClient({
-    provider: 'cloudflare',
-    credential: hashCredential('cloudflare', config.token),
-    authorize: headers => {
-      headers.set('authorization', `Bearer ${config.token}`);
-    },
-  });
+  // One ledger bucket per model: Workers AI rate limits per model, so a 429
+  // on one model must not open the breaker for the others.
+  const clients = new Map<string, ReturnType<typeof createApiClient>>();
+  const clientFor = (model: string) => {
+    let client = clients.get(model);
+    if (!client) {
+      client = createApiClient({
+        provider: 'cloudflare',
+        credential: `${hashCredential('cloudflare', config.token)}:${model}`,
+        authorize: headers => {
+          headers.set('authorization', `Bearer ${config.token}`);
+        },
+      });
+      clients.set(model, client);
+    }
+    return client;
+  };
   const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/ai/v1/chat/completions`;
 
   return async function chat(input: {
@@ -86,7 +96,7 @@ export function workersAiChat(config: WorkersAiConfig) {
     readonly maxTokens?: number;
   }): Promise<WaiResult> {
     await pace(input.model);
-    const response = await client.request({
+    const response = await clientFor(input.model).request({
       url,
       method: 'POST',
       priority: 'default',
