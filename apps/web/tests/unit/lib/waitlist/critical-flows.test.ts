@@ -70,7 +70,11 @@ describe('waitlist critical flow contracts', () => {
     const decision = evaluateWaitlistQualification({
       email: 'artist@example.com',
       payload: basePayload,
-      config: { mode: 'waitlist_enabled', autoAcceptReserved: true },
+      config: {
+        mode: 'waitlist_enabled',
+        autoAcceptReserved: true,
+        goldenPath: { admit: true, reason: 'admit_resolved_artist' },
+      },
     });
 
     expect(decision).toMatchObject({

@@ -1,8 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
 import { GithubHeadroomTile } from './GithubHeadroomTile';
+import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 
 /**
  * Fleet's GitHub API headroom, from the lanes status feed (`githubHeadroom`,
@@ -10,7 +9,7 @@ import { GithubHeadroomTile } from './GithubHeadroomTile';
  * or when the feed carries no current-hour sample.
  */
 export function GithubHeadroomPanel() {
-  const query = useQuery(shippingStateQueryOptions);
-  const report = query.data?.delivery?.lanes?.githubHeadroom ?? null;
+  const query = useHudShippingStateQuery(null);
+  const report = query.view.delivery.lanes.githubHeadroom ?? null;
   return <GithubHeadroomTile report={report} nowMs={Date.now()} />;
 }

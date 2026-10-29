@@ -185,7 +185,7 @@ export const KEYBOARD_SHORTCUTS: KeyboardShortcut[] = [
     shortcutKey: '/',
     decision: {
       status: 'required',
-      binding: 'HeaderActionsProvider, HeaderSearchSurface',
+      binding: 'HeaderActionsProvider, CommandPalette',
     },
   },
   {

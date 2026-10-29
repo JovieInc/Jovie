@@ -1,11 +1,10 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
 import { HudStatusPill } from '@/app/app/(shell)/admin/ops/HudStatusPill';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { type FleetVerdict, fleetVerdict } from '@/lib/ovie/home/fleet-verdict';
 import type { DeliveryLanes } from '@/lib/ovie/shipping-state/contract';
-import { shippingStateQueryOptions } from '@/lib/queries/shipping-state';
+import { useHudShippingStateQuery } from './useHudShippingStateQuery';
 
 const LEVEL_TONE = {
   healthy: 'good',
@@ -79,8 +78,8 @@ export function FleetVerdictPanelView({
 }
 
 export function FleetVerdictPanel() {
-  const query = useQuery(shippingStateQueryOptions);
-  const lanes = query.data?.delivery?.lanes ?? null;
+  const query = useHudShippingStateQuery(null);
+  const lanes = query.view.delivery.lanes;
   if (query.isPending) {
     return (
       <ContentSurfaceCard surface='details' data-testid='fleet-verdict-panel'>
@@ -90,14 +89,13 @@ export function FleetVerdictPanel() {
       </ContentSurfaceCard>
     );
   }
-  if (!lanes) {
+  if (query.view.lastError) {
     return (
       <FleetVerdictPanelView
         verdict={{
           level: 'unknown',
-          headline: query.isError
-            ? 'Fleet health unavailable: the shipping read failed. Refresh to retry.'
-            : 'Fleet health not measured',
+          headline:
+            'Fleet health unavailable: the shipping read failed. Refresh to retry.',
           reasons: [],
           capacity: null,
         }}

@@ -25,6 +25,9 @@ export const COOLDOWN_JITTER = 0.25;
 
 const STATE_ERROR =
   'Linear credential backoff state is unavailable or malformed';
+const PENDING_RECORD =
+  /^\.pending-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const PUBLICATION_WAIT_MS = 1_000;
 
 export function credentialHash(key, apiUrl = LINEAR_API_URL) {
   return createHash('sha256').update(`${apiUrl}\0${key}`).digest('hex');
@@ -148,8 +151,20 @@ async function privateDirectory(path, repair = false) {
     throw stateError();
 }
 
-/** @param {string} directory @param {number} nowMs @param {boolean} strict */
-async function readScope(directory, nowMs, strict) {
+/**
+ * @param {string} directory
+ * @param {number} nowMs
+ * @param {boolean} strict
+ * @param {number} publicationDeadline
+ * @param {Set<string>} uncommitted
+ */
+async function readScope(
+  directory,
+  nowMs,
+  strict,
+  publicationDeadline,
+  uncommitted = new Set()
+) {
   try {
     if (strict) {
       await fs.lstat(directory);
@@ -163,10 +178,14 @@ async function readScope(directory, nowMs, strict) {
     }
     let resetAt = 0;
     for (const name of names) {
-      if (!/^\d+-[0-9a-f-]+\.json$/.test(name)) {
+      const pending = strict && PENDING_RECORD.test(name);
+      if (!pending && !/^\d+-[0-9a-f-]+\.json$/.test(name)) {
         if (strict) throw stateError();
         continue;
       }
+      // A rename after this snapshot also requires a rescan: its final record
+      // was not in `names`, even when lstat below now reports ENOENT.
+      if (pending) uncommitted.add(name.slice('.pending-'.length));
       const path = join(directory, name);
       let record;
       try {
@@ -180,6 +199,7 @@ async function readScope(directory, nowMs, strict) {
           if (strict) throw stateError();
           continue;
         }
+        if (pending) continue;
         record = JSON.parse(await fs.readFile(path, 'utf8'));
       } catch (error) {
         if (error?.code === 'ENOENT') continue;
@@ -196,6 +216,7 @@ async function readScope(directory, nowMs, strict) {
         if (strict) throw stateError();
         continue;
       }
+      uncommitted.delete(name.slice(name.indexOf('-') + 1, -'.json'.length));
       if (record.resetAt > nowMs) resetAt = Math.max(resetAt, record.resetAt);
       else if (strict) {
         try {
@@ -205,9 +226,29 @@ async function readScope(directory, nowMs, strict) {
         }
       }
     }
+    if (uncommitted.size > 0) {
+      // Do not admit from an older snapshot or delete another writer's staging
+      // file. Disappearing staging must resolve to a committed record, not
+      // admission before a failed writer has persisted its fallback.
+      const remaining = publicationDeadline - performance.now();
+      if (remaining <= 0) throw stateError();
+      await new Promise(resolve =>
+        setTimeout(resolve, Math.min(10, remaining))
+      );
+      return readScope(
+        directory,
+        nowMs,
+        strict,
+        publicationDeadline,
+        uncommitted
+      );
+    }
     return resetAt;
   } catch (error) {
-    if (error?.code === 'ENOENT') return 0;
+    if (error?.code === 'ENOENT') {
+      if (strict && uncommitted.size > 0) throw stateError();
+      return 0;
+    }
     if (error?.code === 'BACKOFF_STATE_INVALID') throw error;
     if (strict) throw stateError();
     return 0;
@@ -245,23 +286,39 @@ export function credentialBackoff(
   const keyHash = legacyKeyHash(key);
   const directory = join(root, scope);
   async function read(nowMs) {
+    const publicationDeadline = performance.now() + PUBLICATION_WAIT_MS;
     try {
       if (strict) {
         await privateDirectory(root);
         await privateDirectory(directory);
       }
-      let resetAt = await readScope(directory, nowMs, strict);
+      let resetAt = await readScope(
+        directory,
+        nowMs,
+        strict,
+        publicationDeadline
+      );
       resetAt = Math.max(resetAt, await readLegacyFile(root, keyHash, nowMs));
       for (const legacy of legacyRoots) {
         const legacyScope = join(legacy, scope);
-        const scopeReset = await readScope(legacyScope, nowMs, strict);
+        const scopeReset = await readScope(
+          legacyScope,
+          nowMs,
+          strict,
+          publicationDeadline
+        );
         const fileReset = await readLegacyFile(legacy, keyHash, nowMs);
         resetAt = Math.max(resetAt, scopeReset, fileReset);
       }
       // Fallbacks written when the shared dir rejected a publish (JOV-7577).
       resetAt = Math.max(
         resetAt,
-        await readScope(join(fallbackCooldownRoot(), scope), nowMs, false)
+        await readScope(
+          join(fallbackCooldownRoot(), scope),
+          nowMs,
+          false,
+          publicationDeadline
+        )
       );
       const local = processCooldowns.get(scope);
       if (local !== undefined) {

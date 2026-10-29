@@ -7,6 +7,10 @@ and routes through its Tracker like every other doctor alert; nothing here owns 
 Alarms (each names its stage and carries its evidence):
   throughput-no-push:<repo>:<lane>   demand > 0, seats configured, zero lane pushes for 60 min
   throughput-queue-no-merge          merge queue > 0, zero merges in the last 60 min
+  throughput-queue-unmergeable      an UNMERGEABLE queue entry the sweep could not dequeue (it dequeues, comments and
+                                     routes to lane-fix-conflict after 10 min; #23519 stalled the queue 3h)
+  throughput-claim-errors:<lane>     >= 20% of a lane's runs in 30 min died on claim-error (a broken claim ledger
+                                     killed ~560 fix-red runs from 2026-10-26 07:30Z and nothing alarmed)
   throughput-merge-group-start-slow  merge-group runs wait > 5 min (p50) for a runner
   throughput-prod-lease-held         a Production Controller run holds the lease > 45 min
   throughput-idle-dominant           one idle/hold reason is > 50% of the last hour's exits
@@ -45,6 +49,7 @@ NO_DEMAND_REASONS = frozenset({"maintenance-only-idle", "no-demand", "pool-empty
 GROWTH_ALARM_FRACTION = 0.7
 RELEASE_FLOW_REFRESH_S = 300
 MERGE_GROUP_SAMPLE_RUNS = 3
+CLAIM_ERROR_WINDOW_S, CLAIM_ERROR_FRACTION, CLAIM_ERROR_MIN_RUNS = 1800, 0.2, 5
 PUSH_VERDICTS = frozenset({"pr-opened", "pushed", "fix-pushed", "landing", "verified-not-queued", "decomposed"})
 REPO = "JovieInc/Jovie"
 # Repos the lanes do not claim work in; their demand and merge signals come from GitHub alone.
@@ -98,6 +103,22 @@ def read_idle_exits(state: Path, now: float, window_s: float = 3600) -> list[dic
                 and isinstance(row.get("reason"), str):
             rows.append(row)
     return rows
+
+
+def claim_errors_by_lane(receipts: list[dict], now: float) -> dict[str, dict]:
+    """Per provider over the last 30 min: finished runs and how many died on a claim-error receipt."""
+    out: dict[str, dict] = {}
+    for row in receipts or []:
+        ended = _iso_epoch(row.get("endedAt"))
+        if ended is None or not 0 <= now - ended <= CLAIM_ERROR_WINDOW_S or not row.get("provider"):
+            continue
+        slot = out.setdefault(row["provider"], {"runs": 0, "claimErrors": 0, "sample": None})
+        slot["runs"] += 1
+        reason = next((r for r in row.get("reasons") or [] if isinstance(r, str) and r.startswith("claim-error:")), None)
+        if reason:
+            slot["claimErrors"] += 1
+            slot["sample"] = slot["sample"] or reason[:120]
+    return out
 
 
 def pushes_by_lane(receipts: list[dict], now: float) -> dict[str, int]:
@@ -159,11 +180,21 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         leases = [(now - started) / 60 for row in held.get("workflow_runs") or []
                   if (started := _iso_epoch(row.get("run_started_at"))) is not None]
         runs = [row.get("id") for row in held.get("workflow_runs") or []]
+        # Hosted-runner backlog: queued runs repo-wide and the oldest one's wait. 2026-10-28: 990 queued
+        # runs, oldest 18 min, 64 in progress, so a green head waited on runner concurrency, not on lanes.
+        queued = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1")
+        queued_total = queued.get("total_count") if isinstance(queued.get("total_count"), int) else None
+        oldest_min = None
+        if queued_total:
+            tail = _gh_json(run, f"repos/{repo}/actions/runs?status=queued&per_page=1&page={queued_total}")
+            created = _iso_epoch(((tail.get("workflow_runs") or [{}])[0]).get("created_at"))
+            oldest_min = round((now - created) / 60, 1) if created is not None else None
         signal = {"schema": "symphony-release-flow/v1", "observedAt": now,
                   "mergeGroupRuns": sampled, "mergeGroupJobs": len(waits),
                   "mergeGroupStartP50Min": round(statistics.median(waits), 2) if waits else None,
                   "mergeGroupStartMaxMin": round(max(waits), 2) if waits else None,
-                  "leaseHeldMin": round(max(leases), 1) if leases else 0.0, "leaseRunIds": runs[:3]}
+                  "leaseHeldMin": round(max(leases), 1) if leases else 0.0, "leaseRunIds": runs[:3],
+                  "queuedRuns": queued_total, "queuedOldestMin": oldest_min}
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(signal, sort_keys=True))
         os.replace(tmp, path)
@@ -264,6 +295,13 @@ def growth_bounds(state: Path, limits: dict) -> list[dict]:
 
 def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=None,
             fetch_remote: bool = True) -> dict:
+    queue_unmergeable = None
+    if fetch_remote:
+        try:
+            import queue_unmergeable as _queue
+            queue_unmergeable = _queue.sweep(state, run or _budgeted_gh, now)
+        except Exception as error:  # noqa: BLE001  (a sweep failure must never stop the sentinel)
+            queue_unmergeable = {"seen": [], "dequeued": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
     exits = read_idle_exits(state, now)
     repos, repo_errors = {}, {}
@@ -272,7 +310,14 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         repos[watched] = flow_row
         if flow_err:
             repo_errors[watched] = flow_err
-    return {"pushes1h": pushes_by_lane(receipts, now),
+    breaker = None
+    if fetch_remote:
+        try:
+            import queue_breaker as _breaker
+            breaker = _breaker.sweep(state, run or _budgeted_gh, now)
+        except Exception as error:  # noqa: BLE001
+            breaker = {"tripped": [], "reblocked": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
+    return {"queueBreaker": breaker, "queueUnmergeable": queue_unmergeable, "pushes1h": pushes_by_lane(receipts, now), "claimErrors30m": claim_errors_by_lane(receipts, now),
             "idleExits1h": dict(Counter(row["reason"] for row in exits)),
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
@@ -305,6 +350,23 @@ def judge(obs: dict) -> dict[str, str]:
                     f"({row.get('running', 0)} running, oldest lease "
                     f"{round((row.get('oldestLeaseAge') or 0) / 60)} min) but zero {provider} pushes in the last 60 min; "
                     f"idle exits 1h: {_top(idle)}; held: {obs.get('heldByReason') or {}}")
+    # 1b. Claim errors: runs that die before any work because the claim ledger is unreadable.
+    for provider, row in sorted((sentinel.get("claimErrors30m") or {}).items()):
+        if row.get("runs", 0) >= CLAIM_ERROR_MIN_RUNS and row.get("claimErrors", 0) / row["runs"] > CLAIM_ERROR_FRACTION:
+            alerts[f"throughput-claim-errors:{provider}"] = (
+                f"stage claim ({provider}): {row['claimErrors']}/{row['runs']} runs in the last 30 min ended on claim-error "
+                f"({row.get('sample')}); check runs/execution-attempts.jsonl for a torn line and the execution coordinator")
+    # 1c. An UNMERGEABLE queue entry is dequeued and routed by queue_unmergeable; an alarm only when that fails.
+    stuck = sentinel.get("queueUnmergeable") or {}
+    if stuck.get("errors") and stuck.get("seen"):
+        alerts["throughput-queue-unmergeable"] = (
+            f"stage queued->merged: UNMERGEABLE merge-queue entries {[row['pr'] for row in stuck['seen']]} could not be "
+            f"auto-dequeued: {'; '.join(stuck['errors'])[:300]}")
+    tripped = sentinel.get("queueBreaker") or {}
+    if tripped.get("tripped"):
+        alerts["throughput-queue-breaker"] = (
+            f"stage queued->merged: PR(s) {tripped['tripped']} failed merge-group CI twice in 3h and were dequeued and held with "
+            "lane-fix-red; re-enqueue waits for a new head and a green PR-time check")
     # 2. Queue but no merges.
     merge = obs.get("mergeThroughput") or {}
     if isinstance(merge.get("observedAt"), (int, float)) and obs["now"] - merge["observedAt"] < 1800 \
