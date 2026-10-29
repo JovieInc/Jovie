@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { buildInventory, IDS_PATH, OUT_PATH } from './extract.mjs';
+import { buildInventory, IDS_PATH } from './extract.mjs';
 
 const registry = JSON.parse(readFileSync(IDS_PATH, 'utf8'));
 
@@ -39,10 +39,13 @@ test('a new line gets the next number and never renumbers old ones', () => {
       .filter(v => v.startsWith('SL-'))
       .map(v => Number(v.split('-')[1]))
   );
-  assert.equal(
-    again.find(r => r.text === drop.text && r.source === drop.source).id,
-    `SL-${max + 1}`
-  );
+  // Other not-yet-registered lines (a main that moved) may take the next
+  // numbers first, so assert "after every existing number", not "exactly next".
+  const reborn = again.find(
+    r => r.text === drop.text && r.source === drop.source
+  ).id;
+  assert.match(reborn, /^SL-\d+$/);
+  assert.ok(Number(reborn.split('-')[1]) > max);
   for (const r of rows.filter(x => x.id !== drop.id)) {
     assert.equal(
       again.find(x => x.source === r.source && x.text === r.text)?.id,
@@ -58,7 +61,11 @@ test('home record slots are keyed on the record field', () => {
   assert.ok(home.some(r => r.source.endsWith('hero.subhead')));
 });
 
-test('committed inventory matches the extractor', () => {
-  const out = JSON.parse(readFileSync(OUT_PATH, 'utf8'));
-  assert.equal(out.count, buildInventory(registry).rows.length);
+test('committed ID registry covers every extracted row', () => {
+  const known = new Set(Object.values(registry.ids));
+  const missing = buildInventory(registry).rows.filter(r => !known.has(r.id));
+  assert.deepEqual(
+    missing.map(r => r.id),
+    []
+  );
 });
