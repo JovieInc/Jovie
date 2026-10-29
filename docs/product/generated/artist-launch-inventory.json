@@ -3401,6 +3401,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/investors/respond/route.ts",
+      "kind": "handler",
+      "route": "/api/investors/respond",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/investors/track/route.ts",
       "kind": "handler",
       "route": "/api/investors/track",
