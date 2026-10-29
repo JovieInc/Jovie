@@ -2,8 +2,11 @@
  * Jovie Inbox constants — email domain, category-to-role mapping, territory specificity.
  */
 
-/** The domain used for artist inbound email addresses. */
-export const INBOX_DOMAIN = 'jovie.fm';
+import { EMAIL_STREAM_REGISTRY } from '@/lib/email/streams';
+
+/** The domain used for artist inbound email addresses (the inbox stream's domain). */
+export const INBOX_DOMAIN =
+  EMAIL_STREAM_REGISTRY.streams.inbox.fromDomain ?? '';
 
 /** Maximum inbound emails per artist per hour before rate limiting kicks in. */
 export const INBOUND_RATE_LIMIT_PER_HOUR = 100;

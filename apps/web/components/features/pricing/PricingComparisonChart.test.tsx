@@ -35,7 +35,7 @@ describe('PricingComparisonChart', () => {
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
-      name: 'Contact / subscriber capture',
+      name: 'Fan email capture',
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');
@@ -50,8 +50,8 @@ describe('PricingComparisonChart', () => {
     expect(
       within(mobileTable).getByText('Artist Presence')
     ).toBeInTheDocument();
-    expect(within(desktopTable).getAllByText('Included')).toHaveLength(2);
-    expect(within(mobileTable).getAllByText('Included')).toHaveLength(1);
+    expect(within(desktopTable).getAllByText('Included')).toHaveLength(4);
+    expect(within(mobileTable).getAllByText('Included')).toHaveLength(3);
     expect(desktopTable.querySelector('svg')).toBeNull();
     expect(mobileTable.querySelector('svg')).toBeNull();
     expect(
@@ -80,7 +80,8 @@ describe('PricingComparisonChart', () => {
     expect(selector).toHaveValue('free');
     expect(within(mobileTable).getByText('Free')).toBeInTheDocument();
     expect(within(mobileTable).getByText('$0')).toBeInTheDocument();
-    expect(within(mobileTable).getByText('Up to 100')).toBeInTheDocument();
+    expect(within(mobileTable).getByText('Unlimited')).toBeInTheDocument();
+    expect(within(mobileTable).getAllByText('Not included')).toHaveLength(2);
     expect(within(mobileTable).queryByText('/mo')).not.toBeInTheDocument();
 
     fireEvent.change(selector, { target: { value: 'unknown-plan' } });
