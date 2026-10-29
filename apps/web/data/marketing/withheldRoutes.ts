@@ -19,7 +19,7 @@ export interface WithheldMarketingRoute {
 export const WITHHELD_MARKETING_ROUTES: readonly WithheldMarketingRoute[] = [
   {
     route: '/card',
-    reason: 'Page says "coming soon" and only collects interest.',
+    reason: 'Product is not available yet; the page only collects interest.',
     returnsWhen: 'Jovie Card ships and can be ordered or used.',
     note: 'Restore /card to nav, footer, and sitemap when Jovie Card is live.',
   },
