@@ -14,6 +14,23 @@ import {
 } from './onboarding-tool-impls';
 
 vi.mock('server-only', () => ({}));
+const catalogMocks = vi.hoisted(() => ({
+  fetchPreview: vi.fn().mockResolvedValue(null),
+  recordFunnelStep: vi.fn().mockResolvedValue(undefined),
+  recordStage: vi.fn().mockResolvedValue(true),
+}));
+vi.mock('@/lib/onboarding/catalog-preview.server', () => ({
+  fetchOnboardingCatalogPreview: catalogMocks.fetchPreview,
+}));
+vi.mock('@/lib/analytics/signup-funnel.server', () => ({
+  recordFunnelStep: catalogMocks.recordFunnelStep,
+}));
+vi.mock('@/lib/acquisition/artist-offer-funnel.server', () => ({
+  recordArtistOfferStage: catalogMocks.recordStage,
+}));
+vi.mock('next/headers', () => ({
+  cookies: async () => ({ get: () => undefined }),
+}));
 vi.mock('@/lib/spotify', () => ({
   getSpotifyArtist: vi.fn(),
   buildSpotifyArtistUrl: (id: string) =>
@@ -376,6 +393,62 @@ describe('confirmed artist field provenance', () => {
       fetchedAt: output.metrics?.updatedAt,
     });
     expect(state.artistMetrics).toEqual(output.metrics);
+  });
+
+  it('carries the real catalog into the preview and records the funnel step (JOV-9758)', async () => {
+    vi.mocked(getSpotifyArtist).mockResolvedValueOnce(artist);
+    const catalog = {
+      total: 24,
+      releases: [
+        {
+          id: 'album1',
+          title: 'Latest single',
+          releaseType: 'single' as const,
+          releaseDate: '2026-08-14',
+          artworkUrl: 'https://i.scdn.co/image/album1',
+          spotifyUrl: 'https://open.spotify.com/album/album1',
+        },
+      ],
+    };
+    catalogMocks.fetchPreview.mockResolvedValueOnce(catalog);
+    const state = createOnboardingTurnState({
+      sessionId: 'catalog-fixture',
+      turnCount: 1,
+    });
+    const output = await buildConfirmSpotifyArtistOutput(id, state);
+    expect(catalogMocks.fetchPreview).toHaveBeenCalledWith(id);
+    expect(output.catalog).toEqual(catalog);
+    expect(state.catalogPreview).toEqual(catalog);
+    await vi.waitFor(() =>
+      expect(catalogMocks.recordFunnelStep).toHaveBeenCalledWith({
+        funnel: 'artist_signup',
+        step: 'catalog_preview',
+        surface: 'onboarding',
+      })
+    );
+
+    // A later turn rehydrates the catalog from history without refetching.
+    const rehydrated = createOnboardingTurnState({
+      sessionId: 'catalog-fixture',
+      turnCount: 2,
+      messages: [
+        {
+          id: 'assistant-catalog',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'confirmSpotifyArtist',
+              toolCallId: 'tool-confirm-catalog',
+              state: 'output-available',
+              input: { spotifyArtistId: id },
+              output,
+            },
+          ],
+        },
+      ],
+    });
+    expect(rehydrated.catalogPreview).toEqual(catalog);
   });
 
   it('rejects wrong-identity API data before it can contaminate the accumulator', async () => {

@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import { PhoneFrame } from '@/components/molecules/PhoneFrame';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -21,6 +22,8 @@ export interface ProfilePreviewBentoProps {
   readonly phoneContent?: ReactNode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
+  /** Real releases to render on the preview (JOV-9758). */
+  readonly releases?: readonly PublicRelease[];
   readonly genres?: string[] | null;
   readonly profileHref: string;
   /** Whether the preview visitor already follows the artist. Defaults to false. */
@@ -85,6 +88,7 @@ export function ProfilePreviewBento({
   phoneContent,
   artist,
   socialLinks,
+  releases,
   genres,
   profileHref,
   isSubscribed = false,
@@ -117,6 +121,7 @@ export function ProfilePreviewBento({
             presentation='embedded'
             artist={artist}
             socialLinks={socialLinks}
+            releases={releases}
             contacts={[]}
             showPayButton={false}
             genres={genres}

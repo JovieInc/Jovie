@@ -15,6 +15,7 @@ import {
   type OnboardingWidgetEventType,
   parseWidgetEventFromMetadata,
 } from '@/lib/chat/onboarding-script/widget-events';
+import { readOnboardingCatalogPreview } from '@/lib/onboarding/catalog-preview';
 import { readOnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import { type CheckoutCardPayload } from './ChatProposeCheckoutCard';
 import { type NextStepCardPayload } from './ChatProposeNextStepCard';
@@ -273,6 +274,7 @@ export function artistFromConfirmedOutput(
     followers: artist.followers ?? null,
     popularity: artist.popularity ?? null,
     genres: artist.genres ?? [],
+    catalog: readOnboardingCatalogPreview(output.catalog),
     dspMatches: [
       {
         id: 'spotify',

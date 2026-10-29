@@ -605,6 +605,33 @@ async function driveAnonymousOnboardingJourney(page: Page, handle: string) {
     'Real Spotify artist confirmation did not render the resolved identity'
   ).toBeVisible({ timeout: 60_000 });
 
+  // JOV-9758 guard: value before paywall. The preview must render at least
+  // one release from the artist's real Spotify catalog before any pricing
+  // step exists on the page. An empty "name and a photo" preview fails here.
+  const previewRail = page
+    .locator(
+      '[data-testid="onboarding-profile-rail"], [data-testid="onboarding-profile-rail-inline"]'
+    )
+    .filter({ visible: true })
+    .first();
+  await expect
+    .poll(
+      async () =>
+        Number((await previewRail.getAttribute('data-catalog-releases')) ?? 0),
+      {
+        message:
+          'Onboarding preview did not show any release from the real catalog',
+        timeout: 60_000,
+      }
+    )
+    .toBeGreaterThanOrEqual(1);
+  expect(
+    await page.locator('a[href^="/onboarding/checkout"]').count(),
+    'A pricing step rendered before the catalog preview'
+  ).toBe(0);
+  expect(new URL(page.url()).pathname).not.toBe('/onboarding/checkout');
+  await captureKeyframe(page, 'catalog-preview');
+
   const handleResponse = await sendChatMessage('Set my profile handle');
   expect(handleResponse.headers()['x-onboarding-fallback']).toMatch(/^handle:/);
   const handleCard = page.getByTestId('onboarding-handle-check');
