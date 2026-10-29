@@ -20,4 +20,21 @@ describe('AgentConnectorDocs', () => {
       ).toBeInTheDocument();
     }
   });
+
+  it('links three sibling developer pages from the page body', () => {
+    render(
+      <AgentConnectorDocs
+        listing={LISTING}
+        toolsListHash={snapshot.toolsListHash}
+        tools={snapshot.tools}
+      />
+    );
+    for (const href of ['/developers', '/cli', '/api-versioning']) {
+      expect(
+        document.querySelector(
+          `[data-testid="agent-connector-docs"] a[href="${href}"]`
+        )
+      ).not.toBeNull();
+    }
+  });
 });

@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { MarketingContainer } from '@/components/marketing';
+import { APP_ROUTES } from '@/constants/routes';
 import type { Listing } from '@/lib/agent-distribution/listing';
 
 export interface AgentDocsTool {
@@ -17,6 +18,13 @@ export interface AgentConnectorDocsProps {
   readonly toolsListHash: string;
   readonly tools: readonly AgentDocsTool[];
 }
+
+// Page-owned links to sibling developer pages (geo-sibling-links needs 3-5).
+const RELATED_LINKS = [
+  { href: APP_ROUTES.DEVELOPERS, label: 'Developers Overview' },
+  { href: APP_ROUTES.CLI, label: 'Jovie Command Line' },
+  { href: APP_ROUTES.API_VERSIONING, label: 'API Versioning' },
+] as const;
 
 const H2 =
   'text-balance text-2xl font-semibold tracking-tight text-primary-token';
@@ -117,6 +125,21 @@ export function AgentConnectorDocs({
               {page.expiryHeading}
             </h2>
             <p className={BODY}>{page.expiryText}</p>
+          </section>
+
+          <section aria-labelledby='agent-docs-related'>
+            <h2 id='agent-docs-related' className={H2}>
+              Related
+            </h2>
+            <ul className='mt-4 space-y-2 text-base text-secondary-token'>
+              {RELATED_LINKS.map(link => (
+                <li key={link.href}>
+                  <Link href={link.href} className='underline'>
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </section>
 
           <section aria-labelledby='agent-docs-legal'>
