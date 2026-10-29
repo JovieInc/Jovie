@@ -185,6 +185,7 @@ describe('@critical CheckoutSessionHandler', () => {
       expect(mockAdmitPaidUser).toHaveBeenCalledWith({
         appUserId: betterAuthRow.id,
         cacheKeys: [betterAuthRow.id],
+        subscriptionId: 'sub_123',
       });
       expect(mockActivateReferral).toHaveBeenCalledWith(betterAuthRow.id);
       expect(mockActivateReferral).not.toHaveBeenCalledWith(

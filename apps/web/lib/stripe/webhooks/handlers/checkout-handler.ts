@@ -149,10 +149,13 @@ export class CheckoutSessionHandler extends BaseSubscriptionHandler {
 
       // Paying admits: a verified active subscription moves a still-pending
       // buyer past the waitlist gate (entitlement is already written above).
-      await admitPaidUser({
+      const admission = await admitPaidUser({
         appUserId: result.appUserId,
         cacheKeys: [userId],
+        subscriptionId: subscription.id,
       });
+      // A held waiting buyer was refunded: no referral credit, no welcome.
+      if (admission.refunded) return result;
 
       // Secondary revenue attribution always uses the canonical app UUID.
       await tryActivateReferral(result.appUserId);

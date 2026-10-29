@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { sql as drizzleSql, eq, inArray } from 'drizzle-orm';
+import { isInternalAccount } from '@/lib/accounts/internal-account';
 import type { CertificationRecordBackend } from '@/lib/agent-os/certification-cas';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -190,4 +191,31 @@ export async function decideAdmissionForUser(
     .where(eq(creatorProfiles.waitlistEntryId, user.entryId))
     .limit(1);
   return decideForProfile(context, profile?.id ?? null);
+}
+
+/**
+ * Payment hold (Tim, 2026-10-29: never charge someone we will not admit).
+ * Returns the blocking legs when this account is a waiting customer the
+ * admission gate does not admit; null when payment may proceed. Accounts
+ * already past the waitlist pay as normal, and internal/synthetic accounts
+ * are exempt so production canaries can still exercise checkout. An
+ * unreadable gate holds (fail closed).
+ */
+export async function readPaymentAdmissionHold(
+  appUserId: string
+): Promise<readonly string[] | null> {
+  const [user] = await db
+    .select({
+      email: users.email,
+      accountClass: users.accountClass,
+      userStatus: users.userStatus,
+    })
+    .from(users)
+    .where(eq(users.id, appUserId))
+    .limit(1);
+  if (!user || user.userStatus !== 'waitlist_pending') return null;
+  if (isInternalAccount(user)) return null;
+  const decision = await decideAdmissionForUser(appUserId).catch(() => null);
+  if (decision?.admit) return null;
+  return decision?.blocking ?? ['profile', 'golden_path', 'design'];
 }

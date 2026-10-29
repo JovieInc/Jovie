@@ -20,6 +20,7 @@ import type { SubscriptionHandler } from '@/lib/stripe/webhooks/handlers/subscri
 import type { WebhookContext } from '@/lib/stripe/webhooks/types';
 import {
   mockAdmitPaidUser,
+  mockEnqueuePaidWelcomeAfterEntitlement,
   mockGetUserIdFromStripeCustomer,
   mockInvalidateBillingCache,
   mockLogFallback,
@@ -75,7 +76,40 @@ describe('@critical SubscriptionHandler - Updated', () => {
     expect(mockAdmitPaidUser).toHaveBeenCalledWith({
       appUserId: 'app_user_test',
       cacheKeys: ['user_updated'],
+      subscriptionId: 'sub_updated_123',
     });
+  });
+
+  it('sends no welcome when the admission gate refunded a waiting buyer', async () => {
+    mockAdmitPaidUser.mockResolvedValue({
+      admitted: false,
+      heldBy: ['design'],
+      refunded: true,
+    });
+    const context: WebhookContext = {
+      event: {
+        id: 'evt_updated_123',
+        type: 'customer.subscription.updated',
+        created: Math.floor(Date.now() / 1000),
+        data: {
+          object: {
+            id: 'sub_updated_123',
+            status: 'active',
+            customer: 'cus_123',
+            metadata: { clerk_user_id: 'user_updated' },
+            items: { data: [{ price: { id: 'price_pro_yearly' } }] },
+          } as unknown as Stripe.Subscription,
+        },
+      } as Stripe.Event,
+      stripeEventId: 'evt_updated_123',
+      stripeEventTimestamp: new Date(),
+    };
+
+    const result = await handler.handle(context);
+
+    expect(result.success).toBe(true);
+    expect(mockAdmitPaidUser).toHaveBeenCalled();
+    expect(mockEnqueuePaidWelcomeAfterEntitlement).not.toHaveBeenCalled();
   });
 
   it('processes subscription updated with past_due status (downgrades)', async () => {

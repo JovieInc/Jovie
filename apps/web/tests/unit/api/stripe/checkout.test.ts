@@ -33,6 +33,11 @@ const mockIsMaxPriceId = vi.hoisted(() => vi.fn());
 const mockStripeSubscriptionsList = vi.hoisted(() => vi.fn());
 const mockWithStripeRetry = vi.hoisted(() => vi.fn());
 const mockCaptureCriticalError = vi.hoisted(() => vi.fn());
+const mockReadPaymentAdmissionHold = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/waitlist/admission-gate.server', () => ({
+  readPaymentAdmissionHold: mockReadPaymentAdmissionHold,
+}));
 
 vi.mock('@/lib/auth/cached', () => ({
   getCachedAuth: mockGetCachedAuth,
@@ -93,6 +98,7 @@ import { POST } from '@/app/api/stripe/checkout/route';
 
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
+    mockReadPaymentAdmissionHold.mockResolvedValue(null);
     vi.clearAllMocks();
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
@@ -508,6 +514,27 @@ describe('POST /api/stripe/checkout', () => {
     expect(await response.json()).toEqual({
       error: 'Invalid checkout correlation field: claimId',
     });
+    expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  it('refuses a waiting buyer the admission gate holds before reaching Stripe', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_waiting' });
+    mockReadPaymentAdmissionHold.mockResolvedValue(['design']);
+
+    const response = await POST(
+      new NextRequest('http://localhost/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId: 'price_123' }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toBe('admission_gate_closed');
+    expect(data.blocking).toEqual(['design']);
+    expect(mockReadPaymentAdmissionHold).toHaveBeenCalledWith('user_waiting');
+    expect(mockEnsureStripeCustomer).not.toHaveBeenCalled();
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
   });
 

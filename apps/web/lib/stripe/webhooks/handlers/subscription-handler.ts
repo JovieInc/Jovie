@@ -187,13 +187,20 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       }
       // Paying admits, including a subscription that turns active after an
       // incomplete checkout (3DS, delayed payment).
-      await admitPaidUser({ appUserId: result.appUserId, cacheKeys: [userId] });
-      enqueuePaidWelcomeAfterEntitlement({
+      const admission = await admitPaidUser({
         appUserId: result.appUserId,
-        clerkUserId: userId,
-        subscription,
-        plan: result.plan,
+        cacheKeys: [userId],
+        subscriptionId: subscription.id,
       });
+      // A held waiting buyer was refunded: no welcome email.
+      if (!admission.refunded) {
+        enqueuePaidWelcomeAfterEntitlement({
+          appUserId: result.appUserId,
+          clerkUserId: userId,
+          subscription,
+          plan: result.plan,
+        });
+      }
       try {
         await attributeLeadPaidConversionByAppUserId(
           result.appUserId,
@@ -319,13 +326,20 @@ export class SubscriptionHandler extends BaseSubscriptionHandler {
       }
       // Paying admits, including a subscription that turns active after an
       // incomplete checkout (3DS, delayed payment).
-      await admitPaidUser({ appUserId: result.appUserId, cacheKeys: [userId] });
-      enqueuePaidWelcomeAfterEntitlement({
+      const admission = await admitPaidUser({
         appUserId: result.appUserId,
-        clerkUserId: userId,
-        subscription,
-        plan: result.plan,
+        cacheKeys: [userId],
+        subscriptionId: subscription.id,
       });
+      // A held waiting buyer was refunded: no welcome email.
+      if (!admission.refunded) {
+        enqueuePaidWelcomeAfterEntitlement({
+          appUserId: result.appUserId,
+          clerkUserId: userId,
+          subscription,
+          plan: result.plan,
+        });
+      }
       try {
         await attributeLeadPaidConversionByAppUserId(
           result.appUserId,
