@@ -89,6 +89,9 @@ Tools (MCP server `gbrain`):
 - `query`: any natural-language or multi-concept question. Hybrid vector plus keyword; LLM expansion is off in brain config, so it costs no model call.
 - `search`: exact tokens only (JOV ids, slugs, file names, 1-3 distinctive words). Over MCP it is keyword-only (`search.mcp_keyword_only`), so a long multi-concept string returns 0 results even when matching pages exist. Treat that as a wrong-tool miss and rerun with `query`.
 - `get_page` for a known slug, `recall` for saved facts, and `code_def` / `code_callers` / `code_refs` / `code_blast` for code symbols before grep.
+- `context_pack` (`entities`: slugs, `budget_tokens`) returns one zero-LLM briefing for named people, projects or decisions; use it at task start instead of several searches. A nonzero `search` count is not completeness: run `query`, and use `list_pages` with a type filter for "every page that...".
+- Identity (person, email) needs an exact `entity` lookup, never a search's top hit. `get_backlinks`, `get_timeline` and `traverse_graph` answer relation questions.
+- Writes: `put_page` with a canonical `type` from the active pack (`get_active_schema_pack`, jovie-v1), and YAML-quote any frontmatter value containing `:` or `#`. A decision with a confidence goes in `takes_add`, and its outcome in `takes_resolve`, so calibration can be computed.
 
 Calls take 2-15s against the remote database, so one good `query` beats several `search` calls. CLI fallback (`gbrain search`, `gbrain query`) needs a hard timeout. After a durable decision, write a short gbrain page. To add to a large page, write a new dated page and link it. Do not rewrite the whole page. ruflo agentdb is swarm-session memory; gbrain is long-term founder memory.
 

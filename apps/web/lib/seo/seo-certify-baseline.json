@@ -78,7 +78,7 @@
       "geo:geo-sibling-links"
     ],
     "/pricing": ["geo:geo-sibling-links"],
-    "/product": ["copy:copy-lint", "geo:geo-sibling-links"],
+    "/product": ["geo:geo-sibling-links"],
     "/smart-links": [
       "agentic:structured-data",
       "copy:copy-lint",

@@ -97,6 +97,40 @@ export function parseTscOutput(output) {
 
 const countFor = (counts, file, code) => counts.get(file)?.get(code) ?? 0;
 
+const UNKNOWN_JSON_PROPERTY =
+  /error TS2339: Property '.+' does not exist on type 'unknown'/;
+const JSON_ENVELOPE_MOCK = /error TS2322:.*NeonJsonEnvelope/;
+
+/**
+ * Recurring Source Validation repair: scripts/tsconfig.json (checkJs, lib
+ * es2022) types `response.json()` as `unknown`, so a new property read is
+ * TS2339 and the shrink-only baseline fails. The fix is a JSDoc type at the
+ * read, never a higher baseline count. That same type then becomes the
+ * injected `request` mock's return type, and `{ branches: unknown[] }` is
+ * TS2322 against it.
+ * @param {readonly string[]} diagnosticLines
+ * @returns {string | null}
+ */
+export function unknownJsonPropertyRepair(diagnosticLines) {
+  const lines = diagnosticLines ?? [];
+  if (lines.some(line => UNKNOWN_JSON_PROPERTY.test(line))) {
+    return (
+      'TS2339 on unknown: scripts checkJs types response.json() as unknown ' +
+      '(scripts/tsconfig.json lib es2022). Give that json() result a JSDoc type ' +
+      'before reading properties. Do not grow scripts/typecheck-baseline.json to absorb these.'
+    );
+  }
+  if (lines.some(line => JSON_ENVELOPE_MOCK.test(line))) {
+    return (
+      'TS2322 on NeonJsonEnvelope: the JSDoc type on response.json() is the ' +
+      'injected request mock return type. Return branch rows assignable to that ' +
+      'envelope, not unknown[]. Do not grow apps/web/typecheck-tests-baseline.json ' +
+      'or scripts/typecheck-baseline.json to absorb it.'
+    );
+  }
+  return null;
+}
+
 /**
  * Compare current error counts against a baseline.
  * @param {ErrorCounts} current
@@ -361,6 +395,13 @@ export function evaluateTypecheckBaseline({
       'Fix the new errors. If one is genuinely pre-existing, regenerate the ' +
         `baseline with \`${updateCommand}\` (visible in PR diff).`
     );
+    /** @type {string[]} */
+    const diagnosticLines = [];
+    for (const { file, code } of newErrors) {
+      diagnosticLines.push(...(lines.get(`${file}::${code}`) ?? []));
+    }
+    const repair = unknownJsonPropertyRepair(diagnosticLines);
+    if (repair) console.error(repair);
   }
   if (staleEntries.length > 0) {
     console.error(

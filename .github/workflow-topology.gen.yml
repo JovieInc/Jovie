@@ -115,7 +115,7 @@ nodes:
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:liveness
-    jobCount: 2
+    jobCount: 3
   - name: Canary Health Gate
     path: .github/workflows/canary-health-gate.yml
     active: true
@@ -160,6 +160,7 @@ nodes:
     allowedConsumers:
       - iOS CI
       - Mac CI
+      - Component Certificate
       - Fleet Gate Refresh
       - Lane Fix Relay
       - Merge Queue Green Enroll
@@ -233,6 +234,18 @@ nodes:
       - push
       - workflow_dispatch
     terminalReceipt: job:analyze
+    jobCount: 1
+  - name: Component Certificate
+    path: .github/workflows/component-certificate.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+      - workflow_run
+    terminalReceipt: job:certify
     jobCount: 1
   - name: Controller Quota Replay
     path: .github/workflows/controller-quota-replay.yml
@@ -881,10 +894,11 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - repository_dispatch
       - workflow_dispatch
       - workflow_run
     terminalReceipt: job:notify-failure
-    jobCount: 6
+    jobCount: 7
   - name: PR Conflict Handler
     path: .github/workflows/pr-conflict-handler.yml
     active: false
@@ -923,6 +937,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:prepare
     jobCount: 2
+  - name: PR Remediation Swarm
+    path: .github/workflows/pr-remediation-swarm.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:report
+    jobCount: 3
   - name: PR Review Learn
     path: .github/workflows/pr-review-learn.yml
     active: true
@@ -1002,6 +1028,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - merge_group
       - pull_request
       - push
     terminalReceipt: job:guard
@@ -1198,6 +1225,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:certify
     jobCount: 3
+  - name: Security Advisory Loop (Linear devin lane)
+    path: .github/workflows/security-advisory-loop.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:loop
+    jobCount: 1
   - name: Security Suppression Audit
     path: .github/workflows/security-suppression-audit.yml
     active: true
@@ -1492,6 +1532,9 @@ edges:
   - from: CLI Chaos
     to: Mac Lane Route
     type: workflow_call
+  - from: CI
+    to: Component Certificate
+    type: workflow_run
   - from: Staging Controller
     to: Controller Quota Replay
     type: workflow_run

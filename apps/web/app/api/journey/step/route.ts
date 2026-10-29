@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import {
   SIGNUP_FUNNEL_IDS,
+  SIGNUP_FUNNEL_MAX_TIMING_MS,
   SIGNUP_FUNNEL_OUTCOMES,
   SIGNUP_FUNNEL_SURFACES,
   type SignupFunnelId,
@@ -28,6 +29,13 @@ const stepSchema = z
     outcome: z.enum(SIGNUP_FUNNEL_OUTCOMES).optional(),
     surface: z.enum(CLIENT_SURFACES).optional(),
     reason: z.string().max(48).optional(),
+    stepMs: z.number().int().min(0).max(SIGNUP_FUNNEL_MAX_TIMING_MS).optional(),
+    entryMs: z
+      .number()
+      .int()
+      .min(0)
+      .max(SIGNUP_FUNNEL_MAX_TIMING_MS)
+      .optional(),
   })
   .strict();
 
@@ -85,6 +93,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       | (typeof SIGNUP_FUNNEL_SURFACES)[number]
       | undefined,
     reason: parsed.data.reason,
+    stepMs: parsed.data.stepMs,
+    entryMs: parsed.data.entryMs,
   });
   return accepted();
 }
