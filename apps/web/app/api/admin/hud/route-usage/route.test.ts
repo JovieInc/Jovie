@@ -96,6 +96,25 @@ describe('Ovie route usage access', () => {
     expect(await response.json()).toEqual({ recorded: false });
   });
 
+  it('normalizes legacy observations and reads the requested window', async () => {
+    mocks.read.mockResolvedValue({ measured: true, rows: [] });
+    const recorded = await POST(
+      new Request('https://example.test/api/admin/hud/route-usage', {
+        method: 'POST',
+        body: JSON.stringify({ path: '/app/admin/ops?secret=ignored' }),
+      })
+    );
+    expect(recorded.status).toBe(200);
+    expect(mocks.record).toHaveBeenCalledWith('ops');
+    const read = await GET(
+      new Request('https://example.test/api/admin/hud/route-usage?days=7')
+    );
+    expect(read.status).toBe(200);
+    expect(await read.json()).toEqual({ measured: true, rows: [] });
+    expect(mocks.read).toHaveBeenCalledWith(7);
+    expect(read.headers.get('cache-control')).toBe('no-store');
+  });
+
   it('falls back to the default read window for an invalid number', async () => {
     const response = await GET(
       new Request('https://example.com/api/admin/hud/route-usage?days=invalid')

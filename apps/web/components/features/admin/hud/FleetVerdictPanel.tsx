@@ -63,10 +63,10 @@ export function FleetVerdictPanelView({
           </ul>
         ) : null}
         {counts.length > 0 ? (
-          <dl className='grid grid-cols-[1fr_auto] gap-x-4 gap-y-1 text-2xs'>
+          <dl className='flex flex-col gap-1 text-2xs'>
             {counts.map(([reason, n]) => (
-              <div key={reason} className='contents'>
-                <dt className='text-secondary-token'>{reason}</dt>
+              <div key={reason} className='flex justify-between gap-4'>
+                <dt className='min-w-0 text-secondary-token'>{reason}</dt>
                 <dd className='tabular-nums text-primary-token'>{n}</dd>
               </div>
             ))}

@@ -114,8 +114,6 @@ export async function runCheck(id, fn, now = () => new Date().toISOString()) {
   }
 }
 
-const blocked = summary => ({ status: 'blocked', summary });
-
 async function get(origin, path, fetchImpl, init = {}) {
   const response = await fetchImpl(new URL(path, origin), {
     redirect: 'follow',
@@ -284,11 +282,6 @@ export function anonymousChecks({
           summary: await ogImageCheck(origin, page.body, fetchImpl, link),
         };
       }),
-      run('click-analytics-capture', async () =>
-        blocked(
-          'needs a synthetic-tagged visitor so a prod click does not enter customer analytics; no such path exists yet'
-        )
-      ),
     ],
   };
 }
@@ -317,13 +310,22 @@ export function stepChecks(
       });
       continue;
     }
-    (bySurface[step.surface] ??= []).push({
+    // A Playwright retry re-records the same check. The latest attempt is
+    // the verdict, so one failed attempt followed by a pass is one passed
+    // check, not a failed surface (JOV-9822).
+    const checks = (bySurface[step.surface] ??= []);
+    const record = {
       id: step.id,
       status: step.status,
       startedAt: step.startedAt,
       endedAt: step.endedAt,
       summary: step.summary ?? '',
-    });
+    };
+    const prior = checks.findIndex(c => c.id === step.id);
+    if (prior === -1) checks.push(record);
+    else if (Date.parse(record.endedAt) >= Date.parse(checks[prior].endedAt)) {
+      checks[prior] = record;
+    }
   }
   return { bySurface, observationsBySurface, authStatus, now };
 }
@@ -331,10 +333,15 @@ export function stepChecks(
 /** The browser-owned checks every surface is expected to carry. */
 export const EXPECTED_BROWSER_CHECKS = Object.freeze({
   'signup-signin': ['returning-user-email-otp', 'new-user-email-otp'],
-  claim: ['claimed-profile-owned'],
+  claim: [
+    'claimed-profile-owned',
+    'start-chat-first-reply',
+    'golden-path-preview-has-release',
+  ],
   onboarding: ['dashboard-first-value'],
   chat: ['composer-ready', 'first-reply'],
   'public-profile': ['owned-profile-renders-publicly'],
+  smartlink: ['click-analytics-capture'],
   checkout: ['checkout-entry-renders'],
 });
 
@@ -427,4 +434,29 @@ export async function runProductionCertification({
     );
   }
   return { served, receipts };
+}
+
+/**
+ * One verdict for everything that depends on the production golden path
+ * (recovery email gate, marketplace listing, launch certification): every
+ * surface passed on the served SHA within the freshness window.
+ * @param {any[]} receipts
+ * @param {{ servedSha: string, nowMs?: number, maxAgeMs?: number }} options
+ */
+export function certificationVerdict(
+  receipts,
+  { servedSha, nowMs = Date.now(), maxAgeMs = 24 * 60 * 60 * 1000 }
+) {
+  const bySurface = new Map(receipts.map(r => [r.surface, r]));
+  const notGreen = [];
+  for (const surface of SURFACE_IDS) {
+    const r = bySurface.get(surface);
+    if (!r) notGreen.push({ surface, why: 'no receipt' });
+    else if (r.status !== 'passed') notGreen.push({ surface, why: r.status });
+    else if (r.sha !== servedSha)
+      notGreen.push({ surface, why: `passed on ${r.sha.slice(0, 8)}` });
+    else if (nowMs - Date.parse(r.endedAt) > maxAgeMs)
+      notGreen.push({ surface, why: 'older than 24h' });
+  }
+  return { certified: notGreen.length === 0, servedSha, notGreen };
 }
