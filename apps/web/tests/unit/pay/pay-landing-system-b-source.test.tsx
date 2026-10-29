@@ -25,6 +25,12 @@ const rawGradientPattern = /(?:linear|radial)-gradient/i;
 const directPrimaryActionPattern = /public-action-primary|Claim Your Handle/;
 
 describe('pay landing System B source contract', () => {
+  it('does not number its how-it-works steps', async () => {
+    const source = await readFile(sourcePath, 'utf8');
+
+    expect(source).not.toMatch(/Step \{/);
+  });
+
   it('keeps the claim handle surface on shared System B primitives', async () => {
     const source = await readFile(sourcePath, 'utf8');
 
