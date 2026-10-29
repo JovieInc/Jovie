@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 import { evaluateFleetRules } from '../../pr-fleet-rules.mjs';
+import { evaluateCustomerNoteContract } from '../daily-changelog-publication.mjs';
 
 const { load } = createRequire(import.meta.url)('js-yaml');
 const root = resolve(import.meta.dirname, '../../..');
@@ -46,6 +47,55 @@ test('the red-before-green block the lanes write satisfies the Fleet Rules parse
     0
   );
 });
+
+// Execute the lane generator, then pass its output through the production guards.
+// This proves metadata compatibility, not model compliance or product runtime.
+for (const decision of [
+  { releaseWorthy: false },
+  {
+    issueId: 'JOV-7447',
+    outcomeKey: 'profile-link-claim',
+    audience: 'public',
+    visibility: 'public',
+    releaseWorthy: true,
+    section: 'Added',
+    text: 'Choose your profile link: Start with a name on the homepage.',
+    availability: { status: 'ga', prerequisites: [] },
+    evidence: [{ url: 'https://jov.ie/', contains: 'Claim' }],
+  },
+]) {
+  test(`repair metadata satisfies both guards with releaseWorthy=${decision.releaseWorthy}`, () => {
+    const body = execFileSync(
+      'python3',
+      [
+        '-c',
+        [
+          'import sys,json',
+          "sys.path.insert(0,'scripts/lanes')",
+          'import pr_events as e',
+          "pr={'statusCheckRollup':[{'name':'Source Validation','conclusion':'FAILURE','detailsUrl':'https://github.com/JovieInc/Jovie/actions/runs/123/job/456'}]}",
+          "print(e.repair_evidence_body(pr, '## Summary\\nRepair', customer_decision=json.loads(sys.argv[1])))",
+        ].join('\n'),
+        JSON.stringify(decision),
+      ],
+      { cwd: root, encoding: 'utf8' }
+    );
+    assert.deepEqual(
+      evaluateFleetRules({
+        pr: { title: 'fix(links): count social visits', body },
+        files: [],
+      }).errors,
+      []
+    );
+    const verdict = evaluateCustomerNoteContract({
+      files: ['apps/web/app/s/[code]/route.ts'],
+      body,
+      createdAt: '2026-10-28T00:00:00Z',
+    });
+    assert.equal(verdict.passed, true, verdict.reason);
+    assert.equal(body.split('customer-changelog/v1').length - 1, 1);
+  });
+}
 
 test('the lane repairs evidence rejected by Fleet Rules and preserves accepted evidence', () => {
   const section = (command, evidence) =>
@@ -96,9 +146,20 @@ test('the lane repairs evidence rejected by Fleet Rules and preserves accepted e
     ['placeholder punctuation', section('TODO.', run)],
     ['valid attempt', section('`node test.mjs`', `${run}/attempts/2`)],
     ['invalid attempt', section('`node test.mjs`', `${run}/attempts/0`)],
-  ].map(([name, body]) => ({
+    [
+      'last section with customer metadata',
+      `${section('TODO', '')}<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n`,
+      false,
+    ],
+    [
+      'comments within incomplete evidence',
+      `${section('TODO', '<!-- preserve audit receipt -->')}<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n`,
+    ],
+  ].map(([name, body, hasNextSection = true]) => ({
     name,
-    body: `${body}\n## Blast radius\nKeep this proof.\n`,
+    body: hasNextSection
+      ? `${body}\n## Blast radius\nKeep this proof.\n`
+      : body,
   }));
   const rows = JSON.parse(
     execFileSync(
@@ -139,7 +200,10 @@ test('the lane repairs evidence rejected by Fleet Rules and preserves accepted e
     assert.equal(row.complete, accepted, name);
     assert.equal(row.edits, accepted ? 0 : 1, name);
     assert.deepEqual(redErrors(row.body), [], name);
-    assert.ok(row.body.includes('## Blast radius\nKeep this proof.'), name);
+    if (body.includes('## Blast radius\nKeep this proof.'))
+      assert.ok(row.body.includes('## Blast radius\nKeep this proof.'), name);
+    for (const [comment] of body.matchAll(/<!--[\s\S]*?-->/g))
+      assert.ok(row.body.includes(comment), name);
     assert.equal(
       row.body.match(/## Red-before-green/g).length,
       body.match(/## Red-before-green/g)?.length ?? 1,

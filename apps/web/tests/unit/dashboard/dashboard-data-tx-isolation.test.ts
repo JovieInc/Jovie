@@ -27,6 +27,7 @@ type TxState = { poisoned: boolean; closed: boolean; rolledBack: boolean };
 const {
   captureExceptionMock,
   cleanupGates,
+  commitFailures,
   loggerErrorMock,
   loggerWarnMock,
   outcomes,
@@ -35,6 +36,7 @@ const {
   withDbSessionTxMock,
 } = vi.hoisted(() => {
   const cleanupGates = new Map<number, () => Promise<void>>();
+  const commitFailures = new Map<number, QueryOutcome>();
   const outcomes: QueryOutcome[] = [];
   const setupFailures = new Map<number, QueryOutcome>();
   const txStates: TxState[] = [];
@@ -110,7 +112,16 @@ const {
           state.poisoned = true;
           throw setupError;
         }
-        return await handler(createTx(state), 'user_123');
+        const result = await handler(createTx(state), 'user_123');
+        const commitError = commitFailures.get(transactionIndex)?.().error;
+        if (commitError) {
+          // The callback already finished; Drizzle's post-callback COMMIT
+          // failed on the wire and the wrapper discarded the client (JOV-8641
+          // preserves this original error instead of letting ROLLBACK mask
+          // it). Nothing the callback wrote can be acknowledged.
+          throw commitError;
+        }
+        return result;
       } catch (error) {
         state.rolledBack = true;
         throw error;
@@ -125,6 +136,7 @@ const {
   return {
     captureExceptionMock: vi.fn(),
     cleanupGates,
+    commitFailures,
     loggerErrorMock: vi.fn(),
     loggerWarnMock: vi.fn(),
     outcomes,
@@ -412,6 +424,7 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     const { doesTableExist } = await import('@/lib/db');
     vi.mocked(doesTableExist).mockReset().mockResolvedValue(false);
     cleanupGates.clear();
+    commitFailures.clear();
     outcomes.length = 0;
     setupFailures.clear();
     txStates.length = 0;
@@ -857,17 +870,15 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
   });
 
   it('degrades avatar quality log-only on transient connection failures (JOV-8845)', async () => {
-    // set_config is the first statement of the avatar-quality read
-    // transaction; the Drizzle-wrapped transport cause slips past the
-    // internal JOV-2285 guard (it only matches transport text on the outer
-    // message) and lands in the caller's fail-soft catch.
+    // Fail both avatar setup attempts. The read gets one fresh transaction
+    // retry before the caller degrades a wrapped transport error log-only.
     const transportError = new Error(
       "Failed query: SELECT set_config('statement_timeout', $1, true)",
       { cause: new Error('server conn crashed?') }
     );
     const { setStatementTimeout } = await import('@/lib/db/query-timeout');
     vi.mocked(setStatementTimeout).mockImplementation(async (_tx, ms) => {
-      if (ms === 5000 && txStates.length === 3) {
+      if (ms === 5000 && (txStates.length === 3 || txStates.length === 4)) {
         throw transportError;
       }
     });
@@ -899,7 +910,10 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     expect(result.hasSocialLinks).toBe(true);
     expect(result.hasMusicLinks).toBe(true);
     expect(result.tippingStats.totalReceivedCents).toBe(100);
-    expect(withDbSessionTxMock).toHaveBeenCalledTimes(5);
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates.every(state => state.closed)).toBe(true);
   });
 
   it('degrades tipping stats log-only on transient connection failures (JOV-8845)', async () => {
@@ -1744,5 +1758,79 @@ describe('dashboard data transaction isolation (JOV-4189)', () => {
     } finally {
       clock.mockRestore();
     }
+  });
+
+  it('JOV-8837: recovers an avatar read whose read-only commit died on a dropped connection', async () => {
+    // Neon idle-in-transaction terminations can arrive as a bare transport
+    // failure: Drizzle's post-callback COMMIT rejects with `Failed query:
+    // commit` wrapping a lost connection — no 25P03 SQLSTATE, no idle text.
+    // The idle-only predicate (pre-JOV-8837) let that escape as a warning.
+    const droppedCommit = () =>
+      new Error('Failed query: commit', {
+        cause: new Error('Connection terminated unexpectedly'),
+      });
+    commitFailures.set(2, fail(droppedCommit()));
+    queueReadsBeforeDistribution();
+    // Both avatar attempts consume one profilePhotos outcome each: the first
+    // attempt's rows are discarded by its failed commit, so the retry needs
+    // its own queued read inserted after the first avatar outcome.
+    outcomes.splice(7, 0, () => {
+      // Recovery starts only after the failed transaction fully closed and
+      // was discarded — never on the poisoned, still-open connection.
+      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      return { rows: [{ width: 2048, height: 2048 }] };
+    });
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality).toEqual({
+      status: 'ok',
+      width: 2048,
+      height: 2048,
+    });
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+    expect(txStates[3]).toMatchObject({ closed: true, rolledBack: false });
+    expect(txStates.every(state => state.closed)).toBe(true);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(capturedCascadeErrors()).toEqual([]);
+  });
+
+  it('JOV-8837: falls back after two commit failures have closed their transactions', async () => {
+    const droppedCommit = () =>
+      new Error('Failed query: commit', {
+        cause: new Error('Connection terminated unexpectedly'),
+      });
+    const firstCommit = droppedCommit();
+    const secondCommit = droppedCommit();
+    commitFailures.set(2, fail(firstCommit));
+    commitFailures.set(3, fail(secondCommit));
+    loggerWarnMock.mockImplementation(message => {
+      if (!message.includes('avatar quality read failed')) return;
+      // Log-only degradation happens after both failed transactions close.
+      expect(txStates[2]).toMatchObject({ closed: true, rolledBack: true });
+      expect(txStates[3]).toMatchObject({ closed: true, rolledBack: true });
+    });
+    queueReadsBeforeDistribution();
+    // Both avatar attempts consume one profilePhotos outcome each before
+    // their commits die; the retry needs its own queued read.
+    outcomes.splice(7, 0, ok([{ width: 1024, height: 1024 }]));
+
+    const result = await getDashboardData();
+
+    expect(result.avatarQuality?.status).toBe('unknown');
+    expect(result.tippingStats.totalReceivedCents).toBe(100);
+    expect(result.dashboardLoadError).toBeUndefined();
+    expect(withDbSessionTxMock).toHaveBeenCalledTimes(6);
+    expect(captureExceptionMock).not.toHaveBeenCalled();
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'avatar quality read failed on a transient connection error'
+      )
+    );
+    expect(capturedCascadeErrors()).toEqual([]);
+    expect(txStates.every(state => state.closed)).toBe(true);
   });
 });

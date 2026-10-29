@@ -12,6 +12,7 @@ import { captureWarning } from '@/lib/error-tracking';
 import {
   type ContentKindDefinition,
   contentRecordCacheTag,
+  gateContentRecord,
   validateContentRecord,
 } from './kind';
 
@@ -200,7 +201,7 @@ export async function createContentVersion<T>(
     readonly note?: string | null;
   }
 ): Promise<ContentVersion> {
-  const validated = validateContentRecord(definition, input.key, input.data);
+  const validated = gateContentRecord(definition, input.key, input.data);
   if (!validated.ok) throw new ContentValidationError(validated.errors);
 
   const row = await runAtomicDbOperation(

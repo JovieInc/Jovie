@@ -1,17 +1,20 @@
 import '../../components/marketing/MarketingSnapRail.css';
 import '../../components/marketing/artist-profile/ArtistProfileLandingPage.css';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export const revalidate = false;
 
-export default function BrandLayout({
+export default async function BrandLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const chrome = await getSiteChrome();
   return (
     <PublicPageShell
+      chrome={chrome}
       className='system-b-marketing dark system-b-brand-layout'
       footerVariant='expanded'
       logoSize='sm'

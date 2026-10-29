@@ -3018,6 +3018,23 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
 
+    def test_replacement_preserves_trailing_customer_metadata_and_other_comments(self):
+        customer = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+        audit = '<!-- preserve audit receipt -->'
+        block = events.red_before_green_block(self.PR)
+        for suffix in ('', '\n## Blast radius\nKeep this proof.\n'):
+            with self.subTest(suffix=suffix):
+                body = f'## Red-before-green\n{audit}\nFailing command: TODO\n{events.RED_BLOCK_MARKER}\n{customer}\n{suffix}'
+                updated = events.repair_evidence_body(self.PR, body)
+                self.assertTrue(events.red_section_complete(updated))
+                for comment in (audit, customer, events.RED_BLOCK_MARKER):
+                    self.assertEqual(updated.count(comment), 1)
+                if suffix:
+                    self.assertTrue(updated.endswith(suffix.lstrip('\n')))
+                self.assertEqual(events.repair_evidence_body(self.PR, updated), updated)
+        self.assertIn(events.RED_BLOCK_MARKER, events.with_red_section(
+            f'## Red-before-green\nTODO\n{events.RED_BLOCK_MARKER}', block.replace(events.RED_BLOCK_MARKER, '')))
+
     def test_fenced_headings_preserve_valid_logs_and_quoted_examples(self):
         valid = "## Red-before-green\nFailing command: `node test.mjs`\n```text\n# step\nFAIL transport\n```\n"
         quoted = "```text\n## Red-before-green\nquoted example\n```\n"
@@ -3049,6 +3066,37 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertTrue(events.red_section_complete("Intro\n\n" + block + "\n\n## Next\nx"))
         self.assertNotIn("\n# not a heading", block, "a log line must not end the section")
 
+    def test_failing_command_returns_the_run_failure_status(self):
+        block = events.red_before_green_block(self.PR)
+        self.assertIn(
+            "- Failing command: `gh run watch 123 --repo JovieInc/Jovie --exit-status`",
+            block,
+        )
+        self.assertIn(
+            "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123",
+            block,
+        )
+
+    def test_generated_block_passes_the_canonical_fleet_gate(self):
+        block = events.red_before_green_block(self.PR, "### Failed step\nAssertionError: expected 200")
+        checked = subprocess.run(
+            ["node", "--input-type=module", "-e", """
+                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                import { readFileSync } from 'node:fs';
+                const body = readFileSync(0, 'utf8');
+                const check = body => evaluateFleetRules({
+                    pr: { title: 'fix(db): recover avatar reads', body }, files: [],
+                }).errors;
+                process.stdout.write(JSON.stringify({
+                    generated: check(body), missing: check(''),
+                }));
+            """],
+            cwd=ROOT, input=block, text=True, capture_output=True, check=True,
+        )
+        result = json.loads(checked.stdout)
+        self.assertEqual(result["generated"], [])
+        self.assertTrue(any(error.startswith("red-before-green:") for error in result["missing"]))
+
     def test_no_red_check_means_no_block(self):
         self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
 
@@ -3060,6 +3108,50 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertIn("## Blast radius\ny", updated)
         self.assertEqual(updated.count("## Red-before-green"), 1)
         self.assertFalse(events.red_section_complete(body))
+
+    def test_repair_body_keeps_existing_red_and_adds_an_explicit_customer_decision(self):
+        body = "## Summary\nx\n\n" + events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, customer_decision={"releaseWorthy": False})
+        self.assertTrue(updated.startswith(body))
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated,
+                                                   customer_decision={"releaseWorthy": False}), updated)
+
+    def test_public_decision_round_trips_without_comment_injection(self):
+        decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
+        updated = events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
+        marker = updated.split("<!-- customer-changelog/v1 ", 1)[1].split(" -->", 1)[0]
+        self.assertEqual(json.loads(marker), decision)
+        self.assertNotIn("Choose a link -->", updated)
+
+    def test_repair_body_never_infers_or_overwrites_a_customer_decision(self):
+        body = "## Summary\nx"
+        self.assertNotIn("customer-changelog/v1", events.repair_evidence_body(self.PR, body))
+        for existing in ('{"releaseWorthy":true}', 'malformed'):
+            with self.subTest(existing=existing):
+                original = body + "\n<!-- customer-changelog/v1 " + existing + " -->"
+                updated = events.repair_evidence_body(self.PR, original,
+                                                      customer_decision={"releaseWorthy": False})
+                self.assertIn("<!-- customer-changelog/v1 " + existing + " -->", updated)
+                self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        with self.assertRaises(ValueError):
+            events.repair_evidence_body(self.PR, body, customer_decision={"releaseWorthy": "false"})
+
+    def test_ensure_can_repair_customer_metadata_when_red_evidence_is_already_complete(self):
+        body = events.red_before_green_block(self.PR)
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=body)
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell,
+                                                      customer_decision={"releaseWorthy": False}))
+        self.assertEqual(len(written), 1)
+        self.assertTrue(events.red_section_complete(written[0]))
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', written[0])
 
     def test_ensure_edits_only_an_incomplete_body(self):
         for body, edits in (("## Summary\nx", 1), (events.red_before_green_block(self.PR), 0)):

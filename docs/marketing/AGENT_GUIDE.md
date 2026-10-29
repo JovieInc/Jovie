@@ -63,6 +63,19 @@ any arm with `&arm=<id>` on the preview URL. Run the copy steps below before
 drafting; a valid spec is not approved copy. Publish goes live on the next
 request (cache tag expired) with no code deploy.
 
+### Site header and footer (`site-chrome/main`)
+
+The header nav, Customers flyout and footer columns are one record,
+`site-chrome/main` (`apps/web/lib/content-records/site-chrome.ts`), published
+through the same API (`.../site-chrome/main`). Copy paths are stable ids:
+`footer.<columnId>.<linkId>.label`, `nav.<linkId>.label`. Publish gates: schema,
+sentence-case labels, `@jovie/copy` lint, no duplicate destinations, every
+internal href navigable under feature availability and off the dead-end list
+(`CHROME_BLOCKED_PATHS`: Jovie Card, demo, compare, alternatives, ISRC, UTM,
+CLI, engineering, AI), only approved https social hosts, 3 to 4 columns with 8
+to 16 links, and a resolution smoke test through the shell's resolver. Layout
+and the legal row stay in code.
+
 ## The 4-step procedure
 
 ### 1. Receive a Brief

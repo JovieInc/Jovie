@@ -160,6 +160,21 @@ class RunTests(unittest.TestCase):
             self.assertEqual(receipt["admitted"], ["JOV-2"])
             self.assertEqual(receipt["skipped"]["JOV-1"], "live-state-changed")
 
+    def test_superseded_claim_is_cleared_so_the_move_lands_but_active_is_kept(self):
+        with tempfile.TemporaryDirectory() as d:
+            host = self.seed(d, [row(1, priority=1), row(2, priority=1)])
+            state = Path(d)
+            for iid, status in (("id-1", "superseded"), ("id-2", "active")):
+                with ls._mutating(ls._claims_path(state), ls.CLAIMS) as data:
+                    data.setdefault("claims", {})[iid] = {"identifier": iid, "lane": "hyperagent", "status": status,
+                                                          "claimedAt": NOW - 100}
+            receipt = pa.run(FakeLane, host, "JOV", FakeClient(), now=NOW)
+            self.assertEqual(receipt["admitted"], ["JOV-1"])
+            self.assertEqual(receipt["clearedSuperseded"], ["JOV-1"])
+            self.assertEqual(receipt["skipped"]["JOV-2"], "claim-active")
+            moves = {(e["issueId"], e["target"]) for e in ls._read(ls._outbox_path(state), ls.OUTBOX)["entries"] if e["op"] == "move"}
+            self.assertIn(("id-1", "Todo"), moves)
+
     def test_lagging_mirror_still_nominates(self):
         with tempfile.TemporaryDirectory() as d:
             host = self.seed(d, [row(1, priority=1)])

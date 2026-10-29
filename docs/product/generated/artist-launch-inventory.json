@@ -606,6 +606,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/(marketing)/developers/agents/page.tsx",
+      "kind": "page",
+      "route": "/developers/agents",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/(marketing)/developers/page.tsx",
       "kind": "page",
       "route": "/developers",
@@ -1365,6 +1373,14 @@
       "kind": "handler",
       "route": "/api/admin/hud/ovie-launchers",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/admin/hud/route-usage/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/hud/route-usage",
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -3081,6 +3097,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/health/revenue-spine/route.ts",
+      "kind": "handler",
+      "route": "/api/health/revenue-spine",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/health/route.ts",
       "kind": "handler",
       "route": "/api/health",
@@ -3861,6 +3885,14 @@
       "kind": "handler",
       "route": "/api/notifications/verify-email-otp",
       "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/offer/route.ts",
+      "kind": "handler",
+      "route": "/api/offer",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },

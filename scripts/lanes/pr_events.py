@@ -1002,9 +1002,10 @@ def red_section_complete(body: str) -> bool:
 
 def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
     """A `## Red-before-green` section built from the PR's own red check: the failing run URL and
-    the failed jobs' error lines the fixer is shown. Fleet Rules treats lane-fix-red as a repair
-    label, so every red lane PR needs this evidence; agents forget it (45 of 138 Fleet Rules
-    failures on 2026-10-25) and the lane already has it. None when no red check names a run."""
+    the failed jobs' error lines the fixer is shown. Preserve a command that exits nonzero
+    for the failed run: `gh run view --log-failed` only displays logs and exits successfully.
+    Repair PRs require this evidence; agents forget it (45 of 138 Fleet Rules failures on
+    2026-10-25) and the lane already has it. None when no red check names a run."""
     for check in pr.get("statusCheckRollup") or []:
         if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
             continue
@@ -1019,20 +1020,46 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
                 lines.append(" " + line if ANY_HEADING.match(line) else line)
         return "\n".join([
             "## Red-before-green", "",
-            f"- Failing command: `gh run view {run_url.rsplit('/', 1)[-1]} --repo {REPO} --log-failed`",
+            f"- Failing command: `gh run watch {run_url.rsplit('/', 1)[-1]} --repo {REPO} --exit-status`",
             f"- Failing run (before fix): {run_url}", "",
             "```text", *lines, "```", "", RED_BLOCK_MARKER])
     return None
 
 
 def with_red_section(body: str, block: str) -> str:
-    """Replace an empty/placeholder Red-before-green section with the block, or append one."""
+    """Replace incomplete evidence, retaining opaque metadata even in the last section."""
     body = body or ""
     bounds = red_section_bounds(body)
     if bounds is None:
         return (body or "").rstrip("\n") + "\n\n" + block + "\n"
     start, end = bounds
-    return body[:start] + block + "\n\n" + body[end:]
+    comments = "\n".join(comment.group() for comment in re.finditer(r"<!--[\s\S]*?-->", body[start:end])
+                         if comment.group() not in block)
+    metadata = comments + "\n\n" if comments else ""
+    return body[:start] + block + "\n\n" + metadata + body[end:]
+
+
+def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None) -> str:
+    """Complete repair metadata without replacing existing evidence or customer decisions.
+
+    The caller chooses the customer outcome; never infer it from a failed check.
+    The canonical Fleet/changelog guards still validate the resulting body.
+    """
+    updated = body
+    if not red_section_complete(updated):
+        block = red_before_green_block(pr, excerpt)
+        if block:
+            updated = with_red_section(updated, block)
+    if customer_decision is not None and "customer-changelog/v1" not in updated:
+        if not isinstance(customer_decision, dict) or type(customer_decision.get("releaseWorthy")) is not bool:
+            raise ValueError("customer decision requires an explicit releaseWorthy boolean")
+        if customer_decision["releaseWorthy"] is False:
+            from fix_red_classes import stamp_internal_changelog
+            updated = stamp_internal_changelog(updated)
+        else:
+            note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
+            updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
+    return updated
 
 
 def api_gh(args, **_):
@@ -1045,20 +1072,23 @@ def api_gh(args, **_):
     return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
 
 
-def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh) -> bool:
-    """Write the evidence block into the PR body when its section is missing or incomplete."""
-    block = red_before_green_block(pr, excerpt)
-    if not block or not isinstance(pr.get("number"), int):
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None) -> bool:
+    """Complete repair evidence and an optional caller-selected customer decision."""
+    if not isinstance(pr.get("number"), int) or (
+            customer_decision is None and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
-    if viewed.returncode != 0 or red_section_complete(viewed.stdout or ""):
+    if viewed.returncode != 0:
         return False
-    updated = with_red_section(viewed.stdout or "", block)
+    body = viewed.stdout or ""
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision)
+    if updated == body:
+        return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
         path = Path(tmp) / "body.md"
         from atomic_state import atomic_write_text
         atomic_write_text(path, updated)
-        if RED_BLOCK_MARKER not in path.read_text():
+        if path.read_text() != updated:
             return False
         return sh(["pr", "edit", str(pr["number"]), "--repo", REPO, "--body-file", str(path)]).returncode == 0
 

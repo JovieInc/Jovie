@@ -1,15 +1,18 @@
 import './home.css';
 import '../../components/marketing/MarketingSnapRail.css';
+import { WebMcpTools } from '@/components/marketing/WebMcpTools';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 
 export const revalidate = false;
 
-export default function HomeLayout({
+export default async function HomeLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const chrome = await getSiteChrome();
   // The homepage uses the one canonical marketing shell: the docked
   // landing header (with the Customers flyout) and the full footer. The
   // hero opts into `marketing-hero-dock`, so its cinematic field bleeds
@@ -18,11 +21,13 @@ export default function HomeLayout({
   return (
     <ClientProviders forceSignedOutDefaults>
       <PublicPageShell
+        chrome={chrome}
         className='home-viewport home-viewport--hero-canvas min-h-svh overflow-x-clip bg-base text-primary-token'
         footerVariant='expanded'
         logoSize='sm'
       >
         {children}
+        <WebMcpTools />
       </PublicPageShell>
     </ClientProviders>
   );

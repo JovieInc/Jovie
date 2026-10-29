@@ -321,10 +321,10 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
     receipt.update(todo=len(todo), target=goal, ceiling=ceiling(goal))
     candidates, skipped = admit_candidates(rows, ranks, excluded, lambda row: lane.issue_hits_red_line(binding_refill._issue(lane, row)),
                                            now, pending)
-    for row in list(candidates):  # a superseded claim means a remote owner decided; the outbox would drop the move
-        if linear_sync.claim_status(state, row["id"]) in ("superseded", "active"):
+    for row in list(candidates):  # a live local claim owns the issue; leave it
+        if linear_sync.claim_status(state, row["id"]) == "active":
             candidates.remove(row)
-            skipped[row["identifier"]] = "claim-" + str(linear_sync.claim_status(state, row["id"]))
+            skipped[row["identifier"]] = "claim-active"
     # Ranked and Urgent skips first: the reason a Summer pick did not run must survive the receipt cap.
     receipt["skipped"] = dict(sorted(skipped.items(), key=lambda kv: (kv[0] not in ranks, kv[0]))[:50])
     outbox = linear_sync.Outboxed(state, client)
@@ -352,6 +352,10 @@ def run(lane, host, team: str, client, now: float | None = None, floor: int = 0,
                                             f"unclaimed Todo ({backlog_rank.explain(displaced, now)}). It is re-promoted by rank when Todo has room.")
             live_todo = [r for r in live_todo if r["id"] != displaced["id"]]
             receipt["displaced"].append(displaced["identifier"])
+        # Urgent or Summer-ranked admission is a new decision: a stale superseded claim (an earlier lane
+        # run the remote state outran) must not turn every move into a silent no-op.
+        if linear_sync.clear_superseded(state, row["id"]):
+            receipt.setdefault("clearedSuperseded", []).append(row["identifier"])
         outbox.move(row["id"], "Todo")
         outbox.comment(row["id"], f"Priority admission: promoted to Todo regardless of target ({why}; Todo was {len(todo)} of {goal}"
                                   + (f"; displaced {displaced['identifier']}" if displaced else "")

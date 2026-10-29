@@ -417,7 +417,7 @@ describe('ci-fast bounded parallel workflow', () => {
     expect([...whole, ...keyed[0].files].sort()).toEqual(
       [...LANES_PYTEST_FILES].sort()
     );
-    expect(LANES_PYTEST_FILES).toHaveLength(32);
+    expect(LANES_PYTEST_FILES).toHaveLength(33);
     expect(whole).toContain('scripts/tests/test_factory_signals.py');
     expect(whole).toContain('scripts/tests/test_factory_intake.py');
     expect(whole).toContain('scripts/tests/test_hyperagent_cli.py');
@@ -1916,7 +1916,7 @@ describe('ci-fast bounded parallel workflow', () => {
       'design-system-source-ratchet': 'pnpm design:source-count-ratchet',
       'design-exception-registry': 'pnpm design:exception-registry:check',
       'design-governance-enforcement':
-        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel',
+        'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field',
       'ios-fast': 'pnpm run ios:lint && pnpm run ios:app-store:test',
       'merge-group-guards':
         'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
@@ -2272,7 +2272,7 @@ describe('ci-fast bounded parallel workflow', () => {
 
   it('keeps workflow contracts in the bounded CI control suite', () => {
     expect(PACKAGE_JSON.scripts['ci:control:test']).toBe(
-      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check'
+      'node scripts/run-affected-tests.mjs --control && node --test scripts/ci-workflow-topology.test.mjs && node scripts/ci-workflow-topology.mjs && pnpm ownership:check && node scripts/sources-of-truth.mjs && node scripts/invariants/duplicate-literals.mjs'
     );
     expect(PACKAGE_JSON.scripts['ownership:check']).toBe(
       'node --test scripts/ownership-registry.test.mjs && node scripts/ownership-registry.mjs --report'

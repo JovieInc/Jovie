@@ -313,6 +313,18 @@ def claim(state: Path, issue_id: str, identifier: str, lane: str) -> bool:
     return True
 
 
+def clear_superseded(state: Path, issue_id: str) -> bool:
+    """Forget a superseded claim so a new explicit decision (priority admission) can move the issue.
+    Outboxed.move drops every move for a superseded claim, so one stale `remote:Backlog` record
+    would otherwise make an issue unpromotable for CLAIM_KEEP_S. Active claims are never touched."""
+    with _mutating(_claims_path(state), CLAIMS) as data:
+        claims = data.setdefault("claims", {})
+        if (claims.get(issue_id) or {}).get("status") != "superseded":
+            return False
+        claims.pop(issue_id)
+        return True
+
+
 def release(state: Path, issue_id: str, status: str = "released", reason: str = "") -> None:
     with _mutating(_claims_path(state), CLAIMS) as data:
         row = data.setdefault("claims", {}).get(issue_id)
