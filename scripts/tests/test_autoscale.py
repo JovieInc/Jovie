@@ -415,5 +415,56 @@ class AutoscaleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp); (root / "meminfo").write_text("MemTotal: 100 kB\nMemAvailable: 2048 kB\n"); (root / "pressure").mkdir(); (root / "pressure" / "cpu").write_text("some avg10=1.50 avg60=1.00\n"); (root / "pressure" / "memory").write_text("full avg10=0.25\n"); (root / "pressure" / "io").write_text("full avg10=2.00\n"); probed = A.sample_host(root); self.assertEqual((probed["memAvailableBytes"], probed["psi"]["cpuSomeAvg10"], probed["psi"]["memoryFullAvg10"]), (2048 * 1024, 1.5, 0.25))
             self.assertIsNone(A.sample_host(root / "missing")["psi"]); self.assertIsNone(A.sample_host(root / "missing")["memAvailableBytes"])
+    def test_remote_lane_ignores_gem_host_pressure_but_local_lane_does_not(self):
+        # Hyperagent runs off gem: gem disk, memory, load and PSI are not its limits; provider limits still are.
+        hot = sample(load1=30.0, memAvailableBytes=1 * GIB, psi={"cpuSomeAvg10": 90.0, "memoryFullAvg10": 50.0, "ioFullAvg10": 90.0})
+        seen = obs(eligiblePoolByProvider={"devin": 8, "codex": 6, "hyperagent": 20}, maintenanceQueueByProvider={"devin": 0, "codex": 0, "hyperagent": 0},
+                   newIssueBudgetByProvider={"devin": {"reason": "within-budget"}, "codex": {"reason": "within-budget"}, "hyperagent": {"reason": "within-budget"}},
+                   runningByProvider={"devin": 4, "codex": 3, "hyperagent": 10}, disk={"admitted": False, "freePct": 2})
+        bases = {"codex": 3, "hyperagent": 10}
+        state = decide(None, seen, hot, bases, cfg(remote=["hyperagent"]), NOW)
+        self.assertGreaterEqual(self.lane(state, "hyperagent")["effective"], 10); self.assertNotIn("host-pressure", self.lane(state, "hyperagent")["blockers"])
+        self.assertIn("host-pressure", self.lane(state, "codex")["blockers"]); self.assertLess(self.lane(state, "codex")["effective"], 3)
+        local = decide(None, seen, hot, bases, cfg(), NOW)
+        self.assertLess(self.lane(local, "hyperagent")["effective"], 10)
+        rate = decide(None, obs(rateBankAt={"hyperagent": NOW - 10}, eligiblePoolByProvider={"hyperagent": 20}, newIssueBudgetByProvider={"hyperagent": {"reason": "within-budget"}}, maintenanceQueueByProvider={"hyperagent": 0}, runningByProvider={"hyperagent": 10}), hot, {"hyperagent": 10}, cfg(remote=["hyperagent"]), NOW)
+        self.assertEqual(self.lane(rate, "hyperagent")["effective"], 5)
+class MarginalYieldAndAdmissionTest(unittest.TestCase):
+    lane = staticmethod(lambda state, name: state["lanes"][name])
+
+    def test_low_marginal_yield_blocks_growth_and_gives_a_seat_back(self):
+        prev = {"mode": "apply", "lanes": {"codex": {"base": 3, "effective": 4, "target": 4}}, "host": {"lastChangeAt": NOW - 3600}}
+        seen = obs(runningByProvider={"codex": 4}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20},
+                   yieldByProvider={"codex": {"attempts": 20, "converted": 1}})
+        state = decide(prev, seen, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertEqual((self.lane(state, "codex")["effective"], self.lane(state, "codex")["lastReason"]), (3, "low-yield"))
+        healthy = decide(prev, {**seen, "yieldByProvider": {"codex": {"attempts": 20, "converted": 9}}}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertGreater(self.lane(healthy, "codex")["effective"], 4)
+        few = decide(prev, {**seen, "yieldByProvider": {"codex": {"attempts": 3, "converted": 0}}}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertGreaterEqual(self.lane(few, "codex")["effective"], 4, "too few attempts is no evidence")
+
+    def test_intake_gates_stop_new_issues_but_not_remediation_seats(self):
+        base = obs(runningByProvider={"codex": 3}, eligiblePoolByProvider={"codex": 50}, maintenanceQueueByProvider={"codex": 20})
+        for extra, token in (({"openPRCount": 315, "wipMax": 80}, "wip-cap"),
+                             ({"mergeThroughput": {"queueDepth": 9, "queueWaitP50Minutes": 45, "mergedPerHour": 9, "openedPerHour": 5, "ejectionRate": 0.0}}, "ci-queue-wait"),
+                             ({"quotaDeferredHeads": 2}, "github-quota-deferred")):
+            state = decide(None, {**base, **extra}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+            row = self.lane(state, "codex")
+            self.assertIn(token, row["intakeBlockers"])
+            self.assertEqual(row["intakeEffective"], 0)
+            self.assertGreaterEqual(row["effective"], 3, "remediation seats keep running")
+        under = decide(None, {**base, "openPRCount": 40, "wipMax": 80}, sample(), {"codex": 3}, cfg(max={"codex": 6}), NOW)
+        self.assertEqual(self.lane(under, "codex")["intakeBlockers"], [])
+
+    def test_flow_metrics_and_swarm_claims(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "swarm-claims.json").write_text(json.dumps({"claims": [{"pr": 1, "at": NOW - 60}, {"pr": 2, "at": NOW - 99999}]}))
+            self.assertEqual(A.swarm_claims(Path(tmp), NOW), 1)
+        merged = [{"createdAt": "2026-10-28T00:00:00Z", "mergedAt": "2026-10-28T01:00:00Z"}] * 4
+        m = A.flow_metrics({"merged24h": merged, "mergedWindow": {"complete": True}, "openPRCount": 120, "eligiblePoolByProvider": {"codex": 40}},
+                           {"codex": {"attempts": 10, "converted": 6}}, 3, 80, NOW)
+        self.assertEqual((m["mergedPerDay"], m["convertedPerAttempt"], m["cycleMinutesP50"], m["burnDownEtaDays"], m["swarmClaims"]), (4, 0.6, 60.0, 10.0, 3))
+
+
 if __name__ == "__main__":
     unittest.main()
