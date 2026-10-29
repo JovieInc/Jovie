@@ -185,26 +185,52 @@
   margin: var(--space-3, 0.75rem) 0 0;
 }
 
+/* The lead holds headline, subhead, and the claim: the one primary action. */
+.homepage-hero-canvas__lead {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+/* Real product shot: the template profile capture (registry scenario, 2x
+   PNG at 390 CSS px). The frame fills this box; the box keeps the real
+   screen aspect and never renders wider than the capture's native width,
+   so the shot stays crisp. */
 .homepage-hero-canvas__proof {
-  position: absolute;
-  z-index: 1;
-  right: var(--hero-canvas-chrome);
-  bottom: var(--space-4, 1rem);
-  width: 13rem;
-  pointer-events: none;
+  position: relative;
+  aspect-ratio: 402 / 874;
+  width: min(72vw, 18rem);
+  max-width: 24rem;
+  margin: var(--space-12, 3rem) auto 0;
 }
 
-/* The shared phone class is 21.25rem in the old two-column hero. Inside this
-   field it has to follow the proof box, or it covers the headline. */
-.homepage-hero-canvas__proof .homepage-artist-hero__phone {
-  width: 100%;
+/* Desktop: a balanced two-column field. Lead left, shot right, both
+   centered on the spine. The shot is height-bound so the whole phone
+   screen stays inside the first viewport, never cropped. */
+@media (min-width: 64rem) {
+  .homepage-hero-canvas__copy[data-has-proof="true"] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    column-gap: var(--space-16, 4rem);
+  }
+
+  .homepage-hero-canvas__copy[data-has-proof="true"]
+    .homepage-hero-canvas__proof {
+    justify-self: center;
+    width: auto;
+    height: min(
+      calc(100svh - var(--hero-canvas-bar) - var(--space-32, 8rem)),
+      42rem
+    );
+    min-height: 28rem;
+    margin: 0;
+  }
 }
 
-/* Phone-width field: the proof phone joins the field's flow under the
-   copy. Preserve the copy's natural height, including the claim form's
-   reserved status line; short viewports grow the field instead of
-   shrinking the headline or clipping the conversion control. The phone
-   keeps the real screen aspect and yields space before the field grows. */
+/* Phone-width field: the copy grows to its natural height and the shot
+   follows the claim in flow, never layered over the headline. */
 @media (max-width: 63.99rem) {
   .homepage-hero-canvas__field {
     display: flex;
@@ -217,20 +243,12 @@
     height: auto;
     overflow: hidden;
     justify-content: flex-start;
-    padding-bottom: var(--space-4, 1rem);
+    padding-top: var(--space-12, 3rem);
+    padding-bottom: var(--space-12, 3rem);
   }
 
   .homepage-hero-canvas__proof {
-    position: relative;
-    right: auto;
-    bottom: auto;
-    width: auto;
-    flex: 0 1 auto;
     align-self: center;
-    height: min(30svh, 15.75rem, calc(100svh - var(--hero-canvas-bar) - 20rem));
-    min-height: 7rem;
-    aspect-ratio: 402 / 874;
-    margin: 0 0 var(--space-4, 1rem);
   }
 }
 
