@@ -1,7 +1,7 @@
 {
   "_generated": {
-    "version": "7dfffcc6ab23",
-    "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
+    "version": "a569b13b31d3",
+    "toolsListHash": "87e4a522b0ed1415e0ca53e123958ef35b15b35f4eeff2fe72cc35d3cafe32f6",
     "listingHash": "a7665b2f5a09882b4a03e68179c82c6e3651a971c63ad7dfb88cc10b9d213c6f",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   },
@@ -48,9 +48,11 @@
           ]
         },
         "connectorDocs": {
-          "status": "pass",
+          "status": "fail",
           "receiptId": "docs:/developers/agents",
-          "reasons": []
+          "reasons": [
+            "rendered tool list hash does not match this package"
+          ]
         },
         "listingIcons": {
           "status": "pass",
@@ -62,7 +64,8 @@
         "agentPathCert",
         "trustSurfaceVisual",
         "legalConsistency",
-        "homepageTasteApproval"
+        "homepageTasteApproval",
+        "connectorDocs"
       ]
     },
     "grok": {
@@ -104,9 +107,11 @@
           ]
         },
         "connectorDocs": {
-          "status": "pass",
+          "status": "fail",
           "receiptId": "docs:/developers/agents",
-          "reasons": []
+          "reasons": [
+            "rendered tool list hash does not match this package"
+          ]
         },
         "listingIcons": {
           "status": "pass",
@@ -118,7 +123,8 @@
         "agentPathCert",
         "trustSurfaceVisual",
         "legalConsistency",
-        "homepageTasteApproval"
+        "homepageTasteApproval",
+        "connectorDocs"
       ]
     },
     "chatgpt": {
@@ -160,9 +166,11 @@
           ]
         },
         "connectorDocs": {
-          "status": "pass",
+          "status": "fail",
           "receiptId": "docs:/developers/agents",
-          "reasons": []
+          "reasons": [
+            "rendered tool list hash does not match this package"
+          ]
         },
         "listingIcons": {
           "status": "pass",
@@ -174,7 +182,8 @@
         "agentPathCert",
         "trustSurfaceVisual",
         "legalConsistency",
-        "homepageTasteApproval"
+        "homepageTasteApproval",
+        "connectorDocs"
       ]
     },
     "claude": {
@@ -216,9 +225,11 @@
           ]
         },
         "connectorDocs": {
-          "status": "pass",
+          "status": "fail",
           "receiptId": "docs:/developers/agents",
-          "reasons": []
+          "reasons": [
+            "rendered tool list hash does not match this package"
+          ]
         },
         "listingIcons": {
           "status": "pass",
@@ -230,7 +241,8 @@
         "agentPathCert",
         "trustSurfaceVisual",
         "legalConsistency",
-        "homepageTasteApproval"
+        "homepageTasteApproval",
+        "connectorDocs"
       ]
     }
   }
