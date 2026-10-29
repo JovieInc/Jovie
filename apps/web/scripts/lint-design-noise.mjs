@@ -10,6 +10,7 @@
  *   email-capture    an ad-hoc email field. Use DS InlineSubscribe.
  *   disabled-submit  a submit Button disabled by field validity (renders grey).
  *                    Validate on submit instead.
+ *   filler-bio       a placeholder bio ("Public creator profile on Jovie.").
  *   copy-redundancy  a string that restates a button/CTA label as helper text
  *                    ("Subscribe to ..." under a Subscribe button).
  *
@@ -29,6 +30,8 @@ export const BASELINE_PATH = join(here, '..', 'design-noise.baseline.json');
 
 const ICON_TILE =
   /<(div|span)\b[^>]*className=(?:'([^']*)'|"([^"]*)"|\{`([^`]*)`\})[^>]*>\s*(?:<[A-Za-z.]*(?:Icon|Svg)\w*\b[^>]*\/>|<(?:step|feature|benefit|item)\.icon\b[^>]*\/>|<[A-Z]\w*\b[^>]*aria-hidden[^>]*\/>|\p{Extended_Pictographic}+|\{[a-z.]*[iI]con\})\s*<\/\1>/gu;
+const FILLER_BIO =
+  /['"`>](?:Public (?:creator|artist) profile on Jovie\.?|No bio (?:yet|available)\.?|This (?:creator|artist) has not added a bio\.?)['"`<]/g;
 const TILE_COMPONENT = /<(?:IconBadge|IconTile|IconGlyphFrame)\b/g;
 const STEP_LABEL = /(?:>|\s)Step\s*(?:\{[^}]+\}|\d+)\s*(?:<|$)/g;
 const DISABLED_SUBMIT =
@@ -79,6 +82,9 @@ export function findNoise(source, file = '') {
     ) {
       found.push({ rule: 'icon-tile', line: lineOf(source, m.index) });
     }
+  }
+  for (const m of source.matchAll(FILLER_BIO)) {
+    found.push({ rule: 'filler-bio', line: lineOf(source, m.index) });
   }
   for (const m of source.matchAll(TILE_COMPONENT)) {
     found.push({ rule: 'icon-tile-comp', line: lineOf(source, m.index) });
@@ -180,6 +186,7 @@ const HINTS = {
   'email-capture': 'Use InlineSubscribe from @jovie/ui/atoms/inline-subscribe.',
   'disabled-submit': 'Never a grey disabled submit; validate on submit.',
   'copy-redundancy': 'Helper text restates the button label; delete it.',
+  'filler-bio': 'Show the real bio or nothing; never a filler line.',
 };
 
 function main() {

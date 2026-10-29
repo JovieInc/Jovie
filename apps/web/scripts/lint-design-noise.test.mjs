@@ -57,6 +57,12 @@ describe('findNoise deliberate-red cases', () => {
     ).toContain('disabled-submit');
   });
 
+  it('flags a filler bio', () => {
+    expect(
+      rules(`<p>{bio ?? 'Public creator profile on Jovie.'}</p>`)
+    ).toContain('filler-bio');
+  });
+
   it('flags helper copy that restates the CTA', () => {
     const src = `const c = { buttonLabel: 'Subscribe', consent: 'Subscribe to Jovie changelog emails.' };`;
     expect(rules(src)).toContain('copy-redundancy');
