@@ -1,6 +1,20 @@
 # Pricing certification
 
-Current renewal: 2026-10-21, PR #22351 after merging PR #22382 from main.
+Current renewal: 2026-10-29, JOV-9921 census renewal after PR #23600. The only
+changed pricing owner is `MarketingFooter.tsx`: its diff adds a JSX copy-allow
+comment beside the legal-entity line and reflows `© {year}` to `©{' '}{year}`.
+JSX comments are erased at compile time and the whitespace reflow renders
+identically, so no element, class or text node on `/pricing` changed. This is
+local source evidence, sandboxed without a browser; the rendered captures of
+record remain the 2026-10-29 `mvp-pricing-audit-1029` run below (pricing e2e
+11/11 at 320–1440). Evidence checks: `node scripts/design-authority-guard.mjs`
+passes with the renewed digest (regenerated with the repo's `sourceDigest()`,
+not hand-edited), and the census unit suite passes including `checkCensus`
+against the live tree. `MarketingFooter.test.tsx` passed in PR #23600's
+merge-group unit lane. JOV-8101 retains ownership of continuous pricing
+refinement.
+
+## Previous renewal: 2026-10-21, PR #22351 after merging PR #22382 from main.
 Local source/browser evidence only. The merged source preserves the $12/month
 self-serve offer and Pro claim CTA while moving shared container CSS into its
 section-shell owner. Both changes are covered by the renewed source digest.
