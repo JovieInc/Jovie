@@ -129,6 +129,13 @@ export const ChatMessage = memo(function ChatMessage({
   };
   const shouldReduceMotion = useReducedMotion();
   const toolEvents = getRenderableToolEvents(parts);
+  // Finished tool events already carry their own feedback control; a second
+  // message-level row would stack two thumbs rows under one reply.
+  const hasToolFeedback =
+    renderTools &&
+    toolEvents.some(
+      event => event.state === 'succeeded' || event.state === 'failed'
+    );
   const fileParts = parts.filter(
     (
       p
@@ -315,7 +322,7 @@ export const ChatMessage = memo(function ChatMessage({
                       )}
                     </Button>
                   </SimpleTooltip>
-                  {enableFeedback ? (
+                  {enableFeedback && !hasToolFeedback ? (
                     <ChatFeedbackControl
                       messageId={id}
                       turnId={turnId}

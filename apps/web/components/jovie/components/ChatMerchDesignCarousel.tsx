@@ -259,7 +259,26 @@ export function ChatMerchDesignCarousel({
     );
   };
 
-  if (result.designs.length === 0) return null;
+  if (result.designs.length === 0) {
+    return (
+      <section aria-label='Merch Concepts Unavailable' className='max-w-3xl'>
+        <p className='text-sm text-secondary-token'>
+          No designs came back this time.
+        </p>
+        <Button
+          type='button'
+          variant='secondary'
+          size='sm'
+          className='mt-2'
+          onClick={() =>
+            submitMerchPrompt('Try generating the merch designs again')
+          }
+        >
+          Try Again
+        </Button>
+      </section>
+    );
+  }
 
   if (selected && chosenDesign) {
     const product = selected.product;

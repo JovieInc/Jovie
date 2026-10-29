@@ -146,3 +146,15 @@ describe('merch design strategies', () => {
     );
   });
 });
+
+describe('resolveGenerationNextStep', () => {
+  it('never asks the artist to pick when no design rendered', async () => {
+    const { resolveGenerationNextStep, MERCH_NO_DESIGNS_NEXT_STEP } =
+      await import('./design-generation');
+    expect(resolveGenerationNextStep(0, [{ verdict: 'accept' }])).toBe(
+      MERCH_NO_DESIGNS_NEXT_STEP
+    );
+    expect(MERCH_NO_DESIGNS_NEXT_STEP).not.toMatch(/pick one and/i);
+    expect(resolveGenerationNextStep(3, [])).toMatch(/^Pick one/);
+  });
+});
