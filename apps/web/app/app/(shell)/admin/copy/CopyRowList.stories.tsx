@@ -47,4 +47,18 @@ export const Reviewed: Story = {
     },
   },
 };
+export const WithAlternatives: Story = {
+  args: {
+    verdicts: { 'HOME-3': { verdict: 'sucks', note: 'too long' } },
+    alternatives: {
+      'HOME-3': {
+        forText: 'The link your music deserves.',
+        alternatives: [
+          'Your music. One link.',
+          'One link for everything you make.',
+        ],
+      },
+    },
+  },
+};
 export const Empty: Story = { args: { rows: [] } };
