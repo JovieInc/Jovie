@@ -19,7 +19,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 TEAMS = ("JOV", "LYB")
-SYNC_PAGES = 4    # incremental pages per team per tick
+SYNC_PAGES = 20   # incremental pages per team per tick (1000 rows); the wall budget below ends it sooner
+SYNC_BUDGET_S = 25  # wall budget for one team's incremental pass
+MIRROR_SYNC_LOG = "mirror-sync.jsonl"  # one row per completed pass: oldest change -> mirrored (stage_events linear-mirror)
 FILL_PAGES = 10   # first-fill pages per team per tick; the fill resumes next tick
 FILL_OVERLAP_S = 300  # the first incremental re-reads this window before the fill began
 STALE_ALERT_S = 6 * 3600
@@ -49,7 +51,8 @@ def require_owner(state: Path, issue_id: str, target: str, owner: str | None) ->
         raise StartedWithoutOwner(f"{target} for {issue_id} without a live owner")
 ROW = ("id identifier title description priority createdAt updatedAt state{name type} parent{id} "
        "labels(first:25){pageInfo{hasNextPage} nodes{name}}")
-SYNC_QUERY = ('query($team:String!,$since:DateTimeOrDuration!,$after:String){issues(first:50,after:$after,'
+# Newest change first: an Urgent or just-updated issue reaches the mirror in the first page, not the last.
+SYNC_QUERY = ('query($team:String!,$since:DateTimeOrDuration!,$after:String){issues(first:50,after:$after,orderBy:updatedAt,'
               'filter:{team:{key:{eq:$team}},updatedAt:{gte:$since}}){pageInfo{hasNextPage endCursor} nodes{'
               + ROW + '}}}')
 FILL_QUERY = ('query($team:String!,$after:String){issues(first:50,after:$after,filter:{team:{key:{eq:$team}},'
@@ -186,6 +189,19 @@ def _iso(epoch: float) -> str:
     return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
+def _log_pass(state: Path, team: str, oldest_change, synced_at: float) -> None:
+    """Freshness stage row: when the oldest change in this pass happened, and when the mirror had it."""
+    try:
+        path = Path(state) / MIRROR_SYNC_LOG
+        with open(path, "a") as handle:
+            handle.write(json.dumps({"team": team, "enteredAt": oldest_change, "exitedAt": _iso(synced_at)}) + "\n")
+        if path.stat().st_size > 1_000_000:
+            lines = path.read_text().splitlines()[-2000:]
+            path.write_text("\n".join(lines) + "\n")
+    except OSError:
+        pass
+
+
 def sync(state: Path, team: str, linear, admit, transient=()) -> dict:
     """One bounded incremental pass. Progress (resume cursor) survives across ticks."""
     path = mirror_path(state, team)
@@ -196,7 +212,10 @@ def sync(state: Path, team: str, linear, admit, transient=()) -> dict:
         resume = {"fill": filling, "after": None, "high": None, "since": data.get("cursor"),
                   "startedAt": time.time()}
     pages, outcome = 0, "partial"
+    began = time.monotonic()
     while pages < (FILL_PAGES if filling else SYNC_PAGES):
+        if not filling and pages and time.monotonic() - began > SYNC_BUDGET_S:
+            break
         if not admit(1):
             outcome = "budget-held"
             break
@@ -222,6 +241,7 @@ def sync(state: Path, team: str, linear, admit, transient=()) -> dict:
                   if isinstance(node, dict) and isinstance(node.get("updatedAt"), str)]
         if stamps:
             resume["high"] = max([resume["high"] or "", *stamps])
+            resume["low"] = min([resume.get("low") or stamps[0], *stamps])
         done = info.get("hasNextPage") is False
         with _mutating(path, MIRROR) as current:
             if done:
@@ -232,6 +252,8 @@ def sync(state: Path, team: str, linear, admit, transient=()) -> dict:
                 current["syncedAt"] = time.time()
                 current.setdefault("filledAt", current["syncedAt"])
                 current.pop("resume", None)
+                if not filling:
+                    _log_pass(state, team, resume.get("low") or resume.get("since"), current["syncedAt"])
             else:
                 resume["after"] = info.get("endCursor")
                 current["resume"] = resume
