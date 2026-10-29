@@ -130,6 +130,7 @@ describe('runCert', () => {
     });
     const { receipt, exitCode } = await runCert({ ...base, fetchImpl });
     expect(exitCode).toBe(0);
+    expect(receipt.ok).toBe(true);
     expect(receipt.checks.filter(c => c.status === 'FAIL')).toEqual([]);
     expect(receipt.passed).toBe(receipt.total);
     expect(receipt.at).toBe('2026-01-01T00:00:00.000Z');
@@ -147,6 +148,7 @@ describe('runCert', () => {
     const { fetchImpl } = fakeMcp();
     const { receipt, exitCode } = await runCert({ ...base, fetchImpl });
     expect(exitCode).toBe(1);
+    expect(receipt.ok).toBe(false);
     expect(statusOf(receipt.checks, 'claim_url present and resolves')).toBe(
       'FAIL'
     );
@@ -180,6 +182,7 @@ describe('runCert', () => {
     ).toBe('RATE_LIMITED');
     expect(receipt.checks.some(c => c.status === 'SKIP')).toBe(true);
     expect(exitCode).toBe(75);
+    expect(receipt.ok).toBe(false);
   });
 
   it('skips dependent checks when no candidates come back', async () => {

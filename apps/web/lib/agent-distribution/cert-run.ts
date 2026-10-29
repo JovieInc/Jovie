@@ -339,10 +339,13 @@ export async function runCert(opts: CertOptions) {
   }
 
   const toolsListHash = await main();
+  const failed = checks.some(c => c.status === 'FAIL');
+  const exitCode = failed ? 1 : rateLimited ? 75 : 0;
   const receipt = {
     run: RUN,
     base: BASE,
     at: (opts.now?.() ?? new Date()).toISOString(),
+    ok: exitCode === 0,
     toolsListHash,
     passed: checks.filter(c => c.status === 'PASS').length,
     total: checks.length,
@@ -350,6 +353,5 @@ export async function runCert(opts: CertOptions) {
     checks,
     latency: latencyByTool(calls),
   };
-  const failed = checks.some(c => c.status === 'FAIL');
-  return { receipt, exitCode: failed ? 1 : rateLimited ? 75 : 0 };
+  return { receipt, exitCode };
 }
