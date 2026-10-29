@@ -30,6 +30,63 @@ const workflow = /** @type {{ jobs: Record<string, WorkflowJob> }} */ (
     )
   )
 );
+
+describe('certification steps outside the workspace', () => {
+  it.each(['missing', 'empty', 'recorded'])(
+    'reports whether %s evidence can be uploaded',
+    state => {
+      const root = mkdtempSync(join(tmpdir(), 'prod-cert-handoff-'));
+      const workspace = join(root, 'workspace');
+      const stepsFile = join(root, 'prod-cert-steps.jsonl');
+      const output = join(root, 'output');
+      try {
+        mkdirSync(workspace);
+        if (state !== 'missing')
+          writeFileSync(
+            stepsFile,
+            state === 'empty' ? '' : '{"status":"passed"}\n'
+          );
+        const check = workflow.jobs['auth-smoke'].steps.find(
+          step => step.id === 'check-cert-steps'
+        );
+        expect(check?.run).toBeTypeOf('string');
+        const result = spawnSync('bash', ['-e', '-c', check.run], {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            GITHUB_OUTPUT: output,
+            PROD_CERT_STEPS_FILE: stepsFile,
+          },
+          encoding: 'utf8',
+        });
+        expect(result.status, result.stderr).toBe(0);
+        expect(readFileSync(output, 'utf8').trim()).toBe(
+          `available=${state === 'recorded'}`
+        );
+        const upload = workflow.jobs['auth-smoke'].steps.find(
+          step => step.id === 'upload-cert-steps'
+        );
+        const condition = /** @type {any} */ (upload).if
+          .replace(/^\$\{\{|\}\}$/g, '')
+          .replace(/steps\.([\w-]+)/g, 'steps["$1"]');
+        expect(
+          runInNewContext(condition, {
+            always: () => true,
+            steps: {
+              'check-cert-steps': {
+                outputs: Object.fromEntries([
+                  readFileSync(output, 'utf8').trim().split('='),
+                ]),
+              },
+            },
+          })
+        ).toBe(state === 'recorded');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    }
+  );
+});
 const trigger = workflow.jobs['resolve-target'].steps.find(
   step => step.id === 'trigger'
 );
@@ -138,7 +195,16 @@ async function decide({
     });
     return {
       ...result,
-      shouldProbe: readFileSync(output, 'utf8').trim().split('\n').at(-1),
+      shouldProbe: readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(line => line.startsWith('should_probe='))
+        .at(-1),
+      shouldCertify: readFileSync(output, 'utf8')
+        .trim()
+        .split('\n')
+        .filter(line => line.startsWith('should_certify='))
+        .at(-1),
     };
   } finally {
     rmSync(root, { recursive: true, force: true });
@@ -207,6 +273,50 @@ describe('automatic landed production probes (JOV-8081)', () => {
     expect(result.stdout).not.toContain(
       'following up against landed production'
     );
+  });
+
+  it('certifies after Production Verified even when in-lease probes ran (JOV-9822)', async () => {
+    const base = {
+      run_id: 123,
+      run_attempt: 2,
+      head_sha: sha,
+      head_branch: 'main',
+      status: 'completed',
+      conclusion: 'success',
+    };
+    const jobs = [
+      { ...base, id: 456, name: 'Lighthouse CI (Production)' },
+      { ...base, id: 457, name: 'Production Verified' },
+    ];
+    const result = await decide({ jobs });
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.shouldProbe).toBe('should_probe=false');
+    expect(result.shouldCertify).toBe('should_certify=true');
+
+    const unverified = await decide({
+      jobs: [jobs[0], { ...jobs[1], conclusion: 'skipped' }],
+    });
+    expect(unverified.shouldCertify).toBe('should_certify=false');
+    const otherAttempt = await decide({
+      jobs: [jobs[0], { ...jobs[1], run_attempt: 1 }],
+    });
+    expect(otherAttempt.shouldCertify).toBe('should_certify=false');
+  });
+
+  it('certifies without probing on the lanes clock dispatch (JOV-9822)', async () => {
+    const result = await decide({
+      event: { EVENT_NAME: 'repository_dispatch' },
+    });
+    expect(result.code).toBe(0);
+    expect(result.shouldProbe).toBe('should_probe=false');
+    expect(result.shouldCertify).toBe('should_certify=true');
+    expect(result.requests).toEqual([]);
+  });
+
+  it('never certifies on untrusted controller evidence', async () => {
+    const result = await decide({ event: { TRIGGER_HEAD_BRANCH: 'feature' } });
+    expect(result.code).not.toBe(0);
+    expect(result.shouldCertify).toBe('should_certify=false');
   });
 
   it('retains explicit manual dispatch without requiring controller evidence', async () => {

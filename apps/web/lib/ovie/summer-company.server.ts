@@ -7,13 +7,17 @@ import {
   sql as drizzleSql,
   eq,
   inArray,
-  isNotNull,
   isNull,
   max,
 } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { z } from 'zod';
 import { getProfileUrl } from '@/constants/domains';
+import {
+  externalAccountSql,
+  internalAccountSql,
+  isInternalAccount,
+} from '@/lib/accounts/internal-account';
 import { getAdminStripeOverviewMetrics } from '@/lib/admin/stripe-metrics';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -21,10 +25,6 @@ import { billingAuditLog } from '@/lib/db/schema/billing';
 import { creatorProfiles, userProfileClaims } from '@/lib/db/schema/profiles';
 import { env } from '@/lib/env-server';
 import { stripe } from '@/lib/stripe/client';
-import {
-  INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN,
-  isInternalOrTestAccountEmail,
-} from '@/lib/utils/email';
 import { getLybDailyMrr } from './lyb-mrr.server';
 import { getSummerFounderAccounts } from './summer-founder-cohort.server';
 
@@ -52,33 +52,12 @@ const unavailable = (reason: string): Unavailable => ({
  * `externalAccount` treats a null email as external — it is a
  * user record we cannot classify, not an internal one.
  */
-const internalAccount = () =>
-  drizzleSql`lower(${users.email}) ~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}`;
-const externalAccount = () =>
-  drizzleSql`(${users.email} is null or lower(${users.email}) !~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN})`;
-
-/** Stripe customer ids belonging to internal/test users (by user email). */
-async function getInternalStripeCustomerIds(): Promise<Set<string>> {
-  const rows = await db
-    .select({ stripeCustomerId: users.stripeCustomerId })
-    .from(users)
-    .where(and(isNotNull(users.stripeCustomerId), internalAccount()));
-  return new Set(
-    rows
-      .map(row => row.stripeCustomerId)
-      .filter((id): id is string => id !== null)
-  );
-}
+const internalAccount = () => internalAccountSql();
+const externalAccount = () => externalAccountSql();
 
 export async function getSummerRevenue(now = new Date()) {
-  // A failed internal-id lookup must fail the read, not silently under-exclude.
-  const internalCustomerIds = await getInternalStripeCustomerIds();
   const [stripeMetrics, lyb] = await Promise.all([
-    getAdminStripeOverviewMetrics({
-      isInternalCustomer: ({ id, email }) =>
-        (id !== null && internalCustomerIds.has(id)) ||
-        isInternalOrTestAccountEmail(email),
-    }),
+    getAdminStripeOverviewMetrics(),
     getLybDailyMrr(now).catch(() => unavailable('lyb_mrr_failed')),
   ]);
   const jovie = !stripeMetrics.isConfigured
@@ -312,6 +291,7 @@ async function checkoutAbandoned(limit: number, now: Date): Promise<Cohort> {
       id: users.id,
       name: users.name,
       email: users.email,
+      accountClass: users.accountClass,
       stripeCustomerId: users.stripeCustomerId,
     })
     .from(users)
@@ -322,9 +302,7 @@ async function checkoutAbandoned(limit: number, now: Date): Promise<Cohort> {
         drizzleSql`coalesce(${users.isPro}, false) = false`
       )
     );
-  const external = matched.filter(
-    row => !isInternalOrTestAccountEmail(row.email)
-  );
+  const external = matched.filter(row => !isInternalAccount(row));
   const excludedInternal = matched.length - external.length;
   const rows = external
     .map(row => ({
