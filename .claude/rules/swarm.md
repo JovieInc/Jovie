@@ -236,3 +236,7 @@ The seed plan that established this pattern lives at:
 ```
 
 This file is gitignored (it is a session-specific plan artifact, not a committed doc). If you need to reconstruct a wave plan, use `/autoplan` and reference this rules file as the coordination contract.
+
+## Preflight
+
+Every chunk runs `pnpm preflight:changed` before its push (the pre-push gate that lanes and swarm workers use already does). It catches the repo rules CI would otherwise report one round at a time.
