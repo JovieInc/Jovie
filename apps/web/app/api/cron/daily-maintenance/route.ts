@@ -26,6 +26,7 @@
  */
 
 import { NextResponse } from 'next/server';
+import { purgeExpiredAgentDrafts } from '@/lib/agent-acquisition/draft-purge.server';
 import { recordDailyGatewaySpend } from '@/lib/ai/gateway-spend';
 import { runDataRetentionCleanup } from '@/lib/analytics/data-retention';
 import { verifyCronRequest } from '@/lib/cron/auth';
@@ -249,6 +250,12 @@ export async function GET(request: Request) {
         families: summary.families,
       };
     }
+  );
+
+  // 12b. Expired agent connector drafts (privacy policy retention, #23772).
+  results.agentDraftPurge = await runSubJob(
+    'agentDraftPurge',
+    purgeExpiredAgentDrafts
   );
 
   // 13. Data retention — Sundays only (heavy operation)

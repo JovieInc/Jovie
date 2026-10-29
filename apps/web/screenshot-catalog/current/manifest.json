@@ -140,8 +140,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-29T18:27:56.915Z",
-    "gitSha": "a67bf3b1923804bc0935ae36c7e4d3e10b8eee8b",
+    "capturedAt": "2026-10-29T21:35:50.669Z",
+    "gitSha": "f03fd77b775d4e58154e7edbc2763158170d0b5e",
     "imagePath": "artist-profile-outcomes-section-desktop.png"
   },
   {
@@ -166,8 +166,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-29T17:33:50.719Z",
-    "gitSha": "b4d51a5772e14f5c308faa5859065a40bd555170",
+    "capturedAt": "2026-10-29T21:36:05.951Z",
+    "gitSha": "f03fd77b775d4e58154e7edbc2763158170d0b5e",
     "imagePath": "artist-profile-opinionated-section-desktop.png"
   },
   {
@@ -179,8 +179,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-29T18:28:21.373Z",
-    "gitSha": "a67bf3b1923804bc0935ae36c7e4d3e10b8eee8b",
+    "capturedAt": "2026-10-29T21:36:13.997Z",
+    "gitSha": "f03fd77b775d4e58154e7edbc2763158170d0b5e",
     "imagePath": "artist-profile-spec-wall-section-desktop.png"
   },
   {
@@ -218,8 +218,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-29T18:28:41.473Z",
-    "gitSha": "a67bf3b1923804bc0935ae36c7e4d3e10b8eee8b",
+    "capturedAt": "2026-10-29T21:36:33.122Z",
+    "gitSha": "f03fd77b775d4e58154e7edbc2763158170d0b5e",
     "imagePath": "artist-profile-final-cta-section-desktop.png"
   },
   {
@@ -244,8 +244,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "marketing-export", "investor-ready"],
-    "capturedAt": "2026-10-28T20:24:36.305Z",
-    "gitSha": "14eb4bbc45d9ce19df7f20fbf1f09403634d3113",
+    "capturedAt": "2026-10-29T21:36:43.024Z",
+    "gitSha": "f03fd77b775d4e58154e7edbc2763158170d0b5e",
     "imagePath": "tim-white-profile-live-desktop.png",
     "publicExportPath": "tim-white-profile-live-desktop.png"
   },
@@ -258,8 +258,8 @@
     "viewport": "desktop",
     "theme": "dark",
     "consumers": ["admin", "investor-ready"],
-    "capturedAt": "2026-10-28T20:24:42.197Z",
-    "gitSha": "14eb4bbc45d9ce19df7f20fbf1f09403634d3113",
+    "capturedAt": "2026-10-29T21:36:48.944Z",
+    "gitSha": "f03fd77b775d4e58154e7edbc2763158170d0b5e",
     "imagePath": "tim-white-profile-mainstream-desktop.png",
     "publicExportPath": "tim-white-profile-mainstream-desktop.png"
   },
