@@ -23,6 +23,12 @@ describe('Mutation Diff Gem contract', () => {
     expect(workflow).toMatch(/actions\/cache\/save@/u);
   });
 
+  it('is gated on 5-minute load below 8 with Stryker concurrency 1', () => {
+    expect(workflow).toMatch(/MUTATION_MAX_LOAD: '8'/u);
+    expect(workflow).toMatch(/STRYKER_CONCURRENCY: '1'/u);
+    expect(workflow).not.toMatch(/MUTATION_MAX_LOAD: '(?!8')/u);
+  });
+
   it('ranks the sweep by touch (tier weight plus churn)', () => {
     expect(workflow).toMatch(/test-quality-loop\.mjs rank/u);
     expect(workflow).toMatch(/--touch-file/u);

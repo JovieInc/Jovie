@@ -108,7 +108,12 @@ jobs:
         env:
           CI: 'true'
           FILES: ${{ steps.files.outputs.files }}
-        run: node scripts/mutation-diff.mjs --files "$FILES" --summary "$GITHUB_STEP_SUMMARY"
+          STRYKER_CONCURRENCY: '1'
+          MUTATION_MAX_LOAD: '8'
+        run: |
+          # Off-peak only: skip (not fail) while Gem's 5-minute load is 8 or more.
+          if ! node scripts/mutation-sweep-preflight.mjs; then echo "Gem busy; diff mutation skipped."; exit 0; fi
+          node scripts/mutation-diff.mjs --files "$FILES" --summary "$GITHUB_STEP_SUMMARY"
 
       - name: Upload mutation reports
         if: ${{ always() && hashFiles('apps/web/reports/mutation/diff/*.json') != '' }}
@@ -149,8 +154,8 @@ jobs:
       - name: Check the runner has spare capacity
         id: capacity
         env:
-          # Gem has 16 cores and sits at load 25-35 in normal operation; skip only when it is far past that.
-          MUTATION_MAX_LOAD: '48'
+          # Off-peak only (2026-10-29): run only when Gem's 5-minute load is below 8. Gated on load, not a clock.
+          MUTATION_MAX_LOAD: '8'
           MUTATION_MIN_DISK_GB: '15'
         run: |
           set +e
@@ -178,6 +183,8 @@ jobs:
         if: steps.capacity.outputs.run == 'true'
         env:
           CI: 'true'
+          STRYKER_CONCURRENCY: '1'
+          MUTATION_MAX_LOAD: '8'
           MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'sweep' }}
           MAX_FILES: ${{ github.event_name == 'workflow_dispatch' && inputs.max_files || (github.event_name == 'workflow_run' && '4') || '6' }}
         run: |

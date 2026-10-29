@@ -78,7 +78,7 @@ const { values } = parseArgs({
 /** Spare-compute gate: refuse to start when gem is busy. Exit 75 = skip. */
 function preflight() {
   const minMemGb = Number(process.env.MUTATION_MIN_MEM_GB ?? 8);
-  const maxLoad = Number(process.env.MUTATION_MAX_LOAD ?? 10);
+  const maxLoad = Number(process.env.MUTATION_MAX_LOAD ?? 8);
   const minDiskGb = Number(process.env.MUTATION_MIN_DISK_GB ?? 15);
   const problems = [];
   if (existsSync('/proc/meminfo')) {
@@ -93,8 +93,8 @@ function preflight() {
       );
   }
   if (existsSync('/proc/loadavg')) {
-    const load = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[0]);
-    if (load > maxLoad) problems.push(`load ${load} > ${maxLoad}`);
+    const load = Number(readFileSync('/proc/loadavg', 'utf8').split(' ')[1]);
+    if (load > maxLoad) problems.push(`5-min load ${load} > ${maxLoad}`);
   }
   const df = spawnSync('df', ['-Pk', repoRoot], { encoding: 'utf8' });
   const avail = Number(
@@ -301,6 +301,12 @@ mkdirSync(tasksDir, { recursive: true });
 let issuesFiled = 0;
 
 for (const file of batch) {
+  // Off-peak only: re-check the 5-minute load before every module, not just at start.
+  const busy = preflight();
+  if (busy.length > 0) {
+    console.log(`Host busy before ${file}, stopping: ${busy.join('; ')}`);
+    break;
+  }
   if (Date.now() > deadline) {
     console.log(`Time budget spent; ${file} left for the next run.`);
     break;
@@ -330,7 +336,7 @@ for (const file of batch) {
       env: {
         ...process.env,
         CI: 'true',
-        STRYKER_CONCURRENCY: process.env.STRYKER_CONCURRENCY ?? '4',
+        STRYKER_CONCURRENCY: process.env.STRYKER_CONCURRENCY ?? '1',
       },
     }
   );
