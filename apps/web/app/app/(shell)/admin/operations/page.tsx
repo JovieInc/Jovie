@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { HudSystemHealthStrip } from '@/components/features/admin/hud/HudSystemHealthStrip';
 import { OperationalTasksPanel } from '@/components/features/admin/hud/OperationalTasksPanel';
 import { AdminPage } from '@/components/features/admin/layout/AdminPage';
+import { OperatorRouteTabs } from '@/components/features/admin/layout/OperatorRouteTabs';
+import { ADMIN_WORKSPACE_TABS } from '@/constants/admin-navigation';
 import { APP_ROUTES } from '@/constants/routes';
 import { requireCurrentAdminPageAccess } from '@/lib/admin/page-access';
 import { getHudMetrics } from '@/lib/hud/metrics';
@@ -20,6 +22,10 @@ export default async function OperationsPage() {
       description='Autonomous company outcomes and exceptions. Active remediation stays attached to the work.'
       testId='founder-operations-page'
     >
+      <OperatorRouteTabs
+        tabs={ADMIN_WORKSPACE_TABS.operations}
+        label='Fleet Views'
+      />
       <HudSystemHealthStrip metrics={metrics} presentation='page' />
       <OperationalTasksPanel presentation='page' />
       <nav aria-label='Related Operations'>
