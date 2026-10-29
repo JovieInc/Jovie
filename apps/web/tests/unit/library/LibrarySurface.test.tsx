@@ -1008,6 +1008,7 @@ describe('LibrarySurface', () => {
     const glyph = () => screen.getByTestId('library-status-glyph-release-1');
     expect(glyph()).toHaveAccessibleName('Archived');
     expect(glyph()).toHaveAttribute('data-status-glyph', 'canceled');
+    expect(screen.queryByTestId('library-status-hidden-note')).toBeNull();
 
     clickGridView();
 

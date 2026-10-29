@@ -3055,6 +3055,32 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(result["generated"], [])
         self.assertTrue(any(error.startswith("red-before-green:") for error in result["missing"]))
 
+    def test_fenced_headings_do_not_truncate_real_red_evidence(self):
+        body = ("## Red-before-green\n```text\n# runner comment\nFAIL assertion\n```\n"
+                "- Failing command: `node --test scripts/repair.test.mjs`\n\n## Blast radius\nKeep me.\n")
+        self.assertTrue(events.red_section_complete(body))
+
+    def test_fenced_example_is_not_the_real_red_section(self):
+        body = ("## Example\n~~~markdown\n## Red-before-green\n"
+                "- Failing command: `node --test`\n"
+                "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123\n"
+                "~~~\n\n## Summary\nReal body.\n")
+        self.assertFalse(events.red_section_complete(body))
+        updated = events.with_red_section(body, events.red_before_green_block(self.PR))
+        self.assertTrue(updated.startswith(body.rstrip() + "\n\n"))
+        self.assertTrue(events.red_section_complete(updated))
+
+    def test_replacement_consumes_fenced_logs_and_preserves_next_section(self):
+        body = ("## Summary\nKeep me.\n\n## Red-before-green\n"
+                "```text\n# old runner comment\nFAIL stale evidence\n```\n\n"
+                "## Blast radius\nKeep this too.\n")
+        updated = events.with_red_section(body, events.red_before_green_block(self.PR))
+        self.assertNotIn('stale evidence', updated)
+        self.assertNotIn('old runner comment', updated)
+        self.assertIn('## Summary\nKeep me.', updated)
+        self.assertIn('## Blast radius\nKeep this too.', updated)
+        self.assertTrue(events.red_section_complete(updated))
+
     def test_no_red_check_means_no_block(self):
         self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
 
