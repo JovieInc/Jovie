@@ -45,19 +45,9 @@ export const INSTANT_MERCH_COPY = {
           'No merch brief template required. Begin with the idea as it exists in your head.',
       },
       {
-        title: 'Keep the decision yours',
-        description:
-          'Jovie proposes. You select, revise, or stop. The landing page does not promise an automatic launch.',
-      },
-      {
         title: 'Use the profile you already have',
         description:
           'Approved merch can continue through Jovie’s existing profile and fulfillment surfaces.',
-      },
-      {
-        title: 'See the honest state',
-        description:
-          'Each product stays clearly labeled as a concept until you approve it for the next step.',
       },
     ],
   },

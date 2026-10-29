@@ -111,7 +111,7 @@ function HowItWorksSection() {
               <p className='marketing-kicker'>How it works</p>
               {/* ui-casing-allow: marketing display headline */}
               <h2 className='marketing-h2-linear mt-6 max-w-[12ch] text-primary-token'>
-                Three steps to your first follower.
+                Turn the first payment into a follower.
               </h2>
             </div>
             <div className='homepage-section-copy'>
@@ -124,7 +124,7 @@ function HowItWorksSection() {
           </div>
 
           <div className='homepage-section-stack grid grid-cols-1 gap-6 md:grid-cols-3'>
-            {STEPS.map((step, i) => (
+            {STEPS.map(step => (
               <div
                 key={step.title}
                 className='homepage-surface-card relative flex flex-col rounded-[1rem] p-7 text-left'
@@ -132,10 +132,7 @@ function HowItWorksSection() {
                 <div className='flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
                   <step.icon className='h-6 w-6 text-secondary-token' />
                 </div>
-                <span className='mt-5 text-[length:var(--linear-label-size)] text-tertiary-token'>
-                  Step {i + 1}
-                </span>
-                <h3 className='mt-2 text-lg font-medium tracking-tight text-primary-token'>
+                <h3 className='mt-5 text-lg font-medium tracking-tight text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
