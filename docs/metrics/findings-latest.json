@@ -1,0 +1,247 @@
+{
+  "schema": "jovie.findings-latest/v1",
+  "observedAt": "2026-10-29T18:21:59.244Z",
+  "sources": {
+    "code-scanning": {
+      "status": "ok"
+    },
+    "dependabot": {
+      "status": "ok"
+    },
+    "secret-scanning": {
+      "status": "ok"
+    },
+    "sonarcloud": {
+      "status": "ok"
+    },
+    "coverage": {
+      "status": "ok"
+    },
+    "mutation": {
+      "status": "ok"
+    },
+    "knip": {
+      "status": "not_measured",
+      "reason": "docs/metrics/waste-latest.json not on main yet"
+    }
+  },
+  "openBySource": {
+    "code-scanning": 678,
+    "dependabot": 3,
+    "sonarcloud": 6192,
+    "coverage": 1
+  },
+  "openBySeverity": {
+    "low": 5779,
+    "medium": 850,
+    "high": 114,
+    "info": 126,
+    "critical": 5
+  },
+  "bySourceSeverity": {
+    "code-scanning": {
+      "low": 341,
+      "medium": 103,
+      "high": 103,
+      "info": 126,
+      "critical": 5
+    },
+    "dependabot": {
+      "medium": 1,
+      "low": 1,
+      "high": 1
+    },
+    "sonarcloud": {
+      "high": 9,
+      "medium": 746,
+      "low": 5437
+    },
+    "coverage": {
+      "high": 1
+    }
+  },
+  "sloBreaches": 35,
+  "sloBreachList": [
+    {
+      "fingerprint": "fnd-code-scanning-0fe458928e",
+      "source": "code-scanning",
+      "severity": "medium"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-e78e99527f",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-d42c9efd15",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-beac4fe2d1",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-aad7da502b",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-fa2a3c0be4",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-8f632bc1e0",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-9cf2b77b38",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-c6ed2da691",
+      "source": "code-scanning",
+      "severity": "critical"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-64e8c0adfd",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-347272f805",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-d3d6cbf14d",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-b157204b8b",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-0072b2d196",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-96b167f731",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-2f4ec2b6c3",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-ca2599d7b6",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-84f22d89eb",
+      "source": "code-scanning",
+      "severity": "medium"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-f42851d495",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-f6c1e8b43c",
+      "source": "code-scanning",
+      "severity": "critical"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-40e5ec799c",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-dd8d0a09cd",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-8b9ec397e7",
+      "source": "code-scanning",
+      "severity": "critical"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-d96724dc0a",
+      "source": "code-scanning",
+      "severity": "medium"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-11f4170090",
+      "source": "code-scanning",
+      "severity": "medium"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-5e389676cd",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-bcb621a6c2",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-7368cb9a64",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-0fc31f59d4",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-f654d09b7f",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-7ce7d0144c",
+      "source": "code-scanning",
+      "severity": "medium"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-900c76df6d",
+      "source": "code-scanning",
+      "severity": "medium"
+    },
+    {
+      "fingerprint": "fnd-code-scanning-7f6c3fee74",
+      "source": "code-scanning",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "secadv-ghsa-86w9-cpqp-85rv-node-forge",
+      "source": "dependabot",
+      "severity": "high"
+    },
+    {
+      "fingerprint": "fnd-coverage-174c22a62c",
+      "source": "coverage",
+      "severity": "high"
+    }
+  ],
+  "timeToRemediationHours": {
+    "n": 1155,
+    "p50": 215.53305555555556,
+    "p95": 1936.3327777777777
+  },
+  "blindSources": []
+}

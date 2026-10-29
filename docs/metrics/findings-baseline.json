@@ -1,0 +1,73 @@
+{
+  "schema": "jovie.findings-baseline/v1",
+  "note": "Open findings per source (occurrence counts). lock_down via ratchet-core: new findings may not raise a count; the loop lowers improved counts. Never raise a baseline: fix the finding.",
+  "updatedAt": "2026-10-29T18:21:59.244Z",
+  "ratchets": {
+    "sonarcloud": {
+      "schemaVersion": 1,
+      "dimension": "open-findings-sonarcloud",
+      "direction": "lock_down",
+      "baseline": 6192,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "code-scanning": {
+      "schemaVersion": 1,
+      "dimension": "open-findings-code-scanning",
+      "direction": "lock_down",
+      "baseline": 678,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "dependabot": {
+      "schemaVersion": 1,
+      "dimension": "open-findings-dependabot",
+      "direction": "lock_down",
+      "baseline": 3,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "secret-scanning": {
+      "schemaVersion": 1,
+      "dimension": "open-findings-secret-scanning",
+      "direction": "lock_down",
+      "baseline": 0,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "coverage": {
+      "schemaVersion": 1,
+      "dimension": "open-findings-coverage",
+      "direction": "lock_down",
+      "baseline": 1,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "mutation": {
+      "schemaVersion": 1,
+      "dimension": "open-findings-mutation",
+      "direction": "lock_down",
+      "baseline": 0,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    }
+  }
+}

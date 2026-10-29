@@ -83,6 +83,11 @@ CLOCKS = (
     # fails its ratchet step when an advisory ages past its SLA. Clock is its only backstop.
     Clock("securityAdvisory", "security-advisory-loop.yml", "clock_security_advisory_loop", 4 * 3600,
           "security-advisory-clock.json", frozenset({"push"}), github_cron=False),
+    # Backstop for the event-driven findings loop (scanner runs on main trigger it directly;
+    # alert webhooks arrive as security_alert). Push events are not heartbeats.
+    Clock("findingsLoop", "findings-loop.yml", "clock_findings_loop", 6 * 3600,
+          "findings-loop-clock.json", github_cron=False,
+          ignored_events=frozenset({"push", "workflow_run"})),
     # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).
     Clock("summerCanary", "ovie-summer-canary.yml", "clock_summer_canary", 3600,
           "summer-canary-clock.json", github_cron=False),
