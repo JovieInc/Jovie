@@ -132,7 +132,7 @@ function HowItWorksSection() {
                 <div className='flex h-11 w-11 items-center justify-center rounded-xl border border-subtle bg-surface-1'>
                   <step.icon className='h-6 w-6 text-secondary-token' />
                 </div>
-                <h3 className='mt-5 text-lg font-medium tracking-tight text-primary-token'>
+                <h3 className='text-balance mt-5 text-lg font-medium tracking-tight text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-3 text-sm leading-relaxed text-secondary-token'>
