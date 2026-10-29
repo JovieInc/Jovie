@@ -391,6 +391,26 @@ describe('OnboardingTurnstile (minimal presentation)', () => {
     ).toBe(true);
   });
 
+  it('does not restart an in-flight token mint when the visitor sends early', async () => {
+    vi.stubEnv('NODE_ENV', 'test');
+    vi.stubEnv('NEXT_PUBLIC_TURNSTILE_SITE_KEY', 'site-key');
+    const { render: renderMock, remove: removeMock } = mockTurnstile();
+    const props = { onToken: vi.fn(), onStateChange: vi.fn() };
+
+    const { rerender } = render(<OnboardingTurnstile {...props} />);
+    await waitFor(() => expect(renderMock).toHaveBeenCalledTimes(1));
+
+    rerender(
+      <OnboardingTurnstile
+        {...props}
+        instruction='One quick check before we send'
+      />
+    );
+
+    expect(renderMock).toHaveBeenCalledTimes(1);
+    expect(removeMock).not.toHaveBeenCalled();
+  });
+
   it('retries a stalled silent execute pass', async () => {
     vi.useFakeTimers();
     try {

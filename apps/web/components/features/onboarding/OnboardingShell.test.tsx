@@ -6,6 +6,9 @@ import {
   OnboardingShell,
 } from './OnboardingShell';
 
+const analyticsMocks = vi.hoisted(() => ({ track: vi.fn() }));
+vi.mock('@/lib/analytics', () => ({ track: analyticsMocks.track }));
+
 vi.mock('@/components/organisms/AppShellFrame', () => ({
   AppShellFrame: ({
     main,
@@ -117,6 +120,27 @@ const STARTED_CONVERSATION = [
 ];
 
 describe('OnboardingShell status', () => {
+  it('measures the invisible security check: ready once, failures by status', () => {
+    analyticsMocks.track.mockClear();
+    render(
+      <OnboardingShell
+        sessionLabel='pending'
+        isSignedIn={false}
+        onRestart={vi.fn()}
+      />
+    );
+    act(() => turnstileProps.current?.onStateChange({ status: 'verified' }));
+    act(() => turnstileProps.current?.onStateChange({ status: 'verified' }));
+    act(() => turnstileProps.current?.onStateChange({ status: 'unsupported' }));
+
+    const events = analyticsMocks.track.mock.calls.map(([event]) => event);
+    expect(events.filter(e => e === 'security_check_ready')).toHaveLength(1);
+    expect(analyticsMocks.track).toHaveBeenCalledWith('security_check_failed', {
+      surface: 'start_chat',
+      reason: 'unsupported',
+    });
+  });
+
   it('does not offer Start Over on a first visit with nothing to discard', () => {
     render(
       <OnboardingShell

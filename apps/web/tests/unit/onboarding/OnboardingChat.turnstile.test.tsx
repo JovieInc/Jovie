@@ -798,6 +798,22 @@ describe('OnboardingChat Turnstile gating', () => {
     expect(onConversationActivity).toHaveBeenCalledTimes(3);
   });
 
+  it('tracks composer engagement once, on the first typed character', () => {
+    analyticsMocks.track.mockClear();
+    render(<TurnstileHarness initialToken='token-1' />);
+    const input = screen.getByLabelText('Chat Message Input');
+
+    fireEvent.change(input, { target: { value: '' } });
+    fireEvent.change(input, { target: { value: 'I' } });
+    fireEvent.change(input, { target: { value: 'I am' } });
+
+    expect(
+      analyticsMocks.track.mock.calls.filter(
+        ([event]) => event === 'composer_engaged'
+      )
+    ).toHaveLength(1);
+  });
+
   it('tracks chat start once when a rejected first turn is retried', () => {
     render(
       <TurnstileHarness initialToken='token-1' resetTokenOnRejected={false} />

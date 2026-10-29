@@ -248,6 +248,19 @@ describe('OnboardingChat empty intro', () => {
     expect(screen.queryByTestId('onboarding-starter-suggestions')).toBeNull();
   });
 
+  it('does not count a blank /start visit as composer engagement', async () => {
+    const { track } = await import('@/lib/analytics');
+    vi.mocked(track).mockClear();
+    render(
+      <OnboardingChat turnstileToken='token' turnstileStatus='verified' />
+    );
+
+    expect(track).not.toHaveBeenCalledWith(
+      'composer_engaged',
+      expect.anything()
+    );
+  });
+
   it('keeps a validated starter as a draft while verification is pending', () => {
     process.env.NODE_ENV = 'test';
     render(
