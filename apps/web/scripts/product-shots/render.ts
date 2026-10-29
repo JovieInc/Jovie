@@ -22,6 +22,14 @@ import {
   type ProductShotSpec,
 } from '../../lib/screenshots/product-shots';
 import { SCREENSHOT_VIEWPORTS } from '../../lib/screenshots/registry';
+import {
+  oversizedFormats,
+  type PageBox,
+  parseRenderArgs,
+  type ShotManifestEntry,
+  selectShots,
+  unionClip,
+} from './plan';
 import { hashShotSources, hashShotSpec } from './source-hash.mjs';
 
 const WEB_ROOT = path.resolve(
@@ -34,58 +42,19 @@ const MANIFEST_PATH = path.join(
   WEB_ROOT,
   'lib/screenshots/product-shots.manifest.json'
 );
-/** Per-file ceiling. A shot above it is a crop that shows too much. */
-export const PRODUCT_SHOT_MAX_BYTES = 120 * 1024;
-
-interface ManifestEntry {
-  width: number;
-  height: number;
-  sourceHash: string;
-  specHash: string;
-  renderedAt: string;
-  sources: readonly string[];
-  bytes: { avif: number; webp: number };
-}
+type ManifestEntry = ShotManifestEntry;
 
 interface Manifest {
   schema: 'jovie.product-shots/v1';
   shots: Record<string, ManifestEntry>;
 }
 
-function parseArgs(argv: readonly string[]) {
-  const args = {
-    baseUrl: process.env.BASE_URL ?? 'http://localhost:3100',
-    only: null as Set<string> | null,
-    stale: false,
-  };
-  for (let i = 0; i < argv.length; i += 1) {
-    const flag = argv[i];
-    if (flag === '--base-url') args.baseUrl = argv[++i] ?? args.baseUrl;
-    else if (flag === '--only')
-      args.only = new Set((argv[++i] ?? '').split(','));
-    else if (flag === '--stale') args.stale = true;
-    else throw new Error(`Unknown flag: ${flag}`);
-  }
-  return args;
-}
-
 function readManifest(): Manifest {
   return JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Manifest;
 }
 
-export function isShotStale(
-  spec: ProductShotSpec,
-  entry: ManifestEntry | undefined
-): boolean {
-  if (!entry) return true;
-  return (
-    entry.sourceHash !== hashShotSources(REPO_ROOT, spec.sources) ||
-    entry.specHash !== hashShotSpec(spec)
-  );
-}
-
 async function cropBox(page: Page, spec: ProductShotSpec) {
-  const boxes = [];
+  const boxes: PageBox[] = [];
   for (const selector of spec.crop) {
     const target = page.locator(selector).first();
     await target.waitFor({ state: 'visible', timeout: 30_000 });
@@ -107,21 +76,7 @@ async function cropBox(page: Page, spec: ProductShotSpec) {
     width: document.documentElement.scrollWidth,
     height: document.documentElement.scrollHeight,
   }));
-  const pad = spec.padding ?? 0;
-  const x = Math.max(0, Math.floor(Math.min(...boxes.map(b => b.left)) - pad));
-  const y = Math.max(0, Math.floor(Math.min(...boxes.map(b => b.top)) - pad));
-  const right = Math.min(
-    pageSize.width,
-    Math.ceil(Math.max(...boxes.map(b => b.right)) + pad)
-  );
-  const bottom = Math.min(
-    pageSize.height,
-    Math.ceil(Math.max(...boxes.map(b => b.bottom)) + pad)
-  );
-  const height = spec.maxHeight
-    ? Math.min(bottom - y, spec.maxHeight)
-    : bottom - y;
-  return { x, y, width: right - x, height };
+  return unionClip(boxes, pageSize, spec.padding ?? 0, spec.maxHeight);
 }
 
 async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
@@ -163,13 +118,8 @@ async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
     avif: statSync(avifPath).size,
     webp: statSync(webpPath).size,
   };
-  for (const [format, size] of Object.entries(bytes)) {
-    if (size > PRODUCT_SHOT_MAX_BYTES) {
-      throw new Error(
-        `${spec.id}.${format} is ${size} bytes (> ${PRODUCT_SHOT_MAX_BYTES}); tighten the crop`
-      );
-    }
-  }
+  const oversized = oversizedFormats(spec.id, bytes);
+  if (oversized.length > 0) throw new Error(oversized.join('; '));
   return {
     width: info.width,
     height: info.height,
@@ -182,13 +132,14 @@ async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv.slice(2));
+  const args = parseRenderArgs(process.argv.slice(2), process.env);
   const manifest = readManifest();
-  const shots = (PRODUCT_SHOTS as readonly ProductShotSpec[]).filter(spec => {
-    if (args.only && !args.only.has(spec.id)) return false;
-    if (args.stale) return isShotStale(spec, manifest.shots[spec.id]);
-    return true;
-  });
+  const shots = selectShots(
+    REPO_ROOT,
+    PRODUCT_SHOTS as readonly ProductShotSpec[],
+    manifest.shots,
+    args
+  );
   if (shots.length === 0) {
     process.stdout.write('[shots] nothing to render\n');
     return;
