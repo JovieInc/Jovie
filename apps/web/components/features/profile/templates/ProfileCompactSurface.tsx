@@ -896,6 +896,7 @@ export function ProfileCompactSurface({
                   variant='linear'
                   showCTA={false}
                   size='sm'
+                  mark='brand'
                 />
               </div>
             ) : null}
