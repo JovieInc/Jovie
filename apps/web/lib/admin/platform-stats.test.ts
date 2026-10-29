@@ -11,18 +11,21 @@ const hoisted = vi.hoisted(() => ({
   executes: [] as unknown[],
 }));
 
-function chain(result: unknown[]) {
-  const node: Promise<unknown[]> & Record<string, unknown> = Object.assign(
-    Promise.resolve(result),
-    {
-      from: () => node,
-      innerJoin: () => node,
-      where: (clause: unknown) => {
-        hoisted.wheres.push(clause);
-        return node;
-      },
-    }
-  );
+interface QueryDouble extends Promise<unknown[]> {
+  from: () => QueryDouble;
+  innerJoin: () => QueryDouble;
+  where: (clause: unknown) => QueryDouble;
+}
+
+function chain(result: unknown[]): QueryDouble {
+  const node: QueryDouble = Object.assign(Promise.resolve(result), {
+    from: () => node,
+    innerJoin: () => node,
+    where: (clause: unknown) => {
+      hoisted.wheres.push(clause);
+      return node;
+    },
+  });
   return node;
 }
 
