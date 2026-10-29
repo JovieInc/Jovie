@@ -432,13 +432,8 @@ export interface WaitlistInviteGate {
  */
 export async function readWaitlistInviteGates(
   entryIds: readonly string[]
-): Promise<
-  ReadonlyMap<
-    string,
-    { readonly profileId: string; readonly certified: boolean }
-  >
-> {
-  const gates = new Map<string, { profileId: string; certified: boolean }>();
+): Promise<ReadonlyMap<string, WaitlistInviteGate>> {
+  const gates = new Map<string, WaitlistInviteGate>();
   if (entryIds.length === 0) return gates;
   const profiles = await db
     .select({
