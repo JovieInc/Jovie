@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import PricingPage from '@/app/(marketing)/pricing/page';
@@ -103,19 +103,22 @@ describe('PricingRecipeBody', () => {
     expect(screen.getByTestId('comparison-slot')).toBeVisible();
     expect(screen.getByTestId('audit-offer-slot')).toBeVisible();
     expect(screen.getByText(expectedRequestAccessCopy)).toBeVisible();
+    // Hero owns the free claim; plan cards own Free and Enterprise; the
+    // closing section carries one action instead of repeating all three.
     expect(
-      screen.getAllByRole('link', { name: 'Claim my free profile' })[0]
+      screen.getByRole('link', { name: 'Claim my free profile' })
     ).toBeVisible();
+    const finalSection = screen.getByTestId('marketing-section-cta');
+    expect(within(finalSection).getAllByRole('link')).toHaveLength(1);
     expect(
-      screen.getAllByRole('link', { name: 'Claim my free profile' })[1]
-    ).toBeVisible();
-    expect(
-      screen.getByRole('link', { name: 'Start Artist Presence, $12/mo' })
+      within(finalSection).getByRole('link', {
+        name: 'Start Artist Presence, $12/mo',
+      })
     ).toHaveAttribute('href', '/claim?plan=pro');
-    expect(screen.getByRole('link', { name: 'Contact sales' })).toHaveAttribute(
-      'href',
-      'mailto:support@jov.ie'
-    );
+    expect(screen.queryByRole('link', { name: 'Contact sales' })).toBeNull();
+    expect(
+      screen.queryByText('Public Jovie profile and audience capture.')
+    ).toBeNull();
   });
 
   it('keeps pricing and actions focal without the rejected particle or shader asset', () => {
@@ -191,7 +194,7 @@ describe('PricingRecipeBody', () => {
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"
     );
     expect(routeSource).toContain(
-      'comparisonChart={<PricingComparisonChart />}'
+      'comparisonChart={<PricingComparisonChart categories={publicComparison} />}'
     );
     expect(routeSource).not.toContain("headline='Pricing'");
 
@@ -201,7 +204,7 @@ describe('PricingRecipeBody', () => {
       "<MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />"
     );
     expect(storySource).toContain(
-      'comparisonChart={<PricingComparisonChart />}'
+      'comparisonChart={<PricingComparisonChart categories={publicComparison} />}'
     );
 
     expect(bodySource).not.toContain('FaqSection');

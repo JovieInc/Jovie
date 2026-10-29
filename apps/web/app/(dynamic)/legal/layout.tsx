@@ -1,16 +1,32 @@
+import { MarketingContainer } from '@/components/marketing';
+import { PublicPageShell } from '@/components/site/PublicPageShell';
+
 export const revalidate = false;
 
 /**
- * Pass-through segment layout. The public shell (header/footer) moved to
- * per-route layouts so /legal/privacy and /legal/terms can render the full
- * docked MarketingHeader and a route hero while /legal/cookies and
- * /legal/dmca keep the existing minimal shell unchanged
- * (ad-hoc marketing routes pass, Tim direction 2026-09-26).
+ * One shell for every legal document (/legal/privacy, /legal/terms,
+ * /legal/cookies, /legal/dmca): the full docked marketing header, the
+ * expanded footer, and no route hero. The document's own H1 (LegalHero) is
+ * the single title and focal point; a texture hero above it repeated the
+ * title over off-palette wallpaper (2026-10-29 marketing critic sweep).
  */
 export default function LegalLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <>{children}</>;
+  return (
+    <PublicPageShell
+      className='public-legal-shell bg-base text-primary-token'
+      footerVariant='expanded'
+      logoSize='sm'
+    >
+      <MarketingContainer
+        className='public-legal-content py-16 sm:py-20'
+        width='page'
+      >
+        {children}
+      </MarketingContainer>
+    </PublicPageShell>
+  );
 }

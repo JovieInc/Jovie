@@ -1,11 +1,11 @@
 'use client';
 
-import { Button, Card } from '@jovie/ui';
-import type { LucideIcon } from 'lucide-react';
-import { ArrowRight, BookOpen, LifeBuoy } from 'lucide-react';
+import { Button } from '@jovie/ui';
+import { ArrowRight } from 'lucide-react';
 import { useEffect } from 'react';
 import { MarketingContainer } from '@/components/marketing';
 import { DOCS_URL, SUPPORT_EMAIL } from '@/constants/domains';
+import { SUPPORT_PAGE_COPY } from '@/data/supportCopy';
 import { page, track } from '@/lib/analytics';
 import { trackHelpCenterEscalationLanding } from '@/lib/tracking/help-center-client';
 
@@ -14,31 +14,21 @@ const CONTACT_URL = `${DOCS_URL}/contact`;
 
 const CHANNELS = [
   {
-    title: 'Help Center',
-    description: 'Guides, troubleshooting, and walkthroughs.',
+    ...SUPPORT_PAGE_COPY.channels.helpCenter,
     href: HELP_CENTER_URL,
     event: 'Support Help Center Clicked',
-    cta: 'Browse the Help Center',
-    icon: BookOpen,
   },
   {
-    title: 'Contact Support',
-    description:
-      'Email our team with the page and search context already attached.',
+    ...SUPPORT_PAGE_COPY.channels.contact,
     href: `${CONTACT_URL}?from=/support`,
     event: 'Support Contact Clicked',
-    cta: 'Contact support',
-    icon: LifeBuoy,
   },
-] as const satisfies ReadonlyArray<{
-  readonly title: string;
-  readonly description: string;
-  readonly href: string;
-  readonly event: string;
-  readonly cta: string;
-  readonly icon: LucideIcon;
-}>;
+] as const;
 
+/**
+ * The two self-serve paths as one quiet list: title, one line, one action.
+ * No icon tiles or cards (matte, near-monochrome canon).
+ */
 export function SupportChannels() {
   useEffect(() => {
     page('Support Page', {
@@ -53,47 +43,49 @@ export function SupportChannels() {
         data-testid='marketing-section-content-prose'
         data-marketing-variant='article-body'
         data-marketing-owner='apps/web/app/(marketing)/support/SupportContent.tsx'
+        aria-labelledby='support-channels-heading'
       >
-        <h2 className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'>
-          How Can We Help?
+        <h2
+          id='support-channels-heading'
+          className='text-2xl font-semibold tracking-tight text-primary-token text-balance line-clamp-2'
+        >
+          {SUPPORT_PAGE_COPY.channels.title}
         </h2>
-        <div className='mt-6 grid gap-6 sm:grid-cols-2'>
-          {CHANNELS.map(channel => {
-            const Icon = channel.icon;
-            return (
-              <Card asChild key={channel.title} className='p-6'>
-                <article>
-                  <Icon className='h-5 w-5 text-accent' aria-hidden='true' />
-                  <h3 className='mt-4 text-base font-medium text-primary-token'>
-                    {channel.title}
-                  </h3>
-                  <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
-                    {channel.description}
-                  </p>
-                  <Button
-                    asChild
-                    variant='ghost'
-                    size='marketing'
-                    className='mt-3 gap-1.5'
-                    onClick={() =>
-                      track(channel.event, { source: 'support_page' })
-                    }
-                  >
-                    <a href={channel.href}>
-                      <span>{channel.cta}</span>
-                      <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
-                    </a>
-                  </Button>
-                </article>
-              </Card>
-            );
-          })}
-        </div>
+        <ul className='mt-6 border-t border-subtle'>
+          {CHANNELS.map(channel => (
+            <li
+              key={channel.title}
+              className='flex flex-col gap-3 border-b border-subtle py-6 sm:flex-row sm:items-center sm:justify-between sm:gap-8'
+            >
+              <div className='min-w-0'>
+                <h3 className='text-base font-medium text-primary-token text-balance'>
+                  {channel.title}
+                </h3>
+                <p className='mt-1 text-sm leading-relaxed text-secondary-token text-pretty'>
+                  {channel.description}
+                </p>
+              </div>
+              <Button
+                asChild
+                variant='ghost'
+                size='marketing'
+                className='shrink-0 gap-1.5 self-start max-sm:-ml-2.5 sm:-mr-2.5 sm:self-center'
+                onClick={() => track(channel.event, { source: 'support_page' })}
+              >
+                <a href={channel.href}>
+                  <span>{channel.cta}</span>
+                  <ArrowRight className='h-3.5 w-3.5' aria-hidden='true' />
+                </a>
+              </Button>
+            </li>
+          ))}
+        </ul>
       </section>
     </MarketingContainer>
   );
 }
 
+/** Direct email fallback: a distinct path, not a repeat of the contact form. */
 export function SupportCta() {
   return (
     <MarketingContainer width='prose' className='pb-24'>
@@ -101,43 +93,31 @@ export function SupportCta() {
         data-testid='marketing-section-cta'
         data-marketing-variant='final-single-claim'
         data-marketing-owner='apps/web/app/(marketing)/support/SupportContent.tsx'
+        aria-labelledby='support-email-heading'
       >
-        <h2 className='text-2xl font-semibold tracking-tight text-primary-token line-clamp-2'>
-          Still Need Help?
+        <h2
+          id='support-email-heading'
+          className='text-2xl font-semibold tracking-tight text-primary-token text-balance line-clamp-2'
+        >
+          {SUPPORT_PAGE_COPY.email.title}
         </h2>
-        <p className='mt-4 text-base leading-relaxed text-secondary-token'>
-          If the Help Center did not solve it, contact our team directly.
+        <p className='mt-4 text-base leading-relaxed text-secondary-token text-pretty'>
+          {SUPPORT_PAGE_COPY.email.body}
         </p>
         <Button
           asChild
           variant='secondary'
           size='marketing'
           className='mt-6'
-          aria-label='Contact Support With Page Context Attached'
           onClick={() =>
-            track('Support Contact Clicked', {
+            track('Support Email Clicked', {
+              email: SUPPORT_EMAIL,
               source: 'support_page_cta',
             })
           }
         >
-          <a href={`${CONTACT_URL}?from=/support`}>Contact Support</a>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
         </Button>
-        <p className='mt-4 text-sm leading-relaxed text-secondary-token'>
-          You can also email{' '}
-          <a
-            href={`mailto:${SUPPORT_EMAIL}`}
-            className='text-primary-token underline'
-            onClick={() =>
-              track('Support Email Clicked', {
-                email: SUPPORT_EMAIL,
-                source: 'support_page_cta',
-              })
-            }
-          >
-            {SUPPORT_EMAIL}
-          </a>{' '}
-          directly.
-        </p>
       </section>
     </MarketingContainer>
   );
