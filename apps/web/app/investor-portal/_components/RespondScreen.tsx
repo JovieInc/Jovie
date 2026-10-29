@@ -21,10 +21,10 @@ export function RespondScreen({
   return (
     <div className='dark flex min-h-screen items-center justify-center bg-(--color-bg-base)'>
       <div className='max-w-md text-center'>
-        <span className='mb-6 block text-[length:var(--text-lg)] font-bold tracking-tight text-(--color-text-primary-token)'>
+        <span className='mb-6 block text-(length:--text-lg) font-bold tracking-tight text-(--color-text-primary-token)'>
           Jovie
         </span>
-        <h1 className='text-[length:var(--text-2xl)] font-(--font-weight-bold) text-(--color-text-primary-token)'>
+        <h1 className='text-balance text-(length:--text-2xl) font-(--font-weight-bold) text-(--color-text-primary-token)'>
           {/* ui-casing-allow: marketing sentence-style copy */}
           {title}
         </h1>
