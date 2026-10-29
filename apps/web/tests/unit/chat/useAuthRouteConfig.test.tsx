@@ -14,6 +14,13 @@ vi.mock('next/navigation', () => ({
 }));
 
 describe('useAuthRouteConfig', () => {
+  it('uses Inbox for its separate permanent destination', () => {
+    mockUsePathname.mockReturnValue(APP_ROUTES.INBOX);
+    const { result } = renderHook(() => useAuthRouteConfig());
+    expect(result.current.breadcrumbs).toEqual([
+      { label: 'Inbox', href: APP_ROUTES.INBOX },
+    ]);
+  });
   beforeEach(() => {
     mockUseSearchParams.mockReturnValue(new URLSearchParams());
   });

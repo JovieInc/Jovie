@@ -1,8 +1,7 @@
 'use client';
 
-import { Bell } from 'lucide-react';
 import Link from 'next/link';
-import { APP_ROUTES } from '@/constants/routes';
+import { inboxNavItem } from '@/components/features/dashboard/dashboard-nav/config';
 import type { InboxNavigationAvailability } from '@/lib/inbox/navigation-availability';
 import { useRuntimeUpdate } from './RuntimeUpdateProvider';
 import { Tooltip } from './Tooltip';
@@ -26,7 +25,7 @@ export function SidebarInboxLink({
   return (
     <Tooltip label={accessibleLabel} side='bottom'>
       <Link
-        href={APP_ROUTES.DASHBOARD}
+        href={inboxNavItem.href}
         prefetch={false}
         aria-label={accessibleLabel}
         data-inbox-attention={
@@ -34,7 +33,7 @@ export function SidebarInboxLink({
         }
         className='focus-ring-themed relative inline-flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-item-foreground hover:bg-sidebar-accent focus-visible:bg-sidebar-accent'
       >
-        <Bell
+        <inboxNavItem.icon
           className='size-(--app-shell-sidebar-icon-size)'
           aria-hidden='true'
         />

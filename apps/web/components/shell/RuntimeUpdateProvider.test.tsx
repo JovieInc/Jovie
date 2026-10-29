@@ -83,7 +83,7 @@ describe('updates in the central Inbox', () => {
     });
     expect(
       getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    ).toHaveAttribute('href', APP_ROUTES.INBOX);
   });
 
   it('does not show a notification without a real update', () => {

@@ -63,7 +63,7 @@ describe('DashboardNav route warming', () => {
     resetDashboardNavTestMocks();
   });
 
-  it('leaves home attention to the brand row and retains destinations', () => {
+  it('leaves Inbox attention to the brand row and retains Home', () => {
     const label = 'Inbox';
     const destinations = () =>
       screen.getAllByRole('link').map(link => ({
@@ -75,7 +75,7 @@ describe('DashboardNav route warming', () => {
     });
     const attention = document.querySelector('[data-inbox-attention]');
     expect(attention).toHaveAccessibleName(label);
-    expect(attention).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    expect(attention).toHaveAttribute('href', APP_ROUTES.INBOX);
     const retained = destinations();
     const attentionIndex = screen
       .getAllByRole('link')
@@ -114,7 +114,7 @@ describe('DashboardNav route warming', () => {
         'false'
       );
     }
-    const homeLinks = screen.getAllByRole('link', { name: 'Inbox' });
+    const homeLinks = screen.getAllByRole('link', { name: /^(Home|Inbox)$/ });
     expect(homeLinks).toHaveLength(2);
     for (const link of homeLinks) {
       expect(link).toHaveAttribute('data-prefetch', 'false');
@@ -240,7 +240,7 @@ describe('DashboardNav route warming', () => {
     });
     expect(
       pending.getByRole('link', { name: 'Inbox — App Update Available' })
-    ).toHaveAttribute('href', APP_ROUTES.DASHBOARD);
+    ).toHaveAttribute('href', APP_ROUTES.INBOX);
     expect(
       pending.getByRole('status', { name: '3 pending items' })
     ).toHaveTextContent('3');
@@ -282,7 +282,7 @@ describe('DashboardNav route warming', () => {
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
-  it('labels the header bell Inbox without a rollout override', () => {
+  it('labels the permanent header destination Inbox without a rollout override', () => {
     const view = renderDashboardNav({
       renderFn: render,
     });

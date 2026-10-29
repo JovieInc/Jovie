@@ -416,6 +416,20 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     );
   });
 
+  it('registers the dedicated Inbox without losing Home or protected revenue coverage', () => {
+    for (const [id, source] of [
+      ['web.app-root', 'apps/web/app/app/(shell)/page.tsx'],
+      ['web.inbox', 'apps/web/app/app/(shell)/inbox/page.tsx'],
+    ]) {
+      const screen = SCREEN_REGISTRY.find(entry => entry.id === id);
+      assert.ok(screen);
+      assert.ok(screen.sources.includes(source));
+      assert.deepEqual(screen.viewports, ['desktop', 'mobile']);
+      assert.equal(kindOf(source), 'registered');
+      assert.equal(PROTECTED_REVENUE_SCREEN_SOURCES[source], true);
+    }
+  });
+
   it('registers live provider-host layouts and retires the deleted start loading screen', () => {
     assert.equal(
       kindOf('apps/web/app/(dynamic)/start/layout.tsx'),
@@ -610,6 +624,7 @@ describe('JOV-INV-018 screen-certification/v2', () => {
     assert.deepEqual(protectedSources(), [
       'apps/web/app/(dynamic)/start/page.tsx',
       'apps/web/app/app/(shell)/page.tsx',
+      'apps/web/app/app/(shell)/inbox/page.tsx',
       'apps/web/app/app/(shell)/jovie-work/page.tsx',
       'apps/web/app/app/(shell)/settings/billing/page.tsx',
       'apps/web/app/onboarding/checkout/page.tsx',

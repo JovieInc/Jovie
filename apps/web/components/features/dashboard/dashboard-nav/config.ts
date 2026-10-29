@@ -33,10 +33,10 @@ import type { NavItem } from './types';
 // Shared navigation items – single source of truth for sidebar + mobile
 // ---------------------------------------------------------------------------
 
-/** Named Inbox home. `/app` renders the opportunity card stack. */
+/** Inbox attention is separate from the Home destination. */
 export const inboxNavItem: NavItem = {
   name: 'Inbox',
-  href: APP_ROUTES.DASHBOARD,
+  href: APP_ROUTES.INBOX,
   id: 'inbox',
   icon: Inbox,
   iconName: 'Inbox',
@@ -56,7 +56,7 @@ export const chatNavItem: NavItem = {
 };
 
 export const homeNavItem: NavItem = {
-  name: 'Inbox',
+  name: 'Home',
   href: APP_ROUTES.DASHBOARD,
   id: 'home',
   icon: Home,

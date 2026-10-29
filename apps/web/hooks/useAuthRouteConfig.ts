@@ -4,6 +4,10 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { useMemo } from 'react';
 
 import {
+  homeNavItem,
+  inboxNavItem,
+} from '@/components/features/dashboard/dashboard-nav/config';
+import {
   getAdminGrowthViewLabel,
   getAdminPeopleViewLabel,
   isAdminGrowthView,
@@ -84,6 +88,12 @@ export function useAuthRouteConfig(
         },
       ];
     }
+
+    const destination = [homeNavItem, inboxNavItem].find(
+      item => item.href === pathname
+    );
+    if (destination)
+      return [{ label: destination.name, href: destination.href }];
 
     const parts = pathname.split('/').filter(Boolean);
 

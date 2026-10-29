@@ -86,6 +86,12 @@ export const APP_SCREEN_CANVAS_EXCEPTIONS: Readonly<
     component: 'PageShell',
     enclosingFunction: 'OpportunityInboxPageClient',
   }),
+  'apps/web/app/app/(shell)/inbox/page.tsx': screenOwned({
+    source:
+      'apps/web/components/features/opportunity-inbox/OpportunityInboxPageClient.tsx',
+    component: 'PageShell',
+    enclosingFunction: 'OpportunityInboxPageClient',
+  }),
   // Shell-owned: frame='none', but the calendar grid mounts the
   // system-b-calendar-panel module surface on the shell canvas.
   'apps/web/app/app/(shell)/calendar/page.tsx': {

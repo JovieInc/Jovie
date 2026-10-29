@@ -507,7 +507,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(screen.queryByRole('textbox', { name: 'Notes' })).toBeNull();
   });
 
-  it('renders the inbox feed when cards are present', () => {
+  it('renders the permanent opportunity stack when cards are present', () => {
     render(
       <OpportunityInboxPageClient
         inbox={{
@@ -828,7 +828,7 @@ describe('OpportunityInboxPageClient', () => {
     expect(newSong).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('removes a card optimistically after approve', () => {
+  it('removes a card optimistically after approve', async () => {
     mutateMock.mockImplementation((_id, options) => {
       options?.onSuccess?.();
     });
@@ -860,6 +860,10 @@ describe('OpportunityInboxPageClient', () => {
     expect(
       screen.getByTestId('opportunity-inbox-empty-state')
     ).toBeInTheDocument();
+    expect(mutateMock).toHaveBeenCalledWith(
+      'card-1',
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
   });
 
   it('returns focus to the active filter after clearing its stack', async () => {

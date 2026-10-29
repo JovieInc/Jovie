@@ -189,6 +189,7 @@ export const RETAINED_SWEEP_WORKFLOWS = Object.freeze([
  * @typedef {
  *   | 'apps/web/app/(dynamic)/start/page.tsx'
  *   | 'apps/web/app/app/(shell)/page.tsx'
+ *   | 'apps/web/app/app/(shell)/inbox/page.tsx'
  *   | 'apps/web/app/app/(shell)/jovie-work/page.tsx'
  *   | 'apps/web/app/app/(shell)/settings/billing/page.tsx'
  *   | 'apps/web/app/onboarding/checkout/page.tsx'
@@ -200,6 +201,7 @@ export const RETAINED_SWEEP_WORKFLOWS = Object.freeze([
 export const PROTECTED_REVENUE_SCREEN_SOURCES = Object.freeze({
   'apps/web/app/(dynamic)/start/page.tsx': true,
   'apps/web/app/app/(shell)/page.tsx': true,
+  'apps/web/app/app/(shell)/inbox/page.tsx': true,
   'apps/web/app/app/(shell)/jovie-work/page.tsx': true,
   'apps/web/app/app/(shell)/settings/billing/page.tsx': true,
   'apps/web/app/onboarding/checkout/page.tsx': true,
@@ -346,6 +348,7 @@ web.youtube-channel-pilot|web|screen.youtube.channel-pilot|apps/web/app/app/(she
 web.shipping-statistics|web|shipping-statistics|apps/web/app/app/(shell)/admin/shipping/page.tsx|desktop,mobile
 web.start|web|organism.onboarding-chat|apps/web/app/(dynamic)/start/page.tsx,apps/web/app/(dynamic)/start/layout.tsx|desktop,mobile
 web.app-root|web|screen.root|apps/web/app/app/(shell)/page.tsx|desktop,mobile
+web.inbox|web|screen.inbox|apps/web/app/app/(shell)/inbox/page.tsx|desktop,mobile
 web.chat|web|screen.chat|apps/web/app/app/(shell)/chat/page.tsx|desktop,mobile
 web.jovie-work|web|screen.jovie.work|apps/web/app/app/(shell)/jovie-work/page.tsx|desktop,mobile
 web.settings-billing|web|screen.settings.billing|apps/web/app/app/(shell)/settings/billing/page.tsx|desktop,mobile
