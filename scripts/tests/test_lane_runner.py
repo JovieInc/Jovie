@@ -12918,6 +12918,26 @@ class EventDeliveryTest(unittest.TestCase):
                 if comment is None and self.missing_comment_error:
                     raise RuntimeError('linear: Entity not found: Comment')
                 return {'comment': comment}
+            if 'issues(' in query:
+                # One complete inventory page. An omitted event identifier stays
+                # absent so the claim identity gate still matches that row.
+                nodes = []
+                for row in self.events.values():
+                    if not isinstance(row, dict) or not row.get('issueId'):
+                        continue
+                    priority = row.get('priority')
+                    team = row.get('team')
+                    nodes.append({
+                        'id': row['issueId'],
+                        'identifier': row.get('identifier'),
+                        'title': row.get('title') or '',
+                        'createdAt': row.get('createdAt') or '',
+                        'priority': priority if type(priority) is int else 0,
+                        'team': team if isinstance(team, dict) else {'key': 'JOV'},
+                        'labels': {'nodes': list((self.issue.get('labels') or {}).get('nodes') or [])},
+                        'state': json.loads(json.dumps(self.issue.get('state'))),
+                    })
+                return {'issues': {'pageInfo': {'hasNextPage': False, 'endCursor': None}, 'nodes': nodes}}
             return {'issue': json.loads(json.dumps(self.issue))}
         self.writes.append((query, variables))
         if self.false:

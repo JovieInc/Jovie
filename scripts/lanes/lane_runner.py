@@ -5576,6 +5576,18 @@ def claim_remediation_events(host: Host, linear) -> dict:
             "eventsHuman": summary["eventsHuman"], "eventsExhausted": summary["eventsExhausted"], **delivery}
 
 
+def _labeled_start_due(row: dict, now: float) -> bool:
+    """True only when a claimed start may touch Linear.
+
+    Exhausted and not-yet-due rows stay local. The shared inventory read sits
+    after this gate so a terminal delivery cannot raise or spend a Linear call.
+    """
+    if not row.get("startedStateId"):
+        return False
+    delivery = row.get("startDelivery") or {}
+    return delivery.get("status") != "exhausted" and not now < delivery.get("nextAt", 0)
+
+
 def _labeled_event_issue(row: dict, canonical: dict, description: str = "", event_claim: dict | None = None) -> Issue:
     priority = canonical.get("priority")
     priority = priority if type(priority) is int and 1 <= priority <= 4 else 0
@@ -5611,6 +5623,11 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
         waiting.append((fingerprint, row))
     if not waiting:
         return None
+    # A terminal or not-yet-due start never opens the inventory. The read can
+    # fail closed, and a spent delivery must not spend a Linear call to learn that.
+    waiting = [(fingerprint, row) for fingerprint, row in waiting if _labeled_start_due(row, now)]
+    if not waiting:
+        return None
     # Join the same complete shared inventory; no per-issue API read or event-row
     # rewrite may invalidate an accepted delivery's exact owner preimage.
     canonical = {issue["id"]: issue for issue in fetch_labeled_events(linear)}
@@ -5629,7 +5646,7 @@ def claim_labeled_event(host: Host, name: str, linear) -> Issue | None:
                                                         "deadline": now + EVENT_DELIVERY_STALE_S})
             # A terminal start delivery is a visible failure, never a retry loop: exhausted
             # rows used to re-fail every 60s forever (Gem 2026-10-23: 57 stuck actions).
-            if delivery.get("status") == "exhausted" or now < delivery.get("nextAt", 0):
+            if not _labeled_start_due(row, now):
                 continue
             attempts_cap = event_delivery_max_attempts()
             try:
