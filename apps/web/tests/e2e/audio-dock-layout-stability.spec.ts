@@ -112,15 +112,13 @@ test('player sits flat on the surface-0 shell plane and the main panel ends clea
 }) => {
   test.setTimeout(120_000);
 
-  // The desktop shell dock is hidden below the lg breakpoint (mobile renders
-  // the mobile audio surface); this guard covers the desktop state matrix.
-  const viewport = page.viewportSize();
-  if (!viewport || viewport.width < 1024) {
-    test.skip(
-      true,
-      'Desktop shell dock — mobile renders the mobile audio surface'
-    );
-    return;
+  // The desktop shell dock is the lg+ surface. Pin a desktop viewport so this
+  // guard runs on every project, including a narrow default viewport.
+  const current = page.viewportSize();
+  const viewport =
+    current && current.width >= 1024 ? current : { width: 1280, height: 800 };
+  if (!current || current.width < 1024) {
+    await page.setViewportSize(viewport);
   }
 
   const firstPreview = await findLibraryPreview(page);

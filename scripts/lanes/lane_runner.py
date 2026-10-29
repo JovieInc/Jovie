@@ -6654,6 +6654,24 @@ def renumber_migrations_fix(host: Host, pr: dict, route: dict, worktree: Path, l
     return types.SimpleNamespace(returncode=0)
 
 
+def fill_pr_body_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """No-model fix for a Fleet Rules body gap: write Red-before-green from the red check.
+
+    Returns a finished-agent stand-in when the section was missing and the writer
+    landed it. Returns None when the section is already complete or the write
+    fails, so a real code failure still reaches the model.
+    """
+    del host, route, worktree, log
+    try:
+        wrote = pr_events.ensure_red_before_green(pr, failure_excerpt(pr))
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    if not wrote:
+        return None
+    receipt.update(resolution="filled-pr-body")
+    return types.SimpleNamespace(returncode=0)
+
+
 def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
     """The no-model fix for an unwired script test: list it in ci-fast-lanes.mjs, commit, push. Returns a
     finished-agent stand-in, or None when the edit does not apply (the model then gets the head)."""
@@ -7617,10 +7635,14 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 boundary("before-install")
                 install_dependencies(host, worktree, log)
                 excerpt = failure_excerpt(pr)
-                try:
-                    pr_events.ensure_red_before_green(pr, excerpt)
-                except (OSError, subprocess.SubprocessError, ValueError):
-                    pass  # evidence is best effort; the repair itself must still run
+                # A pure pr-body class is filled by fill_pr_body_fix. Writing the
+                # section here would make that fixer see a complete body and fall
+                # through to a model.
+                if (route or {}).get("action") != fix_red_classes.FILL_BODY:
+                    try:
+                        pr_events.ensure_red_before_green(pr, excerpt)
+                    except (OSError, subprocess.SubprocessError, ValueError):
+                        pass  # evidence is best effort; the repair itself must still run
                 prompt = render_fix_prompt(pr, excerpt)
                 prompt += "\n\n" + "\n".join(machine_gate(host, f"PR{pr['number']}", "", (), excerpt, name,
                                                            fp=machine_gap.check_fingerprint(pr), receipt=receipt))
@@ -7635,7 +7657,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
-                         fix_red_classes.RENUMBER: renumber_migrations_fix}.get((route or {}).get("action"))
+                         fix_red_classes.RENUMBER: renumber_migrations_fix,
+                         fix_red_classes.FILL_BODY: fill_pr_body_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),
@@ -7669,10 +7692,12 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
             if not rewritten:
                 receipt.update(agentExit=agent.returncode if agent else None, headAfter=after,
                                verdict="fix-pushed" if pushed else "fix-no-change")
-                if not pushed and agent is not None:
+                if not pushed and agent is not None and receipt.get("resolution") != "filled-pr-body":
                     log.flush()
                     receipt["reasons"] = classify_unpushed_repair(
                         agent.returncode, (runs / f"{run_id}.log").read_text(errors="replace")[-20000:])
+                if receipt.get("resolution") == "filled-pr-body":
+                    receipt["reasons"] = ["filled-pr-body"]
             if pushed:
                 verify_target({**pr, "headRefOid": after}, "before-push-effects")
                 labels = {label.lower() for label in pr_events.label_names(pr)}

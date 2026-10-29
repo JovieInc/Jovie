@@ -19,7 +19,7 @@ class ClassifyTest(unittest.TestCase):
             "HttpError: API rate limit exceeded for installation": ("platform-infra", "rerun"),
             "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane": ("ci-fast-wiring", "wire-ci-fast"),
             "use atomic_state.atomic_write_text for whole-file state: [('x.py','f','open-w')]": ("atomic-write", "agent"),
-            "red-before-green: include Failing command:": ("pr-body", "agent"),
+            "red-before-green: include Failing command:": ("pr-body", "fill-pr-body"),
             "AssertionError: expected 1": ("other", "agent"),
         }
         for log, (cls, action) in cases.items():
@@ -31,6 +31,32 @@ class ClassifyTest(unittest.TestCase):
                                "Unwired: scripts/a.test.mjs, scripts/b.test.mjs. Wire each file into a ci-fast lane"})
         self.assertEqual(got["files"], ["scripts/a.test.mjs", "scripts/b.test.mjs"])
         self.assertEqual(got["checks"], ["Source Validation"])
+
+    def test_fleet_rules_missing_red_section_is_a_body_fill(self):
+        # The log Fleet Rules printed on PR #23191 before the section existed.
+        log = (
+            'red-before-green: this repair PR has no "## Red-before-green" section; '
+            'missing "- Failing command: <cmd>"; missing "- Failing run (before fix): '
+            '<https://github.com/JovieInc/Jovie/actions/runs/ID URL>"'
+        )
+        got = classes.classify(
+            pr("Fleet Rules Evidence", "PR Fleet Rules"),
+            {"Fleet Rules Evidence": log, "PR Fleet Rules": log},
+        )
+        self.assertEqual((got["cls"], got["action"]), ("pr-body", "fill-pr-body"))
+        self.assertIn(got["action"], classes.DETERMINISTIC)
+
+    def test_source_validation_beside_a_body_gap_stays_with_the_model(self):
+        body = 'red-before-green: this repair PR has no "## Red-before-green" section'
+        source = (
+            "gate-weakening-detector: FAIL\n"
+            "test-skip apps/web/tests/e2e/audio-dock-layout-stability.spec.ts test.skip("
+        )
+        got = classes.classify(
+            pr("Fleet Rules Evidence", "PR Fleet Rules", "Source Validation"),
+            {"Fleet Rules Evidence": body, "PR Fleet Rules": body, "Source Validation": source},
+        )
+        self.assertEqual(got["action"], "agent")
 
     def test_mixed_classes_go_to_the_model_and_behind_branches_sync_main(self):
         mixed = classes.classify(pr("A", "B"), {"A": "API rate limit exceeded", "B": "AssertionError"})
