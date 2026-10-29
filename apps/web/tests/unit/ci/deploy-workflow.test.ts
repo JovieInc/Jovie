@@ -471,7 +471,7 @@ describe('CI test-performance path gate', () => {
 });
 
 describe('CI Storybook accessibility path gate', () => {
-  it('classifies relevant paths; the main-push visual-a11y lane owns execution', () => {
+  it('classifies relevant paths; the daily visual-a11y lane owns execution', () => {
     const workflow = readFileSync(workflowPath, 'utf8');
     const pathJob = getJobBlock(workflow, 'ci-path-changes');
     const detectStep = getStepBlock(
@@ -483,7 +483,7 @@ describe('CI Storybook accessibility path gate', () => {
       "run_storybook_a11y: ${{ steps.detect.outputs.run_storybook_a11y || 'false' }}"
     );
     // The duplicate manual ci-storybook-a11y job was removed (JOV-4326); the
-    // main-push visual-a11y.yml storybook-a11y lane is the single owner.
+    // daily visual-a11y.yml storybook-a11y lane is the single owner.
     expect(workflow).not.toContain('ci-storybook-a11y:');
     expect(detectStep).not.toContain('DEEP_CI_LABEL');
 
@@ -515,7 +515,10 @@ describe('CI Storybook accessibility path gate', () => {
 
     const visualWorkflow = readFileSync(visualA11yWorkflowPath, 'utf8');
     expect(visualWorkflow).not.toMatch(/^  schedule:/m);
-    expect(visualWorkflow).toMatch(/^  push:\n    branches: \[main\]/m);
+    expect(visualWorkflow).toMatch(
+      /^  repository_dispatch:\n    types: \[clock_visual_a11y\]/m
+    );
+    expect(visualWorkflow).not.toMatch(/^  push:/m);
     expect(visualWorkflow).not.toMatch(/^  pull_request:/m);
     expect(visualWorkflow).not.toContain('vars.CI_FAST_RUNNER');
     const visualPathJob = getJobBlock(visualWorkflow, 'ci-visual-path-changes');
@@ -524,7 +527,7 @@ describe('CI Storybook accessibility path gate', () => {
       'Detect visual-relevant changes'
     );
     expect(visualDetectStep).toContain(
-      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ]'
+      '[ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "repository_dispatch" ]'
     );
     expect(visualDetectStep).toContain(
       'echo "has_visual_changes=true" >> "$GITHUB_OUTPUT"'
@@ -555,7 +558,6 @@ describe('CI Storybook accessibility path gate', () => {
         input: 'apps/web/styles.css',
       }).status
     ).toBe(1);
-    expect(visualWorkflow).toMatch(/- 'apps\/web\/styles\/\*\*'/);
   });
 });
 
@@ -5708,7 +5710,7 @@ describe('full matrix authenticated release fixtures', () => {
     );
     expect(seedStep).toContain("E2E_USE_TEST_AUTH_BYPASS: '1'");
     expect(seedStep).toContain(
-      "github.event_name == 'push' || github.event.inputs.test_filter == ''"
+      "github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == ''"
     );
     const seedIndex = job.indexOf(
       '- name: Seed authenticated release fixtures'
