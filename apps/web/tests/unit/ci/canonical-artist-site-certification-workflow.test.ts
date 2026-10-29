@@ -44,6 +44,7 @@ describe('JOV-6572 canonical artist-site certification workflow', () => {
     expect(command).toContain('golden-path-home-welcome.spec.ts');
     expect(command).toContain('golden-path.spec.ts');
     expect(command).toContain('start-entry-continuity.spec.ts');
+    expect(command).toContain('entry-first-html-visual.spec.ts');
     expect(command).toContain('GOLDEN_PATH_REQUIRED=1');
     expect(command).not.toContain('money-path-persistence.spec.ts');
     expect(ci).toContain('Seed required premade profile claim fixture');

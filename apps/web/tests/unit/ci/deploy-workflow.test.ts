@@ -253,7 +253,7 @@ describe('source PR path-output reachability contract', () => {
     const buildLayout = getJobBlock(workflow, 'ci-build-layout');
 
     expect(provenanceHeader).not.toMatch(/^    if:/m);
-    expect(provenanceHeader).toContain('runs-on: ubuntu-latest');
+    expect(provenanceHeader).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(neutralProvenance).toContain(
       "github.event_name != 'push' || github.ref != 'refs/heads/main'"
     );
@@ -663,7 +663,7 @@ describe('deploy workflow Vercel env resolution', () => {
     const buildJob = getJobBlock(workflow, 'ci-build-layout');
 
     expect(buildJob).toContain("github.ref == 'refs/heads/main'");
-    expect(buildJob).toContain('runs-on: ubuntu-latest');
+    expect(buildJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(buildJob).toContain('Build exact combined head');
     expect(buildJob).toContain('Run deterministic layout behavior guard');
     expect(buildJob).not.toContain('actions/upload-artifact');
@@ -683,10 +683,12 @@ describe('deploy workflow Vercel env resolution', () => {
       'promote-production',
       'release-result',
     ]) {
-      expect(getJobBlock(workflow, job)).toContain('runs-on: ubuntu-latest');
+      expect(getJobBlock(workflow, job)).toMatch(
+        /runs-on: ubuntu-(?:latest|24\.04)/
+      );
     }
-    expect(readFileSync(canaryWorkflowPath, 'utf8')).toContain(
-      'runs-on: ubuntu-latest'
+    expect(readFileSync(canaryWorkflowPath, 'utf8')).toMatch(
+      /runs-on: ubuntu-(?:latest|24\.04)/
     );
   });
 
@@ -1754,7 +1756,7 @@ printf 'https://jovie-argv-contract-jovie.vercel.app\\n'
       'lighthouse-ci',
     ]) {
       const block = getJobBlock(workflow, job);
-      expect(block).toContain('runs-on: ubuntu-latest');
+      expect(block).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
       expect(block).not.toContain('continue-on-error: true');
       expect(block).toContain(
         'needs.production-release.outputs.production_deployment_url_b64'
@@ -2016,7 +2018,7 @@ describe('unit-test runner capacity', () => {
     const routeJob = getJobBlock(workflow, 'ci-unit-runner-route');
     const unitJob = getJobBlock(workflow, 'ci-unit-tests');
 
-    expect(routeJob).toContain('runs-on: ubuntu-latest');
+    expect(routeJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(routeJob).toContain('ref: main');
     expect(routeJob).toContain('continue-on-error: true');
     expect(routeJob).toContain("runner_class='hosted'");
@@ -2025,7 +2027,7 @@ describe('unit-test runner capacity', () => {
     expect(routeJob).toContain('fixed|hosted');
     expect(routeJob).not.toContain('runner: ${{ steps.route.outputs.runner }}');
     expect(routeJob).not.toContain('secrets.');
-    expect(unitJob).toContain('runs-on: ubuntu-latest');
+    expect(unitJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(unitJob).not.toContain('runs-on: jovie-runner');
     expect(unitJob).not.toContain('ci-unit-runner-route');
     expect(unitJob).not.toContain('vars.CI_UNIT_RUNNER');
@@ -2130,7 +2132,7 @@ describe('informational CI tail capacity', () => {
 
     expect(summaryJob).toContain('name: Manual Evidence Summary');
     expect(summaryJob).toContain("github.event_name == 'workflow_dispatch'");
-    expect(summaryJob).toContain('runs-on: ubuntu-latest');
+    expect(summaryJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(summaryJob).not.toContain('runs-on: ${{ vars.CI_FAST_RUNNER }}');
   });
 });
@@ -3378,7 +3380,10 @@ describe('CI E2E smoke workflow', () => {
       'Protected Golden Path fixture is already owned; refusing to detach'
     );
     expect(goldenPathSpec).toContain('user_profile_claims upc');
-    expect(goldenPathSpec).toContain('sync-spotify-empty-state');
+    // JOV-9758/JOV-9771: onboarding imports the catalog; the journey never
+    // clicks a manual sync and must see real releases before any pricing.
+    expect(goldenPathSpec).not.toContain('sync-spotify-empty-state');
+    expect(goldenPathSpec).toContain('data-catalog-releases');
     expect(goldenPathSpec).toContain('FROM discog_releases r');
     expect(goldenPathSpec).toContain(
       'INNER JOIN creator_profiles cp ON cp.id = r.creator_profile_id'
@@ -4776,7 +4781,7 @@ describe('production promotion exact-artifact contract', () => {
     expect(sentryAction).toContain('echo "gate_status=error"');
     expect(sentryAction).toContain('refusing automatic rollback');
 
-    expect(sentryJob).toContain('runs-on: ubuntu-latest');
+    expect(sentryJob).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
     expect(sentryJob).toContain('name: Production – jovie');
     expect(sentryJob).toContain('ref: ${{ inputs.expected_sha }}');
     expect(sentryJob).toContain('uses: ./.github/actions/sentry-error-gate');

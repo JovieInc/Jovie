@@ -9,6 +9,11 @@ import {
   inArray,
   or,
 } from 'drizzle-orm';
+import {
+  internalAccountSql,
+  internalEmailSql,
+  isInternalAccount,
+} from '@/lib/accounts/internal-account';
 import { getDeterministicTestBetterAuthUserId } from '@/lib/auth/dev-test-auth-identity';
 import type { CanonicalContactSourceRow } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
@@ -19,10 +24,7 @@ import {
   isReservedPublicProfileIdentity,
   PUBLIC_PROFILE_RESERVED_IDENTITY_HANDLES,
 } from '@/lib/profile/public-profile-identity-policy';
-import {
-  INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN,
-  isInternalOrTestAccountEmail,
-} from '@/lib/utils/email';
+import { isInternalOrTestAccountEmail } from '@/lib/utils/email';
 
 export interface CustomerPopulationExclusions {
   userIds: ReadonlySet<string>;
@@ -33,9 +35,10 @@ export interface CustomerPopulationExclusions {
 export function isNonCustomerUser(user: {
   email: string | null;
   betterAuthUserId: string | null;
+  accountClass?: string | null;
 }): boolean {
   return (
-    isInternalOrTestAccountEmail(user.email) ||
+    isInternalAccount(user) ||
     (!!user.email &&
       user.betterAuthUserId ===
         getDeterministicTestBetterAuthUserId(user.email))
@@ -50,11 +53,12 @@ export async function getCustomerPopulationExclusions(): Promise<CustomerPopulat
         id: users.id,
         email: users.email,
         betterAuthUserId: users.betterAuthUserId,
+        accountClass: users.accountClass,
       })
       .from(users)
       .where(
         or(
-          drizzleSql`btrim(${users.email}) ~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}`,
+          internalAccountSql(drizzleSql`btrim(${users.email})`),
           // UUIDv8 is only a candidate: verify the exact provisioning digest in JS.
           ilike(users.betterAuthUserId, '________-____-8___-____-____________')
         )
@@ -65,9 +69,7 @@ export async function getCustomerPopulationExclusions(): Promise<CustomerPopulat
         emailNormalized: waitlistEntries.emailNormalized,
       })
       .from(waitlistEntries)
-      .where(
-        drizzleSql`btrim(${waitlistEntries.emailNormalized}) ~* ${INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN}`
-      ),
+      .where(internalEmailSql(waitlistEntries.emailNormalized)),
   ]);
   const userIds = new Set(
     userCandidates.filter(isNonCustomerUser).map(row => row.id)

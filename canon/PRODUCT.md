@@ -143,6 +143,7 @@ These rules are enforceable. A proposal, issue, or PR that breaks one is rejecte
 3. **Users do not pick the AI model.** Model, provider, temperature, and prompt choice are Jovie's job. This kind of configurability ships only as a deep feature after paying Pro-level customers ask for it.
 4. **Opinionated defaults over settings.** Pick the right default and ship it. A setting is allowed only when the platform requires it (OS permissions, legal consent, unsubscribe) or when users genuinely differ and no default can be right for most of them.
 5. **One control, not a matrix.** When a control is unavoidable, ship the single system-standard one (on/off, revoke, delete), never a per-item grid.
+6. **No dead ends.** Every rendered control works in the user's current runtime (JOV-INV-046). A control that cannot work here is not rendered: no "not available", "coming soon" or "use X instead" copy, no disabled control without an actionable reason, no no-op button, no link to an unbuilt route. Permission and entitlement prompts that lead to a working path, and transient errors with retry, are fine.
 
 ### Capability classification
 
@@ -214,6 +215,36 @@ possible in terms of DS and IA."
   One-click answers execute immediately with a five-second undo. Ovie Home is
   dashboard-dense on a MacBook Pro.
 
+### Dogfood Jovie with the founder's own careers (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: Ovie is the closed-loop company OS and Jovie is
+the closed-loop creator OS. Tim runs his own music, YouTube, acting/modeling and
+fitness channels from Jovie, so running the company also means dogfooding the
+real product.
+
+- Tim's creator accounts are permanent Jovie dogfood. Product gaps they hit
+  become product issues; there are no private workarounds.
+- Onboarding, chat and Home empty states in both apps use the same shared shell
+  and realtime generated UI, picking the best layout for the moment. The visual
+  reference is the new Shopify admin: full-bleed and editorial.
+
+### Jovie runs the artist's growth loop (founder decision, 2026-10-28)
+
+**EVENT:** Tim White, 2026-10-28: Jovie drives the same goals for each artist
+that Summer drives for the company. It finds the artist's highest-ROI moves,
+executes the ones the artist approves, and takes as much work off the artist as
+possible.
+
+- Abstract the work, not the decision. The artist approves outcomes; Jovie does
+  the steps. Where no native integration exists, Jovie may use concierge work
+  (a human behind the curtain) or a user-controlled cloud browser session (e.g.
+  Cloudflare Browser Rendering) that the artist logs into themselves.
+- Jovie never stores third-party passwords. Browser sessions are scoped to the
+  artist, revocable, and recorded. Unsupported-site automation follows each
+  site's terms.
+- Every executed move carries the optimization contract above: a metric, a
+  read-out date, and keep/iterate/kill.
+
 ### Ovie is one Home (founder decision, 2026-10-21)
 
 **EVENT:** Tim White, 2026-10-21: "Move the shipping dashboard into Ovie, and
@@ -260,6 +291,7 @@ Do not optimize for:
 | 2026-10-21 | Ovie is one no-scroll Home plus a collapsed Tools group. | Tim White |
 | 2026-10-20 | Jovie and Ovie mirror one shell and IA; Ovie Home is a living canvas. | Tim White |
 | 2026-10-15 | Recorded September 3 lock: YouTube artist loop first; APIs/MCPs are a core line on the same contract and workstream. | Tim White / JOV-5891 |
+| 2026-10-28 | "Opinions" rule 6: no dead ends (JOV-INV-046). | Tim White |
 | 2026-09-26 | "Opinions: outcomes over knobs" rules and capability classification (table-stakes / outcome-deepening / configurability held / taste). | Tim White |
 | 2026-08-28 | Continuous-optimization doctrine, learning hierarchy, safe transfer, and objective hierarchy. | Tim White / JOV-4045 |
 | 2026-07-17 | Created as domain canon under `/canon`. | Tim White |

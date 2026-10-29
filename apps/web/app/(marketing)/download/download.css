@@ -1,0 +1,25 @@
+/* One Mac shot that stays legible. The capture is a 1440px window, so on
+   a phone the whole frame would shrink its type to ~4px. Below 640px the
+   frame crops to the releases list at close to the app's own type size. */
+.download-mac-shot {
+  aspect-ratio: 3 / 2;
+}
+
+.download-mac-shot-image {
+  display: block;
+  inline-size: 350%;
+  max-inline-size: none;
+  block-size: auto;
+  margin-inline-start: -56%;
+}
+
+@media (min-width: 40rem) {
+  .download-mac-shot {
+    aspect-ratio: 2880 / 1800;
+  }
+
+  .download-mac-shot-image {
+    inline-size: 100%;
+    margin-inline-start: 0;
+  }
+}

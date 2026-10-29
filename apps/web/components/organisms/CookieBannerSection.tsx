@@ -34,7 +34,15 @@ function isBannerRequiredFromCookie(): boolean {
 
 export function CookieBannerSection({
   testOnlyPathname,
-}: Readonly<{ testOnlyPathname?: string }>) {
+  initialVisible = false,
+}: Readonly<{
+  testOnlyPathname?: string;
+  /**
+   * Server-resolved visibility so the card paints with the HTML (LCP). The
+   * layout effect below still reconciles against localStorage and the cookie.
+   */
+  initialVisible?: boolean;
+}>) {
   const pathname = usePathname();
   const effectivePathname =
     process.env.NEXT_PUBLIC_E2E_MODE === '1' && testOnlyPathname
@@ -49,7 +57,7 @@ export function CookieBannerSection({
   const lastPageFocus = useRef<HTMLElement | null>(null);
   const savingFocus = useRef<HTMLElement | null>(null);
 
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible] = useState(initialVisible);
   const [customize, setCustomize] = useState(false);
   const [_isMobileExpanded, setIsMobileExpanded] = useState(false);
   const [isSavingConsent, setIsSavingConsent] = useState(false);

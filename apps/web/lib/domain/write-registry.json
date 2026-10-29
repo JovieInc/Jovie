@@ -86,7 +86,11 @@
       "id": "waitlist.admission",
       "entity": "waitlist/admission",
       "module": "apps/web/lib/waitlist/approval.ts",
-      "exports": ["approveWaitlistEntryInTx", "disapproveWaitlistEntryInTx"],
+      "exports": [
+        "approveWaitlistEntryInTx",
+        "disapproveWaitlistEntryInTx",
+        "stampWaitlistAcquisitionId"
+      ],
       "tables": ["waitlistEntries", "creatorProfiles"]
     },
     {
@@ -133,6 +137,13 @@
       "module": "apps/web/lib/chat/submit-feedback.ts",
       "exports": ["submitChatFeedback"],
       "tables": []
+    },
+    {
+      "id": "agent.draft-claim",
+      "entity": "agent draft claim",
+      "module": "apps/web/lib/agent-acquisition/draft-claim.server.ts",
+      "exports": ["claimAgentDraft"],
+      "tables": ["creatorProfiles"]
     },
     {
       "id": "agent.draft",

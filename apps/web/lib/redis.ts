@@ -123,6 +123,20 @@ function currentRedisStoreDecision() {
   return selectRedisStore(redisStoreEnvFrom(env));
 }
 
+/**
+ * True when the selected store is usable with its present credentials, as
+ * judged by the same config validation getRedis() applies. Distinguishes
+ * "Redis unconfigured" from "Redis temporarily unavailable" (quota circuit,
+ * init cooldown, transient failure) — both surface as a null getRedis()
+ * return, but only the first is a configuration error.
+ */
+export function isRedisConfigured(): boolean {
+  const decision = currentRedisStoreDecision();
+  if (decision.kind === 'local-redis') return true;
+  if (decision.kind !== 'upstash') return false;
+  return getUpstashConfig() !== null;
+}
+
 export function getRedis(options?: GetRedisOptions): Redis | null {
   const decision = currentRedisStoreDecision();
   warnRedisStoreDecision(decision);

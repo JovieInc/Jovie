@@ -29,6 +29,7 @@
         "apps/web/app/app/(shell)/admin/agent-runs/[id]/page.tsx",
         "apps/web/app/app/(shell)/admin/algorithm-health/page.tsx",
         "apps/web/app/app/(shell)/admin/campaigns/page.tsx",
+        "apps/web/app/app/(shell)/admin/capacity/page.tsx",
         "apps/web/app/app/(shell)/admin/certifications/page.tsx",
         "apps/web/app/app/(shell)/admin/chat-playground/page.tsx",
         "apps/web/app/app/(shell)/admin/chat/page.tsx",
@@ -186,7 +187,10 @@
         "at": "2026-10-15T04:36:00Z",
         "ref": "48075f7f958"
       },
-      "sources": ["apps/web/app/(home)/page.tsx"]
+      "sources": [
+        "apps/web/app/(home)/page.tsx",
+        "apps/web/app/content-preview/[versionId]/page.tsx"
+      ]
     },
     {
       "id": "investor",
@@ -389,8 +393,8 @@
       "evidence": {
         "kind": "certification",
         "at": "2026-10-23T22:18:41.922Z",
-        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements.",
-        "sourceDigest": "8e04962d231d816b3936aaef2002e05d3d28994daa8a970035b91ce66eca8536"
+        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements. Renewed 2026-10-29 (PR #23618): the shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements.",
+        "sourceDigest": "b2711005ff8ce7d99b5f36a3b49d1c5db1d924c1112bb0e7cde3b2b15732c805"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
@@ -681,6 +685,20 @@
       "to": "holdout",
       "at": "2026-10-23T18:26:27.418Z",
       "evidence": "PR #22804 re-registers the command palette product page after merging main including pre-save. Original branch observation: 2026-10-23T12:30:00Z; previous repair registration: 2026-10-23T16:58:51Z. Source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/capacity/page.tsx",
+      "from": null,
+      "to": "migrating",
+      "at": "2026-10-26T02:17:00Z",
+      "evidence": "PR #23313 introduces the admin agent plans page inside the admin shell migration (JOV-8098); source registration only."
+    },
+    {
+      "source": "apps/web/app/content-preview/[versionId]/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T01:10:00Z",
+      "evidence": "PR #23536 introduces the signed homepage spec preview, rendering the same home sections; source registration only, not rendered certification."
     }
   ]
 }
