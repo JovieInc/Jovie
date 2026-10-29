@@ -1,23 +1,7 @@
 {
   "schema": "jovie.a11y-allowlist/v1",
-  "maxEntries": 4,
+  "maxEntries": 2,
   "entries": [
-    {
-      "id": "releases-dashboard-label-content-name-mismatch",
-      "surface": "releases-dashboard",
-      "ruleId": "label-content-name-mismatch",
-      "issue": "JOV-8781",
-      "expires": "2027-01-23",
-      "reason": "Release list name mismatch quarantined until JOV-8781 ships."
-    },
-    {
-      "id": "releases-dashboard-nested-interactive",
-      "surface": "releases-dashboard",
-      "ruleId": "nested-interactive",
-      "issue": "JOV-8781",
-      "expires": "2027-01-23",
-      "reason": "Nested interactive controls in the release list, quarantined until JOV-8781 ships."
-    },
     {
       "id": "a11y-dashboard-frame-tested",
       "surface": "a11y-dashboard",

@@ -383,7 +383,7 @@ existed. Contract:
 
 1. Publish the first coherent commit as a draft.
    `JOVIE_PUSH_PHASE=publication git push` is the default husky path (diff,
-   secrets, hook policy only).
+   scoped Biome, secrets, hook policy only).
 2. Fast source CI on every push.
    Per-PR concurrency cancels superseded runs.
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on

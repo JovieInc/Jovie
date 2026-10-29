@@ -6704,6 +6704,26 @@ def wire_ci_fast_fix(host: Host, pr: dict, route: dict, worktree: Path, log, rec
     return types.SimpleNamespace(returncode=0)
 
 
+def snap_spacing_fix(host: Host, pr: dict, route: dict, worktree: Path, log, receipt: dict):
+    """The no-model fix for a grown spacing ratchet: snap added 10px/14px utilities onto the
+    4px grid, commit and push. Returns a finished-agent stand-in, or None when nothing applies."""
+    diff = sh(["git", "diff", "-U0", "origin/main...HEAD", "--", "apps/web", "packages/ui"],
+              cwd=worktree, log=log, timeout=300)
+    if diff.returncode:
+        return None
+    changed = fix_red_classes.snap_added_conservative_spacing(worktree, diff.stdout or "")
+    if not changed:
+        return None
+    steps = [["git", "add", "--", *changed],
+             ["git", "commit", "-q", "-m", "fix(ui): snap added off-grid spacing onto the 4px scale"],
+             ["git", "push", "-q", "origin", f"HEAD:{pr['headRefName']}"]]
+    for step in steps:
+        if sh(step, cwd=worktree, log=log, timeout=900).returncode:
+            return None
+    receipt.update(resolution="snapped-spacing", snappedFiles=changed)
+    return types.SimpleNamespace(returncode=0)
+
+
 def claim_route(host: Host, pr: dict, action: str) -> bool:
     """True once per (PR, head, action): a deterministic route is tried once, then the model gets the head."""
     taken = []
@@ -7710,7 +7730,8 @@ def _fix_red_pr(host: Host, name: str, spec: dict, pr: dict, *, branch_held=True
                 execution_attempt.boundary(runs / "execution-attempts.jsonl", ident, claimed["fencingToken"],
                                            {"spend": 1, "mutations": 1}, coordination=coordination, boundary_id="repair-dispatch")
                 fixer = {fix_red_classes.WIRE_CI_FAST: wire_ci_fast_fix,
-                         fix_red_classes.RENUMBER: renumber_migrations_fix}.get((route or {}).get("action"))
+                         fix_red_classes.RENUMBER: renumber_migrations_fix,
+                         fix_red_classes.SNAP_SPACING: snap_spacing_fix}.get((route or {}).get("action"))
                 agent = fixer(host, pr, route, worktree, log, receipt) if fixer else None
                 agent = agent or run_agent(template(spec["cmd"], {"prompt": prompt, "prompt_file": str(prompt_file),
                                                          "cwd": str(worktree),

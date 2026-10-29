@@ -59,6 +59,9 @@ run_affected() {
   # skips it; JOVIE_SKIP_PRE_PUSH_GATE is the only other escape hatch.
   echo "[pre-push-gate] running preflight"
   node scripts/preflight.mjs --hook
+  # JOV-9727: path-scoped rules, PR body and companion edits. JOVIE_PREFLIGHT_CHANGED=0 skips it.
+  echo "[pre-push-gate] running preflight:changed"
+  node scripts/preflight-changed.mjs --hook --no-typecheck --no-coverage
   bash scripts/automation-verify.sh affected
 }
 
@@ -78,6 +81,8 @@ run_publication() {
     return 1
   fi
   git diff --check "${publication_base}..HEAD"
+  # Reuse the changed-file Biome guard so formatter failures never reach CI.
+  bash scripts/hooks/biome-pre-push.sh
   bash scripts/security/scan-secrets.sh publication origin/main
   node scripts/lib/policy-gate-liveness.mjs
   node --test scripts/hooks/pre-push-gate.test.mjs

@@ -7,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import os from 'node:os';
@@ -74,7 +75,8 @@ test('publication remains policy gated without running affected tests', () => {
   assert.match(publication, /scan-secrets\.sh publication origin\/main/);
   assert.match(publication, /policy-gate-liveness\.mjs/);
   assert.doesNotMatch(publication, /automation-verify|run_affected/);
-  assert.doesNotMatch(publication, /typecheck|biome|coverage/);
+  assert.match(publication, /bash scripts\/hooks\/biome-pre-push\.sh/);
+  assert.doesNotMatch(publication, /typecheck|coverage|biome check \./);
 });
 
 for (const linkedWorktree of [false, true]) {
@@ -186,3 +188,96 @@ git -C "$JOVIE_CHILD_FIXTURE" commit -m child-check
     }
   });
 }
+
+test('publication rejects committed formatter drift and accepts the formatted repair', () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'pre-push-format-'));
+  const env = { ...process.env };
+  const localNames = spawnSync('git', ['rev-parse', '--local-env-vars'], {
+    encoding: 'utf8',
+  });
+  assert.equal(localNames.status, 0, localNames.stderr);
+  for (const name of localNames.stdout.trim().split('\n')) delete env[name];
+  delete env.JOVIE_SKIP_PRE_PUSH_GATE;
+  env.GIT_CONFIG_GLOBAL = '/dev/null';
+  env.GIT_CONFIG_NOSYSTEM = '1';
+  const run = (command, args) =>
+    spawnSync(command, args, { cwd: root, env, encoding: 'utf8' });
+  const git = (...args) => {
+    const result = run('git', args);
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  };
+  const write = (file, content) => {
+    const target = path.join(root, file);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, content);
+  };
+  const publish = () =>
+    run('bash', ['scripts/hooks/pre-push-gate.sh', 'publication']);
+
+  try {
+    git('init', '--initial-branch=main');
+    git('config', 'user.name', 'Hook Fixture');
+    git('config', 'user.email', 'hook-fixture@example.invalid');
+    write('scripts/hooks/pre-push-gate.sh', readFileSync(gateScript));
+    for (const file of ['resolve-repo-node.sh', 'biome-pre-push.sh']) {
+      write(`scripts/hooks/${file}`, readFileSync(path.join(hooksDir, file)));
+    }
+    for (const file of ['.nvmrc', 'biome.json']) {
+      write(file, readFileSync(path.join(repoRoot, file)));
+    }
+    // Other publication checks are outside this formatting contract. Real Git,
+    // the publication dispatcher and the installed Biome run without mocks.
+    write('scripts/ci-branching-guard.mjs', 'export {};\n');
+    write('scripts/lib/policy-gate-liveness.mjs', 'export {};\n');
+    write('scripts/security/scan-secrets.sh', 'exit 0\n');
+    write('scripts/hooks/pre-push-gate.test.mjs', 'export {};\n');
+    write('.gitignore', 'node_modules/\n');
+    write('legacy.ts', 'export const legacy={old:true};\n');
+    git('add', '.');
+    git('commit', '-m', 'fixture baseline with unrelated formatter debt');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    git('checkout', '-b', 'fixture/format-repair');
+    mkdirSync(path.join(root, 'node_modules/.bin'), { recursive: true });
+    symlinkSync(
+      path.join(repoRoot, 'node_modules/@biomejs'),
+      path.join(root, 'node_modules/@biomejs')
+    );
+    symlinkSync(
+      path.join(repoRoot, 'node_modules/.bin/biome'),
+      path.join(root, 'node_modules/.bin/biome')
+    );
+    write('changed.ts', 'export const changed={value:1};\n');
+    git('add', 'changed.ts');
+    git('commit', '-m', 'introduce formatter drift');
+
+    const rejected = publish();
+    const redOutput = `${rejected.stdout}\n${rejected.stderr}`;
+    assert.notEqual(rejected.status, 0, redOutput);
+    assert.match(redOutput, /changed\.ts format/);
+    assert.match(redOutput, /Formatter would have printed/);
+    assert.doesNotMatch(redOutput, /legacy\.ts format/);
+    assert.equal(
+      readFileSync(path.join(root, 'changed.ts'), 'utf8'),
+      'export const changed={value:1};\n',
+      'publication must not rewrite source'
+    );
+
+    const formatted = run(path.join(root, 'node_modules/.bin/biome'), [
+      'format',
+      '--write',
+      'changed.ts',
+    ]);
+    assert.equal(formatted.status, 0, formatted.stderr);
+    git('add', 'changed.ts');
+    git('commit', '-m', 'format the repair');
+    const accepted = publish();
+    assert.equal(accepted.status, 0, `${accepted.stdout}\n${accepted.stderr}`);
+    assert.match(accepted.stdout, /Checked 1 file/);
+
+    rmSync(path.join(root, 'node_modules/.bin/biome'));
+    const missingTool = publish();
+    assert.notEqual(missingTool.status, 0, 'missing Biome must fail closed');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

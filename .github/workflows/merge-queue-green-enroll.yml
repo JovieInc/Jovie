@@ -289,7 +289,7 @@ jobs:
               ...holdLabels.machineBlockLabels,
             ]);
             const BREAKER_LABEL = 'queue-breaker';
-            const COMPOUNDING_LABEL = 'compounding', MAX_JUMPED = 2;
+            const COMPOUNDING_LABEL = 'compounding', MAX_JUMPED = 2, JUMP_MAX_BUILD_S = 300, JUMP_BATCH_S = 1800;
             const COMPOUNDING_PATHS = [
               /^\.github\/(workflows|actions|ci-harness|scripts|runner-host|runner-image)\//,
               /^scripts\/(lanes|swarm|hermes)\//,
@@ -818,16 +818,34 @@ jobs:
                       query($owner: String!, $repo: String!) {
                         repository(owner: $owner, name: $repo) {
                           mergeQueue(branch: "main") {
-                            entries(first: 50) { nodes { pullRequest { number labels(first: 30) { nodes { name } } } } }
+                            entries(first: 50) { nodes { state enqueuedAt pullRequest { number labels(first: 30) { nodes { name } } } } }
                           }
                         }
                       }`, { owner, repo });
-                    const jumped = (queue.repository.mergeQueue?.entries?.nodes ?? []).filter(e =>
-                      e.pullRequest.number !== pr.number &&
-                      e.pullRequest.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL)).length;
-                    jump = jumped < MAX_JUMPED;
-                    receipt(pr, jump ? 'jump' : 'jump-capped', `compounding(${basis}) queued=${jumped}/${MAX_JUMPED}`);
-                    core.notice(`COMPOUNDING #${pr.number} ${jump ? 'jumps' : 'capped'} (${basis}, ${jumped}/${MAX_JUMPED} jumped entries queued)`);
+                    const entries = (queue.repository.mergeQueue?.entries?.nodes ?? []).filter(e => e.pullRequest.number !== pr.number);
+                    const isCompounding = e => e.pullRequest.labels.nodes.some(l => l.name.toLowerCase() === COMPOUNDING_LABEL);
+                    const ageS = e => (Date.now() - Date.parse(e.enqueuedAt)) / 1000;
+                    // A jump invalidates every merge group already building and restarts its CI (10-20 min;
+                    // the 04:00Z jump of #23554 reset three groups and nothing merged for 90 min). So jump only
+                    // while no building group has had time to make progress: AWAITING_CHECKS entries enqueued
+                    // under JUMP_MAX_BUILD_S ago (enqueuedAt bounds the build start from above), at most one jump per
+                    // JUMP_BATCH_S, and at most MAX_JUMPED compounding entries queued.
+                    const jumped = entries.filter(isCompounding).length;
+                    const building = entries.filter(e => e.state === 'AWAITING_CHECKS');
+                    const stale = building.filter(e => !(ageS(e) < JUMP_MAX_BUILD_S));
+                    const recent = entries.filter(e => isCompounding(e) && ageS(e) < JUMP_BATCH_S);
+                    let deferred = null;
+                    if (jumped >= MAX_JUMPED) deferred = `cap ${jumped}/${MAX_JUMPED}`;
+                    else if (stale.length > 0) deferred = `building groups older than ${JUMP_MAX_BUILD_S}s: ${stale.map(e => '#' + e.pullRequest.number).join(',')}`;
+                    else if (recent.length > 0) deferred = `batch window: ${recent.map(e => '#' + e.pullRequest.number).join(',')} jumped under ${JUMP_BATCH_S}s ago`;
+                    jump = deferred === null;
+                    receipt(pr, jump ? 'jump' : 'jump-deferred', `compounding(${basis}) ${deferred ?? `queued=${jumped}/${MAX_JUMPED}`}`);
+                    core.notice(`COMPOUNDING #${pr.number} ${jump ? 'jumps' : 'deferred'} (${basis}; ${deferred ?? 'clear'})`);
+                    if (jump && building.length > 0) {
+                      // Every reset a jump causes is logged with the groups it restarts.
+                      receipt(pr, 'jump-reset', `restarts building groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                      core.warning(`JUMP RESET by #${pr.number}: restarts building merge groups ${building.map(e => '#' + e.pullRequest.number).join(',')}`);
+                    }
                   }
                 } catch (error) {
                   core.warning(`#${pr.number} compounding check failed, plain enqueue: ${error.message}`);

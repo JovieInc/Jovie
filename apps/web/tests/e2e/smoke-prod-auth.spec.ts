@@ -19,6 +19,7 @@ import { certStep, recordCertObservation } from './utils/prod-cert-steps';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
 import {
   prepareProductionAuthEmailForm,
+  waitForCheckoutEntryContent,
   waitForProductionDashboardContent,
 } from './utils/production-auth-interaction';
 import {
@@ -802,9 +803,10 @@ test.describe('Production Auth Smoke @production-smoke', () => {
           'Billing navigation'
         );
         await waitForHydration(page);
-        const billingText = (
-          await page.locator('main').first().innerText()
-        ).toLowerCase();
+        const billingText = await waitForCheckoutEntryContent(
+          page,
+          SMOKE_TIMEOUTS.VISIBILITY
+        );
         expect(billingText).not.toMatch(
           /application error|something went wrong/
         );

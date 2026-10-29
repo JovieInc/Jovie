@@ -14,8 +14,20 @@ import {
 import { deriveProfileBuilderState } from './onboardingChatHelpers';
 
 vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
-  ProfileCompactSurface: ({ dataTestId }: { dataTestId?: string }) => (
-    <div data-testid={dataTestId ?? 'profile-compact-surface'} />
+  ProfileCompactSurface: ({
+    dataTestId,
+    releases = [],
+  }: {
+    dataTestId?: string;
+    releases?: readonly { id: string; title: string }[];
+  }) => (
+    <div data-testid={dataTestId ?? 'profile-compact-surface'}>
+      {releases.map(release => (
+        <span key={release.id} data-testid='preview-release'>
+          {release.title}
+        </span>
+      ))}
+    </div>
   ),
 }));
 
@@ -42,6 +54,59 @@ const CONFIRMED_STATE: OnboardingProfileBuilderState = {
 };
 
 describe('OnboardingProfileRail', () => {
+  it('renders the confirmed artist real catalog on the preview (JOV-9758)', () => {
+    const output = {
+      action: 'spotify_artist_confirmed',
+      spotifyArtistId: 'artist-1',
+      artist: {
+        id: 'artist-1',
+        name: 'Test Artist',
+        url: 'https://open.spotify.com/artist/artist-1',
+      },
+      catalog: {
+        total: 22,
+        releases: [
+          {
+            id: 'album-new',
+            title: 'Newest single',
+            releaseType: 'single',
+            releaseDate: '2026-08-14',
+            artworkUrl: 'https://i.scdn.co/image/new',
+            spotifyUrl: 'https://open.spotify.com/album/albumnew',
+          },
+        ],
+      },
+    };
+    const state = deriveProfileBuilderState({
+      handleDraft: null,
+      selectedArtist: null,
+      messages: [
+        {
+          id: 'assistant-confirm',
+          role: 'assistant',
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'confirmSpotifyArtist',
+              toolCallId: 'confirm',
+              state: 'output-available',
+              input: {},
+              output,
+            },
+          ],
+        } as UIMessage,
+      ],
+    });
+    render(<OnboardingProfileRail state={state} />);
+    expect(screen.getByTestId('onboarding-profile-rail')).toHaveAttribute(
+      'data-catalog-releases',
+      '1'
+    );
+    expect(screen.getByTestId('preview-release')).toHaveTextContent(
+      'Newest single'
+    );
+  });
+
   it.each(
     onboardingRoleSchema.options.flatMap(role =>
       ['tool', 'metadata'].map(transport => ({ role, transport }))

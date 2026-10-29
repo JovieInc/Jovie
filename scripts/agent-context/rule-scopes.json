@@ -7,7 +7,7 @@
   {
     "file": ".claude/rules/ci-branching.md",
     "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
-    "bodySha256": "d56c26e1a41cab201f71b0327bd15109dd37911f5745f9a553c08cdec9c13419"
+    "bodySha256": "5fabc1298ed53a98b1841258926c05b2a001435651388c5f414d2b3bb145bd54"
   },
   {
     "file": ".claude/rules/code-style.md",
@@ -58,7 +58,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "46fa336beeef6a6d9bfba990205368a7af77f17a50a405ef4451d303bf706a81"
+    "bodySha256": "36704be616218c57d80af32db45bf43b08b5b1a609e7c5abc2a99f9124e8a581"
   },
   {
     "file": ".claude/rules/gstack.md",
@@ -67,7 +67,7 @@
       ".claude/skills/**",
       "docs/agent-context/**"
     ],
-    "bodySha256": "e2e36de64b575a72b809b2581fa6bde2ed0e92f53b3a9af4851383228b4b70bd"
+    "bodySha256": "c1eee77c7109526f0f9f48265b6e404e7e927b132d3e0bbf02bbf958c3c18c4f"
   },
   {
     "file": ".claude/rules/hermes-air.md",
@@ -160,7 +160,7 @@
       "scripts/backlog-orchestrator/**",
       ".claude/commands/qa-swarm*"
     ],
-    "bodySha256": "e26c5b3a138b93444c1497c7d5007d6b4627f8bbd95a1af7cd0849ba68d7df17"
+    "bodySha256": "7cbdca7e2c0d7146e1e97cb310e271a00ee3aba4c6f3a5a06ea471e9e955d3e6"
   },
   {
     "file": ".claude/rules/testing.md",
