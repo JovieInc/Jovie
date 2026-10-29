@@ -2116,6 +2116,10 @@ body {
     border: 1px solid transparent;
     background: var(--color-bg-page);
   }
+  .composite-field[data-surface="field"] {
+    border: 1px solid var(--color-border-subtle);
+    background: var(--color-bg-surface-1);
+  }
   .composite-field[data-surface="shell"] {
     color: var(--color-text-primary-token);
     border: 1px solid var(--app-shell-frame-seam);

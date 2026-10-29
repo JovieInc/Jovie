@@ -231,6 +231,9 @@ export {
 // Inline offline notice
 export type { InlineOfflineNoticeProps } from './atoms/inline-offline';
 export { InlineOfflineNotice } from './atoms/inline-offline';
+// InlineSubscribe
+export type { InlineSubscribeProps } from './atoms/inline-subscribe';
+export { InlineSubscribe } from './atoms/inline-subscribe';
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
