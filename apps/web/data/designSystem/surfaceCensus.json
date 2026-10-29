@@ -393,8 +393,8 @@
       "evidence": {
         "kind": "certification",
         "at": "2026-10-23T22:18:41.922Z",
-        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements.",
-        "sourceDigest": "8e04962d231d816b3936aaef2002e05d3d28994daa8a970035b91ce66eca8536"
+        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements. Renewed 2026-10-29 (PR #23618): the shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements.",
+        "sourceDigest": "b2711005ff8ce7d99b5f36a3b49d1c5db1d924c1112bb0e7cde3b2b15732c805"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },

@@ -438,10 +438,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/home/ProfileMockup.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/library-asset-share/LibraryAssetShareUrlCell.tsx",
       "linearIssue": "JOV-8847"
     },
