@@ -48,6 +48,7 @@ import {
   loadBaseline,
   measureAllRoots,
 } from './story-coverage-ratchet.mjs';
+import { assertBaselineAllowlist } from './ui-story-coverage-policy.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -2022,6 +2023,32 @@ export function resolveRenderedEvaluationSection({
   };
 }
 
+export function checkStoryBaseline(changed, { repoRoot = REPO_ROOT } = {}) {
+  const policyPath = '.github/ui-story-coverage-policy.json';
+  if (
+    !changed.some(
+      path => /\.stories\.(?:[jt]sx?|mdx)$/i.test(path) || path === policyPath
+    )
+  ) {
+    return [];
+  }
+  try {
+    assertBaselineAllowlist(
+      repoRoot,
+      JSON.parse(readText(policyPath, repoRoot))
+    );
+    return [];
+  } catch (error) {
+    return [
+      {
+        path: policyPath,
+        rule: 'story-baseline-stale',
+        detail: error instanceof Error ? error.message : String(error),
+      },
+    ];
+  }
+}
+
 export function runComponentShipGate(options = {}) {
   const flags = {
     checkArtifacts: options.checkArtifacts ?? false,
@@ -2070,6 +2097,8 @@ export function runComponentShipGate(options = {}) {
         .filter(sourceRel => existedAtDiffBase(flags.diffBase, sourceRel))
     );
     const diff = checkChangedComponents(changed, { legacyComponents });
+    diff.issues.push(...checkStoryBaseline(changed));
+    diff.ok = diff.issues.length === 0;
     report.sections.diff = diff;
     if (!diff.ok) report.ok = false;
   } else {

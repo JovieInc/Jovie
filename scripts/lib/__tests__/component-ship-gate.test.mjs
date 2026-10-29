@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   auditCoverageViaReceipts,
   checkChangedComponents,
+  checkStoryBaseline,
   hasRealLegacyTestEvidence,
   isStoryRequirementExempt,
   resolveRenderedEvaluationSection,
@@ -383,6 +384,48 @@ describe('story match checks', () => {
 });
 
 describe('diff gate', () => {
+  it('retires a missing-story exemption when the story lands', () => {
+    const component = 'apps/web/components/atoms/PublishAction.tsx';
+    const story = component.replace('.tsx', '.stories.tsx');
+    const policyPath = '.github/ui-story-coverage-policy.json';
+    const policy = {
+      schemaVersion: 1,
+      owner: 'Gem',
+      mode: 'blocking',
+      cleanBaselineRunsRequired: 5,
+      verifiedCleanRunIds: [1, 2, 3, 4, 5],
+      blockingAfter: '2026-07-27T00:00:00Z',
+      minimumPullRequestNumber: 1,
+      allowlist: [{ path: component, linearIssue: 'JOV-8847' }],
+    };
+    const root = fixtureRepo({
+      [component]:
+        'export function PublishAction() { return <button>Publish</button>; }',
+      [policyPath]: JSON.stringify(policy),
+    });
+    expect(checkStoryBaseline([story], { repoRoot: root })).toEqual([]);
+    writeFileSync(
+      join(root, story),
+      "import { PublishAction } from './PublishAction';"
+    );
+    expect(
+      checkStoryBaseline([story], { repoRoot: root }).map(issue => issue.rule)
+    ).toEqual(['story-baseline-stale']);
+    writeFileSync(
+      join(root, policyPath),
+      JSON.stringify({ ...policy, allowlist: [] })
+    );
+    expect(checkStoryBaseline([story], { repoRoot: root })).toEqual([]);
+  });
+
+  it('keeps unrelated publication free of story-inventory work', () => {
+    expect(
+      checkStoryBaseline(['scripts/example.mjs'], {
+        repoRoot: '/missing-fixture',
+      })
+    ).toEqual([]);
+  });
+
   it('checks publication artifacts without running full qualification', () => {
     const inProcess = runComponentShipGate({
       checkArtifacts: true,
