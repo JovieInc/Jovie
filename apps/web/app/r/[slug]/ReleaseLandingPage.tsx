@@ -40,6 +40,7 @@ import type { ProviderConfidence, ProviderKey } from '@/lib/discography/types';
 import { canonicalizeReleaseArtistHandle } from '@/lib/profile/opaque-internal-profile-handle';
 import { buildReleaseShareContext } from '@/lib/share/context';
 import { postJsonBeacon } from '@/lib/tracking/json-beacon';
+import { buildRoutingTelemetry } from '@/lib/tracking/routing-telemetry';
 import {
   appendUTMParamsToUrl,
   type PartialUTMParams,
@@ -408,6 +409,13 @@ export function ReleaseLandingPage({
     (providerKey: ProviderKey) => {
       if (!artist.handle || !tracking?.contentId || !tracking?.contentType)
         return;
+      const providerUrl = clickableProviders.find(
+        provider => provider.key === providerKey
+      )?.url;
+      const routing = providerUrl
+        ? buildRoutingTelemetry({ providerId: providerKey, url: providerUrl })
+            .telemetry
+        : undefined;
       postJsonBeacon(
         '/api/track',
         {
@@ -420,12 +428,13 @@ export function ReleaseLandingPage({
             contentId: tracking.contentId,
             provider: providerKey,
             smartLinkSlug: tracking.smartLinkSlug ?? undefined,
+            ...routing,
           },
         },
         () => {}
       );
     },
-    [artist.handle, tracking]
+    [artist.handle, clickableProviders, tracking]
   );
 
   return (
