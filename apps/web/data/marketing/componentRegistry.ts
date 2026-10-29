@@ -152,14 +152,7 @@ export const MARKETING_SHELL_REGISTRY = [
     'MarketingFooterCta',
     'Marketing/Shells/MarketingFooterCta',
     [MARKETING_PEN_CONTRACT_IDS.shell.footerCta],
-    'penContractId={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}',
-    [
-      {
-        source: 'apps/web/components/site/MarketingTerminalCta.tsx',
-        binding: 'data-pen-contract={penContractId}',
-        occurrences: 1,
-      },
-    ]
+    'data-pen-contract={MARKETING_PEN_CONTRACT_IDS.shell.footerCta}'
   ),
   shell(
     'shell.final-cta',
