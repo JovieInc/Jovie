@@ -4,7 +4,7 @@ paths: ["apps/ios/**", "**/*.swift"]
 
 # iOS (Native SwiftUI App)
 
-Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Clerk-auth, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`. The Mac direction is SwiftUI/AppKit on shared iOS client foundations; Electron remains shipped until qualified cutover. Share platform-neutral client behavior and existing design owners while keeping UIKit/AppKit in platform shells — [`.claude/rules/macos.md`](macos.md).
+Operating rules for the native iOS app at `apps/ios` (SwiftUI, dark-only, Better Auth via the browser PKCE flow, TestFlight via Fastlane). Read this before touching any Swift under `apps/ios/`. The Mac direction is SwiftUI/AppKit on shared iOS client foundations; Electron remains shipped until qualified cutover. Share platform-neutral client behavior and existing design owners while keeping UIKit/AppKit in platform shells — [`.claude/rules/macos.md`](macos.md).
 
 The north star: **rock solid and blazing fast — 0 jank.** Every change should make the existing surface faster or more reliable, never add main-thread work, flicker, or layout shift.
 
@@ -24,6 +24,17 @@ The guardrail lint runs in `ios-ci.yml` and via `pnpm run ios:lint`. It scans pr
 | `no-force-try` | `try!` | Crashes the whole app on any thrown error | `try?` or `do`/`catch` |
 
 Do **not** add an inline-ignore escape hatch to this lint (same spirit as the web `no biome-ignore` rule). If a rule is genuinely wrong for a case, fix the rule with review and don't suppress it.
+
+## Data Architecture (ADR, enforced by `scripts/swift-arch/guard.mjs`)
+
+All Swift apps follow one architecture: [`docs/architecture/swift-architecture-adr-2026-10-29.md`](../../docs/architecture/swift-architecture-adr-2026-10-29.md).
+
+- **Observation:** `@MainActor @Observable` stores only. No new `ObservableObject`, `@Published`, `@StateObject`, `@ObservedObject` or `@EnvironmentObject`.
+- **Main actor:** the main actor assigns finished values. JSON, disk, Keychain, image decode, Core Data fetch/save, parsing and derived data (sort, filter, interpolate) run off it. Nothing in `body`, or in a computed property that `body` reads, may derive from a whole collection; compute once per data change, or memoize on a content fingerprint.
+- **Data flow:** mutations replace one item by id; rows take `Equatable` value types; push beats polling.
+- **Concurrency:** new modules use Swift 6 language mode.
+
+`pnpm run ios:lint` runs the ratchet. It fails on any new violation, and on a baseline that is higher than reality: after you fix debt, run `node scripts/swift-arch/guard.mjs --write-baseline` in the same PR. Never raise the baseline by hand. The weekly remediation sweep (`--mode swift-arch`) files the remaining debt per rule in Linear.
 
 ## Performance Canon
 
