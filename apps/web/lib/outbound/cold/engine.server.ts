@@ -12,45 +12,19 @@ import {
 import { denyAudienceEffect } from '@/lib/outbound/audience-effect-policy';
 import { outboundCopyEvidenceKey } from '../approval';
 import { isPlausibleMailingAddress } from './compliance';
-import {
-  CONTROLLER_BLOCKER_LABELS,
-  type ControllerPlan,
-  planColdSends,
-} from './controller';
+import { CONTROLLER_BLOCKER_LABELS, planColdSends } from './controller';
 import { readDogfoodGates } from './dogfood-gate.server';
 import { COLD_TEMPLATE_VERSION } from './draft';
 import {
-  type AutoApproveVerdict,
   evaluateAutoApprove,
   mineStyleGuide,
-  type SegmentLearning,
-  type StyleGuide,
   summarizeAll,
 } from './edit-learning';
-import {
-  coldSegmentKey,
-  type FunnelRecord,
-  type SegmentFunnel,
-  summarizeFunnels,
-} from './funnel';
+import type { OutreachEngineStatus } from './engine-types';
+import { coldSegmentKey, type FunnelRecord, summarizeFunnels } from './funnel';
 import { readOutboundEditPairs } from './learning.server';
 
-/**
- * One read of the outreach engine for Ovie and Summer: learning metrics and
- * the auto-approve verdict per segment, the send controller's plan, and the
- * funnel with stage dwell per segment. Contains no recipient data.
- */
-export interface OutreachEngineStatus {
-  readonly schema: 'outreach-engine/v1';
-  readonly generatedAt: string;
-  readonly learning: readonly SegmentLearning[];
-  readonly autoApprove: readonly AutoApproveVerdict[];
-  readonly styleGuide: StyleGuide;
-  readonly controller: ControllerPlan & {
-    readonly blockerLabels: readonly string[];
-  };
-  readonly funnel: readonly SegmentFunnel[];
-}
+export type { OutreachEngineStatus } from './engine-types';
 
 /** Gates read from configuration. Sending stays closed until all are open. */
 function readGates(

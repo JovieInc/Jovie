@@ -23,6 +23,7 @@ vi.mock('@/lib/queries/useOutboundQuery', () => ({
     refetch: vi.fn(),
   }),
   useOutboundDecisionMutation: () => ({ mutateAsync: mocks.decide }),
+  useOutboundEngineQuery: () => ({ data: undefined }),
   useOutboundFactReviewMutation: () => ({ mutateAsync: vi.fn() }),
   useOutboundRefreshEvidenceMutation: () => ({ mutateAsync: vi.fn() }),
   getOutboundDecisionErrorMessage: () => 'refused',
