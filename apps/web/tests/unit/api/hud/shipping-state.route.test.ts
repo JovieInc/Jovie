@@ -176,7 +176,10 @@ describe('GET /api/hud/shipping-state', () => {
       state: 'fresh',
       delivery: { mergeQueueDepth: { value: 4 } },
     });
-    expect(mockPublish).toHaveBeenCalledTimes(1);
+    // First call is the deadline-bound inline read; the second is the full
+    // background reconciliation for sources that missed the cold deadline.
+    expect(mockPublish).toHaveBeenNthCalledWith(1, { readDeadlineMs: 1_800 });
+    expect(mockPublish).toHaveBeenCalledTimes(2);
     expect(mockReadCached).not.toHaveBeenCalled();
   });
 

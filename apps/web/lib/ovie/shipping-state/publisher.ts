@@ -99,6 +99,14 @@ export type PublishShippingStateInput = {
   readonly readers: NamedAuthorityReaders;
   readonly clock?: ShippingClock;
   readonly maxAgeMs?: number;
+  /**
+   * Per-source read deadline, below the default 7.5s. Sources still reading
+   * at the deadline are recorded as `reader-timeout` (their cached read keeps
+   * running for the next publish) so a cold instance answers with the sources
+   * that finished instead of an all-unknown shell. A deadline-bound
+   * publication is never reused as a fresh one under `maxAgeMs`.
+   */
+  readonly readDeadlineMs?: number;
 };
 
 function stoppedProjection(
@@ -147,7 +155,7 @@ async function publishShippingStateOnce(
 
   const reads = await Promise.all(
     SHIPPING_SOURCE_IDS.map(sourceId =>
-      readAuthorityWithinDeadline(input.readers, sourceId)
+      readAuthorityWithinDeadline(input.readers, sourceId, input.readDeadlineMs)
     )
   );
 
@@ -227,7 +235,8 @@ async function publishShippingStateOnce(
 
 async function readAuthorityWithinDeadline(
   readers: NamedAuthorityReaders,
-  sourceId: ShippingSourceId
+  sourceId: ShippingSourceId,
+  deadlineMs: number = SHIPPING_SOURCE_READ_TIMEOUT_MS
 ) {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   const timedOut = new Promise<ReturnType<typeof failedRead>>(resolve => {
@@ -238,7 +247,7 @@ async function readAuthorityWithinDeadline(
             errorCode: 'reader-timeout',
           })
         ),
-      SHIPPING_SOURCE_READ_TIMEOUT_MS
+      Math.min(deadlineMs, SHIPPING_SOURCE_READ_TIMEOUT_MS)
     );
   });
   try {
@@ -299,7 +308,11 @@ export function publishShippingState(
   inFlightPublish = { readers: input.readers, state, promise: publication };
   void publication.then(
     projection => {
-      if (state === runtime && projection.publishing) {
+      if (
+        state === runtime &&
+        projection.publishing &&
+        input.readDeadlineMs == null
+      ) {
         lastCompletedReaders = input.readers;
         lastCompletedAtMs = clock.nowMs();
       }

@@ -34,13 +34,14 @@ const configuredReaders = createLiveShippingStateReaders(
  * authenticated transport with a fixed receipt key per Gem-resident source.
  */
 export function publishConfiguredShippingState(
-  input: Pick<PublishShippingStateInput, 'clock'> = {}
+  input: Pick<PublishShippingStateInput, 'clock' | 'readDeadlineMs'> = {}
 ): Promise<ShippingStateProjection> {
   const clock: ShippingClock | undefined = input.clock;
   return publishShippingState({
     readers: configuredReaders,
     ...(clock ? { clock } : {}),
     maxAgeMs: CONFIGURED_SHIPPING_STATE_MAX_AGE_MS,
+    ...(input.readDeadlineMs ? { readDeadlineMs: input.readDeadlineMs } : {}),
   });
 }
 

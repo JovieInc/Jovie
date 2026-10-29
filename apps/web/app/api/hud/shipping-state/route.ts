@@ -19,11 +19,15 @@ export const dynamic = 'force-dynamic';
 
 /** Under the 3s client read timeout, with margin for the response. */
 const INLINE_REFRESH_WAIT_MS = 2_200;
+/** Per-source cap on a cold inline read; must stay under INLINE_REFRESH_WAIT_MS. */
+const COLD_SOURCE_DEADLINE_MS = 1_800;
 const NO_STORE_HEADERS = { 'Cache-Control': 'no-store' } as const;
 
 /** Start (or join) one coalesced measurement; null if it outlasts `ms`. It keeps running either way. */
-async function measureWithin(ms: number) {
-  const measuring = publishConfiguredShippingState();
+async function measureWithin(ms: number, readDeadlineMs?: number) {
+  const measuring = publishConfiguredShippingState(
+    readDeadlineMs ? { readDeadlineMs } : {}
+  );
   measuring.catch(() => undefined);
   return Promise.race([
     measuring,
@@ -66,7 +70,26 @@ export async function GET(request: NextRequest) {
     // time answers with the honest syncing projection and the next poll lands
     // on the finished measurement.
     if (!hasCachedConfiguredShippingState()) {
-      const measured = await measureWithin(INLINE_REFRESH_WAIT_MS);
+      // Bound every source read below the inline wait so the sources that
+      // finished (lanes feed, merge counts) are served; slow ones read as
+      // `reader-timeout` and complete in the background reconciliation.
+      const measured = await measureWithin(
+        INLINE_REFRESH_WAIT_MS,
+        COLD_SOURCE_DEADLINE_MS
+      );
+      scheduleAfter(
+        async () => {
+          try {
+            await publishConfiguredShippingState();
+          } catch (error) {
+            logger.error(
+              '[hud/shipping-state] Cold reconciliation failed',
+              error
+            );
+          }
+        },
+        { fallback: 'inline' }
+      );
       return NextResponse.json(
         measured ?? readCachedConfiguredShippingState(),
         { headers: NO_STORE_HEADERS }

@@ -98,6 +98,13 @@ export {
   unknownProjection,
 } from './project';
 export {
+  DELIVERY_EVIDENCE_SOURCES,
+  type DeliveryEvidence,
+  type DeliveryEvidenceKey,
+  type DeliveryEvidenceStatus,
+  deliveryEvidence,
+} from './provenance';
+export {
   getLastKnownShippingState,
   getShippingPublisherRuntime,
   type PublishShippingStateInput,
