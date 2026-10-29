@@ -105,7 +105,13 @@ describe('MarketingPricingPlans', () => {
       'data-variant',
       'primary'
     );
-    expect(within(proCard).getByText('Self-serve')).toBeInTheDocument();
+    // Recommendation reads from the primary CTA and surface, not an eyebrow pill.
+    expect(
+      within(proCard).getByText('Self-serve. Cancel anytime.')
+    ).toBeInTheDocument();
+    expect(
+      proCard.querySelector('.marketing-pricing-plan-card__badge')
+    ).toBeNull();
 
     for (const plan of ['free', 'enterprise']) {
       const card = screen.getByTestId(`marketing-pricing-plan-${plan}`);

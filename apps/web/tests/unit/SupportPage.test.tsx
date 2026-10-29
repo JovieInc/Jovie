@@ -27,18 +27,17 @@ describe('SupportPage', () => {
     expect(heading).toHaveTextContent("We're here to help.");
   });
 
-  it('renders the contact support button as a Help Center escalation link', () => {
+  it('renders one contact support link as a Help Center escalation link', () => {
     render(<SupportPage />);
 
-    const contactButton = screen.getByRole('link', {
-      name: /contact support with page context attached/i,
+    const contactLinks = screen.getAllByRole('link', {
+      name: /contact support/i,
     });
-    expect(contactButton).toBeInTheDocument();
-    expect(contactButton).toHaveAttribute(
+    expect(contactLinks).toHaveLength(1);
+    expect(contactLinks[0]).toHaveAttribute(
       'href',
       'https://docs.jov.ie/contact?from=/support'
     );
-    expect(contactButton).toHaveTextContent('Contact Support');
   });
 
   it('keeps a direct email fallback', () => {
@@ -48,15 +47,13 @@ describe('SupportPage', () => {
     expect(emailLink).toHaveAttribute('href', 'mailto:support@jov.ie');
   });
 
-  it('renders the CTA on the canonical 28px marketing Button atom', () => {
+  it('renders the email CTA on the canonical 28px marketing Button atom', () => {
     render(<SupportPage />);
 
-    const contactButton = screen.getByRole('link', {
-      name: /contact support with page context attached/i,
-    });
-    expect(contactButton).toHaveAttribute('data-variant', 'secondary');
-    expect(contactButton).toHaveAttribute('data-size', 'marketing');
-    expect(contactButton).toHaveClass(
+    const emailButton = screen.getByRole('link', { name: 'support@jov.ie' });
+    expect(emailButton).toHaveAttribute('data-variant', 'secondary');
+    expect(emailButton).toHaveAttribute('data-size', 'marketing');
+    expect(emailButton).toHaveClass(
       'h-auto',
       'min-h-7',
       'before:h-full',
@@ -65,10 +62,10 @@ describe('SupportPage', () => {
       'rounded-full'
     );
     for (const residue of ['h-7', 'h-11', 'h-11!', 'h-12', 'before:h-11']) {
-      expect(contactButton).not.toHaveClass(residue);
+      expect(emailButton).not.toHaveClass(residue);
     }
-    expect(contactButton).not.toHaveClass('public-action-secondary');
-    expect(contactButton).not.toHaveClass('public-action-primary');
+    expect(emailButton).not.toHaveClass('public-action-secondary');
+    expect(emailButton).not.toHaveClass('public-action-primary');
   });
 
   it('tracks analytics events when email is clicked', async () => {
@@ -102,7 +99,6 @@ describe('SupportPage', () => {
     // per-breakpoint Tailwind size ramp on the route.
     expect(heading).toHaveClass(
       'system-b-marketing-route-title',
-      'mt-6',
       'text-primary-token'
     );
     for (const residue of [
@@ -131,8 +127,8 @@ describe('SupportPage', () => {
     expect(section).toBeInTheDocument();
   });
 
-  it('renders Help Center and contact destinations as surfaced cards', () => {
-    render(<SupportPage />);
+  it('renders Help Center and contact destinations as a quiet list, not icon tiles', () => {
+    const { container } = render(<SupportPage />);
 
     expect(
       screen.getByRole('heading', { level: 2, name: 'How Can We Help?' })
@@ -144,19 +140,8 @@ describe('SupportPage', () => {
       ).toBeInTheDocument();
     }
 
-    const cards = screen.getAllByRole('article');
-    expect(cards).toHaveLength(2);
-    for (const card of cards) {
-      // Canonical Card atom: concentric System B card radius, no raw rounded-2xl.
-      expect(card).toHaveClass(
-        'rounded-(--system-b-radius-card)',
-        'border',
-        'border-subtle',
-        'bg-surface-1',
-        'p-6'
-      );
-      expect(card).not.toHaveClass('rounded-2xl');
-    }
+    expect(screen.queryAllByRole('article')).toHaveLength(0);
+    expect(container.querySelector('.text-accent')).toBeNull();
 
     for (const action of screen
       .getAllByRole('link')

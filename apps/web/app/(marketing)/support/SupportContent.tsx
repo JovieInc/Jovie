@@ -69,7 +69,7 @@ export function SupportChannels() {
                 asChild
                 variant='ghost'
                 size='marketing'
-                className='shrink-0 gap-1.5 self-start max-sm:-ml-2.5 sm:-mr-2.5 sm:self-center'
+                className='shrink-0 gap-1.5 self-start sm:self-center'
                 onClick={() => track(channel.event, { source: 'support_page' })}
               >
                 <a href={channel.href}>
