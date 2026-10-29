@@ -3067,6 +3067,50 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertEqual(updated.count("## Red-before-green"), 1)
         self.assertFalse(events.red_section_complete(body))
 
+    def test_repair_body_keeps_existing_red_and_adds_an_explicit_customer_decision(self):
+        body = "## Summary\nx\n\n" + events.red_before_green_block(self.PR)
+        updated = events.repair_evidence_body(self.PR, body, customer_decision={"releaseWorthy": False})
+        self.assertTrue(updated.startswith(body))
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', updated)
+        self.assertEqual(events.repair_evidence_body(self.PR, updated,
+                                                   customer_decision={"releaseWorthy": False}), updated)
+
+    def test_public_decision_round_trips_without_comment_injection(self):
+        decision = {"releaseWorthy": True, "text": "Choose a link --> continue"}
+        updated = events.repair_evidence_body(self.PR, "Summary", customer_decision=decision)
+        marker = updated.split("<!-- customer-changelog/v1 ", 1)[1].split(" -->", 1)[0]
+        self.assertEqual(json.loads(marker), decision)
+        self.assertNotIn("Choose a link -->", updated)
+
+    def test_repair_body_never_infers_or_overwrites_a_customer_decision(self):
+        body = "## Summary\nx"
+        self.assertNotIn("customer-changelog/v1", events.repair_evidence_body(self.PR, body))
+        for existing in ('{"releaseWorthy":true}', 'malformed'):
+            with self.subTest(existing=existing):
+                original = body + "\n<!-- customer-changelog/v1 " + existing + " -->"
+                updated = events.repair_evidence_body(self.PR, original,
+                                                      customer_decision={"releaseWorthy": False})
+                self.assertIn("<!-- customer-changelog/v1 " + existing + " -->", updated)
+                self.assertEqual(updated.count("customer-changelog/v1"), 1)
+        with self.assertRaises(ValueError):
+            events.repair_evidence_body(self.PR, body, customer_decision={"releaseWorthy": "false"})
+
+    def test_ensure_can_repair_customer_metadata_when_red_evidence_is_already_complete(self):
+        body = events.red_before_green_block(self.PR)
+        written = []
+
+        def shell(args):
+            if args[:2] == ["pr", "view"]:
+                return SimpleNamespace(returncode=0, stdout=body)
+            written.append(Path(args[args.index("--body-file") + 1]).read_text())
+            return SimpleNamespace(returncode=0, stdout="")
+
+        self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell,
+                                                      customer_decision={"releaseWorthy": False}))
+        self.assertEqual(len(written), 1)
+        self.assertTrue(events.red_section_complete(written[0]))
+        self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', written[0])
+
     def test_ensure_edits_only_an_incomplete_body(self):
         for body, edits in (("## Summary\nx", 1), (events.red_before_green_block(self.PR), 0)):
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
