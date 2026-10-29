@@ -52,7 +52,7 @@
       "schemaVersion": 1,
       "dimension": "unusedDependencies",
       "direction": "lock_down",
-      "baseline": 0,
+      "baseline": 1,
       "policy": {
         "marginFraction": 0,
         "improveEpsilon": 0,

@@ -78,8 +78,7 @@
     },
     "apps/desktop": {
       "entry": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],
-      "project": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],
-      "ignoreDependencies": ["electron-builder-squirrel-windows"]
+      "project": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"]
     },
     "apps/should-i-make": {
       "entry": ["next.config.{js,ts}"],

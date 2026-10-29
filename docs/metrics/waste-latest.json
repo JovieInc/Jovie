@@ -2,7 +2,7 @@
   "schema": "jovie-waste-sweep/v1",
   "measuredAt": "2026-10-29T17:31:29.466Z",
   "sha": "9813d6596ab69664a3181a88889d04330041c4fc",
-  "score": 11491,
+  "score": 11516,
   "knip": {
     "unusedFiles": 269,
     "unusedFileBytes": 877860,
@@ -10,7 +10,7 @@
     "unusedTypes": 3053,
     "unusedEnumMembers": 2,
     "duplicateExports": 35,
-    "unusedDependencies": 0,
+    "unusedDependencies": 1,
     "unlistedDependencies": 63,
     "unresolvedImports": 51
   },
