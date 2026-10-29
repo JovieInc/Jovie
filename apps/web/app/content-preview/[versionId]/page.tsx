@@ -6,7 +6,7 @@ import { experimentArmBody } from '@/lib/content-records/experiment';
 import { validateContentRecord } from '@/lib/content-records/kind';
 import { MARKETING_PAGE_KIND } from '@/lib/content-records/marketing-page';
 import { getContentVersion } from '@/lib/content-records/store.server';
-import { HomepageQueryProvider } from '../../homepage-query-provider';
+import { HomepageQueryProvider } from '../../(home)/homepage-query-provider';
 
 /**
  * Signed preview of one stored homepage spec version, before or after it is

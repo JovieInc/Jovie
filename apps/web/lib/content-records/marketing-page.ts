@@ -1,5 +1,6 @@
 import { lintCopy } from '@jovie/copy';
 import { z } from 'zod';
+import surfaceCensus from '@/data/designSystem/surfaceCensus.json';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
 import { HOMEPAGE_FAN_STATES_COPY } from '@/data/homepageFanStatesCopy';
 import { MARKETING_SECTIONS } from '@/data/marketing/sections';
@@ -71,6 +72,62 @@ const CtaSection = z
       .strict(),
   })
   .strict();
+
+/**
+ * The spec section registry: every section a page spec may place, bound to
+ * the existing marketing component that renders it and to its DS status.
+ * Entries reuse registered `MARKETING_SECTIONS` ids/variants and existing
+ * components only. `dsStatus` mirrors the surface census group that owns the
+ * component (`data/designSystem/surfaceCensus.json`): `canonical` when that
+ * group is certified, otherwise `migrating`. Specs may place migrating
+ * sections (they are what the live page renders today); the status tells
+ * Summer and the DS audit which sections still need canonical certification.
+ */
+export type SpecSectionDsStatus = 'canonical' | 'migrating';
+
+interface SpecSectionRegistryEntry {
+  readonly section: string;
+  readonly variant: string;
+  readonly component: string;
+  readonly source: string;
+  readonly censusGroup: string;
+  readonly dsStatus: SpecSectionDsStatus;
+}
+
+function censusStatus(groupId: string): SpecSectionDsStatus {
+  const group = surfaceCensus.groups.find(entry => entry.id === groupId);
+  return group?.status === 'canonical' ? 'canonical' : 'migrating';
+}
+
+const HOMEPAGE_SECTION_SOURCE =
+  'apps/web/components/homepage/HomepageArtistProfile.tsx';
+
+export const SPEC_SECTION_REGISTRY: readonly SpecSectionRegistryEntry[] = [
+  {
+    section: 'hero',
+    variant: 'split-claim-card',
+    component: 'HomepageArtistHero',
+    source: HOMEPAGE_SECTION_SOURCE,
+    censusGroup: 'home',
+    dsStatus: censusStatus('home'),
+  },
+  {
+    section: 'product-gallery',
+    variant: 'profile-grid',
+    component: 'HomepageFanStates',
+    source: HOMEPAGE_SECTION_SOURCE,
+    censusGroup: 'home',
+    dsStatus: censusStatus('home'),
+  },
+  {
+    section: 'cta',
+    variant: 'final-single-claim',
+    component: 'HomepageOfferClose',
+    source: HOMEPAGE_SECTION_SOURCE,
+    censusGroup: 'home',
+    dsStatus: censusStatus('home'),
+  },
+];
 
 export const MarketingPageSectionSchema = z.discriminatedUnion('section', [
   HeroSection,
@@ -152,6 +209,15 @@ function sectionsViolations(
   const seen = new Set<string>();
   sections.forEach((entry, index) => {
     const at = `${path}[${index}]`;
+    if (
+      !SPEC_SECTION_REGISTRY.some(
+        r => r.section === entry.section && r.variant === entry.variant
+      )
+    ) {
+      errors.push(
+        `${at}: "${entry.section}/${entry.variant}" is not in the spec section registry`
+      );
+    }
     const registered = MARKETING_SECTIONS.find(s => s.id === entry.section);
     if (!registered) {
       errors.push(

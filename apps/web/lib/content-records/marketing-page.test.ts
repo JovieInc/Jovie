@@ -1,10 +1,15 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { MARKETING_SECTIONS } from '@/data/marketing/sections';
 import { assignExperimentArm, experimentArmBody } from './experiment';
 import { validateContentRecord } from './kind';
 import {
   DEFAULT_HOME_SPEC,
   MARKETING_PAGE_KIND,
+  MarketingPageSectionSchema,
   type MarketingPageSpec,
+  SPEC_SECTION_REGISTRY,
 } from './marketing-page';
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -162,6 +167,34 @@ describe('marketing-page content kind', () => {
       variants: [{ id: 'b', weight: 10, body: cleanSpec().sections }],
     };
     expect(errorsOf(spec).length).toBeGreaterThan(0);
+  });
+});
+
+describe('spec section registry', () => {
+  it('binds every schema section to an existing, registered DS component', () => {
+    const schemaPairs = MarketingPageSectionSchema.options.map(option => [
+      option.shape.section.value,
+      option.shape.variant.value,
+    ]);
+    expect(
+      SPEC_SECTION_REGISTRY.map(entry => [entry.section, entry.variant])
+    ).toEqual(schemaPairs);
+    for (const entry of SPEC_SECTION_REGISTRY) {
+      const section = MARKETING_SECTIONS.find(s => s.id === entry.section);
+      expect(section?.variants.map(v => v.id)).toContain(entry.variant);
+      const source = readFileSync(
+        resolve(process.cwd(), '../..', entry.source),
+        'utf8'
+      );
+      expect(source).toContain(`export function ${entry.component}(`);
+    }
+  });
+
+  it('marks homepage sections migrating while the census holds them out', () => {
+    // surfaceCensus `home` is a holdout (JOV-8101); flip with the census.
+    expect(new Set(SPEC_SECTION_REGISTRY.map(e => e.dsStatus))).toEqual(
+      new Set(['migrating'])
+    );
   });
 });
 
