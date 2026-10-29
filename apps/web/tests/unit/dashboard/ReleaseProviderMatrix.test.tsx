@@ -526,7 +526,9 @@ vi.mock(
   })
 );
 
-import { ReleaseProviderMatrix } from '@/components/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix';
+const { ReleaseProviderMatrix } = await import(
+  '@/features/dashboard/organisms/release-provider-matrix/ReleaseProviderMatrix'
+);
 
 interface ProviderConfigEntry {
   label: string;
@@ -700,14 +702,22 @@ describe('ReleaseProviderMatrix', () => {
     it.each([true, false])(
       'passes connection state %s into the Spotify dialog',
       connected => {
-        renderWithProviders(
-          <ReleaseProviderMatrix
-            releases={[]}
-            providerConfig={providerConfig}
-            primaryProviders={primaryProviders}
-            spotifyConnected={connected}
-            spotifyArtistName='Tim White'
-          />
+        render(
+          <QueryClientProvider client={new QueryClient()}>
+            <TooltipProvider>
+              <HeaderActionsProvider>
+                <RightPanelProvider>
+                  <ReleaseProviderMatrix
+                    releases={[]}
+                    providerConfig={providerConfig}
+                    primaryProviders={primaryProviders}
+                    spotifyConnected={connected}
+                    spotifyArtistName='Tim White'
+                  />
+                </RightPanelProvider>
+              </HeaderActionsProvider>
+            </TooltipProvider>
+          </QueryClientProvider>
         );
         expect(screen.getByTestId('spotify-dialog-connection')).toHaveAttribute(
           'data-connected',
