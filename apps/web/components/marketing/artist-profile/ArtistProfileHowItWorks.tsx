@@ -1,4 +1,4 @@
-// @coverage-via apps/web/tests/unit/marketing/component-registry.test.ts
+// @coverage-via apps/web/components/marketing/artist-profile/ArtistProfileHowItWorks.test.tsx
 import { ProductShot } from '@/components/marketing/ProductShot';
 import type { ArtistProfileLandingCopy } from '@/data/artistProfileCopy';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
