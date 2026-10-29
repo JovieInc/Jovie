@@ -269,8 +269,9 @@ def cmd_prepare(a) -> int:
             why = "claimed-elsewhere"
         if not why:
             plan["files"] = [f["filename"] for f in gh_json(["api", f"repos/{REPO}/pulls/{n}/files?per_page=100"])]
-            if any(SENSITIVE.search(f) for f in plan["files"]):
-                why = "sensitive-paths->codex"
+            # Sensitive paths only bar edits by the model or the wiring fixer; a rebase, a rerun and a
+            # conflict sync leave the PR's own diff untouched, so they stay allowed.
+            plan["sensitive"] = any(SENSITIVE.search(f) for f in plan["files"])
         if why:
             plan.update(outcome="skipped", reason=why)
             return finish_plan(plan, a)
@@ -295,7 +296,9 @@ def cmd_prepare(a) -> int:
                     checks=cls["checks"], signature=cls["signature"], mergeable=pr.get("mergeable_state"))
         if pr.get("mergeable_state") == "dirty":
             plan.update(action="sync-main", cls="conflict")
-        if plan["action"] == classes.AGENT and a.agent != "true":
+        if plan.get("sensitive") and plan["action"] in {classes.AGENT, classes.WIRE_CI_FAST}:
+            plan.update(outcome="skipped", reason="sensitive-paths->codex", action="none")
+        elif plan["action"] == classes.AGENT and a.agent != "true":
             plan.update(outcome="skipped", reason="model-budget-closed", action="none")
         elif plan["action"] == classes.AGENT:
             if attempts_for(n, cls["key"]) >= MAX_ATTEMPTS:

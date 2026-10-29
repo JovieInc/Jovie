@@ -16,6 +16,11 @@ class SwarmPolicyTest(unittest.TestCase):
         for path in ("apps/web/components/Button.tsx", "docs/README.md", "scripts/ci-fast-lanes.mjs"):
             self.assertFalse(swarm.SENSITIVE.search(path), path)
 
+    def test_sensitive_gate_blocks_model_edits_only(self):
+        src = Path(swarm.__file__).read_text()
+        self.assertIn('plan["action"] in {classes.AGENT, classes.WIRE_CI_FAST}', src)
+        self.assertNotIn('why = "sensitive-paths->codex"', src)
+
     def test_launch_shepherd_prs_are_excluded(self):
         self.assertTrue({23495, 23519} <= swarm.EXCLUDED)
 
