@@ -30,7 +30,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 CAPACITY_PATH = ROOT / "ops/registry/capacity.json"
 MODEL_REGISTRY_PATH = ROOT / "scripts/backlog-orchestrator/config/model-registry.json"
-GATEWAY_URL = "https://ai-gateway.vercel.sh/v1/models"
+PROVIDERS_PATH = ROOT / "packages/api-client/providers.json"
 CODEX_CACHE = Path.home() / ".codex/models_cache.json"
 SCHEMA = "jovie.model-families/v1"
 DAY = 86400
@@ -255,7 +255,8 @@ def codex_evidence(doc: dict) -> set:
 def fetch_gateway() -> dict:
     sys.path.insert(0, str(HERE.parent))
     from apiclient import ApiClient  # the one client layer; the Gateway catalog is public, so the credential is empty-labelled
-    return ApiClient("ai-gateway", "public-catalog").request(GATEWAY_URL, priority="poll").json()
+    host = json.loads(PROVIDERS_PATH.read_text())["providers"]["ai-gateway"]["hosts"][0]  # host comes from the one provider registry
+    return ApiClient("ai-gateway", "public-catalog").request(f"https://{host}/v1/models", priority="poll").json()
 
 
 def read_codex(path: Path = CODEX_CACHE) -> dict | None:
