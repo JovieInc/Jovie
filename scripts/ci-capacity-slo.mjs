@@ -4,6 +4,8 @@
 // Exit 2 when hosted queue wait p95 exceeds the alarm threshold.
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { summarizeCapacity } from './lib/ci-capacity.mjs';
 
 const arg = (flag, fallback) => {
@@ -14,12 +16,17 @@ const repo = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const windowMinutes = Number(arg('--minutes', '15'));
 const maxRuns = Number(arg('--max-runs', '120'));
 const out = arg('--out', 'docs/metrics/ci-capacity-latest.json');
+const API_CLIENT_CLI = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '../packages/api-client/cli.ts'
+);
 const gh = args =>
   JSON.parse(
-    execFileSync('gh', ['api', ...args], {
-      encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
-    })
+    execFileSync(
+      process.execPath,
+      [API_CLIENT_CLI, 'gh', '--priority', 'report', '--', 'api', ...args],
+      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }
+    )
   );
 
 const since = new Date(Date.now() - windowMinutes * 60_000).toISOString();

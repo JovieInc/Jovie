@@ -94,7 +94,6 @@ jobs:
       # Sampled hosted queue wait + control-plane spend; exit 2 = p95 > 120s
       # alarm, which is surfaced in the report instead of failing the SLO run.
       - name: Sample hosted runner capacity
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
