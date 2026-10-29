@@ -17,6 +17,7 @@ export const OUTBOUND_REJECT_REASONS = [
   'too_big',
   'not_a_fit',
   'bad_data',
+  'wrong_artifact',
   'other',
 ] as const;
 export type OutboundRejectReason = (typeof OUTBOUND_REJECT_REASONS)[number];
@@ -31,6 +32,7 @@ export const OUTBOUND_REJECT_REASON_LABELS: Record<
   too_big: 'Too big',
   not_a_fit: 'Not a fit',
   bad_data: 'Bad data',
+  wrong_artifact: 'Page is wrong',
   other: 'Other',
 };
 

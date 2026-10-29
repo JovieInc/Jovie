@@ -37,6 +37,7 @@ import {
   getOutboundDecisionErrorMessage,
   useOutboundCertificationQuery,
   useOutboundDecisionMutation,
+  useOutboundEngineQuery,
   useOutboundFactReviewMutation,
   useOutboundQueueQuery,
   useOutboundReadinessQuery,
@@ -47,6 +48,7 @@ import { cn } from '@/lib/utils';
 import { formatTimeAgo } from '@/lib/utils/date-formatting';
 import { OutboundRail } from './OutboundRail';
 import { OutboundReadinessPanel } from './OutboundReadinessPanel';
+import { OutboundReviewDeck, reviewableRows } from './OutboundReviewDeck';
 import {
   isTypingTarget,
   resolveOutboundKey,
@@ -404,9 +406,36 @@ export function OutboundWorkspace() {
     [decideTargets]
   );
 
+  const [reviewing, setReviewing] = useState(false);
+  const engine = useOutboundEngineQuery(reviewing);
+  const reviewCount = useMemo(
+    () => reviewableRows(queue?.rows ?? []).length,
+    [queue]
+  );
+  const reviewApprove = useCallback(
+    (row: OutboundRow, copy: OutboundCopy) =>
+      run(
+        'approve',
+        () => decide({ action: 'approve', ...targetRef(row), copy }),
+        'Approved. Nothing sends until outbound opens.'
+      ),
+    [decide, run]
+  );
+  const reviewReject = useCallback(
+    (row: OutboundRow, reason: OutboundRejectReason) =>
+      run(
+        'reject',
+        () => decide({ action: 'reject', items: [targetRef(row)], reason }),
+        'Rejected'
+      ),
+    [decide, run]
+  );
+
   // Surface-scoped accelerators. Typing in the message editor is never stolen.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // The review deck owns the keyboard while it is open.
+      if (reviewing) return;
       if (isTypingTarget(event.target)) return;
       const action = resolveOutboundKey(event);
       if (!action) return;
@@ -458,6 +487,7 @@ export function OutboundWorkspace() {
     focusedIndex,
     onFact,
     onHold,
+    reviewing,
     rows,
     selectedId,
     toggleBulk,
@@ -585,6 +615,18 @@ export function OutboundWorkspace() {
                 {bulk.size ? `${bulk.size} selected · h hold · r reject` : ''}
               </span>
               <PageToolbarTabButton
+                active={reviewing}
+                onClick={() => setReviewing(current => !current)}
+                label={
+                  <span
+                    className='whitespace-nowrap tabular-nums'
+                    data-testid='outbound-review-toggle'
+                  >
+                    Review {reviewCount || ''}
+                  </span>
+                }
+              />
+              <PageToolbarTabButton
                 active={showReadiness}
                 onClick={() => setShowReadiness(current => !current)}
                 label={
@@ -634,34 +676,48 @@ export function OutboundWorkspace() {
             />
           </div>
         ) : null}
-        <AdminTableShell testId='ovie-outbound-table'>
-          {() => (
-            <AdminDataTable
-              data={rows}
-              columns={columns}
-              isLoading={query.isLoading}
-              skeletonRows={10}
-              skeletonColumnConfig={[
-                { variant: 'text' },
-                { variant: 'person' },
-              ]}
-              minWidth='440px'
-              getRowId={row => row.leadId}
-              getRowClassName={getRowClassName}
-              getRowTestId={row => `outbound-row-${row.leadId}`}
-              onRowClick={row => {
-                setSelectedId(row.leadId);
-                setFocusedIndex(rows.indexOf(row));
-              }}
-              focusedRowIndex={focusedIndex}
-              onFocusedRowChange={index => {
-                setFocusedIndex(index);
-                setSelectedId(rows[index]?.leadId ?? null);
-              }}
-              emptyState={emptyState}
+        {reviewing ? (
+          <div className='min-h-0 flex-1'>
+            <OutboundReviewDeck
+              rows={queue?.rows ?? []}
+              engine={engine.data}
+              pending={pending}
+              error={error}
+              onApprove={reviewApprove}
+              onReject={reviewReject}
+              onExit={() => setReviewing(false)}
             />
-          )}
-        </AdminTableShell>
+          </div>
+        ) : (
+          <AdminTableShell testId='ovie-outbound-table'>
+            {() => (
+              <AdminDataTable
+                data={rows}
+                columns={columns}
+                isLoading={query.isLoading}
+                skeletonRows={10}
+                skeletonColumnConfig={[
+                  { variant: 'text' },
+                  { variant: 'person' },
+                ]}
+                minWidth='440px'
+                getRowId={row => row.leadId}
+                getRowClassName={getRowClassName}
+                getRowTestId={row => `outbound-row-${row.leadId}`}
+                onRowClick={row => {
+                  setSelectedId(row.leadId);
+                  setFocusedIndex(rows.indexOf(row));
+                }}
+                focusedRowIndex={focusedIndex}
+                onFocusedRowChange={index => {
+                  setFocusedIndex(index);
+                  setSelectedId(rows[index]?.leadId ?? null);
+                }}
+                emptyState={emptyState}
+              />
+            )}
+          </AdminTableShell>
+        )}
         <p className='border-t border-(--app-shell-frame-seam) px-3 py-1.5 text-2xs text-tertiary-token'>
           j/k person · [/] fact · y/n/u answer fact · a approve message · h hold
           · r reject · x select. Approving records your decision; nothing sends
