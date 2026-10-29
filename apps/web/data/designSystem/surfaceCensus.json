@@ -396,9 +396,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-29T16:42:02.685Z",
-        "ref": "docs/screenshots/mvp-pricing-audit-1029/README.md. PR #23570 replaced the false comparison row (fan capture capped at 100 on Free) with true certified rows; layout unchanged; pricing e2e 11/11 at 320-1440, no horizontal overflow at 1440 and 390. Merged with PR #23618 (main): its shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements. Main Renewed 2026-10-29 (PR #23597 rebase onto #23618): MarketingHero dropped its unused photo prop and photo-only classes; content-mode DOM and classes are unchanged (MarketingHero.test.tsx). Renewed 2026-10-29 (PR #23606 rebase onto main): comparison renders certified registry rows with one closing CTA; /pricing edges unchanged at 1440 and 390.",
-        "sourceDigest": "c399c8fa3de814a77cc4068b986e50bf7e070bf6cfe737757c96537c8ab995e7"
+        "at": "2026-10-29T18:18:38.299Z",
+        "ref": "docs/screenshots/mvp-pricing-audit-1029/README.md. PR #23570 replaced the false comparison row (fan capture capped at 100 on Free) with true certified rows; layout unchanged; pricing e2e 11/11 at 320-1440, no horizontal overflow at 1440 and 390. Merged with PR #23618 (main): its shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements. Main Renewed 2026-10-29 (PR #23597 rebase onto #23618): MarketingHero dropped its unused photo prop and photo-only classes; content-mode DOM and classes are unchanged (MarketingHero.test.tsx). Renewed 2026-10-29 (PR #23606 rebase onto main): comparison renders certified registry rows with one closing CTA; /pricing edges unchanged at 1440 and 390. Renewed 2026-10-29 (PR #23606 rebase onto main): shared owner files changed upstream; /pricing comparison and edges unchanged at 1440 and 390.",
+        "sourceDigest": "a34e54d0466973063aaba1e6509685f4bf7f33440d9eb8d6637a6ec521abf9ad"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
