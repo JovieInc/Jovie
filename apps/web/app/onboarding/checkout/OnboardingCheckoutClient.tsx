@@ -93,50 +93,51 @@ function CatalogPreviewCard({
   const visible = catalog.releases.slice(0, 3);
   if (visible.length === 0) return null;
   return (
-    <ContentSurfaceCard
-      className='mb-6 p-4'
-      data-testid='checkout-catalog-preview'
-    >
-      <p className='mb-3 text-xs font-medium text-tertiary-token tabular-nums'>
-        {catalog.total === 1
-          ? '1 release on your page'
-          : `${catalog.total} releases on your page`}
-      </p>
-      <ul className='space-y-2'>
-        {visible.map((release, index) => (
-          <li
-            key={release.id}
-            className='flex items-center gap-3'
-            data-testid='checkout-catalog-release'
-          >
-            {release.artworkUrl ? (
-              <Image
-                src={release.artworkUrl}
-                alt=''
-                width={40}
-                height={40}
-                className='h-10 w-10 shrink-0 rounded-md object-cover'
-              />
-            ) : (
-              <div className='h-10 w-10 shrink-0 rounded-md bg-surface-2' />
-            )}
-            <div className='min-w-0'>
-              <p className='truncate text-app font-medium text-primary-token'>
-                {release.title}
-              </p>
-              <p className='text-xs text-tertiary-token tabular-nums'>
-                {[
-                  index === 0 ? 'Latest' : null,
-                  releaseYear(release.releaseDate),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
-    </ContentSurfaceCard>
+    <div className='mb-6' data-testid='checkout-catalog-preview'>
+      <ContentSurfaceCard>
+        <div className='p-4'>
+          <p className='mb-3 text-xs font-medium text-tertiary-token tabular-nums'>
+            {catalog.total === 1
+              ? '1 release on your page'
+              : `${catalog.total} releases on your page`}
+          </p>
+          <ul className='space-y-2'>
+            {visible.map((release, index) => (
+              <li
+                key={release.id}
+                className='flex items-center gap-3'
+                data-testid='checkout-catalog-release'
+              >
+                {release.artworkUrl ? (
+                  <Image
+                    src={release.artworkUrl}
+                    alt=''
+                    width={40}
+                    height={40}
+                    className='h-10 w-10 shrink-0 rounded-md object-cover'
+                  />
+                ) : (
+                  <div className='h-10 w-10 shrink-0 rounded-md bg-surface-2' />
+                )}
+                <div className='min-w-0'>
+                  <p className='truncate text-app font-medium text-primary-token'>
+                    {release.title}
+                  </p>
+                  <p className='text-xs text-tertiary-token tabular-nums'>
+                    {[
+                      index === 0 ? 'Latest' : null,
+                      releaseYear(release.releaseDate),
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </ContentSurfaceCard>
+    </div>
   );
 }
 
