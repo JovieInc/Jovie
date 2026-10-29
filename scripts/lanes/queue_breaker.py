@@ -5,9 +5,11 @@
 behind it (about 10 min of CI apiece) and a per-head breaker never tripped because the head kept
 changing. Two merge-group CI failures for one PR within WINDOW_S dequeue it, label it `lane-fix-red`
 (an admission hold label, so the enroll path will not re-enqueue it), and comment with the failing
-check and its first error line. Re-enqueue stays blocked until the head changes AND the failing check
-passes at PR time: the relay clears `lane-fix-red` when Source Validation succeeds, and this sweep
-puts the label back while the head is still the one that failed. State: queue-breaker.json, log:
+check and its first error line. Failures count per PR head: a merge-group run that started before the
+PR's current head existed belongs to an older head and is ignored, so a fix pushed after a trip never
+inherits the old head's failures. The hold stays while the head is the one that failed (the sweep puts
+the label back if the relay cleared it); when a new head is pushed the sweep removes `lane-fix-red`
+itself, for PRs this breaker tripped only (a human or hold-contract label is never touched). State: queue-breaker.json, log:
 queue-breaker.jsonl. All GitHub access goes through the injected budgeted gh runner."""
 from __future__ import annotations
 
@@ -49,8 +51,27 @@ def failures_by_pr(runs: list[dict], now: float) -> dict[int, list[dict]]:
         ended = _epoch(row.get("updated_at"))
         if row.get("conclusion") != "failure" or not match or ended is None or not 0 <= now - ended <= WINDOW_S:
             continue
-        found.setdefault(int(match[1]), []).append({"id": row["id"], "at": ended, "head": row.get("head_sha")})
+        found.setdefault(int(match[1]), []).append({"id": row["id"], "at": ended, "head": row.get("head_sha"),
+                                                    "started": _epoch(row.get("created_at"))})
     return found
+
+
+def head_since(run, repo: str, sha: str | None) -> float | None:
+    """When the PR's current head commit was created; None when unknown (then nothing is discounted)."""
+    if not sha:
+        return None
+    try:
+        commit = json.loads(_gh(run, "api", f"repos/{repo}/commits/{sha}")).get("commit") or {}
+    except (RuntimeError, ValueError):
+        return None
+    return _epoch((commit.get("committer") or {}).get("date"))
+
+
+def current_head_failures(fails: list[dict], since: float | None) -> list[dict]:
+    """Failures of the current head only: a group run that started before the head existed ran an older head."""
+    if since is None:
+        return fails
+    return [f for f in fails if f.get("started") is None or f["started"] >= since]
 
 
 def failing_check(run, repo: str, run_id: int) -> dict:
@@ -92,6 +113,9 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") ->
         pr = queued.get(number)
         if len(fails) < TRIP_FAILURES or pr is None or len(out["tripped"]) >= MAX_TRIPS_PER_TICK:
             continue
+        fails = current_head_failures(fails, head_since(run, repo, pr.get("headRefOid")))
+        if len(fails) < TRIP_FAILURES:
+            continue
         try:
             check = failing_check(run, repo, max(fails, key=lambda f: f["at"])["id"])
             _gh(run, "api", "graphql", "-f", f"query={DEQUEUE}", "-f", f"id={pr['id']}")
@@ -122,7 +146,17 @@ def sweep(state, run, now: float | None = None, repo: str = "JovieInc/Jovie") ->
             if current.get("state") != "open":
                 saved.pop(number, None)
                 continue
-            if (current.get("head") or {}).get("sha") == record.get("head"):
+            if (current.get("head") or {}).get("sha") != record.get("head"):
+                # New head: the breaker's own hold is released. Only this label, and only for a PR it tripped.
+                labels = [l.get("name") for l in current.get("labels") or []]
+                if HOLD_LABEL in labels:
+                    _gh(run, "api", "-X", "DELETE", f"repos/{repo}/issues/{number}/labels/{HOLD_LABEL}")
+                saved.pop(number, None)
+                out.setdefault("released", []).append(int(number))
+                with open(state / LOG_FILE, "a") as log:
+                    log.write(json.dumps({"at": now, "pr": int(number), "head": (current.get("head") or {}).get("sha"),
+                                          "action": "released-new-head"}) + "\n")
+            else:
                 labels = [l.get("name") for l in current.get("labels") or []]
                 if HOLD_LABEL not in labels:
                     _gh(run, "api", f"repos/{repo}/issues/{number}/labels", "-f", f"labels[]={HOLD_LABEL}")

@@ -243,6 +243,41 @@ class QueueBreakerTest(unittest.TestCase):
             labels.clear()
             released = qb.sweep(Path(raw), run, NOW + 1200)
             self.assertEqual((released["reblocked"], labels), ([], []))
+            # ...and the breaker removes its own label itself, only that one, and forgets the PR.
+            self.assertEqual(released["released"], [23471])
+            self.assertEqual(json.loads((Path(raw) / qb.STATE_FILE).read_text()), {})
+
+    def test_failures_on_head_a_never_hold_the_fixed_head_b(self):
+        qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
+        qb.__spec__.loader.exec_module(qb)
+        calls, pushed_at = [], NOW - 300  # head B was committed 5 min ago, after both failures on head A
+
+        def run(args, **kwargs):
+            calls.append(args)
+            flat = " ".join(args)
+            if "workflows/ci.yml/runs" in flat:
+                rows = [{"id": 21, "head_branch": "gh-readonly-queue/main/pr-23570-aaa", "conclusion": "failure", "head_sha": "g1",
+                         "created_at": iso(NOW - 2400), "updated_at": iso(NOW - 2000)},
+                        {"id": 22, "head_branch": "gh-readonly-queue/main/pr-23570-bbb", "conclusion": "failure", "head_sha": "g2",
+                         "created_at": iso(NOW - 1500), "updated_at": iso(NOW - 900)}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "mergeQueue" in flat:
+                node = {"state": "AWAITING_CHECKS", "pullRequest": {"id": "PR_Z", "number": 23570, "headRefOid": "b" * 40}}
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": [node]}}}}}))
+            if "/commits/" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"commit": {"committer": {"date": iso(pushed_at)}}}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)  # head B is in the queue and passing: nothing to trip
+            self.assertEqual((out["tripped"], out["reblocked"], out["errors"]), ([], [], []))
+            flat = "\n".join(" ".join(c) for c in calls)
+            self.assertNotIn("dequeuePullRequest", flat)
+            self.assertNotIn("lane-fix-red", flat)
+            # Two failures that DO start after head B was pushed still trip it (the breaker is per head, not off).
+            pushed_at = NOW - 3000
+            again = qb.sweep(Path(raw), run, NOW)
+            self.assertEqual(again["tripped"], [23570])
 
 
 class IdleNotDemandTest(unittest.TestCase):
