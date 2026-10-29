@@ -159,9 +159,7 @@ export function getPaidSuccessPrimaryLabel(input: {
 }): string {
   if (input.isOnboardingUpgrade) return 'Explore your dashboard';
   if (input.needsProfile) return 'Claim your link';
-  return isArtistVisibilityPlan(input.plan)
-    ? 'Open your profiles'
-    : 'Go to chat';
+  return isArtistVisibilityPlan(input.plan) ? 'Open Identity' : 'Go to chat';
 }
 
 export function shouldCelebratePaidSuccess(

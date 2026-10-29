@@ -314,11 +314,11 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
-  it('primary Pro CTA routes to the profiles workspace', () => {
+  it('primary Pro CTA routes to the Identity workspace', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
     expect(
-      screen.getByRole('link', { name: /open your profiles/i })
+      screen.getByRole('link', { name: /open identity/i })
     ).toHaveAttribute('href', '/app/presence');
   });
 
@@ -334,7 +334,7 @@ describe('CheckoutSuccessPage — CTAs and verification', () => {
       await screen.findByRole('link', { name: /claim your link/i })
     ).toHaveAttribute('href', '/start');
     expect(
-      screen.queryByRole('link', { name: /open your profiles/i })
+      screen.queryByRole('link', { name: /open identity/i })
     ).not.toBeInTheDocument();
   });
 
