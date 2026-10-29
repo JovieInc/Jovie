@@ -42,6 +42,8 @@ on:
       - 'apps/web/lib/idempotency.ts'
       - 'apps/web/lib/stripe/**'
       - 'apps/web/proxy.ts'
+      # Model registry change: re-arm the top-touch modules (a better model writes better tests).
+      - 'ops/registry/capacity.json'
   # Event-driven incremental sweep: after main CI settles, re-score every
   # module whose source changed since it was last scored. The sweep checks out
   # `main` itself, so a fork branch named main cannot supply code.
@@ -128,7 +130,8 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' && (
         (github.event_name == 'workflow_dispatch' && inputs.mode != 'diff') ||
-        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+        github.event_name == 'push'
       )
     # Gem self-hosted runners (test-quality loop, 2026-10-29): hosted is saturated, Gem has
     # spare cores. The preflight below still skips when Gem is short on RAM, disk or CPU.
@@ -198,6 +201,8 @@ jobs:
           # expands from billing, auth and the golden path outward.
           git fetch --quiet --unshallow origin main 2>/dev/null || git fetch --quiet --depth=2000 origin main
           node scripts/test-quality-loop.mjs rank --out "$RUNNER_TEMP/ranked.json" --top 0
+          [ -f "$state_dir/sweep-state.json" ] && node scripts/test-quality-loop.mjs model-check \
+            --state "$state_dir/sweep-state.json" --ranked "$RUNNER_TEMP/ranked.json" || true
           nice -n 19 node scripts/mutation-sweep.mjs \
             --touch-file "$RUNNER_TEMP/ranked.json" \
             --state "$state_dir/sweep-state.json" \
@@ -205,7 +210,13 @@ jobs:
             --summary "$GITHUB_STEP_SUMMARY" \
             --github-output "$GITHUB_OUTPUT" \
             --propose-baseline "$RUNNER_TEMP/baseline-proposal.json"
+          # Metrics (mutation score per surface, survivors killed, test minutes, flakes) and the
+          # warn-only floor check; the report is uploaded and read by the Shipping SLO feed.
+          node scripts/test-quality-loop.mjs report --state "$state_dir/sweep-state.json" \
+            --out "$RUNNER_TEMP/test-quality-latest.json" || true
+          node scripts/test-quality-loop.mjs ratchet --state "$state_dir/sweep-state.json" || true
           mkdir -p "$RUNNER_TEMP/sweep-out"
+          cp "$RUNNER_TEMP/test-quality-latest.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
           cp "$state_dir/sweep-state.json" "$state_dir/sweep-state.json.runs.jsonl" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
           cp -r "$state_dir/survivor-tasks" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
           cp "$RUNNER_TEMP/baseline-proposal.json" "$RUNNER_TEMP/sweep-out/" 2>/dev/null || true
