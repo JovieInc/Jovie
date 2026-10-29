@@ -1,0 +1,46 @@
+import type { SiteChrome } from './site-chrome';
+import { toResolvedSiteChrome } from './site-chrome.defaults';
+
+/**
+ * Resolution smoke test for the site-chrome publish gate: run the record
+ * through the same resolver the public shell uses and confirm every nav link,
+ * footer column title, label and destination survives it. Catches a record
+ * that validates but resolves to something the shell would drop or rewrite.
+ *
+ * It deliberately does not draw the footer component: that is a client
+ * component, which server code (this runs in the publish route) can neither
+ * call nor render. `site-chrome.test.tsx` renders the real footer against the
+ * default record.
+ */
+export function siteChromeSmoke(chrome: SiteChrome): string[] {
+  const resolved = toResolvedSiteChrome(chrome);
+  const errors: string[] = [];
+  chrome.footer.columns.forEach((column, index) => {
+    const drawn = resolved.footerColumns[index];
+    if (!drawn || drawn.title !== column.title) {
+      errors.push(`footer.${column.id}.title: did not resolve`);
+      return;
+    }
+    for (const link of column.links) {
+      const match = drawn.links.find(
+        candidate =>
+          candidate.href === link.href && candidate.label === link.label
+      );
+      if (!match)
+        errors.push(`footer.${column.id}.${link.id}: did not resolve`);
+    }
+  });
+  for (const group of ['primary', 'customers'] as const) {
+    chrome.nav[group].forEach((link, index) => {
+      const drawn = resolved.nav[group][index];
+      if (drawn?.href !== link.href || drawn?.label !== link.label) {
+        errors.push(`nav.${group}.${link.id}: did not resolve`);
+      }
+    });
+  }
+  for (const required of ['/legal/privacy', '/legal/terms']) {
+    const drawn = resolved.legalLinks.some(link => link.href === required);
+    if (!drawn) errors.push(`footer.legal: ${required} missing`);
+  }
+  return errors;
+}

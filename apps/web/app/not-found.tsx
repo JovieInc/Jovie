@@ -4,18 +4,13 @@ import { Container } from '@/components/site/Container';
 import { MarketingFooter } from '@/components/site/MarketingFooter';
 import { MarketingHeader } from '@/components/site/MarketingHeader';
 import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
-import {
-  DEFAULT_SITE_CHROME,
-  toResolvedSiteChrome,
-} from '@/lib/content-records/site-chrome.defaults';
 
 // The 404 renders the code-default chrome synchronously: it is the fallback
 // page, so it must not depend on a store read to draw.
 export default function NotFound() {
-  const chrome = toResolvedSiteChrome(DEFAULT_SITE_CHROME);
   return (
     <div className='system-b-root-not-found-page system-b-marketing dark min-h-screen'>
-      <MarketingHeader chromeNav={chrome.nav} logoSize='xs' variant='minimal' />
+      <MarketingHeader logoSize='xs' variant='minimal' />
 
       <main
         id='main-content'
@@ -29,10 +24,7 @@ export default function NotFound() {
         </Container>
       </main>
 
-      <MarketingFooter
-        columns={chrome.footerColumns}
-        legalLinks={chrome.legalLinks}
-      />
+      <MarketingFooter />
     </div>
   );
 }
