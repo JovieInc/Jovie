@@ -118,6 +118,7 @@ export async function GET(request: Request) {
         avatarLockedByUser: creatorProfiles.avatarLockedByUser,
         onboardingCompletedAt: creatorProfiles.onboardingCompletedAt,
         settings: creatorProfiles.settings,
+        creatorType: creatorProfiles.creatorType,
       })
       .from(creatorProfiles)
       .where(eq(creatorProfiles.id, profileId))
@@ -331,6 +332,7 @@ export async function GET(request: Request) {
 
     const starterContext: SuggestionsStarterContext = {
       segment: inferSegment({
+        creatorType: profile.creatorType,
         explicit: explicitSegmentFromSettings(profile.settings),
         hasMusicCatalog: latestRelease.length > 0 || dspMatches.length > 0,
       }).segment,

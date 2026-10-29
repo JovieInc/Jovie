@@ -201,11 +201,24 @@ export function inferSegment(signals: SegmentSignals): SegmentInference {
     .filter(([segment, value]) => segment !== 'other' && value > 0)
     .sort((a, b) => b[1] - a[1]);
   const top = ranked[0];
-  if (!top) return NEUTRAL_RESULT;
+  // Music artists are the primary launch ICP. An `artist` creator_type with
+  // nothing pointing elsewhere is a musician, never neutral.
+  const artistDefault: SegmentInference = {
+    segment: 'musician',
+    confidence: SEGMENT_CONFIDENCE_THRESHOLD,
+    candidate: 'musician',
+    source: 'inferred',
+  };
+  if (!top) {
+    return signals.creatorType === 'artist' ? artistDefault : NEUTRAL_RESULT;
+  }
   const [segment, confidence] = top;
   const runnerUp = ranked[1];
   const margin = runnerUp ? confidence - runnerUp[1] : confidence;
   if (confidence < SEGMENT_CONFIDENCE_THRESHOLD || margin < 0.15) {
+    if (signals.creatorType === 'artist' && segment === 'musician') {
+      return artistDefault;
+    }
     return { ...NEUTRAL_RESULT, confidence, candidate: segment };
   }
   return { segment, confidence, candidate: segment, source: 'inferred' };

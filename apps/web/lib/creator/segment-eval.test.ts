@@ -43,7 +43,9 @@ function selectedText(segment: ResolvedSegment): string[] {
       i.id.replace(/_/g, ' ')
     ),
     ...selectForSegment(
-      SCRIPT_LINES.filter(l => l.segments),
+      SCRIPT_LINES.flatMap(l =>
+        l.segments ? [{ segments: l.segments, text: l.text }] : []
+      ),
       segment
     ).map(l => l.text),
   ];
