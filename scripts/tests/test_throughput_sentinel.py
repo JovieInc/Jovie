@@ -139,11 +139,54 @@ class ThroughputSentinelTest(unittest.TestCase):
             self.assertEqual((signal["mergeGroupRuns"], signal["mergeGroupStartP50Min"], signal["leaseHeldMin"]),
                              (3, 10.0, 50.0))  # skipped run ignored, three jobs sampled
             again, _ = ts.sample_release_flow(Path(raw), NOW + 10, run)
-            self.assertEqual(len(calls), 5)  # 1 runs + 3 jobs + 1 lease; cached for five minutes
+            self.assertEqual(len(calls), 6)  # 1 runs + 3 jobs + 1 lease + 1 queued count; cached for five minutes
             self.assertEqual(again["leaseRunIds"], [7])
             failing = lambda args, **kw: SimpleNamespace(returncode=1, stdout="", stderr="boom")
             signal, error = ts.sample_release_flow(Path(raw), NOW + 3600, failing)
             self.assertIn("boom", error)
+
+
+class ClaimErrorTest(unittest.TestCase):
+    def test_claim_error_rate_over_twenty_percent_alarms_per_lane(self):
+        dead = {"provider": "codex", "endedAt": iso(NOW - 60), "verdict": "failed",
+                "reasons": ["claim-error:JSONDecodeError:Unterminated string starting at: line 1 column 421"]}
+        ok = {"provider": "codex", "endedAt": iso(NOW - 120), "verdict": "fix-pushed", "reasons": []}
+        old = {"provider": "codex", "endedAt": iso(NOW - 7200), "verdict": "failed", "reasons": dead["reasons"]}
+        rows = ts.claim_errors_by_lane([dead] * 3 + [ok] * 4 + [old] * 9, NOW)
+        self.assertEqual((rows["codex"]["runs"], rows["codex"]["claimErrors"]), (7, 3))
+        alerts = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": rows}})
+        self.assertIn("throughput-claim-errors:codex", alerts)
+        healthy = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": ts.claim_errors_by_lane([dead] + [ok] * 9, NOW)}})
+        self.assertNotIn("throughput-claim-errors:codex", healthy)
+        few = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": ts.claim_errors_by_lane([dead] * 3, NOW)}})
+        self.assertNotIn("throughput-claim-errors:codex", few)
+
+
+class QueueUnmergeableTest(unittest.TestCase):
+    def test_unmergeable_entry_is_dequeued_commented_and_routed_after_the_grace(self):
+        qm = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_unmergeable", ROOT / "scripts/lanes/queue_unmergeable.py"))
+        qm.__spec__.loader.exec_module(qm)
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            if any("mergeQueue" in a for a in args):
+                nodes = [{"state": "UNMERGEABLE", "position": 3, "pullRequest": {"id": "PR_1", "number": 23519, "headRefOid": "a" * 40}},
+                         {"state": "AWAITING_CHECKS", "position": 1, "pullRequest": {"id": "PR_2", "number": 7, "headRefOid": "b" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            first = qm.sweep(Path(raw), run, NOW)
+            self.assertEqual((first["dequeued"], [r["pr"] for r in first["seen"]]), ([], [23519]))
+            second = qm.sweep(Path(raw), run, NOW + qm.GRACE_S + 1)
+            self.assertEqual(second["dequeued"], [23519])
+            flat = "\n".join(" ".join(c) for c in calls)
+            self.assertIn("dequeuePullRequest", flat)
+            self.assertIn("lane-fix-conflict", flat)
+            self.assertIn("queue-dequeue", flat)
+            self.assertIn("23519", (Path(raw) / qm.LOG_FILE).read_text())
+            self.assertNotIn("PR_2", " ".join(" ".join(c) for c in calls if any("dequeue" in a for a in c)))
 
 
 class IdleNotDemandTest(unittest.TestCase):
