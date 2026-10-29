@@ -7,10 +7,12 @@
 //   node scripts/main-red-eject.mjs apply                 plan, then revert + enqueue + incident
 //   node scripts/main-red-eject.mjs reopen --pr <revert>  after the revert merged: re-land as a repair PR
 //   node scripts/main-red-eject.mjs stuck-head [--apply]  UNMERGEABLE head > 5 min: dequeue, conflict pass
+//   node scripts/main-red-eject.mjs metrics --pr <revert> time-main-red + queue-stall -> stage events
 //
 // Mode: MAIN_RED_EJECT_MODE = off | dry | apply (default apply). Kill switch is `off`.
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { runGh } from '../packages/api-client/gh.ts';
 import {
@@ -27,6 +29,7 @@ import {
   failureSignature,
   INCIDENT_LABEL,
   INCIDENT_SCHEMA,
+  incidentMetrics,
   MAX_LOOKBACK_COMMITS,
   marker,
   parsePrNumber,
@@ -34,6 +37,8 @@ import {
   REOPEN_LABEL,
   REVERT_LABEL,
   readMarker,
+  stageEvents,
+  stuckHeadEvent,
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
@@ -609,7 +614,56 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     `queue head #${head.number} UNMERGEABLE ${verdict.dwellMin} min`,
     `Queue head #${head.number} was UNMERGEABLE since ${verdict.since}. Dequeued at ${dequeuedAt}, conflict pass dispatched, Green Enroll will re-enqueue.`
   );
+  const event = stuckHeadEvent({
+    number: head.number,
+    since: verdict.since,
+    dequeuedAt,
+    receipt: `https://github.com/${REPO}/pull/${head.number}`,
+  });
+  emitEvents([event]);
   return { ...verdict, dequeued: true };
+}
+
+// ---- metrics ---------------------------------------------------------------
+
+function emitEvents(rows) {
+  const dir =
+    process.env.RECEIPT_DIR ||
+    join(process.env.RUNNER_TEMP || '.', 'main-red-eject-receipts');
+  mkdirSync(dir, { recursive: true });
+  appendFileSync(
+    join(dir, 'stage-events.ndjson'),
+    rows.map(r => JSON.stringify(r)).join('\n') + '\n'
+  );
+}
+
+export async function metrics(revertPr) {
+  const pr = await api(`repos/${REPO}/pulls/${revertPr}`, 'poll');
+  const m = readMarker(pr.body);
+  if (!m) return { measured: false };
+  const culprit = await api(`repos/${REPO}/commits/${m.culprit}`, 'poll');
+  const redAt = culprit.commit.committer.date;
+  const commits = await mainCommits();
+  const runs = await mergeGroupRuns(2);
+  const out = incidentMetrics({
+    redAt,
+    greenAt: pr.merged_at,
+    now: new Date().toISOString(),
+    mergeTimes: commits.map(c => c.at),
+    groupStarts: runs.map(r => r.createdAt),
+  });
+  const rows = stageEvents({
+    id: `${REPO}@${m.culprit.slice(0, 12)}`,
+    redAt,
+    greenAt: pr.merged_at,
+    stallStart: redAt,
+    stallMinutes: out.queueStallMin,
+    actor: 'main-red-eject.yml',
+    receipt: `https://github.com/${REPO}/pull/${pr.number}`,
+    outcome: 'completed',
+  });
+  emitEvents(rows);
+  return { measured: true, ...out, revertPr: pr.number };
 }
 
 // ---- cli -------------------------------------------------------------------
@@ -637,6 +691,7 @@ if (process.argv[1] === import.meta.filename) {
     result = await stuckHead({
       doApply: values.apply === true && mode === 'apply',
     });
+  else if (cmd === 'metrics') result = await metrics(Number(values.pr));
   else throw new Error(`unknown command: ${cmd}`);
   const text = JSON.stringify(result, null, 2);
   if (values.out) writeFileSync(values.out, `${text}\n`);

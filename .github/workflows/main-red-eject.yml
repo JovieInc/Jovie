@@ -10,7 +10,7 @@ name: Main Red Eject
 # it red, revert it as a `compounding` PR (Green Enroll jumps it; dequeue first if it is
 # already queued, because jump on a queued PR is a no-op), and re-land the change as a
 # repair PR once the revert merges. Also frees an UNMERGEABLE queue head (#23692) and
-# records incidents for operator follow-up.
+# publishes time-main-red / queue-stall minutes to the Shipping SLO stage feed.
 # Kill switch: repository variable MAIN_RED_EJECT_MODE = off | dry | apply (default apply).
 
 on:
@@ -25,11 +25,11 @@ on:
   workflow_dispatch:
     inputs:
       command:
-        description: 'plan (dry run) | apply | stuck-head | reopen'
+        description: 'plan (dry run) | apply | stuck-head | metrics | reopen'
         required: false
         default: 'plan'
       pr:
-        description: 'Revert PR number for reopen'
+        description: 'Revert PR number for metrics / reopen'
         required: false
         default: ''
 
@@ -80,6 +80,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_run' || inputs.command == 'stuck-head' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RECEIPT_DIR: ${{ runner.temp }}/main-red-eject-receipts
         run: node scripts/main-red-eject.mjs stuck-head --apply
       - name: Attribute and eject the culprit
         if: >-
@@ -88,17 +89,31 @@ jobs:
           (github.event.workflow_run.event == 'merge_group' || github.event.workflow_run.name == 'Main Health')) }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RECEIPT_DIR: ${{ runner.temp }}/main-red-eject-receipts
           # Manual plan is always a dry run; every automatic wake follows the mode variable.
           CMD: ${{ github.event_name == 'workflow_dispatch' && (inputs.command || 'plan') || 'apply' }}
         run: node scripts/main-red-eject.mjs "$CMD"
+      - name: Measure a manual incident
+        if: ${{ inputs.command == 'metrics' }}
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RECEIPT_DIR: ${{ runner.temp }}/main-red-eject-receipts
+        run: node scripts/main-red-eject.mjs metrics --pr "${{ inputs.pr }}"
       - name: Re-land manually
         if: ${{ inputs.command == 'reopen' }}
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: node scripts/main-red-eject.mjs reopen --pr "${{ inputs.pr }}"
+      - name: Publish stage events to the Shipping SLO
+        if: ${{ always() && hashFiles(format('{0}/main-red-eject-receipts/stage-events.ndjson', runner.temp)) != '' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: main-red-eject-receipts
+          path: ${{ runner.temp }}/main-red-eject-receipts/stage-events.ndjson
+          if-no-files-found: warn
 
   land:
-    name: Re-land ejected change
+    name: Re-land ejected change and measure
     if: >-
       github.repository == 'JovieInc/Jovie' &&
       github.event_name == 'pull_request_target' && github.event.pull_request.merged == true &&
@@ -131,12 +146,21 @@ jobs:
           git config user.name 'jovie-bot[bot]'
           git config user.email 'jovie-bot[bot]@users.noreply.github.com'
           git remote set-url origin "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-      - name: Re-land ejected change
+      - name: Re-land and measure
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RECEIPT_DIR: ${{ runner.temp }}/main-red-eject-receipts
           PR: ${{ github.event.pull_request.number }}
         run: |
           set -euo pipefail
+          node scripts/main-red-eject.mjs metrics --pr "$PR"
           if [[ "$MAIN_RED_EJECT_MODE" == apply ]]; then
             node scripts/main-red-eject.mjs reopen --pr "$PR"
           fi
+      - name: Publish stage events to the Shipping SLO
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: main-red-eject-receipts
+          path: ${{ runner.temp }}/main-red-eject-receipts/stage-events.ndjson
+          if-no-files-found: warn
