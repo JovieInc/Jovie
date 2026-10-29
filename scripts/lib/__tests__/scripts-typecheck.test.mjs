@@ -65,6 +65,19 @@ describe('scripts-typecheck: unknown JSON property repair', () => {
     ).toBeNull();
     expect(unknownJsonPropertyRepair([])).toBeNull();
   });
+
+  it('names the envelope mock repair for TS2322 against NeonJsonEnvelope', () => {
+    expect(
+      unknownJsonPropertyRepair([
+        "apps/web/tests/unit/ci/neon-branch-guard.test.ts(232,7): error TS2322: Type 'Mock<...>' is not assignable to type '((url: string) => Promise<NeonJsonEnvelope | null>) | undefined'.",
+      ])
+    ).toContain('unknown[]');
+    expect(
+      unknownJsonPropertyRepair([
+        "apps/web/tests/unit/ci/neon-branch-guard.test.ts(1,1): error TS2322: Type 'string' is not assignable to type 'number'.",
+      ])
+    ).toBeNull();
+  });
 });
 
 describe('scripts-typecheck: compilerRunHasParseableDiagnostics', () => {

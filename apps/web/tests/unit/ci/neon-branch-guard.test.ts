@@ -211,7 +211,16 @@ describe('Deliberate-red: legacy reaper would delete these, the guarded one must
     const deletes: string[] = [];
     const request = vi.fn(
       async (url: string, options: { method?: string } = {}) => {
-        if (url.includes('/branches?')) return { branches };
+        if (url.includes('/branches?')) {
+          return {
+            branches: branches as Array<{
+              id?: string;
+              name?: string;
+              default?: boolean;
+              protected?: boolean;
+            }>,
+          };
+        }
         if (url.includes('/endpoints?')) return { endpoints: [] };
         if (url.includes('/actions/runs/'))
           return { ...completed, head_branch: 'release' };
