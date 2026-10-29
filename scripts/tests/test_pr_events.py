@@ -3018,6 +3018,31 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         {"name": "Source Validation", "conclusion": "FAILURE",
          "detailsUrl": "https://github.com/JovieInc/Jovie/actions/runs/123/job/456"}]}
 
+    def test_fenced_headings_preserve_valid_logs_and_quoted_examples(self):
+        valid = "## Red-before-green\nFailing command: `node test.mjs`\n```text\n# step\nFAIL transport\n```\n"
+        quoted = "```text\n## Red-before-green\nquoted example\n```\n"
+        for body in (valid, quoted + valid, valid.replace("```", "~~~") +
+                     "Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123\n"):
+            with self.subTest(body=body):
+                shell = Shell({("pr", "view"): (0, body)})
+                self.assertTrue(events.red_section_complete(body))
+                self.assertFalse(events.ensure_red_before_green(self.PR, "FAIL x", shell))
+                self.assertEqual(len(shell.made("pr", "edit")), 0)
+        for body in (quoted, quoted + "## Red-before-green\nFailing command: TODO\n"):
+            updated = events.with_red_section(body, events.red_before_green_block(self.PR))
+            self.assertTrue(updated.startswith(quoted))
+            self.assertTrue(events.red_section_complete(updated))
+            self.assertEqual(updated.count("## Red-before-green"), 2)
+        for body in ("<!--\n```text\n-->## Red-before-green\nTODO\n",
+                     "## Red-before-green\nTODO\n<!--\n```text\n-->\n"):
+            body += "## Blast radius\nKeep this proof.\n"
+            updated = events.with_red_section(body, events.red_before_green_block(self.PR))
+            self.assertTrue(events.red_section_complete(updated))
+            self.assertIn("## Blast radius\nKeep this proof.", updated)
+            self.assertEqual(updated.count("## Red-before-green"), 1)
+            if body.startswith("<!--"):
+                self.assertTrue(updated.startswith("<!--\n```text\n-->"))
+
     def test_block_carries_the_failing_run_and_red_output_and_passes_the_parser_shape(self):
         block = events.red_before_green_block(self.PR, "### Source Validation\n# not a heading\nAssertionError: x")
         self.assertIn("Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123", block)
