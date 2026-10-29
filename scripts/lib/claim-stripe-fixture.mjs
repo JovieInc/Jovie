@@ -52,20 +52,22 @@ const REQUIRED_VARS = [
 
 /**
  * Compare a retrieved Stripe price against the fixture contract.
- * @param {Record<string, unknown>} price a Stripe Price object
+ * @param {any} price a Stripe Price object
  * @returns {string[]} human-readable mismatch list, empty when it matches
  */
 export function stripeFixtureMismatches(price) {
+  const recurring = price.recurring ?? undefined;
+  const metadata = price.metadata ?? undefined;
   const actual = {
     livemode: price.livemode,
     active: price.active,
     currency: price.currency,
     unit_amount: price.unit_amount,
     type: price.type,
-    'recurring.interval': price.recurring?.interval,
-    'recurring.interval_count': price.recurring?.interval_count,
-    'metadata.offer': price.metadata?.offer,
-    'metadata.decision': price.metadata?.decision,
+    'recurring.interval': recurring?.interval,
+    'recurring.interval_count': recurring?.interval_count,
+    'metadata.offer': metadata?.offer,
+    'metadata.decision': metadata?.decision,
   };
   return Object.entries(EXPECTED_PRICE)
     .filter(([field, expected]) => actual[field] !== expected)
@@ -84,10 +86,7 @@ export function stripeFixtureMismatches(price) {
  * @param {{ fetchImpl?: typeof fetch }} [hooks]
  * @returns {Promise<{ ok: boolean, failures: string[] }>}
  */
-export async function probeStripeTestFixture(
-  env,
-  { fetchImpl = fetch } = {}
-) {
+export async function probeStripeTestFixture(env, { fetchImpl = fetch } = {}) {
   const failures = [];
   const missing = REQUIRED_VARS.filter(name => !env[name]);
   for (const name of missing) {
@@ -109,6 +108,7 @@ export async function probeStripeTestFixture(
   }
 
   const stripeGet = async path => {
+    /** @type {{ ok?: boolean, status?: number, json?: () => Promise<any> }} */
     let response;
     try {
       response = await fetchImpl(`https://api.stripe.com/v1${path}`, {
@@ -121,24 +121,26 @@ export async function probeStripeTestFixture(
       );
       return null;
     }
-    const body = await response.json().catch(() => null);
-    if (response.ok) return body;
-    const detail =
-      body && typeof body === 'object' && 'message' in body
-        ? body.message
-        : `HTTP ${response.status}`;
-    if (response.status === 401 || response.status === 403) {
-      failures.push(
-        `Stripe rejected STRIPE_SECRET_KEY (${detail}). The test key was likely rotated or revoked; set the current sk_test_ key in ${SECRET_STORE}.`
-      );
-    } else if (response.status === 404 && path.startsWith('/prices/')) {
-      failures.push(
-        `Fixture price ${priceId} (STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY) does not exist on this test account. If it was replaced in the Stripe dashboard, update the hardcoded fixture in .github/workflows/claim-checkout-dogfood.yml or rotate STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY in ${SECRET_STORE}.`
-      );
-    } else {
-      failures.push(`Stripe API call ${path} failed: ${detail}.`);
+    const body = await response.json?.().catch(() => null);
+    if (!response.ok) {
+      const detail =
+        body && typeof body === 'object' && 'message' in body
+          ? body.message
+          : `HTTP ${response.status}`;
+      if (response.status === 401 || response.status === 403) {
+        failures.push(
+          `Stripe rejected STRIPE_SECRET_KEY (${detail}). The test key was likely rotated or revoked; set the current sk_test_ key in ${SECRET_STORE}.`
+        );
+      } else if (response.status === 404 && path.startsWith('/prices/')) {
+        failures.push(
+          `Fixture price ${priceId} (STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY) does not exist on this test account. If it was replaced in the Stripe dashboard, update the hardcoded fixture in .github/workflows/claim-checkout-dogfood.yml or rotate STRIPE_PRICE_ARTIST_VISIBILITY_PRO_MONTHLY in ${SECRET_STORE}.`
+        );
+      } else {
+        failures.push(`Stripe API call ${path} failed: ${detail}.`);
+      }
+      return null;
     }
-    return null;
+    return body;
   };
 
   const account = await stripeGet('/account');
