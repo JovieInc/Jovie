@@ -32,7 +32,6 @@ describe('route flag snapshots', () => {
           'STRIPE_CONNECT_ENABLED',
           'YOUTUBE_WORKSPACE_NAV',
           'JOVIE_WORK_NAV',
-          'PROFILES_WORKSPACE',
         ])
       );
     }

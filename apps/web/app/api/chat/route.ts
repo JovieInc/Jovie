@@ -173,10 +173,12 @@ import {
   OVIE_PROGRAM,
 } from '@/lib/ovie/program';
 import { bindEveSummerSpeaker } from '@/lib/ovie/summer-eve-speaker';
+import { createFallbackSummerSpeaker } from '@/lib/ovie/summer-fast-speaker';
 import {
   authorizeFounderSummerUser,
   founderPrincipalHash,
 } from '@/lib/ovie/summer-founder-auth';
+import { fetchSummerShadow } from '@/lib/ovie/summer-shadow-client';
 import { createSummerAssistantStreamResponse } from '@/lib/ovie/summer-stream';
 import {
   getBoundSummerSpeaker,
@@ -2777,7 +2779,23 @@ export async function POST(req: Request) {
       destination: receipt.destination,
       ack: receipt.ack,
     }));
-    const speaker = getBoundSummerSpeaker();
+    const eveSpeaker = getBoundSummerSpeaker();
+    // Interactive turns stream from Summer's fast chat endpoint; durable work
+    // and any fast-path outage fall back to the Eve conversation (still Summer).
+    const speaker = eveSpeaker
+      ? createFallbackSummerSpeaker({
+          eve: eveSpeaker,
+          fetchChat: (chatBody, signal) =>
+            fetchSummerShadow('/ovie/v1/summer-chat/stream', {
+              method: 'POST',
+              body: JSON.stringify(chatBody),
+              signal,
+              headers: {
+                'x-jovie-summer-principal-hash': founderPrincipalHash(userId),
+              },
+            }),
+        })
+      : null;
     const summerSession = generation.session;
     const summerLive =
       summerSession !== null &&

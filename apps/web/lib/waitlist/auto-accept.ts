@@ -12,6 +12,7 @@ import {
   lte,
   or,
 } from 'drizzle-orm';
+import { readCachedAcquisitionEligibility } from '@/lib/acquisition/eligibility.server';
 import { hasProductionWaitlistCanaryNamespace } from '@/lib/canaries/production-waitlist';
 import { db } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
@@ -44,14 +45,23 @@ export interface WaitlistAutoAcceptResult {
   skipped: number;
   failed: number;
   capacityRemaining: number;
-  /** Set when the learning throttle held this run closed. */
-  pausedReason?: 'open_learnings' | 'learnings_unavailable';
+  /** The existing queue remains held while readiness or learning evidence is missing. */
+  pausedReason?:
+    | 'open_learnings'
+    | 'learnings_unavailable'
+    | 'golden_path_not_green';
 }
 
 function getCutoffDate(days: number, now: Date): Date {
   const cutoff = new Date(now);
   cutoff.setUTCDate(cutoff.getUTCDate() - Math.max(1, Math.trunc(days)));
   return cutoff;
+}
+
+/** Cache-only: a drain must never manufacture readiness by probing or retrying. */
+async function isGoldenPathReady(): Promise<boolean> {
+  const report = await readCachedAcquisitionEligibility().catch(() => null);
+  return report?.eligible === true && report.verdict === 'ELIGIBLE';
 }
 
 async function getSuppressedEmailHashes(emails: string[], now: Date) {
@@ -135,6 +145,18 @@ export async function runWaitlistAutoAccept(
     };
   }
 
+  if (!(await isGoldenPathReady())) {
+    return {
+      enabled: settings.autoAcceptEnabled,
+      scanned: 0,
+      approved: 0,
+      skipped: 0,
+      failed: 0,
+      capacityRemaining,
+      pausedReason: 'golden_path_not_green',
+    };
+  }
+
   // Resolve the current cohort's learnings before admitting the next one.
   // Unknown counts fail closed.
   const openLearnings = await countOpenCohortLearnings();
@@ -170,12 +192,19 @@ export async function runWaitlistAutoAccept(
         isNotNull(waitlistEntries.spotifyUrl)
       )
     )
-    .orderBy(asc(waitlistEntries.waitlistedAt), asc(waitlistEntries.createdAt))
+    // Best leads first: highest admission score, then the longest waiting.
+    // Entries without a score sort last, in their old order.
+    .orderBy(
+      drizzleSql`coalesce(CASE WHEN (${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score') ~ '^[0-9]+(\\.[0-9]+)?$' THEN (${waitlistEntries.qualificationInputs} -> 'admissionScore' ->> 'score')::numeric END, -1) desc`,
+      asc(waitlistEntries.waitlistedAt),
+      asc(waitlistEntries.createdAt)
+    )
     .limit(limit);
 
   let approved = 0;
   let skipped = 0;
   let failed = 0;
+  let pausedReason: WaitlistAutoAcceptResult['pausedReason'];
   const candidateEmails = candidates.map(candidate => candidate.email);
   const [suppressedEmailHashes, blockedUserEmails] = await Promise.all([
     getSuppressedEmailHashes(candidateEmails, now),
@@ -194,8 +223,13 @@ export async function runWaitlistAutoAccept(
     }
 
     try {
-      const approval = await withSerializableRetry(() =>
-        withSystemIngestionSession(
+      const approval = await withSerializableRetry(async () => {
+        // Evidence can expire during a drain or serialization backoff. Re-read
+        // on every attempt, before acquiring the database transaction.
+        if (!(await isGoldenPathReady())) {
+          return { outcome: 'readiness_held' as const };
+        }
+        return withSystemIngestionSession(
           async tx => {
             const [lockedCandidate] = await tx
               .select({
@@ -256,9 +290,13 @@ export async function runWaitlistAutoAccept(
             return result;
           },
           { isolationLevel: 'serializable' }
-        )
-      );
+        );
+      });
 
+      if (approval.outcome === 'readiness_held') {
+        pausedReason = 'golden_path_not_green';
+        break;
+      }
       if (approval.outcome === 'capacity_full') {
         break;
       }
@@ -285,5 +323,6 @@ export async function runWaitlistAutoAccept(
     skipped,
     failed,
     capacityRemaining: Math.max(0, capacityRemaining - approved),
+    ...(pausedReason ? { pausedReason } : {}),
   };
 }

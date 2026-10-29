@@ -5,7 +5,7 @@
  * Ensures uniqueness across both content types per creator.
  */
 
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, isNull, like, ne } from 'drizzle-orm';
 import { db, withRetry } from '@/lib/db';
 import { QUERY_TIMEOUTS } from '@/lib/db/query-timeout';
 import {
@@ -15,6 +15,7 @@ import {
   discogReleaseTracks,
   discogTracks,
 } from '@/lib/db/schema/content';
+import { publicReleaseEligibilitySqlPredicate } from '@/lib/profile/public-release-eligibility';
 import { logger } from '@/lib/utils/logger';
 
 export type ContentType = 'release' | 'track' | 'release_track';
@@ -289,13 +290,77 @@ export async function findContentBySlug(
 }
 
 /**
+ * Resolve a superseded base slug to the artist's one published release.
+ *
+ * Import-time collisions suffix later releases (`take-me-over` becomes
+ * `take-me-over-2`) while links already published elsewhere keep the base
+ * slug. Identity cannot be known generically, so this is deliberately
+ * conservative. It returns a slug only when ALL hold:
+ *  - no non-deleted release of the creator owns `baseSlug` (a placeholder or
+ *    draft owner means the slug is claimed; never shadow it);
+ *  - exactly ONE publish-eligible release has slug `{baseSlug}-N`;
+ *  - that release's title normalizes to exactly `baseSlug` (so remixes and
+ *    differently-titled versions never match).
+ * Two or more candidates are ambiguous (could be different recordings), so no
+ * redirect is made.
+ */
+export async function findSupersededReleaseSlug(
+  creatorProfileId: string,
+  baseSlug: string
+): Promise<{ readonly currentSlug: string } | null> {
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(baseSlug)) return null;
+
+  const [owner, siblings] = await Promise.all([
+    db
+      .select({ id: discogReleases.id })
+      .from(discogReleases)
+      .where(
+        and(
+          eq(discogReleases.creatorProfileId, creatorProfileId),
+          eq(discogReleases.slug, baseSlug),
+          isNull(discogReleases.deletedAt)
+        )
+      )
+      .limit(1),
+    db
+      .select({ slug: discogReleases.slug, title: discogReleases.title })
+      .from(discogReleases)
+      .where(
+        and(
+          eq(discogReleases.creatorProfileId, creatorProfileId),
+          like(discogReleases.slug, `${baseSlug}-%`),
+          publicReleaseEligibilitySqlPredicate()
+        )
+      )
+      .limit(20),
+  ]);
+  if (owner.length > 0) return null;
+
+  const suffixed = new RegExp(`^${baseSlug}-\\d+$`);
+  const candidates = siblings.filter(
+    row => suffixed.test(row.slug) && generateBaseSlug(row.title) === baseSlug
+  );
+  const [only] = candidates;
+  return candidates.length === 1 && only ? { currentSlug: only.slug } : null;
+}
+
+/**
  * Look up redirect by old slug.
  * Returns the current slug if a redirect exists.
  */
 export async function findRedirectByOldSlug(
   creatorProfileId: string,
   oldSlug: string,
-  options: { readonly onError?: 'return-null' | 'throw' } = {}
+  options: {
+    readonly onError?: 'return-null' | 'throw';
+    /**
+     * Also resolve a base slug superseded by a collision-suffixed sibling
+     * (see `findSupersededReleaseSlug`). Defaults to true for the public
+     * content route; legacy profile-mode alias checks opt out so a mode alias
+     * is never captured by a release.
+     */
+    readonly includeSuperseded?: boolean;
+  } = {}
 ): Promise<{ type: ContentType; currentSlug: string } | null> {
   try {
     const [redirect] = await withRetry(
@@ -319,7 +384,16 @@ export async function findRedirectByOldSlug(
       { operation: 'read', retryBudgetMs: QUERY_TIMEOUTS.api }
     );
 
-    if (!redirect) return null;
+    if (!redirect) {
+      if (options.includeSuperseded === false) return null;
+      const superseded = await findSupersededReleaseSlug(
+        creatorProfileId,
+        oldSlug
+      );
+      return superseded
+        ? { type: 'release', currentSlug: superseded.currentSlug }
+        : null;
+    }
 
     return await resolveRedirectSlug(redirect);
   } catch (error) {

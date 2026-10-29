@@ -51,7 +51,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       { mode: 0o755 }
     );
     // This fixture has no launch, profile, art-direction, ICP-language, copy, or
-    // oasdiff inventory. Isolate those unrelated checkers, as pnpm above
+    // oasdiff inventory, nor apps/web/lib/domain/write-registry.json. Isolate those unrelated checkers, as pnpm above
     // isolates the other guards, while checking its cwd. The older head
     // deletes scripts/, so the real art-direction, ICP-language, and oasdiff
     // runners are not on that checkout.
@@ -59,7 +59,7 @@ test('trusted source-read guards reject a deleted test on an old head and execut
       join(bin, 'node'),
       `#!/bin/sh
 case "$*" in
-  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*)
+  scripts/artist-launch-contract.mjs*|*scripts/artist-launch-contract.test.mjs|*scripts/artist-profile-conformance.mjs*|*scripts/artist-profile-conformance.test.mjs|*scripts/invariants/art-direction/*|*scripts/invariants/icp-language/*|*scripts/invariants/copy-leak/*|*scripts/invariants/oasdiff-breaking-change.mjs*|*scripts/invariants/oasdiff-breaking-change.test.mjs*|*scripts/domain-write-guard.mjs*)
     [ "$PWD" = "$SOURCE_CHECKOUT" ] || exit 9
     exit 0 ;;
 esac
@@ -132,6 +132,115 @@ exec "$SOURCE_FIXTURE_NODE" "$@"
     assert.doesNotMatch(cleared.stdout, /gate-weakening-detector: FAIL/);
     assert.doesNotMatch(cleared.stdout, /detector-deleted /);
     assert.doesNotMatch(cleared.stdout, /invariant-test-deleted /);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('trusted source-read guards see files main added after the PR branched, and name merge conflicts', () => {
+  const workflow = load(
+    readFileSync('.github/workflows/source-validation.yml', 'utf8')
+  );
+  const step = workflow.jobs.deterministic.steps.find(
+    step =>
+      step.name === 'Validate disk-read source contracts from trusted base'
+  );
+  assert.ok(step, 'disk-read guards must run before queue admission');
+  const script = step.run.replace(/\$\{\{\s*github.base_ref\s*\}\}/g, 'main');
+  const root = mkdtempSync(join(tmpdir(), 'source-read-merge-tree-'));
+  const repo = join(root, 'repo');
+  const bin = join(root, 'bin');
+  const runner = join(root, 'runner');
+  for (const dir of [repo, bin, runner]) mkdirSync(dir, { recursive: true });
+  const git = (...args) =>
+    execFileSync('/usr/bin/git', args, { cwd: repo, encoding: 'utf8' }).trim();
+  const domain = join(repo, 'apps/web/lib/domain');
+  const registry = join(domain, 'write-registry.json');
+  try {
+    mkdirSync(domain, { recursive: true });
+    writeFileSync(join(domain, 'a.ts'), 'export const a = 1;\n');
+    writeFileSync(join(domain, 'shared.ts'), 'export const s = 0;\n');
+    // Stand-in for domain-write-guard: reads a file only main added after the
+    // PR branched (the #23313 and #23336 ENOENT on write-registry.json).
+    writeFileSync(
+      join(bin, 'node'),
+      `#!/bin/sh
+case "$*" in
+  *scripts/domain-write-guard.mjs*)
+    [ -f apps/web/lib/domain/write-registry.json ] || { echo "ENOENT write-registry.json" >&2; exit 2; }
+    exit 0 ;;
+  *scripts/*) exit 0 ;;
+esac
+exec "$SOURCE_FIXTURE_NODE" "$@"
+`,
+      { mode: 0o755 }
+    );
+    writeFileSync(join(bin, 'pnpm'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+    git('init', '--quiet', '--initial-branch=source-head');
+    git('config', 'user.name', 'Source guard test');
+    git('config', 'user.email', 'source-guard@example.invalid');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'fork point');
+    const fork = git('rev-parse', 'HEAD');
+    const archive = execFileSync(
+      '/usr/bin/git',
+      ['archive', 'HEAD', 'scripts'],
+      {
+        maxBuffer: 128 * 1024 * 1024,
+        cwd: process.cwd(),
+      }
+    );
+    // Trusted base: main gains the guard list and the registry the guard reads.
+    git('checkout', '--quiet', '-b', 'main');
+    execFileSync('tar', ['-x', '-C', repo], { input: archive });
+    writeFileSync(registry, '{}\n');
+    writeFileSync(join(domain, 'shared.ts'), 'export const s = "main";\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'main adds guards and write-registry.json');
+    git('remote', 'add', 'origin', repo);
+    git('update-ref', 'refs/remotes/origin/main', git('rev-parse', 'HEAD'));
+    // The PR branched before main added them and edits a guard input.
+    git('checkout', '--quiet', '--detach', fork);
+    writeFileSync(join(domain, 'a.ts'), 'export const a = 2;\n');
+    writeFileSync(join(domain, 'shared.ts'), 'export const s = "head";\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'pr edits a domain writer');
+    const invoke = () =>
+      spawnSync('/bin/bash', ['-c', script], {
+        cwd: repo,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          GITHUB_EVENT_NAME: 'pull_request',
+          GITHUB_BASE_REF: 'main',
+          EXPECTED_HEAD: git('rev-parse', 'HEAD'),
+          RUNNER_TEMP: runner,
+          SOURCE_FIXTURE_NODE: process.execPath,
+        },
+      });
+    // shared.ts differs on both sides: a real conflict is named, and does not
+    // surface as a confusing guard error.
+    const head = git('rev-parse', 'HEAD');
+    const conflicted = invoke();
+    assert.equal(conflicted.status, 1, conflicted.stdout + conflicted.stderr);
+    assert.match(conflicted.stdout, /merge conflict with main/);
+    assert.match(conflicted.stdout, /apps\/web\/lib\/domain\/shared\.ts/);
+    assert.doesNotMatch(conflicted.stdout, /domain-write-guard: exit/);
+    assert.equal(git('rev-parse', 'HEAD'), head);
+    assert.equal(git('status', '--porcelain'), '');
+    // Without the conflict, the guard reads the merge tree and passes.
+    writeFileSync(join(domain, 'shared.ts'), 'export const s = "main";\n');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'take main shared.ts');
+    const clean = git('rev-parse', 'HEAD');
+    const merged = invoke();
+    assert.equal(merged.status, 0, merged.stdout + merged.stderr);
+    assert.match(merged.stdout, /domain-write-guard: exit 0/);
+    // The merge is guard input only: HEAD and the working tree stay the PR's.
+    assert.equal(git('rev-parse', 'HEAD'), clean);
+    assert.equal(git('status', '--porcelain'), '');
+    assert.equal(existsSync(registry), false);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -496,7 +605,7 @@ function fixture() {
     complete: true,
     pr: {
       number: 7,
-      title: 'fix(automation): preserve commissioning acceptance',
+      title: 'feat(automation): preserve commissioning acceptance',
       body: /** @type {string | null} */ ('Refs JOV-7300.'),
       state: 'open',
       draft: false,
@@ -1220,7 +1329,7 @@ test('a red, foreign, or unreadable predecessor runs the full source contract', 
 test('reuse skips every proof step except body-dependent and exact-head evidence', () => {
   const workflow = sourceValidationWorkflow();
   const gate = "steps.reuse.outputs.reuse != 'true'";
-  const [client, runtime, reuseStep] = workflow.jobs.deterministic.steps;
+  const [client, prime, runtime, reuseStep] = workflow.jobs.deterministic.steps;
   assert.equal(client.with.ref, '${{ github.event.pull_request.base.sha }}');
   assert.equal(client.with['persist-credentials'], false);
   assert.match(client.with['sparse-checkout'], /packages\/api-client/);
@@ -1228,7 +1337,16 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     runtime.with['node-version-file'],
     '.source-validation-client/.nvmrc'
   );
+  // The quota-client runtime is primed from nodejs.org so a metadata edit does
+  // not spend a GITHUB_TOKEN manifest call in each of the jobs (2026-10-25).
+  assert.match(prime.run, /prime-node-toolcache\/prime\.sh/);
+  assert.equal(prime.env.NODE_VERSION_FILE, '.source-validation-client/.nvmrc');
+  assert.match(
+    client.with['sparse-checkout'],
+    /prime-node-toolcache\/prime\.sh/
+  );
   assert.equal(client.if, reuseStep.if);
+  assert.match(prime.if, /github\.event\.action == 'edited'/);
   assert.equal(runtime.if, reuseStep.if);
   assert.equal(reuseStep.id, 'reuse');
   // Base retargets change the compared tree, so they never reuse a proof.
@@ -1237,8 +1355,10 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     "${{ github.event.action == 'edited' && !github.event.changes.base }}"
   );
   for (const job of ['security', 'migration', 'coverage', 'unit']) {
-    const [jobClient, jobRuntime, first, ...rest] = workflow.jobs[job].steps;
+    const [jobClient, jobPrime, jobRuntime, first, ...rest] =
+      workflow.jobs[job].steps;
     assert.deepEqual(jobClient, client, job);
+    assert.deepEqual(jobPrime, prime, job);
     assert.deepEqual(jobRuntime, runtime, job);
     assert.equal(first.id, 'reuse', job);
     assert.ok(workflow.jobs[job].permissions.actions === 'read', job);
@@ -1262,6 +1382,13 @@ test('reuse skips every proof step except body-dependent and exact-head evidence
     'Measure actual installed source dependency graph',
     'Preserve exact source dependency evidence',
   ];
+  // Fleet evidence is a status read in `ready`, produced by the base-branch
+  // Fleet Rules Evidence workflow; it never depends on proof reuse.
+  assert.ok(
+    workflow.jobs.ready.steps.some(
+      step => step.name === 'Require fleet-rule evidence'
+    )
+  );
   const deterministic = workflow.jobs.deterministic.steps;
   for (const name of always) {
     const step = deterministic.find(candidate => candidate.name === name);
@@ -1587,4 +1714,29 @@ test('UI-path axe gate blocks PR Ready and stays quiet for non-UI diffs', () => 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test('fleet metadata rules block native auto-merge admission until evidence is supplied', () => {
+  const input = fixture();
+  input.pr.title = 'fix(automation): repair gate';
+  const result = evaluateSourceAdmission(input);
+  assert.equal(result.allowed, false);
+  assert.ok(result.blockers.some(x => x.startsWith('red-before-green:')));
+  input.pr.body =
+    '## Red-before-green\nFailing command: `node --test scripts/fix.test.mjs`\nFailing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123';
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  input.files = [{ filename: 'apps/web/lib/auth/session.ts' }];
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.some(x =>
+      x.startsWith('locked-areas:')
+    )
+  );
+  input.pr.body += '\n## Locked areas\nGBrain: jovie-auth';
+  assert.equal(evaluateSourceAdmission(input).allowed, true);
+  input.pr.body += '\n## Done receipt\nProduction verified.';
+  assert.ok(
+    evaluateSourceAdmission(input).blockers.some(x =>
+      x.startsWith('done-receipt:')
+    )
+  );
 });

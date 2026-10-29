@@ -1,6 +1,10 @@
 import type { UIMessage } from 'ai';
 import { describe, expect, it, vi } from 'vitest';
 import { normalizeArtistMetrics } from '@/lib/onboarding/canonical-metrics';
+import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 import { getSpotifyArtist } from '@/lib/spotify';
 import {
   buildConfirmSpotifyArtistOutput,
@@ -198,6 +202,69 @@ describe('proposeNextStep controlled access', () => {
   });
 });
 
+describe('golden-path admission gates publishing, not paying', () => {
+  it('still offers checkout after an admit that requires proof', async () => {
+    const lowFollowerMetrics = normalizeArtistMetrics(
+      { spotifyFollowers: 3_200 },
+      { source: 'spotify_api', updatedAt: '2026-07-01T00:00:00.000Z' }
+    );
+    const state = createOnboardingTurnState({
+      sessionId: 'session-golden',
+      turnCount: 1,
+      accessControlled: true,
+      goldenPathVerdict: 'ELIGIBLE',
+      messages: [
+        {
+          ...assistantMessage,
+          parts: [
+            {
+              type: 'dynamic-tool',
+              toolName: 'confirmSpotifyArtist',
+              toolCallId: 'tool-confirm-low',
+              state: 'output-available',
+              input: { spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm' },
+              output: {
+                action: 'spotify_artist_confirmed',
+                spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+                metrics: lowFollowerMetrics,
+                artist: {
+                  id: '4Uwpa6zW3zzCSQvooQNksm',
+                  name: 'Mid Artist',
+                  imageUrl: null,
+                  followers: 3_200,
+                  metrics: lowFollowerMetrics,
+                  popularity: 30,
+                  genres: [],
+                },
+              },
+            },
+          ],
+        } as UIMessage,
+      ],
+    });
+    const tools = buildOnboardingTools(state);
+    const next = (await (
+      tools.proposeNextStep as unknown as {
+        execute: () => Promise<{
+          decision: { kind: string; proofRequired?: boolean };
+        }>;
+      }
+    ).execute()) as { decision: { kind: string; proofRequired?: boolean } };
+    expect(next.decision).toMatchObject({
+      kind: 'instant_access',
+      proofRequired: true,
+    });
+
+    const checkout = await (
+      tools.proposeCheckout as unknown as {
+        execute: (input: { plan?: string }) => Promise<{ action: string }>;
+      }
+    ).execute({});
+    // Paying never publishes a page; proof does. Checkout stays available.
+    expect(checkout.action).toBe('propose_checkout');
+  });
+});
+
 describe('confirmSpotifyArtist tool (JOV-7134)', () => {
   it('never lets the model confirm or swap an artist id', async () => {
     const state = createOnboardingTurnState({ sessionId: 's', turnCount: 3 });
@@ -221,6 +288,60 @@ describe('confirmSpotifyArtist tool (JOV-7134)', () => {
     });
     expect(state.spotifyArtistId).toBe('1Cs0zKBU1kc0i8ypK3B9ai');
   });
+});
+
+describe('adaptive job access and current offer', () => {
+  it('does not reuse music qualification for a founder job or an unresolved priority', async () => {
+    const state = createOnboardingTurnState({
+      sessionId: 'multiple-jobs',
+      turnCount: 3,
+      messages: [assistantMessage],
+    });
+    state.profileDraft = advanceOnboardingProfileDraft(
+      emptyOnboardingProfileDraft(),
+      {
+        id: 'founder',
+        text: 'I am a founder https://company.example I want buyer contact',
+      }
+    );
+    const tools = buildOnboardingTools(state);
+    await expect(
+      tools.proposeNextStep.execute?.({}, {} as never)
+    ).resolves.toMatchObject({ decision: { kind: 'waitlist' } });
+    await expect(
+      tools.proposeCheckout.execute?.({ plan: 'free' }, {} as never)
+    ).resolves.toMatchObject({ action: 'checkout_unavailable' });
+    state.profileDraft = advanceOnboardingProfileDraft(state.profileDraft, {
+      id: 'role-conflict',
+      text: 'I am also a musician',
+    });
+    await expect(
+      tools.proposeNextStep.execute?.({}, {} as never)
+    ).resolves.toMatchObject({
+      decision: {
+        kind: 'needs_more_info',
+        rationale: 'role_priority_required',
+      },
+    });
+  });
+
+  it.each(['free', 'pro'] as const)(
+    'rejects Max and permits self-service %s for a qualified artist',
+    async plan => {
+      const state = createOnboardingTurnState({
+        sessionId: 'artist-offer',
+        turnCount: 3,
+        messages: [assistantMessage],
+      });
+      const tools = buildOnboardingTools(state);
+      await expect(
+        tools.proposeCheckout.execute?.({ plan: 'max' }, {} as never)
+      ).resolves.toMatchObject({ action: 'checkout_unavailable' });
+      await expect(
+        tools.proposeCheckout.execute?.({ plan }, {} as never)
+      ).resolves.toMatchObject({ action: 'propose_checkout', plan });
+    }
+  );
 });
 
 describe('confirmed artist field provenance', () => {

@@ -11,7 +11,14 @@ import {
   LOCAL_DEFAULT_ONLY_FLAGS,
 } from '@/lib/flags/contracts';
 
-const SOURCE_DIRECTORIES = ['app', 'components', 'hooks', 'lib', 'scripts'];
+const SOURCE_DIRECTORIES = [
+  'app',
+  'components',
+  'data',
+  'hooks',
+  'lib',
+  'scripts',
+];
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx']);
 
 const SKIP_DIRECTORIES = new Set([
@@ -99,7 +106,6 @@ describe('feature flag registry integrity', () => {
           ![
             'YOUTUBE_WORKSPACE_NAV',
             'JOVIE_WORK_NAV',
-            'PROFILES_WORKSPACE',
             'PROFILE_SEARCH_MONITORING',
             'PAID_WELCOME_EMAIL',
             'CREATOR_FINANCE',
@@ -112,7 +118,6 @@ describe('feature flag registry integrity', () => {
     // These Cmd-K workspace doors remain off pending navigation approval.
     expect(APP_FLAG_DEFAULTS.YOUTUBE_WORKSPACE_NAV).toBe(false);
     expect(APP_FLAG_DEFAULTS.JOVIE_WORK_NAV).toBe(false);
-    expect(APP_FLAG_DEFAULTS.PROFILES_WORKSPACE).toBe(false);
     expect(APP_FLAG_DEFAULTS.PROFILE_SEARCH_MONITORING).toBe(false);
     expect(APP_FLAG_DEFAULTS.PAID_WELCOME_EMAIL).toBe(false);
     expect(APP_FLAG_DEFAULTS.CREATOR_FINANCE).toBe(false);
@@ -156,9 +161,10 @@ describe('feature flag registry integrity', () => {
     expect([...chatFlagsInKeys, ...chatFlagsInValues]).toEqual([]);
   });
 
-  it('keeps the retired design rollout family out of every runtime contract', () => {
+  it('keeps retired product and design rollout gates out of every runtime contract', () => {
     const retiredFlags = [
       'INBOX_HOME',
+      'PROFILES_WORKSPACE',
       'DESIGN_V1',
       'SHELL_CHAT_V1',
       'DESIGN_V1_RELEASES',
@@ -177,8 +183,10 @@ describe('feature flag registry integrity', () => {
       expect(LEGACY_STATSIG_GATE_KEYS).not.toHaveProperty(flagName);
       expect([...LOCAL_DEFAULT_ONLY_FLAGS]).not.toContain(flagName);
 
-      const productionReferences = SOURCE_CORPUS.filter(({ source }) =>
-        source.includes(flagName)
+      const productionReferences = SOURCE_CORPUS.filter(
+        ({ source, relativePath }) =>
+          !/\.(?:test|spec)\.[jt]sx?$/.test(relativePath) &&
+          source.includes(flagName)
       ).map(({ relativePath }) => relativePath);
       expect(productionReferences).toEqual([]);
     }

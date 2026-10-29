@@ -36,7 +36,7 @@ test.describe('Opportunity Inbox', () => {
   });
 
   for (const persona of ['creator-ready', 'admin'] as const) {
-    test(`${persona} stays in the creator inbox at the permanent Inbox destination`, async ({
+    test(`${persona} stays in the creator inbox at the permanent Inbox destination without rollout overrides`, async ({
       page,
     }) => {
       await setTestAuthBypassSession(page, persona);

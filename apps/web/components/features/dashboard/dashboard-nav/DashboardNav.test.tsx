@@ -106,7 +106,6 @@ describe('DashboardNav route warming', () => {
   it('does not full-prefetch customer routes on mount', () => {
     renderDashboardNav({
       renderFn: render,
-      appFlags: { PROFILES_WORKSPACE: true },
     });
 
     for (const label of ['New Chat', 'Identity', 'Work', 'Audience']) {
@@ -283,7 +282,7 @@ describe('DashboardNav route warming', () => {
     expect(link.querySelector('[data-inbox-runtime-update]')).toBeNull();
   });
 
-  it('labels the permanent header destination Inbox', () => {
+  it('labels the permanent header destination Inbox without a rollout override', () => {
     const view = renderDashboardNav({
       renderFn: render,
     });

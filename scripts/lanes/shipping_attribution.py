@@ -69,11 +69,23 @@ def _iso(epoch):
     return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def read_ledger(path: Path) -> dict:
-    """Read the existing append-only ledger and expose corruption as evidence state."""
+def read_ledger(path: Path, tail_bytes: int | None = None) -> dict:
+    """Read the existing append-only ledger and expose corruption as evidence state.
+
+    `tail_bytes` bounds the read to the newest bytes (the doctor judges 24h of receipts; the
+    whole ledger cost ~1s of JSON parsing per pass at 52 MB). The partial first line of a tail
+    is dropped, not counted as corruption."""
     rows, corrupt, latest = [], 0, None
     try:
         with Path(path).open() as handle:
+            if tail_bytes is not None:
+                handle.seek(0, 2)
+                size = handle.tell()
+                if size > tail_bytes:
+                    handle.seek(size - tail_bytes)
+                    handle.readline()  # discard the partial line the cut landed in
+                else:
+                    handle.seek(0)
             for raw in handle:
                 if not raw.strip():
                     continue
@@ -269,11 +281,15 @@ def attribute_pr(pr: dict, receipts: list[dict], repository: str) -> dict:
 
 
 def project_report(project: dict, evidence: dict, ledger: dict, generated_at: float) -> dict:
+    # Origin emitters use a sparse two-file checkout; only reporting needs the reader.
+    import merge_evidence
+
     repository, instrumented = project["repository"], project["instrumented"]
     window = evidence.get("window") if isinstance(evidence, dict) else None
     complete = isinstance(evidence, dict) and evidence.get("complete") is True
+    observed = merge_evidence.search_observations(evidence, repository)
     rows = [attribute_pr(pr, ledger.get("rows") or [], repository) for pr in evidence.get("prs") or []] \
-        if complete and instrumented else []
+        if (complete or observed) and instrumented else []
     if complete and instrumented:
         by_confidence = Counter(row["origin"]["confidence"] for row in rows)
         by_method = Counter(row["origin"]["method"] for row in rows)
@@ -301,6 +317,9 @@ def project_report(project: dict, evidence: dict, ledger: dict, generated_at: fl
         (evidence.get("reason") if isinstance(evidence, dict) else "merge-window-not-read"),
         "attributionEvidenceComplete": complete and instrumented and ledger.get("complete") is True and ingest_complete,
         "mergeCount": denominator,
+        "observedMergeCount": len(rows) if (complete or observed) and instrumented else None,
+        "populationCoverage": evidence.get("populationCoverage", "unknown") if isinstance(evidence, dict) else "unknown",
+        "providerEnumerationComplete": evidence.get("providerEnumerationComplete") if isinstance(evidence, dict) else None,
         "coverage": coverage,
         "byConfidence": dict(sorted(by_confidence.items())) if complete and instrumented else None,
         "byShippingMethod": dict(sorted(by_method.items())) if complete and instrumented else None,

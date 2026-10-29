@@ -17,7 +17,7 @@ Before adding a new test, check the heatmap to see which surface needs it most:
 
 **When to add a test (decision rule):** add a test if (a) the file matches a critical glob in the register, OR (b) the change introduces a new branch / new API route / new server action / new entitlement, OR (c) the change is a bugfix (regression test mandatory). Otherwise no test required — but say so explicitly in the PR description.
 
-**Enforcement:** `.github/PULL_REQUEST_TEMPLATE.md` (Bug-to-Test section), `pnpm test:bug-to-test` (local + `/ship` Step 3.35), and Danger on PRs (`apps/web/dangerfile.ts`).
+**Enforcement:** `.github/pull_request_template.md`, `pnpm test:bug-to-test` (local + `/ship` Step 3.35), and Danger on PRs (`apps/web/dangerfile.ts`).
 
 ## Stack
 
@@ -169,3 +169,13 @@ Never mark a task complete without confirming the fix works:
 Do not land `test.skip`, `it.skip`, `describe.skip`, `.only`, or `xit` to get a
 change through CI. The gate-weakening detector fails that pull request. Deleting
 or emptying a `scripts/invariants/*.test.*` file fails the same check.
+
+## Fleet premise rule
+
+When the same check fails twice in a row on a PR, state the assumption behind
+the proposed repair and run one test that could falsify it **before patching**.
+Read both failures, including reruns at the same head. Record `Assumption:`,
+`Falsifying test:` (exact command), and `Result:` (observed output and implication)
+in the PR body under `## Premise check`. Repeating the failing check without
+testing the assumption is not a falsifying test. This applies to lane-fix-relay,
+safe-pr-remediation, and remediation-sweep handoffs as well as direct agents.
