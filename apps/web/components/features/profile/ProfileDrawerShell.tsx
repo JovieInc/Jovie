@@ -83,7 +83,13 @@ export function ProfileDrawerShell({
   const contentClasses = `relative flex max-h-(--profile-drawer-height-max) w-full flex-col overflow-hidden rounded-t-(--profile-drawer-radius-mobile) border-t border-white/[0.08] bg-[color:var(--profile-drawer-bg)] text-primary-token shadow-[0_-8px_40px_rgba(0,0,0,0.4)] md:max-w-(--profile-shell-max-width) md:rounded-t-(--profile-drawer-radius-desktop) before:pointer-events-none before:absolute before:inset-x-0 before:top-0 before:h-24 before:bg-[linear-gradient(to_bottom,rgba(255,255,255,0.04),transparent)] ${floating ? 'profile-drawer-floating' : ''} ${contentClassName ?? ''}`;
   // Fixed height (not min-h) so overflow-y-auto activates on overflow; min-h
   // lets the body grow past the parent's max-h and get clipped by overflow-hidden.
-  const bodyClasses = `relative z-10 h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))] overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] pt-3 ${bodyClassName ?? ''}`;
+  // Docked sheets keep one fixed body height so switching views never jumps.
+  // A floating task sheet sizes to its content (capped at the same height),
+  // so a short list ends on the sheet's edge instead of empty space.
+  const bodyHeightClass = floating
+    ? 'profile-drawer-floating-body'
+    : 'h-[calc(var(--profile-drawer-height-max)_-_var(--profile-drawer-header))]';
+  const bodyClasses = `relative z-10 ${bodyHeightClass} overflow-y-auto overscroll-contain [touch-action:pan-y] [will-change:scroll-position] px-5 ${floating ? '' : 'pb-[calc(1.25rem_+_env(safe-area-inset-bottom))]'} pt-3 ${bodyClassName ?? ''}`;
 
   const header = (
     <>
