@@ -2409,7 +2409,11 @@ describe('Linear Sync workflow closes its own loops', () => {
     ),
     'utf8'
   );
-  const job = loadYaml(workflow).jobs.sync_done;
+  const parsed =
+    /** @type {{ jobs: { sync_done: { 'timeout-minutes': number, steps: { id?: string, env?: Record<string, string>, run?: string }[] } } }} */ (
+      loadYaml(workflow)
+    );
+  const job = parsed.jobs.sync_done;
   const quotaHold = job.steps.find(step => step.id === 'quota_hold');
 
   it('matches the Production Controller by path, not by its run-name title', () => {
