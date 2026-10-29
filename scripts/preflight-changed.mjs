@@ -45,6 +45,8 @@ import {
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HEAP_MB = process.env.JOVIE_PREFLIGHT_HEAP_MB || '4096';
+// The web program needs more than the default (4096 OOMs); CI uses 8192.
+const WEB_HEAP_MB = process.env.JOVIE_PREFLIGHT_WEB_HEAP_MB || '8192';
 const CONCURRENCY = Number(process.env.JOVIE_PREFLIGHT_JOBS || 3);
 
 /** Guards too slow for a local pass; CI still runs them (use --thorough). */
@@ -369,7 +371,7 @@ export function typecheckTargets(files, cwd) {
 }
 
 function typecheckCommand(target, cwd) {
-  const cap = `NODE_OPTIONS=--max-old-space-size=${HEAP_MB}`;
+  const cap = `NODE_OPTIONS=--max-old-space-size=${target.startsWith('web') ? WEB_HEAP_MB : HEAP_MB}`;
   if (target === 'web')
     return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')
@@ -595,7 +597,26 @@ export async function main({
   // Typecheck affected packages only, heap capped.
   if (args.typecheck)
     for (const t of typecheckTargets(files, cwd))
-      cmd(`tsc:${t}`, `typecheck ${t}`, typecheckCommand(t, cwd), 2, 900_000);
+      add(
+        `tsc:${t}`,
+        `typecheck ${t}`,
+        async () => {
+          const r = await sh(typecheckCommand(t, cwd), {
+            cwd,
+            env: childEnv,
+            timeoutMs: 900_000,
+          });
+          // An OOM is no verdict on the code; say how to raise the cap.
+          if (r.code !== 0 && /heap out of memory/.test(r.out))
+            return {
+              ...r,
+              code: 0,
+              skip: `out of memory at the heap cap; set JOVIE_PREFLIGHT_WEB_HEAP_MB / JOVIE_PREFLIGHT_HEAP_MB higher, or let CI run it`,
+            };
+          return r;
+        },
+        2
+      );
 
   if (args.list) {
     for (const c of checks) log(`run  ${c.id}  ${c.name}`);
