@@ -26,14 +26,15 @@ async function walk(dir: string): Promise<string[]> {
 }
 
 export async function renderDistribution(
-  webDir: string,
-  tools: readonly DistributionTool[] = AGENT_DRAFT_TOOLS as unknown as readonly DistributionTool[]
+  assetDir: string,
+  tools: readonly DistributionTool[] = AGENT_DRAFT_TOOLS as unknown as readonly DistributionTool[],
+  repoRoot: string = resolve(assetDir, '../../../../..')
 ): Promise<DistributionOutput> {
-  const assetDir = join(webDir, 'plugins/jovie-artists/assets');
+  const webDir = resolve(assetDir, '../../..');
   const assets: Record<string, string> = {};
   for (const name of ASSET_NAMES)
     assets[name] = await readFile(join(assetDir, name), 'utf8');
-  const iconSource = await loadIconSource(resolve(webDir, '../..'));
+  const iconSource = await loadIconSource(repoRoot);
   return buildDistribution(
     tools,
     LISTING,

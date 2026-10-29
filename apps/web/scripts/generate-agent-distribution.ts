@@ -12,7 +12,9 @@ import {
 
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 async function main() {
-  const output = await renderDistribution(WEB);
+  const output = await renderDistribution(
+    join(WEB, 'plugins/jovie-artists/assets')
+  );
   return runGenerate({
     check: process.argv.includes('--check'),
     strict: process.argv.includes('--strict'),
