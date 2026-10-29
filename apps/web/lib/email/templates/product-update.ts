@@ -6,6 +6,10 @@
  */
 
 import { APP_NAME, BASE_URL } from '@/constants/app';
+import {
+  getEmailPostalFooterHtml,
+  getEmailPostalFooterText,
+} from '../legal-footer';
 import { escapeHtml } from '../utils';
 
 export interface ProductUpdateTemplateData {
@@ -36,7 +40,7 @@ View full changelog: ${BASE_URL}/changelog
 
 ---
 You're receiving this because you subscribed to ${APP_NAME} product updates.
-Unsubscribe: ${unsubscribeUrl}`;
+Unsubscribe: ${unsubscribeUrl}${getEmailPostalFooterText()}`;
 }
 
 export function getProductUpdateHtml(data: ProductUpdateTemplateData): string {
@@ -104,6 +108,7 @@ export function getProductUpdateHtml(data: ProductUpdateTemplateData): string {
                   Unsubscribe
                 </a>
               </p>
+              ${getEmailPostalFooterHtml()}
             </td>
           </tr>
         </table>
