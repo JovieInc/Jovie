@@ -7,8 +7,13 @@
  * to all verified subscribers. Runs locally after a PR merges.
  *
  * Usage:
- *   pnpm changelog:send              # sends with 24h cooldown protection
- *   pnpm changelog:send --force      # bypasses cooldown (e.g., critical update)
+ *   pnpm changelog:send -- --approval-card sc_<id>          # 24h cooldown protection
+ *   pnpm changelog:send -- --approval-card sc_<id> --force  # bypasses cooldown
+ *
+ * Broadcast stream (apps/web/lib/email/stream-registry.json): fails closed
+ * without an approved Ovie outbound card, LEGAL_MAILING_ADDRESS, or while the
+ * stream is paused; skips suppressed addresses; sender comes from the registry.
+ * See scripts/lib/broadcast-send-gate.mjs.
  *
  * Spam protection:
  *   - 24-hour cooldown between product update emails (per subscriber)
@@ -22,6 +27,14 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  assertBroadcastAllowed,
+  cardIdFromArgv,
+  filterRecipients,
+  legalEntityName,
+  loadBroadcastPolicy,
+  postalFooter,
+} from './lib/broadcast-send-gate.mjs';
 import { isInternalEntry } from './lib/changelog-filter-rules.mjs';
 import { getLatestRelease } from './lib/changelog-parser.mjs';
 
@@ -150,6 +163,16 @@ async function main() {
   await client.connect();
 
   try {
+    // ── Broadcast gate (approval card, postal address, pause) ───────
+    const broadcast = loadBroadcastPolicy(ROOT);
+    const mailingAddress = process.env[broadcast.mailingAddressEnv];
+    await assertBroadcastAllowed({
+      client,
+      cardId: cardIdFromArgv(process.argv),
+      mailingAddress,
+    });
+    const footer = postalFooter(legalEntityName(ROOT), mailingAddress);
+
     // ── Cooldown check ──────────────────────────────────────────────
     // Prevent spamming subscribers when shipping multiple releases per day.
     // Uses a simple "last sent" timestamp on each subscriber row.
@@ -171,20 +194,29 @@ async function main() {
     }
 
     // Get verified non-user subscribers who haven't been emailed recently
-    const { rows: subscribers } = await client.query(
+    const { rows: allSubscribers } = await client.query(
       `SELECT email, unsubscribe_token FROM product_update_subscribers
        WHERE verified = true AND unsubscribed_at IS NULL`
     );
 
-    console.log(`📬 Found ${subscribers.length} subscriber(s)\n`);
+    const {
+      allowed: subscribers,
+      suppressed,
+      capped,
+    } = await filterRecipients({
+      client,
+      subscribers: allSubscribers,
+      perHour: broadcast.policy.rateLimit.perHour,
+    });
+    console.log(
+      `📬 Found ${allSubscribers.length} subscriber(s); ${suppressed} suppressed, ${capped} over the hourly cap\n`
+    );
 
     if (subscribers.length === 0) {
       console.log('No subscribers to email. Done.');
       process.exit(0);
     }
 
-    const fromEmail =
-      process.env.RESEND_FROM_EMAIL || 'notifications@send.jov.ie';
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jov.ie';
     let sent = 0;
     let errors = 0;
@@ -197,7 +229,9 @@ async function main() {
 
         try {
           await resend.emails.send({
-            from: fromEmail,
+            from: broadcast.from,
+            ...(broadcast.replyTo && { replyTo: broadcast.replyTo }),
+            tags: broadcast.tags,
             to: sub.email,
             subject: `What's new at Jovie — v${latest.version}`,
             html: buildEmailHtml(
@@ -205,14 +239,16 @@ async function main() {
               latest.date,
               entriesHtml,
               unsubscribeUrl,
-              appUrl
+              appUrl,
+              footer
             ),
             text: buildEmailText(
               latest.version,
               latest.date,
               entriesText,
               unsubscribeUrl,
-              appUrl
+              appUrl,
+              footer
             ),
             headers: {
               'List-Unsubscribe': `<${unsubscribeUrl}>`,
@@ -250,7 +286,14 @@ async function main() {
   }
 }
 
-function buildEmailHtml(version, date, entriesHtml, unsubscribeUrl, appUrl) {
+function buildEmailHtml(
+  version,
+  date,
+  entriesHtml,
+  unsubscribeUrl,
+  appUrl,
+  footer
+) {
   return `
 <!DOCTYPE html>
 <html>
@@ -263,7 +306,7 @@ function buildEmailHtml(version, date, entriesHtml, unsubscribeUrl, appUrl) {
         <tr><td style="padding:0 32px 8px;"><h1 style="margin:0;font-size:22px;font-weight:600;color:#000;">What's new — v${escapeHtml(version)}</h1><p style="margin:4px 0 0;font-size:13px;color:#999;">${escapeHtml(date)}</p></td></tr>
         <tr><td style="padding:16px 32px 24px;font-size:15px;line-height:1.6;color:#333;">${entriesHtml}</td></tr>
         <tr><td style="padding:0 32px 32px;text-align:center;"><a href="${escapeHtml(appUrl)}/changelog" style="display:inline-block;padding:12px 32px;background:#000;color:#fff;text-decoration:none;border-radius:9999px;font-weight:500;font-size:14px;">View full changelog</a></td></tr>
-        <tr><td style="padding:24px 32px;background:#f9f9f9;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;text-align:center;">You're receiving this because you subscribed to Jovie product updates.</p><p style="margin:8px 0 0;font-size:12px;color:#999;text-align:center;"><a href="${escapeHtml(unsubscribeUrl)}" style="color:#999;text-decoration:underline;">Unsubscribe</a></p></td></tr>
+        <tr><td style="padding:24px 32px;background:#f9f9f9;border-top:1px solid #eee;"><p style="margin:0;font-size:12px;color:#999;text-align:center;">You're receiving this because you subscribed to Jovie product updates.</p><p style="margin:8px 0 0;font-size:12px;color:#999;text-align:center;"><a href="${escapeHtml(unsubscribeUrl)}" style="color:#999;text-decoration:underline;">Unsubscribe</a></p><p style="margin:8px 0 0;font-size:11px;color:#999;text-align:center;">${escapeHtml(footer)}</p></td></tr>
       </table>
     </td></tr>
   </table>
@@ -271,7 +314,14 @@ function buildEmailHtml(version, date, entriesHtml, unsubscribeUrl, appUrl) {
 </html>`;
 }
 
-function buildEmailText(version, date, entriesText, unsubscribeUrl, appUrl) {
+function buildEmailText(
+  version,
+  date,
+  entriesText,
+  unsubscribeUrl,
+  appUrl,
+  footer
+) {
   return `What's new at Jovie — v${version} (${date})
 
 ${entriesText}
@@ -279,7 +329,8 @@ ${entriesText}
 View full changelog: ${appUrl}/changelog
 
 ---
-Unsubscribe: ${unsubscribeUrl}`;
+Unsubscribe: ${unsubscribeUrl}
+${footer}`;
 }
 
 main().catch(err => {
