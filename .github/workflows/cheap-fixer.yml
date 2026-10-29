@@ -43,8 +43,21 @@ jobs:
           ref: main
           persist-credentials: false
           sparse-checkout: |
+            .nvmrc
+            .github/actions/prime-node-toolcache
             scripts/cheap-fixer
-            scripts/invariants
+            scripts/invariants/browser-owned-input.mjs
+            scripts/invariants/browser-owned-input-matrix.json
+            scripts/invariants/jev-ci-failure-triage.mjs
+            scripts/invariants/jev-gateway.mjs
+            scripts/invariants/jev-patch-verdict.mjs
+            scripts/invariants/jev-shadow.mjs
+            scripts/invariants/product-reference-coherence.mjs
+            scripts/invariants/run-outcome.mjs
+            scripts/invariants/screen-certification.mjs
+            scripts/invariants/screen-decision-routing.mjs
+            scripts/invariants/screen-proof-resolver.mjs
+            scripts/lib/playwright-png.mjs
             packages/api-client
           sparse-checkout-cone-mode: false
 
@@ -70,10 +83,13 @@ jobs:
           permission-issues: write
           permission-pull-requests: write
 
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+
       - name: Set up Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: '24'
+          node-version-file: .nvmrc
 
       - name: Install the Jev evaluation client
         run: npm install --no-save --no-package-lock --ignore-scripts --no-audit --no-fund "ai-evaluation@npm:ai@7.0.105"

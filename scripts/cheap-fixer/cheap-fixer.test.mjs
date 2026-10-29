@@ -1,5 +1,17 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import {
+  cpSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { test } from 'node:test';
+import { load as loadYaml } from 'js-yaml';
 import {
   interpretPatchVerdict,
   preparePatchVerdictRequest,
@@ -65,7 +77,11 @@ test('guards reject weakened tests, suppressions, denied and out-of-scope paths'
     []
   );
   const skip = guardPatch(
-    files('src/a.ts', 'run();\n', '// @ts-ignore\nrun();\n'),
+    files(
+      'src/a.ts',
+      'run();\n',
+      `// @${['ts', 'ignore'].join('-')}\nrun();\n`
+    ),
     { changedInPr: inPr, failureClass: 'typecheck' }
   );
   assert.ok(skip.some(v => v.startsWith('weakening-added')));
@@ -180,4 +196,112 @@ test('Jev verdict approves only approve at or above the floor', () => {
     diff: '-a\n+b',
   });
   assert.equal(req.questions.verdict.type, 'choice');
+});
+
+test('every proposed patch rejects lint and formatter suppression directives', () => {
+  for (const [tool, directive] of [
+    ['eslint', 'disable'],
+    ['eslint', 'disable-next-line'],
+    ['biome', 'ignore'],
+    ['biome', 'ignore-all'],
+    ['prettier', 'ignore'],
+  ]) {
+    const suppression = `${tool}-${directive}`;
+    const violations = guardPatch(
+      files('src/a.ts', 'run();\n', `// ${suppression}\nrun();\n`),
+      { changedInPr: new Set(['src/a.ts']), failureClass: 'format' }
+    );
+    assert.ok(
+      violations.some(v => v.startsWith('weakening-added:')),
+      suppression
+    );
+  }
+});
+
+test('the workflow sparse checkout boots Node and the fixer without network access', () => {
+  const root = resolve(import.meta.dirname, '../..');
+  const workflow = loadYaml(
+    readFileSync(join(root, '.github/workflows/cheap-fixer.yml'), 'utf8')
+  );
+  const checkout = workflow.jobs.fix.steps.find(step =>
+    step.uses?.startsWith('actions/checkout@')
+  );
+  const setup = workflow.jobs.fix.steps.find(step =>
+    step.uses?.startsWith('actions/setup-node@')
+  );
+  const prime = workflow.jobs.fix.steps.find(
+    step => step.uses === './.github/actions/prime-node-toolcache'
+  );
+  const sandbox = mkdtempSync(join(tmpdir(), 'cheap-fixer-workflow-'));
+  try {
+    for (const path of checkout.with['sparse-checkout'].trim().split(/\s+/)) {
+      mkdirSync(dirname(join(sandbox, path)), { recursive: true });
+      cpSync(join(root, path), join(sandbox, path), { recursive: true });
+    }
+    assert.ok(prime, 'the workflow primes the Node cache');
+    assert.ok(
+      workflow.jobs.fix.steps.indexOf(prime) <
+        workflow.jobs.fix.steps.indexOf(setup)
+    );
+    const versionFile = setup.with['node-version-file'];
+    const version = readFileSync(join(sandbox, versionFile), 'utf8').trim();
+    assert.equal(version, readFileSync(join(root, '.nvmrc'), 'utf8').trim());
+    const action = join(sandbox, prime.uses);
+    loadYaml(readFileSync(join(action, 'action.yml'), 'utf8'));
+    const cache = join(sandbox, 'toolcache');
+    const cached = join(cache, 'node', version, 'x64');
+    mkdirSync(cached, { recursive: true });
+    writeFileSync(`${cached}.complete`, '');
+    const primed = spawnSync('bash', [join(action, 'prime.sh')], {
+      cwd: sandbox,
+      encoding: 'utf8',
+      timeout: 5000,
+      env: {
+        PATH: process.env.PATH,
+        RUNNER_TOOL_CACHE: cache,
+        NODE_VERSION_FILE: versionFile,
+        PRIME_NODE_PLATFORM: 'linux',
+        PRIME_NODE_ARCH: 'x64',
+      },
+    });
+    assert.equal(primed.status, 0, primed.stderr);
+    assert.match(primed.stdout, /already in the toolcache/);
+    const event = join(sandbox, 'event.json');
+    const out = join(sandbox, 'out');
+    writeFileSync(
+      event,
+      JSON.stringify({
+        workflow_run: { pull_requests: [], head_sha: 'a'.repeat(40) },
+      })
+    );
+    // Fail any accidental outbound request, even if a developer has credentials.
+    const offline = join(sandbox, 'offline.mjs');
+    writeFileSync(
+      offline,
+      "globalThis.fetch = () => { throw new Error('unexpected network request'); };\n"
+    );
+    const boot = spawnSync(
+      process.execPath,
+      ['--import', offline, 'scripts/cheap-fixer/cheap-fixer.mjs'],
+      {
+        cwd: sandbox,
+        encoding: 'utf8',
+        timeout: 5000,
+        env: {
+          PATH: process.env.PATH,
+          HOME: sandbox,
+          MODE: 'shadow',
+          EVENT_PATH: event,
+          OUT_DIR: out,
+        },
+      }
+    );
+    assert.equal(boot.status, 0, boot.stderr);
+    const receipt = JSON.parse(readFileSync(join(out, 'receipt.json'), 'utf8'));
+    assert.equal(receipt.outcome, 'skip-no-pr', receipt.error);
+    assert.equal(receipt.mode, 'shadow');
+    assert.equal(receipt.costUsd, 0);
+  } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
 });
