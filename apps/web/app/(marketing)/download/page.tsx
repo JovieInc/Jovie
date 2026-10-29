@@ -5,17 +5,12 @@ import {
   Laptop,
   QrCode,
   ShieldCheck,
-  Smartphone,
   Sparkles,
 } from 'lucide-react';
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  FaqSection,
-  MarketingContainer,
-  MarketingHeroPhoto,
-} from '@/components/marketing';
+import { FaqSection, MarketingContainer } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
@@ -25,32 +20,16 @@ import { buildBreadcrumbSchema, buildFaqSchema } from '@/lib/constants/schemas';
 import { MAC_APP_SUPPORT } from '@/lib/desktop/mac-compatibility';
 import { getMarketingExportImage } from '@/lib/screenshots/registry';
 import { documentTitle } from '@/lib/seo/document-title';
+import './download.css';
 
 export const revalidate = false;
 
 const DOWNLOAD_URL = '/api/desktop/download';
 const DESKTOP_RELEASES_HTML_URL = 'https://github.com/JovieInc/Jovie/releases';
 const DESKTOP_IMAGE = getMarketingExportImage('dashboard-releases-desktop');
-const PROFILE_IMAGE = getMarketingExportImage('tim-white-profile-live-mobile');
-const DOWNLOAD_HERO_PHOTO = {
-  src: '/images/marketing-hero/download.webp',
-  width: 1600,
-  height: 901,
-  opacity: 0.22,
-} as const;
 
-const PLATFORM_ROWS = [
-  {
-    icon: Laptop,
-    kind: 'mac' as const,
-    ...DOWNLOAD_COPY.platforms.mac,
-  },
-  {
-    icon: Smartphone,
-    kind: 'iphone' as const,
-    ...DOWNLOAD_COPY.platforms.iphone,
-  },
-];
+/** Only what can be downloaded today. The iPhone app ships when it is public. */
+const MAC_PLATFORM = DOWNLOAD_COPY.platforms.mac;
 
 const REQUIREMENTS = [
   {
@@ -128,13 +107,14 @@ export default function DownloadPage() {
           data-marketing-variant='split-screenshot-right'
           data-marketing-owner='apps/web/app/(marketing)/download/page.tsx'
         >
-          <div className='relative flex min-h-svh flex-col overflow-hidden pt-28 sm:pt-32'>
-            <MarketingHeroPhoto {...DOWNLOAD_HERO_PHOTO} />
+          <div className='relative flex flex-col overflow-hidden pt-28 sm:pt-32'>
             <MarketingContainer
               width='page'
-              className='relative z-3 flex flex-1 flex-col'
+              className='relative z-3 flex flex-col'
             >
-              <div className='grid min-h-0 flex-1 items-start gap-12 pb-16 sm:pb-20 lg:grid-cols-2 lg:items-center lg:gap-16 lg:pb-24'>
+              {/* Copy first, then one Mac shot at full container width so the
+                  app's own type stays legible. No second device on top. */}
+              <div className='grid items-start gap-12 pb-16 sm:pb-20 lg:gap-16 lg:pb-24'>
                 <div className='max-w-xl max-sm:min-h-103'>
                   <p className='homepage-section-eyebrow'>
                     {DOWNLOAD_COPY.eyebrow}
@@ -169,15 +149,6 @@ export default function DownloadPage() {
                         {DOWNLOAD_COPY.heroDownload}
                       </a>
                     </Button>
-                    <UiLink
-                      asChild
-                      variant='subtle'
-                      className='text-sm font-medium'
-                    >
-                      <Link href='#iphone'>
-                        {DOWNLOAD_COPY.iphoneStatusLink}
-                      </Link>
-                    </UiLink>
                   </div>
                   <div
                     className={`mt-6 flex flex-wrap gap-x-5 gap-y-2 text-app leading-5 ${soft}`}
@@ -188,11 +159,12 @@ export default function DownloadPage() {
                   </div>
                 </div>
 
-                <div className='relative min-h-96 lg:min-h-144'>
+                {/* Phones get a crop of the releases list at the app's own
+                    type size; sm+ shows the whole window. */}
+                <div className='relative'>
                   <div className='marketing-lit-focal' aria-hidden='true' />
                   <div
-                    className='marketing-lit-enter absolute inset-x-0 top-8 bottom-0 overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
-                    data-overlap='intentional'
+                    className='download-mac-shot marketing-lit-enter relative overflow-hidden rounded-xl border border-subtle bg-surface-1/5 shadow-card'
                     data-testid='download-desktop-screenshot'
                   >
                     <Image
@@ -201,24 +173,9 @@ export default function DownloadPage() {
                       width={DESKTOP_IMAGE.width}
                       height={DESKTOP_IMAGE.height}
                       priority
-                      sizes='(min-width: 1024px) 54vw, 92vw'
+                      sizes='(min-width: 1440px) 1300px, (min-width: 640px) 92vw, 350vw'
                       quality={85}
-                      className='h-full w-full object-cover object-left-top opacity-90'
-                    />
-                  </div>
-                  <div
-                    className='absolute top-0 right-0 w-52 overflow-hidden rounded-3xl border border-subtle bg-(--system-b-cinematic-black) shadow-card max-sm:hidden'
-                    data-overlap='intentional'
-                  >
-                    <Image
-                      src={PROFILE_IMAGE.publicUrl}
-                      alt={DOWNLOAD_COPY.phoneAlt}
-                      width={PROFILE_IMAGE.width}
-                      height={PROFILE_IMAGE.height}
-                      priority
-                      sizes='13rem'
-                      quality={85}
-                      className='h-auto w-full'
+                      className='download-mac-shot-image'
                     />
                   </div>
                 </div>
@@ -235,71 +192,45 @@ export default function DownloadPage() {
           data-marketing-occurrence='platforms'
         >
           <MarketingContainer width='page'>
-            <div className='grid lg:grid-cols-2'>
-              {PLATFORM_ROWS.map((platform, index) => {
-                const Icon = platform.icon;
-                const isMac = platform.kind === 'mac';
-                return (
-                  <div
-                    key={platform.label}
-                    id={isMac ? undefined : 'iphone'}
-                    className={
-                      index === 0
-                        ? 'border-subtle py-12 sm:py-16 max-lg:border-b lg:border-r lg:pr-12 lg:pl-0 xl:pr-16'
-                        : 'border-subtle py-12 sm:py-16 lg:pl-12 lg:pr-0 xl:pl-16'
-                    }
-                  >
-                    <div className={`flex items-center gap-3 ${soft}`}>
-                      <Icon className='size-4' aria-hidden='true' />
-                      <span className='text-xs font-semibold uppercase tracking-widest'>
-                        {platform.label}
-                      </span>
-                    </div>
-                    <h2
-                      data-wrap='editorial-title'
-                      className='mt-5 text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-4xl'
-                    >
-                      {platform.title}
-                    </h2>
-                    <p
-                      className={`mt-4 max-w-lg text-base leading-relaxed ${muted}`}
-                    >
-                      {platform.body}
-                    </p>
-                    {isMac ? (
-                      <div className='mt-7 flex flex-wrap items-center gap-3'>
-                        <a
-                          href={DOWNLOAD_URL}
-                          className='public-action-primary inline-flex min-h-11 items-center gap-2'
-                          data-analytics-event='download_mac_dmg'
-                          data-analytics-source='download_page_platform'
-                        >
-                          <ArrowDownToLine
-                            className='size-4'
-                            aria-hidden='true'
-                          />
-                          {DOWNLOAD_COPY.platforms.mac.action}
-                        </a>
-                        <a
-                          href={DESKTOP_RELEASES_HTML_URL}
-                          target='_blank'
-                          rel='noopener noreferrer'
-                          className='public-action-secondary inline-flex min-h-11 items-center'
-                        >
-                          {DOWNLOAD_COPY.platforms.mac.releasesAction}
-                        </a>
-                      </div>
-                    ) : (
-                      <p
-                        role='status'
-                        className={`mt-7 text-sm font-medium ${muted}`}
-                      >
-                        {DOWNLOAD_COPY.platforms.iphone.status}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
+            <div className='grid gap-8 py-12 sm:py-16 lg:grid-cols-2 lg:items-end lg:gap-16'>
+              <div>
+                <div className={`flex items-center gap-3 ${soft}`}>
+                  <Laptop className='size-4' aria-hidden='true' />
+                  <span className='text-sm font-medium'>
+                    {MAC_PLATFORM.label}
+                  </span>
+                </div>
+                <h2
+                  data-wrap='editorial-title'
+                  className='mt-5 text-balance text-3xl font-bold leading-tight tracking-normal text-(--system-b-text-primary) lg:text-4xl'
+                >
+                  {MAC_PLATFORM.title}
+                </h2>
+                <p
+                  className={`mt-4 max-w-lg text-base leading-relaxed ${muted}`}
+                >
+                  {MAC_PLATFORM.body}
+                </p>
+              </div>
+              <div className='flex flex-wrap items-center gap-3 lg:justify-end'>
+                <a
+                  href={DOWNLOAD_URL}
+                  className='public-action-primary inline-flex min-h-11 items-center gap-2'
+                  data-analytics-event='download_mac_dmg'
+                  data-analytics-source='download_page_platform'
+                >
+                  <ArrowDownToLine className='size-4' aria-hidden='true' />
+                  {MAC_PLATFORM.action}
+                </a>
+                <a
+                  href={DESKTOP_RELEASES_HTML_URL}
+                  target='_blank'
+                  rel='noopener noreferrer'
+                  className='public-action-secondary inline-flex min-h-11 items-center'
+                >
+                  {MAC_PLATFORM.releasesAction}
+                </a>
+              </div>
             </div>
           </MarketingContainer>
         </section>
@@ -326,9 +257,10 @@ export default function DownloadPage() {
               <div className='grid gap-x-10 gap-y-10 sm:grid-cols-2'>
                 {DOWNLOAD_COPY.features.map(row => (
                   <section key={row.title}>
-                    <div className='mb-4 flex size-8 items-center justify-center rounded-full bg-surface-1/10 text-secondary-token'>
-                      <Check className='size-4' aria-hidden='true' />
-                    </div>
+                    <Check
+                      className='mb-4 size-4 text-secondary-token'
+                      aria-hidden='true'
+                    />
                     <h3 className='text-balance text-xl font-semibold tracking-normal text-(--system-b-text-primary)'>
                       {row.title}
                     </h3>
@@ -428,8 +360,6 @@ export default function DownloadPage() {
 
         <MarketingFooterCta
           sectionVariant='final-single-claim'
-          title={DOWNLOAD_COPY.footerTitle}
-          body={DOWNLOAD_COPY.footerBody}
           ctaLabel={DOWNLOAD_COPY.footerCta}
           ctaHref={DOWNLOAD_URL}
           ctaAnalyticsEvent='download_mac_dmg'
