@@ -79,6 +79,7 @@
     "promptfoo": "promptfoo",
     "stryker": "stryker",
     "parity:music-resolver": "NODE_OPTIONS=--conditions=react-server tsx scripts/music-resolver-parity-eval.ts",
+    "benchmark:music-resolver": "NODE_OPTIONS=--conditions=react-server tsx scripts/music-resolver-benchmark.ts",
     "test:evals:deterministic": "node scripts/eval-lanes.mjs deterministic",
     "test:evals:live": "node scripts/eval-lanes.mjs live",
     "evals:live": "bash scripts/run-live-promptfoo-evals.sh smoke",
