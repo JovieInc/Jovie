@@ -10,12 +10,24 @@ vi.mock('@/features/profile/ProfileDrawerShell', () => ({
     children,
     dataTestId,
     title,
+    navigationLevel,
+    floating,
+    onBack,
   }: {
     readonly children: React.ReactNode;
     readonly dataTestId?: string;
     readonly title?: string;
+    readonly navigationLevel?: string;
+    readonly floating?: boolean;
+    readonly onBack?: () => void;
   }) => (
-    <div data-testid={dataTestId ?? 'profile-drawer-shell'} data-title={title}>
+    <div
+      data-testid={dataTestId ?? 'profile-drawer-shell'}
+      data-title={title}
+      data-navigation-level={navigationLevel}
+      data-floating={String(Boolean(floating))}
+      data-has-back={String(Boolean(onBack))}
+    >
       {children}
     </div>
   ),
@@ -83,13 +95,13 @@ vi.mock('@/features/profile/views/PayView', () => ({
 
 vi.mock('@/features/share/PublicShareMenu', () => ({
   PublicShareActionList: ({
-    alignToDrawerHeader,
+    drawerHeader,
   }: {
-    readonly alignToDrawerHeader?: boolean;
+    readonly drawerHeader?: string;
   }) => (
     <div
       data-testid='public-share-action-list'
-      data-align-to-drawer-header={String(Boolean(alignToDrawerHeader))}
+      data-drawer-header={drawerHeader}
     />
   ),
 }));
@@ -165,12 +177,32 @@ describe('ProfileUnifiedDrawer', () => {
     expect(section).toHaveAttribute('data-contacts', 'contact-1');
   });
 
-  it('aligns share rows to the drawer header grid', () => {
+  it('opens share directly with close only, floating above the safe area', () => {
     render(<ProfileUnifiedDrawer {...baseProps} view='share' />);
 
+    const shell = screen.getByTestId('profile-menu-drawer');
+    expect(shell).toHaveAttribute('data-navigation-level', 'direct');
+    expect(shell).toHaveAttribute('data-has-back', 'false');
+    expect(shell).toHaveAttribute('data-floating', 'true');
     expect(screen.getByTestId('public-share-action-list')).toHaveAttribute(
-      'data-align-to-drawer-header',
-      'true'
+      'data-drawer-header',
+      'direct'
+    );
+  });
+
+  it('keeps back when share is reached from the menu', () => {
+    const { rerender } = render(
+      <ProfileUnifiedDrawer {...baseProps} view='menu' />
+    );
+    rerender(<ProfileUnifiedDrawer {...baseProps} view='share' />);
+
+    const shell = screen.getByTestId('profile-menu-drawer');
+    expect(shell).toHaveAttribute('data-navigation-level', 'secondary');
+    expect(shell).toHaveAttribute('data-has-back', 'true');
+    expect(shell).toHaveAttribute('data-floating', 'false');
+    expect(screen.getByTestId('public-share-action-list')).toHaveAttribute(
+      'data-drawer-header',
+      'secondary'
     );
   });
 

@@ -271,6 +271,31 @@ describe('ProfileDrawerShell keyboard modal contract', () => {
     expect(slot.className).toContain('justify-center');
   });
 
+  it('renders a direct task sheet with close only and a floating edge', () => {
+    render(
+      <ProfileDrawerShell
+        open
+        onOpenChange={vi.fn()}
+        title='Share Profile'
+        navigationLevel='direct'
+        floating
+        presentation='embedded'
+        dataTestId='profile-menu-drawer'
+      >
+        <button type='button'>Copy Link</button>
+      </ProfileDrawerShell>
+    );
+
+    expect(
+      screen.getByTestId('profile-drawer-direct-header')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('profile-drawer-close-button')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('profile-drawer-back-button')).toBeNull();
+    expect(document.querySelector('.profile-drawer-floating')).not.toBeNull();
+  });
+
   it('keeps Escape dismissal across a breakpoint presentation change while open', () => {
     const onOpenChange = vi.fn();
     const { rerender } = renderOpenShell('standalone', onOpenChange);
