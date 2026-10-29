@@ -1,3 +1,5 @@
+import { resolveNewAccountClass } from '@/lib/accounts/internal-account';
+import { readRequestAccountClassHeader } from '@/lib/accounts/request-account-class.server';
 import 'server-only';
 
 import { and, eq, isNull, ne, or } from 'drizzle-orm';
@@ -174,6 +176,10 @@ export async function ensureOnboardingUserRow(
       email: params.userEmail,
       userStatus: 'onboarding_incomplete',
       updatedAt: now,
+      accountClass: resolveNewAccountClass({
+        email: params.userEmail,
+        header: await readRequestAccountClassHeader(),
+      }),
     })
     .onConflictDoUpdate({
       target: users.clerkId,

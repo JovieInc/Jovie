@@ -264,7 +264,16 @@ export const SERVER_ANALYTICS_EVENTS = {
   // to a profile, user, or visitor.
   funnel_step: {
     category: 'funnel',
-    properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason', 'cohort'],
+    properties: [
+      'funnel_id',
+      'step',
+      'outcome',
+      'surface',
+      'reason',
+      'cohort',
+      'step_ms',
+      'entry_ms',
+    ],
   },
   // JOV-9627: one row per onboarding chat reply. `session_id` is the signed
   // onboarding session, which chat_conversations carries and claim attaches to
