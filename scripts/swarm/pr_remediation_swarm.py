@@ -456,7 +456,7 @@ def cmd_guard(a) -> int:
 def cmd_finalize(a) -> int:
     plan = json.loads(Path(a.plan).read_text())
     meta = json.loads(Path(a.agent_meta).read_text()) if a.agent_meta and Path(a.agent_meta).exists() else {}
-    plan.update({k: meta[k] for k in ("model", "costUsd", "tokens", "agentSeconds") if k in meta})
+    plan.update({k: meta[k] for k in ("model", "costUsd", "tokens", "agentSeconds", "agentSaid", "aborted") if k in meta})
     if plan["outcome"] == "blocked-credits":
         plan["costUsd"] = 0
     elif plan["outcome"] not in {"skipped", "gave-up", "error", "deterministic-fixed"}:
@@ -592,12 +592,24 @@ def cmd_agent(a) -> int:
               "agent": {"build": {"steps": a.max_steps}}}
     env = {k: v for k, v in os.environ.items() if k not in {"SWARM_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"}}
     env["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
-    prompt = PROMPT.format(checks=", ".join(plan.get("checks", [])), cls=plan.get("cls"), log=a.log)
+    # external_directory is denied, so the agent can only read a log that lives inside the checkout.
+    # It is excluded from git so the diff guard and the commit never see it.
+    inside = Path(a.cwd) / ".swarm-failed.log"
+    try:
+        inside.write_text(Path(a.log).read_text())
+        exclude = Path(a.cwd) / ".git" / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        with exclude.open("a") as fh:
+            fh.write("\n.swarm-failed.log\n")
+    except OSError:
+        pass
+    prompt = PROMPT.format(checks=", ".join(plan.get("checks", [])), cls=plan.get("cls"), log=".swarm-failed.log")
     started = now()
     acc = {"in": 0, "out": 0}
     reported = 0.0
     aborted = None
     blocked_credits = False
+    last_text = ""
     proc = subprocess.Popen(["npx", "--yes", "opencode-ai@1.19.5", "run", "--format", "json", "-m", f"swarm/{model}", prompt],
                             cwd=a.cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     try:
@@ -611,6 +623,8 @@ def cmd_agent(a) -> int:
                 blocked_credits = True
                 aborted = "blocked-credits"
                 break
+            if isinstance(ev, dict) and ev.get("type") == "text":
+                last_text = str((ev.get("part") or {}).get("text") or "")[-300:] or last_text
             step = {"in": 0, "out": 0}
             walk_cost(ev, step)
             acc["in"] += step["in"]; acc["out"] += step["out"]
@@ -627,7 +641,9 @@ def cmd_agent(a) -> int:
             proc.kill()
         key_file.unlink(missing_ok=True)
     cost = max(acc["in"] * p_in + acc["out"] * p_out, reported)
-    meta = {"model": model, "costUsd": round(cost, 5), "tokens": acc, "agentSeconds": int(now() - started)}
+    meta = {"model": model, "costUsd": round(cost, 5), "tokens": acc, "agentSeconds": int(now() - started),
+            "agentSaid": last_text}
+    inside.unlink(missing_ok=True)
     if blocked_credits:
         meta["costUsd"] = 0  # no credit means nothing was charged: never reaches the ledger
         plan.update(outcome="blocked-credits", reason="gateway-insufficient_funds")
