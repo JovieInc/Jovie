@@ -45,6 +45,7 @@ import {
   parseMergeConflicts,
 } from './lib/preflight-changed.mjs';
 import { checkInstallMatchesLockfile } from './lib/preflight-install.mjs';
+import { remoteHint } from './lib/remote-hint.mjs';
 
 const SELF = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const HEAP_MB = process.env.JOVIE_PREFLIGHT_HEAP_MB || '4096';
@@ -397,6 +398,8 @@ export async function main({
     return 0;
   }
   const cwd = args.repo;
+  const hint = remoteHint({ env });
+  if (hint) log(hint);
   // Fail fast before any check runs against an install this worktree did not make.
   const install = checkInstallMatchesLockfile({ repo: cwd });
   if (!install.ok) {
