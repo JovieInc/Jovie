@@ -3,11 +3,7 @@
   "failures": {
     "/": ["geo:geo-sibling-links"],
     "/ai": ["agentic:structured-data"],
-    "/alternatives": [
-      "copy:copy-lint",
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links"
-    ],
+    "/alternatives": ["copy:copy-lint"],
     "/alternatives/linktree": ["geo:geo-last-updated", "geo:geo-sibling-links"],
     "/api-versioning": ["geo:geo-jsonld-type", "geo:geo-sibling-links"],
     "/artist-notifications": [
@@ -26,11 +22,7 @@
       "geo:geo-jsonld-type",
       "geo:geo-sibling-links"
     ],
-    "/card": [
-      "agentic:structured-data",
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links"
-    ],
+    "/card": ["agentic:structured-data"],
     "/changelog": [
       "agentic:structured-data",
       "copy:copy-lint",
@@ -39,11 +31,7 @@
     ],
     "/changelog/26.8.1": ["geo:geo-last-updated"],
     "/cli": ["copy:copy-lint", "geo:geo-sibling-links"],
-    "/compare": [
-      "copy:copy-lint",
-      "geo:geo-jsonld-type",
-      "geo:geo-sibling-links"
-    ],
+    "/compare": ["copy:copy-lint"],
     "/compare/linktree": ["geo:geo-last-updated", "geo:geo-sibling-links"],
     "/demo/video": [
       "agentic:server-rendered-content",
@@ -85,11 +73,6 @@
     "/voice": ["agentic:structured-data", "copy:copy-lint"],
     "/waitlist": ["technical:html-source"],
     "/waitlist/invite": ["technical:html-source"],
-    "/youtube-thumbnails": [
-      "agentic:structured-data",
-      "geo:geo-jsonld-type",
-      "geo:geo-orphan",
-      "geo:geo-sibling-links"
-    ]
+    "/youtube-thumbnails": ["agentic:structured-data", "geo:geo-sibling-links"]
   }
 }
