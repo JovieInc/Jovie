@@ -1,3 +1,4 @@
+// @coverage-via apps/web/lib/content-records/page-spec.test.tsx
 import { Button } from '@jovie/ui';
 import {
   Bell,
@@ -49,10 +50,9 @@ const SURFACE = {
   raised: 'bg-surface-0',
 } as const;
 
-const SECTION_CLASS = 'py-[clamp(4rem,8vw,7rem)] text-primary-token';
-const TITLE_CLASS =
-  'text-balance text-[clamp(1.75rem,3vw,2.5rem)] font-semibold leading-[1.1] tracking-[-0.02em]';
-const BODY_CLASS = 'text-pretty text-lg leading-[1.5] text-secondary-token';
+const SECTION_CLASS = 'py-16 text-primary-token sm:py-24';
+const TITLE_CLASS = 'marketing-type-section';
+const BODY_CLASS = 'text-pretty text-lg text-secondary-token';
 
 function Shell({
   section,
@@ -68,6 +68,7 @@ function Shell({
       aria-labelledby={labelId}
       data-page-spec-section={section.type}
       data-page-spec-id={section.id}
+      data-accent='ion'
       className={cn(SECTION_CLASS, SURFACE[section.background])}
     >
       <MarketingContainer width='page'>{children}</MarketingContainer>
@@ -130,10 +131,7 @@ function renderSection(section: PageSpecSection) {
       return (
         <Shell key={section.id} section={section} labelId={labelId}>
           <div className='flex max-w-3xl flex-col items-start gap-5'>
-            <h1
-              id={labelId}
-              className={cn(TITLE_CLASS, 'text-[clamp(2.25rem,5vw,3.75rem)]')}
-            >
+            <h1 id={labelId} className='marketing-type-display'>
               {section.title}
             </h1>
             <p className={BODY_CLASS}>{section.body}</p>
@@ -194,7 +192,7 @@ function renderSection(section: PageSpecSection) {
       return (
         <Shell key={section.id} section={section}>
           <figure className='max-w-3xl'>
-            <blockquote className='text-balance text-[clamp(1.5rem,2.6vw,2.125rem)] leading-[1.25] tracking-[-0.015em]'>
+            <blockquote className='marketing-type-section text-balance'>
               {section.quote}
             </blockquote>
             <figcaption className='mt-5 text-sm text-secondary-token'>
