@@ -1,3 +1,4 @@
+// @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
   buildLeadBuildHold,
@@ -32,10 +33,13 @@ describe('lead build hold', () => {
 describe('migration 0152 guard', () => {
   it('keeps the trigger and the live backfill', async () => {
     const { readFileSync } = await import('node:fs');
+    const { fileURLToPath } = await import('node:url');
     const sql = readFileSync(
-      new URL(
-        '../../drizzle/migrations/0152_lead_build_hold.sql',
-        import.meta.url
+      fileURLToPath(
+        new URL(
+          '../../drizzle/migrations/0152_lead_build_hold.sql',
+          import.meta.url
+        )
       ),
       'utf8'
     );
