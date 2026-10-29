@@ -8,6 +8,7 @@ import {
 } from '@/lib/screenshots/product-shots';
 import productShotManifest from '@/lib/screenshots/product-shots.manifest.json';
 import { SCREENSHOT_SCENARIOS } from '@/lib/screenshots/registry';
+import { expandVariants } from '@/scripts/product-shots/plan';
 import { hashShotSpec } from '@/scripts/product-shots/source-hash.mjs';
 import {
   ancestorJson,
@@ -105,7 +106,7 @@ describe('marketing product imagery', () => {
   });
 
   it('renders every declared shot from its current spec', () => {
-    for (const spec of PRODUCT_SHOTS) {
+    for (const spec of PRODUCT_SHOTS.flatMap(expandVariants)) {
       const entry = getProductShotManifestEntry(spec.id);
       expect(entry, `${spec.id} is not rendered`).not.toBeNull();
       expect(entry?.sources, `${spec.id} sources drifted`).toEqual(
@@ -119,7 +120,9 @@ describe('marketing product imagery', () => {
   });
 
   it('has no rendered shot without a spec', () => {
-    const declared = new Set<string>(PRODUCT_SHOTS.map(shot => shot.id));
+    const declared = new Set<string>(
+      PRODUCT_SHOTS.flatMap(expandVariants).map(shot => shot.id)
+    );
     const orphans = Object.keys(productShotManifest.shots).filter(
       id => !declared.has(id)
     );

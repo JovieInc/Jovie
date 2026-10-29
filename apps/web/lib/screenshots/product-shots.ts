@@ -64,7 +64,23 @@ export interface ProductShotSpec {
   /** Marketing routes that show this shot. */
   readonly placements: readonly string[];
   readonly fixedNow?: string;
+  /**
+   * Narrow-screen art direction: the same moment captured from the real
+   * component at the mobile viewport, served below 48rem by `<ProductShot>`.
+   * Use it when the desktop crop would shrink type below legibility on a
+   * phone (manifest id `<id>--mobile`).
+   */
+  readonly mobile?: ProductShotVariantSpec;
 }
+
+export interface ProductShotVariantSpec {
+  readonly route?: string;
+  readonly crop: readonly string[];
+  readonly padding?: ProductShotSpec['padding'];
+  readonly displayWidth: number;
+}
+
+export const PRODUCT_SHOT_MOBILE_SUFFIX = '--mobile';
 
 export const PRODUCT_SHOT_DPR = 2;
 export const PRODUCT_SHOT_PUBLIC_DIR = '/product-shots';
@@ -92,6 +108,15 @@ export const PRODUCT_SHOTS = [
     padding: { top: 22, right: 32, bottom: 32, left: 32 },
     frame: 'bare',
     displayWidth: 736,
+    // At 390 the desktop crop shrinks the heading to 19px; the real mobile
+    // layout reads near 1:1 in a phone-width card.
+    mobile: {
+      crop: [`${STAGE} h1`, '[data-testid="onboarding-handle-submit"]'],
+      // 16px sides keep the crop inside the stage's 24px corner radius
+      // (stage edge x=16, heading x=37) so no frame arc shows.
+      padding: { top: 14, right: 16, bottom: 20, left: 16 },
+      displayWidth: 358,
+    },
     sources: [
       `${ONBOARDING}/OnboardingHandleStep.tsx`,
       `${DEMO}/DemoShowcaseSurface.tsx`,
@@ -190,6 +215,12 @@ export interface ProductShotImage {
   /** CSS px at `displayWidth`; intrinsic pixels are `PRODUCT_SHOT_DPR`x. */
   readonly width: number;
   readonly height: number;
+  readonly mobile: {
+    readonly avif: string;
+    readonly webp: string;
+    readonly width: number;
+    readonly height: number;
+  } | null;
 }
 
 export function getProductShotSpec(id: string): ProductShotSpec | null {
@@ -212,15 +243,33 @@ export function getProductShot(id: ProductShotId): ProductShotImage {
       `Product shot ${id} has not been rendered; run pnpm --filter @jovie/web shots:render --only ${id}`
     );
   }
-  const version = entry.sourceHash.slice(0, 12);
-  const base = `${PRODUCT_SHOT_PUBLIC_DIR}/${id}`;
   return {
     id,
     alt: spec.alt,
     frame: spec.frame,
+    ...resolveRendered(id, entry),
+    mobile: spec.mobile ? resolveMobile(id) : null,
+  };
+}
+
+function resolveRendered(fileId: string, entry: ProductShotManifestEntry) {
+  const version = entry.sourceHash.slice(0, 12);
+  const base = `${PRODUCT_SHOT_PUBLIC_DIR}/${fileId}`;
+  return {
     avif: `${base}.avif?v=${version}`,
     webp: `${base}.webp?v=${version}`,
     width: Math.round(entry.width / PRODUCT_SHOT_DPR),
     height: Math.round(entry.height / PRODUCT_SHOT_DPR),
   };
+}
+
+function resolveMobile(id: string) {
+  const fileId = `${id}${PRODUCT_SHOT_MOBILE_SUFFIX}`;
+  const entry = getProductShotManifestEntry(fileId);
+  if (!entry) {
+    throw new Error(
+      `Product shot ${fileId} has not been rendered; run pnpm --filter @jovie/web shots:render --only ${id}`
+    );
+  }
+  return resolveRendered(fileId, entry);
 }

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import type { ProductShotSpec } from '../../lib/screenshots/product-shots';
 import {
+  expandVariants,
   isShotStale,
   oversizedFormats,
   PRODUCT_SHOT_MAX_BYTES,
@@ -103,11 +104,11 @@ describe('selectShots', () => {
   it('treats a changed source file as stale', () => {
     const root = repoWith('export const v = 1;\n');
     const shot = spec('a');
-    const entry = entryFor(root, shot);
-    expect(isShotStale(root, shot, entry)).toBe(false);
+    const manifest = { a: entryFor(root, shot) };
+    expect(isShotStale(root, shot, manifest)).toBe(false);
     writeFileSync(join(root, SOURCE), 'export const v = 2;\n');
-    expect(isShotStale(root, shot, entry)).toBe(true);
-    expect(isShotStale(root, shot, undefined)).toBe(true);
+    expect(isShotStale(root, shot, manifest)).toBe(true);
+    expect(isShotStale(root, shot, {})).toBe(true);
   });
 
   it('filters by --only and fails on an unknown id', () => {
@@ -122,6 +123,38 @@ describe('selectShots', () => {
     expect(() =>
       selectShots(root, shots, {}, { ...args, only: new Set(['typo']) })
     ).toThrow('Unknown product shot: typo');
+  });
+});
+
+describe('expandVariants', () => {
+  const mobile = { crop: ['h1', 'form'], padding: 20, displayWidth: 358 };
+
+  it('adds a mobile-viewport variant with its own crop', () => {
+    const [base, variant] = expandVariants(spec('claim', { mobile }));
+    expect(base.id).toBe('claim');
+    expect(variant).toMatchObject({
+      id: 'claim--mobile',
+      viewport: 'mobile',
+      route: '/demo/claim',
+      crop: ['h1', 'form'],
+      padding: 20,
+      displayWidth: 358,
+    });
+    expect(variant).not.toHaveProperty('mobile');
+    expect(expandVariants(spec('plain'))).toHaveLength(1);
+  });
+
+  it('is stale until the mobile variant is rendered too', () => {
+    const root = repoWith('x');
+    const shot = spec('claim', { mobile });
+    const [base, variant] = expandVariants(shot);
+    expect(isShotStale(root, shot, { claim: entryFor(root, base) })).toBe(true);
+    expect(
+      isShotStale(root, shot, {
+        claim: entryFor(root, base),
+        'claim--mobile': entryFor(root, variant),
+      })
+    ).toBe(false);
   });
 });
 

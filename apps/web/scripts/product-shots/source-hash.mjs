@@ -33,6 +33,7 @@ export function hashShotSpec(spec) {
     maxHeight: spec.maxHeight ?? null,
     displayWidth: spec.displayWidth,
     fixedNow: spec.fixedNow ?? null,
+    mobile: spec.mobile ?? null,
   };
   return createHash('sha256').update(JSON.stringify(pixelFields)).digest('hex');
 }

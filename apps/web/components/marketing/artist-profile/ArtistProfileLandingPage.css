@@ -133,8 +133,8 @@
 
 /* How it works: three registry shots (lib/screenshots/product-shots.ts),
    each already cropped to its moment and staged in a matte card. Claim gets
-   the full row so the handle reads near 1:1; Connect and Share share the
-   second row at equal heights (staged cards stretch). */
+   the full row so the handle reads near 1:1; at 80rem and up Connect and
+   Share share the second row at equal heights (staged cards stretch). */
 .ap-how-it-works__shots {
   display: grid;
   gap: var(--space-4);
@@ -149,7 +149,9 @@
   flex: 1;
 }
 
-@media (min-width: 48rem) {
+/* Two columns only where Connect keeps about 0.7x scale; below that the
+   cards stack and each reads larger. */
+@media (min-width: 80rem) {
   .ap-how-it-works__shots {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

@@ -4,7 +4,10 @@
  * of Playwright and sharp so it is unit tested
  * (scripts/product-shots/plan.test.ts).
  */
-import type { ProductShotSpec } from '../../lib/screenshots/product-shots';
+import {
+  PRODUCT_SHOT_MOBILE_SUFFIX,
+  type ProductShotSpec,
+} from '../../lib/screenshots/product-shots';
 import { hashShotSources, hashShotSpec } from './source-hash.mjs';
 
 /** Per-file ceiling. A shot above it is a crop that shows too much. */
@@ -52,16 +55,42 @@ export interface ShotManifestEntry {
   readonly bytes: { readonly avif: number; readonly webp: number };
 }
 
+/**
+ * Every image a spec renders: the base shot, plus a `<id>--mobile` variant
+ * captured at the mobile viewport when the spec declares one. Each variant
+ * is a full spec so the renderer and the hashes treat it like any shot.
+ */
+export function expandVariants(spec: ProductShotSpec): ProductShotSpec[] {
+  if (!spec.mobile) return [spec];
+  const { mobile, ...base } = spec;
+  return [
+    spec,
+    {
+      ...base,
+      id: `${spec.id}${PRODUCT_SHOT_MOBILE_SUFFIX}`,
+      viewport: 'mobile',
+      route: mobile.route ?? spec.route,
+      crop: mobile.crop,
+      padding: mobile.padding,
+      displayWidth: mobile.displayWidth,
+    },
+  ];
+}
+
+/** A shot is stale when any of its rendered variants is. */
 export function isShotStale(
   repoRoot: string,
   spec: ProductShotSpec,
-  entry: ShotManifestEntry | undefined
+  manifest: Readonly<Record<string, ShotManifestEntry | undefined>>
 ): boolean {
-  if (!entry) return true;
-  return (
-    entry.sourceHash !== hashShotSources(repoRoot, spec.sources) ||
-    entry.specHash !== hashShotSpec(spec)
-  );
+  return expandVariants(spec).some(variant => {
+    const entry = manifest[variant.id];
+    if (!entry) return true;
+    return (
+      entry.sourceHash !== hashShotSources(repoRoot, variant.sources) ||
+      entry.specHash !== hashShotSpec(variant)
+    );
+  });
 }
 
 /** Shots to render for these args; unknown `--only` ids fail loudly. */
@@ -80,7 +109,7 @@ export function selectShots(
   }
   return shots.filter(spec => {
     if (args.only && !args.only.has(spec.id)) return false;
-    if (args.stale) return isShotStale(repoRoot, spec, manifest[spec.id]);
+    if (args.stale) return isShotStale(repoRoot, spec, manifest);
     return true;
   });
 }

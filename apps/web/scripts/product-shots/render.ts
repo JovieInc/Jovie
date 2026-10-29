@@ -23,6 +23,7 @@ import {
 } from '../../lib/screenshots/product-shots';
 import { SCREENSHOT_VIEWPORTS } from '../../lib/screenshots/registry';
 import {
+  expandVariants,
   oversizedFormats,
   type PageBox,
   parseRenderArgs,
@@ -82,11 +83,21 @@ async function cropBox(page: Page, spec: ProductShotSpec) {
 async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
   if (spec.fixedNow) await page.clock.setFixedTime(new Date(spec.fixedNow));
   await page.goto(new URL(spec.route, baseUrl).toString(), {
-    waitUntil: 'networkidle',
+    // Not networkidle: demo profiles keep posting analytics beacons, so the
+    // network never goes quiet. The spec's waitFor selector plus fonts and
+    // decoded images are the readiness signal.
+    waitUntil: 'load',
     timeout: 120_000,
   });
   await page.locator(spec.waitFor).first().waitFor({ timeout: 60_000 });
-  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(
+      [...document.images].map(image =>
+        image.complete ? undefined : image.decode().catch(() => undefined)
+      )
+    );
+  });
   // Next dev overlays and toasts are not product UI.
   await page.addStyleTag({
     content:
@@ -155,7 +166,7 @@ async function main() {
   const browser = await chromium.launch();
   const failures: string[] = [];
   try {
-    for (const spec of shots) {
+    for (const spec of shots.flatMap(expandVariants)) {
       const context = await browser.newContext({
         viewport: SCREENSHOT_VIEWPORTS[spec.viewport],
         deviceScaleFactor: PRODUCT_SHOT_DPR,

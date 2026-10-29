@@ -5,8 +5,8 @@
       "width": 1640,
       "height": 1172,
       "sourceHash": "e6fac0aaa5431462bf511f399ac533364651b5cb36c8fb479aab30a4429a622f",
-      "specHash": "2c9e20071cf0967f2c7846870c33dd2da18f2f2814aa9459fd1ab5073f6dbe21",
-      "renderedAt": "2026-10-29T19:05:43.820Z",
+      "specHash": "431d2bbda1f7a334f405179ebdc85d1f63359bf2683879cf776aa248037d998c",
+      "renderedAt": "2026-10-29T19:20:52.679Z",
       "sources": [
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx",
@@ -22,8 +22,8 @@
       "width": 1472,
       "height": 426,
       "sourceHash": "de31834c23943481cce057174f7ddab901d3c9e400e20f560999c3f60740359a",
-      "specHash": "a029252122ee1f676f81d04c36650138927ef9e57f2749748d086856948c0763",
-      "renderedAt": "2026-10-29T19:04:55.713Z",
+      "specHash": "d26c3855110ccb6d3dcabe8aa7ebcf16d6b3c5800e7c561923051518596464a7",
+      "renderedAt": "2026-10-29T19:21:51.058Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
         "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
@@ -34,12 +34,28 @@
         "webp": 13314
       }
     },
+    "setup-claim-handle--mobile": {
+      "width": 696,
+      "height": 360,
+      "sourceHash": "de31834c23943481cce057174f7ddab901d3c9e400e20f560999c3f60740359a",
+      "specHash": "41bf2a7158c457fb76e5adcbe69503a40a5961fdcf8945b6fe47a17cbb2b0b94",
+      "renderedAt": "2026-10-29T19:22:03.369Z",
+      "sources": [
+        "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
+        "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
+        "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
+      ],
+      "bytes": {
+        "avif": 7842,
+        "webp": 11416
+      }
+    },
     "setup-connect-music": {
       "width": 972,
       "height": 530,
       "sourceHash": "b5f67e2d7921a991f3797c654a2e2bc5b70785fd42fabe7fdc7b67ae01df42e4",
-      "specHash": "4ae18cae15f09a2e8026da5ca135a11f497176b3bfceadd9f7ba39901079468f",
-      "renderedAt": "2026-10-29T19:05:03.733Z",
+      "specHash": "cc187de12e7d6b300efb2e132d4520b657a8c2f8ae04e359d7589c5978325b90",
+      "renderedAt": "2026-10-29T19:15:40.098Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx",
         "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
@@ -54,8 +70,8 @@
       "width": 764,
       "height": 666,
       "sourceHash": "96c85efffe68e56ff8b35ad934ba091d47be3cf6313064caf6e50e6df81ee090",
-      "specHash": "d96f18b1100add4501a67b43ca154087e41e7affbe599333fad307dff2082c9b",
-      "renderedAt": "2026-10-29T19:05:10.631Z",
+      "specHash": "b5e7b8c2e7283ac396ec5dfc619fad20ad240bb90a4f1c4cd23a2ef7f9d8b881",
+      "renderedAt": "2026-10-29T19:20:16.153Z",
       "sources": [
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx",
