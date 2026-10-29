@@ -970,6 +970,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/postmortem-review.test.mjs',
   'scripts/prebuild-install-dep0176.test.mjs',
   'scripts/public-benchmark/public-benchmark.test.mjs',
+  'scripts/catalog-completeness/check.test.mjs',
   'scripts/quality-gap-finder.test.mjs',
   'scripts/screenshot-loop/screenshot-bug-loop.test.mjs',
   'scripts/security/audit-workflow-execution.test.mjs',
