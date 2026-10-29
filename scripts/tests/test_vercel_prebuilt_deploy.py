@@ -669,28 +669,20 @@ def test_staging_build_runs_in_job_and_materializes_trace_closure() -> None:
     assert "VERCEL_ENABLE_SOURCE_FALLBACK: 'false'" in deploy_step
 
 
-def test_staging_clerk_secrets_are_exposed_to_vercel_builds() -> None:
+def test_staging_build_and_deploy_do_not_inject_retired_clerk_env() -> None:
     workflow = PRODUCTION_RELEASE_WORKFLOW.read_text()
-    expected_publishable = (
-        "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: "
-        "${{ secrets.CLERK_PUBLISHABLE_KEY_STAGING }}"
-    )
-    expected_secret = "CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY_STAGING }}"
-
     staging = workflow[
         workflow.index("  deploy-staging:") : workflow.index(
             "  canary-health-gate:"
         )
     ]
-    build_step = _staging_build_step(workflow)
-
-    # The in-job staging build must sign Clerk tokens with staging keys.
-    assert expected_publishable in build_step
-    assert expected_secret in build_step
-    # The prebuilt deploy step also receives them so CLI-side env resolution
-    # cannot fall back to production keys.
-    assert staging.count(expected_publishable) >= 2
-    assert staging.count(expected_secret) >= 2
+    # Clerk is retired: neither the in-job build nor prebuilt deployment
+    # should receive old credentials or aliases, including staging variants.
+    assert not re.search(
+        r"\b(?:NEXT_PUBLIC_CLERK_[A-Z_]+|CLERK_SECRET_KEY(?:_STAGING)?|"
+        r"CLERK_PUBLISHABLE_KEY(?:_STAGING)?)\b",
+        staging,
+    )
 
 
 def test_masked_deployment_url_is_encoded_across_job_boundary() -> None:
