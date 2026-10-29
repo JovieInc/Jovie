@@ -250,7 +250,11 @@ for (const width of [390, 1280]) {
     await expect(rail.getByText('your-handle', { exact: false })).toHaveCount(
       0
     );
-    await expect(rail.getByText('(source:', { exact: false })).toHaveCount(0);
+    await expect(
+      rail.getByText('12.3K Spotify followers (source: enrichment)', {
+        exact: true,
+      })
+    ).toBeVisible();
     expect(
       await page.evaluate(
         () => document.documentElement.scrollWidth <= innerWidth

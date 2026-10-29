@@ -1,12 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 import { ProfilePreviewBento } from './ProfilePreviewBento';
 import { PROFILE_STORY_ARTIST } from './profile-story-fixture';
 
 vi.mock('@/features/profile/templates/ProfileCompactSurface', () => ({
-  ProfileCompactSurface: ({ dataTestId }: { dataTestId?: string }) => (
+  ProfileCompactSurface: vi.fn(({ dataTestId }: { dataTestId?: string }) => (
     <div data-testid={dataTestId ?? 'profile-compact-surface'} />
-  ),
+  )),
 }));
 
 function renderBento(
@@ -23,6 +24,38 @@ function renderBento(
 }
 
 describe('ProfilePreviewBento', () => {
+  it('preserves catalog artwork and disables fan capture for an unclaimed review', () => {
+    const latestRelease = {
+      title: 'Catalog single',
+      slug: 'catalog-single',
+      artworkUrl: 'https://cdn.example.com/catalog.webp',
+      releaseDate: '2026-10-20',
+      releaseType: 'single',
+    };
+    const socialLinks = [
+      {
+        id: 'instagram',
+        platform: 'instagram',
+        url: 'https://instagram.com/artist',
+      },
+    ];
+    renderBento({
+      latestRelease,
+      allowFanCapture: false,
+      headerSocialLinksOverride: socialLinks,
+    });
+
+    expect(ProfileCompactSurface).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        latestRelease,
+        allowFanCapture: false,
+        headerSocialLinksOverride: socialLinks,
+        showPayButton: false,
+        renderInteractiveOverlays: false,
+      }),
+      undefined
+    );
+  });
   it('uses domain-specific phone content without mounting the music surface', () => {
     renderBento({ phoneContent: <p>Company draft</p> });
     expect(screen.getByText('Company draft')).toBeInTheDocument();

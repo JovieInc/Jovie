@@ -82,7 +82,9 @@ function serializeHandleCheck(
     // Legacy boolean cache entries have no observation timestamp. Never
     // relabel their read time as a fresh database check or a reservation.
     checkedAt: freshness === 'fresh' ? new Date().toISOString() : null,
-    reserved: false,
+    // System-reserved names are unavailable; this does not grant a visitor
+    // ownership or claim that an availability lookup reserved a free handle.
+    reserved: result.reason === 'reserved',
     ...(result.error ? { error: result.error } : {}),
     ...(result.suggestedAlternatives && result.suggestedAlternatives.length > 0
       ? { suggestedAlternatives: result.suggestedAlternatives }

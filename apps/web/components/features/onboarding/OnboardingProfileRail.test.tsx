@@ -122,6 +122,24 @@ describe('OnboardingProfileRail', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('shows the real identity without fabricating a release when catalog data is absent', () => {
+    render(
+      <OnboardingProfileRail placement='inline' state={CONFIRMED_STATE} />
+    );
+
+    const phone = screen.getByTestId('onboarding-phone-preview');
+    expect(phone).toHaveTextContent('Test Artist');
+    expect(phone).toHaveTextContent('testartist');
+    expect(screen.queryByRole('img', { name: /artwork/i })).toBeNull();
+    expect(screen.queryByText('Listen now', { exact: true })).toBeNull();
+    expect(screen.queryByText('Get Updates', { exact: true })).toBeNull();
+    expect(
+      screen.getByText('12.3K Spotify followers (source: enrichment)', {
+        exact: true,
+      })
+    ).toBeVisible();
+  });
+
   it('keeps the DSP match strip outside the phone preview', () => {
     render(<OnboardingProfileRail placement='side' state={CONFIRMED_STATE} />);
 

@@ -200,6 +200,7 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(400);
     expect(data.available).toBe(false);
+    expect(data.reserved).toBe(true);
     expect(data.suggestedAlternatives).toEqual(['admin1', 'admin2', 'admin3']);
   });
 
