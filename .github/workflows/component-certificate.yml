@@ -4,7 +4,6 @@
 # revisit-trigger: Fold into the Production Controller evidence packets once they carry design-system certification, or retire when Ovie computes certificates itself.
 # necessary-trust-boundary: Runs on trusted main only, read-only token. The one secret (CRON_SECRET) is used by a single curl step after the certificate script has finished; it posts evidence to the Ovie ingest route and never writes to GitHub.
 name: Component Certificate
-# Informational; script crashes fail. Contract: docs/design-system/COMPONENT_CERTIFICATE.md.
 
 on:
   workflow_run:
@@ -47,6 +46,7 @@ jobs:
           persist-credentials: false
       - name: Require main ancestry
         run: git merge-base --is-ancestor HEAD origin/main
+      - uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v6.4.0
         with:
           node-version-file: .nvmrc
