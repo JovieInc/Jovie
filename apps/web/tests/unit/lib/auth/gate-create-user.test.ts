@@ -109,6 +109,8 @@ vi.mock('@/lib/error-tracking', () => ({
 
 vi.mock('@/lib/utils/email', () => ({
   normalizeEmail: mockNormalizeEmail,
+  isInternalOrTestAccountEmail: () => false,
+  INTERNAL_ACCOUNT_EMAIL_SQL_PATTERN: '$^',
 }));
 
 vi.mock('@/lib/auth/status-checker', () => ({
