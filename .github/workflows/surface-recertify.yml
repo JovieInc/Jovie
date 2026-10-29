@@ -1,7 +1,7 @@
 name: Surface Recertification
 # controller-hop-exception: jovie-controller-hop/v1
 # accountable-writer: Gem
-# necessary-trust-boundary: Main pushes recompute certified-route source fingerprints, capture fresh screenshots with a locally built app, store them in the evidence R2 bucket and open one bot PR that edits only the certification ledger; it never merges, deploys, or records founder decisions.
+# necessary-trust-boundary: Main pushes recompute certified-route source fingerprints, capture fresh screenshots with a locally built app, store them in the evidence R2 bucket and open one bot PR that edits only the certification ledger (merge-queue-green-enroll arms it); it never merges, deploys, or records founder decisions.
 # removal-trigger: Remove when Production Controller emits the recertification packets after each deploy.
 #
 # Event-driven, no clock. PRs never hand-edit
@@ -55,8 +55,7 @@ jobs:
 
       - name: Install Playwright Chromium
         if: steps.stale.outputs.count != '0'
-        working-directory: apps/web
-        run: pnpm exec playwright install --with-deps chromium
+        uses: ./.github/actions/setup-playwright
 
       - name: Build web app
         if: steps.stale.outputs.count != '0'
@@ -112,4 +111,3 @@ jobs:
             --title "chore(design): recertify surfaces after ${GITHUB_SHA::12}" \
             --label compounding \
             --body "Bot-produced certification evidence for routes whose source changed in ${GITHUB_SHA}. Screenshots live in the evidence store; this PR edits only the ledger."
-          node packages/api-client/cli.ts gh --priority report -- pr merge "$BRANCH" --repo "${{ github.repository }}" --auto --squash || true
