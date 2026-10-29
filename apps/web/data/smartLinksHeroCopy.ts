@@ -19,7 +19,7 @@ export const SMART_LINKS_HERO_COPY = {
   generic: {
     title: 'Share your work with one link.',
     intro:
-      'Share a release and each visitor picks their music app once. Every link after that opens there.',
+      'Share a release. People pick their music app once, and every link after that opens there.',
     howTitle: 'One link, three beats.',
     stepTitles: [
       'Land on the work',
