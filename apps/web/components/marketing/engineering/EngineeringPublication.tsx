@@ -137,11 +137,21 @@ export function EngineeringIndex({
     >
       <div data-testid='engineering-index'>
         {stories.length === 0 ? (
-          <p className='text-secondary-token'>
-            {preview
-              ? 'No draft stories in the local founder gallery yet.'
-              : 'No founder-approved engineering stories are public yet.'}
-          </p>
+          <div className='space-y-3'>
+            <p className='text-secondary-token'>
+              {preview
+                ? 'No draft stories in the local founder gallery yet.'
+                : 'No founder-approved engineering stories are public yet.'}
+            </p>
+            {preview ? null : (
+              <p className='max-w-2xl text-secondary-token'>
+                Each note here is written from work that has already shipped,
+                with the pull request, the checks that passed, and the result
+                linked as evidence. Nothing is published until it is approved,
+                so this index only ever lists finished work.
+              </p>
+            )}
+          </div>
         ) : (
           <ul className='space-y-8'>
             {stories.map(story => (
