@@ -1,8 +1,5 @@
 {
   "files": {
-    "apps/web/app/(marketing)/ai/page.tsx": {
-      "copy-redundancy": 1
-    },
     "apps/web/app/(marketing)/youtube-thumbnails/YoutubeThumbnailPasteForm.tsx": {
       "disabled-submit": 1
     },
