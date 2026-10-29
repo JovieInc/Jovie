@@ -6,7 +6,7 @@
       "height": 1172,
       "sourceHash": "e6fac0aaa5431462bf511f399ac533364651b5cb36c8fb479aab30a4429a622f",
       "specHash": "2c9e20071cf0967f2c7846870c33dd2da18f2f2814aa9459fd1ab5073f6dbe21",
-      "renderedAt": "2026-10-29T18:59:34.256Z",
+      "renderedAt": "2026-10-29T19:05:43.820Z",
       "sources": [
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/profile/templates/ProfileCompactTemplate.tsx",
@@ -23,7 +23,7 @@
       "height": 426,
       "sourceHash": "de31834c23943481cce057174f7ddab901d3c9e400e20f560999c3f60740359a",
       "specHash": "a029252122ee1f676f81d04c36650138927ef9e57f2749748d086856948c0763",
-      "renderedAt": "2026-10-29T18:58:44.392Z",
+      "renderedAt": "2026-10-29T19:04:55.713Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
         "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
@@ -39,7 +39,7 @@
       "height": 530,
       "sourceHash": "b5f67e2d7921a991f3797c654a2e2bc5b70785fd42fabe7fdc7b67ae01df42e4",
       "specHash": "4ae18cae15f09a2e8026da5ca135a11f497176b3bfceadd9f7ba39901079468f",
-      "renderedAt": "2026-10-29T18:58:53.176Z",
+      "renderedAt": "2026-10-29T19:05:03.733Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx",
         "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
@@ -53,9 +53,9 @@
     "setup-share-profile": {
       "width": 764,
       "height": 666,
-      "sourceHash": "18aec8ac96069e32e90c690765bbf46a336455ac81ba6292fcf2cb3e0e01bbf1",
+      "sourceHash": "96c85efffe68e56ff8b35ad934ba091d47be3cf6313064caf6e50e6df81ee090",
       "specHash": "d96f18b1100add4501a67b43ca154087e41e7affbe599333fad307dff2082c9b",
-      "renderedAt": "2026-10-29T18:59:00.927Z",
+      "renderedAt": "2026-10-29T19:05:10.631Z",
       "sources": [
         "apps/web/components/features/demo/DemoTimWhiteProfileSurface.tsx",
         "apps/web/components/features/profile/ProfileUnifiedDrawer.tsx",
