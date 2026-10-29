@@ -16,7 +16,11 @@ import { createApiClient } from '../../../../../packages/api-client/client.ts';
 import { hashCredential } from '../../../../../packages/api-client/store.ts';
 
 export const WORKERS_AI_SUBJECT_MODEL = '@cf/zai-org/glm-5.3';
-export const WORKERS_AI_CHEAP_JUDGE = '@cf/zai-org/glm-5.3-flash';
+/**
+ * Cheap judge. Not glm-5.3-flash: that model carries Summer's production
+ * traffic on this account and its per-minute limit is shared.
+ */
+export const WORKERS_AI_CHEAP_JUDGE = '@cf/openai/gpt-oss-120b';
 export const WORKERS_AI_STRONG_JUDGE = '@cf/moonshotai/kimi-k2.6';
 
 export interface WaiMessage {
@@ -51,7 +55,21 @@ export interface WorkersAiConfig {
   readonly token: string;
 }
 
+/**
+ * Minimum gap between calls to one model. Workers AI rate limits per model
+ * per account, and Summer's production route shares this account
+ * (glm-5.3-flash), so the eval paces itself well under the limit.
+ */
+export const WORKERS_AI_MIN_INTERVAL_MS = 5_000;
+
 export function workersAiChat(config: WorkersAiConfig) {
+  const nextSlot = new Map<string, number>();
+  const pace = async (model: string) => {
+    const now = Date.now();
+    const slot = Math.max(now, nextSlot.get(model) ?? 0);
+    nextSlot.set(model, slot + WORKERS_AI_MIN_INTERVAL_MS);
+    if (slot > now) await new Promise(r => setTimeout(r, slot - now));
+  };
   const client = createApiClient({
     provider: 'cloudflare',
     credential: hashCredential('cloudflare', config.token),
@@ -67,6 +85,7 @@ export function workersAiChat(config: WorkersAiConfig) {
     readonly tools?: readonly WaiTool[];
     readonly maxTokens?: number;
   }): Promise<WaiResult> {
+    await pace(input.model);
     const response = await client.request({
       url,
       method: 'POST',

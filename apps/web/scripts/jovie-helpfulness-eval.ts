@@ -18,6 +18,7 @@
  *   --case <id>                                 one case (repeatable)
  *   --out <path>                                JSON report path
  *   --concurrency <n>                           default 3
+ *   --publish-gbrain                            append to gbrain metrics/jovie-helpfulness
  *   --allow-gateway-spend                       required to even read a
  *                                               Gateway key; still unused
  *
@@ -43,6 +44,12 @@ import {
 } from '../tests/eval/helpfulness/cases';
 import { buildEvalToolSpecs } from '../tests/eval/helpfulness/eval-tools';
 import { buildFixture } from '../tests/eval/helpfulness/fixtures';
+import {
+  HELPFULNESS_METRIC_SLUG,
+  type HelpfulnessRunRow,
+  parseHistory,
+  renderMetricPage,
+} from '../tests/eval/helpfulness/publish';
 import {
   buildJudgePrompt,
   type CaseResult,
@@ -360,7 +367,7 @@ async function calibrate(chat: Chat, judges: readonly string[]): Promise<void> {
     )
   ) as { examples: CalibrationExample[] };
   for (const model of judges) {
-    const rows = await mapLimit(file.examples, 3, async example => {
+    const rows = await mapLimit(file.examples, 1, async example => {
       const testCase = HELPFULNESS_CASES.find(c => c.id === example.id);
       if (!testCase) throw new Error(`unknown calibration case ${example.id}`);
       const now = new Date(example.ranAt);
@@ -388,6 +395,25 @@ async function calibrate(chat: Chat, judges: readonly string[]): Promise<void> {
         .join(' ')}\n`
     );
   }
+}
+
+/** Append this run to the gbrain metric page Summer reads weekly. */
+function publishToGbrain(row: HelpfulnessRunRow): void {
+  let existing = '';
+  try {
+    existing = execFileSync('gbrain', ['get', HELPFULNESS_METRIC_SLUG], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch {
+    existing = '';
+  }
+  const page = renderMetricPage([...parseHistory(existing), row]);
+  execFileSync('gbrain', ['put', HELPFULNESS_METRIC_SLUG], {
+    input: page,
+    stdio: ['pipe', 'ignore', 'inherit'],
+  });
+  process.stdout.write(`published: gbrain ${HELPFULNESS_METRIC_SLUG}\n`);
 }
 
 async function main(): Promise<void> {
@@ -487,6 +513,35 @@ async function main(): Promise<void> {
   process.stdout.write(
     `\nJovie helpfulness ${HELPFULNESS_EVAL_VERSION} (${args.model}, judge ${judgeId ?? 'none'}): score ${summary.score}/100, pass ${Math.round(summary.passRate * 100)}%, hard checks ${Math.round(summary.hardPassRate * 100)}%, n=${summary.cases}\n`
   );
+  if (process.argv.includes('--publish-gbrain')) {
+    publishToGbrain({
+      ranAt: report.ranAt,
+      version: report.version,
+      model: report.model,
+      judge: report.judge,
+      subset: report.subset,
+      score: summary.score,
+      passRate: summary.passRate,
+      hardPassRate: summary.hardPassRate,
+      behaviorMeans: summary.behaviorMeans as Record<string, number>,
+      latencyP50Ms: report.summary.latencyMs.p50,
+      latencyP95Ms: report.summary.latencyMs.p95,
+      cases: summary.cases,
+      worst: [...rows]
+        .sort((a, b) => a.result.score - b.result.score)
+        .slice(0, 5)
+        .map(r => ({
+          id: r.result.id,
+          score: r.result.score,
+          why:
+            r.result.judge?.why ??
+            r.result.hardChecks
+              .filter(c => !c.ok)
+              .map(c => `${c.id}${c.detail ? ` (${c.detail})` : ''}`)
+              .join('; '),
+        })),
+    });
+  }
   if (args.out) {
     const outPath = resolve(process.cwd(), args.out);
     mkdirSync(dirname(outPath), { recursive: true });
