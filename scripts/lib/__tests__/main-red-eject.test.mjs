@@ -16,9 +16,11 @@ import {
   detectConsecutiveGroupFailure,
   detectStuckHead,
   failureSignature,
+  incidentMetrics,
   isRevertSubject,
   parsePrNumber,
   planJump,
+  stageEvents,
   titles,
   verifyJump,
 } from '../main-red-eject.mjs';
@@ -225,6 +227,38 @@ describe('queue pitfalls', () => {
         t0 + 9e6
       ).stuck
     ).toBe(false);
+  });
+});
+
+describe('incident metrics', () => {
+  it('measures time-main-red and only counts stall while the queue held work', () => {
+    const m = incidentMetrics({
+      redAt: '2026-10-29T18:07:00Z',
+      greenAt: '2026-10-29T21:07:00Z',
+      mergeTimes: ['2026-10-29T18:30:00Z', '2026-10-29T20:00:00Z'],
+      groupStarts: ['2026-10-29T19:00:00Z'],
+    });
+    expect(m.timeMainRedMin).toBe(180);
+    // gaps: 23 (no groups, idle), 90 (busy) -> 75 stall, 67 (no groups) -> 0
+    expect(m.queueStallMin).toBe(75);
+    expect(m.open).toBe(false);
+  });
+  it('emits contract rows for the stage feed', () => {
+    const rows = stageEvents({
+      id: 'JovieInc/Jovie@3501dbd4c6ef',
+      redAt: '2026-10-29T18:07:00Z',
+      greenAt: '2026-10-29T21:07:00Z',
+      stallStart: '2026-10-29T18:07:00Z',
+      stallMinutes: 75,
+      actor: 'main-red-eject.yml',
+      receipt: 'https://x',
+    });
+    expect(rows.map(r => r.stage)).toEqual(['red', 'queue-stalled']);
+    expect(
+      rows.every(
+        r => r.schema === 'jovie-stage-event/v1' && r.entityType === 'main-red'
+      )
+    ).toBe(true);
   });
 });
 
