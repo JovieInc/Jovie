@@ -1833,7 +1833,7 @@ describe('LibrarySurface', () => {
       screen.getByTestId('library-catalog-waveform-release-1')
     ).toBeInTheDocument();
     expect(
-      screen.getByLabelText('View DSP Distribution Details')
+      screen.getByRole('button', { name: /View DSP Distribution Details/ })
     ).toBeInTheDocument();
 
     // Metrics the production schema does not carry render a stable em-dash

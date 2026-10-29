@@ -1,3 +1,5 @@
+import { resolveNewAccountClass } from '@/lib/accounts/internal-account';
+import { readRequestAccountClassHeader } from '@/lib/accounts/request-account-class.server';
 import 'server-only';
 
 import { and, sql as drizzleSql, eq, isNull } from 'drizzle-orm';
@@ -124,6 +126,10 @@ export async function provisionAppUser(
         name: name ?? null,
         userStatus,
         waitlistEntryId: approvedEntryId,
+        accountClass: resolveNewAccountClass({
+          email: normalizedEmail || email,
+          header: await readRequestAccountClassHeader(),
+        }),
       })
       .onConflictDoNothing()
       .returning({ id: users.id });
