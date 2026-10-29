@@ -16,7 +16,7 @@ import { resolveInHouse } from '../lib/music-resolver/in-house';
 import type { InHouseQuery } from '../lib/music-resolver/in-house-contracts';
 import { createDefaultInHouseSources } from '../lib/music-resolver/in-house-sources';
 
-interface CorpusRow {
+export interface CorpusRow {
   readonly spotify_url: string;
   readonly upc: string;
   readonly title: string;
@@ -43,7 +43,7 @@ export function wilson(successes: number, n: number) {
   };
 }
 
-function spotifyAlbumId(url: string | undefined): string | null {
+export function spotifyAlbumId(url: string | undefined): string | null {
   return (
     url?.match(
       /open\.spotify\.com\/(?:intl-[a-z]+\/)?album\/([A-Za-z0-9]{22})/
@@ -64,7 +64,7 @@ async function run(query: InHouseQuery) {
   }
 }
 
-async function evaluate(row: CorpusRow) {
+export async function evaluate(row: CorpusRow) {
   const truth = spotifyAlbumId(row.spotify_url);
   const cases: Record<string, Outcome> = {};
   const detail: Record<string, unknown> = {};
@@ -131,6 +131,34 @@ function providerCoverage(
   return counts;
 }
 
+export function summarizeBenchmark(
+  results: readonly Awaited<ReturnType<typeof evaluate>>[]
+): Record<string, unknown> {
+  const metrics: Record<string, unknown> = {};
+  for (const name of ['upc_to_spotify', 'name_to_spotify', 'url_to_upc']) {
+    const outcomes = results
+      .map(r => r.cases[name])
+      .filter(Boolean) as Outcome[];
+    const count = (o: Outcome) => outcomes.filter(x => x === o).length;
+    const correct = count('correct');
+    const wrong = count('wrong');
+    const answered = correct + wrong;
+    metrics[name] = {
+      n: outcomes.length,
+      correct,
+      wrong,
+      abstained: count('abstained'),
+      noSpotifyLink: count('no_spotify_link'),
+      errors: count('error'),
+      precision: wilson(correct, answered),
+      usefulCoverage: wilson(correct, outcomes.length),
+      falseLinkRate: wilson(wrong, answered),
+      providerCoverage: providerCoverage(results, name),
+    };
+  }
+  return metrics;
+}
+
 async function main() {
   const [corpusPath, ...rest] = process.argv.slice(2);
   if (!corpusPath)
@@ -156,28 +184,7 @@ async function main() {
     process.stderr.write(`\r${results.length}/${rows.length}`);
   }
   process.stderr.write('\n');
-  const metrics: Record<string, unknown> = {};
-  for (const name of ['upc_to_spotify', 'name_to_spotify', 'url_to_upc']) {
-    const outcomes = results
-      .map(r => r.cases[name])
-      .filter(Boolean) as Outcome[];
-    const count = (o: Outcome) => outcomes.filter(x => x === o).length;
-    const correct = count('correct');
-    const wrong = count('wrong');
-    const answered = correct + wrong;
-    metrics[name] = {
-      n: outcomes.length,
-      correct,
-      wrong,
-      abstained: count('abstained'),
-      noSpotifyLink: count('no_spotify_link'),
-      errors: count('error'),
-      precision: wilson(correct, answered),
-      usefulCoverage: wilson(correct, outcomes.length),
-      falseLinkRate: wilson(wrong, answered),
-      providerCoverage: providerCoverage(results, name),
-    };
-  }
+  const metrics = summarizeBenchmark(results);
   const receipt = {
     schema: 'jovie.resolver-benchmark/v1',
     candidate: 'in-house resolver (resolveInHouse, default sources)',
