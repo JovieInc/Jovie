@@ -1,4 +1,4 @@
-import inventory from '@/data/copyInventory.gen.json';
+import inventory from '../../../../scripts/copy-inventory/inventory.gen.json';
 
 /** One visible copy line, as produced by `scripts/copy-inventory/extract.mjs`. */
 export interface CopyRow {
