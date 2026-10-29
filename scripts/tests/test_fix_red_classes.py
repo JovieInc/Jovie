@@ -40,6 +40,18 @@ class ClassifyTest(unittest.TestCase):
         still = classes.classify(pr("A", merge="BEHIND"), {"A": "API rate limit exceeded"})
         self.assertEqual(still["action"], "rerun", "a deterministic log outranks the stale-branch default")
 
+    def test_adjacent_insertions_keep_both_sides_and_refuse_overlaps(self):
+        kept = classes.resolve_adjacent_insertions(
+            "before\n<<<<<<< ours\nours\n||||||| base\n=======\ntheirs\n>>>>>>> theirs\nafter\n")
+        self.assertEqual(kept, "before\nours\ntheirs\nafter\n")
+        self.assertIsNone(classes.resolve_adjacent_insertions(
+            "<<<<<<< ours\npr\n||||||| base\na\n=======\nmain\n>>>>>>> theirs\n"))
+        self.assertIsNone(classes.resolve_adjacent_insertions(
+            "<<<<<<< HEAD\npr\n=======\nmain\n>>>>>>> origin/main\n"))
+        same = classes.resolve_adjacent_insertions(
+            "<<<<<<< ours\nsame\n||||||| base\n=======\nsame\n>>>>>>> theirs\n")
+        self.assertEqual(same, "same\n")
+
     def test_key_ignores_volatile_numbers_but_separates_failures(self):
         a = classes.classify(pr("T"), {"T": "AssertionError: expected 12 to equal 3"})
         b = classes.classify(pr("T"), {"T": "AssertionError: expected 99 to equal 4"})

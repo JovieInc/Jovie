@@ -137,6 +137,78 @@ def wire_ci_fast(root: Path, files: list[str]) -> list[str]:
     return added
 
 
+def resolve_adjacent_insertions(text: str) -> str | None:
+    """Keep both sides of a zdiff3 conflict when every hunk is an insertion into an empty ancestor.
+
+    Overlapping edits (a non-empty ancestor) and merge-style conflicts with no ancestor marker
+    return None so a model still sees them. Identical sides collapse to one copy. Order is the
+    current branch, then incoming main.
+    """
+    if "<<<<<<< " not in str(text or ""):
+        return None
+    lines = text.splitlines(keepends=True)
+    out: list[str] = []
+    index = 0
+    found = 0
+    while index < len(lines):
+        if lines[index].startswith("<<<<<<< "):
+            found += 1
+            hunk = _insertion_hunk(lines, index)
+            if hunk is None:
+                return None
+            piece, index = hunk
+            out.append(piece)
+            continue
+        if lines[index].startswith(("=======", ">>>>>>> ", "|||||||")):
+            return None
+        out.append(lines[index])
+        index += 1
+    return "".join(out) if found else None
+
+
+def _insertion_hunk(lines: list[str], index: int) -> tuple[str, int] | None:
+    index += 1
+    ours: list[str] = []
+    base: list[str] = []
+    theirs: list[str] = []
+    stage = "ours"
+    saw_ancestor = False
+    while index < len(lines):
+        line = lines[index]
+        if stage == "ours" and line.startswith("|||||||"):
+            saw_ancestor = True
+            stage = "base"
+            index += 1
+            continue
+        if stage in {"ours", "base"} and line.strip() == "=======":
+            stage = "theirs"
+            index += 1
+            continue
+        if stage == "theirs" and line.startswith(">>>>>>> "):
+            if not saw_ancestor or "".join(base).strip():
+                return None
+            return _join_insertions(ours, theirs), index + 1
+        if line.startswith(("<<<<<<< ", ">>>>>>> ", "|||||||")) or line.strip() == "=======":
+            return None
+        {"ours": ours, "base": base, "theirs": theirs}[stage].append(line)
+        index += 1
+    return None
+
+
+def _join_insertions(ours: list[str], theirs: list[str]) -> str:
+    current = "".join(ours)
+    incoming = "".join(theirs)
+    if current.strip() == incoming.strip():
+        return current or incoming
+    if not current.strip():
+        return incoming
+    if not incoming.strip():
+        return current
+    if not current.endswith("\n"):
+        current += "\n"
+    return current + incoming
+
+
 # ---- measurement ---------------------------------------------------------------------------------
 
 def _epoch(row: dict) -> float | None:

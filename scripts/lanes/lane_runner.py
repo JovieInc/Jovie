@@ -6137,32 +6137,62 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
+def _prepare_insertion_conflicts(worktree: Path, paths: set[str]) -> dict[Path, str] | None:
+    """Read each semantic conflict. None when any path is unsafe or not an adjacent insertion."""
+    root = worktree.resolve()
+    prepared: dict[Path, str] = {}
+    for rel in sorted(paths):
+        if not rel or rel.startswith("/") or ".." in Path(rel).parts:
+            return None
+        path = (worktree / rel).resolve()
+        if path != root and root not in path.parents:
+            return None
+        try:
+            text = path.read_text()
+        except (OSError, UnicodeError, ValueError):
+            return None
+        merged = fix_red_classes.resolve_adjacent_insertions(text)
+        if merged is None:
+            return None
+        prepared[path] = merged
+    return prepared
+
+
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
     no model. Merge main, take its copy of each conflicted generated file, run each file's
     canonical regenerator (remediation.GENERATED_RESOLVERS: `pnpm install --lockfile-only`
     for pnpm-lock.yaml, `pnpm ci:topology:write` for workflow-topology.gen.yml), push (no
-    force). Any other conflict, or a failed regeneration, aborts and leaves the PR to the
-    agent."""
+    force). Adjacent insertions (empty zdiff3 ancestor) are kept from both sides via
+    fix_red_classes.resolve_adjacent_insertions. An overlapping edit, or a failed
+    regeneration, aborts and leaves the PR to the agent."""
     guard()
-    merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
+    merged = sh(["git", "-c", "merge.conflictstyle=zdiff3", "merge", "--no-edit", "origin/main"],
+                cwd=worktree, log=log)
     if merged.returncode != 0:
-        conflicted = set(sh(["git", "diff", "--name-only", "--diff-filter=U"], cwd=worktree).stdout.split())
-        if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
+        conflicted = {path for path in sh(["git", "diff", "--name-only", "--diff-filter=U"],
+                                          cwd=worktree).stdout.split() if path}
+        generated = {path for path in conflicted if path in remediation.GENERATED_RESOLVERS}
+        semantic = conflicted - generated
+        prepared = _prepare_insertion_conflicts(worktree, semantic) if semantic else {}
+        if not conflicted or prepared is None or not (generated or prepared):
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
         guard()
-        commands = []
-        for path in sorted(conflicted):
-            command = list(remediation.GENERATED_RESOLVERS[path])
-            if command not in commands:
-                commands.append(command)
-        for command in commands:
-            if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        for path, text in prepared.items():
+            path.write_text(text)
+        if generated:
+            sh(["git", "checkout", "origin/main", "--", *sorted(generated)], cwd=worktree, log=log)
+            commands = []
+            for path in sorted(generated):
+                command = list(remediation.GENERATED_RESOLVERS[path])
+                if command not in commands:
+                    commands.append(command)
+            for command in commands:
+                if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
+                    sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+                    return False
+        sh(["git", "add", "--", *sorted(conflicted)], cwd=worktree, log=log)
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False

@@ -12238,7 +12238,8 @@ class LockfileConflictTest(unittest.TestCase):
             calls = []
             def shell(args, **kwargs):
                 calls.append(args)
-                return SimpleNamespace(returncode=1 if args[:2] == ["git", "merge"] and conflict else 0,
+                merging = args[:1] == ["git"] and any(arg == "merge" for arg in args[:5])
+                return SimpleNamespace(returncode=1 if merging and conflict else 0,
                                        stdout="pnpm-lock.yaml\n" if args[:2] == ["git", "diff"] else "", stderr="")
             guard = Mock(side_effect=[None, lane.RepairStopped("target-pr-merged", {"state": "MERGED"}, "command")])
             with self.subTest(conflict=conflict), patch.object(lane, "sh", side_effect=shell):
@@ -12250,11 +12251,14 @@ class LockfileConflictTest(unittest.TestCase):
         return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=cwd,
                               check=True, capture_output=True, text=True).stdout.strip()
 
-    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None):
+    def repo(self, tmp: Path, pr_changes: dict, main_changes: dict | None = None,
+             base_files: dict | None = None):
         origin, work = tmp / "origin.git", tmp / "work"
         self.git("init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp)
         self.git("clone", "-q", str(origin), str(work), cwd=tmp)
-        for name, text in {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}.items():
+        files = {"package.json": "{}\n", "pnpm-lock.yaml": "base\n", "a.ts": "a\n"}
+        files.update(base_files or {})
+        for name, text in files.items():
             (work / name).write_text(text)
         self.git("add", "-A", cwd=work)
         self.git("commit", "-qm", "base", cwd=work)
@@ -12338,6 +12342,16 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertTrue(ok)
             self.assertEqual(calls.count(["pnpm", "install", "--lockfile-only", "--ignore-scripts"]), 1)
             self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
+
+    def test_adjacent_insertions_from_both_sides_are_kept_and_pushed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {"a.ts": "head\nours\ntail\n"},
+                                     {"a.ts": "head\ntheirs\ntail\n"}, {"a.ts": "head\ntail\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertEqual(self.git("show", "devin/jov-1-20260927:a.ts", cwd=origin),
+                             "head\nours\ntheirs\ntail")
+            self.assertFalse(any(cmd[:2] == ["pnpm", "install"] for cmd in calls))
 
     def test_a_source_conflict_is_left_to_the_agent_untouched(self):
         with tempfile.TemporaryDirectory() as tmp:
