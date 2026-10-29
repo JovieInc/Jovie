@@ -206,6 +206,7 @@
     {"id": "canon-doc:PRODUCT.md", "kind": "canon-doc", "owner": "summer", "status": "active", "ref": "canon/PRODUCT.md", "note": "Summer stewards canon; founder-locked sections change only by a founder EVENT decision."},
     {"id": "canon-doc:README.md", "kind": "canon-doc", "owner": "summer", "status": "active", "ref": "canon/README.md", "note": "Summer stewards canon; founder-locked sections change only by a founder EVENT decision."},
     {"id": "canon-doc:RELEASE_CHANNELS.md", "kind": "canon-doc", "owner": "summer", "status": "active", "ref": "canon/RELEASE_CHANNELS.md", "note": "Summer stewards canon; founder-locked sections change only by a founder EVENT decision."},
+    {"id": "canon-doc:SOURCES_OF_TRUTH.md", "kind": "canon-doc", "owner": "summer", "status": "active", "ref": "canon/SOURCES_OF_TRUTH.md", "note": "Generated from canon/sources-of-truth.json by scripts/sources-of-truth.mjs; never hand-edited."},
     {"id": "canon-doc:VOICE.md", "kind": "canon-doc", "owner": "summer", "status": "active", "ref": "canon/VOICE.md", "note": "Summer stewards canon; founder-locked sections change only by a founder EVENT decision."},
     {"id": "repo:JovieInc/Jovie", "kind": "repo", "owner": "gem-ci-repair", "status": "active", "ref": "https://github.com/JovieInc/Jovie"},
     {"id": "repo:JovieInc/LogYourBody", "kind": "repo", "owner": "gem-ci-repair", "status": "active", "ref": "https://github.com/JovieInc/LogYourBody"},

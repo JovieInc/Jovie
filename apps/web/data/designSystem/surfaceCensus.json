@@ -287,6 +287,7 @@
         "apps/web/app/(marketing)/cli/page.tsx",
         "apps/web/app/(marketing)/compare/[slug]/page.tsx",
         "apps/web/app/(marketing)/compare/page.tsx",
+        "apps/web/app/(marketing)/developers/agents/page.tsx",
         "apps/web/app/(marketing)/developers/page.tsx",
         "apps/web/app/(marketing)/download/page.tsx",
         "apps/web/app/(marketing)/engineering/[slug]/page.tsx",
@@ -392,9 +393,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-29T10:03:24.442Z",
-        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements. Renewed 2026-10-29 (PR #23618): the shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements. Renewed 2026-10-29 (PR #23597 rebase onto #23618): MarketingHero dropped its unused photo prop and photo-only classes; content-mode DOM and classes are unchanged (MarketingHero.test.tsx).",
-        "sourceDigest": "e0180a8a8e53d55364292acd9716a81b55ac1648c8cf8d2ce936bb9a5feb4c64"
+        "at": "2026-10-29T14:35:59.959Z",
+        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements. Renewed 2026-10-29 (PR #23618): the shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements. Renewed 2026-10-29 (PR #23597 rebase onto #23618): MarketingHero dropped its unused photo prop and photo-only classes; content-mode DOM and classes are unchanged (MarketingHero.test.tsx). Renewed 2026-10-29 (site chrome as a content record): the marketing layout, MarketingHeader and MarketingFooter now read nav and footer links from the site-chrome record; the footer grid classes are unchanged (3 columns uses the existing lg:grid-cols-3 branch) and its link count drops from 33 to 15, so it cannot widen the page. Covered by MarketingFooter, PublicPageShell and site-chrome tests; the PR capture job re-captures /pricing at 1440 and 390. The pure default chrome moved to site-chrome.defaults.ts to keep zod out of client bundles; no rendered output changed; the resolver moved to site-chrome.resolve.ts and marketingNavigation.ts projects through it.",
+        "sourceDigest": "9a68a8a102310bd2ecf26595ee435335d56ae5998d8f6885946c65ed0ad9b0fc"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
@@ -699,6 +700,13 @@
       "to": "holdout",
       "at": "2026-10-29T01:10:00Z",
       "evidence": "PR #23536 introduces the signed homepage spec preview, rendering the same home sections; source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/developers/agents/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T09:55:00Z",
+      "evidence": "PR #23608 introduces the generated agent connector docs page (JOV-9762); source registration only, not rendered certification."
     }
   ]
 }

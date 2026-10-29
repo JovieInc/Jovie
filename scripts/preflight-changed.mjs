@@ -511,6 +511,18 @@ export async function main({
       'node scripts/ownership-registry.mjs --report',
       1
     );
+  // One source of truth per fact (canon/SOURCES_OF_TRUTH.md): the map must stay
+  // sound whenever it, the rule or an owner file changes.
+  if (
+    any(
+      /^(?:canon\/(?:sources-of-truth\.json|SOURCES_OF_TRUTH\.md)|\.claude\/rules\/source-of-truth\.md|scripts\/(?:lib\/)?sources-of-truth|apps\/web\/lib\/(?:config\/plan-prices|entitlements\/registry|analytics\/data-retention)|ops\/registry\/)/
+    )
+  )
+    cmd(
+      'sources-of-truth',
+      'sources-of-truth map',
+      'node scripts/sources-of-truth.mjs'
+    );
   if (any(/(?:^|\/)package\.json$|pnpm-lock\.yaml$/))
     cmd(
       'lockfile',

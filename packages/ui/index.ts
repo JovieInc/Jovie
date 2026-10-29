@@ -137,6 +137,12 @@ export {
   isSeparator,
   isSubmenu,
 } from './atoms/common-dropdown-types';
+// CompositeField
+export type {
+  CompositeFieldProps,
+  CompositeFieldShape,
+} from './atoms/composite-field';
+export { CompositeField } from './atoms/composite-field';
 // Context Menu
 export {
   ContextMenu,
@@ -228,6 +234,7 @@ export { InlineOfflineNotice } from './atoms/inline-offline';
 // Input
 export type { InputProps } from './atoms/input';
 export { Input, inputVariants } from './atoms/input';
+
 // InputGroup
 export type { InputGroupProps } from './atoms/input-group';
 export { InputGroup } from './atoms/input-group';

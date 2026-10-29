@@ -168,6 +168,21 @@
   margin: 0;
 }
 
+/* Copy always wraps inside its column at every width (320 to 1920). A flex
+   item defaults to min-width:auto, which lets a long unbroken run push past
+   the container; the field clips it, so it reads as text cut off at the edge
+   instead of a scrollbar. Cap and wrap explicitly. */
+.homepage-hero-canvas__copy > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.homepage-hero-canvas__headline,
+.homepage-hero-canvas__subhead,
+.homepage-hero-canvas__support {
+  overflow-wrap: break-word;
+}
+
 /* Each sentence beat paints on its own line: the last painted line keeps
    at least two words at every width, on every browser's balance engine. */
 .homepage-hero-canvas__headline-beat {
@@ -181,7 +196,7 @@
 
 .homepage-hero-canvas__subhead,
 .homepage-hero-canvas__support {
-  max-width: 36rem;
+  max-width: min(36rem, 100%);
   margin: var(--space-3, 0.75rem) 0 0;
 }
 
@@ -252,7 +267,10 @@
     flex: 1 0 auto;
     min-height: 0;
     height: auto;
-    overflow: hidden;
+    /* No clipping here: text wraps (see the width rules above), and a
+       clipping box would cut the composite field's focus ring, which draws
+       outside the pill edge. */
+    overflow: visible;
     justify-content: flex-start;
     padding-top: var(--space-12, 3rem);
     padding-bottom: var(--space-12, 3rem);
