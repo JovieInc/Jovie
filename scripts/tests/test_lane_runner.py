@@ -12886,6 +12886,62 @@ class NoHumanHoldTest(unittest.TestCase):
         self.assertIn("merging origin/main", fix)
         self.assertEqual(sum("Never rebase, squash, reset or force-push" in line for line in lane.NO_HISTORY_REWRITE), 1)
 
+    def test_narrowed_preflight_conflict_unions_and_fast_forwards(self):
+        root = Path(self.tmp.name)
+        origin = root / "origin.git"
+        work = root / "work"
+        work.mkdir()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(work)], check=True)
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True)
+        def git(*args, cwd=work):
+            return subprocess.run(["git", *args], cwd=cwd, check=True, capture_output=True, text=True)
+        hooks = root / "hooks"
+        hooks.mkdir()
+        for key, value in (("user.name", "t"), ("user.email", "t@example.test"), ("commit.gpgsign", "false"),
+                           ("core.hooksPath", str(hooks))):
+            git("config", key, value)
+        git("remote", "add", "origin", str(origin))
+        path = work / "scripts/preflight-changed.mjs"
+        path.parent.mkdir(parents=True)
+        base = (
+            "export const NARROWED = {\n  'merge-group-unit-guards': {\n    command:\n"
+            "      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts "
+            "tests/unit/analytics-metrics-layer-guard.test.ts',\n"
+            "    note: 'metrics-layer and locked chrome; full suite with --thorough',\n  },\n};\n"
+        )
+        path.write_text(base)
+        git("add", "scripts/preflight-changed.mjs")
+        git("commit", "-qm", "base")
+        git("branch", "feature")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        path.write_text(base.replace(
+            "analytics-metrics-layer-guard.test.ts",
+            "analytics-metrics-layer-guard.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts",
+        ).replace("metrics-layer and locked chrome", "metrics-layer, locked chrome and heading contracts"))
+        git("commit", "-qam", "head adds the heading guard")
+        git("push", "-q", "origin", "HEAD:refs/heads/feature")
+        git("checkout", "-q", "main")
+        path.write_text(base.replace(
+            "      'pnpm",
+            "      'node scripts/design-system-source-ratchet.mjs && pnpm",
+        ).replace("metrics-layer and locked chrome", "source identity, metrics-layer and locked chrome"))
+        git("commit", "-qam", "main adds the source ratchet")
+        git("push", "-q", "origin", "HEAD:refs/heads/main")
+        git("checkout", "-q", "feature")
+        before = git("rev-parse", "HEAD").stdout.strip()
+        self.assertTrue(lane.resolve_narrowed_preflight_conflict(work, "feature", None))
+        text = path.read_text()
+        self.assertIn("node scripts/design-system-source-ratchet.mjs && pnpm", text)
+        self.assertIn("marketing-headline-line-clamp-guard.test.ts", text)
+        self.assertIn("source identity, metrics-layer, locked chrome and heading contracts", text)
+        self.assertNotIn("<<<<<<<", text)
+        after = git("rev-parse", "HEAD").stdout.strip()
+        remote = git("rev-parse", "origin/feature").stdout.strip()
+        self.assertEqual(after, remote)
+        self.assertNotEqual(after, before)
+        self.assertEqual(git("merge-base", "--is-ancestor", before, after).returncode, 0)
+
     def test_runner_push_helper_never_forces(self):
         pushes = []
         def shell(cmd, **kwargs):
