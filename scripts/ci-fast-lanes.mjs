@@ -1014,6 +1014,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
   'scripts/lib/__tests__/prod-cert.test.mjs',
+  'scripts/lib/__tests__/self-hosted-workspace-reset-contract.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
@@ -1255,7 +1256,7 @@ const LANES = [
     id: 'design-governance-enforcement',
     name: 'Design governance enforcement',
     nextLocalCommand:
-      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel',
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field',
     run: runDesignGovernanceEnforcement,
   },
   {
