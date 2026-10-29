@@ -84,7 +84,7 @@ export const MARKETING_MEDIA_TOKEN_FILES = [
   'styles/design-system.css',
 ] as const;
 export const MARKETING_MEDIA_TOKEN_REVISION =
-  'ziawi-2026-09-25/62267dc6e73c3b9d0b48f4a642e2e2672b2369ff703519bf6d8c602bcd9a20d0' as const;
+  'ziawi-2026-09-25/547d98e0ef4d2f0df60c6610b13ac41446aa292235fca944b3caa20d967a76d6' as const;
 
 export interface MarketingMediaRegisteredInput {
   readonly id: string;
@@ -107,8 +107,8 @@ export const MARKETING_MEDIA_INPUTS: readonly MarketingMediaRegisteredInput[] =
       kind: 'registered-live-presentation',
       recipes: ['compact-glass'],
       revision:
-        '2af7c4c60d8f763f0e480d990bff941608e8be08fdd033a15d065c2fdec63483',
-      hash: '2af7c4c60d8f763f0e480d990bff941608e8be08fdd033a15d065c2fdec63483',
+        'e4a57ef45a9b4fe339e1df2976cbc9707c89c56f42a9e54526ff9750dc12a7ba',
+      hash: 'e4a57ef45a9b4fe339e1df2976cbc9707c89c56f42a9e54526ff9750dc12a7ba',
       files: [
         'components/marketing/artist-profile/CompactGlassCaptureDemo.tsx',
         'components/marketing/artist-profile/CompactGlassModule.tsx',
@@ -124,8 +124,8 @@ export const MARKETING_MEDIA_INPUTS: readonly MarketingMediaRegisteredInput[] =
       id: 'dashboard-releases-sidebar-desktop',
       kind: 'real-capture',
       recipes: ['dark-glass'],
-      revision: 'e04c96ab3605cc134fa2c4f479cd5c078a9ae823',
-      hash: 'a0dc630f0c39549bb50f16135142cb6c0810a4b3f079e867f4d72d39bd3405f2',
+      revision: '14eb4bbc45d9ce19df7f20fbf1f09403634d3113',
+      hash: 'cbbc5af09b51a102c18fa5f3ba0ebc1d5e9920122db2b575b1407b67dcb5ee02',
       files: ['public/product-screenshots/releases-dashboard-sidebar.png'],
       rights: 'jovie-owned',
       evidence:
@@ -180,4 +180,4 @@ export const MARKETING_MEDIA_PRESENTATION_FILES = [
   'data/marketing/mediaRecipes.ts',
 ] as const;
 export const MARKETING_MEDIA_PRESENTATION_REVISION =
-  '305fb08ab1d0f9e2262811b1f98851c23b076f77b18e8d28315d981d54982556' as const;
+  'eb9df8024306e3df590b0595fba19c0cdd6dd109e482e66d2b335677e27c6f16' as const;
