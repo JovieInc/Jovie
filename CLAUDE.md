@@ -57,7 +57,6 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | Environment/tooling | [environment](.claude/rules/environment.md) |
 | TypeScript, React, boundaries, prior art | [code-style](.claude/rules/code-style.md) |
 | DB/migrations | [db](.claude/rules/db.md) |
-| Data fetching, caching, mutations, realtime | [data-architecture](.claude/rules/data-architecture.md) |
 | Auth/Better Auth | [auth](.claude/rules/auth.md) |
 | Security, billing, entitlements | [security](.claude/rules/security.md) |
 | External APIs | [external-apis](.claude/rules/external-apis.md) |
@@ -76,7 +75,7 @@ Other scoped rules: ci-branching, event-driven, infra, linear, motion,
 pr-stacking, swarm, hermes-air.
 Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:23 -->
+<!-- doc-freshness:scoped-rules-count:24 -->
 
 ## Tools and workflow
 
