@@ -1,3 +1,5 @@
+import type { ProdGoldenPathLedger } from '@/lib/ovie/certifications/prod-golden-path-ledger';
+import { certificationVerdict } from '../../../../scripts/lib/prod-cert.mjs';
 import type { KnownBadFlowFix } from './registry';
 
 export interface FixCertifier {
@@ -51,46 +53,21 @@ export async function certifyFix(
   return out(true, 'certified', deployedAt);
 }
 
-/** Launch-gate surfaces a recovered user walks through, in order. */
-export const RECOVERY_GOLDEN_PATH_SURFACES = [
-  'landing',
-  'signup-signin',
-  'claim',
-  'onboarding',
-  'chat',
-  'public-profile',
-  'smartlink',
-  'checkout',
-] as const;
-
-export const GOLDEN_PATH_MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
-export interface GoldenPathReceiptView {
-  readonly status: string;
-  readonly sha: string;
-  readonly endedAt: string;
-}
-
 /**
- * Every launch-gate surface must have a passed receipt on the current
- * production commit, finished within 24 hours. Missing, red, blocked, stale or
- * other-commit evidence is a no.
+ * Whole golden path verdict. Reads the production golden-path ledger and
+ * reuses `certificationVerdict` (scripts/lib/prod-cert.mjs), the one function
+ * that decides "all 8 surfaces passed on the served SHA within 24h". The logic
+ * is not duplicated here. A missing ledger or unknown SHA is a no.
  */
 export function isGoldenPathGreen(
-  latest: Readonly<Record<string, GoldenPathReceiptView | undefined>>,
-  sha: string,
-  now: Date
+  ledger: ProdGoldenPathLedger | null,
+  sha: string | null,
+  now: Date = new Date()
 ): boolean {
-  return RECOVERY_GOLDEN_PATH_SURFACES.every(surface => {
-    const receipt = latest[surface];
-    if (!receipt) return false;
-    const age = now.getTime() - Date.parse(receipt.endedAt);
-    return (
-      receipt.status === 'passed' &&
-      receipt.sha === sha &&
-      Number.isFinite(age) &&
-      age >= 0 &&
-      age < GOLDEN_PATH_MAX_AGE_MS
-    );
-  });
+  if (!ledger || !sha) return false;
+  const receipts = Object.values(ledger.surfaces).map(record => record.latest);
+  return certificationVerdict(receipts, {
+    servedSha: sha,
+    nowMs: now.getTime(),
+  }).certified;
 }

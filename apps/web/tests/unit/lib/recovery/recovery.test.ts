@@ -1,5 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const SHA = 'a'.repeat(40);
+const shared = vi.hoisted(() => ({ backend: null as unknown }));
+vi.mock('server-only', () => ({}));
+vi.mock('@/lib/env', () => ({
+  env: { VERCEL_ENV: 'production', NEXT_PUBLIC_APP_URL: 'https://jov.ie' },
+}));
+vi.mock('@/lib/observability/build-info', () => ({
+  resolveCommitSha: () => 'a'.repeat(40),
+}));
+vi.mock('@/lib/ovie/mcp/postgres-backend', () => ({
+  postgresRecordBackend: () => shared.backend,
+}));
 vi.mock('@/lib/email/tracking', () => ({
   buildClickTrackingUrl: (_p: unknown, url: string) => `https://t.test/c?u=x`,
 }));
@@ -7,14 +19,14 @@ vi.mock('@/lib/email/unsubscribe-token', () => ({
   generateUnsubscribeToken: () => 'tok',
 }));
 
+import {
+  PROD_GOLDEN_PATH_SURFACE_IDS,
+  type ProdGoldenPathReceipt,
+  recordProdGoldenPathRun,
+} from '@/lib/ovie/certifications/prod-golden-path-ledger';
 import { memoryRecordBackend } from '@/lib/ovie/mcp/store';
 import { buildRecoveryEmail, RecoveryEmailBlocked } from '@/lib/recovery/email';
-import {
-  certifyFix,
-  type FixCertifier,
-  isGoldenPathGreen,
-  RECOVERY_GOLDEN_PATH_SURFACES,
-} from '@/lib/recovery/gate';
+import { certifyFix, type FixCertifier } from '@/lib/recovery/gate';
 import { createLedger } from '@/lib/recovery/ledger';
 import { decide, type StalledUser } from '@/lib/recovery/policy';
 import type { KnownBadFlowFix } from '@/lib/recovery/registry';
@@ -240,92 +252,160 @@ describe('certifyFix', () => {
   });
 });
 
-describe('whole golden path gate', () => {
-  const now = new Date('2026-10-31T12:00:00Z');
-  const green = () =>
-    Object.fromEntries(
-      RECOVERY_GOLDEN_PATH_SURFACES.map(id => [
-        id,
-        { status: 'passed', sha: 'abc', endedAt: '2026-10-31T06:00:00Z' },
-      ])
-    );
-  it('is green only when every surface passed on this sha within 24h', () => {
-    expect(isGoldenPathGreen(green(), 'abc', now)).toBe(true);
-    expect(
-      isGoldenPathGreen(
-        {
-          ...green(),
-          claim: {
-            status: 'failed',
-            sha: 'abc',
-            endedAt: '2026-10-31T06:00:00Z',
-          },
-        },
-        'abc',
-        now
-      )
-    ).toBe(false);
-    expect(
-      isGoldenPathGreen(
-        {
-          ...green(),
-          chat: {
-            status: 'passed',
-            sha: 'old',
-            endedAt: '2026-10-31T06:00:00Z',
-          },
-        },
-        'abc',
-        now
-      )
-    ).toBe(false);
-    expect(
-      isGoldenPathGreen(
-        {
-          ...green(),
-          landing: {
-            status: 'passed',
-            sha: 'abc',
-            endedAt: '2026-10-30T06:00:00Z',
-          },
-        },
-        'abc',
-        now
-      )
-    ).toBe(false);
-    const { claim: _omit, ...missing } = green();
-    expect(isGoldenPathGreen(missing, 'abc', now)).toBe(false);
-    for (const id of ['smartlink', 'checkout']) {
-      expect(
-        isGoldenPathGreen(
-          {
-            ...green(),
-            [id]: {
-              status: 'failed',
-              sha: 'abc',
+describe('production certifier against the golden-path ledger', () => {
+  const NOW = new Date('2026-10-31T12:00:00Z');
+  const STEP = 'golden-path-preview-has-release';
+  const stepFix: KnownBadFlowFix = { ...fix, checkId: STEP };
+  const receipt = (
+    surface: ProdGoldenPathReceipt['surface'],
+    over: Partial<ProdGoldenPathReceipt> = {},
+    stepStatus: 'passed' | 'failed' = 'passed'
+  ): ProdGoldenPathReceipt => ({
+    schema: 'jovie.prod-golden-path-receipt/v1',
+    surface,
+    status: 'passed',
+    sha: SHA,
+    deploymentId: null,
+    startedAt: '2026-10-31T05:59:00Z',
+    endedAt: '2026-10-31T06:00:00Z',
+    runUrl: null,
+    screenIds: [],
+    identity: 'anonymous',
+    checks: [
+      {
+        id: 'c',
+        status: 'passed',
+        startedAt: '2026-10-31T05:59:00Z',
+        endedAt: '2026-10-31T06:00:00Z',
+        summary: 'ok',
+      },
+      ...(surface === 'claim'
+        ? [
+            {
+              id: STEP,
+              status: stepStatus,
+              startedAt: '2026-10-31T05:59:00Z',
               endedAt: '2026-10-31T06:00:00Z',
+              summary: 'ok',
             },
-          },
-          'abc',
-          now
-        )
-      ).toBe(false);
-    }
+          ]
+        : []),
+    ],
+    blocker: null,
+    issueUrl: null,
+    observations: [],
+    ...over,
   });
-  it('step fixed but golden path red: no send, no card', async () => {
-    const redPath: FixCertifier = {
-      isLiveOnProduction: async () => true,
-      deployedAt: async () => '2026-10-30T00:00:00.000Z',
-      recheck: async () => true,
-      goldenPathGreen: async () => false,
-    };
-    expect((await certifyFix(fix, redPath)).reason).toBe('golden_path_red');
-    const { d, sent, cards, status } = deps({ certifier: redPath });
-    status.v = 'approved';
-    const r = await runRecovery(d);
+
+  async function certifier(
+    overrides: Partial<
+      Record<ProdGoldenPathReceipt['surface'], Partial<ProdGoldenPathReceipt>>
+    > = {},
+    omit: string[] = []
+  ) {
+    const backend = memoryRecordBackend();
+    shared.backend = backend;
+    const receipts = PROD_GOLDEN_PATH_SURFACE_IDS.filter(
+      id => !omit.includes(id)
+    ).map(id => receipt(id, overrides[id]));
+    await recordProdGoldenPathRun({ backend, receipts });
+    const { createProductionCertifier } = await import(
+      '@/lib/recovery/probes.server'
+    );
+    return createProductionCertifier(
+      (async () =>
+        new Response(JSON.stringify({ commitSha: SHA }))) as typeof fetch
+    );
+  }
+
+  const runWith = async (c: FixCertifier, address: string | null) => {
+    const h = deps({
+      fixes: [stepFix],
+      certifier: c,
+      mailingAddress: address,
+    });
+    h.status.v = 'approved';
+    vi.setSystemTime(NOW);
+    const r = await runRecovery({ ...h.d, now: NOW });
+    return { r, ...h };
+  };
+
+  it('everything green but no mailing address: no send', async () => {
+    const c = await certifier();
+    vi.useFakeTimers();
+    const { r, sent } = await runWith(c, null);
+    vi.useRealTimers();
+    expect(r.held).toBe('compliance_mailing_address');
+    expect(sent).toEqual([]);
+  });
+
+  it.each([
+    ['a surface failed', { checkout: { status: 'failed' as const } }, []],
+    ['a surface is missing', {}, ['smartlink']],
+    [
+      'a surface is stale',
+      {
+        landing: {
+          startedAt: '2026-10-29T05:59:00Z',
+          endedAt: '2026-10-29T06:00:00Z',
+        },
+      },
+      [],
+    ],
+    ['a surface passed on another sha', { chat: { sha: 'b'.repeat(40) } }, []],
+  ])('golden path red (%s): no send, no card', async (_n, over, omit) => {
+    const c = await certifier(over as never, omit);
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    expect(await c.goldenPathGreen()).toBe(false);
+    const { r, sent, cards } = await runWith(c, '1 Main St');
+    vi.useRealTimers();
     expect(r.sent).toBe(0);
     expect(r.skipped.fix_not_live).toBe(1);
     expect(sent).toEqual([]);
     expect(cards).toEqual([]);
+  });
+
+  it('the fix step check failing blocks even a green path', async () => {
+    const backend = memoryRecordBackend();
+    shared.backend = backend;
+    await recordProdGoldenPathRun({
+      backend,
+      receipts: PROD_GOLDEN_PATH_SURFACE_IDS.map(id =>
+        receipt(id, id === 'claim' ? { status: 'passed' } : {}, 'passed')
+      ).map(r =>
+        r.surface === 'claim'
+          ? { ...r, checks: r.checks.filter(c => c.id !== STEP) }
+          : r
+      ),
+    });
+    const { createProductionCertifier } = await import(
+      '@/lib/recovery/probes.server'
+    );
+    const c = createProductionCertifier(
+      (async () =>
+        new Response(JSON.stringify({ commitSha: SHA }))) as typeof fetch
+    );
+    expect(await c.recheck(STEP)).toBe(false);
+  });
+
+  it('all green plus address: the eligible user gets an approval card, not an email', async () => {
+    const c = await certifier();
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    expect(await c.goldenPathGreen()).toBe(true);
+    expect(await c.recheck(STEP)).toBe(true);
+    const h = deps({
+      fixes: [stepFix],
+      certifier: { ...c, deployedAt: async () => '2026-10-30T00:00:00.000Z' },
+      mailingAddress: '1 Main St',
+    });
+    const r = await runRecovery({ ...h.d, now: NOW });
+    vi.useRealTimers();
+
+    expect(r.cardsFiled).toBe(1);
+    expect(r.sent).toBe(0);
+    expect(h.sent).toEqual([]);
+    expect(h.cards).toHaveLength(1);
   });
 });

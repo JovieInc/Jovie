@@ -2,10 +2,7 @@ import 'server-only';
 
 import { env } from '@/lib/env';
 import { resolveCommitSha } from '@/lib/observability/build-info';
-import {
-  PROD_GOLDEN_PATH_SURFACE_IDS,
-  readProdGoldenPathLedger,
-} from '@/lib/ovie/certifications/prod-golden-path-ledger';
+import { readProdGoldenPathLedger } from '@/lib/ovie/certifications/prod-golden-path-ledger';
 import { postgresRecordBackend } from '@/lib/ovie/mcp/postgres-backend';
 import { type FixCertifier, isGoldenPathGreen } from './gate';
 import { KNOWN_BAD_FLOW_FIXES } from './registry';
@@ -22,17 +19,19 @@ const DEPLOYED_PREFIX = 'recovery:fix-deployed:';
  * - Deployed-at: the first time that holds, recorded once. It is never earlier
  *   than the real deploy, so a user is never judged to have stalled before a
  *   fix that was not yet live.
- * - Whole path: every launch-gate surface (landing, signup, claim, onboarding,
- *   chat, public profile, smartlinks, checkout) passed on this commit within 24 hours. A fixed step
- *   is not enough if the user would fail at signup or claim afterwards.
- * - Recheck: the latest production golden-path receipt for the step's surface
- *   passed on exactly this commit.
+ * - Whole path: all 8 golden-path surfaces passed on this commit within 24
+ *   hours, decided by the shared `certificationVerdict` (see gate.ts). A fixed
+ *   step is not enough if the user would fail at signup or claim afterwards.
+ * - Recheck: the fix's own step check (registry `checkId`) passed on exactly
+ *   this commit in the latest production golden-path receipts.
  */
 export function createProductionCertifier(
   fetchImpl: typeof fetch = fetch
 ): FixCertifier {
   const backend = postgresRecordBackend();
   const ownSha = resolveCommitSha();
+  // An unreadable or malformed ledger is evidence that cannot be trusted: no.
+  const readLedger = () => readProdGoldenPathLedger(backend).catch(() => null);
   return {
     async isLiveOnProduction() {
       if (!ownSha || env.VERCEL_ENV !== 'production') return false;
@@ -56,25 +55,21 @@ export function createProductionCertifier(
       return typeof stored === 'string' ? stored : null;
     },
     async goldenPathGreen() {
-      if (!ownSha) return false;
-      const ledger = await readProdGoldenPathLedger(backend);
-      if (!ledger) return false;
-      const latest = Object.fromEntries(
-        Object.entries(ledger.surfaces).map(([id, record]) => [
-          id,
-          record.latest,
-        ])
-      );
-      return isGoldenPathGreen(latest, ownSha, new Date());
+      const ledger = await readLedger();
+      return isGoldenPathGreen(ledger, ownSha, new Date());
     },
     async recheck(checkId) {
       if (!ownSha) return false;
-      if (!(PROD_GOLDEN_PATH_SURFACE_IDS as string[]).includes(checkId)) {
-        return false;
-      }
-      const ledger = await readProdGoldenPathLedger(backend);
-      const latest = ledger?.surfaces[checkId]?.latest;
-      return latest?.status === 'passed' && latest.sha === ownSha;
+      const ledger = await readLedger();
+      if (!ledger) return false;
+      // The fix's own step check is one check inside a surface receipt (for
+      // example claim/golden-path-preview-has-release). It must have passed on
+      // exactly this commit.
+      const results = Object.values(ledger.surfaces)
+        .filter(record => record.latest.sha === ownSha)
+        .flatMap(record => record.latest.checks)
+        .filter(check => check.id === checkId);
+      return results.length > 0 && results.every(c => c.status === 'passed');
     },
   };
 }
