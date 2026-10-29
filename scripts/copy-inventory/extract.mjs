@@ -7,6 +7,7 @@
 //
 //   node scripts/copy-inventory/extract.mjs          # write inventory + ids
 //   node scripts/copy-inventory/extract.mjs --check  # exit 1 if stale
+import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -396,7 +397,10 @@ export function buildInventory(registry = { ids: {} }) {
     const [, p, n] = /^(.+)-(\d+)$/.exec(id) ?? [];
     if (p) counters[p] = Math.max(counters[p] ?? 0, Number(n));
   }
-  const assign = (prefix, key) => {
+  // Registry keys are a short hash of the source key: the registry stays small
+  // (repo tracked-bytes budget) and the human-readable key lives in the rows.
+  const assign = (prefix, rawKey) => {
+    const key = createHash('sha1').update(rawKey).digest('hex').slice(0, 12);
     if (!ids[key])
       ids[key] =
         `${prefix}-${(counters[prefix] = (counters[prefix] ?? 0) + 1)}`;
