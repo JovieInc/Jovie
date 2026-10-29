@@ -6098,7 +6098,8 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
                    "number, renumber yours after main's and regenerate its snapshot/journal entry.",
                    "For a pnpm-lock.yaml conflict take main's lockfile and run `pnpm install --lockfile-only`.",
                    "Never hand-merge generated files: take main's generated copy, then run its canonical",
-                   "generator (`pnpm ci:topology:write` for workflow topology or",
+                   "generator (`pnpm ci:topology:write` for workflow topology,",
+                   "`pnpm factory:truth-sync -- --write` for claim-digest.gen.json, or",
                    "`pnpm --filter @jovie/web drizzle:generate` for migration metadata).",
                    "Run the related checks after resolving.", ""]
     else:
@@ -6147,10 +6148,11 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
     no model. Merge main, take its copy of each conflicted generated file, run each file's
-    canonical regenerator (remediation.GENERATED_RESOLVERS: `pnpm install --lockfile-only`
-    for pnpm-lock.yaml, `pnpm ci:topology:write` for workflow-topology.gen.yml), push (no
-    force). Any other conflict, or a failed regeneration, aborts and leaves the PR to the
-    agent."""
+    canonical regenerator (remediation.generated_resolver_commands: `pnpm install
+    --lockfile-only` for pnpm-lock.yaml, `pnpm ci:topology:write` for
+    workflow-topology.gen.yml, `pnpm factory:truth-sync -- --write` for
+    claim-digest.gen.json), push (no force). Any other conflict, or a failed
+    regeneration, aborts and leaves the PR to the agent."""
     guard()
     merged = sh(["git", "merge", "--no-edit", "origin/main"], cwd=worktree, log=log)
     if merged.returncode != 0:
@@ -6160,11 +6162,10 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
             return False
         sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
         guard()
-        commands = []
-        for path in sorted(conflicted):
-            command = list(remediation.GENERATED_RESOLVERS[path])
-            if command not in commands:
-                commands.append(command)
+        commands = [
+            list(command)
+            for command in remediation.generated_resolver_commands(conflicted)
+        ]
         for command in commands:
             if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
                 sh(["git", "merge", "--abort"], cwd=worktree, log=log)

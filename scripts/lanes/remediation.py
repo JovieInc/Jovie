@@ -66,7 +66,23 @@ LOCKFILES = frozenset({"pnpm-lock.yaml"})
 GENERATED_RESOLVERS = {
     ".github/workflow-topology.gen.yml": ("pnpm", "ci:topology:write"),
     "pnpm-lock.yaml": ("pnpm", "install", "--lockfile-only", "--ignore-scripts"),
+    # JOV-7247. A textual merge of this digest is not a digest. Take main's
+    # copy, then rewrite it from the merged claim sources.
+    "apps/web/data/product-truth/claim-digest.gen.json": (
+        "pnpm", "factory:truth-sync", "--", "--write"),
 }
+
+
+def generated_resolver_commands(paths) -> list[tuple[str, ...]]:
+    """Deduped canonical regenerators for generated paths, in path order."""
+    commands: list[tuple[str, ...]] = []
+    for path in sorted({str(item) for item in paths}):
+        command = GENERATED_RESOLVERS.get(path)
+        if command is not None and command not in commands:
+            commands.append(command)
+    return commands
+
+
 # Only a secret-like file is a human call; an oversize diff is split by a repair lane and a
 # lockfile without its manifest is fixed by one (Tim 2026-10-12: no dead-end holds).
 DIFF_POLICY = frozenset({"secret-file"})

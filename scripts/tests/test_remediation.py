@@ -192,6 +192,17 @@ class ClassifierFixtureTest(unittest.TestCase):
         self.assertEqual(ask_classify(lock)["subtype"], "lockfile-only")
         generated = pr(mergeStateStatus="DIRTY", conflictFiles=[".github/workflow-topology.gen.yml"])
         self.assertEqual(ask_classify(generated)["subtype"], "generated-only")
+        digest = "apps/web/data/product-truth/claim-digest.gen.json"
+        digest_only = pr(mergeStateStatus="DIRTY", conflictFiles=[digest])
+        self.assertEqual(ask_classify(digest_only)["subtype"], "generated-only")
+        self.assertEqual(remediation.generated_resolver_commands([digest, digest]),
+                         [("pnpm", "factory:truth-sync", "--", "--write")])
+        self.assertEqual(
+            remediation.generated_resolver_commands(
+                ["pnpm-lock.yaml", ".github/workflow-topology.gen.yml", digest, "src/a.ts"]),
+            [("pnpm", "ci:topology:write"),
+             ("pnpm", "factory:truth-sync", "--", "--write"),
+             ("pnpm", "install", "--lockfile-only", "--ignore-scripts")])
         self.assertEqual(remediation.plan_ladder(ask_classify(generated), {}, providers(), 0, "h")["action"],
                          "resolve-lockfile")
         mixed = pr(mergeStateStatus="DIRTY",
