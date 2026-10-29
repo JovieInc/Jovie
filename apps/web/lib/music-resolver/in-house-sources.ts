@@ -219,8 +219,17 @@ function appleTrack(row: Record<string, unknown>): CatalogTrack | null {
   };
 }
 
+/**
+ * Apple appends a storefront format label (" - Single", " - EP") to
+ * collectionName. It is not part of the release title, and keeping it made
+ * every exact-name album search for a single or EP abstain (JOV-7822 benchmark).
+ */
+export function appleCollectionTitle(value: string | null): string | null {
+  return value?.replace(/ - (?:Single|EP)$/, '') || null;
+}
+
 function appleAlbum(row: Record<string, unknown>): CatalogAlbum | null {
-  const title = text(row.collectionName);
+  const title = appleCollectionTitle(text(row.collectionName));
   const artist = text(row.artistName);
   const href = httpsUrl(text(row.collectionViewUrl));
   const provider = href ? providerForListenUrl(href) : null;

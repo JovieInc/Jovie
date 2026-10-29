@@ -581,3 +581,18 @@ describe('createDefaultInHouseSources', () => {
     }
   );
 });
+
+describe('appleCollectionTitle', () => {
+  it('drops the storefront format label but keeps real title text', async () => {
+    const { appleCollectionTitle } = await import('./in-house-sources');
+    expect(appleCollectionTitle('Seaside Heights - Single')).toBe(
+      'Seaside Heights'
+    );
+    expect(appleCollectionTitle('Sunset - EP')).toBe('Sunset');
+    expect(appleCollectionTitle('Single - Single')).toBe('Single');
+    expect(appleCollectionTitle('Take Me Over - Remixes')).toBe(
+      'Take Me Over - Remixes'
+    );
+    expect(appleCollectionTitle(null)).toBeNull();
+  });
+});
