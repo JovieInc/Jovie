@@ -71,6 +71,20 @@ private func requestBodyData(_ request: URLRequest) throws -> Data {
 
 @Suite(.serialized)
 struct APIClientTests {
+  @Test @MainActor
+  func offMainActorSessionLoadMatchesSynchronousLoad() async throws {
+    try await withNativeSessionTokenStoreTestIsolation {
+      let expiry = Date(timeIntervalSince1970: Date().timeIntervalSince1970.rounded() + 3_600)
+      #expect(await NativeSessionTokenStore.loadOffMainActor() == nil)
+      NativeSessionTokenStore.save(token: "launch-a", userID: "user-a", expiresAt: expiry)
+      let loaded = await NativeSessionTokenStore.loadOffMainActor()
+      #expect(loaded == NativeSessionTokenStore.load())
+      #expect(loaded?.userID == "user-a")
+      NativeSessionTokenStore.clear()
+      #expect(await NativeSessionTokenStore.loadOffMainActor() == nil)
+    }
+  }
+
   private func makeSession() -> URLSession {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.protocolClasses = [MockURLProtocol.self]

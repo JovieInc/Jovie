@@ -34,7 +34,7 @@
     "main-actor-blocking-call": {
       "apps/ios/Jovie/App/AppState.swift": 1,
       "apps/ios/Jovie/App/JovieApp.swift": 5,
-      "apps/ios/Jovie/App/LiveRootContainer.swift": 4,
+      "apps/ios/Jovie/App/LiveRootContainer.swift": 2,
       "apps/ios/Jovie/Core/ChatRepository.swift": 1,
       "apps/ios/Jovie/Features/Auth/MobileAuthCoordinator.swift": 1
     },
@@ -53,8 +53,7 @@
     "per-call-formatter-or-regex": {
       "apps/ios/Jovie/Core/ChatRepository.swift": 3,
       "apps/ios/Jovie/Core/MobileActionLoopInboxResponse.swift": 1,
-      "apps/ios/Jovie/Core/MobileChatContentParser.swift": 6,
-      "apps/ios/Jovie/Core/MobileChatMerchParsing.swift": 1,
+      "apps/ios/Jovie/Core/MobileChatContentParser.swift": 1,
       "apps/ios/Jovie/Core/Observability/ObservabilityReportBuilder.swift": 1,
       "apps/macos/MenuMonitor/Sources/MenuMonitor/ShippingStatusStore.swift": 1
     },

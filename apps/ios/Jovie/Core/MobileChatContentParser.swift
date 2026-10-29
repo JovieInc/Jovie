@@ -327,7 +327,7 @@ enum MobileChatContentParser {
     ]
 
     for pattern in patterns {
-      guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+      guard let regex = MobileChatRegexCache.regex(pattern, options: [.caseInsensitive]) else {
         continue
       }
 
@@ -402,7 +402,7 @@ enum MobileChatContentParser {
     var latest: (index: String.Index, name: String)?
 
     let toolCallPattern = "<tool_call>[\\s\\S]*?<name>\\s*([^<]+?)\\s*</name>[\\s\\S]*?</tool_call>"
-    if let regex = try? NSRegularExpression(pattern: toolCallPattern, options: [.caseInsensitive]) {
+    if let regex = MobileChatRegexCache.regex(toolCallPattern, options: [.caseInsensitive]) {
       let range = NSRange(content.startIndex..., in: content)
       regex.enumerateMatches(in: content, range: range) { match, _, _ in
         guard
@@ -428,7 +428,7 @@ enum MobileChatContentParser {
 
     let functionCallsPattern =
       "<function_calls>[\\s\\S]*?<invoke[^>]*name=[\"']([^\"']+)[\"'][\\s\\S]*?</function_calls>"
-    if let regex = try? NSRegularExpression(pattern: functionCallsPattern, options: [.caseInsensitive]) {
+    if let regex = MobileChatRegexCache.regex(functionCallsPattern, options: [.caseInsensitive]) {
       let range = NSRange(content.startIndex..., in: content)
       regex.enumerateMatches(in: content, range: range) { match, _, _ in
         guard
@@ -560,7 +560,7 @@ enum MobileChatContentParser {
     ]
 
     for pattern in patterns {
-      guard let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]) else {
+      guard let regex = MobileChatRegexCache.regex(pattern, options: [.caseInsensitive]) else {
         continue
       }
 
@@ -614,7 +614,7 @@ enum MobileChatContentParser {
 
     var values: [String: String] = [:]
     let elementPattern = "<([A-Za-z0-9_]+)>\\s*([\\s\\S]*?)\\s*</\\1>"
-    guard let regex = try? NSRegularExpression(pattern: elementPattern) else {
+    guard let regex = MobileChatRegexCache.regex(elementPattern) else {
       return values
     }
 
@@ -686,7 +686,7 @@ enum MobileChatContentParser {
 
   static func firstCapture(in text: String, pattern: String) -> String? {
     guard
-      let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+      let regex = MobileChatRegexCache.regex(pattern, options: [.caseInsensitive]),
       let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
       let range = Range(match.range(at: 1), in: text)
     else {
@@ -707,4 +707,39 @@ enum MobileChatContentParser {
     segments.append(.text(runs: runs))
   }
 
+}
+
+/// Process-wide cache of compiled chat-markup regexes. Compiling an
+/// NSRegularExpression costs far more than matching it, and the parser runs on
+/// the main actor for every streaming batch, so each pattern compiles once.
+/// NSRegularExpression is immutable and safe to share across threads; NSCache
+/// is thread-safe.
+enum MobileChatRegexCache {
+  private final class Key: NSObject {
+    let pattern: String
+    let options: NSRegularExpression.Options
+    init(_ pattern: String, _ options: NSRegularExpression.Options) {
+      self.pattern = pattern
+      self.options = options
+    }
+    override var hash: Int { pattern.hashValue ^ Int(options.rawValue) }
+    override func isEqual(_ object: Any?) -> Bool {
+      guard let other = object as? Key else { return false }
+      return other.pattern == pattern && other.options == options
+    }
+  }
+
+  private static let cache: NSCache<Key, NSRegularExpression> = {
+    let cache = NSCache<Key, NSRegularExpression>()
+    cache.countLimit = 64
+    return cache
+  }()
+
+  static func regex(_ pattern: String, options: NSRegularExpression.Options = []) -> NSRegularExpression? {
+    let key = Key(pattern, options)
+    if let cached = cache.object(forKey: key) { return cached }
+    guard let compiled = try? NSRegularExpression(pattern: pattern, options: options) else { return nil }
+    cache.setObject(compiled, forKey: key)
+    return compiled
+  }
 }
