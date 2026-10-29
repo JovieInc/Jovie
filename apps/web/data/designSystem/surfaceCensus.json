@@ -33,6 +33,7 @@
         "apps/web/app/app/(shell)/admin/certifications/page.tsx",
         "apps/web/app/app/(shell)/admin/chat-playground/page.tsx",
         "apps/web/app/app/(shell)/admin/chat/page.tsx",
+        "apps/web/app/app/(shell)/admin/copy/page.tsx",
         "apps/web/app/app/(shell)/admin/costs/page.tsx",
         "apps/web/app/app/(shell)/admin/creators/page.tsx",
         "apps/web/app/app/(shell)/admin/feature-registry/page.tsx",
@@ -707,6 +708,13 @@
       "to": "holdout",
       "at": "2026-10-29T09:55:00Z",
       "evidence": "PR #23608 introduces the generated agent connector docs page (JOV-9762); source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/copy/page.tsx",
+      "from": null,
+      "to": "migrating",
+      "at": "2026-10-29T17:30:00Z",
+      "evidence": "Copy Jam review table inside the admin shell migration (JOV-8098); source registration only, not rendered certification."
     }
   ]
 }

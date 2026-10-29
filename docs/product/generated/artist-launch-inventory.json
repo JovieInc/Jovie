@@ -1217,6 +1217,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/admin/copy-jam/verdict/route.ts",
+      "kind": "handler",
+      "route": "/api/admin/copy-jam/verdict",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/admin/creator-avatar/route.ts",
       "kind": "handler",
       "route": "/api/admin/creator-avatar",
@@ -5081,6 +5089,14 @@
       "source": "apps/web/app/app/(shell)/admin/chat/page.tsx",
       "kind": "page",
       "route": "/app/admin/chat",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/app/(shell)/admin/copy/page.tsx",
+      "kind": "page",
+      "route": "/app/admin/copy",
       "methods": [],
       "surface": "deferred",
       "classification": "C"
