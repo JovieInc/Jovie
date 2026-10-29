@@ -4,7 +4,7 @@ import { OnboardingProfileRail } from '@/components/features/onboarding/Onboardi
 import { fastRender } from '@/tests/utils/fast-render';
 
 describe('OnboardingProfileRail', () => {
-  it('renders the actual profile surface inside the shared phone frame', () => {
+  it('renders supplied catalog data in the actual profile surface inside the shared phone frame', () => {
     fastRender(
       <OnboardingProfileRail
         state={{
@@ -16,6 +16,13 @@ describe('OnboardingProfileRail', () => {
             followers: 12_300,
             popularity: 48,
             genres: ['progressive house'],
+            latestRelease: {
+              title: 'Catalog Single',
+              slug: 'catalog-single',
+              artworkUrl: 'https://cdn.example.com/catalog-single.webp',
+              releaseDate: '2026-10-20',
+              releaseType: 'single',
+            },
             dspMatches: [
               {
                 id: 'apple-music',
@@ -97,7 +104,10 @@ describe('OnboardingProfileRail', () => {
     ).toBe(false);
   });
 
-  it('omits DSP matches whose urls do not belong to the claimed platform', () => {
+  it.each([
+    'https://evil.test/instagram.com/testartist',
+    'https://instagram.com.evil.test/testartist',
+  ])('omits mismatched platform links and spoofed social URL %s', socialUrl => {
     fastRender(
       <OnboardingProfileRail
         state={{
@@ -119,7 +129,7 @@ describe('OnboardingProfileRail', () => {
           },
           artistConfirmed: true,
           handle: 'testartist',
-          socialLinks: ['https://evil.test/instagram.com/testartist'],
+          socialLinks: [socialUrl],
         }}
       />
     );

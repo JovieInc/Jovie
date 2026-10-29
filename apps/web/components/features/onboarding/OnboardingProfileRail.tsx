@@ -11,6 +11,7 @@ import {
 import type { OnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
 import type { StartEntryRelease } from '@/lib/onboarding/start-entry-profile';
 import { cn } from '@/lib/utils';
+import { detectPlatform } from '@/lib/utils/platform-detection';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
   formatCompactCount,
@@ -123,22 +124,6 @@ function platformToProfileKey(platform: string): string {
   return normalized || platform;
 }
 
-function inferPlatformFromUrl(url: string): string {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
-    if (host.includes('instagram')) return 'instagram';
-    if (host.includes('tiktok')) return 'tiktok';
-    if (host.includes('youtube')) return 'youtube';
-    if (host.includes('soundcloud')) return 'soundcloud';
-    if (host.includes('spotify')) return 'spotify';
-    if (host.includes('music.apple')) return 'apple_music';
-  } catch {
-    return 'website';
-  }
-
-  return 'website';
-}
-
 function uniqueDspMatches(
   artist: OnboardingProfileArtist
 ): readonly OnboardingDspMatch[] {
@@ -229,10 +214,12 @@ function buildPreviewLinks({
   artist,
   dspMatches,
   socialLinks,
+  sourceUrl,
 }: {
   readonly artist: OnboardingProfileArtist;
   readonly dspMatches: readonly OnboardingDspMatch[];
   readonly socialLinks: readonly string[];
+  readonly sourceUrl?: string;
 }): LegacySocialLink[] {
   const links: LegacySocialLink[] = [];
   const seen = new Set<string>();
@@ -257,8 +244,14 @@ function buildPreviewLinks({
   }
 
   for (const url of socialLinks) {
-    addLink(inferPlatformFromUrl(url), url);
+    const detected = detectPlatform(url);
+    if (detected.isValid) {
+      addLink(detected.platform.id, detected.normalizedUrl);
+    }
   }
+  // An explicitly selected non-music source has a different contract from
+  // a claimed social identity. Do not infer one from an arbitrary HTTPS URL.
+  if (sourceUrl) addLink('website', sourceUrl);
 
   return links;
 }
@@ -345,11 +338,12 @@ export function OnboardingProfileRail({
   const previewLinks = buildPreviewLinks({
     artist,
     dspMatches,
-    socialLinks:
+    socialLinks: state.socialLinks,
+    sourceUrl:
       state.profileDraft?.activeRole !== 'artist' &&
       state.profileDraft?.selectedSource
-        ? [state.profileDraft.selectedSource.url]
-        : state.socialLinks,
+        ? state.profileDraft.selectedSource.url
+        : undefined,
   });
   const profileHref = `/${previewArtist.handle}`;
   const draft = state.profileDraft;
