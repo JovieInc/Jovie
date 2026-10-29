@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       prs:
-        description: Comma-separated PR numbers (empty = every lane-fix-red PR, plus lane-fix-conflict PRs for sync-main only)
+        description: Comma-separated PR numbers (empty = every lane-fix-red PR, plus lane-fix-conflict PRs for sync-main, plus up to 10 clean BEHIND PRs for update-branch)
         required: false
         default: ''
       limit:

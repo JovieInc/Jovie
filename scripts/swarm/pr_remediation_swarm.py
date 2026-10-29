@@ -118,6 +118,9 @@ def cmd_select(a) -> int:
                         modes.setdefault(row["number"], mode)  # red wins: sync-main is part of its ladder
                 if len(rows) < 100:
                     break
+    if not a.pr:
+        for n in behind_prs(a.behind_limit):
+            modes.setdefault(n, "behind")
     modes = {n: m for n, m in modes.items() if n not in EXCLUDED}
     spent = day_spend_cents(a.ledger_issue)
     # Each attempt costs ~8 calls; keep a quarter of the remaining quota in reserve.
@@ -136,6 +139,38 @@ def cmd_select(a) -> int:
 
 LEDGER_AUTHOR = os.environ.get("SWARM_LEDGER_AUTHOR", "jovie-bot[bot]")
 LEDGER_RE = re.compile(r"^🤖 swarm-ledger run=(\d+) cents=(\d+) at=(\S+)")
+
+
+BEHIND_QUERY = ("query($after:String){repository(owner:\"%s\",name:\"%s\"){pullRequests(states:OPEN,first:100,after:$after)"
+                "{pageInfo{hasNextPage endCursor} nodes{number mergeStateStatus isCrossRepository labels(first:30){nodes{name}} "
+                "commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}")
+
+
+def behind_prs(limit: int) -> list[int]:
+    """Open same-repo PRs that are only BEHIND main and not red: a server-side update-branch clears them
+    at no model cost. Paced (`limit` per run) because every update fans out a full CI run."""
+    if limit <= 0:
+        return []
+    owner, name = REPO.split("/")
+    found, cursor = [], None
+    try:
+        for _ in range(5):
+            args = ["api", "graphql", "-f", f"query={BEHIND_QUERY % (owner, name)}"]
+            if cursor:
+                args += ["-f", f"after={cursor}"]
+            data = gh_json(args, priority="report")["data"]["repository"]["pullRequests"]
+            for node in data["nodes"]:
+                labels = {l["name"].lower() for l in node["labels"]["nodes"]}
+                rollup = ((node["commits"]["nodes"] or [{}])[0].get("commit") or {}).get("statusCheckRollup") or {}
+                if node["mergeStateStatus"] == "BEHIND" and not node["isCrossRepository"] and not labels & SKIP_LABELS \
+                        and rollup.get("state") not in {"FAILURE", "ERROR"}:
+                    found.append(node["number"])
+            if not data["pageInfo"]["hasNextPage"]:
+                break
+            cursor = data["pageInfo"]["endCursor"]
+    except (RuntimeError, KeyError, TypeError, ValueError):
+        return []  # a read failure costs nothing: no PRs are updated
+    return found[:limit]
 
 
 def day_spend_cents(issue: str) -> int | None:
@@ -280,6 +315,17 @@ def cmd_prepare(a) -> int:
         body = f"🤖 lane claim kind=fix sha={plan['sha']} host={HOST} at={iso()} run={os.environ.get('GITHUB_RUN_ID', '')}"
         cid = gh_json(["api", f"repos/{REPO}/issues/{n}/comments", "-f", f"body={body}"])["id"]
         plan["claimId"] = cid
+        if a.mode == "behind":
+            if pr.get("mergeable_state") != "behind" or pr.get("draft"):
+                plan.update(outcome="skipped", reason="not-behind", action="none")
+                return finish_plan(plan, a)
+            # server-side merge of main into the branch, only if the head is still the one we read
+            res = gh(["api", "-X", "PUT", f"repos/{REPO}/pulls/{n}/update-branch", "-f", f"expected_head_sha={plan['sha']}"])
+            if res.returncode == 0:
+                plan.update(outcome="deterministic-fixed", fix="update-branch", cls="behind", fp="behind", action="none")
+            else:
+                plan.update(outcome="gave-up", reason="update-branch-failed:" + res.stderr.strip()[:80], cls="behind", action="none")
+            return finish_plan(plan, a)
         if a.mode == "conflict":
             if pr.get("mergeable_state") != "dirty":
                 plan.update(outcome="skipped", reason="not-conflicting", action="none")
@@ -617,12 +663,14 @@ def cmd_summarize(a) -> int:
     cost = sum(float(r.get("costUsd") or 0) for r in rows)
     api = sum(int(r.get("calls") or 0) for r in rows)
     greened = by.get("deterministic-fixed", 0) + by.get("agent-fixed", 0)
+    behind = [r for r in rows if r.get("kind") == "behind"]
+    updated = sum(1 for r in behind if r["outcome"] == "deterministic-fixed")
     conflicts = [r for r in rows if r.get("kind") == "conflict"]
     cleared = sum(1 for r in conflicts if r["outcome"] == "deterministic-fixed")
-    reds = [r for r in rows if r.get("kind") != "conflict"]
+    reds = [r for r in rows if r.get("kind") not in {"conflict", "behind"}]
     greened = sum(1 for r in reds if r["outcome"] in ("deterministic-fixed", "agent-fixed"))
     lines = [f"## Remediation swarm", "", f"attempts={len(rows)} reds={len(reds)} reds-pushed-or-rerun={greened} "
-             f"conflicts={len(conflicts)} conflicts-cleared={cleared} blocked-credits={by.get('blocked-credits', 0)} cost=${cost:.4f} api_calls={api}", "",
+             f"conflicts={len(conflicts)} conflicts-cleared={cleared} behind={len(behind)} behind-updated={updated} blocked-credits={by.get('blocked-credits', 0)} cost=${cost:.4f} api_calls={api}", "",
              "| outcome | n |", "|---|---|", *[f"| {k} | {v} |" for k, v in sorted(by.items())]]
     Path(a.out).write_text("\n".join(lines) + "\n")
     out_var("cents", str(int(round(cost * 100 + 0.499))))
@@ -635,7 +683,7 @@ def main() -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("select"); s.add_argument("--pr", default=""); s.add_argument("--limit", type=int, default=30)
     s.add_argument("--daily-cap-usd", type=float, default=5.0); s.add_argument("--attempt-cap-usd", type=float, default=0.10)
-    s.add_argument("--ledger-issue", default="")
+    s.add_argument("--ledger-issue", default=""); s.add_argument("--behind-limit", type=int, default=10)
     pr = sub.add_parser("prepare"); pr.add_argument("--pr", type=int, required=True); pr.add_argument("--plan", required=True); pr.add_argument("--log", required=True); pr.add_argument("--mode", default="red"); pr.add_argument("--agent", default="true")
     for name in ("fix", "guard"):
         x = sub.add_parser(name); x.add_argument("--plan", required=True); x.add_argument("--cwd", required=True)

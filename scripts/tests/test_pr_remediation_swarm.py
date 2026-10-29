@@ -34,7 +34,7 @@ class SwarmPolicyTest(unittest.TestCase):
             a = A(); a.dir = str(d); a.out = str(d / "o.md")
             swarm.cmd_summarize(a)
             text = (d / "o.md").read_text()
-            self.assertIn("attempts=2 reds=2 reds-pushed-or-rerun=1 conflicts=0 conflicts-cleared=0 blocked-credits=0 cost=$0.0420 api_calls=13", text)
+            self.assertIn("attempts=2 reds=2 reds-pushed-or-rerun=1 conflicts=0 conflicts-cleared=0 behind=0 behind-updated=0 blocked-credits=0 cost=$0.0420 api_calls=13", text)
 
     def test_unreadable_ledger_fails_closed_for_model_but_not_for_deterministic(self):
         modes = {1: "red", 2: "conflict", 3: "red"}
@@ -96,6 +96,23 @@ class SwarmPolicyTest(unittest.TestCase):
         # urllib's default UA gets Cloudflare error 1010 from workers.dev before the Worker runs.
         src = Path(swarm.__file__).read_text()
         self.assertEqual(src.count('"User-Agent": "jovie-pr-remediation-swarm/1"'), 2)
+
+    def test_behind_prs_are_paced_and_exclude_red_forks_and_held(self):
+        def node(n, state="BEHIND", fork=False, roll="SUCCESS", labels=()):
+            return {"number": n, "mergeStateStatus": state, "isCrossRepository": fork,
+                    "labels": {"nodes": [{"name": l} for l in labels]},
+                    "commits": {"nodes": [{"commit": {"statusCheckRollup": {"state": roll}}}]}}
+        nodes = [node(1), node(2, state="DIRTY"), node(3, fork=True), node(4, roll="FAILURE"), node(5, labels=("hold",)),
+                 *[node(10 + i) for i in range(20)]]
+        page = {"data": {"repository": {"pullRequests": {"pageInfo": {"hasNextPage": False, "endCursor": None}, "nodes": nodes}}}}
+        original = swarm.gh_json
+        swarm.gh_json = lambda *a, **k: page
+        try:
+            got = swarm.behind_prs(10)
+            self.assertEqual(got, [1] + list(range(10, 19)))  # 10 per run, only clean BEHIND same-repo PRs
+            self.assertEqual(swarm.behind_prs(0), [])
+        finally:
+            swarm.gh_json = original
 
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"
