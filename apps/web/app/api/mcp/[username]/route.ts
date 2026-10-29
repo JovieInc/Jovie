@@ -19,6 +19,7 @@
  *   - generate_merch             → generate three draft design options (auth)
  *   - select_merch_design        → select an option and create a draft (auth)
  *   - publish_merch_card         → propose or confirm publication (auth)
+ *   - get_artist_memory          → what Jovie knows (public, or owner view)
  */
 
 import { NextResponse } from 'next/server';
@@ -36,6 +37,8 @@ import {
   PUBLIC_ARTIST_API_RATE_LIMIT_POLICY_VALUE,
   PUBLIC_ARTIST_API_RATE_LIMIT_WINDOW_SECONDS,
 } from '@/lib/api/v1/contract';
+import { ARTIST_MEMORY_CONTRACT } from '@/lib/artist-memory/contract';
+import { loadArtistMemory } from '@/lib/artist-memory/queries.server';
 import { getCachedAuth } from '@/lib/auth/cached';
 import { proposeMerchAction } from '@/lib/chat/tools/merch-propose';
 import { db } from '@/lib/db';
@@ -499,6 +502,12 @@ function buildToolDescriptors() {
       },
     },
     {
+      name: 'get_artist_memory',
+      description:
+        'What Jovie knows about this artist (jovie.artist-memory/v1): facts with provenance, confidence, visibility and review state. Anonymous callers get public, confirmed facts only; the authenticated owner gets every fact including the review queue.',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    {
       name: 'list_videos',
       description:
         "List videos from the artist's synced YouTube library. Optionally filter by content type, approved release linkage, or thumbnail experiment id.",
@@ -651,6 +660,18 @@ async function callTool(
   profile: NonNullable<ProfileData>
 ): Promise<{ data?: unknown; error?: string }> {
   const handle = profile.usernameNormalized || profile.username.toLowerCase();
+
+  if (name === 'get_artist_memory') {
+    const { userId } = await getCachedAuth();
+    const owner = userId
+      ? await getAuthenticatedProfile(db, profile.id, userId)
+      : null;
+    const facts = await loadArtistMemory(
+      profile.id,
+      owner ? 'owner' : 'public'
+    );
+    return { data: { contract: ARTIST_MEMORY_CONTRACT, facts } };
+  }
 
   if (name === 'get_ticket_link') {
     const eventId = String(args.eventId ?? '');
