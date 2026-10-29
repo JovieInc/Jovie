@@ -109,7 +109,7 @@ export function activeException(group, exceptions, now = new Date()) {
 export function planAdvisories({
   alerts,
   exceptions = [],
-  deployedAt,
+  deployedAt = null,
   now = new Date(),
 }) {
   const groups = groupAlerts(alerts);

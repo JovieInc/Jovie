@@ -73,6 +73,7 @@ test('alerts for one advisory+package collapse into one owned unit', () => {
 });
 
 test('ratchet: advisories past SLA without an exception are breaches', () => {
+  /** @type {Array<[string, number, number]>} */
   const cases = [
     ['critical', 47, 0],
     ['critical', 49, 1],
@@ -134,6 +135,7 @@ test('close only when fixed on main AND a production deploy landed after the fix
     planAdvisories({ alerts, deployedAt: null, now: NOW }).closes.length,
     0
   );
+  assert.equal(planAdvisories({ alerts, now: NOW }).awaitingDeploy.length, 1);
   assert.equal(
     planAdvisories({ alerts, deployedAt: hoursAgo(1), now: NOW }).closes.length,
     1

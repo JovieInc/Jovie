@@ -160,6 +160,7 @@ async function main() {
     for (const g of plan.closes) {
       const r = await closeLinearIssueByFingerprint({
         fingerprint: g.fingerprint,
+        runId: process.env.GITHUB_RUN_ID || now.toISOString(),
         comment: `Fixed on main at ${g.fixedAt} and deployed: Production deployment at ${g.deployedAt} postdates the fix.`,
       });
       receipt.actions.push({
