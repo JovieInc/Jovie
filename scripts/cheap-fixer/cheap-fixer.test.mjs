@@ -43,6 +43,15 @@ test('classifies failures and sends infra/unknown away from the model', () => {
   assert.equal(classifyFailure('something odd'), 'unknown');
 });
 
+/**
+ * checkJs does not narrow `!result.ok` on applyEdits' union. `=== false` does.
+ * @param {{ ok: true, files: Record<string, { before: string, after: string }> } | { ok: false, reason: string }} result
+ */
+const rejectionReason = result => {
+  if (result.ok === false) return result.reason;
+  throw new Error('expected a rejected edit');
+};
+
 test('applyEdits fails closed on missing or ambiguous search text', () => {
   const contents = { 'a.ts': 'foo\nbar\nfoo\n' };
   assert.equal(
@@ -50,17 +59,21 @@ test('applyEdits fails closed on missing or ambiguous search text', () => {
     true
   );
   assert.equal(
-    applyEdits([{ path: 'a.ts', search: 'foo', replace: 'x' }], contents)
-      .reason,
+    rejectionReason(
+      applyEdits([{ path: 'a.ts', search: 'foo', replace: 'x' }], contents)
+    ),
     'search-ambiguous:a.ts'
   );
   assert.equal(
-    applyEdits([{ path: 'a.ts', search: 'nope', replace: 'x' }], contents)
-      .reason,
+    rejectionReason(
+      applyEdits([{ path: 'a.ts', search: 'nope', replace: 'x' }], contents)
+    ),
     'search-not-found:a.ts'
   );
   assert.equal(
-    applyEdits([{ path: 'b.ts', search: 'a', replace: 'x' }], contents).reason,
+    rejectionReason(
+      applyEdits([{ path: 'b.ts', search: 'a', replace: 'x' }], contents)
+    ),
     'unseen-file:b.ts'
   );
 });
@@ -218,10 +231,17 @@ test('every proposed patch rejects lint and formatter suppression directives', (
   }
 });
 
+/**
+ * @typedef {{ uses?: string, with?: Record<string, string> }} WorkflowStep
+ * @typedef {{ jobs: { fix: { steps: WorkflowStep[] } } }} CheapFixerWorkflow
+ */
+
 test('the workflow sparse checkout boots Node and the fixer without network access', () => {
   const root = resolve(import.meta.dirname, '../..');
-  const workflow = loadYaml(
-    readFileSync(join(root, '.github/workflows/cheap-fixer.yml'), 'utf8')
+  const workflow = /** @type {CheapFixerWorkflow} */ (
+    loadYaml(
+      readFileSync(join(root, '.github/workflows/cheap-fixer.yml'), 'utf8')
+    )
   );
   const checkout = workflow.jobs.fix.steps.find(step =>
     step.uses?.startsWith('actions/checkout@')

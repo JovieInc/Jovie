@@ -52,6 +52,29 @@ const OUT_DIR = process.env.OUT_DIR || 'cheap-fixer-out';
 const GATEWAY = `https://${providerSpec('ai-gateway').hosts[0]}/v1/chat/completions`;
 const t0 = Date.now();
 
+/**
+ * @typedef {{
+ *   state: string,
+ *   head: { sha: string, ref: string, repo?: { full_name?: string } | null },
+ *   base: { ref: string },
+ *   labels: Array<{ name: string }>,
+ * }} GhPull
+ * @typedef {{
+ *   id: number,
+ *   name: string,
+ *   conclusion: string | null,
+ *   steps?: Array<{ name?: string, conclusion?: string | null }>,
+ * }} GhJob
+ * @typedef {{ jobs: GhJob[] }} GhJobsPage
+ * @typedef {{ id: number }} GhComment
+ * @typedef {Array<{ filename: string, status: string }>} GhFiles
+ * @typedef {{ size: number, encoding: string, content: string }} GhContent
+ * @typedef {{
+ *   usage?: { prompt_tokens?: number, completion_tokens?: number } | null,
+ *   choices?: Array<{ message?: { content?: string | null } | null }>,
+ * }} GatewayReply
+ */
+
 // Shared budget, breaker and retries: the client layer is the contract (.claude/rules/external-apis.md).
 const reader = createGitHubClient({
   token: process.env.GH_READ_TOKEN ?? '',
@@ -69,6 +92,8 @@ const modelClient = createApiClient({
   authorize: headers =>
     headers.set('authorization', `Bearer ${process.env.AI_GATEWAY_API_KEY}`),
 });
+// A bare object widens `priority` to `string`, which is not a PriorityName.
+/** @type {{ readonly priority: 'repair' }} */
 const call = { priority: 'repair' };
 const get = async path =>
   (await reader.rest('GET', path, undefined, call)).json();
@@ -125,7 +150,7 @@ async function chat(model, prompt) {
       ],
     },
   });
-  const body = res.json();
+  const body = /** @type {GatewayReply} */ (res.json());
   const cost = costUsd(model, body.usage);
   receipt.models.push({ model, usage: body.usage ?? null, costUsd: cost });
   receipt.costUsd += cost ?? 0;
@@ -148,7 +173,7 @@ async function main() {
   mark('start');
   if (!number) finish('skip-no-pr');
 
-  const pr = await get(`repos/${REPO}/pulls/${number}`);
+  const pr = /** @type {GhPull} */ (await get(`repos/${REPO}/pulls/${number}`));
   const labels = new Set(pr.labels.map(l => l.name.toLowerCase()));
   if (!REPLAY && pr.state !== 'open') finish('skip-closed');
   if (!REPLAY && pr.head.sha !== sha) finish('skip-stale-head');
@@ -166,7 +191,7 @@ async function main() {
   if (MODE === 'push' && claims.length) finish('skip-already-attempted');
 
   // Failing job (aggregators like PR Ready only echo a child) and its log tail.
-  const jobs = (
+  const jobs = /** @type {GhJobsPage} */ (
     await get(
       `repos/${REPO}/actions/runs/${run.id}/jobs?per_page=100&filter=latest`
     )
@@ -202,14 +227,16 @@ async function main() {
   let claimId = null;
   if (MODE === 'push') {
     if (!writer) finish('error', { error: 'push mode without GH_TOKEN' });
-    const posted = (
-      await writer.rest(
-        'POST',
-        `repos/${REPO}/issues/${number}/comments`,
-        { body: claimBody(sha) },
-        call
-      )
-    ).json();
+    const posted = /** @type {GhComment} */ (
+      (
+        await writer.rest(
+          'POST',
+          `repos/${REPO}/issues/${number}/comments`,
+          { body: claimBody(sha) },
+          call
+        )
+      ).json()
+    );
     claimId = posted.id;
     const after = activeClaims(await get(commentsPath), sha).sort((a, b) =>
       a.createdAt.localeCompare(b.createdAt)
@@ -244,7 +271,9 @@ async function main() {
   };
 
   // Files: only ones the PR changed (plus snapshots named in the log).
-  const changed = await get(`repos/${REPO}/pulls/${number}/files?per_page=100`);
+  const changed = /** @type {GhFiles} */ (
+    await get(`repos/${REPO}/pulls/${number}/files?per_page=100`)
+  );
   const changedInPr = new Set(
     changed.filter(f => f.status !== 'removed').map(f => f.filename)
   );
@@ -253,7 +282,9 @@ async function main() {
   const contents = {};
   for (const p of wanted) {
     try {
-      const f = await get(`repos/${REPO}/contents/${encodeURI(p)}?ref=${sha}`);
+      const f = /** @type {GhContent} */ (
+        await get(`repos/${REPO}/contents/${encodeURI(p)}?ref=${sha}`)
+      );
       if (f.size <= LIMITS.maxFileBytes && f.encoding === 'base64')
         contents[p] = Buffer.from(f.content, 'base64').toString('utf8');
     } catch {
@@ -287,7 +318,11 @@ async function main() {
       reason: String(reply.handoff ?? '').slice(0, 200),
     });
   const applied = applyEdits(reply.edits, contents);
-  if (!applied.ok) await handoff('edit-invalid', { reason: applied.reason });
+  // checkJs does not narrow this union on `!applied.ok`; `=== false` does.
+  if (applied.ok === false) {
+    await handoff('edit-invalid', { reason: applied.reason });
+    return;
+  }
   const violations = guardPatch(applied.files, { changedInPr, failureClass });
   const diff = Object.entries(applied.files)
     .map(([p, f]) => unifiedDiff(p, f.before, f.after))
@@ -339,7 +374,9 @@ async function main() {
   if (MODE === 'shadow') finish('shadow-proposed');
 
   // Push: one verified, non-forced commit (createCommitOnBranch fails if the head moved).
-  const fresh = await get(`repos/${REPO}/pulls/${number}`);
+  const fresh = /** @type {GhPull} */ (
+    await get(`repos/${REPO}/pulls/${number}`)
+  );
   if (
     fresh.head.sha !== sha ||
     fresh.labels.some(l => HOLD_LABELS.has(l.name.toLowerCase()))

@@ -48,6 +48,9 @@ export const CLASSES = Object.freeze([
   'generated',
   'test',
 ]);
+// A bare array of pairs is `(string | RegExp)[]` under checkJs, so `pattern.exec`
+// and the class name both fail. The tuple annotation is the type, not a cast of data.
+/** @type {Array<[string, RegExp]>} */
 const CLASS_RULES = [
   [
     'pr_metadata',
@@ -191,6 +194,7 @@ export function parseModelReply(text) {
 export function applyEdits(edits, contents) {
   if (!Array.isArray(edits) || edits.length === 0)
     return { ok: false, reason: 'no-edits' };
+  /** @type {Record<string, { before: string, after: string }>} */
   const files = {};
   for (const edit of edits) {
     if (
@@ -220,7 +224,14 @@ export function applyEdits(edits, contents) {
   return { ok: true, files };
 }
 
-/** Deterministic guards run before Jev. Returns the list of violations (empty = pass). */
+/**
+ * Deterministic guards run before Jev. Returns the list of violations (empty = pass).
+ * checkJs types a default `{}` only from bindings that have initializers, so
+ * `failureClass` has to be named on the parameter or callers fail TS2353.
+ * @param {Record<string, { before: string, after: string }>} files
+ * @param {{ changedInPr?: Set<string>, failureClass?: string }} [options]
+ * @returns {string[]}
+ */
 export function guardPatch(
   files,
   { changedInPr = new Set(), failureClass } = {}
