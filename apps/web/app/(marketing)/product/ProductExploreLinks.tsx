@@ -16,7 +16,7 @@ export function ProductExploreLinks() {
       <MarketingContainer width='page'>
         <h2
           id='product-explore-heading'
-          className='text-balance text-sm font-medium text-secondary-token'
+          className='line-clamp-2 text-balance text-sm font-medium text-secondary-token'
         >
           Explore
         </h2>
