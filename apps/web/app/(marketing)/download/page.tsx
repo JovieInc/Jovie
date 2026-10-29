@@ -10,10 +10,7 @@ import {
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  FaqSection,
-  MarketingContainer,
-} from '@/components/marketing';
+import { FaqSection, MarketingContainer } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';

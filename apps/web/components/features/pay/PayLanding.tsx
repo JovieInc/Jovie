@@ -21,7 +21,6 @@ import { ClaimHandleForm } from '@/features/home/claim-handle';
 /*  Hero                                                                      */
 /* -------------------------------------------------------------------------- */
 
-
 /** Hero copy: kicker, headline, lede and the one claim action. */
 function PayHeroCopy() {
   return (
