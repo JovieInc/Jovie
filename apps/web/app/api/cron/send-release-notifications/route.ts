@@ -360,6 +360,11 @@ async function sendEmailNotification(
       headers: emailData.headers,
       channels: ['email'],
       category: 'marketing',
+      emailRoute: {
+        stream: 'transactional',
+        purpose: 'release-day',
+        consent: 'opt-in',
+      },
       senderContext,
     },
     { email: subscriber.email }
