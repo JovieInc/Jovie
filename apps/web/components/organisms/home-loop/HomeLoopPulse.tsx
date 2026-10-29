@@ -56,7 +56,8 @@ export function HomeLoopConstraintBanner({
   /** Rendered instead of the all-clear while the loop read is unknown. */
   readonly unknownLabel?: string | null;
 }>) {
-  const unknown = !loading && unknownLabel != null;
+  // A named constraint wins over the unknown line, including its tone.
+  const unknown = !loading && constraint == null && unknownLabel != null;
   const Icon =
     constraint?.tone === 'bad'
       ? CircleAlert

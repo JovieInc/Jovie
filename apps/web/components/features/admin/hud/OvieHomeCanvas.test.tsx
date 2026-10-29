@@ -354,7 +354,7 @@ describe('OvieHomeCanvas', () => {
     expect(
       screen
         .getAllByTestId(/^home-loop-tile-/)
-        .every(tile => tile.hasAttribute('data-measured', 'false'))
+        .every(tile => tile.getAttribute('data-measured') === 'false')
     ).toBe(true);
   });
 
