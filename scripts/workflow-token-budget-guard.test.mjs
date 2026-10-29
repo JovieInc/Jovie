@@ -182,10 +182,10 @@ test('main bootstraps, passes, then fails when a workflow adds an unbudgeted sit
 });
 
 test('stack repair jobs prime pinned Node before invoking the API client', () => {
-  for (const [file, jobs] of [
-    ['auto-merge-base-guard.yml', ['guard']],
-    ['unstack-merged-parent.yml', ['plan', 'unstack']],
-  ]) {
+  for (const [file, jobs] of Object.entries({
+    'auto-merge-base-guard.yml': ['guard'],
+    'unstack-merged-parent.yml': ['plan', 'unstack'],
+  })) {
     const source = readFileSync(
       new URL(`../.github/workflows/${file}`, import.meta.url),
       'utf8'
