@@ -92,13 +92,9 @@ export function rawInteractiveCounts(file, source) {
     /\.(?:test|spec|stories)\./.test(file)
   )
     return counts;
-  const ast = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX
-  );
+  const { Latest } = ts.ScriptTarget;
+  const { TSX } = ts.ScriptKind;
+  const ast = ts.createSourceFile(file, source, Latest, true, TSX);
   function visit(node) {
     if (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) {
       const tag = node.tagName.getText(ast);
@@ -121,10 +117,7 @@ export function interactiveRatchetViolations(sources, baseline) {
       ])
     )
   );
-  for (const key of new Set([
-    ...Object.keys(current),
-    ...Object.keys(baseline),
-  ])) {
+  for (const key of Object.keys({ ...current, ...baseline })) {
     const actual = current[key] ?? 0;
     const limit = baseline[key] ?? 0;
     if (actual > limit)

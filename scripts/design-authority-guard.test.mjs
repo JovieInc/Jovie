@@ -98,11 +98,8 @@ test('raw control detector parses JSX, ignoring comments, strings and test files
     const text = '<input />';
     const view = <><button
       type="button">Save</button><input /><select /><Button /><Input /></>;`;
-  assert.deepEqual(rawInteractiveCounts(settingsFile, source), {
-    button: 1,
-    input: 1,
-    select: 1,
-  });
+  const counts = rawInteractiveCounts(settingsFile, source);
+  assert.deepEqual(counts, { button: 1, input: 1, select: 1 });
   assert.deepEqual(
     rawInteractiveCounts(settingsFile.replace('.tsx', '.test.tsx'), source),
     {}

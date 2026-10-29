@@ -1,6 +1,5 @@
 'use client';
 
-import { IconButton } from '@jovie/ui';
 import type { ReactNode } from 'react';
 import { Tooltip } from './Tooltip';
 
@@ -22,15 +21,14 @@ export function ThreadCardIconBtn({
 }: ThreadCardIconBtnProps) {
   return (
     <Tooltip label={label}>
-      <IconButton
-        variant='ghost'
-        size='xs'
+      <button
         type='button'
         onClick={onClick}
+        className='h-6 w-6 rounded grid place-items-center text-quaternary-token hover:text-primary-token hover:bg-surface-1/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-token transition-colors duration-subtle ease-subtle'
         aria-label={label}
       >
         {children}
-      </IconButton>
+      </button>
     </Tooltip>
   );
 }

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { PickerToggle } from './PickerToggle';
 
 describe('PickerToggle', () => {
-  it('renders the on label and status dot when on', () => {
+  it('renders the on label and emerald dot when on', () => {
     const { container } = render(
       <PickerToggle
         on
@@ -14,7 +14,7 @@ describe('PickerToggle', () => {
     );
     expect(screen.getByText('Push-to-talk on')).toBeInTheDocument();
     const dot = container.querySelector('span[aria-hidden="true"]');
-    expect(dot?.className).toContain('bg-success');
+    expect(dot?.className).toContain('emerald');
   });
 
   it('renders the off label and muted dot when off', () => {
@@ -28,7 +28,7 @@ describe('PickerToggle', () => {
     );
     expect(screen.getByText('Push-to-talk off')).toBeInTheDocument();
     const dot = container.querySelector('span[aria-hidden="true"]');
-    expect(dot?.className).not.toContain('bg-success');
+    expect(dot?.className).not.toContain('emerald');
   });
 
   it('exposes aria-pressed reflecting the on state', () => {
