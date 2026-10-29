@@ -44,8 +44,10 @@ describe('PillSearch', () => {
     const input = screen.getByLabelText('Filter tracks');
     const row = input.parentElement;
     const root = row?.parentElement;
+    // sr-only prefix + visible "Esc": the accessible name leads with the
+    // action and contains the visible text (WCAG 2.5.3 label-in-name).
     const closeButton = screen.getByRole('button', {
-      name: 'Close Search — Esc',
+      name: 'Close search Esc',
     });
 
     expect(root?.className).toContain('h-full');
