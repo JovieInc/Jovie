@@ -10,6 +10,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import ts from 'typescript';
 import { ROUTES, SITE_CHROME } from './routes.mjs';
 
@@ -469,8 +470,8 @@ function main() {
   if (check) {
     const stale =
       !existsSync(OUT_PATH) ||
-      read(OUT_PATH) !== outJson ||
-      read(IDS_PATH) !== idsOut;
+      !isDeepStrictEqual(JSON.parse(read(OUT_PATH)), JSON.parse(outJson)) ||
+      !isDeepStrictEqual(JSON.parse(read(IDS_PATH)), JSON.parse(idsOut));
     if (stale) {
       console.error(
         'copy inventory is stale: run node scripts/copy-inventory/extract.mjs'
