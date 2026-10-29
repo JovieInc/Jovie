@@ -716,7 +716,11 @@ function classifyMarkerEntry(entry, context) {
   }
   if (
     status === 'completed' &&
-    conclusion === 'failure' &&
+    // A cancelled run (e.g. concurrency cancelling the changelog publication)
+    // is judged by the same job-level proof: Production Verified succeeded,
+    // rollback skipped, only publication jobs unsuccessful. Run 40932269374
+    // (5cbe0cb) froze every release for 3h by being classified interrupted.
+    (conclusion === 'failure' || conclusion === 'cancelled') &&
     verifiedBeforePublicationFailure(entry.attemptJobs, markerContext, attempt)
   ) {
     return {

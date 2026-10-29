@@ -1463,6 +1463,41 @@ describe('production marker attempt state', () => {
       });
     });
 
+    it('stays verified when the run was cancelled during publication only', () => {
+      const jobs: Array<[string, string]> = [
+        ...run37144574062.slice(0, -1),
+        ['Publish verified customer changelog', 'cancelled'],
+      ];
+      const marker = replayMarker(jobs, sha);
+      marker.attemptRun.conclusion = 'cancelled';
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [marker],
+            latestRun: run(1, 'completed', 'cancelled'),
+          })
+        )
+      ).toMatchObject({ state: 'verified' });
+    });
+
+    it('keeps a cancelled run interrupted when a deploy job was cancelled', () => {
+      const jobs = run37144574062.map(([n, c]): [string, string] =>
+        n === 'Production Release / Promote to Production'
+          ? [n, 'cancelled']
+          : [n, c]
+      );
+      const marker = replayMarker(jobs, sha);
+      marker.attemptRun.conclusion = 'cancelled';
+      expect(
+        classifyProductionMarkerEvidence(
+          evidence({
+            markers: [marker],
+            latestRun: run(1, 'completed', 'cancelled'),
+          })
+        ).state
+      ).toBe('recovery_available');
+    });
+
     it('stays verified when the publication remediation filer also failed', () => {
       const jobs: Array<[string, string]> = [
         ...run37144574062,
