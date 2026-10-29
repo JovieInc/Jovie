@@ -4033,6 +4033,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/ovie/music-resolver/route.ts",
+      "kind": "handler",
+      "route": "/api/ovie/music-resolver",
+      "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/ovie/oauth/authorize/route.ts",
       "kind": "handler",
       "route": "/api/ovie/oauth/authorize",
