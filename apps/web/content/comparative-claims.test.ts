@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  loadConfig,
+  matchTerms,
+  withoutAllowedPhrases,
+} from '../../../scripts/invariants/icp-language/match.mjs';
+import {
   allowsPinchZoom,
   COMPARATIVE_BENCHMARK,
   COMPARATIVE_CLAIM_RECEIPTS,
@@ -53,9 +58,19 @@ describe('comparative claims registry', () => {
     }
   });
 
-  it('states every claim in plain, conservative, fan-free wording', () => {
+  it('keeps generated claims and the FAQ within the general-page copy policy', () => {
+    const config = loadConfig();
+    for (const text of [...renderedComparativeClaims(), comparativeAnswer()]) {
+      expect(
+        matchTerms(
+          withoutAllowedPhrases(text, config),
+          config.terms,
+          config.suppressedPrefixes
+        ),
+        text
+      ).toEqual([]);
+    }
     for (const text of renderedComparativeClaims()) {
-      expect(text).not.toMatch(/\bfans?\b/iu);
       expect(text).not.toMatch(/\{[a-z]+\}/u);
       expect(text.length).toBeLessThan(120);
     }
