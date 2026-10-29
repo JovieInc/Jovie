@@ -188,4 +188,25 @@ describe('DemoTimWhiteProfileSurface', () => {
       showTourButton: false,
     });
   });
+
+  it('renders the homepage template archetype with no person and one fresh release', async () => {
+    const props = await renderSurface('archetype=template');
+
+    expect(props).toMatchObject({
+      artist: expect.objectContaining({
+        id: 'homepage-template-profile',
+        handle: 'you',
+        image_url: undefined,
+      }),
+      contacts: [],
+      releases: [],
+      tourDates: [],
+      showPayButton: false,
+      showTourButton: false,
+      latestRelease: expect.objectContaining({
+        id: 'demo-template-first-light',
+        creatorProfileId: 'homepage-template-profile',
+      }),
+    });
+  });
 });

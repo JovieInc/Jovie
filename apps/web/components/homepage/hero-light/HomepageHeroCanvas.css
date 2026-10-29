@@ -190,6 +190,11 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  /* Fill the copy column. As a flex item of the align-start column it would
+     otherwise size to its max-content width and push the subhead and the
+     claim button past a phone viewport. */
+  align-self: stretch;
+  width: 100%;
   min-width: 0;
 }
 

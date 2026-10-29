@@ -110,6 +110,13 @@ describe('homepage hero light budget', () => {
     expect(copy).toContain('margin-inline: auto');
     // The proof keeps the real screen aspect and never exceeds the
     // capture's native width (390 CSS px = 24.375rem), so it stays crisp.
+    // The lead fills the copy column instead of sizing to max-content, so
+    // the subhead and claim button never run past a phone viewport (the
+    // 390px CI capture clipped "Claim", 2026-10-29).
+    const lead = cssBlock(css, '.homepage-hero-canvas__lead');
+    expect(lead).toContain('align-self: stretch');
+    expect(lead).toContain('width: 100%');
+    expect(lead).toContain('min-width: 0');
     const proof = cssBlock(css, '.homepage-hero-canvas__proof');
     expect(proof).toContain('aspect-ratio: 402 / 874');
     expect(proof).toContain('max-width: 24rem');
