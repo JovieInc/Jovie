@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { HOMEPAGE_COPY } from '@/data/homepageCopy';
@@ -166,5 +168,17 @@ describe('HomepageHeroCanvas', () => {
         ?.hasAttribute('data-has-proof')
     ).toBe(false);
     expect(screen.queryByRole('img')).toBeNull();
+  });
+});
+
+describe('HomepageHeroCanvas proof geometry', () => {
+  it('keeps the crop aspect and never renders wider than the capture', () => {
+    const css = readFileSync(join(__dirname, 'HomepageHeroCanvas.css'), 'utf8');
+    const proof =
+      css.match(/\n\.homepage-hero-canvas__proof\s*\{([^}]*)\}/)?.[1] ?? '';
+    // The proof keeps the crop's real aspect (780x1264 capture) and never
+    // exceeds the capture's native width (390 CSS px = 24.375rem).
+    expect(proof).toContain('aspect-ratio: 780 / 1264');
+    expect(proof).toContain('max-width: 24rem');
   });
 });

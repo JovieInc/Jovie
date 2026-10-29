@@ -117,9 +117,8 @@ describe('homepage hero light budget', () => {
     expect(lead).toContain('align-self: stretch');
     expect(lead).toContain('width: 100%');
     expect(lead).toContain('min-width: 0');
-    const proof = cssBlock(css, '.homepage-hero-canvas__proof');
-    expect(proof).toContain('aspect-ratio: 780 / 1264');
-    expect(proof).toContain('max-width: 24rem');
+    // The proof's crop geometry (aspect ratio, native-width cap) is a layout
+    // spec, not a budget: HomepageHeroCanvas.test.tsx owns it.
     const gridSelector = '.homepage-hero-canvas__copy[data-has-proof="true"] {';
     const wideStart = css.lastIndexOf(
       '@media (min-width: 64rem)',
