@@ -138,8 +138,15 @@ export function OnboardingSessionBoundary({
       });
       if (!response.ok) throw new Error('action failed');
       if (actionIdentity.current !== owner) return;
-      if (action === 'logout') await signOut({ redirectUrl: APP_ROUTES.START });
-      else {
+      if (action === 'logout') {
+        const claimReturn =
+          props.entryProfile?.handle ?? props.accountClaimHandle;
+        await signOut({
+          redirectUrl: claimReturn
+            ? `${APP_ROUTES.START}?${new URLSearchParams({ handle: claimReturn })}`
+            : APP_ROUTES.START,
+        });
+      } else {
         // Remove URL handoffs too: reload must not resubmit the old starter.
         globalThis.history.replaceState(null, '', APP_ROUTES.START);
         setRevision(current => current + 1);
@@ -204,9 +211,14 @@ export function OnboardingSessionBoundary({
       {...props}
       key={`${identity}:${revision}:${loaded.snapshot.conversationId ?? 'new'}`}
       isSignedIn={isSignedIn}
+      accountClaimHandle={
+        revision === 0 && props.accountIdentityId === userId
+          ? props.accountClaimHandle
+          : undefined
+      }
       intentId={allowHandoff ? props.intentId : undefined}
       starterHandoff={allowHandoff ? props.starterHandoff : null}
-      entryProfile={allowHandoff ? props.entryProfile : null}
+      entryProfile={revision === 0 ? props.entryProfile : null}
       initialMessages={loaded.snapshot.messages}
       conversationId={loaded.snapshot.conversationId}
       resumeOwnedConversation={loaded.snapshot.owned}

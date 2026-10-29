@@ -45,13 +45,15 @@ describe('buildStartEntryProfile', () => {
       avatarUrl: 'https://blob.example.com/avatars/megaran.avif',
       spotifyId: null,
       spotifyUrl: null,
+      spotifyFollowers: null,
+      latestRelease: null,
       genres: [],
       socialLinks: [
         'https://instagram.com/megaran',
         'https://twitch.tv/megaran',
       ],
-      linkPlatforms: ['instagram', 'twitch', 'website'],
-      linkCount: 4,
+      linkPlatforms: ['instagram', 'twitch'],
+      linkCount: 2,
     });
   });
 
@@ -69,6 +71,32 @@ describe('buildStartEntryProfile', () => {
       displayName: 'Tim White',
       avatarUrl: PREBUILT.avatarUrl,
     });
+  });
+
+  it('reuses public catalog data without exposing private release fields', () => {
+    const release = {
+      title: 'Actual release',
+      slug: 'actual-release',
+      artworkUrl: 'https://cdn.example.com/release.webp',
+      releaseDate: '2026-10-20',
+      releaseType: 'single',
+      ownerEmail: 'private@example.com',
+    };
+    const result = buildStartEntryProfile('megaran', {
+      ...PREBUILT,
+      spotifyFollowers: 42,
+      latestRelease: release,
+    });
+    expect(result).toMatchObject({
+      spotifyFollowers: 42,
+      latestRelease: {
+        title: 'Actual release',
+        artworkUrl: release.artworkUrl,
+      },
+    });
+    expect(
+      result?.status === 'claimable' && result.latestRelease
+    ).not.toHaveProperty('ownerEmail');
   });
 
   it('never reveals a private profile', () => {

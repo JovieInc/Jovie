@@ -36,3 +36,12 @@ export const RestoringStoredIntent: Story = {
     mode: 'restoring_intent',
   },
 };
+
+export const PendingHandle: Story = {
+  args: {
+    mode: 'handle_entry',
+    entryProfile: { status: 'available', handle: 'fixtureartist' },
+    disabled: true,
+    onContinueWithProfile: () => {},
+  },
+};

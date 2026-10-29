@@ -81,6 +81,28 @@ beforeEach(() => {
 });
 
 describe('onboarding identity boundary', () => {
+  it('retains the target handle when switching accounts after a restored conversation', async () => {
+    render(
+      <OnboardingSessionBoundary
+        sessionLabel='pending'
+        isSignedIn
+        accountIdentityId='account-a'
+        accountClaimHandle='david'
+        entryProfile={{ status: 'available', handle: 'david' }}
+      />
+    );
+    await screen.findByTestId('history');
+    fireEvent.click(screen.getByRole('button', { name: 'Log out' }));
+    await waitFor(() =>
+      expect(mocks.auth.signOut).toHaveBeenCalledWith({
+        redirectUrl: '/start?handle=david',
+      })
+    );
+    expect(mocks.shell.mock.calls.at(-1)?.[0].entryProfile).toMatchObject({
+      handle: 'david',
+    });
+  });
+
   it('mounts the chat only after durable history is read and suppresses stale starter intent', async () => {
     let resolve!: (response: Response) => void;
     mocks.fetch.mockReturnValue(

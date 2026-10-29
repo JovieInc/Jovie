@@ -3,10 +3,12 @@
 // @coverage-via apps/web/tests/unit/onboarding/OnboardingShell.sign-in-placement.test.tsx
 
 import { Button } from '@jovie/ui';
+import NextLink from 'next/link';
 import { BrandLogo } from '@/components/atoms/BrandLogo';
 import { ImageWithFallback } from '@/components/atoms/ImageWithFallback';
 import { JovieMarkElectric } from '@/components/atoms/JovieMarkElectric';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { APP_ROUTES } from '@/constants/routes';
 import {
   ONBOARDING_ENTRY_SUPPORT,
   ONBOARDING_ENTRY_TITLE,
@@ -26,6 +28,8 @@ interface OnboardingChatEmptyIntroProps {
   readonly entryProfile?: StartEntryProfile | null;
   /** Taken handle: focus the composer so the visitor can ask for another name. */
   readonly onTryAnotherName?: () => void;
+  readonly onContinueWithProfile?: () => void;
+  readonly disabled?: boolean;
 }
 
 const MAX_ENTRY_ICONS = 6;
@@ -38,7 +42,7 @@ function getHandleEntryCopy(entry: StartEntryProfile): {
     case 'claimable':
       return {
         title: 'Your page is ready',
-        support: `We built jov.ie/${entry.handle} from your public links. Send the message below to claim it.`,
+        support: `We built jov.ie/${entry.handle} from public links. Confirm this is the profile you want to keep. Ownership is verified before it is saved.`,
       };
     case 'claimed':
       return {
@@ -48,7 +52,8 @@ function getHandleEntryCopy(entry: StartEntryProfile): {
     case 'available':
       return {
         title: `Claim jov.ie/${entry.handle}`,
-        support: "Send the message below and I'll set up your page.",
+        support:
+          "Preview your profile first. We'll confirm the handle when you save.",
       };
   }
 }
@@ -143,6 +148,8 @@ export function OnboardingChatEmptyIntro({
   mode,
   entryProfile,
   onTryAnotherName,
+  onContinueWithProfile,
+  disabled = false,
 }: OnboardingChatEmptyIntroProps) {
   if (mode === 'handle_entry' && entryProfile) {
     const copy = getHandleEntryCopy(entryProfile);
@@ -162,6 +169,28 @@ export function OnboardingChatEmptyIntro({
           <p className='mx-auto mt-2 max-w-112 text-sm leading-6 text-secondary-token'>
             {copy.support}
           </p>
+          {entryProfile.status !== 'claimed' && onContinueWithProfile ? (
+            <Button
+              type='button'
+              className='mt-4'
+              disabled={disabled}
+              onClick={onContinueWithProfile}
+              data-testid='onboarding-entry-continue'
+            >
+              {entryProfile.status === 'claimable'
+                ? 'Yes, that is me'
+                : `Continue with @${entryProfile.handle}`}
+            </Button>
+          ) : null}
+          {entryProfile.status === 'claimed' ? (
+            <Button asChild variant='secondary' size='sm' className='mt-4'>
+              <NextLink
+                href={`${APP_ROUTES.SIGNIN}?${new URLSearchParams({ redirect_url: `/${entryProfile.handle}/claim?next=auth` })}`}
+              >
+                Recover access to @{entryProfile.handle}
+              </NextLink>
+            </Button>
+          ) : null}
           {entryProfile.status === 'claimed' && onTryAnotherName ? (
             <Button
               type='button'

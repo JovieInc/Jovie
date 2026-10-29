@@ -1,6 +1,7 @@
 import { AUTH_STATE_PARAM } from '@jovie/auth-routing';
 import { APP_ROUTES } from '@/constants/routes';
 import { getCentralAuthCallbackPath } from '@/lib/auth/central-auth-routing';
+import { categorizePath } from '@/lib/routing/proxy-routing';
 import {
   type AuthOfferHandoff,
   readAuthOfferHandoff,
@@ -29,6 +30,20 @@ function isAuthEntryRedirect(redirectUrl: string | null): boolean {
     redirectUrl?.startsWith(`${APP_ROUTES.SIGNIN_HYPHEN}?`) === true ||
     redirectUrl === APP_ROUTES.SIGNUP_HYPHEN ||
     redirectUrl?.startsWith(`${APP_ROUTES.SIGNUP_HYPHEN}?`) === true
+  );
+}
+
+function isPublicDestination(redirectUrl: string): boolean {
+  const pathname = decodeURIComponent(
+    new URL(redirectUrl, 'https://jov.ie').pathname
+  );
+  if (pathname === APP_ROUTES.START) return true;
+  const category = categorizePath(pathname);
+  return (
+    !category.needsNonce &&
+    !category.isProtectedPath &&
+    !category.isAuthPath &&
+    !category.isAuthCallbackPath
   );
 }
 
@@ -78,6 +93,12 @@ export function getAuthenticatedAuthRouteRedirect(
   }
 
   if (sanitizedRedirect && isWaitlistInviteRedirect(sanitizedRedirect)) {
+    return sanitizedRedirect;
+  }
+
+  // Lifecycle gates govern authenticated work, not the visitor's explicit
+  // public destination. Its owning route still validates any action there.
+  if (sanitizedRedirect && isPublicDestination(sanitizedRedirect)) {
     return sanitizedRedirect;
   }
 
@@ -175,7 +196,8 @@ export function getClientAuthenticatedAuthEntryRedirect(
  * enforced independently by the canonical app/checkout gates.
  */
 export function getStartRouteRedirect(
-  state: CanonicalUserState
+  state: CanonicalUserState,
+  options?: { readonly hasEntryIntent?: boolean }
 ): string | null {
   switch (state) {
     case CanonicalUserState.UNAUTHENTICATED:
@@ -185,7 +207,7 @@ export function getStartRouteRedirect(
     case CanonicalUserState.WAITLIST_PENDING:
       return null;
     case CanonicalUserState.ACTIVE:
-      return APP_ROUTES.DASHBOARD;
+      return options?.hasEntryIntent ? null : APP_ROUTES.DASHBOARD;
     case CanonicalUserState.BANNED:
       return APP_ROUTES.UNAVAILABLE;
     case CanonicalUserState.USER_CREATION_FAILED:

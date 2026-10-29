@@ -9,7 +9,9 @@ import {
   getDisplaySpotifyFollowers,
 } from '@/lib/onboarding/canonical-metrics';
 import type { OnboardingProfileDraft } from '@/lib/onboarding/profile-draft';
+import type { StartEntryRelease } from '@/lib/onboarding/start-entry-profile';
 import { cn } from '@/lib/utils';
+import { detectPlatform } from '@/lib/utils/platform-detection';
 import type { Artist, LegacySocialLink } from '@/types/db';
 import {
   formatCompactCount,
@@ -33,6 +35,7 @@ export interface OnboardingProfileArtist {
   readonly popularity?: number | null;
   readonly genres?: readonly string[];
   readonly dspMatches?: readonly OnboardingDspMatch[];
+  readonly latestRelease?: StartEntryRelease | null;
 }
 
 export interface OnboardingProfileBuilderState {
@@ -119,22 +122,6 @@ function platformToProfileKey(platform: string): string {
   if (normalized.includes('spotify')) return 'spotify';
 
   return normalized || platform;
-}
-
-function inferPlatformFromUrl(url: string): string {
-  try {
-    const host = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
-    if (host.includes('instagram')) return 'instagram';
-    if (host.includes('tiktok')) return 'tiktok';
-    if (host.includes('youtube')) return 'youtube';
-    if (host.includes('soundcloud')) return 'soundcloud';
-    if (host.includes('spotify')) return 'spotify';
-    if (host.includes('music.apple')) return 'apple_music';
-  } catch {
-    return 'website';
-  }
-
-  return 'website';
 }
 
 function uniqueDspMatches(
@@ -227,10 +214,12 @@ function buildPreviewLinks({
   artist,
   dspMatches,
   socialLinks,
+  sourceUrl,
 }: {
   readonly artist: OnboardingProfileArtist;
   readonly dspMatches: readonly OnboardingDspMatch[];
   readonly socialLinks: readonly string[];
+  readonly sourceUrl?: string;
 }): LegacySocialLink[] {
   const links: LegacySocialLink[] = [];
   const seen = new Set<string>();
@@ -255,8 +244,14 @@ function buildPreviewLinks({
   }
 
   for (const url of socialLinks) {
-    addLink(inferPlatformFromUrl(url), url);
+    const detected = detectPlatform(url);
+    if (detected.isValid) {
+      addLink(detected.platform.id, detected.normalizedUrl);
+    }
   }
+  // An explicitly selected non-music source has a different contract from
+  // a claimed social identity. Do not infer one from an arbitrary HTTPS URL.
+  if (sourceUrl) addLink('website', sourceUrl);
 
   return links;
 }
@@ -343,11 +338,12 @@ export function OnboardingProfileRail({
   const previewLinks = buildPreviewLinks({
     artist,
     dspMatches,
-    socialLinks:
+    socialLinks: state.socialLinks,
+    sourceUrl:
       state.profileDraft?.activeRole !== 'artist' &&
       state.profileDraft?.selectedSource
-        ? [state.profileDraft.selectedSource.url]
-        : state.socialLinks,
+        ? state.profileDraft.selectedSource.url
+        : undefined,
   });
   const profileHref = `/${previewArtist.handle}`;
   const draft = state.profileDraft;
@@ -411,9 +407,34 @@ export function OnboardingProfileRail({
                     </a>
                   </Button>
                 </div>
-              ) : undefined
+              ) : artist.latestRelease ? undefined : (
+                <div
+                  className='h-full overflow-y-auto bg-surface-1 px-4 pb-6 pt-19'
+                  data-testid='onboarding-profile-compact-surface'
+                >
+                  {/* No release has been supplied to this draft. Reuse the
+                    canonical artist identity, never a portrait as release art. */}
+                  <ProfileIdentityHeader
+                    name={previewArtist.name}
+                    handle={previewArtist.handle}
+                    imageUrl={previewArtist.image_url ?? null}
+                    profileHref={profileHref}
+                    listenHref={
+                      getSafeSpotifyArtistUrl(artist.url) ?? profileHref
+                    }
+                    hasListenDestination={Boolean(
+                      getSafeSpotifyArtistUrl(artist.url)
+                    )}
+                    socialLinks={previewLinks}
+                    headingAs='p'
+                  />
+                </div>
+              )
             }
             artist={previewArtist}
+            latestRelease={artist.latestRelease}
+            allowFanCapture={false}
+            headerSocialLinksOverride={previewLinks}
             socialLinks={previewLinks}
             genres={previewArtist.genres}
             profileHref={profileHref}

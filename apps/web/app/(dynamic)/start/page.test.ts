@@ -158,7 +158,7 @@ describe('StartPage', () => {
     expect(result.props.entryProfile).toEqual(entry);
   });
 
-  it('keeps an explicit starter prompt in charge of an open or claimable handle', async () => {
+  it('preserves the requested handle alongside the explicit starter prompt', async () => {
     mocks.resolveStartEntryProfile.mockResolvedValueOnce({
       status: 'available',
       handle: 'megaran',
@@ -171,8 +171,14 @@ describe('StartPage', () => {
       }),
     });
 
-    expect(result.props.entryProfile).toBeNull();
-    expect(result.props.starterHandoff).toMatchObject({ kind: 'prompt' });
+    expect(result.props.entryProfile).toEqual({
+      status: 'available',
+      handle: 'megaran',
+    });
+    expect(result.props.starterHandoff).toEqual({
+      kind: 'prompt',
+      prompt: 'I want to claim jov.ie/megaran.',
+    });
   });
 
   it('still reports a taken handle when a starter prompt rides along (JOV-9624)', async () => {

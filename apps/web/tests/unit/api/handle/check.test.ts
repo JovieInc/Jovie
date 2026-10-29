@@ -153,6 +153,11 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(200);
     expect(data.available).toBe(true);
+    expect(data).toMatchObject({
+      freshness: 'fresh',
+      checkedAt: '2026-10-16T18:00:00.000Z',
+      reserved: false,
+    });
     expect(mockCacheHandleAvailability).toHaveBeenCalledWith('real.name', true);
   });
 
@@ -195,6 +200,7 @@ describe('GET /api/handle/check', () => {
 
     expect(response.status).toBe(400);
     expect(data.available).toBe(false);
+    expect(data.reserved).toBe(true);
     expect(data.suggestedAlternatives).toEqual(['admin1', 'admin2', 'admin3']);
   });
 
@@ -212,6 +218,11 @@ describe('GET /api/handle/check', () => {
     expect(response.status).toBe(200);
     expect(data.available).toBe(false);
     expect(data.suggestedAlternatives?.[0]).toMatch(/^cachedhandle\d+$/);
+    expect(data).toMatchObject({
+      freshness: 'cached',
+      checkedAt: null,
+      reserved: false,
+    });
     expect(mockCheckOnboardingHandleAvailability).not.toHaveBeenCalled();
   });
 

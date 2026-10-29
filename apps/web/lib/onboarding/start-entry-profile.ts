@@ -7,6 +7,16 @@ import {
 
 const MAX_ENTRY_LINKS = 8;
 
+/** Public catalog projection, selected by the existing profile service. */
+export interface StartEntryRelease {
+  readonly title: string;
+  readonly slug: string;
+  readonly artworkUrl: string | null;
+  readonly releaseDate: Date | string | null;
+  readonly revealDate?: Date | string | null;
+  readonly releaseType: string;
+}
+
 /**
  * What `/start?handle=<handle>` knows about the visitor before they type
  * (JOV-7753). Outreach and claim links carry the handle; the first screen
@@ -15,11 +25,15 @@ const MAX_ENTRY_LINKS = 8;
 export type StartEntryProfile =
   | {
       readonly status: 'claimable';
+      /** Routing context only; never an ownership or availability receipt. */
+      readonly profileId?: string;
       readonly handle: string;
       readonly displayName: string;
       readonly avatarUrl: string | null;
       readonly spotifyId: string | null;
       readonly spotifyUrl: string | null;
+      readonly spotifyFollowers?: number | null;
+      readonly latestRelease?: StartEntryRelease | null;
       readonly genres: readonly string[];
       readonly socialLinks: readonly string[];
       /** Distinct platforms behind those links, for the entry card icon row. */
@@ -28,6 +42,7 @@ export type StartEntryProfile =
     }
   | {
       readonly status: 'claimed';
+      readonly profileId?: string;
       readonly handle: string;
       readonly displayName: string;
       readonly avatarUrl: string | null;
@@ -35,6 +50,7 @@ export type StartEntryProfile =
   | { readonly status: 'available'; readonly handle: string };
 
 export interface StartEntryProfileSource {
+  readonly id?: string;
   readonly usernameNormalized: string;
   readonly displayName: string | null;
   readonly avatarUrl: string | null;
@@ -42,6 +58,8 @@ export interface StartEntryProfileSource {
   readonly isClaimed: boolean | null;
   readonly spotifyId: string | null;
   readonly spotifyUrl: string | null;
+  readonly spotifyFollowers?: number | null;
+  readonly latestRelease?: StartEntryRelease | null;
   readonly genres: readonly string[] | null;
   readonly socialLinks: readonly {
     readonly url: string;
@@ -66,20 +84,22 @@ export function readStartEntryHandle(
   return handle;
 }
 
-function httpsUrls(links: readonly { readonly url: string }[]): string[] {
+function httpsLinks(links: StartEntryProfileSource['socialLinks']) {
   const urls: string[] = [];
+  const platforms = new Set<string>();
   for (const link of links) {
     try {
       const parsed = new URL(link.url);
       if (parsed.protocol === 'https:' && !urls.includes(parsed.toString())) {
         urls.push(parsed.toString());
+        platforms.add(link.platform.toLowerCase());
       }
     } catch {
       // Skip malformed stored links rather than failing the entry screen.
     }
     if (urls.length >= MAX_ENTRY_LINKS) break;
   }
-  return urls;
+  return { urls, platforms: [...platforms] };
 }
 
 /**
@@ -99,29 +119,41 @@ export function buildStartEntryProfile(
   if (profile.isClaimed) {
     return {
       status: 'claimed',
+      ...(profile.id ? { profileId: profile.id } : {}),
       handle: profile.usernameNormalized,
       displayName,
       avatarUrl: profile.avatarUrl,
     };
   }
 
+  const links = httpsLinks(profile.socialLinks);
   return {
     status: 'claimable',
+    ...(profile.id ? { profileId: profile.id } : {}),
     handle: profile.usernameNormalized,
     displayName,
     avatarUrl: profile.avatarUrl,
     spotifyId: profile.spotifyId,
     spotifyUrl: profile.spotifyUrl,
+    spotifyFollowers: profile.spotifyFollowers ?? null,
+    latestRelease: profile.latestRelease
+      ? {
+          title: profile.latestRelease.title,
+          slug: profile.latestRelease.slug,
+          artworkUrl: profile.latestRelease.artworkUrl,
+          releaseDate: profile.latestRelease.releaseDate,
+          revealDate: profile.latestRelease.revealDate,
+          releaseType: profile.latestRelease.releaseType,
+        }
+      : null,
     genres: profile.genres ?? [],
-    socialLinks: httpsUrls(profile.socialLinks),
-    linkPlatforms: [
-      ...new Set(profile.socialLinks.map(link => link.platform.toLowerCase())),
-    ],
-    linkCount: profile.socialLinks.length,
+    socialLinks: links.urls,
+    linkPlatforms: links.platforms,
+    linkCount: links.urls.length,
   };
 }
 
-/** Draft placed in the composer (not auto-sent) for claimable and open handles. */
+/** Existing chat command submitted by the explicit profile continuation action. */
 export function buildStartEntryDraft(
   entry: StartEntryProfile | null
 ): string | null {
