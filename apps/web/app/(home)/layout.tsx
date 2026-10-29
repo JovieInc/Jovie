@@ -1,5 +1,6 @@
 import './home.css';
 import '../../components/marketing/MarketingSnapRail.css';
+import { WebMcpTools } from '@/components/marketing/WebMcpTools';
 import { ClientProviders } from '@/components/providers/ClientProviders';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
 
@@ -23,6 +24,7 @@ export default function HomeLayout({
         logoSize='sm'
       >
         {children}
+        <WebMcpTools />
       </PublicPageShell>
     </ClientProviders>
   );

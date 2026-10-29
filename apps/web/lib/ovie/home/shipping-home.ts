@@ -37,7 +37,7 @@ import type {
   DeliverySummary,
   StageSummary,
 } from '@/lib/ovie/shipping-state/contract';
-import { operatorAlertCopy } from './operator-copy';
+import { fleetVerdict } from './fleet-verdict';
 
 export { summarizeSourceIssues } from './operator-copy';
 
@@ -446,15 +446,17 @@ export function buildConstraint(
   rows: readonly OvieShipRow[],
   tasksSyncState: OperationalTaskFeed['syncState']
 ): OvieConstraint | null {
-  const alert = delivery.lanes.alerts.find(text => text.trim().length > 0);
-  // Lanes alerts are doctor diagnostics; Home names them in operator copy and
-  // links the Product view, which carries the full (path-redacted) text.
-  if (alert)
+  // One verdict joins the doctor alerts and the lane ratio (see fleet-verdict.ts);
+  // the details link opens Fleet, which lists every reason.
+  const fleet = fleetVerdict(delivery.lanes);
+  if (fleet.level === 'degraded' || fleet.level === 'down') {
+    const capacity = fleet.capacity ? ` · ${fleet.capacity}` : '';
     return {
       tone: 'bad',
-      text: operatorAlertCopy(alert),
-      detailsHref: APP_ROUTES.ADMIN_PRODUCT,
+      text: `${fleet.headline}${capacity}`,
+      detailsHref: APP_ROUTES.ADMIN_OPERATIONS,
     };
+  }
 
   const blocked = rows.filter(row => row.attention === 'blocked').length;
   if (blocked > 0)
@@ -477,8 +479,6 @@ export function buildConstraint(
       text: `Production is ${behind} ${behind === 1 ? 'commit' : 'commits'} behind main`,
     };
 
-  if (delivery.lanes.stale)
-    return { tone: 'warn', text: 'Lanes feed is stale' };
   if (tasksSyncState === 'failed' || tasksSyncState === 'stale')
     return { tone: 'warn', text: 'Work items are not current' };
   return null;
