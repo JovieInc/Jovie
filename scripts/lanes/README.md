@@ -6,7 +6,7 @@ JOV-7706); grok and kimi stay `enabled: false`. Symphony Elixir on Gem is retire
 `gem-retire-elixir.sh`); nothing else claims JOV work.
 
 A lane is a provider command in `providers.json` plus a Linear label that expresses a routing
-preference. Every JOV Todo issue is eligible (Tim 2026-10-11: no `agent-ready`, plan or
+preference. Every JOV Todo issue is eligible, and since 2026-10-29 Backlog admission no longer requires `agent-ready` either (readiness is computed: spec, acceptance, no hold, no blocker, no red line) (Tim 2026-10-11: no `agent-ready`, plan or
 approval label is required): every lane reads one shared all-Todo snapshot per TTL (at most
 `TODO_POOL_PAGES` x 100 issues; a larger pool fails closed) and the cost-aware router (below)
 decides which lane takes each issue. `hold` is the one stop signal, and it expires: the
