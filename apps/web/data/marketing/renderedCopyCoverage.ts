@@ -22,6 +22,8 @@
  * suite; this file stays DOM-free so it can also certify server captures.
  */
 
+import { claims } from '@/lib/billing/offer/claims';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import type {
   MarketingCopyLineBinding,
   MarketingCopyLineRole,
@@ -30,6 +32,9 @@ import type {
   MarketingCopySectionBrief,
   MarketingCopySectionDraft,
 } from './copy';
+
+/** Paid CTA label: plan plus price, from offer truth (JOV-9692). */
+const PRO_CTA_LABEL = getPublicPriceClaim('pro').ctaLabel;
 
 export interface RenderedCopyCoverageEntry {
   readonly surfaceId: string;
@@ -330,11 +335,11 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-pro-v1',
         controlHeadline: 'Pro plan',
         headline: 'Artist Presence',
-        body: 'Self-serve. Cancel anytime.',
+        body: `Self-serve. ${claims(['billing.cancel_short', 'billing.refund'])}`,
         supportingText: [
           'Self-serve',
           '$12/mo',
-          'Claim your profile',
+          PRO_CTA_LABEL,
           'Public Jovie profile and audience capture',
         ],
         claimIds: ['pro-price'],
@@ -383,7 +388,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         body: 'Artist Presence is $12/month. Claim your profile.',
         supportingText: [
           'Claim my free profile',
-          'Claim your profile',
+          PRO_CTA_LABEL,
           'Contact sales',
         ],
         claimIds: ['pro-price'],

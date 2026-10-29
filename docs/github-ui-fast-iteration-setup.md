@@ -21,7 +21,7 @@ Current active ruleset:
 - Max entries to build: `5`
 - Min entries to merge: `1`
 - Max entries to merge: `10`
-- Grouping strategy: `ALLGREEN`
+- Grouping strategy: `HEADGREEN`
 - Check response timeout: `10` minutes
 
 Recommended required checks for `main`:

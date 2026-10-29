@@ -2,6 +2,7 @@
 
 import type { CSSProperties, ReactNode } from 'react';
 import { PhoneFrame } from '@/components/molecules/PhoneFrame';
+import type { PublicRelease } from '@/features/profile/releases/types';
 import { ProfileCompactSurface } from '@/features/profile/templates/ProfileCompactSurface';
 import { cn } from '@/lib/utils';
 import type { Artist, LegacySocialLink } from '@/types/db';
@@ -17,8 +18,12 @@ import type { Artist, LegacySocialLink } from '@/types/db';
  * built and toggle the chrome they need.
  */
 export interface ProfilePreviewBentoProps {
+  /** Domain-specific draft content inside the shared phone and hero chrome. */
+  readonly phoneContent?: ReactNode;
   readonly artist: Artist;
   readonly socialLinks: LegacySocialLink[];
+  /** Real releases to render on the preview (JOV-9758). */
+  readonly releases?: readonly PublicRelease[];
   readonly genres?: string[] | null;
   readonly profileHref: string;
   /** Whether the preview visitor already follows the artist. Defaults to false. */
@@ -80,8 +85,10 @@ const DEFAULT_COVER_VARS = {
 } as CSSProperties;
 
 export function ProfilePreviewBento({
+  phoneContent,
   artist,
   socialLinks,
+  releases,
   genres,
   profileHref,
   isSubscribed = false,
@@ -108,35 +115,38 @@ export function ProfilePreviewBento({
         style={coverVars ?? DEFAULT_COVER_VARS}
         data-testid={phonePreviewTestId}
       >
-        <ProfileCompactSurface
-          renderMode='preview'
-          presentation='embedded'
-          artist={artist}
-          socialLinks={socialLinks}
-          contacts={[]}
-          showPayButton={false}
-          genres={genres}
-          drawerOpen={false}
-          drawerView='menu'
-          activeMode='profile'
-          onDrawerOpenChange={() => {}}
-          onDrawerViewChange={() => {}}
-          onBack={() => {}}
-          onOpenMenu={() => {}}
-          onPlayClick={() => {}}
-          onShare={() => {}}
-          onModeSelect={() => {}}
-          profileHref={profileHref}
-          dataTestId={surfaceTestId}
-          isSubscribed={isSubscribed}
-          hideBackButton
-          hideJovieBranding
-          hideMoreMenu
-          renderInteractiveOverlays={false}
-          renderSemanticHeading={false}
-          headerSocialLinksOverride={[]}
-          resolveNearbyTour={false}
-        />
+        {phoneContent ?? (
+          <ProfileCompactSurface
+            renderMode='preview'
+            presentation='embedded'
+            artist={artist}
+            socialLinks={socialLinks}
+            releases={releases}
+            contacts={[]}
+            showPayButton={false}
+            genres={genres}
+            drawerOpen={false}
+            drawerView='menu'
+            activeMode='profile'
+            onDrawerOpenChange={() => {}}
+            onDrawerViewChange={() => {}}
+            onBack={() => {}}
+            onOpenMenu={() => {}}
+            onPlayClick={() => {}}
+            onShare={() => {}}
+            onModeSelect={() => {}}
+            profileHref={profileHref}
+            dataTestId={surfaceTestId}
+            isSubscribed={isSubscribed}
+            hideBackButton
+            hideJovieBranding
+            hideMoreMenu
+            renderInteractiveOverlays={false}
+            renderSemanticHeading={false}
+            headerSocialLinksOverride={[]}
+            resolveNearbyTour={false}
+          />
+        )}
       </div>
     </PhoneFrame>
   );
