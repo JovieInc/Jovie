@@ -27,18 +27,9 @@
           ]
         },
         "legalConsistency": {
-          "status": "fail",
+          "status": "pass",
           "receiptId": "legal-source-check",
-          "reasons": [
-            "legal text does not cover data collected: public artist identity and release facts",
-            "legal text does not cover anonymous write action: unpublished drafts",
-            "legal text does not cover data collected: acquisition attribution",
-            "legal text does not cover retention: draft expiry after 7 days",
-            "legal text does not cover named assistant as a connector caller: ChatGPT",
-            "legal text does not cover named assistant as a connector caller: Claude",
-            "legal text does not cover named assistant as a connector caller: Grok",
-            "legal text does not cover named assistant as a connector caller: Muse"
-          ]
+          "reasons": []
         },
         "homepageTasteApproval": {
           "status": "missing",
@@ -61,7 +52,6 @@
       "missingReceipts": [
         "agentPathCert",
         "trustSurfaceVisual",
-        "legalConsistency",
         "homepageTasteApproval"
       ]
     },
@@ -83,18 +73,9 @@
           ]
         },
         "legalConsistency": {
-          "status": "fail",
+          "status": "pass",
           "receiptId": "legal-source-check",
-          "reasons": [
-            "legal text does not cover data collected: public artist identity and release facts",
-            "legal text does not cover anonymous write action: unpublished drafts",
-            "legal text does not cover data collected: acquisition attribution",
-            "legal text does not cover retention: draft expiry after 7 days",
-            "legal text does not cover named assistant as a connector caller: ChatGPT",
-            "legal text does not cover named assistant as a connector caller: Claude",
-            "legal text does not cover named assistant as a connector caller: Grok",
-            "legal text does not cover named assistant as a connector caller: Muse"
-          ]
+          "reasons": []
         },
         "homepageTasteApproval": {
           "status": "missing",
@@ -117,7 +98,6 @@
       "missingReceipts": [
         "agentPathCert",
         "trustSurfaceVisual",
-        "legalConsistency",
         "homepageTasteApproval"
       ]
     },
@@ -139,18 +119,9 @@
           ]
         },
         "legalConsistency": {
-          "status": "fail",
+          "status": "pass",
           "receiptId": "legal-source-check",
-          "reasons": [
-            "legal text does not cover data collected: public artist identity and release facts",
-            "legal text does not cover anonymous write action: unpublished drafts",
-            "legal text does not cover data collected: acquisition attribution",
-            "legal text does not cover retention: draft expiry after 7 days",
-            "legal text does not cover named assistant as a connector caller: ChatGPT",
-            "legal text does not cover named assistant as a connector caller: Claude",
-            "legal text does not cover named assistant as a connector caller: Grok",
-            "legal text does not cover named assistant as a connector caller: Muse"
-          ]
+          "reasons": []
         },
         "homepageTasteApproval": {
           "status": "missing",
@@ -173,7 +144,6 @@
       "missingReceipts": [
         "agentPathCert",
         "trustSurfaceVisual",
-        "legalConsistency",
         "homepageTasteApproval"
       ]
     },
@@ -195,18 +165,9 @@
           ]
         },
         "legalConsistency": {
-          "status": "fail",
+          "status": "pass",
           "receiptId": "legal-source-check",
-          "reasons": [
-            "legal text does not cover data collected: public artist identity and release facts",
-            "legal text does not cover anonymous write action: unpublished drafts",
-            "legal text does not cover data collected: acquisition attribution",
-            "legal text does not cover retention: draft expiry after 7 days",
-            "legal text does not cover named assistant as a connector caller: ChatGPT",
-            "legal text does not cover named assistant as a connector caller: Claude",
-            "legal text does not cover named assistant as a connector caller: Grok",
-            "legal text does not cover named assistant as a connector caller: Muse"
-          ]
+          "reasons": []
         },
         "homepageTasteApproval": {
           "status": "missing",
@@ -229,7 +190,6 @@
       "missingReceipts": [
         "agentPathCert",
         "trustSurfaceVisual",
-        "legalConsistency",
         "homepageTasteApproval"
       ]
     }
