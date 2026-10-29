@@ -48,11 +48,9 @@
           ]
         },
         "connectorDocs": {
-          "status": "fail",
+          "status": "pass",
           "receiptId": "docs:/developers/agents",
-          "reasons": [
-            "rendered tool list hash does not match this package"
-          ]
+          "reasons": []
         },
         "listingIcons": {
           "status": "pass",
@@ -64,8 +62,7 @@
         "agentPathCert",
         "trustSurfaceVisual",
         "legalConsistency",
-        "homepageTasteApproval",
-        "connectorDocs"
+        "homepageTasteApproval"
       ]
     },
     "grok": {
@@ -107,11 +104,9 @@
           ]
         },
         "connectorDocs": {
-          "status": "fail",
+          "status": "pass",
           "receiptId": "docs:/developers/agents",
-          "reasons": [
-            "rendered tool list hash does not match this package"
-          ]
+          "reasons": []
         },
         "listingIcons": {
           "status": "pass",
@@ -123,8 +118,7 @@
         "agentPathCert",
         "trustSurfaceVisual",
         "legalConsistency",
-        "homepageTasteApproval",
-        "connectorDocs"
+        "homepageTasteApproval"
       ]
     },
     "chatgpt": {
@@ -166,11 +160,9 @@
           ]
         },
         "connectorDocs": {
-          "status": "fail",
+          "status": "pass",
           "receiptId": "docs:/developers/agents",
-          "reasons": [
-            "rendered tool list hash does not match this package"
-          ]
+          "reasons": []
         },
         "listingIcons": {
           "status": "pass",
@@ -182,8 +174,7 @@
         "agentPathCert",
         "trustSurfaceVisual",
         "legalConsistency",
-        "homepageTasteApproval",
-        "connectorDocs"
+        "homepageTasteApproval"
       ]
     },
     "claude": {
@@ -225,11 +216,9 @@
           ]
         },
         "connectorDocs": {
-          "status": "fail",
+          "status": "pass",
           "receiptId": "docs:/developers/agents",
-          "reasons": [
-            "rendered tool list hash does not match this package"
-          ]
+          "reasons": []
         },
         "listingIcons": {
           "status": "pass",
@@ -241,8 +230,7 @@
         "agentPathCert",
         "trustSurfaceVisual",
         "legalConsistency",
-        "homepageTasteApproval",
-        "connectorDocs"
+        "homepageTasteApproval"
       ]
     }
   }
