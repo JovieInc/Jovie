@@ -21,6 +21,10 @@ export interface AgentConnectorDocsProps {
 const H2 =
   'text-balance text-2xl font-semibold tracking-tight text-primary-token';
 const BODY = 'mt-4 text-pretty text-base leading-relaxed text-secondary-token';
+// Short single-paragraph answers balance their lines: text-pretty alone left
+// "code." alone on the last line of the authentication text (taste ratchet).
+const BODY_BALANCED =
+  'mt-4 text-balance text-base leading-relaxed text-secondary-token';
 
 /** Renders from the listing copy source and the generated tools/list snapshot, so it cannot drift from the registry. */
 export function AgentConnectorDocs({
@@ -91,7 +95,7 @@ export function AgentConnectorDocs({
             <h2 id='agent-docs-auth' className={H2}>
               {page.authHeading}
             </h2>
-            <p className={BODY}>{page.authText}</p>
+            <p className={BODY_BALANCED}>{page.authText}</p>
           </section>
 
           <section aria-labelledby='agent-docs-limits'>
