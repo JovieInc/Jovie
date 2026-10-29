@@ -427,11 +427,7 @@ function main() {
     return;
   }
   for (const issue of result.issues) {
-    console.log(
-      process.env.GITHUB_ACTIONS === 'true'
-        ? `::notice title=shared-ui ratchet improved::${issue}`
-        : issue
-    );
+    console.log(`::notice title=shared-ui ratchet::${issue}`);
   }
   console.log(
     `[shared-ui-visual-arbitrary] PASS — ${result.totalFindings} findings match the shrink-only baseline ` +

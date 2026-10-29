@@ -23,11 +23,8 @@
  * Rules:
  *   - Each count must NEVER exceed the baseline in
  *     ui-feel-ratchet.baseline.json.
- *   - A count BELOW its baseline passes with a notice (a `::notice` GitHub
- *     annotation in CI). An improvement must never fail a PR or eject a
- *     merge group: with several PRs each fixing violations, the combined
- *     count can sit under every committed baseline (JOV-8878 follow-up).
- *     Growth is still a hard failure against the unchanged floor; run
+ *   - A count BELOW its baseline passes with a notice (`::notice` in CI),
+ *     so improvements never fail a PR or merge group (JOV-8878). Run
  *     `--update` and commit the file to lock the gain in.
  *
  * PR time: the CI workflow (and this ratchet) only runs in the merge group,

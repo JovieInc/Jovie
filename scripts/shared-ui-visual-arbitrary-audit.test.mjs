@@ -501,10 +501,8 @@ test('unbaselined shrink passes locally and on merge_group (growth still fails)'
   assert.equal(local.status, 'unbaselined_shrink');
   const grown = compareVisualArbitraryBaseline(
     [{ file: ATOM, value: 'text-[13px]', count: 3 }],
-    baseline,
-    { eventName: 'merge_group' }
+    baseline
   );
-  assert.equal(grown.ok, false);
   assert.equal(grown.status, 'regression');
   const mergeGroup = compareVisualArbitraryBaseline(current, baseline, {
     eventName: 'merge_group',

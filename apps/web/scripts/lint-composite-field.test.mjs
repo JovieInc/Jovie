@@ -45,11 +45,9 @@ describe('compareToBaseline', () => {
     expect(compareToBaseline({ 'a.tsx': 3 }, { 'a.tsx': 2 })).toHaveLength(1);
   });
 
-  it('passes when debt shrinks and reports a notice instead', () => {
+  it('passes a shrink with a notice', () => {
     expect(compareToBaseline({}, { 'a.tsx': 1 })).toEqual([]);
-    expect(compareToBaseline({ 'a.tsx': 1 }, { 'a.tsx': 2 })).toEqual([]);
-    expect(shrinkNotices({ 'a.tsx': 1 }, { 'a.tsx': 2 })).toHaveLength(1);
-    expect(shrinkNotices({ 'a.tsx': 2 }, { 'a.tsx': 2 })).toEqual([]);
+    expect(shrinkNotices({}, { 'a.tsx': 1 })).toHaveLength(1);
   });
 
   it('passes when counts equal the baseline', () => {

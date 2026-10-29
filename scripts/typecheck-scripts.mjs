@@ -375,9 +375,7 @@ export function evaluateTypecheckBaseline({
 
   if (ok) {
     if (staleEntries.length > 0) {
-      const notice =
-        `[${prefix}] baseline can tighten: ${staleEntries.length} (file, error-code) group(s) ` +
-        `no longer produce the baselined errors. Run \`${updateCommand}\` and commit to lock the gain in.`;
+      const notice = `[${prefix}] ${staleEntries.length} baselined group(s) shrank; run \`${updateCommand}\` to lock it in.`;
       console.log(
         process.env.GITHUB_ACTIONS === 'true'
           ? `::notice title=${prefix} improved::${notice}`
