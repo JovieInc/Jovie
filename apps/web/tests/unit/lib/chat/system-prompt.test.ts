@@ -137,7 +137,6 @@ describe('buildSystemPrompt', () => {
       aiCanUseTools: true,
       aiWeeklyMessageLimit: 70,
       accountContext: {
-        email: 'tim@jov.ie',
         plan: 'pro',
         displayPlan: 'Artist Presence',
         isPro: true,
@@ -168,7 +167,8 @@ describe('buildSystemPrompt', () => {
     });
 
     expect(prompt).toContain('## Account & Access');
-    expect(prompt).toContain('- **Account Email:** tim@jov.ie');
+    expect(prompt).not.toContain('tim@jov.ie');
+    expect(prompt).not.toContain('Account Email');
     expect(prompt).toContain('- **Plan:** Artist Presence');
     expect(prompt).toContain('- **Merch Creation:** Available');
     expect(prompt).toContain(
@@ -184,7 +184,6 @@ describe('buildSystemPrompt', () => {
       aiCanUseTools: false,
       aiWeeklyMessageLimit: 10,
       accountContext: {
-        email: 'tim@jov.ie',
         plan: 'free',
         displayPlan: 'Unverified',
         isPro: false,

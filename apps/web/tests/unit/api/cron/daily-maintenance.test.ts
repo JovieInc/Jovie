@@ -19,6 +19,14 @@ const mockRunMusicResolverParityCorpus = vi.hoisted(() => vi.fn());
 const mockReadShadowParitySummary = vi.hoisted(() => vi.fn());
 const mockCaptureError = vi.hoisted(() => vi.fn());
 
+vi.mock('@/lib/agent-acquisition/draft-purge.server', () => ({
+  purgeExpiredAgentDrafts: vi.fn(async () => ({
+    deleted: 0,
+    retentionDays: 30,
+    oldestOverdueDays: null,
+  })),
+}));
+
 vi.mock('@/lib/ai/gateway-spend', () => ({
   recordDailyGatewaySpend: mockRecordDailyGatewaySpend,
 }));
