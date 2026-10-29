@@ -776,9 +776,9 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
         await main({
           args: ['--with-warnings'],
           env,
-          request: async (...a) => {
+          request: async path => {
             if (reads++ === 0) throw quota(T0 + 5_000);
-            return inner(...a);
+            return inner(path);
           },
           log: x => recovered.push(x),
           now: () => T0,
