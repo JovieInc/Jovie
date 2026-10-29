@@ -392,9 +392,9 @@
       "remainingScope": "Certified local source; continuous perceptual refinement is owned by JOV-8101.",
       "evidence": {
         "kind": "certification",
-        "at": "2026-10-23T22:18:41.922Z",
-        "ref": "docs/screenshots/jov-8882-pricing-renewal/README.md. Merged with PR #22849: home, section, blog, and artist-profile widths use one .public-container token; pricing section and chart dropped the 64rem cap; /pricing edges stayed x 71-1369 at 1440 and x 24-366 at 390 with no horizontal overflow. JOV-8882 launch-hero selectors in the shared stylesheet match no /pricing elements.",
-        "sourceDigest": "8e04962d231d816b3936aaef2002e05d3d28994daa8a970035b91ce66eca8536"
+        "at": "2026-10-29T08:57:42.000Z",
+        "ref": "docs/screenshots/mvp-pricing-audit-1029/README.md. PR #23570 replaced the false comparison row (fan capture capped at 100 on Free) with true certified rows; layout unchanged; pricing e2e 11/11 at 320-1440, no horizontal overflow at 1440 and 390.",
+        "sourceDigest": "70f0464228ad3563807be5b4d1ed710b975459b963c69b3003590daff02dfd9b"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },
