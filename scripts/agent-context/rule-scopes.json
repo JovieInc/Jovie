@@ -58,7 +58,7 @@
       "workers/**",
       "tools/**"
     ],
-    "bodySha256": "46fa336beeef6a6d9bfba990205368a7af77f17a50a405ef4451d303bf706a81"
+    "bodySha256": "21ac48cde4ff6bd61ba93371dba227f70228ef55395b5a464da8164e7a95ea7c"
   },
   {
     "file": ".claude/rules/gstack.md",
