@@ -19,7 +19,6 @@
  *
  * Platforms with no known image CDN use an empty array.
  */
-import apiProviders from '@jovie/api-client/providers.json';
 import { ALL_PLATFORMS } from './data';
 
 export const PLATFORM_CDN_DOMAINS: Record<string, readonly string[]> = {
@@ -91,9 +90,6 @@ export const INFRASTRUCTURE_MEDIA_DOMAINS: readonly string[] = [
  * (not `img-src` or `media-src`). Only include hosts the browser fetches
  * directly — server-side API calls do not need entries here.
  */
-export const INFRASTRUCTURE_WEBSOCKET_DOMAINS: readonly string[] =
-  apiProviders.providers.elevenlabs.hosts;
-
 export const INFRASTRUCTURE_CONNECT_DOMAINS: readonly string[] = [
   // Vercel dashboard/API (chat surface deployment status, toolbar)
   'vercel.com',
@@ -199,12 +195,10 @@ export function getCspMediaSrcDomains(): string[] {
 }
 
 /**
- * Returns CSP connect-src entries. Fetch hosts are `https://`. Realtime
- * websocket hosts are `wss://` so the browser can open the provider socket.
- * Used by content-security-policy.ts.
+ * Returns fetch hosts prefixed with `https://` for CSP connect-src.
+ * Realtime websocket hosts stay in content-security-policy.ts. This module
+ * is imported by client image helpers, so it must not load the provider registry.
  */
 export function getCspConnectSrcDomains(): string[] {
-  return [...new Set(INFRASTRUCTURE_CONNECT_DOMAINS)]
-    .map(d => `https://${d}`)
-    .concat(INFRASTRUCTURE_WEBSOCKET_DOMAINS.map(d => `wss://${d}`));
+  return [...new Set(INFRASTRUCTURE_CONNECT_DOMAINS)].map(d => `https://${d}`);
 }
