@@ -1014,7 +1014,7 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
         encoding="utf-8"
     )
     assert "schedule:" not in nightly
-    assert "push:" in nightly
+    assert "repository_dispatch:\n    types: [clock_nightly_tests]" in nightly
     screenshot_triggers = screenshots.split("\non:\n", 1)[1].split(
         "\npermissions:", 1
     )[0]
@@ -1025,20 +1025,18 @@ def test_deep_lanes_are_event_driven_and_bounded() -> None:
 
 
 def test_full_matrix_supersedes_stale_runs_cleanly() -> None:
-    """Main pushes outpace the matrix. The in-progress run must finish and
-    report a real conclusion. GitHub keeps a single pending successor.
-    Path filters stay off so an external sweep cannot kill a non-member
-    mid-test (JOV-7167, JOV-7569). No cron: the lane stays evidence-driven."""
+    """The in-progress run must finish and report a real conclusion; GitHub
+    keeps a single pending successor (JOV-7167, JOV-7569). The matrix runs
+    daily from the Gem lanes clock (waste audit 2026-10-29: every-push runs
+    never passed and spent ~110k runner-minutes a month), never a GitHub cron."""
     workflow = (WORKFLOWS / "e2e-full-matrix.yml").read_text(encoding="utf-8")
 
     triggers = workflow.split("\non:\n", 1)[1].split("\npermissions:", 1)[0]
-    push_trigger = triggers.split("  push:\n", 1)[1].split(
-        "  workflow_dispatch:\n", 1
-    )[0]
     concurrency = workflow.split("\nconcurrency:\n", 1)[1].split(
         "\njobs:\n", 1
     )[0]
-    assert "paths:" not in push_trigger
+    assert "  repository_dispatch:\n    types: [clock_e2e_full_matrix]\n" in triggers
+    assert "  push:\n" not in triggers
     assert "schedule:" not in triggers
     assert "group: e2e-full-matrix-" in concurrency
     assert "github.event_name" in concurrency

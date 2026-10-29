@@ -5708,7 +5708,7 @@ describe('full matrix authenticated release fixtures', () => {
     );
     expect(seedStep).toContain("E2E_USE_TEST_AUTH_BYPASS: '1'");
     expect(seedStep).toContain(
-      "github.event_name == 'push' || github.event.inputs.test_filter == ''"
+      "github.event_name == 'repository_dispatch' || github.event.inputs.test_filter == ''"
     );
     const seedIndex = job.indexOf(
       '- name: Seed authenticated release fixtures'
