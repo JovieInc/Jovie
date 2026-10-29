@@ -12,16 +12,17 @@ const hoisted = vi.hoisted(() => ({
 }));
 
 function chain(result: unknown[]) {
-  const node: Record<string, unknown> = {
-    from: () => node,
-    innerJoin: () => node,
-    where: (clause: unknown) => {
-      hoisted.wheres.push(clause);
-      return node;
-    },
-    // biome-ignore lint/suspicious/noThenProperty: awaitable query-builder double
-    then: (resolve: (value: unknown[]) => unknown) => resolve(result),
-  };
+  const node: Promise<unknown[]> & Record<string, unknown> = Object.assign(
+    Promise.resolve(result),
+    {
+      from: () => node,
+      innerJoin: () => node,
+      where: (clause: unknown) => {
+        hoisted.wheres.push(clause);
+        return node;
+      },
+    }
+  );
   return node;
 }
 
