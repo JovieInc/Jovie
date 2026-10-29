@@ -133,7 +133,7 @@ function renderSection(section: PageSpecSection) {
           <div className='flex max-w-3xl flex-col items-start gap-5'>
             <h1
               id={labelId}
-              className='marketing-type-display'
+              className='marketing-type-display text-balance'
               data-wrap='editorial-title'
             >
               {section.title}
@@ -184,7 +184,9 @@ function renderSection(section: PageSpecSection) {
                       strokeWidth={1.5}
                     />
                   ) : null}
-                  <h3 className='text-lg font-medium'>{item.title}</h3>
+                  <h3 className='text-balance text-lg font-medium'>
+                    {item.title}
+                  </h3>
                   <p className='text-secondary-token'>{item.body}</p>
                 </li>
               );
