@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/unit/onboarding/OnboardingToolArtifacts.test.tsx
+
 import { Button } from '@jovie/ui';
 import {
   AlertCircle,
@@ -870,7 +872,7 @@ export function OnboardingSocialLinkCard({
             />
           </OnboardingToolField>
           <p className='mt-1.5 text-xs leading-5 text-secondary-token'>
-            {parseHint ?? host ?? 'Paste the full URL fans already use.'}
+            {parseHint ?? host ?? 'Paste the full link people already use.'}
           </p>
           {onAttachAccount ? (
             <Button

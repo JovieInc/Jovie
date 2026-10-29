@@ -31,12 +31,18 @@ import {
   MAX_OPEN_COHORT_LEARNINGS,
 } from '@/lib/waitlist/cohort-learnings';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
+import { readWaitlistInviteGates } from '@/lib/waitlist/profile-certification.server';
+import { scheduleProfileCertification } from '@/lib/waitlist/profile-certification-runner.server';
 import {
   getWaitlistSettings,
   tryReserveAutoAcceptSlot,
 } from '@/lib/waitlist/settings';
 
 const AUTO_ACCEPT_ELIGIBLE_STATUSES = ['new', 'waitlisted'] as const;
+
+/** Limits for certifying held candidates from a drain (the event fallback). */
+const AUTO_ACCEPT_RECERTIFY_AFTER_MS = 24 * 60 * 60 * 1000;
+const AUTO_ACCEPT_MAX_RECERTIFY_PER_DRAIN = 10;
 
 export interface WaitlistAutoAcceptResult {
   enabled: boolean;
@@ -45,6 +51,8 @@ export interface WaitlistAutoAcceptResult {
   skipped: number;
   failed: number;
   capacityRemaining: number;
+  /** Candidates held because their profile has no passing certification. */
+  uncertified?: number;
   /** The existing queue remains held while readiness or learning evidence is missing. */
   pausedReason?:
     | 'open_learnings'
@@ -202,6 +210,8 @@ export async function runWaitlistAutoAccept(
     .limit(limit);
 
   let approved = 0;
+  let uncertified = 0;
+  let recertifyScheduled = 0;
   let skipped = 0;
   let failed = 0;
   let pausedReason: WaitlistAutoAcceptResult['pausedReason'];
@@ -211,6 +221,10 @@ export async function runWaitlistAutoAccept(
     getBlockedExistingUserEmails(candidateEmails),
   ]);
 
+  const certifiedEntries = await readWaitlistInviteGates(
+    candidates.map(candidate => candidate.id)
+  );
+
   for (const candidate of candidates) {
     const normalizedEmail = candidate.email.trim().toLowerCase();
     if (
@@ -218,6 +232,34 @@ export async function runWaitlistAutoAccept(
       suppressedEmailHashes.has(hashEmail(candidate.email)) ||
       blockedUserEmails.has(normalizedEmail)
     ) {
+      skipped += 1;
+      continue;
+    }
+
+    // Waitlist gate (Tim, 2026-10-29): invite only a person whose own
+    // profile certified. Anything else is certified now (event), and its
+    // remediation is dispatched; the next drain admits it once it passes.
+    const gate = certifiedEntries.get(candidate.id);
+    if (!gate?.certified) {
+      // A failed receipt already dispatched its remediation, which
+      // re-certifies on its own completion event. Re-certify here only when
+      // there is no receipt or it is stale, and boundedly per drain.
+      const stale =
+        !gate?.certifiedAt ||
+        now.getTime() - Date.parse(gate.certifiedAt) >
+          AUTO_ACCEPT_RECERTIFY_AFTER_MS;
+      if (
+        gate?.profileId &&
+        stale &&
+        recertifyScheduled < AUTO_ACCEPT_MAX_RECERTIFY_PER_DRAIN
+      ) {
+        recertifyScheduled += 1;
+        scheduleProfileCertification({
+          profileId: gate.profileId,
+          trigger: 'auto_accept',
+        });
+      }
+      uncertified += 1;
       skipped += 1;
       continue;
     }
@@ -323,6 +365,7 @@ export async function runWaitlistAutoAccept(
     skipped,
     failed,
     capacityRemaining: Math.max(0, capacityRemaining - approved),
+    uncertified,
     ...(pausedReason ? { pausedReason } : {}),
   };
 }

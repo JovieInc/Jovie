@@ -13,10 +13,14 @@ const mocks = vi.hoisted(() => ({
     return true;
   }),
   flag: vi.fn(() => true),
+  certify: vi.fn(),
 }));
 
 vi.mock('server-only', () => ({}));
 vi.mock('@/lib/db', () => ({ db: {} }));
+vi.mock('@/lib/waitlist/profile-certification.server', () => ({
+  certifyProfile: mocks.certify,
+}));
 vi.mock('@/lib/discography/spotify-import', () => ({
   syncReleasesFromSpotify: mocks.sync,
 }));
@@ -86,6 +90,11 @@ describe('runOnboardingCatalogImport', () => {
       'releases_synced',
       expect.objectContaining({ profileId: 'profile_1', imported: 22 })
     );
+    // Import completion is the certification event for the waitlist gate.
+    expect(mocks.certify).toHaveBeenCalledWith({
+      profileId: 'profile_1',
+      trigger: 'catalog_import',
+    });
   });
 
   it('reports an empty import instead of silently succeeding', async () => {
@@ -109,6 +118,11 @@ describe('runOnboardingCatalogImport', () => {
       expect.objectContaining({ creatorProfileId: 'profile_1' })
     );
     expect(mocks.discovery).not.toHaveBeenCalled();
+    // An empty import still certifies, so the failure reaches an operator.
+    expect(mocks.certify).toHaveBeenCalledWith({
+      profileId: 'profile_1',
+      trigger: 'catalog_import',
+    });
   });
 
   it('keeps importing releases when DSP discovery throws', async () => {

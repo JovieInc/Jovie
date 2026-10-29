@@ -56,6 +56,7 @@ export async function runOnboardingCatalogImport(
         spotifyArtistId: input.spotifyArtistId,
       }
     );
+    await certifyAfterImport(input.profileId);
     return { imported: 0, total: result.total };
   }
 
@@ -104,7 +105,22 @@ export async function runOnboardingCatalogImport(
     }
   }
 
+  await certifyAfterImport(input.profileId);
   return { imported: result.imported, total: result.total };
+}
+
+/** Import completion is a certification event (waitlist gate). Never throws. */
+async function certifyAfterImport(profileId: string): Promise<void> {
+  try {
+    const { certifyProfile } = await import(
+      '@/lib/waitlist/profile-certification.server'
+    );
+    await certifyProfile({ profileId, trigger: 'catalog_import' });
+  } catch (error) {
+    await captureError('Post-import profile certification failed', error, {
+      creatorProfileId: profileId,
+    });
+  }
 }
 
 /**
