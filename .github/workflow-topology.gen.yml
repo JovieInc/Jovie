@@ -1513,6 +1513,18 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:mine
     jobCount: 1
+  - name: Wins Ledger
+    path: .github/workflows/wins-ledger.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request_target
+      - workflow_dispatch
+    terminalReceipt: job:ingest
+    jobCount: 1
 edges:
   - from: Production Continuity Guard
     to: Automation Liveness
