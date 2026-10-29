@@ -11,6 +11,7 @@ import {
 } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 import {
+  isReleaseEmailCanaryRecipient,
   type ReleaseEmailCanaryScope,
   readReleaseEmailCanaryScope,
 } from '@/lib/canaries/release-email';
@@ -167,14 +168,6 @@ async function scheduleNotificationsForRelease(
       drizzleSql`${notificationSubscriptions.confirmedAt} IS NOT NULL`,
       drizzleSql`(${notificationSubscriptions.preferences}->>'releaseDay')::boolean = true`,
     ];
-    if (options?.canaryScope) {
-      // Canary carve-out: only the reserved synthetic inbox, never a real subscriber.
-      conditions.push(
-        eq(notificationSubscriptions.channel, 'email'),
-        drizzleSql`lower(${notificationSubscriptions.email}) = ${options.canaryScope.recipientEmail}`
-      );
-    }
-
     if (lastId) {
       conditions.push(gt(notificationSubscriptions.id, lastId));
     }
@@ -194,6 +187,13 @@ async function scheduleNotificationsForRelease(
       .limit(SUBSCRIBER_PAGE_SIZE);
 
     for (const subscriber of page) {
+      // Canary carve-out: only the reserved synthetic inbox, never a real subscriber.
+      if (
+        options?.canaryScope &&
+        !isReleaseEmailCanaryRecipient(options.canaryScope, subscriber)
+      ) {
+        continue;
+      }
       const campaignId = options?.campaignId ?? null;
       const segment = options?.segment ?? null;
       const dedupKey = campaignId

@@ -19,7 +19,6 @@ import {
   releaseEmailCanaryReceiptSchema,
 } from '@/lib/canaries/release-email';
 import { db } from '@/lib/db';
-import { notificationSubscriptions } from '@/lib/db/schema/analytics';
 import { users } from '@/lib/db/schema/auth';
 import { fanReleaseNotifications } from '@/lib/db/schema/dsp-enrichment';
 import { inboundEmails } from '@/lib/db/schema/inbox';
@@ -84,18 +83,12 @@ async function observePendingRun(
       sentAt: fanReleaseNotifications.sentAt,
     })
     .from(fanReleaseNotifications)
-    .innerJoin(
-      notificationSubscriptions,
-      eq(
-        notificationSubscriptions.id,
-        fanReleaseNotifications.notificationSubscriptionId
-      )
-    )
+    // The canary release is scheduled only for the canary inbox: the
+    // scheduler and sender carve-outs admit no other recipient.
     .where(
       and(
         eq(fanReleaseNotifications.releaseId, pending.releaseId),
-        eq(fanReleaseNotifications.creatorProfileId, scope.creatorProfileId),
-        drizzleSql`lower(${notificationSubscriptions.email}) = ${scope.recipientEmail}`
+        eq(fanReleaseNotifications.creatorProfileId, scope.creatorProfileId)
       )
     )
     .orderBy(desc(fanReleaseNotifications.createdAt))
