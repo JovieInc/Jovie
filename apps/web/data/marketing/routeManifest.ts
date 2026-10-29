@@ -908,6 +908,12 @@ export const MARKETING_ROUTE_MANIFEST: readonly RouteManifestEntry[] = [
         'split-claim-card'
       ),
       approvedVariantBinding(
+        'apps/web/components/marketing/ConnectedComponentsGallery.tsx',
+        'product-gallery',
+        'release-rail',
+        'connected-components'
+      ),
+      approvedVariantBinding(
         'apps/web/app/(marketing)/product/ProductLanding.tsx',
         'cta',
         'editorial-search'

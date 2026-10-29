@@ -17,6 +17,7 @@
     "backfill:collaborator-profiles": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-collaborator-profiles.ts",
     "agent-distribution:generate": "NODE_OPTIONS=--conditions=react-server tsx scripts/generate-agent-distribution.ts",
     "agent-distribution:check": "NODE_OPTIONS=--conditions=react-server tsx scripts/generate-agent-distribution.ts --check",
+    "agent-path:cert": "NODE_OPTIONS=--conditions=react-server tsx scripts/agent-path-cert.ts",
     "validate-env": "tsx scripts/validate-env.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
     "check:stripe-price-ids": "node scripts/check-stripe-price-ids.mjs",
