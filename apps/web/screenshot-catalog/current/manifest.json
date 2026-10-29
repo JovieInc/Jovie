@@ -514,6 +514,20 @@
     "publicExportPath": "tim-white-profile-presave-phone.png"
   },
   {
+    "id": "template-profile-live-mobile",
+    "title": "Template Profile — Latest Release",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/tim-white-profile?archetype=template&capture=hero",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-10-29T06:22:17.544Z",
+    "gitSha": null,
+    "imagePath": "template-profile-live-mobile.png",
+    "publicExportPath": "template-profile-live-phone.png"
+  },
+  {
     "id": "release-presave-mobile",
     "title": "Release Presave Mobile",
     "group": "marketing",
