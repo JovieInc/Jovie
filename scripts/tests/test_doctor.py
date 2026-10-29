@@ -1950,6 +1950,27 @@ class SloFeedTest(unittest.TestCase):
             with mock.patch.object(doctor.subprocess, "run", return_value=bad()):
                 self.assertEqual(doctor.fetch_slo(host, lane), snapshot)
 
+    def test_fetch_waste_keeps_the_summary_and_drops_candidates(self):
+        import unittest.mock as mock
+        with tempfile.TemporaryDirectory() as tmp:
+            host = type("Host", (), {"state": Path(tmp)})()
+            lane = type("Lane", (), {"load_github_env": staticmethod(lambda: None)})
+            snapshot = {"schema": "jovie-waste-sweep/v1", "measuredAt": "t", "sha": "abc", "score": 9,
+                        "knip": {"unusedFiles": 1}, "agentContext": {"alwaysLoadedBytes": 100},
+                        "ci": {"wallMinutes": 50, "alwaysRedMinutes": 5},
+                        "candidates": [{"path": "x"}]}
+            ok = type("R", (), {"returncode": 0, "stdout": json.dumps(snapshot)})
+            with mock.patch.object(doctor.subprocess, "run", return_value=ok()):
+                waste = doctor.fetch_waste(host, lane)
+            self.assertEqual(waste["score"], 9)
+            self.assertEqual(waste["alwaysLoadedContextBytes"], 100)
+            self.assertEqual(waste["ciAlwaysRedMinutes"], 5)
+            self.assertNotIn("candidates", waste)
+            bad = type("R", (), {"returncode": 1, "stdout": ""})
+            (Path(tmp) / "waste.json").unlink()
+            with mock.patch.object(doctor.subprocess, "run", return_value=bad()):
+                self.assertIsNone(doctor.fetch_waste(host, lane))
+
 
 class AccountAttributionTest(unittest.TestCase):
     NOW = 1_000_000

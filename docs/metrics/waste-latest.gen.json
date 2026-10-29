@@ -1,0 +1,754 @@
+{
+  "schema": "jovie-waste-sweep/v1",
+  "measuredAt": "2026-10-29T17:31:29.466Z",
+  "sha": "9813d6596ab69664a3181a88889d04330041c4fc",
+  "score": 11516,
+  "knip": {
+    "unusedFiles": 269,
+    "unusedFileBytes": 877860,
+    "unusedExports": 3768,
+    "unusedTypes": 3053,
+    "unusedEnumMembers": 2,
+    "duplicateExports": 35,
+    "unusedDependencies": 1,
+    "unlistedDependencies": 63,
+    "unresolvedImports": 51
+  },
+  "agentContext": {
+    "alwaysLoadedBytes": 37807,
+    "entryBytes": {
+      "CLAUDE.md": 5990,
+      "canon/OPERATING_SYSTEM.md": 12036
+    },
+    "skills": 56,
+    "skillListingBytes": 19781,
+    "unscopedRules": [],
+    "ruleBytesTotal": 267223,
+    "ruleBytesPerEdit": {
+      "webComponent": 85707,
+      "webLib": 41853,
+      "workflow": 77554
+    },
+    "largestRules": [
+      {
+        "path": ".claude/rules/ui.md",
+        "bytes": 42230
+      },
+      {
+        "path": ".claude/rules/release.md",
+        "bytes": 33088
+      },
+      {
+        "path": ".claude/rules/code-style.md",
+        "bytes": 27005
+      },
+      {
+        "path": ".claude/rules/gstack.md",
+        "bytes": 16370
+      },
+      {
+        "path": ".claude/rules/environment.md",
+        "bytes": 15288
+      }
+    ]
+  },
+  "dependencies": {
+    "packages": 2720,
+    "multiVersionPackages": 497,
+    "extraVersions": 718,
+    "top": [
+      {
+        "name": "commander",
+        "versions": [
+          "12.1.0",
+          "13.1.0",
+          "14.0.3",
+          "2.20.3",
+          "5.1.0",
+          "6.2.1",
+          "7.2.0",
+          "8.3.0",
+          "9.5.0"
+        ]
+      },
+      {
+        "name": "fs-extra",
+        "versions": [
+          "10.1.0",
+          "11.1.0",
+          "11.1.1",
+          "11.4.0",
+          "11.4.1",
+          "7.0.1",
+          "8.1.0",
+          "9.1.0"
+        ]
+      },
+      {
+        "name": "@openai/codex",
+        "versions": [
+          "0.144.6",
+          "0.144.6-darwin-arm64",
+          "0.144.6-darwin-x64",
+          "0.144.6-linux-arm64",
+          "0.144.6-linux-x64",
+          "0.144.6-win32-arm64",
+          "0.144.6-win32-x64"
+        ]
+      },
+      {
+        "name": "type-fest",
+        "versions": ["0.13.1", "0.20.2", "0.21.3", "0.7.1", "4.41.0", "5.10.0"]
+      },
+      {
+        "name": "@babel/traverse",
+        "versions": ["7.29.10", "7.29.8", "8.0.4", "8.0.6", "8.0.7"]
+      },
+      {
+        "name": "@emnapi/runtime",
+        "versions": ["1.10.0", "1.11.0", "1.11.2", "1.11.3", "1.9.2"]
+      },
+      {
+        "name": "@oxc-project/types",
+        "versions": ["0.110.0", "0.127.0", "0.148.0", "0.152.0", "0.153.0"]
+      },
+      {
+        "name": "@types/node",
+        "versions": ["14.18.63", "18.19.130", "20.11.0", "24.19.2", "26.6.5"]
+      },
+      {
+        "name": "lru-cache",
+        "versions": ["10.4.3", "11.5.3", "5.1.1", "6.0.0", "7.18.3"]
+      },
+      {
+        "name": "mute-stream",
+        "versions": ["0.0.7", "0.0.8", "1.0.0", "2.0.0", "3.0.0"]
+      },
+      {
+        "name": "semver",
+        "versions": ["5.7.2", "6.3.1", "7.5.4", "7.7.4", "7.8.5"]
+      },
+      {
+        "name": "string-width",
+        "versions": ["2.1.1", "4.2.3", "5.1.2", "7.2.0", "8.2.2"]
+      },
+      {
+        "name": "@ai-sdk/gateway",
+        "versions": ["3.0.218", "4.0.117", "4.0.120", "4.0.85"]
+      },
+      {
+        "name": "@ai-sdk/provider",
+        "versions": ["3.0.19", "4.0.17", "4.0.30", "4.0.31"]
+      },
+      {
+        "name": "@ai-sdk/provider-utils",
+        "versions": ["4.0.61", "5.0.43", "5.0.63", "5.0.64"]
+      }
+    ],
+    "divergentDirect": [
+      {
+        "name": "typescript",
+        "specs": {
+          "apps/console/package.json": "6.0.3",
+          "apps/desktop/package.json": "5.7.0",
+          "apps/docs/package.json": "6.0.3",
+          "apps/eve-pilot/package.json": "6.0.3",
+          "apps/macos/package.json": "6.0.3",
+          "apps/ovie/package.json": "6.0.3",
+          "apps/should-i-make/package.json": "6.0.3",
+          "apps/web/package.json": "6.0.3",
+          "package.json": "6.0.3",
+          "packages/action-contracts/package.json": "6.0.3",
+          "packages/api-client/package.json": "6.0.3",
+          "packages/audio-contracts/package.json": "6.0.3",
+          "packages/auth-routing/package.json": "6.0.3",
+          "packages/copy/package.json": "6.0.3",
+          "packages/jovie-cli/package.json": "6.0.3",
+          "packages/release-channel-contracts/package.json": "6.0.3",
+          "packages/research/package.json": "6.0.3",
+          "packages/ui/package.json": "6.0.3",
+          "workers/canary-otp/package.json": "5.8.2",
+          "workers/observability-ingest/package.json": "5.8.2"
+        }
+      },
+      {
+        "name": "vercel",
+        "specs": {
+          "apps/eve-pilot/package.json": "59.23.2",
+          "package.json": "56.3.2"
+        }
+      },
+      {
+        "name": "vite",
+        "specs": {
+          "apps/eve-pilot/package.json": "8.1.6",
+          "apps/web/package.json": "8.3.4",
+          "packages/ui/package.json": "8.3.4"
+        }
+      }
+    ]
+  },
+  "ci": {
+    "windowDays": 30,
+    "workflows": 109,
+    "wallMinutes": 471800,
+    "alwaysRed": [
+      {
+        "path": ".github/workflows/claim-checkout-dogfood.yml",
+        "wallMinutes": 3179
+      },
+      {
+        "path": ".github/workflows/visual-a11y.yml",
+        "wallMinutes": 2376
+      }
+    ],
+    "alwaysRedMinutes": 5555,
+    "mostlyCancelled": [
+      {
+        "path": ".github/workflows/test-coverage-audit.yml",
+        "wallMinutes": 41153,
+        "cancelled": 76,
+        "sampled": 100
+      },
+      {
+        "path": ".github/workflows/e2e-full-matrix.yml",
+        "wallMinutes": 34505,
+        "cancelled": 71,
+        "sampled": 100
+      },
+      {
+        "path": ".github/workflows/nightly-tests.yml",
+        "wallMinutes": 25507,
+        "cancelled": 93,
+        "sampled": 100
+      },
+      {
+        "path": ".github/workflows/mutation-diff.yml",
+        "wallMinutes": 7703,
+        "cancelled": 82,
+        "sampled": 100
+      },
+      {
+        "path": ".github/workflows/mac-lane.yml",
+        "wallMinutes": 439,
+        "cancelled": 77,
+        "sampled": 100
+      }
+    ],
+    "mostlyCancelledMinutes": 109307,
+    "neverRan": [
+      ".github/workflows/canary-health-gate.yml",
+      ".github/workflows/actionlint.yml",
+      ".github/workflows/ios-signing-bootstrap.yml",
+      ".github/workflows/observability-issue.yml",
+      ".github/workflows/runner-autoscaler-canary.yml",
+      ".github/workflows/fixed-runner-canary.yml",
+      ".github/workflows/production-release.yml",
+      ".github/workflows/pr-preparation-canary.yml",
+      ".github/workflows/jovie-agent-release.yml",
+      ".github/workflows/cli-chaos.yml",
+      ".github/workflows/mac-lane-route.yml",
+      ".github/workflows/macos-ci.yml"
+    ],
+    "neverFailed": [
+      {
+        "path": ".github/workflows/security.yml",
+        "wallMinutes": 22147
+      },
+      {
+        "path": ".github/workflows/codeql.yml",
+        "wallMinutes": 10104
+      },
+      {
+        "path": ".github/workflows/linear-sync-on-merge.yml",
+        "wallMinutes": 9720
+      },
+      {
+        "path": ".github/workflows/tsc-cache-warm.yml",
+        "wallMinutes": 4535
+      },
+      {
+        "path": ".github/workflows/next-build-cache-warm.yml",
+        "wallMinutes": 3558
+      },
+      {
+        "path": ".github/workflows/runner-health-monitor.yml",
+        "wallMinutes": 2093
+      },
+      {
+        "path": ".github/workflows/source-admission-review-signal.yml",
+        "wallMinutes": 1848
+      },
+      {
+        "path": ".github/workflows/private-data-guard.yml",
+        "wallMinutes": 1815
+      },
+      {
+        "path": ".github/workflows/auto-ready-agent-drafts.yml",
+        "wallMinutes": 1532
+      },
+      {
+        "path": ".github/workflows/pr-size-guard-label-override.yml",
+        "wallMinutes": 1398
+      },
+      {
+        "path": ".github/workflows/summer-eve-pin.yml",
+        "wallMinutes": 1392
+      },
+      {
+        "path": ".github/workflows/neon-ephemeral-branch-cleanup.yml",
+        "wallMinutes": 1322
+      },
+      {
+        "path": ".github/workflows/codeowners-drift.yml",
+        "wallMinutes": 1237
+      },
+      {
+        "path": ".github/workflows/vercel-preview-cleanup.yml",
+        "wallMinutes": 1201
+      },
+      {
+        "path": ".github/workflows/repository-docs-shadow.yml",
+        "wallMinutes": 1181
+      },
+      {
+        "path": ".github/workflows/test-flakiness-report.yml",
+        "wallMinutes": 1170
+      },
+      {
+        "path": ".github/workflows/cost-anomaly-gate.yml",
+        "wallMinutes": 1158
+      },
+      {
+        "path": ".github/workflows/design-governance.yml",
+        "wallMinutes": 1152
+      },
+      {
+        "path": ".github/workflows/fork-pr-gate.yml",
+        "wallMinutes": 1130
+      },
+      {
+        "path": ".github/workflows/quality-gap-finder.yml",
+        "wallMinutes": 1055
+      },
+      {
+        "path": ".github/workflows/internal-review.yml",
+        "wallMinutes": 1052
+      },
+      {
+        "path": ".github/workflows/pen-token-parity.yml",
+        "wallMinutes": 979
+      },
+      {
+        "path": ".github/workflows/help-center-recertification.yml",
+        "wallMinutes": 968
+      },
+      {
+        "path": ".github/workflows/desktop-release.yml",
+        "wallMinutes": 947
+      },
+      {
+        "path": ".github/workflows/merge-queue-green-enroll.yml",
+        "wallMinutes": 944
+      },
+      {
+        "path": ".github/workflows/design-gate.yml",
+        "wallMinutes": 650
+      },
+      {
+        "path": ".github/workflows/actions-cache-gc.yml",
+        "wallMinutes": 603
+      },
+      {
+        "path": ".github/workflows/runner-heartbeat.yml",
+        "wallMinutes": 498
+      },
+      {
+        "path": ".github/workflows/unstack-merged-parent.yml",
+        "wallMinutes": 298
+      },
+      {
+        "path": ".github/workflows/m2-revenue-path-canary.yml",
+        "wallMinutes": 153
+      },
+      {
+        "path": ".github/workflows/shipping-origin.yml",
+        "wallMinutes": 62
+      },
+      {
+        "path": ".github/workflows/golden-path-prod-autofix.yml",
+        "wallMinutes": 57
+      },
+      {
+        "path": ".github/workflows/component-certificate.yml",
+        "wallMinutes": 34
+      }
+    ],
+    "top": [
+      {
+        "path": ".github/workflows/production-controller.yml",
+        "runs": 2494,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 3,
+          "success": 87,
+          "failure": 8,
+          "skipped": 2
+        },
+        "wallMinutes": 64946
+      },
+      {
+        "path": ".github/workflows/test-coverage-audit.yml",
+        "runs": 1575,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 2,
+          "cancelled": 76,
+          "success": 14,
+          "failure": 8
+        },
+        "wallMinutes": 41153
+      },
+      {
+        "path": ".github/workflows/staging-controller.yml",
+        "runs": 2454,
+        "sampled": 100,
+        "conclusions": {
+          "failure": 3,
+          "success": 97
+        },
+        "wallMinutes": 37739
+      },
+      {
+        "path": ".github/workflows/e2e-full-matrix.yml",
+        "runs": 2218,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 2,
+          "cancelled": 71,
+          "failure": 27
+        },
+        "wallMinutes": 34505
+      },
+      {
+        "path": ".github/workflows/source-validation.yml",
+        "runs": 2500,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 6,
+          "failure": 47,
+          "success": 47
+        },
+        "wallMinutes": 30735
+      },
+      {
+        "path": ".github/workflows/ci.yml",
+        "runs": 2500,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 5,
+          "success": 44,
+          "cancelled": 31,
+          "failure": 20
+        },
+        "wallMinutes": 27803
+      },
+      {
+        "path": ".github/workflows/nightly-testing-agent.yml",
+        "runs": 1299,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 1,
+          "success": 54,
+          "cancelled": 37,
+          "failure": 8
+        },
+        "wallMinutes": 26357
+      },
+      {
+        "path": ".github/workflows/nightly-tests.yml",
+        "runs": 1471,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 1,
+          "cancelled": 93,
+          "failure": 3,
+          "success": 3
+        },
+        "wallMinutes": 25507
+      },
+      {
+        "path": ".github/workflows/security.yml",
+        "runs": 2472,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 2,
+          "success": 98
+        },
+        "wallMinutes": 22147
+      },
+      {
+        "path": ".github/workflows/pr-visual-review.yml",
+        "runs": 2500,
+        "sampled": 100,
+        "conclusions": {
+          "in_progress": 5,
+          "success": 74,
+          "failure": 4,
+          "cancelled": 17
+        },
+        "wallMinutes": 18064
+      }
+    ]
+  },
+  "candidates": [
+    {
+      "kind": "always-red-workflow",
+      "fingerprint": "waste-sweep:always-red:.github/workflows/claim-checkout-dogfood.yml",
+      "title": "Fix or retire always-red workflow .github/workflows/claim-checkout-dogfood.yml",
+      "path": ".github/workflows/claim-checkout-dogfood.yml",
+      "wallMinutes": 3179,
+      "weight": 317900
+    },
+    {
+      "kind": "always-red-workflow",
+      "fingerprint": "waste-sweep:always-red:.github/workflows/visual-a11y.yml",
+      "title": "Fix or retire always-red workflow .github/workflows/visual-a11y.yml",
+      "path": ".github/workflows/visual-a11y.yml",
+      "wallMinutes": 2376,
+      "weight": 237600
+    },
+    {
+      "kind": "unused-exports",
+      "fingerprint": "waste-sweep:unused-exports:apps/web/data/marketing/index.ts",
+      "title": "Remove 208 unused exports from apps/web/data/marketing/index.ts",
+      "path": "apps/web/data/marketing/index.ts",
+      "names": [
+        "JOVIE_MARKETING_CHARACTER_SYSTEM_SCHEMA",
+        "MARKETING_CHARACTER_INDIVIDUALITY_AXES",
+        "scoreMarketingCharacterSimilarity",
+        "getMarketingRegistryEntry",
+        "MARKETING_COMPOSITION_CONTRACT",
+        "MARKETING_RECIPE_REGISTRY",
+        "MarketingCompositionSectionSchema",
+        "MARKETING_COPY_LINE_ROLES",
+        "MARKETING_COPY_SEMANTIC_ENFORCEMENTS",
+        "MARKETING_COPY_SPEC_VERSION",
+        "MARKETING_COPY_TASTE_TAGS",
+        "getProposedSection",
+        "formatMarketingEditorialBackgroundsForPrompt",
+        "FACTORY_EVALUATOR_KINDS",
+        "FACTORY_HERO_VARIANT_IDS",
+        "FACTORY_MEDIA_KINDS",
+        "FACTORY_RAMP_STATES",
+        "FACTORY_RECEIPT_SCHEMA",
+        "FACTORY_SPINE_VERSION",
+        "FACTORY_STAGE_MAX_ATTEMPTS"
+      ],
+      "weight": 41600
+    },
+    {
+      "kind": "unused-exports",
+      "fingerprint": "waste-sweep:unused-exports:apps/web/lib/queries/index.ts",
+      "title": "Remove 152 unused exports from apps/web/lib/queries/index.ts",
+      "path": "apps/web/lib/queries/index.ts",
+      "names": [
+        "advanceCacheGeneration",
+        "applyCacheScope",
+        "copyShareableQueryData",
+        "getCacheGeneration",
+        "getCacheScope",
+        "isShareableAcrossProfileSwitch",
+        "resetCacheIsolationForTests",
+        "subscribeCacheFence",
+        "withCacheScope",
+        "FREQUENT_BACKGROUND_CACHE",
+        "RETRY_BACKOFF",
+        "SEARCH_CACHE",
+        "useAiCrawlerAnalyticsQuery",
+        "useArtistThemeMutation",
+        "updateCreatorAvatar",
+        "uploadAvatarToBlob",
+        "useChatCapabilitiesQuery",
+        "useChatConversationsQuery",
+        "chatUsageQueryOptions",
+        "useConfirmChatLinkMutation"
+      ],
+      "weight": 30400
+    },
+    {
+      "kind": "unused-exports",
+      "fingerprint": "waste-sweep:unused-exports:apps/web/lib/validation/schemas/index.ts",
+      "title": "Remove 124 unused exports from apps/web/lib/validation/schemas/index.ts",
+      "path": "apps/web/lib/validation/schemas/index.ts",
+      "names": [
+        "deviceTypeSchema",
+        "httpUrlSchema",
+        "linkTypeSchema",
+        "metadataSchema",
+        "optionalDeviceTypeSchema",
+        "optionalHttpUrlSchema",
+        "optionalMetadataSchema",
+        "optionalUuidSchema",
+        "safeHttpUrlSchema",
+        "uuidSchema",
+        "activityRangeSchema",
+        "activityRangeValues",
+        "creatorTypeSchema",
+        "creatorTypeValues",
+        "linkActionSchema",
+        "linkActionValues",
+        "linkEvidenceSchema",
+        "linkStateSchema",
+        "linkStateValues",
+        "memberSortSchema"
+      ],
+      "weight": 24800
+    },
+    {
+      "kind": "unused-exports",
+      "fingerprint": "waste-sweep:unused-exports:apps/web/components/organisms/table/index.ts",
+      "title": "Remove 104 unused exports from apps/web/components/organisms/table/index.ts",
+      "path": "apps/web/components/organisms/table/index.ts",
+      "names": [
+        "ActionsCell",
+        "AudienceCountryCell",
+        "AudienceCreatedAtCell",
+        "GroupHeader",
+        "PersonCell",
+        "getShellListRowFrameClassName",
+        "SkeletonCell",
+        "SkeletonRow",
+        "TABLE_EMPTY_STATE_MIN_HEIGHT_PX",
+        "ACTION_BAR_BUTTON_CLASS",
+        "ActionBar",
+        "ActionBarItem",
+        "GroupedTableBody",
+        "HeaderBulkActions",
+        "LoadingTableBody",
+        "PAGE_TOOLBAR_BACK_LINK_CLASS",
+        "PAGE_TOOLBAR_BACK_LINK_LABEL_CLASS",
+        "PAGE_TOOLBAR_CONTAINER_CLASS",
+        "PAGE_TOOLBAR_END_CLASS",
+        "PAGE_TOOLBAR_START_CLASS"
+      ],
+      "weight": 20800
+    },
+    {
+      "kind": "unused-exports",
+      "fingerprint": "waste-sweep:unused-exports:apps/web/lib/rate-limit/index.ts",
+      "title": "Remove 71 unused exports from apps/web/lib/rate-limit/index.ts",
+      "path": "apps/web/lib/rate-limit/index.ts",
+      "names": [
+        "parseWindowToMs",
+        "accountDeleteLimiter",
+        "accountEmailLimiter",
+        "accountExportLimiter",
+        "adminCreatorIngestLimiter",
+        "adminFitScoresLimiter",
+        "aiChatLimiter",
+        "aiChatWeeklyFreeLimiter",
+        "aiChatWeeklyMaxLimiter",
+        "aiChatWeeklyPlanAwareLimiter",
+        "aiChatWeeklyProLimiter",
+        "anonymousOnboardingChatAsnLimiter",
+        "anonymousOnboardingChatFirstTouchLimiter",
+        "anonymousOnboardingChatIpLimiter",
+        "anonymousOnboardingChatSessionLimiter",
+        "appleMusicRescanFreeLimiter",
+        "appleMusicRescanPaidLimiter",
+        "appleMusicRescanPlanAwareLimiter",
+        "checkAdminOutreachRateLimit",
+        "checkAiChatRateLimit"
+      ],
+      "weight": 14200
+    },
+    {
+      "kind": "unused-exports",
+      "fingerprint": "waste-sweep:unused-exports:apps/web/lib/nuqs/index.ts",
+      "title": "Remove 70 unused exports from apps/web/lib/nuqs/index.ts",
+      "path": "apps/web/lib/nuqs/index.ts",
+      "names": [
+        "createSearchParamsCache",
+        "parseAsArrayOf",
+        "parseAsBoolean",
+        "parseAsInteger",
+        "parseAsJson",
+        "parseAsString",
+        "parseAsStringLiteral",
+        "usePaginationParams",
+        "useQueryState",
+        "useQueryStates",
+        "useSearchQuery",
+        "useSortParams",
+        "useTableParams",
+        "adminAssetIssuesParser",
+        "adminAssetTypeParser",
+        "adminAssetVerifiedParser",
+        "adminCreatorsSearchParams",
+        "adminCreatorsSortParser",
+        "adminGrowthViewParser",
+        "adminOutreachQueueParser"
+      ],
+      "weight": 14000
+    },
+    {
+      "kind": "unused-exports",
+      "fingerprint": "waste-sweep:unused-exports:apps/web/lib/ovie/shipping-state/index.ts",
+      "title": "Remove 67 unused exports from apps/web/lib/ovie/shipping-state/index.ts",
+      "path": "apps/web/lib/ovie/shipping-state/index.ts",
+      "names": [
+        "DELIVERY_MERGE_REPOS",
+        "EMPTY_CORRELATION",
+        "emptyCounts",
+        "isExactSha",
+        "LANE_BRANCH_RE",
+        "MAX_ACCEPTED_SOURCE_SEQUENCE_GAP",
+        "measuredBoolean",
+        "measuredDuration",
+        "NOT_MEASURED_BOOLEAN",
+        "NOT_MEASURED_COUNT",
+        "NOT_MEASURED_DURATION",
+        "OPERATIONAL_TASK_SYNC_STATES",
+        "OPERATIONAL_TASK_WORKFLOW_STATES",
+        "SHIPPING_SOURCE_PRODUCERS",
+        "SHIPPING_SOURCE_SEMANTIC_FRESHNESS_MS",
+        "SHIPPING_STATE_CLOCK_SKEW_MS",
+        "SHIPPING_STATE_PRODUCER_ID",
+        "SHIPPING_STATE_PRODUCER_VERSION",
+        "detectClockSkew",
+        "eventIdFor"
+      ],
+      "weight": 13400
+    },
+    {
+      "kind": "unused-exports",
+      "fingerprint": "waste-sweep:unused-exports:apps/web/types/index.ts",
+      "title": "Remove 62 unused exports from apps/web/types/index.ts",
+      "path": "apps/web/types/index.ts",
+      "names": [
+        "SOCIAL_PLATFORMS",
+        "convertArtistToCreatorProfile",
+        "convertCreatorProfileToArtist",
+        "isArtistProfile",
+        "isPodcasterProfile",
+        "THEME_MODES",
+        "isValidThemeMode",
+        "LINK_TYPES",
+        "SUBSCRIPTION_PLANS",
+        "SUBSCRIPTION_STATUSES",
+        "CURRENCY_CODES",
+        "isValidCreatorType",
+        "isValidLinkType",
+        "isValidSubscriptionPlan",
+        "isValidSubscriptionStatus",
+        "isValidCurrencyCode",
+        "getSubscriptionPlanLabel",
+        "getSubscriptionStatusLabel",
+        "getCurrencySymbol",
+        "ContactSocialLink"
+      ],
+      "weight": 12400
+    }
+  ]
+}

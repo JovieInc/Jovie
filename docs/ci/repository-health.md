@@ -193,6 +193,15 @@ The sweep never touches `main`, `gh-readonly-queue/*`, `backup/*` (hostops prese
 
 GitHub crons are frozen (JOV-INV-042), so `.github/workflows/stale-branch-sweep.yml` has no schedule. The Gem lanes clock fires `repository_dispatch` type `clock_stale_branch_sweep` weekly; that event applies unless `client_payload.apply` is `false`. The automation registry records the cadence. Manual `workflow_dispatch` is a dry-run unless `apply=true`. Each run uploads a `jovie-stale-branch-sweep/v1` receipt.
 
+### Waste sweep and dead-code ratchet
+
+`scripts/waste-sweep.mjs` (policy in `scripts/lib/waste-sweep.mjs`) measures repository waste in one pass: knip with every issue type (unused files, exports, types, duplicate exports, unused and unlisted dependencies; `knip.json` itself keeps the dependency-only report for `pnpm knip`), always-loaded agent context (`CLAUDE.md`, `canon/OPERATING_SYSTEM.md`, the skill listing, any unscoped rule) plus scoped-rule bytes for a typical web edit, lockfile packages resolved at several versions, direct dependencies whose specifiers diverge across workspaces, and, with `--ci`, 30 days of Actions run history (wall minutes, always-red, mostly-cancelled and never-run workflows).
+
+- **Score for Summer:** `docs/metrics/waste-latest.gen.json` carries the score, the counts and the top ten deletion candidates. The lanes status feed embeds its summary as the `waste` block (`scripts/lanes/doctor.py`).
+- **Ratchet:** `docs/metrics/waste-baseline.json` holds one `lock_down` ratchet-core entry per dead-code count. Source Validation runs `node scripts/waste-sweep.mjs ratchet --base <merge-base>`: any count above its baseline fails, and so does a file the PR adds that nothing imports. The step names the knip findings in the changed files. Fix by deleting the code or by adding a real entry point to `knip.json`; never raise a baseline. An improvement passes and the sweep lowers the baseline.
+- **Cadence:** the Gem lanes clock fires `repository_dispatch` `clock_waste_sweep` weekly (`.github/workflows/waste-sweep.yml`, no GitHub cron per JOV-INV-042). That run samples CI history, opens a `compounding` snapshot PR that also tightens the baseline, and files the top five candidates as deduped Linear issues (`waste-sweep:<kind>:<path>` fingerprints). A push to `main` touching knip config, manifests or agent context re-measures without CI sampling.
+- **Candidates are not deletions.** Routes, API routes and workflows need a usage check (grep, Vercel/Sentry hits) first; knip's blind spots (vendored skills, design-sync scripts, the docs app, promptfoo `file://` providers) belong in `knip.json` entries, not in deletion PRs.
+
 ### Split a package or repository
 
 All must hold for two consecutive 30-day windows:

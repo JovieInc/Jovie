@@ -1513,6 +1513,19 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:mine
     jobCount: 1
+  - name: Waste Sweep
+    path: .github/workflows/waste-sweep.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - push
+      - repository_dispatch
+      - workflow_dispatch
+    terminalReceipt: job:sweep
+    jobCount: 1
 edges:
   - from: Production Continuity Guard
     to: Automation Liveness

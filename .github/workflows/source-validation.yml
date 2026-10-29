@@ -526,6 +526,19 @@ jobs:
           base_sha="$(git merge-base "origin/${{ github.base_ref }}" "$EXPECTED_HEAD")"
           SHADCN_LINT_DIFF_BASE="$base_sha" \
             pnpm --filter @jovie/web exec node eslint-rules/__tests__/shadcn-lint-changed.mjs
+      # Dead-code ratchet (scripts/waste-sweep.mjs): knip with every issue type
+      # must not rise above docs/metrics/waste-baseline.json, and a file this
+      # PR adds must be imported by something. ~30s; the baseline only shrinks.
+      - name: Fail new dead code (knip ratchet)
+        if: steps.reuse.outputs.reuse != 'true'
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD"
+          git fetch --no-tags origin "${{ github.base_ref }}"
+          base_sha="$(git merge-base "origin/${{ github.base_ref }}" "$EXPECTED_HEAD")"
+          node scripts/waste-sweep.mjs ratchet --base "$base_sha"
       - name: Verify changed CLI publication behavior
         if: steps.reuse.outputs.reuse != 'true'
         shell: bash

@@ -22,7 +22,8 @@
         "instrumentation.{ts,js}",
         "next.config.{js,ts}",
         "sentry.*.config.ts",
-        "scripts/**/*.{ts,mjs,js}"
+        "scripts/**/*.{ts,mjs,js}",
+        "tests/eval/promptfoo/*.{ts,mjs}"
       ],
       "project": ["**/*.{ts,tsx,js,jsx,mjs,css,mdx}"],
       "ignore": [
