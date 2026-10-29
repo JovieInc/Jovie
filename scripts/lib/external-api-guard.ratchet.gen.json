@@ -382,9 +382,6 @@
     "scripts/ci-health-check.sh": {
       "gh-shell": 2
     },
-    "scripts/ci-merge-queue-check.mjs": {
-      "gh-subprocess": 1
-    },
     "scripts/ci/gh-api-or-defer.sh": {
       "gh-shell": 1
     },
@@ -437,9 +434,6 @@
     },
     "scripts/golden-path-lock.mjs": {
       "gh-subprocess": 1
-    },
-    "scripts/hold-contract.mjs": {
-      "gh-subprocess": 2
     },
     "scripts/invariants/jev-gateway.mjs": {
       "provider-host": 1
