@@ -42,7 +42,7 @@ export function LyricsHeader({
           size='sm'
           type='button'
           onClick={onArtistClick}
-          className='min-w-0'
+          className='min-w-0 [&>span]:min-w-0 [&>span]:max-w-full'
         >
           <span className='truncate'>{track.artist || 'Unknown artist'}</span>
         </Button>
