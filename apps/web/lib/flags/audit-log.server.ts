@@ -46,6 +46,31 @@ function sourceOf(value: boolean | null): FlagValueSource {
   return value === null ? 'default' : 'override';
 }
 
+/**
+ * A persisted audit cell is only a boolean or an explicit `null`. Anything
+ * else is a malformed source row: fail the read instead of rendering
+ * fabricated history.
+ */
+function parseAuditCell(value: unknown, field: string): boolean | null {
+  if (value === null) return null;
+  if (typeof value !== 'boolean') {
+    throw new Error(`Feature flag audit row is malformed (${field}).`);
+  }
+  return value;
+}
+
+/**
+ * A persisted audit timestamp must be an interpretable Date. Anything else
+ * is a malformed source row: fail the read instead of rendering history the
+ * page cannot date.
+ */
+function parseAuditTimestamp(value: unknown): Date {
+  if (!(value instanceof Date) || Number.isNaN((value as Date).getTime())) {
+    throw new Error('Feature flag audit row is malformed (createdAt).');
+  }
+  return value;
+}
+
 function effectiveOf(flagKey: string, value: boolean | null): boolean | null {
   if (value !== null) return value;
   const defaults = APP_FLAG_DEFAULTS as Record<string, boolean | undefined>;
@@ -90,30 +115,35 @@ export async function getFeatureFlagAuditEvents(
       string | undefined
     >;
 
-    return rows.map(row => ({
-      id: row.id,
-      flagKey: row.flagKey,
-      name:
-        descriptions[row.flagKey] !== undefined
-          ? row.flagKey
-              .toLowerCase()
-              .replaceAll('_', ' ')
-              .replace(/^\w/, c => c.toUpperCase())
-          : row.flagKey,
-      envTier: row.envTier,
-      action: row.action as FlagChangeAction,
-      actor: row.actor,
-      previousValue: row.previousValue,
-      previousSource: sourceOf(row.previousValue),
-      previousEffective: effectiveOf(row.flagKey, row.previousValue),
-      newValue: row.newValue,
-      newSource: sourceOf(row.newValue),
-      newEffective: effectiveOf(row.flagKey, row.newValue),
-      reason: row.reason,
-      createdAt: row.createdAt.toISOString(),
-      createdAtLabel: formatUtc(row.createdAt),
-      canRollback: row.flagKey in APP_FLAG_DEFAULTS,
-    }));
+    return rows.map(row => {
+      const createdAt = parseAuditTimestamp(row.createdAt);
+      const previousValue = parseAuditCell(row.previousValue, 'previousValue');
+      const newValue = parseAuditCell(row.newValue, 'newValue');
+      return {
+        id: row.id,
+        flagKey: row.flagKey,
+        name:
+          descriptions[row.flagKey] !== undefined
+            ? row.flagKey
+                .toLowerCase()
+                .replaceAll('_', ' ')
+                .replace(/^\w/, c => c.toUpperCase())
+            : row.flagKey,
+        envTier: row.envTier,
+        action: row.action as FlagChangeAction,
+        actor: row.actor,
+        previousValue,
+        previousSource: sourceOf(previousValue),
+        previousEffective: effectiveOf(row.flagKey, previousValue),
+        newValue,
+        newSource: sourceOf(newValue),
+        newEffective: effectiveOf(row.flagKey, newValue),
+        reason: row.reason,
+        createdAt: createdAt.toISOString(),
+        createdAtLabel: formatUtc(createdAt),
+        canRollback: row.flagKey in APP_FLAG_DEFAULTS,
+      };
+    });
   } catch (error) {
     await captureWarning('Feature flag audit events read failed', error);
     throw error;

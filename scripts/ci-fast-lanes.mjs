@@ -129,6 +129,7 @@ export const PR_CHEAP_SCAN_COMMANDS = Object.freeze([
   'pnpm --filter=@jovie/web run lint:contrast-ratchet',
   'pnpm design:shared-ui-visual-arbitrary:check',
   'pnpm design:overlay-layers:check',
+  'pnpm design:no-dead-ends:check',
   'pnpm component-ship-gate',
   'pnpm screen-registration-gate',
   'pnpm ci:harness:check',
@@ -860,6 +861,8 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/preflight.test.mjs',
   'scripts/layout-guard-pen-contracts.test.mjs',
   'scripts/ci-rounds-report.test.mjs',
+  'scripts/preflight-changed.test.mjs',
+  'scripts/lib/__tests__/ci-rounds.test.mjs',
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
@@ -945,6 +948,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/lib/__tests__/quota-deferred-heads.test.mjs',
   'scripts/hold-contract.test.mjs',
   'scripts/invariants/art-direction/surface-media.test.mjs',
+  'scripts/invariants/marketing-critic/marketing-critic.test.mjs',
   'scripts/lib/__tests__/admission-hold-labels.test.mjs',
   'scripts/lib/__tests__/source-validation-lane-classification.test.mjs',
   'scripts/lib/__tests__/source-guard-dependency-generation.test.mjs',
@@ -1000,6 +1004,7 @@ export const SCRIPT_CONTRACT_NODE_COMMAND = `${DEPRECATION_COVERAGE_COMMAND} && 
 export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/merge-group-failure-hold.test.mjs',
   'scripts/lib/__tests__/mesh-host-ack.test.mjs',
+  'scripts/lib/__tests__/prod-cert.test.mjs',
   'scripts/lib/__tests__/ci-timing-collector.test.mjs',
   'scripts/lib/__tests__/mesh-native-terminal.test.mjs',
   'scripts/lib/__tests__/mesh-runtime-bundle.test.mjs',
@@ -1094,6 +1099,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/credentials-registry.test.mjs',
   'scripts/lib/__tests__/credentials-spend-check.test.mjs',
   'scripts/lib/__tests__/capacity-registry.test.mjs',
+  'scripts/lib/__tests__/fleet-registry.test.mjs',
   'scripts/lib/__tests__/remediation-sweep.test.mjs',
   'scripts/lib/__tests__/remediation-sweep-workflow-contract.test.mjs',
   'scripts/lib/__tests__/repository-docs-ratchet.test.mjs',
@@ -2854,6 +2860,7 @@ export async function runStructural(opts = {}) {
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/controller-quota-replay.mjs --test-coverage-lines=90 --test-coverage-branches=80 --test-coverage-functions=80 .github/scripts/controller-quota-replay.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/vercel-build-queue.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=100 .github/scripts/vercel-build-queue.test.mjs',
     'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-release-source.mjs --test-coverage-lines=100 --test-coverage-branches=95 --test-coverage-functions=100 .github/scripts/staging-release-source.test.mjs',
+    'node --test --experimental-test-coverage --test-coverage-include=.github/scripts/staging-supersession-policy.mjs --test-coverage-lines=95 --test-coverage-branches=80 --test-coverage-functions=90 .github/scripts/staging-supersession-policy.test.mjs',
     DELIVERY_CONTROLLER_COVERAGE_COMMAND,
     OFFLINE_FAILURE_COVERAGE_COMMAND,
     'node --test --experimental-test-coverage --test-coverage-include=scripts/security/deepsec-policy.mjs --test-coverage-include=scripts/security/deepsec-loop.mjs --test-coverage-lines=95 --test-coverage-branches=85 --test-coverage-functions=95 scripts/security/deepsec-policy.test.mjs scripts/security/deepsec-loop.test.mjs',
@@ -2914,6 +2921,8 @@ export async function runStructural(opts = {}) {
     'pnpm design:shared-ui-visual-arbitrary:check',
     // JOV-INV-036: no new raw global-layer z-index values in web source.
     'pnpm design:overlay-layers:check',
+    // JOV-INV-046: no new dead-end copy, no-op handlers, or unresolved hrefs.
+    'pnpm design:no-dead-ends:check',
     // JOV-6103: execute the certification kernel and its negative-path tests.
     // A missing selector or dependency must fail, never count as proof.
     CERTIFICATION_KERNEL_COMMAND,
