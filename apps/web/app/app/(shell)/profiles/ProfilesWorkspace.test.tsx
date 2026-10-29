@@ -1114,7 +1114,6 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
       row =>
         within(row).queryByRole('cell', {
           name: 'Connected',
-          exact: true,
         }) !== null
     );
     expect(connectedRows).toHaveLength(dogfoodPlatforms.length);
