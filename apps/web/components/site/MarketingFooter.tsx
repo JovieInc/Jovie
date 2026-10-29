@@ -255,7 +255,8 @@ export function MarketingFooter({
         >
           {isMinimal ? <FooterBrandMark /> : null}
           <span className='mf-copyright'>
-            © {new Date().getFullYear()} Jovie Technology Inc.
+            {/* copy-allow: legal entity line, owned by code */}©{' '}
+            {new Date().getFullYear()} Jovie Technology Inc.
           </span>
           <div className='mf-baseband__meta'>
             {isMinimal ? (

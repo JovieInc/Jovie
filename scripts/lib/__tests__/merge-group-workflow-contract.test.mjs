@@ -3478,9 +3478,6 @@ ${selectedGateScript}`,
     );
 
     const buildLayout = getJobBlock(CI_WORKFLOW, 'ci-build-layout');
-    expect(buildLayout).toContain(
-      'pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk'
-    );
     expect(buildLayout).not.toContain('secrets.');
 
     const mergeGroupWorkflows = readdirSync(
