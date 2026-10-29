@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { runDbHostIsolationCheck } from '../../../scripts/check-database-isolation';
+import { runDbHostIsolationCheck } from '../../scripts/check-database-isolation';
 import {
   assertStagingDatabaseIsolation,
   evaluateStagingDbHostGuard,
