@@ -1626,7 +1626,7 @@ jobs:
             # 2026-10-25..29). Close it and regenerate: the publisher recollects
             # from the last merged receipt, so nothing is lost.
             age_hours="$(jq -r '((now - (.[0].created_at | fromdateiso8601)) / 3600) | floor' <<<"$open_notes")"
-            in_queue="$(gh pr view "$pr" --json isInMergeQueue --jq .isInMergeQueue)"
+            in_queue="$(gh api graphql -f query='query($n:Int!){repository(owner:"JovieInc",name:"Jovie"){pullRequest(number:$n){isInMergeQueue}}}' -F n="$pr" --jq .data.repository.pullRequest.isInMergeQueue)"
             if [ "$in_queue" = true ] || [ "$age_hours" -lt 6 ]; then
               echo "Existing release PR owns publication: #$pr (${age_hours}h old)"
               exit 0
@@ -1728,6 +1728,9 @@ jobs:
           ref: main
           fetch-depth: 0
           persist-credentials: false
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
