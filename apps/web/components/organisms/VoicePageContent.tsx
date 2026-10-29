@@ -74,7 +74,7 @@ export function VoicePageContent() {
       >
         <MarketingContainer width='page'>
           <div className='mx-auto max-w-3xl text-center'>
-            <h2 className='text-2xl font-semibold tracking-tight text-primary-token'>
+            <h2 className='text-balance text-2xl font-semibold tracking-tight text-primary-token'>
               Your Voice. Trained. Ready.
             </h2>
             <p className='mt-3 text-mid leading-7 text-secondary-token'>
@@ -89,7 +89,7 @@ export function VoicePageContent() {
                 key={step.title}
                 className='rounded-3xl border border-subtle bg-base p-6'
               >
-                <h3 className='text-lg font-semibold text-primary-token'>
+                <h3 className='text-balance text-lg font-semibold text-primary-token'>
                   {step.title}
                 </h3>
                 <p className='mt-2 text-sm leading-6 text-secondary-token'>
