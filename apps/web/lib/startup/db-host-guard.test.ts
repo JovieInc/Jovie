@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { runDbHostIsolationCheck } from '../scripts/check-database-isolation';
+import { runDbHostIsolationCheck } from '../../../scripts/check-database-isolation';
 import {
   assertStagingDatabaseIsolation,
   evaluateStagingDbHostGuard,
@@ -17,10 +17,10 @@ vi.mock('@/lib/music-resolver/musicfetch-gate', () => ({
   musicResolverCutoverReceipt: () => ({}),
 }));
 
-// Connection-string fixtures are CONSTRUCTED from parts: a literal
-// `postgres://user:pass@host` URI in source trips TruffleHog's Postgres/URI
-// detector in scripts/security/scan-secrets.sh (exit 183). Bare hostnames
-// and part-built strings carry no credential-shaped text.
+// Connection-string fixtures are CONSTRUCTED from parts: a literal credentialed
+// postgres URI in source trips TruffleHog's Postgres/URI detector in
+// scripts/security/scan-secrets.sh (exit 183). Bare hostnames and part-built
+// strings carry no credential-shaped text.
 const FAKE_USERPART = ['user', 'secret'].join(':');
 const neonEndpointHost = (endpoint: string): string =>
   `${endpoint}.us-east-2.aws.neon.tech`;
