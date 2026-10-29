@@ -741,7 +741,7 @@ const RECIPE_RESOLUTIONS = {
       },
       {
         source: 'apps/web/app/(home)/page.tsx',
-        binding: '<HomepageSpecSections sections={spec.data.sections} />',
+        binding: '<HomepageSpecSections',
         occurrences: 1,
         kind: 'source',
       },
