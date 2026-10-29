@@ -35,9 +35,8 @@ const { summerCardInputSchema } = await import('./summer-cards');
 const { summerCardId, summerCardPayloadDigest } = await import(
   './summer-card-digest'
 );
-const { decideSummerCard, submitSummerCard } = await import(
-  './summer-cards.server'
-);
+const { decideSummerCard, submitSummerCard, supersedeSummerCard } =
+  await import('./summer-cards.server');
 
 const NOW = new Date('2026-09-26T10:00:00.000Z');
 
@@ -161,6 +160,38 @@ describe('summer card store', () => {
         value: expect.objectContaining({ decidedBy: 'founder@jov.ie' }),
       })
     );
+  });
+
+  it('supersedes a decision card whose premise is gone, recording the system and the reason', async () => {
+    hoisted.selectLimit.mockResolvedValue([
+      { value: stored({ kind: 'decision' }) },
+    ]);
+    hoisted.updateReturning.mockResolvedValue([{ key: 'k' }]);
+    const result = await supersedeSummerCard(
+      { id: stored().id, reason: 'no human holds exist' },
+      new Date('2026-09-26T11:00:00.000Z')
+    );
+    expect(result).toMatchObject({
+      outcome: 'superseded',
+      card: { status: 'rejected', resolution: 'default' },
+    });
+    expect(hoisted.updateSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        value: expect.objectContaining({
+          decidedBy: 'premise-superseded',
+          comment: expect.stringContaining('No action taken'),
+        }),
+      })
+    );
+  });
+
+  it('never supersedes a spend or outbound card', async () => {
+    hoisted.updateSet.mockClear();
+    hoisted.selectLimit.mockResolvedValue([{ value: stored() }]);
+    expect(
+      await supersedeSummerCard({ id: stored().id, reason: 'premise gone now' })
+    ).toEqual({ outcome: 'reserved', kind: 'spend' });
+    expect(hoisted.updateSet).not.toHaveBeenCalled();
   });
 
   it('never overwrites an already-decided card', async () => {
