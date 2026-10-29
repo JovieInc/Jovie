@@ -134,9 +134,9 @@ describe('WaitlistSuccessView', () => {
     );
     expect(routeSource).toContain('<WaitlistRouteWithContract>');
     expect(routeSource).toContain('email={authResult.context.email}');
-    expect(routeSource).toContain(
-      'proCheckoutPriceId = PRICING.pro.monthly.priceId'
-    );
+    // Checkout is offered only to a person the admission gate admits.
+    expect(routeSource).toContain('decideAdmissionForEmail(');
+    expect(routeSource).toContain('PRICING.pro.monthly.priceId');
     expect(routeSource).toContain('getWaitlistRouteRedirect');
     expect(routeSource).not.toContain('notFound()');
     expect(routeSource).not.toContain('WaitlistIntakeChat');
