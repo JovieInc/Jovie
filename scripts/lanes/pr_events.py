@@ -1011,10 +1011,12 @@ def with_red_section(body: str, block: str) -> str:
     return "\n".join(lines[:start] + block.split("\n") + [""] + lines[end:])
 
 
-def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None) -> str:
+def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_decision: dict | None = None,
+                         locking_pr: int | None = None) -> str:
     """Complete repair metadata without replacing existing evidence or customer decisions.
 
-    The caller chooses the customer outcome; never infer it from a failed check.
+    The caller chooses the customer outcome and supplies any locking PR provenance;
+    never infer either from a failed check. Existing locked-area decisions are preserved.
     The canonical Fleet/changelog guards still validate the resulting body.
     """
     updated = body
@@ -1031,6 +1033,12 @@ def repair_evidence_body(pr: dict, body: str, excerpt: str = "", *, customer_dec
         else:
             note = json.dumps(customer_decision, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
             updated = updated.rstrip("\n") + "\n<!-- customer-changelog/v1 " + note + " -->\n"
+    if locking_pr is not None:
+        if type(locking_pr) is not int or locking_pr < 1:
+            raise ValueError("locking PR requires an explicit positive PR number")
+        visible = re.sub(r"<!--[\s\S]*?-->", "", updated)
+        if not re.search(r"^#{1,6}\s+Locked areas\s*$", visible, re.I | re.M):
+            updated = updated.rstrip("\n") + f"\n\n## Locked areas\n\nLocking PR: #{locking_pr}\n"
     return updated
 
 
@@ -1044,16 +1052,17 @@ def api_gh(args, **_):
     return subprocess.CompletedProcess(args, done["code"], done["stdout"], done["stderr"])
 
 
-def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None) -> bool:
+def ensure_red_before_green(pr: dict, excerpt: str = "", sh=api_gh, *, customer_decision: dict | None = None,
+                            locking_pr: int | None = None) -> bool:
     """Complete repair evidence and an optional caller-selected customer decision."""
     if not isinstance(pr.get("number"), int) or (
-            customer_decision is None and red_before_green_block(pr, excerpt) is None):
+            customer_decision is None and locking_pr is None and red_before_green_block(pr, excerpt) is None):
         return False
     viewed = sh(["pr", "view", str(pr["number"]), "--repo", REPO, "--json", "body", "--jq", ".body"])
     if viewed.returncode != 0:
         return False
     body = viewed.stdout or ""
-    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision)
+    updated = repair_evidence_body(pr, body, excerpt, customer_decision=customer_decision, locking_pr=locking_pr)
     if updated == body:
         return False
     with tempfile.TemporaryDirectory(prefix="red-before-green-") as tmp:
