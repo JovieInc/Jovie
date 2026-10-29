@@ -85,8 +85,6 @@ CLOCKS = (
           "nightly-tests-clock.json", github_cron=False),
     Clock("e2eFullMatrix", "e2e-full-matrix.yml", "clock_e2e_full_matrix", 86400,
           "e2e-full-matrix-clock.json", github_cron=False),
-    Clock("visualA11y", "visual-a11y.yml", "clock_visual_a11y", 86400,
-          "visual-a11y-clock.json", github_cron=False),
     Clock("testCoverageAudit", "test-coverage-audit.yml", "clock_test_coverage_audit", 86400,
           "test-coverage-audit-clock.json", github_cron=False),
     # Dependabot advisories reach no workflow event; the loop files/closes Linear work and
