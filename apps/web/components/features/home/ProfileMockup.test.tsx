@@ -2,8 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from './homepage-profile-preview-fixture';
 import { ProfileMockup } from './ProfileMockup';
+import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from './tim-white-catalog';
 
 vi.mock('next/image', () => ({
   default: (props: { readonly alt?: string; readonly src?: string }) => (

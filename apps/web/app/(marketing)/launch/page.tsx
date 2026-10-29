@@ -29,9 +29,9 @@ import { APP_ROUTES } from '@/constants/routes';
 import { resolveMarketingAuthPrefetch } from '@/data/marketing/authEntryPrefetch';
 import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
-import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from '@/features/home/homepage-profile-preview-fixture';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
 import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
+import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from '@/features/home/tim-white-catalog';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -625,7 +625,7 @@ export default function LaunchPage() {
                           alt=''
                           width={40}
                           height={40}
-                          className='system-b-launch-art object-cover'
+                          className='system-b-launch-art rounded-md object-cover'
                         />
                         <div>
                           <strong>{release.title}</strong>

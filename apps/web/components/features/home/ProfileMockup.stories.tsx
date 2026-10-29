@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, within } from 'storybook/test';
-import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from './homepage-profile-preview-fixture';
 import { ProfileMockup } from './ProfileMockup';
+import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from './tim-white-catalog';
 
 const meta = {
   title: 'Features/Home/ProfileMockup',

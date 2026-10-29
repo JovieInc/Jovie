@@ -4,7 +4,7 @@ import { Music2 } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from './homepage-profile-preview-fixture';
+import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from './tim-white-catalog';
 
 const RELEASES = HOMEPAGE_PROFILE_PREVIEW_CATALOG;
 const LEAD_RELEASE = RELEASES[0];

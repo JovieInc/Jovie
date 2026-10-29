@@ -389,7 +389,7 @@ export function ChatMerchDesignCarousel({
               <DesignArt design={design} />
             </div>
             <div
-              className='flex min-w-0 flex-1 flex-col justify-between gap-2 px-2.5 py-2.5'
+              className='flex min-w-0 flex-1 flex-col justify-between gap-2 px-2.5 py-3'
               data-testid='chat-merch-option-caption'
             >
               <h3 className='line-clamp-3 text-xs font-medium leading-snug text-primary-token sm:text-sm'>
