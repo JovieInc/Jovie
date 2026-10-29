@@ -352,6 +352,12 @@ export interface ComparisonFeature {
   readonly pro: boolean | string;
   readonly max: boolean | string;
   readonly comingSoon?: boolean;
+  /**
+   * Product-truth capability (`data/product-truth/registry.ts`) that proves
+   * this row. Public pricing renders only rows whose capability is certified
+   * and generally available; untagged rows stay internal.
+   */
+  readonly capabilityId?: string;
 }
 
 export interface PricingCategory {
@@ -363,57 +369,83 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
   {
     category: 'Smart Links',
     features: [
-      { name: 'Unlimited smart links', free: true, pro: true, max: true },
+      {
+        name: 'Unlimited smart links',
+        free: true,
+        pro: true,
+        max: true,
+        capabilityId: 'smart-links',
+      },
       { name: 'Auto-sync from Spotify', free: true, pro: true, max: true },
       {
         name: 'Smart deep links (native apps)',
         free: true,
         pro: true,
         max: true,
+        capabilityId: 'smart-links',
       },
       {
         name: 'Edit & customize smart links',
         free: true,
         pro: true,
         max: true,
+        capabilityId: 'smart-links',
       },
       {
         name: 'Release pages with listen links per DSP',
         free: true,
         pro: true,
         max: true,
+        capabilityId: 'smart-links',
       },
-      { name: 'Short link redirects', free: true, pro: true, max: true },
-      { name: 'Vanity URLs', free: true, pro: true, max: true },
+      {
+        name: 'Short link redirects',
+        free: true,
+        pro: true,
+        max: true,
+        capabilityId: 'smart-links',
+      },
+      {
+        name: 'Vanity URLs',
+        free: true,
+        pro: true,
+        max: true,
+        capabilityId: 'smart-links',
+      },
       {
         name: 'Auto DSP detection & linking',
         free: true,
         pro: true,
         max: true,
+        capabilityId: 'smart-links',
       },
       {
         name: 'Manual release creation',
         free: true,
         pro: true,
         max: true,
+        capabilityId: 'release-launch',
       },
       {
         name: 'Pre-save campaigns',
         free: false,
         pro: true,
         max: true,
+        capabilityId: 'smart-links',
       },
       {
         name: 'Pre-release & countdown pages',
         free: false,
         pro: true,
         max: true,
+        capabilityId: 'release-launch',
       },
       {
         name: 'URL encryption',
         free: false,
         pro: true,
         max: true,
+        capabilityId: 'smart-links',
       },
     ],
   },
@@ -425,21 +457,36 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         free: true,
         pro: true,
         max: true,
+        capabilityId: 'public-profile',
       },
       {
-        name: 'Artist bio & social links',
+        name: 'Bio & social links',
         free: true,
         pro: true,
         max: true,
+        capabilityId: 'public-profile',
       },
       {
         name: 'Subscribe / follow page',
         free: true,
         pro: true,
         max: true,
+        capabilityId: 'public-profile',
       },
-      { name: 'Contact page', free: true, pro: true, max: true },
-      { name: 'About page', free: true, pro: true, max: true },
+      {
+        name: 'Contact page',
+        free: true,
+        pro: true,
+        max: true,
+        capabilityId: 'public-profile',
+      },
+      {
+        name: 'About page',
+        free: true,
+        pro: true,
+        max: true,
+        capabilityId: 'public-profile',
+      },
       {
         name: 'Tour dates (Bandsintown)',
         free: true,
@@ -502,12 +549,14 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
         free: 'Up to 100',
         pro: 'Unlimited',
         max: 'Unlimited',
+        capabilityId: 'artist-profiles',
       },
       {
         name: 'Release notifications (email to your audience)',
         free: false,
         pro: true,
         max: true,
+        capabilityId: 'artist-notifications',
       },
       { name: 'Contact export', free: false, pro: true, max: true },
       { name: 'Fan CRM', free: false, pro: true, max: true },

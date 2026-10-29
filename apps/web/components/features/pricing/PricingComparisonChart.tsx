@@ -7,38 +7,27 @@ import {
   formatPublicPriceDisplay,
   getPublicPriceClaim,
 } from '@/lib/billing/offer-truth';
-import { PUBLIC_PRICING_COMPARISON } from '@/lib/billing/public-pricing-features';
-import type { ComparisonFeature } from '@/lib/entitlements/registry';
+import type { PublicComparisonPlan } from '@/lib/billing/public-pricing-comparison';
+import type {
+  ComparisonFeature,
+  PricingCategory,
+} from '@/lib/entitlements/registry';
 
-type PlanColumn = 'free' | 'pro';
+type PlanColumn = PublicComparisonPlan;
 
-function CellValue({
-  value,
-  comingSoon,
-}: {
-  readonly value: boolean | string;
-  readonly comingSoon?: boolean;
-}) {
+function CellValue({ value }: { readonly value: boolean | string }) {
   if (typeof value === 'string') {
-    return (
-      <span className='system-b-pricing-chart-value'>
-        {value}
-        {comingSoon ? (
-          <span className='system-b-pricing-chart-badge'>Soon</span>
-        ) : null}
-      </span>
-    );
+    return <span className='system-b-pricing-chart-value'>{value}</span>;
   }
 
-  if (value === true) {
-    return <span className='system-b-pricing-chart-value'>Included</span>;
-  }
-
-  if (comingSoon) {
-    return <span className='system-b-pricing-chart-badge'>Soon</span>;
-  }
-
-  return <span className='system-b-pricing-chart-value'>Not included</span>;
+  return (
+    <span
+      className='system-b-pricing-chart-value'
+      data-included={value ? 'true' : 'false'}
+    >
+      {value ? 'Included' : 'Not included'}
+    </span>
+  );
 }
 
 function MobileFeatureRow({
@@ -61,10 +50,7 @@ function MobileFeatureRow({
         className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'
         data-selected={selectedPlan === 'pro' ? 'true' : undefined}
       >
-        <CellValue
-          value={feature[selectedPlan]}
-          comingSoon={feature.comingSoon && feature[selectedPlan] !== false}
-        />
+        <CellValue value={feature[selectedPlan]} />
       </td>
     </tr>
   );
@@ -84,25 +70,29 @@ function DesktopFeatureRow({
         {feature.name}
       </th>
       <td className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'>
-        <CellValue
-          value={feature.free}
-          comingSoon={feature.comingSoon && feature.free !== false}
-        />
+        <CellValue value={feature.free} />
       </td>
       <td
         className='system-b-pricing-chart-cell system-b-pricing-chart-cell--value'
         data-selected='true'
       >
-        <CellValue
-          value={feature.pro}
-          comingSoon={feature.comingSoon && feature.pro !== false}
-        />
+        <CellValue value={feature.pro} />
       </td>
     </tr>
   );
 }
 
-export function PricingComparisonChart() {
+export interface PricingComparisonChartProps {
+  /**
+   * Rows to compare, from `getPublicPricingComparison()` (server-side
+   * projection of the entitlement registry).
+   */
+  readonly categories: readonly PricingCategory[];
+}
+
+export function PricingComparisonChart({
+  categories,
+}: PricingComparisonChartProps) {
   const [selectedPlan, setSelectedPlan] = useState<PlanColumn>('pro');
 
   const freeClaim = getPublicPriceClaim('free');
@@ -185,7 +175,7 @@ export function PricingComparisonChart() {
           </thead>
 
           <tbody>
-            {PUBLIC_PRICING_COMPARISON.map(category => (
+            {categories.map(category => (
               <Fragment key={`cat-${category.category}`}>
                 <tr className='system-b-pricing-category-row'>
                   <td colSpan={3} className='system-b-pricing-category-cell'>
@@ -235,7 +225,7 @@ export function PricingComparisonChart() {
           </thead>
 
           <tbody>
-            {PUBLIC_PRICING_COMPARISON.map(category => (
+            {categories.map(category => (
               <Fragment key={`mcat-${category.category}`}>
                 <tr className='system-b-pricing-category-row'>
                   <td colSpan={2} className='system-b-pricing-category-cell'>

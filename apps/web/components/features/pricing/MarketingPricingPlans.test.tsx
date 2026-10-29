@@ -53,4 +53,25 @@ describe('MarketingPricingPlans', () => {
       expect(label).not.toMatch(/\bfans?\b/i);
     }
   });
+
+  it('renders no eyebrow badge pill above the plan name', () => {
+    const { container } = render(
+      <MarketingPricingPlans variant='tier-cards-neutral' />
+    );
+
+    expect(
+      container.querySelectorAll('.marketing-pricing-plan-card__badge')
+    ).toHaveLength(0);
+    for (const badge of ['Free forever', 'Self-serve']) {
+      expect(screen.queryByText(badge)).not.toBeInTheDocument();
+    }
+    for (const card of container.querySelectorAll(
+      '.marketing-pricing-plan-card'
+    )) {
+      expect(
+        card.querySelector('.marketing-pricing-plan-card__header')
+          ?.firstElementChild
+      ).toHaveClass('marketing-pricing-plan-card__name');
+    }
+  });
 });
