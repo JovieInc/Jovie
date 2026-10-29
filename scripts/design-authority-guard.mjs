@@ -81,7 +81,6 @@ export function hasExactSerifException(exceptions, relativePath, line) {
   );
 }
 
-// JOV-3720: raw control debt only shrinks; use shared primitives in settings/shell.
 export function rawInteractiveCounts(file, source) {
   const counts = {};
   if (

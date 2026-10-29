@@ -62,7 +62,7 @@ const LyricListRow = memo(function LyricListRow({
       <span className='shrink-0 w-9 pt-0.5 text-3xs tabular-nums text-quaternary-token group-hover/lyric:text-tertiary-token transition-colors duration-subtle ease-subtle'>
         {formatLyricsTime(line.at)}
       </span>
-      <span className='flex-1 leading-snug'>{line.text}</span>
+      <span className='flex-1 text-left leading-snug'>{line.text}</span>
     </Button>
   );
 });
