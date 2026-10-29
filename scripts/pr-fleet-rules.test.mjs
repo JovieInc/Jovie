@@ -527,6 +527,7 @@ test('verdict script maps exit codes to the job result and never turns a deferra
           encoding: 'utf8',
           env: {
             PATH: process.env.PATH,
+            FLEET_DEFERRED_BACKOFF_STEP_S: '0',
             API_CLIENT: join(dir, 'client.mjs'),
             GH_TOKEN: 'gh-token-value',
             FLEET_TOKEN: 'app-token-value',
@@ -699,7 +700,6 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
     // transient status, marker for the relay, no secret detail, never pass.
     for (const [label, retryAt] of [
       ['reset past the budget', T0 + 3_000_000],
-      ['unknown reset', null],
     ]) {
       /** @type {string[]} */
       const logs = [];
@@ -722,6 +722,89 @@ test('quota or outage evidence failures hold once, then defer with the relay mar
       assert.deepEqual(sleeps, [], String(label));
       assert.match(String(logs.at(-1)), /github-quota-deferred/);
       assert.doesNotMatch(String(logs.at(-1)), /secret detail/);
+    }
+    // Unknown reset: doubling backoff (15s, 30s, 60s) inside the 120s
+    // budget, then the deferral. Never a pass, never a policy verdict.
+    {
+      const logs = [];
+      const sleeps = [];
+      assert.equal(
+        await main({
+          args: [],
+          env,
+          request: async () => {
+            throw quota(null);
+          },
+          log: x => logs.push(x),
+          now: () => T0,
+          sleep: async ms => sleeps.push(ms),
+        }),
+        75
+      );
+      assert.deepEqual(sleeps, [15_000, 30_000, 60_000]);
+      assert.match(String(logs.at(-1)), /github-quota-deferred/);
+    }
+    // Advisory (pull_request copy): a 403 rate limit that outlasts the hold is
+    // an infrastructure warning, exit 0, no error annotation, no red verdict.
+    {
+      const logs = [];
+      const sleeps = [];
+      assert.equal(
+        await main({
+          args: ['--with-warnings', '--advisory'],
+          env,
+          request: async () => {
+            throw quota(null);
+          },
+          log: x => logs.push(x),
+          now: () => T0,
+          sleep: async ms => sleeps.push(ms),
+        }),
+        0
+      );
+      assert.equal(sleeps.length, 3);
+      assert.ok(!logs.some(x => x.startsWith('::error')));
+      assert.match(
+        String(logs.at(-1)),
+        /^::warning title=Infrastructure, not a verdict::.*github-quota-deferred/
+      );
+      // Recovery after one 403 (authoritative mode): backoff once, then the policy verdict decides.
+      let reads = 0;
+      const inner = api(pr({ title: 'fix: broken', body: '' }));
+      const recovered = [];
+      assert.equal(
+        await main({
+          args: ['--with-warnings'],
+          env,
+          request: async path => {
+            if (reads++ === 0) throw quota(T0 + 5_000);
+            return inner(path);
+          },
+          log: x => recovered.push(x),
+          now: () => T0,
+          sleep: async () => {},
+        }),
+        1
+      );
+      assert.ok(recovered.some(x => x.startsWith('::error::red-before-green')));
+    }
+    // Advisory reads the PR from the event payload: files are the only call.
+    {
+      const paths = [];
+      const adv = JSON.parse(JSON.stringify(event));
+      adv.pull_request = { ...adv.pull_request, ...pr(), changed_files: 0 };
+      adv.pull_request.head = event.pull_request.head;
+      const result = await runFleetRules({
+        event: adv,
+        request: async p => {
+          paths.push(p);
+          return [];
+        },
+        fromEvent: true,
+      });
+      assert.deepEqual(result.errors, []);
+      assert.equal(paths.length, 1);
+      assert.match(paths[0], /\/files\?/);
     }
     {
       const logs = [];
