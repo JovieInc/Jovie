@@ -14,8 +14,8 @@ export function buildSweepManifest(
     E2E_SKIP_WEB_SERVER: '1',
     E2E_USE_TEST_AUTH_BYPASS: '1',
     E2E_FAST_ONBOARDING: '1',
-    NEXT_PUBLIC_AUTH_MOCK: '1',
-    NEXT_PUBLIC_AUTH_PROXY_DISABLED: '1',
+    NEXT_PUBLIC_CLERK_MOCK: '1',
+    NEXT_PUBLIC_CLERK_PROXY_DISABLED: '1',
     E2E_TEST_AUTH_PERSONA: 'creator',
   } satisfies Record<string, string>;
 
