@@ -76,7 +76,7 @@ describe('fleet registry rules', () => {
     agent(r, 'instinct').capabilities = [];
     expect(run(r).join()).toMatch(/needs capability/);
     const m = base();
-    agent(m, 'instinct').route.senderKind = 'nobody';
+    agent(m, 'muse').route.senderKind = 'nobody';
     expect(run(m).join()).toMatch(/differs from identity mesh.senderKind/);
   });
   it('rejects unknown joins, duplicate ids and secrets', () => {
