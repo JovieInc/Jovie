@@ -89,6 +89,8 @@ const DEMO = 'apps/web/components/features/demo';
 const ONBOARDING =
   'apps/web/components/features/dashboard/organisms/onboarding';
 const PROFILE = 'apps/web/components/features/profile';
+const ONBOARDING_COPY =
+  'apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts';
 const STAGE = '[data-testid="onboarding-stage-framed"]';
 
 export const PRODUCT_SHOTS = [
@@ -97,28 +99,22 @@ export const PRODUCT_SHOTS = [
     title: 'Claim your handle',
     alt: 'Jovie onboarding with the handle tim entered after jov.ie/.',
     route: '/demo/showcase/onboarding-handle?profile=tim-white',
-    viewport: 'desktop',
+    // The real mobile layout at every width: at 1440 the desktop field is
+    // 672px wide and the handle reads as a mostly empty pill.
+    viewport: 'mobile',
     theme: 'dark',
     waitFor: '[data-testid="onboarding-handle-submit"]',
-    // The submit button, not the form: the form also holds an empty
-    // validation-status slot that read as dead space under the input.
     crop: [`${STAGE} h1`, '[data-testid="onboarding-handle-submit"]'],
-    // 48px heading on a 52px line box: 10px less on top balances the cap
-    // height against the 32px under the input.
-    padding: { top: 22, right: 32, bottom: 32, left: 32 },
+    // 16px sides keep the crop inside the stage's 24px corner radius
+    // (stage edge x=16, heading x=37) so no frame arc shows; the bottom
+    // balances the ~21px the heading's line box leaves above its caps
+    // (blind critique 2026-10-29: 32 read bottom-heavy).
+    padding: { top: 14, right: 16, bottom: 26, left: 16 },
     frame: 'bare',
-    displayWidth: 736,
-    // At 390 the desktop crop shrinks the heading to 19px; the real mobile
-    // layout reads near 1:1 in a phone-width card.
-    mobile: {
-      crop: [`${STAGE} h1`, '[data-testid="onboarding-handle-submit"]'],
-      // 16px sides keep the crop inside the stage's 24px corner radius
-      // (stage edge x=16, heading x=37) so no frame arc shows.
-      padding: { top: 14, right: 16, bottom: 20, left: 16 },
-      displayWidth: 358,
-    },
+    displayWidth: 358,
     sources: [
       `${ONBOARDING}/OnboardingHandleStep.tsx`,
+      ONBOARDING_COPY,
       `${DEMO}/DemoShowcaseSurface.tsx`,
       'apps/web/components/features/onboarding/OnboardingExperienceShell.tsx',
     ],
@@ -138,6 +134,7 @@ export const PRODUCT_SHOTS = [
     displayWidth: 560,
     sources: [
       `${ONBOARDING}/OnboardingDspStep.tsx`,
+      ONBOARDING_COPY,
       `${DEMO}/DemoShowcaseSurface.tsx`,
       'apps/web/components/features/onboarding/OnboardingExperienceShell.tsx',
     ],

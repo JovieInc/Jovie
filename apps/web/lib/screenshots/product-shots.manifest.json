@@ -19,51 +19,37 @@
       }
     },
     "setup-claim-handle": {
-      "width": 1472,
-      "height": 426,
-      "sourceHash": "de31834c23943481cce057174f7ddab901d3c9e400e20f560999c3f60740359a",
-      "specHash": "d26c3855110ccb6d3dcabe8aa7ebcf16d6b3c5800e7c561923051518596464a7",
-      "renderedAt": "2026-10-29T19:21:51.058Z",
-      "sources": [
-        "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
-        "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
-        "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
-      ],
-      "bytes": {
-        "avif": 9396,
-        "webp": 13314
-      }
-    },
-    "setup-claim-handle--mobile": {
       "width": 696,
-      "height": 360,
-      "sourceHash": "de31834c23943481cce057174f7ddab901d3c9e400e20f560999c3f60740359a",
-      "specHash": "41bf2a7158c457fb76e5adcbe69503a40a5961fdcf8945b6fe47a17cbb2b0b94",
-      "renderedAt": "2026-10-29T19:22:03.369Z",
+      "height": 372,
+      "sourceHash": "b476b23c99368aeb6e2ecd82041a84d353e24012183dc076ddd3fdc51c721a37",
+      "specHash": "8e8165321af2f58428e0d98ae5f458702ea14d0331883630a01c31630c875ffd",
+      "renderedAt": "2026-10-29T19:42:52.724Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingHandleStep.tsx",
+        "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
         "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
         "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
       ],
       "bytes": {
-        "avif": 7842,
-        "webp": 11416
+        "avif": 8086,
+        "webp": 11838
       }
     },
     "setup-connect-music": {
       "width": 972,
       "height": 530,
-      "sourceHash": "b5f67e2d7921a991f3797c654a2e2bc5b70785fd42fabe7fdc7b67ae01df42e4",
+      "sourceHash": "a35c3cf4e9bcf1c7787421e6eec8a688ab77df0b3672970e1fe9498e9ec1079f",
       "specHash": "cc187de12e7d6b300efb2e132d4520b657a8c2f8ae04e359d7589c5978325b90",
-      "renderedAt": "2026-10-29T19:15:40.098Z",
+      "renderedAt": "2026-10-29T19:36:43.647Z",
       "sources": [
         "apps/web/components/features/dashboard/organisms/onboarding/OnboardingDspStep.tsx",
+        "apps/web/components/features/dashboard/organisms/onboarding-v2/shared/types.ts",
         "apps/web/components/features/demo/DemoShowcaseSurface.tsx",
         "apps/web/components/features/onboarding/OnboardingExperienceShell.tsx"
       ],
       "bytes": {
-        "avif": 12520,
-        "webp": 17678
+        "avif": 12755,
+        "webp": 18120
       }
     },
     "setup-share-profile": {

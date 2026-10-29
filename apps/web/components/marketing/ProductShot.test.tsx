@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   getProductShot,
   PRODUCT_SHOT_DPR,
@@ -41,22 +41,31 @@ describe('ProductShot', () => {
     }
   });
 
-  it('serves the mobile variant below the narrow breakpoint without CLS', () => {
-    const { container } = render(<ProductShot id='setup-claim-handle' />);
-    const shot = getProductShot('setup-claim-handle');
-    if (!shot.mobile)
-      throw new Error('setup-claim-handle declares a mobile variant');
+  it('serves a mobile variant below the narrow breakpoint without CLS', async () => {
+    const registry = await import('@/lib/screenshots/product-shots');
+    const base = registry.getProductShot('setup-connect-music');
+    const mobile = {
+      avif: '/product-shots/setup-connect-music--mobile.avif?v=1',
+      webp: '/product-shots/setup-connect-music--mobile.webp?v=1',
+      width: 358,
+      height: 180,
+    };
+    const spy = vi
+      .spyOn(registry, 'getProductShot')
+      .mockReturnValue({ ...base, mobile });
+    const { container } = render(<ProductShot id='setup-connect-music' />);
     const [mobileAvif, mobileWebp, desktopAvif] =
       container.querySelectorAll('source');
 
     expect(mobileAvif).toHaveAttribute('media', PRODUCT_SHOT_MOBILE_MEDIA);
-    expect(mobileAvif).toHaveAttribute('srcset', shot.mobile.avif);
-    expect(mobileWebp).toHaveAttribute('srcset', shot.mobile.webp);
+    expect(mobileAvif).toHaveAttribute('srcset', mobile.avif);
+    expect(mobileWebp).toHaveAttribute('srcset', mobile.webp);
     expect(desktopAvif).not.toHaveAttribute('media');
     const figure = container.querySelector('figure') as HTMLElement;
     expect(figure.style.getPropertyValue('--product-shot-mobile-ratio')).toBe(
-      `${shot.mobile.width} / ${shot.mobile.height}`
+      '358 / 180'
     );
+    spy.mockRestore();
   });
 
   it('draws window chrome only for window-framed shots', () => {
