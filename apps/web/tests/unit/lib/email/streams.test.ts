@@ -51,12 +51,8 @@ describe('email stream registry', () => {
   });
 
   it('flags cold on Resend and a provider that does not permit its stream', () => {
-    const bad = structuredClone(
-      EMAIL_STREAM_REGISTRY
-    ) as EmailStreamRegistry & {
-      streams: Record<string, { provider: string | null }>;
-    };
-    bad.streams.cold.provider = 'resend';
+    const bad = structuredClone(EMAIL_STREAM_REGISTRY) as EmailStreamRegistry;
+    (bad.streams.cold as { provider: string | null }).provider = 'resend';
     const rules = findHardViolations({}, bad).map(v => v.rule);
     expect(rules).toContain('cold-on-transactional-provider');
     expect(rules).toContain('provider-not-allowed');
