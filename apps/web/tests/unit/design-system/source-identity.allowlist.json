@@ -102,6 +102,72 @@
       "rule": "linear-namespace",
       "value": "--linear-text-secondary",
       "reason": "A11y contrast repair (2026-10-23): dropdown subText moved off --linear-text-tertiary, which fails WCAG AA at text-2xs on the menu surface; --linear-text-secondary is the in-namespace canonical secondary already used by badge.tsx and siblings."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.stories.tsx",
+      "rule": "arbitrary-value",
+      "value": "w-[24rem]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "ring-[rgb(var(--focus-ring))]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "tracking-[-0.015em]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "tracking-[-0.03em]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "tracking-[-0.04em]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "transition-[border-color,background-color,color]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "transition-[border-color,background-color,opacity]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "transition-[max-height,opacity]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/features/pay/PaySelector.tsx",
+      "rule": "arbitrary-value",
+      "value": "transition-[opacity,border-color]",
+      "reason": "JOV-8873: PaySelector family moved molecules -> features/pay (completing the fable-branch rename); these are the component's existing grandfathered arbitrary values registered at their new canonical path, not new debt."
+    },
+    {
+      "file": "apps/web/components/molecules/page-toolbar-classes.ts",
+      "rule": "arbitrary-value",
+      "value": "font-[540]",
+      "reason": "JOV-8873: page-toolbar action classes extracted into the shared page-toolbar-classes module; value-identical to PageToolbar.tsx's grandfathered string (ACTION_BAR_BUTTON_CLASS === APP_CONTROL_BUTTON_CLASS). File-move registration only."
     }
   ],
   "notes": "Documented escapes only. Each identity is file<TAB>rule<TAB>value (or {file, rule, value}). Prefer deleting the debt over adding an escape. The JOV-[1-9] entry is a zod issue-key validation regex in that route (identifier: /^JOV-[1-9][0-9]*$/u), not a style token; no canonical design token applies."
