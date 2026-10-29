@@ -6147,6 +6147,22 @@ def render_fix_prompt(pr: dict, excerpt: str) -> str:
     ])
 
 
+def regenerate_merged_generated(worktree: Path, paths, log, *, guard=lambda: None) -> bool:
+    """Restore main's generated copies, then regenerate from the merged source, including
+    outputs that Git merged cleanly. Also usable after an agent resolves source conflicts."""
+    generated = sorted(set(paths) & remediation.GENERATED_RESOLVERS.keys())
+    if not generated:
+        return True
+    if sh(["git", "checkout", "origin/main", "--", *generated], cwd=worktree, log=log).returncode:
+        return False
+    commands = dict.fromkeys(remediation.GENERATED_RESOLVERS[path] for path in generated)
+    for command in commands:
+        guard()
+        if sh(list(command), cwd=worktree, timeout=900, log=log).returncode:
+            return False
+    return sh(["git", "add", *generated], cwd=worktree, log=log).returncode == 0
+
+
 def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda: None) -> bool:
     """JOV-6837/JOV-7594: a PR that conflicts with main only in machine-derived files needs
     no model. Merge main, take its copy of each conflicted generated file, run each file's
@@ -6161,18 +6177,11 @@ def resolve_generated_conflict(worktree: Path, branch: str, log, *, guard=lambda
         if not conflicted or not conflicted <= remediation.GENERATED_RESOLVERS.keys():
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
-        sh(["git", "checkout", "origin/main", "--", *sorted(conflicted)], cwd=worktree, log=log)
-        guard()
-        commands = []
-        for path in sorted(conflicted):
-            command = list(remediation.GENERATED_RESOLVERS[path])
-            if command not in commands:
-                commands.append(command)
-        for command in commands:
-            if sh(command, cwd=worktree, timeout=900, log=log).returncode != 0:
-                sh(["git", "merge", "--abort"], cwd=worktree, log=log)
-                return False
-        sh(["git", "add", *sorted(conflicted)], cwd=worktree, log=log)
+        changed = sh(["git", "diff", "--name-only", "HEAD"], cwd=worktree)
+        if changed.returncode or not regenerate_merged_generated(
+                worktree, conflicted | set(changed.stdout.splitlines()), log, guard=guard):
+            sh(["git", "merge", "--abort"], cwd=worktree, log=log)
+            return False
         if sh(["git", "commit", "--no-edit"], cwd=worktree, log=log).returncode != 0:
             sh(["git", "merge", "--abort"], cwd=worktree, log=log)
             return False
