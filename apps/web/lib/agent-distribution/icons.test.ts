@@ -13,6 +13,15 @@ import {
 const ROOT = join(__dirname, '../../../..');
 
 describe('listing icons', () => {
+  it('returns null when the canonical mark or tokens are missing', async () => {
+    const empty = await mkdtemp(join(tmpdir(), 'agent-icons-empty-'));
+    try {
+      expect(await loadIconSource(empty)).toBeNull();
+    } finally {
+      await rm(empty, { recursive: true, force: true });
+    }
+  });
+
   it('builds the icon from the canonical mark on the canvas token', async () => {
     const source = await loadIconSource(ROOT);
     expect(source?.info.markPath).toBe(
