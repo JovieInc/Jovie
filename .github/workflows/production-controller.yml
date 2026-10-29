@@ -1609,6 +1609,8 @@ jobs:
           GH_TOKEN: ${{ steps.changelog-token.outputs.token }}
           GH_API_HOLD_BUDGET_SECONDS: '480'
           JOVIE_AGENT_PROFILE: coder
+          # Set repo variable CHANGELOG_CATCH_UP=1 for one run to fold a backlog into one post.
+          CHANGELOG_CATCH_UP: ${{ vars.CHANGELOG_CATCH_UP == '1' && '1' || '' }}
         run: |
           set -euo pipefail
           # The release-writer token has an independent REST quota; avoid making
@@ -1643,7 +1645,8 @@ jobs:
           git checkout -b "$branch"
           node scripts/publish-daily-changelog.mjs \
             --marker "$RUNNER_TEMP/changelog-marker/production-generation-verified.json" \
-            --output "$RUNNER_TEMP/customer-changelog" --write
+            --output "$RUNNER_TEMP/customer-changelog" --write \
+            ${CHANGELOG_CATCH_UP:+--catch-up}
           [ "$(jq -r .status "$RUNNER_TEMP/customer-changelog/plan.json")" = publish ] || exit 0
           git config user.name 'jovie-bot[bot]'
           git config user.email 'jovie-bot[bot]@users.noreply.github.com'
