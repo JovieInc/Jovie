@@ -2249,18 +2249,18 @@
       "classification": "C"
     },
     {
-      "source": "apps/web/app/api/content-records/stage-events/route.ts",
-      "kind": "handler",
-      "route": "/api/content-records/stage-events",
-      "methods": ["GET"],
-      "surface": "deferred",
-      "classification": "C"
-    },
-    {
       "source": "apps/web/app/api/content-records/[kind]/[key]/route.ts",
       "kind": "handler",
       "route": "/api/content-records/[kind]/[key]",
       "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/content-records/stage-events/route.ts",
+      "kind": "handler",
+      "route": "/api/content-records/stage-events",
+      "methods": ["GET"],
       "surface": "deferred",
       "classification": "C"
     },
