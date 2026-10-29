@@ -273,24 +273,21 @@ describe('SpotifyConnectDialog', () => {
     const { rerender } = renderDialog();
 
     const { user, input } = await searchFor('tim white');
-    await user.keyboard('{Escape}');
+    await user.keyboard('{ArrowUp}');
 
     mockSearchHook({
-      results: [
-        ...defaultResults,
-        { ...otherClaimedArtist, id: 'arriving-id' },
-      ],
+      results: [currentUserArtist],
     });
     rerender(
       <SpotifyConnectDialog open onOpenChange={vi.fn()} connected={false} />
     );
 
-    expect(input).toHaveValue('tim white');
+    expect(input).not.toHaveAttribute('aria-activedescendant');
     expect(input).toHaveFocus();
 
-    await user.tab();
+    await user.keyboard('{Escape}{Tab}');
     await user.click(input);
-    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(1));
     expect(input).toHaveValue('tim white');
   }, 15_000);
 

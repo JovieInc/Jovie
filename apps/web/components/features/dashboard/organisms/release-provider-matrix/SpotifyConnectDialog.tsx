@@ -576,7 +576,7 @@ export function SpotifyConnectDialog({
               aria-expanded={hasVisibleResults}
               aria-controls={hasVisibleResults ? RESULTS_ID : undefined}
               aria-activedescendant={
-                hasVisibleResults && formState.activeResultIndex >= 0
+                hasVisibleResults && visibleResults[formState.activeResultIndex]
                   ? `spotify-connect-result-${formState.activeResultIndex}`
                   : undefined
               }
