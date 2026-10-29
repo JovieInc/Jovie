@@ -10,7 +10,7 @@ const release: ReleaseViewModel = {
   title: 'Midnight Signal',
   status: 'released',
   releaseDate: '2026-01-01',
-  artworkUrl: null,
+  artworkUrl: undefined,
   slug: 'midnight-signal',
   smartLinkPath: '/r/midnight-signal',
   releaseType: 'single',
