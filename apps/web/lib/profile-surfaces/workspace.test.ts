@@ -129,12 +129,12 @@ describe('connections workspace helpers', () => {
     for (const row of [...rows, ...connectorRows]) {
       for (const providerAvailable of [true, false]) {
         const status = getConnectionStatus(row, providerAvailable);
-        expect(`${row.id}/${providerAvailable}`, status.label.trim()).not.toBe(
+        expect(status.label.trim(), `${row.id}/${providerAvailable}`).not.toBe(
           ''
         );
         expect(
-          `${row.id}/${providerAvailable}`,
-          status.nextAction.trim()
+          status.nextAction.trim(),
+          `${row.id}/${providerAvailable}`
         ).not.toBe('');
       }
     }

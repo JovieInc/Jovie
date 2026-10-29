@@ -1108,15 +1108,22 @@ describe('ProfilesWorkspace', { timeout: 15_000 }, () => {
     });
 
     expect(screen.queryByText('Unknown')).not.toBeInTheDocument();
-    // Every connected platform reads Connected in its row — never Unknown.
-    // Exact full-text matching keeps 'YouTube' from matching the
-    // 'YouTube Music' row, and the row count covers the full dogfood set.
-    const connectedRows = screen
-      .getAllByRole('row')
-      .filter(row => within(row).queryByText('Connected') !== null);
+    // Mobile and desktop both render the status label. Select the Status
+    // cell, then verify each platform belongs to exactly one connected row.
+    const connectedRows = screen.getAllByRole('row').filter(
+      row =>
+        within(row).queryByRole('cell', {
+          name: 'Connected',
+          exact: true,
+        }) !== null
+    );
     expect(connectedRows).toHaveLength(dogfoodPlatforms.length);
     for (const label of dogfoodPlatforms) {
-      expect(screen.getByText(label)).toBeInTheDocument();
+      expect(
+        connectedRows.filter(
+          row => within(row).queryByText(label, { exact: true }) !== null
+        )
+      ).toHaveLength(1);
     }
     expect(screen.getAllByText('Needs Qualification').length).toBeGreaterThan(
       0
