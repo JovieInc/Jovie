@@ -4101,7 +4101,8 @@ html:not(.dark) .smart-link-powered-by {
     var(--profile-drawer-height-max) -
     var(--profile-drawer-header)
   );
-  padding-bottom: var(--space-5);
+  /* Matches the inset above the first row (rows carry their own py-3). */
+  padding-bottom: var(--space-3);
 }
 
 @media (min-width: 768px) {

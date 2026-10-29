@@ -158,7 +158,7 @@ export function ProfileDrawerShell({
           </div>
         ) : isDirectHeader ? (
           <div
-            className='grid grid-cols-[minmax(0,1fr)_44px] items-center gap-2.5 pt-5'
+            className='grid grid-cols-[minmax(0,1fr)_44px] items-center gap-3 pt-5'
             data-testid='profile-drawer-direct-header'
           >
             <div
