@@ -404,8 +404,12 @@ export const SCREENSHOT_SCENARIOS: readonly ScreenshotScenario[] = [
       // monogram avatar, abstract release art) keeps every person off `/`.
       id: 'template-profile-live-mobile',
       title: 'Template Profile — Latest Release',
-      route: '/demo/showcase/tim-white-profile?archetype=template',
-      waitFor: '[data-testid="demo-showcase-tim-white-profile"]',
+      // Locator crop of the top of the screen (identity, links, featured
+      // release); the tab bar and the empty run above it stay out of frame.
+      route: '/demo/showcase/tim-white-profile?archetype=template&capture=hero',
+      waitFor: '[data-testid="demo-template-hero-capture"]',
+      captureTarget: 'locator',
+      captureSelector: '[data-testid="demo-template-hero-capture"]',
       viewport: 'mobile',
       publicExportPath: 'template-profile-live-phone.png',
     },
@@ -684,7 +688,7 @@ const PUBLIC_EXPORT_DIMENSIONS: Record<
   'release-tasks-active.png': { width: 1624, height: 1428 },
   'releases-dashboard-full.png': { width: 2880, height: 1800 },
   'releases-dashboard-sidebar.png': { width: 2880, height: 1800 },
-  'template-profile-live-phone.png': { width: 780, height: 1688 },
+  'template-profile-live-phone.png': { width: 780, height: 1264 },
   'tim-white-profile-contact-phone.png': { width: 780, height: 1688 },
   'tim-white-profile-listen-phone.png': { width: 780, height: 1688 },
   'tim-white-profile-live-phone.png': { width: 780, height: 1688 },

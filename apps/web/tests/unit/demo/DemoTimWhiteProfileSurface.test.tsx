@@ -208,5 +208,15 @@ describe('DemoTimWhiteProfileSurface', () => {
         creatorProfileId: 'homepage-template-profile',
       }),
     });
+    expect(screen.queryByTestId('demo-template-hero-capture')).toBeNull();
+  });
+
+  it('adds the hero crop target for the homepage capture', async () => {
+    await renderSurface('archetype=template&capture=hero');
+
+    expect(screen.getByTestId('demo-template-hero-capture')).toHaveClass(
+      'absolute',
+      'h-158'
+    );
   });
 });

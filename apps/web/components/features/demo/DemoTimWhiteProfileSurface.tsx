@@ -827,9 +827,23 @@ export function DemoTimWhiteProfileSurface() {
     );
   }
 
+  // Homepage hero crop: the top of the template profile (identity, links,
+  // and the featured release) without the empty run above the tab bar.
+  const heroCrop = archetype === 'template' && captureMode === 'hero';
+
   return (
     <DemoClientProviders>
-      <div data-testid='demo-showcase-tim-white-profile'>
+      <div
+        data-testid='demo-showcase-tim-white-profile'
+        className={heroCrop ? 'relative' : undefined}
+      >
+        {heroCrop ? (
+          <div
+            aria-hidden='true'
+            data-testid='demo-template-hero-capture'
+            className='pointer-events-none absolute inset-x-0 top-0 z-50 h-158'
+          />
+        ) : null}
         <StaticArtistPage
           presentation={
             searchParams.get('presentation') === 'compact-preview'

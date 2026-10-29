@@ -108,7 +108,7 @@ describe('homepage hero light budget', () => {
     // children align to the spine's left edge, not the field center.
     expect(copy).toContain('align-items: flex-start');
     expect(copy).toContain('margin-inline: auto');
-    // The proof keeps the real screen aspect and never exceeds the
+    // The proof keeps the crop's real aspect (780x1264 capture) and never exceeds the
     // capture's native width (390 CSS px = 24.375rem), so it stays crisp.
     // The lead fills the copy column instead of sizing to max-content, so
     // the subhead and claim button never run past a phone viewport (the
@@ -118,7 +118,7 @@ describe('homepage hero light budget', () => {
     expect(lead).toContain('width: 100%');
     expect(lead).toContain('min-width: 0');
     const proof = cssBlock(css, '.homepage-hero-canvas__proof');
-    expect(proof).toContain('aspect-ratio: 402 / 874');
+    expect(proof).toContain('aspect-ratio: 780 / 1264');
     expect(proof).toContain('max-width: 24rem');
     const gridSelector = '.homepage-hero-canvas__copy[data-has-proof="true"] {';
     const wideStart = css.lastIndexOf(
@@ -139,9 +139,10 @@ describe('homepage hero light budget', () => {
       'grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)'
     );
     expect(grid).toContain('align-items: center');
-    // Height-bound so the whole phone screen fits the first viewport.
+    // Width follows the viewport height so the whole crop fits the first
+    // viewport, capped at the native capture width.
     expect(wide).toMatch(
-      /\.homepage-hero-canvas__proof \{[^}]*height: min\(\s*calc\(100svh - var\(--hero-canvas-bar\) - var\(--space-32, 8rem\)\),\s*42rem\s*\)/
+      /\.homepage-hero-canvas__proof \{[^}]*width: min\(\s*24rem,\s*calc\(\(100svh - var\(--hero-canvas-bar\) - var\(--space-32, 8rem\)\) \* 0\.617\)\s*\)/
     );
   });
 
@@ -164,7 +165,7 @@ describe('homepage hero light budget', () => {
     expect(proof).toContain('align-self: center');
     const base = cssBlock(css, '.homepage-hero-canvas__proof');
     expect(base).not.toContain('position: absolute');
-    expect(base).toContain('width: min(72vw, 18rem)');
+    expect(base).toContain('width: min(80vw, 20rem)');
   });
 
   it('records the scoped WebGL exception without rewriting the standing rule', () => {
