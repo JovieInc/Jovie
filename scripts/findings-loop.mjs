@@ -373,7 +373,6 @@ function writeBaseline(ledger, existing) {
       dimension: `open-findings-${source}`,
       direction: 'lock_down',
       baseline: measured,
-      policy: { marginFraction: 0, improveEpsilon: 0, minSampleSize: 0 },
     };
   }
   return {

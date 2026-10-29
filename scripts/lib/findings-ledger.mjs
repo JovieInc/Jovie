@@ -480,7 +480,18 @@ export function ratchetReport(metrics, baseline) {
       });
       continue;
     }
-    const verdict = compareRatchet({ value: measured, sampleSize: 1 }, ratchet);
+    // Baselines omit the policy: a ledger ratchet is always exact (no margin, no epsilon).
+    const verdict = compareRatchet(
+      { value: measured, sampleSize: 1 },
+      {
+        ...ratchet,
+        policy: ratchet.policy ?? {
+          marginFraction: 0,
+          improveEpsilon: 0,
+          minSampleSize: 0,
+        },
+      }
+    );
     results.push({
       source,
       measured,

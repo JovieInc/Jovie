@@ -7,67 +7,37 @@
       "schemaVersion": 1,
       "dimension": "open-findings-sonarcloud",
       "direction": "lock_down",
-      "baseline": 6192,
-      "policy": {
-        "marginFraction": 0,
-        "improveEpsilon": 0,
-        "minSampleSize": 0
-      }
+      "baseline": 6192
     },
     "code-scanning": {
       "schemaVersion": 1,
       "dimension": "open-findings-code-scanning",
       "direction": "lock_down",
-      "baseline": 678,
-      "policy": {
-        "marginFraction": 0,
-        "improveEpsilon": 0,
-        "minSampleSize": 0
-      }
+      "baseline": 678
     },
     "dependabot": {
       "schemaVersion": 1,
       "dimension": "open-findings-dependabot",
       "direction": "lock_down",
-      "baseline": 3,
-      "policy": {
-        "marginFraction": 0,
-        "improveEpsilon": 0,
-        "minSampleSize": 0
-      }
+      "baseline": 3
     },
     "secret-scanning": {
       "schemaVersion": 1,
       "dimension": "open-findings-secret-scanning",
       "direction": "lock_down",
-      "baseline": 0,
-      "policy": {
-        "marginFraction": 0,
-        "improveEpsilon": 0,
-        "minSampleSize": 0
-      }
+      "baseline": 0
     },
     "coverage": {
       "schemaVersion": 1,
       "dimension": "open-findings-coverage",
       "direction": "lock_down",
-      "baseline": 1,
-      "policy": {
-        "marginFraction": 0,
-        "improveEpsilon": 0,
-        "minSampleSize": 0
-      }
+      "baseline": 1
     },
     "mutation": {
       "schemaVersion": 1,
       "dimension": "open-findings-mutation",
       "direction": "lock_down",
-      "baseline": 0,
-      "policy": {
-        "marginFraction": 0,
-        "improveEpsilon": 0,
-        "minSampleSize": 0
-      }
+      "baseline": 0
     }
   }
 }
