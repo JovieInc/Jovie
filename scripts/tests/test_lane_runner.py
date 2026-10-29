@@ -756,6 +756,14 @@ class PromptTest(unittest.TestCase):
         self.assertIn('<!-- customer-changelog/v1 {"releaseWorthy":false} -->', prompt)
         self.assertIn("docs/CHANGELOG_PUBLICATION.md", prompt)
 
+    def test_repair_prompt_preflights_the_customer_decision_without_replacing_approved_copy(self):
+        prompt = lane.render_fix_prompt({"number": 23211, "headRefName": "fix/apple-music-visitor-storefront"},
+                                      "Customer outcome decision missing or invalid (missing-metadata)")
+        self.assertIn("exactly one customer-changelog/v1 decision", prompt)
+        self.assertIn("preserve existing approved customer copy", prompt)
+        self.assertIn("node scripts/changelog-source-guard.mjs --pr-file <pr.json> --body-file <body.md>", prompt)
+        self.assertIn("not hosted CI proof", prompt)
+
     def test_contract_forbids_interactive_skill_workflows(self):
         prompt = lane.render_prompt(issue(), "codex/jov-1", "")
         self.assertIn("Never stop to ask", prompt)
