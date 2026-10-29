@@ -166,7 +166,10 @@
         "at": "2026-10-20T22:14:00Z",
         "ref": "334dc8c4413326cad5832ed2b0e74780da7e3467:apps/web/app/claim/page.tsx"
       },
-      "sources": ["apps/web/app/claim/page.tsx"]
+      "sources": [
+        "apps/web/app/claim/agent/[draftId]/page.tsx",
+        "apps/web/app/claim/page.tsx"
+      ]
     },
     {
       "id": "home",
@@ -707,6 +710,13 @@
       "to": "holdout",
       "at": "2026-10-29T09:55:00Z",
       "evidence": "PR #23608 introduces the generated agent connector docs page (JOV-9762); source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/claim/agent/[draftId]/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T16:20:00Z",
+      "evidence": "PR #23573 introduces the agent draft claim page (JOV-9760); source registration only, not rendered certification."
     }
   ]
 }
