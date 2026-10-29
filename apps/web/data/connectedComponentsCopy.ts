@@ -20,8 +20,8 @@ export const CONNECTED_COMPONENTS_COPY = {
     {
       id: 'coming-soon',
       scenarioId: 'tim-white-profile-presave-mobile',
-      alt: 'A Jovie profile with an upcoming release marked Coming soon and a Get Updates button.',
-      title: 'Coming soon',
+      alt: 'A Jovie profile showing an upcoming release and a Get Updates button.',
+      title: 'Upcoming release',
       body: 'Before release day, your profile says what is coming and lets people ask for updates.',
     },
     {

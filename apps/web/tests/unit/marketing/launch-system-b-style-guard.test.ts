@@ -121,4 +121,26 @@ describe('launch page System B source contract', () => {
     );
     expect(source).toContain('tabIndex={0}');
   });
+
+  it('shows one catalog everywhere: no invented release titles or fixed old dates', () => {
+    for (const path of [
+      pageSourcePath,
+      'components/features/home/ProfileMockup.tsx',
+    ]) {
+      const source = readFileSync(resolve(process.cwd(), path), 'utf8');
+      for (const stale of [
+        'Signals',
+        'The Sound',
+        'Fading Light',
+        'Where It Goes',
+        '2018',
+        '2019',
+        '2020',
+        '2022',
+      ]) {
+        expect(source, `${path} still names ${stale}`).not.toContain(stale);
+      }
+      expect(source).toContain('HOMEPAGE_PROFILE_PREVIEW_CATALOG');
+    }
+  });
 });

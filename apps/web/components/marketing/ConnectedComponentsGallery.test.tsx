@@ -1,3 +1,4 @@
+import { DEAD_END_RULES, lintCopy } from '@jovie/copy';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { CONNECTED_COMPONENTS_COPY } from '@/data/connectedComponentsCopy';
@@ -15,6 +16,24 @@ vi.mock('next/image', () => ({
 }));
 
 describe('ConnectedComponentsGallery', () => {
+  it('keeps rendered captions and accessible descriptions inside the copy policy', () => {
+    const { container } = render(<ConnectedComponentsGallery />);
+    const copy = [
+      container.textContent ?? '',
+      ...Array.from(container.querySelectorAll('[alt], [aria-label]'), node =>
+        [node.getAttribute('alt'), node.getAttribute('aria-label')].join(' ')
+      ),
+    ];
+    for (const text of copy) {
+      expect(lintCopy(text, { register: 'jovie-marketing' }).blocking).toEqual(
+        []
+      );
+      expect(DEAD_END_RULES.filter(rule => rule.pattern.test(text))).toEqual(
+        []
+      );
+    }
+  });
+
   it('renders one real capture per moment, in release order', () => {
     render(<ConnectedComponentsGallery />);
     const gallery = screen.getByTestId('connected-components-gallery');
