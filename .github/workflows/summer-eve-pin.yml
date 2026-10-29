@@ -87,5 +87,7 @@ jobs:
 
       - name: Check source-bound production Summer
         env:
-          SUMMER_PIN_CHECK_VERCEL_TOKEN: ${{ secrets.SUMMER_PIN_CHECK_VERCEL_TOKEN }}
+          # PR runs execute PR code (setup action and pnpm script come from the
+          # merge ref): they get the public identity read only, never the token.
+          SUMMER_PIN_CHECK_VERCEL_TOKEN: ${{ github.event_name != 'pull_request' && secrets.SUMMER_PIN_CHECK_VERCEL_TOKEN || '' }}
         run: pnpm check:summer-eve-pin
