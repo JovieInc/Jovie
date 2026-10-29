@@ -104,7 +104,7 @@ export default function AiPage() {
           </article>
         </section>
 
-        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8 lg:grid-cols-[1.2fr_0.8fr]'>
+        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8'>
           <div className='space-y-4'>
             {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight line-clamp-2'>
@@ -123,29 +123,10 @@ export default function AiPage() {
               </li>
             </ul>
           </div>
-          <div className='space-y-4'>
-            {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-2xl font-semibold tracking-tight line-clamp-2'>
-              Read the public context
-            </h2>
-            <p className='text-sm leading-7 text-secondary-token'>
-              The deeper memo and fundraising material stay private. The public
-              surfaces below explain the problem, the product shape, and the
-              creator-facing offer.
-            </p>
-            <div className='flex flex-wrap gap-3'>
-              <Button asChild variant='secondary'>
-                <Link href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}>
-                  Read The Memo
-                </Link>
-              </Button>
-            </div>
-          </div>
         </section>
       </MarketingContainer>
 
       <MarketingFooterCta
-        title='See the AI operating system on your Jovie profile.'
         ctaLabel='See Pricing'
         ctaHref={APP_ROUTES.PRICING}
         ctaAnalyticsEvent='ai_footer_cta_pricing'

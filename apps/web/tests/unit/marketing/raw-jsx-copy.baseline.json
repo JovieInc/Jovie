@@ -64,7 +64,6 @@
     "apps/web/components/site/MarketingFooter.tsx :: raw-jsx-attr :: Legal",
     "apps/web/components/site/MarketingFooter.tsx :: raw-jsx-attr :: Footer",
     "apps/web/components/site/MarketingFooter.tsx :: raw-jsx-attr :: Resources",
-    "apps/web/components/site/MarketingFooterCta.tsx :: raw-jsx-attr :: Request Access to Jovie.",
     "apps/web/components/site/NotFoundPageContent.tsx :: raw-jsx :: Go home",
     "apps/web/components/site/NotFoundPageContent.tsx :: raw-jsx :: Explore profiles",
     "apps/web/components/site/theme-toggle/ThemeToggle.tsx :: raw-jsx :: Toggle theme",

@@ -1,10 +1,8 @@
 'use client';
 
 import { ReleaseSmartLinkAnalytics } from '@/components/organisms/release-sidebar/ReleaseSmartLinkAnalytics';
-import type {
-  Release,
-  ReleaseSidebarAnalytics,
-} from '@/components/organisms/release-sidebar/types';
+import type { Release } from '@/components/organisms/release-sidebar/types';
+import { buildLinkAnalyticsFixture } from './linkAnalyticsFixture';
 
 const RELEASE: Release = {
   profileId: 'profile-northline',
@@ -19,13 +17,6 @@ const RELEASE: Release = {
   totalTracks: 1,
 };
 
-const ANALYTICS: ReleaseSidebarAnalytics = {
-  totalClicks: 1842,
-  last7DaysClicks: 126,
-  lastClickAt: '2026-08-20T15:04:00.000Z',
-  providerClicks: [{ provider: 'spotify', clicks: 940 }],
-};
-
 /**
  * Shipped smart-link analytics panel with a fixed click fixture.
  * The override skips the dashboard fetch so the first render is ready.
@@ -33,7 +24,7 @@ const ANALYTICS: ReleaseSidebarAnalytics = {
 export function LinkAnalyticsSurface() {
   return (
     <ReleaseSmartLinkAnalytics
-      analyticsOverride={ANALYTICS}
+      analyticsOverride={buildLinkAnalyticsFixture()}
       release={RELEASE}
       variant='flat'
     />
