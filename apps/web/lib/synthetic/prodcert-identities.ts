@@ -20,7 +20,7 @@ export const PRODCERT_RETURNING_CANARY_EMAIL =
   DEFAULT_DEV_TEST_AUTH_EMAILS['creator-ready'];
 
 export const PRODCERT_NEW_USER_EMAIL_PATTERN =
-  /^browse-ready\+synthetic-prodcert-[a-z0-9]{6,24}@jov\.ie$/u;
+  /^browse-ready\+synthetic-prodcert-(?:[a-z\d]){6,24}@jov\.ie$/u;
 
 export function isProdcertCanaryEmail(
   email: string | null | undefined
