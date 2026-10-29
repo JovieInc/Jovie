@@ -62,8 +62,8 @@ export const HEAVY_GUARDS = new Set([
 export const NARROWED = {
   'merge-group-unit-guards': {
     command:
-      'pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
-    note: 'metrics-layer + locked chrome only; design-system suite runs with --thorough',
+      'node scripts/design-system-source-ratchet.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts',
+    note: 'source identity, metrics-layer and locked chrome; full suite with --thorough',
   },
 };
 
@@ -355,8 +355,11 @@ export function typecheckTargets(files, cwd) {
       continue;
     const isTest = /\.(?:test|spec)\.[^/]+$|\/tests?\//.test(f.filename);
     const web = f.filename.startsWith('apps/web/');
-    if (web) out.add(isTest ? 'web-tests' : 'web');
-    else if (/^scripts\//.test(f.filename)) out.add('scripts');
+    if (web) {
+      out.add(isTest ? 'web-tests' : 'web');
+      // Ovie compiles shared web routes/components under its own TS graph.
+      if (!isTest) out.add('pkg:@jovie/ovie');
+    } else if (/^scripts\//.test(f.filename)) out.add('scripts');
     else {
       let dir = path.dirname(f.filename);
       while (dir && dir !== '.') {
