@@ -12,11 +12,9 @@ import { HomepageQueryProvider } from '../../(home)/homepage-query-provider';
  * Signed preview of one stored homepage spec version, before or after it is
  * published. The link carries an HMAC of the version id (`?token=`) and an
  * optional experiment arm (`?arm=`). Unsigned, unknown, or invalid versions
- * 404. Never indexed and never cached: this route is the only per-request
- * render of a spec, and it is not a marketing page.
+ * 404. Never indexed; reading `searchParams` makes it a per-request render,
+ * and it is not a marketing page.
  */
-
-export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Preview',
