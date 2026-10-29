@@ -305,12 +305,13 @@
       "capacityProviderId": "hyperagent",
       "label": "Hyperagent",
       "kind": "provider-pool",
-      "status": "active",
+      "status": "pending-bridge",
       "route": {
-        "kind": "hyperagent-mcp",
+        "kind": "mesh",
+        "senderKind": "ops-mac-host",
         "endpoint": "https://hyperagent.com/api/mcp",
-        "executor": "Mac or Gem `hyperagent execute` (OAuth token at ~/.config/hyperagent/mcp-oauth.json, mode 0600) running a task it picks up from the mesh. The token is not copied to Vercel.",
-        "note": "Account-level OAuth MCP: start a thread, follow the run, read results (skills/hyperagent/SKILL.md)."
+        "executor": "A bridge on the Mac or Gem polls the ops-mac-host mailbox and runs `hyperagent execute` (OAuth token at ~/.config/hyperagent/mcp-oauth.json, mode 0600), replying by mesh with the FLT ref. The token is not copied to Vercel.",
+        "note": "Proven 2026-10-28 through Summer dispatch and result code with an in-memory mesh and the real `hyperagent execute` (thread cmvss736w02ze07add3p1t5mb, 63s). Not live: no bridge consumer is registered or polling, so status stays pending-bridge and Summer will not dispatch."
       },
       "capabilities": [
         "research",
@@ -342,9 +343,9 @@
         "checkedAt": "2026-10-28"
       },
       "verified": {
-        "level": "config",
+        "level": "observed",
         "asOf": "2026-10-28",
-        "evidence": "Endpoint answers 401 with an OAuth resource_metadata challenge and scopes threads:read threads:write approvals:read approvals:write."
+        "evidence": "Hyperagent thread cmvsrrv2v02zh07ade7dk7584 (UI PR review) and cmvss736w02ze07add3p1t5mb (execute wrapper via dispatch/record code)."
       },
       "standingWorkloads": [
         "pr-review",
