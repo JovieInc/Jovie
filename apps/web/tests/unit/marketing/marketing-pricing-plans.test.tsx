@@ -1,7 +1,10 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { MarketingPricingPlans } from '@/components/features/pricing/MarketingPricingPlans';
-import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
+import {
+  getPublicPriceClaim,
+  PRO_SELF_SERVE_TRUTH,
+} from '@/lib/billing/offer-truth';
 
 describe('MarketingPricingPlans', () => {
   it('renders the canonical Free, Pro, and Enterprise plans by default', () => {
@@ -106,9 +109,7 @@ describe('MarketingPricingPlans', () => {
       'primary'
     );
     // Recommendation reads from the primary CTA and surface, not an eyebrow pill.
-    expect(
-      within(proCard).getByText('Self-serve. Cancel anytime.')
-    ).toBeInTheDocument();
+    expect(within(proCard).getByText(PRO_SELF_SERVE_TRUTH)).toBeInTheDocument();
     expect(
       proCard.querySelector('.marketing-pricing-plan-card__badge')
     ).toBeNull();
