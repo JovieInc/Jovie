@@ -18,6 +18,8 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from atomic_state import atomic_write_text
+
 TEAMS = ("JOV", "LYB")
 SYNC_PAGES = 20   # incremental pages per team per tick (1000 rows); the wall budget below ends it sooner
 SYNC_BUDGET_S = 25  # wall budget for one team's incremental pass
@@ -197,7 +199,7 @@ def _log_pass(state: Path, team: str, oldest_change, synced_at: float) -> None:
             handle.write(json.dumps({"team": team, "enteredAt": oldest_change, "exitedAt": _iso(synced_at)}) + "\n")
         if path.stat().st_size > 1_000_000:
             lines = path.read_text().splitlines()[-2000:]
-            path.write_text("\n".join(lines) + "\n")
+            atomic_write_text(path, "\n".join(lines) + "\n")
     except OSError:
         pass
 
