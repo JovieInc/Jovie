@@ -43,3 +43,73 @@ test('pickBatch breaks rank ties by touch before age', () => {
   );
   expect(picked).toEqual(['lib/high.ts', 'lib/low.ts']);
 });
+
+import {
+  aggregateByTier,
+  evaluateFloors,
+  modelFingerprint,
+  rearmTop,
+  survivorsKilled,
+} from '../test-quality-metrics.mjs';
+
+const surfaces = { tiers: config.tiers };
+const state = {
+  modules: {
+    'lib/billing/a.ts': {
+      status: 'scored',
+      valid: 100,
+      killed: 60,
+      survived: 40,
+      durationMs: 60000,
+    },
+    'lib/x.ts': {
+      status: 'scored',
+      valid: 10,
+      killed: 10,
+      survived: 0,
+      durationMs: 0,
+    },
+    'lib/y.ts': { status: 'error', valid: 0, survived: 0 },
+  },
+};
+
+test('aggregateByTier weights by valid mutants and skips unscored', () => {
+  const t = aggregateByTier(state, surfaces);
+  expect(t.billing.score).toBe(60);
+  expect(t.billing.minutes).toBe(1);
+  expect(t.default.modules).toBe(1);
+});
+
+test('floors only ratchet up and violations are reported', () => {
+  const t = aggregateByTier(state, surfaces);
+  expect(evaluateFloors(t, { billing: 70 }).violations).toEqual([
+    { tier: 'billing', score: 60, floor: 70 },
+  ]);
+  expect(evaluateFloors(t, { billing: 10 }).next.billing).toBe(59);
+  expect(evaluateFloors(t, { billing: 90 }).next.billing).toBe(90);
+});
+
+test('survivors killed counts only decreases', () => {
+  expect(
+    survivorsKilled({ 'lib/billing/a.ts': 50, 'lib/x.ts': 0 }, state)
+  ).toBe(10);
+});
+
+test('model fingerprint is order independent and rearm marks top scored modules', () => {
+  expect(modelFingerprint({ a: '1', b: '2' })).toBe(
+    modelFingerprint({ b: '2', a: '1' })
+  );
+  const s = structuredClone(state);
+  expect(
+    rearmTop(
+      s,
+      [
+        { file: 'lib/billing/a.ts' },
+        { file: 'lib/y.ts' },
+        { file: 'lib/x.ts' },
+      ],
+      2
+    )
+  ).toBe(2);
+  expect(s.modules['lib/billing/a.ts'].at).toBe(new Date(0).toISOString());
+});
