@@ -37,6 +37,7 @@ const THEME_SWITCHING_ROUTE_POLICY = {
     '/support',
     '/developers',
     '/developers/agents',
+    '/proof/methodology',
     '/api-versioning',
     '/cli',
     '/ai',

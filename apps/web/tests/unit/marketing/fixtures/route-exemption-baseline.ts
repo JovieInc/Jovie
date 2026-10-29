@@ -9,6 +9,8 @@ export const SANCTIONED_EXEMPTION_BASELINE = [
   '(marketing)/developers/page.tsx',
   // JOV-9762 / PR23608: generated agent connector reference (listing + tools/list snapshot), not an authored recipe.
   '(marketing)/developers/agents/page.tsx',
+  // Proof-stat methodology: generated from apps/web/data/proof-stats/registry.json, not an authored recipe.
+  '(marketing)/proof/methodology/page.tsx',
   '(marketing)/api-versioning/page.tsx',
   '(marketing)/compare/page.tsx',
   '(marketing)/alternatives/page.tsx',
