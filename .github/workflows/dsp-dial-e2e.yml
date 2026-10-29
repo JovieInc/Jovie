@@ -2,6 +2,7 @@
 # accountable-writer: Claude
 # capability-gap: The dial's touch, wheel, keyboard and performance budget need a real browser against next dev; unit tests cannot see momentum jank or long tasks. Read-only token except issues:write on a red main run.
 # revisit-trigger: Fold into a shared main-failure reporter when one covers every evidence workflow, or retire if the dial is removed.
+# github-token-budget: 6 calls/run - on a red main run, list the standing issue then create it or resolve and edit it; includes gh metadata reads.
 name: Service Dial E2E
 
 # Gesture, keyboard, wheel, a11y and performance budget for the release-page
@@ -71,8 +72,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
+      contents: read
       issues: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.nvmrc'
       - name: Open or update standing issue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -82,10 +90,10 @@ jobs:
           set -euo pipefail
           TITLE="Service dial e2e lane red"
           BODY="The main $GITHUB_WORKFLOW run failed on ${GITHUB_SHA::8}. Run: $RUN_URL. Reproduce: pnpm --filter @jovie/web run e2e:dsp-dial against next dev."
-          EXISTING=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number,title \
+          EXISTING=$(node packages/api-client/cli.ts gh --priority repair -- issue list --state open --search "in:title \"$TITLE\"" --json number,title \
             --jq '.[] | select(.title == "Service dial e2e lane red") | .number' | head -1)
           if [ -n "$EXISTING" ]; then
-            gh issue edit "$EXISTING" --body "$BODY"
+            node packages/api-client/cli.ts gh --priority repair -- issue edit "$EXISTING" --body "$BODY"
           else
-            gh issue create --title "$TITLE" --body "$BODY"
+            node packages/api-client/cli.ts gh --priority repair -- issue create --title "$TITLE" --body "$BODY"
           fi
