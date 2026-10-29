@@ -75,6 +75,13 @@ describe('checkout success moment (JOV-9035)', () => {
     expect(CHECKOUT_RETURN_FEATURE_ROUTES.includes('/billing')).toBe(false);
   });
 
+  it.each([undefined, 42, true, {}, [APP_ROUTES.CHAT]])(
+    'rejects non-string checkout return input %j',
+    from => {
+      expect(resolveCheckoutReturnFeature(from)).toBeNull();
+    }
+  );
+
   it('routes the primary destination to the from feature ahead of the plan default', () => {
     const input = {
       plan: 'pro' as const,

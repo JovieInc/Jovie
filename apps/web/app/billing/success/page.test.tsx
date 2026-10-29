@@ -1,6 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  type PoliteAnnouncer,
   registerPoliteAnnouncer,
   resetAnnouncedEventIds,
 } from '@/lib/a11y/announce';
@@ -521,7 +522,7 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
 });
 
 describe('CheckoutSuccessPage — checkout success moment (JOV-9035)', () => {
-  let announcerSpy: ReturnType<typeof vi.fn>;
+  let announcerSpy: ReturnType<typeof vi.fn<PoliteAnnouncer>>;
 
   beforeEach(() => {
     fetchMock.mockReset();
@@ -534,7 +535,7 @@ describe('CheckoutSuccessPage — checkout success moment (JOV-9035)', () => {
     searchParamsMock.mockReturnValue(new URLSearchParams());
     routerReplaceMock.mockReset();
     resetAnnouncedEventIds();
-    announcerSpy = vi.fn();
+    announcerSpy = vi.fn<PoliteAnnouncer>();
     registerPoliteAnnouncer(announcerSpy);
   });
 

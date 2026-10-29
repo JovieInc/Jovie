@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { NuqsTestingAdapter } from 'nuqs/adapters/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BillingDashboard } from '@/components/organisms/BillingDashboard';
+import { APP_ROUTES } from '@/constants/routes';
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -16,6 +17,7 @@ vi.mock('@/lib/analytics', () => ({
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  usePathname: () => APP_ROUTES.SETTINGS_BILLING,
 }));
 
 // Mock sonner so toast calls don't throw

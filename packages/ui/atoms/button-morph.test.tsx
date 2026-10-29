@@ -150,7 +150,7 @@ describe('Button pay-pill geometry (JOV-9035)', () => {
     );
     expect(screen.getAllByRole('status')).toHaveLength(1);
     expect(screen.getByRole('button')).toHaveAccessibleName(
-      'Could not start checkout. Try again'
+      'Could not start checkout Try again'
     );
   });
 });

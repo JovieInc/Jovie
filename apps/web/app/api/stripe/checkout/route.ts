@@ -291,10 +291,17 @@ export async function POST(request: NextRequest) {
       request.cookies.get(CLAIM_FLOW_COOKIE)?.value === '1';
 
     const sourceKey = isClaimFlow ? 'claim' : (checkoutSource ?? 'default');
+    const fromFeature = resolveCheckoutReturnFeature(rawFrom);
+    // Different return URLs are different Stripe requests; same-feature retries
+    // must retain their key. Other checkout sources ignore the return feature.
+    const returnFeatureKey =
+      sourceKey === 'default' && fromFeature
+        ? `:${encodeURIComponent(fromFeature)}`
+        : '';
     const correlationPart = checkoutCorrelationIdempotencyPart(correlation);
     const idempotencyKey = correlationPart
-      ? `checkout:${userId}:${priceId}:${sourceKey}:${correlationPart}:${idempotencyBucket}`
-      : `checkout:${userId}:${priceId}:${sourceKey}:${idempotencyBucket}`;
+      ? `checkout:${userId}:${priceId}:${sourceKey}${returnFeatureKey}:${correlationPart}:${idempotencyBucket}`
+      : `checkout:${userId}:${priceId}:${sourceKey}${returnFeatureKey}:${idempotencyBucket}`;
 
     const planIdSuffix = selectedPlan
       ? `&plan_id=${encodeURIComponent(selectedPlan)}`
@@ -303,7 +310,6 @@ export async function POST(request: NextRequest) {
     // JOV-9035: a checkout triggered from an app feature returns to that
     // feature (validated against the exact-match allowlist — never an
     // arbitrary URL) instead of stranding the buyer on the billing surface.
-    const fromFeature = resolveCheckoutReturnFeature(rawFrom);
     const fromSuffix = fromFeature
       ? `&from=${encodeURIComponent(fromFeature)}`
       : '';

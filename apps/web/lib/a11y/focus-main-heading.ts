@@ -7,11 +7,11 @@
  * arrival that carries the `focus=heading` marker.
  */
 
-const HEADING_SELECTOR = 'main h1, [role="main"] h1, h1';
-
 /** Focus the first main heading (or the main landmark as a fallback). */
 export function focusMainHeading(root: ParentNode = document): boolean {
-  const heading = root.querySelector<HTMLElement>(HEADING_SELECTOR);
+  const heading = root.querySelector<HTMLElement>(
+    'main h1, [role="main"] h1, h1'
+  );
   if (heading) {
     // Absent tabindex reads as tabIndex === 0 in the DOM IDL but does not
     // make the element focusable — only an explicit tabindex does.

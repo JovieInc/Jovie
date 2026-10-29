@@ -129,7 +129,7 @@ describe('UpgradeButton', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Stripe unavailable');
     expect(
       screen.getByRole('button', {
-        name: 'Could not start checkout. Try again',
+        name: 'Could not start checkout Try again',
       })
     ).toBeInTheDocument();
 

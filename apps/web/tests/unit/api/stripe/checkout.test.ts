@@ -622,6 +622,37 @@ describe('POST /api/stripe/checkout', () => {
     expect(call.successUrl).not.toMatch(/\/billing$/);
   });
 
+  it('separates feature return destinations while preserving same-feature retries', async () => {
+    mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+    mockCreateCheckoutSession.mockResolvedValue({
+      id: 'cs_from_feature',
+      url: 'https://checkout.stripe.com/pay/cs_from_feature',
+    });
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1_750_000_000_000);
+
+    try {
+      for (const from of ['/app/chat', '/app/presence', '/app/chat']) {
+        const response = await POST(
+          new NextRequest('http://localhost/api/stripe/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priceId: 'price_123', from }),
+          })
+        );
+        expect(response.status).toBe(200);
+      }
+
+      const [first, differentFeature, retry] =
+        mockCreateCheckoutSession.mock.calls.map(([input]) => input);
+      expect(first.successUrl).not.toBe(differentFeature.successUrl);
+      expect(first.idempotencyKey).not.toBe(differentFeature.idempotencyKey);
+      expect(first.idempotencyKey).toBe(retry.idempotencyKey);
+      expect(first.successUrl).toBe(retry.successUrl);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   it('drops an unallowlisted from instead of embedding it in the return url', async () => {
     mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
     mockCreateCheckoutSession.mockResolvedValue({

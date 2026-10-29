@@ -24,9 +24,7 @@ export const CHECKOUT_RETURN_FEATURE_ROUTES: readonly string[] = [
   APP_ROUTES.DASHBOARD_RELEASE_PLAN,
 ].sort() as readonly string[];
 
-export function resolveCheckoutReturnFeature(
-  from: string | null | undefined
-): string | null {
+export function resolveCheckoutReturnFeature(from: unknown): string | null {
   if (typeof from !== 'string' || from === '') return null;
   return CHECKOUT_RETURN_FEATURE_ROUTES.includes(from) ? from : null;
 }
