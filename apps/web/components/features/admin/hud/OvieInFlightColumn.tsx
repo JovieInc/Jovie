@@ -99,7 +99,7 @@ export function summarizeInFlight(
   if (listed.length === 0) {
     if (inFlight === null) note = 'Unknown: in-flight work was not measured.';
     else if (inFlight === 0) note = 'No work in flight.';
-    else note = 'The list is not available.';
+    else note = 'PR details were not measured.';
   }
 
   const ordered = [...listed].sort(

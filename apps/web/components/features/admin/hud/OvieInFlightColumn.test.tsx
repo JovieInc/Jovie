@@ -44,10 +44,10 @@ describe('summarizeInFlight', () => {
       'No work in flight.'
     );
   });
-  it('admits an unavailable list when the count is nonzero', () => {
+  it('keeps the measured count when PR details are unmeasured', () => {
     const summary = summarizeInFlight(delivery({ inFlight: count(41) }), []);
     expect(summary.headline).toBe('41 open PRs');
-    expect(summary.note).toBe('The list is not available.');
+    expect(summary.note).toBe('PR details were not measured.');
   });
   it('groups by meaning: open PRs, then failing and ready to merge, not raw titles', () => {
     const rows = [
@@ -116,6 +116,23 @@ describe('summarizeInFlight', () => {
 });
 
 describe('OvieInFlightColumn', () => {
+  it('distinguishes missing PR details from an empty pipeline', () => {
+    render(
+      <OvieInFlightColumn
+        delivery={delivery({ inFlight: count(41) })}
+        rows={[]}
+        status='ready'
+      />
+    );
+    expect(screen.getByTestId('ovie-inflight-headline')).toHaveTextContent(
+      '41 open PRs'
+    );
+    expect(screen.getByTestId('ovie-inflight-note')).toHaveTextContent(
+      'PR details were not measured.'
+    );
+    expect(screen.queryByText('No work in flight.')).toBeNull();
+  });
+
   it('renders the headline, the quiet +N more, and never claims empty when unknown', () => {
     const rows = Array.from({ length: 6 }, (_, index) => row(index + 1));
     const { unmount } = render(
