@@ -1,4 +1,5 @@
 'use client';
+// @coverage-via apps/web/tests/unit/demo/demo-showcase-onboarding-copy.test.tsx
 
 import { useSearchParams } from 'next/navigation';
 import { useCallback, useMemo, useRef, useState } from 'react';
