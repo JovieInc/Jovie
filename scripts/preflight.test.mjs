@@ -493,3 +493,42 @@ jobs:
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test('body preflight supplies a valid internal-work repair only for a missing decision', async () => {
+  const before = 'export const operator = false;\n';
+  const after = 'export const operator = true;\n';
+  const filename = 'apps/web/lib/ovie/operator.ts';
+  for (const missing of ['', 'releaseWorthy:false', '## Release note']) {
+    const red = await lintRepairDiff(before, after, filename, missing);
+    assert.ok(red.errors.some(error => error.includes('missing-metadata')));
+    assert.equal(
+      red.template,
+      '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
+    );
+    const green = await lintRepairDiff(before, after, filename, red.template);
+    assert.deepEqual(green.errors, []);
+    assert.equal(green.template, '');
+  }
+  for (const invalid of [
+    '<!-- customer-changelog/v1 nope -->',
+    '<!-- customer-changelog/v1 {"releaseWorthy":false} -->\n<!-- customer-changelog/v1 {"releaseWorthy":false} -->',
+  ]) {
+    const result = await lintRepairDiff(before, after, filename, invalid);
+    assert.ok(
+      result.errors.some(error => error.startsWith('changelog-marker:'))
+    );
+    assert.equal(
+      result.template,
+      '',
+      'never append another decision to invalid or ambiguous metadata'
+    );
+  }
+  const internal = await lintRepairDiff(
+    before,
+    after,
+    'scripts/operator.mjs',
+    ''
+  );
+  assert.deepEqual(internal.errors, []);
+  assert.equal(internal.template, '');
+});

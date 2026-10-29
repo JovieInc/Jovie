@@ -262,6 +262,7 @@ export async function lintBody({
   const { evaluateCustomerNoteContract } = await import(
     './lib/daily-changelog-publication.mjs'
   );
+  const { CUSTOMER_MARKER } = await import('./lib/preflight-changed.mjs');
   const body = readFileSync(bodyFile, 'utf8');
   const mergeBase = git(['merge-base', `origin/${base}`, 'HEAD'], { cwd, env });
   if (!mergeBase) throw new Error('Cannot resolve PR body comparison base');
@@ -310,7 +311,11 @@ export async function lintBody({
     errors.push(
       `changelog-marker: customer outcome decision missing or invalid (${note.reason}).`
     );
-  return { errors, warnings };
+  // A missing decision can use the existing internal-work template after the
+  // writer classifies the change. Malformed/duplicate decisions need repair,
+  // not another marker appended to the body.
+  const template = note.reason === 'missing-metadata' ? CUSTOMER_MARKER : '';
+  return { errors, warnings, template };
 }
 
 export function parseArgs(argv) {
@@ -528,6 +533,11 @@ export async function main({
       log(`  FAIL  ${message}`);
     }
     for (const message of bodyIssues.warnings) log(`  warn  ${message}`);
+    if (bodyIssues.template) {
+      log('  For internal work, add this decision to the PR body:');
+      log(bodyIssues.template);
+      log('  Customer-visible work: see docs/CHANGELOG_PUBLICATION.md.');
+    }
   }
 
   log('\n== preflight summary');
