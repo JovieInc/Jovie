@@ -15,7 +15,7 @@
  *   4. ad-hoc chrome raw <nav>/<aside> elements in route and feature code outside
  *                    registered chrome owners are ratcheted per file in
  *                    shell-ia.baseline.json. New files or higher counts fail;
- *                    lower counts must be locked with --update (stale headroom).
+ *                    lower counts pass with a notice; lock them with --update.
  *   5. sub-nav       app routes render RouteSegmentControl with surface='ghost'
  *                    (the one flat sub-navigation treatment). Plate-rail uses
  *                    are ratcheted the same way.
@@ -216,7 +216,11 @@ export function measureDebt({ root, registry }) {
   return { rawChrome, plateSubNav };
 }
 
-export function compareDebt(current, baseline) {
+/**
+ * Growth fails; a shrink passes with a notice (same policy as the other
+ * shrink-only ratchets, #23659). Lock a shrink with --update.
+ */
+export function compareDebt(current, baseline, notices = []) {
   const findings = [];
   for (const key of ['rawChrome', 'plateSubNav']) {
     const now = current[key] ?? {};
@@ -232,9 +236,9 @@ export function compareDebt(current, baseline) {
     }
     for (const [file, count] of Object.entries(base)) {
       if ((now[file] ?? 0) < count) {
-        findings.push({
-          kind: `${key}-stale`,
-          detail: `${file} ${count} -> ${now[file] ?? 0}; run with --update to lock the shrink`,
+        notices.push({
+          kind: `${key}-shrank`,
+          detail: `${file} ${count} -> ${now[file] ?? 0}; run pnpm design:shell-ia:update to lock the shrink`,
         });
       }
     }
@@ -255,13 +259,14 @@ export function validateShellIa({
   baseline = readBaseline(root),
 } = {}) {
   const debt = measureDebt({ root, registry });
+  const notices = [];
   const findings = [
     ...checkPrimitives({ root, registry }),
     ...checkReachability({ root, registry }),
     ...checkNavigationCaps({ root, registry }),
-    ...compareDebt(debt, baseline),
+    ...compareDebt(debt, baseline, notices),
   ];
-  return { ok: findings.length === 0, findings, debt };
+  return { ok: findings.length === 0, findings, notices, debt };
 }
 
 function sorted(record) {
@@ -292,9 +297,11 @@ export function main(
   }
   const result = validateShellIa({ root, registry });
   if (argv.includes('--json')) log(JSON.stringify(result, null, 2));
-  else if (result.ok)
+  else if (result.ok) {
+    for (const n of result.notices)
+      log(`::notice::${SHELL_IA_INVARIANT_ID} ${n.kind}: ${n.detail}`);
     log(`${SHELL_IA_INVARIANT_ID}: shell and IA registry holds`);
-  else
+  } else
     for (const f of result.findings)
       log(`${SHELL_IA_INVARIANT_ID} ${f.kind}: ${f.detail}`);
   return result.ok ? 0 : 1;

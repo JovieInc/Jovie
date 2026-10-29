@@ -130,15 +130,21 @@ test('deliberate red: rejects a primitive that no longer exports its name', () =
   assert.ok(result.findings.some(f => f.kind === 'missing-export'));
 });
 
-test('ratchet flags growth and stale headroom', () => {
+test('deliberate red: ratchet fails growth and only notes a shrink', () => {
+  const notices = [];
   const findings = compareDebt(
     { rawChrome: { a: 2 }, plateSubNav: {} },
-    { rawChrome: { a: 1, b: 1 }, plateSubNav: {} }
+    { rawChrome: { a: 1, b: 1 }, plateSubNav: {} },
+    notices
   );
-  assert.deepEqual(findings.map(f => f.kind).sort(), [
-    'rawChrome-grew',
-    'rawChrome-stale',
-  ]);
+  assert.deepEqual(
+    findings.map(f => f.kind),
+    ['rawChrome-grew']
+  );
+  assert.deepEqual(
+    notices.map(n => n.kind),
+    ['rawChrome-shrank']
+  );
 });
 
 test('the committed registry and baseline hold on this checkout', () => {

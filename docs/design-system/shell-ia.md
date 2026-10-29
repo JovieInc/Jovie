@@ -142,7 +142,8 @@ Motion tokens and rules live in `.claude/rules/motion.md`. Shell additions:
 2. Every registered route reaches its surface shell through its layouts.
 3. Ad-hoc `<nav>` and `<aside>` chrome outside registered shell owners is
    ratcheted in `scripts/invariants/shell-ia.baseline.json`. New sites fail;
-   the count only goes down.
+   a shrink passes with a notice and is locked
+   with `pnpm design:shell-ia:update`.
 4. Ad-hoc sub-navigation (a plate-rail segment control in an app route) is
    ratcheted the same way.
 
