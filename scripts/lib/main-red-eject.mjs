@@ -5,7 +5,7 @@
 // docs-only) path-selected away the structural lane. Every later group then failed on
 // main's census row, not on its own change. These functions attribute the culprit
 // commit, decide whether an automatic revert is allowed, account for queue-position
-// pitfalls, and turn the incident into stage events for the Shipping SLO.
+// pitfalls.
 // No network or git here: scripts/main-red-eject.mjs feeds evidence in.
 
 import { parseCiFastLog } from './merge-group-ahead-attribution.mjs';
@@ -21,7 +21,6 @@ export const MIN_CONSECUTIVE_GROUPS = 2;
 export const MAX_LOOKBACK_COMMITS = 30;
 export const MAX_ATTEMPTS_PER_CHANGE = 2;
 export const REPAIR_GRACE_MIN = 20;
-export const STALL_GAP_MIN = 15;
 export const UNMERGEABLE_DWELL_MIN = 5;
 
 const ABORTED = new Set(['cancelled', 'skipped', 'neutral', 'stale']);
@@ -85,7 +84,7 @@ export const checkKey = signature =>
 
 /**
  * Trigger: the same failure across >= n consecutive completed merge groups.
- * @param {Array<{id:number, conclusion:string, createdAt:string, signature?:string[]}>} groups newest first
+ * @param {Array<{id:number, conclusion:string, signature?:string[]}>} groups newest first
  */
 export function detectConsecutiveGroupFailure(
   groups,
@@ -122,7 +121,8 @@ export function classifyEvidence(run, signature) {
 /**
  * First main commit whose own group went red on this failure. A later green
  * (docs-only head that skipped the lane) proves nothing, so scan oldest first.
- * @param {Array<{sha:string, evidence:'red'|'green'|'other'|'unknown'}>} commits oldest first
+ * @template {{sha:string, evidence:'red'|'green'|'other'|'unknown'}} T
+ * @param {T[]} commits oldest first; attribution preserves the caller's metadata
  */
 export function attributeCulprit(commits) {
   const firstRed = commits.findIndex(c => c.evidence === 'red');
@@ -269,99 +269,5 @@ export function detectStuckHead(
     dwellMin: Math.round(dwell * 10) / 10,
     head: head.number,
     since: seen,
-  };
-}
-
-// ---- metrics ---------------------------------------------------------------
-
-const minutes = (a, b) => Math.max(0, (Date.parse(b) - Date.parse(a)) / 60_000);
-
-/**
- * time-main-red: culprit landed -> repair landed (or now while open).
- * queue-stall: minutes inside that window where the queue held work (a merge
- * group ran) yet no merge happened for longer than STALL_GAP_MIN.
- * @param {{redAt:string, greenAt?:string|null, now?:string, mergeTimes:string[], groupStarts:string[]}} input
- */
-export function incidentMetrics({
-  redAt,
-  greenAt = null,
-  now = new Date().toISOString(),
-  mergeTimes,
-  groupStarts,
-}) {
-  const end = greenAt ?? now;
-  const inside = t =>
-    Date.parse(t) >= Date.parse(redAt) && Date.parse(t) <= Date.parse(end);
-  const points = [redAt, ...mergeTimes.filter(inside).sort(), end];
-  let stall = 0;
-  for (let i = 1; i < points.length; i += 1) {
-    const gap = minutes(points[i - 1], points[i]);
-    const busy = groupStarts.some(
-      t =>
-        Date.parse(t) >= Date.parse(points[i - 1]) &&
-        Date.parse(t) <= Date.parse(points[i])
-    );
-    if (busy && gap > STALL_GAP_MIN) stall += gap - STALL_GAP_MIN;
-  }
-  return {
-    timeMainRedMin: Math.round(minutes(redAt, end) * 10) / 10,
-    queueStallMin: Math.round(stall * 10) / 10,
-    open: greenAt == null,
-  };
-}
-
-/** jovie-stage-event/v1 rows for entity `main-red` (docs/metrics/stage-manifest.json). */
-export function stageEvents({
-  id,
-  redAt,
-  greenAt,
-  stallStart,
-  stallMinutes,
-  actor,
-  receipt,
-  outcome = 'completed',
-}) {
-  const base = {
-    schema: 'jovie-stage-event/v1',
-    entityType: 'main-red',
-    entityId: id,
-    actor,
-    sourceReceipt: receipt,
-  };
-  const rows = [
-    {
-      ...base,
-      stage: 'red',
-      enteredAt: redAt,
-      exitedAt: greenAt ?? null,
-      outcome: greenAt ? outcome : 'open',
-    },
-  ];
-  if (stallMinutes > 0 && stallStart) {
-    const end = new Date(
-      Date.parse(stallStart) + stallMinutes * 60_000
-    ).toISOString();
-    rows.push({
-      ...base,
-      stage: 'queue-stalled',
-      enteredAt: stallStart,
-      exitedAt: end,
-      outcome: greenAt ? outcome : 'open',
-    });
-  }
-  return rows;
-}
-
-export function stuckHeadEvent({ number, since, dequeuedAt, receipt }) {
-  return {
-    schema: 'jovie-stage-event/v1',
-    entityType: 'main-red',
-    entityId: `JovieInc/Jovie#${number}:unmergeable`,
-    stage: 'head-unmergeable',
-    enteredAt: since,
-    exitedAt: dequeuedAt ?? null,
-    actor: 'main-red-eject.yml',
-    outcome: dequeuedAt ? 'advanced' : 'open',
-    sourceReceipt: receipt,
   };
 }

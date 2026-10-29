@@ -7,12 +7,10 @@
 //   node scripts/main-red-eject.mjs apply                 plan, then revert + enqueue + incident
 //   node scripts/main-red-eject.mjs reopen --pr <revert>  after the revert merged: re-land as a repair PR
 //   node scripts/main-red-eject.mjs stuck-head [--apply]  UNMERGEABLE head > 5 min: dequeue, conflict pass
-//   node scripts/main-red-eject.mjs metrics --pr <revert> time-main-red + queue-stall -> stage events
 //
 // Mode: MAIN_RED_EJECT_MODE = off | dry | apply (default apply). Kill switch is `off`.
 import { execFileSync } from 'node:child_process';
-import { appendFileSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { appendFileSync, writeFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import { runGh } from '../packages/api-client/gh.ts';
 import {
@@ -29,7 +27,6 @@ import {
   failureSignature,
   INCIDENT_LABEL,
   INCIDENT_SCHEMA,
-  incidentMetrics,
   MAX_LOOKBACK_COMMITS,
   marker,
   parsePrNumber,
@@ -37,8 +34,6 @@ import {
   REOPEN_LABEL,
   REVERT_LABEL,
   readMarker,
-  stageEvents,
-  stuckHeadEvent,
   titles,
   verifyJump,
 } from './lib/main-red-eject.mjs';
@@ -47,6 +42,10 @@ const REPO = process.env.GITHUB_REPOSITORY || 'JovieInc/Jovie';
 const CI_WORKFLOW = 'ci.yml';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+/**
+ * @param {string[]} args
+ * @param {import('../packages/api-client/contract.ts').PriorityName} priority
+ */
 async function gh(args, priority = 'repair') {
   const r = await runGh(args, { priority });
   if (r.code !== 0)
@@ -79,6 +78,9 @@ async function signatureOfRun(run) {
   return failureSignature(logs);
 }
 
+/** @typedef {{id:number, conclusion:string, createdAt:string, sha:string, branch:string, signature?:string[]}} MergeGroupRun */
+
+/** @returns {Promise<MergeGroupRun[]>} */
 async function mergeGroupRuns(pages = 1) {
   const rows = [];
   for (let page = 1; page <= pages; page += 1) {
@@ -97,7 +99,11 @@ async function mergeGroupRuns(pages = 1) {
   }));
 }
 
-/** A main commit older than the listing window: ask for its own merge-group run directly. */
+/**
+ * A main commit older than the listing window: ask for its own merge-group run directly.
+ * @param {string} sha
+ * @returns {Promise<MergeGroupRun | undefined>}
+ */
 async function runForSha(sha) {
   const { workflow_runs } = await api(
     `repos/${REPO}/actions/workflows/${CI_WORKFLOW}/runs?event=merge_group&head_sha=${sha}&per_page=5`,
@@ -378,6 +384,7 @@ const git = (...args) =>
 // ---- apply -----------------------------------------------------------------
 
 export async function apply(p) {
+  if (!p.decision) return { ...p, applied: false };
   const { culprit, check, decision } = p;
   if (decision.action !== 'revert') {
     if (
@@ -471,7 +478,7 @@ export async function apply(p) {
   const issue = await incident(
     `check:${check}`,
     `main-red: ${check}`,
-    `Main red on \`${check}\` since ${culprit.at} (#${culprit.pr}). Revert PR #${pr.number}; jump: ${JSON.stringify(jump.verified ?? jump)}.`
+    `Main red on \`${check}\` since ${culprit.at} (#${culprit.pr}). Revert PR #${pr.number}; jump: ${JSON.stringify('verified' in jump ? (jump.verified ?? jump) : jump)}.`
   );
   return { ...p, applied: true, revertPr: pr.number, jump, incident: issue };
 }
@@ -602,56 +609,7 @@ export async function stuckHead({ doApply = false, now = Date.now() } = {}) {
     `queue head #${head.number} UNMERGEABLE ${verdict.dwellMin} min`,
     `Queue head #${head.number} was UNMERGEABLE since ${verdict.since}. Dequeued at ${dequeuedAt}, conflict pass dispatched, Green Enroll will re-enqueue.`
   );
-  const event = stuckHeadEvent({
-    number: head.number,
-    since: verdict.since,
-    dequeuedAt,
-    receipt: `https://github.com/${REPO}/pull/${head.number}`,
-  });
-  emitEvents([event]);
   return { ...verdict, dequeued: true };
-}
-
-// ---- metrics ---------------------------------------------------------------
-
-function emitEvents(rows) {
-  const dir =
-    process.env.RECEIPT_DIR ||
-    join(process.env.RUNNER_TEMP || '.', 'main-red-eject-receipts');
-  mkdirSync(dir, { recursive: true });
-  appendFileSync(
-    join(dir, 'stage-events.ndjson'),
-    rows.map(r => JSON.stringify(r)).join('\n') + '\n'
-  );
-}
-
-export async function metrics(revertPr) {
-  const pr = await api(`repos/${REPO}/pulls/${revertPr}`, 'poll');
-  const m = readMarker(pr.body);
-  if (!m) return { measured: false };
-  const culprit = await api(`repos/${REPO}/commits/${m.culprit}`, 'poll');
-  const redAt = culprit.commit.committer.date;
-  const commits = await mainCommits();
-  const runs = await mergeGroupRuns(2);
-  const out = incidentMetrics({
-    redAt,
-    greenAt: pr.merged_at,
-    now: new Date().toISOString(),
-    mergeTimes: commits.map(c => c.at),
-    groupStarts: runs.map(r => r.createdAt),
-  });
-  const rows = stageEvents({
-    id: `${REPO}@${m.culprit.slice(0, 12)}`,
-    redAt,
-    greenAt: pr.merged_at,
-    stallStart: redAt,
-    stallMinutes: out.queueStallMin,
-    actor: 'main-red-eject.yml',
-    receipt: `https://github.com/${REPO}/pull/${pr.number}`,
-    outcome: 'completed',
-  });
-  emitEvents(rows);
-  return { measured: true, ...out, revertPr: pr.number };
 }
 
 // ---- cli -------------------------------------------------------------------
@@ -673,13 +631,12 @@ if (process.argv[1] === import.meta.filename) {
   else if (cmd === 'plan') result = await plan({ mode: 'dry' });
   else if (cmd === 'apply') {
     const p = await plan({ mode });
-    result = p.decision?.action === 'revert' ? await apply(p) : await apply(p);
+    result = await apply(p);
   } else if (cmd === 'reopen') result = await reopen(Number(values.pr));
   else if (cmd === 'stuck-head')
     result = await stuckHead({
       doApply: values.apply === true && mode === 'apply',
     });
-  else if (cmd === 'metrics') result = await metrics(Number(values.pr));
   else throw new Error(`unknown command: ${cmd}`);
   const text = JSON.stringify(result, null, 2);
   if (values.out) writeFileSync(values.out, `${text}\n`);

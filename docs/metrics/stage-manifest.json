@@ -12,33 +12,6 @@
     "minAbsoluteSeconds": 60
   },
   "entities": {
-    "main-red": {
-      "entityId": "owner/repo@<culprit sha, 12 chars> (red, queue-stalled) or owner/repo#<pr>:unmergeable (head-unmergeable)",
-      "description": "One main-red incident: a culprit commit landed red and stopped the merge queue. red = time-main-red (culprit landed to repair landed). queue-stalled = minutes the queue held work but nothing merged for over 15 min inside that window. head-unmergeable = a queue head UNMERGEABLE until main-red-eject dequeued it.",
-      "stages": [
-        {
-          "id": "red",
-          "meaning": "culprit landed on main until the revert merged",
-          "producer": "main-red-eject.yml",
-          "status": "pushed",
-          "source": "main-red-eject-receipts"
-        },
-        {
-          "id": "queue-stalled",
-          "meaning": "stall minutes inside the red window (queue non-empty, no merge over 15 min)",
-          "producer": "main-red-eject.yml",
-          "status": "pushed",
-          "source": "main-red-eject-receipts"
-        },
-        {
-          "id": "head-unmergeable",
-          "meaning": "queue head UNMERGEABLE until dequeued by main-red-eject",
-          "producer": "main-red-eject.yml",
-          "status": "pushed",
-          "source": "main-red-eject-receipts"
-        }
-      ]
-    },
     "chat-comparison": {
       "entityId": "source SHA (build) or source SHA:attempt (smoke)",
       "stages": [
@@ -581,13 +554,6 @@
     }
   },
   "sources": {
-    "main-red-eject-receipts": {
-      "kind": "events",
-      "url": null,
-      "artifact": "main-red-eject-receipts/stage-events.ndjson",
-      "workflow": "main-red-eject.yml",
-      "owner": "queue health (scripts/main-red-eject.mjs)"
-    },
     "content-record-events": {
       "kind": "events",
       "url": "https://jov.ie/api/content-records/stage-events",
@@ -665,11 +631,6 @@
   },
   "producers": {
     "workflows": {
-      "main-red-eject.yml": [
-        "main-red:red",
-        "main-red:queue-stalled",
-        "main-red:head-unmergeable"
-      ],
       "automation-liveness.yml": [
         "automation-run:started",
         "automation-run:finished"

@@ -1,4 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { apply } from '../../main-red-eject.mjs';
+
+vi.mock('../../../packages/api-client/gh.ts', () => ({
+  runGh: vi.fn(() => {
+    throw new Error('unexpected GitHub call');
+  }),
+}));
+
 import {
   attributeCulprit,
   bisectFirstRed,
@@ -8,11 +16,9 @@ import {
   detectConsecutiveGroupFailure,
   detectStuckHead,
   failureSignature,
-  incidentMetrics,
   isRevertSubject,
   parsePrNumber,
   planJump,
-  stageEvents,
   titles,
   verifyJump,
 } from '../main-red-eject.mjs';
@@ -222,38 +228,6 @@ describe('queue pitfalls', () => {
   });
 });
 
-describe('incident metrics', () => {
-  it('measures time-main-red and only counts stall while the queue held work', () => {
-    const m = incidentMetrics({
-      redAt: '2026-10-29T18:07:00Z',
-      greenAt: '2026-10-29T21:07:00Z',
-      mergeTimes: ['2026-10-29T18:30:00Z', '2026-10-29T20:00:00Z'],
-      groupStarts: ['2026-10-29T19:00:00Z'],
-    });
-    expect(m.timeMainRedMin).toBe(180);
-    // gaps: 23 (no groups, idle), 90 (busy) -> 75 stall, 67 (no groups) -> 0
-    expect(m.queueStallMin).toBe(75);
-    expect(m.open).toBe(false);
-  });
-  it('emits contract rows for the stage feed', () => {
-    const rows = stageEvents({
-      id: 'JovieInc/Jovie@3501dbd4c6ef',
-      redAt: '2026-10-29T18:07:00Z',
-      greenAt: '2026-10-29T21:07:00Z',
-      stallStart: '2026-10-29T18:07:00Z',
-      stallMinutes: 75,
-      actor: 'main-red-eject.yml',
-      receipt: 'https://x',
-    });
-    expect(rows.map(r => r.stage)).toEqual(['red', 'queue-stalled']);
-    expect(
-      rows.every(
-        r => r.schema === 'jovie-stage-event/v1' && r.entityType === 'main-red'
-      )
-    ).toBe(true);
-  });
-});
-
 describe('ambiguity', () => {
   it('alerts instead of reverting a culprit with an unproven predecessor', () => {
     const d = decideEject({
@@ -265,5 +239,21 @@ describe('ambiguity', () => {
       action: 'alert',
       reason: 'ambiguous-culprit-needs-bisect',
     });
+  });
+});
+
+describe('apply idle plans', () => {
+  it('preserves an explicit dry-revert decision without mutations', async () => {
+    const plan = {
+      decision: { action: 'dry-revert', reason: 'culprit-attributed' },
+    };
+    await expect(apply(plan)).resolves.toEqual({ ...plan, applied: false });
+  });
+  it.each([
+    'fewer-than-2-consecutive-failed-groups',
+    'failures-do-not-share-a-signature',
+  ])('keeps %s as a no-op without GitHub mutations', async reason => {
+    const plan = { action: 'none', reason, trigger: null };
+    await expect(apply(plan)).resolves.toEqual({ ...plan, applied: false });
   });
 });
