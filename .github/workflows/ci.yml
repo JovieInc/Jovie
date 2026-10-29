@@ -1110,7 +1110,7 @@ jobs:
     name: Merge Group Admission
     needs: [ci-path-changes]
     if: ${{ needs.ci-path-changes.result == 'success' && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     # Must exceed MERGE_GROUP_ADMISSION_QUOTA_RECOVERY_MS (66 min) plus the
     # 6-minute check poll plus setup/checkout. The helper sleeps until
     # x-ratelimit-reset inside that window. A hard cancel would eject the
@@ -1224,7 +1224,7 @@ jobs:
   ci-merge-group-supersede:
     name: Merge Group Supersede Older Runs
     if: ${{ github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 3
     permissions:
       actions: write
@@ -7680,7 +7680,7 @@ jobs:
         ci-lighthouse-onboarding-pr,
       ]
     if: ${{ always() && github.event_name == 'merge_group' }}
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, X64, jovie-fixed]
     timeout-minutes: 2
     steps:
       - name: Evaluate combined-head checks
