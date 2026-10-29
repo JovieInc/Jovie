@@ -1,0 +1,141 @@
+◇ injected env (0) from .env.test
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.fast.mts:16:41). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Both esbuild and oxc options were set. oxc options will be used and esbuild options will be ignored. The following esbuild options were set: `{ target: 'esnext', format: 'esm' }`
+
+ RUN  v5.0.5 /workspace/Jovie/apps/web
+
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > is eligible when every existing owner reports green 12ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > blocks acquisition on a reconciled rail even when the old canary and other evidence remain green 4ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > maps a failing live M2 step to its cone requirement 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > marks the live-probed requirements unknown when the probe throws 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > turns a failed Golden Path lane into a red payment requirement 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce selectedRail evidence is missing 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce jov6258Preflight evidence is missing 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce handoffCorrelation evidence is missing 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce paymentJourney evidence is missing 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed when commerce reversal evidence is missing 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > fails closed without leaking a commerce reader error 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > redacts raw canary, workflow and funnel diagnostics 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > treats cancelled runs, missing runs and unreadable GitHub as unknown 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > treats an expired canary key and a red canary differently 1ms
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > rejects a green canary summary with empty underlying checks 6ms
+   → expected true to be false // Object.is equality
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > rejects a green canary summary with contradictory underlying checks 1ms
+   → expected true to be false // Object.is equality
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > cannot diagnose the funnel when the funnel read is degraded 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > serves a cached report without re-probing 1ms
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > expires evidence while the Redis entry still exists without probing 1ms
+   → expected true to be false // Object.is equality
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > recomputes and caches on a miss, a malformed entry, or fresh=1 2ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > still computes when Redis reads fail 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > Golden Path workflow evidence > reads the Golden Path job, not the dispatching run 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > Golden Path workflow evidence > keeps whole-run evidence for plain workflow files 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > Golden Path workflow evidence > reports an unreadable run or job list as unavailable 1ms
+ ✓ |jsdom| lib/acquisition/eligibility.server.test.ts > Golden Path workflow evidence > counts a skipped or missing Golden Path job as red unless cancelled 0ms
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > preserves a current complete report but invalidates it after its evidence expires 3ms
+   → expected true to be false // Object.is equality
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for missing-evidence even when the stored eligible flag is true 2ms
+   → expected true to be false // Object.is equality
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for invalid-status even when the stored eligible flag is true 1ms
+   → expected true to be false // Object.is equality
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for invalid-budget even when the stored eligible flag is true 1ms
+   → expected true to be false // Object.is equality
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for duplicate-requirement even when the stored eligible flag is true 6ms
+   → expected true to be false // Object.is equality
+ × |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for contradictory-summary even when the stored eligible flag is true 1ms
+   → expected true to be false // Object.is equality
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 9 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > rejects a green canary summary with empty underlying checks
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > computeAcquisitionEligibility > rejects a green canary summary with contradictory underlying checks
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ lib/acquisition/eligibility.server.test.ts:408:29
+    406|   ] as const)('rejects a green canary summary with %s underlying check…
+    407|     const result = await computeAcquisitionEligibility(deps({ readAuth…
+    408|     expect(result.eligible).toBe(false);
+       |                             ^
+    409|     expect(result.firstBlocker).toMatchObject({ id: 'auth_signup', sta…
+    410|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/9]⎯
+
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > getAcquisitionEligibility > expires evidence while the Redis entry still exists without probing
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ lib/acquisition/eligibility.server.test.ts:454:29
+    452|     const runRevenuePathCanary = vi.fn();
+    453|     const result = await getAcquisitionEligibility({}, deps({ now: () …
+    454|     expect(result.eligible).toBe(false);
+       |                             ^
+    455|     expect(result.verdict).toBe('UNKNOWN');
+    456|     expect(result.firstBlocker?.id).toBe('entry');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/9]⎯
+
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > preserves a current complete report but invalidates it after its evidence expires
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ lib/acquisition/eligibility.server.test.ts:604:66
+    602|     expect((await readCachedAcquisitionEligibility())?.eligible).toBe(…
+    603|     vi.setSystemTime(new Date(NOW.getTime() + 16 * 60_000));
+    604|     expect((await readCachedAcquisitionEligibility())?.eligible).toBe(…
+       |                                                                  ^
+    605|     expect(hoisted.redis?.set).not.toHaveBeenCalled();
+    606|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/9]⎯
+
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for missing-evidence even when the stored eligible flag is true
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for invalid-status even when the stored eligible flag is true
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for invalid-budget even when the stored eligible flag is true
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for duplicate-requirement even when the stored eligible flag is true
+ FAIL  |jsdom| lib/acquisition/eligibility.server.test.ts > readCachedAcquisitionEligibility > fails closed for contradictory-summary even when the stored eligible flag is true
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ lib/acquisition/eligibility.server.test.ts:617:77
+    615|       if (mutation === 'contradictory-summary') cached.requirements[0]…
+    616|       hoisted.redis?.get.mockResolvedValue(cached);
+    617|       expect((await readCachedAcquisitionEligibility())?.eligible ?? f…
+       |                                                                             ^
+    618|     }
+    619|   );
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/9]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  9 failed | 22 passed (31)
+   Start at  22:55:58
+   Duration  1.17s (environment 54%, transform 28%, setup 6%, import 6%, tests 5%)
+
+undefined
+/workspace/Jovie/apps/web:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run lib/acquisition/eligibility.server.test.ts --reporter=verbose

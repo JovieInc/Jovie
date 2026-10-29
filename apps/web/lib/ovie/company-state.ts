@@ -145,7 +145,7 @@ export interface BuildCompanyStateInput {
   readonly previous?: CompanyStateSnapshot | null;
 }
 
-const PRODUCT_FRESHNESS_MS = 30 * 60_000;
+export const PRODUCT_FRESHNESS_MS = 30 * 60_000;
 
 export function companyMetric<T>(input: {
   readonly value: T | null;
