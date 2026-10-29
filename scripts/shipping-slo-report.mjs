@@ -499,6 +499,7 @@ export function buildReport(
     .sort((a, b) => b.seconds - a.seconds)
     .slice(0, 5);
 
+  /** @type {Record<string, any>} */
   const flat = {
     ...flattenMetrics(metrics),
     ...flattenCiRounds(metrics.ciRounds),

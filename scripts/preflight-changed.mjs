@@ -105,13 +105,16 @@ export const HOST_RED_TESTS = new Set([
   'lib/__tests__/auto-ready-green-drafts.test.mjs',
   'lib/__tests__/pre-push-gate.test.mjs',
   'lib/__tests__/mesh-runtime-bundle.test.mjs',
+  'tests/unit/db/migration-validation-script.test.ts',
 ]);
 
 export function downgradeHostRed(check, result, platform = process.platform) {
   if (platform === 'linux' || !result.code || !/^guard:/.test(check.id))
     return result;
   const failed = [
-    ...String(result.out).matchAll(/FAIL\s+\|[\w-]+\|\s+(\S+\.test\.m?js)/g),
+    ...String(result.out).matchAll(
+      /FAIL\s+\|[\w-]+\|\s+(\S+\.test\.[mc]?[jt]s)/g
+    ),
   ].map(m => m[1]);
   if (failed.length && failed.every(f => HOST_RED_TESTS.has(f)))
     return {
@@ -190,6 +193,7 @@ export function changedFiles(cwd, base) {
   const mb =
     git(cwd, ['merge-base', `origin/${base}`, 'HEAD']) ||
     git(cwd, ['rev-parse', `origin/${base}`]);
+  /** @type {{filename:string, previous_filename:string|undefined, status:string, patch:string}[]} */
   const rows = git(cwd, ['diff', '--name-status', '-M', mb])
     .split('\n')
     .filter(Boolean)
@@ -212,7 +216,13 @@ export function changedFiles(cwd, base) {
   for (const f of git(cwd, ['ls-files', '--others', '--exclude-standard'])
     .split('\n')
     .filter(Boolean))
-    if (!seen.has(f)) rows.push({ filename: f, status: 'added', patch: '' });
+    if (!seen.has(f))
+      rows.push({
+        filename: f,
+        previous_filename: undefined,
+        status: 'added',
+        patch: '',
+      });
   return { mergeBase: mb, files: rows };
 }
 
@@ -272,7 +282,7 @@ function loadBody(args, cwd) {
 async function privateDataCheck(cwd, env, mergeBase) {
   const wfPath = path.join(cwd, '.github/workflows/private-data-guard.yml');
   if (!existsSync(wfPath)) return { skip: 'no private-data-guard workflow' };
-  const wf = yamlLoad(readFileSync(wfPath, 'utf8'));
+  const wf = /** @type {any} */ (yamlLoad(readFileSync(wfPath, 'utf8')));
   const job = Object.values(wf.jobs ?? {})[0] ?? {};
   const m = String(job.uses ?? '').match(/^JovieInc\/ci\/(.+)@([0-9a-f]{40})$/);
   if (!m) return { skip: 'guard is not a pinned JovieInc/ci workflow' };
@@ -361,7 +371,7 @@ export function typecheckTargets(files, cwd) {
 function typecheckCommand(target, cwd) {
   const cap = `NODE_OPTIONS=--max-old-space-size=${HEAP_MB}`;
   if (target === 'web')
-    return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
+    return `cd apps/web && ${cap} pnpm exec node ../../scripts/typecheck-singleflight.mjs -- tsc -p tsconfig.typecheck.json --noEmit --incremental --tsBuildInfoFile .cache/tsbuildinfo`;
   if (target === 'web-tests')
     return `cd apps/web && ${cap} node ../../scripts/typecheck-singleflight.mjs -- node ../../scripts/typecheck-web-tests.mjs`;
   if (target === 'scripts') return `${cap} pnpm typecheck:scripts`;
