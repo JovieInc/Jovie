@@ -1071,6 +1071,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/delivery-control-receipts-workflow.test.mjs',
   'scripts/lib/__tests__/dependabot-update-policy.test.mjs',
   'scripts/lib/__tests__/design-surface-census.test.mjs',
+  'scripts/lib/__tests__/main-red-eject.test.mjs',
   'scripts/lib/__tests__/doc-freshness.test.mjs',
   'scripts/lib/__tests__/flaky-test-filing.test.mjs',
   'scripts/lib/__tests__/gbrain-pool-env.test.mjs',
@@ -1480,6 +1481,20 @@ function argv(command, args, opts = {}) {
   };
 }
 
+/**
+ * Lane selection for a merge group must cover every entry the head contains.
+ * merge_group.base_sha is the entry ahead, so HEADGREEN landed a red entry
+ * behind a docs-only green head (#23600, 2026-10-29). Prefer the merge base
+ * with live origin/main (fetched by the ci-fast job); fall back to the event base.
+ * @param {string} cwd
+ * @param {string} fallback
+ */
+export function mergeGroupDiffBase(cwd, fallback) {
+  const mergeBase = argv('git', ['merge-base', 'HEAD', 'origin/main'], { cwd });
+  const sha = mergeBase.output.trim();
+  return mergeBase.code === 0 && /^[0-9a-f]{40}$/.test(sha) ? sha : fallback;
+}
+
 /** @param {readonly string[]} patterns */
 export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
@@ -1494,6 +1509,8 @@ export function changedFiles(patterns = [], cwd = REPO_ROOT) {
       probe.code === 0
         ? `origin/${base}`
         : process.env.TURBO_SCM_BASE || diffBase;
+  } else if (event === 'merge_group') {
+    diffBase = mergeGroupDiffBase(cwd, process.env.TURBO_SCM_BASE || diffBase);
   } else if (process.env.TURBO_SCM_BASE) {
     diffBase = process.env.TURBO_SCM_BASE;
   }

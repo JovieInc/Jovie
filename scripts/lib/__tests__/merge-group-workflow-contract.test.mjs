@@ -4261,6 +4261,41 @@ describe('resolveMergeGroupPathDiff coalesced heads (JOV-4905)', () => {
     });
   });
 
+  it('widens a stacked head to the entries ahead of it (HEADGREEN, #23600)', () => {
+    const { seed, rootSha } = createFixture();
+    git(seed, ['update-ref', 'refs/remotes/origin/main', rootSha]);
+    git(seed, ['switch', '-q', '-c', 'queue']);
+    const entryAhead = writeAndCommit(
+      seed,
+      'apps/web/components/site/MarketingFooter.tsx',
+      'export const footer = 1;\n',
+      'entry ahead'
+    );
+    const headSha = writeAndCommit(
+      seed,
+      'docs/ci/memo.md',
+      'docs only\n',
+      'docs-only head'
+    );
+
+    const result = resolveMergeGroupPathDiff({
+      git: createGitRunner(seed),
+      eventBaseSha: entryAhead,
+      eventHeadSha: headSha,
+      fetchLiveMain: false,
+    });
+
+    expect(result).toMatchObject({
+      source: 'live_main_merge_base',
+      isNoop: false,
+      baseSha: rootSha,
+      files: [
+        'apps/web/components/site/MarketingFooter.tsx',
+        'docs/ci/memo.md',
+      ],
+    });
+  });
+
   it('recomputes against live main when the event-base range is empty', () => {
     const { origin, seed, rootSha } = createFixture();
     git(seed, ['switch', '-q', '-c', 'feature']);
