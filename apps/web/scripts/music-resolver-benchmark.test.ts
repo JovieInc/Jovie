@@ -100,7 +100,7 @@ describe('music resolver benchmark', () => {
     >;
     expect(metrics.name_to_spotify.wrong).toBe(1);
     expect(metrics.name_to_spotify).toMatchObject({
-      wrongDifferentRelease: 1,
+      wrong: 1,
       wrongSameUpcTwin: 0,
     });
     expect(metrics.name_to_spotify.providerCoverage).toEqual({
@@ -110,34 +110,34 @@ describe('music resolver benchmark', () => {
     expect(metrics.upc_to_spotify.correct).toBe(1);
   });
 
-  it('separates a same-UPC Spotify twin from a different release', async () => {
+  it('scores a playable same-UPC twin as correct and reports it separately', async () => {
     const twin = 'https://open.spotify.com/album/TWINTWINTWINTWINTWIN00';
-    mocks.resolve
-      .mockResolvedValueOnce(resolved([{ provider: 'spotify', url: twin }]))
-      .mockResolvedValueOnce({ status: 'no_match', upc: null, links: [] })
-      .mockResolvedValueOnce(resolved([]));
+    const queue = () =>
+      mocks.resolve
+        .mockResolvedValueOnce(resolved([{ provider: 'spotify', url: twin }]))
+        .mockResolvedValueOnce({ status: 'no_match', upc: null, links: [] })
+        .mockResolvedValueOnce(resolved([]));
+    queue();
     mocks.albumRecord.mockResolvedValueOnce({
       external_ids: { upc: `00${row.upc}` },
     });
     const sameRelease = await evaluate(row);
-    expect(sameRelease.cases.upc_to_spotify).toBe('wrong');
+    expect(sameRelease.cases.upc_to_spotify).toBe('twin');
 
-    mocks.resolve
-      .mockResolvedValueOnce(resolved([{ provider: 'spotify', url: twin }]))
-      .mockResolvedValueOnce({ status: 'no_match', upc: null, links: [] })
-      .mockResolvedValueOnce(resolved([]));
+    queue();
     mocks.albumRecord.mockResolvedValueOnce({
       external_ids: { upc: '111111111111' },
     });
     const otherRelease = await evaluate(row);
+    expect(otherRelease.cases.upc_to_spotify).toBe('wrong');
 
     const metrics = summarizeBenchmark([sameRelease, otherRelease]) as Record<
       string,
-      { wrong: number; wrongDifferentRelease: number; wrongSameUpcTwin: number }
+      { correct: number; wrong: number; wrongSameUpcTwin: number }
     >;
     expect(metrics.upc_to_spotify).toMatchObject({
-      wrong: 2,
-      wrongDifferentRelease: 1,
+      correct: 1,
+      wrong: 1,
       wrongSameUpcTwin: 1,
     });
   });

@@ -24,7 +24,13 @@ export interface CorpusRow {
   readonly release_type?: string;
 }
 
-type Outcome = 'correct' | 'wrong' | 'abstained' | 'no_spotify_link' | 'error';
+type Outcome =
+  | 'correct'
+  | 'twin'
+  | 'wrong'
+  | 'abstained'
+  | 'no_spotify_link'
+  | 'error';
 
 /** Wilson score interval, 95%. */
 export function wilson(successes: number, n: number) {
@@ -103,11 +109,14 @@ export async function evaluate(row: CorpusRow) {
       else if (!spotify) cases[name] = 'no_spotify_link';
       else if (spotifyAlbumId(spotify.url) === truth) cases[name] = 'correct';
       else {
-        cases[name] = 'wrong';
         const upc = await returnedAlbumUpc(spotify.url);
-        (detail[name] as Record<string, unknown>).returnedAlbumUpc = upc;
-        (detail[name] as Record<string, unknown>).sameUpcAsTruth =
+        const sameUpc =
           upc !== null && upc.replace(/^0+/, '') === row.upc.replace(/^0+/, '');
+        // A playable same-UPC twin is the right release and the album a
+        // listener needs: scored correct, reported separately.
+        cases[name] = sameUpc ? 'twin' : 'wrong';
+        (detail[name] as Record<string, unknown>).returnedAlbumUpc = upc;
+        (detail[name] as Record<string, unknown>).sameUpcAsTruth = sameUpc;
       }
       return result;
     } catch (error) {
@@ -166,21 +175,17 @@ export function summarizeBenchmark(
       .map(r => r.cases[name])
       .filter(Boolean) as Outcome[];
     const count = (o: Outcome) => outcomes.filter(x => x === o).length;
-    const correct = count('correct');
+    const exact = count('correct');
+    const twin = count('twin');
     const wrong = count('wrong');
+    // A same-UPC twin is a correct link; it is reported on its own line.
+    const correct = exact + twin;
     const answered = correct + wrong;
-    // Wrong by Spotify id, split into a different release and a same-UPC twin.
-    const sameUpcTwin = results.filter(
-      r =>
-        r.cases[name] === 'wrong' &&
-        (r.detail[name] as { sameUpcAsTruth?: boolean } | undefined)
-          ?.sameUpcAsTruth === true
-    ).length;
     metrics[name] = {
-      wrongDifferentRelease: wrong - sameUpcTwin,
-      wrongSameUpcTwin: sameUpcTwin,
       n: outcomes.length,
       correct,
+      correctExactId: exact,
+      wrongSameUpcTwin: twin,
       wrong,
       abstained: count('abstained'),
       noSpotifyLink: count('no_spotify_link'),
