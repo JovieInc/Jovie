@@ -276,7 +276,7 @@ export function ReleasePlanWizard({
         </DialogDescription>
         <DialogActions>
           <Button type='button' size='sm' onClick={handleClose}>
-            Close
+            Got It
           </Button>
         </DialogActions>
       </Dialog>

@@ -40,7 +40,7 @@ const PRO_ANALYTICS_DAYS = getLimit('pro', 'analyticsRetentionDays');
 
 export const ARTIST_VISIBILITY_ACTIVATION_COPY = {
   status: `${PRO_PLAN_DISPLAY_NAME} is active`,
-  next: 'Here is what your plan turns on.',
+  next: 'Included with your plan.',
 } as const;
 
 export const ARTIST_VISIBILITY_ACTIVATION_STEPS = [
