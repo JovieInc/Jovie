@@ -1,0 +1,26 @@
+{
+  "version": "b2aeb0d50f62",
+  "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
+  "listingHash": "7883dee8a0ce9226462c05def64fcd2cae40c2fce1eab660e996c1b12b7363b6",
+  "regenerate": "pnpm --filter @jovie/web agent-distribution:generate",
+  "files": [
+    "chatgpt/jovie-agent/assets/icon-dark.svg",
+    "chatgpt/jovie-agent/assets/icon.svg",
+    "chatgpt/jovie-agent/assets/logo-dark.svg",
+    "chatgpt/jovie-agent/assets/logo.svg",
+    "chatgpt/jovie-agent/mcp.json",
+    "chatgpt/jovie-agent/plugin.json",
+    "claude/directory-listing.json",
+    "grok/use-jovie-in-grok.md",
+    "grok/xai-remote-mcp.json",
+    "muse/connector-form.json",
+    "readiness.json",
+    "tools-list.snapshot.json"
+  ],
+  "versions": {
+    "muse": "95c2f8460164",
+    "grok": "67ebd6d4eb40",
+    "chatgpt": "ceccd7c4f84f",
+    "claude": "9ee886e0a97c"
+  }
+}

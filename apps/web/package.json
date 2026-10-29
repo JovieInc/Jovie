@@ -15,6 +15,8 @@
     "backfill:audience-action-owners": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-audience-action-owners.ts",
     "backfill:credit-spotify-ids": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-credit-spotify-ids.ts",
     "backfill:collaborator-profiles": "NODE_OPTIONS=--conditions=react-server tsx scripts/backfill-collaborator-profiles.ts",
+    "agent-distribution:generate": "NODE_OPTIONS=--conditions=react-server tsx scripts/generate-agent-distribution.ts",
+    "agent-distribution:check": "NODE_OPTIONS=--conditions=react-server tsx scripts/generate-agent-distribution.ts --check",
     "validate-env": "tsx scripts/validate-env.ts",
     "check:signup-readiness": "tsx scripts/check-signup-readiness.ts",
     "check:stripe-price-ids": "node scripts/check-stripe-price-ids.mjs",

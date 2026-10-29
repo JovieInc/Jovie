@@ -954,6 +954,7 @@ RED_BLOCK_MARKER = "<!-- lanes:red-before-green -->"
 RED_HEADING = re.compile(r"^#{1,6}\s*red-before-green\s*$", re.I)
 ANY_HEADING = re.compile(r"^#{1,6}\s")
 JOB_URL = re.compile(r"^(https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*)(?:/job/\d+)?")
+RED_RUN_URL = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/actions/runs/[1-9]\d*(?:/attempts/[1-9]\d*)?")
 
 
 def red_section_complete(body: str) -> bool:
@@ -969,14 +970,17 @@ def red_section_complete(body: str) -> bool:
     fence = re.search(r"```(?:text|console|log|bash|sh)?\n[\s\S]*?\b(?:FAIL|Error|AssertionError|ERR_|expected|not ok)[\s\S]*?```",
                       section, re.I)
     text = command.group(1).replace("`", "").strip() if command else ""
-    return len(text) > 2 and text.lower() not in {"todo", "tbd", "n/a", "none"} and bool(fence or run_url)
+    placeholder = re.fullmatch(r"(?:todo|tbd|n/?a|none|not applicable|\.\.\.|<[^>]*>)\s*[.!]?", text, re.I)
+    valid_run = run_url and RED_RUN_URL.fullmatch(run_url.group(1))
+    return len(text) > 2 and not placeholder and bool(fence or valid_run)
 
 
 def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
     """A `## Red-before-green` section built from the PR's own red check: the failing run URL and
-    the failed jobs' error lines the fixer is shown. Fleet Rules treats lane-fix-red as a repair
-    label, so every red lane PR needs this evidence; agents forget it (45 of 138 Fleet Rules
-    failures on 2026-10-25) and the lane already has it. None when no red check names a run."""
+    the failed jobs' error lines the fixer is shown. Preserve a command that exits nonzero
+    for the failed run: `gh run view --log-failed` only displays logs and exits successfully.
+    Repair PRs require this evidence; agents forget it (45 of 138 Fleet Rules failures on
+    2026-10-25) and the lane already has it. None when no red check names a run."""
     for check in pr.get("statusCheckRollup") or []:
         if str(check.get("conclusion") or "").lower() not in RED_CONCLUSIONS:
             continue
@@ -991,8 +995,8 @@ def red_before_green_block(pr: dict, excerpt: str = "") -> str | None:
                 lines.append(" " + line if ANY_HEADING.match(line) else line)
         return "\n".join([
             "## Red-before-green", "",
-            f"Failing command: `gh run view {run_url.rsplit('/', 1)[-1]} --repo {REPO} --log-failed`",
-            f"Failing run (before fix): {run_url}", "",
+            f"- Failing command: `gh run watch {run_url.rsplit('/', 1)[-1]} --repo {REPO} --exit-status`",
+            f"- Failing run (before fix): {run_url}", "",
             "```text", *lines, "```", "", RED_BLOCK_MARKER])
     return None
 

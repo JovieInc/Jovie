@@ -393,8 +393,8 @@
       "evidence": {
         "kind": "certification",
         "at": "2026-10-29T08:57:42.000Z",
-        "ref": "docs/screenshots/mvp-pricing-audit-1029/README.md. PR #23570 replaced the false comparison row (fan capture capped at 100 on Free) with true certified rows; layout unchanged; pricing e2e 11/11 at 320-1440, no horizontal overflow at 1440 and 390.",
-        "sourceDigest": "70f0464228ad3563807be5b4d1ed710b975459b963c69b3003590daff02dfd9b"
+        "ref": "docs/screenshots/mvp-pricing-audit-1029/README.md. PR #23570 replaced the false comparison row (fan capture capped at 100 on Free) with true certified rows; layout unchanged; pricing e2e 11/11 at 320-1440, no horizontal overflow at 1440 and 390. Merged with PR #23618 (main): its shared stylesheet change touches only .system-b-artist-notifications-card-* and the mobile .system-b-launch-profile-stage rule, which match no /pricing elements.",
+        "sourceDigest": "4e1d0b31f83a244a2fbd36a103448629c6c6d2b9a437aac87be13514e3b9f281"
       },
       "sources": ["apps/web/app/(marketing)/pricing/page.tsx"]
     },

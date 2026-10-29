@@ -3024,6 +3024,37 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertTrue(events.red_section_complete("Intro\n\n" + block + "\n\n## Next\nx"))
         self.assertNotIn("\n# not a heading", block, "a log line must not end the section")
 
+    def test_failing_command_returns_the_run_failure_status(self):
+        block = events.red_before_green_block(self.PR)
+        self.assertIn(
+            "- Failing command: `gh run watch 123 --repo JovieInc/Jovie --exit-status`",
+            block,
+        )
+        self.assertIn(
+            "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123",
+            block,
+        )
+
+    def test_generated_block_passes_the_canonical_fleet_gate(self):
+        block = events.red_before_green_block(self.PR, "### Failed step\nAssertionError: expected 200")
+        checked = subprocess.run(
+            ["node", "--input-type=module", "-e", """
+                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                import { readFileSync } from 'node:fs';
+                const body = readFileSync(0, 'utf8');
+                const check = body => evaluateFleetRules({
+                    pr: { title: 'fix(db): recover avatar reads', body }, files: [],
+                }).errors;
+                process.stdout.write(JSON.stringify({
+                    generated: check(body), missing: check(''),
+                }));
+            """],
+            cwd=ROOT, input=block, text=True, capture_output=True, check=True,
+        )
+        result = json.loads(checked.stdout)
+        self.assertEqual(result["generated"], [])
+        self.assertTrue(any(error.startswith("red-before-green:") for error in result["missing"]))
+
     def test_no_red_check_means_no_block(self):
         self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
 
@@ -3041,3 +3072,40 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
             events.ensure_red_before_green(self.PR, "FAIL x", shell)
             self.assertEqual(len(shell.made("pr", "edit")), edits)
+
+    def test_ensure_repairs_evidence_rejected_by_fleet_rules(self):
+        run_url = "https://github.com/JovieInc/Jovie/actions/runs/123"
+        cases = [("<cmd>", run_url), ("not applicable", run_url),
+                 ("...", run_url), ("node --test", "https://example.com/red"),
+                 ("node --test", run_url + "/job/456")]
+        bodies = []
+        for command, url in cases:
+            body = (f"## Summary\nKeep this.\n\n## Red-before-green\n"
+                    f"- Failing command: `{command}`\n- Failing run (before fix): {url}\n"
+                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n")
+            written = []
+            def edit(args):
+                written.append(Path(args[-1]).read_text())
+                return (0, "")
+            shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): edit})
+            with self.subTest(command=command, url=url):
+                self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell))
+                self.assertEqual(len(written), 1)
+                self.assertIn("## Summary\nKeep this.", written[0])
+                self.assertIn("## Blast radius\nWhat could break: repair evidence.", written[0])
+                bodies.extend([body, written[0]])
+        # Exercise the actual consumer, rather than trusting the Python mirror.
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(ci): repair evidence', body, labels: []}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, timeout=15)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        verdicts = json.loads(checked.stdout)
+        self.assertEqual(len(verdicts), len(cases) * 2)
+        for before, after in zip(verdicts[::2], verdicts[1::2]):
+            self.assertTrue(any(error.startswith("red-before-green:") for error in before), before)
+            self.assertEqual(after, [])
