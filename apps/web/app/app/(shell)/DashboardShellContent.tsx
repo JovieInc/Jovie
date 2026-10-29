@@ -26,6 +26,7 @@ import {
   getDashboardShellData,
   setSidebarCollapsed,
 } from './dashboard/actions';
+import { HeadingFocusOnArrival } from './HeadingFocusOnArrival';
 import { ProfileCompletionRedirect } from './ProfileCompletionRedirect';
 import {
   shouldDefaultOpenShellPreview,
@@ -159,6 +160,7 @@ export async function DashboardShellContent({
               <OperatorBannerWrapper isAdmin={showOperatorChrome} />
               <ImpersonationBannerWrapper />
               <DashboardLoadTracker pathname={pathname} userId={userId} />
+              <HeadingFocusOnArrival />
               <ProfileCompletionRedirect />
             </>
           )

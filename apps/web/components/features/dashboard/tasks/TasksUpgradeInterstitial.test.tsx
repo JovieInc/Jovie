@@ -5,10 +5,6 @@ import {
   ReleasePlanUpgradeInterstitial,
 } from './TasksUpgradeInterstitial';
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
-
 vi.mock('@/lib/analytics', () => ({
   track: vi.fn(),
   useFeatureFlag: () => false,

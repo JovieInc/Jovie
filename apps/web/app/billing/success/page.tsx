@@ -3,10 +3,10 @@
 import { Button } from '@jovie/ui';
 import {
   BarChart3,
+  Check,
   CircleCheck,
   Eye,
   Loader2,
-  PartyPopper,
   Radar,
   Rocket,
   ShieldCheck,
@@ -15,14 +15,14 @@ import {
   XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ConfettiOverlay } from '@/components/atoms/Confetti';
 import { ContentSectionHeader } from '@/components/molecules/ContentSectionHeader';
 import { ContentSurfaceCard } from '@/components/molecules/ContentSurfaceCard';
 import { UpgradeButton } from '@/components/molecules/UpgradeButton';
 import { StandaloneProductPage } from '@/components/organisms/StandaloneProductPage';
 import { APP_ROUTES } from '@/constants/routes';
+import { announceOncePerEvent } from '@/lib/a11y/announce';
 import { page, track } from '@/lib/analytics';
 import { PROOF_PENDING_TERMS } from '@/lib/claim/proof-terms';
 import { useReducedMotion } from '@/lib/hooks/useReducedMotion';
@@ -32,14 +32,18 @@ import {
   ARTIST_VISIBILITY_ACTIVATION_STEPS,
   CHECKOUT_PENDING_COPY,
   CHECKOUT_RECOVERY_COPY,
+  CHECKOUT_SUCCESS_HOLD_MS,
+  getCheckoutSuccessAnnouncement,
   getPaidSuccessPrimaryHref,
   getPaidSuccessPrimaryLabel,
   isArtistVisibilityPlan,
   type PaidPlanId,
   resolveCanonicalPlan,
+  resolveCheckoutReturnFeature,
   resolveCheckoutSuccessView,
   resolvePaidPlan,
   shouldCelebratePaidSuccess,
+  withHeadingFocusParam,
 } from './checkout-success-state';
 
 const MAX_UNLOCK_TILES = [
@@ -117,6 +121,43 @@ function FeatureCard({
   );
 }
 
+/**
+ * JOV-9035 spinner-to-check beat. Stroke draw 250ms ease-out plus scale
+ * 0.9 -> 1 spring, on the canonical lucide check geometry. Reduced motion
+ * REPLACES the transform with a static check and a --duration-fast opacity
+ * fade: no transform ever changes under reduced motion.
+ */
+function CheckoutSuccessCheck({ reduced }: { readonly reduced: boolean }) {
+  const [drawn, setDrawn] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setDrawn(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  const style: React.CSSProperties = reduced
+    ? {
+        transition: 'opacity var(--duration-fast) var(--ease-out)',
+        opacity: drawn ? 1 : 0,
+      }
+    : {
+        transition:
+          'stroke-dashoffset var(--duration-slow) var(--ease-out), transform var(--duration-slow) var(--ease-spring)',
+        strokeDasharray: '23px',
+        strokeDashoffset: drawn ? 0 : 23,
+        transform: drawn ? 'scale(1)' : 'scale(0.9)',
+      };
+
+  return (
+    <Check
+      className='h-8 w-8 text-success'
+      aria-hidden='true'
+      data-testid='checkout-success-check'
+      style={style}
+    />
+  );
+}
+
 function getVerificationButtonLabel(state: string): string {
   if (state === 'success') return 'Verification requested';
   if (state === 'submitting') return 'Sending request...';
@@ -125,9 +166,11 @@ function getVerificationButtonLabel(state: string): string {
 
 export default function CheckoutSuccessPage() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const isOnboardingUpgrade = searchParams.get('source') === 'onboarding';
   const checkoutSessionId = searchParams.get('session_id');
   const rawPlanIdParam = searchParams.get('plan_id');
+  const fromFeature = resolveCheckoutReturnFeature(searchParams.get('from'));
   const [requestState, setRequestState] = useState<
     'idle' | 'submitting' | 'success' | 'error'
   >('idle');
@@ -159,6 +202,10 @@ export default function CheckoutSuccessPage() {
   const conversionTrackedRef = useRef(false);
   const onboardingTrackedRef = useRef(false);
   const celebrationTrackedRef = useRef(false);
+  const momentFiredRef = useRef(false);
+  const momentNavigatedRef = useRef(false);
+  const momentArmTimeRef = useRef<number | null>(null);
+  const primaryCtaRef = useRef<HTMLAnchorElement | null>(null);
 
   useEffect(() => {
     setHasHydratedMotion(true);
@@ -309,6 +356,67 @@ export default function CheckoutSuccessPage() {
   const paidDisplayName =
     resolvedPlan.displayName ??
     (view.kind === 'success' ? view.displayName : null);
+
+  /*
+   * JOV-9035 checkout success moment: acknowledge once per checkout session
+   * BEFORE any redirect, then land on the unlocked feature (the `from` route
+   * when it is allowlisted), focusing its main heading on arrival. The hold
+   * is non-blocking: the primary CTA stays reachable the whole time.
+   */
+  useEffect(() => {
+    if (
+      view.kind !== 'success' ||
+      !checkoutSessionId ||
+      isSessionPlanPending ||
+      momentNavigatedRef.current
+    ) {
+      return;
+    }
+
+    if (!momentFiredRef.current) {
+      momentFiredRef.current = true;
+      announceOncePerEvent(
+        checkoutSessionId,
+        getCheckoutSuccessAnnouncement(view.displayName)
+      );
+      primaryCtaRef.current?.focus();
+    }
+
+    // Deps can change mid-hold (billing query landing, plan resolution);
+    // re-arming keeps the original arm time so the acknowledgement hold
+    // never restarts and never exceeds CHECKOUT_SUCCESS_HOLD_MS.
+    if (momentArmTimeRef.current === null) {
+      momentArmTimeRef.current = Date.now();
+    }
+    const remainingMs = Math.max(
+      0,
+      CHECKOUT_SUCCESS_HOLD_MS - (Date.now() - momentArmTimeRef.current)
+    );
+    const timer = setTimeout(() => {
+      if (momentNavigatedRef.current) return;
+      momentNavigatedRef.current = true;
+      router.replace(
+        withHeadingFocusParam(
+          getPaidSuccessPrimaryHref({
+            plan: view.plan,
+            isOnboardingUpgrade,
+            needsProfile,
+            fromFeature,
+          })
+        )
+      );
+    }, remainingMs);
+    return () => clearTimeout(timer);
+  }, [
+    checkoutSessionId,
+    fromFeature,
+    isOnboardingUpgrade,
+    isSessionPlanPending,
+    needsProfile,
+    router,
+    view,
+  ]);
+
   const isArtistVisibilitySuccess =
     view.kind === 'success' && isArtistVisibilityPlan(view.plan);
   let successTitle: string;
@@ -355,10 +463,6 @@ export default function CheckoutSuccessPage() {
       'space-y-6 px-5 py-5 text-center opacity-0 translate-y-6 scale-[0.98] transition-[opacity,transform] duration-cinematic ease-out sm:px-6';
   }
 
-  const showConfetti =
-    shouldCelebratePaidSuccess(view) &&
-    !shouldSuppressMotion &&
-    hasHydratedMotion;
   const viewTestId =
     view.kind === 'pending'
       ? 'checkout-success-pending'
@@ -373,8 +477,6 @@ export default function CheckoutSuccessPage() {
       className='relative'
       contentClassName='relative z-10'
     >
-      {showConfetti ? <ConfettiOverlay viewport /> : null}
-
       <ContentSurfaceCard
         surface='details'
         className='overflow-hidden'
@@ -395,7 +497,6 @@ export default function CheckoutSuccessPage() {
                   ? 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-warning/20 bg-warning-subtle'
                   : 'mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-success/20 bg-success-subtle'
             }
-            aria-live={view.kind === 'pending' ? 'polite' : undefined}
             aria-busy={view.kind === 'pending' ? true : undefined}
           >
             {view.kind === 'pending' ? (
@@ -406,7 +507,7 @@ export default function CheckoutSuccessPage() {
             ) : view.kind === 'recovery' ? (
               <XCircle className='h-8 w-8 text-warning' aria-hidden='true' />
             ) : (
-              <PartyPopper className='h-8 w-8 text-success' />
+              <CheckoutSuccessCheck reduced={shouldSuppressMotion} />
             )}
           </div>
 
@@ -459,16 +560,19 @@ export default function CheckoutSuccessPage() {
               <>
                 <Button asChild size='lg'>
                   <Link
+                    ref={primaryCtaRef}
                     href={getPaidSuccessPrimaryHref({
                       plan: view.plan,
                       isOnboardingUpgrade,
                       needsProfile,
+                      fromFeature,
                     })}
                   >
                     {getPaidSuccessPrimaryLabel({
                       plan: view.plan,
                       isOnboardingUpgrade,
                       needsProfile,
+                      fromFeature,
                     })}
                   </Link>
                 </Button>

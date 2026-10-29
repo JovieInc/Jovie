@@ -1,5 +1,11 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  type PoliteAnnouncer,
+  registerPoliteAnnouncer,
+  resetAnnouncedEventIds,
+} from '@/lib/a11y/announce';
+import { expectNoA11yViolations } from '@/tests/utils/a11y';
 
 const {
   fetchMock,
@@ -8,6 +14,7 @@ const {
   useBillingStatusQueryMock,
   useReducedMotionMock,
   searchParamsMock,
+  routerReplaceMock,
 } = vi.hoisted(() => ({
   fetchMock: vi.fn(),
   pageMock: vi.fn(),
@@ -15,12 +22,14 @@ const {
   useBillingStatusQueryMock: vi.fn(),
   useReducedMotionMock: vi.fn(() => false),
   searchParamsMock: vi.fn(() => new URLSearchParams()),
+  routerReplaceMock: vi.fn(),
 }));
 
 vi.stubGlobal('fetch', fetchMock);
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => searchParamsMock(),
+  useRouter: () => ({ replace: routerReplaceMock }),
 }));
 
 vi.mock('next/link', () => ({
@@ -470,13 +479,12 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
   });
 
-  it('renders viewport confetti when motion is allowed and paid success is verified', () => {
+  it('never celebrates a payment with confetti, even when motion is allowed', () => {
     mockBilling('pro');
     render(<CheckoutSuccessPage />);
-    expect(screen.getByTestId('confetti-overlay')).toHaveAttribute(
-      'data-viewport',
-      'true'
-    );
+    // JOV-9035: paying is a transaction, not an achievement — the checkout
+    // success moment never celebrates with confetti (Apple: celebrate rarely).
+    expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
   });
 
   it('does not declare paid success when checkout-session fetch fails', async () => {
@@ -510,5 +518,183 @@ describe('CheckoutSuccessPage — analytics and shell', () => {
     expect(screen.getByTestId('checkout-success-pending')).toBeInTheDocument();
     expect(screen.queryByTestId('confetti-overlay')).not.toBeInTheDocument();
     expect(pageMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('CheckoutSuccessPage — checkout success moment (JOV-9035)', () => {
+  let announcerSpy: ReturnType<typeof vi.fn<PoliteAnnouncer>>;
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+    pageMock.mockReset();
+    trackMock.mockReset();
+    useBillingStatusQueryMock.mockReset();
+    useReducedMotionMock.mockReset();
+    useReducedMotionMock.mockReturnValue(false);
+    searchParamsMock.mockReset();
+    searchParamsMock.mockReturnValue(new URLSearchParams());
+    routerReplaceMock.mockReset();
+    resetAnnouncedEventIds();
+    announcerSpy = vi.fn<PoliteAnnouncer>();
+    registerPoliteAnnouncer(announcerSpy);
+  });
+
+  afterEach(() => {
+    registerPoliteAnnouncer(null);
+    resetAnnouncedEventIds();
+    vi.useRealTimers();
+  });
+
+  /** Flush the session-fetch microtask chain under fake timers. */
+  async function flushSessionValidation() {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  it('acknowledges the payment once, holds 600ms, then lands on the from feature with focus', async () => {
+    vi.useFakeTimers();
+    setSearchParams('session_id=cs_moment_1&plan_id=pro&from=/app/chat');
+    mockValidatedSessionPlan('pro');
+    mockBilling(null);
+
+    render(<CheckoutSuccessPage />);
+    await flushSessionValidation();
+
+    expect(screen.getByTestId('checkout-success-paid')).toBeInTheDocument();
+
+    // Acknowledged exactly once through the single app-level polite region.
+    expect(announcerSpy).toHaveBeenCalledTimes(1);
+    expect(announcerSpy).toHaveBeenCalledWith(
+      'Payment complete. Artist Presence is active.'
+    );
+
+    // No navigation before the 600ms acknowledgement hold.
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(599);
+    });
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+
+    // Lands on the unlocked feature — not /billing — with the h1 focus marker.
+    expect(routerReplaceMock).toHaveBeenCalledWith('/app/chat?focus=heading');
+
+    // Later timer ticks never duplicate the acknowledgement or navigation.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(announcerSpy).toHaveBeenCalledTimes(1);
+    expect(routerReplaceMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to the plan destination when no from is set', async () => {
+    vi.useFakeTimers();
+    setSearchParams('session_id=cs_moment_2&plan_id=pro');
+    mockValidatedSessionPlan('pro');
+    mockBilling(null);
+
+    render(<CheckoutSuccessPage />);
+    await flushSessionValidation();
+
+    expect(screen.getByTestId('checkout-success-paid')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+
+    expect(routerReplaceMock).toHaveBeenCalledWith(
+      '/app/presence?focus=heading'
+    );
+  });
+
+  it('never auto-navigates a billing-entitled visit without a checkout session', async () => {
+    vi.useFakeTimers();
+    mockBilling('pro');
+
+    render(<CheckoutSuccessPage />);
+    await flushSessionValidation();
+
+    expect(screen.getByTestId('checkout-success-paid')).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(routerReplaceMock).not.toHaveBeenCalled();
+    expect(announcerSpy).not.toHaveBeenCalled();
+  });
+
+  it('draws the check without any transform change under reduced motion', async () => {
+    vi.useFakeTimers();
+    useReducedMotionMock.mockReturnValue(true);
+    setSearchParams('session_id=cs_moment_3&plan_id=pro&from=/app/releases');
+    mockValidatedSessionPlan('pro');
+    mockBilling(null);
+
+    render(<CheckoutSuccessPage />);
+    await flushSessionValidation();
+
+    const check = screen.getByTestId('checkout-success-check');
+
+    // Reduced motion REPLACES the transform with an opacity cross-fade: no
+    // transform is ever declared or transitioned.
+    expect(check.style.transform).toBe('');
+    expect(check.style.transition).not.toContain('transform');
+    expect(check.style.transition).toContain(
+      'opacity var(--duration-fast) var(--ease-out)'
+    );
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(600);
+    });
+    expect(routerReplaceMock).toHaveBeenCalledWith(
+      '/app/releases?focus=heading'
+    );
+  });
+
+  it('draws the check with the spring scale and token easings under motion', async () => {
+    vi.useFakeTimers();
+    setSearchParams('session_id=cs_moment_4&plan_id=pro');
+    mockValidatedSessionPlan('pro');
+    mockBilling(null);
+
+    render(<CheckoutSuccessPage />);
+    await flushSessionValidation();
+
+    const check = screen.getByTestId('checkout-success-check');
+
+    expect(check.style.transition).toContain(
+      'stroke-dashoffset var(--duration-slow) var(--ease-out)'
+    );
+    expect(check.style.transition).toContain(
+      'transform var(--duration-slow) var(--ease-spring)'
+    );
+  });
+
+  it('routes the primary CTA to the from feature ahead of the plan default', async () => {
+    setSearchParams('session_id=cs_moment_5&plan_id=pro&from=/app/library');
+    mockValidatedSessionPlan('pro');
+    mockBilling(null);
+
+    const { container } = render(<CheckoutSuccessPage />);
+    await waitFor(() => {
+      expect(screen.getByTestId('checkout-success-paid')).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByRole('link', { name: 'Open your unlocked feature' })
+    ).toHaveAttribute('href', '/app/library');
+    expect(
+      screen
+        .getByRole('link', { name: 'Open your unlocked feature' })
+        .getAttribute('href')
+    ).not.toContain('/billing');
+
+    await expectNoA11yViolations(container);
   });
 });

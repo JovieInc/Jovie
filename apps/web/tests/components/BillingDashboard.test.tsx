@@ -14,10 +14,6 @@ vi.mock('@/lib/analytics', () => ({
   FEATURE_FLAGS: { BILLING_UPGRADE_DIRECT: 'billing.upgradeDirect' },
 }));
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-}));
-
 // Mock sonner so toast calls don't throw
 vi.mock('sonner', () => ({
   toast: Object.assign(vi.fn(), {

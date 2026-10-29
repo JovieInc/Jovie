@@ -26,10 +26,6 @@ vi.mock('@/lib/analytics', () => ({
   useFeatureFlag: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn(), prefetch: vi.fn() }),
-}));
-
 const hoisted = vi.hoisted(() => ({
   useAiCrawlerAnalyticsQueryMock: vi.fn(),
 }));
