@@ -367,10 +367,11 @@ function recordSlots() {
       if (
         sectionProp &&
         copyProp &&
-        ts.isObjectLiteralExpression(copyProp.initializer)
+        ts.isObjectLiteralExpression(/** @type {any} */ (copyProp).initializer)
       ) {
-        const section = sectionProp.initializer.text;
-        for (const slot of copyProp.initializer.properties) {
+        const section = /** @type {any} */ (sectionProp).initializer.text;
+        for (const slot of /** @type {any} */ (copyProp).initializer
+          .properties) {
           if (!ts.isPropertyAssignment(slot)) continue;
           const m = /^HOMEPAGE_COPY\.(.+)$/.exec(slot.initializer.getText(sf));
           if (m)
@@ -444,8 +445,9 @@ export function buildInventory(registry = { ids: {} }) {
     emitGroup(files, route, prefix);
   }
   // Traffic order: routes in ROUTES order (chrome last), position in file order.
+  /** @type {Map<string, number>} */
   const rank = new Map([
-    ...ROUTES.map((r, i) => [r.route, i]),
+    ...ROUTES.map(/** @returns {[string, number]} */ (r, i) => [r.route, i]),
     [SITE_CHROME.route, ROUTES.length],
   ]);
   rows.sort((a, b) => rank.get(a.route) - rank.get(b.route));
