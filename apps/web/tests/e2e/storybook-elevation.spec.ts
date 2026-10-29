@@ -791,14 +791,14 @@ test.describe('sidebar attention and Settings header', () => {
         ['Inbox', '/app'],
         ['Work', '/app/library'],
         ['Audience', '/app/contacts?tab=audience'],
+        // JOV-7733 retired the Identity rollout gate, so it is part of the
+        // default-flags navigation.
+        ['Identity', '/app/presence'],
       ]) {
         const destination = page.getByRole('link', { name, exact: true });
         await expect(destination).toBeVisible();
         await expect(destination).toHaveAttribute('href', href);
       }
-      await expect(
-        page.getByRole('link', { name: 'Identity', exact: true })
-      ).toHaveCount(0);
     });
   }
 });

@@ -19,7 +19,16 @@ import {
   type QualificationInput,
   qualificationReceipt,
 } from '@/lib/acquisition/conversation-loop';
-import { type CanonicalArtistMetrics } from '@/lib/onboarding/canonical-metrics';
+import {
+  type CanonicalArtistMetrics,
+  getDisplaySpotifyFollowers,
+  normalizeArtistMetrics,
+} from '@/lib/onboarding/canonical-metrics';
+import {
+  decideGoldenPathAdmission,
+  type GoldenPathAdmissionReason,
+  type GoldenPathVerdict,
+} from '@/lib/waitlist/golden-path-admission';
 import {
   type AudienceBand,
   collapseInterviewSignals,
@@ -95,6 +104,10 @@ export interface AccessDecision {
   readonly kind: AccessDecisionKind;
   /** Short rationale for logging + UI surfaces. Not user-facing copy. */
   readonly rationale: string;
+  /** Admitted, but the page stays private until ownership is proven. */
+  readonly proofRequired?: boolean;
+  /** Why the golden path held this artist (controlled gate only). */
+  readonly goldenPathHold?: GoldenPathAdmissionReason;
   /** 0-100 confidence; useful for retroactive analysis of where to tune thresholds. */
   readonly score: number;
   /**
@@ -173,6 +186,8 @@ export function evaluateAccessSignal(
 }
 
 export interface OnboardingAccessInput {
+  /** Undefined is legacy state; null is an explicitly unresolved role. */
+  readonly activeRole?: string | null;
   readonly accessControlled: boolean;
   readonly youtubeQualified?: boolean;
   readonly spotifyArtistId: string | null;
@@ -180,6 +195,14 @@ export interface OnboardingAccessInput {
   readonly publicProfileUrl?: string | null;
   readonly spotifyFollowers: number | null;
   readonly metrics?: CanonicalArtistMetrics | null;
+  /**
+   * Golden-path verdict resolved once per turn by the handler (already null
+   * when auto-accept capacity is full or the verdict is unreadable). Only the
+   * controlled-access branch reads it.
+   */
+  readonly goldenPathVerdict?: GoldenPathVerdict | null;
+  /** Capacity/throttle hold from the turn context; wins over an admit. */
+  readonly goldenPathHold?: GoldenPathAdmissionReason | null;
   readonly signals: readonly Omit<
     InterviewSignalsMetadata['signals'][number],
     'recordedAt'
@@ -197,7 +220,15 @@ export interface OnboardingAccessInput {
 export function decideOnboardingAccess(
   input: OnboardingAccessInput
 ): AccessDecision {
-  if (!input.spotifyArtistId && !input.publicProfileUrl) {
+  if (input.activeRole === null)
+    return {
+      kind: 'needs_more_info',
+      rationale: 'role_priority_required',
+      score: 0,
+    };
+  const musicJob =
+    input.activeRole === undefined || input.activeRole === 'artist';
+  if (!(musicJob && input.spotifyArtistId) && !input.publicProfileUrl) {
     return {
       kind: 'needs_more_info',
       rationale: 'public_profile_required_for_waitlist',
@@ -209,11 +240,36 @@ export function decideOnboardingAccess(
   if (input.extraBand) {
     signals.push({ audienceBand: input.extraBand, recordedAt });
   }
-  return evaluateAccessSignal({
+  const decision = evaluateAccessSignal({
     signal: collapseInterviewSignals(signals),
-    spotifyFollowers: input.spotifyFollowers,
-    metrics: input.metrics,
+    spotifyFollowers: musicJob ? input.spotifyFollowers : null,
+    metrics: musicJob ? input.metrics : null,
     turnCount: input.turnCount,
-    youtubeQualified: input.youtubeQualified,
+    youtubeQualified: musicJob && input.youtubeQualified,
   });
+  // Complete the interview before either terminal outcome. A green golden
+  // path cannot substitute for the YouTube ICP; a verified ICP cannot waive
+  // readiness, identity safety or the turn's capacity/throttle hold.
+  if (decision.kind === 'needs_more_info' || !input.accessControlled) {
+    return decision;
+  }
+  const admission = decideGoldenPathAdmission({
+    spotifyArtistId: musicJob ? input.spotifyArtistId : null,
+    reach: getDisplaySpotifyFollowers(
+      input.metrics ??
+        normalizeArtistMetrics(
+          { spotifyFollowers: input.spotifyFollowers },
+          { source: 'tool_output' }
+        )
+    ),
+    goldenPathVerdict: input.goldenPathVerdict ?? null,
+  });
+  const goldenPathHold =
+    input.goldenPathHold ?? (admission.admit ? null : admission.reason);
+  if (goldenPathHold) {
+    return { ...decision, kind: 'waitlist', goldenPathHold };
+  }
+  return decision.kind === 'instant_access'
+    ? { ...decision, proofRequired: true }
+    : decision;
 }

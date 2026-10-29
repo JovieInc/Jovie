@@ -9,7 +9,8 @@ const channelUrl = 'https://www.youtube.com/@testartist';
 const OWNED_ID = 'UC1234567890123456789012';
 const base = {
   accessControlled: true,
-  spotifyArtistId: null,
+  spotifyArtistId: 'artist',
+  goldenPathVerdict: 'ELIGIBLE' as const,
   spotifyFollowers: 0,
   publicProfileUrl: channelUrl,
   signals: [

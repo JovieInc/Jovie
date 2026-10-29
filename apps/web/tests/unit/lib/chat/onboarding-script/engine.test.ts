@@ -373,6 +373,33 @@ describe('decideFallbackTurn', () => {
     );
   });
 
+  it('holds a Spotify-only artist even when the controlled golden path is green', async () => {
+    const messages = [
+      ...baseThroughArtist(),
+      assistant('Handle locked.', [HANDLE_CONFIRMED, SOCIAL_ATTACHED]),
+      user('around 20k on instagram'),
+    ];
+    const state = createOnboardingTurnState({
+      sessionId: SESSION,
+      turnCount: messages.filter(m => m.role === 'user').length,
+      accessControlled: true,
+      goldenPathVerdict: 'ELIGIBLE',
+      messages,
+    });
+    const turn = await decideFallbackTurn({ uiMessages: messages, state });
+
+    expect(turn.line.stepId).toBe('waitlist');
+    expect(turn.toolEvents.map(event => event.toolName)).not.toContain(
+      'proposeCheckout'
+    );
+    expect(
+      turn.toolEvents.find(event => event.output.action === 'propose_next_step')
+        ?.output
+    ).toMatchObject({
+      decision: { kind: 'waitlist' },
+    });
+  });
+
   it('waitlists only with meaningful signal after turn cap', async () => {
     const lowSignal = {
       ...CONFIRMED_OUTPUT,

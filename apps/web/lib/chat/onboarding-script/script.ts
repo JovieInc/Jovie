@@ -31,10 +31,17 @@ export type ScriptStepId =
   | 'handle'
   | 'ask_audience'
   | 'instant_access'
+  | 'golden_path_admitted'
   | 'waitlist'
   | 'done'
   | 'stream_error'
-  | 'ownership_conflict';
+  | 'ownership_conflict'
+  | 'clarify'
+  | 'faq_what'
+  | 'faq_price'
+  | 'faq_time'
+  | 'faq_ownership'
+  | 'faq_spotify';
 
 export interface ScriptLine {
   readonly key: `${ScriptStepId}:${string}`;
@@ -102,6 +109,12 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'You clear the bar. Checkout takes about a minute. The free tier is available if you want to start there.'
   ),
 
+  line(
+    'golden_path_admitted',
+    'v1',
+    'You clear the bar. Your page goes live once we confirm it is you, and it stays private and yours to edit until then. Checkout takes about a minute and paying does not change that. The free tier is available if you want to start there.'
+  ),
+
   line('waitlist', 'v3', ONBOARDING_WAITLIST_RECEIPT),
 
   line(
@@ -114,6 +127,39 @@ export const SCRIPT_LINES: readonly ScriptLine[] = [
     'ownership_conflict',
     'v1',
     'This artist already has a Jovie profile. Sign in with the original account or use the verified profile claim flow.'
+  ),
+
+  // System-1 answer sets (JOV-9627). Fixed copy for the questions visitors
+  // actually ask; the classifier picks the key, no model writes a word.
+  line(
+    'clarify',
+    'v1',
+    'Give me the artist name, or paste the Spotify link. I will take it from there.'
+  ),
+  line(
+    'faq_what',
+    'v1',
+    'Jovie builds an artist profile from your Spotify data and keeps it current. Pick the artist, claim a handle, and the page takes shape.'
+  ),
+  line(
+    'faq_price',
+    'v1',
+    'Starting is free. Paid plans come after the profile exists, and nothing in this chat charges a card.'
+  ),
+  line(
+    'faq_time',
+    'v1',
+    'Four short steps: pick the artist, lock a handle, attach one account, then see the result.'
+  ),
+  line(
+    'faq_ownership',
+    'v1',
+    'Nothing goes live until we confirm it is you. Until then the page stays private.'
+  ),
+  line(
+    'faq_spotify',
+    'v1',
+    'Spotify gives us the real catalog and counts, so we start there. Pick the closest match.'
   ),
 
   line(
@@ -162,10 +208,17 @@ export const SCRIPT_STEP_IDS: readonly ScriptStepId[] = [
   'handle',
   'ask_audience',
   'instant_access',
+  'golden_path_admitted',
   'waitlist',
   'done',
   'stream_error',
   'ownership_conflict',
+  'clarify',
+  'faq_what',
+  'faq_price',
+  'faq_time',
+  'faq_ownership',
+  'faq_spotify',
 ];
 
 export function isScriptStepId(value: string): value is ScriptStepId {

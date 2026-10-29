@@ -11,7 +11,7 @@ vi.mock('next/image', () => ({
 import { CommandPalettePanel } from './CommandPalettePanel';
 
 describe('CommandPalettePanel', () => {
-  it('shows the default registry groups and hides flag-gated rows', () => {
+  it('shows the default registry groups with Identity ungated and capped at five per group', () => {
     render(<CommandPalettePanel />);
 
     expect(
@@ -23,14 +23,15 @@ describe('CommandPalettePanel', () => {
       'true'
     );
     expect(screen.getByRole('option', { name: /^Work/ })).toBeVisible();
-    expect(screen.getByRole('option', { name: /^Profile/ })).toBeVisible();
+    expect(screen.getByRole('option', { name: /^Identity/ })).toBeVisible();
+    // Identity now takes a slot in the top-five navigation group.
+    expect(screen.queryByRole('option', { name: /^Profile/ })).toBeNull();
     expect(
       screen.getByRole('option', { name: /^Generate pitch/ })
     ).toBeVisible();
     expect(
       screen.getByRole('option', { name: /^Remove social link/ })
     ).toBeVisible();
-    expect(screen.queryByRole('option', { name: /^Identity/ })).toBeNull();
     expect(screen.queryByRole('option', { name: /^Settings/ })).toBeNull();
     expect(screen.queryByRole('option', { name: /^Send feedback/ })).toBeNull();
     expect(screen.queryByText('Artists')).toBeNull();
@@ -62,7 +63,7 @@ describe('CommandPalettePanel', () => {
 
     expect(screen.getByTestId('shared-command-palette')).toHaveAttribute(
       'data-committed-command',
-      'go-work'
+      'go-presence'
     );
     expect(screen.queryByText('Artists')).toBeNull();
   });

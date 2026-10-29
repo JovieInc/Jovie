@@ -304,6 +304,11 @@ export const ServerEnvSchema = z.object({
    * returns 403 TURNSTILE_REQUIRED. Inert on Vercel production/preview.
    */
   E2E_REQUIRE_TURNSTILE_GATE: z.string().optional(),
+  /**
+   * JOV-9627 kill switch: 'off' sends every onboarding chat turn back through
+   * the LLM. Unset (the default) leaves the system-1 reply engine on.
+   */
+  ONBOARDING_SYSTEM1_ENGINE: z.string().optional(),
 
   // Analytics
   ANALYTICS_RETENTION_DAYS: z.string().optional(),
@@ -442,6 +447,7 @@ export const ServerEnvSchema = z.object({
   // Instantly (outreach email campaigns)
   INSTANTLY_API_KEY: z.string().optional(),
   INSTANTLY_CAMPAIGN_ID: z.string().optional(),
+  INSTANTLY_WEBHOOK_SECRET: z.string().min(32).optional(),
 
   // Search APIs (lead discovery)
   SERPAPI_API_KEY: z.string().optional(),
@@ -654,6 +660,7 @@ export const ENV_KEYS = [
   'SESSION_SECRET',
   'TURNSTILE_SECRET_KEY',
   'E2E_REQUIRE_TURNSTILE_GATE',
+  'ONBOARDING_SYSTEM1_ENGINE',
   'E2E_PROD_SIGNUP_EMAIL_BASE',
   'PRODUCTION_WAITLIST_CANARY_READ_TOKEN',
   'E2E_PROD_SIGNUP_PASSWORD',
@@ -718,6 +725,7 @@ export const ENV_KEYS = [
   'JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
+  'INSTANTLY_WEBHOOK_SECRET',
   'SERPAPI_API_KEY',
   'EXA_API_KEY',
   'JOVIE_FACEBOOK_PIXEL_ID',

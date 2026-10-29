@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  advanceOnboardingProfileDraft,
+  emptyOnboardingProfileDraft,
+} from '@/lib/onboarding/profile-draft';
 
 const mockRevenueFailure = vi.hoisted(() => vi.fn());
 const claimVerification = vi.hoisted(() => ({
@@ -784,6 +788,45 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
     mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
   });
 
+  it.each(['artist', 'author', 'creator', 'expert', 'founder'] as const)(
+    'reserves a %s draft without an invented artist classification',
+    async role => {
+      const profileDraft = advanceOnboardingProfileDraft(
+        emptyOnboardingProfileDraft(),
+        { id: 'role', text: `I am a ${role}. I want a useful profile` }
+      );
+      mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+        artist: null,
+        handle: 'mywork',
+        socialLinks: [],
+        interviewSignals: [],
+        profileDraft,
+      });
+      setupOwnedConversationAndMessages();
+      setupExistingProfileSelect(null);
+      const [insertValues] = queueProfileInsert({ id: 'profile_reserved' });
+      queueReservedPostPersistWrites();
+      await materializeClaimedOnboardingProfile({
+        userId: 'user_1',
+        conversationId: 'conv_1',
+        ipAddress: null,
+        userAgent: null,
+        visibility: 'reserved',
+        waitlistEntryId: 'entry_1',
+      });
+      expect(insertValues).toHaveBeenCalledWith(
+        expect.objectContaining({
+          creatorType: role === 'artist' ? 'artist' : 'creator',
+          isPublic: false,
+          isClaimed: false,
+          settings: expect.objectContaining({
+            onboarding: expect.objectContaining({ profileDraft }),
+          }),
+        })
+      );
+    }
+  );
+
   it('creates a hidden, unclaimed profile that holds the handle for the waitlist entry', async () => {
     setupOwnedConversationAndMessages();
     setupExistingProfileSelect(null);
@@ -885,6 +928,59 @@ describe('materializeClaimedOnboardingProfile — reserved waitlist hold (JOV-72
 
     expect(setSpy).toHaveBeenCalledWith(
       expect.objectContaining({ isPublic: true, isClaimed: true })
+    );
+  });
+});
+
+describe('materializeClaimedOnboardingProfile — unproven admission (private until proof)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockIdentityConflict.mockReset();
+    mockDeriveClaimedOnboardingStateFromMessageRows.mockReturnValue({
+      artist: {
+        id: '4Uwpa6zW3zzCSQvooQNksm',
+        name: 'Mid Artist',
+        url: 'https://open.spotify.com/artist/4Uwpa6zW3zzCSQvooQNksm',
+        imageUrl: null,
+        genres: [],
+        followers: 3_200,
+        popularity: 30,
+      },
+      handle: 'midartist',
+      socialLinks: [],
+      interviewSignals: [],
+    });
+    mockReserveOnboardingHandle.mockResolvedValue('midartist');
+    mockFetchArtistBySpotifyUrl.mockResolvedValue(null);
+  });
+
+  it('creates a claimed but private profile, holds the Spotify identity and opens a proof request', async () => {
+    setupOwnedConversationAndMessages();
+    setupExistingProfileSelect(null);
+    const [insertValues] = queueProfileInsert({ id: 'profile_unproven' });
+    queuePostPersistWrites();
+
+    await materializeClaimedOnboardingProfile({
+      userId: 'user_1',
+      conversationId: 'conv_1',
+      ipAddress: null,
+      userAgent: null,
+      visibility: 'unproven',
+    });
+
+    expect(insertValues).toHaveBeenCalledWith(
+      expect.objectContaining({ isPublic: false, isClaimed: true })
+    );
+    const inserted = insertValues.mock.calls[0]?.[0] as Record<string, unknown>;
+    // No catalog or identity is attributed to the requester before proof.
+    expect(inserted.spotifyId).toBeUndefined();
+    expect(claimVerification.request).toHaveBeenCalledWith(
+      expect.objectContaining({
+        spotifyArtistId: '4Uwpa6zW3zzCSQvooQNksm',
+        reach: 3_200,
+        paid: false,
+        proofOnly: true,
+      })
     );
   });
 });
