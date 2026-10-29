@@ -4,7 +4,6 @@ import { GET } from './route';
 const mocks = vi.hoisted(() => ({
   principal: vi.fn(),
   parity: vi.fn(),
-  identity: vi.fn(),
 }));
 
 vi.mock('@/lib/ovie/mcp/principal', () => ({
@@ -12,9 +11,6 @@ vi.mock('@/lib/ovie/mcp/principal', () => ({
 }));
 vi.mock('@/lib/music-resolver/resolve-parity.server', () => ({
   readShadowParitySummary: mocks.parity,
-}));
-vi.mock('@/lib/music-resolver/artist-identity-confidence.server', () => ({
-  readArtistIdentityQuality: mocks.identity,
 }));
 vi.mock('@/lib/music-resolver/musicfetch-gate', () => ({
   musicResolverCutoverReceipt: () => ({
@@ -32,17 +28,15 @@ describe('GET /api/ovie/music-resolver', () => {
       receipts: 6,
       falseLinkAlarm: { firing: false },
     });
-    mocks.identity.mockResolvedValue({ profiles: 3, certifiedRate: null });
   });
 
-  it('returns parity, artist identity and cutover state to admins', async () => {
+  it('returns parity and cutover state to admins', async () => {
     const response = await GET(request());
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('private, no-store');
     const body = await response.json();
     expect(body.schema).toBe('jovie.music-resolver-quality/v1');
     expect(body.parity.receipts).toBe(6);
-    expect(body.artistIdentity.certifiedRate).toBeNull();
     expect(body.cutover.schema).toBe('jovie.music-resolver-cutover/v1');
   });
 
