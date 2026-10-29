@@ -64,6 +64,22 @@ rounds mean `blocked`.
 In code, use `writeUntilPass(brief, write, gatewayTransport(key))` for generated
 copy and `lintCopy(text, { register })` on every volume send path.
 
+### Copy Jam: Tim's verdicts feed the loop
+
+Tim reviews marketing lines by ID in Ovie (`/app/ov/copy`) or by voice memo.
+Summer reads them from `/api/internal/ovie/copy-jam`:
+
+- `?view=examples`: `great` lines are positive examples. Pass their `text` as
+  `voiceSamples` on the brief so the judge scores against Tim's taste. `avoid`
+  lines (with his note) are what to steer away from; quote the note in the brief goal.
+- `?view=queue`: lines Tim called `sucks` or `meh`, with his note. For each, run
+  the loop above to produce 2-3 alternatives (each a different move, not a
+  rewording), then `POST` them as `{copyId, alternatives}`. They are held as
+  pending suggestions and pass the blocking lint on the way in. A suggestion
+  never changes a page: a record-backed line (`source` starts `record:`) goes
+  live only through that record's draft, validate and publish.
+- `?view=stats`: lines reviewed, % great, and the rewrite re-rated great rate.
+
 ## 4. Landing pages: compile in stages
 
 Never start at layout or visuals. Build `landing.json` (shape: `LandingSpec` in
