@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import snapshot from '@/lib/agent-distribution/generated/tools-list.snapshot.json';
 import { LISTING } from '@/lib/agent-distribution/listing';
 import { AgentConnectorDocs } from './AgentConnectorDocs';
