@@ -31,6 +31,7 @@
       "lib/eval/scorers/scorers.test.ts",
       "tests/eval/golden/golden-eval-set.ci.test.ts",
       "tests/eval/helpfulness/helpfulness.ci.test.ts",
+      "tests/eval/helpfulness/runner.ci.test.ts",
       "tests/unit/chat/onboarding-transcript-quality.eval.test.ts"
     ]
   },
