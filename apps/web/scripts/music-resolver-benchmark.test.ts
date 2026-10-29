@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ resolve: vi.fn() }));
+const mocks = vi.hoisted(() => ({ resolve: vi.fn(), albumRecord: vi.fn() }));
 
 vi.mock('../lib/music-resolver/in-house', () => ({
   resolveInHouse: mocks.resolve,
+}));
+vi.mock('../lib/spotify/client', () => ({
+  spotifyClient: { requestJson: mocks.albumRecord },
 }));
 vi.mock('../lib/music-resolver/in-house-sources', () => ({
   createDefaultInHouseSources: () => ({}),
@@ -30,7 +33,11 @@ function resolved(links: { provider: string; url: string }[], upc = row.upc) {
 }
 
 describe('music resolver benchmark', () => {
-  beforeEach(() => mocks.resolve.mockReset());
+  beforeEach(() => {
+    mocks.resolve.mockReset();
+    mocks.albumRecord.mockReset();
+    mocks.albumRecord.mockRejectedValue(new Error('unreadable'));
+  });
 
   it('computes a Wilson interval and null on an empty denominator', () => {
     expect(wilson(0, 0)).toBeNull();
@@ -92,10 +99,46 @@ describe('music resolver benchmark', () => {
       }
     >;
     expect(metrics.name_to_spotify.wrong).toBe(1);
+    expect(metrics.name_to_spotify).toMatchObject({
+      wrongDifferentRelease: 1,
+      wrongSameUpcTwin: 0,
+    });
     expect(metrics.name_to_spotify.providerCoverage).toEqual({
       spotify: 1,
       apple_music: 1,
     });
     expect(metrics.upc_to_spotify.correct).toBe(1);
+  });
+
+  it('separates a same-UPC Spotify twin from a different release', async () => {
+    const twin = 'https://open.spotify.com/album/TWINTWINTWINTWINTWIN00';
+    mocks.resolve
+      .mockResolvedValueOnce(resolved([{ provider: 'spotify', url: twin }]))
+      .mockResolvedValueOnce({ status: 'no_match', upc: null, links: [] })
+      .mockResolvedValueOnce(resolved([]));
+    mocks.albumRecord.mockResolvedValueOnce({
+      external_ids: { upc: `00${row.upc}` },
+    });
+    const sameRelease = await evaluate(row);
+    expect(sameRelease.cases.upc_to_spotify).toBe('wrong');
+
+    mocks.resolve
+      .mockResolvedValueOnce(resolved([{ provider: 'spotify', url: twin }]))
+      .mockResolvedValueOnce({ status: 'no_match', upc: null, links: [] })
+      .mockResolvedValueOnce(resolved([]));
+    mocks.albumRecord.mockResolvedValueOnce({
+      external_ids: { upc: '111111111111' },
+    });
+    const otherRelease = await evaluate(row);
+
+    const metrics = summarizeBenchmark([sameRelease, otherRelease]) as Record<
+      string,
+      { wrong: number; wrongDifferentRelease: number; wrongSameUpcTwin: number }
+    >;
+    expect(metrics.upc_to_spotify).toMatchObject({
+      wrong: 2,
+      wrongDifferentRelease: 1,
+      wrongSameUpcTwin: 1,
+    });
   });
 });
