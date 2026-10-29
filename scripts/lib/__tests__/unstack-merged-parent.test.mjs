@@ -328,7 +328,7 @@ describe('unstack-merged-parent.sh', () => {
     }
   );
 
-  it.each(['tim-hold', 'tim:hold', 'hold:tim', 'do-not-merge'])(
+  it.each(['hold', 'gated', 'incident', 'queue-deferred'])(
     'preserves %s applied after rebase but before publication',
     label => {
       const fx = fixture();
@@ -379,7 +379,7 @@ describe('unstack-merged-parent.sh', () => {
 
   it('uses trusted committed policy after checking out child policy overrides', () => {
     const fx = fixture({ policyCheckout: true });
-    changePrAfterRebase(fx, '.["11"].labels = [{"name":"hold:tim"}]');
+    changePrAfterRebase(fx, '.["11"].labels = [{"name":"hold"}]');
     const result = run(fx);
     expect(result.status, result.stdout + result.stderr).toBe(0);
     expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);

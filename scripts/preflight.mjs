@@ -259,8 +259,12 @@ export async function lintBody({
   env = process.env,
 }) {
   const { evaluateFleetRules } = await import('./pr-fleet-rules.mjs');
+  const { evaluateCustomerNoteContract } = await import(
+    './lib/daily-changelog-publication.mjs'
+  );
   const body = readFileSync(bodyFile, 'utf8');
   const mergeBase = git(['merge-base', `origin/${base}`, 'HEAD'], { cwd, env });
+  if (!mergeBase) throw new Error('Cannot resolve PR body comparison base');
   const status = git(['diff', '--name-status', mergeBase, 'HEAD'], {
     cwd,
     env,
@@ -270,20 +274,41 @@ export async function lintBody({
     .filter(Boolean)
     .map(row => {
       const [code, from, to] = row.split('\t');
+      const diff = spawnSync(
+        'git',
+        [
+          'diff',
+          '--no-ext-diff',
+          '--no-textconv',
+          mergeBase,
+          'HEAD',
+          '--',
+          from,
+          ...(to ? [to] : []),
+        ],
+        { cwd, env, encoding: 'utf8' }
+      );
+      if (diff.status !== 0)
+        throw new Error(`Cannot read PR body diff for ${to ?? from}`);
       return {
         filename: to ?? from,
         previous_filename: to ? from : undefined,
         status: code.startsWith('A') ? 'added' : 'modified',
-        patch: '',
+        patch: diff.stdout,
       };
     });
   const { errors, warnings } = evaluateFleetRules({
     pr: { title: title ?? '', body, labels: [] },
     files,
   });
-  if (!/releaseWorthy\s*:\s*(?:true|false)|^#{1,6}\s*release note/im.test(body))
+  const note = evaluateCustomerNoteContract({
+    files: files.map(file => file.filename),
+    body,
+    createdAt: undefined,
+  });
+  if (!note.passed)
     errors.push(
-      'changelog-marker: add `releaseWorthy:false` or a release note section.'
+      `changelog-marker: customer outcome decision missing or invalid (${note.reason}).`
     );
   return { errors, warnings };
 }

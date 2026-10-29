@@ -198,6 +198,12 @@ needs an auditable PR-body marker line — `api-breaking: <reason>`.
 |-------|---------|------|-------------|
 | `/api/create-tip-intent` | POST | `public` | Create Stripe payment intent for tip |
 
+### Content Records
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/content-records/[kind]/[key]` | GET, POST | `admin` or `CONTENT_PUBLISH_SECRET` bearer + `x-content-actor` | Versioned content-as-data store: history (GET); validate, draft (returns signed preview URL), publish, rollback (POST). Every publish/rollback writes an audit row. See `lib/content-records/`. |
+
 ### Creator
 
 | Route | Methods | Auth | Description |
