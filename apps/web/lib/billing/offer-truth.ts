@@ -8,7 +8,7 @@
  */
 
 import { APP_ROUTES } from '@/constants/routes';
-import { claims } from '@/lib/billing/offer/claims';
+import { claims, requireClaim } from '@/lib/billing/offer/claims';
 import {
   ARTIST_VISIBILITY_OFFER,
   PLAN_PRICES,
@@ -42,8 +42,16 @@ export const PRO_TRIAL_TRUTH = `${PRO_TRIAL_DURATION_DAYS}-day ${ARTIST_VISIBILI
 /** EVENT: Tim, 2026-10-20 — Pro is self-serve; "Limited access" is retired. */
 export const PRO_SELF_SERVE_TRUTH = `Self-serve. ${claims(['billing.cancel_short', 'billing.refund'])}`;
 
+/**
+ * EVENT: Tim, 2026-10-25 — the one public cancellation and refund sentence.
+ * Rendered verbatim in the published terms; tests keep the two in step.
+ */
+export const CANCEL_AND_REFUND_TRUTH = requireClaim(
+  'billing.cancel_and_refund'
+);
+
 export const FREE_PROFILE_TRUTH =
-  'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.';
+  'Your Jovie profile stays free forever and keeps audience capture.';
 
 export const MAX_NO_TRIAL_TRUTH = 'Paid Max plan. No Max trial.';
 
@@ -205,7 +213,8 @@ export function getPublicPriceClaim(plan: PublicOfferPlan): PublicPriceClaim {
       cadence: '/mo',
       badge: 'Self-serve',
       note: PRO_SELF_SERVE_TRUTH,
-      ctaLabel: 'Claim your profile',
+      // Paid CTA names the plan and price (JOV-9692): never a bare "Claim".
+      ctaLabel: `Start ${ARTIST_VISIBILITY_OFFER.pro.displayName}, ${formatUsdAmount(priceUsd)}/mo`,
       // `plan=pro` keeps the shared signup-intent contract on every
       // self-serve CTA; /claim/start persists the Pro monthly intent.
       ctaHref: `${APP_ROUTES.CLAIM}?plan=pro`,

@@ -6,7 +6,11 @@ import { db } from '@/lib/db';
 import { agentVisibilityDrafts } from '@/lib/db/schema/agent-drafts';
 import { resolveAgentArtist } from './artist-resolution';
 import { draftTokenHash, verifyDraftCapability } from './draft-capability';
-import { createAgentDraftSchema, type DraftCapability } from './draft-contract';
+import {
+  createAgentDraftSchema,
+  type DraftCapability,
+  invalidInputError,
+} from './draft-contract';
 import type { StoredReleaseLaunch } from './draft-preview';
 
 export type AgentDraftRow = typeof agentVisibilityDrafts.$inferSelect;
@@ -114,12 +118,7 @@ export async function storeAgentReleaseLaunch(
 /** One PK-protected insert makes retries and racing instances share one draft. */
 export async function createAgentDraft(input: unknown) {
   const parsed = createAgentDraftSchema.safeParse(input);
-  if (!parsed.success)
-    return {
-      status: 'error' as const,
-      code: 'INVALID_INPUT' as const,
-      retryable: false,
-    };
+  if (!parsed.success) return invalidInputError(parsed.error);
   const { artist_id: artistId, draft_token: token } = parsed.data;
   const capability = verifyDraftCapability(token);
   if (!capability || capability.artist_id !== artistId) return unavailable();

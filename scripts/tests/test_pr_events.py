@@ -519,11 +519,17 @@ class RelayTest(unittest.TestCase):
 
         for status in ("CLEAN", "HAS_HOOKS", "UNSTABLE"):
             added, shell = success(status)
-            self.assertEqual(added, [(5, "cleared-red")], status)
+            self.assertEqual(added, [(5, "cleared-red"), (5, "enroll-wake")], status)
             delete = ["gh", "api", "-X", "DELETE",
                       f"repos/{events.REPO}/issues/5/labels/lane-fix-red"]
             self.assertIn(delete, shell.calls, status)
             self.assertFalse(events.gh_read_only(delete), status)
+            # JOV-8788: the GITHUB_TOKEN DELETE wakes nothing (recursion guard),
+            # so the relay hands the now-eligible head straight to green enroll.
+            wake = ["gh", "workflow", "run", events.GREEN_ENROLL_WORKFLOW,
+                    "--repo", events.REPO, "--ref", "main", "-f", "pr_number=5"]
+            self.assertIn(wake, shell.calls, status)
+            self.assertFalse(events.gh_read_only(wake), status)
             self.assertEqual(shell.made("gh", "api", "-X", "POST"), [], status)
         for status in ("BLOCKED", "DIRTY", "BEHIND", "UNKNOWN"):
             added, shell = success(status)
@@ -558,6 +564,16 @@ class RelayTest(unittest.TestCase):
                "pull_requests": [{"number": 5}]}
         self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()), [])
         self.assertEqual(len(shell.made("gh", "api", "-X", "DELETE")), 1)
+        self.assertEqual(shell.made("gh", "workflow", "run"), [])
+
+    def test_a_green_success_that_fails_the_enroll_wake_records_it(self):
+        view = pr(branch="cursor/fix", sha="h1", merge="CLEAN", labels=["lane-fix-red"], state="OPEN")
+        shell = Shell({("gh", "pr", "view"): view, ("gh", "workflow", "run"): (1, "")})
+        run = {"event": "pull_request", "conclusion": "success", "head_sha": "h1",
+               "pull_requests": [{"number": 5}]}
+        self.assertEqual(events.relay("workflow_run", {"workflow_run": run}, shell, set()),
+                         [(5, "cleared-red"), (5, "enroll-wake-failed")])
+        self.assertEqual(len(shell.made("gh", "workflow", "run")), 1)
 
     def test_a_green_lane_draft_drops_lane_fix_red_and_can_still_be_marked_green(self):
         view = pr(draft=True, merge="CLEAN", labels=["lane-fix-red"], state="OPEN", sha="h1")
@@ -1036,11 +1052,12 @@ class QuotaRelayTest(unittest.TestCase):
         return "transient-server" if "HTTP 502" in text else "none"
 
     def shell(self, logs, jobs=(1,), jobs_reply=None):
-        routes = {("gh", "pr", "view"): self.VIEW,
-                  ("gh", "api", f"repos/{events.REPO}/actions/runs/900/jobs?filter=latest&per_page=100"):
-                      jobs_reply or (0, json.dumps(list(jobs)))}
+        routes = {("gh", "pr", "view"): self.VIEW}
+        for attempt in range(1, events.INFRA_RERUN_MAX_ATTEMPT + 1):
+            routes[("gh", "api", f"repos/{events.REPO}/actions/runs/900/attempts/{attempt}/jobs?per_page=100")] = \
+                jobs_reply or (0, json.dumps(list(jobs)))
         for job, log in zip(jobs, logs):
-            routes[("gh", "api", f"repos/{events.REPO}/actions/jobs/{job}/logs")] = (0, log)
+            routes[("gh", "run", "view", "--repo", events.REPO, "--job", str(job))] = (0, log)
         return Shell(routes)
 
     def relay(self, shell, run=None):
@@ -1067,6 +1084,112 @@ class QuotaRelayTest(unittest.TestCase):
         with patch.object(events, "classify_github_failure", lambda t: "primary-rate-limit" if "github-quota-deferred" in t else "none"):
             self.assertEqual(events.relay("workflow_run", {"workflow_run": {**self.RUN, "name": "PR Fleet Rules"}}, shell, set()), [])
         self.assertIn(["gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"], shell.calls)
+
+    def test_fleet_ansi_log_uses_safe_exact_attempt_view(self):
+        # Hosted gh 2.102 refuses ANSI-bearing raw API log bodies, even when
+        # stdout is captured. Its run view reader sanitizes the same bytes.
+        safe_log = "\n".join(f"PR Fleet Rules\tEnforce receipts\t{line}"
+                             for line in self.FLEET_LOG.splitlines())
+        shell = self.shell([])
+        for path in ("jobs?filter=latest&per_page=100", "attempts/1/jobs?per_page=100"):
+            shell.routes[("gh", "api", f"repos/{events.REPO}/actions/runs/900/{path}")] = (0, "[1]")
+        shell.routes[("gh", "api", f"repos/{events.REPO}/actions/jobs/1/logs")] = (
+            1, "the response contains terminal escape sequences")
+        safe_args = ("gh", "run", "view", "--repo", events.REPO, "--job", "1",
+                     "--attempt", "1", "--log")
+        shell.routes[safe_args] = (0, safe_log)
+        self.assertEqual(events.quota_failure(self.RUN, shell), "primary-rate-limit")
+        self.assertEqual(shell.made("gh", "run", "view"), [list(safe_args)])
+        self.assertFalse(any("--allow-escape-sequences" in call for call in shell.calls))
+        self.assertTrue(events.gh_read_only(list(safe_args)))
+
+    def test_log_discovery_and_reads_stay_on_the_triggering_attempt(self):
+        shell = self.shell([self.QUOTA_LOG] * 3, jobs=(1, 2, 3))
+        run = {**self.RUN, "run_attempt": 2}
+        self.assertEqual(events.quota_failure(run, shell, self.classify), "primary-rate-limit")
+        self.assertEqual(shell.calls[0][2],
+                         f"repos/{events.REPO}/actions/runs/900/attempts/2/jobs?per_page=100")
+        reads = shell.made("gh", "run", "view")
+        self.assertEqual(len(reads), 3)
+        self.assertTrue(all(call[-3:] == ["--attempt", "2", "--log"] for call in reads))
+
+    def test_production_safe_reader_uses_canonical_admission_and_existing_read_token(self):
+        from apiclient.store import MemoryLedgerStore
+        for read_token in ("read-fixture", ""):
+            with self.subTest(read_token=bool(read_token)), \
+                    patch.dict(events.os.environ, {"GH_TOKEN": "write-fixture", "GH_READ_TOKEN": read_token}, clear=True), \
+                    patch("apiclient.gh.default_store", return_value=MemoryLedgerStore()), \
+                    patch.object(events.lifecycle, "run") as execute:
+                execute.side_effect = [subprocess.CompletedProcess([], 0, "[1]", ""),
+                                       subprocess.CompletedProcess([], 0, self.QUOTA_LOG, "")]
+                self.assertEqual(events.quota_failure(self.RUN, classify=self.classify), "primary-rate-limit")
+                self.assertEqual(execute.call_count, 2)
+                safe = execute.call_args
+                self.assertEqual(safe.args[0], ["gh", "run", "view", "--repo", events.REPO,
+                                                "--job", "1", "--attempt", "1", "--log"])
+                self.assertEqual(safe.kwargs["timeout"], 60)
+                self.assertEqual(safe.kwargs["env"]["GH_TOKEN"], read_token or "write-fixture")
+                self.assertEqual(safe.kwargs["env"]["NO_COLOR"], "1")
+
+    def test_production_safe_reader_never_retries_or_waits_after_read_failure(self):
+        from apiclient.store import MemoryLedgerStore
+        for error in ("gh: API rate limit exceeded (HTTP 403)", "gh: Bad Gateway (HTTP 502)"):
+            with self.subTest(error=error), \
+                    patch("apiclient.gh.default_store", return_value=MemoryLedgerStore()), \
+                    patch("apiclient.gh.time.sleep") as sleep, patch.object(events.lifecycle, "run") as execute:
+                execute.side_effect = [subprocess.CompletedProcess([], 0, "[1]", ""),
+                                       subprocess.CompletedProcess([], 1, "", error)]
+                self.assertIsNone(events.quota_failure(self.RUN, classify=self.classify))
+                self.assertEqual(execute.call_count, 2, "one discovery and one safe read only")
+                sleep.assert_not_called()
+
+    def test_production_safe_reader_refuses_insufficient_budget_without_execution(self):
+        from apiclient.policy import credential_state
+        from apiclient.store import MemoryLedgerStore, hash_credential, now_ms
+        store, at = MemoryLedgerStore(), now_ms()
+        def seed(ledger):
+            state = credential_state(ledger, hash_credential("github", "read-fixture"), at)
+            state["buckets"]["core"] = {"limit": None, "remaining": 4,
+                                           "resetAt": at + 60000, "observedAt": at}
+        store.transact("github", seed)
+        with patch.dict(events.os.environ, {"GH_TOKEN": "write-fixture", "GH_READ_TOKEN": "read-fixture"}, clear=True), \
+                patch("apiclient.gh.default_store", return_value=store), \
+                patch.object(events.lifecycle, "run") as execute, patch("apiclient.gh.time.sleep") as sleep:
+            result = events.quota_log_gh(["gh", "run", "view", "--repo", events.REPO,
+                                          "--job", "1", "--attempt", "1", "--log"])
+            self.assertEqual(result.returncode, 75)
+            execute.assert_not_called()
+            sleep.assert_not_called()
+
+    def test_production_safe_reader_preserves_timeout_without_retry(self):
+        from apiclient.store import MemoryLedgerStore
+        args = ["gh", "run", "view", "--repo", events.REPO, "--job", "1", "--attempt", "1", "--log"]
+        with patch("apiclient.gh.default_store", return_value=MemoryLedgerStore()), \
+                patch.object(events.lifecycle, "run", side_effect=subprocess.TimeoutExpired(args, 60)) as execute, \
+                patch("apiclient.gh.time.sleep") as sleep:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                events.quota_log_gh(args)
+            execute.assert_called_once()
+            self.assertEqual(execute.call_args.kwargs["timeout"], 60)
+            sleep.assert_not_called()
+
+    def test_unknown_identity_or_unreadable_safe_log_never_authorizes_rerun(self):
+        for value in (None, True, 0, -1, "1"):
+            for field in ("id", "run_attempt"):
+                with self.subTest(field=field, value=value):
+                    shell = self.shell([self.QUOTA_LOG])
+                    self.assertIsNone(events.quota_failure({**self.RUN, field: value}, shell, self.classify))
+                    self.assertEqual(shell.calls, [])
+        for ids in ([], [True], [0], ["1"], [1, 2, 3, 4]):
+            with self.subTest(ids=ids):
+                shell = self.shell([], jobs_reply=(0, json.dumps(ids)))
+                self.assertIsNone(events.quota_failure(self.RUN, shell, self.classify))
+                self.assertFalse(shell.made("gh", "run", "view"))
+        shell = self.shell([])
+        shell.routes[("gh", "run", "view")] = (1, "log unavailable")
+        self.assertEqual(self.relay(shell), [(5, "red")])
+        self.assertFalse(shell.made("gh", "api", "-X", "POST",
+                                    f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs"))
 
     def test_failed_rerun_preserves_red_until_current_healthy_reconciliation(self):
         rerun = ("gh", "api", "-X", "POST", f"repos/{events.REPO}/actions/runs/900/rerun-failed-jobs")
@@ -2238,7 +2361,7 @@ class NativeQueueClaimTest(unittest.TestCase):
                     elif change == "head":live["headRefOid"] = "external"
                     elif change == "branch":live["headRefName"] = "external/branch"
                     elif change == "fork":live["isCrossRepository"] = True
-                    elif change == "remote-hold":live["labels"] = [{"name": "tim-hold"}]
+                    elif change == "remote-hold":live["labels"] = [{"name": "hold"}]
                     else:(host.state / "held.json").write_text(json.dumps({"5": events.held_record("h1", ["secret-like-file-changed"])}))
                     return "failed merge group"
                 with patch.object(events, "queue_failure", side_effect=failure):
@@ -2530,8 +2653,6 @@ class TargetFileWitnessTest(unittest.TestCase):
             with self.subTest(key=key, value=value):
                 self.assertIsNone(events.target_issue_files({**valid, key: value}, witnesses, NOW))
 
-if __name__ == "__main__":
-    unittest.main()
 
 class TerminalPreservationTest(unittest.TestCase):
     def test_external_head_waits_for_active_old_owner_before_event_or_worker_reentry(self):
@@ -2631,7 +2752,7 @@ class TerminalPreservationTest(unittest.TestCase):
 
     def test_tick_cannot_ready_close_or_sync_terminal_or_explicitly_held_work(self):
         for labels, record in [(['lane-fix-exhausted'], {}), ([], {'sha':'h1','count':2}),
-                               (['Tim:Hold'], {}), ([], {'sha':'h1','count':1,'at':NOW-1})]:
+                               (['Hold'], {}), ([], {'sha':'h1','count':1,'at':NOW-1})]:
             with self.subTest(labels=labels,record=record):
                 self.state('fix-attempts.json', {'5': record})
                 target = pr(branch='claude/jov-1-20260926t0900', draft=True, merge='CLEAN',
@@ -2755,7 +2876,7 @@ class TerminalPreservationTest(unittest.TestCase):
         target=pr(sha='cached-h1',merge='DIRTY',kinds=['conflict'],labels=['lane-fix-exhausted'])
         history={'5':{'sha':'current-h2','count':2,'endedAt':NOW-1}}
         for observed in [None,{**target,'state':'OPEN','headRefOid':'current-h2'},
-                         {**target,'state':'CLOSED'},{**target,'state':'OPEN','labels':[{'name':'Tim:Hold'}]}]:
+                         {**target,'state':'CLOSED'},{**target,'state':'OPEN','labels':[{'name':'Hold'}]}]:
             with self.subTest(observed=observed):
                 self.state('fix-attempts.json',history)
                 shell=Shell();lane=fake_lane(shell);lane.reconcile_fix_target=lambda pr:observed
@@ -2903,6 +3024,37 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
         self.assertTrue(events.red_section_complete("Intro\n\n" + block + "\n\n## Next\nx"))
         self.assertNotIn("\n# not a heading", block, "a log line must not end the section")
 
+    def test_failing_command_returns_the_run_failure_status(self):
+        block = events.red_before_green_block(self.PR)
+        self.assertIn(
+            "- Failing command: `gh run watch 123 --repo JovieInc/Jovie --exit-status`",
+            block,
+        )
+        self.assertIn(
+            "- Failing run (before fix): https://github.com/JovieInc/Jovie/actions/runs/123",
+            block,
+        )
+
+    def test_generated_block_passes_the_canonical_fleet_gate(self):
+        block = events.red_before_green_block(self.PR, "### Failed step\nAssertionError: expected 200")
+        checked = subprocess.run(
+            ["node", "--input-type=module", "-e", """
+                import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+                import { readFileSync } from 'node:fs';
+                const body = readFileSync(0, 'utf8');
+                const check = body => evaluateFleetRules({
+                    pr: { title: 'fix(db): recover avatar reads', body }, files: [],
+                }).errors;
+                process.stdout.write(JSON.stringify({
+                    generated: check(body), missing: check(''),
+                }));
+            """],
+            cwd=ROOT, input=block, text=True, capture_output=True, check=True,
+        )
+        result = json.loads(checked.stdout)
+        self.assertEqual(result["generated"], [])
+        self.assertTrue(any(error.startswith("red-before-green:") for error in result["missing"]))
+
     def test_no_red_check_means_no_block(self):
         self.assertIsNone(events.red_before_green_block({"statusCheckRollup": [{"name": "x", "conclusion": "SUCCESS"}]}))
 
@@ -2920,3 +3072,40 @@ class RedBeforeGreenEvidenceTests(unittest.TestCase):
             shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): (0, "")})
             events.ensure_red_before_green(self.PR, "FAIL x", shell)
             self.assertEqual(len(shell.made("pr", "edit")), edits)
+
+    def test_ensure_repairs_evidence_rejected_by_fleet_rules(self):
+        run_url = "https://github.com/JovieInc/Jovie/actions/runs/123"
+        cases = [("<cmd>", run_url), ("not applicable", run_url),
+                 ("...", run_url), ("node --test", "https://example.com/red"),
+                 ("node --test", run_url + "/job/456")]
+        bodies = []
+        for command, url in cases:
+            body = (f"## Summary\nKeep this.\n\n## Red-before-green\n"
+                    f"- Failing command: `{command}`\n- Failing run (before fix): {url}\n"
+                    "\n## Blast radius\nWhat could break: repair evidence.\nProof: regression tests.\n")
+            written = []
+            def edit(args):
+                written.append(Path(args[-1]).read_text())
+                return (0, "")
+            shell = Shell({("pr", "view"): (0, body), ("pr", "edit"): edit})
+            with self.subTest(command=command, url=url):
+                self.assertTrue(events.ensure_red_before_green(self.PR, sh=shell))
+                self.assertEqual(len(written), 1)
+                self.assertIn("## Summary\nKeep this.", written[0])
+                self.assertIn("## Blast radius\nWhat could break: repair evidence.", written[0])
+                bodies.extend([body, written[0]])
+        # Exercise the actual consumer, rather than trusting the Python mirror.
+        checked = subprocess.run(["node", "--input-type=module", "-e", """
+import { readFileSync } from 'node:fs';
+import { evaluateFleetRules } from './scripts/pr-fleet-rules.mjs';
+const bodies = JSON.parse(readFileSync(0, 'utf8'));
+console.log(JSON.stringify(bodies.map(body => evaluateFleetRules({
+  pr: {title: 'fix(ci): repair evidence', body, labels: []}, files: [],
+}).errors)));
+"""], cwd=ROOT, input=json.dumps(bodies), text=True, capture_output=True, timeout=15)
+        self.assertEqual(checked.returncode, 0, checked.stderr)
+        verdicts = json.loads(checked.stdout)
+        self.assertEqual(len(verdicts), len(cases) * 2)
+        for before, after in zip(verdicts[::2], verdicts[1::2]):
+            self.assertTrue(any(error.startswith("red-before-green:") for error in before), before)
+            self.assertEqual(after, [])

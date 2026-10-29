@@ -14,13 +14,6 @@
     "cancel_claim": 3,
     "refund_guarantee_claim": 1
   },
-  "apps/docs/app/docs/plans-pricing/page.mdx": {
-    "trial_claim": 1,
-    "no_card_claim": 1,
-    "recurring_price": 3,
-    "billing_claim": 3,
-    "free_forever_claim": 1
-  },
   "apps/eve-pilot/COMMERCIAL_GOVERNOR.md": {
     "recurring_price": 1
   },
@@ -82,6 +75,9 @@
   "apps/web/components/features/admin/FunnelMetricsStrip.tsx": {
     "billing_claim": 1
   },
+  "apps/web/components/features/admin/capacity/CapacityBoard.tsx": {
+    "billing_claim": 3
+  },
   "apps/web/components/features/auth/AuthOfferSummary.tsx": {
     "trial_claim": 2,
     "billing_claim": 1
@@ -134,14 +130,11 @@
     "billing_claim": 2,
     "trial_claim": 3,
     "no_card_claim": 1,
-    "cancel_claim": 1,
-    "refund_guarantee_claim": 2
+    "cancel_claim": 2,
+    "refund_guarantee_claim": 3
   },
   "apps/web/content/published-claims.ts": {
     "trial_claim": 1
-  },
-  "apps/web/data/artistNotificationsCopy.ts": {
-    "trial_claim": 2
   },
   "apps/web/data/homepageFrontDoorCta.ts": {
     "no_card_claim": 1,
@@ -181,8 +174,7 @@
     "no_card_claim": 1
   },
   "apps/web/lib/acquisition/canonical-artist-site-certification.ts": {
-    "recurring_price": 1,
-    "billing_claim": 1
+    "billing_claim": 2
   },
   "apps/web/lib/acquisition/eligibility.ts": {
     "plan_price": 5,
@@ -215,7 +207,10 @@
     "trial_claim": 2,
     "no_card_claim": 1,
     "free_forever_claim": 2,
-    "billing_claim": 2
+    "billing_claim": 3
+  },
+  "apps/web/lib/billing/price-assignment.ts": {
+    "no_card_claim": 1
   },
   "apps/web/lib/billing/sync-remediation-policy.ts": {
     "refund_guarantee_claim": 2
@@ -239,14 +234,20 @@
     "refund_guarantee_claim": 1
   },
   "apps/web/lib/chat/prompts/onboarding.ts": {
+    "billing_claim": 2,
     "trial_claim": 1,
-    "no_card_claim": 1
+    "no_card_claim": 1,
+    "cancel_claim": 1
   },
   "apps/web/lib/chat/system-prompt.ts": {
     "refund_guarantee_claim": 1
   },
   "apps/web/lib/claim/claim-verification-review.server.ts": {
-    "refund_guarantee_claim": 2
+    "refund_guarantee_claim": 3
+  },
+  "apps/web/lib/claim/proof-terms.ts": {
+    "cancel_claim": 1,
+    "refund_guarantee_claim": 1
   },
   "apps/web/lib/connectors/eval/fixtures/booking_us_east_coast.ts": {
     "refund_guarantee_claim": 1

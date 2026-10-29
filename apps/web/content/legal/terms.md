@@ -1,6 +1,6 @@
 ## Terms of Service
 
-_Last updated: February 2026_
+_Last updated: October 2026_
 
 These Terms are between you and {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
@@ -104,15 +104,19 @@ We value your privacy. Please review the [Privacy Policy](/legal/privacy) to und
 
 ### Plans
 
-Jovie offers Free, Pro, and Max plans. The Free plan is available at no cost. Pro and Max are paid plans billed monthly or annually via Stripe. Current pricing is available at [jov.ie/pricing](https://jov.ie/pricing).
+Jovie offers a Free plan and one self-serve paid plan, Artist Presence (called "Pro" in these Terms and in the app). The Free plan is available at no cost. Artist Presence is billed monthly via Stripe. Teams and labels can contact us about Enterprise terms, which are agreed in writing. Current pricing is available at [jov.ie/pricing](https://jov.ie/pricing).
 
 ### Free Trial
 
-New accounts start with a 14-day Pro trial at no charge and no credit card required. After the trial period, your account reverts to the Free plan unless you choose to upgrade.
+New accounts start with a 14-day Pro trial at no charge and no credit card required. After the trial period, your account reverts to the Free plan unless you choose to upgrade. The trial does not start a paid subscription and you will not be charged.
 
 ### Billing and Cancellation
 
-Paid subscriptions renew automatically at the end of each billing cycle. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period. You retain access to paid features until then. Cancel anytime and keep Pro to the end of the paid month. No partial refunds.
+Paid subscriptions renew automatically at the end of each billing cycle. Each renewal charges your payment method on file the then-current monthly price, plus applicable taxes, until you cancel. We will give notice of a price change before it applies to your next renewal, and you can cancel before it takes effect. Existing legacy plans continue on their current terms until they end. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period. You retain access to paid features until then.
+
+Cancel anytime, keep Pro to the end of the paid month, no partial refunds.
+
+This does not limit any refund or cancellation rights you have under applicable law that cannot be waived by contract.
 
 ## Disclaimers and Liability
 

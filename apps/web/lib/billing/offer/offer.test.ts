@@ -133,6 +133,7 @@ describe('refund policy (Tim, 2026-10-25): no partial refunds', () => {
       terms: { ...OFFER.terms, refund: null },
     } as unknown as typeof OFFER;
     expect(claims(['billing.refund'], off)).toBe('');
+    expect(claim('billing.cancel_and_refund', off)).toBeNull();
     expect(forbiddenShapeViolations('No partial refunds.', off)).toContain(
       'refund_unpublished'
     );
@@ -140,11 +141,11 @@ describe('refund policy (Tim, 2026-10-25): no partial refunds', () => {
 });
 
 describe('legal terms carry the registered claims verbatim', () => {
-  it('terms.md contains billing.cancel and billing.refund', () => {
+  it('terms.md contains the registered combined cancellation and refund claim', () => {
     const terms = readFileSync(
       resolve(__dirname, '../../../content/legal/terms.md'),
       'utf8'
     );
-    expect(terms).toContain(claims(['billing.cancel', 'billing.refund']));
+    expect(terms).toContain(requireClaim('billing.cancel_and_refund'));
   });
 });

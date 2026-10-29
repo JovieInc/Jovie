@@ -146,6 +146,8 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             scripts/lanes
+            scripts/apiclient
+            packages/api-client/providers.json
             scripts/lib/github-rate-limit.mjs
           sparse-checkout-cone-mode: false
 

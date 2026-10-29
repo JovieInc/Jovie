@@ -34,6 +34,7 @@ import {
   runDesignConformance,
   runMergeGroupGuards,
   runStructural,
+  SCRIPT_CONTRACT_NODE_TESTS,
   SOURCE_GUARDS,
   STRUCTURAL_DEFAULT_CONCURRENCY,
   STRUCTURAL_PYTHON_REGRESSION_COMMANDS,
@@ -2243,7 +2244,9 @@ describe('source-read guard selection', () => {
         ? ['ui-story-coverage-allowlist']
         : []),
       'merged-with-base-invariants',
-      ...(/^scripts\/(?:lanes\/|tests\/test_)/u.test(path)
+      ...(/^(?:scripts\/|packages\/|ops\/registry\/|\.nvmrc$|pnpm-lock\.yaml$)/u.test(
+        path
+      )
         ? ['lanes-selftest-changed-tests']
         : []),
       ...(path.startsWith('apps/web/') ? ['copy-leak'] : []),
@@ -2276,6 +2279,27 @@ describe('source-read guard selection', () => {
     expect(
       SOURCE_GUARDS.find(guard => guard.id === 'public-command-openapi').command
     ).toContain('public-command-openapi.test.ts');
+  });
+
+  it.each([
+    'scripts/installation-budget-sentinel.mjs',
+    'scripts/installation-budget-sentinel.test.mjs',
+    '.github/workflows/automation-liveness.yml',
+  ])('runs budget sample coverage before queue admission for %s', path => {
+    for (const event of ['pull_request', 'merge_group', 'push']) {
+      expect(selected(event, [path])).toContain('automation-registry');
+    }
+    const guard = SOURCE_GUARDS.find(
+      entry => entry.id === 'automation-registry'
+    );
+    expect(guard.command).toContain(
+      'scripts/installation-budget-sentinel.test.mjs'
+    );
+    expect(guard.command).toContain('--test-coverage-lines=95');
+    expect(guard.command).toContain('--test-coverage-branches=90');
+    expect(SCRIPT_CONTRACT_NODE_TESTS).toContain(
+      'scripts/installation-budget-sentinel.test.mjs'
+    );
   });
 
   it('keeps web unit guards on PRs and runs profile conformance on every head', () => {

@@ -1,0 +1,39 @@
+{
+  "schema": "jovie.motion-effects/v1",
+  "note": "Registry of marketing motion effects (ASR-039). Canvas, WebGL and rAF-loop code under the marketing roots ships only inside an effect listed here, with a reduced-motion rest state, a static fallback and a perf budget. Files ending in / are directory prefixes. Guide: .claude/skills/design-system/guides/motion.md. Checked by scripts/invariants/art-direction/surface-media.mjs. Every WebGL or canvas-loop background also registers in apps/web/data/marketing/animatedBackgroundBudget.ts (static by default, <= 2ms per frame).",
+  "effects": [
+    {
+      "id": "homepage-hero",
+      "summary": "Homepage hero light: static CSS poster by default; WebGL only when apps/web/data/marketing/animatedBackgroundBudget.ts enables it.",
+      "files": ["apps/web/components/homepage/hero-light/"],
+      "fallback": "poster|renderer\\s*!==\\s*['\"]webgl['\"]|mountCanvas\\s*\\?",
+      "reducedMotion": {
+        "marker": "prefers-reduced-motion",
+        "requiredIn": [
+          "apps/web/components/homepage/hero-light/HomepageHeroLight.tsx"
+        ]
+      },
+      "budget": { "gzipBytes": 7168, "fpsCap": null, "pausesOffscreen": true }
+    },
+    {
+      "id": "marketing-hero-zoom",
+      "summary": "Hero shell zoom (CSS transforms, no GL).",
+      "files": ["apps/web/components/marketing/motion/hero-shell-zoom.ts"],
+      "fallback": "rest frame",
+      "reducedMotion": {
+        "marker": "prefers-reduced-motion",
+        "requiredIn": [
+          "apps/web/components/marketing/motion/hero-shell-zoom.ts"
+        ]
+      },
+      "budget": {
+        "gzipBytes": 1536,
+        "perFileGzipBytes": {
+          "apps/web/components/marketing/motion/hero-shell-zoom.ts": 1536
+        },
+        "fpsCap": null,
+        "pausesOffscreen": false
+      }
+    }
+  ]
+}

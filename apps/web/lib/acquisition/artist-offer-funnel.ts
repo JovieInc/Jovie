@@ -50,6 +50,10 @@ export type ArtistOfferBranchStage =
  * creator who arrived from an outreach claim link), not a step every journey
  * passes through. `claimed` is the page claimed and live at its free-tier
  * address; `upgrade-viewed` is the first view of the upgrade offer.
+ * `catalog-preview` (JOV-9758) is recorded, not linear: the first onboarding
+ * preview that rendered at least one release from the artist's real catalog.
+ * Non-music creators never reach it, so it is read as a branch off `start`
+ * and never flags the weekly stalled-stage invariant.
  */
 export const GOLDEN_PATH_ENTRY_STAGE = 'claim-link-open' as const;
 
@@ -67,13 +71,23 @@ export type GoldenPathStage = (typeof GOLDEN_PATH_STAGES)[number];
 export type GoldenPathExtraStage =
   | typeof GOLDEN_PATH_ENTRY_STAGE
   | 'start'
+  | 'catalog-preview'
   | 'claimed'
   | 'upgrade-viewed';
+
+/**
+ * Waitlist stages (growth spine): `waitlist-join` is the intake submit,
+ * `admitted` is the moment the entry is let in (auto, qualified or manual).
+ * They share the journey table so loop -> waitlist -> admit -> paid reads off
+ * one journey id.
+ */
+export type WaitlistGrowthStage = 'waitlist-join' | 'admitted';
 
 type ArtistOfferAnyStage =
   | ArtistOfferFunnelStage
   | ArtistOfferBranchStage
-  | GoldenPathExtraStage;
+  | GoldenPathExtraStage
+  | WaitlistGrowthStage;
 
 /** Stages written by producers; the rest are derived from the journey row. */
 export const RECORDED_ARTIST_OFFER_STAGES = [
@@ -87,8 +101,11 @@ export const RECORDED_ARTIST_OFFER_STAGES = [
   'claim-rejected',
   'claim-link-open',
   'start',
+  'catalog-preview',
   'claimed',
   'upgrade-viewed',
+  'waitlist-join',
+  'admitted',
 ] as const satisfies readonly ArtistOfferAnyStage[];
 
 export type RecordedArtistOfferStage =

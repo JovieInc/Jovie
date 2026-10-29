@@ -39,7 +39,7 @@ export function loadConfig(url = CONFIG_URL) {
 export function evaluateGateWeakening(files, config = loadConfig()) {
   const findings = [];
   for (const file of files ?? []) {
-    if (!file?.path || excluded(file.path, config)) continue;
+    if (!file?.path || excluded(file.path, config) || isGeneratedReport(file.path, config)) continue;
     findings.push(...inspectInvariantTest(file));
     if (isSelf(file.path, config)) {
       findings.push(...inspectSelf(file));
@@ -182,7 +182,9 @@ function inspectGateFile(file, config) {
       if (raised(file.before, file.after, key)) add(kind, key);
     }
   }
-  if (isShrinkOnly(file.path) && file.after != null && grew(file.before ?? '', file.after)) {
+  // A brand-new ledger (no prior version) introduces a ratchet; it is not a
+  // loosening. Growth of an existing ledger still trips this.
+  if (isShrinkOnly(file.path) && file.before != null && file.after != null && grew(file.before, file.after)) {
     add('shrink-only-growth', 'count increased');
   }
   if (isThresholdPath(file.path) && file.before != null && file.after != null) {
@@ -236,6 +238,11 @@ function inspectSelf(file) {
   for (const exclusion of after.scanExclusions ?? []) {
     if (!(before.scanExclusions ?? []).includes(exclusion)) {
       add('scan-exclusion-grew', exclusion);
+    }
+  }
+  for (const report of after.generatedReports ?? []) {
+    if (!(before.generatedReports ?? []).includes(report)) {
+      add('scan-exclusion-grew', report);
     }
   }
   if (before.override?.label !== after.override?.label || before.override?.bodyLine !== after.override?.bodyLine) add('override-policy-changed', 'override');
@@ -430,6 +437,9 @@ function labelNames(labels) {
   return labels.map(label => (typeof label === 'string' ? label : label?.name)).filter(name => typeof name === 'string' && name);
 }
 const excluded = (path, config) => (config.scanExclusions ?? []).some(prefix => path.startsWith(prefix));
+// Machine-written reports (exact paths) are measurements, not gates: a refresh of
+// their numbers is not a threshold change. Growing the list is itself flagged.
+const isGeneratedReport = (path, config) => (config.generatedReports ?? []).includes(path);
 const isSelf = (path, config) => (config.selfPaths ?? []).includes(path);
 const isRuleset = path => /ruleset|branch-protection|branch_protection/i.test(path);
 const isCiYaml = path => /^(\.github\/|github\/rulesets\/|scripts\/ci-|scripts\/lib\/ci-)/.test(path) && /\.(?:yml|yaml|mjs|js)$/.test(path);

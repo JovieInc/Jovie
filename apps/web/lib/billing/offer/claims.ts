@@ -23,6 +23,7 @@ export type ClaimId =
   | 'billing.renewal'
   | 'billing.cancel'
   | 'billing.cancel_short'
+  | 'billing.cancel_and_refund'
   | 'billing.refund';
 
 interface ClaimDef {
@@ -109,6 +110,14 @@ const DEFS: readonly ClaimDef[] = [
     id: 'billing.cancel_short',
     appliesTo: o => o.terms.cancel === 'anytime_effective_end_of_period',
     render: () => 'Cancel anytime.',
+  },
+  {
+    id: 'billing.cancel_and_refund',
+    appliesTo: o =>
+      o.terms.cancel === 'anytime_effective_end_of_period' &&
+      o.terms.refund === 'none_partial_period',
+    render: () =>
+      'Cancel anytime, keep Pro to the end of the paid month, no partial refunds.',
   },
   {
     id: 'billing.refund',

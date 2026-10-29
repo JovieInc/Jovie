@@ -23,6 +23,7 @@
  */
 
 import { claims } from '@/lib/billing/offer/claims';
+import { getPublicPriceClaim } from '@/lib/billing/offer-truth';
 import type {
   MarketingCopyLineBinding,
   MarketingCopyLineRole,
@@ -31,6 +32,9 @@ import type {
   MarketingCopySectionBrief,
   MarketingCopySectionDraft,
 } from './copy';
+
+/** Paid CTA label: plan plus price, from offer truth (JOV-9692). */
+const PRO_CTA_LABEL = getPublicPriceClaim('pro').ctaLabel;
 
 export interface RenderedCopyCoverageEntry {
   readonly surfaceId: string;
@@ -309,7 +313,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         candidateId: 'pricing-plan-free-v1',
         controlHeadline: 'Free plan',
         headline: 'Free',
-        body: 'Your Jovie profile stays free forever. Downgrading restores Jovie branding and keeps audience capture.',
+        body: 'Your Jovie profile stays free forever and keeps audience capture.',
         supportingText: [
           'Free forever',
           '$0',
@@ -335,7 +339,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         supportingText: [
           'Self-serve',
           '$12/mo',
-          'Claim your profile',
+          PRO_CTA_LABEL,
           'Public Jovie profile and audience capture',
         ],
         claimIds: ['pro-price'],
@@ -384,7 +388,7 @@ export function pricingPageReviewedDraft(): MarketingCopyPageDraft {
         body: 'Artist Presence is $12/month. Claim your profile.',
         supportingText: [
           'Claim my free profile',
-          'Claim your profile',
+          PRO_CTA_LABEL,
           'Contact sales',
         ],
         claimIds: ['pro-price'],
