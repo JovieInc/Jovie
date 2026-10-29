@@ -167,9 +167,9 @@ jobs:
 
           🤖 Generated with [Claude Code](https://claude.com/claude-code)
           BODY
-          if number="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')" && [ -n "$number" ]; then
-            gh pr edit "$number" --body-file "$RUNNER_TEMP/body.md" --title "chore(design): renew certification evidence for ${renewed}"
+          if number="$(node packages/api-client/cli.ts gh --priority repair -- pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')" && [ -n "$number" ]; then
+            node packages/api-client/cli.ts gh --priority repair -- pr edit "$number" --body-file "$RUNNER_TEMP/body.md" --title "chore(design): renew certification evidence for ${renewed}"
           else
-            gh pr create --base main --head "$BRANCH" --label compounding \
+            node packages/api-client/cli.ts gh --priority repair -- pr create --base main --head "$BRANCH" --label compounding \
               --title "chore(design): renew certification evidence for ${renewed}" --body-file "$RUNNER_TEMP/body.md"
           fi
