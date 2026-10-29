@@ -8,6 +8,7 @@ import {
   type DeliveryMergeRepo,
   type DeployHealth,
   type DeployHealthRepo,
+  type DeployLag,
   isExactSha,
   LANE_BRANCH_PREFIXES,
   LANE_BRANCH_RE,
@@ -976,10 +977,28 @@ export function parseDeployHealth(value: unknown): DeployHealth | null {
       lastSuccessAt: parseTimestamp(row.lastSuccessAt),
     });
   }
+  const lag: DeployLag[] = [];
+  if (isRecord(value.lag)) {
+    const minutes = (raw: unknown) =>
+      typeof raw === 'number' && Number.isFinite(raw) && raw >= 0 ? raw : null;
+    for (const [name, row] of Object.entries(value.lag).slice(0, 8)) {
+      if (!/^[\w.-]{1,48}\/[\w.-]{1,48}$/.test(name) || !isRecord(row))
+        continue;
+      lag.push({
+        repo: name,
+        p50Min: minutes(row.p50Min),
+        p95Min: minutes(row.p95Min),
+        samples: nullableInt(row.n) ?? 0,
+        targetP50Min: minutes(row.targetP50Min),
+        targetP95Min: minutes(row.targetP95Min),
+      });
+    }
+  }
   return {
     observedAt: parseTimestamp(value.observedAt),
     healthy: value.healthy,
     repos,
+    lag,
   };
 }
 
