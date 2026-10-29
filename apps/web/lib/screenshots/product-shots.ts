@@ -72,7 +72,7 @@ export const PRODUCT_SHOTS = [
     route: '/demo/showcase/onboarding-handle?profile=tim-white',
     viewport: 'desktop',
     theme: 'dark',
-    waitFor: '[data-testid="demo-showcase-onboarding-handle"] input',
+    waitFor: '[data-testid="onboarding-handle-submit"]',
     crop: [`${STAGE} h1`, `${STAGE} form`],
     padding: 32,
     frame: 'bare',

@@ -208,12 +208,18 @@ describe('artist profile landing family System B source contract', () => {
       ),
       'utf8'
     );
-    expect(howItWorks).toContain('ONBOARDING_HANDLE_CAPTURE');
-    expect(howItWorks).toContain('ONBOARDING_DSP_CAPTURE');
-    expect(howItWorks).toContain(
-      "getMarketingExportImage('tim-white-profile-live-mobile')"
-    );
-    expect(howItWorks).toContain('<Image');
+    // Each step is a registry product shot cropped to its moment, never a
+    // full-viewport catalog capture scaled down by CSS.
+    expect(howItWorks).toContain('<ProductShot');
+    for (const shot of [
+      "'setup-claim-handle'",
+      "'setup-connect-music'",
+      "'setup-share-profile'",
+    ]) {
+      expect(howItWorks).toContain(shot);
+    }
+    expect(howItWorks).not.toContain('screenshot-catalog');
+    expect(howItWorks).not.toContain('<Image');
 
     const finalCta = readFileSync(
       resolve(
