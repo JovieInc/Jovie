@@ -204,8 +204,9 @@ export function measureAgentContext(root) {
   let skills = 0;
   if (existsSync(skillsDir)) {
     for (const name of readdirSync(skillsDir)) {
+      // Hosts list only <name>/SKILL.md skills; loose .md files are not listed.
       const candidates = name.endsWith('.md')
-        ? [`.claude/skills/${name}`]
+        ? []
         : [`.claude/skills/${name}/SKILL.md`];
       for (const path of candidates) {
         if (!existsSync(join(root, path))) continue;
