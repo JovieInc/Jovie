@@ -189,7 +189,7 @@ export function ChatProposeNextStepCard({
       className='space-y-4 px-1 py-1'
       data-testid='onboarding-profile-review'
     >
-      <h2 className='text-xl font-semibold text-primary-token'>
+      <h2 className='text-balance text-xl font-semibold text-primary-token'>
         {reviewKey ? `Here is jov.ie/${handle}` : 'Your profile draft'}
       </h2>
       <p className='text-app leading-6 text-secondary-token'>
@@ -199,7 +199,7 @@ export function ChatProposeNextStepCard({
       {review && artist ? (
         <>
           <div className='space-y-2' data-testid='onboarding-found-sources'>
-            <h3 className='text-app font-medium text-primary-token'>
+            <h3 className='text-balance text-app font-medium text-primary-token'>
               What Jovie Found
             </h3>
             <p className='text-app text-secondary-token'>
