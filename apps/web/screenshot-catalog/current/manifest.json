@@ -318,6 +318,48 @@
     "imagePath": "tim-white-profile-listen-fallback-mobile.png"
   },
   {
+    "id": "profile-state-release-mobile",
+    "title": "Profile State — Release First",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/tim-white-profile?release=live",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-10-29T04:03:48.879Z",
+    "gitSha": null,
+    "imagePath": "profile-state-release-mobile.png",
+    "publicExportPath": "profile-state-release.png"
+  },
+  {
+    "id": "profile-state-shows-mobile",
+    "title": "Profile State — Upcoming Shows",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/tim-white-profile?mode=tour",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-10-29T04:29:41.984Z",
+    "gitSha": null,
+    "imagePath": "profile-state-shows-mobile.png",
+    "publicExportPath": "profile-state-shows.png"
+  },
+  {
+    "id": "profile-state-capture-mobile",
+    "title": "Profile State — Audience Capture",
+    "group": "marketing",
+    "groupLabel": "Marketing",
+    "route": "/demo/showcase/tim-white-profile?mode=subscribe",
+    "viewport": "mobile",
+    "theme": "dark",
+    "consumers": ["admin", "marketing-export", "investor-ready"],
+    "capturedAt": "2026-10-29T04:03:57.193Z",
+    "gitSha": null,
+    "imagePath": "profile-state-capture-mobile.png",
+    "publicExportPath": "profile-state-capture.png"
+  },
+  {
     "id": "tim-white-profile-listen-mobile",
     "title": "Tim White Profile — Listen",
     "group": "marketing",
