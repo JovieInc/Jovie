@@ -35,6 +35,7 @@ import {
   findBlogQualificationRun,
   isStrictBlogContentPr,
 } from './lib/blog-publish-latency.mjs';
+import { ciRoundsMetrics, flattenCiRounds } from './lib/ci-rounds.mjs';
 import { formatBiomeJson } from './lib/format-biome-json.mjs';
 import {
   buildGistSloBlock,
@@ -459,6 +460,7 @@ export function buildReport(
       nowMs,
     }),
     productionLag: productionLag(merged, verifiedEvents, sinceMs, nowMs),
+    ciRounds: ciRoundsMetrics(prRuns, merged, { sinceMs, nowMs }),
     throughput: throughputTrend(merged, nowMs, {
       verifiedPredicate: p =>
         Boolean(
@@ -497,7 +499,10 @@ export function buildReport(
     .sort((a, b) => b.seconds - a.seconds)
     .slice(0, 5);
 
-  const flat = flattenMetrics(metrics);
+  const flat = {
+    ...flattenMetrics(metrics),
+    ...flattenCiRounds(metrics.ciRounds),
+  };
   // When no verification evidence was collected at all, a 0 is a collector
   // gap, not a throughput signal — null the derived keys so the evaluator
   // skips them instead of filing a phantom >20% regression (JOV-8082).
@@ -613,6 +618,11 @@ export function markdownSummary(report) {
       `(target +8%) · trend ${t.growthTrend ?? 'unknown'}`,
     `**Queue ejection rate:** ${report.metrics.mergeQueue?.ejectionRate === null || report.metrics.mergeQueue?.ejectionRate === undefined ? 'n/a' : (report.metrics.mergeQueue.ejectionRate * 100).toFixed(1) + '%'}`
   );
+  const cr = report.metrics.ciRounds;
+  if (cr?.prs)
+    lines.push(
+      `**CI rounds per merged PR:** mean ${cr.roundsMean.toFixed(2)} (target <= ${cr.target}) · p95 ${cr.roundsP95} · Source Validation first-push pass ${cr.firstPushPassRate === null ? 'n/a' : `${(cr.firstPushPassRate * 100).toFixed(0)}%`} (n=${cr.firstPushSamples})`
+    );
   const blog = report.blogPublishLatency;
   lines.push(
     '',
