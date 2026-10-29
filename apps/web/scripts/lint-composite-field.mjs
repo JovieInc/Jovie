@@ -96,14 +96,23 @@ export function compareToBaseline(counts, baseline) {
       );
     }
   }
+  return problems;
+}
+
+/**
+ * Files whose debt shrank below the committed baseline. Never a failure: an
+ * improvement must not fail a PR or a merge group. Surfaced as a notice.
+ */
+export function shrinkNotices(counts, baseline) {
+  const notices = [];
   for (const [file, count] of Object.entries(baseline)) {
     if ((counts[file] ?? 0) < count) {
-      problems.push(
-        `${file}: debt shrank (${counts[file] ?? 0} < ${count}); run node scripts/lint-composite-field.mjs --update and commit the baseline.`
+      notices.push(
+        `${file}: debt shrank (${counts[file] ?? 0} < ${count}); run node scripts/lint-composite-field.mjs --update and commit the baseline to lock the gain in.`
       );
     }
   }
-  return problems;
+  return notices;
 }
 
 export function countsOf(current) {
@@ -132,6 +141,16 @@ function main() {
     return;
   }
   const baseline = JSON.parse(readFileSync(BASELINE_PATH, 'utf8')).files;
+  const notices = shrinkNotices(counts, baseline);
+  if (notices.length) {
+    for (const notice of notices) {
+      console.log(
+        process.env.GITHUB_ACTIONS === 'true'
+          ? `::notice title=composite-field ratchet improved::${notice}`
+          : notice
+      );
+    }
+  }
   const problems = compareToBaseline(counts, baseline);
   if (problems.length) {
     console.error(problems.join('\n'));
