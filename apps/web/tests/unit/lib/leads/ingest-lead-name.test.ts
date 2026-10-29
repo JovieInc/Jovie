@@ -102,6 +102,18 @@ describe('ingestLeadAsCreator display name', () => {
     );
   });
 
+  it('builds the profile private until certified or claimed', async () => {
+    mocks.fetchFullExtractionProfile.mockResolvedValue({
+      avatarUrl: null,
+      displayName: 'Mega Ran',
+    });
+    await ingestLeadAsCreator(lead('Mega Ran'));
+
+    expect(mocks.handleNewProfileIngest).toHaveBeenCalledWith(
+      expect.objectContaining({ leadHold: true })
+    );
+  });
+
   it('keeps the raw scraped title on the lead as provenance', async () => {
     const rawTitle = 'Mega Ran | Instagram, Facebook, Twitch';
     mocks.fetchFullExtractionProfile.mockResolvedValue({
