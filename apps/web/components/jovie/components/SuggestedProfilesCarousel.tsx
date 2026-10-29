@@ -19,6 +19,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { ProfileSuggestion } from '@/app/api/suggestions/route';
 import { SocialIcon } from '@/components/atoms/SocialIcon';
+import { APP_ROUTES } from '@/constants/routes';
 import { cn } from '@/lib/utils';
 import type { UseSuggestedProfilesReturn } from '../hooks/useSuggestedProfiles';
 import { PROFILE_NUDGE_IDS } from '../hooks/useSuggestedProfiles';
@@ -311,7 +312,7 @@ function NudgeCard({
         isActioning={isActioning}
       />
       <div className='p-4'>
-        <div className='mb-4 flex items-center gap-2.5'>
+        <div className='mb-4 flex items-center gap-2'>
           <div className='system-b-suggested-profile-icon-shell'>
             <NudgeIcon className='h-4 w-4 text-secondary-token' aria-hidden />
           </div>
@@ -339,7 +340,7 @@ function NudgeCard({
         </div>
 
         <Link
-          href={suggestion.externalUrl ?? '/app/settings/profile'}
+          href={suggestion.externalUrl ?? APP_ROUTES.SETTINGS_PROFILE}
           className='system-b-suggested-profile-primary-link'
         >
           Continue setup
