@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   initialCursors,
   interpretAuthorityRead,
+  LANE_BRANCH_PREFIXES,
   laneIssueIdentifier,
   projectDelivery,
   publishShippingState,
@@ -446,7 +447,14 @@ describe('lane-pull-requests (open devin/ and codex/ PRs)', () => {
   it('searches each lane head prefix and keeps only lane branches', async () => {
     const live = io(async (_url, init) => {
       const { variables } = graphqlBody(init);
-      const lane = variables.query?.includes('head:codex/') ? 'codex' : 'devin';
+      const lane = variables.query?.includes('head:codex/')
+        ? 'codex'
+        : variables.query?.includes('head:devin/')
+          ? 'devin'
+          : 'other';
+      if (lane === 'other') {
+        return json({ data: { search: { issueCount: 0, nodes: [] } } });
+      }
       return json({
         data: {
           search: {
@@ -480,14 +488,21 @@ describe('lane-pull-requests (open devin/ and codex/ PRs)', () => {
     });
     const read = await readLanePullRequests(live);
 
-    expect(live.fetch).toHaveBeenCalledTimes(2);
+    expect(live.fetch).toHaveBeenCalledTimes(LANE_BRANCH_PREFIXES.length);
     const queries = live.fetch.mock.calls.map(
       ([, init]) => graphqlBody(init).variables.query
     );
-    expect(queries).toEqual([
-      'repo:JovieInc/Jovie is:pr is:open head:devin/',
-      'repo:JovieInc/Jovie is:pr is:open head:codex/',
-    ]);
+    expect(queries).toEqual(
+      LANE_BRANCH_PREFIXES.map(
+        lane => `repo:JovieInc/Jovie is:pr is:open head:${lane}/`
+      )
+    );
+    // glm/opus/grok/cursor lanes were invisible when only devin+codex were searched.
+    for (const lane of ['glm', 'opus', 'grok', 'cursor']) {
+      expect(queries).toContain(
+        `repo:JovieInc/Jovie is:pr is:open head:${lane}/`
+      );
+    }
     expect(read).toMatchObject({
       status: 'ok',
       truncated: false,

@@ -501,7 +501,7 @@ export function ProfileCompactTemplate({
     [artist.theme]
   );
 
-  // Hydration-safe ?source= capture: reading location.search during the
+  // Hydration-safe entry-query capture: reading location.search during the
   // first client render (e.g. a window-guarded useMemo) makes the identity
   // link href differ from the SSR'd markup whenever a source param is present
   // (/testartist vs /testartist?source=qr — React hydration mismatch, and the
@@ -511,10 +511,13 @@ export function ProfileCompactTemplate({
   // sourceOverride falls through to useProfileShell's own hydration-safe
   // locationSource (useSyncExternalStore) while this is null.
   const [initialSource, setInitialSource] = useState<string | null>(null);
+  const [initialClaimIntent, setInitialClaimIntent] = useState<boolean | null>(
+    null
+  );
   useEffect(() => {
-    setInitialSource(
-      new URLSearchParams(globalThis.location.search).get('source')
-    );
+    const params = new URLSearchParams(globalThis.location.search);
+    setInitialSource(params.get('source'));
+    setInitialClaimIntent(params.get('claim') === '1');
   }, []);
 
   const { notificationsContextValue, notificationsController, locationMode } =
@@ -620,12 +623,15 @@ export function ProfileCompactTemplate({
   ]);
 
   const searchSuffix = useMemo(() => {
-    if (!initialSource) {
-      return '';
-    }
-
-    return `source=${encodeURIComponent(initialSource)}`;
-  }, [initialSource]);
+    // Preserve the public claim-entry marker across profile navigation, never
+    // arbitrary incoming query fields (which may contain private tokens).
+    return [
+      initialSource ? `source=${encodeURIComponent(initialSource)}` : '',
+      initialClaimIntent ? 'claim=1' : '',
+    ]
+      .filter(Boolean)
+      .join('&');
+  }, [initialSource, initialClaimIntent]);
 
   const resolveInitialView = useCallback(
     (nextMode: ProfileMode) =>
@@ -781,13 +787,14 @@ export function ProfileCompactTemplate({
       return;
     }
 
-    // Skip until initialSource has hydrated if the URL carries a source param.
+    // Wait for entry-query hydration before reconstructing a profile URL.
     // Without this guard the effect fires on the first render cycle with
     // searchSuffix = '' and pushes a source-less URL before the initialSource
     // useEffect (which reads location.search post-mount) has a chance to run.
     if (
-      initialSource === null &&
-      new URLSearchParams(globalThis.location.search).has('source')
+      initialClaimIntent === null ||
+      (initialSource === null &&
+        new URLSearchParams(globalThis.location.search).has('source'))
     ) {
       return;
     }
@@ -879,6 +886,7 @@ export function ProfileCompactTemplate({
     artist.handle,
     searchSuffix,
     initialSource,
+    initialClaimIntent,
   ]);
 
   const profileHref = useMemo(
