@@ -18,7 +18,7 @@
   align-items: start;
 }
 
-.m-shipped-sites__card {
+.m-shipped-sites__item {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);

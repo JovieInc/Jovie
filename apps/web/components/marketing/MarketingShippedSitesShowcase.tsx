@@ -23,7 +23,7 @@ function ProfileStateCard({
   return (
     <article
       data-testid='shipped-site-tile'
-      className={cn('m-shipped-sites__card', className)}
+      className={cn('m-shipped-sites__item', className)}
     >
       <ProductScreenshotFrame
         scenarioId={tile.scenarioId}
