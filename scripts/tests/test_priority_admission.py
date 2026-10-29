@@ -110,7 +110,12 @@ class FakeLane:
 
 
 class FakeClient:
-    pass
+    """Linear live read: every issue is in the state the test mirror says, unless overridden."""
+    def __init__(self, states=None):
+        self.states = states or {}
+
+    def gql(self, query, variables):
+        return {"issue": {"state": {"name": self.states.get(variables["id"], "Backlog" if variables["id"] in ("id-1", "id-2") else "Todo")}}}
 
 
 class RunTests(unittest.TestCase):
@@ -148,10 +153,23 @@ class RunTests(unittest.TestCase):
             self.assertEqual(len(receipt["demoted"]), pa.MAX_DEMOTE_PER_TICK)
             self.assertEqual(receipt["admitted"], [])
 
+    def test_live_state_change_and_superseded_claim_block_admission(self):
+        with tempfile.TemporaryDirectory() as d:
+            host = self.seed(d, [row(1, priority=1), row(2, priority=1)])
+            receipt = pa.run(FakeLane, host, "JOV", FakeClient({"id-1": "In Progress"}), now=NOW)
+            self.assertEqual(receipt["admitted"], ["JOV-2"])
+            self.assertEqual(receipt["skipped"]["JOV-1"], "live-state-changed")
+
+    def test_lagging_mirror_still_nominates(self):
+        with tempfile.TemporaryDirectory() as d:
+            host = self.seed(d, [row(1, priority=1)])
+            receipt = pa.run(FakeLane, host, "JOV", FakeClient(), now=NOW + 3000)
+            self.assertEqual(receipt["admitted"], ["JOV-1"])
+
     def test_stale_mirror_holds(self):
         with tempfile.TemporaryDirectory() as d:
             host = self.seed(d, [row(1, priority=1)])
-            receipt = pa.run(FakeLane, host, "JOV", FakeClient(), now=NOW + 2000)
+            receipt = pa.run(FakeLane, host, "JOV", FakeClient(), now=NOW + 7 * 3600)
             self.assertEqual(receipt["held"], "mirror-stale")
 
 
