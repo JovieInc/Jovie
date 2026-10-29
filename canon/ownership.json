@@ -36,6 +36,7 @@
     {"id": "workflow:security-advisory-loop", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/security-advisory-loop.yml", "note": "Dependabot advisories to owned Linear work with severity SLA; ratchet fails on breach."},
     {"id": "workflow:deprecation-intake", "kind": "workflow", "owner": "summer", "status": "active", "ref": ".github/workflows/deprecation-intake.yml", "note": "Workflow header names TimWhite as accountable writer; the routine owner is the agent role here."},
     {"id": "workflow:design-gate", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-gate.yml"},
+    {"id": "workflow:design-present", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-present.yml", "note": "Fails PR bodies that show screenshots without a passing design-present receipt (.claude/rules/design-present.md)."},
     {"id": "workflow:design-governance", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/design-governance.yml"},
     {"id": "workflow:desktop-release", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/desktop-release.yml"},
     {"id": "workflow:doc-gardening-agent", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/doc-gardening-agent.yml"},

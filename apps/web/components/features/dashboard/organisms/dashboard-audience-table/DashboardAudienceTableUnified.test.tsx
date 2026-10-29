@@ -9,6 +9,7 @@ import { TableMetaProvider } from '@/contexts/TableMetaContext';
 import { AudiencePanelProvider } from '@/features/dashboard/organisms/AudiencePanelContext';
 import type { AudienceMember } from '@/types';
 import { DashboardAudienceTableUnified } from './DashboardAudienceTableUnified';
+import { buildAudienceMemberColumns } from './table-config';
 import { DEFAULT_AUDIENCE_FILTERS } from './types';
 
 // Analytics has its own query contract; this test exercises table/export binding.
@@ -39,6 +40,14 @@ function renderWithProviders(ui: ReactElement) {
 
 describe('DashboardAudienceTableUnified', () => {
   afterEach(() => vi.unstubAllGlobals());
+
+  it('reserves the selection track only when there are rows to select', () => {
+    // ui.md One Workspace Left Seam: with no rows, Member returns to the seam.
+    expect(buildAudienceMemberColumns('members')[0]?.id).toBe('select');
+    expect(
+      buildAudienceMemberColumns('members', { selectable: false })[0]?.id
+    ).toBe('fan');
+  });
 
   it('binds subscriber export to the table immutable profile instead of local member export', async () => {
     const profileId = '11111111-1111-4111-8111-111111111111';
@@ -75,7 +84,7 @@ describe('DashboardAudienceTableUnified', () => {
       )
     );
   });
-  it('renders the workspace empty state as the shared focal card', () => {
+  it('renders the empty state on the canvas, never on a bordered card', () => {
     renderWithProviders(
       <DashboardAudienceTableUnified
         mode='members'
@@ -92,12 +101,16 @@ describe('DashboardAudienceTableUnified', () => {
       />
     );
 
-    const card = document.querySelector('[data-empty-state-card]');
-    expect(card).not.toBeNull();
-    expect(card).toHaveClass('rounded-md');
-    expect(card).toHaveClass('border-subtle');
-    expect(card).toHaveClass('bg-surface-0');
-    expect(card).toHaveClass('text-left');
+    // Founder ban (2026-10-28): no bordered empty-state cards.
+    expect(document.querySelector('[data-empty-state-card]')).toBeNull();
+    const emptyState = document.querySelector(
+      '[data-empty-state-presentation]'
+    );
+    expect(emptyState).toHaveAttribute(
+      'data-empty-state-presentation',
+      'default'
+    );
+    expect(screen.getAllByText('Grow Your Audience').length).toBeGreaterThan(0);
   });
 
   it('renders the empty members view', () => {

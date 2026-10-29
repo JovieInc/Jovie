@@ -86,6 +86,17 @@ describe('DashboardHeader', () => {
     expect(source).not.toContain('sm:h-(--app-shell-header-height-compact)');
   });
 
+  it('puts the desktop title on the route content seam (design-present axis)', () => {
+    const source = readFileSync(
+      resolve(__dirname, './DashboardHeader.tsx'),
+      'utf8'
+    );
+    // The header spans the panel edge to edge; its seam adds back the content
+    // inset every route sits in, so title and toolbars share one left edge.
+    expect(source).toContain('sm:px-(--app-shell-header-seam-x)');
+    expect(source).not.toContain('sm:px-(--app-shell-header-padding-x)');
+  });
+
   it('exposes the header row as an Electron drag region', () => {
     render(<DashboardHeader breadcrumbs={[{ label: 'New Chat' }]} />);
 

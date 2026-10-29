@@ -4,6 +4,8 @@ paths: ["apps/web/**/*.tsx", "apps/web/**/*.css", "packages/ui/**", "DESIGN.md",
 
 # UI System
 
+Any screenshot shown to the founder first passes the presentation gate: [design-present.md](design-present.md).
+
 Design system, component hierarchy, surfaces, taste rules. Always read `DESIGN.md` before making any visual decisions.
 
 This contract covers every rendered Jovie surface, including internal HTML
