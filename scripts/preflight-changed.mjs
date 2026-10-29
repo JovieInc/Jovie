@@ -96,6 +96,32 @@ export const GENERATORS = [
   },
 ];
 
+/**
+ * Tests that fail on a non-Linux host for reasons unrelated to any diff (fake
+ * `gh` shims and GNU-only shell tools). Verified red on a pristine checkout;
+ * CI runs them on Linux. A guard whose only reds are these is not a local red.
+ */
+export const HOST_RED_TESTS = new Set([
+  'lib/__tests__/auto-ready-green-drafts.test.mjs',
+  'lib/__tests__/pre-push-gate.test.mjs',
+  'lib/__tests__/mesh-runtime-bundle.test.mjs',
+]);
+
+export function downgradeHostRed(check, result, platform = process.platform) {
+  if (platform === 'linux' || !result.code || !/^guard:/.test(check.id))
+    return result;
+  const failed = [
+    ...String(result.out).matchAll(/FAIL\s+\|[\w-]+\|\s+(\S+\.test\.m?js)/g),
+  ].map(m => m[1]);
+  if (failed.length && failed.every(f => HOST_RED_TESTS.has(f)))
+    return {
+      ...result,
+      code: 0,
+      skip: `host-only reds (${[...new Set(failed)].join(', ')}); CI runs Linux`,
+    };
+  return result;
+}
+
 export function parseArgs(argv) {
   const a = {
     base: 'main',
@@ -574,7 +600,7 @@ export async function main({
     const worker = async () => {
       while (queue.length) {
         const c = queue.shift();
-        const r = await c.run();
+        const r = downgradeHostRed(c, await c.run());
         const status = r.skip ? 'skip' : r.code === 0 ? 'ok' : 'FAIL';
         log(
           `  ${status.padEnd(4)}  ${c.name} (${((r.ms ?? 0) / 1000).toFixed(1)}s)${r.skip ? `  [${r.skip}]` : ''}`
@@ -583,6 +609,18 @@ export async function main({
       }
     };
     await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+    if (phase === 0 && args.write && results.length) {
+      // Commit hooks (lint-staged) format staged files; match that so the
+      // generated output is committable as written.
+      const touched = git(cwd, ['diff', '--name-only'])
+        .split('\n')
+        .filter(f => /\.(?:[cm]?[jt]sx?|json)$/.test(f));
+      if (touched.length)
+        await sh(
+          `pnpm exec biome check --write --no-errors-on-unmatched ${touched.map(f => JSON.stringify(f)).join(' ')}`,
+          { cwd, env: childEnv }
+        );
+    }
     if (phase === 0 && args.write) {
       const changedByGen = git(cwd, ['status', '--porcelain'])
         .split('\n')

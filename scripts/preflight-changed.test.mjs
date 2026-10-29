@@ -7,6 +7,7 @@ import {
 } from './lib/preflight-changed.mjs';
 import { evaluateFleetRules } from './pr-fleet-rules.mjs';
 import {
+  downgradeHostRed,
   GENERATORS,
   HEAVY_GUARDS,
   parseArgs,
@@ -118,4 +119,19 @@ test('arguments parse and unknown flags fail', () => {
   assert.throws(() => parseArgs(['--nope']));
   assert.ok(HEAVY_GUARDS.has('merged-with-base-invariants'));
   assert.ok(GENERATORS.some(g => g.id === 'workflow-topology'));
+});
+
+test('host-only reds are downgraded on macOS but real reds are not', () => {
+  const host = {
+    code: 1,
+    out: 'FAIL  |workspace-scripts| lib/__tests__/pre-push-gate.test.mjs > x',
+  };
+  const real = {
+    code: 1,
+    out: `${host.out}\nFAIL  |node| lib/__tests__/ci-rounds.test.mjs > y`,
+  };
+  const check = { id: 'guard:script-contracts' };
+  assert.equal(downgradeHostRed(check, host, 'darwin').code, 0);
+  assert.equal(downgradeHostRed(check, real, 'darwin').code, 1);
+  assert.equal(downgradeHostRed(check, host, 'linux').code, 1);
 });
