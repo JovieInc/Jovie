@@ -19,7 +19,7 @@ export function SidebarInboxLink({
     ? `Inbox — ${availability?.pendingCount} items need attention`
     : availability?.state === 'empty'
       ? 'Inbox — all caught up'
-      : 'Inbox — status unavailable';
+      : 'Inbox';
   const accessibleLabel = hasRuntimeUpdate
     ? `${label}; app update available`
     : label;

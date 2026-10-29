@@ -92,10 +92,7 @@ describe('central Inbox bell', () => {
 
   it.each([
     [{ state: 'empty' as const, pendingCount: 0 }, 'Inbox — all caught up'],
-    [
-      { state: 'unknown' as const, pendingCount: null },
-      'Inbox — status unavailable',
-    ],
+    [{ state: 'unknown' as const, pendingCount: null }, 'Inbox'],
   ])('keeps the destination available for %s', (availability, name) => {
     render(<SidebarInboxLink availability={availability} />);
     const link = screen.getByRole('link', { name });
