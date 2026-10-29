@@ -168,3 +168,14 @@ describe('passage token', () => {
     expect(a.ok && b.ok && a.claims.jti !== b.claims.jti).toBe(true);
   });
 });
+
+describe('CI key derivation parity (scripts/synthetic-passage-key.mjs)', () => {
+  it('derives exactly the key the server verifies with', async () => {
+    const { derivePassageKeyBase64Url } = await import(
+      '../../../../scripts/synthetic-passage-key.mjs'
+    );
+    const ciKey = Buffer.from(derivePassageKeyBase64Url(ROOT), 'base64url');
+    expect(ciKey.equals(KEY)).toBe(true);
+    expect(() => derivePassageKeyBase64Url('')).toThrow(/CRON_SECRET/);
+  });
+});
