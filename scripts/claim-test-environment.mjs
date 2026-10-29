@@ -2,11 +2,11 @@
 import { readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateClaimTestEnvironment } from './lib/claim-test-environment.mjs';
 import {
   probeStripeTestFixture,
   shouldProbeLiveFixture,
 } from './lib/claim-stripe-fixture.mjs';
+import { validateClaimTestEnvironment } from './lib/claim-test-environment.mjs';
 
 const OUTBOUND_KEYS = [
   'RESEND_API_KEY',
