@@ -30,6 +30,7 @@ describe('StatTile', () => {
       );
       const value = screen.getByTestId('stat-tile-value');
       expect(value).toHaveAttribute('data-state', 'not-measured');
+      expect(value.className).toContain('tabular-nums');
       expect(value).toHaveTextContent(STAT_TILE_NOT_MEASURED_LABEL);
       expect(value.textContent).not.toBe('');
       expect(value.textContent).not.toContain('—');

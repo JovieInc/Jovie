@@ -55,7 +55,7 @@ export function StatTile({
           data-state='not-measured'
           data-testid='stat-tile-value'
           title={notMeasuredTitle(notMeasuredSource)}
-          className='text-sm font-medium leading-none tracking-tight text-tertiary-token'
+          className='tabular-nums text-sm font-medium leading-none tracking-tight text-tertiary-token'
         >
           {STAT_TILE_NOT_MEASURED_LABEL}
         </p>
