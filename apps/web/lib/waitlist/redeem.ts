@@ -3,6 +3,7 @@ import 'server-only';
 
 import { and, sql as drizzleSql, eq } from 'drizzle-orm';
 import { invalidateProxyUserStateCache } from '@/lib/auth/proxy-state';
+import { ensurePriceLockForUserSafely } from '@/lib/billing/price-lock.server';
 import type { DbOrTransaction } from '@/lib/db';
 import { users } from '@/lib/db/schema/auth';
 import { waitlistEntries } from '@/lib/db/schema/waitlist';
@@ -233,6 +234,7 @@ export async function redeemWaitlistInviteToken(input: {
   );
 
   if (result.outcome === 'approved') {
+    await ensurePriceLockForUserSafely(input.clerkUserId, 'waitlist');
     await invalidateProxyUserStateCache(input.clerkUserId);
   }
 

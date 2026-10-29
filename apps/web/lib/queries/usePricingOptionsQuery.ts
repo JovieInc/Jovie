@@ -9,10 +9,15 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
+import {
+  applyPriceLockToOptions,
+  type PriceLockView,
+} from '@/lib/billing/price-lock-view';
 import { STABLE_CACHE } from './cache-strategies';
 import { createQueryFn } from './fetch';
 import { queryKeys } from './keys';
 import { createClassifiedRetry } from './retry-policy';
+import { fetchPriceLock } from './usePriceLockQuery';
 
 /**
  * Individual pricing option from the API.
@@ -23,6 +28,7 @@ export interface PricingOption {
   currency: string;
   interval: string;
   description: string;
+  plan?: string;
 }
 
 /**
@@ -39,6 +45,8 @@ interface PricingOptionsRawResponse {
  */
 export interface PricingOptionsResponse {
   options: PricingOption[];
+  /** The person's price lock; options already carry the locked price. */
+  priceLock: PriceLockView | null;
 }
 
 const fetchPricingOptionsRaw = createQueryFn<PricingOptionsRawResponse>(
@@ -50,9 +58,18 @@ async function fetchPricingOptions({
 }: {
   signal?: AbortSignal;
 }): Promise<PricingOptionsResponse> {
-  const raw = await fetchPricingOptionsRaw({ signal });
+  // The lock is fetched with the list and applied here, so no consumer can
+  // render a list price for a person who has a lock. A lock that fails to
+  // load fails the whole query (the billing recovery banner), never a silent
+  // fall back to the list price.
+  const [raw, priceLock] = await Promise.all([
+    fetchPricingOptionsRaw({ signal }),
+    fetchPriceLock({ signal }),
+  ]);
+  const listed = [...(raw.pricingOptions ?? []), ...(raw.options ?? [])];
   return {
-    options: [...(raw.pricingOptions ?? []), ...(raw.options ?? [])],
+    options: applyPriceLockToOptions(listed, priceLock),
+    priceLock,
   };
 }
 

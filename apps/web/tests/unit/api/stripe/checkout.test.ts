@@ -50,6 +50,23 @@ vi.mock('@/lib/error-tracking', async () => {
   };
 });
 
+const mockResolveCheckoutPriceForUser = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/billing/price-lock.server', () => ({
+  resolveCheckoutPriceForUser: mockResolveCheckoutPriceForUser,
+}));
+
+const LIST_LOCK = {
+  plan: 'pro',
+  priceVersionId: 'pro-2026-10-20-m12',
+  currency: 'usd',
+  monthlyAmountCents: 1200,
+  yearlyAmountCents: null,
+  stripePriceIdMonthly: 'price_123',
+  stripePriceIdYearly: null,
+  source: 'signup',
+  lockedAt: '2026-10-29T00:00:00.000Z',
+};
+
 vi.mock('@/lib/stripe/client', () => ({
   createCheckoutSession: mockCreateCheckoutSession,
   createBillingPortalSession: mockCreateBillingPortalSession,
@@ -94,6 +111,12 @@ import { POST } from '@/app/api/stripe/checkout/route';
 describe('POST /api/stripe/checkout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockResolveCheckoutPriceForUser.mockImplementation(
+      async (_userId: string, priceId: string) => ({
+        decision: { kind: 'list', priceId },
+        lock: LIST_LOCK,
+      })
+    );
     mockIsMaxPlanEnabled.mockReturnValue(true);
     mockIsMaxPriceId.mockReturnValue(false);
     mockGetActivePriceIds.mockReturnValue(['price_123']);
@@ -509,6 +532,99 @@ describe('POST /api/stripe/checkout', () => {
       error: 'Invalid checkout correlation field: claimId',
     });
     expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+  });
+
+  describe('price lock', () => {
+    const lockedDecision = (substituted: boolean) => ({
+      decision: {
+        kind: 'locked',
+        priceId: 'price_locked_12',
+        plan: 'pro',
+        expectation: { amountCents: 1200, currency: 'usd', interval: 'month' },
+        substituted,
+      },
+      lock: LIST_LOCK,
+    });
+
+    it('charges the locked price, not the list price the browser sent', async () => {
+      mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+      mockResolveCheckoutPriceForUser.mockResolvedValue(lockedDecision(true));
+      mockGetPriceMappingDetails.mockImplementation((id: string) =>
+        id === 'price_locked_12'
+          ? {
+              priceId: id,
+              plan: 'pro',
+              amount: 1200,
+              currency: 'usd',
+              interval: 'month',
+              description: 'Artist Presence',
+            }
+          : null
+      );
+      // The locked price is retired from the active list.
+      mockGetActivePriceIds.mockReturnValue(['price_list_19']);
+      mockCreateCheckoutSession.mockResolvedValue({
+        id: 'cs_locked',
+        url: 'https://checkout.stripe.com/pay/cs_locked',
+      });
+
+      const response = await POST(
+        new NextRequest('http://localhost/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId: 'price_list_19' }),
+        })
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockResolveCheckoutPriceForUser).toHaveBeenCalledWith(
+        'user_123',
+        'price_list_19'
+      );
+      expect(mockCreateCheckoutSession).toHaveBeenCalledWith(
+        expect.objectContaining({
+          priceId: 'price_locked_12',
+          plan: 'pro',
+          lockedPrice: {
+            amountCents: 1200,
+            currency: 'usd',
+            interval: 'month',
+          },
+        })
+      );
+    });
+
+    it('fails closed when the lock cannot be read or created', async () => {
+      mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+      mockResolveCheckoutPriceForUser.mockRejectedValue(new Error('db down'));
+
+      const response = await POST(
+        new NextRequest('http://localhost/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId: 'price_123' }),
+        })
+      );
+
+      expect(response.status).toBe(500);
+      expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    });
+
+    it('keeps validating list prices for a person whose lock does not apply', async () => {
+      mockGetCachedAuth.mockResolvedValue({ userId: 'user_123' });
+      mockGetActivePriceIds.mockReturnValue(['price_other']);
+
+      const response = await POST(
+        new NextRequest('http://localhost/api/stripe/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ priceId: 'price_123' }),
+        })
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockCreateCheckoutSession).not.toHaveBeenCalled();
+    });
   });
 
   it('creates checkout session for authenticated user', async () => {

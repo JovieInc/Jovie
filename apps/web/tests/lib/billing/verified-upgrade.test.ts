@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FALLBACK_VERIFIED_PRICE_LABEL,
   formatVerifiedPriceLabel,
+  formatVerifiedUpgradeLabel,
   getPreferredVerifiedPrice,
 } from '@/lib/billing/verified-upgrade';
 
@@ -41,7 +41,7 @@ describe('verified upgrade pricing helpers', () => {
     expect(selected?.priceId).toBe('price_year');
   });
 
-  it('formats currency labels and falls back when missing', () => {
+  it('formats currency labels and shows no price when unknown', () => {
     expect(
       formatVerifiedPriceLabel({
         priceId: 'price_month',
@@ -52,8 +52,8 @@ describe('verified upgrade pricing helpers', () => {
       })
     ).toBe('$9/mo');
 
-    expect(formatVerifiedPriceLabel(undefined)).toBe(
-      FALLBACK_VERIFIED_PRICE_LABEL
-    );
+    // No list-price fallback: an unknown price shows no price at all.
+    expect(formatVerifiedPriceLabel(undefined)).toBeNull();
+    expect(formatVerifiedUpgradeLabel(undefined)).toBe('Get Verified');
   });
 });

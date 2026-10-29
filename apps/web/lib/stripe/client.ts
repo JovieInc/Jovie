@@ -5,6 +5,7 @@
 
 import 'server-only';
 import Stripe from 'stripe';
+import type { LockedCheckoutExpectation } from '@/lib/billing/price-lock-checkout';
 import { cacheQuery, invalidateCache } from '@/lib/db/cache';
 import { publicEnv } from '@/lib/env-public';
 import { env } from '@/lib/env-server';
@@ -169,9 +170,12 @@ export async function createCheckoutSession({
   idempotencyKey,
   referralCode,
   correlation,
+  lockedPrice,
 }: {
   customerId: string;
   priceId: string;
+  /** The person's price lock; Stripe's price must match it, not the list. */
+  lockedPrice?: LockedCheckoutExpectation;
   plan?: string;
   userId: string;
   successUrl: string;
@@ -182,8 +186,10 @@ export async function createCheckoutSession({
 }): Promise<Stripe.Checkout.Session> {
   try {
     const stripeClient = getStripe();
-    await assertCheckoutPriceContract(priceId, id =>
-      stripeClient.prices.retrieve(id)
+    await assertCheckoutPriceContract(
+      priceId,
+      id => stripeClient.prices.retrieve(id),
+      lockedPrice
     );
     const requestOptions: Stripe.RequestOptions | undefined = idempotencyKey
       ? { idempotencyKey }
