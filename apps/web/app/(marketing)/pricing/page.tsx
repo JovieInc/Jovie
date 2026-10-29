@@ -17,7 +17,9 @@ export const revalidate = false;
 
 const VISIBLE_PRICING_PLANS = getVisibleMarketingPricingPlans();
 /** Registry rows a buyer can rely on today (server-side projection). */
-const publicComparison = getPublicPricingComparison();
+const publicComparisonChart = (
+  <PricingComparisonChart categories={getPublicPricingComparison()} />
+);
 const PRO_MONTHLY_PRICE = `${getPublicPriceClaim('pro').priceLabel}/month`;
 const PRICING_OG_IMAGE = `${BASE_URL}/og/default.png`;
 const PRICING_TITLE = `Pricing | ${APP_NAME}`;
@@ -131,7 +133,7 @@ export default function PricingPage() {
         <MarketingPricingPlans mode='expanded' variant='tier-cards-neutral' />
       }
       auditOffer={<VisibilityAuditOffer />}
-      comparisonChart={<PricingComparisonChart categories={publicComparison} />}
+      comparisonChart={publicComparisonChart}
     />
   );
 }
