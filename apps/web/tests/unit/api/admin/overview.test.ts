@@ -88,7 +88,9 @@ describe('GET /api/admin/overview', () => {
       canRemoveBranding: true,
     });
     mockDbSelect.mockReturnValue({
-      from: vi.fn().mockResolvedValue([{ count: 100 }]),
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ count: 100 }]),
+      }),
     });
 
     const { GET } = await import('@/app/api/admin/overview/route');
