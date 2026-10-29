@@ -36,6 +36,46 @@ The offer shows only what `lib/billing/offer-truth.ts` publishes: today the free
 profile. The $12 artist-profile pilot is approved but unpublished (JOV-8368), so
 it stays off public pages until offer truth carries it.
 
+## Publishing copy without a deploy
+
+The homepage renders the published `marketing-page/home` content record
+(`apps/web/lib/content-records/marketing-page.ts`): an ordered list of
+registered DS sections, each with its variant and copy slots. A copy or
+section-order change is a publish, not a PR. Locked lines (the headline),
+prices, plan facts and components have no slot and stay in code.
+
+```bash
+API=https://jov.ie/api/content-records/marketing-page/home
+AUTH=(-H "authorization: Bearer $CONTENT_PUBLISH_SECRET" -H "x-content-actor: summer")
+curl "${AUTH[@]}" -X POST $API -d '{"action":"validate","data":SPEC}'   # dry run
+curl "${AUTH[@]}" -X POST $API -d '{"action":"draft","data":SPEC,"note":"why"}'  # → previewUrl
+curl "${AUTH[@]}" -X POST $API -d '{"action":"publish","versionId":"…","reason":"why"}'
+curl "${AUTH[@]}" -X POST $API -d '{"action":"rollback","reason":"why"}'  # previous version
+curl "${AUTH[@]}" $API                                                    # versions + audit log
+```
+
+Validation runs at draft and again at publish: section ids and variants must
+be in `MARKETING_SECTIONS` and have a renderer; hero first, cta last; no
+prices (offer truth only); `@jovie/copy` blocking rules; no audience language
+on general pages (MKT-D16). `experiment` adds variants (full section lists),
+integer weights, and one `artist_signup` funnel step as the metric. Preview
+any arm with `&arm=<id>` on the preview URL. Run the copy steps below before
+drafting; a valid spec is not approved copy. Publish goes live on the next
+request (cache tag expired) with no code deploy.
+
+### Site header and footer (`site-chrome/main`)
+
+The header nav, Customers flyout and footer columns are one record,
+`site-chrome/main` (`apps/web/lib/content-records/site-chrome.ts`), published
+through the same API (`.../site-chrome/main`). Copy paths are stable ids:
+`footer.<columnId>.<linkId>.label`, `nav.<linkId>.label`. Publish gates: schema,
+sentence-case labels, `@jovie/copy` lint, no duplicate destinations, every
+internal href navigable under feature availability and off the dead-end list
+(`CHROME_BLOCKED_PATHS`: Jovie Card, demo, compare, alternatives, ISRC, UTM,
+CLI, engineering, AI), only approved https social hosts, 3 to 4 columns with 8
+to 16 links, and a resolution smoke test through the shell's resolver. Layout
+and the legal row stay in code.
+
 ## The 4-step procedure
 
 ### 1. Receive a Brief
