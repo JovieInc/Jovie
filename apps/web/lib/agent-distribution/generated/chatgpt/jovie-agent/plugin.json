@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "jovie-agent",
-  "version": "cded1cdbe3ac",
+  "version": "795fc4093597",
   "description": "Find an artist and draft their Jovie page and release smart link. Nothing is published.",
   "author": {
     "name": "Jovie",
@@ -117,9 +117,9 @@
     }
   },
   "_generated": {
-    "version": "cded1cdbe3ac",
+    "version": "795fc4093597",
     "toolsListHash": "5d4c361dd8af47313af5a5f273b1bdea84b68e21e5099741df8d0f5cd90d5f94",
-    "listingHash": "a85d2d6e7ee9757b15e990a03c5750e3e08fdf5c616c2ebe6ccced9b55f3a8e6",
+    "listingHash": "3dc2c64c58654c6c87790cb1d3f9b50a31b1ff4e88830fdf7eef722e0b28b2b0",
     "regenerate": "pnpm --filter @jovie/web agent-distribution:generate"
   }
 }

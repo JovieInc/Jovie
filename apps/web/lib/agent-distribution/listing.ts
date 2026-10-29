@@ -138,7 +138,7 @@ export const LISTING = {
       'None. The connector is anonymous and never asks for a password or a one-time code.',
     limitsHeading: 'Limits',
     limitsText:
-      'Calls are rate limited per client. A limited call returns a retry signal. Wait, then try again.',
+      'We limit how many requests a caller can make to the connector, and we limit the total number of requests across all callers. A limited call returns a retry signal. Wait, then try again.',
     dataHeading: 'Data handling',
     expiryHeading: 'Draft expiry',
     expiryText: 'A draft and its draft token expire after seven days.',
