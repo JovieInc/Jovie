@@ -470,10 +470,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateRow.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/opportunity-inbox/OpportunityInboxTourDateSections.tsx",
       "linearIssue": "JOV-8847"
     },
