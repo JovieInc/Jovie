@@ -24,7 +24,6 @@ import { dspArtistMatches } from '@/lib/db/schema/dsp-enrichment';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
 import { PROVIDER_CONFIG } from '@/lib/discography/config';
 import { normalizeEditableIsrc } from '@/lib/discography/editable-isrc';
-import { purgeOrphanRecordings } from '@/lib/discography/live-catalog';
 import { validateProviderUrl } from '@/lib/discography/provider-domains';
 import {
   getProviderLink,
@@ -33,6 +32,7 @@ import {
   getReleaseTrackSummariesForReleases,
   getReleaseTracksForReleaseWithProviders,
   getTracksForRelease,
+  purgeOrphanRecordings,
   resetProviderLink as resetProviderLinkDb,
   upsertProviderLink,
   upsertRecording,

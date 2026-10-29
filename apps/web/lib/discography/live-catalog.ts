@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, inArray, isNull, notExists } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import {
   discogRecordings,
@@ -41,32 +41,4 @@ export async function getLiveRecordingTitles(
     .where(eq(discogRecordings.creatorProfileId, profileId))
     .limit(limit);
   return rows.map(row => row.title);
-}
-
-/**
- * Hard-deleting a release cascades its release tracks but leaves the
- * profile-scoped recordings behind. Remove the recordings no remaining release
- * carries so deleted songs cannot resurface through any recording-keyed read.
- */
-export async function purgeOrphanRecordings(
-  profileId: string,
-  recordingIds: readonly string[]
-): Promise<number> {
-  if (recordingIds.length === 0) return 0;
-  const removed = await db
-    .delete(discogRecordings)
-    .where(
-      and(
-        eq(discogRecordings.creatorProfileId, profileId),
-        inArray(discogRecordings.id, [...recordingIds]),
-        notExists(
-          db
-            .select({ one: discogReleaseTracks.id })
-            .from(discogReleaseTracks)
-            .where(eq(discogReleaseTracks.recordingId, discogRecordings.id))
-        )
-      )
-    )
-    .returning({ id: discogRecordings.id });
-  return removed.length;
 }
