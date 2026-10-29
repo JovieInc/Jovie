@@ -163,7 +163,10 @@
       "ceiling": 200,
       "display": {
         "sentence": "Profiles start responding in under {value} ms",
-        "rounding": { "mode": "ceil", "step": 10 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 10
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_ttfb_ms",
@@ -193,7 +196,10 @@
       "threshold": 80,
       "display": {
         "sentence": "Scores {value}/100 for AI-agent readiness",
-        "rounding": { "mode": "floor", "step": 1 }
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_agent_score",
@@ -224,7 +230,10 @@
       "threshold": null,
       "display": {
         "sentence": "Profiles load faster than {value} measured link-in-bio platforms",
-        "rounding": { "mode": "ceil", "step": 100 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 100
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_lcp_rank",
@@ -255,7 +264,10 @@
       "threshold": null,
       "display": {
         "sentence": "Lighter than {value} measured link-in-bio platforms",
-        "rounding": { "mode": "ceil", "step": 10000 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 10000
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_js_bytes_rank",
@@ -285,7 +297,10 @@
       "threshold": 1,
       "display": {
         "sentence": "Passes every agent-path certification check",
-        "rounding": { "mode": "floor", "step": 0.01 }
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#agent_path_cert",
@@ -315,7 +330,10 @@
       "threshold": null,
       "display": {
         "sentence": "{value} of marketplace checks pass",
-        "rounding": { "mode": "floor", "step": 0.01 }
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -346,7 +364,9 @@
       "ceiling": 0,
       "display": {
         "sentence": "{value} open critical vulnerabilities",
-        "rounding": { "mode": "exact" }
+        "rounding": {
+          "mode": "exact"
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#security_open_critical",
@@ -377,7 +397,10 @@
       "ceiling": 72,
       "display": {
         "sentence": "High-severity fixes ship in under {value} hours",
-        "rounding": { "mode": "ceil", "step": 1 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#security_patch_hours_p50",
@@ -407,7 +430,9 @@
       "threshold": null,
       "display": {
         "sentence": "{value} open Dependabot alerts",
-        "rounding": { "mode": "exact" }
+        "rounding": {
+          "mode": "exact"
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -437,7 +462,9 @@
       "threshold": null,
       "display": {
         "sentence": "Secret scan clean: {value}",
-        "rounding": { "mode": "exact" }
+        "rounding": {
+          "mode": "exact"
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -467,7 +494,10 @@
       "threshold": null,
       "display": {
         "sentence": "{value} changes shipped a day",
-        "rounding": { "mode": "floor", "step": 1 }
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -497,7 +527,10 @@
       "threshold": null,
       "display": {
         "sentence": "Fixes reach production in under {value} minutes",
-        "rounding": { "mode": "ceil", "step": 5 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 5
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -527,7 +560,10 @@
       "threshold": null,
       "display": {
         "sentence": "Incidents resolved in {value} minutes on average",
-        "rounding": { "mode": "ceil", "step": 5 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 5
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -557,7 +593,10 @@
       "threshold": null,
       "display": {
         "sentence": "{value} production releases a day",
-        "rounding": { "mode": "floor", "step": 1 }
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -587,7 +626,10 @@
       "threshold": null,
       "display": {
         "sentence": "CI waits {value} minutes at the median",
-        "rounding": { "mode": "ceil", "step": 1 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -617,7 +659,11 @@
       "threshold": null,
       "display": {
         "sentence": "{value} of changes written by agents",
-        "rounding": { "mode": "floor", "step": 0.01, "percent": true }
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01,
+          "percent": true
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -626,6 +672,39 @@
         "value": 3,
         "feasibility": 4,
         "why": "Company story for investors and hiring. Internal until Tim chooses."
+      }
+    },
+    {
+      "id": "eng_wins_verified",
+      "label": "Verified engineering wins, trailing 7 days",
+      "unit": "count",
+      "better": "higher",
+      "visibility": "internal",
+      "legalClass": "plain",
+      "status": "proposed",
+      "source": {
+        "kind": "wins-ledger",
+        "ref": "docs/metrics/wins-latest.json#winsVerified",
+        "note": "Count of wins in canon/wins/wins.jsonl whose computed status is verified (post-merge receipt kept at least half the claimed gain). The wins ledger owns each win; this stat is its aggregate, posted by the wins-ledger workflow."
+      },
+      "owner": "summer",
+      "refreshCadence": "daily",
+      "freshnessSlaHours": 30,
+      "threshold": null,
+      "display": {
+        "sentence": "{value} verified engineering wins this week",
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
+      },
+      "fallback": null,
+      "methodology": null,
+      "milestones": true,
+      "marketing": {
+        "value": 3,
+        "feasibility": 5,
+        "why": "Company and hiring story; feeds Summer's engineering posts. Internal until a post cites it."
       }
     }
   ]

@@ -88,3 +88,24 @@ sends the win text to Tim, deduping on the event id.
 2. Add a producer: a production query in `queries.server.ts`, or a producer
    that posts to `/api/internal/proof-stats` with a receipt.
 3. Move to `live` once it measures. It publishes itself when it passes the rules above.
+
+## The Summer loop
+
+`node scripts/remediation-sweep.mjs --mode proof` runs daily in the Remediation
+Sweep (`scripts/lib/proof-loop.mjs`); every stage records start and end times
+in the `proof-loop-run` artifact.
+
+| Stage | What it does |
+|---|---|
+| ideate | Ranks every stat by `marketing.value x feasibility` (seeded with production, benchmark, agent-score, security and engineering stats) |
+| establish | One Linear issue per `proposed` stat with no measurement (`proof-stat-establish-<id>`) |
+| ratchet | One issue per benchmark loss or missed web-vitals target from the latest run's `proof-ratchets.json` (`proof-stat-ratchet-<metric>-<platform or target>`) |
+| publish | A Summer approval card payload (`kind: decision`, `defaultDecision: none`) for every comparative claim that is fresh and true but unapproved |
+| keep true | One issue per live public stat that went stale (`proof-stat-stale-<id>`); win texts for milestone events since the last pass |
+
+Run-record metrics: stats published, stale, below threshold, unapproved,
+numeric marketing claims and their stat-bound share
+(`node scripts/invariants/stat-claims/check.mjs --json`), plans filed,
+approval requests and win texts. Summer reads the approvals and win texts from
+the artifact or directly from `/api/internal/proof-stats` (events), files the
+cards through its own Summer-cards path and texts Tim the wins.

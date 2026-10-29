@@ -33,6 +33,7 @@ const MODES = new Set([
   'drift',
   'exhausted',
   'holds',
+  'proof',
   'summer',
   'summer-config',
   'vercel',
@@ -477,6 +478,7 @@ export async function fileRemediationPlans(plans, { dryRun, upsert, apiKey }) {
  * @param {() => Promise<any[]>} [options.loadDomains]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadCredentials]
  * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadDrift]
+ * @param {() => Promise<{ plans: any[], warnings?: string[] }>} [options.loadProof]
  * @param {boolean} [options.vercelTokenPresent]
  * @param {(args: any) => Promise<any>} [options.upsert]
  * @param {string} [options.apiKey]
@@ -492,6 +494,7 @@ export async function runRemediationSweep({
   loadDomains,
   loadCredentials,
   loadDrift,
+  loadProof,
   vercelTokenPresent = false,
   upsert,
   apiKey,
@@ -579,6 +582,17 @@ export async function runRemediationSweep({
       const drift = await loadDrift();
       warnings.push(...(drift.warnings ?? []));
       plans.push(...drift.plans);
+    }
+  }
+  if (includesMode(mode, 'proof')) {
+    // Proof-stat loop (apps/web/data/proof-stats): establish issues for
+    // proposed stats, benchmark ratchets, stale-stat alarms.
+    if (!loadProof) {
+      warnings.push('Proof-stat loop loader not wired; not judged');
+    } else {
+      const proof = await loadProof();
+      warnings.push(...(proof.warnings ?? []));
+      plans.push(...proof.plans);
     }
   }
   const issues = await fileRemediationPlans(plans, { dryRun, upsert, apiKey });
