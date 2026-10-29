@@ -183,36 +183,73 @@ is_trufflehog_excluded() {
   return 1
 }
 
-# Filesystem scan for a file list. A pinned action reference
-# (`uses: owner/repo@<40 hex>`) trips the GitHubOauth2 detector on a 20-hex
-# slice of the SHA (unverified, never a credential), and trufflehog ignores
-# inline `trufflehog:ignore` markers here (verified 2026-10-25), so excluding
-# the whole file was the only switch. Instead drop only an UNVERIFIED finding
-# whose line is exactly a `uses:` pin containing the matched text; every other
-# finding in the same file still fails the scan.
-trufflehog_filesystem_scan() {
-  local out kept file line raw text
-  out="$(mktemp)"
-  "$TRUFFLEHOG_BIN" filesystem "$@" --no-verification --json >"$out" || true
-  kept=0
-  while IFS= read -r finding; do
+# Filter only the known GitHubOauth2 false positive inside an action SHA.
+# Git findings must use the attributed commit's source, never the current file.
+# Keep the Commit lines consumed by the existing exact-range classifiers.
+filter_trufflehog_findings() {
+  local source="$1" out="$2" finding file line raw commit text pin kept=0
+  local pin_pattern='^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]+[[:alnum:]_.-]+/[[:alnum:]_./-]+@([0-9a-f]{40})([[:space:]]+#.*)?[[:space:]]*$'
+  while IFS= read -r finding || [[ -n "$finding" ]]; do
     [[ -z "$finding" ]] && continue
-    file="$(jq -r '.SourceMetadata.Data.Filesystem.file // ""' <<<"$finding" 2>/dev/null || true)"
-    line="$(jq -r '.SourceMetadata.Data.Filesystem.line // 0' <<<"$finding" 2>/dev/null || true)"
-    raw="$(jq -r '.Raw // ""' <<<"$finding" 2>/dev/null || true)"
-    if [[ "$(jq -r '.Verified // false' <<<"$finding" 2>/dev/null)" == false \
-      && -n "$file" && "$line" =~ ^[1-9][0-9]*$ && ${#raw} -ge 16 ]]; then
-      text="$(sed -n "${line}p" "$file")"
-      if [[ "$text" =~ ^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*[^[:space:]]+@[0-9a-f]{40}([[:space:]]|$) \
-        && "$text" == *"$raw"* ]]; then
-        continue
+    if ! jq -e 'type == "object" and (.DetectorName | type == "string") and (.Raw | type == "string") and (.Verified | type == "boolean")' <<<"$finding" >/dev/null 2>&1; then
+      echo '::error title=Secret scan incomplete::Invalid TruffleHog finding JSON; failing closed.' >&2
+      return 1
+    fi
+    file="$(jq -r --arg source "$source" '.SourceMetadata.Data[$source].file // ""' <<<"$finding")"
+    line="$(jq -r --arg source "$source" '.SourceMetadata.Data[$source].line // 0' <<<"$finding")"
+    raw="$(jq -r '.Raw' <<<"$finding")"
+    commit=''
+    if [[ "$source" == Git ]]; then
+      commit="$(jq -r '.SourceMetadata.Data.Git.commit // ""' <<<"$finding")"
+      if [[ ! "$commit" =~ ^[0-9a-f]{40}$ ]]; then
+        echo '::error title=Secret scan incomplete::Missing Git finding attribution; failing closed.' >&2
+        return 1
+      fi
+    fi
+    if jq -e '.Verified == false and .DetectorName == "GitHubOauth2"' <<<"$finding" >/dev/null \
+      && [[ -n "$file" && "$line" =~ ^[1-9][0-9]*$ && "$raw" =~ ^[0-9a-f]{20}$ ]]; then
+      text=''
+      if [[ "$source" == Git ]]; then
+        text="$(git show "${commit}:${file}" 2>/dev/null | sed -n "${line}p")" || text=''
+      else
+        text="$(sed -n "${line}p" "$file" 2>/dev/null)" || text=''
+      fi
+      # Raw is only the OAuth client ID. RawV2 also contains its paired
+      # secret; both must belong to this public pin, not another credential.
+      if [[ "$text" =~ $pin_pattern ]]; then
+        pin="${BASH_REMATCH[2]}"
+        if [[ "$pin" == *"$raw"* && "${text/"$pin"/}" != *"$raw"* ]] \
+          && jq -e --arg pin "$pin" '.RawV2 == (.Raw + $pin)' <<<"$finding" >/dev/null; then
+          continue
+        fi
       fi
     fi
     kept=$((kept + 1))
-    echo "Found unverified result: ${file}:${line} (detector $(jq -r '.DetectorName // "?"' <<<"$finding" 2>/dev/null))" >&2
+    printf 'Found result: %q:%q (detector %q)\n' "$file" "$line" "$(jq -r '.DetectorName' <<<"$finding")"
+    [[ -z "$commit" ]] || printf 'Commit: %s\n' "$commit"
   done <"$out"
-  rm -f "$out"
-  [[ "$kept" -eq 0 ]]
+  [[ "$kept" -eq 0 ]] || return 183
+}
+
+trufflehog_filesystem_scan() {
+  local out log status=0 filtered_status=0
+  out="$(mktemp)"
+  log="$(mktemp)"
+  "$TRUFFLEHOG_BIN" filesystem "$@" --no-verification --json --fail >"$out" 2>"$log" || status=$?
+  cat "$log" >&2
+  if grep -q 'encountered errors during scan' "$log"; then
+    echo '::error title=Secret scan incomplete::TruffleHog aborted its filesystem scan; failing closed.' >&2
+    status=1
+  fi
+  if [[ "$status" -eq 0 || "$status" -eq 183 ]]; then
+    filter_trufflehog_findings Filesystem "$out" || filtered_status=$?
+    # A findings exit without findings is not proof of a complete scan.
+    if [[ "$status" -eq 0 ]] || grep -q '[^[:space:]]' "$out"; then
+      status="$filtered_status"
+    fi
+  fi
+  rm -f "$out" "$log"
+  return "$status"
 }
 
 run_trufflehog_pre_commit() {
@@ -355,30 +392,38 @@ repair_partial_clone() {
 }
 
 run_trufflehog_git() {
-  local log status
+  local log out status filtered_status=0
   log="$(mktemp)"
+  out="$(mktemp)"
   status=0
   # shellcheck disable=SC2046
-  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \
-    >"$log" 2>&1 || status=$?
+  "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --json \
+    >"$out" 2>"$log" || status=$?
   if [[ $status -ne 0 ]] && grep -qiE "$CLONE_CORRUPTION_SIGNATURE" "$log"; then
     echo "::error title=Secret scan checkout corruption::TruffleHog could not read the runner's Git object store; repairing the checkout and retrying once." >&2
     repair_partial_clone || {
       status=$?
       echo "::error title=Secret scan checkout repair failed::Unable to fetch a complete Git object store; secret scanning did not run." >&2
-      rm -f "$log"
+      rm -f "$log" "$out"
       return "$status"
     }
     status=0
     # The retry's output replaces the corrupted attempt wholesale so range
     # classification downstream parses exactly one final scan result.
     : >"$log"
+    : >"$out"
     # shellcheck disable=SC2046
-    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) \
-      >"$log" 2>&1 || status=$?
+    "$TRUFFLEHOG_BIN" git file://"$REPO_ROOT" "$@" $(trufflehog_exclude_args) --json \
+      >"$out" 2>"$log" || status=$?
   fi
   cat "$log"
-  rm -f "$log"
+  if [[ "$status" -eq 0 || "$status" -eq 183 ]]; then
+    filter_trufflehog_findings Git "$out" || filtered_status=$?
+    if [[ "$status" -eq 0 ]] || grep -q '[^[:space:]]' "$out"; then
+      status="$filtered_status"
+    fi
+  fi
+  rm -f "$log" "$out"
   return $status
 }
 
