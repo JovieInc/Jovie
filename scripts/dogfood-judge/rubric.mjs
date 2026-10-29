@@ -342,7 +342,7 @@ export function buildJudgeSchema(stepIds, imageNames) {
 }
 
 /**
- * @param {{ surface: string, steps: Array<{ id: string, title: string, url?: string|null, images: Array<{ name: string, path: string, t?: number|null }>, text?: string, console?: string }>, penRefs: Array<{ id: string, title: string, path: string }>, tier: 'screen' | 'confirm', prior?: any }} input
+ * @param {{ surface: string, steps: Array<{ id: string, title: string, url?: string|null, images: Array<{ name: string, path: string, t?: number|null }>, text?: string, console?: string }>, penRefs: Array<{ id: string, title: string, path: string }>, tier: 'screen' | 'confirm', prior?: any, canary?: string[] }} input
  */
 export function buildJudgePrompt({
   surface,
