@@ -11850,6 +11850,39 @@ class DoctorFreshnessTest(unittest.TestCase):
                     lane.lifecycle.HEARTBEAT = None
 
 
+class UpdaterSelfHealTest(unittest.TestCase):
+    def test_paths_deleted_upstream_drop_out_of_the_bundle_instead_of_refusing_forever(self):
+        with tempfile.TemporaryDirectory() as raw:
+            repo = Path(raw)
+            run = lambda *a: subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *a], cwd=repo, check=True, capture_output=True)
+            run("init", "-q", "-b", "main")
+            (repo / "scripts/lanes").mkdir(parents=True)
+            (repo / "scripts/lanes/lane_runner.py").write_text("x")
+            keep, gone = "scripts/kept.mjs", "ops/registry/gone.jsonl"
+            (repo / "scripts").mkdir(exist_ok=True); (repo / keep).write_text("k")
+            run("add", "-A"); run("commit", "-qm", "c")
+            with patch.object(lane, "RELEASE_EXTRAS", [keep, gone]), patch.object(lane, "LANE_TESTS", []):
+                self.assertEqual(lane.release_paths(repo, "HEAD"), [keep, "scripts/lanes"])
+            (repo / "scripts/lanes/lane_runner.py").unlink(); run("add", "-A"); run("commit", "-qm", "d")
+            with patch.object(lane, "RELEASE_EXTRAS", []), patch.object(lane, "LANE_TESTS", []), self.assertRaises(RuntimeError):
+                lane.release_paths(repo, "HEAD")
+
+    def test_aged_dependency_pool_is_refilled_once_before_the_build(self):
+        host = lane.Host(state=Path("/nonexistent-state"), repo=Path("/nonexistent-repo"))
+        with patch.object(lane.worktree_pool, "enabled", return_value=True), \
+             patch.object(lane.worktree_pool, "pool_dir", return_value=Path("/p")), \
+             patch.object(lane.worktree_pool, "ready_slots", return_value=[]), \
+             patch.object(lane.worktree_pool, "fill", return_value=["built slot-a"]) as fill:
+            self.assertTrue(lane.ensure_dependency_pool(host))
+            fill.assert_called_once()
+        with patch.object(lane.worktree_pool, "enabled", return_value=True), \
+             patch.object(lane.worktree_pool, "pool_dir", return_value=Path("/p")), \
+             patch.object(lane.worktree_pool, "ready_slots", return_value=[Path("/p/slot-a")]), \
+             patch.object(lane.worktree_pool, "fill") as fill:
+            self.assertFalse(lane.ensure_dependency_pool(host))
+            fill.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
 
