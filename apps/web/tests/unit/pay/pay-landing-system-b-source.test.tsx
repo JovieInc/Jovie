@@ -48,6 +48,19 @@ describe('pay landing System B source contract', () => {
     expect(source).not.toMatch(/homepage-section-stack mt-0/);
   });
 
+  it('shows the real pay sheet in the hero, not an empty field', () => {
+    render(<PayLanding />);
+
+    const hero = screen.getByTestId('pay-hero');
+    const shot = within(hero).getByTestId('pay-hero-product');
+    const image = within(shot).getByRole('img');
+    // Registry capture of the live profile pay state (Tim White, ?mode=pay).
+    expect(decodeURIComponent(image.getAttribute('src') ?? '')).toContain(
+      'tim-white-profile-pay-phone'
+    );
+    expect(image.getAttribute('alt')).toBeTruthy();
+  });
+
   it('keeps the final claim section to the handle form action path', () => {
     render(<PayLanding />);
 
@@ -95,6 +108,9 @@ describe('pay landing System B source contract', () => {
     expect(dock).toHaveAttribute('data-testid', 'marketing-section-hero');
     expect(dock).toHaveAttribute('data-marketing-variant', 'split-claim-card');
     expect(dock?.querySelector(':scope > .hero-glow')).not.toBeNull();
+    // Matte hero: no per-route photograph layer behind the copy (2026-10-29).
+    // The product shot (MarketingPhoneImage, #23613) is content, not backdrop.
+    expect(dock?.querySelector('[class*="hero-photo"]')).toBeNull();
   });
 
   it('gives the hero H1 enough measure to paint both Pen lines', () => {

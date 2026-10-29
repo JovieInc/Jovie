@@ -2,7 +2,7 @@ import type { LogoVariant } from '@/components/atoms/Logo';
 import { SkipToContent } from '@/components/atoms/SkipToContent';
 import type { MarketingHeaderBrand } from '@/data/marketing/headerBrand';
 import { MARKETING_PEN_CONTRACT_IDS } from '@/data/marketing/penContracts';
-import { isCodeFlagEnabled } from '@/lib/flags/code-flags';
+import type { ResolvedSiteChrome } from '@/lib/content-records/site-chrome.resolve';
 import { cn } from '@/lib/utils';
 import { MarketingFooter } from './MarketingFooter';
 import {
@@ -19,6 +19,8 @@ import {
 
 export interface PublicPageShellProps {
   readonly children: React.ReactNode;
+  /** Published site chrome from `getSiteChrome()`; code default when omitted. */
+  readonly chrome?: ResolvedSiteChrome;
   readonly className?: string;
   readonly footerClassName?: string;
   readonly footerVariant?: 'auto' | 'expanded' | 'minimal';
@@ -42,6 +44,7 @@ export interface PublicPageShellProps {
 
 export function PublicPageShell({
   children,
+  chrome,
   className,
   footerClassName,
   footerVariant,
@@ -66,6 +69,7 @@ export function PublicPageShell({
       {skipToContent ? <SkipToContent /> : null}
       <MarketingHeader
         brand={headerBrand}
+        chromeNav={chrome?.nav}
         logoSize={logoSize}
         logoVariant={logoVariant}
         navLinks={navLinks}
@@ -88,7 +92,8 @@ export function PublicPageShell({
       </main>
       <MarketingFooter
         className={footerClassName}
-        genericCreatorNav={isCodeFlagEnabled('MARKETING_GENERIC_CREATOR_NAV')}
+        columns={chrome?.footerColumns}
+        legalLinks={chrome?.legalLinks}
         variant={footerVariant}
       />
     </div>
