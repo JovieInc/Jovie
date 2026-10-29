@@ -336,6 +336,33 @@ describe('EmptyToFilled', () => {
     }
   );
 
+  it.each(['empty', 'filled'] as const)(
+    'retains focus when the outgoing %s content is removed during the swap',
+    initialState => {
+      const view = (state: 'empty' | 'filled') => (
+        <EmptyToFilled
+          state={state}
+          announcement={state}
+          empty={
+            state === 'empty' ? (
+              <button type='button'>Connect Spotify</button>
+            ) : null
+          }
+        >
+          {state === 'filled' ? (
+            <button type='button'>View release</button>
+          ) : null}
+        </EmptyToFilled>
+      );
+      const { rerender } = render(view(initialState));
+      screen.getByRole('button').focus();
+
+      rerender(view(initialState === 'empty' ? 'filled' : 'empty'));
+
+      expect(screen.getByRole('button')).toHaveFocus();
+    }
+  );
+
   it('keeps the visible pane control interactive and withdraws the hidden pane from pointer input by CSS contract', () => {
     const onClick = vi.fn();
     const { rerender } = render(

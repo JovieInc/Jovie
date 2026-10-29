@@ -45,17 +45,19 @@ export function EmptyToFilled({
   testId,
 }: EmptyToFilledProps) {
   const rootRef = useRef<HTMLDivElement>(null);
-  const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const lastFocusedPaneRef = useRef<HTMLElement | null>(null);
   const prevStateRef = useRef(state);
 
   const handleFocusCapture = (event: ReactFocusEvent<HTMLDivElement>) => {
-    lastFocusedRef.current =
-      event.target instanceof HTMLElement ? event.target : null;
+    lastFocusedPaneRef.current =
+      event.target instanceof HTMLElement
+        ? event.target.closest<HTMLElement>('[data-part="pane"]')
+        : null;
   };
 
   const handleBlurCapture = (event: ReactFocusEvent<HTMLDivElement>) => {
     if (!event.currentTarget.contains(event.relatedTarget)) {
-      lastFocusedRef.current = null;
+      lastFocusedPaneRef.current = null;
     }
   };
 
@@ -66,14 +68,12 @@ export function EmptyToFilled({
     }
     prevStateRef.current = state;
 
-    const previouslyFocused = lastFocusedRef.current;
-    if (!previouslyFocused || !root.contains(previouslyFocused)) {
-      return;
-    }
-
-    const previousPane =
-      previouslyFocused.closest<HTMLElement>('[data-part="pane"]');
-    if (!previousPane || previousPane.dataset.pane === state) {
+    const previousPane = lastFocusedPaneRef.current;
+    if (
+      !previousPane ||
+      !root.contains(previousPane) ||
+      previousPane.dataset.pane === state
+    ) {
       // Focus was outside the panes, or in the pane that stays visible.
       return;
     }
@@ -97,12 +97,12 @@ export function EmptyToFilled({
       }
       candidate.focus({ preventScroll: true });
       if (root.ownerDocument.activeElement === candidate) {
-        lastFocusedRef.current = candidate;
+        lastFocusedPaneRef.current = showingPane;
         return;
       }
     }
     showingPane.focus({ preventScroll: true });
-    lastFocusedRef.current = showingPane;
+    lastFocusedPaneRef.current = showingPane;
   }, [state]);
 
   return (
