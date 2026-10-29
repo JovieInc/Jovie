@@ -47,10 +47,21 @@ def fingerprint(title: str, labels=()) -> str:
     return hashlib.sha256(" ".join(words).encode()).hexdigest()[:12] if words else "unclassified"
 
 
-def check_fingerprint(pr: dict) -> str:
+# CANCELLED is a superseded or lost run, not a defect. Hashing it made every stale
+# draft whose only red was the same cancelled job share one fingerprint, so the
+# abstraction gate demanded a new machine on each later occurrence (Fleet Rules
+# Evidence, 10 PRs / 14 days). Timeouts and failures still define the class.
+# No actionable check returns None; machine_gate then fingerprints the title.
+_FINGERPRINT_CONCLUSIONS = frozenset({"FAILURE", "TIMED_OUT"})
+_FINGERPRINT_AGGREGATES = frozenset({"pr ready", "ci summary", "rollup"})
+
+
+def check_fingerprint(pr: dict) -> str | None:
     names = sorted({str(c.get("name")) for c in pr.get("statusCheckRollup") or []
-                    if str(c.get("conclusion") or "").upper() in {"FAILURE", "TIMED_OUT", "CANCELLED"}
-                    and str(c.get("name") or "").lower() not in {"pr ready", "ci summary"}})
+                    if str(c.get("conclusion") or "").upper() in _FINGERPRINT_CONCLUSIONS
+                    and str(c.get("name") or "").lower() not in _FINGERPRINT_AGGREGATES})
+    if not names:
+        return None
     return "fix-red-" + hashlib.sha256("|".join(names).encode()).hexdigest()[:10]
 
 

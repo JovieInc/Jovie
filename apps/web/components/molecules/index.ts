@@ -14,6 +14,8 @@ export type { DSPButtonGroupProps } from './DSPButtonGroup';
 export { DSPButtonGroup } from './DSPButtonGroup';
 export type { EmptyStateProps } from './EmptyState';
 export { EmptyState } from './EmptyState';
+export type { EmptyToFilledProps } from './EmptyToFilled';
+export { EmptyToFilled } from './EmptyToFilled';
 export type { FeatureCardProps } from './FeatureCard';
 export { FeatureCard } from './FeatureCard';
 export { FrostedContainer } from './FrostedContainer';

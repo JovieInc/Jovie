@@ -14,6 +14,25 @@ NOW = 2_000_000_000.0
 
 
 class GateTest(unittest.TestCase):
+    def test_cancelled_checks_do_not_define_a_fix_red_fingerprint(self):
+        cancelled = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "CANCELLED"},
+            {"name": "ci-fast", "conclusion": "SUCCESS"},
+            {"name": "PR Ready", "conclusion": "CANCELLED"},
+        ]}
+        self.assertIsNone(gap.check_fingerprint(cancelled))
+        self.assertIsNone(gap.check_fingerprint({"statusCheckRollup": []}))
+        failed = {"statusCheckRollup": [{"name": "Fleet Rules Evidence", "conclusion": "FAILURE"}]}
+        timed_out = {"statusCheckRollup": [{"name": "ci-fast", "conclusion": "TIMED_OUT"}]}
+        self.assertNotEqual(gap.check_fingerprint(failed), gap.check_fingerprint(timed_out))
+        self.assertTrue(gap.check_fingerprint(failed).startswith("fix-red-"))
+        # A cancelled sibling does not change the class of the real failure.
+        with_cancel = {"statusCheckRollup": [
+            {"name": "Fleet Rules Evidence", "conclusion": "FAILURE"},
+            {"name": "ci-fast", "conclusion": "CANCELLED"},
+        ]}
+        self.assertEqual(gap.check_fingerprint(failed), gap.check_fingerprint(with_cancel))
+
     def test_fingerprint_ignores_ids_and_numbers_and_honours_explicit_labels(self):
         a = gap.fingerprint("fix: JOV-9001 sentry error 42 in profile page", [])
         b = gap.fingerprint("Fix Sentry error 77 in profile page (JOV-9100)", [])

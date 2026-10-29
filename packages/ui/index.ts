@@ -264,6 +264,13 @@ export {
 // Progress
 export type { ProgressBarProps } from './atoms/progress';
 export { ProgressBar } from './atoms/progress';
+// Progress Steps
+export type {
+  ProgressStep,
+  ProgressStepItemState,
+  ProgressStepsProps,
+} from './atoms/progress-steps';
+export { ProgressSteps } from './atoms/progress-steps';
 // Radio Group
 export { RadioGroup, RadioGroupItem } from './atoms/radio-group';
 // Searchable Submenu
