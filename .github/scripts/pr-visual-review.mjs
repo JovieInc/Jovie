@@ -311,7 +311,7 @@ export function routeChangedFiles(files) {
  * a successful run with fewer screenshots.
  *
  * @param {{ routes?: unknown, viewports?: unknown, captures?: unknown }} manifest
- * @param {{ routes?: string[], viewportNames?: string[] }} [expected]
+ * @param {{ routes?: string[], viewportNames?: string[], viewportNamesForRoute?: (route: string) => string[] }} [expected]
  */
 export function validateCaptureManifest(manifest, expected = {}) {
   const routes = expected.routes ?? manifest?.routes;

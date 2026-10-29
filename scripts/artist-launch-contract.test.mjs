@@ -163,6 +163,7 @@ test('checks fail on new, removed and renamed routes until the inventory is revi
     assert.throws(
       () => main(['--check'], root),
       error => {
+        assert.ok(error instanceof Error);
         assert.match(error.message, /inventory drift/);
         assert.match(error.message, /apps\/web\/app\/unreviewed\/page\.tsx/);
         assert.match(

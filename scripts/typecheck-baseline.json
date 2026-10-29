@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "tool": "scripts/typecheck-scripts.mjs",
-  "generatedAt": "2026-10-20T19:15:13.794Z",
-  "totalErrors": 101,
+  "generatedAt": "2026-10-29T12:07:41.664Z",
+  "totalErrors": 100,
   "files": {
     "apps/web/scripts/generate-brand-assets.ts": {
       "TS1470": 2,
@@ -93,7 +93,7 @@
       "TS2304": 1
     },
     "scripts/send-changelog-email.mjs": {
-      "TS2307": 2,
+      "TS2307": 1,
       "TS2339": 2
     },
     "scripts/ship-swarm/next-batch.mjs": {
