@@ -46,7 +46,7 @@ for (const source of stale) {
       if (!response || response.status() >= 400) {
         throw new Error(`HTTP ${response?.status()}`);
       }
-      await page.evaluate(() => document.fonts.ready);
+      await page.evaluate('document.fonts.ready');
       const dir = join(out, captureSlug(source));
       mkdirSync(dir, { recursive: true });
       await page.screenshot({ path: join(dir, `${name}.png`), fullPage: true });

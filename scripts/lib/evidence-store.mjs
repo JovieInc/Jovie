@@ -73,6 +73,10 @@ export function pointerPathFor(binaryPath) {
   return `${binaryPath}${EVIDENCE_POINTER_SUFFIX}`;
 }
 
+/**
+ * @param {{ bytes: Buffer, extension: string, viewport?: string | null,
+ *   capturedAt: string, label?: string }} input
+ */
 export function buildPointer({
   bytes,
   extension,

@@ -40,6 +40,10 @@ export const captureSlug = source =>
 export const capturable = row =>
   !row.route.includes('[') && !row.route.startsWith('/app');
 
+/**
+ * @param {{ root?: string, capturesDir?: string, now?: Date,
+ *   upload?: (pointer: any, file: string) => void, dryRun?: boolean }} [options]
+ */
 export function recertify({
   root = process.cwd(),
   capturesDir,

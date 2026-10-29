@@ -36,6 +36,10 @@ function pngSize(bytes) {
   return png ? `${bytes.readUInt32BE(16)}x${bytes.readUInt32BE(20)}` : null;
 }
 
+/**
+ * @param {string} file
+ * @param {{ viewport?: string, keep?: boolean, capturedAt: string, dryRun?: boolean }} options
+ */
 function putFile(file, { viewport, keep, capturedAt, dryRun }) {
   const bytes = readFileSync(file);
   const pointer = buildPointer({
