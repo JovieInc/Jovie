@@ -1200,7 +1200,7 @@ describe('merge_group workflow contract', () => {
     // merges the shard reports and runs the changed-line ratchet.
     const shard = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage-shard');
     const coverage = getJobBlock(CI_WORKFLOW, 'ci-exact-head-coverage');
-    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(20);
+    expect(NATIVE_QUEUE_POLICY.check_response_timeout_minutes).toBe(30);
     for (const job of [shard, coverage]) {
       const timeout = Number(job.match(/timeout-minutes:\s*(\d+)/)?.[1]);
       expect(timeout).toBe(EXACT_HEAD_COVERAGE_JOB_TIMEOUT_MINUTES);
@@ -3354,7 +3354,7 @@ ${selectedGateScript}`,
       /^\s*max_entries_to_merge:\s*(\d+)$/m
     )?.[1];
     expect(maxMembers).toBeTruthy();
-    // ALLGREEN layers each entry's synthetic head on the entry ahead, so one
+    // ALLGREEN and HEADGREEN both layer each entry's synthetic head on the entry ahead, so one
     // group carries exactly one member even when up to max_entries_to_merge
     // entries land in one push. The member bound stays at one (fail closed)
     // and never exceeds the checked-in merge batch.
