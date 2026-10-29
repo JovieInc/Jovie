@@ -105,11 +105,14 @@ def cmd_select(a) -> int:
         out_var("reason", "quota-low")
         return 0
     modes: dict[int, str] = {}
+    want = {m.strip() for m in a.modes.split(",")}
     if a.pr:
         for n in (int(x) for x in a.pr.split(",") if x.strip()):
             modes[n] = "red"
     else:
         for label, mode in ((LABEL, "red"), (CONFLICT_LABEL, "conflict")):
+            if mode not in want and "all" not in want:
+                continue
             for page in range(1, 6):
                 rows = gh_json(["api", f"repos/{REPO}/issues?labels={label}&state=open&per_page=100&page={page}"], priority="report")
                 for row in rows:
@@ -118,7 +121,7 @@ def cmd_select(a) -> int:
                         modes.setdefault(row["number"], mode)  # red wins: sync-main is part of its ladder
                 if len(rows) < 100:
                     break
-    if not a.pr:
+    if not a.pr and ("behind" in want or "all" in want):
         for n in behind_prs(a.behind_limit):
             modes.setdefault(n, "behind")
     modes = {n: m for n, m in modes.items() if n not in EXCLUDED}
@@ -699,7 +702,7 @@ def main() -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("select"); s.add_argument("--pr", default=""); s.add_argument("--limit", type=int, default=30)
     s.add_argument("--daily-cap-usd", type=float, default=5.0); s.add_argument("--attempt-cap-usd", type=float, default=0.10)
-    s.add_argument("--ledger-issue", default=""); s.add_argument("--behind-limit", type=int, default=10)
+    s.add_argument("--ledger-issue", default=""); s.add_argument("--behind-limit", type=int, default=10); s.add_argument("--modes", default="all")
     pr = sub.add_parser("prepare"); pr.add_argument("--pr", type=int, required=True); pr.add_argument("--plan", required=True); pr.add_argument("--log", required=True); pr.add_argument("--mode", default="red"); pr.add_argument("--agent", default="true")
     for name in ("fix", "guard"):
         x = sub.add_parser(name); x.add_argument("--plan", required=True); x.add_argument("--cwd", required=True)
