@@ -228,6 +228,21 @@ test('schema markers are required', () => {
 });
 
 test('bindMeshSenderKinds sets senderKind on the matching identity and leaves unknowns', () => {
+  // identity() infers a return without mesh, so checkJs rejects `.mesh`
+  // (TS2339). Include the fixture fields; a mesh-only target is a weak type.
+  /**
+   * @type {{
+   *   identities: Record<
+   *     string,
+   *     {
+   *       name: string,
+   *       kind: string,
+   *       owner: string,
+   *       mesh?: { registered?: boolean, senderKind?: string },
+   *     }
+   *   >,
+   * }}
+   */
   const registry = {
     identities: {
       zoe: identity({ mesh: { registered: false } }),
