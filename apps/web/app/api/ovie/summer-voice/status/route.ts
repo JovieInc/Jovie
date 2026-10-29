@@ -5,8 +5,6 @@ import {
 } from '@/lib/ovie/summer-founder-gate';
 import { isSummerVoiceConfigured } from '@/lib/ovie/summer-voice';
 
-export const dynamic = 'force-dynamic';
-
 /** Voice UI flag: the control stays hidden until the agent is configured. */
 export async function GET(): Promise<NextResponse> {
   const gate = await requireFounderPrincipal();

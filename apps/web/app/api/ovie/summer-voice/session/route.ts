@@ -5,8 +5,6 @@ import {
 } from '@/lib/ovie/summer-founder-gate';
 import { createSummerVoiceSession } from '@/lib/ovie/summer-voice';
 
-export const dynamic = 'force-dynamic';
-
 /** Mints a short-lived signed provider URL; the provider API key never reaches the browser. */
 export async function POST(): Promise<NextResponse> {
   const gate = await requireFounderPrincipal();

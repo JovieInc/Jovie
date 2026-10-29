@@ -6,7 +6,6 @@ import {
 } from '@/lib/ovie/summer-founder-gate';
 import { askSummerForVoice } from '@/lib/ovie/summer-voice';
 
-export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const bodySchema = z
