@@ -6,7 +6,8 @@ import {
   buildOvieAsks,
   buildUpcomingDefaults,
 } from '@/lib/ovie/home/shipping-home';
-import { INTERACTION_CASE_CONTRACT, type OvieInbox } from '@/lib/ovie/inbox';
+import type { OvieInbox } from '@/lib/ovie/inbox';
+import { INTERACTION_CASE_CONTRACT } from '@/lib/ovie/interaction-case';
 import { unknownProjection } from '@/lib/ovie/shipping-state';
 import { parseShippingCockpitProjection } from '@/lib/ovie/shipping-state/client';
 import {

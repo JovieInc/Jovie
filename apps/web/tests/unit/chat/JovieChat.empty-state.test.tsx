@@ -1030,7 +1030,7 @@ describe('JovieChat living Home canvas (Ovie): HUD first, conversation replaces 
 
     it('Esc on an empty composer returns to the HUD', () => {
       startThread();
-      fireEvent.keyDown(globalThis, { key: 'Escape' });
+      fireEvent.keyDown(document, { key: 'Escape' });
       expect(surface()).toBe('home');
     });
 
@@ -1038,7 +1038,7 @@ describe('JovieChat living Home canvas (Ovie): HUD first, conversation replaces 
       const { rerender } = startThread();
       mockChatState.input = 'half a thought';
       rerender(view());
-      fireEvent.keyDown(globalThis, { key: 'Escape' });
+      fireEvent.keyDown(document, { key: 'Escape' });
       expect(surface()).toBe('thread');
     });
 
@@ -1046,7 +1046,7 @@ describe('JovieChat living Home canvas (Ovie): HUD first, conversation replaces 
       const { rerender } = startThread();
       Object.assign(mockChatState, { isSubmitting: true });
       rerender(view());
-      fireEvent.keyDown(globalThis, { key: 'Escape' });
+      fireEvent.keyDown(document, { key: 'Escape' });
       expect(surface()).toBe('thread');
     });
   });
