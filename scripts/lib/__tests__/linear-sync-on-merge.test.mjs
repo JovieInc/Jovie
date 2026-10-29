@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import {
+  chmodSync,
   copyFileSync,
   existsSync,
   mkdirSync,
@@ -12,7 +13,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { runInNewContext } from 'node:vm';
+import { load as loadYaml } from 'js-yaml';
 import { describe, expect, it } from 'vitest';
+import { evaluateGateWeakening } from '../../invariants/gate-weakening-detector.mjs';
 import { formatDeprecationObservation } from '../deprecation-observation.mjs';
 import {
   COMMISSIONING_PARENT_ALLOWLIST,
@@ -2406,6 +2409,8 @@ describe('Linear Sync workflow closes its own loops', () => {
     ),
     'utf8'
   );
+  const job = loadYaml(workflow).jobs.sync_done;
+  const quotaHold = job.steps.find(step => step.id === 'quota_hold');
 
   it('matches the Production Controller by path, not by its run-name title', () => {
     const step = workflow
@@ -2442,11 +2447,102 @@ describe('Linear Sync workflow closes its own loops', () => {
     expect(workflow).toContain(
       "steps.evaluate_retry.outputs.quota_deferred == 'true'"
     );
-    expect(workflow).toMatch(/GH_API_HOLD_BUDGET_SECONDS: '600'/);
     expect(workflow).toContain('.github/scripts/gh-api-hold.sh\n');
-    const timeout = Number(/timeout-minutes: (\d+)/.exec(workflow)[1]);
-    expect(timeout).toBeGreaterThanOrEqual(20);
   });
+
+  it('keeps both screen-audit attempts and the lifecycle hold inside the original job budget', () => {
+    const timeout = job['timeout-minutes'];
+    const holds = job.steps
+      .filter(step => step.env?.GH_API_HOLD_BUDGET_SECONDS)
+      .map(step => Number(step.env.GH_API_HOLD_BUDGET_SECONDS));
+    expect(holds).toHaveLength(2);
+    // Two screen-audit attempts plus one lifecycle hold must leave at least
+    // half the original job window for checkout, evaluation and cache saves.
+    expect(holds.every(seconds => seconds > 0)).toBe(true);
+    expect(2 * holds[0] + holds[1]).toBeLessThanOrEqual(timeout * 30);
+    expect(
+      evaluateGateWeakening([
+        {
+          path: '.github/workflows/linear-sync-on-merge.yml',
+          before: workflow.replace(
+            /timeout-minutes: \d+/,
+            'timeout-minutes: 15'
+          ),
+          after: workflow,
+        },
+      ])
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['within budget', 10, 0, 2],
+    ['outside budget', 3600, 1, 1],
+  ])(
+    'runs the workflow quota hold %s without passing an unevaluated sync',
+    (_, resetIn, status, attempts) => {
+      const dir = mkdtempSync(join(tmpdir(), 'linear-sync-hold-'));
+      try {
+        const gh = join(dir, 'gh');
+        writeFileSync(
+          gh,
+          `#!/usr/bin/env bash
+if [ "$2" = rate_limit ]; then echo "$FIXTURE_RESET"; exit 0; fi
+count=0
+[ ! -f "$FIXTURE_DIR/count" ] || read -r count < "$FIXTURE_DIR/count"
+count=$((count + 1))
+echo "$count" > "$FIXTURE_DIR/count"
+if [ "$count" -eq 1 ]; then
+  echo 'gh: API rate limit exceeded for installation ID 1. (HTTP 403)' >&2
+  exit 1
+fi
+`
+        );
+        const sleep = join(dir, 'sleep');
+        writeFileSync(
+          sleep,
+          '#!/usr/bin/env bash\necho "$1" > "$FIXTURE_DIR/sleep.txt"\n'
+        );
+        chmodSync(gh, 0o755);
+        chmodSync(sleep, 0o755);
+        const result = spawnSync(
+          'bash',
+          ['-euo', 'pipefail', '-c', quotaHold.run],
+          {
+            cwd: resolve(import.meta.dirname, '../../..'),
+            encoding: 'utf8',
+            timeout: 5000,
+            env: {
+              ...process.env,
+              ...quotaHold.env,
+              GH_TOKEN: 'fixture',
+              REPO: 'JovieInc/Jovie',
+              GH_API_HOLD_BIN: gh,
+              GH_API_HOLD_TOKEN_CAP_SECONDS: '3900',
+              GITHUB_STEP_SUMMARY: join(dir, 'summary'),
+              FIXTURE_DIR: dir,
+              FIXTURE_RESET: String(Math.floor(Date.now() / 1000) + resetIn),
+              PATH: `${dir}:${process.env.PATH}`,
+            },
+          }
+        );
+        expect(result.status, result.stderr).toBe(status);
+        expect(Number(readFileSync(join(dir, 'count'), 'utf8'))).toBe(attempts);
+        expect(existsSync(join(dir, 'sleep.txt'))).toBe(status === 0);
+        if (status === 0) {
+          expect(
+            Number(readFileSync(join(dir, 'sleep.txt'), 'utf8'))
+          ).toBeLessThanOrEqual(
+            Number(quotaHold.env.GH_API_HOLD_BUDGET_SECONDS)
+          );
+          expect(readFileSync(join(dir, 'summary'), 'utf8')).toContain(
+            'linear-sync-quota-hold'
+          );
+        }
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    }
+  );
 
   it('flags a soft-failed quota 403 in the step output and summary only', () => {
     const dir = mkdtempSync(join(tmpdir(), 'quota-deferral-'));

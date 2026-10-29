@@ -37,8 +37,8 @@ jobs:
     name: Project merge and deploy evidence onto Linear
     if: github.event_name != 'pull_request' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
-    # +5 min over the original 15 for the bounded GitHub quota hold below.
-    timeout-minutes: 20
+    # Quota holds share this existing window with evaluation and cache saves.
+    timeout-minutes: 15
     # Full sweeps coalesce globally; receipt wakes coalesce per issue so a
     # pending sweep or another issue cannot replace their only causal wake.
     # Merge events retain their per-PR group. Every write re-reads the full
@@ -152,13 +152,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
           REPO: ${{ github.repository }}
-          GH_API_HOLD_BUDGET_SECONDS: '300'
+          GH_API_HOLD_BUDGET_SECONDS: '60'
           GH_API_HOLD_LABEL: screen-audit-quota-hold
         run: |
           set -uo pipefail
           # The first live backfill (2026-10-24 23:45Z) died on the shared GITHUB_TOKEN
           # quota ("github exhausted: GET .../compare"). Probe through the hold helper
-          # first (sleeps to the reset when it is within 300s), and attempt twice.
+          # first (sleeps to the reset when it is within 60s), and attempt twice.
           attempt() {
             set -e
             sha="$(curl -fsS --max-time 10 https://jov.ie/api/health/build-info | jq -r '.commitSha // empty')"
@@ -206,14 +206,14 @@ jobs:
       # An installation-quota 403 is not a verdict, so the evaluator exits 0 and
       # flags `quota_deferred`. That used to end as a green run that did nothing
       # (2026-10-24: 22:43Z and 23:01Z). Hold until the quota resets (bounded to
-      # 10 minutes; a later reset fails this step and the job visibly), then run
+      # 5 minutes; a later reset fails this step and the job visibly), then run
       # the same evaluation once more; a second deferral fails the job.
       - name: Hold for the GitHub quota reset
         id: quota_hold
         if: ${{ steps.evaluate.outputs.quota_deferred == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          GH_API_HOLD_BUDGET_SECONDS: '600'
+          GH_API_HOLD_BUDGET_SECONDS: '300'
           GH_API_HOLD_LABEL: linear-sync-quota-hold
           REPO: ${{ github.repository }}
         run: .github/scripts/gh-api-hold.sh api "repos/$REPO/pulls?per_page=1&state=open" --silent
