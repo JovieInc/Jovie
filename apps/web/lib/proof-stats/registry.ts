@@ -81,6 +81,8 @@ export const proofStatDefinitionSchema = z
     /** Shown instead of the sentence when the stat cannot render. null: hide. */
     fallback: z.string().min(3).max(140).nullable(),
     methodology: z.string().startsWith('/').nullable(),
+    /** Plain-language method for the public methodology page. */
+    publicMethod: z.string().min(20).max(400).optional(),
     milestones: z.boolean(),
     marketing: z
       .object({
@@ -94,6 +96,10 @@ export const proofStatDefinitionSchema = z
   .refine(s => s.visibility === 'internal' || s.methodology, {
     path: ['methodology'],
     message: 'a public stat needs a methodology link',
+  })
+  .refine(s => s.visibility === 'internal' || s.publicMethod, {
+    path: ['publicMethod'],
+    message: 'a public stat needs a plain-language method',
   })
   .refine(
     s =>

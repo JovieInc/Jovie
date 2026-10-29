@@ -288,6 +288,7 @@
         "apps/web/app/(marketing)/compare/[slug]/page.tsx",
         "apps/web/app/(marketing)/compare/page.tsx",
         "apps/web/app/(marketing)/developers/agents/page.tsx",
+        "apps/web/app/(marketing)/proof/methodology/page.tsx",
         "apps/web/app/(marketing)/developers/page.tsx",
         "apps/web/app/(marketing)/download/page.tsx",
         "apps/web/app/(marketing)/engineering/[slug]/page.tsx",
@@ -707,6 +708,13 @@
       "to": "holdout",
       "at": "2026-10-29T09:55:00Z",
       "evidence": "PR #23608 introduces the generated agent connector docs page (JOV-9762); source registration only, not rendered certification."
+    },
+    {
+      "source": "apps/web/app/(marketing)/proof/methodology/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T18:00:00Z",
+      "evidence": "Proof-stat methodology page generated from the stat registry; source registration only, not rendered certification."
     }
   ]
 }

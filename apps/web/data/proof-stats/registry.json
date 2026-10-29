@@ -31,6 +31,7 @@
       },
       "fallback": "Built for artists and the teams behind them",
       "methodology": "/proof/methodology#accounts_total",
+      "publicMethod": "Accounts people created on Jovie. Team, test and automated accounts are excluded, and deleted accounts are not counted.",
       "milestones": true,
       "marketing": {
         "value": 5,
@@ -66,6 +67,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#artists_claimed",
+      "publicMethod": "Artist profiles that an artist or their team has claimed and runs. Profiles we prepared that nobody has claimed are not counted, nor are team or test profiles.",
       "milestones": true,
       "marketing": {
         "value": 4,
@@ -101,6 +103,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#smart_links_total",
+      "publicMethod": "Release and track links created on Jovie profiles, counted once per link. Links on team or test profiles are excluded.",
       "milestones": true,
       "marketing": {
         "value": 3,
@@ -136,6 +139,7 @@
       },
       "fallback": null,
       "methodology": "/proof/methodology#release_alerts_delivered",
+      "publicMethod": "Release alerts sent to listeners who asked to hear about a release. Alerts from team or test profiles are excluded.",
       "milestones": true,
       "marketing": {
         "value": 4,
@@ -163,10 +167,14 @@
       "ceiling": 200,
       "display": {
         "sentence": "Profiles start responding in under {value} ms",
-        "rounding": { "mode": "ceil", "step": 10 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 10
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_ttfb_ms",
+      "publicMethod": "Time until a public Jovie profile starts responding, the median of repeated page loads in our weekly benchmark.",
       "milestones": false,
       "marketing": {
         "value": 3,
@@ -193,10 +201,14 @@
       "threshold": 80,
       "display": {
         "sentence": "Scores {value}/100 for AI-agent readiness",
-        "rounding": { "mode": "floor", "step": 1 }
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_agent_score",
+      "publicMethod": "A 0 to 100 score for how well AI assistants can read a public Jovie profile: crawler access, readable HTML, structured data and machine interfaces. Measured weekly.",
       "milestones": false,
       "marketing": {
         "value": 4,
@@ -224,10 +236,14 @@
       "threshold": null,
       "display": {
         "sentence": "Profiles load faster than {value} measured link-in-bio platforms",
-        "rounding": { "mode": "ceil", "step": 100 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 100
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_lcp_rank",
+      "publicMethod": "Largest contentful paint of a public profile on each platform, mobile, median of repeated loads. Shown only when Jovie is faster than every platform we could measure, by at least 10 percent.",
       "milestones": false,
       "marketing": {
         "value": 5,
@@ -255,10 +271,14 @@
       "threshold": null,
       "display": {
         "sentence": "Lighter than {value} measured link-in-bio platforms",
-        "rounding": { "mode": "ceil", "step": 10000 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 10000
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#profile_js_bytes_rank",
+      "publicMethod": "Total bytes downloaded to show a public profile on each platform, median of repeated loads. Shown only when Jovie is lighter than every platform we could measure, by at least 10 percent.",
       "milestones": false,
       "marketing": {
         "value": 3,
@@ -285,10 +305,14 @@
       "threshold": 1,
       "display": {
         "sentence": "Passes every agent-path certification check",
-        "rounding": { "mode": "floor", "step": 0.01 }
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#agent_path_cert",
+      "publicMethod": "The checks an AI agent runs to create, claim and update a Jovie profile end to end. Shown only when every check passes.",
       "milestones": false,
       "marketing": {
         "value": 4,
@@ -315,7 +339,10 @@
       "threshold": null,
       "display": {
         "sentence": "{value} of marketplace checks pass",
-        "rounding": { "mode": "floor", "step": 0.01 }
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -346,10 +373,13 @@
       "ceiling": 0,
       "display": {
         "sentence": "{value} open critical vulnerabilities",
-        "rounding": { "mode": "exact" }
+        "rounding": {
+          "mode": "exact"
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#security_open_critical",
+      "publicMethod": "Open security findings rated critical across dependency, code and secret scanning. Shown only when the count is zero.",
       "milestones": false,
       "marketing": {
         "value": 3,
@@ -377,10 +407,14 @@
       "ceiling": 72,
       "display": {
         "sentence": "High-severity fixes ship in under {value} hours",
-        "rounding": { "mode": "ceil", "step": 1 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": "/proof/methodology#security_patch_hours_p50",
+      "publicMethod": "Median hours from a high or critical security finding to its fix reaching the main branch, over the last 90 days.",
       "milestones": false,
       "marketing": {
         "value": 3,
@@ -407,7 +441,9 @@
       "threshold": null,
       "display": {
         "sentence": "{value} open Dependabot alerts",
-        "rounding": { "mode": "exact" }
+        "rounding": {
+          "mode": "exact"
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -437,7 +473,9 @@
       "threshold": null,
       "display": {
         "sentence": "Secret scan clean: {value}",
-        "rounding": { "mode": "exact" }
+        "rounding": {
+          "mode": "exact"
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -467,7 +505,10 @@
       "threshold": null,
       "display": {
         "sentence": "{value} changes shipped a day",
-        "rounding": { "mode": "floor", "step": 1 }
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -497,7 +538,10 @@
       "threshold": null,
       "display": {
         "sentence": "Fixes reach production in under {value} minutes",
-        "rounding": { "mode": "ceil", "step": 5 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 5
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -527,7 +571,10 @@
       "threshold": null,
       "display": {
         "sentence": "Incidents resolved in {value} minutes on average",
-        "rounding": { "mode": "ceil", "step": 5 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 5
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -557,7 +604,10 @@
       "threshold": null,
       "display": {
         "sentence": "{value} production releases a day",
-        "rounding": { "mode": "floor", "step": 1 }
+        "rounding": {
+          "mode": "floor",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -587,7 +637,10 @@
       "threshold": null,
       "display": {
         "sentence": "CI waits {value} minutes at the median",
-        "rounding": { "mode": "ceil", "step": 1 }
+        "rounding": {
+          "mode": "ceil",
+          "step": 1
+        }
       },
       "fallback": null,
       "methodology": null,
@@ -617,7 +670,11 @@
       "threshold": null,
       "display": {
         "sentence": "{value} of changes written by agents",
-        "rounding": { "mode": "floor", "step": 0.01, "percent": true }
+        "rounding": {
+          "mode": "floor",
+          "step": 0.01,
+          "percent": true
+        }
       },
       "fallback": null,
       "methodology": null,

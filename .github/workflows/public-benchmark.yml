@@ -72,6 +72,24 @@ jobs:
           cp "$RUNNER_TEMP"/public-benchmark/receipt-*[0-9].json public-benchmark-receipt/
           jq '.gate' "$RUNNER_TEMP/public-benchmark-gate.json" > public-benchmark-receipt/gate.json
           exit "$status"
+      - name: Publish proof-stat observations
+        # Feeds apps/web/data/proof-stats (profile speed, agent score, and the
+        # comparative ranks once Jovie beats every measured platform). Writes
+        # proof-ratchets.json (anonymized) for Summer. Without the secret it
+        # computes and prints only.
+        if: always()
+        env:
+          CONTENT_PUBLISH_SECRET: ${{ secrets.CONTENT_PUBLISH_SECRET }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          receipt="$(find public-benchmark-receipt -maxdepth 1 -name 'receipt-*[0-9].json' 2>/dev/null | head -1)"
+          [[ -n "$receipt" && -f public-benchmark-receipt/gate.json ]] || { echo "no receipt; nothing to publish"; exit 0; }
+          private="$(find "$RUNNER_TEMP/public-benchmark" -maxdepth 1 -name 'receipt-*.private.json' 2>/dev/null | head -1)"
+          node scripts/public-benchmark/proof-observations.mjs \
+            --gate public-benchmark-receipt/gate.json --receipt "$receipt" \
+            --run-url "$RUN_URL" ${private:+--labels "$private"} \
+            --out public-benchmark-receipt --post
       - name: Upload anonymized receipt
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
