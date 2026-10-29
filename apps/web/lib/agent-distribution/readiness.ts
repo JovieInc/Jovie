@@ -1,7 +1,7 @@
 /**
  * "Ready to submit" gate for marketplace listing packages (JOV-9759).
  *
- * A package is ready only when all four receipts hold:
+ * A package is ready only when all six gates hold:
  *   agentPathCert        harness receipt (agent-path-cert.json): ok=true, base=https://jov.ie,
  *                        younger than 24h, toolsListHash equals this package's tools/list hash.
  *   trustSurfaceVisual   trust-surface-visual.json (schema trust-surface-visual/v1): zero severe findings at
@@ -16,10 +16,17 @@
  *                        title, body, recommendation, defaultIfSilent, defaultDecision: "approve", decideBy }.
  *                        The card id is sc_ + the first 32 hex of sha256("summer-card:" + idempotencyKey).
  *
+ *   connectorDocs        the /developers/agents page exists, cannot redirect or 404, renders from the tools/list
+ *                        snapshot and its tool list hash equals the package hash. No receipt file.
+ *   listingIcons         icon source hashes and the 48/64/512/1024 sizes are recorded in the manifest; at submit
+ *                        time every rendered PNG must exist at its exact size with a sha256. No receipt file.
+ *
  * Time checks (24h freshness, a passed deadline) need a clock. The committed readiness.json is evaluated with
  * no clock so it stays reproducible; `agent-distribution:ready` re-evaluates with the real time.
  */
-import type { Listing } from './listing';
+import { hashTools } from './hash';
+import { ICON_SIZES, type IconSourceInfo, type RenderedIcon } from './icons';
+import { type Listing, SITE } from './listing';
 
 export const PLATFORMS = ['muse', 'grok', 'chatgpt', 'claude'] as const;
 export type Platform = (typeof PLATFORMS)[number];
@@ -28,6 +35,8 @@ export const GATES = [
   'trustSurfaceVisual',
   'legalConsistency',
   'homepageTasteApproval',
+  'connectorDocs',
+  'listingIcons',
 ] as const;
 export type GateName = (typeof GATES)[number];
 
@@ -56,6 +65,13 @@ export interface ReceiptSet {
   readonly agentPathCert?: unknown;
   readonly trustSurfaceVisual?: unknown;
   readonly homepageTasteApproval?: unknown;
+}
+
+export interface DocsInputs {
+  readonly pageSource: string | null;
+  readonly routesSource: string;
+  /** Tools array of the generated tools-list snapshot the page renders from. */
+  readonly snapshotTools: readonly unknown[] | null;
 }
 
 export interface LegalInputs {
@@ -237,6 +253,56 @@ export function checkLegalConsistency(
   return result('legal-source-check', reasons);
 }
 
+/** The docs page exists, is not a redirect or 404, renders from the registry snapshot and matches the package hash. */
+export function checkConnectorDocs(
+  docs: DocsInputs | null,
+  listing: Listing,
+  toolsListHash: string
+): GateResult {
+  if (!docs || docs.pageSource === null) return missing();
+  const reasons: string[] = [];
+  if (/\b(notFound|redirect|permanentRedirect)\(/u.test(docs.pageSource))
+    reasons.push('the docs page can return a redirect or a 404');
+  if (!docs.pageSource.includes('tools-list.snapshot.json'))
+    reasons.push('the docs page does not render from the tools/list snapshot');
+  const route = new RegExp(`DEVELOPERS_AGENTS:\\s*'${listing.docsPath}'`, 'u');
+  if (!route.test(docs.routesSource))
+    reasons.push(`no route constant for ${listing.docsPath}`);
+  if (listing.docsUrl !== `${SITE}${listing.docsPath}`)
+    reasons.push('listing docsUrl does not point at the docs page');
+  if (!docs.snapshotTools) reasons.push('no tools/list snapshot to render');
+  else if (hashTools(docs.snapshotTools) !== toolsListHash)
+    reasons.push('rendered tool list hash does not match this package');
+  return result(`docs:${listing.docsPath}`, reasons);
+}
+
+const HEX64 = /^[0-9a-f]{64}$/u;
+
+/** Icons come from the canonical mark. With `rendered` (submit time) every PNG must exist at its exact size. */
+export function checkListingIcons(
+  icons: IconSourceInfo | null,
+  rendered: readonly RenderedIcon[] | null | undefined
+): GateResult {
+  if (!icons) return missing();
+  const reasons: string[] = [];
+  if (!HEX64.test(icons.markSha256) || !HEX64.test(icons.composedSha256))
+    reasons.push('icon source hashes are not recorded');
+  for (const size of ICON_SIZES)
+    if (!icons.sizes.includes(size))
+      reasons.push(`size ${size} is not declared`);
+  if (rendered !== undefined) {
+    for (const size of ICON_SIZES) {
+      const icon = rendered?.find(r => r.size === size);
+      if (!icon) reasons.push(`no rendered ${size}px icon`);
+      else if (icon.width !== size || icon.height !== size)
+        reasons.push(`${size}px icon is ${icon.width}x${icon.height}`);
+      else if (!HEX64.test(icon.sha256))
+        reasons.push(`${size}px icon has no sha256`);
+    }
+  }
+  return result(`icons:${icons.composedSha256.slice(0, 12)}`, reasons);
+}
+
 export interface PackageReadiness {
   readonly ready: boolean;
   readonly gates: Record<GateName, GateResult>;
@@ -246,6 +312,9 @@ export interface PackageReadiness {
 export function evaluatePackage(input: {
   receipts: ReceiptSet;
   legal: LegalInputs | null;
+  docs: DocsInputs | null;
+  icons: IconSourceInfo | null;
+  renderedIcons?: readonly RenderedIcon[] | null;
   listing: Listing;
   toolsListHash: string;
   now: Date | null;
@@ -264,6 +333,12 @@ export function evaluatePackage(input: {
       input.receipts.homepageTasteApproval,
       input.now
     ),
+    connectorDocs: checkConnectorDocs(
+      input.docs,
+      input.listing,
+      input.toolsListHash
+    ),
+    listingIcons: checkListingIcons(input.icons, input.renderedIcons),
   };
   const failing = GATES.filter(g => gates[g].status !== 'pass');
   return { ready: failing.length === 0, gates, missingReceipts: failing };
@@ -272,6 +347,10 @@ export function evaluatePackage(input: {
 export type ReadinessInputs = {
   readonly receipts: Record<Platform, ReceiptSet>;
   readonly legal: LegalInputs | null;
+  readonly docs: DocsInputs | null;
+  readonly icons: IconSourceInfo | null;
+  /** Set at submit time after rendering; leave undefined for the reproducible committed evaluation. */
+  readonly renderedIcons?: readonly RenderedIcon[] | null;
 };
 
 export function evaluateAll(
@@ -286,6 +365,9 @@ export function evaluateAll(
       evaluatePackage({
         receipts: inputs.receipts[p],
         legal: inputs.legal,
+        docs: inputs.docs,
+        icons: inputs.icons,
+        renderedIcons: inputs.renderedIcons,
         listing,
         toolsListHash,
         now,

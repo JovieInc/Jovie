@@ -2,9 +2,12 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { hashTools } from './hash';
+import type { IconSourceInfo, RenderedIcon } from './icons';
 import { LISTING } from './listing';
 import {
   CERT_MAX_AGE_MS,
+  type DocsInputs,
   evaluatePackage,
   type LegalInputs,
   namedAsCaller,
@@ -13,7 +16,10 @@ import {
 } from './readiness';
 import { readReadinessInputs } from './readiness-io';
 
-const HASH = 'a'.repeat(64);
+const SNAPSHOT_TOOLS = [
+  { name: 'artist.search_or_import', title: 'Find artist' },
+];
+const HASH = hashTools(SNAPSHOT_TOOLS);
 const NOW = new Date('2026-10-29T12:00:00Z');
 const iso = (offsetMs: number) =>
   new Date(NOW.getTime() + offsetMs).toISOString();
@@ -61,14 +67,45 @@ const legalOk: LegalInputs = {
   termsText: '',
 };
 
+const docsOk: DocsInputs = {
+  pageSource:
+    "import snapshot from '@/lib/agent-distribution/generated/tools-list.snapshot.json';",
+  routesSource: "DEVELOPERS_AGENTS: '/developers/agents',",
+  snapshotTools: SNAPSHOT_TOOLS,
+};
+const iconsOk: IconSourceInfo = {
+  markPath: 'packages/brand/svg/jovie-mark-white.svg',
+  markSha256: 'c'.repeat(64),
+  backgroundToken: 'surface.canvas',
+  background: '#030406',
+  composedSha256: 'd'.repeat(64),
+  sizes: [48, 64, 512, 1024],
+};
+const renderedOk: RenderedIcon[] = [48, 64, 512, 1024].map(size => ({
+  size,
+  file: `icon-${size}.png`,
+  width: size,
+  height: size,
+  sha256: 'e'.repeat(64),
+}));
+
+interface Extra {
+  docs?: DocsInputs | null;
+  icons?: IconSourceInfo | null;
+  renderedIcons?: RenderedIcon[] | null;
+}
 const evaluate = (
   receipts: Parameters<typeof evaluatePackage>[0]['receipts'],
   legal: LegalInputs | null = legalOk,
-  now: Date | null = NOW
+  now: Date | null = NOW,
+  extra: Extra = {}
 ) =>
   evaluatePackage({
     receipts,
     legal,
+    docs: extra.docs === undefined ? docsOk : extra.docs,
+    icons: extra.icons === undefined ? iconsOk : extra.icons,
+    renderedIcons: extra.renderedIcons,
     listing: LISTING,
     toolsListHash: HASH,
     now,
@@ -103,6 +140,9 @@ describe('listing readiness gate', () => {
       'legalConsistency',
       'homepageTasteApproval',
     ]);
+    const bare = evaluate({}, null, NOW, { docs: null, icons: null });
+    expect(bare.gates.connectorDocs.status).toBe('missing');
+    expect(bare.gates.listingIcons.status).toBe('missing');
     expect(out.gates.agentPathCert.status).toBe('missing');
   });
 
@@ -195,6 +235,64 @@ describe('listing readiness gate', () => {
     expect(reasons).toContain('7-day draft expiry');
     expect(reasons).toContain('named assistant as a connector caller: ChatGPT');
     expect(reasons).toContain('named assistant as a connector caller: Claude');
+  });
+
+  it('fails the docs gate for a redirecting page, a hash mismatch or a wrong docs URL', () => {
+    const gate = (docs: DocsInputs) =>
+      evaluate(allPass, legalOk, NOW, { docs }).gates.connectorDocs;
+    expect(gate(docsOk).status).toBe('pass');
+    expect(
+      gate({
+        ...docsOk,
+        pageSource: `${docsOk.pageSource} notFound();`,
+      }).reasons.join()
+    ).toContain('404');
+    expect(
+      gate({
+        ...docsOk,
+        pageSource: 'export default () => null',
+      }).reasons.join()
+    ).toContain('snapshot');
+    expect(gate({ ...docsOk, routesSource: '' }).reasons.join()).toContain(
+      'route constant'
+    );
+    expect(
+      gate({ ...docsOk, snapshotTools: [{ name: 'other' }] }).reasons.join()
+    ).toContain('hash');
+    expect(gate({ ...docsOk, snapshotTools: null }).status).toBe('fail');
+    expect(gate({ ...docsOk, pageSource: null }).status).toBe('missing');
+  });
+
+  it('fails the icons gate for undeclared sizes and wrong or missing renders', () => {
+    const gate = (
+      icons: IconSourceInfo,
+      renderedIcons?: RenderedIcon[] | null
+    ) =>
+      evaluate(allPass, legalOk, NOW, { icons, renderedIcons }).gates
+        .listingIcons;
+    expect(gate(iconsOk).status).toBe('pass');
+    expect(gate(iconsOk, renderedOk).status).toBe('pass');
+    expect(gate({ ...iconsOk, sizes: [48, 64] }).reasons).toEqual([
+      'size 512 is not declared',
+      'size 1024 is not declared',
+    ]);
+    expect(gate({ ...iconsOk, markSha256: 'x' }).reasons.join()).toContain(
+      'hashes'
+    );
+    const wrong = renderedOk.map(r =>
+      r.size === 64 ? { ...r, width: 60 } : r
+    );
+    expect(gate(iconsOk, wrong).reasons).toEqual(['64px icon is 60x64']);
+    expect(gate(iconsOk, renderedOk.slice(1)).reasons).toEqual([
+      'no rendered 48px icon',
+    ]);
+    expect(gate(iconsOk, null).status).toBe('fail');
+  });
+
+  it('is ready only when all six gates pass', () => {
+    const out = evaluate(allPass, legalOk, NOW, { renderedIcons: renderedOk });
+    expect(out.ready).toBe(true);
+    expect(Object.keys(out.gates)).toHaveLength(6);
   });
 
   it('reads receipts and legal sources from disk', async () => {

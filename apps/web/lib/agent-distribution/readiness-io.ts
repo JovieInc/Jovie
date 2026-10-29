@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { loadIconSource } from './icons';
 import {
+  type DocsInputs,
   type LegalInputs,
   PLATFORMS,
   type Platform,
@@ -66,12 +68,30 @@ export async function readLegalInputs(webDir: string): Promise<LegalInputs> {
   };
 }
 
+export async function readDocsInputs(webDir: string): Promise<DocsInputs> {
+  const [pageSource, routesSource, snapshot] = await Promise.all([
+    readText(join(webDir, 'app/(marketing)/developers/agents/page.tsx')),
+    readText(join(webDir, 'constants/routes.ts')),
+    readJson(
+      join(webDir, 'lib/agent-distribution/generated/tools-list.snapshot.json')
+    ),
+  ]);
+  const tools = (snapshot as { tools?: unknown } | undefined)?.tools;
+  return {
+    pageSource,
+    routesSource: routesSource ?? '',
+    snapshotTools: Array.isArray(tools) ? tools : null,
+  };
+}
+
 export async function readReadinessInputs(
   webDir: string
 ): Promise<ReadinessInputs> {
-  const [receipts, legal] = await Promise.all([
+  const [receipts, legal, docs, icons] = await Promise.all([
     readReceipts(join(webDir, 'lib/agent-distribution/receipts')),
     readLegalInputs(webDir),
+    readDocsInputs(webDir),
+    loadIconSource(resolve(webDir, '../..')),
   ]);
-  return { receipts, legal };
+  return { receipts, legal, docs, icons: icons?.info ?? null };
 }

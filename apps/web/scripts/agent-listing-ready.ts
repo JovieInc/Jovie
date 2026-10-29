@@ -7,6 +7,7 @@ import { readFile } from 'node:fs/promises';
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadIconSource, renderIcons } from '@/lib/agent-distribution/icons';
 import { LISTING } from '@/lib/agent-distribution/listing';
 import { evaluateAll, PLATFORMS } from '@/lib/agent-distribution/readiness';
 import { readReadinessInputs } from '@/lib/agent-distribution/readiness-io';
@@ -22,8 +23,16 @@ async function main() {
       'utf8'
     )
   );
+  const inputs = await readReadinessInputs(WEB);
+  const iconSource = await loadIconSource(resolve(WEB, '../..'));
+  const renderedIcons = iconSource
+    ? await renderIcons(
+        iconSource,
+        resolve(WEB, '.agent-distribution-out/icons')
+      )
+    : null;
   const all = evaluateAll(
-    await readReadinessInputs(WEB),
+    { ...inputs, renderedIcons },
     LISTING,
     snapshot.toolsListHash,
     new Date()
