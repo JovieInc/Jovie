@@ -1057,6 +1057,7 @@ export const SCRIPT_CONTRACT_VITEST_TESTS = Object.freeze([
   'scripts/lib/__tests__/run-actionlint.test.mjs',
   'scripts/lib/__tests__/guardrail-inputs.test.mjs',
   'scripts/lib/__tests__/vitest-orphan-inventory.test.mjs',
+  'scripts/lib/__tests__/waste-sweep.test.mjs',
   'scripts/lib/__tests__/gate-config-consistency.test.mjs',
   'scripts/lib/__tests__/claim-dogfood-report.test.mjs',
   'scripts/lib/__tests__/claim-test-environment.test.mjs',
