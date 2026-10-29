@@ -11,7 +11,37 @@ vi.mock('@/hooks/useClerkSafe', () => ({
   useAuthSafe: () => ({ signOut: vi.fn() }),
 }));
 vi.mock('@/lib/analytics', () => ({ track: vi.fn() }));
-vi.mock('@/lib/queries', () => ({ useCheckoutMutation: () => checkout }));
+const priceLock = vi.hoisted(() => ({
+  data: null as null | {
+    locked: true;
+    priceVersionId: string;
+    lockedAt: string;
+    month: {
+      amountCents: number;
+      currency: string;
+      interval: 'month';
+      priceId: string;
+    } | null;
+    year: null;
+  },
+}));
+vi.mock('@/lib/queries', () => ({
+  useCheckoutMutation: () => checkout,
+  usePriceLockQuery: () => priceLock,
+}));
+
+const LOCK_12 = {
+  locked: true as const,
+  priceVersionId: 'pro-2026-10-20-m12',
+  lockedAt: '2026-10-29T00:00:00.000Z',
+  month: {
+    amountCents: 1200,
+    currency: 'usd',
+    interval: 'month' as const,
+    priceId: 'price_12',
+  },
+  year: null,
+};
 
 import { WaitlistOutcomeView } from '@/components/features/waitlist/WaitlistOutcomeView';
 
@@ -47,6 +77,7 @@ describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
     ['no link', null],
   ])('offers Start Pro on the pending receipt with %s', (_label, handle) => {
     checkout.mutate.mockClear();
+    priceLock.data = LOCK_12;
     render(
       <WaitlistOutcomeView
         outcome='pending'
@@ -56,7 +87,11 @@ describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
     );
 
     const cta = screen.getByTestId('waitlist-start-pro-checkout');
-    expect(cta).toHaveTextContent('Start Pro ($12)');
+    // The price is the person's own locked price, not a list-price constant.
+    expect(cta).toHaveTextContent('Start Pro ($12/mo)');
+    expect(screen.getByTestId('price-lock-note')).toHaveTextContent(
+      'Your price is locked at $12/mo.'
+    );
     fireEvent.click(cta);
     // Default checkout: no onboarding source, so success lands on
     // /billing/success and routes a link-less buyer to /start.
@@ -65,6 +100,19 @@ describe('WaitlistOutcomeView Start Pro (JOV-7701: anyone can buy)', () => {
       expect.any(Object)
     );
     expect(screen.getByTestId('waitlist-resume-start')).toBeInTheDocument();
+  });
+
+  it('shows no price (never the list price) until the lock has loaded', () => {
+    priceLock.data = null;
+    render(
+      <WaitlistOutcomeView
+        outcome='pending'
+        proCheckoutPriceId='price_pro_monthly'
+      />
+    );
+    const cta = screen.getByTestId('waitlist-start-pro-checkout');
+    expect(cta).toHaveTextContent(/^Start Pro$/);
+    expect(screen.queryByTestId('price-lock-note')).toBeNull();
   });
 
   it('hides Start Pro without a configured price or on error receipts', () => {

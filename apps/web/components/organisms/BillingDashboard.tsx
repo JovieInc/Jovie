@@ -1,5 +1,7 @@
 'use client';
 
+// @coverage-via apps/web/tests/components/BillingDashboard.test.tsx
+
 import { QueryClientContext, useQueryClient } from '@tanstack/react-query';
 import { AlertCircle } from 'lucide-react';
 import {

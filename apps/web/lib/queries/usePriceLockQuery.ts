@@ -17,7 +17,7 @@ interface PriceLockResponse {
   readonly priceLock: PriceLockView;
 }
 
-/** Null for a signed-out visitor (401); anything else fails the query. */
+/** Null when there is no lock to apply; any outage fails the query. */
 export async function fetchPriceLock({
   signal,
 }: {
@@ -28,9 +28,16 @@ export async function fetchPriceLock({
       '/api/billing/price-lock',
       { signal, cache: 'no-store' }
     );
-    return data.priceLock;
+    return data?.priceLock ?? null;
   } catch (error) {
-    if (error instanceof FetchHttpError && error.status === 401) return null;
+    // 401: signed out. 404: this deployment has no lock endpoint yet, and its
+    // checkout has no lock either. Every other failure fails the query.
+    if (
+      error instanceof FetchHttpError &&
+      (error.status === 401 || error.status === 404)
+    ) {
+      return null;
+    }
     throw error;
   }
 }
