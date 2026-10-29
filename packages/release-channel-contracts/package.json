@@ -1,6 +1,6 @@
 {
   "name": "@jovie/release-channel-contracts",
-  "version": "26.10.16",
+  "version": "26.10.17",
   "private": true,
   "type": "module",
   "main": "./index.ts",
