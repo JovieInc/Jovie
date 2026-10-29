@@ -139,11 +139,145 @@ class ThroughputSentinelTest(unittest.TestCase):
             self.assertEqual((signal["mergeGroupRuns"], signal["mergeGroupStartP50Min"], signal["leaseHeldMin"]),
                              (3, 10.0, 50.0))  # skipped run ignored, three jobs sampled
             again, _ = ts.sample_release_flow(Path(raw), NOW + 10, run)
-            self.assertEqual(len(calls), 5)  # 1 runs + 3 jobs + 1 lease; cached for five minutes
+            self.assertEqual(len(calls), 6)  # 1 runs + 3 jobs + 1 lease + 1 queued count; cached for five minutes
             self.assertEqual(again["leaseRunIds"], [7])
             failing = lambda args, **kw: SimpleNamespace(returncode=1, stdout="", stderr="boom")
             signal, error = ts.sample_release_flow(Path(raw), NOW + 3600, failing)
             self.assertIn("boom", error)
+
+
+class ClaimErrorTest(unittest.TestCase):
+    def test_claim_error_rate_over_twenty_percent_alarms_per_lane(self):
+        dead = {"provider": "codex", "endedAt": iso(NOW - 60), "verdict": "failed",
+                "reasons": ["claim-error:JSONDecodeError:Unterminated string starting at: line 1 column 421"]}
+        ok = {"provider": "codex", "endedAt": iso(NOW - 120), "verdict": "fix-pushed", "reasons": []}
+        old = {"provider": "codex", "endedAt": iso(NOW - 7200), "verdict": "failed", "reasons": dead["reasons"]}
+        rows = ts.claim_errors_by_lane([dead] * 3 + [ok] * 4 + [old] * 9, NOW)
+        self.assertEqual((rows["codex"]["runs"], rows["codex"]["claimErrors"]), (7, 3))
+        alerts = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": rows}})
+        self.assertIn("throughput-claim-errors:codex", alerts)
+        healthy = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": ts.claim_errors_by_lane([dead] + [ok] * 9, NOW)}})
+        self.assertNotIn("throughput-claim-errors:codex", healthy)
+        few = ts.judge({"now": NOW, "sentinel": {"claimErrors30m": ts.claim_errors_by_lane([dead] * 3, NOW)}})
+        self.assertNotIn("throughput-claim-errors:codex", few)
+
+
+class QueueUnmergeableTest(unittest.TestCase):
+    def test_unmergeable_entry_is_dequeued_commented_and_routed_after_the_grace(self):
+        qm = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_unmergeable", ROOT / "scripts/lanes/queue_unmergeable.py"))
+        qm.__spec__.loader.exec_module(qm)
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            if any("mergeQueue" in a for a in args):
+                nodes = [{"state": "UNMERGEABLE", "position": 3, "pullRequest": {"id": "PR_1", "number": 23519, "headRefOid": "a" * 40}},
+                         {"state": "AWAITING_CHECKS", "position": 1, "pullRequest": {"id": "PR_2", "number": 7, "headRefOid": "b" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            first = qm.sweep(Path(raw), run, NOW)
+            self.assertEqual((first["dequeued"], [r["pr"] for r in first["seen"]]), ([], [23519]))
+            second = qm.sweep(Path(raw), run, NOW + qm.GRACE_S + 1)
+            self.assertEqual(second["dequeued"], [23519])
+            flat = "\n".join(" ".join(c) for c in calls)
+            self.assertIn("dequeuePullRequest", flat)
+            self.assertIn("lane-fix-conflict", flat)
+            self.assertIn("queue-dequeue", flat)
+            self.assertIn("23519", (Path(raw) / qm.LOG_FILE).read_text())
+            self.assertNotIn("PR_2", " ".join(" ".join(c) for c in calls if any("dequeue" in a for a in c)))
+
+
+class QueueBreakerTest(unittest.TestCase):
+    def test_two_group_failures_in_three_hours_dequeue_hold_and_keep_the_head_blocked(self):
+        qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
+        qb.__spec__.loader.exec_module(qb)
+        calls, labels = [], []
+        head = {"sha": "a" * 40}
+        gone = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            path = args[-1] if args[0] == "api" else ""
+            flat = " ".join(args)
+            if "workflows/ci.yml/runs" in flat:
+                rows = [{"id": 11, "head_branch": "gh-readonly-queue/main/pr-23471-abc", "conclusion": "failure", "updated_at": iso(NOW - 600), "head_sha": "s1"},
+                        {"id": 12, "head_branch": "gh-readonly-queue/main/pr-23471-def", "conclusion": "failure", "updated_at": iso(NOW - 3000), "head_sha": "s2"},
+                        {"id": 13, "head_branch": "gh-readonly-queue/main/pr-500-abc", "conclusion": "failure", "updated_at": iso(NOW - 600), "head_sha": "s3"},
+                        {"id": 14, "head_branch": "gh-readonly-queue/main/pr-23471-old", "conclusion": "failure", "updated_at": iso(NOW - 40000), "head_sha": "s4"}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "mergeQueue" in flat:
+                nodes = ([] if gone else [{"state": "AWAITING_CHECKS", "pullRequest": {"id": "PR_X", "number": 23471, "headRefOid": "a" * 40}}]) + [
+                         {"state": "QUEUED", "pullRequest": {"id": "PR_Y", "number": 500, "headRefOid": "b" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            if path.endswith("/jobs?per_page=100"):
+                jobs = [{"id": 9, "name": "ci-fast (remaining)", "conclusion": "failure", "steps": [{"name": "Run structural ci-fast lane", "conclusion": "failure"}]},
+                        {"id": 8, "name": "ci-fast", "conclusion": "failure", "steps": []}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"jobs": jobs}))
+            if path.endswith("/logs"):
+                return SimpleNamespace(returncode=0, stderr="", stdout="x\n2026 ##[error]UpdateTest failed: 1 != 0\n")
+            if "/labels" in flat:
+                labels.append(flat)
+                return SimpleNamespace(returncode=0, stderr="", stdout="[]")
+            if "/pulls/" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"state": "open", "head": head, "labels": []}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            first = qb.sweep(Path(raw), run, NOW)
+            gone.append(1)  # dequeued
+            self.assertEqual(first["tripped"], [23471])
+            flat = "\n".join(" ".join(c) for c in calls)
+            self.assertIn("dequeuePullRequest", flat)
+            self.assertIn("ci-fast (remaining)", flat)
+            self.assertIn("UpdateTest failed", flat)
+            self.assertNotIn("PR_Y", "\n".join(" ".join(c) for c in calls if any("dequeue" in a for a in c)))
+            labels.clear()
+            # Same head, label cleared by a green Source Validation: the hold is put back.
+            again = qb.sweep(Path(raw), run, NOW + 600)
+            self.assertEqual(again["reblocked"], [23471])
+            self.assertTrue(any("issues/23471/labels" in l for l in labels))
+            # A new head releases the PR.
+            head["sha"] = "c" * 40
+            labels.clear()
+            released = qb.sweep(Path(raw), run, NOW + 1200)
+            self.assertEqual((released["reblocked"], labels), ([], []))
+            # ...and the breaker removes its own label itself, only that one, and forgets the PR.
+            self.assertEqual(released["released"], [23471])
+            self.assertEqual(json.loads((Path(raw) / qb.STATE_FILE).read_text()), {})
+
+    def test_failures_on_head_a_never_hold_the_fixed_head_b(self):
+        qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
+        qb.__spec__.loader.exec_module(qb)
+        calls, pushed_at = [], NOW - 300  # head B was committed 5 min ago, after both failures on head A
+
+        def run(args, **kwargs):
+            calls.append(args)
+            flat = " ".join(args)
+            if "workflows/ci.yml/runs" in flat:
+                rows = [{"id": 21, "head_branch": "gh-readonly-queue/main/pr-23570-aaa", "conclusion": "failure", "head_sha": "g1",
+                         "created_at": iso(NOW - 2400), "updated_at": iso(NOW - 2000)},
+                        {"id": 22, "head_branch": "gh-readonly-queue/main/pr-23570-bbb", "conclusion": "failure", "head_sha": "g2",
+                         "created_at": iso(NOW - 1500), "updated_at": iso(NOW - 900)}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"workflow_runs": rows}))
+            if "mergeQueue" in flat:
+                node = {"state": "AWAITING_CHECKS", "pullRequest": {"id": "PR_Z", "number": 23570, "headRefOid": "b" * 40}}
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": [node]}}}}}))
+            if "/commits/" in flat:
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"commit": {"committer": {"date": iso(pushed_at)}}}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(Path(raw), run, NOW)  # head B is in the queue and passing: nothing to trip
+            self.assertEqual((out["tripped"], out["reblocked"], out["errors"]), ([], [], []))
+            flat = "\n".join(" ".join(c) for c in calls)
+            self.assertNotIn("dequeuePullRequest", flat)
+            self.assertNotIn("lane-fix-red", flat)
+            # Two failures that DO start after head B was pushed still trip it (the breaker is per head, not off).
+            pushed_at = NOW - 3000
+            again = qb.sweep(Path(raw), run, NOW)
+            self.assertEqual(again["tripped"], [23570])
 
 
 class IdleNotDemandTest(unittest.TestCase):
