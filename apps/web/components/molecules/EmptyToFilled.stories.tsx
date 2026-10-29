@@ -56,7 +56,8 @@ export const Filled: Story = {
 };
 
 export const Transitioning: Story = {
-  render: () => {
+  args: Empty.args,
+  render: function TransitioningStory() {
     const [state, setState] = useState<'empty' | 'filled'>('empty');
     return (
       <div className='space-y-3'>
@@ -97,6 +98,7 @@ export const Transitioning: Story = {
 };
 
 export const ReducedMotion: Story = {
+  args: Filled.args,
   parameters: {
     docs: {
       description: {
