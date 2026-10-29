@@ -165,16 +165,6 @@ jobs:
             )
           fi
           node scripts/lib/merge-group-member-policy.mjs --policy=size --also=fork
-      - name: Clear sparse checkout for the next job on this workspace
-        if: always() && runner.environment != 'github-hosted'
-        shell: bash
-        run: |
-          # Fixed runners reuse one workspace; a sparse checkout left by a merge_group gate job hides
-          # .github/scripts and .github/actions from the next full checkout (Production Controller 40893280985).
-          if [[ -d .git ]]; then
-            git sparse-checkout disable 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
 
   merge-group-fork:
     # The merge-group "Fork PR Gate" required context, decided from the size
@@ -256,16 +246,6 @@ jobs:
             status=0
           fi
           exit "$status"
-      - name: Clear sparse checkout for the next job on this workspace
-        if: always() && runner.environment != 'github-hosted'
-        shell: bash
-        run: |
-          # Fixed runners reuse one workspace; a sparse checkout left by a merge_group gate job hides
-          # .github/scripts and .github/actions from the next full checkout (Production Controller 40893280985).
-          if [[ -d .git ]]; then
-            git sparse-checkout disable 2>/dev/null || true
-            rm -f .git/info/sparse-checkout
-          fi
 
   size:
     name: ${{ github.event_name == 'pull_request' && 'PR Size Guard' || 'PR Size Guard (source inactive)' }}

@@ -25,9 +25,17 @@ function pooledJobs() {
   return found;
 }
 
+// pr-size-guard.yml's size jobs are pinned byte-for-byte by merge-group-size-bootstrap-contract, so they
+// cannot carry a clearing step; every consumer that needs a full tree resets before its checkout instead.
+const PINNED_SPARSE_JOBS = new Set([
+  'pr-size-guard.yml:merge-group-size',
+  'pr-size-guard.yml:merge-group-workflow-load',
+]);
+
 describe('self-hosted workspace reset contract', () => {
   it('every pooled job that sparse-checks-out clears sparse state afterwards (if: always())', () => {
     for (const { file, name, steps } of pooledJobs()) {
+      if (PINNED_SPARSE_JOBS.has(`${file}:${name}`)) continue;
       if (!steps.some(s => isChecked(s) && s.with?.['sparse-checkout']))
         continue;
       const last = steps.filter(resets).at(-1);
