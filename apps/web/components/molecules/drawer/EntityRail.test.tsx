@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
+import { ACTIVITY_ITEMS as ACTIVITY } from './drawer.fixtures';
 import { EntityRail } from './EntityRail';
 import {
   ENTITY_RAIL_ENTITY_TABLE,
@@ -40,43 +41,15 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
 }));
 
 const readSource = (file: string) =>
-  readFileSync(fileURLToPath(new URL(`./${file}`, import.meta.url)), 'utf8');
+  readFileSync(
+    resolve(process.cwd(), 'components/molecules/drawer', file),
+    'utf8'
+  );
 
 const PROPERTIES = [
   { label: 'Status', value: 'Live' },
   { label: 'ISRC', value: 'USRC17607839', copyValue: 'USRC17607839' },
   { label: 'Release date', value: 'Apr 12, 2026' },
-];
-
-const ACTIVITY = [
-  {
-    id: 'a1',
-    actor: 'Tim White',
-    verb: 'edited',
-    object: 'Midnight Drive',
-    at: '2026-01-15T10:05:00Z',
-  },
-  {
-    id: 'a2',
-    actor: 'Jovie',
-    verb: 'linked',
-    object: 'Spotify',
-    at: '2026-01-15T09:00:00Z',
-  },
-  {
-    id: 'a3',
-    actor: 'Maya Vale',
-    verb: 'approved',
-    object: 'Tour poster',
-    at: '2026-01-14T18:30:00Z',
-  },
-  {
-    id: 'a4',
-    actor: 'Jovie',
-    verb: 'published',
-    object: 'Lost in the Light',
-    at: '2026-01-13T08:00:00Z',
-  },
 ];
 
 function renderReleaseRail(
@@ -142,10 +115,20 @@ describe('EntityRail entity table', () => {
 
 describe('EntityRail', () => {
   it('renders tabs and stats in entity-table order for a release', async () => {
-    const { container } = renderReleaseRail();
+    const onClose = vi.fn();
+    const { container } = renderReleaseRail({
+      onClose,
+      primaryAction: <button type='button'>Edit</button>,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledOnce();
     const rail = screen.getByTestId('right-drawer');
     expect(rail).toHaveAttribute('aria-label', 'Release details');
     expect(rail).toHaveStyle({ width: '360px' });
+    expect(rail.querySelector('[data-scroll-strategy]')).toHaveAttribute(
+      'data-scroll-strategy',
+      'shell'
+    );
 
     const tablist = screen.getByRole('tablist', { name: 'Release tabs' });
     const tabs = tablist.querySelectorAll('[role="tab"]');
@@ -196,7 +179,7 @@ describe('EntityRail', () => {
     expect(statusRow?.querySelector('button')).toBeNull();
   });
 
-  it('previews the last 3 activity items and opens the Activity tab with View all', () => {
+  it('previews the last 3 activity items and opens the Activity tab with View All', () => {
     const onTabChange = vi.fn();
     const { rerender } = renderReleaseRail({ onTabChange });
     const overview = screen.getByTestId('entity-rail-overview');
@@ -204,7 +187,7 @@ describe('EntityRail', () => {
       overview.querySelectorAll('[data-testid="entity-rail-activity-item"]')
     ).toHaveLength(3);
 
-    fireEvent.click(screen.getByRole('button', { name: 'View all' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View All' }));
     expect(onTabChange).toHaveBeenCalledWith('activity');
 
     rerender(
@@ -225,6 +208,24 @@ describe('EntityRail', () => {
     expect(screen.queryByTestId('entity-rail-overview')).toBeNull();
   });
 
+  it('returns to Overview when the new entity lacks the selected tab', () => {
+    const { rerender } = renderReleaseRail();
+    fireEvent.click(screen.getByRole('tab', { name: 'Tasks' }));
+    rerender(
+      <EntityRail
+        entityType='link'
+        isOpen
+        title='Smart link'
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(screen.getByTestId('entity-rail-overview')).toBeInTheDocument();
+  });
+
   it('shows the quiet empty state naming the entity', () => {
     renderReleaseRail({ isEmpty: true });
     expect(
@@ -241,8 +242,6 @@ describe('EntityRail', () => {
 
   it('accepts only entity types that exist in the entity table', () => {
     renderReleaseRail();
-    // The entity table is the closed set: a bogus type is rejected at compile
-    // time, and the runtime table lookup only resolves known keys.
     expect(Object.keys(ENTITY_RAIL_ENTITY_TABLE)).toContain('release');
     expect(Object.keys(ENTITY_RAIL_ENTITY_TABLE)).toHaveLength(14);
     // @ts-expect-error unknown entity types must not typecheck

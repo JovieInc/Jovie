@@ -2,9 +2,21 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { StatRow } from './StatRow';
 
 const STATS = [
-  { label: 'Total clicks', value: '1,204' },
-  { label: 'Last click', value: '2h ago' },
-  { label: 'Streams', state: 'not-measured' as const },
+  {
+    label: 'Total clicks',
+    value: '1,204',
+    notMeasuredSource: 'smart-link analytics',
+  },
+  {
+    label: 'Last click',
+    value: '2h ago',
+    notMeasuredSource: 'smart-link analytics',
+  },
+  {
+    label: 'Streams',
+    state: 'not-measured' as const,
+    notMeasuredSource: 'streaming ingestion',
+  },
 ];
 
 const meta = {
@@ -32,33 +44,17 @@ export const Default: Story = {};
 
 export const Loading: Story = {
   args: {
-    stats: [
-      { label: 'Total clicks', state: 'loading' as const },
-      { label: 'Last click', state: 'loading' as const },
-      { label: 'Streams', state: 'loading' as const },
-    ],
+    stats: STATS.map(({ label }) => ({ label, state: 'loading' as const })),
   },
 };
 
 export const NotMeasured: Story = {
   args: {
-    stats: [
-      {
-        label: 'Total clicks',
-        state: 'not-measured' as const,
-        notMeasuredSource: 'smart-link analytics',
-      },
-      {
-        label: 'Last click',
-        state: 'not-measured' as const,
-        notMeasuredSource: 'smart-link analytics',
-      },
-      {
-        label: 'Streams',
-        state: 'not-measured' as const,
-        notMeasuredSource: 'streaming ingestion',
-      },
-    ],
+    stats: STATS.map(({ label, notMeasuredSource }) => ({
+      label,
+      notMeasuredSource,
+      state: 'not-measured' as const,
+    })),
   },
 };
 

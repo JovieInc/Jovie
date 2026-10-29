@@ -295,11 +295,7 @@ export function EntitySidebarShell({
                   {!isMinimalHeader && tabs ? (
                     <div
                       className={cn(
-                        // One card seam: the surface card owns the border; the
-                        // nested divider stays transparent so the tab region
-                        // keeps its 1px geometry without a second bordered
-                        // surface (nested-bordered rule, Focus/Selection/
-                        // Stability — no layout shift).
+                        // Preserve the 1px geometry; the card owns the seam.
                         'overflow-visible border-t border-transparent px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName
                       )}
@@ -311,7 +307,6 @@ export function EntitySidebarShell({
                   {renderMinimalTabsInHeader && tabs ? (
                     <div
                       className={cn(
-                        // Same nested-bordered rule as the standard divider.
                         showMinimalHeaderBar && 'border-t border-transparent',
                         'overflow-visible px-3 py-2.5 [&>*]:w-full',
                         tabsContainerClassName

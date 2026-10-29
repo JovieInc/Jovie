@@ -1,46 +1,19 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from '@/tests/utils/a11y';
-import { ActivityFeed, type EntityRailActivityItem } from './ActivityFeed';
-
-const HOUR = 60 * 60 * 1000;
-
-function iso(offsetMs: number): string {
-  return new Date(Date.now() - offsetMs).toISOString();
-}
-
-const ITEMS: readonly EntityRailActivityItem[] = [
-  {
-    id: 'now',
-    actor: 'Tim White',
-    verb: 'edited',
-    object: 'Midnight Drive',
-    at: iso(5 * 60 * 1000),
-  },
-  {
-    id: 'earlier-today',
-    actor: 'Jovie',
-    verb: 'linked',
-    object: 'Spotify',
-    at: iso(3 * HOUR),
-  },
-  {
-    id: 'yesterday',
-    actor: 'Maya Vale',
-    verb: 'approved',
-    object: 'Tour poster',
-    at: iso(26 * HOUR),
-  },
-  {
-    id: 'archive',
-    actor: 'Jovie',
-    verb: 'published',
-    object: 'Lost in the Light',
-    at: '2026-01-15T10:05:00Z',
-  },
-];
+import { ActivityFeed } from './ActivityFeed';
+import { ACTIVITY_ITEMS as ITEMS } from './drawer.fixtures';
 
 describe('ActivityFeed', () => {
+  beforeEach(() => {
+    vi.stubEnv('TZ', 'America/Los_Angeles');
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-15T12:00:00Z'));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
   it('time-groups items into Today, Yesterday, and dated groups', async () => {
     const { container } = render(<ActivityFeed items={ITEMS} />);
     const today = screen
@@ -58,7 +31,7 @@ describe('ActivityFeed', () => {
     expect(
       screen
         .getByTestId('entity-rail-activity-feed')
-        .querySelector('[data-activity-group="Jan 15"]')
+        .querySelector('[data-activity-group="Jan 13"]')
     ).not.toBeNull();
     await expectNoA11yViolations(container);
   });

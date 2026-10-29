@@ -18,6 +18,8 @@ describe('StatTile', () => {
   it.each([
     ['null value', { label: 'Streams', value: null }],
     ['empty value', { label: 'Streams', value: '' }],
+    ['explicit empty value', { label: 'Streams', state: 'value', value: '' }],
+    ['explicit missing value', { label: 'Streams', state: 'value' }],
     ['not-measured state', { label: 'Streams', state: 'not-measured' }],
   ])(
     'renders "Not measured" for %s — never blank, never an em dash',

@@ -3,10 +3,7 @@ export interface StatTileProps {
   /** Measured value; omitted or empty falls back to the not-measured state. */
   readonly value?: string;
   readonly hint?: string;
-  /**
-   * `value` = a measured number; `loading` = a reserved skeleton;
-   * `not-measured` = the stat's source is not wired yet.
-   */
+  /** Loading reserves the slot; not-measured names an unwired source. */
   readonly state?: 'value' | 'loading' | 'not-measured';
   /** Names the source that will measure this stat (surfaced when not measured). */
   readonly notMeasuredSource?: string;
@@ -29,7 +26,11 @@ export function StatTile({
   notMeasuredSource,
 }: StatTileProps) {
   const resolvedState: 'value' | 'loading' | 'not-measured' =
-    state ?? (value == null || value.trim() === '' ? 'not-measured' : 'value');
+    state === 'loading'
+      ? 'loading'
+      : state === 'not-measured' || !value?.trim()
+        ? 'not-measured'
+        : 'value';
 
   return (
     <div data-slot='stat-tile' className='space-y-0.5'>

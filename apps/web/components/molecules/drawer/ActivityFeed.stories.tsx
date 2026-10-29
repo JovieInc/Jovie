@@ -1,36 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { ActivityFeed, type EntityRailActivityItem } from './ActivityFeed';
-
-const ITEMS: readonly EntityRailActivityItem[] = [
-  {
-    id: 'now',
-    actor: 'Tim White',
-    verb: 'edited',
-    object: 'Midnight Drive',
-    at: '2026-01-15T10:05:00Z',
-  },
-  {
-    id: 'earlier-today',
-    actor: 'Jovie',
-    verb: 'linked',
-    object: 'Spotify',
-    at: '2026-01-15T09:00:00Z',
-  },
-  {
-    id: 'yesterday',
-    actor: 'Maya Vale',
-    verb: 'approved',
-    object: 'Tour poster',
-    at: '2026-01-14T18:30:00Z',
-  },
-  {
-    id: 'archive',
-    actor: 'Jovie',
-    verb: 'published',
-    object: 'Lost in the Light',
-    at: '2026-01-13T08:00:00Z',
-  },
-];
+import { ActivityFeed } from './ActivityFeed';
+import { ACTIVITY_ITEMS as ITEMS } from './drawer.fixtures';
 
 const meta = {
   title: 'Molecules/Drawer/ActivityFeed',

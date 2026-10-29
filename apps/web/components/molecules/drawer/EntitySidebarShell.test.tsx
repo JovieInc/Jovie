@@ -8,23 +8,15 @@ vi.mock('@/components/molecules/drawer/RightDrawer', () => ({
   RightDrawer: ({
     children,
     ariaLabel,
-    id,
-    width,
     onKeyDown,
-    'data-testid': testId,
   }: {
     readonly children: ReactNode;
     readonly ariaLabel?: string;
-    readonly id?: string;
-    readonly width?: number;
     readonly onKeyDown?: (event: KeyboardEvent) => void;
-    readonly 'data-testid'?: string;
   }) => (
     <aside
-      id={id}
-      data-testid={testId ?? 'right-drawer'}
+      data-testid='right-drawer'
       aria-label={ariaLabel}
-      style={{ width }}
       onKeyDown={event => onKeyDown?.(event.nativeEvent)}
     >
       {children}

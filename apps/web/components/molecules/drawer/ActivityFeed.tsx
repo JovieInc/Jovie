@@ -19,14 +19,16 @@ export interface ActivityFeedProps {
 }
 
 function startOfDay(value: Date): number {
-  return Date.UTC(value.getFullYear(), value.getMonth(), value.getDate());
+  return Date.UTC(
+    value.getUTCFullYear(),
+    value.getUTCMonth(),
+    value.getUTCDate()
+  );
 }
 
 function dayGroupLabel(at: Date): string {
-  const today = new Date();
-  const days = Math.round(
-    (startOfDay(today) - startOfDay(at)) / (24 * 60 * 60 * 1000)
-  );
+  const days =
+    (startOfDay(new Date()) - startOfDay(at)) / (24 * 60 * 60 * 1000);
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
   return at.toLocaleDateString('en-US', {
@@ -44,13 +46,9 @@ function timeLabel(at: Date): string {
   });
 }
 
-interface NormalizedActivityItem {
-  readonly id: string;
-  readonly actor: string;
-  readonly verb: string;
-  readonly object: string;
+type NormalizedActivityItem = Omit<EntityRailActivityItem, 'at'> & {
   readonly at: Date;
-}
+};
 
 interface ActivityGroup {
   readonly label: string;
@@ -70,11 +68,7 @@ function groupByDay(items: readonly EntityRailActivityItem[]): ActivityGroup[] {
   return groups;
 }
 
-/**
- * ActivityFeed — the shared Activity tab body of the EntityRail template.
- * Time-grouped, one quiet line per item (actor, verb, object); the same
- * feed renders on every entity type.
- */
+/** Time-grouped activity shared by entity rails. */
 export function ActivityFeed({
   items,
   className,

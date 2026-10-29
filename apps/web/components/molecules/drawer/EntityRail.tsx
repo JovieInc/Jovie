@@ -5,6 +5,7 @@ import { Button } from '@jovie/ui';
 import { Check, Copy } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { InlineIconButton } from '@/components/atoms/InlineIconButton';
+import { DrawerHeaderActions } from '@/components/molecules/drawer-header/DrawerHeaderActions';
 import { useClipboard } from '@/hooks/useClipboard';
 import { cn } from '@/lib/utils';
 import { ActivityFeed, type EntityRailActivityItem } from './ActivityFeed';
@@ -33,10 +34,8 @@ export interface EntityRailProperty {
 }
 
 export interface EntityRailProps {
-  /** Must exist in the entity table — enforced by type and test. */
   readonly entityType: EntityRailEntityType;
   readonly isOpen: boolean;
-  /** The only 100%-strength text in the rail. */
   readonly title: ReactNode;
   readonly onClose: () => void;
   readonly id?: string;
@@ -45,7 +44,6 @@ export interface EntityRailProps {
   readonly thumbnail?: ReactNode;
   readonly statusGlyph?: ReactNode;
   readonly badge?: ReactNode;
-  /** Max 1 primary action, rendered in the chrome bar before overflow. */
   readonly primaryAction?: ReactNode;
   readonly contextMenuItems?: CommonDropdownItem[];
   /** Defaults to the entity table's 3 stats, unmeasured until wired. */
@@ -57,9 +55,7 @@ export interface EntityRailProps {
   /** `wide` (480px, documents) is the only width variant; default is 360. */
   readonly variant?: 'default' | 'wide';
   readonly footer?: ReactNode;
-  /** Non-overview tab bodies. */
   readonly children?: ReactNode;
-  /** Shows "Select a {entity} to see details." instead of the entity. */
   readonly isEmpty?: boolean;
   readonly 'data-testid'?: string;
 }
@@ -126,20 +122,7 @@ function RailPropertyList({
   );
 }
 
-/**
- * EntityRail — the ONE right-rail template (Tim, 2026-10-25).
- *
- * Slots, top to bottom: chrome bar (entity-type eyebrow left; primary action,
- * overflow, close right — Esc closes), EntityHeader with thumbnail, title,
- * subtitle and status glyph, a 3-stat StatRow, one tabs primitive (DrawerTabs,
- * max 4 visible, `fill` distribution, overflow scroll, first tab Overview),
- * an Overview body of properties + last 3 activity items with "View all", and
- * an optional footer. Width is fixed at RAIL_WIDTH (360) on >= lg; `wide`
- * (480) is the only variant, for document editors.
- *
- * EntitySidebarShell is the implementation shell; consumers migrate onto
- * EntityRail in separate jobs — this component never forks the shell.
- */
+/** Canonical rail template; EntitySidebarShell owns its chrome and layout. */
 export function EntityRail({
   entityType,
   isOpen,
@@ -166,7 +149,10 @@ export function EntityRail({
 }: EntityRailProps) {
   const [internalTab, setInternalTab] = useState(ENTITY_RAIL_OVERVIEW_TAB_ID);
   const config = getEntityRailConfig(entityType);
-  const activeTabId = activeTab ?? internalTab ?? ENTITY_RAIL_OVERVIEW_TAB_ID;
+  const requestedTab = activeTab ?? internalTab;
+  const activeTabId = config.tabs.some(tab => tab.id === requestedTab)
+    ? requestedTab
+    : ENTITY_RAIL_OVERVIEW_TAB_ID;
   const handleTabChange = (tabId: string) => {
     setInternalTab(tabId);
     onTabChange?.(tabId);
@@ -196,7 +182,7 @@ export function EntityRail({
               size='sm'
               onClick={() => handleTabChange('activity')}
             >
-              View all
+              View All
             </Button>
           ) : null}
         </div>
@@ -213,7 +199,17 @@ export function EntityRail({
       onClose={onClose}
       contextMenuItems={contextMenuItems}
       title={config.label}
-      headerActions={primaryAction}
+      headerActions={
+        <>
+          {primaryAction}
+          <DrawerHeaderActions
+            primaryActions={[]}
+            menuItems={contextMenuItems}
+            onClose={onClose}
+          />
+        </>
+      }
+      scrollStrategy='shell'
       tabs={
         <DrawerTabs
           value={activeTabId}
