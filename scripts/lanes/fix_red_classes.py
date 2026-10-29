@@ -51,6 +51,14 @@ BODY_TEXT = re.compile(r"red-before-green:|PR body is missing|missing (?:a )?`?#
 INTERNAL_CHANGELOG_NOTE = '<!-- customer-changelog/v1 {"releaseWorthy":false} -->'
 CHANGELOG_MISSING = re.compile(r"Customer outcome decision missing or invalid \(missing-metadata\)")
 CHANGELOG_QUOTA_READ = re.compile(r"github-quota-deferred: PR metadata read hit GitHub")
+# Design-surface census throws this when a canonical digest no longer matches the
+# source bytes. Main renews that certification. A red required check reports
+# BLOCKED, so the BEHIND fallback never runs and a model is sent to rewrite a
+# digest main already owns. Sync main instead. This pattern is checked before
+# platform text: the same Source Validation log contains passing-test rate-limit
+# lines. A branch that already contains main fails update-branch and still
+# reaches a model, which is the only path that may renew a digest the PR owns.
+CENSUS_CERTIFICATION = re.compile(r"source changed; renew certification evidence")
 # Armed spacing ratchet (spacing-scale-ratchet.test.ts). The count grew because a
 # PR added a 10px/14px utility. Snap those added utilities; do not raise the floor.
 SPACING_RATCHET_TEXT = re.compile(
@@ -96,6 +104,7 @@ SIGNATURES = (
     # Before platform-infra: the ratchet message includes a count such as 591,
     # and `\b5\d\d\b` would otherwise treat that count as an HTTP 5xx.
     ("spacing-scale", SPACING_RATCHET_TEXT, SNAP_SPACING),
+    ("census-certification", CENSUS_CERTIFICATION, SYNC_MAIN),
     ("quota-deferred", QUOTA_TEXT, RERUN),
     ("platform-infra", PLATFORM_TEXT, RERUN),
     ("migration-number", migration_renumber.LOG_TEXT, RENUMBER),
