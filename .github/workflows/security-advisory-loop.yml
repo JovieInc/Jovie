@@ -19,7 +19,7 @@ on:
       - 'pnpm-lock.yaml'
       - '**/package.json'
       - '**/requirements.txt'
-      - 'config/security/advisory-exceptions.json'
+      - 'scripts/security/advisory-exceptions.json'
       - 'scripts/security-advisory-intake.mjs'
       - 'scripts/lib/security-advisory-policy.mjs'
       - '.github/workflows/security-advisory-loop.yml'

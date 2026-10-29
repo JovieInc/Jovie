@@ -169,7 +169,7 @@ test('stage metrics report detect->fixed p50/p95 from alert history', () => {
 test('exceptions file is time-boxed and carries a reachability reason', () => {
   const { exceptions } = JSON.parse(
     readFileSync(
-      path.join(ROOT, 'config/security/advisory-exceptions.json'),
+      path.join(ROOT, 'scripts/security/advisory-exceptions.json'),
       'utf8'
     )
   );

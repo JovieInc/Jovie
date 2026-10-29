@@ -108,7 +108,7 @@ async function main() {
   const deployedAt = latestProductionDeploy(repo, process.env.GH_TOKEN);
   const exceptions = JSON.parse(
     readFileSync(
-      path.join(ROOT, 'config/security/advisory-exceptions.json'),
+      path.join(ROOT, 'scripts/security/advisory-exceptions.json'),
       'utf8'
     )
   ).exceptions;
