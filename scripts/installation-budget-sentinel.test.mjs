@@ -57,7 +57,9 @@ test('main samples the shared and CI App installations separately and never logs
     env: { GITHUB_TOKEN: 'tok-shared', CI_APP_TOKEN: 'tok-app' },
     fetchImpl: async (url, options) => {
       assert.equal(String(url), 'https://api.github.com/rate_limit');
-      const token = options.headers.get('authorization').replace('Bearer ', '');
+      const token = new Headers(options.headers)
+        .get('authorization')
+        .replace('Bearer ', '');
       seen.push(token);
       return Response.json({
         resources: { core: token === 'tok-shared' ? core(50) : core(900) },
@@ -154,7 +156,8 @@ test('writes per-installation alarm outputs and summary for Slack', async () => 
         Response.json({
           resources: {
             core: core(
-              options.headers.get('authorization') === 'Bearer tok-shared'
+              new Headers(options.headers).get('authorization') ===
+                'Bearer tok-shared'
                 ? 50
                 : 900
             ),
@@ -186,7 +189,10 @@ test('one failed installation does not hide the other or expose credentials', as
     log: x => logs.push(x),
     fetchImpl: async (_, options) => {
       calls++;
-      if (options.headers.get('authorization') === 'Bearer tok-shared')
+      if (
+        new Headers(options.headers).get('authorization') ===
+        'Bearer tok-shared'
+      )
         throw new Error('network failure with tok-shared');
       return Response.json({ resources: { core: core(50) } });
     },

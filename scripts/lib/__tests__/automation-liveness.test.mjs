@@ -1764,11 +1764,15 @@ describe('alert state preservation (JOV-8843)', () => {
 });
 
 describe('budget diagnostics failure isolation', () => {
+  /** @typedef {{id?: string, name?: string, if?: string, run?: string}} BudgetStep */
+  /** @typedef {{needs: string, if: string, steps: BudgetStep[]}} BudgetJob */
   it('uses the same due gate without becoming a heartbeat dependency', () => {
-    const workflow = load(
-      readFileSync(
-        join(repoRoot, '.github/workflows/automation-liveness.yml'),
-        'utf8'
+    const workflow = /** @type {{jobs: Record<string, BudgetJob>}} */ (
+      load(
+        readFileSync(
+          join(repoRoot, '.github/workflows/automation-liveness.yml'),
+          'utf8'
+        )
       )
     );
     const budget = workflow.jobs['installation-budget'];

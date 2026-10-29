@@ -12,7 +12,9 @@ import { parseBudget } from '../packages/api-client/headers.ts';
 
 export const LOW_BUDGET_FRACTION = 0.15;
 
-/** @param {{ limit: number, remaining: number, reset: number }} core */
+/** @typedef {{ limit: number, remaining: number, reset: number }} RateLimitCore */
+
+/** @param {Partial<RateLimitCore> | undefined} core */
 export function evaluateBudget(core, nowMs = Date.now()) {
   const { limit, remaining, reset } = core ?? {};
   if (
@@ -86,10 +88,22 @@ async function sampleOne(name, token, { fetchImpl, now, store }) {
       at
     );
   }
-  const body = response.json();
+  const body =
+    /** @type {{ resources?: { core?: Partial<RateLimitCore> } }} */ (
+      response.json()
+    );
   return evaluateBudget(body?.resources?.core, at);
 }
 
+/**
+ * @param {{
+ *   env?: NodeJS.ProcessEnv,
+ *   fetchImpl?: typeof fetch,
+ *   log?: (message: string) => void,
+ *   now?: () => number,
+ *   store?: import('../packages/api-client/store.ts').LedgerStore,
+ * }} [options]
+ */
 export async function main({
   env = process.env,
   fetchImpl = fetch,
