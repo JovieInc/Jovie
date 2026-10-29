@@ -92,6 +92,11 @@ class SwarmPolicyTest(unittest.TestCase):
         finally:
             swarm.gh_json = original
 
+    def test_relay_requests_carry_a_user_agent_cloudflare_accepts(self):
+        # urllib's default UA gets Cloudflare error 1010 from workers.dev before the Worker runs.
+        src = Path(swarm.__file__).read_text()
+        self.assertEqual(src.count('"User-Agent": "jovie-pr-remediation-swarm/1"'), 2)
+
     def test_claim_format_matches_the_lanes_parser(self):
         body = f"🤖 lane claim kind=fix sha=abc host={swarm.HOST} at={swarm.iso()}"
         fields = dict(p.split("=", 1) for p in body.split()[3:] if "=" in p)

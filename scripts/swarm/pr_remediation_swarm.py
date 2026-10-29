@@ -184,7 +184,7 @@ def credits_available(base: str, key: str) -> bool:
         return False
     import urllib.error
     import urllib.request
-    req = urllib.request.Request(base.rstrip("/") + "/credits", headers={"Authorization": f"Bearer {key}"})
+    req = urllib.request.Request(base.rstrip("/") + "/credits", headers={"Authorization": f"Bearer {key}", "User-Agent": "jovie-pr-remediation-swarm/1"})
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.load(resp)
@@ -343,7 +343,7 @@ def cmd_fix(a) -> int:
     fixed = None
     if plan["action"] == classes.SYNC_MAIN:
         sh(["git", "fetch", "origin", "main", "--depth=200"], cwd)
-        if sh(["git", "rebase", "origin/main"], cwd).returncode == 0:
+        if sh(["git", "-c", "user.name=jovie-swarm", "-c", "user.email=swarm@jov.ie", "rebase", "origin/main"], cwd).returncode == 0:
             fixed = "rebase-main"
         else:
             sh(["git", "rebase", "--abort"], cwd)
@@ -373,6 +373,9 @@ def cmd_guard(a) -> int:
     """Passes only a bounded, non-sensitive diff that does not delete or weaken tests."""
     plan = json.loads(Path(a.plan).read_text())
     base = plan["sha"]
+    if plan.get("outcome") in {"gave-up", "blocked-credits", "error"}:
+        out_var("guard", "fail")  # an earlier step already decided; keep its reason
+        return 0
     if plan.get("fix") == "rebase-main":  # history rewrite onto main: nothing of the PR's own diff changes
         out_var("guard", "ok")
         return 0
@@ -489,7 +492,7 @@ def gateway_base() -> str:
 
 def pick_model(base: str, key: str, candidates: list[str]) -> tuple[str, float, float]:
     import urllib.request
-    req = urllib.request.Request(base.rstrip("/") + "/models", headers={"Authorization": f"Bearer {key}"})
+    req = urllib.request.Request(base.rstrip("/") + "/models", headers={"Authorization": f"Bearer {key}", "User-Agent": "jovie-pr-remediation-swarm/1"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = {m["id"]: m for m in json.load(resp)["data"]}
     for c in candidates:
@@ -529,7 +532,8 @@ def cmd_agent(a) -> int:
     except OSError as exc:  # urllib HTTPError/URLError are OSErrors; 402 = no credit
         key_file.unlink(missing_ok=True)
         blocked = "402" in str(exc) or "insufficient" in str(exc).lower()
-        plan.update(outcome="blocked-credits" if blocked else "gave-up", reason="gateway-" + ("insufficient_funds" if blocked else "unreachable"))
+        plan.update(outcome="blocked-credits" if blocked else "gave-up",
+                    reason="gateway-insufficient_funds" if blocked else "relay-unreachable:" + str(exc)[:80])
         Path(a.plan).write_text(json.dumps(plan))
         Path(a.meta).write_text(json.dumps({"costUsd": 0, "aborted": plan["reason"]}))
         return 0
