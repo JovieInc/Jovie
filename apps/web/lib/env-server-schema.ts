@@ -104,6 +104,8 @@ export const ServerEnvSchema = z.object({
   RESEND_REPLY_TO_EMAIL: z.string().email().optional(),
   RESEND_WEBHOOK_SECRET: z.string().optional(),
   RESEND_INBOUND_WEBHOOK_SECRET: z.string().optional(),
+  // Read-capable key for received-email bodies (RESEND_API_KEY is send-only).
+  RESEND_RECEIVING_API_KEY: z.string().optional(),
   // JOV-9779 release-email canary: the only scope the audience-delivery
   // carve-out admits. Both unset (or invalid) keeps every send denied.
   RELEASE_EMAIL_CANARY_PROFILE_ID: z.string().uuid().optional(),
@@ -569,6 +571,7 @@ export const ENV_KEYS = [
   'RESEND_REPLY_TO_EMAIL',
   'RESEND_WEBHOOK_SECRET',
   'RESEND_INBOUND_WEBHOOK_SECRET',
+  'RESEND_RECEIVING_API_KEY',
   'RELEASE_EMAIL_CANARY_PROFILE_ID',
   'RELEASE_EMAIL_CANARY_INBOX',
   'SLACK_WEBHOOK_URL',
