@@ -34,11 +34,12 @@
   aspect-ratio: 4 / 5;
 }
 
-/* The tile is the card; a registry shot sits flush inside it, no second frame. */
+/* The tile is the card: the staged shot drops its own card chrome and keeps
+   only the floating UI panel (Pen feature bento I8TdQv). */
 .m-spec-bento__shot.product-shot {
   border: 0;
   border-radius: var(--radius-lg);
-  box-shadow: none;
+  background: var(--color-bg-surface-0);
 }
 
 @media (min-width: 768px) {

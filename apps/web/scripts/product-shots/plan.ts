@@ -92,35 +92,51 @@ export interface PageBox {
   readonly bottom: number;
 }
 
+export type ShotPadding =
+  | number
+  | {
+      readonly top: number;
+      readonly right: number;
+      readonly bottom: number;
+      readonly left: number;
+    };
+
+export function resolvePadding(padding: ShotPadding = 0) {
+  return typeof padding === 'number'
+    ? { top: padding, right: padding, bottom: padding, left: padding }
+    : padding;
+}
+
 /**
  * The screenshot clip: the union of the crop targets' page boxes plus
  * padding, clamped to the page and to `maxHeight`, in whole CSS pixels.
+ * A padded side rounds outward; an unpadded side rounds inward so a
+ * subpixel edge never pulls in a line of whatever sits behind the element.
  */
 export function unionClip(
   boxes: readonly PageBox[],
   page: { readonly width: number; readonly height: number },
-  padding = 0,
+  padding: ShotPadding = 0,
   maxHeight?: number
 ) {
   if (boxes.length === 0) throw new Error('No crop targets');
-  const x = Math.max(
-    0,
-    Math.floor(Math.min(...boxes.map(b => b.left)) - padding)
-  );
-  const y = Math.max(
-    0,
-    Math.floor(Math.min(...boxes.map(b => b.top)) - padding)
-  );
-  const right = Math.min(
+  const pad = resolvePadding(padding);
+  const left = Math.min(...boxes.map(b => b.left)) - pad.left;
+  const top = Math.min(...boxes.map(b => b.top)) - pad.top;
+  const right = Math.max(...boxes.map(b => b.right)) + pad.right;
+  const bottom = Math.max(...boxes.map(b => b.bottom)) + pad.bottom;
+  const x = Math.max(0, pad.left > 0 ? Math.floor(left) : Math.ceil(left));
+  const y = Math.max(0, pad.top > 0 ? Math.floor(top) : Math.ceil(top));
+  const r = Math.min(
     page.width,
-    Math.ceil(Math.max(...boxes.map(b => b.right)) + padding)
+    pad.right > 0 ? Math.ceil(right) : Math.floor(right)
   );
-  const bottom = Math.min(
+  const b = Math.min(
     page.height,
-    Math.ceil(Math.max(...boxes.map(b => b.bottom)) + padding)
+    pad.bottom > 0 ? Math.ceil(bottom) : Math.floor(bottom)
   );
-  const height = maxHeight ? Math.min(bottom - y, maxHeight) : bottom - y;
-  return { x, y, width: right - x, height };
+  const height = maxHeight ? Math.min(b - y, maxHeight) : b - y;
+  return { x, y, width: r - x, height };
 }
 
 /** Byte-budget failures for one rendered shot (empty when within budget). */

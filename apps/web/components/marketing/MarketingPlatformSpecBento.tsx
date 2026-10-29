@@ -62,6 +62,7 @@ export function MarketingPlatformSpecBento({
                 {tile.shot ? (
                   <ProductShot
                     id={tile.shot}
+                    staged
                     className='m-spec-bento__shot'
                     sizes='(min-width: 1280px) 50rem, (min-width: 768px) 45vw, 92vw'
                   />

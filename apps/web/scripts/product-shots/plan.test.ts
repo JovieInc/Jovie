@@ -152,6 +152,26 @@ describe('unionClip', () => {
     ).toEqual({ x: 0, y: 0, width: 1440, height: 300 });
   });
 
+  it('rounds unpadded edges inward so nothing behind the element shows', () => {
+    expect(
+      unionClip([{ left: 529.4, top: 567.6, right: 911.5, bottom: 1039.2 }], {
+        width: 1440,
+        height: 1200,
+      })
+    ).toEqual({ x: 530, y: 568, width: 381, height: 471 });
+  });
+
+  it('takes per-side padding to compensate for line-box leading', () => {
+    expect(
+      unionClip([{ left: 100, top: 100, right: 300, bottom: 200 }], page, {
+        top: 22,
+        right: 32,
+        bottom: 32,
+        left: 32,
+      })
+    ).toEqual({ x: 68, y: 78, width: 264, height: 154 });
+  });
+
   it('fails without crop targets', () => {
     expect(() => unionClip([], page)).toThrow('No crop targets');
   });

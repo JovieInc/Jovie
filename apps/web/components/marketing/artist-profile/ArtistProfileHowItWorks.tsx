@@ -19,17 +19,17 @@ const SETUP_STAGES: readonly {
   {
     id: 'claim',
     shot: 'setup-claim-handle',
-    sizes: '(min-width: 1024px) 40rem, 92vw',
+    sizes: '(min-width: 1024px) 46rem, 92vw',
   },
   {
     id: 'connect',
     shot: 'setup-connect-music',
-    sizes: '(min-width: 1024px) 24rem, 92vw',
+    sizes: '(min-width: 1024px) 22rem, 92vw',
   },
   {
     id: 'share',
     shot: 'setup-share-profile',
-    sizes: '(min-width: 1024px) 16rem, 20rem',
+    sizes: '(min-width: 1024px) 22rem, 92vw',
   },
 ];
 
@@ -76,18 +76,12 @@ export function ArtistProfileHowItWorks({
         </div>
 
         <ol className='ap-how-it-works__shots'>
-          {SETUP_STAGES.map((stage, index) => (
+          {SETUP_STAGES.map(stage => (
             <li
               key={stage.id}
               className={`ap-how-it-works__shot ap-how-it-works__shot--${stage.id}`}
             >
-              <span
-                className='font-mono text-3xs text-tertiary-token'
-                aria-hidden='true'
-              >
-                {String(index + 1).padStart(2, '0')}
-              </span>
-              <ProductShot id={stage.shot} sizes={stage.sizes} />
+              <ProductShot id={stage.shot} sizes={stage.sizes} staged />
             </li>
           ))}
         </ol>

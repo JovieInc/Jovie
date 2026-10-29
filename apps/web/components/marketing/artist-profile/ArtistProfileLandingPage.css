@@ -131,27 +131,27 @@
   left: 24%;
 }
 
-/* How it works: three registry shots (lib/screenshots/product-shots.ts), each
-   already cropped to its moment. No CSS cropping or scaling of captures. */
+/* How it works: three registry shots (lib/screenshots/product-shots.ts),
+   each already cropped to its moment and staged in a matte card. Claim gets
+   the full row so the handle reads near 1:1; Connect and Share share the
+   second row at equal heights (staged cards stretch). */
 .ap-how-it-works__shots {
   display: grid;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .ap-how-it-works__shot {
-  display: grid;
-  gap: var(--space-3);
+  display: flex;
   min-width: 0;
 }
 
-.ap-how-it-works__shot--share .product-shot {
-  max-width: 20rem;
+.ap-how-it-works__shot > .product-shot {
+  flex: 1;
 }
 
-@media (min-width: 64rem) {
+@media (min-width: 48rem) {
   .ap-how-it-works__shots {
-    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-    align-items: start;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .ap-how-it-works__shot--claim {

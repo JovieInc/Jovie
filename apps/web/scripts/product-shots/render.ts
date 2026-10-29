@@ -92,6 +92,13 @@ async function renderShot(page: Page, baseUrl: string, spec: ProductShotSpec) {
     content:
       'nextjs-portal,[data-nextjs-toast],[data-sonner-toaster]{display:none!important}',
   });
+  // Focus rings are interaction state, not the product moment. Focus traps
+  // (dialogs, drawers) re-focus after a blur, so suppress the styling of the
+  // focused element instead of moving focus.
+  await page.addStyleTag({
+    content:
+      ':focus,:focus-visible{outline:none!important;box-shadow:none!important;--tw-ring-shadow:0 0 #0000!important;--tw-ring-offset-shadow:0 0 #0000!important}',
+  });
   const clip = await cropBox(page, spec);
   const png = await page.screenshot({
     clip,

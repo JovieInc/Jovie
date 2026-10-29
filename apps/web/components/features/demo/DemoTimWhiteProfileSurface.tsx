@@ -120,6 +120,7 @@ const DEMO_TIM_WHITE_SHOWCASE_STATE_IDS = [
   'alerts-fallback',
   'events-empty',
   'more-menu',
+  'share',
   'fans-opt-in',
   'fans-confirmed',
   'fans-song-alert',
@@ -649,8 +650,10 @@ function SingleStatePhonePreview({
   );
 }
 
-function MoreMenuPhonePreview() {
-  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES['more-menu'];
+function DrawerPhonePreview({
+  stateId,
+}: Readonly<{ stateId: 'more-menu' | 'share' }>) {
+  const state = HOMEPAGE_PROFILE_SHOWCASE_STATES[stateId];
   const profileAccentStyle = buildProfileAccentCssVars(
     readProfileAccentTheme(HOMEPAGE_PROFILE_PREVIEW_ARTIST.theme)
   );
@@ -811,8 +814,8 @@ export function DemoTimWhiteProfileSurface() {
   }
 
   if (showcaseState) {
-    if (showcaseState === 'more-menu') {
-      return <MoreMenuPhonePreview />;
+    if (showcaseState === 'more-menu' || showcaseState === 'share') {
+      return <DrawerPhonePreview stateId={showcaseState} />;
     }
 
     return (

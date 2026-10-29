@@ -41,8 +41,19 @@ export interface ProductShotSpec {
    * control without wrapping product markup in a capture-only element.
    */
   readonly crop: readonly string[];
-  /** CSS px of surrounding UI kept around the element (default 0). */
-  readonly padding?: number;
+  /**
+   * CSS px of surrounding UI kept around the element (default 0). Per-side
+   * values let a crop compensate for a heading's line-box leading so the
+   * visible margins balance optically.
+   */
+  readonly padding?:
+    | number
+    | {
+        readonly top: number;
+        readonly right: number;
+        readonly bottom: number;
+        readonly left: number;
+      };
   /** Clip the crop height in CSS px (keeps tall lists to one moment). */
   readonly maxHeight?: number;
   readonly frame: ProductShotFrame;
@@ -73,10 +84,14 @@ export const PRODUCT_SHOTS = [
     viewport: 'desktop',
     theme: 'dark',
     waitFor: '[data-testid="onboarding-handle-submit"]',
-    crop: [`${STAGE} h1`, `${STAGE} form`],
-    padding: 32,
+    // The submit button, not the form: the form also holds an empty
+    // validation-status slot that read as dead space under the input.
+    crop: [`${STAGE} h1`, '[data-testid="onboarding-handle-submit"]'],
+    // 48px heading on a 52px line box: 10px less on top balances the cap
+    // height against the 32px under the input.
+    padding: { top: 22, right: 32, bottom: 32, left: 32 },
     frame: 'bare',
-    displayWidth: 560,
+    displayWidth: 736,
     sources: [
       `${ONBOARDING}/OnboardingHandleStep.tsx`,
       `${DEMO}/DemoShowcaseSurface.tsx`,
@@ -106,18 +121,19 @@ export const PRODUCT_SHOTS = [
   {
     id: 'setup-share-profile',
     title: 'Share your profile',
-    alt: "Tim White's live Jovie profile header with jov.ie/timwhite and Get Updates.",
-    route: '/demo/showcase/tim-white-profile?release=live',
+    alt: "The share sheet on Tim White's Jovie profile: Copy Link, Instagram Story, X, Threads and Email.",
+    route: '/demo/showcase/tim-white-profile?state=share',
     viewport: 'desktop',
     theme: 'dark',
-    waitFor: '[data-testid="profile-compact-shell"]',
-    crop: ['[data-testid="profile-identity-header"]'],
-    padding: 40,
+    waitFor: '[data-testid="profile-menu-drawer"]',
+    crop: ['[data-testid="profile-menu-drawer"]'],
     frame: 'bare',
-    displayWidth: 320,
+    displayWidth: 382,
     sources: [
       `${DEMO}/DemoTimWhiteProfileSurface.tsx`,
-      `${PROFILE}/ProfileIdentityHeader.tsx`,
+      `${PROFILE}/ProfileUnifiedDrawer.tsx`,
+      'apps/web/components/features/share/PublicShareMenu.tsx',
+      'apps/web/components/features/home/homepage-profile-preview-fixture.ts',
     ],
     placements: ['/artist-profiles', '/solutions/artists'],
   },

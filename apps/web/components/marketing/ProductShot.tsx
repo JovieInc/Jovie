@@ -1,4 +1,5 @@
 // @coverage-via apps/web/components/marketing/ProductShot.test.tsx
+import type { CSSProperties } from 'react';
 import {
   getProductShot,
   type ProductShotId,
@@ -12,6 +13,12 @@ interface ProductShotProps {
   readonly sizes?: string;
   readonly priority?: boolean;
   readonly className?: string;
+  /**
+   * Stage the shot: a matte card with the UI floating inside on its own
+   * radius and hairline (Pen feature bento I8TdQv). Use when the shot sits
+   * beside other shots or inside a tile, so cards align at equal heights.
+   */
+  readonly staged?: boolean;
 }
 
 /**
@@ -24,11 +31,18 @@ export function ProductShot({
   sizes,
   priority = false,
   className,
+  staged = false,
 }: ProductShotProps) {
   const shot = getProductShot(id);
   return (
     <figure
-      className={cn('product-shot', `product-shot--${shot.frame}`, className)}
+      className={cn(
+        'product-shot',
+        `product-shot--${shot.frame}`,
+        staged && 'product-shot--staged',
+        className
+      )}
+      style={{ '--product-shot-max-width': `${shot.width}px` } as CSSProperties}
       data-product-shot={shot.id}
       data-testid={`product-shot-${shot.id}`}
     >
