@@ -145,6 +145,7 @@ for (const width of [390, 1280]) {
         review.getByRole('button', { name: /continue with this profile/i })
       ).toBeFocused();
       expect(writes).toEqual([]);
+      expect(runtimeEvents).toEqual([]);
       expect(
         await page.evaluate(
           () =>

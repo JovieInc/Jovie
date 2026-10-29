@@ -57,7 +57,7 @@ export const ProfileBeforeAuth: Story = {
       handle: 'fixtureartist',
       displayName: 'Fixture Artist',
       avatarUrl: new URL(
-        '../../../public/images/avatars/nova-lane.jpg',
+        '../../../public/images/avatars/tim-white.jpg',
         import.meta.url
       ).href,
       spotifyId: 'fixtureartist',
