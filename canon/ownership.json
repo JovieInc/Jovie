@@ -125,6 +125,7 @@
     {"id": "workflow:test-flakiness-report", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/test-flakiness-report.yml"},
     {"id": "workflow:tsc-cache-warm", "kind": "workflow", "owner": "gem-hostops", "status": "active", "ref": ".github/workflows/tsc-cache-warm.yml"},
     {"id": "workflow:ui-story-coverage-audit", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/ui-story-coverage-audit.yml"},
+    {"id": "workflow:auto-merge-base-guard", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/auto-merge-base-guard.yml"},
     {"id": "workflow:unstack-merged-parent", "kind": "workflow", "owner": "gem-lanes", "status": "active", "ref": ".github/workflows/unstack-merged-parent.yml"},
     {"id": "workflow:vercel-preview-cleanup", "kind": "workflow", "owner": "symphony-release", "status": "active", "ref": ".github/workflows/vercel-preview-cleanup.yml"},
     {"id": "workflow:visual-a11y", "kind": "workflow", "owner": "gem-ci-repair", "status": "active", "ref": ".github/workflows/visual-a11y.yml"},

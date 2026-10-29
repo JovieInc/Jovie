@@ -404,8 +404,8 @@ never ships. Two layers enforce it: `assertEnrollCandidate` in
 `scripts/merge-queue-backend.mjs` refuses a non-main base (this covers green
 enroll and `drain-pr-queue.sh`), and the `Auto-Merge Base Guard` workflow
 disables auto-merge the moment it is enabled on a non-main base (covers a
-person or agent running `gh pr merge --auto`). When a parent merges,
+person or agent arming auto-merge by hand). When a parent merges,
 `Unstack Merged Parent` retargets its children to `main`, rebases them without
-the parent's squash-merged commits, then enqueues (CLEAN) or arms auto-merge
-(squash) unless the child is draft or carries an admission-blocking label.
-`QUEUE_FREEZE=1` stops the arming step; the retarget and rebase still run.
+the parent's squash-merged commits, then dispatches green enroll's per-PR path
+for it, so admission (green head, holds, draft) stays in the single queue
+writer. `QUEUE_FREEZE=1` stops that dispatch; the retarget and rebase still run.

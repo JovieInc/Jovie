@@ -487,15 +487,19 @@ describe('unstack-merged-parent.sh', () => {
     expect(workflow).toContain(
       '# controller-hop-exception: jovie-controller-hop/v1'
     );
-    // Arming goes through the policy lib and is frozen with the queue.
+    // Admission goes through green enroll's per-PR dispatch and is frozen with the queue.
     expect(workflow).toContain("vars.QUEUE_FREEZE != '1'");
     expect(workflow).not.toContain('--auto');
   });
 
-  it('dry-run with arming reports the policy decision and mutates nothing', () => {
+  it('hands the unstacked child to green enroll and never writes the queue itself', () => {
     const fx = fixture();
-    const result = run(fx, { DRY_RUN: '1', ARM_AFTER_UNSTACK: '1' });
+    const result = run(fx, { DRY_RUN: '1', ADMIT_AFTER_UNSTACK: '1' });
     expect(result.status, result.stdout + result.stderr).toBe(0);
+    expect(result.stdout).toContain('would dispatch green enroll for #11');
+    const source = readFileSync(script, 'utf8');
+    expect(source).not.toMatch(/enqueuePullRequest|enablePullRequestAutoMerge/);
+    expect(source).not.toMatch(/pr merge[^\n]*--auto/);
     expect(git(fx.remote, 'rev-parse', 'child')).toBe(fx.childSha);
   });
 });

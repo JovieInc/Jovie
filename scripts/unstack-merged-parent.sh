@@ -16,9 +16,12 @@
 #
 # A conflict aborts the rebase and leaves the branch untouched with a comment;
 # the lanes conflict lane owns it from there. Never closes a PR, never touches
-# `hold`/`gated` PRs. With ARM_AFTER_UNSTACK=1 the unstacked child is then
-# armed per scripts/lib/stack-arm-policy.mjs: enqueued when CLEAN, otherwise
-# native auto-merge (squash). Only a PR whose base is main is ever armed.
+# `hold`/`gated` PRs, never arms auto-merge or enqueues itself: Merge Queue
+# Green Enroll is the only queue writer (admission-hold-labels.test.mjs). With
+# ADMIT_AFTER_UNSTACK=1 the unstacked child is handed to it by dispatching its
+# per-PR path (`pr_number`), which enqueues the head when it is green and
+# holds/labels are clear, and otherwise leaves it for the green wake. Only a PR
+# that now targets main is handed over.
 #
 # Env:
 #   REPO           owner/name (default JovieInc/Jovie)
@@ -26,7 +29,7 @@
 #   OLD_BASE_REF   its former base branch when GitHub already retargeted it to
 #                  main after deleting the merged parent branch (optional)
 #   DRY_RUN=1      plan and print only; no push, edit, comment or arming
-#   ARM_AFTER_UNSTACK=1  enqueue/arm the child once it targets main (default 0)
+#   ADMIT_AFTER_UNSTACK=1  dispatch green enroll for the child once it targets main (default 0)
 #   GIT_REMOTE     remote name (default origin)
 set -euo pipefail
 
@@ -38,7 +41,7 @@ CHILD_PR="${CHILD_PR:-}"
 OLD_BASE_REF="${OLD_BASE_REF:-}"
 DRY_RUN="${DRY_RUN:-0}"
 GIT_REMOTE="${GIT_REMOTE:-origin}"
-ARM_AFTER_UNSTACK="${ARM_AFTER_UNSTACK:-0}"
+ADMIT_AFTER_UNSTACK="${ADMIT_AFTER_UNSTACK:-0}"
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 MARKER="unstack-merged-parent"
 
@@ -55,8 +58,7 @@ POLICY_DIR="$(mktemp -d)"
 trap 'rm -rf "$POLICY_DIR"' EXIT
 git -C "$POLICY_ROOT" archive "$POLICY_REF" scripts/lanes scripts/apiclient \
   packages/api-client/providers.json scripts/lib/upsert-pr-comment.sh \
-  scripts/lib/stack-arm-policy.mjs scripts/lib/admission-hold-labels.mjs \
-  scripts/lib/admission-hold-labels.json \
+  packages/api-client \
   | tar -x -C "$POLICY_DIR"
 
 custody_read() {  # custody_read state <num> | claims <num> <expected-head>
@@ -161,41 +163,20 @@ rebase_branch() {
   echo "$new_head"
 }
 
-# arm_child <num>: after the child targets main, enqueue it when CLEAN, else arm
-# native auto-merge (squash). The decision is scripts/lib/stack-arm-policy.mjs
-# (open, ready, base main, no admission-blocking label). Never fatal: arming is
-# best-effort and green-enroll remains the backstop for a green main-based PR.
-arm_child() {
-  [[ "$ARM_AFTER_UNSTACK" == "1" ]] || return 0
-  local num="$1" live action id head
-  live="$(gh_retry pr view "$num" -R "$REPO" \
-    --json id,state,isDraft,baseRefName,headRefOid,mergeStateStatus,labels,autoMergeRequest,isInMergeQueue 2>/dev/null)" || {
-    echo "    ~ #$num state unreadable; not arming"
-    return 0
-  }
-  action="$(jq '{state, isDraft, baseRefName, mergeStateStatus, labels: [.labels[].name],
-      autoMergeEnabled: (.autoMergeRequest != null), inQueue: .isInMergeQueue}' <<<"$live" \
-    | node "$POLICY_DIR/scripts/lib/stack-arm-policy.mjs")" || action="skip:policy-error"
-  id="$(jq -r .id <<<"$live")"
-  head="$(jq -r .headRefOid <<<"$live")"
-  echo "    arm #$num: $action"
+# admit_child <num>: once the child targets main, hand it to Merge Queue Green
+# Enroll's per-PR path (workflow_dispatch pr_number). That controller owns every
+# admission rule (green head, hold labels, draft, queue freeze); this script
+# never writes the queue. Never fatal: the green wake is the backstop.
+admit_child() {
+  [[ "$ADMIT_AFTER_UNSTACK" == "1" ]] || return 0
   if [[ "$DRY_RUN" == "1" ]]; then
+    echo "    [dry-run] would dispatch green enroll for #$1"
     return 0
   fi
-  case "$action" in
-    enqueue)
-      gh_retry api graphql \
-        -f query='mutation($id:ID!,$oid:GitObjectID!){enqueuePullRequest(input:{pullRequestId:$id,expectedHeadOid:$oid}){mergeQueueEntry{position}}}' \
-        -f id="$id" -f oid="$head" >/dev/null \
-        || echo "    ~ enqueue of #$num failed; green enroll will retry"
-      ;;
-    auto-merge)
-      gh_retry api graphql \
-        -f query='mutation($id:ID!){enablePullRequestAutoMerge(input:{pullRequestId:$id,mergeMethod:SQUASH}){pullRequest{id}}}' \
-        -f id="$id" >/dev/null \
-        || echo "    ~ auto-merge arm of #$num failed; green enroll will retry"
-      ;;
-  esac
+  node "$POLICY_DIR/packages/api-client/cli.ts" gh --priority merge -- \
+    workflow run merge-queue-green-enroll.yml -R "$REPO" --ref main -f pr_number="$1" >/dev/null \
+    && echo "    admit #$1: green enroll dispatched" \
+    || echo "    ~ green enroll dispatch for #$1 failed; the green wake will admit it"
 }
 
 git config user.name >/dev/null 2>&1 || git config user.name "jovie-bot[bot]"
@@ -233,7 +214,7 @@ onto="${GIT_REMOTE}/main"
 # conflict (or replay commits) on a branch that is already correct.
 if ! git merge-base --is-ancestor "$parent_sha" "$child_sha" 2>/dev/null; then
   echo "  ~ #$CHILD_PR no longer carries parent #$parent_pr; already unstacked"
-  [[ "$child_base" != "main" ]] || arm_child "$CHILD_PR"
+  [[ "$child_base" != "main" ]] || admit_child "$CHILD_PR"
   exit 0
 fi
 if new_child="$(rebase_branch "$CHILD_PR" "$child_branch" "$parent_sha" "$onto" "$child_sha" "$child_base")"; then
@@ -249,7 +230,7 @@ if [[ "$child_base" != "main" && "$DRY_RUN" != "1" ]]; then
   gh_retry pr edit "$CHILD_PR" -R "$REPO" --base main >/dev/null
 fi
 echo "  ✓ #$CHILD_PR targets main"
-arm_child "$CHILD_PR"
+admit_child "$CHILD_PR"
 comment "$CHILD_PR" "🤖 Unstack: parent #${parent_pr} merged, so this PR was rebased onto \`main\` with only its own commits (\`${child_sha:0:12}\` → \`${new_child:0:12}\`) and now targets \`main\`. _(at $(date -u +%Y-%m-%dT%H:%M:%SZ))_"
 
 # Restack the chain: each open PR based on a rewritten branch moves its own

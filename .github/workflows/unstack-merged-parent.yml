@@ -6,11 +6,10 @@ name: Unstack Merged Parent
 #
 # A stacked PR whose parent merged is rebased onto main with only its own
 # commits, retargeted to main, and its open descendants are restacked on the
-# rewritten branch. When the child is then eligible (open, ready, no hold
-# label, base main) it is enqueued if CLEAN, otherwise native auto-merge is
-# armed (squash). See scripts/unstack-merged-parent.sh and
-# scripts/lib/stack-arm-policy.mjs. Never closes a PR, never touches
-# held/gated PRs, never arms a PR whose base is not main.
+# rewritten branch. The child is then handed to Merge Queue Green Enroll's
+# per-PR dispatch, the only queue writer, which enqueues it when green and not
+# held. See scripts/unstack-merged-parent.sh. Never closes a PR, never touches
+# held/gated PRs, never arms or enqueues anything itself.
 #
 # Wakes: (1) pull_request_target `closed` + merged: open children whose base is
 # the merged PR's head branch (found while the base branch still exists);
@@ -56,6 +55,15 @@ jobs:
     outputs:
       children: ${{ steps.children.outputs.children }}
     steps:
+      - name: Checkout main policy code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v4.4.0
+        with:
+          node-version-file: .nvmrc
       - name: List the stacked children to unstack
         id: children
         env:
@@ -71,7 +79,7 @@ jobs:
           if [ "$EVENT" = workflow_dispatch ]; then
             list="[$INPUT_PR]"
           elif [ "$ACTION" = closed ]; then
-            list="$(gh pr list -R "$REPO" --state open --base "$MERGED_HEAD_REF" --limit 50 --json number --jq '[.[].number]')"
+            list="$(node packages/api-client/cli.ts gh --priority merge -- pr list -R "$REPO" --state open --base "$MERGED_HEAD_REF" --limit 50 --json number --jq '[.[].number]')"
           else
             list="[$EVENT_PR]"
           fi
@@ -116,5 +124,5 @@ jobs:
           GH_RETRY_MAX_DELAY: 60
           CHILD_PR: ${{ matrix.child }}
           OLD_BASE_REF: ${{ (github.event.action == 'closed' && github.event.pull_request.head.ref) || github.event.changes.base.ref.from || '' }}
-          ARM_AFTER_UNSTACK: ${{ vars.QUEUE_FREEZE != '1' && '1' || '0' }}
+          ADMIT_AFTER_UNSTACK: ${{ vars.QUEUE_FREEZE != '1' && '1' || '0' }}
         run: bash scripts/unstack-merged-parent.sh
