@@ -315,8 +315,11 @@ interface ResendFullEmail {
 async function fetchFullEmail(
   emailId: string
 ): Promise<ResendFullEmail | null> {
-  if (!env.RESEND_API_KEY) {
-    logger.warn('RESEND_API_KEY not configured for full email fetch', {
+  // Received bodies need a read-capable key; the sending key is send-only in
+  // production. Received mail lives under /emails/receiving (JOV-9779).
+  const apiKey = env.RESEND_RECEIVING_API_KEY ?? env.RESEND_API_KEY;
+  if (!apiKey) {
+    logger.warn('No Resend key configured for full email fetch', {
       emailId,
     });
     return null;
@@ -324,10 +327,10 @@ async function fetchFullEmail(
 
   try {
     const response = await serverFetch(
-      `https://api.resend.com/emails/${emailId}`,
+      `https://api.resend.com/emails/receiving/${encodeURIComponent(emailId)}`,
       {
         headers: {
-          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         timeoutMs: 10_000,
         context: 'Resend received email fetch',
