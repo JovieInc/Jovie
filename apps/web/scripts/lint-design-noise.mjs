@@ -2,7 +2,7 @@
 /**
  * Design-noise guard (founder bans, 2026-10-28): static, ratcheted.
  *
- * Rules (each counted per file against design-noise.debt.json, shrink-only):
+ * Rules (each counted per file against design-noise.baseline.json, shrink-only):
  *   icon-tile        an icon/emoji that is the sole child of an element with a
  *                    border, ring or background fill. Bare icons only.
  *   icon-tile-comp   use of IconBadge / IconTile / IconGlyphFrame components.
@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(here, '..', '..', '..');
-export const BASELINE_PATH = join(here, '..', 'design-noise.debt.json');
+export const BASELINE_PATH = join(here, '..', 'design-noise.baseline.json');
 
 const ICON_TILE =
   /<(div|span)\b[^>]*className=(?:'([^']*)'|"([^"]*)"|\{`([^`]*)`\})[^>]*>\s*(?:<[A-Za-z.]*(?:Icon|Svg)\w*\b[^>]*\/>|<(?:step|feature|benefit|item)\.icon\b[^>]*\/>|<[A-Z]\w*\b[^>]*aria-hidden[^>]*\/>|\p{Extended_Pictographic}+|\{[a-z.]*[iI]con\})\s*<\/\1>/gu;
