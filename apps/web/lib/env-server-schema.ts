@@ -182,6 +182,9 @@ export const ServerEnvSchema = z.object({
   // Stripe server-side configuration
   STRIPE_SECRET_KEY: z.string().optional(),
   REVENUECAT_LYB_SECRET_API_KEY: z.string().optional(),
+  // Fleet audit trail read side (workers/observability-ingest, jovie-fleet-audit worker).
+  FLEET_AUDIT_READ_TOKEN: z.string().optional(),
+  FLEET_AUDIT_URL: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_CONNECT_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_WEBHOOK_SECRET_TIPS: z.string().optional(),
@@ -602,6 +605,7 @@ export const ENV_KEYS = [
   'TELEGRAM_WEBHOOK_SECRET',
   'STRIPE_SECRET_KEY',
   'REVENUECAT_LYB_SECRET_API_KEY',
+  'FLEET_AUDIT_READ_TOKEN',
   'STRIPE_WEBHOOK_SECRET',
   'STRIPE_CONNECT_WEBHOOK_SECRET',
   'STRIPE_WEBHOOK_SECRET_TIPS',

@@ -20,7 +20,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 | Design tokens | file | `apps/web/design/tokens.json` | `design.tokens.json`<br>`canon/DESIGN.md` | - |
 | Marketing copy, nav and footer | record | `apps/web/lib/content-records/registry.ts` (moves to #23595) | `apps/web/lib/content-records/marketing-page.ts`<br>`apps/web/data/product-truth/claims.ts` | - |
 | Product claims and proof | file | `apps/web/data/product-truth/claims.ts` | `apps/web/data/product-truth/registry.ts`<br>`apps/web/data/product-truth/claim-digest.gen.json` | - |
-| Email streams and sending domains | file | `apps/web/constants/domains.ts` (moves to #23585) | `apps/web/lib/email/legal-footer.ts` | DNS (SPF, DKIM, DMARC) for the sending domains |
+| Email streams and sending domains | file | `apps/web/lib/email/stream-registry.json` | `apps/web/lib/email/streams.ts`<br>`apps/web/lib/notifications/sender-policy.ts`<br>`apps/web/lib/inbox/constants.ts`<br>`apps/web/lib/email/legal-footer.ts`<br>`docs/company/email-sending-streams.md` | DNS (SPF, DKIM, DMARC) for the sending domains; Resend domain verification |
 | Legal claims (privacy, terms, cookies) | file | `apps/web/content/legal/privacy.md` | `apps/web/content/legal/terms.md`<br>`canon/COMPLIANCE.md`<br>`apps/web/lib/email/legal-footer.ts` | - |
 | Retention windows and numeric limits quoted in copy | file | `apps/web/lib/analytics/data-retention.ts` | `apps/web/content/legal/privacy.md`<br>`apps/web/app/api/cron/data-retention/route.ts` | - |
 | Linear workflow states | external | Linear (team workflow settings) (mirror: `.claude/rules/linear.md`) | `scripts/lib/linear-issue-intake.mjs`<br>`scripts/lib/linear-sync-on-merge.mjs` | - |
@@ -42,7 +42,7 @@ Machine-readable map: [`sources-of-truth.json`](./sources-of-truth.json). Rule f
 - **Design tokens.** Machine-readable token source; the repo-root export and CSS are generated from it.
 - **Marketing copy, nav and footer.** Content records (marketing page specs; site-chrome for header and footer in #23595). The registry file declares the record kinds; the records themselves live in the content-records table.
 - **Product claims and proof.** Each public claim names its evidence; copy that states a capability must derive from a claim.
-- **Email streams and sending domains.** Hostname and mailbox addresses today. PR #23585 adds the stream registry (cold mail never on jov.ie); when it lands, point this owner at it.
+- **Email streams and sending domains.** Every email stream (transactional, lifecycle, founder, broadcast, inbox, cold) bound to provider, sending domain and address, reply-to, required headers, postal footer, consent, suppression, rate limit, approval and deliverability thresholds. The send gateway (apps/web/lib/email/gateway) and the mail rules in scripts/lib/external-api-guard.mjs read it. Cold never runs on jov.ie or the Resend account and is closed until Tim approves a cold path.
 - **Legal claims (privacy, terms, cookies).** Privacy policy, terms and cookies in apps/web/content/legal. COMPLIANCE.md is the register of what must be true.
 - **Retention windows and numeric limits quoted in copy.** DEFAULT_RETENTION_DAYS and CHAT_RETENTION_DAYS. Privacy policy and pricing copy quote these; they must derive from this owner, not restate it.
 - **Linear workflow states.** Linear holds the states; the rule documents which transitions agents make.

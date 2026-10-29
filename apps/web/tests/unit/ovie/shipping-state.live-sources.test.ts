@@ -125,6 +125,15 @@ describe('lanes-status deployHealth block', () => {
     schema: 'jovie-deploy-health/v1',
     observedAt: '2026-10-25T06:40:00Z',
     healthy: false,
+    lag: {
+      'JovieInc/Jovie': {
+        p50Min: 56,
+        p95Min: 246,
+        n: 187,
+        targetP50Min: 30,
+        targetP95Min: 90,
+      },
+    },
     repos: {
       'JovieInc/LogYourBody': {
         status: 'failing',
@@ -152,6 +161,16 @@ describe('lanes-status deployHealth block', () => {
           behindMain: 54,
           oldestUnshippedAgeSeconds: 140083,
           lastSuccessAt: '2026-10-23T16:03:00.000Z',
+        },
+      ],
+      lag: [
+        {
+          repo: 'JovieInc/Jovie',
+          p50Min: 56,
+          p95Min: 246,
+          samples: 187,
+          targetP50Min: 30,
+          targetP95Min: 90,
         },
       ],
     });
