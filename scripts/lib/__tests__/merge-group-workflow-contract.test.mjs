@@ -457,7 +457,9 @@ describe('merge_group workflow contract', () => {
     const sizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
-    expect(admission).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
+    expect(admission).toContain(
+      'runs-on: [self-hosted, Linux, X64, jovie-fixed]'
+    );
     expect(admission).toContain('timeout-minutes: 75');
     expect(admission).not.toContain('sleep "$wait_s"');
     expect(admission).toContain('actions: read');
