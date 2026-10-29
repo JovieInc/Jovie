@@ -85,7 +85,6 @@ jobs:
       # Same no-secret public-route mode the local certification runs use: no
       # database, mocked auth keys. Evidence is for public marketing routes.
       - name: Start the app
-        working-directory: apps/web
         env:
           DATABASE_URL: postgresql://localhost/noop
           NEXT_DISABLE_TOOLBAR: '1'
@@ -96,7 +95,7 @@ jobs:
           NEXT_TELEMETRY_DISABLED: '1'
           PORT: '3917'
         run: |
-          nohup node scripts/dev-fast.mjs > "$RUNNER_TEMP/dev.log" 2>&1 &
+          nohup node apps/web/scripts/dev-fast.mjs > "$RUNNER_TEMP/dev.log" 2>&1 &
           for i in $(seq 1 60); do
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 120 http://localhost:3917/ || true)"
             [ "$code" = 200 ] && exit 0
