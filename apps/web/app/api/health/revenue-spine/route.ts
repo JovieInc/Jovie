@@ -6,7 +6,6 @@ import {
 } from '@/lib/observability/revenue-spine';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
 
 /**
  * Public runtime receipt for the revenue-spine failure contract (JOV-8249).
