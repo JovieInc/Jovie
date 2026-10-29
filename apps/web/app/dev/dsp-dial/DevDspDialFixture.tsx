@@ -56,7 +56,7 @@ export function DevDspDialFixture({
   const [selectedId, setSelectedId] = useState(options[0]!.id);
   const [activated, setActivated] = useState<string | null>(null);
   return (
-    <main className='mx-auto min-h-dvh w-full max-w-[390px] bg-surface-1 p-4'>
+    <main className='mx-auto min-h-dvh w-full max-w-md bg-surface-1 p-4'>
       <ActionDial
         options={options}
         selectedId={selectedId}
