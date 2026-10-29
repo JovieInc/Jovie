@@ -253,8 +253,6 @@ export function CliLandingPage() {
 
       <MarketingFooterCta
         sectionVariant='final-single-claim'
-        title='Jovie, for your agents.'
-        body='Install the Jovie CLI and give a creator a profile from their Spotify link.'
         ctaLabel={CLI_PRIMARY_CTA_LABEL}
         ctaHref='#install'
         ctaAnalyticsEvent='cli_install_cta'

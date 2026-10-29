@@ -30,9 +30,9 @@ async function enterPersona(
   await expect(page.locator('#main-content')).toBeVisible({ timeout: 60_000 });
 }
 
-/** Business and Tools stay collapsed until the viewer opens them (Tim 2026-10-21). */
+/** Company and Tools stay collapsed until the viewer opens them (Tim 2026-10-21). */
 async function expandOperatorTools(navigation: Locator) {
-  for (const name of ['Business', 'Tools']) {
+  for (const name of ['Company', 'Tools']) {
     const group = navigation.getByRole('button', { name, exact: true });
     if ((await group.count()) === 0) continue;
     if ((await group.getAttribute('aria-expanded')) !== 'true') {

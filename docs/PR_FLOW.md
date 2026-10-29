@@ -342,7 +342,7 @@ each plane as separate evidence, never as a reason to repeat the mutation.
 | GitHub native queue and exact-head merge-group checks | Landing without current combined-head proof |
 | `taste-classifier.mjs` | Taste-flagged PRs are routed to LLM review, not held |
 | Risk-tiered triggers | Heavy scans saturating runners on the PR path |
-| gate-weakening detector (JOV-INV-045) | PRs that loosen required checks, shrink-only baselines, budgets, or blocking CI without `gate-change:` plus the `codeowners-approved` label |
+| gate-weakening detector (JOV-INV-045) | PRs that loosen required checks, shrink-only baselines, budgets, or blocking CI without `gate-change:` plus the `codeowners-approved` audit label (agent-applied after LLM review; no human approval) |
 
 ### Runner label policy
 
@@ -383,7 +383,7 @@ existed. Contract:
 
 1. Publish the first coherent commit as a draft.
    `JOVIE_PUSH_PHASE=publication git push` is the default husky path (diff,
-   secrets, hook policy only).
+   scoped Biome, secrets, hook policy only).
 2. Fast source CI on every push.
    Per-PR concurrency cancels superseded runs.
    `Exact-head Coverage` runs V8 coverage and the 60% changed-line ratchet on

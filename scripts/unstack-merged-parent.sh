@@ -66,7 +66,7 @@ import pr_events
 try:
     mode, number = sys.argv[2], int(sys.argv[3])
     if mode == "claims":
-        if pr_events.claim_active(number, sys.argv[4], sh=pr_events.machine_hold_gh,
+        if pr_events.claim_active(number, sys.argv[4], sh=lambda args, **kw: pr_events.api_gh(args[1:] if args and args[0] == "gh" else args, **kw),
                                   kind=("fix", "gate", "adopt"), exclude_host=None):
             raise ValueError("active or unreadable claim")
     elif mode == "state":

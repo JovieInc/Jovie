@@ -38,6 +38,9 @@ export const CANONICAL_WEB_SURFACE_OWNERSHIP = {
     liveSourcePaths: [
       'apps/web/app/(home)/page.tsx',
       'apps/web/app/(home)/layout.tsx',
+      // The page renders the published spec through this renderer, which
+      // mounts the homepage section components (lib/content-records).
+      'apps/web/components/homepage/HomepageSpecSections.tsx',
     ],
     requiredTokens: [
       'HomepageArtistHero',

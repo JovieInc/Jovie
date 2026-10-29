@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { PRODUCTION_AUTH_SMOKE_EMAIL } from '../../e2e/utils/production-auth-credentials';
 import {
   extractProductionAuthOtp,
+  isProductionCanaryOtpEmail,
+  newProdcertUserEmail,
   waitForProductionAuthOtp,
 } from '../../e2e/utils/production-auth-otp';
 
@@ -109,5 +111,34 @@ describe('production Better Auth OTP retrieval', () => {
       'Production Better Auth OTP retrieval refused a non-smoke identity.'
     );
     expect(loadRecord).not.toHaveBeenCalled();
+  });
+
+  it('reads exactly the tagged prodcert new-user canary and nothing near it', async () => {
+    const loadRecord = vi.fn().mockResolvedValue(null);
+    const ok = newProdcertUserEmail('Run-12345abc');
+    expect(ok).toBe('browse-ready+synthetic-prodcert-run12345abc@jov.ie');
+    expect(isProductionCanaryOtpEmail(ok)).toBe(true);
+    for (const bad of [
+      'browse-ready@jov.ie',
+      'browse-ready+synthetic-prodcert-abc@jov.ie',
+      'browse-ready+synthetic-prodcert-abcdef12@gmail.com',
+      'browse-ready+synthetic-prodcert-abcdef12@evil.jov.ie',
+      'someone+synthetic-prodcert-abcdef12@jov.ie',
+      'browse-ready+synthetic-prodcert-abcdef12+x@jov.ie',
+      'tim@jov.ie',
+    ]) {
+      expect(isProductionCanaryOtpEmail(bad), bad).toBe(false);
+      await expect(
+        waitForProductionAuthOtp({ email: bad, startedAtMs, loadRecord })
+      ).rejects.toThrow('refused a non-smoke identity');
+    }
+    expect(loadRecord).not.toHaveBeenCalled();
+  });
+
+  it('deliberate red: the creator-ready smoke identity still resolves unchanged', () => {
+    expect(isProductionCanaryOtpEmail('browse-ready+clerk_test@jov.ie')).toBe(
+      true
+    );
+    expect(isProductionCanaryOtpEmail('browse+clerk_test@jov.ie')).toBe(false);
   });
 });

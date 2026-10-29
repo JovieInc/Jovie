@@ -225,8 +225,7 @@ finish a PR.
 
 ### Hold contract (jovie-hold/v1)
 
-Every stop label (`hold`, `gated`, `incident`, `do-not-merge`, and the
-`tim-hold` / `tim:hold` / `hold:tim` variants) must come with a receipt comment
+Every stop label (`hold`, `gated`, `incident`, `queue-deferred`) must come with a receipt comment
 on the PR that names an owner and a machine-checkable release. The canonical
 list is `scripts/lib/admission-hold-labels.mjs`; enroll, dequeue, auto-merge
 enable and the merge-group member policy all block on the same set plus the

@@ -744,7 +744,7 @@ the relay), deploy
 failures and Sentry `repository_dispatch` `sentry-issue` payloads become one
 `jovie.remediation-event/v1`. `classify_blocker` / `classify_event` name exactly one class:
 `ready`, `needs-rebase` (`lockfile-only`, `generated-only` or `semantic`), `flaky-infra`, `fixable-by-model`,
-`needs-human-decision`, `obsolete`, plus `main-red` when main itself is the failure.
+`needs-human-decision` (a reserved decision or a secret-file security gate: it surfaces once and files a non-blocking Ovie `decisionAsk` with a default and a deadline; it applies no label and holds nothing, EVENT 2026-10-28), `obsolete`, plus `main-red` when main itself is the failure.
 
 The ladder (`plan_ladder`) runs deterministic rungs first — one `update-branch` per episode,
 the existing generated-file resolver, one `gh run rerun --failed` per head. Those spend no model
@@ -757,7 +757,7 @@ Spent caps are `ladder-exhausted`. Re-entry is a new external head, a cleared de
 main turning green; attempt history is kept on the `jovie-reentry/v1` receipt.
 
 Flags: `LANES_ESCALATION` default on; `LANES_ESCALATION_NOTIFY_TIM` default off (Linear
-`needs-human` label plus one comment); `LANES_ESCALATION_LIFT_HUMAN_HOLDS` default off.
+`needs-human` label plus one comment). A repaired PR always lifts its machine `hold`.
 Needs-human, obsolete and ladder-exhausted share one PR comment marked
 `<!-- symphony-surface pr=N head=SHA -->`. Hold nags are at most one per PR per head per 24h.
 Escalating, ladder-exhausted and surfaced PRs count toward the terminal cap (`slots × 4`)

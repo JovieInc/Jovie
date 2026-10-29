@@ -1,6 +1,6 @@
 ## Privacy Policy
 
-_Last updated: February 2026_
+_Last updated: October 2026_
 
 This policy applies to {{LEGAL_ENTITY_NAME}} ("Jovie", "we", "us").
 
@@ -18,7 +18,7 @@ Jovie is not intended for children under 13 years of age. We do not knowingly co
 
 When you create a profile, we collect exactly what we need to deliver the product:
 
-- Email address and verification state (via Clerk authentication)
+- Email address and verification state (via our self-hosted Better Auth authentication)
 - Artist metadata synced from Spotify (name, artist ID, profile art)
 - Profile customizations such as taglines, social links, and CTA order
 
@@ -57,7 +57,6 @@ We automatically gather operational signals to keep Jovie reliable:
 
 Our stack uses a small set of trusted partners:
 
-- **Clerk** for authentication, identity, and session security
 - **Neon** for our Postgres database (with strict RLS policies)
 - **Stripe** for billing and customer subscriptions
 - **Spotify** for artist discovery and metadata enrichment
@@ -135,7 +134,7 @@ You can choose not to use AI features. The AI chat assistant is optional and doe
 
 We do not sell data to anyone. We may share data with:
 
-- Service providers who assist in operating Jovie (Clerk, Neon, Stripe, Statsig, Anthropic, Google AI, Vercel, Sentry, Resend)
+- Service providers who assist in operating Jovie (Neon, Stripe, Statsig, Anthropic, Google AI, Vercel, Sentry, Resend)
 - Legal authorities when required by law or to protect against fraud
 - Partners only when you explicitly connect a service (e.g., Spotify)
 
@@ -150,7 +149,6 @@ Data obtained from Google or Spotify is **never**:
 
 Data from Google and Spotify may only be shared with:
 
-- **Clerk**: Our authentication provider, which processes OAuth tokens securely
 - **Neon**: Our database provider, where your account information is stored with encryption
 
 All service providers are contractually bound to use your data only for providing services to Jovie and must maintain appropriate security measures.
@@ -161,7 +159,7 @@ We protect your data with layered safeguards:
 
 - **Encryption in transit**: All data transmitted between your browser and our servers uses TLS 1.3 encryption
 - **Encryption at rest**: All databases and backups are encrypted using AES-256
-- **Secure authentication**: OAuth flows powered by Clerk using industry-standard protocols (OAuth 2.0, OpenID Connect)
+- **Secure authentication**: OAuth flows powered by our self-hosted authentication stack (Better Auth) using industry-standard protocols (OAuth 2.0, OpenID Connect)
 - **Access controls**: Role-based access controls limit who can access production systems
 - **Audit logging**: All data access and modifications are logged for security monitoring
 - **Regular security reviews**: We conduct periodic security assessments of our infrastructure

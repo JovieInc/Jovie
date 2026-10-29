@@ -456,6 +456,22 @@ export const RATE_LIMITERS = {
   } satisfies RateLimitConfig,
 
   /**
+   * Global ceiling for agent draft writes (MCP + REST), keyed by a constant.
+   * Bounds total write volume when per-caller keys (session/installation) are
+   * spoofed. Sized for marketplace traffic from many shared egress IPs.
+   */
+  agentWriteGlobal: {
+    name: 'Agent Write Global',
+    limit: 600,
+    window: '1 h',
+    prefix: 'public:agent-write-global',
+    analytics: false,
+    algorithm: 'fixed-window',
+    trafficClass: 'anonymous',
+    requireRedis: true,
+  } satisfies RateLimitConfig,
+
+  /**
    * Anonymous creator extraction (GET /api/agents/creator-lookup): 60 per hour
    * per IP. Each request performs one bounded fetch to a supported platform.
    */

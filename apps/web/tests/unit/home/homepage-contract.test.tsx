@@ -32,6 +32,20 @@ vi.mock('@/lib/flags/marketing-static', async importOriginal => {
   };
 });
 vi.mock('@/lib/analytics', () => ({ track: vi.fn(), page: vi.fn() }));
+vi.mock('@/lib/content-records/store.server', async () => {
+  const { MARKETING_PAGE_KIND } = await import(
+    '@/lib/content-records/marketing-page'
+  );
+  return {
+    getLiveContent: async () => ({
+      data: MARKETING_PAGE_KIND.defaultRecord('home'),
+      source: 'default',
+      versionId: null,
+      version: null,
+      publishedAt: null,
+    }),
+  };
+});
 vi.mock('next/navigation', async importOriginal => ({
   ...(await importOriginal<typeof import('next/navigation')>()),
   useRouter: () => ({ push: vi.fn() }),
@@ -53,7 +67,7 @@ const read = (path: string) =>
 
 async function renderHomePage() {
   const { default: HomePage } = await import('@/app/(home)/page');
-  return render(HomePage());
+  return render(await HomePage());
 }
 
 async function loadCopy() {

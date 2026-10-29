@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { BASE_URL } from '@/constants/app';
 import {
   type AgentAcquisition,
+  invalidInputError,
   type PrepareReleaseLaunchInput,
   prepareReleaseLaunchSchema,
 } from './draft-contract';
@@ -396,13 +397,7 @@ const unavailable = () => ({
 
 export async function prepareReleaseLaunch(input: unknown) {
   const parsed = prepareReleaseLaunchSchema.safeParse(input);
-  if (!parsed.success)
-    return {
-      status: 'error' as const,
-      code: 'INVALID_INPUT' as const,
-      next_action: 'correct_input' as const,
-      retryable: false,
-    };
+  if (!parsed.success) return invalidInputError(parsed.error);
   const value = parsed.data;
   const inputFingerprint = fingerprint(value);
   const row = await loadAgentDraftForMutation(

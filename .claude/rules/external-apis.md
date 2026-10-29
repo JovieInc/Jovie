@@ -71,6 +71,12 @@ not on the hosted image) and per-PR-event evidence reads.
   `scripts/lib/workflow-token-budget.ratchet.json` and only shrink (`--write`).
   A workflow that must spend it declares
   `# github-token-budget: <N> calls/run - <reason>`.
+- PR Fleet Rules (the `pull_request` copy, which can never hold the App key) runs
+  `pr-fleet-rules.mjs --advisory`: PR from the event payload (files are its only
+  call, was two), backoff up to 120s, and a quota answer that outlasts it is an
+  "Infrastructure, not a verdict" warning (`github-quota-deferred`), never red.
+  Fleet Rules Evidence (CI App budget) stays the authoritative verdict. Quota
+  share: `node scripts/quota-deferred-heads.mjs --share 40`.
 - Headroom, from the `api-quota` notices Merge Queue Green Enroll emits about
   once a minute: `node scripts/lib/api-quota-report.mjs headroom --hours 1`
   (hourly min remaining per bucket, exhausted samples, JSON with `--json`).

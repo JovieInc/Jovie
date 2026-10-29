@@ -1783,10 +1783,8 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 3,
         producerJobId: 99,
         environment: 'local-production-build',
-        sourcePaths: [
-          'apps/web/app/(home)/page.tsx',
-          'apps/web/app/(home)/layout.tsx',
-        ],
+        // The producer emits the registered screen sources (screen-proof-emit).
+        sourcePaths: [...home().sources],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
@@ -2354,10 +2352,8 @@ if (p.endsWith('/zip')) {
         producerRunAttempt: 3,
         producerJobId: 99,
         environment: 'local-production-build',
-        sourcePaths: [
-          'apps/web/app/(home)/page.tsx',
-          'apps/web/app/(home)/layout.tsx',
-        ],
+        // The producer emits the registered screen sources (screen-proof-emit).
+        sourcePaths: [...home().sources],
         capturedAt: iso(-60_000),
         artifactDigest: `sha256:${'0'.repeat(64)}`,
         activeFlow: { disclosure: false },
@@ -2664,10 +2660,7 @@ if (p.endsWith('/zip')) {
         context: {
           headSha: head,
           screenId: 'web.homepage',
-          sourcePaths: [
-            'apps/web/app/(home)/page.tsx',
-            'apps/web/app/(home)/layout.tsx',
-          ],
+          sourcePaths: [...home().sources],
           viewports: home().viewports,
           marketingRoute: '/',
         },

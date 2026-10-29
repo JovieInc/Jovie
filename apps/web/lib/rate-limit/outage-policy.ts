@@ -85,6 +85,7 @@ export const RATE_LIMIT_OUTAGE_POLICY = {
   publicArtistApi: mandatoryDenyFixed,
   agentCreatorLookup: mandatoryDenyFixed,
   agentProfileCreate: mandatoryDenyFixed,
+  agentWriteGlobal: mandatoryDenyFixed,
   general: mandatoryDenyFixed,
   changelogSubscribe: mandatoryDenyFixed,
   musicBrainzLookup: mandatoryDeny,

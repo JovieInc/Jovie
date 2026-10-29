@@ -733,6 +733,10 @@ export const PRODUCT_FLAG_CAPABILITIES = {
     nonMarketing: 'hidden until the flag and a Stripe Payment Link are set',
   },
   NEW_RELEASE_PAGE: { nonMarketing: 'UI layout toggle' },
+  ONBOARDING_VALUE_BEFORE_PAYWALL: {
+    nonMarketing:
+      'onboarding funnel order: real catalog preview before pricing; env kill switch (JOV-9758)',
+  },
   CANVAS_GRAIN: { nonMarketing: 'UI visual treatment' },
   CYAN_FOCUS_GLOW: { nonMarketing: 'UI visual treatment' },
   CHAT_COMPOSER_V2: { nonMarketing: 'UI layout toggle' },

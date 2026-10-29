@@ -352,6 +352,17 @@ export const agentProfileCreateLimiter = createRateLimiter(
 );
 
 /**
+ * Global ceiling for agent draft writes across all callers (constant key).
+ * Limit: 600 requests per hour. Fails closed without Redis.
+ */
+export const agentWriteGlobalLimiter = createRateLimiter(
+  RATE_LIMITERS.agentWriteGlobal,
+  {
+    requireRedis: true,
+  }
+);
+
+/**
  * Rate limiter for anonymous creator extraction
  * (`GET /api/agents/creator-lookup`). Limit: 60 requests per hour per IP.
  * Fails closed without Redis.
@@ -1317,6 +1328,7 @@ export function getAllLimiters(): Record<string, RateLimiter> {
     publicProfile: publicProfileLimiter,
     publicArtistApi: publicArtistApiLimiter,
     agentProfileCreate: agentProfileCreateLimiter,
+    agentWriteGlobal: agentWriteGlobalLimiter,
     agentCreatorLookup: agentCreatorLookupLimiter,
     claimTokenAccess: claimTokenAccessLimiter,
     investorPortalToken: investorPortalTokenLimiter,

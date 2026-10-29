@@ -48,6 +48,19 @@ describe('pay landing System B source contract', () => {
     expect(source).not.toMatch(/homepage-section-stack mt-0/);
   });
 
+  it('shows the real pay sheet in the hero, not an empty field', () => {
+    render(<PayLanding />);
+
+    const hero = screen.getByTestId('pay-hero');
+    const shot = within(hero).getByTestId('pay-hero-product');
+    const image = within(shot).getByRole('img');
+    // Registry capture of the live profile pay state (Tim White, ?mode=pay).
+    expect(decodeURIComponent(image.getAttribute('src') ?? '')).toContain(
+      'tim-white-profile-pay-phone'
+    );
+    expect(image.getAttribute('alt')).toBeTruthy();
+  });
+
   it('keeps the final claim section to the handle form action path', () => {
     render(<PayLanding />);
 

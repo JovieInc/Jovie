@@ -10,7 +10,9 @@ import {
 import React from 'react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { PublicClaimBanner } from '@/app/[username]/_components/PublicClaimBanner';
 import { AboutSection } from '@/components/features/profile/AboutSection';
+import { ProfileDrawerShell } from '@/components/features/profile/ProfileDrawerShell';
 import type { PublicRelease } from '@/components/features/profile/releases/types';
 import type { PublicContact } from '@/types/contacts';
 import type { Artist } from '@/types/db';
@@ -1826,6 +1828,129 @@ describe('ProfileCompactTemplate', () => {
     });
 
     expect(screen.getByTestId('profile-bottom-nav')).toBeInTheDocument();
+  });
+
+  describe('claim entry navigation', () => {
+    beforeEach(() => {
+      vi.stubEnv('NEXT_PUBLIC_FEATURE_PROFILE_DESKTOP_SURFACE', '');
+      mockViewport('desktop');
+      // Keep the real drawer's Escape/focus lifecycle; only its heavy body
+      // is omitted from this history and claim-banner regression.
+      mockProfileUnifiedDrawer.mockImplementation(
+        (props: React.ComponentProps<typeof ProfileDrawerShell>) => (
+          <ProfileDrawerShell {...props} title='Menu'>
+            <button type='button'>Menu action</button>
+          </ProfileDrawerShell>
+        )
+      );
+    });
+
+    afterEach(() => vi.unstubAllEnvs());
+
+    const profile = () => (
+      <ProfileCompactTemplate
+        mode='profile'
+        artist={mockArtist}
+        socialLinks={[]}
+        contacts={[]}
+        profileBanner={
+          <PublicClaimBanner
+            profileHandle={mockArtist.handle}
+            displayName={mockArtist.name}
+            directClaimSupported
+            isClaimed={false}
+            visitorState='organic_unclaimed'
+          />
+        }
+      />
+    );
+
+    it.each([null, 'qr'])(
+      '%s source keeps claim intent through Escape, modes, and history',
+      async source => {
+        const query = new URLSearchParams({
+          claim: '1',
+          token: 'private-token',
+          email: 'private@example.com',
+        });
+        if (source) query.set('source', source);
+        window.history.replaceState(null, '', `/test-artist?${query}`);
+        render(profile());
+
+        const expectClaimIntent = () => {
+          expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+            'Your profile is ready. Claim it to turn on release emails.'
+          );
+          expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
+            'href',
+            '/test-artist/claim?next=auth'
+          );
+        };
+        const expectMode = (mode: string) => {
+          expect(screen.getByTestId('profile-compact-surface')).toHaveAttribute(
+            'data-mode',
+            mode
+          );
+          expect(
+            Object.fromEntries(new URLSearchParams(window.location.search))
+          ).toEqual({
+            claim: '1',
+            ...(source ? { source } : {}),
+            ...(mode === 'profile' ? {} : { mode }),
+          });
+          expectClaimIntent();
+        };
+
+        await waitFor(expectClaimIntent);
+        const menu = screen.getByRole('button', { name: 'Menu' });
+        menu.focus();
+        fireEvent.click(menu);
+        await screen.findByRole('dialog', { name: 'Menu' });
+        expectClaimIntent();
+        fireEvent.keyDown(document, { key: 'Escape' });
+        await waitFor(() => {
+          expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+          expectMode('profile');
+        });
+
+        const nav = () => within(screen.getByTestId('profile-bottom-nav'));
+        fireEvent.click(nav().getByRole('button', { name: 'Events' }));
+        await waitFor(() => expectMode('tour'));
+        fireEvent.click(nav().getByRole('button', { name: 'Home' }));
+        await waitFor(() => expectMode('profile'));
+        act(() => window.history.back());
+        await waitFor(() => expectMode('tour'));
+        act(() => window.history.forward());
+        await waitFor(() => expectMode('profile'));
+      }
+    );
+
+    it.each(['0', 'true', 'private-token'])(
+      'does not propagate unsupported claim=%s',
+      async claim => {
+        window.history.replaceState(
+          null,
+          '',
+          `/test-artist?claim=${claim}&source=qr&token=private-token`
+        );
+        render(profile());
+        expect(screen.getByTestId('claim-banner')).toHaveTextContent(
+          'This profile is unclaimed. Is it yours? Claim it with Spotify.'
+        );
+        fireEvent.click(
+          within(screen.getByTestId('profile-bottom-nav')).getByRole('button', {
+            name: 'Events',
+          })
+        );
+        await waitFor(() => {
+          expect(window.location.search).toBe('?mode=tour&source=qr');
+          expect(screen.getByTestId('claim-banner-cta')).toHaveAttribute(
+            'href',
+            '/test-artist/claim?next=auth'
+          );
+        });
+      }
+    );
   });
 
   it('does not push the profile URL over a claim-funnel navigation', async () => {

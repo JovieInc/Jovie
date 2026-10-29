@@ -132,6 +132,29 @@ def event(row: dict) -> dict | None:
             "outcome": _outcome(row), "sourceReceipt": f"lanes-ledger:{row['runId']}"}
 
 
+def mirror_events(state: Path, now: float) -> list[dict]:
+    """linear-mirror stale -> mirrored rows: oldest change in a pass -> the mirror holding it (target under 5 min)."""
+    rows = []
+    try:
+        lines = (Path(state) / "mirror-sync.jsonl").read_text().splitlines()
+    except OSError:
+        return rows
+    for line in lines:
+        try:
+            item = json.loads(line)
+        except ValueError:
+            continue
+        entered, exited = _epoch(item.get("enteredAt")), _epoch(item.get("exitedAt"))
+        if not isinstance(item.get("team"), str) or entered is None or exited is None or exited < entered \
+                or now - exited > WINDOW_S:
+            continue
+        base = {"schema": SCHEMA, "entityType": "linear-mirror", "entityId": item["team"], "actor": "lanes",
+                "sourceReceipt": f"linear-mirror:{item['team']}@{_iso(exited)}"}
+        rows.append({**base, "stage": "stale", "enteredAt": _iso(entered), "exitedAt": _iso(exited), "outcome": "advanced"})
+        rows.append({**base, "stage": "mirrored", "enteredAt": _iso(exited), "exitedAt": _iso(exited), "outcome": "completed"})
+    return rows
+
+
 def ndjson(ledger: Path, now: float) -> str:
     """Rolling 28-day NDJSON (by exitedAt), newest kept when the 8 MB cap is reached."""
     rows, seen = [], set()
@@ -152,6 +175,11 @@ def ndjson(ledger: Path, now: float) -> str:
                             rows.append(row)
         except OSError:
             continue
+    for row in mirror_events(Path(ledger).parent.parent, now):
+        key = (row["sourceReceipt"], row["stage"])
+        if key not in seen:
+            seen.add(key)
+            rows.append(row)
     rows.sort(key=lambda row: (row["exitedAt"], row["sourceReceipt"], row["stage"]))
     lines = [json.dumps(row, separators=(",", ":"), sort_keys=True) for row in rows]
     kept, size = [], 0

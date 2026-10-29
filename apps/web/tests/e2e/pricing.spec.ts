@@ -120,7 +120,7 @@ test.describe('Pricing Page', () => {
       'Self-serve'
     );
     await expect(page.getByTestId('marketing-pricing-plan-pro')).toContainText(
-      'Claim your profile'
+      'Start Artist Presence, $12/mo'
     );
     await expect(
       page.getByTestId('marketing-pricing-plan-enterprise')
@@ -358,7 +358,7 @@ test.describe('Pricing Page', () => {
     await expect(freeTierCta).toHaveAttribute('href', /\/signup\?plan=free/);
     await expect(
       page.getByTestId('marketing-pricing-plan-pro').getByRole('link', {
-        name: 'Claim your profile',
+        name: 'Start Artist Presence, $12/mo',
       })
     ).toHaveAttribute('href', '/claim?plan=pro');
     await expect(

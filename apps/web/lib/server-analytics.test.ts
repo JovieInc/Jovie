@@ -17,6 +17,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@sentry/nextjs', () => ({
   captureException: vi.fn(),
+  addBreadcrumb: vi.fn(),
 }));
 
 import {
@@ -83,13 +84,13 @@ describe('server analytics contract', () => {
     expect(SERVER_ANALYTICS_CONSENT_POLICY).toBe(
       'first_party_operational_measurement'
     );
-    expect(countProductionCallSites(WEB_ROOT)).toBe(37);
+    expect(countProductionCallSites(WEB_ROOT)).toBe(38);
     expect(
       SERVER_ANALYTICS_CALLSITE_INVENTORY.reduce(
         (total, entry) => total + entry.invocations,
         0
       )
-    ).toBe(37);
+    ).toBe(38);
 
     for (const entry of SERVER_ANALYTICS_CALLSITE_INVENTORY) {
       const source = readFileSync(join(WEB_ROOT, entry.path), 'utf8');
@@ -437,6 +438,106 @@ describe('server analytics contract', () => {
         tags: expect.objectContaining({ event_name: 'subscription_churned' }),
       })
     );
+  });
+
+  it('keeps a successful delivery when the timeout guard statement fails (JOV-8761)', async () => {
+    // Statement order: read previous timeout, set the guard (fails here),
+    // insert, restore. A failed guard must degrade to the caller's own
+    // timeout instead of surfacing as
+    // "Failed query: SELECT set_config('statement_timeout', $1, true)".
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ statementTimeout: '45s' }] })
+      .mockRejectedValueOnce(
+        new Error(
+          'current transaction is aborted, commands ignored until end of transaction block'
+        )
+      );
+
+    const result = await trackServerEventTx(
+      {
+        execute,
+        insert: mocks.insert,
+      } as never,
+      'signup_completed',
+      { profileId: PROFILE_ID, source: 'organic' },
+      { eventIdentity: `signup_completed:${PROFILE_ID}` }
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      eventId: 'event-1',
+      deduplicated: false,
+    });
+    // Guard failed -> no previous timeout was captured, so the restore is
+    // intentionally skipped (no redundant set_config on a suspect statement).
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(mocks.insert).toHaveBeenCalledOnce();
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'database',
+        level: 'error',
+        message: expect.stringContaining(
+          'server_analytics_timeout_guard: set_config failed:'
+        ),
+      })
+    );
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('does not destroy a successful delivery when the timeout restore fails (JOV-8761)', async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ statementTimeout: '45s' }] })
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('connection terminated unexpectedly'));
+
+    const result = await trackServerEventTx(
+      {
+        execute,
+        insert: mocks.insert,
+      } as never,
+      'signup_completed',
+      { profileId: PROFILE_ID, source: 'organic' },
+      { eventIdentity: `signup_completed:${PROFILE_ID}` }
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      eventId: 'event-1',
+      deduplicated: false,
+    });
+    expect(execute).toHaveBeenCalledTimes(3);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'database',
+        level: 'error',
+        message: expect.stringContaining(
+          'server_analytics_timeout_restore: set_config failed:'
+        ),
+      })
+    );
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
+  it('still surfaces the analytics insert failure inside the caller transaction', async () => {
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce({ rows: [{ statementTimeout: '45s' }] })
+      .mockResolvedValue(undefined);
+    mocks.returning.mockRejectedValueOnce(new Error('insert failed'));
+
+    await expect(
+      trackServerEventTx(
+        {
+          execute,
+          insert: mocks.insert,
+        } as never,
+        'signup_completed',
+        { profileId: PROFILE_ID }
+      )
+    ).rejects.toThrow('insert failed');
+    expect(Sentry.captureException).not.toHaveBeenCalled();
   });
 
   it('restores the caller timeout after a transaction-scoped insert', async () => {

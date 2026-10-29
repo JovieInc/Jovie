@@ -26,6 +26,35 @@ function buildSignInVerificationIdentifier(email: string): string {
   return `sign-in-otp-${email.trim().toLowerCase()}`;
 }
 
+/**
+ * Synthetic new-user canary addresses (JOV-9625): exactly
+ * browse-ready+synthetic-prodcert-<run>@jov.ie on our own domain. The
+ * `+synthetic-` tag already quarantines the account from customer metrics
+ * (isInternalOrTestAccountEmail). Nothing else is readable.
+ */
+const PRODCERT_NEW_USER_EMAIL =
+  /^browse-ready\+synthetic-prodcert-[a-z0-9]{6,24}@jov\.ie$/u;
+
+export function isProductionCanaryOtpEmail(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  return (
+    normalized === PRODUCTION_AUTH_SMOKE_EMAIL ||
+    PRODCERT_NEW_USER_EMAIL.test(normalized)
+  );
+}
+
+export function newProdcertUserEmail(runId: string): string {
+  const slug = runId
+    .toLowerCase()
+    .replace(/[^a-z0-9]/gu, '')
+    .slice(0, 24);
+  const email = `browse-ready+synthetic-prodcert-${slug}@jov.ie`;
+  if (!isProductionCanaryOtpEmail(email)) {
+    throw new Error('Run id cannot form a valid prodcert canary address.');
+  }
+  return email;
+}
+
 export function extractProductionAuthOtp(
   record: ProductionAuthOtpRecord,
   startedAtMs: number,
@@ -102,7 +131,7 @@ export async function waitForProductionAuthOtp({
   readonly pollIntervalMs?: number;
 }): Promise<string> {
   const normalizedEmail = email.trim().toLowerCase();
-  if (normalizedEmail !== PRODUCTION_AUTH_SMOKE_EMAIL) {
+  if (!isProductionCanaryOtpEmail(normalizedEmail)) {
     throw new Error(
       'Production Better Auth OTP retrieval refused a non-smoke identity.'
     );

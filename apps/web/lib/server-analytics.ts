@@ -264,7 +264,16 @@ export const SERVER_ANALYTICS_EVENTS = {
   // to a profile, user, or visitor.
   funnel_step: {
     category: 'funnel',
-    properties: ['funnel_id', 'step', 'outcome', 'surface', 'reason', 'cohort'],
+    properties: [
+      'funnel_id',
+      'step',
+      'outcome',
+      'surface',
+      'reason',
+      'cohort',
+      'step_ms',
+      'entry_ms',
+    ],
   },
   // JOV-9627: one row per onboarding chat reply. `session_id` is the signed
   // onboarding session, which chat_conversations carries and claim attaches to
@@ -390,6 +399,16 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     path: 'app/onboarding/actions/index.ts',
     invocations: 0,
     events: ['claim_completed', 'signup_completed', 'activation_achieved'],
+  },
+  {
+    path: 'lib/onboarding/catalog-import.server.ts',
+    invocations: 1,
+    events: ['releases_synced'],
+  },
+  {
+    path: 'lib/agent-acquisition/draft-claim.server.ts',
+    invocations: 0,
+    events: ['claim_completed', 'activation_achieved'],
   },
   {
     path: 'lib/onboarding/upgrade-offer.ts',
@@ -842,6 +861,73 @@ export async function trackServerEvent(
  * emission could permanently lose the event. A duplicate `eventIdentity`
  * deduplicates instead of throwing.
  */
+/**
+ * Best-effort transaction-scoped statement_timeout guard (JOV-8761).
+ *
+ * Returns the caller's previous timeout when the guard was applied, or null
+ * when it failed. The guard statements must never throw: a failure surfacing
+ * as "Failed query: SELECT set_config('statement_timeout', $1, true)" masks
+ * the real error (the transaction aborts on the first statement error, so the
+ * next statement — usually the guard — is the one Sentry names) or fails an
+ * otherwise-successful business transaction. When the guard fails we degrade
+ * to the caller's own timeout and let the insert report its own error.
+ */
+async function applyServerAnalyticsTimeoutGuard(
+  tx: DbOrTransaction,
+  eventName: ServerAnalyticsEventName
+): Promise<string | null> {
+  try {
+    const previousTimeoutResult = await tx.execute<{
+      statementTimeout: string;
+    }>(
+      drizzleSql`SELECT current_setting('statement_timeout') AS "statementTimeout"`
+    );
+    const previousTimeout =
+      previousTimeoutResult.rows[0]?.statementTimeout ?? '0';
+    await tx.execute(
+      drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS)}, true)`
+    );
+    return previousTimeout;
+  } catch (error) {
+    Sentry.addBreadcrumb({
+      category: 'database',
+      level: 'error',
+      message: `server_analytics_timeout_guard: set_config failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      data: { event_name: eventName, phase: 'guard' },
+    });
+    return null;
+  }
+}
+
+/**
+ * Restores the caller's statement_timeout after a successful analytics
+ * insert. A failed restore must not destroy the business transaction the
+ * delivery already succeeded in (JOV-8761) — the caller's timeout re-applies
+ * from the next transaction onward.
+ */
+async function restoreServerAnalyticsTimeout(
+  tx: DbOrTransaction,
+  previousTimeout: string,
+  eventName: ServerAnalyticsEventName
+): Promise<void> {
+  try {
+    await tx.execute(
+      drizzleSql`SELECT set_config('statement_timeout', ${previousTimeout}, true)`
+    );
+  } catch (error) {
+    Sentry.addBreadcrumb({
+      category: 'database',
+      level: 'error',
+      message: `server_analytics_timeout_restore: set_config failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      data: { event_name: eventName, phase: 'restore' },
+    });
+  }
+}
+
 export async function trackServerEventTx(
   tx: DbOrTransaction,
   event: string,
@@ -856,20 +942,20 @@ export async function trackServerEventTx(
   // transaction remain pinned after the caller has already timed out. Restore
   // the caller's timeout after a successful insert so later business queries
   // in the same transaction do not inherit this analytics-specific budget.
-  const previousTimeoutResult = await tx.execute<{
-    statementTimeout: string;
-  }>(
-    drizzleSql`SELECT current_setting('statement_timeout') AS "statementTimeout"`
-  );
-  const previousTimeout =
-    previousTimeoutResult.rows[0]?.statementTimeout ?? '0';
-  await tx.execute(
-    drizzleSql`SELECT set_config('statement_timeout', ${String(SERVER_ANALYTICS_STATEMENT_TIMEOUT_MS)}, true)`
+  // Guard and restore are best-effort (JOV-8761): the insert itself stays
+  // strict so business state and its measurement commit atomically.
+  const previousTimeout = await applyServerAnalyticsTimeoutGuard(
+    tx,
+    prepared.eventName
   );
   const delivery = await insertServerAnalyticsRow(tx, prepared);
-  await tx.execute(
-    drizzleSql`SELECT set_config('statement_timeout', ${previousTimeout}, true)`
-  );
+  if (previousTimeout !== null) {
+    await restoreServerAnalyticsTimeout(
+      tx,
+      previousTimeout,
+      prepared.eventName
+    );
+  }
   return delivery;
 }
 

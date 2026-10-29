@@ -135,7 +135,7 @@ Labels are part of the CI control plane, not just project organization. Apply in
   deterministic combined-head evidence for only the selected product lanes.
 - `testing`, `deep-ci`, `launch-candidate`, and `deploy-preview` are metadata only. They have no CI fan-out semantics.
 
-- Do not use `needs-human` as a PR enrollment hold. If completion requires a
+- Do not use `needs-human`, `tim-hold` or `do-not-merge` as a PR enrollment hold; they are retired and a scrub deletes them (EVENT 2026-10-28). If completion requires a
   physical action only a human can perform (sign an agreement, rotate a key,
   flip a dashboard toggle), ship the code path disabled or keep the external
   action unsubmitted and track that authority gate separately.

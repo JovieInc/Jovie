@@ -328,6 +328,13 @@ padding. Optional selection columns may occupy their own reserved track, but
 the primary content column must return to the shared seam when that track is
 absent.
 
+### No dead ends (JOV-INV-046)
+
+- Every control you render must work in the current runtime. Decide with a capability check (`isDesktopApp`, speech/mic support, entitlement) and render nothing when it fails.
+- Banned UI: "not available", "unavailable", "not supported", "coming soon", "check back", "use X instead", "only available on Y"; `disabled` with no reason (`title`, `disabledReason`, `aria-describedby`); empty or no-op handlers; `href="#"`; links to routes that do not exist.
+- Allowed: permission or entitlement prompts that lead to a working path (Allow microphone, a real checkout) and transient errors that offer retry. Mark a deliberate exception with a `dead-end-ok: <reason>` comment on the same or previous line.
+- `pnpm design:no-dead-ends:check` fails on new violations; grandfathered ones live in `packages/copy/dead-ends.baseline.json` and only shrink (`pnpm design:no-dead-ends:update` locks a shrink). If a dead end can still reach a user, call `trackDeadEndShown(surface, reason)` so Summer can find it.
+
 ## Taste Rules (Hard Invariants)
 
 ### No ICP-specific language on general pages

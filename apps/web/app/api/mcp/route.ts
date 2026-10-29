@@ -85,7 +85,11 @@ export async function POST(request: Request) {
       !AGENT_DRAFT_TOOLS.some(tool => tool.name === call.data.name)
     )
       return rpcError(-32602, 'Unknown tool or invalid arguments', id, 200);
-    const writeBlocked = await guardAgentRequest(request, true);
+    const writeBlocked = await guardAgentRequest(
+      request,
+      true,
+      call.data.arguments
+    );
     if (writeBlocked) return writeBlocked;
     const result = await executeAgentDraftTool(
       call.data.name,

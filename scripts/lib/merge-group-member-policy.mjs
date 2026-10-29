@@ -20,10 +20,6 @@ export const HOLD_LABELS = new Set([
   'hold',
   'gated',
   'incident',
-  'do-not-merge',
-  'tim-hold',
-  'tim:hold',
-  'hold:tim',
   'queue-deferred',
 ]);
 const COLLABORATOR_ASSOCIATIONS = new Set(['COLLABORATOR', 'MEMBER', 'OWNER']);

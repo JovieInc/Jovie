@@ -1735,6 +1735,13 @@ class LaunchIdentityTest(Isolated):
         self.assertEqual(report["providers"]["codex"]["accountLeases"], 1)
 
 
+class LaneConnectorsDisabledTest(unittest.TestCase):
+    def test_exec_command_disables_plugin_connectors(self):
+        source = (ROOT / "scripts/lanes/codex_lane.py").read_text()
+        for feature in ("plugins", "remote_plugin", "apps"):
+            self.assertIn(f'"--disable", "{feature}"', source)
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -267,6 +267,8 @@ export const ServerEnvSchema = z.object({
 
   // Revalidation
   REVALIDATE_SECRET: z.string().optional(),
+  // Content records: bearer for agent publish + HMAC key for preview links.
+  CONTENT_PUBLISH_SECRET: z.string().min(32).optional(),
 
   // Apple Music DSP enrichment
   APPLE_MUSIC_KEY_ID: z.string().optional(),
@@ -447,6 +449,7 @@ export const ServerEnvSchema = z.object({
   // Instantly (outreach email campaigns)
   INSTANTLY_API_KEY: z.string().optional(),
   INSTANTLY_CAMPAIGN_ID: z.string().optional(),
+  INSTANTLY_WEBHOOK_SECRET: z.string().min(32).optional(),
 
   // Search APIs (lead discovery)
   SERPAPI_API_KEY: z.string().optional(),
@@ -640,6 +643,7 @@ export const ENV_KEYS = [
   'GBRAIN_API_KEY',
   'GBRAIN_HEALTH_URL',
   'REVALIDATE_SECRET',
+  'CONTENT_PUBLISH_SECRET',
   'APPLE_MUSIC_KEY_ID',
   'APPLE_MUSIC_TEAM_ID',
   'APPLE_MUSIC_PRIVATE_KEY',
@@ -724,6 +728,7 @@ export const ENV_KEYS = [
   'JOVIE_IOS_REAL_BROWSER_AUTH_TOKEN',
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
+  'INSTANTLY_WEBHOOK_SECRET',
   'SERPAPI_API_KEY',
   'EXA_API_KEY',
   'JOVIE_FACEBOOK_PIXEL_ID',

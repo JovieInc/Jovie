@@ -139,6 +139,13 @@
       "tables": []
     },
     {
+      "id": "agent.draft-claim",
+      "entity": "agent draft claim",
+      "module": "apps/web/lib/agent-acquisition/draft-claim.server.ts",
+      "exports": ["claimAgentDraft"],
+      "tables": ["creatorProfiles"]
+    },
+    {
       "id": "agent.draft",
       "entity": "agent draft",
       "module": "apps/web/lib/agent-acquisition/draft-store.ts",
