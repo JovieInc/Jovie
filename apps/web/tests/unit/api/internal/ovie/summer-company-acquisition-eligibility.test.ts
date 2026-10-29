@@ -1,4 +1,10 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  evaluateAcquisitionEligibility,
+  REVENUE_CONE_REQUIREMENTS,
+  unknownAcquisitionEligibility,
+} from '@/lib/acquisition/eligibility';
 
 const hoisted = vi.hoisted(() => ({
   verify: vi.fn(),
@@ -69,8 +75,12 @@ const commerce = {
 describe('GET /api/internal/ovie/summer-company/acquisition-eligibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-10-14T18:00:00.000Z'));
     hoisted.verify.mockResolvedValue(true);
   });
+
+  afterEach(() => vi.useRealTimers());
 
   it('returns 401 without probing when OIDC fails', async () => {
     hoisted.verify.mockResolvedValue(false);
@@ -85,8 +95,11 @@ describe('GET /api/internal/ovie/summer-company/acquisition-eligibility', () => 
       snapshot: {
         sourcePayloads: {
           acquisitionEligibility: {
-            eligible: false,
-            verdict: 'UNKNOWN',
+            ...unknownAcquisitionEligibility(
+              new Date(),
+              'No observed evidence'
+            ),
+            funnel: null,
             commerce,
           },
         },
@@ -124,21 +137,119 @@ describe('GET /api/internal/ovie/summer-company/acquisition-eligibility', () => 
     expect(hoisted.eligibility).not.toHaveBeenCalled();
   });
 
-  it('returns the predicate uncached and honors fresh=1', async () => {
-    hoisted.eligibility.mockResolvedValue({
-      eligible: false,
-      verdict: 'BLOCKED',
-      commerce,
+  it('keeps a complete fresh eligible snapshot eligible without probing', async () => {
+    const now = new Date();
+    const sources: Record<string, string[]> = {
+      entry: ['m2-revenue-path:live#signed_out'],
+      auth_signup: ['canary:auth-signup-onboarding'],
+      claim: ['m2-revenue-path:live#claim'],
+      profile_truth: [
+        'canary:public-profile',
+        'github:m2-revenue-path-canary.yml@main',
+      ],
+      offer_checkout: ['m2-revenue-path:live#pro_checkout_199'],
+      activation: ['m2-revenue-path:live#activation'],
+      payment_entitlement: ['github:ci.yml#Golden Path (manual)@main'],
+      instrumentation: ['founder-funnel:30d'],
+    };
+    const eligibility = evaluateAcquisitionEligibility({
+      now,
+      evidence: REVENUE_CONE_REQUIREMENTS.flatMap(requirement =>
+        (sources[requirement.id] ?? [`commerce:${requirement.id}`]).map(
+          source => ({
+            requirement: requirement.id,
+            source,
+            status: 'green',
+            observedAt: now.toISOString(),
+            maxAgeMs: 15 * 60_000,
+            ref: null,
+            detail: 'controlled receipt',
+          })
+        )
+      ),
     });
+    const freshCommerce = {
+      ...commerce,
+      eligible: true,
+      matrix: commerce.matrix.map(decision => ({
+        ...decision,
+        eligible: true,
+        status: 'passed-canary',
+        blockers: [],
+        canary: {
+          ...decision.canary,
+          result: 'passed',
+          observedAt: now.toISOString(),
+        },
+      })),
+    };
+    hoisted.cache.mockResolvedValue({
+      snapshot: {
+        sourcePayloads: {
+          acquisitionEligibility: {
+            ...eligibility,
+            commerce: freshCommerce,
+            funnel: null,
+          },
+        },
+      },
+    });
+    const response = await route.GET(new Request(URL));
+    await expect(response.json()).resolves.toMatchObject({
+      eligible: true,
+      verdict: 'ELIGIBLE',
+      commerce: { eligible: true },
+    });
+    expect(hoisted.eligibility).not.toHaveBeenCalled();
+  });
+
+  it('returns the predicate uncached and honors fresh=1', async () => {
+    const held = {
+      ...unknownAcquisitionEligibility(new Date(), 'No observed evidence'),
+      funnel: null,
+      commerce,
+    };
+    hoisted.eligibility.mockResolvedValue(held);
     const response = await route.GET(new Request(`${URL}?fresh=1`));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
-    await expect(response.json()).resolves.toEqual({
+    await expect(response.json()).resolves.toMatchObject({
       eligible: false,
-      verdict: 'BLOCKED',
-      commerce,
+      verdict: 'UNKNOWN',
+      commerce: { eligible: false },
     });
     expect(hoisted.eligibility).toHaveBeenCalledWith({ fresh: true });
+  });
+
+  it('never serves a stale eligible snapshot to Summer when the producer stops', async () => {
+    const observedAt = new Date('2026-10-14T18:00:00.000Z');
+    const eligibility = evaluateAcquisitionEligibility({
+      now: observedAt,
+      evidence: REVENUE_CONE_REQUIREMENTS.map(requirement => ({
+        requirement: requirement.id,
+        source: `test:${requirement.id}`,
+        status: 'green',
+        observedAt: observedAt.toISOString(),
+        maxAgeMs: 15 * 60_000,
+        ref: null,
+        detail: 'known controlled outcome',
+      })),
+    });
+    expect(eligibility.eligible).toBe(true);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(observedAt.getTime() + 16 * 60_000));
+    hoisted.cache.mockResolvedValue({
+      snapshot: {
+        sourcePayloads: {
+          acquisitionEligibility: { ...eligibility, commerce, funnel: null },
+        },
+      },
+    });
+    const response = await route.GET(new Request(URL));
+    const body = await response.json();
+    expect(body.eligible).toBe(false);
+    expect(body.policy.outboundAcquisition).toBe('blocked');
+    expect(hoisted.eligibility).not.toHaveBeenCalled();
   });
 
   it('rejects a pre-commerce company-state cache entry', async () => {

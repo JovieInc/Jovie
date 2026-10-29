@@ -8,8 +8,7 @@
 Read this execution contract before UI work. Load only the relevant section of
 [design details](docs/design-system/DETAILS.md) for the component or surface being changed.
 Token values come from the source registries below. Historical decisions describe
-past state; the newest founder-locked decision governs. For instruction-only edits,
-verify policy preservation and links; screenshots apply when rendered UI changes.
+past state; the newest founder-locked decision governs.
 
 Current direction: one System B token foundation, compact product and editorial
 marketing languages. Inter is the body/UI face; Satoshi is the approved display
@@ -106,6 +105,10 @@ Follow [the Ovie guardrail](docs/design-system/DETAILS.md#ovie-ops-cockpit-guard
 ## Subtraction Principle
 
 Read [the subtraction principle reference](docs/design-system/DETAILS.md#subtraction-principle) when changing this area.
+
+## No Dead Ends (JOV-INV-046)
+
+Read [no dead ends](docs/design-system/DETAILS.md#no-dead-ends) before UI work.
 
 ## Use Tokens, Not Raw Colors
 
