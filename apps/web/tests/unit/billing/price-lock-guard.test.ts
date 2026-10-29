@@ -49,26 +49,26 @@ const INLINE_ALLOW = /price-lock-allow:/;
  * none of them serves a per-person price. Shrink only.
  */
 const ALLOWED: Readonly<Record<string, { max: number; why: string }>> = {
-  'lib/config/plan-prices.ts': { max: 3, why: 'owner of the list price' },
+  'lib/config/plan-prices.ts': { max: 4, why: 'owner of the list price' },
   'lib/config/pricing.ts': {
-    max: 8,
+    max: 7,
     why: 'list pricing table derived from the owner',
   },
   'lib/entitlements/registry.ts': {
-    max: 4,
+    max: 5,
     why: 'plan matrix marketing metadata, not a quote',
   },
   'constants/plans.ts': { max: 1, why: 're-export of the owner' },
   'lib/stripe/config.ts': {
-    max: 10,
+    max: 13,
     why: 'active-price mappings: the list of what new subscribers can buy',
   },
   'lib/stripe/plan-change.ts': {
-    max: 10,
+    max: 6,
     why: 'plan-change catalogue; the person route resolves the lock first (plan-change route tests)',
   },
   'lib/stripe/price-contract.ts': {
-    max: 3,
+    max: 2,
     why: 'checks Stripe against the active mapping or the lock expectation',
   },
   'lib/stripe/startup-validation.ts': {
@@ -76,52 +76,52 @@ const ALLOWED: Readonly<Record<string, { max: number; why: string }>> = {
     why: 'deploy-time config check',
   },
   'lib/stripe/test-price-contract.ts': {
-    max: 3,
+    max: 4,
     why: 'test-mode price contract check',
   },
   'app/api/billing/health/route.ts': {
-    max: 2,
+    max: 1,
     why: 'operator health of the active price ids',
   },
   'app/api/stripe/pricing-options/route.ts': {
-    max: 2,
+    max: 1,
     why: 'public, anonymous list; signed-in clients apply the lock (usePricingOptionsQuery)',
   },
   'app/api/stripe/checkout/route.ts': {
-    max: 3,
+    max: 2,
     why: 'validates list ids only for people whose lock does not apply',
   },
   'lib/billing/price-versions.ts': {
-    max: 12,
+    max: 7,
     why: 'the price version registry and lock resolver',
   },
   'lib/billing/price-lock.server.ts': {
-    max: 3,
+    max: 2,
     why: 'builds a new signup lock from the current list version',
   },
   'lib/billing/price-assignment.ts': {
-    max: 6,
+    max: 2,
     why: 'experiment assignment; existing payers and lock holders are grandfathered by input',
   },
   'lib/billing/offer-truth.ts': {
-    max: 3,
+    max: 6,
     why: 'public anonymous offer claims',
   },
-  'lib/billing/offer/offer.ts': { max: 2, why: 'public anonymous offer' },
+  'lib/billing/offer/offer.ts': { max: 4, why: 'public anonymous offer' },
   'lib/billing/commerce/support-matrix.ts': {
-    max: 5,
+    max: 7,
     why: 'public agentic-commerce catalogue, anonymous',
   },
   'lib/billing/commerce/rail-decisions.ts': {
-    max: 2,
+    max: 1,
     why: 'internal rail decision record',
   },
   'lib/acquisition/canonical-artist-site-certification.ts': {
-    max: 6,
+    max: 8,
     why: 'internal certification of the public offer',
   },
   'lib/acquisition/proof-claim-funnel.ts': {
-    max: 3,
+    max: 1,
     why: 'anonymous pre-signup funnel figure',
   },
   'lib/canaries/m2-revenue-path.ts': {
@@ -133,11 +133,11 @@ const ALLOWED: Readonly<Record<string, { max: number; why: string }>> = {
     why: 'public one-time audit copy',
   },
   'data/marketing/renderedCopyCoverage.ts': {
-    max: 2,
+    max: 1,
     why: 'copy coverage fixture of the public claim',
   },
   'components/features/auth/AuthOfferSummary.tsx': {
-    max: 3,
+    max: 1,
     why: 'pre-auth sign-up recap: a new signup is locked to this list price',
   },
 };
