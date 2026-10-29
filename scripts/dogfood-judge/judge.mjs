@@ -43,7 +43,7 @@ async function judgeBatch({
   penRefs,
   tier,
   model,
-  prior,
+  prior = null,
   dirs,
   timeoutMs,
 }) {
@@ -79,7 +79,7 @@ async function judgeBatch({
 }
 
 /**
- * @param {{ manifest: any, penRefs: any[], tiers: { screen: string, confirm: string }, outDir: string, confirmAll?: boolean, timeoutMs?: number, log?: (line: string) => void }} args
+ * @param {{ manifest: any, penRefs: any[], tiers: { screen: string, confirm: string }, outDir: string, confirmAll?: boolean, cold?: boolean, timeoutMs?: number, log?: (line: string) => void }} args
  */
 export async function judgeRun({
   manifest,
