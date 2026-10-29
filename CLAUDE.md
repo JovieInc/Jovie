@@ -88,7 +88,7 @@ and regenerate. CLAUDE.md stays a router; use Playwright only for repo web QA.
 Message agents: `jovie mesh send/read`. Batch independent reads; serialize
 state changes.
 
-Run `pnpm preflight:changed` before every push.
+Run `pnpm preflight:changed` before every push. On a saturated laptop run `pnpm preflight:remote` (same args) instead: it pushes the branch and runs the gate in `~/wt/remote-preflight/<branch>` on Gem (host `JOVIE_REMOTE_PREFLIGHT_HOST`, default `gem`; max `JOVIE_REMOTE_PREFLIGHT_SLOTS`=4 concurrent; node from `.nvmrc` via nvm). See `scripts/preflight-remote.mjs`.
 Before publication follow `docs/PR_FLOW.md`: coherent draft → rolling CI → review
 and required checks. Auth/payment edits use CI + Migration Guard, not an extra
 human merge gate. Sensitive surfaces: proxy, migrations, billing, entitlements,
