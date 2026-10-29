@@ -395,3 +395,15 @@ Commit signing remains an audit signal, but live ruleset `10512119` does not
 currently require signatures. Keep agent signing enabled where supported and
 use `commit-signature-check` on `main`; do not claim this as an admission gate
 until an explicit ruleset cutover is verified against native squash commits.
+
+## Runner pool variables
+
+Control-plane and the cheap required `PR Ready` job read their pool from repo
+variables so a saturated hosted pool can be relieved without a PR. Unset means
+`ubuntu-latest`. Values are JSON:
+
+- `RUNNER_CONTROL_PLANE`: Green Enroll, Lane Fix Relay, Auto-Ready Drafts, PR Fleet Rules and PR targets main (non-merge-group events). Gem: `["self-hosted","Linux","X64","jovie-fixed"]`.
+- `RUNNER_READY`: the `PR Ready` job in Source Validation.
+
+Fork PR Gate stays hosted: it handles untrusted fork events and must not run on persistent runners.
+Flip: `gh variable set RUNNER_CONTROL_PLANE --body '["self-hosted","Linux","X64","jovie-fixed"]'`; revert: `gh variable delete RUNNER_CONTROL_PLANE`.
