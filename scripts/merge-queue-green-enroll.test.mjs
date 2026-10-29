@@ -1198,7 +1198,6 @@ test('a blocking label on a queued PR dequeues only that PR', () => {
     'hold',
     'gated',
     'incident',
-    'do-not-merge',
     'queue-poison',
     'lane-fix-red',
   ]) {
@@ -2028,7 +2027,6 @@ for (const label of [
   'hold',
   'gated',
   'incident',
-  'do-not-merge',
   'queue-poison',
   'lane-fix-red',
 ]) {

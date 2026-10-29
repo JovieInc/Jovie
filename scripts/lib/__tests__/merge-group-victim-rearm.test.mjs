@@ -163,8 +163,8 @@ test('a red head, an armed PR, and a poison label are not rearmed', () => {
   );
 });
 
-test('every admission-blocking label, including the tim-hold variants, prevents a rearm', () => {
-  for (const label of ['tim:hold', 'hold:tim', 'tim-hold', 'do-not-merge']) {
+test('every admission-blocking label, prevents a rearm', () => {
+  for (const label of ['hold', 'gated', 'incident', 'queue-deferred']) {
     const [decision] = planVictimRearms({
       runId: 7,
       implicatedPaths: ['CLAUDE.md'],
