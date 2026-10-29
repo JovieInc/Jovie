@@ -398,10 +398,6 @@
       "linearIssue": "JOV-8847"
     },
     {
-      "path": "apps/web/components/features/demo/DemoReleaseTrackedLinksSurface.tsx",
-      "linearIssue": "JOV-8847"
-    },
-    {
       "path": "apps/web/components/features/demo/DemoVideoPlayer.tsx",
       "linearIssue": "JOV-8847"
     },

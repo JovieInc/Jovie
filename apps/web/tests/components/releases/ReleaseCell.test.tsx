@@ -22,9 +22,13 @@ vi.mock('@/components/organisms/release-sidebar/useTrackAudioPlayer', () => ({
 }));
 
 vi.mock('@/components/atoms/TruncatedText', () => ({
-  TruncatedText: ({ children }: { children: ReactNode }) => (
-    <span>{children}</span>
-  ),
+  TruncatedText: ({
+    children,
+    title,
+  }: {
+    children: ReactNode;
+    title?: string;
+  }) => <span title={title}>{children}</span>,
 }));
 
 const baseRelease: ReleaseViewModel = {

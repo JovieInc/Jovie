@@ -3,6 +3,12 @@ import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { DemoReleaseTrackedLinksSurface } from './DemoReleaseTrackedLinksSurface';
 
+vi.mock('./mock-release-data', () => ({
+  DEMO_RELEASE_VIEW_MODELS: [
+    { title: 'Test release', artistNames: ['Tim White', 'Cosmic Gate'] },
+  ],
+}));
+
 vi.mock('./DemoAuthShell', () => ({
   DemoAuthShell: ({ children }: { readonly children?: ReactNode }) => (
     <div data-testid='demo-auth-shell'>{children}</div>

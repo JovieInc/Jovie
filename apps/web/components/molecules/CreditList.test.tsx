@@ -85,6 +85,7 @@ describe('CreditList', () => {
     render(
       <CreditList
         names={['Vigel', 'Cosmic Gate', 'Tim White']}
+        renderName={name => <button type='button'>{name}</button>}
         literalClassName='text-white/70'
       />
     );

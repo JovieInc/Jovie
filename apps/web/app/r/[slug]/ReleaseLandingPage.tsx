@@ -242,6 +242,15 @@ function SmartLinkCreditName({
   return <span className='text-white/70'>{name}</span>;
 }
 
+function creditHandlesByName(artists: readonly FeaturedArtist[]) {
+  const handles = new Map<string, string | null>();
+  for (const artist of artists) {
+    const name = artist.name.trim();
+    if (name && !handles.has(name)) handles.set(name, artist.handle ?? null);
+  }
+  return handles;
+}
+
 function SmartLinkArtistLine({
   artist,
   primaryArtists,
@@ -254,12 +263,8 @@ function SmartLinkArtistLine({
   const hasFeatured = featuredArtists && featuredArtists.length > 0;
   const bylineArtists =
     primaryArtists && primaryArtists.length > 0 ? primaryArtists : [artist];
-  const bylineHandleByName = new Map(
-    bylineArtists.map(entry => [entry.name, entry.handle ?? null])
-  );
-  const featuredHandleByName = new Map(
-    (featuredArtists ?? []).map(entry => [entry.name, entry.handle ?? null])
-  );
+  const bylineHandleByName = creditHandlesByName(bylineArtists);
+  const featuredHandleByName = creditHandlesByName(featuredArtists ?? []);
 
   return (
     <p

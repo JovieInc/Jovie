@@ -100,7 +100,7 @@ export type ReleaseArtistLinePart =
 
 export function formatReleaseArtistLine(
   artistNames: readonly string[] | undefined,
-  fallbackArtistName: string | null | undefined
+  fallbackArtistName?: string | null
 ): string | null {
   const normalizedNames = normalizeReleaseCreditNames(artistNames);
 
