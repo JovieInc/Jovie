@@ -11,6 +11,7 @@ import {
   numbered,
   page,
 } from './markdown';
+import { evaluateAll, type ReadinessInputs } from './readiness';
 
 export interface DistributionTool {
   readonly name: string;
@@ -124,6 +125,7 @@ export function buildDistribution(
   tools: readonly DistributionTool[],
   listing: Listing,
   assets: Record<string, string> = {},
+  readinessInputs: ReadinessInputs | null = null,
   icons: IconSourceInfo | null = null
 ): DistributionOutput {
   const served = tools.map(t => ({ ...t }));
@@ -299,10 +301,19 @@ export function buildDistribution(
     tools: toolSummary,
   };
 
+  const platforms = readinessInputs
+    ? evaluateAll(readinessInputs, listing, toolsListHash, null)
+    : null;
   const readiness = {
     _generated: provenance('readiness'),
-    ready: issues.blockers.length === 0,
+    ready:
+      issues.blockers.length === 0 &&
+      platforms !== null &&
+      Object.values(platforms).every(p => p.ready),
     blockers: issues.blockers,
+    timeChecks:
+      'Receipt age and deadlines are checked by the agent-distribution:ready script, not here.',
+    platforms,
   };
 
   const files: Record<string, string> = {

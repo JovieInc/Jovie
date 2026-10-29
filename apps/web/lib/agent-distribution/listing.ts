@@ -147,6 +147,8 @@ export const LISTING = {
     termsLabel: 'Terms of service',
     supportLabel: 'Support',
   },
+  assistants: ['ChatGPT', 'Claude', 'Grok', 'Muse'],
+  draftRetentionDays: 7,
   categories: ['Entertainment', 'Productivity', 'Marketing'],
   useCases: [
     'Find an artist on Spotify or Apple Music and start an unpublished Jovie draft.',
