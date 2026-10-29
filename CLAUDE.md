@@ -60,6 +60,7 @@ Context guidance: [agent context](docs/agent-context/README.md).
 | Auth/Better Auth | [auth](.claude/rules/auth.md) |
 | Security, billing, entitlements | [security](.claude/rules/security.md) |
 | External APIs | [external-apis](.claude/rules/external-apis.md) |
+| New dependency, new module, algorithm | [build-vs-buy](.claude/rules/build-vs-buy.md) |
 | UI/design | [DESIGN](DESIGN.md), [ui](.claude/rules/ui.md) |
 | Marketing pages (fully static) | [marketing guide](docs/marketing/AGENT_GUIDE.md) |
 | Writing/copy | [writing contract](docs/writing/SURFACE_COVERAGE.md) |
@@ -75,7 +76,7 @@ Other scoped rules: ci-branching, event-driven, infra, linear, motion,
 pr-stacking, swarm, hermes-air.
 Company domain canon: [index](canon/README.md). API/cron/webhook maps:
 [AI_AGENT_GUIDE](docs/AI_AGENT_GUIDE.md). Codex: [CODEX](CODEX.md).
-<!-- doc-freshness:scoped-rules-count:23 -->
+<!-- doc-freshness:scoped-rules-count:24 -->
 
 ## Tools and workflow
 

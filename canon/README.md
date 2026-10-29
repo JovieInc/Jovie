@@ -28,4 +28,8 @@ Read in this order:
    its derived surfaces; generated from `sources-of-truth.json`. Find the owner before
    adding a fact; derive, never copy.
 
+14. [`BUILD_VS_BUY.md`](./BUILD_VS_BUY.md) — build, buy, borrow or own: the ponytail test,
+   decision order, dependency health bar, and prior-art-first for algorithms; enforced by
+   Fleet Rules from `build-vs-buy.json`.
+
 Operational files (`CLAUDE.md`, `.claude/rules/*`, `docs/*`, skills, scripts, workflows) implement this canon. If they conflict, update the lower-level file or escalate to Tim.

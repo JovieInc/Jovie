@@ -64,6 +64,8 @@ correctness, security, reliability, privacy, performance and user experience.
 Custom product behavior is expected; custom commodity mechanisms require evidence.
 Dependency count and lines of code are not goals. This is the single sourcing and
 planning authority; scoped rules, task packets and review project it.
+[BUILD_VS_BUY.md](./BUILD_VS_BUY.md) is the enforced rubric for what to pick
+(own, rent, write the few lines) and the prior-art-first order for algorithms.
 
 1. State the user outcome. Classify each consequential capability as
    **differentiating product logic**, **necessary integration**, or **commodity

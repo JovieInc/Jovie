@@ -1004,6 +1004,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/voc/voc-mine.test.mjs',
   'scripts/web-ai-health-intake.test.mjs',
   'scripts/weekly-agent-readiness.test.mjs',
+  'scripts/lib/__tests__/build-vs-buy.test.mjs',
   'scripts/lib/__tests__/pr-fleet-rules-workflow.test.mjs',
   'scripts/lib/__tests__/wake-fanout-contract.test.mjs',
 ]);

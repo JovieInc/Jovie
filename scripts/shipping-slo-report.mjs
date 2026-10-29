@@ -30,11 +30,13 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { collect as collectBuildVsBuy } from './build-vs-buy-metrics.mjs';
 import {
   buildBlogPublishLatency,
   findBlogQualificationRun,
   isStrictBlogContentPr,
 } from './lib/blog-publish-latency.mjs';
+import { summarizeMetrics as summarizeBuildVsBuy } from './lib/build-vs-buy-metrics.mjs';
 import { ciRoundsMetrics, flattenCiRounds } from './lib/ci-rounds.mjs';
 import { formatBiomeJson } from './lib/format-biome-json.mjs';
 import {
@@ -82,6 +84,10 @@ const STAGE_MANIFEST_PATH = resolve(
 const STAGE_TIMINGS_PATH = resolve(
   REPO_ROOT,
   'docs/metrics/stage-timings-latest.json'
+);
+const BUILD_VS_BUY_PATH = resolve(
+  REPO_ROOT,
+  'docs/metrics/build-vs-buy-latest.json'
 );
 const API_CLIENT_CLI = resolve(REPO_ROOT, 'packages/api-client/cli.ts');
 const TIMELINE_PR_LIMIT = 80;
@@ -804,6 +810,15 @@ async function main() {
   }
 
   if (hasArg(args, '--write-latest')) {
+    // Build-vs-buy counts (canon/BUILD_VS_BUY.md) ride the same snapshot Summer
+    // already reads; a failed measurement drops the block, never the SLO.
+    try {
+      const buildVsBuy = collectBuildVsBuy();
+      writeFileSync(BUILD_VS_BUY_PATH, formatBiomeJson(buildVsBuy));
+      report.gistSlo.buildVsBuy = summarizeBuildVsBuy(buildVsBuy);
+    } catch (error) {
+      console.error(`[shipping-slo] build-vs-buy metrics skipped: ${error}`);
+    }
     writeFileSync(LATEST_PATH, formatBiomeJson(report.gistSlo));
     writeFileSync(
       BLOG_LATENCY_PATH,
