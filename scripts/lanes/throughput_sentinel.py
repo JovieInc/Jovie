@@ -310,7 +310,14 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         repos[watched] = flow_row
         if flow_err:
             repo_errors[watched] = flow_err
-    return {"queueUnmergeable": queue_unmergeable, "pushes1h": pushes_by_lane(receipts, now), "claimErrors30m": claim_errors_by_lane(receipts, now),
+    breaker = None
+    if fetch_remote:
+        try:
+            import queue_breaker as _breaker
+            breaker = _breaker.sweep(state, run or _budgeted_gh, now)
+        except Exception as error:  # noqa: BLE001
+            breaker = {"tripped": [], "reblocked": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
+    return {"queueBreaker": breaker, "queueUnmergeable": queue_unmergeable, "pushes1h": pushes_by_lane(receipts, now), "claimErrors30m": claim_errors_by_lane(receipts, now),
             "idleExits1h": dict(Counter(row["reason"] for row in exits)),
             "idleExitsByProvider1h": {name: dict(Counter(r["reason"] for r in exits if r.get("provider") == name))
                                       for name in sorted({r.get("provider") for r in exits if r.get("provider")})},
@@ -355,6 +362,11 @@ def judge(obs: dict) -> dict[str, str]:
         alerts["throughput-queue-unmergeable"] = (
             f"stage queued->merged: UNMERGEABLE merge-queue entries {[row['pr'] for row in stuck['seen']]} could not be "
             f"auto-dequeued: {'; '.join(stuck['errors'])[:300]}")
+    tripped = sentinel.get("queueBreaker") or {}
+    if tripped.get("tripped"):
+        alerts["throughput-queue-breaker"] = (
+            f"stage queued->merged: PR(s) {tripped['tripped']} failed merge-group CI twice in 3h and were dequeued and held with "
+            "lane-fix-red; re-enqueue waits for a new head and a green PR-time check")
     # 2. Queue but no merges.
     merge = obs.get("mergeThroughput") or {}
     if isinstance(merge.get("observedAt"), (int, float)) and obs["now"] - merge["observedAt"] < 1800 \

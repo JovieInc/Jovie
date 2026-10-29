@@ -401,6 +401,11 @@ export const SERVER_ANALYTICS_CALLSITE_INVENTORY = [
     events: ['claim_completed', 'signup_completed', 'activation_achieved'],
   },
   {
+    path: 'lib/onboarding/catalog-import.server.ts',
+    invocations: 1,
+    events: ['releases_synced'],
+  },
+  {
     path: 'lib/onboarding/upgrade-offer.ts',
     invocations: 1,
     events: [
