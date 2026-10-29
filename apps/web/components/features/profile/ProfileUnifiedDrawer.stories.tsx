@@ -75,17 +75,5 @@ export const AboutDestination: StoryObj<typeof meta> = {
   },
 };
 
+/** Pay sheet: the recipient is named once, in the drawer title; the body is amount and method only. */
 export const PayNow: StoryObj<typeof meta> = {};
-
-/** Pay sheet with the recipient named once, in the drawer title; no body block. */
-export const PayRecipientInTitle: StoryObj<typeof meta> = {
-  args: { view: 'pay', hasTip: true },
-  parameters: {
-    docs: {
-      description: {
-        story:
-          'The drawer title reads "Pay <artist>". The body shows only the amount and method controls.',
-      },
-    },
-  },
-};
