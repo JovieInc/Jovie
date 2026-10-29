@@ -6,10 +6,12 @@ import {
   buildPresenceRows,
   type CanonicalIdentity,
   computeLoopMetrics,
+  type FixProposal,
   type LoopMetrics,
   type PresenceMode,
   type PresenceRow,
   type ProfileObservation,
+  proposeFix,
 } from './health';
 
 /** Platforms every identity is expected to have; company/personal differ later. */
@@ -74,4 +76,34 @@ export function buildPresenceHealth(
     now: options.now ?? new Date(),
   });
   return { rows, metrics: computeLoopMetrics(rows) };
+}
+
+const SEVERITY_RANK = { high: 0, medium: 1, low: 2 } as const;
+
+/**
+ * One approvable fix for a row: its most severe issue. Null when the row is
+ * healthy or not an owned surface, so the action never appears as a dead end.
+ */
+export function fixForRow(
+  row: ProfileWorkspaceRow,
+  mode: PresenceMode,
+  now: Date = new Date()
+): FixProposal | null {
+  const [obs] = rowsToObservations([row]);
+  if (!obs?.qualified) return null;
+  const [health] = buildPresenceRows({
+    observations: [obs],
+    expectedPlatforms: [],
+    canonical: { handle: '', bio: '', photoHash: '' },
+    now,
+  });
+  const issue = [...(health?.issues ?? [])].sort(
+    (a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]
+  )[0];
+  return issue ? proposeFix(issue, mode) : null;
+}
+
+/** Chat deep link that opens the drafted task for the user to review and send. */
+export function fixChatHref(fix: FixProposal): string {
+  return `/app/chat?q=${encodeURIComponent(fix.agentTask)}`;
 }

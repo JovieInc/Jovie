@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ProfileWorkspaceSurfaceRow } from '@/components/features/presence/types';
-import { buildPresenceHealth } from './adapter';
+import { buildPresenceHealth, fixChatHref, fixForRow } from './adapter';
 
 const NOW = new Date('2026-10-29T12:00:00Z');
 const canonical = { handle: 'tim', bio: '', photoHash: '' };
@@ -59,5 +59,24 @@ describe('buildPresenceHealth', () => {
     expect(metrics.outboundCoverage).toBe(50);
     expect(metrics.inboundCoverage).toBeNull();
     expect(metrics.verifiedPct).toBe(25);
+  });
+});
+
+describe('fixForRow', () => {
+  it('proposes one approvable fix for an unhealthy owned row', () => {
+    const fix = fixForRow(
+      row({ platform: 'twitter', linksOut: false }),
+      'personal',
+      NOW
+    );
+    expect(fix?.issue.kind).toBe('jovie_does_not_link_out');
+    expect(fix?.requiresApproval).toBe(true);
+    expect(fix && fixChatHref(fix)).toContain('/app/chat?q=');
+  });
+  it('proposes nothing for healthy or unowned rows (no dead ends)', () => {
+    expect(fixForRow(row({ linksOut: true }), 'personal', NOW)).toBeNull();
+    expect(
+      fixForRow(row({ qualificationStatus: 'suggested' }), 'personal', NOW)
+    ).toBeNull();
   });
 });

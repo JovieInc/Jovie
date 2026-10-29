@@ -8,6 +8,8 @@
  * posts or contacts anyone.
  */
 
+import { computeRatePercent } from '@/lib/analytics/metrics';
+
 export type PresenceMode = 'personal' | 'company';
 
 export type PresenceHealthStatus =
@@ -272,10 +274,6 @@ export interface LoopMetrics {
   readonly linkWebCoverage: number | null;
 }
 
-function pct(n: number, d: number): number {
-  return d === 0 ? 0 : Math.round((n / d) * 1000) / 10;
-}
-
 /** Coverage over observed rows only; null when nothing was observed. */
 function coverage(
   rows: readonly PresenceRow[],
@@ -283,7 +281,10 @@ function coverage(
 ): number | null {
   const seen = rows.filter(r => observed(r) !== null);
   if (seen.length === 0) return null;
-  return pct(seen.filter(r => observed(r) === true).length, seen.length);
+  return computeRatePercent(
+    seen.filter(r => observed(r) === true).length,
+    seen.length
+  );
 }
 
 export function computeLoopMetrics(rows: readonly PresenceRow[]): LoopMetrics {
@@ -293,7 +294,7 @@ export function computeLoopMetrics(rows: readonly PresenceRow[]): LoopMetrics {
   const outbound = coverage(present, r => r.linkOut);
   return {
     profiles: rows.length,
-    verifiedPct: pct(
+    verifiedPct: computeRatePercent(
       rows.filter(r => r.status === 'verified').length,
       rows.length
     ),
@@ -308,6 +309,6 @@ export function computeLoopMetrics(rows: readonly PresenceRow[]): LoopMetrics {
     linkWebCoverage:
       inbound === null || outbound === null
         ? (inbound ?? outbound)
-        : Math.round(((inbound + outbound) / 2) * 10) / 10,
+        : computeRatePercent(inbound + outbound, 200),
   };
 }
