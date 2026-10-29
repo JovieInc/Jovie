@@ -836,6 +836,8 @@ describe('ensureOnboardingUserRow', () => {
       email: 'artist@example.com',
       userStatus: 'onboarding_incomplete',
       updatedAt: FIXED_NOW,
+      // @example.com is a reserved test domain, so the new row is stamped.
+      accountClass: 'internal',
     });
     expect(mocks.onConflictDoUpdateMock).toHaveBeenCalledWith({
       target: users.clerkId,

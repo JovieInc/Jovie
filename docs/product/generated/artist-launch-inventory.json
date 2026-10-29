@@ -2233,6 +2233,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/content-records/[kind]/[key]/route.ts",
+      "kind": "handler",
+      "route": "/api/content-records/[kind]/[key]",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/create-tip-intent/route.ts",
       "kind": "handler",
       "route": "/api/create-tip-intent",
@@ -3265,6 +3273,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/golden-path-evidence",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/internal/ovie/lyb-mrr/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/lyb-mrr",
@@ -3301,6 +3317,14 @@
       "kind": "handler",
       "route": "/api/internal/ovie/pipeline-bottleneck",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/recovery-emails/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/recovery-emails",
+      "methods": ["GET", "POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -4537,6 +4561,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/unsubscribe/recovery/route.ts",
+      "kind": "handler",
+      "route": "/api/unsubscribe/recovery",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/usage/summary/route.ts",
       "kind": "handler",
       "route": "/api/usage/summary",
@@ -4677,6 +4709,14 @@
       "kind": "handler",
       "route": "/api/wallet/apple/v1/passes/[passTypeIdentifier]/[serialNumber]",
       "methods": ["GET"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/webhooks/instantly/route.ts",
+      "kind": "handler",
+      "route": "/api/webhooks/instantly",
+      "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
     },
@@ -6843,6 +6883,14 @@
       "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
+    },
+    {
+      "source": "apps/web/app/content-preview/[versionId]/page.tsx",
+      "kind": "page",
+      "route": "/content-preview/[versionId]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
     },
     {
       "source": "apps/web/app/demo/audience/page.tsx",
