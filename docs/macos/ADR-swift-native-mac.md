@@ -33,9 +33,8 @@ sessions, and measured production workloads are different evidence.
 
 These target paths are architectural destinations, not evidence that a native
 product target or complete shared package has landed. Do not rename the iOS tree
-or create another repository to start this migration. The deprecated standalone
-Swift Ovie implementation is read-only by policy, not the product foundation. Ovie can become a surface of the
-one native Mac product without reviving that deprecated implementation.
+or create another repository to start this migration. There is no native Ovie (founder decision 2026-10-28, `canon/PRODUCT.md`): Ovie is the web
+shell at `/app/ov`, and the native Mac product must not grow an Ovie surface.
 
 Share transport, models, cache, conversation state, session boundaries, and
 canonical action semantics. Keep UIKit/AppKit integrations behind platform

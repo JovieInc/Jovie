@@ -2243,7 +2243,6 @@ def product_id_for_repository(repository: str | None) -> str | None:
     fallback = {
         "jovieinc/jovie": JOVIE_PRODUCT_ID,
         "jovieinc/logyourbody": "logyourbody",
-        "jovieinc/ovie": "ovie",
     }
     return fallback.get(repository.casefold())
 
@@ -2318,7 +2317,6 @@ def _issue_intake_product_rows() -> list[tuple[str, str]]:
         return [
             (JOVIE_PRODUCT_ID, "JovieInc/Jovie"),
             ("logyourbody", "JovieInc/LogYourBody"),
-            ("ovie", "JovieInc/ovie"),
         ]
     try:
         return [(repo.id, repo.github) for repo in issue_intake_repos()]
@@ -2326,7 +2324,6 @@ def _issue_intake_product_rows() -> list[tuple[str, str]]:
         return [
             (JOVIE_PRODUCT_ID, "JovieInc/Jovie"),
             ("logyourbody", "JovieInc/LogYourBody"),
-            ("ovie", "JovieInc/ovie"),
         ]
 
 
@@ -2381,7 +2378,7 @@ def product_intake_allowed(
 ) -> bool:
     """Return newIssueIntakeAllowed for one registry product.
 
-    Jovie MQ empty/UNMERGEABLE never freezes LYB/Ovie. Systems-down shared
+    Jovie MQ empty/UNMERGEABLE never freezes LYB. Systems-down shared
     evidence still fails closed for every product.
     """
     needle = str(product_id or "").strip() or JOVIE_PRODUCT_ID

@@ -119,6 +119,25 @@ planning authority; scoped rules, task packets and review project it.
     repair uses existing emergency authority without lowering security, recording
     a bounded follow-up. Legacy mechanisms do not trigger a wholesale rewrite.
 
+### One surface per product
+
+<!-- founder decision 2026-10-28: one Ovie -->
+
+A new surface for an existing product extends that product's shared shell. It
+does not create a parallel app, repository, native rewrite or second shell
+(agents once built several Ovies; only the web Ovie at `/app/ov` survives).
+
+- `canon/product-surfaces.json` registers every `apps/*` directory with a kind
+  (`shell`, `deploy-boundary`, `wrapper`, `independent`). `independent` needs a
+  written justification; anything else extends an existing shell.
+- The same file lists forbidden parallel implementations and retired
+  repositories per product. `pnpm run surfaces:check` (also in
+  `invariants:check`) fails on an unregistered app, a tracked forbidden path
+  (for example Swift Ovie) or a retired repo left in the ownership, release
+  communications or closure-health registries.
+- Plans that add a repo or app must name the shell they extend in the IA
+  preflight below; "new repo" is not an answer to "where does this live".
+
 ### IA preflight for UI-bearing plans
 
 **Integrate > consolidate > replace > extend > add.** Before implementation,

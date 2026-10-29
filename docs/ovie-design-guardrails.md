@@ -1,6 +1,6 @@
 # Ovie Design Guardrails
 
-Ovie is Jovie's local macOS ops cockpit. Treat Ovie UI work as product/admin UI, not marketing or landing-page work: dense but calm, fast, native-feeling, and stripped of AI-slop decoration.
+Ovie is Jovie's company cockpit: web, at `/app/ov` on the shared Jovie/Ovie shell (no native Ovie). Treat Ovie UI work as product/admin UI, not marketing or landing-page work: dense but calm, fast, and stripped of AI-slop decoration.
 
 ## Required Routing
 
@@ -9,7 +9,7 @@ Any Ovie UI or UX task must run through the existing make-interfaces-better guar
 - Load gstack `/design-review` before marking visual work complete.
 - Load `design-taste-frontend` where available and run its audit checklist.
 - Read `DESIGN.md` and this file before changing Ovie UI.
-- Preserve Ovie's local dirty state first. If `~/JovieInc/ovie` has uncommitted changes, inspect them and avoid overwriting unrelated work.
+- Work in a Jovie worktree. There is no separate Ovie checkout; `JovieInc/ovie` is archived.
 
 ## Design Read
 
@@ -19,7 +19,7 @@ Before editing Ovie UI, write this one-line statement in the agent notes and PR:
 
 For most Ovie work, the default read should be:
 
-`Reading this as: macOS ops cockpit for Jovie operators, with a calm dense native language, leaning toward Linear-style product UI adapted to macOS.`
+`Reading this as: web ops cockpit for Jovie operators, with a calm dense language, leaning toward Linear-style product UI.`
 
 Set the design dials from that read:
 
