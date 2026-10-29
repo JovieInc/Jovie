@@ -42,7 +42,7 @@ describe('TooltipShortcut', () => {
       expect(tooltip).toHaveTextContent('Bold');
       expect(tooltip).toHaveTextContent('⌘B');
       expect(screen.getByTestId('tooltip-content')).toHaveClass(
-        'rounded-(--system-b-radius-overlay)',
+        'rounded-(--radius-sm)',
         'whitespace-normal'
       );
     });
@@ -85,7 +85,7 @@ describe('TooltipShortcut', () => {
     );
 
     expect(screen.getByTestId('tooltip-content')).toHaveClass(
-      'rounded-(--system-b-radius-overlay)'
+      'rounded-(--radius-sm)'
     );
   });
 
