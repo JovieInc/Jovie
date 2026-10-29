@@ -1,5 +1,6 @@
 import { MarketingContainer } from '@/components/marketing';
 import { PublicPageShell } from '@/components/site/PublicPageShell';
+import { getSiteChrome } from '@/lib/content-records/site-chrome.server';
 
 export const revalidate = false;
 
@@ -10,13 +11,15 @@ export const revalidate = false;
  * the single title and focal point; a texture hero above it repeated the
  * title over off-palette wallpaper (2026-10-29 marketing critic sweep).
  */
-export default function LegalLayout({
+export default async function LegalLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const chrome = await getSiteChrome();
   return (
     <PublicPageShell
+      chrome={chrome}
       className='public-legal-shell bg-base text-primary-token'
       footerVariant='expanded'
       logoSize='sm'
