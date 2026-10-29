@@ -1495,6 +1495,20 @@ export function mergeGroupDiffBase(cwd, fallback) {
   return mergeBase.code === 0 && /^[0-9a-f]{40}$/.test(sha) ? sha : fallback;
 }
 
+/** Keep Turbo's affected graph as wide as merge-group lane selection. */
+export function typecheckEnvironment(cwd = REPO_ROOT) {
+  return process.env.GITHUB_EVENT_NAME === 'merge_group'
+    ? {
+        ...process.env,
+        TURBO_SCM_BASE: mergeGroupDiffBase(
+          cwd,
+          process.env.TURBO_SCM_BASE || 'HEAD^1'
+        ),
+        TURBO_SCM_HEAD: 'HEAD',
+      }
+    : process.env;
+}
+
 /** @param {readonly string[]} patterns */
 export function changedFiles(patterns = [], cwd = REPO_ROOT) {
   const event = process.env.GITHUB_EVENT_NAME || '';
@@ -2153,7 +2167,10 @@ function runTypecheck() {
       };
     }
   }
-  return shellAsync('pnpm turbo typecheck --affected --force');
+  return shellAsync(
+    'pnpm turbo typecheck --affected --force',
+    typecheckEnvironment()
+  );
 }
 
 function runWebTestsTypecheck() {
@@ -2553,14 +2570,14 @@ function shellQuote(value) {
 }
 
 /** Async twin of shell() so structural commands can overlap. */
-function shellAsync(command) {
+function shellAsync(command, env = process.env) {
   return new Promise(resolveResult => {
     const stdout = [];
     const stderr = [];
     const child = spawn(command, {
       shell: true,
       cwd: REPO_ROOT,
-      env: process.env,
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     child.stdout.on('data', chunk => stdout.push(chunk));
