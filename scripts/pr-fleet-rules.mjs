@@ -255,7 +255,7 @@ export function evaluateFleetRules({
     );
   if (locked.length && !citation)
     errors.push(
-      `locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for ${[...new Set(locked)].join(', ')}.`
+      `locked-areas: cite GBrain: <slug/page> or Locking PR: #<number> in Locked areas for ${[...new Set(locked)].join(', ')}. Add to the PR body: "## Locked areas\nGBrain: design/design-operating-system" (design-system.css and design baselines) or "Locking PR: #<number>".`
     );
   return { errors, warnings };
 }

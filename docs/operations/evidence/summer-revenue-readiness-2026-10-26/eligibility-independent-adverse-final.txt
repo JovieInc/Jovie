@@ -1,0 +1,16 @@
+✔ control: fresh complete evidence remains eligible (10.839772ms)
+✔ stale receipt cannot inherit cached eligible flag (0.989603ms)
+✔ missing requirement is not zero-success (0.465232ms)
+✔ failed receipt overrides cached green (0.729513ms)
+✔ held cached decision cannot self-promote (0.854883ms)
+✔ profile cannot lose workflow producer silently (1.076054ms)
+✔ malformed cache cannot raise existing freshness budget (0.773146ms)
+✔ contradictory duplicate commerce receipt cannot hide red (0.382877ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32.799148
