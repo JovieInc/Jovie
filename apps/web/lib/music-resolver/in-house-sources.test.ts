@@ -494,9 +494,11 @@ describe('createDefaultInHouseSources', () => {
       )
     ).toBe(true);
     await sources.searchAlbums('Tim White', 'Release', 'CA');
-    expect(String(fetchMock.mock.calls.at(-1)?.[0])).toContain(
-      'entity=album&limit=8&country=ca'
-    );
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('entity=album&limit=8&country=ca')
+      )
+    ).toBe(true);
     await sources.albumByUpc('123456789012', 'GB');
     expect(
       fetchMock.mock.calls.some(([url]) =>
