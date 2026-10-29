@@ -70,7 +70,6 @@ describe('public marketing navigation', () => {
       'Pay',
       'Audience capture',
       'Audience reactivation',
-      'Product Demo',
       'Release System',
     ]);
     expect(MARKETING_TOOLS_FLYOUT_LINKS[0]).toMatchObject({
@@ -94,7 +93,6 @@ describe('public marketing navigation', () => {
       'Pay',
       'Audience Capture',
       'Audience Reactivation',
-      'Product Demo',
       'Release System',
     ]);
     expect(customers?.links[0]).toMatchObject({

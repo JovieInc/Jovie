@@ -129,7 +129,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.PRODUCT_ISRC, label: 'ISRC' },
       { href: APP_ROUTES.PRODUCT_PRE_SAVE, label: 'Pre-save' },
       { href: APP_ROUTES.PRODUCT_LINK_ANALYTICS, label: 'Link analytics' },
-      { href: APP_ROUTES.CARD, label: 'Jovie Card' },
       { href: APP_ROUTES.PRICING, label: 'Pricing' },
     ],
   },
@@ -148,7 +147,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
         href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
         label: 'Audience reactivation',
       },
-      { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
       { href: APP_ROUTES.LAUNCH, label: 'Release System' },
     ],
   },
@@ -169,8 +167,6 @@ const RAW_MARKETING_FOOTER_COLUMNS: readonly MarketingFooterColumn[] = [
       { href: APP_ROUTES.ENGINEERING, label: 'Engineering' },
       { href: APP_ROUTES.AI, label: 'AI Operating System' },
       { href: APP_ROUTES.SUPPORT, label: 'Support' },
-      { href: APP_ROUTES.COMPARE, label: 'Compare' },
-      { href: APP_ROUTES.ALTERNATIVES, label: 'Alternatives' },
     ],
   },
   {
@@ -211,7 +207,6 @@ const RAW_GENERIC_CREATOR_FOOTER_LINKS = [
     href: `${APP_ROUTES.ARTIST_PROFILES}#bring-them-back-automatically`,
     label: 'Audience Reactivation',
   },
-  { href: APP_ROUTES.DEMO_VIDEO, label: 'Product Demo' },
   { href: APP_ROUTES.LAUNCH, label: 'Release System' },
 ] as const satisfies readonly MarketingFooterLink[];
 
@@ -243,7 +238,6 @@ const RAW_PUBLIC_COMMERCIAL_FOOTER_LINKS = [
   { href: APP_ROUTES.PRICING, label: 'Pricing' },
   { href: APP_ROUTES.ARTIST_PROFILES, label: 'Artist Profiles' },
   { href: APP_ROUTES.SMART_LINKS, label: 'Music Smart Links' },
-  { href: APP_ROUTES.CARD, label: 'Jovie Card' },
 ] as const satisfies readonly MarketingFooterLink[];
 
 export const PUBLIC_COMMERCIAL_FOOTER_LINKS: readonly MarketingFooterLink[] =
