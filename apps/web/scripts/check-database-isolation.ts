@@ -20,6 +20,7 @@ import {
   evaluateStagingDbHostGuard,
   type GuardEnv,
   parseDatabaseHost,
+  PROD_DATABASE_HOST_ENV_VAR,
 } from '@/lib/startup/db-host-guard';
 
 /**
@@ -31,11 +32,12 @@ export function runDbHostIsolationCheck(env: GuardEnv = process.env): number {
   // Prefer a host-name reference when provided; otherwise parse the prod URL
   // in-process. Both paths only ever surface the hostname for comparison.
   const prodUrlHost = parseDatabaseHost(env.PROD_DATABASE_URL);
-  if (prodUrlHost && !env.PROD_DATABASE_HOST && !env.PROD_DATABASE_HOSTS) {
-    env.PROD_DATABASE_HOST = prodUrlHost;
-  }
+  const effectiveEnv: GuardEnv =
+    prodUrlHost && !env.PROD_DATABASE_HOST && !env.PROD_DATABASE_HOSTS
+      ? { ...env, [PROD_DATABASE_HOST_ENV_VAR]: prodUrlHost }
+      : env;
 
-  const verdict = evaluateStagingDbHostGuard({ env });
+  const verdict = evaluateStagingDbHostGuard({ env: effectiveEnv });
 
   if (!verdict.active) {
     console.log(
