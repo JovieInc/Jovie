@@ -43,21 +43,25 @@ describe('truthful chat operation status', () => {
       />
     );
     expect(row()).toHaveAttribute('data-operation-status', 'pending');
+    expect(screen.getAllByRole('status')).toEqual([owner]);
+    expect(screen.queryByText(/status unknown|not been confirmed/i)).toBeNull();
     expect(checks(container)).toHaveLength(0);
     rerender(
       <ToolPartsRenderer variant='chat' parts={TOOL_STATUS_PARTS.unconfirmed} />
     );
-    expect(row()).toHaveAttribute('data-operation-status', 'unknown');
+    expect(screen.queryByTestId('tool-status-row')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(checks(container)).toHaveLength(0);
     rerender(
       <ToolPartsRenderer variant='chat' parts={TOOL_STATUS_PARTS.succeeded} />
     );
     expect(checks(container)).toHaveLength(1);
-    expect(screen.getAllByRole('status')).toEqual([owner]);
+    expect(screen.getAllByRole('status')).toEqual([row()]);
+    expect(row()).toHaveAttribute('data-operation-status', 'succeeded');
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('receives the saved receipt through the real timeline refetch without replacing the row', () => {
+  it('receives the saved receipt through the real timeline refetch without replacing the message', () => {
     let state = reduceChatTimeline(createInitialChatTimelineState(), {
       type: 'message.send.started',
       conversationId: 'conversation',
@@ -136,7 +140,8 @@ describe('truthful chat operation status', () => {
       <ToolPartsRenderer variant='chat' parts={[fake]} />
     );
     expect(checks(container)).toHaveLength(0);
-    expect(row()).toHaveAttribute('data-operation-status', 'unknown');
+    expect(screen.queryByTestId('tool-status-row')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('clears an old receipt when the latest part for the call is live', () => {
@@ -150,7 +155,8 @@ describe('truthful chat operation status', () => {
       />
     );
     expect(checks(container)).toHaveLength(0);
-    expect(screen.getAllByTestId('tool-status-row')).toHaveLength(1);
+    expect(screen.queryByTestId('tool-status-row')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('stops on an interrupted task and never turns stream end into success', () => {
@@ -164,7 +170,8 @@ describe('truthful chat operation status', () => {
     rerender(
       <ToolPartsRenderer variant='chat' parts={TOOL_STATUS_PARTS.working} />
     );
-    expect(row()).toHaveAttribute('data-operation-status', 'unknown');
+    expect(screen.queryByTestId('tool-status-row')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
     expect(container.querySelector('[data-fill="indeterminate"]')).toBeNull();
     expect(checks(container)).toHaveLength(0);
   });

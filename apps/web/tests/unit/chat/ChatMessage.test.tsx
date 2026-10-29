@@ -2,6 +2,7 @@ import { fireEvent, screen, within } from '@testing-library/react';
 import type { ComponentProps, ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ChatMessage } from '@/components/jovie/components/ChatMessage';
+import { hydratePersistedMessageParts } from '@/components/jovie/message-parts';
 import { fastRender } from '@/tests/utils/fast-render';
 
 vi.mock('motion/react', () => ({
@@ -321,15 +322,16 @@ describe('ChatMessage', () => {
     const messageProps = {
       id: 'assistant-tool-1',
       role: 'assistant' as const,
-      parts: [
+      parts: hydratePersistedMessageParts('', [
         {
-          type: 'dynamic-tool' as const,
+          schemaVersion: 2,
           toolName: 'summarizeAudience',
           toolCallId: 'tool-1',
-          state: 'output-available' as const,
+          state: 'succeeded',
+          uiHint: 'status',
           output: { summary: 'Audience summary complete.' },
         },
-      ],
+      ]),
     };
 
     fastRender(<ChatMessage {...messageProps} />);
@@ -347,26 +349,54 @@ describe('ChatMessage', () => {
     expect(screen.queryByTestId('tool-activity-timeline-line')).toBeNull();
   });
 
+  it('keeps the reply visible without an unconfirmed tool activity row', () => {
+    const messageProps = {
+      id: 'assistant-unconfirmed-tool',
+      role: 'assistant' as const,
+      parts: [
+        { type: 'text' as const, text: 'Here is your audience summary.' },
+        {
+          type: 'dynamic-tool' as const,
+          toolName: 'summarizeAudience',
+          toolCallId: 'unconfirmed-tool',
+          state: 'output-available' as const,
+          output: { summary: 'Audience summary complete.' },
+        },
+      ],
+    };
+
+    fastRender(<ChatMessage {...messageProps} />);
+
+    expect(screen.getByTestId('chat-message-reply')).toHaveTextContent(
+      'Here is your audience summary.'
+    );
+    expect(screen.queryByTestId('tool-activity-feed')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('tool-status-row')).not.toBeInTheDocument();
+    expect(screen.queryByText(/status unknown|not been confirmed/i)).toBeNull();
+  });
+
   it('connects multiple generic tools with timeline lines in one quiet activity run', () => {
     const messageProps = {
       id: 'assistant-tool-2',
       role: 'assistant' as const,
-      parts: [
+      parts: hydratePersistedMessageParts('', [
         {
-          type: 'dynamic-tool' as const,
+          schemaVersion: 2,
           toolName: 'writeWorldClassBio',
           toolCallId: 'tool-1',
-          state: 'output-available' as const,
+          state: 'succeeded',
+          uiHint: 'status',
           output: { summary: 'Bio ready.' },
         },
         {
-          type: 'dynamic-tool' as const,
+          schemaVersion: 2,
           toolName: 'submitFeedback',
           toolCallId: 'tool-2',
-          state: 'output-error' as const,
-          errorText: 'Feedback failed.',
+          state: 'failed',
+          uiHint: 'status',
+          errorMessage: 'Feedback failed.',
         },
-      ],
+      ]),
     };
 
     fastRender(<ChatMessage {...messageProps} />);
