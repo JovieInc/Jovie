@@ -538,7 +538,7 @@
           "id": "data-edit",
           "meaning": "content record version drafted (immutable version stored)",
           "producer": "content-records",
-          "status": "spec",
+          "status": "pushed",
           "source": "content-record-events",
           "owner": "apps/web/lib/content-records/stage-events.ts"
         },
@@ -546,7 +546,7 @@
           "id": "data-live",
           "meaning": "publish or rollback moved the live pointer; served on the next request",
           "producer": "content-records",
-          "status": "spec",
+          "status": "pushed",
           "source": "content-record-events",
           "owner": "apps/web/lib/content-records/stage-events.ts"
         }
@@ -556,7 +556,7 @@
   "sources": {
     "content-record-events": {
       "kind": "events",
-      "url": null,
+      "url": "https://jov.ie/api/content-records/stage-events",
       "owner": "apps/web/lib/content-records/stage-events.ts"
     },
     "chat-comparison-receipts": {
