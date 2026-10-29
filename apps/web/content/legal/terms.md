@@ -112,7 +112,7 @@ New accounts start with a 14-day Pro trial at no charge and no credit card requi
 
 ### Billing and Cancellation
 
-Paid subscriptions renew automatically at the end of each billing cycle. Each renewal charges your payment method on file the then-current monthly price, plus applicable taxes, until you cancel. We will give notice of a price change before it applies to your next renewal, and you can cancel before it takes effect. Existing legacy plans continue on their current terms until they end. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period. You retain access to paid features until then.
+Paid subscriptions renew automatically at the end of each billing cycle. Each renewal charges your payment method on file the then-current monthly price, plus applicable taxes, until you cancel. We will give notice of a price change before it applies to your next renewal, and you can cancel before it takes effect. Existing legacy plans continue on their current terms until they end. You may cancel anytime from your account settings. Cancellation takes effect at the end of the current billing period. You retain access to paid features until then. Cancel anytime and keep Pro to the end of the paid month. No partial refunds.
 
 Cancel anytime, keep Pro to the end of the paid month, no partial refunds.
 

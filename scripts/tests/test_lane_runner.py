@@ -12289,6 +12289,11 @@ class LockfileConflictTest(unittest.TestCase):
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_text("regenerated\n")
                 return SimpleNamespace(returncode=0, stdout="", stderr="")
+            if args == ["pnpm", "factory:truth-sync", "--", "--write"]:
+                target = Path(cwd) / "apps/web/data/product-truth/claim-digest.gen.json"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("regenerated\n")
+                return SimpleNamespace(returncode=0, stdout="", stderr="")
             return real(args, cwd=cwd, timeout=timeout, env=env)
         lane.sh = sh
         try:
@@ -12337,6 +12342,18 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertTrue(ok)
             self.assertEqual(calls.count(["pnpm", "install", "--lockfile-only", "--ignore-scripts"]), 1)
             self.assertEqual(calls.count(["pnpm", "ci:topology:write"]), 1)
+
+    def test_claim_digest_conflict_is_regenerated_and_pushed(self):
+        """A product-truth digest conflict is rewritten by factory:truth-sync, not hand-merged."""
+        path = "apps/web/data/product-truth/claim-digest.gen.json"
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = self.repo(Path(tmp), {path: "pr\n"},
+                                     main_changes={path: "main\n", "a.ts": "main\n"})
+            ok, calls = self.run_resolve(work)
+            self.assertTrue(ok)
+            self.assertIn(["pnpm", "factory:truth-sync", "--", "--write"], calls)
+            self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
+            self.assertEqual(self.git("show", f"devin/jov-1-20260927:{path}", cwd=origin), "regenerated")
 
     def test_a_source_conflict_is_left_to_the_agent_untouched(self):
         with tempfile.TemporaryDirectory() as tmp:
