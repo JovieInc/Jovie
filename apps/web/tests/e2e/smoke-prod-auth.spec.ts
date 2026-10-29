@@ -15,6 +15,7 @@ import {
   requireExactNavigationOrigin,
 } from '../helpers/vercel-preview';
 import { primeOriginBoundVercelBypass } from './utils/prime-vercel-bypass';
+import { certStep, certStepBlocked } from './utils/prod-cert-steps';
 import { resolveProductionAuthCredentials } from './utils/production-auth-credentials';
 import {
   prepareProductionAuthEmailForm,
@@ -491,11 +492,35 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     });
     assertExactNavigationUrl(page.url(), expectedOrigin, 'Sign-in navigation');
 
-    const result = await signInViaRenderedFlow(
-      page,
-      credentials,
-      expectedOrigin
-    );
+    const result = await certStep(
+      'signup-signin',
+      'returning-user-email-otp',
+      async () => {
+        const outcome = await signInViaRenderedFlow(
+          page,
+          credentials,
+          expectedOrigin
+        );
+        if (outcome !== 'authenticated') {
+          throw new Error(`returning-user sign-in ended as ${outcome}`);
+        }
+        return outcome;
+      },
+      () => 'creator-ready signed in with a fresh email OTP'
+    ).catch(error => {
+      // Preserve the original, more specific assertions below for the
+      // known non-authenticated outcomes.
+      if (
+        !/ended as (verification-required|signin-form-unavailable)/.test(
+          String(error?.message)
+        )
+      ) {
+        throw error;
+      }
+      return String(error.message).includes('verification-required')
+        ? ('verification-required' as SignInResult)
+        : ('signin-form-unavailable' as SignInResult);
+    });
 
     if (result === 'verification-required') {
       throw new Error(
@@ -522,9 +547,20 @@ test.describe('Production Auth Smoke @production-smoke', () => {
       }
     );
 
-    const mainText = await waitForProductionDashboardContent(
-      page,
-      SMOKE_TIMEOUTS.VISIBILITY
+    const mainText = await certStep(
+      'onboarding',
+      'dashboard-first-value',
+      async () => {
+        const text = await waitForProductionDashboardContent(
+          page,
+          SMOKE_TIMEOUTS.VISIBILITY
+        );
+        const lowered = text.toLowerCase();
+        expect(lowered).not.toContain('application error');
+        expect(lowered).not.toContain('something went wrong');
+        return text;
+      },
+      text => `dashboard rendered ${text.length} chars of real content`
     );
 
     const lower = mainText.toLowerCase();
@@ -540,27 +576,42 @@ test.describe('Production Auth Smoke @production-smoke', () => {
     // must be live on its public URL. A sign-in that lands on a dashboard with
     // no claimed profile, or a claimed handle that 404s, breaks the artist
     // golden path even though the dashboard shell renders.
-    const profileResponse = await page
-      .context()
-      .request.get(`${expectedOrigin}/api/dashboard/profile`);
-    expect(
-      profileResponse.status(),
-      'Signed-in identity must resolve its claimed profile'
-    ).toBe(200);
-    const claimedUsername = (
-      (await profileResponse.json()) as { profile?: { username?: unknown } }
-    ).profile?.username;
-    expect(typeof claimedUsername, 'Claimed profile has no handle').toBe(
-      'string'
+    const claimedUsername = await certStep(
+      'claim',
+      'claimed-profile-owned',
+      async () => {
+        const profileResponse = await page
+          .context()
+          .request.get(`${expectedOrigin}/api/dashboard/profile`);
+        expect(
+          profileResponse.status(),
+          'Signed-in identity must resolve its claimed profile'
+        ).toBe(200);
+        const username = (
+          (await profileResponse.json()) as {
+            profile?: { username?: unknown };
+          }
+        ).profile?.username;
+        expect(typeof username, 'Claimed profile has no handle').toBe('string');
+        expect(String(username).length).toBeGreaterThan(0);
+        return String(username);
+      },
+      username => `signed-in identity owns /${username}`
     );
-    expect(String(claimedUsername).length).toBeGreaterThan(0);
-    const publicResponse = await page
-      .context()
-      .request.get(`${expectedOrigin}/${claimedUsername}`);
-    expect(
-      publicResponse.status(),
-      `Claimed profile /${claimedUsername} must render publicly`
-    ).toBe(200);
+    await certStep(
+      'public-profile',
+      'owned-profile-renders-publicly',
+      async () => {
+        const publicResponse = await page
+          .context()
+          .request.get(`${expectedOrigin}/${claimedUsername}`);
+        expect(
+          publicResponse.status(),
+          `Claimed profile /${claimedUsername} must render publicly`
+        ).toBe(200);
+      },
+      () => `/${claimedUsername} renders publicly`
+    );
 
     const tabs = [
       {
@@ -623,6 +674,58 @@ test.describe('Production Auth Smoke @production-smoke', () => {
         /application error|something went wrong/
       );
     }
+
+    // Chat: same session (a second OTP request would invalidate this one).
+    await certStep(
+      'chat',
+      'composer-ready',
+      async () => {
+        await page.goto(APP_ROUTES.CHAT, {
+          waitUntil: 'domcontentloaded',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        assertExactNavigationUrl(page.url(), expectedOrigin, 'Chat navigation');
+        await waitForHydration(page);
+        const composer = page
+          .locator('textarea, [role="textbox"], [contenteditable="true"]')
+          .first();
+        await expect(composer).toBeVisible({
+          timeout: SMOKE_TIMEOUTS.VISIBILITY,
+        });
+        await expect(composer).toBeEnabled();
+      },
+      () => 'chat composer visible and enabled'
+    );
+    certStepBlocked(
+      'chat',
+      'first-reply',
+      'first assistant reply is not exercised yet: a prod send spends model credit and has no synthetic-tagged thread cleanup'
+    );
+
+    await certStep(
+      'checkout',
+      'checkout-entry-renders',
+      async () => {
+        await page.goto(APP_ROUTES.SETTINGS_BILLING, {
+          waitUntil: 'domcontentloaded',
+          timeout: SMOKE_TIMEOUTS.NAVIGATION,
+        });
+        assertExactNavigationUrl(
+          page.url(),
+          expectedOrigin,
+          'Billing navigation'
+        );
+        await waitForHydration(page);
+        const billingText = (
+          await page.locator('main').first().innerText()
+        ).toLowerCase();
+        expect(billingText).not.toMatch(
+          /application error|something went wrong/
+        );
+        expect(billingText).toMatch(/plan|upgrade|billing|pro/);
+      },
+      () => 'billing/checkout entry rendered; stopped before payment'
+    );
 
     const performanceAuthStatePath =
       process.env.PERFORMANCE_AUTH_STATE_PATH?.trim();

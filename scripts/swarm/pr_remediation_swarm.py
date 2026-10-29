@@ -105,11 +105,14 @@ def cmd_select(a) -> int:
         out_var("reason", "quota-low")
         return 0
     modes: dict[int, str] = {}
+    want = {m.strip() for m in a.modes.split(",")}
     if a.pr:
         for n in (int(x) for x in a.pr.split(",") if x.strip()):
             modes[n] = "red"
     else:
         for label, mode in ((LABEL, "red"), (CONFLICT_LABEL, "conflict")):
+            if mode not in want and "all" not in want:
+                continue
             for page in range(1, 6):
                 rows = gh_json(["api", f"repos/{REPO}/issues?labels={label}&state=open&per_page=100&page={page}"], priority="report")
                 for row in rows:
@@ -118,6 +121,9 @@ def cmd_select(a) -> int:
                         modes.setdefault(row["number"], mode)  # red wins: sync-main is part of its ladder
                 if len(rows) < 100:
                     break
+    if not a.pr and ("behind" in want or "all" in want):
+        for n in behind_prs(a.behind_limit):
+            modes.setdefault(n, "behind")
     modes = {n: m for n, m in modes.items() if n not in EXCLUDED}
     spent = day_spend_cents(a.ledger_issue)
     # Each attempt costs ~8 calls; keep a quarter of the remaining quota in reserve.
@@ -136,6 +142,38 @@ def cmd_select(a) -> int:
 
 LEDGER_AUTHOR = os.environ.get("SWARM_LEDGER_AUTHOR", "jovie-bot[bot]")
 LEDGER_RE = re.compile(r"^🤖 swarm-ledger run=(\d+) cents=(\d+) at=(\S+)")
+
+
+BEHIND_QUERY = ("query($after:String){repository(owner:\"%s\",name:\"%s\"){pullRequests(states:OPEN,first:100,after:$after)"
+                "{pageInfo{hasNextPage endCursor} nodes{number mergeStateStatus isCrossRepository labels(first:30){nodes{name}} "
+                "commits(last:1){nodes{commit{statusCheckRollup{state}}}}}}}}")
+
+
+def behind_prs(limit: int) -> list[int]:
+    """Open same-repo PRs that are only BEHIND main and not red: a server-side update-branch clears them
+    at no model cost. Paced (`limit` per run) because every update fans out a full CI run."""
+    if limit <= 0:
+        return []
+    owner, name = REPO.split("/")
+    found, cursor = [], None
+    try:
+        for _ in range(5):
+            args = ["api", "graphql", "-f", f"query={BEHIND_QUERY % (owner, name)}"]
+            if cursor:
+                args += ["-f", f"after={cursor}"]
+            data = gh_json(args, priority="report")["data"]["repository"]["pullRequests"]
+            for node in data["nodes"]:
+                labels = {l["name"].lower() for l in node["labels"]["nodes"]}
+                rollup = ((node["commits"]["nodes"] or [{}])[0].get("commit") or {}).get("statusCheckRollup") or {}
+                if node["mergeStateStatus"] == "BEHIND" and not node["isCrossRepository"] and not labels & SKIP_LABELS \
+                        and rollup.get("state") not in {"FAILURE", "ERROR"}:
+                    found.append(node["number"])
+            if not data["pageInfo"]["hasNextPage"]:
+                break
+            cursor = data["pageInfo"]["endCursor"]
+    except (RuntimeError, KeyError, TypeError, ValueError):
+        return []  # a read failure costs nothing: no PRs are updated
+    return found[:limit]
 
 
 def day_spend_cents(issue: str) -> int | None:
@@ -184,7 +222,7 @@ def credits_available(base: str, key: str) -> bool:
         return False
     import urllib.error
     import urllib.request
-    req = urllib.request.Request(base.rstrip("/") + "/credits", headers={"Authorization": f"Bearer {key}"})
+    req = urllib.request.Request(base.rstrip("/") + "/credits", headers={"Authorization": f"Bearer {key}", "User-Agent": "jovie-pr-remediation-swarm/1"})
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.load(resp)
@@ -280,6 +318,17 @@ def cmd_prepare(a) -> int:
         body = f"🤖 lane claim kind=fix sha={plan['sha']} host={HOST} at={iso()} run={os.environ.get('GITHUB_RUN_ID', '')}"
         cid = gh_json(["api", f"repos/{REPO}/issues/{n}/comments", "-f", f"body={body}"])["id"]
         plan["claimId"] = cid
+        if a.mode == "behind":
+            if pr.get("mergeable_state") != "behind" or pr.get("draft"):
+                plan.update(outcome="skipped", reason="not-behind", action="none")
+                return finish_plan(plan, a)
+            # server-side merge of main into the branch, only if the head is still the one we read
+            res = gh(["api", "-X", "PUT", f"repos/{REPO}/pulls/{n}/update-branch", "-f", f"expected_head_sha={plan['sha']}"])
+            if res.returncode == 0:
+                plan.update(outcome="deterministic-fixed", fix="update-branch", cls="behind", fp="behind", action="none")
+            else:
+                plan.update(outcome="gave-up", reason="update-branch-failed:" + res.stderr.strip()[:80], cls="behind", action="none")
+            return finish_plan(plan, a)
         if a.mode == "conflict":
             if pr.get("mergeable_state") != "dirty":
                 plan.update(outcome="skipped", reason="not-conflicting", action="none")
@@ -343,7 +392,7 @@ def cmd_fix(a) -> int:
     fixed = None
     if plan["action"] == classes.SYNC_MAIN:
         sh(["git", "fetch", "origin", "main", "--depth=200"], cwd)
-        if sh(["git", "rebase", "origin/main"], cwd).returncode == 0:
+        if sh(["git", "-c", "user.name=jovie-swarm", "-c", "user.email=swarm@jov.ie", "rebase", "origin/main"], cwd).returncode == 0:
             fixed = "rebase-main"
         else:
             sh(["git", "rebase", "--abort"], cwd)
@@ -373,6 +422,9 @@ def cmd_guard(a) -> int:
     """Passes only a bounded, non-sensitive diff that does not delete or weaken tests."""
     plan = json.loads(Path(a.plan).read_text())
     base = plan["sha"]
+    if plan.get("outcome") in {"gave-up", "blocked-credits", "error"}:
+        out_var("guard", "fail")  # an earlier step already decided; keep its reason
+        return 0
     if plan.get("fix") == "rebase-main":  # history rewrite onto main: nothing of the PR's own diff changes
         out_var("guard", "ok")
         return 0
@@ -407,7 +459,7 @@ def cmd_guard(a) -> int:
 def cmd_finalize(a) -> int:
     plan = json.loads(Path(a.plan).read_text())
     meta = json.loads(Path(a.agent_meta).read_text()) if a.agent_meta and Path(a.agent_meta).exists() else {}
-    plan.update({k: meta[k] for k in ("model", "costUsd", "tokens", "agentSeconds") if k in meta})
+    plan.update({k: meta[k] for k in ("model", "costUsd", "tokens", "agentSeconds", "agentSaid", "aborted") if k in meta})
     if plan["outcome"] == "blocked-credits":
         plan["costUsd"] = 0
     elif plan["outcome"] not in {"skipped", "gave-up", "error", "deterministic-fixed"}:
@@ -489,7 +541,7 @@ def gateway_base() -> str:
 
 def pick_model(base: str, key: str, candidates: list[str]) -> tuple[str, float, float]:
     import urllib.request
-    req = urllib.request.Request(base.rstrip("/") + "/models", headers={"Authorization": f"Bearer {key}"})
+    req = urllib.request.Request(base.rstrip("/") + "/models", headers={"Authorization": f"Bearer {key}", "User-Agent": "jovie-pr-remediation-swarm/1"})
     with urllib.request.urlopen(req, timeout=30) as resp:
         data = {m["id"]: m for m in json.load(resp)["data"]}
     for c in candidates:
@@ -529,7 +581,8 @@ def cmd_agent(a) -> int:
     except OSError as exc:  # urllib HTTPError/URLError are OSErrors; 402 = no credit
         key_file.unlink(missing_ok=True)
         blocked = "402" in str(exc) or "insufficient" in str(exc).lower()
-        plan.update(outcome="blocked-credits" if blocked else "gave-up", reason="gateway-" + ("insufficient_funds" if blocked else "unreachable"))
+        plan.update(outcome="blocked-credits" if blocked else "gave-up",
+                    reason="gateway-insufficient_funds" if blocked else "relay-unreachable:" + str(exc)[:80])
         Path(a.plan).write_text(json.dumps(plan))
         Path(a.meta).write_text(json.dumps({"costUsd": 0, "aborted": plan["reason"]}))
         return 0
@@ -542,12 +595,24 @@ def cmd_agent(a) -> int:
               "agent": {"build": {"steps": a.max_steps}}}
     env = {k: v for k, v in os.environ.items() if k not in {"SWARM_API_KEY", "GH_TOKEN", "GITHUB_TOKEN"}}
     env["OPENCODE_CONFIG_CONTENT"] = json.dumps(config)
-    prompt = PROMPT.format(checks=", ".join(plan.get("checks", [])), cls=plan.get("cls"), log=a.log)
+    # external_directory is denied, so the agent can only read a log that lives inside the checkout.
+    # It is excluded from git so the diff guard and the commit never see it.
+    inside = Path(a.cwd) / ".swarm-failed.log"
+    try:
+        inside.write_text(Path(a.log).read_text())
+        exclude = Path(a.cwd) / ".git" / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        with exclude.open("a") as fh:
+            fh.write("\n.swarm-failed.log\n")
+    except OSError:
+        pass
+    prompt = PROMPT.format(checks=", ".join(plan.get("checks", [])), cls=plan.get("cls"), log=".swarm-failed.log")
     started = now()
     acc = {"in": 0, "out": 0}
     reported = 0.0
     aborted = None
     blocked_credits = False
+    last_text = ""
     proc = subprocess.Popen(["npx", "--yes", "opencode-ai@1.19.5", "run", "--format", "json", "-m", f"swarm/{model}", prompt],
                             cwd=a.cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     try:
@@ -561,6 +626,8 @@ def cmd_agent(a) -> int:
                 blocked_credits = True
                 aborted = "blocked-credits"
                 break
+            if isinstance(ev, dict) and ev.get("type") == "text":
+                last_text = str((ev.get("part") or {}).get("text") or "")[-300:] or last_text
             step = {"in": 0, "out": 0}
             walk_cost(ev, step)
             acc["in"] += step["in"]; acc["out"] += step["out"]
@@ -577,7 +644,9 @@ def cmd_agent(a) -> int:
             proc.kill()
         key_file.unlink(missing_ok=True)
     cost = max(acc["in"] * p_in + acc["out"] * p_out, reported)
-    meta = {"model": model, "costUsd": round(cost, 5), "tokens": acc, "agentSeconds": int(now() - started)}
+    meta = {"model": model, "costUsd": round(cost, 5), "tokens": acc, "agentSeconds": int(now() - started),
+            "agentSaid": last_text}
+    inside.unlink(missing_ok=True)
     if blocked_credits:
         meta["costUsd"] = 0  # no credit means nothing was charged: never reaches the ledger
         plan.update(outcome="blocked-credits", reason="gateway-insufficient_funds")
@@ -613,12 +682,14 @@ def cmd_summarize(a) -> int:
     cost = sum(float(r.get("costUsd") or 0) for r in rows)
     api = sum(int(r.get("calls") or 0) for r in rows)
     greened = by.get("deterministic-fixed", 0) + by.get("agent-fixed", 0)
+    behind = [r for r in rows if r.get("kind") == "behind"]
+    updated = sum(1 for r in behind if r["outcome"] == "deterministic-fixed")
     conflicts = [r for r in rows if r.get("kind") == "conflict"]
     cleared = sum(1 for r in conflicts if r["outcome"] == "deterministic-fixed")
-    reds = [r for r in rows if r.get("kind") != "conflict"]
+    reds = [r for r in rows if r.get("kind") not in {"conflict", "behind"}]
     greened = sum(1 for r in reds if r["outcome"] in ("deterministic-fixed", "agent-fixed"))
     lines = [f"## Remediation swarm", "", f"attempts={len(rows)} reds={len(reds)} reds-pushed-or-rerun={greened} "
-             f"conflicts={len(conflicts)} conflicts-cleared={cleared} blocked-credits={by.get('blocked-credits', 0)} cost=${cost:.4f} api_calls={api}", "",
+             f"conflicts={len(conflicts)} conflicts-cleared={cleared} behind={len(behind)} behind-updated={updated} blocked-credits={by.get('blocked-credits', 0)} cost=${cost:.4f} api_calls={api}", "",
              "| outcome | n |", "|---|---|", *[f"| {k} | {v} |" for k, v in sorted(by.items())]]
     Path(a.out).write_text("\n".join(lines) + "\n")
     out_var("cents", str(int(round(cost * 100 + 0.499))))
@@ -631,7 +702,7 @@ def main() -> int:
     sub = p.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("select"); s.add_argument("--pr", default=""); s.add_argument("--limit", type=int, default=30)
     s.add_argument("--daily-cap-usd", type=float, default=5.0); s.add_argument("--attempt-cap-usd", type=float, default=0.10)
-    s.add_argument("--ledger-issue", default="")
+    s.add_argument("--ledger-issue", default=""); s.add_argument("--behind-limit", type=int, default=10); s.add_argument("--modes", default="all")
     pr = sub.add_parser("prepare"); pr.add_argument("--pr", type=int, required=True); pr.add_argument("--plan", required=True); pr.add_argument("--log", required=True); pr.add_argument("--mode", default="red"); pr.add_argument("--agent", default="true")
     for name in ("fix", "guard"):
         x = sub.add_parser(name); x.add_argument("--plan", required=True); x.add_argument("--cwd", required=True)

@@ -2233,6 +2233,14 @@
       "classification": "C"
     },
     {
+      "source": "apps/web/app/api/content-records/[kind]/[key]/route.ts",
+      "kind": "handler",
+      "route": "/api/content-records/[kind]/[key]",
+      "methods": ["GET", "POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
       "source": "apps/web/app/api/create-tip-intent/route.ts",
       "kind": "handler",
       "route": "/api/create-tip-intent",
@@ -3260,6 +3268,14 @@
       "source": "apps/web/app/api/internal/ovie/fleet/events/route.ts",
       "kind": "handler",
       "route": "/api/internal/ovie/fleet/events",
+      "methods": ["POST"],
+      "surface": "deferred",
+      "classification": "C"
+    },
+    {
+      "source": "apps/web/app/api/internal/ovie/golden-path-evidence/route.ts",
+      "kind": "handler",
+      "route": "/api/internal/ovie/golden-path-evidence",
       "methods": ["POST"],
       "surface": "deferred",
       "classification": "C"
@@ -6851,6 +6867,14 @@
       "methods": ["GET"],
       "surface": "claim",
       "classification": "B"
+    },
+    {
+      "source": "apps/web/app/content-preview/[versionId]/page.tsx",
+      "kind": "page",
+      "route": "/content-preview/[versionId]",
+      "methods": [],
+      "surface": "deferred",
+      "classification": "C"
     },
     {
       "source": "apps/web/app/demo/audience/page.tsx",
