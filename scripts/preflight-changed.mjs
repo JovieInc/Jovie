@@ -14,7 +14,7 @@
  *
  * Usage:
  *   pnpm preflight:changed [--base main] [--repo path] [--body-file f | --pr N]
- *     [--title t] [--no-coverage] [--no-typecheck] [--thorough] [--no-write]
+ *     [--title t] [--pr-body f] [--no-coverage] [--no-typecheck] [--thorough] [--no-write]
  *     [--hook] [--list] [--json]
  *
  *   --hook      pre-push mode: honours JOVIE_PREFLIGHT_CHANGED=0, never needs a PR
@@ -62,8 +62,8 @@ export const HEAVY_GUARDS = new Set([
 export const NARROWED = {
   'merge-group-unit-guards': {
     command:
-      'node scripts/design-system-source-ratchet.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts tests/unit/design-system/mac-header-two-lines-v1.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts',
-    note: 'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough',
+      'node scripts/design-system-source-ratchet.mjs && pnpm --filter @jovie/web exec vitest run --config=vitest.config.mts tests/unit/design-system tests/unit/analytics-metrics-layer-guard.test.ts tests/unit/marketing/locked-pen-chrome-contract.test.ts tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts',
+    note: 'source identity, the whole locked design-system dir (one-primary-action, mac header, ratchets), metrics-layer, locked chrome and heading contracts; ~13s; full suite with --thorough',
   },
 };
 
@@ -99,7 +99,64 @@ export const GENERATORS = [
     write: 'node scripts/generate-llms-design-manifest.mjs',
     check: 'node scripts/generate-llms-design-manifest.mjs --check',
   },
+  // PR #23573 rounds 1 and 2: generated agent-distribution drift. Inputs are
+  // everything renderDistribution reads (tool registry, listing, icons, copy lint).
+  {
+    id: 'agent-distribution',
+    pkgScript: 'apps/web/package.json#agent-distribution:check',
+    when: /^apps\/web\/(?:lib\/(?:agent-distribution|agent-acquisition)\/|plugins\/jovie-artists\/|scripts\/(?:generate-agent-distribution|render-agent-icons)\.ts$)|^packages\/copy\//,
+    write: 'cd apps/web && pnpm run agent-distribution:generate',
+    check: 'cd apps/web && pnpm run agent-distribution:check',
+  },
+  {
+    id: 'web-design-tokens',
+    pkgScript: 'apps/web/package.json#tokens:check',
+    when: /^design\.tokens\.json$|^apps\/web\/scripts\/build-design-tokens\.mjs$/,
+    write: 'cd apps/web && pnpm run tokens:build',
+    check: 'cd apps/web && pnpm run tokens:check',
+  },
+  {
+    id: 'product-surface-counts',
+    pkgScript: 'apps/web/package.json#product-surface-counts:check',
+    when: /^apps\/web\/(?:lib\/(?:commands\/registry|keyboard-shortcuts|utm\/presets)|scripts\/generate-product-surface-counts\.ts$)/,
+    write:
+      'cd apps/web && pnpm exec tsx scripts/generate-product-surface-counts.ts',
+    check: 'cd apps/web && pnpm run product-surface-counts:check',
+  },
 ];
+
+/**
+ * `--check` package scripts that are not in GENERATORS, each with the reason.
+ * The contract test fails on any other (preflight-gap ratchet, PR #23573).
+ */
+export const GENERATOR_CHECK_EXEMPT = {
+  'package.json#test:coverage:diff':
+    'preflight-exempt: not a generator; changed-line coverage runs as the coverage check',
+  'package.json#ci:harness:check':
+    'preflight-exempt: the generate-docs leg is gen:ci-harness-docs; the rest is the structural lane run on the merged tree',
+  'package.json#design:drift-ledger:check':
+    'preflight-exempt: ledger is rewritten by the design-gate workflow, not a committed generator output',
+  'apps/web/package.json#visual-qa:coverage:check':
+    'preflight-exempt: needs a rendered visual run; CI runs it in the visual lane',
+  'apps/web/package.json#format:check':
+    'preflight-exempt: biome check on changed files covers formatting',
+};
+
+/** Coverage kinds a CI-required check may cite in scripts/lib/preflight-coverage-map.mjs. */
+export const PREFLIGHT_COVERAGE_KINDS = new Set([
+  'generators',
+  'source-guards',
+  'design-guards',
+  'workflow-lint',
+  'biome',
+  'typecheck',
+  'coverage',
+  'pr-body',
+  'migration',
+  'private-data',
+  'ship-gate',
+  'companion',
+]);
 
 /**
  * Tests that fail on a non-Linux host for reasons unrelated to any diff (fake
@@ -146,7 +203,7 @@ export function parseArgs(argv) {
     const f = argv[i];
     if (f === '--base') a.base = argv[++i];
     else if (f === '--repo') a.repo = path.resolve(argv[++i]);
-    else if (f === '--body-file') a.bodyFile = argv[++i];
+    else if (f === '--body-file' || f === '--pr-body') a.bodyFile = argv[++i];
     else if (f === '--pr') a.pr = argv[++i];
     else if (f === '--title') a.title = argv[++i];
     else if (f === '--no-coverage') a.coverage = false;
@@ -611,6 +668,39 @@ export async function main({
     privateDataCheck(cwd, childEnv, mergeBase)
   );
 
+  // --no-coverage is an escape hatch, not a pass: CI enforces 60% on changed
+  // lines (PR #23573 round 3). Say so loudly when coverable source changed.
+  if (!args.coverage && any(/^apps\/web\//))
+    add(
+      'coverage-skipped',
+      'exact-head coverage on changed lines (SKIPPED by --no-coverage)',
+      async () => {
+        const plan = await sh(
+          `node scripts/check-changed-test-coverage.mjs --base ${mergeBase} --head ${git(cwd, ['rev-parse', 'HEAD'])} --plan`,
+          { cwd, env: childEnv, timeoutMs: 60_000 }
+        );
+        let applicable = true;
+        try {
+          applicable = JSON.parse(plan.out.trim().split('\n').pop()).applicable;
+        } catch {
+          // unknown plan: warn anyway
+        }
+        return applicable
+          ? {
+              code: 0,
+              out: '',
+              ms: plan.ms,
+              warn: 'COVERAGE NOT CHECKED (--no-coverage). CI ENFORCES 60% EXACT-HEAD COVERAGE ON CHANGED LINES and fails the PR when new source is short. Rerun without --no-coverage before pushing.',
+            }
+          : {
+              code: 0,
+              out: '',
+              ms: plan.ms,
+              skip: 'no coverable web product source',
+            };
+      }
+    );
+
   // Coverage on changed lines (60% min), related tests only.
   if (args.coverage && any(/^apps\/web\//)) {
     add(
@@ -721,7 +811,11 @@ export async function main({
     if (phase === 0 && args.write) {
       const changedByGen = git(cwd, ['status', '--porcelain'])
         .split('\n')
-        .filter(l => /workflow-topology|ci-harness|design-tokens|llms/.test(l));
+        .filter(l =>
+          /workflow-topology|ci-harness|design-tokens|llms|agent-distribution|product-surface|tokens/.test(
+            l
+          )
+        );
       if (changedByGen.length)
         log(
           `  note  generators wrote output; stage and commit:\n        ${changedByGen.join('\n        ')}`

@@ -149,9 +149,8 @@ test('default preflight checks heading bounds without truncating marketing copy'
   assert.ok(
     command.startsWith('node scripts/design-system-source-ratchet.mjs && ')
   );
-  assert.ok(
-    command.includes('tests/unit/design-system/mac-header-two-lines-v1.test.ts')
-  );
+  // The whole locked design-system dir, as CI runs it (one-primary-action-per-screen, #23573 round 4).
+  assert.ok(/ tests\/unit\/design-system /.test(command));
   assert.ok(
     command.includes(
       'tests/unit/marketing/marketing-headline-line-clamp-guard.test.ts'
@@ -159,7 +158,7 @@ test('default preflight checks heading bounds without truncating marketing copy'
   );
   assert.equal(
     NARROWED['merge-group-unit-guards'].note,
-    'source identity, metrics-layer, locked chrome and heading contracts; full suite with --thorough'
+    'source identity, the whole locked design-system dir (one-primary-action, mac header, ratchets), metrics-layer, locked chrome and heading contracts; ~13s; full suite with --thorough'
   );
 });
 
@@ -185,4 +184,26 @@ test('merge-tree conflict output yields the conflicting paths', () => {
     'apps/web/a.ts',
     'b.ts deleted in HEAD and modified in x',
   ]);
+});
+
+test('Fleet Rules body lint uses CI parser: trailing punctuation on the locking PR fails (PR #23573 follow-up)', () => {
+  const files = [file('apps/web/styles/design-system.css')];
+  const run = body =>
+    lintPrBody({
+      body,
+      title: 'fix(design): x',
+      files,
+      evaluateFleetRules,
+    }).errors.map(e => e.id);
+  const base = '## Blast radius\nWhat could break: x\nProof: y\n';
+  assert.ok(
+    run(`${base}## Locked areas\nLocking PR: #123.\n`).includes('locked-areas')
+  );
+  assert.ok(
+    !run(`${base}## Locked areas\nLocking PR: #123\n`).includes('locked-areas')
+  );
+});
+
+test('--pr-body is an alias for --body-file', () => {
+  assert.equal(parseArgs(['--pr-body', 'b.md']).bodyFile, 'b.md');
 });
