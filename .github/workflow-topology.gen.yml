@@ -923,6 +923,17 @@ nodes:
       - workflow_dispatch
     terminalReceipt: job:prepare
     jobCount: 2
+  - name: PR Remediation Swarm
+    path: .github/workflows/pr-remediation-swarm.yml
+    active: true
+    category: remediation-dispatch
+    authoritativeProducer: Lane Fix Relay
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - workflow_dispatch
+    terminalReceipt: job:report
+    jobCount: 3
   - name: PR Review Learn
     path: .github/workflows/pr-review-learn.yml
     active: true
@@ -993,6 +1004,18 @@ nodes:
     triggeringStateTransition:
       - pull_request
     terminalReceipt: job:capture
+    jobCount: 1
+  - name: Private Data Guard
+    path: .github/workflows/private-data-guard.yml
+    active: true
+    category: source-validation
+    authoritativeProducer: Source Validation
+    authoritativeFor: []
+    allowedConsumers: []
+    triggeringStateTransition:
+      - pull_request
+      - push
+    terminalReceipt: job:guard
     jobCount: 1
   - name: Production Continuity Guard
     path: .github/workflows/production-continuity.yml
