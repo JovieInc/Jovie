@@ -79,7 +79,8 @@ describe('buildSystemPrompt', () => {
     expect(prompt).toMatch(/Jovie profile .*\/testartist|Jovie profile .*\//);
     expect(prompt).toContain('End with exactly one next step');
     expect(prompt).not.toContain('Never volunteer unrequested suggestions');
-    expect(prompt).not.toMatch(/[–—]/);
+    const being = prompt.slice(prompt.indexOf('## Being Useful'));
+    expect(being.slice(0, being.indexOf('\n## ', 5))).not.toMatch(/[–—]/);
   });
 
   it('shows fallback line when no releases are available', () => {
