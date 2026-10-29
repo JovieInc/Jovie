@@ -59,6 +59,8 @@ export const RECOVERY_GOLDEN_PATH_SURFACES = [
   'onboarding',
   'chat',
   'public-profile',
+  'smartlink',
+  'checkout',
 ] as const;
 
 export const GOLDEN_PATH_MAX_AGE_MS = 24 * 60 * 60 * 1000;

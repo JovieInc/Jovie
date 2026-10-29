@@ -295,6 +295,22 @@ describe('whole golden path gate', () => {
     ).toBe(false);
     const { claim: _omit, ...missing } = green();
     expect(isGoldenPathGreen(missing, 'abc', now)).toBe(false);
+    for (const id of ['smartlink', 'checkout']) {
+      expect(
+        isGoldenPathGreen(
+          {
+            ...green(),
+            [id]: {
+              status: 'failed',
+              sha: 'abc',
+              endedAt: '2026-10-31T06:00:00Z',
+            },
+          },
+          'abc',
+          now
+        )
+      ).toBe(false);
+    }
   });
   it('step fixed but golden path red: no send, no card', async () => {
     const redPath: FixCertifier = {

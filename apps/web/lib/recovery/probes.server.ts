@@ -23,7 +23,7 @@ const DEPLOYED_PREFIX = 'recovery:fix-deployed:';
  *   than the real deploy, so a user is never judged to have stalled before a
  *   fix that was not yet live.
  * - Whole path: every launch-gate surface (landing, signup, claim, onboarding,
- *   chat, public profile) passed on this commit within 24 hours. A fixed step
+ *   chat, public profile, smartlinks, checkout) passed on this commit within 24 hours. A fixed step
  *   is not enough if the user would fail at signup or claim afterwards.
  * - Recheck: the latest production golden-path receipt for the step's surface
  *   passed on exactly this commit.
