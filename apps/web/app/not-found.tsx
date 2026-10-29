@@ -7,7 +7,7 @@ import { NotFoundPageContent } from '@/components/site/NotFoundPageContent';
 import {
   DEFAULT_SITE_CHROME,
   toResolvedSiteChrome,
-} from '@/lib/content-records/site-chrome';
+} from '@/lib/content-records/site-chrome.defaults';
 
 // The 404 renders the code-default chrome synchronously: it is the fallback
 // page, so it must not depend on a store read to draw.

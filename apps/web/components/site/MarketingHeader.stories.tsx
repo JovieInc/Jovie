@@ -4,7 +4,7 @@ import { APP_ROUTES } from '@/constants/routes';
 import {
   DEFAULT_SITE_CHROME,
   toResolvedSiteChrome,
-} from '@/lib/content-records/site-chrome';
+} from '@/lib/content-records/site-chrome.defaults';
 import { MarketingHeader } from './MarketingHeader';
 
 const meta = {

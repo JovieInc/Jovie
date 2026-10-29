@@ -1,12 +1,18 @@
 import { lintCopy } from '@jovie/copy';
 import { z } from 'zod';
-import type { MarketingHeaderChromeNav } from '@/components/site/MarketingHeader';
 import { isNavigationEligiblePath } from '@/data/marketing/featureAvailability';
-import type {
-  MarketingFooterColumn,
-  MarketingFooterLink,
-} from '@/data/marketingNavigation';
 import type { ContentKindDefinition } from './kind';
+import {
+  DEFAULT_SITE_CHROME,
+  isExternalChromeHref,
+} from './site-chrome.defaults';
+
+export {
+  DEFAULT_SITE_CHROME,
+  isExternalChromeHref,
+  type ResolvedSiteChrome,
+  toResolvedSiteChrome,
+} from './site-chrome.defaults';
 
 /**
  * Site chrome: the header navigation and the site footer as one content
@@ -139,80 +145,6 @@ export const REQUIRED_LEGAL_HREFS = ['/legal/privacy', '/legal/terms'] as const;
 
 export const FOOTER_LINK_BUDGET = { min: 8, max: 16 } as const;
 
-/** The code default: what the site shows before anything is published. */
-export const DEFAULT_SITE_CHROME: SiteChrome = {
-  nav: {
-    primary: [
-      { id: 'product', label: 'Product', href: '/product' },
-      { id: 'pricing', label: 'Pricing', href: '/pricing' },
-    ],
-    customers: [
-      { id: 'artists', label: 'Artists', href: '/solutions/artists' },
-    ],
-  },
-  footer: {
-    columns: [
-      {
-        id: 'product',
-        title: 'Product',
-        links: [
-          {
-            id: 'artist-profiles',
-            label: 'Artist profiles',
-            href: '/artist-profiles',
-          },
-          { id: 'smart-links', label: 'Smart links', href: '/smart-links' },
-          { id: 'pre-save', label: 'Pre-save', href: '/product/pre-save' },
-          {
-            id: 'link-analytics',
-            label: 'Link analytics',
-            href: '/product/link-analytics',
-          },
-          {
-            id: 'notifications',
-            label: 'Notifications',
-            href: '/artist-notifications',
-          },
-          { id: 'pay', label: 'Pay', href: '/pay' },
-          { id: 'pricing', label: 'Pricing', href: '/pricing' },
-        ],
-      },
-      {
-        id: 'company',
-        title: 'Company',
-        links: [
-          { id: 'about', label: 'About', href: '/about' },
-          { id: 'blog', label: 'Blog', href: '/blog' },
-          { id: 'changelog', label: 'Changelog', href: '/changelog' },
-          {
-            id: 'instagram',
-            label: 'Instagram',
-            href: 'https://instagram.com/meetjovie',
-          },
-          { id: 'x', label: 'X', href: 'https://x.com/meetjovie' },
-        ],
-      },
-      {
-        id: 'resources',
-        title: 'Resources',
-        links: [
-          { id: 'support', label: 'Support', href: '/support' },
-          { id: 'developers', label: 'Developers', href: '/developers' },
-          { id: 'download', label: 'Download', href: '/download' },
-        ],
-      },
-    ],
-    legal: [
-      { id: 'privacy', label: 'Privacy', href: '/legal/privacy' },
-      { id: 'terms', label: 'Terms', href: '/legal/terms' },
-    ],
-  },
-};
-
-export function isExternalChromeHref(href: string): boolean {
-  return /^https?:\/\//i.test(href);
-}
-
 function sentenceCaseViolation(text: string): string | null {
   const words = text.split(/\s+/).filter(Boolean);
   for (const [index, word] of words.entries()) {
@@ -337,31 +269,3 @@ export const SITE_CHROME_KIND: ContentKindDefinition<SiteChrome> = {
   // revalidate the layout tree rather than naming routes.
   livePaths: () => ['/'],
 };
-
-/** Serializable chrome props for the shared public shell. */
-export interface ResolvedSiteChrome {
-  readonly nav: MarketingHeaderChromeNav;
-  readonly footerColumns: readonly MarketingFooterColumn[];
-  readonly legalLinks: readonly MarketingFooterLink[];
-}
-
-export function toResolvedSiteChrome(chrome: SiteChrome): ResolvedSiteChrome {
-  return {
-    nav: {
-      primary: chrome.nav.primary.map(({ href, label }) => ({ href, label })),
-      customers: chrome.nav.customers.map(({ href, label }) => ({
-        href,
-        label,
-      })),
-    },
-    legalLinks: chrome.footer.legal.map(({ href, label }) => ({ href, label })),
-    footerColumns: chrome.footer.columns.map(column => ({
-      title: column.title,
-      links: column.links.map(({ href, label }) => ({
-        href,
-        label,
-        external: /^https?:\/\//i.test(href) || undefined,
-      })),
-    })),
-  };
-}

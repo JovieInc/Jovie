@@ -3,7 +3,7 @@ import { isNavigationEligiblePath } from '@/data/marketing/featureAvailability';
 import {
   DEFAULT_SITE_CHROME,
   isExternalChromeHref,
-} from '@/lib/content-records/site-chrome';
+} from '@/lib/content-records/site-chrome.defaults';
 
 export interface MarketingNavLink {
   readonly href: string;

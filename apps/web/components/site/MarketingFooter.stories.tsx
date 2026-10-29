@@ -3,7 +3,7 @@ import { marketingFullscreenParameters } from '@/components/marketing/storybook/
 import {
   DEFAULT_SITE_CHROME,
   toResolvedSiteChrome,
-} from '@/lib/content-records/site-chrome';
+} from '@/lib/content-records/site-chrome.defaults';
 import { MarketingFooter } from './MarketingFooter';
 
 const meta = {
