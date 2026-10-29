@@ -19,7 +19,7 @@ export interface AgentConnectorDocsProps {
 }
 
 const H2 = 'text-2xl font-semibold tracking-tight text-primary-token';
-const BODY = 'mt-4 text-base leading-relaxed text-secondary-token';
+const BODY = 'mt-4 text-pretty text-base leading-relaxed text-secondary-token';
 
 /** Renders from the listing copy source and the generated tools/list snapshot, so it cannot drift from the registry. */
 export function AgentConnectorDocs({
@@ -70,7 +70,7 @@ export function AgentConnectorDocs({
                   <h3 className='text-lg font-semibold text-primary-token'>
                     {tool.title ?? tool.name}
                   </h3>
-                  <p className='mt-1 text-sm text-tertiary-token'>
+                  <p className='mt-1 text-pretty text-sm text-tertiary-token'>
                     <code>{tool.name}</code>
                     {' · '}
                     {tool.annotations?.readOnlyHint
