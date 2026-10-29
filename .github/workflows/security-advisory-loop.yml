@@ -54,6 +54,9 @@ jobs:
 
       - name: Generate alerts-read App token
         id: app-token
+        # The installation may lack the permission (run 40924917151); the intake
+        # then runs blind, files one grant card and the ledger counts the breach.
+        continue-on-error: true
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}

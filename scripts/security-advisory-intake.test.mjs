@@ -309,3 +309,27 @@ test('loop is wired: workflow runs sync + check on the lanes clock, registry row
   assert.match(row.purpose, /48h/);
   assert.ok(row.maxStalenessMinutes > 0);
 });
+
+test('recordBlindSource writes a blind receipt instead of reading as zero advisories', async () => {
+  const { recordBlindSource } = await import('./security-advisory-intake.mjs');
+  const dir = mkdtempSync(path.join(tmpdir(), 'secadv-blind-'));
+  const receipt = path.join(dir, 'receipt.json');
+  const prior = process.env.RECEIPT_PATH;
+  process.env.RECEIPT_PATH = receipt;
+  try {
+    await recordBlindSource({
+      repo: 'JovieInc/Jovie',
+      error: new Error('GitHub advisory read failed (exit 1).'),
+      dryRun: true,
+      now: new Date('2026-10-29T18:00:00Z'),
+    });
+    const written = JSON.parse(readFileSync(receipt, 'utf8'));
+    assert.equal(written.blind, true);
+    assert.match(written.reason, /advisory read failed/);
+    assert.equal(written.open, undefined);
+  } finally {
+    if (prior === undefined) delete process.env.RECEIPT_PATH;
+    else process.env.RECEIPT_PATH = prior;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
