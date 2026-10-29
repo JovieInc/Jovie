@@ -1697,6 +1697,28 @@ export async function recordValidationReceipt(args, options = {}) {
   return body;
 }
 
+/**
+ * Make a quota deferral visible: step output for the workflow's hold-and-retry
+ * and a summary line. Exit stays 0 (the 403 is not a verdict on any issue).
+ * @param {{ softFailed: boolean }} disposition
+ * @param {NodeJS.ProcessEnv} [env]
+ */
+export function reportQuotaDeferral(disposition, env = process.env) {
+  if (!disposition?.softFailed) return false;
+  try {
+    if (env.GITHUB_OUTPUT)
+      appendFileSync(env.GITHUB_OUTPUT, 'quota_deferred=true\n');
+    if (env.GITHUB_STEP_SUMMARY)
+      appendFileSync(
+        env.GITHUB_STEP_SUMMARY,
+        '- Linear sync DEFERRED: GitHub installation quota 403; no lifecycle evaluation completed.\n'
+      );
+  } catch {
+    // Visibility must never turn a deferral into a crash.
+  }
+  return true;
+}
+
 const isDirectRun =
   process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
@@ -1710,6 +1732,7 @@ if (isDirectRun) {
     .catch(error => {
       const disposition = failureDisposition('Linear Sync', error);
       console.error(disposition.log);
+      reportQuotaDeferral(disposition);
       if (!disposition.softFailed) process.exitCode = disposition.code;
     })
     .finally(() => {
