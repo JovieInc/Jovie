@@ -2,16 +2,15 @@
 
 import { Button } from '@jovie/ui';
 import {
+  BadgeCheck,
   BarChart3,
-  CircleCheck,
-  Eye,
+  CalendarClock,
   Loader2,
+  Mail,
   PartyPopper,
-  Radar,
   Rocket,
   ShieldCheck,
   Workflow,
-  Wrench,
   XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -61,10 +60,10 @@ const MAX_UNLOCK_TILES = [
 ] as const;
 
 const ARTIST_VISIBILITY_STEP_ICONS = {
-  monitor: Eye,
-  surface: Radar,
-  approve: CircleCheck,
-  fix: Wrench,
+  notify: Mail,
+  prerelease: CalendarClock,
+  analytics: BarChart3,
+  verify: BadgeCheck,
 } as const;
 
 async function fetchValidatedSession(
@@ -100,7 +99,7 @@ function FeatureCard({
   description,
   status,
 }: {
-  readonly icon: typeof Eye;
+  readonly icon: typeof Mail;
   readonly title: string;
   readonly description: string;
   readonly status?: string;
@@ -336,7 +335,7 @@ export default function CheckoutSuccessPage() {
     successSubtitle = PROOF_PENDING_TERMS;
   } else if (isOnboardingUpgrade) {
     successSubtitle = isArtistVisibilitySuccess
-      ? "You're all set. Artist Visibility is ready to start."
+      ? `You're all set. ${ARTIST_VISIBILITY_ACTIVATION_COPY.status}.`
       : "You're all set. Here's what you just unlocked.";
   } else if (isArtistVisibilitySuccess) {
     successSubtitle = ARTIST_VISIBILITY_ACTIVATION_COPY.next;

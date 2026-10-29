@@ -146,7 +146,7 @@ const PRO_FEATURES: readonly string[] = [
   'Advanced analytics & geographic insights',
   'Traffic quality filtering',
   'AI-powered insights',
-  'Unlimited contacts',
+  'Unlimited saved contacts',
   'Contact export',
   'Fan CRM',
   'Tips & payments',
@@ -158,7 +158,6 @@ const PRO_FEATURES: readonly string[] = [
   'AI assistant (70 messages/week)',
   'Unlimited chat file uploads',
   'AI pitch generation (5 per release)',
-  'Priority support',
 ];
 
 // ---------------------------------------------------------------------------
@@ -230,7 +229,7 @@ export const ENTITLEMENT_REGISTRY: Record<PlanId, PlanEntitlements> = {
         'Click & visit tracking',
         'Basic analytics (30 days)',
         'Audience intelligence',
-        'Up to 100 contacts',
+        'Up to 100 saved contacts',
         'AI assistant (15 messages/week)',
         '1 AI pitch generation per release',
         'Chat file uploads (5 files/batch)',
@@ -491,7 +490,15 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
     category: 'Audience & Growth',
     features: [
       {
-        name: 'Contact / subscriber capture',
+        // Fan email capture is uncapped on every plan; contactsLimit only
+        // applies to saved team/press/booking contacts (creatorContactPeople).
+        name: 'Fan email capture',
+        free: 'Unlimited',
+        pro: 'Unlimited',
+        max: 'Unlimited',
+      },
+      {
+        name: 'Saved contacts (team, press, booking)',
         free: 'Up to 100',
         pro: 'Unlimited',
         max: 'Unlimited',
@@ -549,10 +556,7 @@ export const PRICING_COMPARISON: readonly PricingCategory[] = [
   },
   {
     category: 'Platform',
-    features: [
-      { name: 'Email support', free: true, pro: true, max: true },
-      { name: 'Priority support', free: false, pro: true, max: true },
-    ],
+    features: [{ name: 'Email support', free: true, pro: true, max: true }],
   },
 ] as const;
 

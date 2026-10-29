@@ -21,6 +21,25 @@ export interface FeatureFlagAdminRow {
 
 const RUNTIME_FLAG_NAMES = Object.keys(APP_FLAG_DEFAULTS) as AppFlagName[];
 
+/**
+ * A persisted override cell is only a boolean or an explicit `null`
+ * (inheriting the code default). Anything else is a malformed source row:
+ * fail the read instead of displaying fabricated flag values.
+ */
+function parseOverrideCell(
+  value: unknown,
+  flagKey: string,
+  envTier: 'dev' | 'staging' | 'prod'
+): boolean | null {
+  if (value === null) return null;
+  if (typeof value !== 'boolean') {
+    throw new Error(
+      `Feature flag override row for ${flagKey} is malformed (${envTier} cell).`
+    );
+  }
+  return value;
+}
+
 export async function getFeatureFlagAdminRows(): Promise<
   FeatureFlagAdminRow[]
 > {
@@ -43,9 +62,9 @@ export async function getFeatureFlagAdminRows(): Promise<
       .from(featureFlagOverrides);
     for (const row of rows) {
       overridesByKey.set(row.flagKey, {
-        dev: row.dev,
-        staging: row.staging,
-        prod: row.prod,
+        dev: parseOverrideCell(row.dev, row.flagKey, 'dev'),
+        staging: parseOverrideCell(row.staging, row.flagKey, 'staging'),
+        prod: parseOverrideCell(row.prod, row.flagKey, 'prod'),
       });
     }
   } catch (error) {
