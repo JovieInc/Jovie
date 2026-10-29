@@ -60,4 +60,28 @@ describe('ProfileMockup', () => {
       expect(rule).not.toMatch(/max-height|overflow:\s*hidden/);
     }
   });
+
+  it('renders server-formatted date labels verbatim so hydration never re-dates them', () => {
+    // CI froze the client clock (page.clock) and React #418 fired when the
+    // card recomputed dates on the client. Routes pass labels from the server.
+    render(
+      <ProfileMockup
+        name='Tim White'
+        releases={[
+          {
+            title: 'The Deep End',
+            releaseType: 'Single',
+            artworkUrl: '/img/releases/the-deep-end.jpg',
+            dateLabel: 'Jan 2000',
+          },
+        ]}
+      />
+    );
+    expect(screen.getByText(/Single · Jan 2000/)).toBeInTheDocument();
+    const launch = readFileSync(
+      resolve(import.meta.dirname, '../../../app/(marketing)/launch/page.tsx'),
+      'utf8'
+    );
+    expect(launch).toContain('releases={PROFILE_RELEASES}');
+  });
 });

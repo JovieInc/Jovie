@@ -4,16 +4,11 @@ import { Music2 } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from './tim-white-catalog';
-
-const RELEASES = HOMEPAGE_PROFILE_PREVIEW_CATALOG;
-const LEAD_RELEASE = RELEASES[0];
-
-const MONTH_YEAR = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-});
+import {
+  formatCatalogRelease,
+  HOMEPAGE_PROFILE_PREVIEW_CATALOG,
+  type ProfileMockupRelease,
+} from './tim-white-catalog';
 
 const CTA_INTERVAL = 5000;
 
@@ -34,6 +29,12 @@ export interface ProfileMockupProps {
   readonly handle?: string | null;
   /** Avatar image URL from the real profile */
   readonly avatarUrl?: string | null;
+  /**
+   * Release rows with their date labels already formatted. Server routes pass
+   * these so the client hydrates the exact text the server rendered, whatever
+   * the visitor's clock says.
+   */
+  readonly releases?: readonly ProfileMockupRelease[];
 }
 
 export function ProfileMockup({
@@ -41,7 +42,9 @@ export function ProfileMockup({
   tagline,
   handle,
   avatarUrl,
-}: ProfileMockupProps = {}) {
+  releases = HOMEPAGE_PROFILE_PREVIEW_CATALOG.map(formatCatalogRelease),
+}: Readonly<ProfileMockupProps>) {
+  const leadRelease = releases[0];
   const displayName = name || FALLBACK.name;
   const displayTagline = tagline || FALLBACK.tagline;
   const displayHandle = handle || FALLBACK.handle;
@@ -128,7 +131,7 @@ export function ProfileMockup({
 
         {/* Releases: the real catalog with its cover art. */}
         <ul aria-label='Releases' className='mb-5 flex flex-col gap-2.5'>
-          {RELEASES.map(release => (
+          {releases.map(release => (
             <li key={release.title} className='flex items-center gap-3'>
               <Image
                 src={release.artworkUrl}
@@ -142,8 +145,7 @@ export function ProfileMockup({
                   {release.title}
                 </div>
                 <div className='text-xs text-tertiary-token'>
-                  {release.releaseType} ·{' '}
-                  {MONTH_YEAR.format(new Date(release.releaseDate))}
+                  {release.releaseType} · {release.dateLabel}
                 </div>
               </div>
             </li>
@@ -172,7 +174,7 @@ export function ProfileMockup({
             )}
           >
             <Music2 className='h-3.5 w-3.5 shrink-0' aria-hidden='true' />
-            <span>Play {LEAD_RELEASE.title} on Spotify</span>
+            <span>Play {leadRelease?.title} on Spotify</span>
           </div>
 
           {/* Progress bar */}

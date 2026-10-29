@@ -43,3 +43,28 @@ export const HOMEPAGE_PROFILE_PREVIEW_CATALOG = [
     releaseDate: pastReleaseDate(211),
   },
 ] as const;
+
+const MONTH_YEAR = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
+});
+
+/** A catalog row as the profile card renders it. */
+export interface ProfileMockupRelease {
+  readonly title: string;
+  readonly releaseType: string;
+  readonly artworkUrl: string;
+  readonly dateLabel: string;
+}
+
+export function formatCatalogRelease(
+  release: (typeof HOMEPAGE_PROFILE_PREVIEW_CATALOG)[number]
+): ProfileMockupRelease {
+  return {
+    title: release.title,
+    releaseType: release.releaseType,
+    artworkUrl: release.artworkUrl,
+    dateLabel: MONTH_YEAR.format(new Date(release.releaseDate)),
+  };
+}

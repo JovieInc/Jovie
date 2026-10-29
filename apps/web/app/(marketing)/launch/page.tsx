@@ -31,7 +31,10 @@ import { AiDemo } from '@/features/home/AiDemo';
 import { AuthRedirectHandler } from '@/features/home/AuthRedirectHandler';
 import { ProfileMockup } from '@/features/home/ProfileMockup';
 import { TIM_WHITE_PROFILE } from '@/features/home/tim-white';
-import { HOMEPAGE_PROFILE_PREVIEW_CATALOG } from '@/features/home/tim-white-catalog';
+import {
+  formatCatalogRelease,
+  HOMEPAGE_PROFILE_PREVIEW_CATALOG,
+} from '@/features/home/tim-white-catalog';
 import {
   buildOrganizationSchema,
   buildSoftwareSchema,
@@ -219,6 +222,9 @@ const RELEASES = HOMEPAGE_PROFILE_PREVIEW_CATALOG.map((release, index) => ({
   active: index === 0,
 }));
 const LEAD_RELEASE = HOMEPAGE_PROFILE_PREVIEW_CATALOG[0];
+/** Formatted on the server so the client card hydrates the same text. */
+const PROFILE_RELEASES =
+  HOMEPAGE_PROFILE_PREVIEW_CATALOG.map(formatCatalogRelease);
 const LEAD_RELEASE_SLUG = LEAD_RELEASE.title.toLowerCase().replaceAll(' ', '-');
 
 const RELEASE_FIELDS = [
@@ -513,6 +519,7 @@ export default function LaunchPage() {
                   name={TIM_WHITE_PROFILE.name}
                   handle='tim'
                   avatarUrl={TIM_WHITE_PROFILE.avatarSrc}
+                  releases={PROFILE_RELEASES}
                 />
               </div>
             </div>
