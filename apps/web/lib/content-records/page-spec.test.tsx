@@ -197,4 +197,16 @@ describe('page-spec content kind', () => {
   it('is empty in production until a route migrates', () => {
     expect(PAGE_SPEC_KIND.keys).toEqual([]);
   });
+
+  it('structure smoke reports a repeated id and a second h1', () => {
+    const base = spec();
+    const hero = base.sections[0]!;
+    const errors = pageSpecSmoke({
+      ...base,
+      sections: [hero, hero, ...base.sections.slice(1)],
+    });
+    expect(errors).toContain('sections.hero: id appears twice');
+    expect(errors).toContain('sections: page renders more than one h1');
+    expect(pageSpecSmoke(base)).toEqual([]);
+  });
 });
