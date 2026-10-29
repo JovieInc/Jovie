@@ -4,12 +4,14 @@ const mocks = vi.hoisted(() => ({
   select: vi.fn(),
   update: vi.fn(),
   captureError: vi.fn(),
+  limit: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
   db: { select: mocks.select, update: mocks.update },
 }));
 vi.mock('@/lib/error-tracking', () => ({ captureError: mocks.captureError }));
+vi.mock('@/lib/rate-limit', () => ({ apiLimiter: { limit: mocks.limit } }));
 
 import { POST } from '@/app/api/investors/track/route';
 
@@ -39,6 +41,7 @@ function limitResult(rows: unknown[]) {
 describe('POST /api/investors/track', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.limit.mockResolvedValue({ success: true });
   });
 
   it('rejects a missing or short claim token before reading the database', async () => {
@@ -55,6 +58,41 @@ describe('POST /api/investors/track', () => {
       })
     );
     expect(short.status).toBe(404);
+    expect(mocks.select).not.toHaveBeenCalled();
+  });
+
+  it('short-circuits malformed tokens before spending limiter budget or database reads', async () => {
+    await POST(
+      request({
+        token: 'token-123',
+        pagePath: '/investor-portal',
+        durationHintMs: 10,
+      })
+    );
+    expect(mocks.limit).not.toHaveBeenCalled();
+  });
+
+  it('rate-limits per IP before any database lookup (JOV-8888 abuse cap)', async () => {
+    const limited = new Request('https://jov.ie/api/investors/track', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-forwarded-for': '203.0.113.5',
+      },
+      body: JSON.stringify({
+        token: CLAIM_TOKEN,
+        pagePath: '/investor-portal',
+        durationHintMs: 10,
+      }),
+    });
+
+    mocks.limit.mockResolvedValueOnce({ success: false });
+    const response = await POST(limited);
+
+    expect(response.status).toBe(429);
+    expect(mocks.limit).toHaveBeenCalledWith(
+      'investor-portal:track:203.0.113.5'
+    );
     expect(mocks.select).not.toHaveBeenCalled();
   });
 

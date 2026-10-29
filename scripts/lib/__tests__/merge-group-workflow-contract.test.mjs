@@ -457,7 +457,9 @@ describe('merge_group workflow contract', () => {
     const sizeGuard = getJobBlock(SIZE_GUARD_WORKFLOW, 'merge-group-size');
     expect(admission).toContain('needs: [ci-path-changes]');
     expect(admission).toContain("github.event_name == 'merge_group'");
-    expect(admission).toMatch(/runs-on: ubuntu-(?:latest|24\.04)/);
+    expect(admission).toContain(
+      'runs-on: [self-hosted, Linux, X64, jovie-fixed]'
+    );
     expect(admission).toContain('timeout-minutes: 75');
     expect(admission).not.toContain('sleep "$wait_s"');
     expect(admission).toContain('actions: read');
@@ -3109,11 +3111,17 @@ ${selectedGateScript}`,
     );
     expect(resolve).toContain('should_probe');
 
+    // JOV-9822: auth smoke feeds the golden-path certification, which also
+    // runs after every Production Verified and on the lanes clock.
+    expect(resolve).toContain('should_certify');
+    expect(resolve).toContain('.name == "Production Verified"');
     for (const jobId of ['smoke', 'auth-smoke', 'lighthouse']) {
       const job = getJobBlock(POSTDEPLOY_PROBES_WORKFLOW, jobId);
       expect(job, jobId).toContain('needs: [resolve-target]');
       expect(job, jobId).toContain(
-        "needs.resolve-target.outputs.should_probe == 'true'"
+        jobId === 'auth-smoke'
+          ? "needs.resolve-target.outputs.should_certify == 'true'"
+          : "needs.resolve-target.outputs.should_probe == 'true'"
       );
       expect(job, jobId).toContain(
         'ref: ${{ needs.resolve-target.outputs.commit_sha }}'
@@ -3490,7 +3498,26 @@ ${selectedGateScript}`,
       'pr-fleet-rules.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',
+      'private-data-guard.yml',
     ]);
+    const privateGuardSource = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/private-data-guard.yml'),
+      'utf8'
+    );
+    const privateGuard =
+      /** @type {{ permissions: Record<string, string>, jobs: Record<string, { permissions: Record<string, string>, uses: string, secrets?: unknown }> }} */ (
+        load(privateGuardSource)
+      );
+    expect(privateGuard.permissions).toEqual({});
+    expect(Object.keys(privateGuard.jobs)).toEqual(['guard']);
+    expect(privateGuard.jobs.guard.permissions).toEqual({ contents: 'read' });
+    expect(privateGuard.jobs.guard.uses).toBe(
+      'JovieInc/ci/.github/workflows/private-data-guard.yml@315c327e822e328e01c0e8f50d4e6b14db86af2c'
+    );
+    expect(privateGuardSource).not.toMatch(
+      /secrets\.[A-Z0-9_]+|secrets:\s*inherit/
+    );
+    expect(privateGuard.jobs.guard.secrets).toBeUndefined();
     const fleet = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/pr-fleet-rules.yml'),
       'utf8'

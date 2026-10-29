@@ -198,6 +198,12 @@ needs an auditable PR-body marker line — `api-breaking: <reason>`.
 |-------|---------|------|-------------|
 | `/api/create-tip-intent` | POST | `public` | Create Stripe payment intent for tip |
 
+### Content Records
+
+| Route | Methods | Auth | Description |
+|-------|---------|------|-------------|
+| `/api/content-records/[kind]/[key]` | GET, POST | `admin` or `CONTENT_PUBLISH_SECRET` bearer + `x-content-actor` | Versioned content-as-data store: history (GET); validate, draft (returns signed preview URL), publish, rollback (POST). Every publish/rollback writes an audit row. See `lib/content-records/`. |
+
 ### Creator
 
 | Route | Methods | Auth | Description |
@@ -329,6 +335,7 @@ needs an auditable PR-body marker line — `api-breaking: <reason>`.
 | `/api/health/homepage` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy:true,timestamp}` and does not fetch featured creators |
 | `/api/health/keys` | GET | `public` liveness; detail is admin or `CRON_SECRET` | Anonymous is `{healthy,timestamp}` (503 when a required key is missing) with no key labels |
 | `/api/health/redis` | GET | `admin` or `CRON_SECRET` | Redis write/read operability (protected to prevent quota burn) |
+| `/api/health/revenue-spine` | GET | `public` | Runtime receipt for the revenue-spine failure contract (JOV-8249). Executes the real contract builder for all nine stages in the serving process; no user attribution, no Sentry probe emission, never cached |
 
 ### HUD
 
