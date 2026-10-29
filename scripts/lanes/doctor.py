@@ -1852,11 +1852,10 @@ def reconcile(alerts: dict[str, str], previous: dict, tracker: Tracker | None, n
 SLO_CACHE_S = 3600
 
 
-def fetch_slo(host, lane) -> dict | None:
-    """Latest committed shipping-SLO snapshot (docs/metrics/shipping-slo-latest.json,
-    written daily by .github/workflows/shipping-slo.yml), cached for an hour so
-    ticks stay cheap. Best-effort: a failed fetch keeps the last cached copy."""
-    cache = host.state / "slo.json"
+def fetch_committed_metric(host, lane, cache_name: str, repo_path: str) -> dict | None:
+    """A committed docs/metrics snapshot, cached for an hour so ticks stay cheap.
+    Best-effort: a failed fetch keeps the last cached copy."""
+    cache = host.state / cache_name
     record = read_json(cache, {})
     try:
         fetched_at = datetime.fromisoformat(record["fetchedAt"].replace("Z", "+00:00")).timestamp()
@@ -1867,7 +1866,7 @@ def fetch_slo(host, lane) -> dict | None:
     try:
         lane.load_github_env()
         raw = lifecycle.run(
-            ["gh", "api", "repos/JovieInc/Jovie/contents/docs/metrics/shipping-slo-latest.json",
+            ["gh", "api", f"repos/JovieInc/Jovie/contents/{repo_path}",
              "-H", "Accept: application/vnd.github.raw"],
             capture_output=True, text=True, timeout=20)
         if raw.returncode == 0 and raw.stdout.strip():
@@ -1877,6 +1876,30 @@ def fetch_slo(host, lane) -> dict | None:
     except (OSError, ValueError, subprocess.SubprocessError):
         pass
     return record.get("snapshot")
+
+
+def fetch_slo(host, lane) -> dict | None:
+    """Latest committed shipping-SLO snapshot (docs/metrics/shipping-slo-latest.json,
+    written daily by .github/workflows/shipping-slo.yml)."""
+    return fetch_committed_metric(host, lane, "slo.json", "docs/metrics/shipping-slo-latest.json")
+
+
+WASTE_KEYS = ("schema", "measuredAt", "sha", "score", "knip")
+
+
+def fetch_waste(host, lane) -> dict | None:
+    """Waste score for Summer (docs/metrics/waste-latest.json, written weekly by
+    .github/workflows/waste-sweep.yml): score, dead-code counts, always-loaded
+    agent-context bytes and CI minutes. Candidates stay in the committed file."""
+    snapshot = fetch_committed_metric(host, lane, "waste.json", "docs/metrics/waste-latest.json")
+    if not isinstance(snapshot, dict):
+        return None
+    ci = snapshot.get("ci") or {}
+    context = snapshot.get("agentContext") or {}
+    return {**{k: snapshot.get(k) for k in WASTE_KEYS},
+            "alwaysLoadedContextBytes": context.get("alwaysLoadedBytes"),
+            "ciWallMinutes": ci.get("wallMinutes"),
+            "ciAlwaysRedMinutes": ci.get("alwaysRedMinutes")}
 
 
 def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict | None = None,
@@ -1996,6 +2019,7 @@ def status_feed(host, lane, obs: dict, alerts: dict, tick: dict, previous: dict 
             "oldest_prs": [row for row in (obs.get("reconcile") or {}).get("dispositions") or []][:10],
             "dep_holds": (obs.get("reconcile") or {}).get("depHolds") or [],
             "slo": obs.get("slo"),
+            "waste": obs.get("waste"),
             "escalation": obs.get("escalation") or remediation.empty_escalation(),
             "remediation": obs.get("remediation") or remediation.empty_remediation(),
             "autoscale": _autoscale_block(host),
@@ -2523,6 +2547,10 @@ def run(host, lane, codex, tracker: Tracker | None = None) -> dict:
             obs["slo"] = fetch_slo(host, lane)
         except Exception:
             obs["slo"] = obs.get("slo")
+        try:
+            obs["waste"] = fetch_waste(host, lane)
+        except Exception:
+            obs["waste"] = obs.get("waste")
         try:
             feed = status_feed(host, lane, obs, alerts, obs.get("tick") or {}, previous, result["conditions"])
             result["idleQualifiedSince"] = feed.pop("_idleQualifiedSince", {})

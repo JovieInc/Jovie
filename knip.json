@@ -22,7 +22,8 @@
         "instrumentation.{ts,js}",
         "next.config.{js,ts}",
         "sentry.*.config.ts",
-        "scripts/**/*.{ts,mjs,js}"
+        "scripts/**/*.{ts,mjs,js}",
+        "tests/eval/promptfoo/*.{ts,mjs}"
       ],
       "project": ["**/*.{ts,tsx,js,jsx,mjs,css,mdx}"],
       "ignore": [
@@ -77,7 +78,8 @@
     },
     "apps/desktop": {
       "entry": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],
-      "project": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"]
+      "project": ["src/**/*.ts", "scripts/**/*.{js,mjs,cjs}"],
+      "ignoreDependencies": ["electron-builder-squirrel-windows"]
     },
     "apps/should-i-make": {
       "entry": ["next.config.{js,ts}"],

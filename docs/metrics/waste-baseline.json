@@ -1,0 +1,74 @@
+{
+  "schema": "jovie-waste-baseline/v1",
+  "note": "Dead-code counts from scripts/waste-sweep.mjs (knip, every issue type). lock_down: a PR may not raise any count; the weekly sweep lowers improved counts. Never raise a baseline: delete the code or add a real entry point to knip.json.",
+  "updatedAt": "2026-10-29T17:15:48.000Z",
+  "sha": "9813d6596ab69664a3181a88889d04330041c4fc",
+  "ratchets": {
+    "unusedFiles": {
+      "schemaVersion": 1,
+      "dimension": "unusedFiles",
+      "direction": "lock_down",
+      "baseline": 269,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "unusedExports": {
+      "schemaVersion": 1,
+      "dimension": "unusedExports",
+      "direction": "lock_down",
+      "baseline": 3768,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "unusedTypes": {
+      "schemaVersion": 1,
+      "dimension": "unusedTypes",
+      "direction": "lock_down",
+      "baseline": 3053,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "duplicateExports": {
+      "schemaVersion": 1,
+      "dimension": "duplicateExports",
+      "direction": "lock_down",
+      "baseline": 35,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "unusedDependencies": {
+      "schemaVersion": 1,
+      "dimension": "unusedDependencies",
+      "direction": "lock_down",
+      "baseline": 0,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    },
+    "unlistedDependencies": {
+      "schemaVersion": 1,
+      "dimension": "unlistedDependencies",
+      "direction": "lock_down",
+      "baseline": 63,
+      "policy": {
+        "marginFraction": 0,
+        "improveEpsilon": 0,
+        "minSampleSize": 0
+      }
+    }
+  }
+}

@@ -79,6 +79,11 @@ CLOCKS = (
     # applies unless client_payload.apply is false; the bot token cannot send workflow_dispatch.
     Clock("staleBranchSweep", "stale-branch-sweep.yml", "clock_stale_branch_sweep", 7 * 86400,
           "stale-branch-sweep-clock.json", github_cron=False),
+    # Weekly waste inventory (dead code, unused deps, agent context, CI minutes) with CI
+    # history sampling and Linear deletion candidates. Pushes re-measure without sampling.
+    Clock("wasteSweep", "waste-sweep.yml", "clock_waste_sweep", 7 * 86400,
+          "waste-sweep-clock.json", github_cron=False,
+          ignored_events=frozenset({"push"})),
     # Dependabot advisories reach no workflow event; the loop files/closes Linear work and
     # fails its ratchet step when an advisory ages past its SLA. Clock is its only backstop.
     Clock("securityAdvisory", "security-advisory-loop.yml", "clock_security_advisory_loop", 4 * 3600,
