@@ -107,6 +107,10 @@ apps/docs/scripts/*.test.mjs
 /scripts/*
 !/scripts/funnel-judge/
 !/scripts/funnel-judge/trend.jsonl
+# Copy Jam inventory: imported by apps/web/lib/copy-jam/inventory.ts.
+!/scripts/copy-inventory/
+/scripts/copy-inventory/*
+!/scripts/copy-inventory/inventory.gen.json
 !apps/eve-pilot/identities/jovie/instructions.md
 !apps/eve-pilot/identities/summer/instructions.md
 
