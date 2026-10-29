@@ -37,6 +37,7 @@ import {
   isChatThreadSurfacePath,
   syncChatThreadUrlWithoutNavigation,
 } from '@/lib/chat/sync-chat-thread-url';
+import { resolveProfileSegment } from '@/lib/creator/segments';
 import { env } from '@/lib/env-client';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import {
@@ -300,6 +301,15 @@ export function ChatPageClient({
       : null;
   const activeProfile =
     selectedProfile ?? fallbackProfile ?? e2eFallbackProfile;
+  const activeSegment = activeProfile
+    ? resolveProfileSegment({
+        creatorType: activeProfile.creatorType,
+        settings: activeProfile.settings as Record<string, unknown> | null,
+        bio: activeProfile.bio,
+        spotifyId: activeProfile.spotifyId,
+        spotifyUrl: activeProfile.spotifyUrl,
+      })
+    : undefined;
   const hasDashboardLoadFailure = Boolean(dashboardLoadError);
   const isProfileSetupRace =
     hasProfilesButNoSelection && !hasDashboardLoadFailure;
@@ -887,6 +897,7 @@ export function ChatPageClient({
             isFirstSession={isFirstSession || dashboardIsFirstSession || false}
             isProfileComplete={profileCompletion.percentage >= 100}
             chatMode={chatMode}
+            segment={activeSegment}
             ambientOwnedByShell
           />
         </ChatWorkspaceSurface>

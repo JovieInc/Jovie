@@ -4,6 +4,7 @@ import {
   inferSegment,
   isMusicSegment,
   NEUTRAL_SEGMENT,
+  resolveProfileSegment,
   SEGMENTS,
 } from './segments';
 
@@ -108,5 +109,24 @@ describe('explicitSegmentFromSettings', () => {
     expect(explicitSegmentFromSettings({ segment: 'athlete' })).toBe('athlete');
     expect(explicitSegmentFromSettings({ segment: 'wizard' })).toBeNull();
     expect(explicitSegmentFromSettings(null)).toBeNull();
+  });
+});
+
+describe('resolveProfileSegment', () => {
+  it('gives a plain artist profile the musician segment', () => {
+    expect(resolveProfileSegment({ creatorType: 'artist' })).toBe('musician');
+  });
+
+  it('honors an explicit athlete setting over an artist type', () => {
+    expect(
+      resolveProfileSegment({
+        creatorType: 'artist',
+        settings: { segment: 'athlete' },
+      })
+    ).toBe('athlete');
+  });
+
+  it('keeps a plain creator neutral', () => {
+    expect(resolveProfileSegment({ creatorType: 'creator' })).toBe('neutral');
   });
 });

@@ -6,6 +6,7 @@ import {
 } from 'ai';
 import type { ReactNode } from 'react';
 import { TOOL_UI_REGISTRY } from '@/lib/chat/tool-ui-registry';
+import type { ResolvedSegment } from '@/lib/creator/segments';
 import type { ChatInsightSummary } from '@/types/insights';
 import {
   CHAT_STARTER_ACTION_ORDER,
@@ -49,6 +50,11 @@ export interface MessageLike {
 export interface JovieChatProps {
   /** Profile ID for server-side context fetching (preferred) */
   readonly profileId?: string;
+  /**
+   * Resolved creator segment (JOV-9679). Gates segment-specific next steps in
+   * the empty state. Omitted keeps the ungated legacy behavior.
+   */
+  readonly segment?: ResolvedSegment;
   /** @deprecated Use profileId instead. Client-provided artist context for backward compatibility. */
   readonly artistContext?: ArtistContext;
   /** Conversation ID to load and continue */

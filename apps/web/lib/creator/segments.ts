@@ -231,3 +231,27 @@ export function explicitSegmentFromSettings(
   const value = settings?.segment;
   return isSegment(value) ? value : null;
 }
+
+/** Profile fields the segment is derived from. */
+export interface SegmentProfileLike {
+  creatorType?: CreatorType | null;
+  settings?: Record<string, unknown> | null;
+  bio?: string | null;
+  spotifyId?: string | null;
+  spotifyUrl?: string | null;
+}
+
+/** Resolve the segment for a profile row. Shared by the chat page and API. */
+export function resolveProfileSegment(
+  profile: SegmentProfileLike,
+  extra: Pick<SegmentSignals, 'platforms' | 'hasMusicCatalog'> = {}
+): ResolvedSegment {
+  return inferSegment({
+    creatorType: profile.creatorType,
+    explicit: explicitSegmentFromSettings(profile.settings),
+    bio: profile.bio,
+    platforms: extra.platforms,
+    hasMusicCatalog:
+      extra.hasMusicCatalog ?? Boolean(profile.spotifyId || profile.spotifyUrl),
+  }).segment;
+}
