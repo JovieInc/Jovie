@@ -86,7 +86,7 @@ describe('PricingComparisonChart', () => {
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
-      name: 'Contact / subscriber capture',
+      name: PUBLIC_ROWS.find(row => row.pro !== false)?.name ?? '',
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');
