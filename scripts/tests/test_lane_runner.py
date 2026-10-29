@@ -8160,6 +8160,72 @@ class FixRedTest(unittest.TestCase):
         self.assertEqual(pending, {"5": "h9"})
         self.assertFalse(any(c[:3] in (["gh", "pr", "ready"], ["gh", "pr", "merge"]) for c in calls))
 
+    def test_dirty_source_conflict_shapes_the_repair_fingerprint(self):
+        real_sh = lane.sh
+        real_generated = lane.resolve_generated_conflict
+        real_narrowed = lane.resolve_narrowed_preflight_conflict
+        real_agent = lane.run_agent
+        real_fp = lane.machine_gap.check_fingerprint
+        seen = {}
+        paths = (
+            "apps/web/components/jovie/tool-ui.test.tsx",
+            "apps/web/components/jovie/tool-ui.tsx",
+            "apps/web/tests/unit/chat/InlineChatArea.tool-rendering.test.tsx",
+        )
+
+        def generated(worktree, branch, log, **kwargs):
+            del worktree, branch, log, kwargs
+            generated.last_conflict_paths = ("apps/web/components/jovie/tool-ui.tsx",)
+            return False
+
+        def narrowed(worktree, branch, log, **kwargs):
+            del worktree, branch, log, kwargs
+            narrowed.last_conflict_paths = paths
+            return False
+
+        def spy(pr, conflict_paths=()):
+            seen["paths"] = tuple(conflict_paths)
+            return real_fp(pr, conflict_paths)
+
+        def fake(args, cwd=None, timeout=600, env=None, log=None):
+            del cwd, timeout, env, log
+            if args[:2] == ["git", "rev-parse"]:
+                return SimpleNamespace(returncode=0, stdout="h1\n")
+            if args[:2] == ["git", "ls-remote"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="h1\trefs/heads/devin/jov-1\n")
+            if args[:3] == ["git", "worktree", "add"]:
+                Path(args[-2]).mkdir(parents=True, exist_ok=True)
+            if args[:2] == ["git", "rev-list"]:
+                return SimpleNamespace(returncode=0, stderr="", stdout="0\n")
+            if args[:3] == ["git", "worktree", "remove"]:
+                target = Path(args[-1])
+                if target.is_dir():
+                    target.rmdir()
+            return SimpleNamespace(returncode=0, stderr="", stdout="")
+
+        lane.sh = fake
+        lane.resolve_generated_conflict = generated
+        lane.resolve_narrowed_preflight_conflict = narrowed
+        lane.machine_gap.check_fingerprint = spy
+        lane.run_agent = lambda *a, **k: SimpleNamespace(returncode=0)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                host = lane.Host(state=Path(tmp), repo=Path(tmp))
+                receipt = lane.fix_red_pr(host, "devin", {"cmd": ["true"]}, {
+                    **self.pr(),
+                    "mergeStateStatus": "DIRTY",
+                    "statusCheckRollup": [],
+                })
+        finally:
+            lane.sh = real_sh
+            lane.resolve_generated_conflict = real_generated
+            lane.resolve_narrowed_preflight_conflict = real_narrowed
+            lane.machine_gap.check_fingerprint = real_fp
+            lane.run_agent = real_agent
+        self.assertEqual(seen["paths"], paths)
+        self.assertNotEqual(receipt["machineGate"]["fp"], "fix-red-e3b0c44298")
+        self.assertEqual(receipt["machineGate"]["fp"], real_fp({"statusCheckRollup": []}, paths))
+
     def test_excerpt_keeps_failing_lines_and_prompt_forbids_new_prs(self):
         real = lane.sh
         lane.sh = lambda *a, **k: SimpleNamespace(returncode=0, stderr="", stdout=(
@@ -12375,6 +12441,7 @@ class LockfileConflictTest(unittest.TestCase):
             self.assertNotIn(["pnpm", "install", "--lockfile-only", "--ignore-scripts"], calls)
             self.assertFalse((work / ".git" / "MERGE_HEAD").exists(), "merge aborted")
             self.assertEqual(self.git("rev-parse", "devin/jov-1-20260927", cwd=origin), before)
+            self.assertEqual(lane.resolve_generated_conflict.last_conflict_paths, ("a.ts", "pnpm-lock.yaml"))
 
     def test_failed_generated_restore_or_generator_stops_before_staging(self):
         for failure in ("checkout", "generator"):
