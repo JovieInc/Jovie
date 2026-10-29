@@ -6,6 +6,9 @@
 // point (remaining, used, reset) so hourly consumption is a subtraction.
 import { appendFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { providerSpec } from '../packages/api-client/contract.ts';
+import { createGitHubClient } from '../packages/api-client/github.ts';
+import { parseBudget } from '../packages/api-client/headers.ts';
 
 export const LOW_BUDGET_FRACTION = 0.15;
 
@@ -47,18 +50,44 @@ export const INSTALLATIONS = [
   { name: 'ci-app', tokenEnv: 'CI_APP_TOKEN' },
 ];
 
-async function sampleOne(name, token, { fetchImpl, now }) {
-  const response = await fetchImpl('https://api.github.com/rate_limit', {
-    headers: {
-      authorization: `Bearer ${token}`,
-      accept: 'application/vnd.github+json',
-    },
-    signal: AbortSignal.timeout(15000),
+async function sampleOne(name, token, { fetchImpl, now, store }) {
+  const github = createGitHubClient({ token, fetch: fetchImpl, now, store });
+  const response = await github.rest('GET', '/rate_limit', undefined, {
+    priority: 'report',
+    // GitHub exempts this endpoint from REST quota. It must still sample a
+    // depleted ledger; ordinary report reads are shed below the reserve.
+    costs: {},
+    conditional: false,
+    maxAttempts: 1,
+    maxWaitMs: 0,
+    timeoutMs: 15_000,
   });
-  if (!response.ok)
+  if (response.status !== 200)
     throw new Error(`${name} rate_limit read failed (${response.status})`);
-  const body = await response.json();
-  return evaluateBudget(body?.resources?.core, now());
+  const at = now();
+  const headerBudget = parseBudget(
+    providerSpec('github'),
+    response.headers,
+    at,
+    'core'
+  ).find(observation => observation.resource === 'core');
+  // GitHub's headers govern enforcement when the overview body disagrees.
+  if (
+    headerBudget &&
+    headerBudget.limit !== null &&
+    headerBudget.resetAt !== null
+  ) {
+    return evaluateBudget(
+      {
+        limit: headerBudget.limit,
+        remaining: headerBudget.remaining,
+        reset: headerBudget.resetAt / 1000,
+      },
+      at
+    );
+  }
+  const body = response.json();
+  return evaluateBudget(body?.resources?.core, at);
 }
 
 export async function main({
@@ -66,6 +95,7 @@ export async function main({
   fetchImpl = fetch,
   log = console.log,
   now = Date.now,
+  store,
 } = {}) {
   const samples = {};
   for (const { name, tokenEnv } of INSTALLATIONS) {
@@ -74,7 +104,11 @@ export async function main({
       continue;
     }
     try {
-      const sample = await sampleOne(name, env[tokenEnv], { fetchImpl, now });
+      const sample = await sampleOne(name, env[tokenEnv], {
+        fetchImpl,
+        now,
+        store,
+      });
       samples[name] = sample;
       log(render(sample, name));
       if (env.GITHUB_STEP_SUMMARY)
@@ -91,7 +125,8 @@ export async function main({
       }
     } catch (error) {
       // A failed read is not an alarm: the next sample covers it.
-      log(`::warning::${name} budget sample unavailable (${error.message})`);
+      const status = error.status ? ` (HTTP ${error.status})` : '';
+      log(`::warning::${name} budget sample unavailable${status}`);
     }
   }
   return samples;

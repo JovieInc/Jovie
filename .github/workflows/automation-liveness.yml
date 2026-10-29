@@ -84,18 +84,19 @@ jobs:
           done
           echo "due=$due" >> "$GITHUB_OUTPUT"
 
-  liveness:
-    name: Check automation heartbeats
+  # Budget diagnostics share the existing due gate. A failed token mint must
+  # not fail Check automation heartbeats or defeat its 20-minute throttle.
+  installation-budget:
+    name: Sample installation REST budgets
     needs: gate
     if: needs.gate.outputs.due == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
           persist-credentials: false
-
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
         uses: ./.github/actions/prime-node-toolcache
@@ -109,8 +110,7 @@ jobs:
       # this sanctioned ~25m backstop (JOV-INV-042: no new clock).
       - name: Mint CI App read token for budget sample
         id: ci-app-token
-        if: ${{ always() }}
-        continue-on-error: true
+        if: ${{ always() && vars.CI_APP_ID != '' }}
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.CI_APP_ID }}
@@ -120,7 +120,6 @@ jobs:
       - name: Sample GitHub installation budgets
         id: installation-budget
         if: ${{ always() }}
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
           CI_APP_TOKEN: ${{ steps.ci-app-token.outputs.token }}
@@ -140,6 +139,25 @@ jobs:
             }
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  liveness:
+    name: Check automation heartbeats
+    needs: gate
+    if: needs.gate.outputs.due == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Prime Node toolcache (no GitHub API manifest call)
+        if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
+        uses: ./.github/actions/prime-node-toolcache
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
 
       # JOV-6813: independent of the canary's own job/alert steps. Reuse this
       # sanctioned ~25m backstop; a daily AI-only success is not a heartbeat.

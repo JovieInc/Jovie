@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load } from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiClient } from '../../../packages/api-client/client.ts';
 import { MemoryLedgerStore } from '../../../packages/api-client/store.ts';
@@ -1759,5 +1760,41 @@ describe('alert state preservation (JOV-8843)', () => {
         action: 'skip',
       });
     }
+  });
+});
+
+describe('budget diagnostics failure isolation', () => {
+  it('uses the same due gate without becoming a heartbeat dependency', () => {
+    const workflow = load(
+      readFileSync(
+        join(repoRoot, '.github/workflows/automation-liveness.yml'),
+        'utf8'
+      )
+    );
+    const budget = workflow.jobs['installation-budget'];
+    const heartbeat = workflow.jobs.liveness;
+    expect(budget.needs).toBe('gate');
+    expect(heartbeat.needs).toBe('gate');
+    expect(budget.if).toBe(heartbeat.if);
+    expect(heartbeat.steps.some(step => step.id === 'ci-app-token')).toBe(
+      false
+    );
+    expect(
+      heartbeat.steps.some(
+        step => step.name === 'Preserve synthetic dead-man failure'
+      )
+    ).toBe(true);
+    const sample = budget.steps.find(step => step.id === 'installation-budget');
+    expect(sample.if).toBe('${{ always() }}');
+    expect(sample.run).toBe('node scripts/installation-budget-sentinel.mjs');
+    const alert = budget.steps.find(
+      step => step.name === 'Send Slack Alert on Low Installation Budget'
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.shared_github_token_low == 'true'"
+    );
+    expect(alert.if).toContain(
+      "steps.installation-budget.outputs.ci_app_low == 'true'"
+    );
   });
 });

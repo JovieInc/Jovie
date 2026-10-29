@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
+import { createGitHubClient } from '../packages/api-client/github.ts';
+import { MemoryLedgerStore } from '../packages/api-client/store.ts';
 import {
   evaluateBudget,
   LOW_BUDGET_FRACTION,
@@ -48,10 +53,11 @@ test('main samples the shared and CI App installations separately and never logs
   const logs = [];
   const seen = [];
   const samples = await main({
+    store: new MemoryLedgerStore(),
     env: { GITHUB_TOKEN: 'tok-shared', CI_APP_TOKEN: 'tok-app' },
     fetchImpl: async (url, options) => {
-      assert.equal(url, 'https://api.github.com/rate_limit');
-      const token = options.headers.authorization.replace('Bearer ', '');
+      assert.equal(String(url), 'https://api.github.com/rate_limit');
+      const token = options.headers.get('authorization').replace('Bearer ', '');
       seen.push(token);
       return Response.json({
         resources: { core: token === 'tok-shared' ? core(50) : core(900) },
@@ -71,6 +77,7 @@ test('main samples the shared and CI App installations separately and never logs
 test('a missing token or failed read warns instead of alarming or throwing', async () => {
   const logs = [];
   await main({
+    store: new MemoryLedgerStore(),
     env: { GITHUB_TOKEN: 'tok-shared' },
     fetchImpl: async () => new Response(null, { status: 500 }),
     log: x => logs.push(x),
@@ -80,4 +87,161 @@ test('a missing token or failed read warns instead of alarming or throwing', asy
     /^::warning::shared-github-token budget sample unavailable \(.*500\)/
   );
   assert.match(logs[1], /^::warning::ci-app budget not sampled/);
+});
+
+test('samples a depleted shared ledger without a charged or cached REST read', async () => {
+  const store = new MemoryLedgerStore();
+  const seen = [];
+  const fetchImpl = async (url, options) => {
+    seen.push({ url, headers: options.headers });
+    return Response.json(
+      { resources: { core: core(0) } },
+      {
+        headers: {
+          'x-ratelimit-limit': '1000',
+          'x-ratelimit-remaining': '0',
+          'x-ratelimit-reset': String(NOW / 1000 + 600),
+          etag: '"sample"',
+        },
+      }
+    );
+  };
+  const github = createGitHubClient({
+    token: 'tok-shared',
+    store,
+    fetch: fetchImpl,
+    now: () => NOW,
+  });
+  await github.rest('GET', '/repos/JovieInc/Jovie');
+  assert.equal(
+    Object.values((await store.read('github')).credentials)[0].buckets.core
+      .remaining,
+    0
+  );
+  for (let i = 0; i < 2; i++) {
+    const samples = await main({
+      env: { GITHUB_TOKEN: 'tok-shared' },
+      store,
+      fetchImpl,
+      now: () => NOW,
+      log: () => {},
+    });
+    assert.equal(samples['shared-github-token'].low, true);
+  }
+  assert.equal(seen.length, 3);
+  for (const request of seen.slice(1)) {
+    assert.equal(String(request.url), 'https://api.github.com/rate_limit');
+    assert.equal(request.headers.has('if-none-match'), false);
+  }
+});
+
+test('writes per-installation alarm outputs and summary for Slack', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'installation-budget-'));
+  const output = join(dir, 'output');
+  const summary = join(dir, 'summary');
+  try {
+    await main({
+      env: {
+        GITHUB_TOKEN: 'tok-shared',
+        CI_APP_TOKEN: 'tok-app',
+        GITHUB_OUTPUT: output,
+        GITHUB_STEP_SUMMARY: summary,
+      },
+      store: new MemoryLedgerStore(),
+      now: () => NOW,
+      log: () => {},
+      fetchImpl: async (_, options) =>
+        Response.json({
+          resources: {
+            core: core(
+              options.headers.get('authorization') === 'Bearer tok-shared'
+                ? 50
+                : 900
+            ),
+          },
+        }),
+    });
+    assert.equal(
+      readFileSync(output, 'utf8'),
+      'shared_github_token_low=true\nshared_github_token_remaining=50\nshared_github_token_limit=1000\nshared_github_token_reset_in_seconds=600\n' +
+        'ci_app_low=false\nci_app_remaining=900\nci_app_limit=1000\nci_app_reset_in_seconds=600\n'
+    );
+    assert.match(
+      readFileSync(summary, 'utf8'),
+      /shared-github-token budget: remaining=50/
+    );
+    assert.match(readFileSync(summary, 'utf8'), /ci-app budget: remaining=900/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('one failed installation does not hide the other or expose credentials', async () => {
+  const logs = [];
+  let calls = 0;
+  const samples = await main({
+    env: { GITHUB_TOKEN: 'tok-shared', CI_APP_TOKEN: 'tok-app' },
+    store: new MemoryLedgerStore(),
+    now: () => NOW,
+    log: x => logs.push(x),
+    fetchImpl: async (_, options) => {
+      calls++;
+      if (options.headers.get('authorization') === 'Bearer tok-shared')
+        throw new Error('network failure with tok-shared');
+      return Response.json({ resources: { core: core(50) } });
+    },
+  });
+  assert.equal(calls, 2);
+  assert.deepEqual(Object.keys(samples), ['ci-app']);
+  assert.equal(samples['ci-app'].low, true);
+  assert.match(logs[0], /budget sample unavailable/);
+  assert.doesNotMatch(logs.join('\n'), /tok-shared|tok-app/);
+});
+
+test('malformed and non-successful samples warn without raising an alarm', async () => {
+  for (const response of [
+    Response.json({}),
+    new Response('{}', { status: 404 }),
+    new Response('{'),
+  ]) {
+    const logs = [];
+    const samples = await main({
+      env: { GITHUB_TOKEN: 'tok-shared' },
+      store: new MemoryLedgerStore(),
+      fetchImpl: async () => response,
+      now: () => NOW,
+      log: x => logs.push(x),
+    });
+    assert.deepEqual(samples, {});
+    assert.match(logs[0], /budget sample unavailable/);
+    assert.doesNotMatch(logs.join('\n'), /::error/);
+  }
+});
+
+test('uses authoritative core headers when the overview body disagrees', async () => {
+  for (const resource of ['core', 'search']) {
+    const samples = await main({
+      env: { GITHUB_TOKEN: 'tok-shared' },
+      store: new MemoryLedgerStore(),
+      now: () => NOW,
+      log: () => {},
+      fetchImpl: async () =>
+        Response.json(
+          { resources: { core: core(900) } },
+          {
+            headers: {
+              'x-ratelimit-resource': resource,
+              'x-ratelimit-limit': '1000',
+              'x-ratelimit-remaining': '0',
+              'x-ratelimit-reset': String(NOW / 1000 + 600),
+            },
+          }
+        ),
+    });
+    assert.equal(
+      samples['shared-github-token'].remaining,
+      resource === 'core' ? 0 : 900
+    );
+    assert.equal(samples['shared-github-token'].low, resource === 'core');
+  }
 });
