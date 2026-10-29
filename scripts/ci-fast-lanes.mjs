@@ -862,6 +862,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/layout-guard-pen-contracts.test.mjs',
   'scripts/ci-rounds-report.test.mjs',
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
+  'scripts/copy-inventory/extract.test.mjs',
   'scripts/lib/__tests__/script-contract-affected.test.mjs',
   'scripts/lib/__tests__/web-source-read-tests.test.mjs',
   '.claude/hooks/post-task-validate.test.mjs',
