@@ -8,7 +8,7 @@ import { captureError } from '@/lib/error-tracking';
 import {
   certifyProfile,
   certifyWaitlistEntry,
-} from '@/lib/waitlist/profile-certification.server';
+} from '@/lib/waitlist/profile-certification-runner.server';
 
 /**
  * Certify one waitlist profile on demand (operator or agent dogfood run).

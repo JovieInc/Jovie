@@ -50,7 +50,7 @@ import {
   getAccountMetricCohort,
 } from '@/lib/utils/email';
 import { normalizeUsername, validateUsername } from '@/lib/validation/username';
-import { scheduleProfileCertification } from '@/lib/waitlist/profile-certification.server';
+import { scheduleProfileCertification } from '@/lib/waitlist/profile-certification-runner.server';
 
 type CreatorProfile = typeof creatorProfiles.$inferSelect;
 

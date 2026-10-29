@@ -123,6 +123,20 @@ export interface ProfileCertFacts {
   } | null;
   /** Smart link probes of public release pages; empty when not probed. */
   readonly smartLinkProbes: readonly { readonly status: number }[];
+  /**
+   * Evidence-scored artist identity from the music resolver
+   * (`getArtistIdentityConfidence`, #23732). When present it decides the
+   * artist check; the owner-pick comparison is only the fallback.
+   */
+  readonly identity?: {
+    readonly decision:
+      | 'certified'
+      | 'needs_confirmation'
+      | 'conflict'
+      | 'unbound';
+    readonly score: number;
+    readonly threshold: number;
+  } | null;
 }
 
 const KNOWN_PLANS = new Set(['free', 'pro', 'growth', 'max', 'founding']);
@@ -154,6 +168,20 @@ function check(
 }
 
 export function checkArtistMatch(facts: ProfileCertFacts): ProfileCertCheck {
+  if (facts.identity) {
+    const { decision, score, threshold } = facts.identity;
+    return decision === 'certified'
+      ? check(
+          'artist_match',
+          'passed',
+          `Artist identity certified by evidence (${score} >= ${threshold}).`
+        )
+      : check(
+          'artist_match',
+          'failed',
+          `Artist identity ${decision.replace('_', ' ')} (${score} < ${threshold}); the owner confirms in product.`
+        );
+  }
   if (!facts.spotifyId) {
     return check('artist_match', 'failed', 'No artist matched yet.');
   }

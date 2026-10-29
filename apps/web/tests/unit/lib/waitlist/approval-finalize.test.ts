@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/lib/auth/proxy-state', () => ({
   invalidateProxyUserStateCache: mocks.invalidate,
 }));
-vi.mock('@/lib/waitlist/profile-certification.server', () => ({
+vi.mock('@/lib/waitlist/profile-certification-runner.server', () => ({
   scheduleProfileCertification: mocks.schedule,
 }));
 

@@ -92,6 +92,25 @@ describe('evaluateProfileCertification', () => {
     expect(statusOf(named, 'artist_match')).toBe('passed');
   });
 
+  it('lets evidence-scored identity override the owner pick', () => {
+    const below = facts({
+      identity: {
+        decision: 'needs_confirmation',
+        score: 0.55,
+        threshold: 0.85,
+      },
+    });
+    expect(evaluateProfileCertification(below).status).toBe(
+      'needs_artist_confirmation'
+    );
+    const certified = facts({
+      selectedSpotifyArtistId: null,
+      personName: 'Someone Else',
+      identity: { decision: 'certified', score: 0.85, threshold: 0.85 },
+    });
+    expect(statusOf(certified, 'artist_match')).toBe('passed');
+  });
+
   it('needs an artist when no artist is matched at all', () => {
     expect(
       evaluateProfileCertification(facts({ spotifyId: null })).status

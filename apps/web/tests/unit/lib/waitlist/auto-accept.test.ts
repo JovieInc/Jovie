@@ -137,6 +137,8 @@ vi.mock('@/lib/waitlist/email-jobs', () => ({
 
 vi.mock('@/lib/waitlist/profile-certification.server', () => ({
   readWaitlistInviteGates: mockReadWaitlistInviteGates,
+}));
+vi.mock('@/lib/waitlist/profile-certification-runner.server', () => ({
   scheduleProfileCertification: mockScheduleProfileCertification,
 }));
 

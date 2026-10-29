@@ -281,7 +281,7 @@ export async function finalizeWaitlistApproval(result: WaitlistApprovalResult) {
     // (an empty catalog imports now, so the invitee never lands on a shell).
     try {
       const { scheduleProfileCertification } = await import(
-        '@/lib/waitlist/profile-certification.server'
+        '@/lib/waitlist/profile-certification-runner.server'
       );
       scheduleProfileCertification({
         profileId: result.profileId,

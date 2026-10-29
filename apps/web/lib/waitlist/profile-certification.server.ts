@@ -252,22 +252,31 @@ export async function recordProfileCertReceipt(
   });
 }
 
+/** Runs the canonical catalog import (injected to avoid an import cycle). */
+export type ProfileCertCatalogImporter = (input: {
+  readonly profileId: string;
+  readonly spotifyArtistId: string;
+  readonly spotifyArtistUrl: string;
+  readonly userId: string;
+}) => Promise<unknown>;
+
 async function dispatchRemediation(
   receipt: ProfileCertReceipt,
   facts: ProfileCertFacts,
-  ownerUserId: string | null
+  ownerUserId: string | null,
+  importCatalog: ProfileCertCatalogImporter | undefined
 ): Promise<void> {
   if (
     receipt.remediation.includes('import_catalog') &&
     facts.spotifyId &&
-    ownerUserId
+    ownerUserId &&
+    importCatalog
   ) {
     // Import completion re-certifies (catalog-import.server.ts), so the fix
-    // event closes the loop without a sweep.
-    const { runOnboardingCatalogImport } = await import(
-      '@/lib/onboarding/catalog-import.server'
-    );
-    await runOnboardingCatalogImport({
+    // event closes the loop without a sweep. The importer is injected by
+    // profile-certification-runner.server.ts: importing it here would close
+    // an import cycle with catalog-import.server.ts.
+    await importCatalog({
       profileId: facts.profileId,
       spotifyArtistId: facts.spotifyId,
       spotifyArtistUrl: `https://open.spotify.com/artist/${facts.spotifyId}`,
@@ -314,6 +323,8 @@ export async function certifyProfile(input: {
   readonly probe?: boolean;
   /** Walk recording and step screenshots from the agent dogfood run. */
   readonly evidence?: ProfileCertEvidence | null;
+  /** Catalog import remediation; absent means no import is dispatched. */
+  readonly importCatalog?: ProfileCertCatalogImporter;
 }): Promise<ProfileCertReceipt | null> {
   const startedAt = new Date().toISOString();
   const facts = await readProfileCertFacts(input.profileId, {
@@ -364,7 +375,8 @@ export async function certifyProfile(input: {
             }
           : receipt,
         facts,
-        owner?.userId ?? null
+        owner?.userId ?? null,
+        input.importCatalog
       );
     } catch (error) {
       await captureError('Profile certification remediation failed', error, {
@@ -380,6 +392,7 @@ export async function certifyWaitlistEntry(input: {
   readonly trigger: ProfileCertTrigger;
   readonly remediate?: boolean;
   readonly evidence?: ProfileCertEvidence | null;
+  readonly importCatalog?: ProfileCertCatalogImporter;
 }): Promise<
   | { readonly outcome: 'no_profile' }
   | { readonly outcome: 'certified'; readonly receipt: ProfileCertReceipt }
@@ -395,6 +408,7 @@ export async function certifyWaitlistEntry(input: {
     trigger: input.trigger,
     remediate: input.remediate,
     evidence: input.evidence,
+    importCatalog: input.importCatalog,
   });
   return receipt
     ? { outcome: 'certified', receipt }
@@ -405,6 +419,7 @@ export async function certifyWaitlistEntry(input: {
 export function scheduleProfileCertification(input: {
   readonly profileId: string;
   readonly trigger: ProfileCertTrigger;
+  readonly importCatalog?: ProfileCertCatalogImporter;
 }): void {
   scheduleAfter(async () => {
     try {

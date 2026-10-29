@@ -31,10 +31,8 @@ import {
   MAX_OPEN_COHORT_LEARNINGS,
 } from '@/lib/waitlist/cohort-learnings';
 import { enqueueWaitlistApprovalInviteEmail } from '@/lib/waitlist/email-jobs';
-import {
-  readWaitlistInviteGates,
-  scheduleProfileCertification,
-} from '@/lib/waitlist/profile-certification.server';
+import { readWaitlistInviteGates } from '@/lib/waitlist/profile-certification.server';
+import { scheduleProfileCertification } from '@/lib/waitlist/profile-certification-runner.server';
 import {
   getWaitlistSettings,
   tryReserveAutoAcceptSlot,

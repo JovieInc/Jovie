@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/cron/auth', () => ({ verifyCronRequest: mocks.verify }));
-vi.mock('@/lib/waitlist/profile-certification.server', () => ({
+vi.mock('@/lib/waitlist/profile-certification-runner.server', () => ({
   certifyProfile: mocks.certifyProfile,
   certifyWaitlistEntry: mocks.certifyEntry,
 }));

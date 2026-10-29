@@ -47,9 +47,6 @@ vi.mock('@/lib/http/bounded-fetch', () => ({ boundedFetch: mocks.fetch }));
 vi.mock('@/lib/next/schedule-after', () => ({
   scheduleAfter: mocks.scheduleAfter,
 }));
-vi.mock('@/lib/onboarding/catalog-import.server', () => ({
-  runOnboardingCatalogImport: mocks.importCatalog,
-}));
 vi.mock('@/lib/ovie/summer-cards.server', () => ({
   submitSummerCard: mocks.submitCard,
 }));
@@ -132,6 +129,7 @@ describe('certifyProfile', () => {
     const receipt = await certifyProfile({
       profileId: 'profile-1',
       trigger: 'waitlist_approval',
+      importCatalog: mocks.importCatalog,
     });
 
     expect(receipt?.status).toBe('failed');
@@ -147,7 +145,11 @@ describe('certifyProfile', () => {
     queueProfile(PROFILE, []);
     mocks.queue.push([{ userId: 'user-1' }]);
 
-    await certifyProfile({ profileId: 'profile-1', trigger: 'catalog_import' });
+    await certifyProfile({
+      profileId: 'profile-1',
+      trigger: 'catalog_import',
+      importCatalog: mocks.importCatalog,
+    });
 
     expect(mocks.importCatalog).not.toHaveBeenCalled();
     expect(mocks.submitCard).toHaveBeenCalledWith(

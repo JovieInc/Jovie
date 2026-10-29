@@ -185,7 +185,7 @@ vi.mock('@/lib/onboarding/catalog-import.server', () => ({
 }));
 
 const mockScheduleProfileCertification = vi.hoisted(() => vi.fn());
-vi.mock('@/lib/waitlist/profile-certification.server', () => ({
+vi.mock('@/lib/waitlist/profile-certification-runner.server', () => ({
   scheduleProfileCertification: mockScheduleProfileCertification,
 }));
 
