@@ -3490,7 +3490,26 @@ ${selectedGateScript}`,
       'pr-fleet-rules.yml',
       'pr-size-guard.yml',
       'pr-targets-main.yml',
+      'private-data-guard.yml',
     ]);
+    const privateGuardSource = readFileSync(
+      resolve(REPO_ROOT, '.github/workflows/private-data-guard.yml'),
+      'utf8'
+    );
+    const privateGuard =
+      /** @type {{ permissions: Record<string, string>, jobs: Record<string, { permissions: Record<string, string>, uses: string, secrets?: unknown }> }} */ (
+        load(privateGuardSource)
+      );
+    expect(privateGuard.permissions).toEqual({});
+    expect(Object.keys(privateGuard.jobs)).toEqual(['guard']);
+    expect(privateGuard.jobs.guard.permissions).toEqual({ contents: 'read' });
+    expect(privateGuard.jobs.guard.uses).toBe(
+      'JovieInc/ci/.github/workflows/private-data-guard.yml@315c327e822e328e01c0e8f50d4e6b14db86af2c'
+    );
+    expect(privateGuardSource).not.toMatch(
+      /secrets\.[A-Z0-9_]+|secrets:\s*inherit/
+    );
+    expect(privateGuard.jobs.guard.secrets).toBeUndefined();
     const fleet = readFileSync(
       resolve(REPO_ROOT, '.github/workflows/pr-fleet-rules.yml'),
       'utf8'

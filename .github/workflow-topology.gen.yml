@@ -1014,6 +1014,7 @@ nodes:
     authoritativeFor: []
     allowedConsumers: []
     triggeringStateTransition:
+      - merge_group
       - pull_request
       - push
     terminalReceipt: job:guard
