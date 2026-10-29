@@ -761,7 +761,9 @@ jobs:
         run: pnpm turbo build --filter=@jovie/web
         env:
           TURBO_ENGINE_READ_ONLY: '1'
-          TURBO_CACHE: local:r
+          # Read-only: local:r plus the R2 remote when setup-node-pnpm selected
+          # it (the RO token cannot write either way).
+          TURBO_CACHE: ${{ env.TURBO_CACHE_READ || 'local:r' }}
           # Same public mock environment as the merge group's Build + Layout,
           # so both measure identical bundles without secrets.
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_test_ZHVtbXktdGVzdC1jb3ZlcmFnZS5jbGVyay5hY2NvdW50cy5kZXYk

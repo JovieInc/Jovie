@@ -20,7 +20,11 @@ runs:
   steps:
     # Cloudflare R2 Turbo cache with automatic fallback. Runs only when the
     # caller exported CF_TURBO_* (ci.yml); a failed probe leaves the legacy
-    # TURBO_* values untouched. Roles: rw (trusted push) or ro (PR/merge group).
+    # TURBO_* values untouched. Roles: rw (push, dispatch, merge group) or ro
+    # (pull_request). TURBO_CACHE_READ is the read-only form for steps that must
+    # never write (they set TURBO_CACHE to it instead of hard-coding local:r,
+    # which would also switch remote reads off). The "turbo-cache:" log line is
+    # parsed by scripts/lib/turbo-cache-stats.mjs; keep its format.
     - name: Select Turbo remote cache
       shell: bash
       env:
@@ -30,6 +34,7 @@ runs:
         CF_TURBO_SIGNATURE_KEY: ${{ env.CF_TURBO_SIGNATURE_KEY }}
       run: |
         if [ -z "${CF_TURBO_URL:-}" ] || [ -z "${CF_TURBO_TOKEN:-}" ]; then
+          echo "TURBO_CACHE_READ=local:r" >> "$GITHUB_ENV"
           echo "turbo-cache: backend=legacy (no Cloudflare credentials)"
           exit 0
         fi
@@ -38,6 +43,7 @@ runs:
           "${CF_TURBO_URL%/}/v8/artifacts/status" || true)
         if [ "$code" != "200" ]; then
           echo "::warning::Cloudflare Turbo cache probe returned ${code:-none}; using legacy cache."
+          echo "TURBO_CACHE_READ=local:r" >> "$GITHUB_ENV"
           echo "turbo-cache: backend=legacy (probe ${code:-none})"
           exit 0
         fi
@@ -56,6 +62,7 @@ runs:
           echo "TURBO_API=${CF_TURBO_URL%/}"
           echo "TURBO_TOKEN=${CF_TURBO_TOKEN}"
           echo "TURBO_TEAM=jovie"
+          echo "TURBO_CACHE_READ=local:r,remote:r"
           if [ -n "$signed_json" ]; then
             echo "TURBO_ROOT_TURBO_JSON=${signed_json}"
             echo "TURBO_REMOTE_CACHE_SIGNATURE_KEY=${CF_TURBO_SIGNATURE_KEY}"
