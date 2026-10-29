@@ -1,11 +1,8 @@
 import { APP_ROUTES } from '@/constants/routes';
 
 /**
- * The /product hub's quiet index of every product page that is not in the
- * footer. The footer is a content record capped at 16 links
- * (`lib/content-records/site-chrome.ts`), so these pages are linked from the
- * hub instead: each stays reachable in one click and the SEO orphan check
- * (`geo-orphan`) has a swept page that links to it.
+ * The /product hub's index of pages the 16-link footer record leaves out, so
+ * each stays one click away and is not an SEO orphan (`geo-orphan`).
  */
 export interface ProductExploreLink {
   readonly href: string;

@@ -2,15 +2,10 @@ import type { SiteChrome } from './site-chrome';
 import { toResolvedSiteChrome } from './site-chrome.resolve';
 
 /**
- * Resolution smoke test for the site-chrome publish gate: run the record
- * through the same resolver the public shell uses and confirm every nav link,
- * footer column title, label and destination survives it. Catches a record
- * that validates but resolves to something the shell would drop or rewrite.
- *
- * It deliberately does not draw the footer component: that is a client
- * component, which server code (this runs in the publish route) can neither
- * call nor render. `site-chrome.test.tsx` renders the real footer against the
- * default record.
+ * Resolution smoke test for the site-chrome publish gate: every nav link,
+ * footer title, label and destination must survive the shell's resolver.
+ * It does not draw the footer (a client component server code cannot call);
+ * `site-chrome.test.tsx` renders the real footer against the default record.
  */
 export function siteChromeSmoke(chrome: SiteChrome): string[] {
   const resolved = toResolvedSiteChrome(chrome);
