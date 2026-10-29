@@ -2093,7 +2093,8 @@ body:has(.system-b-pricing-page) .marketing-glass-header__cta:focus-visible {
 }
 
 :where(.system-b-pricing-chart-value[data-included="false"]) {
-  color: color-mix(in oklab, var(--system-b-text-primary) 32%, transparent);
+  /* Quieter than included values, still >= 4.5:1 on the page black. */
+  color: color-mix(in oklab, var(--system-b-text-primary) 50%, transparent);
 }
 
 :where(.system-b-pricing-inclusion-icon),
