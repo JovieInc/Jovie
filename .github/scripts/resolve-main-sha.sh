@@ -8,6 +8,8 @@
 # hold until x-ratelimit-reset when that instant is inside
 # RESOLVE_MAIN_BUDGET_SECONDS. An unreadable main exits 1. This script never
 # prints a guessed SHA.
+# Final certification callers pass --once: one Git read, killed at 15 seconds,
+# with no retry, REST fallback or rate-reset wait.
 set -euo pipefail
 
 repository="${1:-${REPOSITORY:-${GITHUB_REPOSITORY:-}}}"
@@ -19,9 +21,18 @@ repository="${1:-${REPOSITORY:-${GITHUB_REPOSITORY:-}}}"
 token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
 retry_sleep="${RESOLVE_MAIN_RETRY_SECONDS:-2}"
 budget="${RESOLVE_MAIN_BUDGET_SECONDS:-90}"
+mode="${2:-}"
+case "$mode" in
+  ''|--once) ;;
+  *) echo "::error::resolve-main-sha: unknown mode." >&2; exit 1 ;;
+esac
 url="https://github.com/${repository}.git"
 
 ls_remote_main() {
+  local -a read_command=(git ls-remote --refs "$url" refs/heads/main)
+  if [ "$mode" = --once ]; then
+    read_command=(timeout --signal=KILL 15s "${read_command[@]}")
+  fi
   if [ -n "$token" ]; then
     GIT_CONFIG_COUNT=2 \
       GIT_CONFIG_KEY_0=http.https://github.com/.extraheader \
@@ -30,33 +41,37 @@ ls_remote_main() {
       GIT_CONFIG_VALUE_1=/dev/null \
       GIT_TERMINAL_PROMPT=0 \
       GCM_INTERACTIVE=never \
-      git ls-remote --refs "$url" refs/heads/main
+      "${read_command[@]}"
     return
   fi
   GIT_TERMINAL_PROMPT=0 GCM_INTERACTIVE=never \
-    git ls-remote --refs "$url" refs/heads/main
+    "${read_command[@]}"
 }
 
 valid_sha() {
-  [[ "${1:-}" =~ ^[0-9a-f]{40}$ ]]
+  [[ "${1:-}" =~ ^[0-9a-f]{40}$ && "$1" != 0000000000000000000000000000000000000000 ]]
 }
 
 sha=""
 attempt=1
-while [ "$attempt" -le 3 ]; do
-  line="$(ls_remote_main 2>/dev/null || true)"
-  sha="${line%%[!0-9a-f]*}"
-  if valid_sha "$sha"; then
-    printf '%s\n' "$sha"
-    exit 0
+max_attempts=3
+if [ "$mode" = --once ]; then max_attempts=1; fi
+while [ "$attempt" -le "$max_attempts" ]; do
+  if line="$(ls_remote_main 2>/dev/null)" &&
+    [[ "$line" =~ ^([0-9a-f]{40})[[:blank:]]refs/heads/main$ ]]; then
+    sha="${BASH_REMATCH[1]}"
+    if valid_sha "$sha"; then
+      printf '%s\n' "$sha"
+      exit 0
+    fi
   fi
-  if [ "$attempt" -lt 3 ]; then
+  if [ "$attempt" -lt "$max_attempts" ]; then
     sleep "$retry_sleep"
   fi
   attempt=$((attempt + 1))
 done
 
-if ! command -v gh >/dev/null 2>&1 || [ -z "$token" ]; then
+if [ "$mode" = --once ] || ! command -v gh >/dev/null 2>&1 || [ -z "$token" ]; then
   echo "::error::Could not resolve refs/heads/main for ${repository} via git ls-remote." >&2
   exit 1
 fi
