@@ -86,13 +86,13 @@ function canvasHtml(fallback: boolean): string {
         padding: 0.55rem 0.9rem;
         font: 500 0.95rem/1 Satoshi, sans-serif;
       }
-      /* Quiet phone mock: bezel-free mobile web screen at the real 402/874
+      /* Quiet phone mock: bezel-free mobile web screen at the crop aspect, filling the proof box
          aspect (components/marketing/device/DeviceScreen.css). Skeleton
          structure only — no invented profile content. */
       .mobile-web-screen {
         position: relative;
         width: 100%;
-        aspect-ratio: 402 / 874;
+        height: 100%;
         overflow: hidden;
         border: 1px solid rgba(168, 176, 195, 0.16);
         border-radius: 1.25rem;
@@ -364,11 +364,9 @@ test.describe('homepage hero canvas scroll', () => {
         boxes.headline.top,
         `${label} headline clipped by the field top`
       ).toBeGreaterThan(boxes.field.top - 1);
-      // The phone keeps the real screen aspect (402/874) at every width.
-      expect(boxes.screen.height / boxes.screen.width).toBeCloseTo(
-        874 / 402,
-        2
-      );
+      // The shot keeps the capture's real aspect (780x1264) at every width.
+      expect(boxes.proof.height / boxes.proof.width).toBeCloseTo(1264 / 780, 2);
+      expect(boxes.screen.height).toBeLessThanOrEqual(boxes.proof.height + 0.5);
     }
   });
 

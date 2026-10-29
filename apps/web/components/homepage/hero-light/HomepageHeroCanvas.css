@@ -193,21 +193,28 @@
   min-width: 0;
 }
 
-/* Real product shot: the template profile capture (registry scenario, 2x
-   PNG at 390 CSS px). The frame fills this box; the box keeps the real
-   screen aspect and never renders wider than the capture's native width,
-   so the shot stays crisp. */
+/* Real product shot: the template profile capture, a locator crop of the
+   top of the screen (identity, links, featured release) at 2x of 390 CSS
+   px. The box keeps the crop's real aspect and never renders wider than
+   the capture's native width, so the shot stays crisp. */
 .homepage-hero-canvas__proof {
   position: relative;
-  aspect-ratio: 402 / 874;
-  width: min(72vw, 18rem);
+  aspect-ratio: 780 / 1264;
+  width: min(80vw, 20rem);
   max-width: 24rem;
+  flex: none;
   margin: var(--space-12, 3rem) auto 0;
 }
 
+/* The canonical phone screen defaults to a full-screen aspect; this shot is
+   a crop, so the frame takes the crop's aspect (no letterbox band). */
+.homepage-hero-canvas__shot {
+  aspect-ratio: 780 / 1264;
+}
+
 /* Desktop: a balanced two-column field. Lead left, shot right, both
-   centered on the spine. The shot is height-bound so the whole phone
-   screen stays inside the first viewport, never cropped. */
+   centered on the spine. The shot's width follows the viewport height
+   (0.617 = 780 / 1264) so the whole crop stays inside the first viewport. */
 @media (min-width: 64rem) {
   .homepage-hero-canvas__copy[data-has-proof="true"] {
     display: grid;
@@ -219,12 +226,11 @@
   .homepage-hero-canvas__copy[data-has-proof="true"]
     .homepage-hero-canvas__proof {
     justify-self: center;
-    width: auto;
-    height: min(
-      calc(100svh - var(--hero-canvas-bar) - var(--space-32, 8rem)),
-      42rem
+    width: min(
+      24rem,
+      calc((100svh - var(--hero-canvas-bar) - var(--space-32, 8rem)) * 0.617)
     );
-    min-height: 28rem;
+    min-width: 18rem;
     margin: 0;
   }
 }

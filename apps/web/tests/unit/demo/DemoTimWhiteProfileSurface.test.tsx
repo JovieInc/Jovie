@@ -188,4 +188,47 @@ describe('DemoTimWhiteProfileSurface', () => {
       showTourButton: false,
     });
   });
+
+  it('renders the homepage template profile with no person and a recent release', async () => {
+    const before = Date.now();
+    const props = await renderSurface('archetype=template');
+
+    expect(props).toMatchObject({
+      artist: expect.objectContaining({
+        name: 'Your Name',
+        handle: 'you',
+        image_url: undefined,
+        is_verified: false,
+      }),
+      contacts: [],
+      releases: [],
+      tourDates: [],
+      showPayButton: false,
+      showTourButton: false,
+    });
+    const release = props?.latestRelease as {
+      readonly title: string;
+      readonly artworkUrl: string;
+      readonly releaseDate: Date;
+      readonly creatorProfileId: string;
+    };
+    expect(release.title).toBe('First Light');
+    expect(release.artworkUrl).toBe('/img/releases/first-light.jpg');
+    expect(release.creatorProfileId).toBe('homepage-template-profile');
+    // Dated relative to the capture clock: out, and within the last month.
+    const ageDays = (before - release.releaseDate.getTime()) / 86_400_000;
+    expect(ageDays).toBeGreaterThan(10);
+    expect(ageDays).toBeLessThan(14);
+    // The hero crop target exists only when the capture asks for it.
+    expect(screen.queryByTestId('demo-template-hero-capture')).toBeNull();
+  });
+
+  it('adds the hero crop target for the homepage capture', async () => {
+    await renderSurface('archetype=template&capture=hero');
+
+    expect(screen.getByTestId('demo-template-hero-capture')).toHaveClass(
+      'absolute',
+      'h-158'
+    );
+  });
 });
