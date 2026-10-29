@@ -91,6 +91,7 @@ export const OVERALL_FINGERPRINT = 'prod-cert-overall';
  * surface is not green on the served SHA, closed when all eight are. Summer
  * picks it up from the Launch project; per-surface issues carry the detail.
  * @param {ReturnType<typeof certificationVerdict>} verdict
+ * @param {{ runUrl?: string | null, deps?: { upsert?: Function, close?: Function } }} [options]
  */
 export async function fileOverallIssue(verdict, { runUrl, deps = {} } = {}) {
   const upsert = deps.upsert ?? upsertLinearIssueByTitleFingerprint;
