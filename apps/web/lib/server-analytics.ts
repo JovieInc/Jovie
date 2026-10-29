@@ -882,7 +882,7 @@ async function applyServerAnalyticsTimeoutGuard(
     Sentry.addBreadcrumb({
       category: 'database',
       level: 'error',
-      message: `[server_analytics_timeout_guard] set_config failed: ${
+      message: `server_analytics_timeout_guard: set_config failed: ${
         error instanceof Error ? error.message : String(error)
       }`,
       data: { event_name: eventName, phase: 'guard' },
@@ -910,7 +910,7 @@ async function restoreServerAnalyticsTimeout(
     Sentry.addBreadcrumb({
       category: 'database',
       level: 'error',
-      message: `[server_analytics_timeout_restore] set_config failed: ${
+      message: `server_analytics_timeout_restore: set_config failed: ${
         error instanceof Error ? error.message : String(error)
       }`,
       data: { event_name: eventName, phase: 'restore' },

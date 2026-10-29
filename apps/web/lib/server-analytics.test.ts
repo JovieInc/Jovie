@@ -477,7 +477,9 @@ describe('server analytics contract', () => {
       expect.objectContaining({
         category: 'database',
         level: 'error',
-        message: expect.stringContaining('server_analytics_timeout_guard'),
+        message: expect.stringContaining(
+          'server_analytics_timeout_guard: set_config failed:'
+        ),
       })
     );
     expect(Sentry.captureException).not.toHaveBeenCalled();
@@ -510,7 +512,9 @@ describe('server analytics contract', () => {
       expect.objectContaining({
         category: 'database',
         level: 'error',
-        message: expect.stringContaining('server_analytics_timeout_restore'),
+        message: expect.stringContaining(
+          'server_analytics_timeout_restore: set_config failed:'
+        ),
       })
     );
     expect(Sentry.captureException).not.toHaveBeenCalled();

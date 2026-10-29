@@ -177,7 +177,9 @@ describe('Query Timeout', () => {
         expect.objectContaining({
           category: 'database',
           level: 'error',
-          message: expect.stringContaining('statement_timeout_guard'),
+          message: expect.stringContaining(
+            'statement_timeout_guard: set_config failed:'
+          ),
         })
       );
     });

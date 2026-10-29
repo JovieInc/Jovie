@@ -118,7 +118,7 @@ export async function setStatementTimeout(
     Sentry.addBreadcrumb({
       category: 'database',
       level: 'error',
-      message: `[statement_timeout_guard] set_config failed: ${
+      message: `statement_timeout_guard: set_config failed: ${
         error instanceof Error ? error.message : String(error)
       }`,
       data: { timeoutMs: safeMs },
