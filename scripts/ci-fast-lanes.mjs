@@ -869,6 +869,7 @@ export const SCRIPT_CONTRACT_NODE_TESTS = Object.freeze([
   'scripts/layout-guard-pen-contracts.test.mjs',
   'scripts/ci-rounds-report.test.mjs',
   'scripts/preflight-changed.test.mjs',
+  'scripts/preflight-remote.test.mjs',
   'scripts/preflight-install.test.mjs',
   'scripts/lib/__tests__/ci-rounds.test.mjs',
   'scripts/invariants/copy-leak/copy-leak.test.mjs',
@@ -1259,7 +1260,7 @@ const LANES = [
     id: 'design-governance-enforcement',
     name: 'Design governance enforcement',
     nextLocalCommand:
-      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field',
+      'pnpm design:authority:check && pnpm design:tokens:export:check && pnpm design:governance:audit && pnpm --filter @jovie/web run lint:touch-target && pnpm --filter @jovie/web run lint:ui-feel && pnpm --filter @jovie/web run lint:composite-field && pnpm --filter @jovie/web run lint:design-noise',
     run: runDesignGovernanceEnforcement,
   },
   {

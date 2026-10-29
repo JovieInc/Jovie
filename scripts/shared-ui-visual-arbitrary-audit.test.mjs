@@ -489,7 +489,7 @@ test('zero baseline rejects the first visual arbitrary in every event', () => {
   }
 });
 
-test('unbaselined shrink fails locally and is sibling-safe on merge_group', () => {
+test('unbaselined shrink passes locally and on merge_group (growth still fails)', () => {
   const baseline = toVisualArbitraryBaseline([
     { file: ATOM, value: 'text-[13px]', count: 2 },
   ]);
@@ -497,8 +497,13 @@ test('unbaselined shrink fails locally and is sibling-safe on merge_group', () =
   const local = compareVisualArbitraryBaseline(current, baseline, {
     eventName: 'local',
   });
-  assert.equal(local.ok, false);
+  assert.equal(local.ok, true);
   assert.equal(local.status, 'unbaselined_shrink');
+  const grown = compareVisualArbitraryBaseline(
+    [{ file: ATOM, value: 'text-[13px]', count: 3 }],
+    baseline
+  );
+  assert.equal(grown.status, 'regression');
   const mergeGroup = compareVisualArbitraryBaseline(current, baseline, {
     eventName: 'merge_group',
   });

@@ -31,9 +31,11 @@ import { certStep, certStepBlocked } from './utils/prod-cert-steps';
  * synthetic (automation user agent + x-synthetic-monitoring).
  *
  * Also certifies smartlink/click-analytics-capture: one release-link click is
- * recorded by /api/track and read back from the database as `is_bot = true`,
- * so it is captured end to end and excluded from every customer metric. The
- * marketing-consent cookie is declined, so no audience member is created.
+ * recorded by /api/track and read back from the database as `is_bot = true`
+ * with the synthetic passage tag in metadata, so it is captured end to end,
+ * tagged synthetic by a server-validated canary token, and excluded from
+ * every customer metric. The marketing-consent cookie is declined, so no
+ * audience member is created.
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -180,15 +182,27 @@ test('a release smartlink click is captured and excluded from customer analytics
   request,
 }) => {
   const databaseUrl = process.env.DATABASE_URL ?? '';
+  const passageKey = process.env.SYNTHETIC_PASSAGE_KEY ?? '';
   const handle = process.env.PROD_CERT_PROFILE_HANDLE ?? 'tim';
-  if (!databaseUrl) {
+  if (!databaseUrl || !passageKey) {
     certStepBlocked(
       'smartlink',
       'click-analytics-capture',
-      'DATABASE_URL is not provided to this run, so the click cannot be read back'
+      !databaseUrl
+        ? 'DATABASE_URL is not provided to this run, so the click cannot be read back'
+        : 'SYNTHETIC_PASSAGE_KEY is not provided to this run, so the click cannot be tagged synthetic'
     );
     return;
   }
+  recordPlaywrightSensitiveValues([passageKey]);
+
+  const clickToken = mintPassageToken(Buffer.from(passageKey, 'base64url'), {
+    sub: newProdcertUserEmail(runId()),
+    scp: 'smartlink_click',
+    run: runId().slice(0, 64),
+    ttlSeconds: 300,
+  });
+  recordPlaywrightSensitiveValues([clickToken]);
 
   await certStep(
     'smartlink',
@@ -204,6 +218,7 @@ test('a release smartlink click is captured and excluded from customer analytics
       const click = await request.post(`${ORIGIN}/api/track`, {
         headers: {
           'x-synthetic-monitoring': 'prod-cert',
+          [PASSAGE_TOKEN_HEADER]: clickToken,
           cookie: `${CONSENT_COOKIE_NAME}=${encodeURIComponent(
             JSON.stringify({
               essential: true,
@@ -230,11 +245,19 @@ test('a release smartlink click is captured and excluded from customer analytics
       if (!id) throw new Error('/api/track returned no click id');
 
       const rows = (await neon(databaseUrl)`
-        SELECT is_bot, audience_member_id FROM click_events WHERE id = ${id}
-      `) as { is_bot: boolean; audience_member_id: string | null }[];
+        SELECT is_bot, audience_member_id, metadata ->> 'synthetic' AS synthetic
+        FROM click_events WHERE id = ${id}
+      `) as {
+        is_bot: boolean;
+        audience_member_id: string | null;
+        synthetic: string | null;
+      }[];
       if (rows.length !== 1) throw new Error('click was not persisted');
       if (rows[0].is_bot !== true) {
         throw new Error('synthetic click was not classified as a bot');
+      }
+      if (rows[0].synthetic !== 'prodcert') {
+        throw new Error('click was not tagged with the synthetic passage tag');
       }
       if (rows[0].audience_member_id !== null) {
         throw new Error('synthetic click created an audience member');
@@ -242,6 +265,6 @@ test('a release smartlink click is captured and excluded from customer analytics
       return slug;
     },
     slug =>
-      `/${handle}/${slug} click persisted as is_bot=true, no audience member`
+      `/${handle}/${slug} click persisted as is_bot=true, tagged synthetic, no audience member`
   );
 });

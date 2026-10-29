@@ -190,6 +190,29 @@ class QueueUnmergeableTest(unittest.TestCase):
 
 
 class QueueBreakerTest(unittest.TestCase):
+    def test_headgreen_failed_build_of_a_still_queued_entry_is_not_counted(self):
+        qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
+        qb.__spec__.loader.exec_module(qb)
+        calls = []
+
+        def run(args, **kwargs):
+            calls.append(args)
+            flat = " ".join(args)
+            if "workflows/ci.yml/runs" in flat:
+                rows = [{"id": 11, "head_branch": "gh-readonly-queue/main/pr-700-abc", "conclusion": "failure", "updated_at": iso(NOW - 600), "head_sha": "live1"},
+                        {"id": 12, "head_branch": "gh-readonly-queue/main/pr-700-def", "conclusion": "failure", "updated_at": iso(NOW - 3000), "head_sha": "old2"}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": None, "workflow_runs": rows}))
+            if "mergeQueue" in flat:
+                nodes = [{"state": "AWAITING_CHECKS", "headCommit": {"oid": "LIVE1"}, "pullRequest": {"id": "PR_X", "number": 700, "headRefOid": "a" * 40}}]
+                return SimpleNamespace(returncode=0, stderr="", stdout=json.dumps({"data": {"repository": {"mergeQueue": {"entries": {"nodes": nodes}}}}}))
+            return SimpleNamespace(returncode=0, stderr="", stdout="{}")
+
+        with tempfile.TemporaryDirectory() as raw:
+            out = qb.sweep(raw, run, now=NOW)
+        # One failure is the live entry (never ejected under HEADGREEN); one failure is not a trip.
+        self.assertEqual(out["tripped"], [])
+        self.assertFalse(any("dequeuePullRequest" in " ".join(c) for c in calls))
+
     def test_two_group_failures_in_three_hours_dequeue_hold_and_keep_the_head_blocked(self):
         qb = importlib.util.module_from_spec(importlib.util.spec_from_file_location("queue_breaker", ROOT / "scripts/lanes/queue_breaker.py"))
         qb.__spec__.loader.exec_module(qb)

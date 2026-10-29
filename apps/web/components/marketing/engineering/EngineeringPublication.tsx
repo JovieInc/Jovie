@@ -6,6 +6,7 @@ import { MarketingContentProse } from '@/components/marketing/MarketingContentPr
 import { MarketingEditorialHeroPhoto } from '@/components/marketing/MarketingEditorialHeroPhoto';
 import { MarketingHero } from '@/components/marketing/MarketingHero';
 import { APP_ROUTES } from '@/constants/routes';
+import { ENGINEERING_COPY } from '@/data/engineeringCopy';
 import type { EngineeringStoryRecord } from '@/lib/engineering-publication';
 
 function formatDate(iso: string): string {
@@ -137,11 +138,18 @@ export function EngineeringIndex({
     >
       <div data-testid='engineering-index'>
         {stories.length === 0 ? (
-          <p className='text-secondary-token'>
-            {preview
-              ? 'No draft stories in the local founder gallery yet.'
-              : 'No founder-approved engineering stories are public yet.'}
-          </p>
+          <div className='space-y-3'>
+            <p className='text-secondary-token'>
+              {preview
+                ? 'No draft stories in the local founder gallery yet.'
+                : 'No founder-approved engineering stories are public yet.'}
+            </p>
+            {preview ? null : (
+              <p className='max-w-2xl text-secondary-token'>
+                {ENGINEERING_COPY.emptyIndexExplainer}
+              </p>
+            )}
+          </div>
         ) : (
           <ul className='space-y-8'>
             {stories.map(story => (
