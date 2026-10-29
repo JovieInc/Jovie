@@ -26,7 +26,7 @@ describe('Ovie route usage access', () => {
       isAdmin: true,
     });
     mocks.record.mockResolvedValue(true);
-    mocks.read.mockResolvedValue({ days: 30, routes: [] });
+    mocks.read.mockResolvedValue({ measured: true, rows: [] });
   });
 
   it.each([
@@ -73,9 +73,10 @@ describe('Ovie route usage access', () => {
   it.each([
     ['7', 7],
     ['invalid', 30],
-  ])('reads the requested finite window (%s)', async (days, expected) => {
+  ])('reads the requested finite day range (%s)', async (days, expected) => {
     const response = await GET(new Request(`${url}?days=${days}`));
     expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ measured: true, rows: [] });
     expect(mocks.read).toHaveBeenCalledWith(expected);
     expect(mocks.entitlements).toHaveBeenCalledWith({ purpose: 'read' });
     expect(response.headers.get('cache-control')).toBe('no-store');
