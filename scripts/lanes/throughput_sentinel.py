@@ -203,6 +203,74 @@ def sample_release_flow(state: Path, now: float, run=None, repo: str = REPO) -> 
         return (cached or None), f"{type(error).__name__}: {error}"[:200]
 
 
+QUEUE_TIMINGS_REFRESH_S, QUEUE_TIMINGS_PRS, QUEUE_TIMINGS_FILE = 900, 12, "queue-timings.json"
+
+
+def _pct(values: list, q: float):
+    values = sorted(values)
+    return round(values[min(len(values) - 1, int(len(values) * q))], 1) if values else None
+
+
+def sample_queue_timings(state: Path, now: float, run=None, repo: str = REPO) -> tuple[dict | None, str | None]:
+    """Merge-queue wait stages (schema symphony-queue-timings/v1), refreshed every 15 min:
+    merge-group CI duration p50/p95 and outcome mix over the latest 100 CI merge_group runs
+    (cancelled = a group reset by a failure, jump or dequeue), and enqueue->merge p50/p95 for the
+    latest merged PRs (last enqueue, and first enqueue which includes ejections and re-enqueues)."""
+    path = Path(state) / QUEUE_TIMINGS_FILE
+    try:
+        cached = json.loads(path.read_text())
+    except (OSError, ValueError):
+        cached = {}
+    if isinstance(cached.get("observedAt"), (int, float)) and 0 <= now - cached["observedAt"] < QUEUE_TIMINGS_REFRESH_S:
+        return cached, None
+    try:
+        runs = _gh_json(run, f"repos/{repo}/actions/workflows/ci.yml/runs?event=merge_group&per_page=100").get("workflow_runs") or []
+        done = [row for row in runs if row.get("status") == "completed" and _iso_epoch(row.get("created_at")) is not None
+                and _iso_epoch(row.get("updated_at")) is not None]
+        by = {kind: [(_iso_epoch(r["updated_at"]) - _iso_epoch(r["created_at"])) / 60 for r in done if r.get("conclusion") == kind]
+              for kind in ("success", "failure", "cancelled")}
+        merged = _gh_json(run, f"repos/{repo}/pulls?state=closed&sort=updated&direction=desc&per_page=40")
+        merged = [pr for pr in merged if pr.get("merged_at")][:QUEUE_TIMINGS_PRS]
+        last, first = [], []
+        dequeues = {"github": 0, "bot": 0, "human": 0}
+        requeue_lag = []
+        for pr in merged:
+            events = _gh_json(run, f"repos/{repo}/issues/{pr['number']}/timeline?per_page=100")
+            adds = [_iso_epoch(e.get("created_at")) for e in events if e.get("event") == "added_to_merge_queue"]
+            adds = [a for a in adds if a is not None]
+            # Silent dequeues: removals with no check named on the PR. github-merge-queue[bot] = GitHub ejected
+            # the entry after a merge-group failure/timeout; each is followed by a re-enqueue (lag measured).
+            removed = [(_iso_epoch(e.get("created_at")), str((e.get("actor") or {}).get("login") or ""))
+                       for e in events if e.get("event") == "removed_from_merge_queue"]
+            for at, actor in removed:
+                if at is None:
+                    continue
+                dequeues["github" if actor.startswith("github-merge-queue") else "bot" if actor.endswith("[bot]") else "human"] += 1
+                later = [a for a in adds if a > at]
+                if later:
+                    requeue_lag.append((min(later) - at) / 60)
+            merged_at = _iso_epoch(pr.get("merged_at"))
+            if adds and merged_at is not None:
+                last.append((merged_at - max(adds)) / 60)
+                first.append((merged_at - min(adds)) / 60)
+        total = sum(len(v) for v in by.values())
+        signal = {"schema": "symphony-queue-timings/v1", "observedAt": now, "groupCi": {
+                      "runs": total, "successP50Min": _pct(by["success"], .5), "successP95Min": _pct(by["success"], .95),
+                      "cancelledShare": round(len(by["cancelled"]) / total, 3) if total else None,
+                      "failureShare": round(len(by["failure"]) / total, 3) if total else None},
+                  "enqueueToMerge": {"prs": len(last), "lastEnqueueP50Min": _pct(last, .5), "lastEnqueueP95Min": _pct(last, .95),
+                                     "firstEnqueueP50Min": _pct(first, .5), "firstEnqueueP95Min": _pct(first, .95),
+                                     "targets": {"p50Min": 30, "p95Min": 60}},
+                  "dequeues": {"prs": len(last), "silentGithub": dequeues["github"], "bot": dequeues["bot"], "human": dequeues["human"],
+                               "requeueLagP50Min": _pct(requeue_lag, .5), "requeueLagP95Min": _pct(requeue_lag, .95)}}
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(signal, sort_keys=True))
+        os.replace(tmp, path)
+        return signal, None
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        return (cached or None), f"{type(error).__name__}: {error}"[:200]
+
+
 def sample_repo_flow(state: Path, repo: str, now: float, run=None) -> tuple[dict | None, str | None]:
     """Open-PR and recent-merge signals for a repo without lane demand (two `gh pr list` reads per 5 min)."""
     path = Path(state) / f"repo-flow-{repo.rsplit('/', 1)[-1].lower()}.json"
@@ -303,6 +371,8 @@ def observe(state: Path, now: float, receipts: list[dict], limits: dict, run=Non
         except Exception as error:  # noqa: BLE001  (a sweep failure must never stop the sentinel)
             queue_unmergeable = {"seen": [], "dequeued": [], "errors": [f"{type(error).__name__}: {error}"[:160]]}
     flow, flow_error = (sample_release_flow(state, now, run) if fetch_remote else (None, None))
+    if fetch_remote:
+        sample_queue_timings(state, now, run)
     exits = read_idle_exits(state, now)
     repos, repo_errors = {}, {}
     for watched in (WATCHED_REPOS if fetch_remote else ()):
