@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { AgentConnectorDocs } from '@/components/features/developers/AgentConnectorDocs';
 import { APP_NAME, BASE_URL } from '@/constants/app';
 import { APP_ROUTES } from '@/constants/routes';
+import { marketingOgImage } from '@/data/marketingOgCards';
 import snapshot from '@/lib/agent-distribution/generated/tools-list.snapshot.json';
 import { LISTING } from '@/lib/agent-distribution/listing';
 import { buildBreadcrumbSchema } from '@/lib/constants/schemas';
@@ -18,6 +19,11 @@ export const metadata: Metadata = {
     description: LISTING.oneLiner,
     url: PAGE_URL,
     type: 'article',
+    images: [marketingOgImage('developers')],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: [marketingOgImage('developers').url],
   },
 };
 
