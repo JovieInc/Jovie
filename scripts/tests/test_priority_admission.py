@@ -162,7 +162,7 @@ class RunTests(unittest.TestCase):
             import time as _t
             (Path(d) / "summer-portfolio" / "rank.verified.json").write_text(json.dumps({
                 "schema": "jovie-summer-portfolio-verified/v1", "expiresAt": _t.time() + 3600, "ranks": {"JOV-7": 1, "JOV-8": 2}}))
-            receipt = pa.run(FakeLane, host, "JOV", FakeClient(), now=NOW)
+            receipt = pa.run(FakeLane, host, "JOV", FakeClient({"id-7": "Backlog", "id-8": "Backlog"}), now=NOW)
             self.assertEqual(receipt["admitted"], ["JOV-7", "JOV-8"])
             self.assertEqual(receipt["admittedUnlabelled"], ["JOV-7"])
             rows = [json.loads(line) for line in (Path(d) / "priority-admissions.jsonl").read_text().splitlines()]
