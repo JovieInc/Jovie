@@ -105,7 +105,7 @@ export default function AiPage() {
         </section>
 
         <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8'>
-          <div className='space-y-4'>
+          <article className='space-y-4'>
             {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight line-clamp-2'>
               What ships in the launch version
@@ -122,7 +122,7 @@ export default function AiPage() {
                 Instrumentation that ties profile visits to measurable lift.
               </li>
             </ul>
-          </div>
+          </article>
         </section>
       </MarketingContainer>
 
