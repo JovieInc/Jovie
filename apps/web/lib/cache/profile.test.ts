@@ -28,9 +28,25 @@ describe('invalidateProfileCache discovery outputs (JOV-6260)', () => {
     expect(revalidateTag).toHaveBeenCalledWith('sitemap-catalog', 'max');
     expect(revalidateTag).toHaveBeenCalledWith('featured-creators', 'max');
     expect(revalidateTag).toHaveBeenCalledWith('artists-directory', 'max');
-    expect(revalidateTag).toHaveBeenCalledWith('profiles-all', 'max');
+    expect(revalidateTag).toHaveBeenCalledWith('profile:newrelease', 'max');
     expect(revalidatePath).toHaveBeenCalledWith('/artists');
     expect(revalidatePath).toHaveBeenCalledWith('/newrelease');
+  });
+  it("expires only the edited artist's profile entry, not every artist's", async () => {
+    const { invalidateProfileCache } = await import('./profile');
+    await invalidateProfileCache('newrelease');
+
+    expect(revalidateTag).not.toHaveBeenCalledWith(
+      'profiles-all',
+      expect.anything()
+    );
+    expect(revalidateTag).toHaveBeenCalledWith('profile:newrelease', 'max');
+  });
+  it('falls back to the profiles-all family when the handle is unknown', async () => {
+    const { invalidateProfileCache } = await import('./profile');
+    await invalidateProfileCache(null);
+
+    expect(revalidateTag).toHaveBeenCalledWith('profiles-all', 'max');
   });
   it('hard-expires old discovery and profile payloads after an owner privacy change', async () => {
     const { invalidateProfileCache } = await import('./profile');

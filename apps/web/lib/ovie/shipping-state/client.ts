@@ -185,6 +185,20 @@ const deliveryLanesSchema = z.object({
           })
         )
         .max(8),
+      lag: z
+        .array(
+          z.object({
+            repo: z.string().min(1).max(96),
+            p50Min: z.number().nonnegative().nullable(),
+            p95Min: z.number().nonnegative().nullable(),
+            samples: z.number().int().nonnegative(),
+            targetP50Min: z.number().nonnegative().nullable(),
+            targetP95Min: z.number().nonnegative().nullable(),
+          })
+        )
+        .max(8)
+        .optional()
+        .default([]),
     })
     .nullable()
     .optional()
@@ -358,6 +372,7 @@ export const shippingCockpitProjectionSchema = z.object({
   terminalFailures: countMeasurementSchema,
   capacityAvailable: countMeasurementSchema,
   operationalTasks: operationalTaskFeedSchema,
+  delivery: z.unknown().optional().transform(parseDeliverySummary),
   sources: z.object(sourceMapShape),
 });
 

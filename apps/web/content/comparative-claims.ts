@@ -155,7 +155,7 @@ export const COMPARATIVE_CLAIMS = [
     metric: 'music-markup',
     direction: 'higher-is-better',
     wording:
-      'Search engines read the page as a music artist with releases, not a generic person.',
+      'Search engines read structured profile and release data beyond a generic person.',
     baseline: { jovie: 1, competitor: 0 },
     spread: { jovie: [1, 1], competitor: [0, 0] },
     minMargin: 1.01,

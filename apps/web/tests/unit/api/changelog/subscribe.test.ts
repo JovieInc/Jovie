@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockSelectLimit = vi.hoisted(() => vi.fn());
 const mockUpdateWhere = vi.hoisted(() => vi.fn());
+const mockUpdateReturning = vi.hoisted(() => vi.fn());
 const mockUpdateSet = vi.hoisted(() => vi.fn());
 const mockInsertValues = vi.hoisted(() => vi.fn());
 const mockSendEmail = vi.hoisted(() => vi.fn());
@@ -11,9 +12,15 @@ const mockIsTurnstileConfigured = vi.hoisted(() => vi.fn());
 const mockLimiterLimit = vi.hoisted(() => vi.fn());
 const mockCreateRateLimitHeaders = vi.hoisted(() => vi.fn());
 const mockGetClientIP = vi.hoisted(() => vi.fn());
+const mockAnd = vi.hoisted(() => vi.fn());
+const mockLte = vi.hoisted(() => vi.fn());
+const mockIsNull = vi.hoisted(() => vi.fn());
 
 vi.mock('drizzle-orm', () => ({
   eq: vi.fn(),
+  and: mockAnd,
+  lte: mockLte,
+  isNull: mockIsNull,
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -38,6 +45,7 @@ vi.mock('@/lib/db/schema/product-update-subscribers', () => ({
   productUpdateSubscribers: {
     email: 'email',
     id: 'id',
+    tokenExpiresAt: 'tokenExpiresAt',
   },
 }));
 
@@ -108,7 +116,8 @@ describe('POST /api/changelog/subscribe', () => {
       reset: Date.now() + 10_000,
     });
     mockSelectLimit.mockResolvedValue([]);
-    mockUpdateWhere.mockResolvedValue(undefined);
+    mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
+    mockUpdateReturning.mockResolvedValue([{ id: 'existing' }]);
     mockUpdateSet.mockReturnValue({
       where: mockUpdateWhere,
     });
@@ -310,6 +319,44 @@ describe('POST /api/changelog/subscribe', () => {
     });
     expect(mockUpdateSet).toHaveBeenCalledTimes(1);
     expect(mockSendEmail).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not double-send when a concurrent request wins the resend claim', async () => {
+    // The read observes an elapsed cooldown, but the conditional cooldown
+    // claim in the update matches zero rows: another concurrent request
+    // re-sent first and refreshed tokenExpiresAt. This fails before the
+    // conditional claim exists (the old unconditional update always lands
+    // and the confirmation email is sent a second time).
+    mockSelectLimit.mockResolvedValue([
+      {
+        id: 'existing',
+        verified: false,
+        unsubscribedAt: null,
+        tokenExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000 - 61 * 1000),
+      },
+    ]);
+    mockUpdateReturning.mockResolvedValue([]);
+
+    const { POST } = await import('@/app/api/changelog/subscribe/route');
+    const response = await POST(
+      buildRequest({
+        email: 'reader@example.com',
+        turnstileToken: 'token',
+      }) as never
+    );
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({
+      error: 'Confirmation email was just sent. Please wait before resending.',
+      retryAfterSeconds: expect.any(Number),
+    });
+    expect(response.headers.get('Retry-After')).toBeTruthy();
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    // The claim is a conditional compare-and-set on the persisted cooldown,
+    // not an unconditional update by id.
+    expect(mockAnd).toHaveBeenCalledTimes(1);
+    expect(mockLte).toHaveBeenCalledWith('tokenExpiresAt', expect.any(Date));
+    expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
   it('resends a confirmation when the previous link already expired', async () => {

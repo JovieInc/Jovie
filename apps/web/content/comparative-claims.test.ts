@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  loadConfig,
+  matchTerms,
+} from '../../../scripts/invariants/icp-language/match.mjs';
+import {
   allowsPinchZoom,
   COMPARATIVE_BENCHMARK,
   COMPARATIVE_CLAIM_RECEIPTS,
@@ -17,6 +21,17 @@ import {
 import { validatePublishedClaimReceipts } from './published-claims';
 
 describe('comparative claims registry', () => {
+  it('keeps rendered claims and the answer within the shared ICP language policy', () => {
+    const policy = loadConfig();
+    const copy = [...renderedComparativeClaims(), comparativeAnswer()];
+    for (const text of copy) {
+      expect(
+        matchTerms(text, policy.terms, policy.suppressedPrefixes),
+        text
+      ).toEqual([]);
+    }
+  });
+
   it('holds at its own baseline with a real margin', () => {
     for (const claim of COMPARATIVE_CLAIMS) {
       const result = evaluateComparativeClaim(claim, claim.baseline);

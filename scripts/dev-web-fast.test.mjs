@@ -167,7 +167,7 @@ test('dev-web-fast unsets production Upstash by default', async () => {
     assert.ok(dopplerArgs.includes('UPSTASH_REDIS_REST_TOKEN'));
     assert.ok(!dopplerArgs.includes('AI_GATEWAY_API_KEY'));
     assert.ok(dopplerArgs.includes('E2E_USE_TEST_AUTH_BYPASS=1'));
-    assert.ok(dopplerArgs.includes('NEXT_PUBLIC_CLERK_MOCK=1'));
+    assert.ok(dopplerArgs.includes('NEXT_PUBLIC_AUTH_MOCK=1'));
     assert.ok(dopplerArgs.includes('pnpm'));
   } finally {
     rmSync(tmp, { force: true, recursive: true });
