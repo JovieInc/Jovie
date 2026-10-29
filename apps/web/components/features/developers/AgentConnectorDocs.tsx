@@ -18,7 +18,8 @@ export interface AgentConnectorDocsProps {
   readonly tools: readonly AgentDocsTool[];
 }
 
-const H2 = 'text-2xl font-semibold tracking-tight text-primary-token';
+const H2 =
+  'text-balance text-2xl font-semibold tracking-tight text-primary-token';
 const BODY = 'mt-4 text-pretty text-base leading-relaxed text-secondary-token';
 
 /** Renders from the listing copy source and the generated tools/list snapshot, so it cannot drift from the registry. */
@@ -49,7 +50,7 @@ export function AgentConnectorDocs({
             <h2 id='agent-docs-connect' className={H2}>
               {page.connectHeading}
             </h2>
-            <ol className='mt-4 list-decimal space-y-2 pl-5 text-base leading-relaxed text-secondary-token'>
+            <ol className='mt-4 list-decimal space-y-2 pl-5 text-pretty text-base leading-relaxed text-secondary-token'>
               {page.connectSteps.map(step => (
                 <li key={step}>{step}</li>
               ))}
@@ -67,7 +68,7 @@ export function AgentConnectorDocs({
             <ul className='mt-6 space-y-8'>
               {tools.map(tool => (
                 <li key={tool.name}>
-                  <h3 className='text-lg font-semibold text-primary-token'>
+                  <h3 className='text-balance text-lg font-semibold text-primary-token'>
                     {tool.title ?? tool.name}
                   </h3>
                   <p className='mt-1 text-pretty text-sm text-tertiary-token'>
