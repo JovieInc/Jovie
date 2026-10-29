@@ -79,7 +79,7 @@ export const CompositeField = React.forwardRef<
         'relative flex min-w-0 items-center',
         shapeClasses[shape],
         sizeClasses[size],
-        'transition-[border-color,box-shadow] duration-subtle ease-subtle motion-reduce:transition-none',
+        'transition-colors duration-subtle ease-subtle motion-reduce:transition-none',
         // Focus ring + inner-control reset live in globals.css (.composite-field):
         // token-based, radius following, no arbitrary values here.
         'composite-field',
