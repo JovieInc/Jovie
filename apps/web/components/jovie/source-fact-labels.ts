@@ -13,7 +13,6 @@ export function sourceFactLabel(fact: EnrichedFact): string | null {
   return value.type === 'text' ? value.value : null;
 }
 
-/** Finite formatter aliases only; never attach evidence by fuzzy text matching. */
 export function sourceMetricLabels(fact: EnrichedFact): readonly string[] {
   const compact = sourceFactLabel(fact);
   if (!compact || fact.value?.type !== 'number' || !fact.unit) return [];

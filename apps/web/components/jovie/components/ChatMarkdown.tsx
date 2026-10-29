@@ -14,7 +14,6 @@ interface SourceMarkdownMaps {
 let sourceMarkdownMaps: Promise<SourceMarkdownMaps> | null = null;
 
 function loadSourceMarkdownMaps(): Promise<SourceMarkdownMaps> {
-  // Static import would pull entity cards and Zod into shell and founder first-load JS.
   sourceMarkdownMaps ??= import('./SourceEvidence').then(module => ({
     block: module.SOURCE_MARKDOWN_COMPONENTS,
     inline: module.INLINE_SOURCE_MARKDOWN_COMPONENTS,

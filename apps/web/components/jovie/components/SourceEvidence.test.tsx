@@ -1,7 +1,7 @@
 import { TooltipProvider } from '@jovie/ui';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 import { fastRender } from '@/tests/utils/fast-render';
 import { AssistantMessageText } from './AssistantMessageText';
@@ -236,5 +236,26 @@ describe('inline typed source evidence', () => {
     await screen.findByTestId('source-fact-card');
     await user.hover(triggers[1]);
     expect(await screen.findAllByTestId('source-fact-card')).toHaveLength(1);
+  });
+
+  it('opens a narrow viewport in the bottom sheet', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query.includes('max-width'),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    try {
+      const user = userEvent.setup();
+      renderEvidence([sourceFixture()]);
+      await user.click(
+        await screen.findByTestId('entity-chip-popover-trigger')
+      );
+      const sheet = await screen.findByTestId('entity-chip-source-sheet');
+      expect(sheet).toHaveAttribute('data-side', 'bottom');
+      expect(sheet).toHaveTextContent('Direct source');
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

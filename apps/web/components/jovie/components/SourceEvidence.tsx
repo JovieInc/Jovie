@@ -43,7 +43,6 @@ function SourceMention({
   );
 }
 
-/** Match complete, unambiguous typed values. Never make a number alone clickable. */
 function enrichText(text: string, facts: readonly EnrichedFact[]): ReactNode {
   const labels = facts.flatMap(fact =>
     sourceMetricLabels(fact).map(label => ({ fact, label }))

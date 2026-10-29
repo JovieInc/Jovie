@@ -3,7 +3,6 @@ import {
   enrichedFactId,
 } from '@/lib/profile-facts/enrichment';
 
-/** Public synthetic evidence for interaction fixtures; never a live provider claim. */
 export function sourceFixture(
   overrides: Partial<EnrichedFact> = {}
 ): EnrichedFact {

@@ -11,10 +11,6 @@ import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 
 export const SourceEvidenceContext = createContext<readonly EnrichedFact[]>([]);
 
-/**
- * Public facts start empty until the Zod projection chunk loads. Callers must
- * not render a source claim from the unprojected payload.
- */
 export function SourceEvidenceProvider({
   facts,
   children,

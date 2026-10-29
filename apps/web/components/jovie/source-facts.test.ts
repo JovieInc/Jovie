@@ -42,48 +42,29 @@ describe('chat source receipt scope', () => {
   });
 
   it('removes restricted evidence, wrong identities, and unsafe click targets', () => {
-    const publicFact = sourceFixture();
+    const ref = sourceFixture().sourceRefs[0];
+    const message = (id: string, fact: ReturnType<typeof sourceFixture>) => ({
+      id,
+      role: 'assistant' as const,
+      parts: [receipt([fact])],
+    });
     const facts = sourceFactsByMessage([
-      {
-        id: 'private',
-        role: 'assistant',
-        parts: [receipt([sourceFixture({ permission: 'private' })])],
-      },
-      {
-        id: 'wrong',
-        role: 'assistant',
-        parts: [
-          receipt([
-            sourceFixture({
-              sourceRefs: [{ ...publicFact.sourceRefs[0], subjectId: 'other' }],
-            }),
-          ]),
-        ],
-      },
-      {
-        id: 'unsafe',
-        role: 'assistant',
-        parts: [
-          receipt([
-            sourceFixture({
-              sourceRefs: [
-                {
-                  ...publicFact.sourceRefs[0],
-                  url: 'javascript:alert(1)',
-                  originUrl: null,
-                },
-              ],
-            }),
-          ]),
-        ],
-      },
+      message('private', sourceFixture({ permission: 'private' })),
+      message(
+        'wrong',
+        sourceFixture({ sourceRefs: [{ ...ref, subjectId: 'other' }] })
+      ),
+      message(
+        'unsafe',
+        sourceFixture({
+          sourceRefs: [{ ...ref, url: 'javascript:alert(1)', originUrl: null }],
+        })
+      ),
     ]);
     expect(facts.get('private')).toEqual([]);
     expect(facts.get('wrong')).toEqual([]);
-    expect(facts.get('unsafe')?.[0]).toMatchObject({
-      value: null,
-      status: 'unknown',
-    });
-    expect(facts.get('unsafe')?.[0].sourceRefs[0].url).toBeNull();
+    const unsafe = facts.get('unsafe')?.[0];
+    expect(unsafe).toMatchObject({ value: null, status: 'unknown' });
+    expect(unsafe?.sourceRefs[0].url).toBeNull();
   });
 });

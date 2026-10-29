@@ -39,7 +39,6 @@ import { useProjectedSourceFact } from './useProjectedSourceFact';
 
 const HOVER_OPEN_DELAY_MS = 200;
 const HOVER_CLOSE_DELAY_MS = 120;
-// Coordination belongs to the existing entity overlay owner, across transcripts/rails.
 let activeInspection: { owner: object; close: () => void } | null = null;
 let lastInspectionAt = 0;
 
@@ -366,7 +365,6 @@ export function EntityChipPopover({
             } as CSSProperties
           }
           onPointerEnter={() => {
-            // Keep the popover open while the cursor is over its content.
             clearTimers();
           }}
           onPointerLeave={event => {

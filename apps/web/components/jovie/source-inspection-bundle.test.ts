@@ -6,56 +6,43 @@ function source(relativePath: string): string {
   return readFileSync(resolve(import.meta.dirname, relativePath), 'utf8');
 }
 
-function valueImportSpecifiers(code: string): string[] {
-  const withoutTypeImports = code.replace(
+function valueImports(relativePath: string): string[] {
+  const code = source(relativePath).replace(
     /^\s*import\s+type\s+[\s\S]*?from\s+['"][^'"]+['"];?/gm,
     ''
   );
   return [
-    ...withoutTypeImports.matchAll(
+    ...code.matchAll(
       /^\s*import\s+(?!type\b)[\s\S]*?from\s+['"]([^'"]+)['"];?/gm
     ),
   ].map(match => match[1] ?? '');
 }
 
 describe('source inspection first-load split', () => {
-  it('keeps shell markdown from statically importing the source card graph', () => {
-    const specifiers = valueImportSpecifiers(
-      source('components/ChatMarkdown.tsx')
+  it('loads the card graph and Zod projection after first paint', () => {
+    expect(valueImports('components/ChatMarkdown.tsx')).not.toContain(
+      './SourceEvidence'
     );
-    expect(specifiers).not.toContain('./SourceEvidence');
     expect(source('components/ChatMarkdown.tsx')).toContain(
       "import('./SourceEvidence')"
     );
-  });
-
-  it('keeps the admin transcript from statically importing Zod enrichment', () => {
-    expect(
-      valueImportSpecifiers(source('JovieChatSections.tsx'))
-    ).not.toContain('./source-facts');
+    expect(valueImports('JovieChatSections.tsx')).not.toContain(
+      './source-facts'
+    );
     expect(source('JovieChatSections.tsx')).toContain(
       "import('./source-facts')"
     );
-    expect(
-      valueImportSpecifiers(source('components/ChatMessage.tsx'))
-    ).not.toContain('./SourceEvidence');
-    expect(
-      valueImportSpecifiers(source('components/EntityChipPopover.tsx'))
-    ).not.toContain('@/lib/profile-facts/enrichment');
-    expect(
-      valueImportSpecifiers(source('components/EntityChipPopover.tsx'))
-    ).not.toContain('./SourceFactCard');
-    expect(
-      valueImportSpecifiers(source('source-fact-labels.ts'))
-    ).not.toContain('@/lib/profile-facts/enrichment');
-    expect(
-      valueImportSpecifiers(source('source-evidence-context.ts'))
-    ).not.toContain('@/lib/profile-facts/enrichment');
-    expect(
-      valueImportSpecifiers(source('components/SourceEvidence.tsx'))
-    ).not.toContain('@/lib/profile-facts/enrichment');
-    expect(
-      valueImportSpecifiers(source('components/SourceEvidence.tsx'))
-    ).not.toContain('../source-facts');
+    const forbidden = [
+      ['components/ChatMessage.tsx', './SourceEvidence'],
+      ['components/EntityChipPopover.tsx', '@/lib/profile-facts/enrichment'],
+      ['components/EntityChipPopover.tsx', './SourceFactCard'],
+      ['source-fact-labels.ts', '@/lib/profile-facts/enrichment'],
+      ['source-evidence-context.ts', '@/lib/profile-facts/enrichment'],
+      ['components/SourceEvidence.tsx', '@/lib/profile-facts/enrichment'],
+      ['components/SourceEvidence.tsx', '../source-facts'],
+    ] as const;
+    for (const [file, specifier] of forbidden) {
+      expect(valueImports(file)).not.toContain(specifier);
+    }
   });
 });

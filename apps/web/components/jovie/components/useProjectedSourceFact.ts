@@ -5,10 +5,6 @@ import type { EnrichedFact } from '@/lib/profile-facts/enrichment';
 
 type SourceFactCardComponent = ComponentType<{ readonly fact: EnrichedFact }>;
 
-/**
- * The trigger can paint before this resolves. A missing projection hides the
- * source card, so a private or mismatched fact never becomes inspectable.
- */
 export function useProjectedSourceFact(
   candidate: EnrichedFact | undefined,
   id: string
