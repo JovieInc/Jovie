@@ -1,7 +1,7 @@
 import { Button } from '@jovie/ui';
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarketingContainer, MarketingHeroPhoto } from '@/components/marketing';
+import { MarketingContainer } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { APP_ROUTES } from '@/constants/routes';
 import { COMPANY_IDENTITY } from '@/data/companyIdentity';
@@ -23,18 +23,10 @@ export const metadata: Metadata = {
 
 const AI_HERO_INNER_CLASS = 'relative z-3 py-16 sm:py-20 lg:py-24';
 
-const AI_HERO_PHOTO = {
-  src: '/images/marketing-hero/ai.webp',
-  width: 1600,
-  height: 1067,
-  opacity: 0.2,
-} as const;
-
 export default function AiPage() {
   return (
     <main className='marketing-hero-dock marketing-hero-dock--inset relative overflow-x-clip bg-base text-primary-token'>
       <section className='relative overflow-hidden'>
-        <MarketingHeroPhoto {...AI_HERO_PHOTO} />
         <div
           aria-hidden='true'
           className='hero-glow pointer-events-none absolute inset-0'

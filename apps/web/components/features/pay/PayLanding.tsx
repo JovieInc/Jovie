@@ -12,7 +12,6 @@ import {
 import {
   MarketingContainer,
   MarketingHero,
-  MarketingHeroPhoto,
   MarketingPageShell,
 } from '@/components/marketing';
 import { MarketingPhoneImage } from '@/components/marketing/MarketingPhoneImage';
@@ -22,11 +21,6 @@ import { ClaimHandleForm } from '@/features/home/claim-handle';
 /*  Hero                                                                      */
 /* -------------------------------------------------------------------------- */
 
-const PAY_HERO_PHOTO = {
-  src: '/images/marketing-hero/pay.webp',
-  width: 1600,
-  height: 901,
-} as const;
 
 /** Hero copy: kicker, headline, lede and the one claim action. */
 function PayHeroCopy() {
@@ -69,7 +63,6 @@ function TipsHero() {
       data-marketing-variant='split-claim-card'
       data-marketing-owner='apps/web/components/features/pay/PayLanding.tsx'
     >
-      <MarketingHeroPhoto {...PAY_HERO_PHOTO} />
       <div className='hero-glow pointer-events-none absolute inset-0' />
       <MarketingHero
         variant='split'

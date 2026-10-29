@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Homepage hero light. The CSS poster is always there. WebGL upgrades it after idle when the device can run it, and drops back to the poster on reduced motion or context loss.',
+          'Homepage hero light. The static CSS poster is the default. WebGL runs only when the animated-background budget enables it, after idle on a capable device, and drops back to the poster on reduced motion or context loss.',
       },
     },
   },
@@ -36,3 +36,5 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Poster: Story = {};
+
+export const BudgetEnabled: Story = { args: { animate: true } };
