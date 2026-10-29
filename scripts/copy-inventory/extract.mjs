@@ -2,7 +2,7 @@
 // Copy inventory: every visible copy line on the public marketing routes as a
 // row {id, route, section, role, text, source}. IDs are short and speakable
 // ("HOME-3") and stable: they are assigned once, keyed on the source (file +
-// text, or a content-record field), and committed in ids.json. Re-running
+// text, or a content-record field), and committed in ids.gen.json. Re-running
 // never renumbers; new lines get the next free number for their prefix.
 //
 //   node scripts/copy-inventory/extract.mjs          # write inventory + ids
@@ -17,7 +17,7 @@ import { ROUTES, SITE_CHROME } from './routes.mjs';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(HERE, '../..');
 const WEB = join(REPO, 'apps/web');
-export const IDS_PATH = join(HERE, 'ids.json');
+export const IDS_PATH = join(HERE, 'ids.gen.json');
 export const OUT_PATH = join(WEB, 'data/copyInventory.gen.json');
 
 // Object keys whose string values are visible copy.
