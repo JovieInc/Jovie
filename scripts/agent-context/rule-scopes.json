@@ -1,48 +1,27 @@
 [
   {
     "file": ".claude/rules/auth.md",
-    "paths": [
-      "apps/web/**/auth/**",
-      "apps/web/proxy.ts",
-      "apps/web/tests/**"
-    ],
+    "paths": ["apps/web/**/auth/**", "apps/web/proxy.ts", "apps/web/tests/**"],
     "bodySha256": "75c6e6ebb898dfa5265b39f4a57844cd1c0fd0452adf105262e244e008650936"
   },
   {
     "file": ".claude/rules/ci-branching.md",
-    "paths": [
-      ".github/**",
-      "scripts/ci-*",
-      "scripts/lib/ci-*"
-    ],
+    "paths": [".github/**", "scripts/ci-*", "scripts/lib/ci-*"],
     "bodySha256": "5fabc1298ed53a98b1841258926c05b2a001435651388c5f414d2b3bb145bd54"
   },
   {
     "file": ".claude/rules/code-style.md",
-    "paths": [
-      "**/*.ts",
-      "**/*.tsx",
-      "**/*.js",
-      "**/*.mjs",
-      "**/*.cjs"
-    ],
+    "paths": ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.mjs", "**/*.cjs"],
     "bodySha256": "e432bd7b9d223fec22c3eb84bc978c5faa11c3176cfa80c7d7fed3c570e6195f"
   },
   {
     "file": ".claude/rules/db.md",
-    "paths": [
-      "**/db/**",
-      "**/drizzle/**",
-      "**/migrations/**",
-      "**/queries/**"
-    ],
+    "paths": ["**/db/**", "**/drizzle/**", "**/migrations/**", "**/queries/**"],
     "bodySha256": "827454729d91ae084f5accd102eda950842fccfeb8094182866d04e0c323df32"
   },
   {
     "file": ".claude/rules/domain-writes.md",
-    "paths": [
-      "apps/web/**"
-    ],
+    "paths": ["apps/web/**"],
     "bodySha256": "95d9db99d51c78dd7d07d0836f4692415ef8c2180896e9ed820fae44c99601c4"
   },
   {
@@ -92,9 +71,7 @@
   },
   {
     "file": ".claude/rules/hermes-air.md",
-    "paths": [
-      "docs/HERMES_AIR.md"
-    ],
+    "paths": ["docs/HERMES_AIR.md"],
     "bodySha256": "1146534132d4a342e1ed2d00e9594d10e4e3fcf347054041bfe91323c5de98e7"
   },
   {
@@ -109,10 +86,7 @@
   },
   {
     "file": ".claude/rules/ios.md",
-    "paths": [
-      "apps/ios/**",
-      "**/*.swift"
-    ],
+    "paths": ["apps/ios/**", "**/*.swift"],
     "bodySha256": "8064a84295f7bac353ab5ca2858863bee4f7e82be6e12c0e8c2df8b7d305ad7d"
   },
   {
@@ -149,20 +123,12 @@
   },
   {
     "file": ".claude/rules/pen.md",
-    "paths": [
-      "**/*.pen",
-      "scripts/agent/pen*",
-      "docs/design-system/**"
-    ],
+    "paths": ["**/*.pen", "scripts/agent/pen*", "docs/design-system/**"],
     "bodySha256": "6dcfcd4b052bd71873bfd431fdc265a7452384f4823f41575924c08598c53582"
   },
   {
     "file": ".claude/rules/pr-stacking.md",
-    "paths": [
-      ".github/**",
-      "scripts/*pr*",
-      "docs/PR_FLOW.md"
-    ],
+    "paths": [".github/**", "scripts/*pr*", "docs/PR_FLOW.md"],
     "bodySha256": "43c5a50289369ce1152ca8716058e858fac5375a1701ab536b977bcd425840d5"
   },
   {
