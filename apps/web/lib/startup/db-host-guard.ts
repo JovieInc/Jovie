@@ -176,10 +176,10 @@ export function assertStagingDatabaseIsolation(
 
   if (!verdict.ok) {
     throw new Error(
-      '[DB-HOST-GUARD] FATAL: staging/preview DATABASE_URL resolves to the ' +
-        'production database host (JOV-9959). Refusing to boot. Set a ' +
-        `dedicated database in Doppler config for this environment and ` +
-        `provide the production host via ${PROD_DATABASE_HOST_ENV_VAR} or ` +
+      'DB-HOST-GUARD, JOV-9959: staging/preview DATABASE_URL resolves to the ' +
+        'production database host. Refusing to boot. Set a dedicated database ' +
+        'in Doppler config for this environment and provide the production ' +
+        `host via ${PROD_DATABASE_HOST_ENV_VAR} or ` +
         `${PROD_DATABASE_HOSTS_ENV_VAR} for comparison.`
     );
   }
