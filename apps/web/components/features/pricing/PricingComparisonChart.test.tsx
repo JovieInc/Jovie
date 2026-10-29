@@ -87,7 +87,11 @@ describe('PricingComparisonChart', () => {
     }
 
     const feature = within(mobileTable).getByRole('rowheader', {
+<<<<<<< HEAD
       name: 'Audience email capture',
+=======
+      name: PUBLIC_ROWS.find(row => row.pro !== false)?.name ?? '',
+>>>>>>> 0029062d6e (chore(marketing): refresh baselines and pricing test after rebase onto main)
     });
     expect(feature).toHaveAttribute('scope', 'row');
     expect(feature).toHaveAttribute('data-wrap', 'feature-label');
