@@ -92,6 +92,7 @@ export type OutboundNextAction =
   | 'check_entity'
   | 'review_facts'
   | 'approve_message'
+  | 'await_dogfood'
   | 'send'
   | 'await_reply'
   | 'await_claim'
@@ -100,6 +101,7 @@ export type OutboundNextAction =
 
 export const OUTBOUND_NEXT_ACTION_LABELS: Record<OutboundNextAction, string> = {
   build_profile: 'Build profile',
+  await_dogfood: 'Awaiting dogfood judge',
   gather_evidence: 'Gather evidence',
   check_entity: 'Check entity',
   review_facts: 'Review facts',
@@ -149,6 +151,11 @@ export interface OutboundRow {
   readonly ability: OutboundBand;
   readonly intent: OutboundBand;
   readonly certified: boolean;
+  /**
+   * Why the dogfood gate is shut for this person (artifact or onboarding
+   * flow not passed); empty when open. No draft is shown while it is shut.
+   */
+  readonly dogfoodBlocks: readonly string[];
   /** Only a channel with a sendable recipient on file; null when unreachable. */
   readonly channel: OutboundChannel | null;
   readonly nextAction: OutboundNextAction;
@@ -163,6 +170,19 @@ export interface OutboundRow {
   readonly message:
     | (OutboundCopy & { readonly revision: string | null })
     | null;
+  /**
+   * The machine draft and its follow-up sequence, before any edit by Tim.
+   * Edit learning compares what Tim approves against `draft.copy`.
+   */
+  readonly draft: {
+    readonly copy: OutboundCopy;
+    readonly templateVersion: string;
+    readonly followUps: readonly {
+      readonly subject: string;
+      readonly body: string;
+    }[];
+    readonly segment: string;
+  } | null;
   readonly rank: number;
 }
 
@@ -192,5 +212,7 @@ export const OUTBOUND_REFUSAL_MESSAGES = {
   not_certified: 'Certify the current profile facts before approving outreach.',
   no_channel: 'No email or Instagram on file to reach them.',
   invalid: 'The message must be non-empty and keep the claim link.',
+  dogfood_not_passed:
+    'The built page or the onboarding flow has not passed the dogfood judge yet.',
 } as const;
 export type OutboundRefusal = keyof typeof OUTBOUND_REFUSAL_MESSAGES;

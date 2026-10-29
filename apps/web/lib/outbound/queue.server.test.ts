@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   results: [] as unknown[][],
   ledger: vi.fn(),
   execute: vi.fn(),
+  artifacts: vi.fn(),
 }));
 
 function chain(result: unknown[]) {
@@ -23,6 +24,9 @@ vi.mock('@/lib/db', () => ({
 vi.mock('./ledger.server', async importOriginal => ({
   ...(await importOriginal<typeof import('./ledger.server')>()),
   readOutboundLedger: mocks.ledger,
+}));
+vi.mock('./cold/artifact-facts.server', () => ({
+  readOutboundArtifactFacts: mocks.artifacts,
 }));
 vi.mock('@/constants/domains', () => ({
   getAppUrl: (path: string) => `https://jov.ie${path}`,
@@ -56,6 +60,7 @@ const base = {
 describe('getOutboundQueue', () => {
   beforeEach(() => {
     mocks.ledger.mockResolvedValue(new Map());
+    mocks.artifacts.mockResolvedValue(new Map());
     mocks.execute.mockReset();
     mocks.execute.mockResolvedValue({ rows: [] });
   });
@@ -133,7 +138,8 @@ describe('getOutboundQueue', () => {
     expect(
       queue.rows.map(row => [row.leadId, row.view, row.nextAction])
     ).toEqual([
-      ['a', 'certified', 'approve_message'],
+      // The dogfood judge has no verdicts yet, so the gate is shut.
+      ['a', 'certified', 'await_dogfood'],
       ['d', 'ready', 'review_facts'],
       ['e', 'needs_evidence', 'gather_evidence'],
       ['b', 'needs_evidence', 'build_profile'],

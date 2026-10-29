@@ -7,6 +7,8 @@ import type { ContactCertificationInspection } from '@/lib/contacts/certificatio
 import { contactDedupeKey } from '@/lib/contacts/lifecycle';
 import { db } from '@/lib/db';
 import { leads } from '@/lib/db/schema/leads';
+import { readDogfoodGates } from './cold/dogfood-gate.server';
+import { recordOutboundEditPair } from './cold/learning.server';
 import {
   type OutboundLeadIdentity,
   recordOutboundDecision,
@@ -74,6 +76,11 @@ export async function approveOutbound(input: {
   const certification = await getOutboundCertification(lead);
   if (certification?.status !== 'certified_for_outreach')
     return { ok: false, reason: 'not_certified' };
+  // Hard gate: the built page and the onboarding flow must pass the judge.
+  const profileId = lead.creatorProfileId;
+  const gates = await readDogfoodGates(profileId ? [profileId] : []);
+  if (!profileId || gates.byProfile.get(profileId)?.passed !== true)
+    return { ok: false, reason: 'dogfood_not_passed' };
   const target = await recordOutboundDecision({
     lead,
     actorUserId: input.actorUserId,
@@ -84,7 +91,7 @@ export async function approveOutbound(input: {
     },
   });
   if (!target.ok) return target;
-  return recordOutboundDecision({
+  const copy = await recordOutboundDecision({
     lead,
     actorUserId: input.actorUserId,
     decision: {
@@ -94,6 +101,16 @@ export async function approveOutbound(input: {
       copy: input.copy,
     },
   });
+  if (copy.ok)
+    await recordOutboundEditPair({
+      leadId: lead.id,
+      actorUserId: input.actorUserId,
+      channel: input.copy.channel,
+      decision: 'approved',
+      approved: input.copy,
+      rejectReason: null,
+    });
+  return copy;
 }
 
 /** Save an edited message as a draft; any earlier approval is withdrawn. */
@@ -128,7 +145,7 @@ export async function decideOutboundTarget(input: {
 }): Promise<Result> {
   const lead = await loadOutboundLead(input.leadId);
   if (!lead) return { ok: false, reason: 'not_found' };
-  return recordOutboundDecision({
+  const result = await recordOutboundDecision({
     lead,
     actorUserId: input.actorUserId,
     decision: {
@@ -139,4 +156,15 @@ export async function decideOutboundTarget(input: {
       note: input.note,
     },
   });
+  // A reject is a review outcome the drafter learns from; a hold is not.
+  if (result.ok && input.action === 'reject')
+    await recordOutboundEditPair({
+      leadId: lead.id,
+      actorUserId: input.actorUserId,
+      channel: null,
+      decision: 'rejected',
+      approved: null,
+      rejectReason: input.reason,
+    });
+  return result;
 }

@@ -6,6 +6,8 @@ import { db } from '@/lib/db';
 import { contactEvidenceReviews } from '@/lib/db/schema/contacts';
 import { leadFunnelEvents, leads } from '@/lib/db/schema/leads';
 import { creatorProfiles } from '@/lib/db/schema/profiles';
+import { readOutboundArtifactFacts } from './cold/artifact-facts.server';
+import { readDogfoodGates } from './cold/dogfood-gate.server';
 import { outboundTargetFromLead, readOutboundLedger } from './ledger.server';
 import {
   buildOutboundRow,
@@ -133,32 +135,35 @@ export async function getOutboundQueue(
         .filter((id): id is string => id !== null)
     ),
   ];
-  const [ledger, certifications, replies, evidence] = await Promise.all([
-    readOutboundLedger(leadIds),
-    keys.length
-      ? db
-          .select({ dedupeKey: contactEvidenceReviews.dedupeKey })
-          .from(contactEvidenceReviews)
-          .where(
-            and(
-              inArray(contactEvidenceReviews.dedupeKey, keys),
-              eq(contactEvidenceReviews.evidenceKey, 'profile:certification')
+  const [ledger, certifications, replies, evidence, artifacts, dogfood] =
+    await Promise.all([
+      readOutboundLedger(leadIds),
+      keys.length
+        ? db
+            .select({ dedupeKey: contactEvidenceReviews.dedupeKey })
+            .from(contactEvidenceReviews)
+            .where(
+              and(
+                inArray(contactEvidenceReviews.dedupeKey, keys),
+                eq(contactEvidenceReviews.evidenceKey, 'profile:certification')
+              )
             )
-          )
-      : Promise.resolve([]),
-    leadIds.length
-      ? db
-          .select({ leadId: leadFunnelEvents.leadId })
-          .from(leadFunnelEvents)
-          .where(
-            and(
-              inArray(leadFunnelEvents.leadId, leadIds),
-              inArray(leadFunnelEvents.eventType, REPLY_EVENT_TYPES)
+        : Promise.resolve([]),
+      leadIds.length
+        ? db
+            .select({ leadId: leadFunnelEvents.leadId })
+            .from(leadFunnelEvents)
+            .where(
+              and(
+                inArray(leadFunnelEvents.leadId, leadIds),
+                inArray(leadFunnelEvents.eventType, REPLY_EVENT_TYPES)
+              )
             )
-          )
-      : Promise.resolve([]),
-    readEvidenceClasses(profileIds),
-  ]);
+        : Promise.resolve([]),
+      readEvidenceClasses(profileIds),
+      readOutboundArtifactFacts(profileIds),
+      readDogfoodGates(profileIds, now),
+    ]);
   const certified = new Set(certifications.map(row => row.dedupeKey));
   const replied = new Set(replies.map(row => row.leadId));
 
@@ -170,6 +175,12 @@ export async function getOutboundQueue(
       replied: replied.has(row.id),
       evidenceClasses: row.creatorProfileId
         ? (evidence.get(row.creatorProfileId) ?? [])
+        : null,
+      artifact: row.creatorProfileId
+        ? (artifacts.get(row.creatorProfileId) ?? null)
+        : null,
+      dogfood: row.creatorProfileId
+        ? (dogfood.byProfile.get(row.creatorProfileId) ?? null)
         : null,
     };
     return buildOutboundRow({

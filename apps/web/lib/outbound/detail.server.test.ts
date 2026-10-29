@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   record: vi.fn(),
   contact: vi.fn(),
   inspection: vi.fn(),
+  editPair: vi.fn(),
+  gates: vi.fn(),
 }));
 
 vi.mock('@/lib/db', () => ({
@@ -19,6 +21,12 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 vi.mock('./ledger.server', () => ({ recordOutboundDecision: mocks.record }));
+vi.mock('./cold/dogfood-gate.server', () => ({
+  readDogfoodGates: mocks.gates,
+}));
+vi.mock('./cold/learning.server', () => ({
+  recordOutboundEditPair: mocks.editPair,
+}));
 vi.mock('@/lib/admin/contacts', () => ({
   getCanonicalContactByKey: mocks.contact,
 }));
@@ -58,6 +66,24 @@ describe('outbound decisions', () => {
     mocks.record.mockResolvedValue({ ok: true, revision: 'r' });
     mocks.contact.mockResolvedValue({ dedupeKey: 'email:ada@example.com' });
     mocks.inspection.mockResolvedValue({ status: 'certified_for_outreach' });
+    mocks.gates.mockResolvedValue({
+      onboarding: { passed: true, blocks: [] },
+      byProfile: new Map([['profile-1', { passed: true, blocks: [] }]]),
+    });
+  });
+
+  it('refuses approval until the page and onboarding pass the dogfood judge', async () => {
+    mocks.gates.mockResolvedValue({
+      onboarding: { passed: false, blocks: ['onboarding_failed'] },
+      byProfile: new Map([
+        ['profile-1', { passed: false, blocks: ['onboarding_failed'] }],
+      ]),
+    });
+    await expect(approveOutbound(INPUT)).resolves.toEqual({
+      ok: false,
+      reason: 'dogfood_not_passed',
+    });
+    expect(mocks.record).not.toHaveBeenCalled();
   });
 
   it('looks up the canonical contact by email, then handle', async () => {
@@ -84,6 +110,21 @@ describe('outbound decisions', () => {
       },
     ]);
     expect(mocks.record.mock.calls[0][0].actorUserId).toBe('tim');
+    expect(mocks.editPair).toHaveBeenCalledWith({
+      leadId: 'lead-1',
+      actorUserId: 'tim',
+      channel: 'email',
+      decision: 'approved',
+      approved: COPY,
+      rejectReason: null,
+    });
+  });
+
+  it('records no edit pair when an approval is refused or only saved', async () => {
+    mocks.record.mockResolvedValueOnce({ ok: false, reason: 'stale_target' });
+    await approveOutbound(INPUT);
+    await saveOutboundCopy(INPUT);
+    expect(mocks.editPair).not.toHaveBeenCalled();
   });
 
   it('refuses approval before the facts are certified', async () => {
@@ -140,5 +181,11 @@ describe('outbound decisions', () => {
       expect.objectContaining({ decision: 'unsure', reason: null }),
       expect.objectContaining({ decision: 'no', reason: 'too_big' }),
     ]);
+    // Rejects teach the drafter; holds do not.
+    expect(mocks.editPair).toHaveBeenCalledTimes(1);
+    expect(mocks.editPair.mock.calls[0][0]).toMatchObject({
+      decision: 'rejected',
+      rejectReason: 'too_big',
+    });
   });
 });

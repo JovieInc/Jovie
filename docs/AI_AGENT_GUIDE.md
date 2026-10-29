@@ -51,6 +51,7 @@ no literal `fetch` call for their paths.
 | `/api/ovie/certifications/metrics` | GET | Ovie principal + Summer control | Ovie/Summer clients use the shared certification and receipt-backed product-quality projection |
 | `/api/ovie/ingest` | POST | Ovie principal + Summer control | Ovie/Summer clients submit durable operating-store dumps through the shared Ovie route projection |
 | `/api/internal/ovie/pipeline-bottleneck/contributions` | POST | `CRON_SECRET` bearer | Hourly loop overwrites `summer-bottleneck/contributions/hourly-loop.json`; validated `pipeline-bottleneck-contribution/v1`, maximum 16 KiB |
+| `/api/internal/ovie/outreach-engine` | GET | Summer OIDC | Outreach engine status: edit learning, auto-approve verdicts, cold send controller, funnel dwell; no recipient data |
 | `/api/internal/ovie/lyb-mrr` | GET | `CRON_SECRET` + trusted origin | Ovie and Summer company tools read the LogYourBody RevenueCat MRR record |
 | `/api/internal/release-communications/merge-events` | POST | HMAC `x-jovie-signature-256` | Source-repository merge automation submits verified release events |
 

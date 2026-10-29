@@ -450,6 +450,8 @@ export const ServerEnvSchema = z.object({
   INSTANTLY_API_KEY: z.string().optional(),
   INSTANTLY_CAMPAIGN_ID: z.string().optional(),
   INSTANTLY_WEBHOOK_SECRET: z.string().min(32).optional(),
+  /** CAN-SPAM postal address for cold outreach footers (JOV-9648). */
+  OUTREACH_MAILING_ADDRESS: z.string().optional(),
 
   // Search APIs (lead discovery)
   SERPAPI_API_KEY: z.string().optional(),
@@ -732,6 +734,7 @@ export const ENV_KEYS = [
   'INSTANTLY_API_KEY',
   'INSTANTLY_CAMPAIGN_ID',
   'INSTANTLY_WEBHOOK_SECRET',
+  'OUTREACH_MAILING_ADDRESS',
   'SERPAPI_API_KEY',
   'EXA_API_KEY',
   'JOVIE_FACEBOOK_PIXEL_ID',
