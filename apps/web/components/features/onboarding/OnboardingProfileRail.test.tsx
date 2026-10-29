@@ -199,6 +199,8 @@ describe('OnboardingProfileRail', () => {
     expect(rail).toContainElement(strip);
     expect(phonePreview).not.toContainElement(strip);
     expect(screen.getByText(/12\.3K Spotify followers/)).toBeVisible();
+    // Internal provenance markers never reach the artist.
+    expect(screen.queryByText(/source: enrichment/i)).toBeNull();
   });
 
   it('renders the inline rail variant at mobile widths', () => {

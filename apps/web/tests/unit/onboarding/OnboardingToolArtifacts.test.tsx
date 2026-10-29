@@ -426,6 +426,21 @@ describe('onboarding tool artifacts', () => {
     expect(screen.getByText(/Add the account path/i)).toBeDefined();
   });
 
+  it('hints at the link without fan language when no URL is proposed', () => {
+    fastRender(
+      <OnboardingSocialLinkCard
+        state='output-available'
+        output={{ action: 'propose_social_link', url: '' }}
+        onAttachAccount={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByText('Paste the full link people already use.')
+    ).toBeDefined();
+    expect(screen.queryByText(/\bfans?\b/i)).toBeNull();
+  });
+
   it('offers None of These when artist results are present', () => {
     mocks.artistSearch.results = [
       {
