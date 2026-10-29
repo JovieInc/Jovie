@@ -2289,7 +2289,7 @@ describe('LibrarySurface', () => {
       }),
     ]);
 
-    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Search Jovie/ }));
 
     expect(screen.queryByLabelText('Filter work')).toBeNull();
     expect(
@@ -2454,9 +2454,9 @@ describe('LibrarySurface', () => {
 
     expect(screen.queryByLabelText('Search library by title')).toBeNull();
     expect(
-      screen.getByRole('button', { name: /Search Jovie$/ })
+      screen.getByRole('button', { name: /^Search Jovie/ })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Search Jovie$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Search Jovie/ }));
     expect(
       screen.queryByRole('searchbox', { name: 'Command Palette Search' })
     ).toBeNull();

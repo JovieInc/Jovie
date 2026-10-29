@@ -754,7 +754,7 @@ describe('ShellReleasesView', () => {
     const probe = await screen.findByTestId('header-actions-probe');
     expect(probe).toBeInTheDocument();
     const searchTrigger = await screen.findByRole('button', {
-      name: /Search Jovie$/,
+      name: /^Search Jovie/,
     });
     expect(searchTrigger).toHaveAttribute('data-app-search-trigger', 'true');
   });
@@ -780,7 +780,7 @@ describe('ShellReleasesView', () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(
-      await screen.findByRole('button', { name: /Search Jovie$/ })
+      await screen.findByRole('button', { name: /^Search Jovie/ })
     );
 
     expect(
