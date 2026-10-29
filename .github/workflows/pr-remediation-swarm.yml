@@ -66,6 +66,8 @@ jobs:
           DAILY_CAP: ${{ vars.SWARM_DAILY_USD_CAP || '5' }}
           ATTEMPT_CAP: ${{ vars.SWARM_ATTEMPT_USD_CAP || '0.10' }}
           LEDGER_ISSUE: ${{ vars.SWARM_LEDGER_ISSUE }}
+          SWARM_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          SWARM_BASE_URL: ${{ vars.SWARM_BASE_URL }}
         run: python3 scripts/swarm/pr_remediation_swarm.py select --pr "$PR" --limit "$LIMIT" --daily-cap-usd "$DAILY_CAP" --attempt-cap-usd "$ATTEMPT_CAP" --ledger-issue "$LEDGER_ISSUE"
 
   remediate:

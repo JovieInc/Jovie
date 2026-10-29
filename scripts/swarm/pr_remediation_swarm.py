@@ -122,13 +122,15 @@ def cmd_select(a) -> int:
     spent = day_spend_cents(a.ledger_issue)
     # Each attempt costs ~8 calls; keep a quarter of the remaining quota in reserve.
     by_quota = int((remaining * 0.75) // 8)
+    credits_ok = credits_available(gateway_base(), os.environ.get("SWARM_API_KEY", ""))
     matrix = plan_matrix(modes, limit=a.limit, by_quota=by_quota, spent_cents=spent,
-                         daily_cap_usd=a.daily_cap_usd, attempt_cap_usd=a.attempt_cap_usd)
+                         daily_cap_usd=a.daily_cap_usd, attempt_cap_usd=a.attempt_cap_usd, credits_ok=credits_ok)
     agents = sum(1 for m in matrix if m["agent"])
     print(f"red={len(modes)} take={len(matrix)} agent_slots={agents} quota={remaining}/{limit} "
+          f"credits={'ok' if credits_ok else 'NONE (model slots closed)'} "
           f"spent_cents={'UNREADABLE (fail closed: no model attempts)' if spent is None else spent}")
     out_var("matrix", json.dumps(matrix))
-    out_var("reason", "ledger-unreadable" if spent is None else ("daily-cap" if agents == 0 and matrix else ("ok" if matrix else "none")))
+    out_var("reason", "ledger-unreadable" if spent is None else "no-credits" if not credits_ok else ("daily-cap" if agents == 0 and matrix else ("ok" if matrix else "none")))
     return 0
 
 
@@ -173,11 +175,30 @@ def cmd_ledger(a) -> int:
     return 1
 
 
+def credits_available(base: str, key: str) -> bool:
+    """True only when the gateway reports a positive balance. Anything else (no key, 402,
+    insufficient_funds, unreadable) closes the model slots; deterministic actions still run."""
+    if not key:
+        return False
+    import urllib.error
+    import urllib.request
+    req = urllib.request.Request(base.rstrip("/") + "/credits", headers={"Authorization": f"Bearer {key}"})
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            data = json.load(resp)
+    except (urllib.error.URLError, ValueError, OSError):
+        return False
+    try:
+        return float(data.get("balance", data.get("total_credits", 0)) or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 def plan_matrix(modes: dict[int, str], *, limit: int, by_quota: int, spent_cents: int | None,
-                daily_cap_usd: float, attempt_cap_usd: float) -> list[dict]:
+                daily_cap_usd: float, attempt_cap_usd: float, credits_ok: bool = True) -> list[dict]:
     """PRs to dispatch. `agent` is true only for as many PRs as the remaining daily budget affords; an
     unreadable ledger affords none. Deterministic actions cost $0, so PRs are still dispatched."""
-    afford = 0 if spent_cents is None else int(max(0.0, daily_cap_usd * 100 - spent_cents) // max(1.0, attempt_cap_usd * 100))
+    afford = 0 if (spent_cents is None or not credits_ok) else int(max(0.0, daily_cap_usd * 100 - spent_cents) // max(1.0, attempt_cap_usd * 100))
     take = max(0, min(len(modes), limit, by_quota))
     return [{"pr": n, "mode": modes[n], "agent": i < afford} for i, n in enumerate(list(modes)[:take])]
 
@@ -382,7 +403,9 @@ def cmd_finalize(a) -> int:
     plan = json.loads(Path(a.plan).read_text())
     meta = json.loads(Path(a.agent_meta).read_text()) if a.agent_meta and Path(a.agent_meta).exists() else {}
     plan.update({k: meta[k] for k in ("model", "costUsd", "tokens", "agentSeconds") if k in meta})
-    if plan["outcome"] not in {"skipped", "gave-up", "error", "deterministic-fixed"}:
+    if plan["outcome"] == "blocked-credits":
+        plan["costUsd"] = 0
+    elif plan["outcome"] not in {"skipped", "gave-up", "error", "deterministic-fixed"}:
         if a.guard == "ok" and a.repro in {"ok", "n/a"} and push_commit(a, plan):
             plan["outcome"] = "deterministic-fixed" if plan.get("deterministic") else "agent-fixed"
         else:
@@ -392,7 +415,7 @@ def cmd_finalize(a) -> int:
     plan["calls"] = plan.get("calls", 0) + calls + (2 if plan.get("claimId") else 0)
     if plan.get("claimId"):
         release_claim(plan)
-        if plan["outcome"] != "skipped":
+        if plan["outcome"] not in {"skipped", "blocked-credits"}:
             receipt(plan)
     Path(a.plan).write_text(json.dumps(plan))
     with open(a.metrics, "a") as fh:
@@ -448,6 +471,9 @@ Do not commit or push. Stop after the minimal fix; if the failure is not fixable
 edits, change nothing."""
 
 
+CREDIT_TEXT = re.compile(r"insufficient[_ ]funds|insufficient credit|payment required|\"status\"\s*:\s*402", re.I)
+
+
 def gateway_base() -> str:
     """OpenAI-compatible base URL: SWARM_BASE_URL, else the registered ai-gateway host (one registry)."""
     if os.environ.get("SWARM_BASE_URL"):
@@ -490,7 +516,15 @@ def cmd_agent(a) -> int:
     key = key_file.read_text().strip()
     cands = [m.strip() for m in os.environ.get("SWARM_MODELS", "zai/glm-5.3-flash,deepseek/deepseek-v4-flash,zai/glm-5.2").split(",")]
     cap = float(os.environ.get("SWARM_ATTEMPT_USD_CAP", "0.10"))
-    model, p_in, p_out = pick_model(base, key, cands)
+    try:
+        model, p_in, p_out = pick_model(base, key, cands)
+    except OSError as exc:  # urllib HTTPError/URLError are OSErrors; 402 = no credit
+        key_file.unlink(missing_ok=True)
+        blocked = "402" in str(exc) or "insufficient" in str(exc).lower()
+        plan.update(outcome="blocked-credits" if blocked else "gave-up", reason="gateway-" + ("insufficient_funds" if blocked else "unreachable"))
+        Path(a.plan).write_text(json.dumps(plan))
+        Path(a.meta).write_text(json.dumps({"costUsd": 0, "aborted": plan["reason"]}))
+        return 0
     config = {"$schema": "https://opencode.ai/config.json", "autoupdate": False, "share": "disabled",
               "provider": {"swarm": {"npm": "@ai-sdk/openai-compatible", "name": "swarm",
                                       "options": {"baseURL": base, "apiKey": "{file:" + str(key_file) + "}"},
@@ -505,6 +539,7 @@ def cmd_agent(a) -> int:
     acc = {"in": 0, "out": 0}
     reported = 0.0
     aborted = None
+    blocked_credits = False
     proc = subprocess.Popen(["npx", "--yes", "opencode-ai@1.19.5", "run", "--format", "json", "-m", f"swarm/{model}", prompt],
                             cwd=a.cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     try:
@@ -513,6 +548,11 @@ def cmd_agent(a) -> int:
                 ev = json.loads(line)
             except ValueError:
                 continue
+            # Only an error event counts: the agent echoes repo text that may mention payments.
+            if isinstance(ev, dict) and (ev.get("type") == "error" or "error" in ev) and CREDIT_TEXT.search(line):
+                blocked_credits = True
+                aborted = "blocked-credits"
+                break
             step = {"in": 0, "out": 0}
             walk_cost(ev, step)
             acc["in"] += step["in"]; acc["out"] += step["out"]
@@ -530,7 +570,13 @@ def cmd_agent(a) -> int:
         key_file.unlink(missing_ok=True)
     cost = max(acc["in"] * p_in + acc["out"] * p_out, reported)
     meta = {"model": model, "costUsd": round(cost, 5), "tokens": acc, "agentSeconds": int(now() - started)}
-    if aborted:
+    if blocked_credits:
+        meta["costUsd"] = 0  # no credit means nothing was charged: never reaches the ledger
+        plan.update(outcome="blocked-credits", reason="gateway-insufficient_funds")
+        sh(["git", "checkout", "--", "."], a.cwd)
+        sh(["git", "clean", "-fdq"], a.cwd)
+        Path(a.plan).write_text(json.dumps(plan))
+    elif aborted:
         meta["aborted"] = aborted
         plan.update(reason="agent-" + aborted.split(" ")[0])
         sh(["git", "checkout", "--", "."], a.cwd)
@@ -564,7 +610,7 @@ def cmd_summarize(a) -> int:
     reds = [r for r in rows if r.get("kind") != "conflict"]
     greened = sum(1 for r in reds if r["outcome"] in ("deterministic-fixed", "agent-fixed"))
     lines = [f"## Remediation swarm", "", f"attempts={len(rows)} reds={len(reds)} reds-pushed-or-rerun={greened} "
-             f"conflicts={len(conflicts)} conflicts-cleared={cleared} cost=${cost:.4f} api_calls={api}", "",
+             f"conflicts={len(conflicts)} conflicts-cleared={cleared} blocked-credits={by.get('blocked-credits', 0)} cost=${cost:.4f} api_calls={api}", "",
              "| outcome | n |", "|---|---|", *[f"| {k} | {v} |" for k, v in sorted(by.items())]]
     Path(a.out).write_text("\n".join(lines) + "\n")
     out_var("cents", str(int(round(cost * 100 + 0.499))))

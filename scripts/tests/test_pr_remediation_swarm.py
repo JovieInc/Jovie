@@ -29,7 +29,7 @@ class SwarmPolicyTest(unittest.TestCase):
             a = A(); a.dir = str(d); a.out = str(d / "o.md")
             swarm.cmd_summarize(a)
             text = (d / "o.md").read_text()
-            self.assertIn("attempts=2 reds=2 reds-pushed-or-rerun=1 conflicts=0 conflicts-cleared=0 cost=$0.0420 api_calls=13", text)
+            self.assertIn("attempts=2 reds=2 reds-pushed-or-rerun=1 conflicts=0 conflicts-cleared=0 blocked-credits=0 cost=$0.0420 api_calls=13", text)
 
     def test_unreadable_ledger_fails_closed_for_model_but_not_for_deterministic(self):
         modes = {1: "red", 2: "conflict", 3: "red"}
@@ -40,6 +40,18 @@ class SwarmPolicyTest(unittest.TestCase):
         self.assertFalse(any(m["agent"] for m in reached))
         some = swarm.plan_matrix(modes, limit=10, by_quota=10, spent_cents=480, daily_cap_usd=5, attempt_cap_usd=0.1)
         self.assertEqual([m["agent"] for m in some], [True, True, False])  # 20c left = 2 attempts
+
+    def test_no_gateway_credit_closes_model_slots_but_not_deterministic_actions(self):
+        modes = {1: "red", 2: "conflict"}
+        m = swarm.plan_matrix(modes, limit=10, by_quota=10, spent_cents=0, daily_cap_usd=5, attempt_cap_usd=0.1, credits_ok=False)
+        self.assertEqual([x["pr"] for x in m], [1, 2])
+        self.assertFalse(any(x["agent"] for x in m))
+        self.assertFalse(swarm.credits_available("https://example.invalid/v1", ""))
+
+    def test_credit_text_is_recognised_as_blocked_credits(self):
+        for line in ('{"error":{"code":"insufficient_funds"}}', "Payment Required", '{"status": 402}'):
+            self.assertTrue(swarm.CREDIT_TEXT.search(line), line)
+        self.assertFalse(swarm.CREDIT_TEXT.search('{"type":"step-finish","tokens":{"input":402}}'))
 
     def test_day_spend_returns_none_when_the_read_fails(self):
         def boom(*args, **kwargs):
