@@ -741,7 +741,15 @@ const RECIPE_RESOLUTIONS = {
       },
       {
         source: 'apps/web/app/(home)/page.tsx',
-        binding: '<HomepageFanStates />',
+        binding: '<HomepageSpecSections',
+        occurrences: 1,
+        kind: 'source',
+      },
+      {
+        // The page renders the published marketing-page/home spec; the
+        // spec renderer mounts each registered section once.
+        source: 'apps/web/components/homepage/HomepageSpecSections.tsx',
+        binding: '<HomepageFanStates',
         occurrences: 1,
         kind: 'source',
       },

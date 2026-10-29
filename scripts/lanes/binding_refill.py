@@ -36,8 +36,7 @@ import macos_pool
 READY_LABEL = "agent-ready"
 # Labels that mean a human decision, a human-owned task or a container: never auto-promoted.
 HOLD_LABELS = frozenset({"needs-tim", "tim-action-required", "human-review-required", "type:epic",
-                         "hold", "do-not-merge", "reasoning-job", "codex-blocked", "tim-hold", "gated",
-                         "needs-human-decision", "no-auto", "ws:human-decision"})
+                         "hold", "reasoning-job", "codex-blocked", "gated"})
 FACTORY_FLOOR = 0.20     # factory share of issue runs below this puts factory work first
 ALARM_AFTER_S = 900      # ready Backlog work with Todo below target for this long is an alarm
 GROOM_KEEP = 25

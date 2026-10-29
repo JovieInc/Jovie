@@ -187,7 +187,10 @@
         "at": "2026-10-15T04:36:00Z",
         "ref": "48075f7f958"
       },
-      "sources": ["apps/web/app/(home)/page.tsx"]
+      "sources": [
+        "apps/web/app/(home)/page.tsx",
+        "apps/web/app/content-preview/[versionId]/page.tsx"
+      ]
     },
     {
       "id": "investor",
@@ -689,6 +692,13 @@
       "to": "migrating",
       "at": "2026-10-26T02:17:00Z",
       "evidence": "PR #23313 introduces the admin agent plans page inside the admin shell migration (JOV-8098); source registration only."
+    },
+    {
+      "source": "apps/web/app/content-preview/[versionId]/page.tsx",
+      "from": null,
+      "to": "holdout",
+      "at": "2026-10-29T01:10:00Z",
+      "evidence": "PR #23536 introduces the signed homepage spec preview, rendering the same home sections; source registration only, not rendered certification."
     }
   ]
 }
