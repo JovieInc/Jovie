@@ -594,16 +594,21 @@ jobs:
       # A contents:read Jovie Bot installation token returns 200. Severity
       # and the GPL/AGPL denylist stay blocking. The minted token is
       # contents:read only; an empty key fails the mint closed.
+      # Dependabot main PRs use the identical pinned review in the trusted
+      # Fleet Rules Evidence job, where the CI App credential is available.
+      # PR Ready already requires that exact-head job and its event-driven
+      # rerun path; no status publication, polling or secret copy is needed.
+      # Non-main bases retain this check because they have no fleet evidence.
       - name: Mint dependency review read token
         id: dependency-review-token
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-contents: read
       - name: Review added and upgraded dependencies
-        if: steps.reuse.outputs.reuse != 'true'
+        if: steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           repo-token: ${{ steps.dependency-review-token.outputs.token }}
