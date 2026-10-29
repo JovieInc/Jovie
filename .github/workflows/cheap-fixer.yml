@@ -96,8 +96,8 @@ jobs:
 
       - name: Attempt a cheap fix
         env:
-          GH_TOKEN: ${{ steps.read-token.outputs.token }}
-          GH_PUSH_TOKEN: ${{ steps.push-token.outputs.token }}
+          GH_READ_TOKEN: ${{ steps.read-token.outputs.token }}
+          GH_TOKEN: ${{ steps.push-token.outputs.token }}
           AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
           REPO: ${{ github.repository }}
           EVENT_PATH: ${{ github.event_path }}

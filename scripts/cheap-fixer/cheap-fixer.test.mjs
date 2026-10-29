@@ -301,6 +301,47 @@ test('the workflow sparse checkout boots Node and the fixer without network acce
     assert.equal(receipt.outcome, 'skip-no-pr', receipt.error);
     assert.equal(receipt.mode, 'shadow');
     assert.equal(receipt.costUsd, 0);
+    // The mutating client's conventional token must never authorize a read.
+    writeFileSync(
+      event,
+      JSON.stringify({
+        workflow_run: {
+          pull_requests: [{ number: 1 }],
+          head_sha: 'a'.repeat(40),
+        },
+      })
+    );
+    writeFileSync(
+      offline,
+      `globalThis.fetch = async (url, options) => {
+      if (String(url) !== 'https://api.github.com/repos/JovieInc/Jovie/pulls/1') throw new Error('unexpected request');
+      if (new Headers(options.headers).get('authorization') !== 'Bearer fixture-read') throw new Error('wrong read credential');
+      return new Response(JSON.stringify({ state: 'closed', labels: [] }), {status: 200, headers: { 'content-type': 'application/json' }});
+    };\n`
+    );
+    const read = spawnSync(
+      process.execPath,
+      ['--import', offline, 'scripts/cheap-fixer/cheap-fixer.mjs'],
+      {
+        cwd: sandbox,
+        encoding: 'utf8',
+        timeout: 5000,
+        env: {
+          PATH: process.env.PATH,
+          HOME: sandbox,
+          MODE: 'shadow',
+          EVENT_PATH: event,
+          OUT_DIR: out,
+          GH_READ_TOKEN: 'fixture-read',
+          GH_TOKEN: 'fixture-write',
+        },
+      }
+    );
+    assert.equal(read.status, 0, read.stderr);
+    const readReceipt = JSON.parse(
+      readFileSync(join(out, 'receipt.json'), 'utf8')
+    );
+    assert.equal(readReceipt.outcome, 'skip-closed', readReceipt.error);
   } finally {
     rmSync(sandbox, { recursive: true, force: true });
   }

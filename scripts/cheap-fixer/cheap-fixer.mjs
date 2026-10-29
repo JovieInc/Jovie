@@ -6,7 +6,7 @@
  * Any doubt hands off to the lanes untouched. Never executes PR code; the only inputs are logs
  * and file text, treated as untrusted. All outbound calls go through packages/api-client.
  *
- * Env: GH_TOKEN (read), GH_PUSH_TOKEN (push mode), AI_GATEWAY_API_KEY, REPO, EVENT_PATH,
+ * Env: GH_READ_TOKEN (read), GH_TOKEN (push mode), AI_GATEWAY_API_KEY, REPO, EVENT_PATH,
  *      MODE=shadow|push, PUSH_CLASSES=comma list, OUT_DIR, REPLAY=1 (historical run, judge-only).
  */
 import { createHash } from 'node:crypto';
@@ -54,12 +54,12 @@ const t0 = Date.now();
 
 // Shared budget, breaker and retries: the client layer is the contract (.claude/rules/external-apis.md).
 const reader = createGitHubClient({
-  token: process.env.GH_TOKEN ?? '',
+  token: process.env.GH_READ_TOKEN ?? '',
   credential: 'cheap-fixer-read',
 });
-const writer = process.env.GH_PUSH_TOKEN
+const writer = process.env.GH_TOKEN
   ? createGitHubClient({
-      token: process.env.GH_PUSH_TOKEN,
+      token: process.env.GH_TOKEN,
       credential: 'cheap-fixer-write',
     })
   : null;
@@ -201,7 +201,7 @@ async function main() {
   // Only push mode fences the head: shadow must never stop the lanes from working.
   let claimId = null;
   if (MODE === 'push') {
-    if (!writer) finish('error', { error: 'push mode without GH_PUSH_TOKEN' });
+    if (!writer) finish('error', { error: 'push mode without GH_TOKEN' });
     const posted = (
       await writer.rest(
         'POST',
