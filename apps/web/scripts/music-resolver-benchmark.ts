@@ -51,6 +51,27 @@ export function spotifyAlbumId(url: string | undefined): string | null {
   );
 }
 
+/**
+ * A returned Spotify id that differs from the corpus id is only a wrong
+ * release if its own record carries a different UPC. Spotify keeps unplayable
+ * twins (same UPC, same release, no markets) that search never returns, and
+ * catalog imports can hold the twin. Read the returned album back to tell
+ * the two apart; null means it could not be read, which stays wrong.
+ */
+async function returnedAlbumUpc(url: string): Promise<string | null> {
+  const id = spotifyAlbumId(url);
+  if (!id) return null;
+  try {
+    const { spotifyClient } = await import('../lib/spotify/client');
+    const payload = await spotifyClient.requestJson<{
+      external_ids?: { upc?: string };
+    }>(`/albums/${id}`);
+    return payload.external_ids?.upc ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function run(query: InHouseQuery) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
@@ -80,9 +101,14 @@ export async function evaluate(row: CorpusRow) {
       };
       if (result.status !== 'resolved') cases[name] = 'abstained';
       else if (!spotify) cases[name] = 'no_spotify_link';
-      else
-        cases[name] =
-          spotifyAlbumId(spotify.url) === truth ? 'correct' : 'wrong';
+      else if (spotifyAlbumId(spotify.url) === truth) cases[name] = 'correct';
+      else {
+        cases[name] = 'wrong';
+        const upc = await returnedAlbumUpc(spotify.url);
+        (detail[name] as Record<string, unknown>).returnedAlbumUpc = upc;
+        (detail[name] as Record<string, unknown>).sameUpcAsTruth =
+          upc !== null && upc.replace(/^0+/, '') === row.upc.replace(/^0+/, '');
+      }
       return result;
     } catch (error) {
       cases[name] = 'error';
@@ -143,7 +169,16 @@ export function summarizeBenchmark(
     const correct = count('correct');
     const wrong = count('wrong');
     const answered = correct + wrong;
+    // Wrong by Spotify id, split into a different release and a same-UPC twin.
+    const sameUpcTwin = results.filter(
+      r =>
+        r.cases[name] === 'wrong' &&
+        (r.detail[name] as { sameUpcAsTruth?: boolean } | undefined)
+          ?.sameUpcAsTruth === true
+    ).length;
     metrics[name] = {
+      wrongDifferentRelease: wrong - sameUpcTwin,
+      wrongSameUpcTwin: sameUpcTwin,
       n: outcomes.length,
       correct,
       wrong,
