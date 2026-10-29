@@ -75,4 +75,26 @@ export const HOMEPAGE_COPY = {
   },
 } as const;
 
-export type HomepageCopy = typeof HOMEPAGE_COPY;
+/**
+ * Copy slots widen to `string` so a published page spec
+ * (`lib/content-records/marketing-page.ts`) can fill them. The offer plan id
+ * keeps its literal type: plans and prices come from offer truth only.
+ */
+type CopyText<T> = T extends string
+  ? string
+  : T extends readonly (infer U)[]
+    ? readonly CopyText<U>[]
+    : T extends object
+      ? { readonly [K in keyof T]: CopyText<T[K]> }
+      : T;
+
+type HomepageCopySource = typeof HOMEPAGE_COPY;
+
+export interface HomepageCopy {
+  readonly seo: CopyText<HomepageCopySource['seo']>;
+  readonly hero: CopyText<HomepageCopySource['hero']>;
+  readonly offer: Omit<CopyText<HomepageCopySource['offer']>, 'plan'> & {
+    readonly plan: HomepageCopySource['offer']['plan'];
+  };
+  readonly close: CopyText<HomepageCopySource['close']>;
+}

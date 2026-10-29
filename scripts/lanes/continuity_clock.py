@@ -80,6 +80,9 @@ CLOCKS = (
     # fails its ratchet step when an advisory ages past its SLA. Clock is its only backstop.
     Clock("securityAdvisory", "security-advisory-loop.yml", "clock_security_advisory_loop", 4 * 3600,
           "security-advisory-clock.json", frozenset({"push"}), github_cron=False),
+    # Hourly stateless probe of Summer's fast chat path through production (P0 2026-10-25).
+    Clock("summerCanary", "ovie-summer-canary.yml", "clock_summer_canary", 3600,
+          "summer-canary-clock.json", github_cron=False),
 )
 CONTINUITY = CLOCKS[0]
 

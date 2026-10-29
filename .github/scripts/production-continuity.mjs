@@ -141,19 +141,53 @@ export function aggregateContinuity(observations, { now = new Date() } = {}) {
     unknownReasons: unknown.map(item => item.reason ?? 'unknown'),
     incidentClasses: [...new Set(unhealthy.map(item => item.incidentClass))],
     requiresFounderNotification: unhealthy.length > 0,
-    // A stale production is a release-pipeline failure, not a provider
-    // outage: it pages the founder but never admits a provider-recovery task.
-    requiresAgentIngress: unhealthy.some(
+    // Every unhealthy verdict is admitted to Summer's No Unattended Red queue.
+    // A stale production is a release-pipeline failure, not a provider outage,
+    // so it routes as production-controller-failed (gem investigates) instead
+    // of provider-unavailable. It used to be skipped, so only the founder knew.
+    requiresAgentIngress: unhealthy.length > 0,
+    agentIngressFailure: unhealthy.some(
       item => item.incidentClass !== FRESHNESS_INCIDENT_CLASS
-    ),
+    )
+      ? 'provider-unavailable'
+      : 'production-controller-failed',
   };
 }
 
 export const FRESHNESS_TARGET_ID = 'jovie-production-freshness';
 export const FRESHNESS_INCIDENT_CLASS = 'production-stale';
-// Twice the controller's own starvation bound (release-lineage-gate.sh), so
-// this only fires once the in-band guard has already failed to ship.
-export const DEFAULT_STALE_AFTER_SECONDS = 7200;
+// Fallback only: 246 minutes, the measured p95 of normal merge-to-production lag over the 7 days to 2026-10-25.
+// The live bound is recomputed weekly from the trailing 7 days by the lanes doctor (its deploy_health module)
+// and read from the public lanes feed (`deployHealth.limits`); see resolveStaleAfterSeconds.
+export const DEFAULT_STALE_AFTER_SECONDS = 14760;
+const MIN_STALE_AFTER_SECONDS = 3600;
+const MAX_STALE_AFTER_SECONDS = 86_400;
+
+/** The freshness bound for `repository`: the feed's measured limit when readable and sane, else the fallback. */
+export async function resolveStaleAfterSeconds({
+  fetchImpl = fetch,
+  limitsUrl = '',
+  repository = '',
+  fallback = DEFAULT_STALE_AFTER_SECONDS,
+  timeoutMs = 5000,
+} = {}) {
+  if (!limitsUrl || !repository) return fallback;
+  try {
+    const response = await fetchImpl(limitsUrl, {
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!response.ok) return fallback;
+    const age = (await response.json())?.deployHealth?.limits?.[repository]
+      ?.ageS;
+    return Number.isFinite(age) &&
+      age >= MIN_STALE_AFTER_SECONDS &&
+      age <= MAX_STALE_AFTER_SECONDS
+      ? Math.floor(age)
+      : fallback;
+  } catch {
+    return fallback;
+  }
+}
 const SHA_PATTERN = /^[0-9a-f]{40}$/;
 // Strict: only a real string can be a SHA (RegExp.test would stringify arrays).
 const isSha = value => typeof value === 'string' && SHA_PATTERN.test(value);
@@ -282,6 +316,12 @@ export async function observeProductionFreshness({
     unshippedCommits,
     oldestUnshippedAt,
     unshippedAgeSeconds,
+    // Production serves an ancestor of main and is within its freshness bound:
+    // the release FIFO is catching up, not stalled.
+    catchingUp: !stale,
+    summary: stale
+      ? `behind by ${unshippedCommits}, stale`
+      : `behind by ${unshippedCommits}, catching up`,
   };
 }
 
@@ -578,7 +618,15 @@ export async function runCli({
   const result = await observeProductionContinuity({
     fetchImpl,
     freshness: repository
-      ? { repository, token: env.GH_TOKEN?.trim() ?? '' }
+      ? {
+          repository,
+          token: env.GH_TOKEN?.trim() ?? '',
+          staleAfterSeconds: await resolveStaleAfterSeconds({
+            fetchImpl,
+            limitsUrl: env.PRODUCTION_LIMITS_FEED_URL?.trim() ?? '',
+            repository,
+          }),
+        }
       : null,
     now,
     targets: parseTargets(args.targets),
@@ -597,6 +645,7 @@ export async function runCli({
         `unknown_reasons=${result.unknownReasons.join(',')}`,
         `incident_key=${incidentKey}`,
         `requires_agent_ingress=${result.requiresAgentIngress}`,
+        `agent_ingress_failure=${result.agentIngressFailure}`,
       ].join('\n') + '\n',
       'utf8'
     );

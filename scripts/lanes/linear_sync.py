@@ -18,8 +18,12 @@ from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
+from atomic_state import atomic_write_text
+
 TEAMS = ("JOV", "LYB")
-SYNC_PAGES = 4    # incremental pages per team per tick
+SYNC_PAGES = 20   # incremental pages per team per tick (1000 rows); the wall budget below ends it sooner
+SYNC_BUDGET_S = 25  # wall budget for one team's incremental pass
+MIRROR_SYNC_LOG = "mirror-sync.jsonl"  # one row per completed pass: oldest change -> mirrored (stage_events linear-mirror)
 FILL_PAGES = 10   # first-fill pages per team per tick; the fill resumes next tick
 FILL_OVERLAP_S = 300  # the first incremental re-reads this window before the fill began
 STALE_ALERT_S = 6 * 3600
@@ -49,7 +53,8 @@ def require_owner(state: Path, issue_id: str, target: str, owner: str | None) ->
         raise StartedWithoutOwner(f"{target} for {issue_id} without a live owner")
 ROW = ("id identifier title description priority createdAt updatedAt state{name type} parent{id} "
        "labels(first:25){pageInfo{hasNextPage} nodes{name}}")
-SYNC_QUERY = ('query($team:String!,$since:DateTimeOrDuration!,$after:String){issues(first:50,after:$after,'
+# Newest change first: an Urgent or just-updated issue reaches the mirror in the first page, not the last.
+SYNC_QUERY = ('query($team:String!,$since:DateTimeOrDuration!,$after:String){issues(first:50,after:$after,orderBy:updatedAt,'
               'filter:{team:{key:{eq:$team}},updatedAt:{gte:$since}}){pageInfo{hasNextPage endCursor} nodes{'
               + ROW + '}}}')
 FILL_QUERY = ('query($team:String!,$after:String){issues(first:50,after:$after,filter:{team:{key:{eq:$team}},'
@@ -186,6 +191,19 @@ def _iso(epoch: float) -> str:
     return datetime.fromtimestamp(epoch, timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
 
+def _log_pass(state: Path, team: str, oldest_change, synced_at: float) -> None:
+    """Freshness stage row: when the oldest change in this pass happened, and when the mirror had it."""
+    try:
+        path = Path(state) / MIRROR_SYNC_LOG
+        with open(path, "a") as handle:
+            handle.write(json.dumps({"team": team, "enteredAt": oldest_change, "exitedAt": _iso(synced_at)}) + "\n")
+        if path.stat().st_size > 1_000_000:
+            lines = path.read_text().splitlines()[-2000:]
+            atomic_write_text(path, "\n".join(lines) + "\n")
+    except OSError:
+        pass
+
+
 def sync(state: Path, team: str, linear, admit, transient=()) -> dict:
     """One bounded incremental pass. Progress (resume cursor) survives across ticks."""
     path = mirror_path(state, team)
@@ -196,7 +214,10 @@ def sync(state: Path, team: str, linear, admit, transient=()) -> dict:
         resume = {"fill": filling, "after": None, "high": None, "since": data.get("cursor"),
                   "startedAt": time.time()}
     pages, outcome = 0, "partial"
+    began = time.monotonic()
     while pages < (FILL_PAGES if filling else SYNC_PAGES):
+        if not filling and pages and time.monotonic() - began > SYNC_BUDGET_S:
+            break
         if not admit(1):
             outcome = "budget-held"
             break
@@ -222,6 +243,7 @@ def sync(state: Path, team: str, linear, admit, transient=()) -> dict:
                   if isinstance(node, dict) and isinstance(node.get("updatedAt"), str)]
         if stamps:
             resume["high"] = max([resume["high"] or "", *stamps])
+            resume["low"] = min([resume.get("low") or stamps[0], *stamps])
         done = info.get("hasNextPage") is False
         with _mutating(path, MIRROR) as current:
             if done:
@@ -232,6 +254,8 @@ def sync(state: Path, team: str, linear, admit, transient=()) -> dict:
                 current["syncedAt"] = time.time()
                 current.setdefault("filledAt", current["syncedAt"])
                 current.pop("resume", None)
+                if not filling:
+                    _log_pass(state, team, resume.get("low") or resume.get("since"), current["syncedAt"])
             else:
                 resume["after"] = info.get("endCursor")
                 current["resume"] = resume
@@ -309,6 +333,8 @@ def enqueue(state: Path, op: str, issue_id: str, *, target: str | None = None, b
         key = f"label:{issue_id}:{body}"
     elif op == "comment":
         key = "comment:" + hashlib.sha256(f"{issue_id}\0{body}".encode()).hexdigest()[:24]
+    elif op == "create":  # a child issue under issue_id; body is the JSON payload (title, description, priority, labels)
+        key = "create:" + hashlib.sha256(f"{issue_id}\0{json.loads(body)['title']}".encode()).hexdigest()[:24]
     else:
         raise ValueError(f"unknown outbox op {op}")
     with _mutating(_outbox_path(state), OUTBOX) as data:
@@ -384,6 +410,42 @@ def _deliver_comment(state: Path, linear, entry: dict) -> str:
     return "commented"
 
 
+CHILDREN_QUERY = ('query($id:String!){issue(id:$id){team{id key states{nodes{id name}}} '
+                  'children(first:100){nodes{id identifier title}}}}')
+CREATE_MUTATION = 'mutation($i:IssueCreateInput!){issueCreate(input:$i){success issue{id identifier title}}}'
+
+
+def _deliver_create(state: Path, linear, entry: dict) -> str:
+    """Create one child issue in Backlog. Idempotent: a child with the same title under the parent is the
+    readback, so a lost response or a retry never makes a duplicate."""
+    payload = json.loads(entry["body"])
+    parent = (linear.gql(CHILDREN_QUERY, {"id": entry["issueId"]}) or {}).get("issue")
+    if not isinstance(parent, dict):
+        return "remote-missing"
+    if any(node.get("title") == payload["title"] for node in (parent.get("children") or {}).get("nodes") or []):
+        return "already"
+    team = parent["team"]
+    backlog = next((n["id"] for n in team["states"]["nodes"] if n["name"] == "Backlog"), None)
+    if not backlog:
+        raise ValueError("team has no Backlog state")
+    label_ids = []
+    for name in payload.get("labels") or []:
+        nodes = ((linear.gql(LABEL_LOOKUP, {"n": name}) or {}).get("issueLabels") or {}).get("nodes") or []
+        found = next((n["id"] for n in nodes if (n.get("team") or {}).get("key") == team["key"]),
+                     next((n["id"] for n in nodes if not n.get("team")), None))
+        if not found:
+            raise ValueError(f"no label {name}")
+        label_ids.append(found)
+    _settle(state, entry["key"], sent=True)
+    result = (linear.gql(CREATE_MUTATION, {"i": {
+        "teamId": team["id"], "stateId": backlog, "parentId": entry["issueId"], "title": payload["title"],
+        "description": payload["description"], "priority": int(payload.get("priority") or 0),
+        "labelIds": label_ids}}) or {}).get("issueCreate") or {}
+    if result.get("success") is not True:
+        raise RuntimeError("create not confirmed")
+    return "created"
+
+
 def _deliver_rank(state: Path, linear, entry: dict) -> str:
     result = (linear.gql(RANK_MUTATION, {"id": entry["issueId"], "o": entry["value"]}) or {}).get("issueUpdate") or {}
     after = result.get("issue") if isinstance(result.get("issue"), dict) else {}
@@ -424,7 +486,8 @@ def flush(state: Path, linear, admit, transient=(), limit: int = FLUSH_LIMIT, bu
             outcome = "budget-held"
             break
         try:
-            result = {"move": _deliver_move, "rank": _deliver_rank, "label": _deliver_label}.get(entry["op"], _deliver_comment)(
+            result = {"move": _deliver_move, "rank": _deliver_rank, "label": _deliver_label,
+                  "create": _deliver_create}.get(entry["op"], _deliver_comment)(
                 state, linear, entry)
         except transient:
             outcome = "rate-limited"  # never an attempt: the entry waits for the reset

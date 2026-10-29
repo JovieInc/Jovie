@@ -23,6 +23,9 @@ run-name: "${{ github.event_name == 'pull_request_target' && format('fleet-rules
 # skipped.
 on:
   pull_request_target:
+    # Base filter, not a job `if`: stacked PRs (non-main base) never reach PR Ready
+    # (wrong-base blocker), and ~235 all-skipped runs/day came from them.
+    branches: [main]
     types: [opened, edited, synchronize, labeled, unlabeled, reopened]
   # A verdict can land before Source Validation finishes (PR Ready then reads
   # "missing") or after it (PR Ready already red). Either way the failed jobs
@@ -34,10 +37,13 @@ on:
 permissions: {}
 
 concurrency:
-  # One group per PR across every pull_request_target type: the newest read
-  # cancels an older one, so a slower older run can never post a stale verdict
-  # last. workflow_run re-run hops get their own group.
-  group: ${{ github.event_name == 'workflow_run' && format('fleet-rules-rerun-{0}', github.event.workflow_run.id) || format('fleet-rules-evidence-{0}', github.event.pull_request.number) }}
+  # One group per PR *and head*: a newer event for the same head cancels an
+  # older one, but events for different heads never touch each other. With the
+  # PR number alone, the older head's run could start last and cancel the
+  # current head's run, leaving PR Ready with no evidence (#23270, 2026-10-25).
+  # PR Ready reads the run by head sha, so a superseded head's run is harmless.
+  # workflow_run re-run hops get their own group.
+  group: ${{ github.event_name == 'workflow_run' && format('fleet-rules-rerun-{0}', github.event.workflow_run.id) || format('fleet-rules-evidence-{0}-{1}', github.event.pull_request.number, github.event.pull_request.head.sha) }}
   cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
 
 jobs:
@@ -57,6 +63,7 @@ jobs:
         with:
           app-id: ${{ vars.CI_APP_ID }}
           private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-actions: read
           permission-contents: read
           permission-pull-requests: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -66,6 +73,7 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             .nvmrc
+            .github/dependency-review-config.yml
             scripts/pr-fleet-rules.mjs
             packages/api-client
             .github/scripts/fleet-rules-verdict.sh
@@ -73,6 +81,16 @@ jobs:
             .github/actions/prime-node-toolcache/action.yml
             .github/actions/prime-node-toolcache/prime.sh
           sparse-checkout-cone-mode: false
+      # Dependabot pull_request jobs cannot read Actions app credentials. Reuse
+      # this required trusted job and its exact-head PR Ready/rerun path for
+      # the identical blocking dependency review. Only main's config is read;
+      # the action compares PR dependencies through the API, never PR code.
+      - name: Review Dependabot dependencies
+        if: github.event.pull_request.user.login == 'dependabot[bot]'
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          repo-token: ${{ steps.fleet-token.outputs.token }}
+          config-file: ./.github/dependency-review-config.yml
       # No token input: setup-node keeps its default github.token, never the CI App token.
       - name: Prime Node toolcache (no GitHub API manifest call)
         if: ${{ hashFiles('.github/actions/prime-node-toolcache/action.yml') != '' }}
@@ -98,6 +116,13 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Mint CI App read token for the re-run lookups
+        id: fleet-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.CI_APP_ID }}
+          private-key: ${{ secrets.CI_APP_PRIVATE_KEY }}
+          permission-actions: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
@@ -118,7 +143,9 @@ jobs:
           node-version-file: .nvmrc
       - name: Re-run PR Ready when a passing verdict exists for this exact head
         env:
+          # Reads run on the CI App installation token, the POSTs (actions:write) on github.token.
           GH_TOKEN: ${{ github.token }}
+          GH_READ_TOKEN: ${{ steps.fleet-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_ID: ${{ github.event.workflow_run.id }}
@@ -130,6 +157,11 @@ jobs:
           # job budget (75s of the 2 minute timeout; the gate-weakening detector
           # forbids raising it) holds with no API calls and retries once. A longer
           # wait or a second deferral still fails, never a pass.
+          # Reads never fall back to github.token: no App token means the hop cannot look up.
+          ghr() {
+            if [ -z "${GH_READ_TOKEN:-}" ]; then echo "::error::No CI App read token for the re-run lookups." >&2; return 75; fi
+            GH_TOKEN="$GH_READ_TOKEN" ghx "$@"
+          }
           ghx() {
             local err rc until_ts wait_s
             err="$(mktemp)"
@@ -144,14 +176,19 @@ jobs:
               sleep "$wait_s"
             done
           }
-          latest="$(ghx api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&status=completed&per_page=10" \
-            --jq '[.workflow_runs[]] | sort_by(.created_at) | last | "\(.id // "")\t\(.conclusion // "missing")\t\(.run_attempt // 0)"')"
+          latest="$(ghr api "repos/$REPOSITORY/actions/workflows/fleet-rules-evidence.yml/runs?head_sha=$HEAD_SHA&event=pull_request_target&status=completed&per_page=10" \
+            --jq '[.workflow_runs[]] | sort_by([.created_at, .id]) | last | "\(.id // "")\t\(.conclusion // "missing")\t\(.run_attempt // 0)"')"
           IFS=$'\t' read -r ev_id concl attempt <<<"$latest"
           if [ "$concl" = success ]; then
             bash .github/scripts/fleet-rules-rerun.sh "$RUN_ID"
           elif [ "$concl" = failure ] && [[ "$ev_id" =~ ^[1-9][0-9]*$ ]] && [ "$attempt" -lt 3 ]; then
             ghx api -X POST "repos/$REPOSITORY/actions/runs/$ev_id/rerun-failed-jobs" >/dev/null \
               && echo "Re-ran fleet evidence run $ev_id (attempt $attempt)."
+          elif [ "$concl" = cancelled ] && [[ "$ev_id" =~ ^[1-9][0-9]*$ ]] && [ "$attempt" -lt 3 ]; then
+            # A cancelled evidence run for this head left PR Ready with no verdict
+            # (#23270). Cancelled jobs are not "failed", so re-run the whole run.
+            ghx api -X POST "repos/$REPOSITORY/actions/runs/$ev_id/rerun" >/dev/null \
+              && echo "Re-ran cancelled fleet evidence run $ev_id (attempt $attempt)."
           else
             echo "Fleet evidence for $HEAD_SHA is $concl (attempt ${attempt:-0}); nothing to re-run."
           fi

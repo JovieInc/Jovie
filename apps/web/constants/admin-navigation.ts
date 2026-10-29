@@ -52,6 +52,7 @@ export type AdminWorkspaceId =
   | 'feature_registry'
   | 'screenshots'
   | 'costs'
+  | 'capacity'
   | 'revenue_lift'
   | 'share_studio'
   | 'system_map'
@@ -69,7 +70,7 @@ export interface AdminNavRegistryItem {
 
 /**
  * Five daily destinations (Tim's jobs: what matters, what is blocked on me,
- * what is shipping, is the fleet healthy, what does capacity cost). Business
+ * what is shipping, is the fleet healthy, what does capacity cost). Company
  * and Tools hold everything else. See fleet/ovie-ia.md.
  */
 export const ADMIN_PRIMARY_WORKSPACE_IDS = [
@@ -99,6 +100,7 @@ export const ADMIN_SETTINGS_TOOL_IDS = [
   'presence',
   'activity',
   'share_studio',
+  'capacity',
 ] as const satisfies readonly AdminWorkspaceId[];
 
 const ADMIN_NAV_ITEMS: readonly Omit<AdminNavRegistryItem, 'section'>[] = [
@@ -209,6 +211,13 @@ const ADMIN_NAV_ITEMS: readonly Omit<AdminNavRegistryItem, 'section'>[] = [
     description: 'Provider capacity and vendor spend (30-day view)',
   },
   {
+    id: 'capacity',
+    label: 'Agent Plans',
+    href: APP_ROUTES.ADMIN_CAPACITY,
+    description:
+      'Agent plans, cost, remaining quota and credits, and pace per provider',
+  },
+  {
     id: 'revenue_lift',
     label: 'Revenue Lift',
     href: APP_ROUTES.ADMIN_REVENUE_LIFT,
@@ -245,7 +254,7 @@ function orderedIds(): readonly AdminWorkspaceId[] {
   ];
 }
 
-/** Registry order is the sidebar order: primary, Business, Tools. */
+/** Registry order is the sidebar order: primary, Company, Tools. */
 export const ADMIN_NAV_REGISTRY: readonly AdminNavRegistryItem[] = orderedIds()
   .map(id => {
     const item = ADMIN_NAV_ITEMS.find(entry => entry.id === id);

@@ -13,6 +13,7 @@ export const revalidate = false;
 
 export const metadata: Metadata = {
   title: documentTitle('Jovie AI Operating System'),
+  description: 'How a Jovie profile decides what to lead with.',
   robots: NOINDEX_ROBOTS,
   twitter: {
     site: COMPANY_IDENTITY.xHandle,
@@ -48,10 +49,9 @@ export default function AiPage() {
               The AI operating system behind every Jovie profile
             </h1>
             <p className='max-w-2xl text-lg leading-8 text-secondary-token'>
-              Jovie turns a creator profile into an always-on decision loop:
-              identify the visitor, read context, choose the next best action,
-              and learn from the result. This public page covers the operating
-              model without exposing the private investor portal.
+              Jovie turns a creator profile into a page that leads with the
+              latest release or show. This public page covers the operating
+              model without exposing private material.
             </p>
             <div className='flex flex-wrap gap-3'>
               <Button asChild variant='primary'>
@@ -104,8 +104,8 @@ export default function AiPage() {
           </article>
         </section>
 
-        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8 lg:grid-cols-[1.2fr_0.8fr]'>
-          <div className='space-y-4'>
+        <section className='grid gap-8 rounded-4xl border border-subtle bg-panel px-6 py-8'>
+          <article className='space-y-4'>
             {/* ui-casing-allow: marketing display headline */}
             <h2 className='text-2xl font-semibold tracking-tight line-clamp-2'>
               What ships in the launch version
@@ -122,30 +122,11 @@ export default function AiPage() {
                 Instrumentation that ties profile visits to measurable lift.
               </li>
             </ul>
-          </div>
-          <div className='space-y-4'>
-            {/* ui-casing-allow: marketing display headline */}
-            <h2 className='text-2xl font-semibold tracking-tight line-clamp-2'>
-              Read the public context
-            </h2>
-            <p className='text-sm leading-7 text-secondary-token'>
-              The deeper memo and fundraising material stay private. The public
-              surfaces below explain the problem, the product shape, and the
-              creator-facing offer.
-            </p>
-            <div className='flex flex-wrap gap-3'>
-              <Button asChild variant='secondary'>
-                <Link href={APP_ROUTES.BLOG_THE_MYSPACE_PROBLEM}>
-                  Read The Memo
-                </Link>
-              </Button>
-            </div>
-          </div>
+          </article>
         </section>
       </MarketingContainer>
 
       <MarketingFooterCta
-        title='See the AI operating system on your Jovie profile.'
         ctaLabel='See Pricing'
         ctaHref={APP_ROUTES.PRICING}
         ctaAnalyticsEvent='ai_footer_cta_pricing'

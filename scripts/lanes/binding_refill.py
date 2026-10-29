@@ -28,17 +28,20 @@ import time
 from pathlib import Path
 
 import backlog_rank
+import pathlib as _pl, sys as _sys  # noqa: E402
+_sys.path[:0] = [p for p in [str(_pl.Path(__file__).resolve().parent)] if p not in _sys.path]  # sibling module of the release
+from atomic_state import atomic_write_text  # noqa: E402
+import macos_pool
 
 READY_LABEL = "agent-ready"
 # Labels that mean a human decision, a human-owned task or a container: never auto-promoted.
 HOLD_LABELS = frozenset({"needs-tim", "tim-action-required", "human-review-required", "type:epic",
-                         "hold", "do-not-merge", "reasoning-job", "codex-blocked", "tim-hold", "gated",
-                         "needs-human-decision", "no-auto", "ws:human-decision"})
+                         "hold", "reasoning-job", "codex-blocked", "gated"})
 FACTORY_FLOOR = 0.20     # factory share of issue runs below this puts factory work first
 ALARM_AFTER_S = 900      # ready Backlog work with Todo below target for this long is an alarm
 GROOM_KEEP = 25
 MIN_DESCRIPTION = 200
-ACCEPTANCE = re.compile(r"(?i)acceptance|accept\b|\bverif(?:y|ication)\b|required outcome|definition of done|\bdone bar\b")
+ACCEPTANCE = re.compile(r"(?i)acceptance|accept\b|\bverif(?:y|ication)\b|required outcome|definition of done|\bdone bar\b|(?:^|\n)#+[ \t]*done\b")
 # "Blocked by LYB-12", "Sequencing: after LYB-138", "depends on LYB-9": an open referenced issue blocks.
 BLOCKER = re.compile(r"(?i)(?:blocked by|depends on|waits? (?:on|for)|sequencing[:*\s]*(?:\w+\s+)?after|gate:?\s*blocked by)"
                      r"[^\n]{0,80}?\b([A-Z]{2,5}-\d+)\b")
@@ -181,8 +184,15 @@ def refill(lane, host, binding, linear, floor: int = 0, now: float | None = None
         _write(path, receipt)
         return receipt
     live = [row for row in rows if pending.get(row["id"]) != "Todo"]
+    # LYB iOS work waits while LYB's running + queued hosted-macOS jobs are at the cap (macos_pool.HOLD_AT):
+    # the shared pool is Jovie's merge-group Mac lane too. Fails open without a fresh sample.
+    admission = macos_pool.admission(state, now) if binding.key == "LYB" else {"hold": False}
+    live, macos_held = macos_pool.partition_ios(live, admission["hold"])
     picked, skipped = select(live, goal - depth, binding.excluded, lambda row: lane.issue_hits_red_line(_issue(lane, row)),
                              now, _factory_share(state))
+    skipped.update(macos_held)
+    if binding.key == "LYB":
+        receipt["macosAdmission"] = admission
     outbox = lane.linear_sync.Outboxed(state, linear)
     for row in picked:
         outbox.move(row["id"], "Todo")
@@ -323,7 +333,7 @@ def _factory_share(state: Path, now: float | None = None) -> float | None:
         except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
             share = None
     try:
-        cache.write_text(json.dumps({"at": now, "share": share}))
+        atomic_write_text(cache, json.dumps({"at": now, "share": share}))
     except OSError:
         pass
     return share

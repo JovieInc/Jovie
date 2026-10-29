@@ -1,133 +1,116 @@
-import Image from 'next/image';
 import Link from 'next/link';
-import {
-  FaqSection,
-  MarketingContainer,
-  MarketingHero,
-  MarketingHeroPhoto,
-} from '@/components/marketing';
-import { AboutPageRefresh } from '@/components/organisms/AboutPageRefresh';
+import { MarketingContainer, MarketingHero } from '@/components/marketing';
 import { MarketingFooterCta } from '@/components/site/MarketingFooterCta';
 import { ABOUT_COPY, ABOUT_FAQ_ITEMS } from '@/data/aboutCopy';
-import { FEATURE_FLAGS } from '@/lib/flags/marketing-static';
 
 export { ABOUT_FAQ_ITEMS };
 
-const ABOUT_HERO_PHOTO = {
-  src: '/images/marketing-hero/about.webp',
-  width: 1600,
-  height: 600,
-} as const;
+const ROW_CLASS =
+  'grid gap-4 border-t border-subtle py-16 md:grid-cols-12 md:gap-12';
+const LABEL_CLASS = 'text-sm font-medium text-tertiary-token md:col-span-4';
+const BODY_CLASS = 'max-w-prose md:col-span-8';
 
 export function AboutPageContent() {
-  if (FEATURE_FLAGS.SHOW_PUBLIC_ABOUT_FOOTER_REFRESH) {
-    return <AboutPageRefresh />;
-  }
-
   return (
     <>
-      <div className='marketing-hero-dock marketing-hero-dock--inset relative overflow-hidden'>
-        <MarketingHeroPhoto {...ABOUT_HERO_PHOTO} />
-        <div
-          aria-hidden='true'
-          className='marketing-hero-backdrop pointer-events-none absolute inset-0'
-        />
-        <MarketingHero
-          variant='left'
-          testId='marketing-section-hero'
-          sectionVariant='left-none'
-          sectionOwner='apps/web/components/organisms/AboutPageContent.tsx'
-        >
-          <p className='text-sm font-medium text-tertiary-token'>
-            {ABOUT_COPY.kicker}
-          </p>
-          <h1 className='mt-6 max-w-2xl text-3xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl lg:text-6xl'>
-            {ABOUT_COPY.headline}
-          </h1>
-          <p className='mt-6 max-w-2xl text-lg leading-relaxed text-secondary-token'>
-            {ABOUT_COPY.support}
-          </p>
-        </MarketingHero>
-      </div>
+      <MarketingHero
+        variant='left'
+        testId='marketing-section-hero'
+        sectionVariant='left-none'
+        sectionOwner='apps/web/components/organisms/AboutPageContent.tsx'
+      >
+        <p className='text-sm font-medium text-tertiary-token'>
+          {ABOUT_COPY.eyebrow}
+        </p>
+        <h1 className='mt-6 max-w-3xl text-4xl font-semibold tracking-tight text-balance text-primary-token sm:text-5xl'>
+          {ABOUT_COPY.headline}
+        </h1>
+      </MarketingHero>
 
-      <MarketingContainer width='page' className='pb-16'>
+      <MarketingContainer width='page' className='pb-24'>
         <section
-          className='flex flex-col items-start gap-10 lg:flex-row lg:gap-16'
           data-testid='marketing-section-content-prose'
           data-marketing-variant='article-body'
           data-marketing-owner='apps/web/components/organisms/AboutPageContent.tsx'
         >
-          <div className='min-w-0 max-w-prose flex-1'>
-            <h2 className='text-2xl font-semibold text-primary-token'>
-              {ABOUT_COPY.origin.heading}
-            </h2>
-            <div className='mt-6 space-y-5 text-base leading-relaxed text-secondary-token'>
-              {ABOUT_COPY.origin.paragraphs.map(paragraph => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
-          </div>
-          <figure className='w-full overflow-hidden rounded-3xl border border-subtle bg-surface-1/20 lg:w-72 lg:shrink-0'>
-            <Image
-              alt='Tim White, founder of Jovie'
-              className='aspect-square h-auto w-full object-cover'
-              height={640}
-              sizes='(min-width: 1024px) 18rem, 70vw'
-              src='/images/avatars/tim-white.jpg'
-              width={640}
-            />
-            <figcaption className='px-5 py-4 text-sm text-secondary-token'>
-              <Link
-                href={ABOUT_COPY.origin.href}
-                prefetch={false}
-                className='underline underline-offset-4'
+          {ABOUT_COPY.sections.map(section => (
+            <div key={section.id} className={ROW_CLASS}>
+              <h2 className={LABEL_CLASS}>{section.label}</h2>
+              <p
+                className={`${BODY_CLASS} ${
+                  section.id === 'what'
+                    ? 'text-xl leading-relaxed text-primary-token'
+                    : 'text-base leading-relaxed text-secondary-token'
+                }`}
               >
-                {ABOUT_COPY.origin.signoff}
+                {section.text}
+              </p>
+            </div>
+          ))}
+          <div className={ROW_CLASS}>
+            <h2 className={LABEL_CLASS}>{ABOUT_COPY.contact.label}</h2>
+            <p
+              className={`${BODY_CLASS} text-base leading-relaxed text-secondary-token`}
+            >
+              <a
+                href={`mailto:${ABOUT_COPY.contact.email}`}
+                className='text-primary-token underline underline-offset-4'
+              >
+                {ABOUT_COPY.contact.email}
+              </a>
+              <br />
+              <Link
+                href={ABOUT_COPY.contact.supportPath}
+                prefetch={false}
+                className='text-primary-token underline underline-offset-4'
+              >
+                {ABOUT_COPY.contact.supportLabel}
               </Link>
-            </figcaption>
-          </figure>
-        </section>
-      </MarketingContainer>
-
-      <MarketingContainer width='prose' className='pb-16'>
-        <section
-          data-testid='marketing-section-feature-grid'
-          data-marketing-variant='two-column-text'
-          data-marketing-owner='apps/web/components/organisms/AboutPageContent.tsx'
-        >
-          <h2 className='text-2xl font-semibold text-primary-token'>
-            {ABOUT_COPY.featuresHeading}
-          </h2>
-          <div className='mt-6 grid gap-8 sm:grid-cols-2'>
-            {ABOUT_COPY.features.map(feature => (
-              <div key={feature.title}>
-                <h3 className='font-medium text-primary-token'>
+            </p>
+          </div>
+          <div className={ROW_CLASS}>
+            <h2 className={LABEL_CLASS}>{ABOUT_COPY.related.label}</h2>
+            <ul
+              className={`${BODY_CLASS} flex flex-wrap gap-x-8 gap-y-2 text-base text-secondary-token`}
+            >
+              {ABOUT_COPY.related.links.map(link => (
+                <li key={link.href}>
                   <Link
-                    href={feature.href}
+                    href={link.href}
                     prefetch={false}
-                    className='underline underline-offset-4'
+                    className='text-primary-token underline underline-offset-4'
                   >
-                    {feature.title}
+                    {link.label}
                   </Link>
-                </h3>
-                <p className='mt-2 text-sm leading-relaxed text-secondary-token'>
-                  {feature.description}
-                </p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+        <section
+          data-testid='marketing-section-faq'
+          data-marketing-variant='objection-handler'
+          data-marketing-owner='apps/web/components/organisms/AboutPageContent.tsx'
+          className={ROW_CLASS}
+        >
+          <h2 className={LABEL_CLASS}>{ABOUT_COPY.questionsLabel}</h2>
+          <dl className={`${BODY_CLASS} space-y-10`}>
+            {ABOUT_FAQ_ITEMS.map(item => (
+              <div key={item.question}>
+                <dt className='text-base font-medium text-primary-token'>
+                  {item.question}
+                </dt>
+                <dd className='mt-2 text-base leading-relaxed text-secondary-token'>
+                  {item.answer}
+                </dd>
               </div>
             ))}
-          </div>
+          </dl>
         </section>
       </MarketingContainer>
-
-      <FaqSection
-        items={ABOUT_FAQ_ITEMS}
-        sectionVariant='objection-handler'
-        headingClassName='text-2xl font-semibold tracking-tight text-primary-token'
-      />
 
       <MarketingFooterCta
         sectionVariant='final-single-claim'
-        title='Ready to build your Jovie profile?'
         ctaAnalyticsEvent='about_footer_cta_start'
         ctaAnalyticsSource='about_page_footer'
         prefetch={false}
