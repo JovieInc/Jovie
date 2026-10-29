@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
+import { wcag22AaAxeOptions } from '@/lib/a11y-gates/wcag-standard.cjs';
 
 const stories = {
   'large-glass': '.psf[data-status="loaded"]',
@@ -28,7 +29,7 @@ for (const [story, selector] of Object.entries(stories)) {
       ).toBe(width);
       const scan = await new AxeBuilder({ page })
         .include('[data-testid="marketing-section-feature-split"]')
-        .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+        .options(wcag22AaAxeOptions())
         .analyze();
       expect(scan.violations).toEqual([]);
       if (story === 'large-glass') {
