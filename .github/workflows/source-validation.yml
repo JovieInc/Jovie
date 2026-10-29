@@ -557,11 +557,10 @@ jobs:
   security:
     name: Security Evidence
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       actions: read
       contents: read
-      statuses: read
     steps:
       - *quota-client
       - *quota-prime
@@ -595,47 +594,25 @@ jobs:
       # A contents:read Jovie Bot installation token returns 200. Severity
       # and the GPL/AGPL denylist stay blocking. The minted token is
       # contents:read only; an empty key fails the mint closed.
-      # Dependabot runs cannot read JOVIE_BOT_PRIVATE_KEY (the Dependabot secret
-      # store is separate and the key is deliberately not copied into it), so
-      # the mint below would fail closed forever. The identical dependency
-      # review for those PRs runs in Fork PR Gate Dependabot Controller, which
-      # holds the app credential and never checks out PR code. It reports the
-      # verdict as the `Dependabot Dependency Review` commit status, and the
-      # last step here waits for it. Every other author keeps the in-job review.
+      # Dependabot main PRs use the identical pinned review in the trusted
+      # Fleet Rules Evidence job, where the CI App credential is available.
+      # PR Ready already requires that exact-head job and its event-driven
+      # rerun path; no status publication, polling or secret copy is needed.
+      # Non-main bases retain this check because they have no fleet evidence.
       - name: Mint dependency review read token
         id: dependency-review-token
-        if: steps.reuse.outputs.reuse != 'true' && github.event.pull_request.user.login != 'dependabot[bot]'
+        if: steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           app-id: ${{ vars.JOVIE_BOT_APP_ID }}
           private-key: ${{ secrets.JOVIE_BOT_PRIVATE_KEY }}
           permission-contents: read
       - name: Review added and upgraded dependencies
-        if: steps.reuse.outputs.reuse != 'true' && github.event.pull_request.user.login != 'dependabot[bot]'
+        if: steps.reuse.outputs.reuse != 'true' && (github.event.pull_request.user.login != 'dependabot[bot]' || github.event.pull_request.base.ref != 'main')
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           repo-token: ${{ steps.dependency-review-token.outputs.token }}
           config-file: ./.github/dependency-review-config.yml
-      - name: Require the Dependabot dependency review verdict
-        if: steps.reuse.outputs.reuse != 'true' && github.event.pull_request.user.login == 'dependabot[bot]'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          REPO: ${{ github.repository }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 60); do
-            state="$(gh api "repos/$REPO/commits/$HEAD_SHA/statuses?per_page=100" \
-              --jq '[.[] | select(.context == "Dependabot Dependency Review" and .creator.login == "jovie-bot[bot]")] | first | .state // "missing"')"
-            case "$state" in
-              success) echo "Dependabot Dependency Review passed on $HEAD_SHA."; exit 0 ;;
-              failure|error) echo "::error::Dependabot Dependency Review $state on $HEAD_SHA."; exit 1 ;;
-            esac
-            echo "Waiting for Dependabot Dependency Review ($state), attempt $attempt/60."
-            sleep 15
-          done
-          echo "::error::No Dependabot Dependency Review verdict for $HEAD_SHA within 15 minutes."
-          exit 1
   migration:
     name: Migration Guard
     runs-on: ubuntu-latest
